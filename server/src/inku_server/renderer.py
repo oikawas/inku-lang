@@ -90,4 +90,33 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction):
         cx, cy = _px(ins.center)
         return dwg.circle(center=(cx, cy), r=ins.radius * CANVAS_PX, **attrs)
 
+    if ins.primitive == "ellipse":
+        if ins.center is None or ins.size is None:
+            raise ValueError("ellipse requires 'center' and 'size'")
+        cx, cy = _px(ins.center)
+        rx = ins.size[0] * CANVAS_PX / 2
+        ry = ins.size[1] * CANVAS_PX / 2
+        return dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs)
+
+    if ins.primitive == "square":
+        if ins.position is None or ins.size is None:
+            raise ValueError("square requires 'position' and 'size'")
+        x, y = _px(ins.position)
+        w = ins.size[0] * CANVAS_PX
+        h = ins.size[1] * CANVAS_PX
+        return dwg.rect(insert=(x, y), size=(w, h), **attrs)
+
+    if ins.primitive == "triangle":
+        if ins.position is None or ins.size is None:
+            raise ValueError("triangle requires 'position' and 'size'")
+        x, y = _px(ins.position)
+        w = ins.size[0] * CANVAS_PX
+        h = ins.size[1] * CANVAS_PX
+        points = [
+            (x + w / 2, y),
+            (x, y + h),
+            (x + w, y + h),
+        ]
+        return dwg.polygon(points=points, **attrs)
+
     raise NotImplementedError(f"primitive '{ins.primitive}' not yet supported")

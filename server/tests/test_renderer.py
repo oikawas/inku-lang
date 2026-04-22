@@ -60,6 +60,76 @@ def test_render_circle():
     assert "#a2342a" in svg
 
 
+def test_render_ellipse():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.4, 0.2],
+                    "color": "blue",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<ellipse" in svg
+    assert 'cx="500' in svg
+    assert 'cy="500' in svg
+    assert 'rx="200' in svg
+    assert 'ry="100' in svg
+    assert "#2c3e91" in svg
+
+
+def test_render_square():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.1, 0.1],
+                    "size": [0.3, 0.3],
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<rect" in svg
+    assert 'x="100' in svg
+    assert 'y="100' in svg
+    assert 'width="300' in svg
+    assert 'height="300' in svg
+
+
+def test_render_triangle():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "triangle",
+                    "position": [0.0, 0.0],
+                    "size": [1.0, 1.0],
+                    "color": "green",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<polygon" in svg
+    assert "500" in svg
+    assert "1000" in svg
+    assert "#2f6b3a" in svg
+
+
+def test_ellipse_missing_size_raises():
+    import pytest
+
+    score = Score(instructions=[Instruction(primitive="ellipse", center=(0.5, 0.5))])
+    with pytest.raises(ValueError):
+        render(score)
+
+
 def test_variation_schema_roundtrip():
     score = Score.model_validate(
         {

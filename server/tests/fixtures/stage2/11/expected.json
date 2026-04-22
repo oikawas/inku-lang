@@ -1,0 +1,15 @@
+{
+  "instructions": [
+    {
+      "primitive": "line",
+      "from": [0.0, 0.333],
+      "to": [1.0, 0.333],
+      "variation": {
+        "amplitude": "fine",
+        "frequency": "medium",
+        "quality": "perlin",
+        "dimensions": ["position_y"]
+      }
+    }
+  ]
+}

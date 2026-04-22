@@ -1,0 +1,19 @@
+{
+  "instructions": [
+    {
+      "primitive": "circle",
+      "center": [0.25, 0.5],
+      "radius": 0.05
+    },
+    {
+      "primitive": "circle",
+      "center": [0.5, 0.5],
+      "radius": 0.05
+    },
+    {
+      "primitive": "circle",
+      "center": [0.75, 0.5],
+      "radius": 0.05
+    }
+  ]
+}

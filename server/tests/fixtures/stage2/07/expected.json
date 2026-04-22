@@ -1,0 +1,10 @@
+{
+  "instructions": [
+    {
+      "primitive": "line",
+      "from": [0.0, 0.5],
+      "to": [1.0, 0.5],
+      "style": "dashed"
+    }
+  ]
+}

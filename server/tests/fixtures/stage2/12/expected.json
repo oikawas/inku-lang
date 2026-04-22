@@ -1,0 +1,9 @@
+{
+  "instructions": [
+    {
+      "primitive": "ellipse",
+      "center": [0.5, 0.5],
+      "size": [0.6, 0.3]
+    }
+  ]
+}

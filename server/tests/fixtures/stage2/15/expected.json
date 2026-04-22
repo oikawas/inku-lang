@@ -1,0 +1,15 @@
+{
+  "instructions": [
+    {
+      "primitive": "line",
+      "from": [0.5, 0.0],
+      "to": [0.5, 1.0],
+      "variation": {
+        "amplitude": "broad",
+        "frequency": "medium",
+        "quality": "wave",
+        "dimensions": ["position_x"]
+      }
+    }
+  ]
+}

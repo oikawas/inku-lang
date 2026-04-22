@@ -1,0 +1,10 @@
+{
+  "instructions": [
+    {
+      "primitive": "square",
+      "position": [0.35, 0.35],
+      "size": [0.3, 0.3],
+      "color": "green"
+    }
+  ]
+}

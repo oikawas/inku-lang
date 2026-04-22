@@ -15,8 +15,8 @@ def test_render_single_line_solid_pen_black():
     )
     svg = render(score)
     assert "<line" in svg
-    assert 'x1="0"' in svg and 'y1="330' in svg
-    assert 'x2="1000"' in svg and 'y2="330' in svg
+    assert 'x1="0.0"' in svg and 'y1="330' in svg
+    assert 'x2="1000.0"' in svg and 'y2="330' in svg
     assert "#111111" in svg
     assert "stroke-dasharray" not in svg
 

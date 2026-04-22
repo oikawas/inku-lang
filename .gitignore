@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# uv
+.uv_cache/
+
+# Node / SvelteKit
+node_modules/
+.svelte-kit/
+.vercel/
+web/build/
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# 環境変数
+.env
+.env.local
+.env.*.local
+
+# Claude Code
+CLAUDE.md
+no-git-sync/

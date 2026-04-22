@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v0.3**
+**Version: v0.4**
 
 ---
 
@@ -1026,35 +1026,112 @@ JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（
 
 ## 16. 未決定・今後の検討事項
 
+**UI / 体験**
 - 記述エリアの物理的なサイズ制限（短歌的な「型」として機能させるか）
 - 解釈フィードバック（7.6）の色パレットの確定（墨の濃淡 vs 墨+朱）
 - 解釈のズレの併記（7.6発展形）を MVP に入れるか後回しにするか
 - 差分の色分けルール（7.2／7.7：変更・追加・削除をどう区別するか）
-- Opus 4.7 APIの具体的な利用方針（二段階変換 vs 一段階変換）
+
+**実装詳細 (v0.4 時点で未決)**
+- `arc` primitive の角度フィールド仕様 (start_angle / end_angle / sweep_flag or SVG path)
+- Renderer での揺らぎ実装 (perlin / pink / wave の具体的な波形生成器、決定論的シード運用)
+- Fixture テストの厳密度 (LLM 出力の数値 ±tolerance、ソフトマッチの範囲)
+- Stage 1 (Opus 4.7 解釈) のプロンプト設計と Stage 2 への受渡しフォーマット
+- FastAPI エンドポイント設計 (`/api/compose` の単発 / ストリーミング)
+- Web UI フレームワーク確定済 (SvelteKit) だが着手タイミング未定
+
+**エコシステム**
 - エクステンション機構の実装方式（Nature plugin等をどう組み込むか）
+- Saijiki 辞書の配信形式 (静的 JSON vs API)
 
 ---
 
 ## 付録: 既存ファイル構成
 
 ```
-inku/
-├── README.md               # プロジェクト紹介（英語）
-├── README.ja.md            # プロジェクト紹介（日本語）
-├── LICENSE                 # MIT License
-├── SPEC.md                 # 本書（設計哲学・言語設計）
-├── CLAUDE.md               # Claude Code 用プロジェクトコンテキスト
-├── ddl/                    # Python PoC（Web版の開発ベース）
-│   ├── ddl/composer.py     # DDLテキスト → JSON
-│   ├── ddl/renderer.py     # JSON → SVG
-│   ├── schema/score.json   # JSON Schema v0.1.0
-│   └── prompts/system.md   # システムプロンプト v0.1.1
-└── android/                # Android アプリ（SPEC_v1.md 参照）
+inku-lang/                         # github.com/oikawas/inku-lang
+├── README.md                      # プロジェクト紹介（英語）
+├── README.ja.md                   # プロジェクト紹介（日本語）
+├── LICENSE                        # MIT License
+├── SPEC.md                        # 本書（設計哲学・言語設計）
+├── CLAUDE.md                      # Claude Code 用コンテキスト (gitignore)
+├── server/                        # Python バックエンド (uv管理)
+│   ├── pyproject.toml             # inku-server 0.1.0
+│   ├── uv.lock
+│   ├── .env.example               # ANTHROPIC_API_KEY 雛形
+│   ├── src/inku_server/
+│   │   ├── __init__.py
+│   │   ├── schema.py              # JSON Score Pydantic モデル
+│   │   ├── renderer.py            # Score → SVG (svgwrite)
+│   │   └── composer.py            # 正規化DDL → Score (Haiku 4.5)
+│   └── tests/
+│       ├── conftest.py            # dotenv 読込
+│       ├── test_renderer.py       # 10 cases
+│       ├── test_composer.py       # 15 fixture + tool schema
+│       └── fixtures/stage2/       # 正規化DDL ↔ Score ペア
+│           └── {01..15}/{input.txt,expected.json}
+└── web/                           # (予定: SvelteKit UI)
 ```
+
+**別リポジトリ / 別 PoC**:
+- `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
+- `android/` — Android 実装 (SPEC_v1.md 参照、E2E 動作確認済)
 
 ---
 
 ## 変更履歴
+
+### v0.4 (2026-04-23)
+
+**Phase 1 実装着手 — Server バックエンドの骨格形成**
+
+- **リポジトリ構成**
+  - `inku-lang` リポジトリを GitHub (`github.com/oikawas/inku-lang`) に作成
+  - 開発フロー: `pentala` (Ubuntu 22.04.5) 中心開発 + Mac git sync
+  - `server/` と `web/` の2スロット構成。`server/` 先行実装
+
+- **Python プロジェクト: inku-server 0.1.0**
+  - パッケージマネージャ: `uv` (0.11.7) + src-layout
+  - 依存: anthropic, fastapi, pydantic v2, svgwrite, uvicorn, python-dotenv
+  - dev: pytest, ruff
+  - Python 3.10+
+
+- **JSON Score schema (Pydantic v2 実装)**
+  - `extra="forbid"` で未知フィールド拒否、schema 厳密化
+  - `populate_by_name=True` + alias で予約語回避 (`from` → `from_`)
+  - Primitive: `line | circle | ellipse | triangle | square | arc`
+  - Weight 9種、Color 6種、LineStyle 4種、Variation 4フィールド (amplitude/frequency/quality/dimensions)
+  - `Score.model_json_schema()` を Anthropic tool input_schema にそのまま渡せる形
+
+- **Renderer MVP (svgwrite, 1000x1000 viewBox)**
+  - 実装済 primitive: line, circle, ellipse, triangle (等辺二等辺), square (矩形)
+  - 座標変換: `0.0-1.0` 比率 × `CANVAS_PX=1000` で px 化
+  - weight → `stroke-width` マッピング (hair 0.5 〜 rope 10.0)
+  - color → HEX パレット (黒=#111111, 青=#2c3e91, 赤=#a2342a, 緑=#2f6b3a, 灰=#888888, 白=#ffffff)
+  - style → `stroke-dasharray` (solid=なし, dashed=12,8, dotted=2,6, dash_dot=12,6,2,6)
+  - 背景色: `#f7f5ef` (墨が映える薄黄、和紙を想起)
+  - 未実装: arc (schema に角度フィールド未定義)、variation の実際の波形生成
+
+- **Stage 2 composer (正規化DDL → JSON Score)**
+  - モデル: `claude-haiku-4-5-20251001` via Anthropic tool_use
+  - `submit_score` ツールを定義し `tool_choice` で強制呼び出し
+  - system prompt に Saijiki 歳時記マッピング + 座標系 + 出力ルールを圧縮記述
+  - `Score.model_json_schema()` を tool input_schema に直接注入
+
+- **正規化DDL Fixture 15ケース**
+  - `server/tests/fixtures/stage2/{01..15}/` に input.txt + expected.json ペア
+  - 網羅: 全5 primitive、全4 style、weight 複数 (pencil/pen/brush_thick)、color 全6、variation 2種 (fine+perlin, broad+wave)、複数命令 (3円並列)
+
+- **テスト**
+  - `test_renderer.py`: 10 cases, pytest 全 pass
+  - `test_composer.py`: 15 fixture parametrize + tool schema validation
+  - Integration は `ANTHROPIC_API_KEY` 有時のみ実行 (`pytest.mark.skipif`)
+  - `conftest.py` で `.env` 自動読込 (python-dotenv)
+
+- **二段階変換アーキテクチャの確定**
+  - v0.3 で方針化、v0.4 で Stage 2 (Haiku 4.5) を先行実装 (逆順実装)
+  - Stage 1 (Opus 4.7 解釈) は未着手
+  - `/api/compose` FastAPI 実装は次 phase
 
 ### v0.3 (2026-04-21)
 

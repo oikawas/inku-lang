@@ -54,6 +54,34 @@ def test_compose_composer_failure_returns_502(monkeypatch):
     assert "haiku unavailable" in r.json()["detail"]
 
 
+def test_interpret_happy_path(monkeypatch):
+    monkeypatch.setattr(api_module, "interpret", lambda text: "中心に黒い円を置く。")
+    r = client.post("/api/interpret", json={"text": "一滴の墨"})
+    assert r.status_code == 200
+    assert r.json() == {"ddl": "中心に黒い円を置く。"}
+
+
+def test_interpret_empty_rejected():
+    r = client.post("/api/interpret", json={"text": ""})
+    assert r.status_code == 422
+
+
+def test_paint_pipeline(monkeypatch):
+    monkeypatch.setattr(api_module, "interpret", lambda text: "中心に黒い円を置く。")
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl: fake_score)
+
+    r = client.post("/api/paint", json={"text": "一滴の墨"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["text"] == "一滴の墨"
+    assert data["ddl"] == "中心に黒い円を置く。"
+    assert data["score"]["instructions"][0]["primitive"] == "circle"
+    assert "<svg" in data["svg"]
+
+
 def test_cors_allows_localhost(monkeypatch):
     fake_score = Score(instructions=[])
     monkeypatch.setattr(api_module, "compose", lambda ddl: fake_score)

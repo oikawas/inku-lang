@@ -1,6 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { SAIJIKI } from '$lib/saijiki';
 	import { annotate } from '$lib/highlight';
+
+	const STORAGE_KEY = 'inku-history-v1';
 
 	type Score = { instructions: unknown[] };
 
@@ -41,6 +45,42 @@
 	let history = $state<Iteration[]>([]);
 	let cursor = $state(-1);
 
+	function loadHistory(): Iteration[] {
+		if (!browser) return [];
+		try {
+			const raw = localStorage.getItem(STORAGE_KEY);
+			if (!raw) return [];
+			const parsed = JSON.parse(raw);
+			if (!Array.isArray(parsed)) return [];
+			return parsed.filter(
+				(it: unknown): it is Iteration =>
+					!!it &&
+					typeof it === 'object' &&
+					'svg' in (it as Record<string, unknown>) &&
+					'input' in (it as Record<string, unknown>)
+			);
+		} catch {
+			return [];
+		}
+	}
+
+	function persistHistory(items: Iteration[]) {
+		if (!browser) return;
+		try {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+		} catch {
+			// quota / disabled: silently skip
+		}
+	}
+
+	function clearHistory() {
+		history = [];
+		cursor = -1;
+		result = null;
+		ddl = null;
+		persistHistory([]);
+	}
+
 	const placeholders: Record<Mode, string> = {
 		free: '山の向こうに月が昇る',
 		ddl: '中心に赤い円を置く。半径は画面の2割。'
@@ -50,6 +90,7 @@
 		const next = [...history, it];
 		history = next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
 		cursor = history.length - 1;
+		persistHistory(history);
 	}
 
 	function loadIteration(idx: number) {
@@ -93,6 +134,14 @@
 			saijikiOpen = false;
 		}
 	}
+
+	onMount(() => {
+		const loaded = loadHistory();
+		if (loaded.length > 0) {
+			history = loaded;
+			loadIteration(loaded.length - 1);
+		}
+	});
 
 	function switchMode(next: Mode) {
 		if (mode === next) return;
@@ -292,7 +341,10 @@
 
 	{#if history.length > 1}
 		<section class="history" aria-label="演奏履歴">
-			<h2>履歴</h2>
+			<div class="history-head">
+				<h2>履歴 <span class="muted">({history.length})</span></h2>
+				<button class="clear-btn" onclick={clearHistory}>全て消す</button>
+			</div>
 			<div class="strip">
 				{#each history as it, i (it.at)}
 					<button
@@ -662,11 +714,41 @@
 		padding-top: 1.5rem;
 	}
 
+	.history-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.75rem;
+	}
+
 	.history h2 {
 		font-size: 1rem;
 		font-weight: 600;
 		color: #555;
-		margin: 0 0 0.75rem;
+		margin: 0;
+	}
+
+	.muted {
+		color: #aaa;
+		font-weight: normal;
+		font-size: 0.85rem;
+		margin-left: 0.25rem;
+	}
+
+	.clear-btn {
+		background: transparent;
+		border: 1px solid #ccc;
+		color: #888;
+		padding: 0.3rem 0.7rem;
+		border-radius: 3px;
+		cursor: pointer;
+		font-size: 0.8rem;
+		font-family: inherit;
+	}
+
+	.clear-btn:hover {
+		color: #a2342a;
+		border-color: #a2342a;
 	}
 
 	.strip {

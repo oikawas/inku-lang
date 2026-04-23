@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v0.4**
+**Version: v0.5**
 
 ---
 
@@ -1068,10 +1068,22 @@ inku-lang/                         # github.com/oikawas/inku-lang
 │       ├── conftest.py            # dotenv 読込
 │       ├── test_renderer.py       # 10 cases
 │       ├── test_composer.py       # 15 fixture + tool schema
+│       ├── test_api.py            # FastAPI TestClient 5 cases
 │       └── fixtures/stage2/       # 正規化DDL ↔ Score ペア
 │           └── {01..15}/{input.txt,expected.json}
-└── web/                           # (予定: SvelteKit UI)
+└── web/                           # SvelteKit 2 + Svelte 5 + TS (inku-web 0.1.0)
+    ├── package.json
+    ├── svelte.config.js
+    ├── vite.config.ts             # /api → 127.0.0.1:8000 proxy
+    ├── src/
+    │   ├── app.html
+    │   └── routes/
+    │       ├── +layout.svelte
+    │       └── +page.svelte       # 記述 / 演奏 / 楽譜 の3パネル UI
+    └── static/
 ```
+
+**開発環境 (ローカル運用手順は `LOCAL_WORK.md` を参照、未コミット)**
 
 **別リポジトリ / 別 PoC**:
 - `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
@@ -1080,6 +1092,36 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v0.5 (2026-04-23)
+
+**Phase 1 続き — FastAPI + Web クライアント 立ち上げ**
+
+- **FastAPI エンドポイント**
+  - `POST /api/compose`: `{ddl}` → `{score, svg}` (Stage 2 composer → Renderer を縦結合)
+  - `GET /health`: liveness (`{ok: true}`)
+  - CORS: `http://localhost:*` / `127.0.0.1:*` 許可 (regex ベース)
+  - エラーハンドリング: composer 失敗 502, render 失敗 500, 入力不正 422
+  - エントリポイント: `uv run inku-server` で `uvicorn` が `127.0.0.1:8000` reload 起動
+  - テスト: `TestClient` + `monkeypatch` で composer バイパス、API キー不要で 5 cases pass
+
+- **SvelteKit Web クライアント (`web/`)**
+  - SvelteKit 2.57 + Svelte 5.55 (runes モード) + Vite 8 + TypeScript
+  - 単一ルート `/`: 記述 textarea + 演奏 (SVG インライン表示) + 楽譜 (JSON Score collapsible)
+  - Vite dev proxy: `/api` → `http://127.0.0.1:8000` (CORS 回避)
+  - スタイル: Renderer パレットと整合 (背景 #f7f5ef, 墨 #111)、和文フォント優先
+  - 名前: `inku-web` v0.1.0
+  - svelte-check: 0 error, 0 warning
+
+- **ホスト構成**
+  - server + web ともに pentala (Ubuntu 22.04.5) で常時起動
+  - Mac はブラウザクライアント専用 (SSH tunnel `-L 5173 -L 8000`)
+  - Node.js 22.22.2 (NodeSource apt、システム PATH)、Python 3.10.12 + uv
+
+- **次段階への布石**
+  - `/api/compose` は Stage 2 のみ。Stage 1 (Opus 解釈) エンドポイントは未実装
+  - 解釈フィードバック (書後色付け)、Saijiki 参照窓、Prev/Next 並置は UI 未着手
+  - Renderer の揺らぎ (perlin/wave) 実装も未着手 (fixture 11/15 が variation 指定)
 
 ### v0.4 (2026-04-23)
 

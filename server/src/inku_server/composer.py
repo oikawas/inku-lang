@@ -1,24 +1,28 @@
-"""Stage 2: Normalized DDL → JSON Score via Claude Haiku 4.5.
+"""Stage 2: Normalized DDL → JSON Score.
 
-正規化DDL (コア語彙のみ) を受け取り、構造化された JSON Score を返す。
+backend 切替: 環境変数 `INKU_LLM_BACKEND`
+- `anthropic` (default): Claude Haiku 4.5 tool_use
+- `openai`: OpenAI 互換 API (OVMS の Qwen2.5 等) に JSON 直接出力させる
+
 揺らぎ (variation) の実現は Renderer 層 (SPEC §13.8) なので、ここでは
 決定的な楽譜を出すだけ。
 """
 
 from __future__ import annotations
 
+import json
+import os
+import re
 from typing import Any
-
-from anthropic import Anthropic
 
 from .schema import Score
 
-MODEL = "claude-haiku-4-5-20251001"
+ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 4096
 
 SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 正規化DDL (コア語彙のみの自然言語記述)
-出力: submit_score ツール経由で JSON Score
+出力: JSON Score
 
 # コア語彙 (Saijiki / 歳時記)
 
@@ -71,14 +75,19 @@ def _submit_tool() -> dict[str, Any]:
     }
 
 
-def compose(ddl: str, *, client: Anthropic | None = None) -> Score:
-    """正規化DDL → JSON Score。
+def compose(ddl: str) -> Score:
+    backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
+    if backend == "openai":
+        return _compose_openai(ddl)
+    return _compose_anthropic(ddl)
 
-    環境変数 ANTHROPIC_API_KEY が必要。
-    """
-    client = client or Anthropic()
+
+def _compose_anthropic(ddl: str) -> Score:
+    from anthropic import Anthropic
+
+    client = Anthropic()
     resp = client.messages.create(
-        model=MODEL,
+        model=ANTHROPIC_MODEL,
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         tools=[_submit_tool()],
@@ -88,4 +97,55 @@ def compose(ddl: str, *, client: Anthropic | None = None) -> Score:
     for block in resp.content:
         if block.type == "tool_use" and block.name == "submit_score":
             return Score.model_validate(block.input)
-    raise RuntimeError("Haiku did not return submit_score tool call")
+    raise RuntimeError("Anthropic did not return submit_score tool call")
+
+
+def _compose_openai(ddl: str) -> Score:
+    from openai import OpenAI
+
+    base_url = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:18000/v3")
+    api_key = os.getenv("OPENAI_API_KEY") or "none"
+    model = os.getenv("OPENAI_MODEL", "qwen-api")
+
+    client = OpenAI(base_url=base_url, api_key=api_key)
+
+    schema_str = json.dumps(Score.model_json_schema(), ensure_ascii=False)
+    system = (
+        SYSTEM_PROMPT
+        + "\n\n# 出力形式\n\n"
+        + "以下の JSON Schema に厳密に準拠した **JSON オブジェクトのみ** を返せ。"
+        + "説明文・前置き・マークダウン装飾は禁止。`{` から `}` までの単一 JSON のみ。\n\n"
+        + f"Schema:\n{schema_str}"
+    )
+
+    resp = client.chat.completions.create(
+        model=model,
+        max_tokens=MAX_TOKENS,
+        temperature=0.0,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": ddl},
+        ],
+        stream=False,
+    )
+    text = (resp.choices[0].message.content or "").strip()
+    data = _extract_json(text)
+    return Score.model_validate(data)
+
+
+def _extract_json(text: str) -> dict:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if m:
+        return json.loads(m.group(1))
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return json.loads(text[start : end + 1])
+
+    raise ValueError(f"Could not extract JSON from response: {text[:500]}")

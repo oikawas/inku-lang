@@ -20,9 +20,16 @@ def _cases() -> list[Path]:
     return sorted(p for p in FIXTURES_DIR.iterdir() if p.is_dir())
 
 
+def _backend_available() -> bool:
+    backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
+    if backend == "openai":
+        return True  # OVMS 等の local endpoint 前提。接続不可時はテストで失敗させる
+    return bool(os.getenv("ANTHROPIC_API_KEY"))
+
+
 requires_api_key = pytest.mark.skipif(
-    not os.getenv("ANTHROPIC_API_KEY"),
-    reason="requires ANTHROPIC_API_KEY",
+    not _backend_available(),
+    reason="no LLM backend configured (set ANTHROPIC_API_KEY or INKU_LLM_BACKEND=openai)",
 )
 
 

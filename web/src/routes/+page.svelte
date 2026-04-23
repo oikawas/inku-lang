@@ -17,6 +17,17 @@
 
 	type Mode = 'free' | 'ddl';
 
+	type Iteration = {
+		mode: Mode;
+		input: string;
+		ddl: string | null;
+		score: Score;
+		svg: string;
+		at: number;
+	};
+
+	const MAX_HISTORY = 20;
+
 	let mode = $state<Mode>('free');
 	let input = $state('山の向こうに月が昇る');
 	let loading = $state(false);
@@ -26,10 +37,38 @@
 	let saijikiOpen = $state(false);
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 
+	let history = $state<Iteration[]>([]);
+	let cursor = $state(-1);
+
 	const placeholders: Record<Mode, string> = {
 		free: '山の向こうに月が昇る',
 		ddl: '中心に赤い円を置く。半径は画面の2割。'
 	};
+
+	function pushHistory(it: Iteration) {
+		const next = [...history, it];
+		history = next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
+		cursor = history.length - 1;
+	}
+
+	function loadIteration(idx: number) {
+		if (idx < 0 || idx >= history.length) return;
+		cursor = idx;
+		const it = history[idx];
+		mode = it.mode;
+		input = it.input;
+		ddl = it.ddl;
+		result = { score: it.score, svg: it.svg } as ComposeResponse;
+		error = null;
+	}
+
+	function gotoPrev() {
+		if (cursor > 0) loadIteration(cursor - 1);
+	}
+
+	function gotoNext() {
+		if (cursor < history.length - 1) loadIteration(cursor + 1);
+	}
 
 	function insertWord(word: string) {
 		const ta = textareaEl;
@@ -69,6 +108,7 @@
 		error = null;
 		ddl = null;
 		try {
+			let entry: Iteration;
 			if (mode === 'free') {
 				const r = await fetch('/api/paint', {
 					method: 'POST',
@@ -82,6 +122,14 @@
 				const data = (await r.json()) as PaintResponse;
 				ddl = data.ddl;
 				result = data;
+				entry = {
+					mode,
+					input,
+					ddl: data.ddl,
+					score: data.score,
+					svg: data.svg,
+					at: Date.now()
+				};
 			} else {
 				const r = await fetch('/api/compose', {
 					method: 'POST',
@@ -92,8 +140,18 @@
 					const d = await r.json().catch(() => ({}));
 					throw new Error(d.detail ?? `HTTP ${r.status}`);
 				}
-				result = (await r.json()) as ComposeResponse;
+				const data = (await r.json()) as ComposeResponse;
+				result = data;
+				entry = {
+					mode,
+					input,
+					ddl: null,
+					score: data.score,
+					svg: data.svg,
+					at: Date.now()
+				};
 			}
+			pushHistory(entry);
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			result = null;
@@ -168,7 +226,26 @@
 		</section>
 
 		<section class="output">
-			<label for="canvas">演奏</label>
+			<div class="output-head">
+				<label for="canvas">演奏</label>
+				{#if history.length > 0}
+					<div class="nav" aria-label="履歴ナビゲーション">
+						<button
+							class="nav-btn"
+							onclick={gotoPrev}
+							disabled={cursor <= 0}
+							aria-label="前の演奏"
+						>◀</button>
+						<span class="counter">{cursor + 1} / {history.length}</span>
+						<button
+							class="nav-btn"
+							onclick={gotoNext}
+							disabled={cursor >= history.length - 1}
+							aria-label="次の演奏"
+						>▶</button>
+					</div>
+				{/if}
+			</div>
 			<div id="canvas" class="canvas">
 				{#if result}
 					{@html result.svg}
@@ -184,6 +261,25 @@
 			{/if}
 		</section>
 	</div>
+
+	{#if history.length > 1}
+		<section class="history" aria-label="演奏履歴">
+			<h2>履歴</h2>
+			<div class="strip">
+				{#each history as it, i (it.at)}
+					<button
+						class="thumb"
+						class:current={i === cursor}
+						onclick={() => loadIteration(i)}
+						title={it.input}
+					>
+						<div class="thumb-svg">{@html it.svg}</div>
+						<div class="thumb-label">{i + 1}</div>
+					</button>
+				{/each}
+			</div>
+		</section>
+	{/if}
 </main>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -450,6 +546,115 @@
 		font-size: 0.95rem;
 		line-height: 1.7;
 		color: #333;
+	}
+
+	.output-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin-bottom: 0.5rem;
+	}
+
+	.output-head label {
+		margin-bottom: 0;
+	}
+
+	.nav {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.85rem;
+	}
+
+	.nav-btn {
+		background: transparent;
+		border: 1px solid #bbb;
+		color: #333;
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		cursor: pointer;
+		font-size: 0.7rem;
+		padding: 0;
+		line-height: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-family: inherit;
+	}
+
+	.nav-btn:hover:not(:disabled) {
+		background: #111;
+		color: #fff;
+		border-color: #111;
+	}
+
+	.nav-btn:disabled {
+		opacity: 0.35;
+		cursor: not-allowed;
+	}
+
+	.counter {
+		color: #666;
+		min-width: 3rem;
+		text-align: center;
+	}
+
+	.history {
+		margin-top: 2.5rem;
+		border-top: 1px solid #ddd;
+		padding-top: 1.5rem;
+	}
+
+	.history h2 {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #555;
+		margin: 0 0 0.75rem;
+	}
+
+	.strip {
+		display: flex;
+		gap: 0.75rem;
+		overflow-x: auto;
+		padding-bottom: 0.5rem;
+	}
+
+	.thumb {
+		flex: 0 0 auto;
+		width: 96px;
+		background: #fff;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		padding: 0;
+		cursor: pointer;
+		overflow: hidden;
+		font-family: inherit;
+	}
+
+	.thumb.current {
+		border-color: #111;
+		box-shadow: 0 0 0 2px #11111133;
+	}
+
+	.thumb-svg {
+		width: 96px;
+		height: 96px;
+		overflow: hidden;
+	}
+
+	.thumb-svg :global(svg) {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+
+	.thumb-label {
+		padding: 0.2rem;
+		font-size: 0.75rem;
+		color: #888;
+		text-align: center;
+		border-top: 1px solid #eee;
 	}
 
 	.canvas {

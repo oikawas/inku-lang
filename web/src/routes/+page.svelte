@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { SAIJIKI } from '$lib/saijiki';
+
 	type Score = { instructions: unknown[] };
 
 	type PaintResponse = {
@@ -21,11 +23,36 @@
 	let error = $state<string | null>(null);
 	let ddl = $state<string | null>(null);
 	let result = $state<PaintResponse | ComposeResponse | null>(null);
+	let saijikiOpen = $state(false);
+	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 
 	const placeholders: Record<Mode, string> = {
 		free: '山の向こうに月が昇る',
 		ddl: '中心に赤い円を置く。半径は画面の2割。'
 	};
+
+	function insertWord(word: string) {
+		const ta = textareaEl;
+		if (!ta) {
+			input = input + word;
+			return;
+		}
+		const start = ta.selectionStart ?? input.length;
+		const end = ta.selectionEnd ?? input.length;
+		input = input.slice(0, start) + word + input.slice(end);
+		requestAnimationFrame(() => {
+			if (!textareaEl) return;
+			textareaEl.focus();
+			const pos = start + word.length;
+			textareaEl.setSelectionRange(pos, pos);
+		});
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape' && saijikiOpen) {
+			saijikiOpen = false;
+		}
+	}
 
 	function switchMode(next: Mode) {
 		if (mode === next) return;
@@ -78,8 +105,19 @@
 
 <main>
 	<header>
-		<h1>inku</h1>
-		<p class="sub">視覚的な短歌を書く</p>
+		<div class="header-inner">
+			<div>
+				<h1>inku</h1>
+				<p class="sub">視覚的な短歌を書く</p>
+			</div>
+			<button
+				class="saijiki-toggle"
+				aria-expanded={saijikiOpen}
+				onclick={() => (saijikiOpen = !saijikiOpen)}
+			>
+				歳時記
+			</button>
+		</div>
 	</header>
 
 	<div class="mode-switch" role="tablist" aria-label="入力モード">
@@ -108,6 +146,7 @@
 			</label>
 			<textarea
 				id="input-ta"
+				bind:this={textareaEl}
 				bind:value={input}
 				rows="8"
 				spellcheck="false"
@@ -147,6 +186,35 @@
 	</div>
 </main>
 
+<svelte:window onkeydown={handleKeydown} />
+
+{#if saijikiOpen}
+	<div
+		class="saijiki-backdrop"
+		onclick={() => (saijikiOpen = false)}
+		aria-hidden="true"
+	></div>
+	<aside class="saijiki" aria-label="歳時記 - 語彙一覧">
+		<div class="saijiki-head">
+			<h2>歳時記 <span class="en">Saijiki</span></h2>
+			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label="閉じる">
+				×
+			</button>
+		</div>
+		<p class="saijiki-hint">語彙をクリックすると記述欄に挿入されます。</p>
+		{#each SAIJIKI as cat (cat.key)}
+			<section class="saijiki-cat">
+				<h3>{cat.label} <span class="en">{cat.en}</span></h3>
+				<div class="chips">
+					{#each cat.words as word (word)}
+						<button class="chip" onclick={() => insertWord(word)}>{word}</button>
+					{/each}
+				</div>
+			</section>
+		{/each}
+	</aside>
+{/if}
+
 <style>
 	:global(body) {
 		background: #f7f5ef;
@@ -166,6 +234,12 @@
 		margin-bottom: 1.5rem;
 	}
 
+	.header-inner {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-end;
+	}
+
 	h1 {
 		font-size: 2rem;
 		margin: 0;
@@ -175,6 +249,121 @@
 	.sub {
 		color: #666;
 		margin: 0.25rem 0 0;
+	}
+
+	.saijiki-toggle {
+		background: transparent;
+		border: 1px solid #888;
+		color: #333;
+		padding: 0.4rem 1rem;
+		border-radius: 999px;
+		cursor: pointer;
+		font-size: 0.9rem;
+		font-family: inherit;
+	}
+
+	.saijiki-toggle:hover {
+		background: #111;
+		color: #fff;
+		border-color: #111;
+	}
+
+	.saijiki-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.2);
+		z-index: 10;
+	}
+
+	.saijiki {
+		position: fixed;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		width: min(380px, 90vw);
+		background: #fbf9f3;
+		border-left: 1px solid #ccc;
+		box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+		overflow-y: auto;
+		padding: 1.5rem;
+		z-index: 11;
+	}
+
+	.saijiki-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin-bottom: 0.25rem;
+	}
+
+	.saijiki-head h2 {
+		margin: 0;
+		font-size: 1.3rem;
+		letter-spacing: 0.1em;
+	}
+
+	.saijiki-head .en {
+		font-size: 0.75rem;
+		color: #888;
+		font-weight: normal;
+		letter-spacing: 0.05em;
+	}
+
+	.saijiki-close {
+		background: transparent;
+		border: none;
+		font-size: 1.5rem;
+		color: #666;
+		cursor: pointer;
+		line-height: 1;
+		padding: 0 0.25rem;
+	}
+
+	.saijiki-hint {
+		color: #888;
+		font-size: 0.8rem;
+		margin: 0 0 1rem;
+	}
+
+	.saijiki-cat {
+		margin-bottom: 1.5rem;
+	}
+
+	.saijiki-cat h3 {
+		margin: 0 0 0.5rem;
+		font-size: 0.95rem;
+		color: #333;
+		font-weight: 600;
+	}
+
+	.saijiki-cat .en {
+		font-size: 0.7rem;
+		color: #aaa;
+		font-weight: normal;
+		margin-left: 0.25rem;
+	}
+
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.chip {
+		background: #fff;
+		border: 1px solid #ddd;
+		color: #333;
+		padding: 0.3rem 0.7rem;
+		border-radius: 3px;
+		cursor: pointer;
+		font-size: 0.9rem;
+		font-family: inherit;
+	}
+
+	.chip:hover {
+		background: #111;
+		color: #fff;
+		border-color: #111;
 	}
 
 	.mode-switch {

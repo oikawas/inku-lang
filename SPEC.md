@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v0.5**
+**Version: v0.6**
 
 ---
 
@@ -1038,15 +1038,21 @@ JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（
 - Fixture テストの厳密度 (LLM 出力の数値 ±tolerance、ソフトマッチの範囲) — `±0.05` 仮採用
 - FastAPI エンドポイント設計 (`/api/compose` の単発 / ストリーミング)
 
-**Stage 2 の Qwen2.5 (qwen-api) 合格率 (v0.5 時点)**
-- strict 比較で 9/15 合格 (tool_call API 経由、few-shot プロンプト)
-- 残存する典型的な外し方:
-  - `center` vs `position` の混同 (円/楕円 = center, 三角/四角 = position)
-  - 「中央に」指示時の bbox 左上補正の未実施 (fixture 06)
-  - 縦線の `from`/`to` 座標ずれ (x軸を 0 に固定、中心指定を無視: fixture 15)
-  - 3 要素並列時の center/position 一括誤適用 (fixture 13)
-- ひとまず記録、ローカル LLM の fidelity 限界として受け入れる
-- Stage 1 も OpenAI 互換 (qwen3-api) を並行実装、Anthropic パスは後回し
+**LLM fidelity 記録 (v0.6 時点、全て OVMS OpenAI-compat)**
+- Stage 2 (qwen-api / Qwen2.5-7B): 15 fixture 中 9 通過 (strict, tool_use 経由)
+  - center (円/楕円) vs position (三角/四角) 混同、「中央」指示時の bbox 左上補正未実施、複数命令並列時の誤適用
+- Stage 1 (qwen3-api / Qwen3-8B): 5 smoke 通過、ただし 4/5 は prompt 内例と入力同一 (memorize 懸念)
+- Anthropic path は両 stage で未検証 (Haiku 4.5 / Opus 4.7 で fidelity 差分を測る予定)
+
+**Prompt 評価と汎化**
+- 正規化DDL fixture は prompt 内例と重複があり、memorize なのか汎化なのか切り分け未実施
+- prompt 外例 10-20 件の追加 fixture が次の検証タスク
+- tolerance 値 `±0.05` は暫定、LLM 間比較で再調整要
+
+**Renderer 揺らぎ (未実装)**
+- perlin / pink / wave の波形生成器、シード管理、segment 数、振幅のスケール
+- fixture 11 (fine+perlin) / 15 (broad+wave) は現状 静的描画
+- Web UI で SVG として揺らぎを表現するか Canvas / WebGL へ切替るか未決
 
 **エコシステム**
 - エクステンション機構の実装方式（Nature plugin等をどう組み込むか）
@@ -1075,21 +1081,31 @@ inku-lang/                         # github.com/oikawas/inku-lang
 │   └── tests/
 │       ├── conftest.py            # dotenv 読込
 │       ├── test_renderer.py       # 10 cases
-│       ├── test_composer.py       # 15 fixture + tool schema
-│       ├── test_api.py            # FastAPI TestClient 5 cases
+│       ├── test_composer.py       # 15 fixture + 厳密比較
+│       ├── test_interpreter.py    # 5 smoke cases (Saijiki 語彙検査)
+│       ├── test_api.py            # FastAPI TestClient 8 cases
 │       └── fixtures/stage2/       # 正規化DDL ↔ Score ペア
 │           └── {01..15}/{input.txt,expected.json}
 └── web/                           # SvelteKit 2 + Svelte 5 + TS (inku-web 0.1.0)
     ├── package.json
     ├── svelte.config.js
-    ├── vite.config.ts             # /api → 127.0.0.1:8000 proxy
+    ├── vite.config.ts             # /api → 127.0.0.1:8100 proxy
     ├── src/
     │   ├── app.html
+    │   ├── lib/
+    │   │   └── saijiki.ts         # 歳時記辞書 (7 カテゴリ)
     │   └── routes/
     │       ├── +layout.svelte
-    │       └── +page.svelte       # 記述 / 演奏 / 楽譜 の3パネル UI
+    │       └── +page.svelte       # モード切替 / Saijiki / 履歴 UI
     └── static/
 ```
+
+`server/src/inku_server/`:
+- `schema.py` — Pydantic Score モデル
+- `renderer.py` — Score → SVG (svgwrite)
+- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (backend dispatch)
+- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch)
+- `api.py` — FastAPI app: `/api/compose`/`/api/interpret`/`/api/paint`/`/health`
 
 **開発環境 (ローカル運用手順は `LOCAL_WORK.md` を参照、未コミット)**
 
@@ -1100,6 +1116,52 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v0.6 (2026-04-23)
+
+**Phase 1 完了 — E2E パイプライン稼働 + UI 反復支援**
+
+- **LLM バックエンド 二系統併存**
+  - Stage 2 (composer): `qwen-api` (Qwen2.5-7B) 既定、Anthropic Haiku 4.5 併用可能
+  - Stage 1 (interpreter): `qwen3-api` (Qwen3-8B) 既定、Anthropic Opus 4.7 併用可能
+  - 切替: 環境変数 `INKU_LLM_BACKEND=openai|anthropic`
+  - OVMS (`http://127.0.0.1:18000/v3`) は OpenAI 互換、API key=`none`
+  - qwen3-api は `/no_think` prefix で thinking トレースを抑制して使用
+  - tool_use は Anthropic ネイティブ、OpenAI 側は `<tool_call>` タグが content に埋め込まれるので正規表現で抽出
+
+- **Stage 1 interpreter 実装**
+  - `server/src/inku_server/interpreter.py`
+  - 入力: 自由な自然言語、出力: Saijiki 語彙のみを使う短い日本語 (正規化DDL)
+  - system prompt に 4 few-shot (感情語→物理語 置換、画面座標比率)
+  - 5 ケース smoke test 全通過 (4 は prompt 内例と重複、memorize 傾向あり)
+
+- **API エンドポイント 拡張**
+  - `POST /api/interpret`: 自由記述 → 正規化DDL
+  - `POST /api/paint`: 自由記述 → 正規化DDL → Score → SVG (フルパイプライン)
+  - 既存 `POST /api/compose`, `GET /health` は維持
+  - FastAPI 既定 port を `8000 → 8100` へ変更 (pentala 上で 8000 が他サービスと衝突)
+  - 起動時 env: `INKU_SERVER_HOST`, `INKU_SERVER_PORT` で上書き可
+
+- **Stage 2 fidelity 記録 (qwen-api strict モード)**
+  - 15 fixture 中 9 通過、残り 6 件の典型的な失敗:
+    - center (円/楕円) と position (三角/四角) の混同
+    - 「中央」指示時の bbox 左上補正未実施
+    - 複数命令並列時の field 一括誤適用
+  - tool_use API 経由で JSON 構造エラー (`]` vs `}` 誤閉じ等) は解消
+  - Haiku 4.5 移行で改善見込みだが、ローカル LLM で回る事実を優先
+
+- **Web UI: モード切替 + Saijiki 参照 + 反復履歴**
+  - タブ: 自由記述 / 正規化DDL (それぞれ /api/paint と /api/compose に繋ぐ)
+  - 自由記述モード: 解釈結果 (正規化DDL) を左カラム下部に常時表示
+  - 歳時記ドロワー: 右スライドイン、7 カテゴリ (かたち/てざわり/つらなり/いろ/ゆらぎ/ばしょ/うごき)、chip クリックで textarea の caret 位置に挿入
+  - Saijiki 辞書は `web/src/lib/saijiki.ts` に分離
+  - 反復履歴: in-memory、最大 20 件、`◀ N/M ▶` 移動ボタンで input/output/DDL を過去状態に復元
+  - サムネイル列: 履歴 2 件以上で下段に 96px 方形ミニチュア SVG を横並べ、クリックで jump
+
+- **運用 / 非公開メモ**
+  - `LOCAL_WORK.md` に同期フロー・起動手順・トラブルシュートを集約 (gitignore 済)
+  - Mac は SSH tunnel or `http://pentala:5173` でブラウザアクセス、コード編集のみ
+  - dev server は pentala 上で nohup 常駐 (`/tmp/inku-server.log`, `/tmp/inku-web.log`)
 
 ### v0.5 (2026-04-23)
 

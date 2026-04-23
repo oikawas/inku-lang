@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { SAIJIKI } from '$lib/saijiki';
+	import { annotate } from '$lib/highlight';
 
 	type Score = { instructions: unknown[] };
 
@@ -217,10 +218,37 @@
 				<p class="error">{error}</p>
 			{/if}
 
+			{#if result}
+				<div class="interpreted">
+					<label for="input-feedback">入力に含まれた語彙</label>
+					<div id="input-feedback" class="annot-box">
+						{#each annotate(input) as part, i (i)}
+							{#if part.kind === 'saijiki'}
+								<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
+							{:else if part.kind === 'emotion'}
+								<span class="tok tok-emotion" title="感情語彙 (正規化で置換)">{part.text}</span>
+							{:else}
+								<span class="tok tok-plain">{part.text}</span>
+							{/if}
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			{#if mode === 'free' && ddl}
 				<div class="interpreted">
 					<label for="ddl-interpret">解釈 (正規化DDL)</label>
-					<div id="ddl-interpret" class="ddl-box">{ddl}</div>
+					<div id="ddl-interpret" class="annot-box ddl-box">
+						{#each annotate(ddl) as part, i (i)}
+							{#if part.kind === 'saijiki'}
+								<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
+							{:else if part.kind === 'emotion'}
+								<span class="tok tok-emotion">{part.text}</span>
+							{:else}
+								<span class="tok tok-plain">{part.text}</span>
+							{/if}
+						{/each}
+					</div>
 				</div>
 			{/if}
 		</section>
@@ -538,14 +566,42 @@
 		margin-top: 1.5rem;
 	}
 
-	.ddl-box {
+	.annot-box {
 		padding: 0.75rem;
-		border-left: 3px solid #888;
 		background: #fff;
-		border-radius: 0 4px 4px 0;
+		border: 1px solid #ddd;
+		border-radius: 4px;
 		font-size: 0.95rem;
-		line-height: 1.7;
-		color: #333;
+		line-height: 1.9;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	.ddl-box {
+		border-left: 3px solid #888;
+		border-radius: 0 4px 4px 0;
+	}
+
+	.tok {
+		transition: color 0.15s;
+	}
+
+	/* 墨の濃淡: Saijiki = 濃墨、地文 = 薄墨、感情語 = 滲む */
+	.tok-saijiki {
+		color: #111;
+		font-weight: 500;
+	}
+
+	.tok-plain {
+		color: #9a9a9a;
+	}
+
+	.tok-emotion {
+		color: #c9a08a;
+		font-style: italic;
+		text-decoration: line-through;
+		text-decoration-color: rgba(162, 52, 42, 0.4);
+		text-decoration-thickness: 1px;
 	}
 
 	.output-head {

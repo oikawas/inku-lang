@@ -1,29 +1,72 @@
 <script lang="ts">
-	type ComposeResponse = {
-		score: { instructions: unknown[] };
+	type Score = { instructions: unknown[] };
+
+	type PaintResponse = {
+		text: string;
+		ddl: string;
+		score: Score;
 		svg: string;
 	};
 
-	let ddl = $state('中心に赤い円を置く。半径は画面の2割。');
+	type ComposeResponse = {
+		score: Score;
+		svg: string;
+	};
+
+	type Mode = 'free' | 'ddl';
+
+	let mode = $state<Mode>('free');
+	let input = $state('山の向こうに月が昇る');
 	let loading = $state(false);
 	let error = $state<string | null>(null);
-	let result = $state<ComposeResponse | null>(null);
+	let ddl = $state<string | null>(null);
+	let result = $state<PaintResponse | ComposeResponse | null>(null);
+
+	const placeholders: Record<Mode, string> = {
+		free: '山の向こうに月が昇る',
+		ddl: '中心に赤い円を置く。半径は画面の2割。'
+	};
+
+	function switchMode(next: Mode) {
+		if (mode === next) return;
+		mode = next;
+		input = placeholders[next];
+		ddl = null;
+		result = null;
+		error = null;
+	}
 
 	async function submit() {
-		if (!ddl.trim()) return;
+		if (!input.trim()) return;
 		loading = true;
 		error = null;
+		ddl = null;
 		try {
-			const r = await fetch('/api/compose', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl })
-			});
-			if (!r.ok) {
-				const detail = await r.json().catch(() => ({}));
-				throw new Error(detail.detail ?? `HTTP ${r.status}`);
+			if (mode === 'free') {
+				const r = await fetch('/api/paint', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ text: input })
+				});
+				if (!r.ok) {
+					const d = await r.json().catch(() => ({}));
+					throw new Error(d.detail ?? `HTTP ${r.status}`);
+				}
+				const data = (await r.json()) as PaintResponse;
+				ddl = data.ddl;
+				result = data;
+			} else {
+				const r = await fetch('/api/compose', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ ddl: input })
+				});
+				if (!r.ok) {
+					const d = await r.json().catch(() => ({}));
+					throw new Error(d.detail ?? `HTTP ${r.status}`);
+				}
+				result = (await r.json()) as ComposeResponse;
 			}
-			result = await r.json();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			result = null;
@@ -34,18 +77,54 @@
 </script>
 
 <main>
-	<h1>inku</h1>
-	<p class="sub">視覚的な短歌を書く</p>
+	<header>
+		<h1>inku</h1>
+		<p class="sub">視覚的な短歌を書く</p>
+	</header>
+
+	<div class="mode-switch" role="tablist" aria-label="入力モード">
+		<button
+			role="tab"
+			aria-selected={mode === 'free'}
+			class:active={mode === 'free'}
+			onclick={() => switchMode('free')}
+		>
+			自由記述
+		</button>
+		<button
+			role="tab"
+			aria-selected={mode === 'ddl'}
+			class:active={mode === 'ddl'}
+			onclick={() => switchMode('ddl')}
+		>
+			正規化DDL
+		</button>
+	</div>
 
 	<div class="row">
 		<section class="input">
-			<label for="ddl">記述</label>
-			<textarea id="ddl" bind:value={ddl} rows="10" spellcheck="false"></textarea>
-			<button onclick={submit} disabled={loading || !ddl.trim()}>
+			<label for="input-ta">
+				{mode === 'free' ? '記述 (自由)' : '正規化DDL'}
+			</label>
+			<textarea
+				id="input-ta"
+				bind:value={input}
+				rows="8"
+				spellcheck="false"
+				placeholder={placeholders[mode]}
+			></textarea>
+			<button class="submit" onclick={submit} disabled={loading || !input.trim()}>
 				{loading ? '演奏中…' : '演奏する'}
 			</button>
 			{#if error}
 				<p class="error">{error}</p>
+			{/if}
+
+			{#if mode === 'free' && ddl}
+				<div class="interpreted">
+					<label for="ddl-interpret">解釈 (正規化DDL)</label>
+					<div id="ddl-interpret" class="ddl-box">{ddl}</div>
+				</div>
 			{/if}
 		</section>
 
@@ -83,6 +162,10 @@
 		padding: 2rem 1.5rem;
 	}
 
+	header {
+		margin-bottom: 1.5rem;
+	}
+
 	h1 {
 		font-size: 2rem;
 		margin: 0;
@@ -91,7 +174,31 @@
 
 	.sub {
 		color: #666;
-		margin: 0.25rem 0 2rem;
+		margin: 0.25rem 0 0;
+	}
+
+	.mode-switch {
+		display: flex;
+		gap: 0.25rem;
+		margin-bottom: 1.5rem;
+		border-bottom: 1px solid #ccc;
+	}
+
+	.mode-switch button {
+		background: transparent;
+		border: none;
+		padding: 0.5rem 1rem;
+		font-size: 0.95rem;
+		cursor: pointer;
+		color: #888;
+		border-bottom: 2px solid transparent;
+		margin-bottom: -1px;
+		font-family: inherit;
+	}
+
+	.mode-switch button.active {
+		color: #111;
+		border-bottom-color: #111;
 	}
 
 	.row {
@@ -120,7 +227,7 @@
 		resize: vertical;
 	}
 
-	button {
+	button.submit {
 		margin-top: 0.75rem;
 		padding: 0.5rem 1.25rem;
 		background: #111;
@@ -129,9 +236,10 @@
 		border-radius: 4px;
 		cursor: pointer;
 		font-size: 0.95rem;
+		font-family: inherit;
 	}
 
-	button:disabled {
+	button.submit:disabled {
 		background: #999;
 		cursor: not-allowed;
 	}
@@ -139,6 +247,20 @@
 	.error {
 		color: #a2342a;
 		margin-top: 0.75rem;
+	}
+
+	.interpreted {
+		margin-top: 1.5rem;
+	}
+
+	.ddl-box {
+		padding: 0.75rem;
+		border-left: 3px solid #888;
+		background: #fff;
+		border-radius: 0 4px 4px 0;
+		font-size: 0.95rem;
+		line-height: 1.7;
+		color: #333;
 	}
 
 	.canvas {

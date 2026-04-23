@@ -6,6 +6,8 @@ GET  /health      : liveness
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -103,4 +105,6 @@ def api_paint(req: PaintRequest) -> PaintResponse:
 def main() -> None:
     import uvicorn
 
-    uvicorn.run("inku_server.api:app", host="127.0.0.1", port=8000, reload=True)
+    host = os.getenv("INKU_SERVER_HOST", "127.0.0.1")
+    port = int(os.getenv("INKU_SERVER_PORT", "8100"))
+    uvicorn.run("inku_server.api:app", host=host, port=port, reload=True)

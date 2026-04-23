@@ -1035,10 +1035,18 @@ JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（
 **実装詳細 (v0.4 時点で未決)**
 - `arc` primitive の角度フィールド仕様 (start_angle / end_angle / sweep_flag or SVG path)
 - Renderer での揺らぎ実装 (perlin / pink / wave の具体的な波形生成器、決定論的シード運用)
-- Fixture テストの厳密度 (LLM 出力の数値 ±tolerance、ソフトマッチの範囲)
-- Stage 1 (Opus 4.7 解釈) のプロンプト設計と Stage 2 への受渡しフォーマット
+- Fixture テストの厳密度 (LLM 出力の数値 ±tolerance、ソフトマッチの範囲) — `±0.05` 仮採用
 - FastAPI エンドポイント設計 (`/api/compose` の単発 / ストリーミング)
-- Web UI フレームワーク確定済 (SvelteKit) だが着手タイミング未定
+
+**Stage 2 の Qwen2.5 (qwen-api) 合格率 (v0.5 時点)**
+- strict 比較で 9/15 合格 (tool_call API 経由、few-shot プロンプト)
+- 残存する典型的な外し方:
+  - `center` vs `position` の混同 (円/楕円 = center, 三角/四角 = position)
+  - 「中央に」指示時の bbox 左上補正の未実施 (fixture 06)
+  - 縦線の `from`/`to` 座標ずれ (x軸を 0 に固定、中心指定を無視: fixture 15)
+  - 3 要素並列時の center/position 一括誤適用 (fixture 13)
+- ひとまず記録、ローカル LLM の fidelity 限界として受け入れる
+- Stage 1 も OpenAI 互換 (qwen3-api) を並行実装、Anthropic パスは後回し
 
 **エコシステム**
 - エクステンション機構の実装方式（Nature plugin等をどう組み込むか）

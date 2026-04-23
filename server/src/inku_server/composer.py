@@ -24,33 +24,71 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 正規化DDL (コア語彙のみの自然言語記述)
 出力: JSON Score
 
-# コア語彙 (Saijiki / 歳時記)
+# 手順 (順番に考えよ)
 
-## かたち (primitive)
-- 円 → circle (center, radius)
-- 楕円 → ellipse (center, size)
-- 三角 → triangle (position=bbox左上, size)
-- 四角 → square (position=左上, size)
-- 線 → line (from, to)
-- 弧 → arc (未対応)
+## 1. primitive を決める
 
-## てざわり (weight)
+| 日本語 | primitive | 必須フィールド | 補助フィールド |
+|---|---|---|---|
+| 線 | line | from=(x1,y1), to=(x2,y2) | — |
+| 円 | circle | center=(cx,cy), radius | — |
+| 楕円 | ellipse | center=(cx,cy), size=(w,h) | — |
+| 三角 | triangle | position=(bbox左上x, bbox左上y), size=(w,h) | — |
+| 四角 | square | position=(左上x, 左上y), size=(w,h) | — |
+
+**重要**: 円/楕円は `center` (中心)、三角/四角は `position` (bbox 左上) を使う。混同禁止。
+
+## 2. 「中央に配置」= position と center で値が違う
+
+同じ「中央配置」でも:
+- circle/ellipse の center = (0.5, 0.5) そのまま
+- square/triangle の position = (0.5 - w/2, 0.5 - h/2) **左上に補正要**
+
+例: 中央に一辺0.4の四角 → position=(0.3, 0.3), size=(0.4, 0.4)
+
+## 3. 必須数値の既定値
+
+ユーザー指定がない場合の既定:
+- circle.radius = 0.1
+- ellipse.size = (0.4, 0.2)
+- square.size = (0.3, 0.3)
+- triangle.size = (0.3, 0.3)
+- line の位置は必ず from/to を埋める (省略禁止)
+
+## 4. 日本語→値 マッピング (厳守)
+
+### style (つらなり)
+| 日本語 | 値 |
+|---|---|
+| 実線 (default) | solid |
+| 破線 | dashed |
+| 点線 | dotted |
+| 一点鎖線 | dash_dot |
+
+### weight (てざわり)
 髪=hair, 鉛筆=pencil, ペン=pen(default), ロットリング=rotring,
 クレヨン=crayon, チョーク=chalk, 細筆=brush_thin, 太筆=brush_thick, 縄=rope
 
-## つらなり (style)
-実線=solid(default), 破線=dashed, 点線=dotted, 一点鎖線=dash_dot
-
-## いろ (color)
+### color (いろ)
 白=white, 黒=black(default), 青=blue, 赤=red, 緑=green, 灰=gray
 
-## ゆらぎ (variation) — 任意
-- amplitude: fine(細かく), medium, broad(大きく)
-- frequency: slow(ゆっくり), medium, high(速く)
-- quality: none, white, perlin, pink, wave(波打つ)
-- dimensions: position_x/position_y/angle/length/thickness/rotation/radius のリスト
+### variation (ゆらぎ) — 明示された場合のみ付ける
+| 日本語 | amplitude | quality |
+|---|---|---|
+| 細かく揺れる / 小刻み | fine | perlin |
+| 大きく揺れる | broad | perlin |
+| 波打つ | (文脈次第) | wave |
+| 震える | fine | perlin |
+| 滲む | (各値を文脈から) | pink |
 
-# 座標系
+frequency: ゆっくり=slow, 速く=high, 無指定=medium
+
+### variation.dimensions (揺れる軸) — **線の進行方向と垂直な軸**
+- 横線 (y固定、xが0→1に進行) が揺れる → dimensions=["position_y"]
+- 縦線 (x固定、yが0→1に進行) が揺れる → dimensions=["position_x"]
+- 斜め線: dimensions=["position_x","position_y"] 両方
+
+## 5. 座標系
 
 0.0〜1.0 の比率。左上=(0,0), 右下=(1,1)。
 - 中心 → (0.5, 0.5)
@@ -58,13 +96,29 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - 画面の2割 → 0.2
 - 左端=x:0, 右端=x:1, 上端=y:0, 下端=y:1
 
-# 出力ルール
+## 6. 出力
 
-- primitive ごとに必須フィールドを埋める
-- 数値は小数 (0.5, 0.333 等)
-- 指定無きフィールドはデフォルト (weight=pen, color=black, style=solid)
-- 明示されない揺らぎは variation を付けない
-- 複数指示は instructions 配列に順番通り並べる"""
+- 説明文 / 前置き / マークダウン fence 禁止
+- `{` から `}` までの単一 JSON オブジェクト
+- instructions 配列、順番通り
+
+# 例
+
+入力: 上端中央に小さな黒い円。半径0.05。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.1],"radius":0.05}]}
+
+入力: 画面中央に一辺0.4の緑の四角。
+出力: {"instructions":[{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"color":"green"}]}
+
+入力: 左端から右端へy=0.7で点線を引く。
+出力: {"instructions":[{"primitive":"line","from":[0.0,0.7],"to":[1.0,0.7],"style":"dotted"}]}
+
+入力: 左端に縦線を引く。上から下まで。波打つ。
+出力: {"instructions":[{"primitive":"line","from":[0.0,0.0],"to":[0.0,1.0],"variation":{"amplitude":"medium","frequency":"medium","quality":"wave","dimensions":["position_x"]}}]}
+
+入力: 上から半分に横線。小刻みに震える。
+出力: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
+"""
 
 
 def _submit_tool() -> dict[str, Any]:
@@ -109,26 +163,40 @@ def _compose_openai(ddl: str) -> Score:
 
     client = OpenAI(base_url=base_url, api_key=api_key)
 
-    schema_str = json.dumps(Score.model_json_schema(), ensure_ascii=False)
-    system = (
-        SYSTEM_PROMPT
-        + "\n\n# 出力形式\n\n"
-        + "以下の JSON Schema に厳密に準拠した **JSON オブジェクトのみ** を返せ。"
-        + "説明文・前置き・マークダウン装飾は禁止。`{` から `}` までの単一 JSON のみ。\n\n"
-        + f"Schema:\n{schema_str}"
-    )
+    tool = {
+        "type": "function",
+        "function": {
+            "name": "submit_score",
+            "description": "正規化DDLから導出した JSON Score を提出する。",
+            "parameters": Score.model_json_schema(),
+        },
+    }
 
     resp = client.chat.completions.create(
         model=model,
         max_tokens=MAX_TOKENS,
         temperature=0.0,
         messages=[
-            {"role": "system", "content": system},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": ddl},
         ],
+        tools=[tool],
+        tool_choice={"type": "function", "function": {"name": "submit_score"}},
         stream=False,
     )
-    text = (resp.choices[0].message.content or "").strip()
+
+    msg = resp.choices[0].message
+    if msg.tool_calls:
+        args = msg.tool_calls[0].function.arguments
+        return Score.model_validate(json.loads(args))
+
+    text = (msg.content or "").strip()
+    m = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", text, re.DOTALL)
+    if m:
+        payload = json.loads(m.group(1))
+        args = payload.get("arguments", payload)
+        return Score.model_validate(args)
+
     data = _extract_json(text)
     return Score.model_validate(data)
 

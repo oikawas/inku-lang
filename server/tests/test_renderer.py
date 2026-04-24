@@ -153,6 +153,95 @@ def test_variation_schema_roundtrip():
     assert score.instructions[0].variation.amplitude == "fine"
 
 
+def test_render_line_with_perlin_variation_emits_polyline():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.333],
+                    "to": [1.0, 0.333],
+                    "variation": {
+                        "amplitude": "fine",
+                        "frequency": "medium",
+                        "quality": "perlin",
+                        "dimensions": ["position_y"],
+                    },
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<polyline" in svg
+    assert "<line" not in svg
+
+
+def test_render_line_with_wave_variation_emits_polyline():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.5, 0.0],
+                    "to": [0.5, 1.0],
+                    "variation": {
+                        "amplitude": "broad",
+                        "frequency": "medium",
+                        "quality": "wave",
+                        "dimensions": ["position_x"],
+                    },
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<polyline" in svg
+
+
+def test_render_line_variation_is_deterministic():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "variation": {
+                        "amplitude": "medium",
+                        "frequency": "high",
+                        "quality": "perlin",
+                        "dimensions": ["position_y"],
+                    },
+                }
+            ]
+        }
+    )
+    assert render(score) == render(score)
+
+
+def test_render_line_quality_none_still_straight():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "variation": {
+                        "amplitude": "fine",
+                        "frequency": "medium",
+                        "quality": "none",
+                        "dimensions": ["position_y"],
+                    },
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<line" in svg
+    assert "<polyline" not in svg
+
+
 def test_line_missing_endpoints_raises():
     import pytest
 

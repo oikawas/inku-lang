@@ -1032,9 +1032,9 @@ JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（
 - 解釈のズレの併記（7.6発展形）を MVP に入れるか後回しにするか
 - 差分の色分けルール（7.2／7.7：変更・追加・削除をどう区別するか）
 
-**実装詳細 (v0.4 時点で未決)**
-- `arc` primitive の角度フィールド仕様 (start_angle / end_angle / sweep_flag or SVG path)
-- Renderer での揺らぎ実装 (perlin / pink / wave の具体的な波形生成器、決定論的シード運用)
+**実装詳細 (v0.4 時点で未決、順次解消中)**
+- ~~`arc` primitive の角度フィールド仕様~~ → v0.7 で解消: `angle_start` / `angle_end` (度、0=東、CCW 正)、center + radius と組み合わせて SVG path A コマンドを生成
+- ~~Renderer での揺らぎ実装~~ → v0.7 `line` で解消 (perlin/wave/pink/white、SHA-256 シード)、他 primitive は未対応
 - Fixture テストの厳密度 (LLM 出力の数値 ±tolerance、ソフトマッチの範囲) — `±0.05` 仮採用
 - FastAPI エンドポイント設計 (`/api/compose` の単発 / ストリーミング)
 

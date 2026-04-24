@@ -153,6 +153,59 @@ def test_variation_schema_roundtrip():
     assert score.instructions[0].variation.amplitude == "fine"
 
 
+def test_render_arc_quarter():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.5, 0.5],
+                    "radius": 0.3,
+                    "angle_start": 0.0,
+                    "angle_end": 90.0,
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<path" in svg
+    # 始点: center + r east = (0.8*1000, 0.5*1000) = (800, 500)
+    assert 'M 800.000 500.000' in svg
+    # 終点: center + r north (y-flip) = (500, 0.5*1000 - 300) = (500, 200)
+    assert 'A 300.000 300.000 0 0 0 500.000 200.000' in svg
+
+
+def test_render_arc_half_upper():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.5, 0.5],
+                    "radius": 0.2,
+                    "angle_start": 0.0,
+                    "angle_end": 180.0,
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    # delta=180 is edge: large_arc=0, then 180 exactly → 0。sweep=0 (CCW)
+    assert "<path" in svg
+
+
+def test_arc_missing_angles_raises():
+    import pytest
+
+    score = Score(
+        instructions=[
+            Instruction(primitive="arc", center=(0.5, 0.5), radius=0.3)
+        ]
+    )
+    with pytest.raises(ValueError, match="angle_start"):
+        render(score)
+
+
 def test_render_line_with_perlin_variation_emits_polyline():
     score = Score.model_validate(
         {

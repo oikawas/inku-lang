@@ -184,6 +184,29 @@ def _px(coord: tuple[float, float]) -> tuple[float, float]:
     return x * CANVAS_PX, y * CANVAS_PX
 
 
+def _arc_path_d(cx: float, cy: float, r: float, start_deg: float, end_deg: float) -> str:
+    """SVG <path d> の A コマンドで弧を描く文字列を返す。
+
+    角度は度、0°=東、CCW 正 (数学慣習)。y 軸は画面下向きなので
+    y 成分は反転。CCW 描画は SVG の sweep-flag=0 に対応する。
+    """
+    sa = math.radians(start_deg)
+    ea = math.radians(end_deg)
+    x1 = cx + r * math.cos(sa)
+    y1 = cy - r * math.sin(sa)
+    x2 = cx + r * math.cos(ea)
+    y2 = cy - r * math.sin(ea)
+
+    delta = (end_deg - start_deg) % 360
+    large_arc = 1 if delta > 180 else 0
+    sweep = 0 if end_deg > start_deg else 1  # math CCW → SVG 反時計回り (y 反転後)
+
+    return (
+        f"M {x1:.3f} {y1:.3f} "
+        f"A {r:.3f} {r:.3f} 0 {large_arc} {sweep} {x2:.3f} {y2:.3f}"
+    )
+
+
 def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction):
     attrs = _stroke_attrs(ins)
 
@@ -234,5 +257,15 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction):
             (x + w, y + h),
         ]
         return dwg.polygon(points=points, **attrs)
+
+    if ins.primitive == "arc":
+        if ins.center is None or ins.radius is None:
+            raise ValueError("arc requires 'center' and 'radius'")
+        if ins.angle_start is None or ins.angle_end is None:
+            raise ValueError("arc requires 'angle_start' and 'angle_end'")
+        cx, cy = _px(ins.center)
+        r = ins.radius * CANVAS_PX
+        path_d = _arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)
+        return dwg.path(d=path_d, **attrs)
 
     raise NotImplementedError(f"primitive '{ins.primitive}' not yet supported")

@@ -35,8 +35,13 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 | 楕円 | ellipse | center=(cx,cy), size=(w,h) | — |
 | 三角 | triangle | position=(bbox左上x, bbox左上y), size=(w,h) | — |
 | 四角 | square | position=(左上x, 左上y), size=(w,h) | — |
+| 弧 | arc | center, radius, angle_start, angle_end | — |
 
 **重要**: 円/楕円は `center` (中心)、三角/四角は `position` (bbox 左上) を使う。混同禁止。
+
+**arc の角度** (度): 0=東(右), 90=北(上), 180=西(左), 270=南(下)、CCW 正。
+- 右上 1/4 円 → start=0, end=90
+- 上半 半円 → start=0, end=180
 
 ## 2. 「中央に配置」= position と center で値が違う
 

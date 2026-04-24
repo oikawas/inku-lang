@@ -56,6 +56,13 @@ class Instruction(BaseModel):
     radius: Optional[float] = None
     position: Optional[Coord] = None
     size: Optional[tuple[float, float]] = None
+    angle_start: Optional[float] = Field(
+        default=None,
+        description="arc 始端角 (度、0=東、CCW正、90=北、180=西、270=南)",
+    )
+    angle_end: Optional[float] = Field(
+        default=None, description="arc 終端角 (度、同上)"
+    )
 
     style: LineStyle = "solid"
     weight: Weight = "pen"

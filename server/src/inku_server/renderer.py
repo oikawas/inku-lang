@@ -160,6 +160,28 @@ def _scatter_pos(i: int, seed: int, margin: float) -> tuple[float, float]:
     return (margin + xv * span, margin + yv * span)
 
 
+def _ensure_line_coords(ins: Instruction) -> Instruction:
+    """arrangement 付き line で from_/to が省略されたとき layout から補完する。
+
+    horizontal → 縦線 (x=0.5 を後で _shift が動かす)
+    vertical   → 横線
+    scatter/radial/その他 → 縦線
+    """
+    if ins.primitive != "line" or (ins.from_ is not None and ins.to is not None):
+        return ins
+    arr = ins.arrangement
+    if arr is not None and arr.layout == "vertical":
+        default_from: list[float] = [0.0, 0.5]
+        default_to: list[float] = [1.0, 0.5]
+    else:
+        default_from = [0.5, 0.0]
+        default_to = [0.5, 1.0]
+    data = ins.model_dump(by_alias=True)
+    data["from"] = default_from
+    data["to"] = default_to
+    return Instruction.model_validate(data)
+
+
 def _anchor(ins: Instruction) -> tuple[float, float]:
     """図形の論理的な中心座標を返す。"""
     if ins.primitive == "line" and ins.from_ and ins.to:
@@ -189,6 +211,7 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     """arrangement を展開して N 個の Instruction を返す。"""
     arr = ins.arrangement
     assert arr is not None
+    ins = _ensure_line_coords(ins)
     if arr.count == 1:
         data = ins.model_dump(by_alias=True)
         data.pop("arrangement", None)
@@ -288,10 +311,8 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction):
     attrs = _stroke_attrs(ins)
 
     if ins.primitive == "line":
-        if ins.from_ is None or ins.to is None:
-            raise ValueError("line requires 'from' and 'to'")
-        start = _px(ins.from_)
-        end = _px(ins.to)
+        start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0))
+        end = _px(ins.to if ins.to is not None else (0.5, 1.0))
         if _needs_variation(ins.variation):
             assert ins.variation is not None
             points = _line_with_variation(

@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v0.7**
+**Version: v0.8**
 
 ---
 
@@ -1024,44 +1024,75 @@ JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（
 
 ---
 
-## 16. 未決定・今後の検討事項
+## 16. 残件と検討事項
 
-**UI / 体験**
-- 記述エリアの物理的なサイズ制限（短歌的な「型」として機能させるか）
-- 解釈フィードバック（7.6）の色パレットの確定（墨の濃淡 vs 墨+朱）
-- 解釈のズレの併記（7.6発展形）を MVP に入れるか後回しにするか
-- 差分の色分けルール（7.2／7.7：変更・追加・削除をどう区別するか）
+v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → SVG) はブラウザで稼働**している。以下は今後の拡張 / 品質向上タスク。
 
-**実装詳細 (v0.4 時点で未決、順次解消中)**
-- ~~`arc` primitive の角度フィールド仕様~~ → v0.7 で解消: `angle_start` / `angle_end` (度、0=東、CCW 正)、center + radius と組み合わせて SVG path A コマンドを生成
-- ~~Renderer での揺らぎ実装~~ → v0.7 `line` で解消 (perlin/wave/pink/white、SHA-256 シード)、他 primitive は未対応
-- Fixture テストの厳密度 (LLM 出力の数値 ±tolerance、ソフトマッチの範囲) — `±0.05` 仮採用
-- FastAPI エンドポイント設計 (`/api/compose` の単発 / ストリーミング)
+### A. Renderer (実装優先)
 
-**LLM fidelity 記録 (v0.7 時点、全て OVMS OpenAI-compat)**
-- Stage 2 (qwen-api / Qwen2.5-7B): 15 fixture 中 9 通過 (strict, tool_use 経由)
-  - center (円/楕円) vs position (三角/四角) 混同、「中央」指示時の bbox 左上補正未実施、複数命令並列時の誤適用
-- Stage 1 (qwen3-api / Qwen3-8B): leaked 4/4、novel 11/11 通過 (loose 判定: Saijiki 存在 + 感情語不在)
-  - ただし実出力には SPEC §2 原則5 違反動詞 (動く / 広げる 等) が混入することあり
-  - v0.7 で system prompt に禁止動詞 + 言い換え例 追加、再測は未実施
-- Stage 1 Qwen3 の `<think>` 可視化あり、作者の解釈プロセス確認に有用
-- Anthropic path (Haiku 4.5 / Opus 4.7) は未検証
-- Gemma3-4B は Score full schema + tool_choice で破綻 (空白クォート連鎖)、実用は schema 簡略化が必要
-- Gemma3-12B は動くが 1 推論 10 分超、実用外
+| 項目 | 状態 | 備考 |
+|---|---|---|
+| line 揺らぎ | 実装済 (v0.8) | 80 segments polyline、perlin/wave/pink/white |
+| circle 揺らぎ | 未実装 | 円周 polygon 化 → radius or 位置の揺らぎ注入 |
+| ellipse 揺らぎ | 未実装 | circle と同様 (rx/ry 方向別揺らぎ可能) |
+| triangle 揺らぎ | 未実装 | 3 辺それぞれ polyline に展開 |
+| square 揺らぎ | 未実装 | 4 辺それぞれ polyline に展開 |
+| arc 揺らぎ | 未実装 | path を N 分割して radius 揺らぎ |
+| `thickness` dimension | 未対応 | stroke-width を segment 毎に変化 (1 line = 複数 path 必要) |
+| `angle` / `rotation` / `length` dimension | 未対応 | 線の端点位置に作用する軸 |
+| 揺らぎの視覚品質 | MVP 水準 | 鉛筆 / 筆の物理的リアリズムは未着手 (SPEC §13.5) |
 
-**Prompt 評価と汎化**
-- Stage 2 fixture (15件): prompt 外例の追加が必要、tolerance `±0.05` は暫定
-- Stage 1 novel 試験は通るが、composer 互換性 (E2E) 未検証
-- LLM 間の fidelity 比較は UI dropdown から手動可能になったが、大量バッチは未自動化
+### B. Stage 2 composer (Qwen2.5 限界の改善)
 
-**Renderer 揺らぎ (未実装)**
-- perlin / pink / wave の波形生成器、シード管理、segment 数、振幅のスケール
-- fixture 11 (fine+perlin) / 15 (broad+wave) は現状 静的描画
-- Web UI で SVG として揺らぎを表現するか Canvas / WebGL へ切替るか未決
+- qwen-api の fixture 合格率 9/15、残 6 件の改善案:
+  - prompt に center/position 混同の対比例を強化
+  - 複数命令並列用の例を追加
+- fixture を prompt 外例に差替 (memorize vs 汎化 切り分け Stage 1 風)
+- Anthropic Haiku 4.5 path の fidelity 測定 (ベースライン比較)
+- Gemma3-4B 対応: tool parameters 用の flat schema 生成ヘルパ (`_flatten_schema_for_tool()`)
+- tolerance `±0.05` の妥当性 (複数 LLM 横断比較で再調整)
 
-**エコシステム**
-- エクステンション機構の実装方式（Nature plugin等をどう組み込むか）
-- Saijiki 辞書の配信形式 (静的 JSON vs API)
+### C. Stage 1 interpreter
+
+- Stage 1 prompt に arc 例 (弧を使う詩句→`弧を引く` 等) 追加、弧出力を誘導
+- Stage 1 → Stage 2 の E2E 汎化試験 (interpret 結果が composer を通るか)
+- SPEC §2 原則5 違反動詞の混入率測定 (v0.7 prompt 強化後の再評価)
+- Anthropic Opus 4.7 path の測定 (作者感による解釈品質比較)
+
+### D. Web UI / 体験 (SPEC §7 未消化)
+
+- **Prev/Next 並置の二枚鑑賞** — 現状は単枚差替え、SPEC §7.7 は並置を想定
+- **LLM Model Inspection** — Stage 2 を複数モデルで同時実行し結果を横並べ比較するビュー
+- 履歴 item 個別削除 (× ボタン) / export・import JSON
+- **解釈のズレ併記** (7.6 発展) — 別解釈を並べて提示
+- **差分の色分けルール** (7.2/7.7) — 前回との変更・追加・削除を色分け
+- **記述エリアのサイズ制限** (短歌的「型」として文字数ガイド)
+- 解釈フィードバック色パレットの確定 (v0.6 で `墨の濃淡` 採用、朱色追加要否)
+- サンプル記述集 (SPEC §14.3 Phase 2)
+
+### E. テスト / CI / 運用
+
+- GitHub Actions 等の CI 未設定 (全テスト pentala 手動実行)
+- LLM fixture テストを夜間バッチ化、model × fixture 行列で記録
+- latency / token usage メトリクス収集
+- LLM hallucination エラー回復 (SPEC §12.8) 未実装
+
+### F. 仕様 / エコシステム (長期)
+
+- **Nature plugin** — 風 / さざ波 / 葉などの現象起因揺らぎ (SPEC §13.7)
+- **エクステンション機構** — プラグイン読込、名前空間 (SPEC §4)
+- **Saijiki 辞書の配信形式** — `web/src/lib/saijiki.ts` 内ハードコード中、将来的に `inku-saijiki` パッケージ
+- **Base Language** — 英語版 Saijiki + 英語 prompt (SPEC §5)
+- **短歌的制約の強化** — 文字数カウント、句跨ぎの扱い
+- **リーダーボード / 作品保存** — ユーザーごとの作品コレクション (P2P or 集約サーバー)
+
+### G. 既に解消済 (参考)
+
+- ~~arc primitive の角度フィールド仕様~~ → v0.7 で解消 (現 v0.8 付録参照)
+- ~~Renderer 揺らぎの基本実装~~ → v0.8 で line に実装
+- ~~Opus 4.7 API の利用方針 (二段階 vs 一段階)~~ → v0.3 二段階確定
+- ~~LLM モデル選択の UI~~ → v0.7 で dropdown + localStorage
+- ~~qwen3 thinking 可視化~~ → v0.7 で実装
 
 ---
 
@@ -1109,7 +1140,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 `server/src/inku_server/`:
 - `schema.py` — Pydantic Score モデル
-- `renderer.py` — Score → SVG (svgwrite)
+- `renderer.py` — Score → SVG (svgwrite)、line の揺らぎ生成 (perlin/wave/pink/white)、arc の SVG path 生成
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (backend dispatch)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch)
 - `api.py` — FastAPI app: `/api/compose`/`/api/interpret`/`/api/paint`/`/health`
@@ -1123,6 +1154,24 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v0.8 (2026-04-24)
+
+**Renderer 揺らぎ実装 + arc primitive**
+
+- **line の variation を Renderer で生成** (SPEC §13.8 の核心)
+  - 80 セグメントの polyline に変換、SHA-256(model_dump_json) でシード
+  - quality 4 種: `wave` (sin), `perlin` (smoothstep 1D value noise), `pink` (2 オクターブ合成), `white` (per-segment hash)
+  - amplitude: fine=4px / medium=12px / broad=30px (1000px canvas 上)
+  - frequency: slow=2 / medium=6 / high=14 cycles/線長
+  - dimensions 適用: `position_x` / `position_y` 単独は該軸揺らぎ、両方指定は線に垂直方向揺らぎ
+  - 決定的: 同一 Score → byte 一致 SVG (test 保証)
+- **arc primitive 本実装**
+  - Schema: `angle_start` / `angle_end` (度、0°=東、CCW 正)
+  - Renderer: `<path d="M ... A r r 0 large sweep x y">` で弧描画
+  - large-arc-flag: `(end-start) % 360 > 180`、sweep-flag: `end > start` で 0 (CCW)
+  - Composer prompt に 弧 行追加、1/4円 / 半円 の角度例
+- **新規 test 7件** (arc quarter / half / missing-angles、variation perlin / wave / deterministic / quality=none)
 
 ### v0.7 (2026-04-24)
 

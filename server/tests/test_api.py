@@ -55,10 +55,10 @@ def test_compose_composer_failure_returns_502(monkeypatch):
 
 
 def test_interpret_happy_path(monkeypatch):
-    monkeypatch.setattr(api_module, "interpret", lambda text, model=None: "中心に黒い円を置く。")
+    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
     r = client.post("/api/interpret", json={"text": "一滴の墨"})
     assert r.status_code == 200
-    assert r.json() == {"ddl": "中心に黒い円を置く。"}
+    assert r.json() == {"ddl": "中心に黒い円を置く。", "thinking": None}
 
 
 def test_interpret_empty_rejected():
@@ -67,7 +67,7 @@ def test_interpret_empty_rejected():
 
 
 def test_paint_pipeline(monkeypatch):
-    monkeypatch.setattr(api_module, "interpret", lambda text, model=None: "中心に黒い円を置く。")
+    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )

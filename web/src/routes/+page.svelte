@@ -14,6 +14,7 @@
 	type PaintResponse = {
 		text: string;
 		ddl: string;
+		thinking: string | null;
 		score: Score;
 		svg: string;
 	};
@@ -29,6 +30,7 @@
 		mode: Mode;
 		input: string;
 		ddl: string | null;
+		thinking?: string | null;
 		score: Score;
 		svg: string;
 		at: number;
@@ -41,12 +43,14 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let ddl = $state<string | null>(null);
+	let thinking = $state<string | null>(null);
 	let result = $state<PaintResponse | ComposeResponse | null>(null);
 	let saijikiOpen = $state(false);
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 
 	let stage1Model = $state<string>(DEFAULT_STAGE1_MODEL);
 	let stage2Model = $state<string>(DEFAULT_STAGE2_MODEL);
+	let includeThinking = $state(false);
 
 	let history = $state<Iteration[]>([]);
 	let cursor = $state(-1);
@@ -106,6 +110,7 @@
 		mode = it.mode;
 		input = it.input;
 		ddl = it.ddl;
+		thinking = it.thinking ?? null;
 		result = { score: it.score, svg: it.svg } as ComposeResponse;
 		error = null;
 	}
@@ -180,6 +185,7 @@
 		mode = next;
 		input = placeholders[next];
 		ddl = null;
+		thinking = null;
 		result = null;
 		error = null;
 	}
@@ -189,6 +195,7 @@
 		loading = true;
 		error = null;
 		ddl = null;
+		thinking = null;
 		try {
 			let entry: Iteration;
 			if (mode === 'free') {
@@ -198,7 +205,8 @@
 					body: JSON.stringify({
 						text: input,
 						stage1_model: stage1Model,
-						stage2_model: stage2Model
+						stage2_model: stage2Model,
+						include_thinking: includeThinking
 					})
 				});
 				if (!r.ok) {
@@ -207,11 +215,13 @@
 				}
 				const data = (await r.json()) as PaintResponse;
 				ddl = data.ddl;
+				thinking = data.thinking;
 				result = data;
 				entry = {
 					mode,
 					input,
 					ddl: data.ddl,
+					thinking: data.thinking,
 					score: data.score,
 					svg: data.svg,
 					at: Date.now()
@@ -308,6 +318,12 @@
 				{/each}
 			</select>
 		</label>
+		{#if mode === 'free' && stage1Model.includes('qwen3')}
+			<label class="think-toggle">
+				<input type="checkbox" bind:checked={includeThinking} />
+				<span>思考を表示</span>
+			</label>
+		{/if}
 	</div>
 
 	<div class="row">
@@ -345,6 +361,13 @@
 						{/each}
 					</div>
 				</div>
+			{/if}
+
+			{#if mode === 'free' && thinking}
+				<details class="thinking" open>
+					<summary>思考 (qwen3 内部)</summary>
+					<pre>{thinking}</pre>
+				</details>
 			{/if}
 
 			{#if mode === 'free' && ddl}
@@ -656,6 +679,44 @@
 		border-radius: 3px;
 		background: #fff;
 		color: #333;
+	}
+
+	.think-toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.85rem;
+		color: #666;
+		cursor: pointer;
+	}
+
+	.thinking {
+		margin-top: 1rem;
+		font-size: 0.85rem;
+		background: #f3efe6;
+		border-left: 3px solid #c9a08a;
+		border-radius: 0 3px 3px 0;
+		padding: 0.5rem 0.75rem;
+	}
+
+	.thinking summary {
+		cursor: pointer;
+		color: #8a6f5a;
+		font-style: italic;
+	}
+
+	.thinking pre {
+		white-space: pre-wrap;
+		word-break: break-word;
+		color: #6b5340;
+		font-family: inherit;
+		line-height: 1.6;
+		margin: 0.5rem 0 0;
+		max-height: 240px;
+		overflow-y: auto;
+		background: transparent;
+		border: none;
+		padding: 0;
 	}
 
 	.row {

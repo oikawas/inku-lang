@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .composer import compose
-from .interpreter import interpret
+from .interpreter import interpret_detail
 from .renderer import render
 from .schema import Score
 
@@ -45,21 +45,27 @@ class InterpretRequest(BaseModel):
     model: str | None = Field(
         default=None, description="Stage 1 モデル名 (未指定時は OPENAI_MODEL_STAGE1 既定)"
     )
+    include_thinking: bool = Field(
+        default=False, description="qwen3 の <think> 内容を別フィールドで返すか"
+    )
 
 
 class InterpretResponse(BaseModel):
     ddl: str
+    thinking: str | None = None
 
 
 class PaintRequest(BaseModel):
     text: str = Field(..., min_length=1, description="自由な自然言語の記述")
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
+    include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
 
 
 class PaintResponse(BaseModel):
     text: str
     ddl: str
+    thinking: str | None = None
     score: Score
     svg: str
 
@@ -87,16 +93,20 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
 @app.post("/api/interpret", response_model=InterpretResponse)
 def api_interpret(req: InterpretRequest) -> InterpretResponse:
     try:
-        ddl = interpret(req.text, model=req.model)
+        ddl, thinking = interpret_detail(
+            req.text, model=req.model, include_thinking=req.include_thinking
+        )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
-    return InterpretResponse(ddl=ddl)
+    return InterpretResponse(ddl=ddl, thinking=thinking)
 
 
 @app.post("/api/paint", response_model=PaintResponse)
 def api_paint(req: PaintRequest) -> PaintResponse:
     try:
-        ddl = interpret(req.text, model=req.stage1_model)
+        ddl, thinking = interpret_detail(
+            req.text, model=req.stage1_model, include_thinking=req.include_thinking
+        )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     try:
@@ -107,7 +117,7 @@ def api_paint(req: PaintRequest) -> PaintResponse:
         svg = render(score)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
-    return PaintResponse(text=req.text, ddl=ddl, score=score, svg=svg)
+    return PaintResponse(text=req.text, ddl=ddl, thinking=thinking, score=score, svg=svg)
 
 
 def main() -> None:

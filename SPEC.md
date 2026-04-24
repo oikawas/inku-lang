@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v0.8**
+**Version: v0.9**
 
 ---
 
@@ -1042,19 +1042,18 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 | `angle` / `rotation` / `length` dimension | 未対応 | 線の端点位置に作用する軸 |
 | 揺らぎの視覚品質 | MVP 水準 | 鉛筆 / 筆の物理的リアリズムは未着手 (SPEC §13.5) |
 
-### B. Stage 2 composer (Qwen2.5 限界の改善)
+### B. Stage 2 composer (精度改善)
 
 - qwen-api の fixture 合格率 9/15、残 6 件の改善案:
-  - prompt に center/position 混同の対比例を強化
+  - center/position 混同の対比例を EXAMPLE_POOL 形式で追加
   - 複数命令並列用の例を追加
-- fixture を prompt 外例に差替 (memorize vs 汎化 切り分け Stage 1 風)
 - Anthropic Haiku 4.5 path の fidelity 測定 (ベースライン比較)
 - Gemma3-4B 対応: tool parameters 用の flat schema 生成ヘルパ (`_flatten_schema_for_tool()`)
 - tolerance `±0.05` の妥当性 (複数 LLM 横断比較で再調整)
 
 ### C. Stage 1 interpreter
 
-- Stage 1 prompt に arc 例 (弧を使う詩句→`弧を引く` 等) 追加、弧出力を誘導
+- EXAMPLE_POOL に arc 例 (弧を使う詩句 → `弧を引く` 等) 追加、弧出力を誘導
 - Stage 1 → Stage 2 の E2E 汎化試験 (interpret 結果が composer を通るか)
 - SPEC §2 原則5 違反動詞の混入率測定 (v0.7 prompt 強化後の再評価)
 - Anthropic Opus 4.7 path の測定 (作者感による解釈品質比較)
@@ -1093,6 +1092,9 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~Opus 4.7 API の利用方針 (二段階 vs 一段階)~~ → v0.3 二段階確定
 - ~~LLM モデル選択の UI~~ → v0.7 で dropdown + localStorage
 - ~~qwen3 thinking 可視化~~ → v0.7 で実装
+- ~~NVIDIA NIM プロバイダー追加 + モデル per-stage 選択~~ → v0.9 で実装
+- ~~本数・個数の arrangement 展開 (JSON サイズ問題)~~ → v0.9 で実装
+- ~~プロンプト無限増殖問題~~ → v0.9 で schema-as-spec + EXAMPLE_POOL により構造的に解決
 
 ---
 
@@ -1154,6 +1156,64 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v0.9 (2026-04-25)
+
+**プロンプト非線形化 + NVIDIA NIM 対応 + arrangement 実装**
+
+#### プロンプト設計の構造改善 (主要変更)
+
+機能追加でプロンプトが際限なく長くなる問題を、MT (機械翻訳) のスペック / コーパス分離原則を援用して構造的に解決。
+
+- **schema.py を仕様の正典 (Source of Truth) に**
+  - 全フィールドに日本語 ↔ 値マッピングを含む `description` を付与
+  - LLM はツールスキーマの description を直接参照 → SYSTEM_PROMPT にフィールド説明を繰り返す必要がなくなる
+  - 新プリミティブ追加 = スキーマ更新のみ。SYSTEM_PROMPT は変えない
+
+- **composer.py: SYSTEM_PROMPT を手順のみに削減**
+  - 3,942 chars → 1,072 chars (-73%)
+  - 変換例は最重要パターン 4 件に絞る (残りはスキーマ description が補う)
+
+- **interpreter.py: EXAMPLE_POOL + 動的例選択**
+  - `EXAMPLE_POOL`: `{keywords, input, output}` タプルのリスト (現在 12 件)
+  - `_select_examples(text, k=3)`: 入力とのキーワード一致数でスコアリングし上位 k 件を選択
+  - `_build_system_prompt(text)`: PREFIX + 選択された k 件を推論ごとに構築
+  - 例を何件追加してもプロンプト長は固定 (PREFIX + 3 件)
+  - SYSTEM_PROMPT モジュール変数はプレフィックスのみを公開 (`/api/prompts` 互換)
+
+- **レイテンシ効果**: 322.7s → 21.5s (同一出力、NVIDIA Gemma 4 31B、15x 高速化)
+
+#### NVIDIA NIM プロバイダー追加
+
+- `google/gemma-4-31b-it` を第一・第二段階の既定モデルに設定
+- モデル ID による自動ルーティング:
+  - `anthropic:<model>` プレフィックス → Anthropic API
+  - `/` を含む ID → NVIDIA NIM (`https://integrate.api.nvidia.com/v1`)
+  - その他 → OVMS (ローカル OpenAI 互換)
+- UI: プロバイダー選択 (NVIDIA NIM / Anthropic / ローカル) + モデル選択の 2 段 dropdown、localStorage 永続化
+- `web/src/lib/models.ts` に `PROVIDER_GROUPS` 構造を追加
+- NVIDIA_API_KEY は `no-git-sync/.env` + systemd `EnvironmentFile=` で管理
+
+#### arrangement フィールド (本数・個数の JSON サイズ問題)
+
+N 個の instruction を展開すると JSON が N 倍になる問題を解決。Renderer 側で展開することで JSON は常に O(1)。
+
+- **schema.py**: `Arrangement` モデル追加 (`count` / `layout` / `margin` / `center` / `radius`)
+- **renderer.py**: `_anchor()` / `_shift()` / `_expand_arrangement()` — Renderer 側で N 個に展開
+  - layout: `horizontal` / `vertical` / `radial` / `scatter` (決定的ランダム散布)
+  - `count=1` は展開せず単体返却。`ge=2` → `ge=1` に変更 (バリデーションエラー防止)
+- **interpreter.py EXAMPLE_POOL**: 数量表現を 1 文でまとめる例、ランダム配置例を収録
+- **composer.py**: arrangement 使用を SYSTEM_PROMPT で強制、複数 instruction 生成を禁止
+
+#### UI 改善
+
+- 正規化DDL タブ削除 (常に自由記述モード = `/api/paint`)
+- 履歴サムネイルに経過秒数を表示 (`Iteration` に `elapsed_ms` 追加)
+- `GET /api/prompts` エンドポイント追加 → 出力欄「プロンプト (デバッグ)」パネルで Stage 1 / 2 のシステムプロンプトと実際の入力を表示
+- キャンバス背景色を白に変更 (`#f7f5ef` → `#ffffff`)
+- 推論中ライブタイマー + 完了後「解釈 Xs + 構造化 Ys = Zs」内訳表示
+
+---
 
 ### v0.8 (2026-04-24)
 

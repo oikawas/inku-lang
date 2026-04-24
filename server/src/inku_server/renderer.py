@@ -151,13 +151,13 @@ def _line_with_variation(
     return pts
 
 
-# arrangement の scatter で使う決定的な位置リスト
-_SCATTER_POSITIONS: list[tuple[float, float]] = [
-    (0.15, 0.20), (0.80, 0.15), (0.50, 0.50),
-    (0.20, 0.75), (0.75, 0.80), (0.30, 0.35),
-    (0.70, 0.40), (0.55, 0.25), (0.40, 0.65),
-    (0.85, 0.55),
-]
+def _scatter_pos(i: int, seed: int, margin: float) -> tuple[float, float]:
+    """index i に対応する決定的な散布座標を返す (hash ベース)。"""
+    span = 1.0 - 2 * margin
+    h = hashlib.sha256(f"{seed}:s:{i}".encode()).digest()
+    xv = struct.unpack("<I", h[:4])[0] / 0xFFFFFFFF
+    yv = struct.unpack("<I", h[4:8])[0] / 0xFFFFFFFF
+    return (margin + xv * span, margin + yv * span)
 
 
 def _anchor(ins: Instruction) -> tuple[float, float]:
@@ -196,6 +196,7 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     n = arr.count
     margin = arr.margin
     ax, ay = _anchor(ins)
+    seed = _seed_for_instruction(ins)
 
     if arr.layout == "horizontal":
         span = 1.0 - 2 * margin
@@ -219,7 +220,7 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
         return [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
 
     if arr.layout == "scatter":
-        targets = _SCATTER_POSITIONS[:n]
+        targets = [_scatter_pos(i, seed, margin) for i in range(n)]
         return [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
 
     return [ins]

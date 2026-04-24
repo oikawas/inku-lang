@@ -60,7 +60,7 @@ class Arrangement(BaseModel):
 
     count: int = Field(
         ge=1,
-        le=50,
+        le=500,
         description="配置数。2以上の同一図形には必ず使う。複数 instruction 生成は禁止",
     )
 
@@ -68,7 +68,7 @@ class Arrangement(BaseModel):
     @classmethod
     def _clamp_count(cls, v: object) -> object:
         if isinstance(v, (int, float)):
-            return min(max(int(v), 1), 50)
+            return min(max(int(v), 1), 500)
         return v
     layout: Layout = Field(
         default="horizontal",

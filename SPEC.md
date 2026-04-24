@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v0.6**
+**Version: v0.7**
 
 ---
 
@@ -1038,16 +1038,21 @@ JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（
 - Fixture テストの厳密度 (LLM 出力の数値 ±tolerance、ソフトマッチの範囲) — `±0.05` 仮採用
 - FastAPI エンドポイント設計 (`/api/compose` の単発 / ストリーミング)
 
-**LLM fidelity 記録 (v0.6 時点、全て OVMS OpenAI-compat)**
+**LLM fidelity 記録 (v0.7 時点、全て OVMS OpenAI-compat)**
 - Stage 2 (qwen-api / Qwen2.5-7B): 15 fixture 中 9 通過 (strict, tool_use 経由)
   - center (円/楕円) vs position (三角/四角) 混同、「中央」指示時の bbox 左上補正未実施、複数命令並列時の誤適用
-- Stage 1 (qwen3-api / Qwen3-8B): 5 smoke 通過、ただし 4/5 は prompt 内例と入力同一 (memorize 懸念)
-- Anthropic path は両 stage で未検証 (Haiku 4.5 / Opus 4.7 で fidelity 差分を測る予定)
+- Stage 1 (qwen3-api / Qwen3-8B): leaked 4/4、novel 11/11 通過 (loose 判定: Saijiki 存在 + 感情語不在)
+  - ただし実出力には SPEC §2 原則5 違反動詞 (動く / 広げる 等) が混入することあり
+  - v0.7 で system prompt に禁止動詞 + 言い換え例 追加、再測は未実施
+- Stage 1 Qwen3 の `<think>` 可視化あり、作者の解釈プロセス確認に有用
+- Anthropic path (Haiku 4.5 / Opus 4.7) は未検証
+- Gemma3-4B は Score full schema + tool_choice で破綻 (空白クォート連鎖)、実用は schema 簡略化が必要
+- Gemma3-12B は動くが 1 推論 10 分超、実用外
 
 **Prompt 評価と汎化**
-- 正規化DDL fixture は prompt 内例と重複があり、memorize なのか汎化なのか切り分け未実施
-- prompt 外例 10-20 件の追加 fixture が次の検証タスク
-- tolerance 値 `±0.05` は暫定、LLM 間比較で再調整要
+- Stage 2 fixture (15件): prompt 外例の追加が必要、tolerance `±0.05` は暫定
+- Stage 1 novel 試験は通るが、composer 互換性 (E2E) 未検証
+- LLM 間の fidelity 比較は UI dropdown から手動可能になったが、大量バッチは未自動化
 
 **Renderer 揺らぎ (未実装)**
 - perlin / pink / wave の波形生成器、シード管理、segment 数、振幅のスケール
@@ -1093,10 +1098,12 @@ inku-lang/                         # github.com/oikawas/inku-lang
     ├── src/
     │   ├── app.html
     │   ├── lib/
-    │   │   └── saijiki.ts         # 歳時記辞書 (7 カテゴリ)
+    │   │   ├── saijiki.ts         # 歳時記辞書 (7 カテゴリ)
+    │   │   ├── highlight.ts       # 墨濃淡トークナイザ (Saijiki/感情/地)
+    │   │   └── models.ts          # 選択可能な LLM 一覧と既定
     │   └── routes/
     │       ├── +layout.svelte
-    │       └── +page.svelte       # モード切替 / Saijiki / 履歴 UI
+    │       └── +page.svelte       # モード / モデル選択 / Saijiki / 履歴 / 思考 UI
     └── static/
 ```
 
@@ -1116,6 +1123,34 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v0.7 (2026-04-24)
+
+**LLM 多モデル対応 + Stage 1 静止画強化 + thinking 可視化**
+
+- **LLM モデル: UI から切替可能に**
+  - `POST /api/compose`: `model` フィールド
+  - `POST /api/interpret`: `model` フィールド
+  - `POST /api/paint`: `stage1_model` / `stage2_model` フィールド
+  - `compose()` / `interpret_detail()` に `model` キーワード引数追加、未指定時は env 既定
+  - UI (モード切替下に `解釈` / `構造化` dropdown、localStorage 永続化): Qwen2.5-7B / Qwen3-8B / Gemma3-4B / Gemma3-12B
+
+- **既定モデル**
+  - Stage 1: `qwen3-api` (Qwen3-8B)
+  - Stage 2: `qwen-api` (Qwen2.5-7B)
+  - Gemma3-12B は 15 fixture に 6 時間要、実用外 (選択肢には残す)
+  - Gemma3-4B は Score full schema + tool_choice 組合せで破綻 (bracket 出力異常、空白クォート連鎖)、prompt + schema 簡略化で動作するが品質は未検証
+
+- **Stage 1 system prompt: 静止画原則 強化 (SPEC §2 原則5)**
+  - 禁止動詞: 動く / 動かす / 広がる / 広げる / 流れる / 伸びる / 昇る / 落ちる / 散る / 沈む / 塗る
+  - 使える動作動詞: 置く / 並べる / 引く / 描く / 散らす / 埋める
+  - 動的→静的 言い換え 5 例 (月が昇る→右上に円、花が散る→細かい点を散らす 等)
+
+- **Qwen3 thinking 可視化**
+  - `interpret_detail()` が `(ddl, thinking)` tuple を返す
+  - `include_thinking=True` で `/no_think` を外し、`<think>…</think>` 内容を分離保持
+  - `POST /api/interpret`, `/api/paint` に `include_thinking` request フィールド、`thinking` response フィールド
+  - UI: Stage 1 が qwen3 系のとき「思考を表示」checkbox、結果パネルに faded amber 色の `<details>` で内部思考表示 (作者の思考プロセス可視化)
 
 ### v0.6 (2026-04-23)
 

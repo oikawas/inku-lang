@@ -129,10 +129,10 @@ def _submit_tool() -> dict[str, Any]:
     }
 
 
-def compose(ddl: str) -> Score:
+def compose(ddl: str, *, model: str | None = None) -> Score:
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        return _compose_openai(ddl)
+        return _compose_openai(ddl, model=model)
     return _compose_anthropic(ddl)
 
 
@@ -154,12 +154,12 @@ def _compose_anthropic(ddl: str) -> Score:
     raise RuntimeError("Anthropic did not return submit_score tool call")
 
 
-def _compose_openai(ddl: str) -> Score:
+def _compose_openai(ddl: str, *, model: str | None = None) -> Score:
     from openai import OpenAI
 
     base_url = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:18000/v3")
     api_key = os.getenv("OPENAI_API_KEY") or "none"
-    model = os.getenv("OPENAI_MODEL", "qwen-api")
+    model = model or os.getenv("OPENAI_MODEL", "qwen-api")
 
     client = OpenAI(base_url=base_url, api_key=api_key)
 
@@ -191,14 +191,50 @@ def _compose_openai(ddl: str) -> Score:
         return Score.model_validate(json.loads(args))
 
     text = (msg.content or "").strip()
-    m = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", text, re.DOTALL)
-    if m:
-        payload = json.loads(m.group(1))
-        args = payload.get("arguments", payload)
+    args = _extract_tool_call_args(text)
+    if args is not None:
         return Score.model_validate(args)
 
     data = _extract_json(text)
     return Score.model_validate(data)
+
+
+def _extract_tool_call_args(text: str) -> dict | None:
+    """Tool call の `arguments` 部を各モデル方言から抽出する。
+
+    対応する形式:
+    - Qwen2.5: `<tool_call>{"name":"X","arguments":{...}}</tool_call>`
+    - Gemma 3: ```json {"tool_calls":[{"name":"X","arguments":{...}}]} ```
+    - その他: 裸の {"instructions":[...]} (Score 直接)
+    """
+    # Qwen 方言
+    m = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", text, re.DOTALL)
+    if m:
+        try:
+            payload = json.loads(m.group(1))
+            return payload.get("arguments", payload)
+        except json.JSONDecodeError:
+            pass
+
+    # Gemma 方言 (markdown fence + {"tool_calls":[{...}]})
+    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if m:
+        try:
+            payload = json.loads(m.group(1))
+            if isinstance(payload, dict):
+                tcs = payload.get("tool_calls")
+                if isinstance(tcs, list) and tcs:
+                    args = tcs[0].get("arguments") or tcs[0].get("parameters")
+                    if isinstance(args, dict):
+                        return args
+                if "arguments" in payload and isinstance(payload["arguments"], dict):
+                    return payload["arguments"]
+                if "instructions" in payload:
+                    return payload
+        except json.JSONDecodeError:
+            pass
+
+    return None
 
 
 def _extract_json(text: str) -> dict:

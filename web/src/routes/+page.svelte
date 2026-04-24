@@ -3,8 +3,11 @@
 	import { browser } from '$app/environment';
 	import { SAIJIKI } from '$lib/saijiki';
 	import { annotate } from '$lib/highlight';
+	import { MODELS, DEFAULT_STAGE1_MODEL, DEFAULT_STAGE2_MODEL } from '$lib/models';
 
 	const STORAGE_KEY = 'inku-history-v1';
+	const MODEL_STAGE1_KEY = 'inku-model-stage1';
+	const MODEL_STAGE2_KEY = 'inku-model-stage2';
 
 	type Score = { instructions: unknown[] };
 
@@ -41,6 +44,9 @@
 	let result = $state<PaintResponse | ComposeResponse | null>(null);
 	let saijikiOpen = $state(false);
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
+
+	let stage1Model = $state<string>(DEFAULT_STAGE1_MODEL);
+	let stage2Model = $state<string>(DEFAULT_STAGE2_MODEL);
 
 	let history = $state<Iteration[]>([]);
 	let cursor = $state(-1);
@@ -141,7 +147,33 @@
 			history = loaded;
 			loadIteration(loaded.length - 1);
 		}
+		try {
+			const s1 = localStorage.getItem(MODEL_STAGE1_KEY);
+			if (s1) stage1Model = s1;
+			const s2 = localStorage.getItem(MODEL_STAGE2_KEY);
+			if (s2) stage2Model = s2;
+		} catch {
+			// ignore
+		}
 	});
+
+	function saveStage1Model(v: string) {
+		stage1Model = v;
+		try {
+			localStorage.setItem(MODEL_STAGE1_KEY, v);
+		} catch {
+			// ignore
+		}
+	}
+
+	function saveStage2Model(v: string) {
+		stage2Model = v;
+		try {
+			localStorage.setItem(MODEL_STAGE2_KEY, v);
+		} catch {
+			// ignore
+		}
+	}
 
 	function switchMode(next: Mode) {
 		if (mode === next) return;
@@ -163,7 +195,11 @@
 				const r = await fetch('/api/paint', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ text: input })
+					body: JSON.stringify({
+						text: input,
+						stage1_model: stage1Model,
+						stage2_model: stage2Model
+					})
 				});
 				if (!r.ok) {
 					const d = await r.json().catch(() => ({}));
@@ -184,7 +220,7 @@
 				const r = await fetch('/api/compose', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ ddl: input })
+					body: JSON.stringify({ ddl: input, model: stage2Model })
 				});
 				if (!r.ok) {
 					const d = await r.json().catch(() => ({}));
@@ -245,6 +281,33 @@
 		>
 			正規化DDL
 		</button>
+	</div>
+
+	<div class="model-row">
+		{#if mode === 'free'}
+			<label class="model-pick">
+				<span>解釈</span>
+				<select
+					value={stage1Model}
+					onchange={(e) => saveStage1Model((e.currentTarget as HTMLSelectElement).value)}
+				>
+					{#each MODELS as m (m.id)}
+						<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
+		<label class="model-pick">
+			<span>構造化</span>
+			<select
+				value={stage2Model}
+				onchange={(e) => saveStage2Model((e.currentTarget as HTMLSelectElement).value)}
+			>
+				{#each MODELS as m (m.id)}
+					<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>
+				{/each}
+			</select>
+		</label>
 	</div>
 
 	<div class="row">
@@ -564,6 +627,35 @@
 	.mode-switch button.active {
 		color: #111;
 		border-bottom-color: #111;
+	}
+
+	.model-row {
+		display: flex;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
+		flex-wrap: wrap;
+	}
+
+	.model-pick {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.85rem;
+		color: #666;
+	}
+
+	.model-pick span {
+		color: #888;
+	}
+
+	.model-pick select {
+		font-family: inherit;
+		font-size: 0.85rem;
+		padding: 0.25rem 0.5rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		background: #fff;
+		color: #333;
 	}
 
 	.row {

@@ -30,6 +30,9 @@ app.add_middleware(
 
 class ComposeRequest(BaseModel):
     ddl: str = Field(..., min_length=1, description="正規化DDL テキスト")
+    model: str | None = Field(
+        default=None, description="Stage 2 モデル名 (未指定時は OPENAI_MODEL 既定)"
+    )
 
 
 class ComposeResponse(BaseModel):
@@ -39,6 +42,9 @@ class ComposeResponse(BaseModel):
 
 class InterpretRequest(BaseModel):
     text: str = Field(..., min_length=1, description="自由な自然言語の記述")
+    model: str | None = Field(
+        default=None, description="Stage 1 モデル名 (未指定時は OPENAI_MODEL_STAGE1 既定)"
+    )
 
 
 class InterpretResponse(BaseModel):
@@ -47,6 +53,8 @@ class InterpretResponse(BaseModel):
 
 class PaintRequest(BaseModel):
     text: str = Field(..., min_length=1, description="自由な自然言語の記述")
+    stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
+    stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
 
 
 class PaintResponse(BaseModel):
@@ -64,7 +72,7 @@ def health() -> dict[str, bool]:
 @app.post("/api/compose", response_model=ComposeResponse)
 def api_compose(req: ComposeRequest) -> ComposeResponse:
     try:
-        score = compose(req.ddl)
+        score = compose(req.ddl, model=req.model)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -79,7 +87,7 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
 @app.post("/api/interpret", response_model=InterpretResponse)
 def api_interpret(req: InterpretRequest) -> InterpretResponse:
     try:
-        ddl = interpret(req.text)
+        ddl = interpret(req.text, model=req.model)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     return InterpretResponse(ddl=ddl)
@@ -88,11 +96,11 @@ def api_interpret(req: InterpretRequest) -> InterpretResponse:
 @app.post("/api/paint", response_model=PaintResponse)
 def api_paint(req: PaintRequest) -> PaintResponse:
     try:
-        ddl = interpret(req.text)
+        ddl = interpret(req.text, model=req.stage1_model)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     try:
-        score = compose(ddl)
+        score = compose(ddl, model=req.stage2_model)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
     try:

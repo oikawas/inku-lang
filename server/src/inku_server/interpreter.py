@@ -69,10 +69,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第一段階インタプリタ。
 正規化DDL のテキストのみ。前置き・説明・タグ・コードブロック装飾はすべて禁止。"""
 
 
-def interpret(text: str) -> str:
+def interpret(text: str, *, model: str | None = None) -> str:
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        return _interpret_openai(text)
+        return _interpret_openai(text, model=model)
     return _interpret_anthropic(text)
 
 
@@ -92,17 +92,17 @@ def _interpret_anthropic(text: str) -> str:
     raise RuntimeError("Anthropic did not return text content")
 
 
-def _interpret_openai(text: str) -> str:
+def _interpret_openai(text: str, *, model: str | None = None) -> str:
     from openai import OpenAI
 
     base_url = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:18000/v3")
     api_key = os.getenv("OPENAI_API_KEY") or "none"
-    model = os.getenv("OPENAI_MODEL_STAGE1", "qwen3-api")
+    model = model or os.getenv("OPENAI_MODEL_STAGE1", "qwen3-api")
 
     client = OpenAI(base_url=base_url, api_key=api_key)
 
-    # Qwen3 thinking モード抑制
-    user_content = f"/no_think {text}"
+    # Qwen3 のみ thinking 抑制が必要
+    user_content = f"/no_think {text}" if "qwen3" in model.lower() else text
 
     resp = client.chat.completions.create(
         model=model,
@@ -116,4 +116,6 @@ def _interpret_openai(text: str) -> str:
     )
     out = (resp.choices[0].message.content or "").strip()
     out = re.sub(r"<think>.*?</think>", "", out, flags=re.DOTALL).strip()
+    # markdown fence で囲まれる場合 (Gemma 3 稀) も剥がす
+    out = re.sub(r"^```(?:\w+)?\s*\n?|\n?```$", "", out, flags=re.MULTILINE).strip()
     return out

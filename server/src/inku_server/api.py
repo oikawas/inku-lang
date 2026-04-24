@@ -6,15 +6,18 @@ GET  /health      : liveness
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from threading import Lock
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .composer import compose
@@ -50,6 +53,10 @@ def _save_history() -> None:
 
 
 _load_history()
+
+# 起動時に学習済みコーパスを EXAMPLE_POOL へ注入
+from .trainer import load_learned_examples as _load_learned  # noqa: E402
+_load_learned()
 
 app.add_middleware(
     CORSMiddleware,
@@ -230,6 +237,64 @@ def api_history_delete() -> dict[str, bool]:
         _history.clear()
         _save_history()
     return {"ok": True}
+
+
+# ── 学習モード (SSE) ────────────────────────────────────────────────────────────
+
+@app.get("/api/train/stats")
+def api_train_stats() -> dict:
+    from .trainer import learned_count
+    return {"learned_count": learned_count()}
+
+
+@app.delete("/api/train")
+def api_train_delete() -> dict[str, bool]:
+    from .trainer import clear_learned_examples
+    clear_learned_examples()
+    return {"ok": True}
+
+
+@app.get("/api/train")
+async def api_train_stream(
+    request: Request,
+    n: int = Query(default=5, ge=1, le=200),
+    model: str | None = None,
+) -> StreamingResponse:
+    from .trainer import learned_count, run_one_iteration
+
+    async def generate() -> AsyncGenerator[str, None]:
+        for i in range(n):
+            if await request.is_disconnected():
+                break
+            yield (
+                "data: "
+                + json.dumps({"type": "progress", "i": i, "total": n, "learned": learned_count()})
+                + "\n\n"
+            )
+            try:
+                result = await asyncio.to_thread(run_one_iteration, i, model)
+                yield (
+                    "data: "
+                    + json.dumps({"type": "result", "i": i + 1, "total": n, "learned": learned_count(), **result})
+                    + "\n\n"
+                )
+            except Exception as e:  # noqa: BLE001
+                yield (
+                    "data: "
+                    + json.dumps({"type": "error", "i": i + 1, "total": n, "error": str(e)})
+                    + "\n\n"
+                )
+        yield (
+            "data: "
+            + json.dumps({"type": "done", "total": n, "learned": learned_count()})
+            + "\n\n"
+        )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def main() -> None:

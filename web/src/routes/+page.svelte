@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { SAIJIKI } from '$lib/saijiki';
 	import { annotate } from '$lib/highlight';
 	import {
@@ -76,6 +76,68 @@
 	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
+
+	// 学習モード
+	type TrainEntry = { i: number; text: string; ddl: string; style: string };
+	let trainOpen = $state(false);
+	let trainN = $state(10);
+	let trainRunning = $state(false);
+	let trainProgress = $state({ i: 0, total: 0 });
+	let trainLog = $state<TrainEntry[]>([]);
+	let trainLearnedCount = $state(0);
+	let trainEventSource = $state<EventSource | null>(null);
+
+	function startTraining() {
+		if (trainRunning) return;
+		trainRunning = true;
+		trainLog = [];
+		trainProgress = { i: 0, total: trainN };
+
+		const params = new URLSearchParams({ n: String(trainN) });
+		if (stage1Model) params.set('model', stage1Model);
+		const es = new EventSource(`/api/train?${params.toString()}`);
+		trainEventSource = es;
+
+		es.onmessage = (e: MessageEvent) => {
+			const data = JSON.parse(e.data);
+			if (data.type === 'progress') {
+				trainProgress = { i: data.i, total: data.total };
+				if (data.learned != null) trainLearnedCount = data.learned;
+			} else if (data.type === 'result') {
+				trainProgress = { i: data.i, total: data.total };
+				if (data.learned != null) trainLearnedCount = data.learned;
+				trainLog = [
+					{ i: data.i, text: data.text, ddl: data.ddl, style: data.style },
+					...trainLog
+				].slice(0, 50);
+			} else if (data.type === 'error') {
+				trainLog = [
+					{ i: data.i, text: `[エラー] ${data.error}`, ddl: '', style: '' },
+					...trainLog
+				].slice(0, 50);
+			} else if (data.type === 'done') {
+				if (data.learned != null) trainLearnedCount = data.learned;
+				stopTraining();
+			}
+		};
+		es.onerror = () => stopTraining();
+	}
+
+	function stopTraining() {
+		if (trainEventSource) {
+			trainEventSource.close();
+			trainEventSource = null;
+		}
+		trainRunning = false;
+	}
+
+	async function clearCorpus() {
+		try {
+			await fetch('/api/train', { method: 'DELETE' });
+		} catch { /* ignore */ }
+		trainLearnedCount = 0;
+		trainLog = [];
+	}
 
 	async function fetchHistoryPage(page: number): Promise<void> {
 		const offset = page * HISTORY_PAGE_SIZE;
@@ -194,6 +256,17 @@
 		} catch {
 			// ignore prompt load failure
 		}
+		try {
+			const r = await fetch('/api/train/stats');
+			if (r.ok) {
+				const d = await r.json();
+				trainLearnedCount = d.learned_count ?? 0;
+			}
+		} catch { /* ignore */ }
+	});
+
+	onDestroy(() => {
+		stopTraining();
 	});
 
 	function setStage1Provider(v: Provider) {
@@ -532,6 +605,74 @@
 		</section>
 	{/if}
 </main>
+
+	<section class="training">
+		<button class="training-toggle" onclick={() => (trainOpen = !trainOpen)}>
+			<span class="training-title">学習モード <span class="muted">corpus builder</span></span>
+			{#if trainLearnedCount > 0}
+				<span class="learned-badge">{trainLearnedCount} 件学習済</span>
+			{/if}
+			<span class="toggle-arrow">{trainOpen ? '▲' : '▼'}</span>
+		</button>
+
+		{#if trainOpen}
+			<div class="training-body">
+				<div class="train-controls">
+					<label class="train-n-label">
+						<span>回数</span>
+						<input
+							type="number"
+							bind:value={trainN}
+							min="1"
+							max="200"
+							disabled={trainRunning}
+						/>
+					</label>
+					<span class="train-model-hint">解釈モデル: {stage1Model}</span>
+					{#if !trainRunning}
+						<button class="train-btn start" onclick={startTraining}>開始</button>
+					{:else}
+						<button class="train-btn stop" onclick={stopTraining}>停止</button>
+					{/if}
+					{#if trainLearnedCount > 0 && !trainRunning}
+						<button class="clear-btn" onclick={clearCorpus}>コーパス削除</button>
+					{/if}
+				</div>
+
+				{#if trainProgress.total > 0}
+					<div class="train-progress-row">
+						<div class="train-bar-wrap">
+							<div
+								class="train-bar-fill"
+								style="width: {(trainProgress.i / trainProgress.total) * 100}%"
+								class:running={trainRunning}
+							></div>
+						</div>
+						<span class="train-counter">{trainProgress.i} / {trainProgress.total}</span>
+					</div>
+				{/if}
+
+				{#if trainLog.length > 0}
+					<div class="train-log">
+						{#each trainLog as entry (entry.i)}
+							<div class="train-entry" class:error-entry={entry.style === ''}>
+								<div class="train-entry-meta">
+									<span class="train-idx">#{entry.i}</span>
+									{#if entry.style}
+										<span class="train-style">{entry.style}</span>
+									{/if}
+								</div>
+								<div class="train-text">{entry.text}</div>
+								{#if entry.ddl}
+									<div class="train-ddl">→ {entry.ddl}</div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</section>
 
 <svelte:window onkeydown={handleKeydown} />
 
@@ -1132,6 +1273,216 @@
 		font-size: 0.78rem;
 		line-height: 1.5;
 		margin: 0;
+	}
+
+	/* 学習モード */
+	.training {
+		margin-top: 2rem;
+		border-top: 1px solid #ddd;
+		padding-top: 1rem;
+	}
+
+	.training-toggle {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		background: transparent;
+		border: none;
+		padding: 0.5rem 0;
+		cursor: pointer;
+		font-family: inherit;
+		text-align: left;
+	}
+
+	.training-toggle:hover .training-title {
+		color: #111;
+	}
+
+	.training-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #555;
+	}
+
+	.learned-badge {
+		font-size: 0.78rem;
+		background: #e8edf8;
+		color: #2c3e91;
+		padding: 0.15rem 0.5rem;
+		border-radius: 999px;
+	}
+
+	.toggle-arrow {
+		margin-left: auto;
+		font-size: 0.75rem;
+		color: #aaa;
+	}
+
+	.training-body {
+		margin-top: 0.75rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.train-controls {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.train-n-label {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.85rem;
+		color: #555;
+	}
+
+	.train-n-label input {
+		width: 4rem;
+		padding: 0.25rem 0.4rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		font-family: inherit;
+		font-size: 0.85rem;
+		text-align: right;
+	}
+
+	.train-model-hint {
+		font-size: 0.8rem;
+		color: #999;
+	}
+
+	.train-btn {
+		padding: 0.4rem 1rem;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.9rem;
+		font-weight: 500;
+	}
+
+	.train-btn.start {
+		background: #2c3e91;
+		color: #fff;
+	}
+
+	.train-btn.start:hover {
+		background: #1e2d6b;
+	}
+
+	.train-btn.stop {
+		background: #a2342a;
+		color: #fff;
+	}
+
+	.train-btn.stop:hover {
+		background: #7d2820;
+	}
+
+	.train-progress-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.train-bar-wrap {
+		flex: 1;
+		height: 6px;
+		background: #e8e8e8;
+		border-radius: 3px;
+		overflow: hidden;
+	}
+
+	.train-bar-fill {
+		height: 100%;
+		background: #2c3e91;
+		border-radius: 3px;
+		transition: width 0.3s ease;
+	}
+
+	.train-bar-fill.running {
+		background: linear-gradient(90deg, #2c3e91, #5b7be8, #2c3e91);
+		background-size: 200% 100%;
+		animation: shimmer 1.5s infinite linear;
+	}
+
+	@keyframes shimmer {
+		0% { background-position: 200% 0; }
+		100% { background-position: -200% 0; }
+	}
+
+	.train-counter {
+		font-size: 0.8rem;
+		color: #888;
+		min-width: 3.5rem;
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.train-log {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		max-height: 400px;
+		overflow-y: auto;
+		border: 1px solid #e8e8e8;
+		border-radius: 4px;
+		padding: 0.5rem;
+		background: #fafafa;
+	}
+
+	.train-entry {
+		background: #fff;
+		border: 1px solid #eee;
+		border-radius: 3px;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.85rem;
+	}
+
+	.train-entry.error-entry {
+		border-color: #f5c6c4;
+		background: #fff8f7;
+	}
+
+	.train-entry-meta {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.3rem;
+	}
+
+	.train-idx {
+		font-size: 0.75rem;
+		color: #aaa;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.train-style {
+		font-size: 0.72rem;
+		color: #888;
+		background: #f0f0f0;
+		padding: 0.1rem 0.4rem;
+		border-radius: 999px;
+	}
+
+	.train-text {
+		color: #222;
+		line-height: 1.5;
+		margin-bottom: 0.2rem;
+	}
+
+	.train-ddl {
+		color: #2c3e91;
+		font-size: 0.82rem;
+		line-height: 1.5;
+		border-left: 2px solid #c5cceb;
+		padding-left: 0.5rem;
+		margin-top: 0.25rem;
 	}
 
 	@media (max-width: 720px) {

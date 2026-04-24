@@ -35,6 +35,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
 - variation は明示された揺らぎがある場合のみ付ける
+- **count は 1〜50 の整数のみ。「たくさん・多数・無数」は 20 程度。50 を超えてはならない**
 
 # 例 (最重要パターン)
 

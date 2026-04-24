@@ -6,10 +6,14 @@ GET  /health      : liveness
 
 from __future__ import annotations
 
+import json
 import os
 import time
+import uuid
+from pathlib import Path
+from threading import Lock
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -21,6 +25,31 @@ from .renderer import render
 from .schema import Score
 
 app = FastAPI(title="inku-server", version="0.1.0")
+
+# ── 履歴ストレージ ──────────────────────────────────────────────────────────────
+_HISTORY_FILE = Path(os.getenv("INKU_HISTORY_FILE", "/tmp/inku-history.json"))
+_history: list[dict] = []
+_history_lock = Lock()
+
+
+def _load_history() -> None:
+    global _history
+    if not _HISTORY_FILE.exists():
+        return
+    try:
+        _history = json.loads(_HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        _history = []
+
+
+def _save_history() -> None:
+    try:
+        _HISTORY_FILE.write_text(json.dumps(_history), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+_load_history()
 
 app.add_middleware(
     CORSMiddleware,
@@ -80,6 +109,26 @@ class PaintResponse(BaseModel):
 class PromptsResponse(BaseModel):
     stage1_system: str
     stage2_system: str
+
+
+class HistoryPostBody(BaseModel):
+    input: str
+    ddl: str | None = None
+    score: dict
+    svg: str
+    at: int
+    elapsed_ms: int = 0
+
+
+class HistoryItem(HistoryPostBody):
+    id: str
+
+
+class HistoryListResponse(BaseModel):
+    items: list[HistoryItem]
+    total: int
+    offset: int
+    limit: int
 
 
 @app.get("/health")
@@ -152,6 +201,35 @@ def api_paint(req: PaintRequest) -> PaintResponse:
         elapsed_stage2_ms=elapsed_stage2_ms,
         elapsed_total_ms=elapsed_total_ms,
     )
+
+
+@app.get("/api/history", response_model=HistoryListResponse)
+def api_history_get(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
+) -> HistoryListResponse:
+    with _history_lock:
+        items_newest_first = list(reversed(_history))
+        total = len(items_newest_first)
+        page = items_newest_first[offset : offset + limit]
+    return HistoryListResponse(items=page, total=total, offset=offset, limit=limit)
+
+
+@app.post("/api/history", response_model=HistoryItem)
+def api_history_post(body: HistoryPostBody) -> HistoryItem:
+    item = HistoryItem(id=str(uuid.uuid4()), **body.model_dump())
+    with _history_lock:
+        _history.append(item.model_dump())
+        _save_history()
+    return item
+
+
+@app.delete("/api/history")
+def api_history_delete() -> dict[str, bool]:
+    with _history_lock:
+        _history.clear()
+        _save_history()
+    return {"ok": True}
 
 
 def main() -> None:

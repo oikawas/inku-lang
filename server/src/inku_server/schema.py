@@ -7,7 +7,7 @@
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Coord = tuple[float, float]
 
@@ -63,6 +63,13 @@ class Arrangement(BaseModel):
         le=50,
         description="配置数。2以上の同一図形には必ず使う。複数 instruction 生成は禁止",
     )
+
+    @field_validator("count", mode="before")
+    @classmethod
+    def _clamp_count(cls, v: object) -> object:
+        if isinstance(v, (int, float)):
+            return min(max(int(v), 1), 50)
+        return v
     layout: Layout = Field(
         default="horizontal",
         description=(

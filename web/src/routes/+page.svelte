@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
 	import { SAIJIKI } from '$lib/saijiki';
 	import { annotate } from '$lib/highlight';
 	import {
@@ -8,11 +7,10 @@
 		DEFAULT_PROVIDER,
 		DEFAULT_MODEL,
 		modelsForProvider,
-		providerOfModel,
 		type Provider
 	} from '$lib/models';
 
-	const STORAGE_KEY = 'inku-history-v1';
+	const HISTORY_PAGE_SIZE = 10;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
@@ -48,8 +46,6 @@
 		elapsed_ms?: number;
 	};
 
-	const MAX_HISTORY = 20;
-
 	let input = $state('山の向こうに月が昇る');
 	let loading = $state(false);
 	let error = $state<string | null>(null);
@@ -72,58 +68,68 @@
 	let _timerStart = 0;
 	let _timerHandle: ReturnType<typeof setInterval> | null = null;
 
-	let history = $state<Iteration[]>([]);
-	let cursor = $state(-1);
+	// 履歴 (サーバー側ストレージ、ページネーション)
+	let historyItems = $state<Iteration[]>([]);
+	let historyTotal = $state(0);
+	let historyPage = $state(0);
+	let historyCursor = $state(-1);
+	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
-	function loadHistory(): Iteration[] {
-		if (!browser) return [];
+	async function fetchHistoryPage(page: number): Promise<void> {
+		const offset = page * HISTORY_PAGE_SIZE;
 		try {
-			const raw = localStorage.getItem(STORAGE_KEY);
-			if (!raw) return [];
-			const parsed = JSON.parse(raw);
-			if (!Array.isArray(parsed)) return [];
-			return parsed.filter(
-				(it: unknown): it is Iteration =>
-					!!it &&
-					typeof it === 'object' &&
-					'svg' in (it as Record<string, unknown>) &&
-					'input' in (it as Record<string, unknown>)
-			);
+			const r = await fetch(`/api/history?offset=${offset}&limit=${HISTORY_PAGE_SIZE}`);
+			if (!r.ok) return;
+			const data = await r.json();
+			historyItems = data.items;
+			historyTotal = data.total;
+			historyPage = page;
 		} catch {
-			return [];
+			// ignore
 		}
 	}
 
-	function persistHistory(items: Iteration[]) {
-		if (!browser) return;
+	async function pushHistory(it: Iteration): Promise<void> {
 		try {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+			await fetch('/api/history', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					input: it.input,
+					ddl: it.ddl,
+					score: it.score,
+					svg: it.svg,
+					at: it.at,
+					elapsed_ms: it.elapsed_ms ?? 0
+				})
+			});
 		} catch {
-			// quota / disabled: silently skip
+			// ignore
 		}
+		await fetchHistoryPage(0);
+		historyCursor = 0;
 	}
 
-	function clearHistory() {
-		history = [];
-		cursor = -1;
+	async function clearHistory(): Promise<void> {
+		try {
+			await fetch('/api/history', { method: 'DELETE' });
+		} catch {
+			// ignore
+		}
+		historyItems = [];
+		historyTotal = 0;
+		historyPage = 0;
+		historyCursor = -1;
 		result = null;
 		ddl = null;
-		persistHistory([]);
-	}
-
-	function pushHistory(it: Iteration) {
-		const next = [...history, it];
-		history = next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
-		cursor = history.length - 1;
-		persistHistory(history);
 	}
 
 	function loadIteration(idx: number) {
-		if (idx < 0 || idx >= history.length) return;
-		cursor = idx;
-		const it = history[idx];
+		if (idx < 0 || idx >= historyItems.length) return;
+		historyCursor = idx;
+		const it = historyItems[idx];
 		input = it.input;
 		ddl = it.ddl;
 		thinking = it.thinking ?? null;
@@ -131,12 +137,14 @@
 		error = null;
 	}
 
+	// ◀ = 古い方向 (インデックス増加 = 新しい順リストで後ろ)
 	function gotoPrev() {
-		if (cursor > 0) loadIteration(cursor - 1);
+		if (historyCursor < historyItems.length - 1) loadIteration(historyCursor + 1);
 	}
 
+	// ▶ = 新しい方向 (インデックス減少)
 	function gotoNext() {
-		if (cursor < history.length - 1) loadIteration(cursor + 1);
+		if (historyCursor > 0) loadIteration(historyCursor - 1);
 	}
 
 	function insertWord(word: string) {
@@ -163,10 +171,9 @@
 	}
 
 	onMount(async () => {
-		const loaded = loadHistory();
-		if (loaded.length > 0) {
-			history = loaded;
-			loadIteration(loaded.length - 1);
+		await fetchHistoryPage(0);
+		if (historyItems.length > 0) {
+			loadIteration(0);
 		}
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null;
@@ -268,7 +275,7 @@
 			elapsedStage1Ms = data.elapsed_stage1_ms ?? 0;
 			elapsedStage2Ms = data.elapsed_stage2_ms ?? 0;
 			elapsedTotalMs = data.elapsed_total_ms ?? 0;
-			pushHistory({
+			await pushHistory({
 				input,
 				ddl: data.ddl,
 				thinking: data.thinking,
@@ -294,13 +301,6 @@
 				<h1>inku</h1>
 				<p class="sub">視覚的な短歌を書く</p>
 			</div>
-			<button
-				class="saijiki-toggle"
-				aria-expanded={saijikiOpen}
-				onclick={() => (saijikiOpen = !saijikiOpen)}
-			>
-				歳時記
-			</button>
 		</div>
 	</header>
 
@@ -353,7 +353,16 @@
 
 	<div class="row">
 		<section class="input">
-			<label for="input-ta">記述</label>
+			<div class="input-header">
+				<label for="input-ta">記述</label>
+				<button
+					class="saijiki-toggle"
+					aria-expanded={saijikiOpen}
+					onclick={() => (saijikiOpen = !saijikiOpen)}
+				>
+					歳時記
+				</button>
+			</div>
 			<textarea
 				id="input-ta"
 				bind:this={textareaEl}
@@ -427,20 +436,20 @@
 		<section class="output">
 			<div class="output-head">
 				<label for="canvas">演奏</label>
-				{#if history.length > 0}
+				{#if historyTotal > 0}
 					<div class="nav" aria-label="履歴ナビゲーション">
 						<button
 							class="nav-btn"
 							onclick={gotoPrev}
-							disabled={cursor <= 0}
-							aria-label="前の演奏"
+							disabled={historyCursor >= historyItems.length - 1}
+							aria-label="古い演奏"
 						>◀</button>
-						<span class="counter">{cursor + 1} / {history.length}</span>
+						<span class="counter">{historyPage * HISTORY_PAGE_SIZE + historyCursor + 1} / {historyTotal}</span>
 						<button
 							class="nav-btn"
 							onclick={gotoNext}
-							disabled={cursor >= history.length - 1}
-							aria-label="次の演奏"
+							disabled={historyCursor <= 0}
+							aria-label="新しい演奏"
 						>▶</button>
 					</div>
 				{/if}
@@ -480,17 +489,32 @@
 		</section>
 	</div>
 
-	{#if history.length > 1}
+	{#if historyTotal > 1}
 		<section class="history" aria-label="演奏履歴">
 			<div class="history-head">
-				<h2>履歴 <span class="muted">({history.length})</span></h2>
+				<h2>履歴 <span class="muted">({historyTotal})</span></h2>
+				{#if historyTotalPages > 1}
+					<div class="page-nav">
+						<button
+							onclick={() => fetchHistoryPage(historyPage - 1)}
+							disabled={historyPage <= 0}
+							aria-label="新しいページ"
+						>← 新</button>
+						<span>{historyPage + 1} / {historyTotalPages}</span>
+						<button
+							onclick={() => fetchHistoryPage(historyPage + 1)}
+							disabled={historyPage >= historyTotalPages - 1}
+							aria-label="古いページ"
+						>旧 →</button>
+					</div>
+				{/if}
 				<button class="clear-btn" onclick={clearHistory}>全て消す</button>
 			</div>
 			<div class="strip">
-				{#each history as it, i (it.at)}
+				{#each historyItems as it, i (it.at)}
 					<button
 						class="thumb"
-						class:current={i === cursor}
+						class:current={i === historyCursor}
 						onclick={() => loadIteration(i)}
 						title={it.input}
 					>
@@ -499,7 +523,7 @@
 							{#if it.elapsed_ms && it.elapsed_ms > 0}
 								{(it.elapsed_ms / 1000).toFixed(1)}s
 							{:else}
-								{i + 1}
+								{historyPage * HISTORY_PAGE_SIZE + i + 1}
 							{/if}
 						</div>
 					</button>
@@ -561,6 +585,17 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-end;
+	}
+
+	.input-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin-bottom: 0.5rem;
+	}
+
+	.input-header label {
+		margin-bottom: 0;
 	}
 
 	h1 {
@@ -848,9 +883,9 @@
 		transition: color 0.15s;
 	}
 
-	/* 墨の濃淡: Saijiki = 濃墨、地文 = 薄墨、感情語 = 滲む */
+	/* 語彙ハイライト: Saijiki = 青、地文 = 薄墨、感情語 = 滲む */
 	.tok-saijiki {
-		color: #111;
+		color: #2c3e91;
 		font-weight: 500;
 	}
 
@@ -928,7 +963,38 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		gap: 0.75rem;
 		margin-bottom: 0.75rem;
+	}
+
+	.page-nav {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.8rem;
+		color: #666;
+	}
+
+	.page-nav button {
+		background: transparent;
+		border: 1px solid #ccc;
+		color: #555;
+		padding: 0.2rem 0.5rem;
+		border-radius: 3px;
+		cursor: pointer;
+		font-size: 0.75rem;
+		font-family: inherit;
+	}
+
+	.page-nav button:disabled {
+		opacity: 0.35;
+		cursor: not-allowed;
+	}
+
+	.page-nav button:hover:not(:disabled) {
+		background: #111;
+		color: #fff;
+		border-color: #111;
 	}
 
 	.history h2 {

@@ -3,10 +3,19 @@
 	import { browser } from '$app/environment';
 	import { SAIJIKI } from '$lib/saijiki';
 	import { annotate } from '$lib/highlight';
-	import { MODELS, DEFAULT_STAGE1_MODEL, DEFAULT_STAGE2_MODEL } from '$lib/models';
+	import {
+		PROVIDER_GROUPS,
+		DEFAULT_PROVIDER,
+		DEFAULT_MODEL,
+		modelsForProvider,
+		providerOfModel,
+		type Provider
+	} from '$lib/models';
 
 	const STORAGE_KEY = 'inku-history-v1';
+	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY = 'inku-model-stage1';
+	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY = 'inku-model-stage2';
 
 	type Score = { instructions: unknown[] };
@@ -17,28 +26,30 @@
 		thinking: string | null;
 		score: Score;
 		svg: string;
+		elapsed_stage1_ms: number;
+		elapsed_stage2_ms: number;
+		elapsed_total_ms: number;
 	};
 
 	type ComposeResponse = {
 		score: Score;
 		svg: string;
+		elapsed_ms: number;
 	};
 
-	type Mode = 'free' | 'ddl';
-
 	type Iteration = {
-		mode: Mode;
+		mode?: string;
 		input: string;
 		ddl: string | null;
 		thinking?: string | null;
 		score: Score;
 		svg: string;
 		at: number;
+		elapsed_ms?: number;
 	};
 
 	const MAX_HISTORY = 20;
 
-	let mode = $state<Mode>('free');
 	let input = $state('山の向こうに月が昇る');
 	let loading = $state(false);
 	let error = $state<string | null>(null);
@@ -48,12 +59,23 @@
 	let saijikiOpen = $state(false);
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 
-	let stage1Model = $state<string>(DEFAULT_STAGE1_MODEL);
-	let stage2Model = $state<string>(DEFAULT_STAGE2_MODEL);
+	let stage1Provider = $state<Provider>(DEFAULT_PROVIDER);
+	let stage1Model = $state<string>(DEFAULT_MODEL);
+	let stage2Provider = $state<Provider>(DEFAULT_PROVIDER);
+	let stage2Model = $state<string>(DEFAULT_MODEL);
 	let includeThinking = $state(false);
+
+	let elapsedStage1Ms = $state(0);
+	let elapsedStage2Ms = $state(0);
+	let elapsedTotalMs = $state(0);
+	let liveMs = $state(0);
+	let _timerStart = 0;
+	let _timerHandle: ReturnType<typeof setInterval> | null = null;
 
 	let history = $state<Iteration[]>([]);
 	let cursor = $state(-1);
+
+	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
 	function loadHistory(): Iteration[] {
 		if (!browser) return [];
@@ -91,11 +113,6 @@
 		persistHistory([]);
 	}
 
-	const placeholders: Record<Mode, string> = {
-		free: '山の向こうに月が昇る',
-		ddl: '中心に赤い円を置く。半径は画面の2割。'
-	};
-
 	function pushHistory(it: Iteration) {
 		const next = [...history, it];
 		history = next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
@@ -107,7 +124,6 @@
 		if (idx < 0 || idx >= history.length) return;
 		cursor = idx;
 		const it = history[idx];
-		mode = it.mode;
 		input = it.input;
 		ddl = it.ddl;
 		thinking = it.thinking ?? null;
@@ -146,48 +162,78 @@
 		}
 	}
 
-	onMount(() => {
+	onMount(async () => {
 		const loaded = loadHistory();
 		if (loaded.length > 0) {
 			history = loaded;
 			loadIteration(loaded.length - 1);
 		}
 		try {
-			const s1 = localStorage.getItem(MODEL_STAGE1_KEY);
-			if (s1) stage1Model = s1;
-			const s2 = localStorage.getItem(MODEL_STAGE2_KEY);
-			if (s2) stage2Model = s2;
+			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null;
+			if (p1) stage1Provider = p1;
+			const m1 = localStorage.getItem(MODEL_STAGE1_KEY);
+			if (m1) stage1Model = m1;
+			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null;
+			if (p2) stage2Provider = p2;
+			const m2 = localStorage.getItem(MODEL_STAGE2_KEY);
+			if (m2) stage2Model = m2;
 		} catch {
 			// ignore
+		}
+
+		try {
+			const r = await fetch('/api/prompts');
+			if (r.ok) promptsData = await r.json();
+		} catch {
+			// ignore prompt load failure
 		}
 	});
 
-	function saveStage1Model(v: string) {
+	function setStage1Provider(v: Provider) {
+		stage1Provider = v;
+		stage1Model = modelsForProvider(v)[0]?.id ?? stage1Model;
+		try {
+			localStorage.setItem(PROVIDER_STAGE1_KEY, v);
+			localStorage.setItem(MODEL_STAGE1_KEY, stage1Model);
+		} catch {}
+	}
+
+	function setStage1Model(v: string) {
 		stage1Model = v;
 		try {
 			localStorage.setItem(MODEL_STAGE1_KEY, v);
-		} catch {
-			// ignore
-		}
+		} catch {}
 	}
 
-	function saveStage2Model(v: string) {
+	function setStage2Provider(v: Provider) {
+		stage2Provider = v;
+		stage2Model = modelsForProvider(v)[0]?.id ?? stage2Model;
+		try {
+			localStorage.setItem(PROVIDER_STAGE2_KEY, v);
+			localStorage.setItem(MODEL_STAGE2_KEY, stage2Model);
+		} catch {}
+	}
+
+	function setStage2Model(v: string) {
 		stage2Model = v;
 		try {
 			localStorage.setItem(MODEL_STAGE2_KEY, v);
-		} catch {
-			// ignore
-		}
+		} catch {}
 	}
 
-	function switchMode(next: Mode) {
-		if (mode === next) return;
-		mode = next;
-		input = placeholders[next];
-		ddl = null;
-		thinking = null;
-		result = null;
-		error = null;
+	function startTimer() {
+		_timerStart = Date.now();
+		liveMs = 0;
+		_timerHandle = setInterval(() => {
+			liveMs = Date.now() - _timerStart;
+		}, 100);
+	}
+
+	function stopTimer() {
+		if (_timerHandle !== null) {
+			clearInterval(_timerHandle);
+			_timerHandle = null;
+		}
 	}
 
 	async function submit() {
@@ -196,62 +242,46 @@
 		error = null;
 		ddl = null;
 		thinking = null;
+		elapsedStage1Ms = 0;
+		elapsedStage2Ms = 0;
+		elapsedTotalMs = 0;
+		startTimer();
 		try {
-			let entry: Iteration;
-			if (mode === 'free') {
-				const r = await fetch('/api/paint', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						text: input,
-						stage1_model: stage1Model,
-						stage2_model: stage2Model,
-						include_thinking: includeThinking
-					})
-				});
-				if (!r.ok) {
-					const d = await r.json().catch(() => ({}));
-					throw new Error(d.detail ?? `HTTP ${r.status}`);
-				}
-				const data = (await r.json()) as PaintResponse;
-				ddl = data.ddl;
-				thinking = data.thinking;
-				result = data;
-				entry = {
-					mode,
-					input,
-					ddl: data.ddl,
-					thinking: data.thinking,
-					score: data.score,
-					svg: data.svg,
-					at: Date.now()
-				};
-			} else {
-				const r = await fetch('/api/compose', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ ddl: input, model: stage2Model })
-				});
-				if (!r.ok) {
-					const d = await r.json().catch(() => ({}));
-					throw new Error(d.detail ?? `HTTP ${r.status}`);
-				}
-				const data = (await r.json()) as ComposeResponse;
-				result = data;
-				entry = {
-					mode,
-					input,
-					ddl: null,
-					score: data.score,
-					svg: data.svg,
-					at: Date.now()
-				};
+			const r = await fetch('/api/paint', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					text: input,
+					stage1_model: stage1Model,
+					stage2_model: stage2Model,
+					include_thinking: includeThinking
+				})
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({}));
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
 			}
-			pushHistory(entry);
+			const data = (await r.json()) as PaintResponse;
+			ddl = data.ddl;
+			thinking = data.thinking;
+			result = data;
+			elapsedStage1Ms = data.elapsed_stage1_ms ?? 0;
+			elapsedStage2Ms = data.elapsed_stage2_ms ?? 0;
+			elapsedTotalMs = data.elapsed_total_ms ?? 0;
+			pushHistory({
+				input,
+				ddl: data.ddl,
+				thinking: data.thinking,
+				score: data.score,
+				svg: data.svg,
+				at: Date.now(),
+				elapsed_ms: data.elapsed_total_ms ?? 0
+			});
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			result = null;
 		} finally {
+			stopTimer();
 			loading = false;
 		}
 	}
@@ -274,51 +304,46 @@
 		</div>
 	</header>
 
-	<div class="mode-switch" role="tablist" aria-label="入力モード">
-		<button
-			role="tab"
-			aria-selected={mode === 'free'}
-			class:active={mode === 'free'}
-			onclick={() => switchMode('free')}
-		>
-			自由記述
-		</button>
-		<button
-			role="tab"
-			aria-selected={mode === 'ddl'}
-			class:active={mode === 'ddl'}
-			onclick={() => switchMode('ddl')}
-		>
-			正規化DDL
-		</button>
-	</div>
-
 	<div class="model-row">
-		{#if mode === 'free'}
-			<label class="model-pick">
-				<span>解釈</span>
-				<select
-					value={stage1Model}
-					onchange={(e) => saveStage1Model((e.currentTarget as HTMLSelectElement).value)}
-				>
-					{#each MODELS as m (m.id)}
-						<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>
-					{/each}
-				</select>
-			</label>
-		{/if}
-		<label class="model-pick">
-			<span>構造化</span>
+		<div class="model-group">
+			<span class="model-label">解釈</span>
 			<select
-				value={stage2Model}
-				onchange={(e) => saveStage2Model((e.currentTarget as HTMLSelectElement).value)}
+				value={stage1Provider}
+				onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}
 			>
-				{#each MODELS as m (m.id)}
+				{#each PROVIDER_GROUPS as pg (pg.id)}
+					<option value={pg.id}>{pg.label}</option>
+				{/each}
+			</select>
+			<select
+				value={stage1Model}
+				onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}
+			>
+				{#each modelsForProvider(stage1Provider) as m (m.id)}
 					<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>
 				{/each}
 			</select>
-		</label>
-		{#if mode === 'free' && stage1Model.includes('qwen3')}
+		</div>
+		<div class="model-group">
+			<span class="model-label">構造化</span>
+			<select
+				value={stage2Provider}
+				onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}
+			>
+				{#each PROVIDER_GROUPS as pg (pg.id)}
+					<option value={pg.id}>{pg.label}</option>
+				{/each}
+			</select>
+			<select
+				value={stage2Model}
+				onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}
+			>
+				{#each modelsForProvider(stage2Provider) as m (m.id)}
+					<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>
+				{/each}
+			</select>
+		</div>
+		{#if stage1Model.includes('qwen3')}
 			<label class="think-toggle">
 				<input type="checkbox" bind:checked={includeThinking} />
 				<span>思考を表示</span>
@@ -328,20 +353,31 @@
 
 	<div class="row">
 		<section class="input">
-			<label for="input-ta">
-				{mode === 'free' ? '記述 (自由)' : '正規化DDL'}
-			</label>
+			<label for="input-ta">記述</label>
 			<textarea
 				id="input-ta"
 				bind:this={textareaEl}
 				bind:value={input}
 				rows="8"
 				spellcheck="false"
-				placeholder={placeholders[mode]}
+				placeholder="山の向こうに月が昇る"
 			></textarea>
-			<button class="submit" onclick={submit} disabled={loading || !input.trim()}>
-				{loading ? '演奏中…' : '演奏する'}
-			</button>
+			<div class="submit-row">
+				<button class="submit" onclick={submit} disabled={loading || !input.trim()}>
+					{loading ? '演奏中…' : '演奏する'}
+				</button>
+				{#if loading}
+					<span class="elapsed elapsed-live">{(liveMs / 1000).toFixed(1)}s</span>
+				{:else if elapsedTotalMs > 0}
+					{#if elapsedStage1Ms > 0}
+						<span class="elapsed">
+							解釈 {(elapsedStage1Ms / 1000).toFixed(1)}s + 構造化 {(elapsedStage2Ms / 1000).toFixed(1)}s = {(elapsedTotalMs / 1000).toFixed(1)}s
+						</span>
+					{:else}
+						<span class="elapsed">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
+					{/if}
+				{/if}
+			</div>
 			{#if error}
 				<p class="error">{error}</p>
 			{/if}
@@ -363,14 +399,14 @@
 				</div>
 			{/if}
 
-			{#if mode === 'free' && thinking}
+			{#if thinking}
 				<details class="thinking" open>
 					<summary>思考 (qwen3 内部)</summary>
 					<pre>{thinking}</pre>
 				</details>
 			{/if}
 
-			{#if mode === 'free' && ddl}
+			{#if ddl}
 				<div class="interpreted">
 					<label for="ddl-interpret">解釈 (正規化DDL)</label>
 					<div id="ddl-interpret" class="annot-box ddl-box">
@@ -421,6 +457,25 @@
 					<summary>楽譜 (JSON Score)</summary>
 					<pre>{JSON.stringify(result.score, null, 2)}</pre>
 				</details>
+				<details>
+					<summary>プロンプト (デバッグ)</summary>
+					{#if promptsData}
+						<div class="prompt-section">
+							<p class="prompt-label">Stage 1 システムプロンプト</p>
+							<pre class="prompt-pre">{promptsData.stage1_system}</pre>
+							<p class="prompt-label">Stage 1 ユーザー入力</p>
+							<pre class="prompt-pre">{input}</pre>
+							<p class="prompt-label">Stage 2 システムプロンプト</p>
+							<pre class="prompt-pre">{promptsData.stage2_system}</pre>
+							{#if ddl}
+								<p class="prompt-label">Stage 2 ユーザー入力 (正規化DDL)</p>
+								<pre class="prompt-pre">{ddl}</pre>
+							{/if}
+						</div>
+					{:else}
+						<p class="muted">読み込み中…</p>
+					{/if}
+				</details>
 			{/if}
 		</section>
 	</div>
@@ -440,7 +495,13 @@
 						title={it.input}
 					>
 						<div class="thumb-svg">{@html it.svg}</div>
-						<div class="thumb-label">{i + 1}</div>
+						<div class="thumb-label">
+							{#if it.elapsed_ms && it.elapsed_ms > 0}
+								{(it.elapsed_ms / 1000).toFixed(1)}s
+							{:else}
+								{i + 1}
+							{/if}
+						</div>
 					</button>
 				{/each}
 			</div>
@@ -628,30 +689,6 @@
 		border-color: #111;
 	}
 
-	.mode-switch {
-		display: flex;
-		gap: 0.25rem;
-		margin-bottom: 1.5rem;
-		border-bottom: 1px solid #ccc;
-	}
-
-	.mode-switch button {
-		background: transparent;
-		border: none;
-		padding: 0.5rem 1rem;
-		font-size: 0.95rem;
-		cursor: pointer;
-		color: #888;
-		border-bottom: 2px solid transparent;
-		margin-bottom: -1px;
-		font-family: inherit;
-	}
-
-	.mode-switch button.active {
-		color: #111;
-		border-bottom-color: #111;
-	}
-
 	.model-row {
 		display: flex;
 		gap: 1rem;
@@ -659,19 +696,19 @@
 		flex-wrap: wrap;
 	}
 
-	.model-pick {
+	.model-group {
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 0.35rem;
 		font-size: 0.85rem;
-		color: #666;
 	}
 
-	.model-pick span {
+	.model-label {
 		color: #888;
+		min-width: 2.5rem;
 	}
 
-	.model-pick select {
+	.model-group select {
 		font-family: inherit;
 		font-size: 0.85rem;
 		padding: 0.25rem 0.5rem;
@@ -679,6 +716,10 @@
 		border-radius: 3px;
 		background: #fff;
 		color: #333;
+	}
+
+	.model-group select:first-of-type {
+		color: #555;
 	}
 
 	.think-toggle {
@@ -745,8 +786,14 @@
 		resize: vertical;
 	}
 
-	button.submit {
+	.submit-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
 		margin-top: 0.75rem;
+	}
+
+	button.submit {
 		padding: 0.5rem 1.25rem;
 		background: #111;
 		color: #fff;
@@ -760,6 +807,16 @@
 	button.submit:disabled {
 		background: #999;
 		cursor: not-allowed;
+	}
+
+	.elapsed {
+		font-size: 0.8rem;
+		color: #888;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.elapsed-live {
+		color: #c9a08a;
 	}
 
 	.error {
@@ -982,6 +1039,33 @@
 		border: 1px solid #ddd;
 		overflow: auto;
 		max-height: 300px;
+	}
+
+	.prompt-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.prompt-label {
+		margin: 0.5rem 0 0.25rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #555;
+	}
+
+	.prompt-pre {
+		background: #f8f6f0;
+		padding: 0.75rem;
+		border-radius: 4px;
+		border: 1px solid #ddd;
+		overflow: auto;
+		max-height: 200px;
+		white-space: pre-wrap;
+		word-break: break-word;
+		font-size: 0.78rem;
+		line-height: 1.5;
+		margin: 0;
 	}
 
 	@media (max-width: 720px) {

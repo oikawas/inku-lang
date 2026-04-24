@@ -12,7 +12,7 @@ import struct
 
 import svgwrite
 
-from .schema import Instruction, Score, Variation
+from .schema import Arrangement, Instruction, Score, Variation
 
 CANVAS_PX = 1000
 
@@ -44,7 +44,7 @@ STYLE_TO_DASH: dict[str, str | None] = {
     "dash_dot": "12,6,2,6",
 }
 
-BACKGROUND = "#f7f5ef"
+BACKGROUND = "#ffffff"
 
 # SPEC §13.8: 揺らぎは Renderer 層で生成する (JSON Score は決定的な楽譜)
 AMPLITUDE_PX: dict[str, float] = {"fine": 4.0, "medium": 12.0, "broad": 30.0}
@@ -151,6 +151,80 @@ def _line_with_variation(
     return pts
 
 
+# arrangement の scatter で使う決定的な位置リスト
+_SCATTER_POSITIONS: list[tuple[float, float]] = [
+    (0.15, 0.20), (0.80, 0.15), (0.50, 0.50),
+    (0.20, 0.75), (0.75, 0.80), (0.30, 0.35),
+    (0.70, 0.40), (0.55, 0.25), (0.40, 0.65),
+    (0.85, 0.55),
+]
+
+
+def _anchor(ins: Instruction) -> tuple[float, float]:
+    """図形の論理的な中心座標を返す。"""
+    if ins.primitive == "line" and ins.from_ and ins.to:
+        return ((ins.from_[0] + ins.to[0]) / 2, (ins.from_[1] + ins.to[1]) / 2)
+    if ins.primitive in ("circle", "ellipse", "arc") and ins.center:
+        return ins.center
+    if ins.primitive in ("square", "triangle") and ins.position and ins.size:
+        return (ins.position[0] + ins.size[0] / 2, ins.position[1] + ins.size[1] / 2)
+    return (0.5, 0.5)
+
+
+def _shift(ins: Instruction, dx: float, dy: float) -> Instruction:
+    """ins を (dx, dy) だけ平行移動した新しい Instruction を返す。arrangement は除去。"""
+    data = ins.model_dump(by_alias=True)
+    data.pop("arrangement", None)
+    if ins.primitive == "line" and ins.from_ and ins.to:
+        data["from"] = [ins.from_[0] + dx, ins.from_[1] + dy]
+        data["to"] = [ins.to[0] + dx, ins.to[1] + dy]
+    elif ins.primitive in ("circle", "ellipse", "arc") and ins.center:
+        data["center"] = [ins.center[0] + dx, ins.center[1] + dy]
+    elif ins.primitive in ("square", "triangle") and ins.position:
+        data["position"] = [ins.position[0] + dx, ins.position[1] + dy]
+    return Instruction.model_validate(data)
+
+
+def _expand_arrangement(ins: Instruction) -> list[Instruction]:
+    """arrangement を展開して N 個の Instruction を返す。"""
+    arr = ins.arrangement
+    assert arr is not None
+    if arr.count == 1:
+        data = ins.model_dump(by_alias=True)
+        data.pop("arrangement", None)
+        return [Instruction.model_validate(data)]
+    n = arr.count
+    margin = arr.margin
+    ax, ay = _anchor(ins)
+
+    if arr.layout == "horizontal":
+        span = 1.0 - 2 * margin
+        targets = [(margin + i / max(n - 1, 1) * span, ay) for i in range(n)]
+        return [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
+
+    if arr.layout == "vertical":
+        span = 1.0 - 2 * margin
+        targets = [(ax, margin + i / max(n - 1, 1) * span) for i in range(n)]
+        return [_shift(ins, 0.0, ty - ay) for _, ty in targets]
+
+    if arr.layout == "radial":
+        cx = arr.center[0] if arr.center else 0.5
+        cy = arr.center[1] if arr.center else 0.5
+        r = arr.radius if arr.radius else 0.3
+        targets = [
+            (cx + r * math.cos(math.radians(i * 360 / n)),
+             cy - r * math.sin(math.radians(i * 360 / n)))
+            for i in range(n)
+        ]
+        return [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+
+    if arr.layout == "scatter":
+        targets = _SCATTER_POSITIONS[:n]
+        return [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+
+    return [ins]
+
+
 def render(score: Score) -> str:
     dwg = svgwrite.Drawing(
         size=(CANVAS_PX, CANVAS_PX),
@@ -159,9 +233,11 @@ def render(score: Score) -> str:
     dwg.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX), fill=BACKGROUND))
 
     for ins in score.instructions:
-        element = _render_instruction(dwg, ins)
-        if element is not None:
-            dwg.add(element)
+        expanded = _expand_arrangement(ins) if ins.arrangement else [ins]
+        for single in expanded:
+            element = _render_instruction(dwg, single)
+            if element is not None:
+                dwg.add(element)
 
     return dwg.tostring()
 

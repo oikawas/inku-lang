@@ -1,11 +1,13 @@
 """Stage 2: Normalized DDL → JSON Score.
 
-backend 切替: 環境変数 `INKU_LLM_BACKEND`
-- `anthropic` (default): Claude Haiku 4.5 tool_use
-- `openai`: OpenAI 互換 API (OVMS の Qwen2.5 等) に JSON 直接出力させる
+設計原則:
+  SYSTEM_PROMPT は「手順」のみ。フィールド仕様は schema.py の description が正典。
+  新しい primitive や属性を追加する場合は schema.py を更新する。ここは変えない。
 
-揺らぎ (variation) の実現は Renderer 層 (SPEC §13.8) なので、ここでは
-決定的な楽譜を出すだけ。
+モデル ID によるバックエンド自動選択:
+- `anthropic:<model>` → Anthropic tool_use API
+- `org/model` (スラッシュ含む) → NVIDIA NIM API
+- それ以外 → OVMS (ローカル OpenAI 互換)
 """
 
 from __future__ import annotations
@@ -17,113 +19,38 @@ from typing import Any
 
 from .schema import Score
 
-ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
+DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 4096
 
+# 手順のみ。フィールド仕様は submit_score スキーマの description を参照。
+# 例は「最も非自明なパターン」に絞る — 追加は EXAMPLE_POOL (interpreter.py) と同じ方針で。
 SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
-入力: 正規化DDL (コア語彙のみの自然言語記述)
-出力: JSON Score
+正規化DDL を解析し submit_score を呼び出せ。
+フィールド仕様は submit_score スキーマの description フィールドが正典。
 
-# 手順 (順番に考えよ)
+# 変換ルール (厳守)
 
-## 1. primitive を決める
+- 座標: 0.0-1.0 比率 (左上=(0,0) 右下=(1,1))
+- circle/ellipse/arc → center フィールド。square/triangle → position フィールド (bbox 左上)
+- 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
+- **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
+- variation は明示された揺らぎがある場合のみ付ける
 
-| 日本語 | primitive | 必須フィールド | 補助フィールド |
-|---|---|---|---|
-| 線 | line | from=(x1,y1), to=(x2,y2) | — |
-| 円 | circle | center=(cx,cy), radius | — |
-| 楕円 | ellipse | center=(cx,cy), size=(w,h) | — |
-| 三角 | triangle | position=(bbox左上x, bbox左上y), size=(w,h) | — |
-| 四角 | square | position=(左上x, 左上y), size=(w,h) | — |
-| 弧 | arc | center, radius, angle_start, angle_end | — |
+# 例 (最重要パターン)
 
-**重要**: 円/楕円は `center` (中心)、三角/四角は `position` (bbox 左上) を使う。混同禁止。
+入力: 縦の実線を横に三本並べる。
+出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
 
-**arc の角度** (度): 0=東(右), 90=北(上), 180=西(左), 270=南(下)、CCW 正。
-- 右上 1/4 円 → start=0, end=90
-- 上半 半円 → start=0, end=180
+入力: 青い小さな円をランダムに五つ散らす。半径0.04。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter"}}]}
 
-## 2. 「中央に配置」= position と center で値が違う
-
-同じ「中央配置」でも:
-- circle/ellipse の center = (0.5, 0.5) そのまま
-- square/triangle の position = (0.5 - w/2, 0.5 - h/2) **左上に補正要**
-
-例: 中央に一辺0.4の四角 → position=(0.3, 0.3), size=(0.4, 0.4)
-
-## 3. 必須数値の既定値
-
-ユーザー指定がない場合の既定:
-- circle.radius = 0.1
-- ellipse.size = (0.4, 0.2)
-- square.size = (0.3, 0.3)
-- triangle.size = (0.3, 0.3)
-- line の位置は必ず from/to を埋める (省略禁止)
-
-## 4. 日本語→値 マッピング (厳守)
-
-### style (つらなり)
-| 日本語 | 値 |
-|---|---|
-| 実線 (default) | solid |
-| 破線 | dashed |
-| 点線 | dotted |
-| 一点鎖線 | dash_dot |
-
-### weight (てざわり)
-髪=hair, 鉛筆=pencil, ペン=pen(default), ロットリング=rotring,
-クレヨン=crayon, チョーク=chalk, 細筆=brush_thin, 太筆=brush_thick, 縄=rope
-
-### color (いろ)
-白=white, 黒=black(default), 青=blue, 赤=red, 緑=green, 灰=gray
-
-### variation (ゆらぎ) — 明示された場合のみ付ける
-| 日本語 | amplitude | quality |
-|---|---|---|
-| 細かく揺れる / 小刻み | fine | perlin |
-| 大きく揺れる | broad | perlin |
-| 波打つ | (文脈次第) | wave |
-| 震える | fine | perlin |
-| 滲む | (各値を文脈から) | pink |
-
-frequency: ゆっくり=slow, 速く=high, 無指定=medium
-
-### variation.dimensions (揺れる軸) — **線の進行方向と垂直な軸**
-- 横線 (y固定、xが0→1に進行) が揺れる → dimensions=["position_y"]
-- 縦線 (x固定、yが0→1に進行) が揺れる → dimensions=["position_x"]
-- 斜め線: dimensions=["position_x","position_y"] 両方
-
-## 5. 座標系
-
-0.0〜1.0 の比率。左上=(0,0), 右下=(1,1)。
-- 中心 → (0.5, 0.5)
-- 上から1/3 → y=0.333
-- 画面の2割 → 0.2
-- 左端=x:0, 右端=x:1, 上端=y:0, 下端=y:1
-
-## 6. 出力
-
-- 説明文 / 前置き / マークダウン fence 禁止
-- `{` から `}` までの単一 JSON オブジェクト
-- instructions 配列、順番通り
-
-# 例
-
-入力: 上端中央に小さな黒い円。半径0.05。
-出力: {"instructions":[{"primitive":"circle","center":[0.5,0.1],"radius":0.05}]}
+入力: 上から半分に横線。小刻みに震える。
+出力: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
 
 入力: 画面中央に一辺0.4の緑の四角。
 出力: {"instructions":[{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"color":"green"}]}
 
-入力: 左端から右端へy=0.7で点線を引く。
-出力: {"instructions":[{"primitive":"line","from":[0.0,0.7],"to":[1.0,0.7],"style":"dotted"}]}
-
-入力: 左端に縦線を引く。上から下まで。波打つ。
-出力: {"instructions":[{"primitive":"line","from":[0.0,0.0],"to":[0.0,1.0],"variation":{"amplitude":"medium","frequency":"medium","quality":"wave","dimensions":["position_x"]}}]}
-
-入力: 上から半分に横線。小刻みに震える。
-出力: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
-"""
+説明・前置き禁止。submit_score 呼び出しのみ。"""
 
 
 def _submit_tool() -> dict[str, Any]:
@@ -134,19 +61,38 @@ def _submit_tool() -> dict[str, Any]:
     }
 
 
+def _get_provider(model: str) -> str:
+    if model.startswith("anthropic:"):
+        return "anthropic"
+    if "/" in model:
+        return "nvidia"
+    return "ovms"
+
+
+def _strip_prefix(model: str) -> str:
+    if model.startswith("anthropic:"):
+        return model[len("anthropic:"):]
+    return model
+
+
 def compose(ddl: str, *, model: str | None = None) -> Score:
+    if model:
+        provider = _get_provider(model)
+        if provider == "anthropic":
+            return _compose_anthropic(ddl, model=_strip_prefix(model))
+        return _compose_openai(ddl, model=model)
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        return _compose_openai(ddl, model=model)
+        return _compose_openai(ddl, model=None)
     return _compose_anthropic(ddl)
 
 
-def _compose_anthropic(ddl: str) -> Score:
+def _compose_anthropic(ddl: str, *, model: str | None = None) -> Score:
     from anthropic import Anthropic
 
     client = Anthropic()
     resp = client.messages.create(
-        model=ANTHROPIC_MODEL,
+        model=model or DEFAULT_ANTHROPIC_MODEL,
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         tools=[_submit_tool()],
@@ -162,9 +108,14 @@ def _compose_anthropic(ddl: str) -> Score:
 def _compose_openai(ddl: str, *, model: str | None = None) -> Score:
     from openai import OpenAI
 
-    base_url = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:18000/v3")
-    api_key = os.getenv("OPENAI_API_KEY") or "none"
     model = model or os.getenv("OPENAI_MODEL", "qwen-api")
+
+    if "/" in model:
+        base_url = "https://integrate.api.nvidia.com/v1"
+        api_key = os.getenv("NVIDIA_API_KEY", "")
+    else:
+        base_url = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:18000/v3")
+        api_key = os.getenv("OPENAI_API_KEY") or "none"
 
     client = OpenAI(base_url=base_url, api_key=api_key)
 
@@ -205,14 +156,13 @@ def _compose_openai(ddl: str, *, model: str | None = None) -> Score:
 
 
 def _extract_tool_call_args(text: str) -> dict | None:
-    """Tool call の `arguments` 部を各モデル方言から抽出する。
+    """Tool call の arguments 部を各モデル方言から抽出する。
 
     対応する形式:
     - Qwen2.5: `<tool_call>{"name":"X","arguments":{...}}</tool_call>`
     - Gemma 3: ```json {"tool_calls":[{"name":"X","arguments":{...}}]} ```
     - その他: 裸の {"instructions":[...]} (Score 直接)
     """
-    # Qwen 方言
     m = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", text, re.DOTALL)
     if m:
         try:
@@ -221,7 +171,6 @@ def _extract_tool_call_args(text: str) -> dict | None:
         except json.JSONDecodeError:
             pass
 
-    # Gemma 方言 (markdown fence + {"tool_calls":[{...}]})
     m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if m:
         try:

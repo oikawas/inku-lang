@@ -187,7 +187,7 @@ def api_paint(req: PaintRequest) -> PaintResponse:
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     t1 = time.perf_counter()
     try:
-        score = compose(ddl, model=req.stage2_model)
+        score = compose(ddl, model=req.stage2_model, original_text=req.text)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
     t2 = time.perf_counter()

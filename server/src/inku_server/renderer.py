@@ -207,6 +207,17 @@ def _shift(ins: Instruction, dx: float, dy: float) -> Instruction:
     return Instruction.model_validate(data)
 
 
+def _apply_color_cycle(items: list[Instruction], cycle: list) -> list[Instruction]:
+    if not cycle:
+        return items
+    result = []
+    for i, single in enumerate(items):
+        data = single.model_dump(by_alias=True)
+        data["color"] = cycle[i % len(cycle)]
+        result.append(Instruction.model_validate(data))
+    return result
+
+
 def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     """arrangement を展開して N 個の Instruction を返す。"""
     arr = ins.arrangement
@@ -215,7 +226,7 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     if arr.count == 1:
         data = ins.model_dump(by_alias=True)
         data.pop("arrangement", None)
-        return [Instruction.model_validate(data)]
+        return _apply_color_cycle([Instruction.model_validate(data)], arr.color_cycle)
     n = arr.count
     margin = arr.margin
     ax, ay = _anchor(ins)
@@ -224,12 +235,14 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     if arr.layout == "horizontal":
         span = 1.0 - 2 * margin
         targets = [(margin + i / max(n - 1, 1) * span, ay) for i in range(n)]
-        return [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
+        result = [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
+        return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "vertical":
         span = 1.0 - 2 * margin
         targets = [(ax, margin + i / max(n - 1, 1) * span) for i in range(n)]
-        return [_shift(ins, 0.0, ty - ay) for _, ty in targets]
+        result = [_shift(ins, 0.0, ty - ay) for _, ty in targets]
+        return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "radial":
         cx = arr.center[0] if arr.center else 0.5
@@ -240,13 +253,15 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
              cy - r * math.sin(math.radians(i * 360 / n)))
             for i in range(n)
         ]
-        return [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+        result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+        return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "scatter":
         targets = [_scatter_pos(i, seed, margin) for i in range(n)]
-        return [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+        result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+        return _apply_color_cycle(result, arr.color_cycle)
 
-    return [ins]
+    return _apply_color_cycle([ins], arr.color_cycle)
 
 
 def render(score: Score) -> str:
@@ -254,7 +269,8 @@ def render(score: Score) -> str:
         size=(CANVAS_PX, CANVAS_PX),
         viewBox=f"0 0 {CANVAS_PX} {CANVAS_PX}",
     )
-    dwg.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX), fill=BACKGROUND))
+    bg = COLOR_MAP.get(score.background, BACKGROUND)
+    dwg.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX), fill=bg))
 
     for ins in score.instructions:
         expanded = _expand_arrangement(ins) if ins.arrangement else [ins]

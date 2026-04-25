@@ -10,6 +10,8 @@
 		type Provider
 	} from '$lib/models';
 
+	declare const __BUILD_NUMBER__: string;
+
 	const HISTORY_PAGE_SIZE = 10;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY = 'inku-model-stage1';
@@ -76,6 +78,7 @@
 	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
+	let outputTab = $state<'canvas' | 'score' | 'prompts'>('canvas');
 
 	// 学習モード
 	type TrainEntry = { i: number; text: string; ddl: string; style: string };
@@ -345,6 +348,7 @@
 			ddl = data.ddl;
 			thinking = data.thinking;
 			result = data;
+			outputTab = 'canvas';
 			elapsedStage1Ms = data.elapsed_stage1_ms ?? 0;
 			elapsedStage2Ms = data.elapsed_stage2_ms ?? 0;
 			elapsedTotalMs = data.elapsed_total_ms ?? 0;
@@ -374,12 +378,14 @@
 				<h1>inku</h1>
 				<p class="sub">視覚的な短歌を書く</p>
 			</div>
+			<span class="build-badge">#{__BUILD_NUMBER__}</span>
 		</div>
 	</header>
 
 	<div class="model-row">
 		<div class="model-group">
 			<span class="model-label">解釈</span>
+			<span class="field-label">接続先：</span>
 			<select
 				value={stage1Provider}
 				onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}
@@ -388,6 +394,7 @@
 					<option value={pg.id}>{pg.label}</option>
 				{/each}
 			</select>
+			<span class="field-label">モデル：</span>
 			<select
 				value={stage1Model}
 				onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}
@@ -399,6 +406,7 @@
 		</div>
 		<div class="model-group">
 			<span class="model-label">構造化</span>
+			<span class="field-label">接続先：</span>
 			<select
 				value={stage2Provider}
 				onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}
@@ -407,6 +415,7 @@
 					<option value={pg.id}>{pg.label}</option>
 				{/each}
 			</select>
+			<span class="field-label">モデル：</span>
 			<select
 				value={stage2Model}
 				onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}
@@ -508,7 +517,25 @@
 
 		<section class="output">
 			<div class="output-head">
-				<label for="canvas">演奏</label>
+				<div class="output-tabs">
+					<button
+						class="tab-btn"
+						class:active={outputTab === 'canvas'}
+						onclick={() => (outputTab = 'canvas')}
+					>演奏</button>
+					<button
+						class="tab-btn"
+						class:active={outputTab === 'score'}
+						onclick={() => (outputTab = 'score')}
+						disabled={!result}
+					>楽譜</button>
+					<button
+						class="tab-btn"
+						class:active={outputTab === 'prompts'}
+						onclick={() => (outputTab = 'prompts')}
+						disabled={!result}
+					>プロンプト</button>
+				</div>
 				{#if historyTotal > 0}
 					<div class="nav" aria-label="履歴ナビゲーション">
 						<button
@@ -527,37 +554,34 @@
 					</div>
 				{/if}
 			</div>
-			<div id="canvas" class="canvas">
-				{#if result}
-					{@html result.svg}
-				{:else}
-					<div class="placeholder">（まだ演奏されていない）</div>
-				{/if}
-			</div>
-			{#if result}
-				<details>
-					<summary>楽譜 (JSON Score)</summary>
-					<pre>{JSON.stringify(result.score, null, 2)}</pre>
-				</details>
-				<details>
-					<summary>プロンプト (デバッグ)</summary>
-					{#if promptsData}
-						<div class="prompt-section">
-							<p class="prompt-label">Stage 1 システムプロンプト</p>
-							<pre class="prompt-pre">{promptsData.stage1_system}</pre>
-							<p class="prompt-label">Stage 1 ユーザー入力</p>
-							<pre class="prompt-pre">{input}</pre>
-							<p class="prompt-label">Stage 2 システムプロンプト</p>
-							<pre class="prompt-pre">{promptsData.stage2_system}</pre>
-							{#if ddl}
-								<p class="prompt-label">Stage 2 ユーザー入力 (正規化DDL)</p>
-								<pre class="prompt-pre">{ddl}</pre>
-							{/if}
-						</div>
+
+			{#if outputTab === 'canvas'}
+				<div id="canvas" class="canvas">
+					{#if result}
+						{@html result.svg}
 					{:else}
-						<p class="muted">読み込み中…</p>
+						<div class="placeholder">（まだ演奏されていない）</div>
 					{/if}
-				</details>
+				</div>
+			{:else if outputTab === 'score'}
+				<pre class="tab-content-pre">{JSON.stringify(result?.score, null, 2)}</pre>
+			{:else if outputTab === 'prompts'}
+				{#if promptsData}
+					<div class="prompt-section tab-content-pre">
+						<p class="prompt-label">Stage 1 ユーザー入力</p>
+						<pre class="prompt-pre">{input}</pre>
+						<p class="prompt-label">Stage 1 システムプロンプト</p>
+						<pre class="prompt-pre">{promptsData.stage1_system}</pre>
+						{#if ddl}
+							<p class="prompt-label">Stage 2 ユーザー入力 (正規化DDL)</p>
+							<pre class="prompt-pre">{ddl}</pre>
+						{/if}
+						<p class="prompt-label">Stage 2 システムプロンプト</p>
+						<pre class="prompt-pre">{promptsData.stage2_system}</pre>
+					</div>
+				{:else}
+					<p class="muted">読み込み中…</p>
+				{/if}
 			{/if}
 		</section>
 	</div>
@@ -728,6 +752,14 @@
 		align-items: flex-end;
 	}
 
+	.build-badge {
+		font-size: 0.75rem;
+		color: #aaa;
+		font-variant-numeric: tabular-nums;
+		align-self: flex-start;
+		padding-top: 0.25rem;
+	}
+
 	.input-header {
 		display: flex;
 		justify-content: space-between;
@@ -882,6 +914,12 @@
 	.model-label {
 		color: #888;
 		min-width: 2.5rem;
+	}
+
+	.field-label {
+		color: #aaa;
+		font-size: 0.8rem;
+		white-space: nowrap;
 	}
 
 	.model-group select {
@@ -1045,12 +1083,62 @@
 	.output-head {
 		display: flex;
 		justify-content: space-between;
-		align-items: baseline;
+		align-items: center;
 		margin-bottom: 0.5rem;
+		gap: 0.5rem;
 	}
 
-	.output-head label {
-		margin-bottom: 0;
+	.output-tabs {
+		display: flex;
+		gap: 0;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.tab-btn {
+		background: #fff;
+		border: none;
+		border-right: 1px solid #ccc;
+		color: #666;
+		padding: 0.3rem 0.9rem;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.85rem;
+		line-height: 1;
+	}
+
+	.tab-btn:last-child {
+		border-right: none;
+	}
+
+	.tab-btn:hover:not(:disabled):not(.active) {
+		background: #f5f5f5;
+	}
+
+	.tab-btn.active {
+		background: #111;
+		color: #fff;
+	}
+
+	.tab-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.tab-content-pre {
+		background: #fff;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		padding: 0.75rem;
+		overflow: auto;
+		max-height: 480px;
+		font-size: 0.82rem;
+		line-height: 1.5;
+		white-space: pre-wrap;
+		word-break: break-word;
+		box-sizing: border-box;
+		width: 100%;
 	}
 
 	.nav {

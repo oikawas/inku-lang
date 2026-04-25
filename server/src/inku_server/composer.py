@@ -27,6 +27,7 @@ MAX_TOKENS = 4096
 SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 正規化DDL を解析し submit_score を呼び出せ。
 フィールド仕様は submit_score スキーマの description フィールドが正典。
+「原文」が付いている場合は正規化DDL を主とし、原文は省略された属性（色・素材・数量など）の補完に使え。
 
 # 変換ルール (厳守)
 
@@ -37,6 +38,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - variation は明示された揺らぎがある場合のみ付ける
 - **count は 1〜1000 の整数。「たくさん・多数・無数」は 20 程度。DDL に明示的な数があればその値を使う**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
+- **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
+- **色とりどり・ランダム配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
 
 # 例 (最重要パターン)
 
@@ -54,6 +57,12 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 赤い塗りつぶし円を中央に。半径0.2。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"color":"red","filled":true}]}
+
+入力: 背景を黒で塗りつぶす。中央に白い横線を引く。
+出力: {"background":"black","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"white"}]}
+
+入力: 赤・青・緑・黒の色とりどりの円を放射状に八つ並べる。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,"arrangement":{"count":8,"layout":"radial","color_cycle":["red","blue","green","black","gray","red","blue","green"]}}]}
 
 説明・前置き禁止。submit_score 呼び出しのみ。"""
 
@@ -80,19 +89,26 @@ def _strip_prefix(model: str) -> str:
     return model
 
 
-def compose(ddl: str, *, model: str | None = None) -> Score:
+def _build_user_message(ddl: str, original_text: str | None) -> str:
+    if original_text and original_text.strip() != ddl.strip():
+        return f"[原文]\n{original_text}\n\n[正規化DDL]\n{ddl}"
+    return ddl
+
+
+def compose(ddl: str, *, model: str | None = None, original_text: str | None = None) -> Score:
+    user_msg = _build_user_message(ddl, original_text)
     if model:
         provider = _get_provider(model)
         if provider == "anthropic":
-            return _compose_anthropic(ddl, model=_strip_prefix(model))
-        return _compose_openai(ddl, model=model)
+            return _compose_anthropic(user_msg, model=_strip_prefix(model))
+        return _compose_openai(user_msg, model=model)
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        return _compose_openai(ddl, model=None)
-    return _compose_anthropic(ddl)
+        return _compose_openai(user_msg, model=None)
+    return _compose_anthropic(user_msg)
 
 
-def _compose_anthropic(ddl: str, *, model: str | None = None) -> Score:
+def _compose_anthropic(user_msg: str, *, model: str | None = None) -> Score:
     from anthropic import Anthropic
 
     client = Anthropic()
@@ -102,7 +118,7 @@ def _compose_anthropic(ddl: str, *, model: str | None = None) -> Score:
         system=SYSTEM_PROMPT,
         tools=[_submit_tool()],
         tool_choice={"type": "tool", "name": "submit_score"},
-        messages=[{"role": "user", "content": ddl}],
+        messages=[{"role": "user", "content": user_msg}],
     )
     for block in resp.content:
         if block.type == "tool_use" and block.name == "submit_score":
@@ -110,7 +126,7 @@ def _compose_anthropic(ddl: str, *, model: str | None = None) -> Score:
     raise RuntimeError("Anthropic did not return submit_score tool call")
 
 
-def _compose_openai(ddl: str, *, model: str | None = None) -> Score:
+def _compose_openai(user_msg: str, *, model: str | None = None) -> Score:
     from openai import OpenAI
 
     model = model or os.getenv("OPENAI_MODEL", "qwen-api")
@@ -139,7 +155,7 @@ def _compose_openai(ddl: str, *, model: str | None = None) -> Score:
         temperature=0.0,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": ddl},
+            {"role": "user", "content": user_msg},
         ],
         tools=[tool],
         tool_choice={"type": "function", "function": {"name": "submit_score"}},

@@ -77,6 +77,14 @@ class Arrangement(BaseModel):
             " / radial=指定中心周囲に円状 / scatter=決定的ランダム散布"
         ),
     )
+    color_cycle: list[Color] = Field(
+        default_factory=list,
+        description=(
+            "配色サイクル: 空=全要素同色。"
+            "設定するとインデックス順に color_cycle を循環して各要素に適用する。"
+            "色とりどり・ランダム配色の表現に使う"
+        ),
+    )
     margin: float = Field(
         default=0.1,
         ge=0.0,
@@ -168,4 +176,8 @@ class Score(BaseModel):
 
     version: str = "0.1.0"
     canvas: Literal["square"] = "square"
+    background: Color = Field(
+        default="white",
+        description="背景色 (省略=white)。「背景を黒で塗りつぶす」→ black",
+    )
     instructions: list[Instruction]

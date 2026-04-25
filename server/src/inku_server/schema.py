@@ -60,7 +60,7 @@ class Arrangement(BaseModel):
 
     count: int = Field(
         ge=1,
-        le=500,
+        le=1000,
         description="配置数。2以上の同一図形には必ず使う。複数 instruction 生成は禁止",
     )
 
@@ -68,7 +68,7 @@ class Arrangement(BaseModel):
     @classmethod
     def _clamp_count(cls, v: object) -> object:
         if isinstance(v, (int, float)):
-            return min(max(int(v), 1), 500)
+            return min(max(int(v), 1), 1000)
         return v
     layout: Layout = Field(
         default="horizontal",
@@ -134,6 +134,10 @@ class Instruction(BaseModel):
         description="arc 終端角(度) 同上",
     )
 
+    filled: bool = Field(
+        default=False,
+        description="塗りつぶし: True=color で塗りつぶす / False=輪郭のみ。line には無効",
+    )
     style: LineStyle = Field(
         default="solid",
         description="solid=実線 / dashed=破線 / dotted=点線 / dash_dot=一点鎖線",

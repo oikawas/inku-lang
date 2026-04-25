@@ -270,7 +270,7 @@ def _stroke_attrs(ins: Instruction) -> dict:
     attrs = {
         "stroke": COLOR_MAP[ins.color],
         "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight],
-        "fill": "none",
+        "fill": COLOR_MAP[ins.color] if ins.filled else "none",
         "stroke_linecap": "round",
     }
     dash = STYLE_TO_DASH[ins.style]

@@ -35,7 +35,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
 - variation は明示された揺らぎがある場合のみ付ける
-- **count は 1〜500 の整数。「たくさん・多数・無数」は 20 程度。DDL に明示的な数があればその値を使う**
+- **count は 1〜1000 の整数。「たくさん・多数・無数」は 20 程度。DDL に明示的な数があればその値を使う**
+- **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 
 # 例 (最重要パターン)
 
@@ -50,6 +51,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 画面中央に一辺0.4の緑の四角。
 出力: {"instructions":[{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"color":"green"}]}
+
+入力: 赤い塗りつぶし円を中央に。半径0.2。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"color":"red","filled":true}]}
 
 説明・前置き禁止。submit_score 呼び出しのみ。"""
 

@@ -282,11 +282,15 @@ def render(score: Score) -> str:
     return dwg.tostring()
 
 
+_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})
+
+
 def _stroke_attrs(ins: Instruction) -> dict:
+    do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled
     attrs = {
         "stroke": COLOR_MAP[ins.color],
         "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight],
-        "fill": COLOR_MAP[ins.color] if ins.filled else "none",
+        "fill": COLOR_MAP[ins.color] if do_fill else "none",
         "stroke_linecap": "round",
     }
     dash = STYLE_TO_DASH[ins.style]

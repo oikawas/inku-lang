@@ -85,13 +85,14 @@ The reference vocabulary dictionary is called **Saijiki**（歳時記）— a te
 
 | Category (EN) | Category (JA) | Vocabulary |
 |---|---|---|
-| forms | かたち | circle, triangle, square, line, arc |
+| forms | かたち | circle, ellipse, triangle, square, line, arc |
 | touches | てざわり | pen, brush, crayon, chalk, rope |
 | motions | うごき | place, align, fill, scatter |
 | places | ばしょ | top, bottom, center, edge, corner |
 | continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | movements | ゆらぎ | fine, broad, quick, slow, wobble, undulate, tremble, blur |
 | colors | いろ | white, black, blue, red, green, gray |
+| proportions | わりあい | tall, wide, full-width, half-width, semicircle, first-quarter, last-quarter, crescent |
 
 Only physical and observational words are allowed. Emotional evaluation — "beautifully," "delicately," "powerfully" — is not part of the core.
 
@@ -110,15 +111,29 @@ For the full design rationale, see [SPEC.md](./SPEC.md).
 
 ---
 
-## Status
+## Capabilities (v1.2)
 
-**Early development.**
+The web version is operational. Current features:
+
+- **Two-stage pipeline** — interpretation (frontier LLM) + structuring (lightweight LLM), with live stage display during rendering
+- **Primitives** — line, circle, ellipse, arc, square, triangle; all with weight, color, style, and variation
+- **Arrangement** — horizontal, vertical, radial, scatter layouts; count up to 1,000; color cycle
+- **Variation (揺らぎ)** — perlin, wave, pink, white noise applied to position axes
+- **Background color** — canvas background controllable per drawing
+- **Closed-shape fill** — circle, ellipse, square, triangle fill automatically when color is specified
+- **Proportions vocabulary (わりあい)** — tall/wide rectangles, full/half-width lines, arc-based moon shapes
+- **Batch mode** — enter multiple descriptions line-by-line; processed sequentially with progress display
+- **History** — server-side, unlimited, paginated; thumbnail strip with model info
+- **Saijiki panel** — vocabulary reference, click-to-insert
+
+---
+
+## Status
 
 Current implementations:
 
-- **Python PoC** — reference implementation of the compose–render pipeline
+- **Web version** — operational (Python FastAPI + SvelteKit, runs locally or on a server)
 - **Android app** — end-to-end working demo on Pixel 9 with Gemma 4 running locally
-- **Web version** — in development
 
 ---
 

@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.1**
+**Version: v1.2**
 
 ---
 
@@ -1106,6 +1106,10 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~背景色の固定 (white のみ)~~ → v1.1 で Score.background フィールド追加
 - ~~大量配置時の単色制約~~ → v1.1 で Arrangement.color_cycle 追加
 - ~~Stage 2 がユーザーの元の記述を参照できない~~ → v1.1 で original_text パス・スルー実装
+- ~~比率・形状の語彙不足 (縦長/横長/月形等)~~ → v1.2 で Saijiki わりあいカテゴリ追加
+- ~~演奏中に何をしているか分からない~~ → v1.2 で 2 コール方式 + ステージラベル表示
+- ~~1 記述ずつしか処理できない~~ → v1.2 でバッチ記述モード追加
+- ~~学習モードの複雑さ~~ → v1.2 で廃止 (実験的機能として trainer.py は残置)
 
 ---
 
@@ -1155,11 +1159,11 @@ inku-lang/                         # github.com/oikawas/inku-lang
 `server/src/inku_server/`:
 - `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
 - `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
-- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 30件、k=5 動的選択、非 Saijiki 語展開ルール)
-- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー)
+- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 38件、k=5 動的選択、非 Saijiki 語展開・わりあいルール)
+- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例)
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
-- `api.py` — FastAPI: `/api/paint`/`/api/compose`/`/api/interpret`/`/api/history`/`/api/train`/`/health`
-- `trainer.py` — 学習モード: サンプル生成 → interpret → EXAMPLE_POOL 追加、SSE ストリーム、永続化
+- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/health`
+- `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
 **開発環境 (ローカル運用手順は `LOCAL_WORK.md` を参照、未コミット)**
 
@@ -1170,6 +1174,45 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.2 (2026-04-25)
+
+**バッチモード + 演奏ステージ可視化 + 学習モード廃止 + わりあい語彙追加**
+
+#### バッチ記述モード
+
+- 入力欄に「記述 / バッチ」タブを追加
+- バッチタブ: 改行区切りで複数の記述を入力、左端に行番号を自動表示
+- 順次処理: 演奏中は「N / M 番目を演奏中…」と表示、停止ボタンで中断可能
+- 各結果を履歴に保存し、最後の結果がキャンバスに残る
+
+#### 演奏中ステージ可視化
+
+- フロントエンドの処理方式を `/api/paint` 1 コール → `/api/interpret` + `/api/compose` の 2 コール方式に変更
+- 演奏中に「解釈中…」「構造化中…」をステージラベルとして経過秒と並べてリアルタイム表示
+- `ComposeRequest` に `original_text` フィールド追加 (Stage 2 が元の記述を参照して属性補完に活用)
+
+#### 学習モード廃止
+
+- Web UI の学習モードパネルを削除
+- `GET /api/train`・`GET /api/train/stats`・`DELETE /api/train` エンドポイントを削除
+- 起動時の EXAMPLE_POOL 注入ルーティングも削除 (`trainer.py` は実験的ユーティリティとして残置)
+
+#### Web UI 改善
+
+- 出力タブ順変更: 演奏 → プロンプト → 楽譜 (旧: 演奏→楽譜→プロンプト)
+- プロンプト表示領域拡大: ユーザー入力 max-height 160px、システムプロンプト 400px、外枠 680px
+- 履歴に `stage1_model` / `stage2_model` を記録 (サムネイルの title で確認可)
+
+#### Saijiki わりあいカテゴリ追加
+
+- 新カテゴリ `わりあい (proportions)`: 縦長・横長・全幅・半幅・半円・上弦・下弦・三日月
+- Stage 1 `SYSTEM_PROMPT_PREFIX` に `# わりあい` ルールセクション追加 (縦横比・線長・月形→角度の変換原則)
+- Stage 2 `SYSTEM_PROMPT` にわりあい JSON マッピング例 7 件追加
+- `EXAMPLE_POOL` に 8 件追加 (縦横比 2・線長 2・弧月 4)
+- `saijiki.ts` に `わりあい` カテゴリを追加
+
+---
 
 ### v1.1 (2026-04-25)
 

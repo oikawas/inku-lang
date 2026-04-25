@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.0**
+**Version: v1.1**
 
 ---
 
@@ -1101,6 +1101,11 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~line from/to 省略時のレンダーエラー~~ → v1.0 で layout から推定補完 + fallback
 - ~~Stage 1 属性脱落問題 (色・素材・方向の省略)~~ → v1.0 で属性保持セクション + EXAMPLE_POOL 強化
 - ~~履歴の localStorage 上限・永続化~~ → v1.0 でサーバーサイド無制限保存 + ページネーション
+- ~~render failed: 必須フィールド欠損エラー~~ → v1.1 で coerce.py (PRIMITIVE_SPECS テーブル駆動) により事前補修
+- ~~非 Saijiki 語の展開 (固定辞書の限界)~~ → v1.1 で LLM 意味理解 + SYSTEM_PROMPT_PREFIX 展開原則に転換
+- ~~背景色の固定 (white のみ)~~ → v1.1 で Score.background フィールド追加
+- ~~大量配置時の単色制約~~ → v1.1 で Arrangement.color_cycle 追加
+- ~~Stage 2 がユーザーの元の記述を参照できない~~ → v1.1 で original_text パス・スルー実装
 
 ---
 
@@ -1121,7 +1126,8 @@ inku-lang/                         # github.com/oikawas/inku-lang
 │   │   ├── __init__.py
 │   │   ├── schema.py              # JSON Score Pydantic モデル
 │   │   ├── renderer.py            # Score → SVG (svgwrite)
-│   │   └── composer.py            # 正規化DDL → Score (Haiku 4.5)
+│   │   ├── composer.py            # 正規化DDL → Score (Haiku 4.5)
+│   │   └── coerce.py              # Score 構造補修 (PRIMITIVE_SPECS テーブル駆動)
 │   └── tests/
 │       ├── conftest.py            # dotenv 読込
 │       ├── test_renderer.py       # 10 cases
@@ -1147,10 +1153,11 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ```
 
 `server/src/inku_server/`:
-- `schema.py` — Pydantic Score モデル (Arrangement.count 上限 500)
-- `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布
-- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 21件、k=5 動的選択)
-- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch)
+- `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
+- `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
+- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 30件、k=5 動的選択、非 Saijiki 語展開ルール)
+- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー)
+- `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
 - `api.py` — FastAPI: `/api/paint`/`/api/compose`/`/api/interpret`/`/api/history`/`/api/train`/`/health`
 - `trainer.py` — 学習モード: サンプル生成 → interpret → EXAMPLE_POOL 追加、SSE ストリーム、永続化
 
@@ -1163,6 +1170,68 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.1 (2026-04-25)
+
+**coerce レイヤー + 背景色 + 配色サイクル + 塗りつぶし + 非 Saijiki 語展開 + UI 改善**
+
+#### coerce.py — テーブル駆動の構造補修レイヤー (新規)
+
+LLM が必須フィールドを省略した Score を renderer に渡す前に自動補修する `coerce.py` を新規作成。
+
+- **設計原則**: primitive 個別の if/elif を書かない。`FieldSpec` dataclass + `PRIMITIVE_SPECS` テーブルで要件を宣言し、汎用ループで適用。新 primitive 追加 = テーブルにエントリ追記のみ
+- **`FieldSpec`**: `name / default / fallbacks (cross-field 代替) / coerce (型正規化関数)` を宣言
+- **`PRIMITIVE_SPECS`**: 6 primitive (line/circle/ellipse/arc/square/triangle) の必須フィールド仕様
+  - fallback 例: circle の `center` 欠損時は `position` を代用
+  - 型正規化: `_as_coord / _as_positive_float / _as_positive_size / _as_float`
+- **`POST_COERCE`**: cross-field 制約 (arc の `angle_start == angle_end` → +270° 補正)
+- **`api.py`**: `/api/compose` / `/api/paint` 両エンドポイントで `render()` 前に `coerce_score()` を呼び出し
+
+#### 閉じた形状の自動塗りつぶし
+
+- `_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})`
+- `_stroke_attrs()`: `do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled` — 閉形状は色指定で自動塗りつぶし
+- `Instruction.filled: bool = False` フィールドを schema.py に追加 (明示的塗りつぶし指定)
+
+#### 背景色 (Score.background)
+
+- `Score.background: Color = "white"` フィールド追加
+- `renderer.render()`: `COLOR_MAP.get(score.background, BACKGROUND)` でキャンバス全体を背景色で塗りつぶし
+- Stage 2 プロンプトに background ルール追加
+
+#### 配色サイクル (Arrangement.color_cycle)
+
+- `Arrangement.color_cycle: list[Color]` フィールド追加 (デフォルト空 = 全要素同色)
+- `_apply_color_cycle(items, cycle)`: arrangement 展開後に `i % len(cycle)` で色を上書き
+- 全 layout (horizontal / vertical / radial / scatter) で適用
+
+#### count 上限 1000 へ拡張
+
+- `Arrangement.count` 上限 500 → 1000、`_clamp_count` validator も更新
+- composer.py / interpreter.py のプロンプト記述も同様に更新
+
+#### Stage 2: original_text パス・スルー
+
+- `compose(ddl, *, original_text=None)` に引数追加
+- `_build_user_message(ddl, original_text)`: 原文と正規化DDL が異なる場合 `[原文]…[正規化DDL]…` 形式でユーザーメッセージを構成
+- `/api/paint` で `req.text` を Stage 2 に渡すよう改善 → LLM が元の記述の意図をより正確に反映
+
+#### 非 Saijiki 語の LLM 意味展開
+
+- Stage 1 `SYSTEM_PROMPT_PREFIX` に `# 非 Saijiki 語の展開` セクションを追加
+  - 展開の四つの切り口: 形状 / 質感 / 構造 / 動作→配置
+  - 例: 月→円、霧→楕円(滲む)、森→縦線を複数、散る→ランダムに散らす
+- 固定辞書アプローチ (`expansion.py`) を削除 — LLM の意味理解に委ねる方針に転換
+- EXAMPLE_POOL に自然現象・詩的語彙の例 9 件追加 (太陽、星空、水平線+月、山並み、森、雪、炎、都市、花びら)
+
+#### Web UI 改善
+
+- **タブ切り替え**: 演奏 / 楽譜 / プロンプト の 3 タブ (旧: 垂直展開)。新しい結果が来ると自動的に「演奏」タブに戻る
+- **ビルド番号**: `vite.config.ts` に `.build-number` ファイルベースのインクリメント機構を追加。ヘッダー左上に `#N` 表示
+- **接続先 / モデル ラベル**: 「接続先：」「モデル：」を明記
+- **プロンプト表示順**: Stage1ユーザー入力 → Stage1システム → Stage2ユーザー入力 → Stage2システム (文脈順)
+
+---
 
 ### v1.0 (2026-04-25)
 

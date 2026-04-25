@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v0.9**
+**Version: v1.0**
 
 ---
 
@@ -1055,8 +1055,9 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 - EXAMPLE_POOL に arc 例 (弧を使う詩句 → `弧を引く` 等) 追加、弧出力を誘導
 - Stage 1 → Stage 2 の E2E 汎化試験 (interpret 結果が composer を通るか)
-- SPEC §2 原則5 違反動詞の混入率測定 (v0.7 prompt 強化後の再評価)
+- SPEC §2 原則5 違反動詞の混入率測定 (v0.7 強化 + v1.0 属性保持強化後の再評価)
 - Anthropic Opus 4.7 path の測定 (作者感による解釈品質比較)
+- 学習モードの生成サンプル品質評価 (style ローテーションの多様性実測)
 
 ### D. Web UI / 体験 (SPEC §7 未消化)
 
@@ -1095,6 +1096,11 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~NVIDIA NIM プロバイダー追加 + モデル per-stage 選択~~ → v0.9 で実装
 - ~~本数・個数の arrangement 展開 (JSON サイズ問題)~~ → v0.9 で実装
 - ~~プロンプト無限増殖問題~~ → v0.9 で schema-as-spec + EXAMPLE_POOL により構造的に解決
+- ~~大量オブジェクト描画 (100本・200個)~~ → v1.0 で count 上限 500 + scatter hash 化
+- ~~scatter 固定10点問題~~ → v1.0 で SHA-256 hash ベースに変更、N 個任意対応
+- ~~line from/to 省略時のレンダーエラー~~ → v1.0 で layout から推定補完 + fallback
+- ~~Stage 1 属性脱落問題 (色・素材・方向の省略)~~ → v1.0 で属性保持セクション + EXAMPLE_POOL 強化
+- ~~履歴の localStorage 上限・永続化~~ → v1.0 でサーバーサイド無制限保存 + ページネーション
 
 ---
 
@@ -1141,11 +1147,12 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ```
 
 `server/src/inku_server/`:
-- `schema.py` — Pydantic Score モデル
-- `renderer.py` — Score → SVG (svgwrite)、line の揺らぎ生成 (perlin/wave/pink/white)、arc の SVG path 生成
-- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (backend dispatch)
+- `schema.py` — Pydantic Score モデル (Arrangement.count 上限 500)
+- `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布
+- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 21件、k=5 動的選択)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch)
-- `api.py` — FastAPI app: `/api/compose`/`/api/interpret`/`/api/paint`/`/health`
+- `api.py` — FastAPI: `/api/paint`/`/api/compose`/`/api/interpret`/`/api/history`/`/api/train`/`/health`
+- `trainer.py` — 学習モード: サンプル生成 → interpret → EXAMPLE_POOL 追加、SSE ストリーム、永続化
 
 **開発環境 (ローカル運用手順は `LOCAL_WORK.md` を参照、未コミット)**
 
@@ -1156,6 +1163,82 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.0 (2026-04-25)
+
+**大量描画対応 + Renderer 堅牢化 + Stage 1 属性保持強化 + 学習モード + サーバーサイド履歴**
+
+#### 大量オブジェクト描画 (count 上限 500)
+
+「100本の線」「200個の円」を実際に描画できるようアルゴリズムを改良。
+
+- **schema.py**: `Arrangement.count` 上限 50 → 500、`_clamp_count` validator も同様
+- **renderer.py**: 固定10点 `_SCATTER_POSITIONS` を廃止。`_scatter_pos(i, seed, margin)` を追加
+  - SHA-256 hash ベースの決定的ランダム座標生成 — N 個任意対応
+  - 同一 Score → 同一 SVG の決定性を維持 (seed = instruction の hash)
+- **interpreter.py**: 「100本・200個 → 30程度に丸める」規則を撤廃、具体的な数はそのまま通す
+- **composer.py**: count 上限説明を 50 → 500 に更新
+
+#### Renderer: line from/to 省略時の fallback
+
+LLM が arrangement 付き line を生成するとき `from`/`to` を省略するケースがあり `render failed` エラーが発生していた問題を修正。
+
+- `_ensure_line_coords(ins)` を追加: layout から方向を推定してデフォルト座標を補完
+  - `layout="vertical"` → 横線 (`[0.0, 0.5]`→`[1.0, 0.5]`)
+  - その他 (`horizontal` / `scatter` / `radial`) → 縦線 (`[0.5, 0.0]`→`[0.5, 1.0]`)
+- `_expand_arrangement` 入口で呼び出し (arrangement 展開前に補完)
+- `_render_instruction` でも arrangement なし line に同様の fallback を適用 (raise を除去)
+
+#### Stage 1 属性保持強化
+
+記述の解釈時に色・素材・方向・揺らぎが脱落する問題を構造的に修正。
+
+- **`# 属性保持 — 脱落禁止` セクション追加**
+  - 「感情語の除去だけが正規化であり、属性の省略は誤り」を明示
+  - いろ / てざわり / 太さ / 方向・ばしょ / ゆらぎ / 配置パターン の保持を個別明記
+- **数量表現ルール更新**: 「色・素材・方向とともに 1 文に」収める例を追加
+- **EXAMPLE_POOL**: 12件 → 21件 (+7件)
+  - 追加例: クレヨン+色+数量、鉛筆+細さ、震える複数線、右半分+色+数量、300本のクレヨン、地平線構成、チョーク+滲み
+- **k: 3 → 5** — 複合属性入力での例参照数を増加
+
+#### 学習モード (SSE ストリーム)
+
+コーパスを自動拡張するバックグラウンド学習機能を追加。
+
+- **`trainer.py` 新規作成**
+  - `VARIATION_STYLES` (5スタイル): 詩的・口語・抽象・自然現象・擬音語をローテーション
+  - `generate_sample(style_idx, model)`: 指定スタイルで記述サンプルを LLM 生成
+  - `run_one_iteration(style_idx, model)`: 生成 → `interpret_detail` → EXAMPLE_POOL 追加
+  - `add_learned_example(input, ddl)`: EXAMPLE_POOL へ追記 + `INKU_LEARNED_FILE` に永続化
+  - `load_learned_examples()`: 起動時に永続化済みコーパスを EXAMPLE_POOL へ注入
+  - `clear_learned_examples()`: auto エントリのみ削除、static 例は保持
+  - backend dispatch: interpreter.py と同じ anthropic / nvidia / ovms ルーティング
+- **`api.py` 追加エンドポイント**
+  - `GET /api/train?n=&model=` → SSE ストリーム (`progress` / `result` / `error` / `done` イベント)
+  - `GET /api/train/stats` → `{"learned_count": N}`
+  - `DELETE /api/train` → コーパスクリア
+  - `asyncio.to_thread` で sync LLM 呼び出しを非同期化
+  - `request.is_disconnected()` でクライアント切断を検出してループを停止
+- **Web UI** (学習モードパネル)
+  - 折り畳み式パネル、イテレーション数入力、モデル選択
+  - リアルタイム進捗バー (shimmer アニメーション)、ログ表示
+  - 停止ボタン → EventSource close → サーバーループも次イテレーション前に停止
+  - `onMount` で初期 `learned_count` を取得
+
+#### サーバーサイド履歴 (無制限・ページネーション)
+
+localStorage の容量制限を解消し、セッション跨ぎの履歴を実現。
+
+- **`api.py`**: `_history: list[dict]` をメモリ保持 + `_HISTORY_FILE` (既定 `/tmp/inku-history.json`) に永続化
+- エンドポイント: `GET /api/history?offset=&limit=` (新着順)、`POST /api/history`、`DELETE /api/history`
+- **Web UI**: `HISTORY_PAGE_SIZE=10`、`← 新` / `旧 →` ページナビ、全件数表示
+
+#### UI 改善
+
+- **歳時記ボタン**: ヘッダー → 記述エリア右上 (`<div class="input-header">`) に移動
+- **Saijiki トークン色**: `#111` → `#2c3e91` (青) でインライン表示
+
+---
 
 ### v0.9 (2026-04-25)
 

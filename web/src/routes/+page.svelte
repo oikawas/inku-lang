@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import { SAIJIKI } from '$lib/saijiki';
 	import { annotate } from '$lib/highlight';
 	import {
@@ -20,25 +20,15 @@
 
 	type Score = { instructions: unknown[] };
 
-	type PaintResponse = {
-		text: string;
-		ddl: string;
-		thinking: string | null;
-		score: Score;
+	type PaintResult = {
 		svg: string;
+		score: Score;
 		elapsed_stage1_ms: number;
 		elapsed_stage2_ms: number;
 		elapsed_total_ms: number;
 	};
 
-	type ComposeResponse = {
-		score: Score;
-		svg: string;
-		elapsed_ms: number;
-	};
-
 	type Iteration = {
-		mode?: string;
 		input: string;
 		ddl: string | null;
 		thinking?: string | null;
@@ -46,23 +36,40 @@
 		svg: string;
 		at: number;
 		elapsed_ms?: number;
+		stage1_model?: string | null;
+		stage2_model?: string | null;
 	};
 
+	// ── Input ───────────────────────────────────────────────
+	let inputMode = $state<'single' | 'batch'>('single');
 	let input = $state('山の向こうに月が昇る');
-	let loading = $state(false);
-	let error = $state<string | null>(null);
-	let ddl = $state<string | null>(null);
-	let thinking = $state<string | null>(null);
-	let result = $state<PaintResponse | ComposeResponse | null>(null);
-	let saijikiOpen = $state(false);
+	let batchInput = $state('');
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 
+	// ── Loading ─────────────────────────────────────────────
+	let loading = $state(false);
+	let stageLabel = $state('');
+	let batchCurrent = $state(0);
+	let batchTotal = $state(0);
+	let error = $state<string | null>(null);
+
+	// ── Result ──────────────────────────────────────────────
+	let ddl = $state<string | null>(null);
+	let thinking = $state<string | null>(null);
+	let result = $state<PaintResult | null>(null);
+
+	// ── UI ──────────────────────────────────────────────────
+	let saijikiOpen = $state(false);
+	let outputTab = $state<'canvas' | 'prompts' | 'score'>('canvas');
+
+	// ── Models ──────────────────────────────────────────────
 	let stage1Provider = $state<Provider>(DEFAULT_PROVIDER);
 	let stage1Model = $state<string>(DEFAULT_MODEL);
 	let stage2Provider = $state<Provider>(DEFAULT_PROVIDER);
 	let stage2Model = $state<string>(DEFAULT_MODEL);
 	let includeThinking = $state(false);
 
+	// ── Timer ───────────────────────────────────────────────
 	let elapsedStage1Ms = $state(0);
 	let elapsedStage2Ms = $state(0);
 	let elapsedTotalMs = $state(0);
@@ -70,7 +77,7 @@
 	let _timerStart = 0;
 	let _timerHandle: ReturnType<typeof setInterval> | null = null;
 
-	// 履歴 (サーバー側ストレージ、ページネーション)
+	// ── History ─────────────────────────────────────────────
 	let historyItems = $state<Iteration[]>([]);
 	let historyTotal = $state(0);
 	let historyPage = $state(0);
@@ -78,70 +85,151 @@
 	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
-	let outputTab = $state<'canvas' | 'score' | 'prompts'>('canvas');
 
-	// 学習モード
-	type TrainEntry = { i: number; text: string; ddl: string; style: string };
-	let trainOpen = $state(false);
-	let trainN = $state(10);
-	let trainRunning = $state(false);
-	let trainProgress = $state({ i: 0, total: 0 });
-	let trainLog = $state<TrainEntry[]>([]);
-	let trainLearnedCount = $state(0);
-	let trainEventSource = $state<EventSource | null>(null);
+	// ── Batch derived ────────────────────────────────────────
+	const batchLines = $derived(batchInput.split('\n'));
+	const lineNumbersText = $derived(batchLines.map((_, i) => String(i + 1)).join('\n'));
+	const batchNonEmpty = $derived(batchLines.filter((l) => l.trim()).length);
+	const canSubmit = $derived(
+		inputMode === 'single' ? !!input.trim() : batchNonEmpty > 0
+	);
 
-	function startTraining() {
-		if (trainRunning) return;
-		trainRunning = true;
-		trainLog = [];
-		trainProgress = { i: 0, total: trainN };
-
-		const params = new URLSearchParams({ n: String(trainN) });
-		if (stage1Model) params.set('model', stage1Model);
-		const es = new EventSource(`/api/train?${params.toString()}`);
-		trainEventSource = es;
-
-		es.onmessage = (e: MessageEvent) => {
-			const data = JSON.parse(e.data);
-			if (data.type === 'progress') {
-				trainProgress = { i: data.i, total: data.total };
-				if (data.learned != null) trainLearnedCount = data.learned;
-			} else if (data.type === 'result') {
-				trainProgress = { i: data.i, total: data.total };
-				if (data.learned != null) trainLearnedCount = data.learned;
-				trainLog = [
-					{ i: data.i, text: data.text, ddl: data.ddl, style: data.style },
-					...trainLog
-				].slice(0, 50);
-			} else if (data.type === 'error') {
-				trainLog = [
-					{ i: data.i, text: `[エラー] ${data.error}`, ddl: '', style: '' },
-					...trainLog
-				].slice(0, 50);
-			} else if (data.type === 'done') {
-				if (data.learned != null) trainLearnedCount = data.learned;
-				stopTraining();
-			}
-		};
-		es.onerror = () => stopTraining();
+	// ── Timer ───────────────────────────────────────────────
+	function startTimer() {
+		_timerStart = Date.now();
+		liveMs = 0;
+		_timerHandle = setInterval(() => {
+			liveMs = Date.now() - _timerStart;
+		}, 100);
 	}
 
-	function stopTraining() {
-		if (trainEventSource) {
-			trainEventSource.close();
-			trainEventSource = null;
+	function stopTimer() {
+		if (_timerHandle !== null) {
+			clearInterval(_timerHandle);
+			_timerHandle = null;
 		}
-		trainRunning = false;
 	}
 
-	async function clearCorpus() {
+	// ── Core paint function (2-stage call) ──────────────────
+	async function paintOne(text: string): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
+		const t0 = Date.now();
+
+		stageLabel = '解釈中…';
+		const r1 = await fetch('/api/interpret', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ text, model: stage1Model, include_thinking: includeThinking })
+		});
+		if (!r1.ok) {
+			const d = await r1.json().catch(() => ({})) as { detail?: string };
+			throw new Error(d.detail ?? `HTTP ${r1.status}`);
+		}
+		const d1 = (await r1.json()) as { ddl: string; thinking: string | null };
+		const t1 = Date.now();
+
+		stageLabel = '構造化中…';
+		const r2 = await fetch('/api/compose', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text })
+		});
+		if (!r2.ok) {
+			const d = await r2.json().catch(() => ({})) as { detail?: string };
+			throw new Error(d.detail ?? `HTTP ${r2.status}`);
+		}
+		const d2 = (await r2.json()) as { score: Score; svg: string };
+		const t2 = Date.now();
+
+		return {
+			ddl: d1.ddl,
+			thinking: d1.thinking,
+			score: d2.score,
+			svg: d2.svg,
+			elapsed_stage1_ms: t1 - t0,
+			elapsed_stage2_ms: t2 - t1,
+			elapsed_total_ms: t2 - t0
+		};
+	}
+
+	// ── Submit ──────────────────────────────────────────────
+	async function submit() {
+		if (!canSubmit || loading) return;
+		loading = true;
+		error = null;
+		ddl = null;
+		thinking = null;
+		elapsedStage1Ms = 0;
+		elapsedStage2Ms = 0;
+		elapsedTotalMs = 0;
+		batchCurrent = 0;
+		batchTotal = 0;
+		startTimer();
+
 		try {
-			await fetch('/api/train', { method: 'DELETE' });
-		} catch { /* ignore */ }
-		trainLearnedCount = 0;
-		trainLog = [];
+			if (inputMode === 'single') {
+				const r = await paintOne(input);
+				ddl = r.ddl;
+				thinking = r.thinking;
+				result = r;
+				outputTab = 'canvas';
+				elapsedStage1Ms = r.elapsed_stage1_ms;
+				elapsedStage2Ms = r.elapsed_stage2_ms;
+				elapsedTotalMs = r.elapsed_total_ms;
+				await pushHistory({
+					input,
+					ddl: r.ddl,
+					thinking: r.thinking,
+					score: r.score,
+					svg: r.svg,
+					at: Date.now(),
+					elapsed_ms: r.elapsed_total_ms,
+					stage1_model: stage1Model,
+					stage2_model: stage2Model
+				});
+			} else {
+				const lines = batchLines.map((l) => l.trim()).filter((l) => l);
+				batchTotal = lines.length;
+				outputTab = 'canvas';
+				for (let i = 0; i < lines.length; i++) {
+					if (!loading) break;
+					batchCurrent = i + 1;
+					try {
+						const r = await paintOne(lines[i]);
+						result = r;
+						await pushHistory({
+							input: lines[i],
+							ddl: r.ddl,
+							thinking: r.thinking,
+							score: r.score,
+							svg: r.svg,
+							at: Date.now(),
+							elapsed_ms: r.elapsed_total_ms,
+							stage1_model: stage1Model,
+							stage2_model: stage2Model
+						});
+					} catch {
+						// continue with next line
+					}
+				}
+				elapsedTotalMs = Date.now() - _timerStart;
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+			result = null;
+		} finally {
+			stopTimer();
+			loading = false;
+			stageLabel = '';
+			batchCurrent = 0;
+			batchTotal = 0;
+		}
 	}
 
+	function stopBatch() {
+		loading = false;
+	}
+
+	// ── History ─────────────────────────────────────────────
 	async function fetchHistoryPage(page: number): Promise<void> {
 		const offset = page * HISTORY_PAGE_SIZE;
 		try {
@@ -167,7 +255,9 @@
 					score: it.score,
 					svg: it.svg,
 					at: it.at,
-					elapsed_ms: it.elapsed_ms ?? 0
+					elapsed_ms: it.elapsed_ms ?? 0,
+					stage1_model: it.stage1_model ?? null,
+					stage2_model: it.stage2_model ?? null
 				})
 			});
 		} catch {
@@ -198,21 +288,30 @@
 		input = it.input;
 		ddl = it.ddl;
 		thinking = it.thinking ?? null;
-		result = { score: it.score, svg: it.svg } as ComposeResponse;
+		result = {
+			score: it.score,
+			svg: it.svg,
+			elapsed_stage1_ms: 0,
+			elapsed_stage2_ms: 0,
+			elapsed_total_ms: it.elapsed_ms ?? 0
+		};
 		error = null;
 	}
 
-	// ◀ = 古い方向 (インデックス増加 = 新しい順リストで後ろ)
 	function gotoPrev() {
 		if (historyCursor < historyItems.length - 1) loadIteration(historyCursor + 1);
 	}
 
-	// ▶ = 新しい方向 (インデックス減少)
 	function gotoNext() {
 		if (historyCursor > 0) loadIteration(historyCursor - 1);
 	}
 
+	// ── Saijiki ─────────────────────────────────────────────
 	function insertWord(word: string) {
+		if (inputMode === 'batch') {
+			batchInput = batchInput ? batchInput + word : word;
+			return;
+		}
 		const ta = textareaEl;
 		if (!ta) {
 			input = input + word;
@@ -230,48 +329,10 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' && saijikiOpen) {
-			saijikiOpen = false;
-		}
+		if (e.key === 'Escape' && saijikiOpen) saijikiOpen = false;
 	}
 
-	onMount(async () => {
-		await fetchHistoryPage(0);
-		if (historyItems.length > 0) {
-			loadIteration(0);
-		}
-		try {
-			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null;
-			if (p1) stage1Provider = p1;
-			const m1 = localStorage.getItem(MODEL_STAGE1_KEY);
-			if (m1) stage1Model = m1;
-			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null;
-			if (p2) stage2Provider = p2;
-			const m2 = localStorage.getItem(MODEL_STAGE2_KEY);
-			if (m2) stage2Model = m2;
-		} catch {
-			// ignore
-		}
-
-		try {
-			const r = await fetch('/api/prompts');
-			if (r.ok) promptsData = await r.json();
-		} catch {
-			// ignore prompt load failure
-		}
-		try {
-			const r = await fetch('/api/train/stats');
-			if (r.ok) {
-				const d = await r.json();
-				trainLearnedCount = d.learned_count ?? 0;
-			}
-		} catch { /* ignore */ }
-	});
-
-	onDestroy(() => {
-		stopTraining();
-	});
-
+	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
 		stage1Provider = v;
 		stage1Model = modelsForProvider(v)[0]?.id ?? stage1Model;
@@ -283,9 +344,7 @@
 
 	function setStage1Model(v: string) {
 		stage1Model = v;
-		try {
-			localStorage.setItem(MODEL_STAGE1_KEY, v);
-		} catch {}
+		try { localStorage.setItem(MODEL_STAGE1_KEY, v); } catch {}
 	}
 
 	function setStage2Provider(v: Provider) {
@@ -299,76 +358,28 @@
 
 	function setStage2Model(v: string) {
 		stage2Model = v;
+		try { localStorage.setItem(MODEL_STAGE2_KEY, v); } catch {}
+	}
+
+	// ── Mount ───────────────────────────────────────────────
+	onMount(async () => {
+		await fetchHistoryPage(0);
+		if (historyItems.length > 0) loadIteration(0);
 		try {
-			localStorage.setItem(MODEL_STAGE2_KEY, v);
+			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null;
+			if (p1) stage1Provider = p1;
+			const m1 = localStorage.getItem(MODEL_STAGE1_KEY);
+			if (m1) stage1Model = m1;
+			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null;
+			if (p2) stage2Provider = p2;
+			const m2 = localStorage.getItem(MODEL_STAGE2_KEY);
+			if (m2) stage2Model = m2;
 		} catch {}
-	}
-
-	function startTimer() {
-		_timerStart = Date.now();
-		liveMs = 0;
-		_timerHandle = setInterval(() => {
-			liveMs = Date.now() - _timerStart;
-		}, 100);
-	}
-
-	function stopTimer() {
-		if (_timerHandle !== null) {
-			clearInterval(_timerHandle);
-			_timerHandle = null;
-		}
-	}
-
-	async function submit() {
-		if (!input.trim()) return;
-		loading = true;
-		error = null;
-		ddl = null;
-		thinking = null;
-		elapsedStage1Ms = 0;
-		elapsedStage2Ms = 0;
-		elapsedTotalMs = 0;
-		startTimer();
 		try {
-			const r = await fetch('/api/paint', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					text: input,
-					stage1_model: stage1Model,
-					stage2_model: stage2Model,
-					include_thinking: includeThinking
-				})
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({}));
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
-			}
-			const data = (await r.json()) as PaintResponse;
-			ddl = data.ddl;
-			thinking = data.thinking;
-			result = data;
-			outputTab = 'canvas';
-			elapsedStage1Ms = data.elapsed_stage1_ms ?? 0;
-			elapsedStage2Ms = data.elapsed_stage2_ms ?? 0;
-			elapsedTotalMs = data.elapsed_total_ms ?? 0;
-			await pushHistory({
-				input,
-				ddl: data.ddl,
-				thinking: data.thinking,
-				score: data.score,
-				svg: data.svg,
-				at: Date.now(),
-				elapsed_ms: data.elapsed_total_ms ?? 0
-			});
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			result = null;
-		} finally {
-			stopTimer();
-			loading = false;
-		}
-	}
+			const r = await fetch('/api/prompts');
+			if (r.ok) promptsData = await r.json();
+		} catch {}
+	});
 </script>
 
 <main>
@@ -436,27 +447,66 @@
 	<div class="row">
 		<section class="input">
 			<div class="input-header">
-				<label for="input-ta">記述</label>
+				<div class="input-mode-tabs">
+					<button
+						class="mode-btn"
+						class:active={inputMode === 'single'}
+						onclick={() => (inputMode = 'single')}
+					>記述</button>
+					<button
+						class="mode-btn"
+						class:active={inputMode === 'batch'}
+						onclick={() => (inputMode = 'batch')}
+					>バッチ</button>
+				</div>
 				<button
 					class="saijiki-toggle"
 					aria-expanded={saijikiOpen}
 					onclick={() => (saijikiOpen = !saijikiOpen)}
-				>
-					歳時記
-				</button>
+				>歳時記</button>
 			</div>
-			<textarea
-				id="input-ta"
-				bind:this={textareaEl}
-				bind:value={input}
-				rows="8"
-				spellcheck="false"
-				placeholder="山の向こうに月が昇る"
-			></textarea>
+
+			{#if inputMode === 'single'}
+				<textarea
+					id="input-ta"
+					bind:this={textareaEl}
+					bind:value={input}
+					rows="8"
+					spellcheck="false"
+					placeholder="山の向こうに月が昇る"
+				></textarea>
+			{:else}
+				<div class="batch-wrapper">
+					<div class="line-nums" aria-hidden="true">{lineNumbersText}</div>
+					<textarea
+						class="batch-ta"
+						bind:value={batchInput}
+						rows="8"
+						spellcheck="false"
+						placeholder="山の向こうに月が昇る&#10;夜の霧が広がる&#10;青いクレヨンの線"
+					></textarea>
+				</div>
+				{#if batchNonEmpty > 0}
+					<p class="batch-info">{batchNonEmpty} 件</p>
+				{/if}
+			{/if}
+
 			<div class="submit-row">
-				<button class="submit" onclick={submit} disabled={loading || !input.trim()}>
-					{loading ? '演奏中…' : '演奏する'}
+				<button class="submit" onclick={submit} disabled={!canSubmit || (loading && inputMode === 'single')}>
+					{#if loading}
+						{#if batchTotal > 0}
+							{batchCurrent} / {batchTotal} 番目を演奏中…
+						{:else}
+							{stageLabel || '演奏中…'}
+						{/if}
+					{:else}
+						演奏する
+					{/if}
 				</button>
+				{#if loading && batchTotal > 0}
+					<span class="stage-label">{stageLabel}</span>
+					<button class="stop-btn" onclick={stopBatch}>停止</button>
+				{/if}
 				{#if loading}
 					<span class="elapsed elapsed-live">{(liveMs / 1000).toFixed(1)}s</span>
 				{:else if elapsedTotalMs > 0}
@@ -473,7 +523,7 @@
 				<p class="error">{error}</p>
 			{/if}
 
-			{#if result}
+			{#if result && inputMode === 'single'}
 				<div class="interpreted">
 					<label for="input-feedback">入力に含まれた語彙</label>
 					<div id="input-feedback" class="annot-box">
@@ -525,16 +575,16 @@
 					>演奏</button>
 					<button
 						class="tab-btn"
-						class:active={outputTab === 'score'}
-						onclick={() => (outputTab = 'score')}
-						disabled={!result}
-					>楽譜</button>
-					<button
-						class="tab-btn"
 						class:active={outputTab === 'prompts'}
 						onclick={() => (outputTab = 'prompts')}
 						disabled={!result}
 					>プロンプト</button>
+					<button
+						class="tab-btn"
+						class:active={outputTab === 'score'}
+						onclick={() => (outputTab = 'score')}
+						disabled={!result}
+					>楽譜</button>
 				</div>
 				{#if historyTotal > 0}
 					<div class="nav" aria-label="履歴ナビゲーション">
@@ -563,25 +613,25 @@
 						<div class="placeholder">（まだ演奏されていない）</div>
 					{/if}
 				</div>
-			{:else if outputTab === 'score'}
-				<pre class="tab-content-pre">{JSON.stringify(result?.score, null, 2)}</pre>
 			{:else if outputTab === 'prompts'}
 				{#if promptsData}
-					<div class="prompt-section tab-content-pre">
+					<div class="prompt-section">
 						<p class="prompt-label">Stage 1 ユーザー入力</p>
-						<pre class="prompt-pre">{input}</pre>
+						<pre class="prompt-pre">{inputMode === 'single' ? input : '(バッチモード)'}</pre>
 						<p class="prompt-label">Stage 1 システムプロンプト</p>
-						<pre class="prompt-pre">{promptsData.stage1_system}</pre>
+						<pre class="prompt-pre prompt-pre-lg">{promptsData.stage1_system}</pre>
 						{#if ddl}
 							<p class="prompt-label">Stage 2 ユーザー入力 (正規化DDL)</p>
 							<pre class="prompt-pre">{ddl}</pre>
 						{/if}
 						<p class="prompt-label">Stage 2 システムプロンプト</p>
-						<pre class="prompt-pre">{promptsData.stage2_system}</pre>
+						<pre class="prompt-pre prompt-pre-lg">{promptsData.stage2_system}</pre>
 					</div>
 				{:else}
 					<p class="muted">読み込み中…</p>
 				{/if}
+			{:else if outputTab === 'score'}
+				<pre class="score-pre">{JSON.stringify(result?.score, null, 2)}</pre>
 			{/if}
 		</section>
 	</div>
@@ -613,7 +663,7 @@
 						class="thumb"
 						class:current={i === historyCursor}
 						onclick={() => loadIteration(i)}
-						title={it.input}
+						title="{it.input}{it.stage1_model ? ` [${it.stage1_model}]` : ''}"
 					>
 						<div class="thumb-svg">{@html it.svg}</div>
 						<div class="thumb-label">
@@ -630,74 +680,6 @@
 	{/if}
 </main>
 
-	<section class="training">
-		<button class="training-toggle" onclick={() => (trainOpen = !trainOpen)}>
-			<span class="training-title">学習モード <span class="muted">corpus builder</span></span>
-			{#if trainLearnedCount > 0}
-				<span class="learned-badge">{trainLearnedCount} 件学習済</span>
-			{/if}
-			<span class="toggle-arrow">{trainOpen ? '▲' : '▼'}</span>
-		</button>
-
-		{#if trainOpen}
-			<div class="training-body">
-				<div class="train-controls">
-					<label class="train-n-label">
-						<span>回数</span>
-						<input
-							type="number"
-							bind:value={trainN}
-							min="1"
-							max="200"
-							disabled={trainRunning}
-						/>
-					</label>
-					<span class="train-model-hint">解釈モデル: {stage1Model}</span>
-					{#if !trainRunning}
-						<button class="train-btn start" onclick={startTraining}>開始</button>
-					{:else}
-						<button class="train-btn stop" onclick={stopTraining}>停止</button>
-					{/if}
-					{#if trainLearnedCount > 0 && !trainRunning}
-						<button class="clear-btn" onclick={clearCorpus}>コーパス削除</button>
-					{/if}
-				</div>
-
-				{#if trainProgress.total > 0}
-					<div class="train-progress-row">
-						<div class="train-bar-wrap">
-							<div
-								class="train-bar-fill"
-								style="width: {(trainProgress.i / trainProgress.total) * 100}%"
-								class:running={trainRunning}
-							></div>
-						</div>
-						<span class="train-counter">{trainProgress.i} / {trainProgress.total}</span>
-					</div>
-				{/if}
-
-				{#if trainLog.length > 0}
-					<div class="train-log">
-						{#each trainLog as entry (entry.i)}
-							<div class="train-entry" class:error-entry={entry.style === ''}>
-								<div class="train-entry-meta">
-									<span class="train-idx">#{entry.i}</span>
-									{#if entry.style}
-										<span class="train-style">{entry.style}</span>
-									{/if}
-								</div>
-								<div class="train-text">{entry.text}</div>
-								{#if entry.ddl}
-									<div class="train-ddl">→ {entry.ddl}</div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
-		{/if}
-	</section>
-
 <svelte:window onkeydown={handleKeydown} />
 
 {#if saijikiOpen}
@@ -709,9 +691,7 @@
 	<aside class="saijiki" aria-label="歳時記 - 語彙一覧">
 		<div class="saijiki-head">
 			<h2>歳時記 <span class="en">Saijiki</span></h2>
-			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label="閉じる">
-				×
-			</button>
+			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label="閉じる">×</button>
 		</div>
 		<p class="saijiki-hint">語彙をクリックすると記述欄に挿入されます。</p>
 		{#each SAIJIKI as cat (cat.key)}
@@ -742,9 +722,7 @@
 		padding: 2rem 1.5rem;
 	}
 
-	header {
-		margin-bottom: 1.5rem;
-	}
+	header { margin-bottom: 1.5rem; }
 
 	.header-inner {
 		display: flex;
@@ -760,28 +738,468 @@
 		padding-top: 0.25rem;
 	}
 
+	h1 { font-size: 2rem; margin: 0; letter-spacing: 0.2em; }
+	.sub { color: #666; margin: 0.25rem 0 0; }
+
+	/* ── Model row ─────────────────────────────────────────── */
+	.model-row {
+		display: flex;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
+		flex-wrap: wrap;
+	}
+
+	.model-group {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.85rem;
+	}
+
+	.model-label { color: #888; min-width: 2.5rem; }
+	.field-label { color: #aaa; font-size: 0.8rem; white-space: nowrap; }
+
+	.model-group select {
+		font-family: inherit;
+		font-size: 0.85rem;
+		padding: 0.25rem 0.5rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		background: #fff;
+		color: #333;
+	}
+
+	.think-toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.85rem;
+		color: #666;
+		cursor: pointer;
+	}
+
+	/* ── Layout ────────────────────────────────────────────── */
+	.row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 2rem;
+	}
+
+	/* ── Input section ─────────────────────────────────────── */
 	.input-header {
 		display: flex;
 		justify-content: space-between;
-		align-items: baseline;
+		align-items: center;
 		margin-bottom: 0.5rem;
 	}
 
-	.input-header label {
-		margin-bottom: 0;
+	.input-mode-tabs {
+		display: flex;
+		gap: 0;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		overflow: hidden;
 	}
 
-	h1 {
-		font-size: 2rem;
-		margin: 0;
-		letter-spacing: 0.2em;
-	}
-
-	.sub {
+	.mode-btn {
+		background: #fff;
+		border: none;
+		border-right: 1px solid #ccc;
 		color: #666;
-		margin: 0.25rem 0 0;
+		padding: 0.3rem 0.9rem;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.85rem;
+		line-height: 1;
 	}
 
+	.mode-btn:last-child { border-right: none; }
+
+	.mode-btn:hover:not(.active) { background: #f5f5f5; }
+
+	.mode-btn.active {
+		background: #111;
+		color: #fff;
+	}
+
+	textarea {
+		width: 100%;
+		padding: 0.75rem;
+		font-family: inherit;
+		font-size: 1rem;
+		line-height: 1.6;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #fff;
+		box-sizing: border-box;
+		resize: vertical;
+	}
+
+	/* ── Batch ─────────────────────────────────────────────── */
+	.batch-wrapper {
+		display: flex;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.line-nums {
+		background: #f5f5f5;
+		border-right: 1px solid #ddd;
+		padding: 0.75rem 0.5rem;
+		font-family: 'SF Mono', 'Menlo', monospace;
+		font-size: 1rem;
+		line-height: 1.6;
+		text-align: right;
+		color: #bbb;
+		user-select: none;
+		white-space: pre;
+		min-width: 2rem;
+	}
+
+	.batch-ta {
+		flex: 1;
+		border: none;
+		border-radius: 0;
+		padding: 0.75rem;
+		font-family: inherit;
+		font-size: 1rem;
+		line-height: 1.6;
+		resize: vertical;
+		min-height: 8rem;
+	}
+
+	.batch-info {
+		margin: 0.3rem 0 0;
+		font-size: 0.8rem;
+		color: #999;
+	}
+
+	/* ── Submit row ────────────────────────────────────────── */
+	.submit-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-top: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	button.submit {
+		padding: 0.5rem 1.25rem;
+		background: #111;
+		color: #fff;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 0.95rem;
+		font-family: inherit;
+	}
+
+	button.submit:disabled {
+		background: #999;
+		cursor: not-allowed;
+	}
+
+	.stop-btn {
+		padding: 0.4rem 0.9rem;
+		background: transparent;
+		border: 1px solid #a2342a;
+		color: #a2342a;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 0.85rem;
+		font-family: inherit;
+	}
+
+	.stop-btn:hover { background: #a2342a; color: #fff; }
+
+	.stage-label {
+		font-size: 0.8rem;
+		color: #888;
+		font-style: italic;
+	}
+
+	.elapsed { font-size: 0.8rem; color: #888; font-variant-numeric: tabular-nums; }
+	.elapsed-live { color: #c9a08a; }
+
+	.error { color: #a2342a; margin-top: 0.75rem; }
+
+	/* ── Annotations ───────────────────────────────────────── */
+	.interpreted { margin-top: 1.5rem; }
+
+	label {
+		display: block;
+		font-size: 0.85rem;
+		color: #666;
+		margin-bottom: 0.5rem;
+	}
+
+	.annot-box {
+		padding: 0.75rem;
+		background: #fff;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		font-size: 0.95rem;
+		line-height: 1.9;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	.ddl-box { border-left: 3px solid #888; border-radius: 0 4px 4px 0; }
+
+	.tok { transition: color 0.15s; }
+	.tok-saijiki { color: #2c3e91; font-weight: 500; }
+	.tok-plain { color: #9a9a9a; }
+	.tok-emotion {
+		color: #c9a08a;
+		font-style: italic;
+		text-decoration: line-through;
+		text-decoration-color: rgba(162, 52, 42, 0.4);
+		text-decoration-thickness: 1px;
+	}
+
+	.thinking {
+		margin-top: 1rem;
+		font-size: 0.85rem;
+		background: #f3efe6;
+		border-left: 3px solid #c9a08a;
+		border-radius: 0 3px 3px 0;
+		padding: 0.5rem 0.75rem;
+	}
+
+	.thinking summary { cursor: pointer; color: #8a6f5a; font-style: italic; }
+
+	.thinking pre {
+		white-space: pre-wrap;
+		word-break: break-word;
+		color: #6b5340;
+		font-family: inherit;
+		line-height: 1.6;
+		margin: 0.5rem 0 0;
+		max-height: 240px;
+		overflow-y: auto;
+		background: transparent;
+		border: none;
+		padding: 0;
+	}
+
+	/* ── Output section ────────────────────────────────────── */
+	.output-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.5rem;
+		gap: 0.5rem;
+	}
+
+	.output-tabs {
+		display: flex;
+		gap: 0;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.tab-btn {
+		background: #fff;
+		border: none;
+		border-right: 1px solid #ccc;
+		color: #666;
+		padding: 0.3rem 0.9rem;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.85rem;
+		line-height: 1;
+	}
+
+	.tab-btn:last-child { border-right: none; }
+	.tab-btn:hover:not(:disabled):not(.active) { background: #f5f5f5; }
+	.tab-btn.active { background: #111; color: #fff; }
+	.tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+	.canvas {
+		aspect-ratio: 1 / 1;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #fff;
+		overflow: hidden;
+	}
+
+	.canvas :global(svg) { width: 100%; height: 100%; display: block; }
+
+	.placeholder {
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #999;
+	}
+
+	/* ── Prompts tab ───────────────────────────────────────── */
+	.prompt-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		max-height: 680px;
+		overflow-y: auto;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		padding: 0.75rem;
+		background: #fff;
+	}
+
+	.prompt-label {
+		margin: 0.5rem 0 0.2rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #555;
+	}
+
+	.prompt-pre {
+		background: #f8f6f0;
+		padding: 0.65rem 0.75rem;
+		border-radius: 4px;
+		border: 1px solid #ddd;
+		overflow-x: auto;
+		max-height: 160px;
+		white-space: pre-wrap;
+		word-break: break-word;
+		font-size: 0.78rem;
+		line-height: 1.5;
+		margin: 0;
+	}
+
+	.prompt-pre-lg {
+		max-height: 400px;
+	}
+
+	/* ── Score tab ─────────────────────────────────────────── */
+	.score-pre {
+		background: #fff;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		padding: 0.75rem;
+		overflow: auto;
+		max-height: 620px;
+		font-size: 0.82rem;
+		line-height: 1.5;
+		white-space: pre-wrap;
+		word-break: break-word;
+		box-sizing: border-box;
+		width: 100%;
+	}
+
+	/* ── Nav ───────────────────────────────────────────────── */
+	.nav { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+
+	.nav-btn {
+		background: transparent;
+		border: 1px solid #bbb;
+		color: #333;
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		cursor: pointer;
+		font-size: 0.7rem;
+		padding: 0;
+		line-height: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-family: inherit;
+	}
+
+	.nav-btn:hover:not(:disabled) { background: #111; color: #fff; border-color: #111; }
+	.nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+	.counter { color: #666; min-width: 3rem; text-align: center; }
+
+	/* ── History ───────────────────────────────────────────── */
+	.history {
+		margin-top: 2.5rem;
+		border-top: 1px solid #ddd;
+		padding-top: 1.5rem;
+	}
+
+	.history-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.history h2 { font-size: 1rem; font-weight: 600; color: #555; margin: 0; }
+
+	.page-nav {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.8rem;
+		color: #666;
+	}
+
+	.page-nav button {
+		background: transparent;
+		border: 1px solid #ccc;
+		color: #555;
+		padding: 0.2rem 0.5rem;
+		border-radius: 3px;
+		cursor: pointer;
+		font-size: 0.75rem;
+		font-family: inherit;
+	}
+
+	.page-nav button:disabled { opacity: 0.35; cursor: not-allowed; }
+	.page-nav button:hover:not(:disabled) { background: #111; color: #fff; border-color: #111; }
+
+	.muted { color: #aaa; font-weight: normal; font-size: 0.85rem; margin-left: 0.25rem; }
+
+	.clear-btn {
+		background: transparent;
+		border: 1px solid #ccc;
+		color: #888;
+		padding: 0.3rem 0.7rem;
+		border-radius: 3px;
+		cursor: pointer;
+		font-size: 0.8rem;
+		font-family: inherit;
+	}
+
+	.clear-btn:hover { color: #a2342a; border-color: #a2342a; }
+
+	.strip {
+		display: flex;
+		gap: 0.75rem;
+		overflow-x: auto;
+		padding-bottom: 0.5rem;
+	}
+
+	.thumb {
+		flex: 0 0 auto;
+		width: 96px;
+		background: #fff;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		padding: 0;
+		cursor: pointer;
+		overflow: hidden;
+		font-family: inherit;
+	}
+
+	.thumb.current { border-color: #111; box-shadow: 0 0 0 2px #11111133; }
+
+	.thumb-svg { width: 96px; height: 96px; overflow: hidden; }
+	.thumb-svg :global(svg) { width: 100%; height: 100%; display: block; }
+
+	.thumb-label {
+		padding: 0.2rem;
+		font-size: 0.75rem;
+		color: #888;
+		text-align: center;
+		border-top: 1px solid #eee;
+	}
+
+	/* ── Saijiki panel ─────────────────────────────────────── */
 	.saijiki-toggle {
 		background: transparent;
 		border: 1px solid #888;
@@ -793,11 +1211,7 @@
 		font-family: inherit;
 	}
 
-	.saijiki-toggle:hover {
-		background: #111;
-		color: #fff;
-		border-color: #111;
-	}
+	.saijiki-toggle:hover { background: #111; color: #fff; border-color: #111; }
 
 	.saijiki-backdrop {
 		position: fixed;
@@ -827,18 +1241,8 @@
 		margin-bottom: 0.25rem;
 	}
 
-	.saijiki-head h2 {
-		margin: 0;
-		font-size: 1.3rem;
-		letter-spacing: 0.1em;
-	}
-
-	.saijiki-head .en {
-		font-size: 0.75rem;
-		color: #888;
-		font-weight: normal;
-		letter-spacing: 0.05em;
-	}
+	.saijiki-head h2 { margin: 0; font-size: 1.3rem; letter-spacing: 0.1em; }
+	.saijiki-head .en { font-size: 0.75rem; color: #888; font-weight: normal; }
 
 	.saijiki-close {
 		background: transparent;
@@ -850,35 +1254,12 @@
 		padding: 0 0.25rem;
 	}
 
-	.saijiki-hint {
-		color: #888;
-		font-size: 0.8rem;
-		margin: 0 0 1rem;
-	}
+	.saijiki-hint { color: #888; font-size: 0.8rem; margin: 0 0 1rem; }
+	.saijiki-cat { margin-bottom: 1.5rem; }
+	.saijiki-cat h3 { margin: 0 0 0.5rem; font-size: 0.95rem; color: #333; font-weight: 600; }
+	.saijiki-cat .en { font-size: 0.7rem; color: #aaa; font-weight: normal; margin-left: 0.25rem; }
 
-	.saijiki-cat {
-		margin-bottom: 1.5rem;
-	}
-
-	.saijiki-cat h3 {
-		margin: 0 0 0.5rem;
-		font-size: 0.95rem;
-		color: #333;
-		font-weight: 600;
-	}
-
-	.saijiki-cat .en {
-		font-size: 0.7rem;
-		color: #aaa;
-		font-weight: normal;
-		margin-left: 0.25rem;
-	}
-
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-	}
+	.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
 	.chip {
 		background: #fff;
@@ -891,440 +1272,10 @@
 		font-family: inherit;
 	}
 
-	.chip:hover {
-		background: #111;
-		color: #fff;
-		border-color: #111;
-	}
+	.chip:hover { background: #111; color: #fff; border-color: #111; }
 
-	.model-row {
-		display: flex;
-		gap: 1rem;
-		margin-bottom: 1.5rem;
-		flex-wrap: wrap;
-	}
-
-	.model-group {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.85rem;
-	}
-
-	.model-label {
-		color: #888;
-		min-width: 2.5rem;
-	}
-
-	.field-label {
-		color: #aaa;
-		font-size: 0.8rem;
-		white-space: nowrap;
-	}
-
-	.model-group select {
-		font-family: inherit;
-		font-size: 0.85rem;
-		padding: 0.25rem 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 3px;
-		background: #fff;
-		color: #333;
-	}
-
-	.model-group select:first-of-type {
-		color: #555;
-	}
-
-	.think-toggle {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.85rem;
-		color: #666;
-		cursor: pointer;
-	}
-
-	.thinking {
-		margin-top: 1rem;
-		font-size: 0.85rem;
-		background: #f3efe6;
-		border-left: 3px solid #c9a08a;
-		border-radius: 0 3px 3px 0;
-		padding: 0.5rem 0.75rem;
-	}
-
-	.thinking summary {
-		cursor: pointer;
-		color: #8a6f5a;
-		font-style: italic;
-	}
-
-	.thinking pre {
-		white-space: pre-wrap;
-		word-break: break-word;
-		color: #6b5340;
-		font-family: inherit;
-		line-height: 1.6;
-		margin: 0.5rem 0 0;
-		max-height: 240px;
-		overflow-y: auto;
-		background: transparent;
-		border: none;
-		padding: 0;
-	}
-
-	.row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 2rem;
-	}
-
-	label {
-		display: block;
-		font-size: 0.85rem;
-		color: #666;
-		margin-bottom: 0.5rem;
-	}
-
-	textarea {
-		width: 100%;
-		padding: 0.75rem;
-		font-family: inherit;
-		font-size: 1rem;
-		line-height: 1.6;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		background: #fff;
-		box-sizing: border-box;
-		resize: vertical;
-	}
-
-	.submit-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-top: 0.75rem;
-	}
-
-	button.submit {
-		padding: 0.5rem 1.25rem;
-		background: #111;
-		color: #fff;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-		font-size: 0.95rem;
-		font-family: inherit;
-	}
-
-	button.submit:disabled {
-		background: #999;
-		cursor: not-allowed;
-	}
-
-	.elapsed {
-		font-size: 0.8rem;
-		color: #888;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.elapsed-live {
-		color: #c9a08a;
-	}
-
-	.error {
-		color: #a2342a;
-		margin-top: 0.75rem;
-	}
-
-	.interpreted {
-		margin-top: 1.5rem;
-	}
-
-	.annot-box {
-		padding: 0.75rem;
-		background: #fff;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		font-size: 0.95rem;
-		line-height: 1.9;
-		white-space: pre-wrap;
-		word-break: break-word;
-	}
-
-	.ddl-box {
-		border-left: 3px solid #888;
-		border-radius: 0 4px 4px 0;
-	}
-
-	.tok {
-		transition: color 0.15s;
-	}
-
-	/* 語彙ハイライト: Saijiki = 青、地文 = 薄墨、感情語 = 滲む */
-	.tok-saijiki {
-		color: #2c3e91;
-		font-weight: 500;
-	}
-
-	.tok-plain {
-		color: #9a9a9a;
-	}
-
-	.tok-emotion {
-		color: #c9a08a;
-		font-style: italic;
-		text-decoration: line-through;
-		text-decoration-color: rgba(162, 52, 42, 0.4);
-		text-decoration-thickness: 1px;
-	}
-
-	.output-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 0.5rem;
-		gap: 0.5rem;
-	}
-
-	.output-tabs {
-		display: flex;
-		gap: 0;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.tab-btn {
-		background: #fff;
-		border: none;
-		border-right: 1px solid #ccc;
-		color: #666;
-		padding: 0.3rem 0.9rem;
-		cursor: pointer;
-		font-family: inherit;
-		font-size: 0.85rem;
-		line-height: 1;
-	}
-
-	.tab-btn:last-child {
-		border-right: none;
-	}
-
-	.tab-btn:hover:not(:disabled):not(.active) {
-		background: #f5f5f5;
-	}
-
-	.tab-btn.active {
-		background: #111;
-		color: #fff;
-	}
-
-	.tab-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-
-	.tab-content-pre {
-		background: #fff;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		padding: 0.75rem;
-		overflow: auto;
-		max-height: 480px;
-		font-size: 0.82rem;
-		line-height: 1.5;
-		white-space: pre-wrap;
-		word-break: break-word;
-		box-sizing: border-box;
-		width: 100%;
-	}
-
-	.nav {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.85rem;
-	}
-
-	.nav-btn {
-		background: transparent;
-		border: 1px solid #bbb;
-		color: #333;
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		cursor: pointer;
-		font-size: 0.7rem;
-		padding: 0;
-		line-height: 1;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		font-family: inherit;
-	}
-
-	.nav-btn:hover:not(:disabled) {
-		background: #111;
-		color: #fff;
-		border-color: #111;
-	}
-
-	.nav-btn:disabled {
-		opacity: 0.35;
-		cursor: not-allowed;
-	}
-
-	.counter {
-		color: #666;
-		min-width: 3rem;
-		text-align: center;
-	}
-
-	.history {
-		margin-top: 2.5rem;
-		border-top: 1px solid #ddd;
-		padding-top: 1.5rem;
-	}
-
-	.history-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 0.75rem;
-		margin-bottom: 0.75rem;
-	}
-
-	.page-nav {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.8rem;
-		color: #666;
-	}
-
-	.page-nav button {
-		background: transparent;
-		border: 1px solid #ccc;
-		color: #555;
-		padding: 0.2rem 0.5rem;
-		border-radius: 3px;
-		cursor: pointer;
-		font-size: 0.75rem;
-		font-family: inherit;
-	}
-
-	.page-nav button:disabled {
-		opacity: 0.35;
-		cursor: not-allowed;
-	}
-
-	.page-nav button:hover:not(:disabled) {
-		background: #111;
-		color: #fff;
-		border-color: #111;
-	}
-
-	.history h2 {
-		font-size: 1rem;
-		font-weight: 600;
-		color: #555;
-		margin: 0;
-	}
-
-	.muted {
-		color: #aaa;
-		font-weight: normal;
-		font-size: 0.85rem;
-		margin-left: 0.25rem;
-	}
-
-	.clear-btn {
-		background: transparent;
-		border: 1px solid #ccc;
-		color: #888;
-		padding: 0.3rem 0.7rem;
-		border-radius: 3px;
-		cursor: pointer;
-		font-size: 0.8rem;
-		font-family: inherit;
-	}
-
-	.clear-btn:hover {
-		color: #a2342a;
-		border-color: #a2342a;
-	}
-
-	.strip {
-		display: flex;
-		gap: 0.75rem;
-		overflow-x: auto;
-		padding-bottom: 0.5rem;
-	}
-
-	.thumb {
-		flex: 0 0 auto;
-		width: 96px;
-		background: #fff;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		padding: 0;
-		cursor: pointer;
-		overflow: hidden;
-		font-family: inherit;
-	}
-
-	.thumb.current {
-		border-color: #111;
-		box-shadow: 0 0 0 2px #11111133;
-	}
-
-	.thumb-svg {
-		width: 96px;
-		height: 96px;
-		overflow: hidden;
-	}
-
-	.thumb-svg :global(svg) {
-		width: 100%;
-		height: 100%;
-		display: block;
-	}
-
-	.thumb-label {
-		padding: 0.2rem;
-		font-size: 0.75rem;
-		color: #888;
-		text-align: center;
-		border-top: 1px solid #eee;
-	}
-
-	.canvas {
-		aspect-ratio: 1 / 1;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		background: #fff;
-		overflow: hidden;
-	}
-
-	.canvas :global(svg) {
-		width: 100%;
-		height: 100%;
-		display: block;
-	}
-
-	.placeholder {
-		height: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #999;
-	}
-
-	details {
-		margin-top: 1rem;
-		font-size: 0.85rem;
+	@media (max-width: 720px) {
+		.row { grid-template-columns: 1fr; }
 	}
 
 	pre {
@@ -1336,246 +1287,5 @@
 		max-height: 300px;
 	}
 
-	.prompt-section {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.prompt-label {
-		margin: 0.5rem 0 0.25rem;
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: #555;
-	}
-
-	.prompt-pre {
-		background: #f8f6f0;
-		padding: 0.75rem;
-		border-radius: 4px;
-		border: 1px solid #ddd;
-		overflow: auto;
-		max-height: 200px;
-		white-space: pre-wrap;
-		word-break: break-word;
-		font-size: 0.78rem;
-		line-height: 1.5;
-		margin: 0;
-	}
-
-	/* 学習モード */
-	.training {
-		margin-top: 2rem;
-		border-top: 1px solid #ddd;
-		padding-top: 1rem;
-	}
-
-	.training-toggle {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		background: transparent;
-		border: none;
-		padding: 0.5rem 0;
-		cursor: pointer;
-		font-family: inherit;
-		text-align: left;
-	}
-
-	.training-toggle:hover .training-title {
-		color: #111;
-	}
-
-	.training-title {
-		font-size: 1rem;
-		font-weight: 600;
-		color: #555;
-	}
-
-	.learned-badge {
-		font-size: 0.78rem;
-		background: #e8edf8;
-		color: #2c3e91;
-		padding: 0.15rem 0.5rem;
-		border-radius: 999px;
-	}
-
-	.toggle-arrow {
-		margin-left: auto;
-		font-size: 0.75rem;
-		color: #aaa;
-	}
-
-	.training-body {
-		margin-top: 0.75rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.train-controls {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-	}
-
-	.train-n-label {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.85rem;
-		color: #555;
-	}
-
-	.train-n-label input {
-		width: 4rem;
-		padding: 0.25rem 0.4rem;
-		border: 1px solid #ccc;
-		border-radius: 3px;
-		font-family: inherit;
-		font-size: 0.85rem;
-		text-align: right;
-	}
-
-	.train-model-hint {
-		font-size: 0.8rem;
-		color: #999;
-	}
-
-	.train-btn {
-		padding: 0.4rem 1rem;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-		font-family: inherit;
-		font-size: 0.9rem;
-		font-weight: 500;
-	}
-
-	.train-btn.start {
-		background: #2c3e91;
-		color: #fff;
-	}
-
-	.train-btn.start:hover {
-		background: #1e2d6b;
-	}
-
-	.train-btn.stop {
-		background: #a2342a;
-		color: #fff;
-	}
-
-	.train-btn.stop:hover {
-		background: #7d2820;
-	}
-
-	.train-progress-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.train-bar-wrap {
-		flex: 1;
-		height: 6px;
-		background: #e8e8e8;
-		border-radius: 3px;
-		overflow: hidden;
-	}
-
-	.train-bar-fill {
-		height: 100%;
-		background: #2c3e91;
-		border-radius: 3px;
-		transition: width 0.3s ease;
-	}
-
-	.train-bar-fill.running {
-		background: linear-gradient(90deg, #2c3e91, #5b7be8, #2c3e91);
-		background-size: 200% 100%;
-		animation: shimmer 1.5s infinite linear;
-	}
-
-	@keyframes shimmer {
-		0% { background-position: 200% 0; }
-		100% { background-position: -200% 0; }
-	}
-
-	.train-counter {
-		font-size: 0.8rem;
-		color: #888;
-		min-width: 3.5rem;
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.train-log {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		max-height: 400px;
-		overflow-y: auto;
-		border: 1px solid #e8e8e8;
-		border-radius: 4px;
-		padding: 0.5rem;
-		background: #fafafa;
-	}
-
-	.train-entry {
-		background: #fff;
-		border: 1px solid #eee;
-		border-radius: 3px;
-		padding: 0.5rem 0.75rem;
-		font-size: 0.85rem;
-	}
-
-	.train-entry.error-entry {
-		border-color: #f5c6c4;
-		background: #fff8f7;
-	}
-
-	.train-entry-meta {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 0.3rem;
-	}
-
-	.train-idx {
-		font-size: 0.75rem;
-		color: #aaa;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.train-style {
-		font-size: 0.72rem;
-		color: #888;
-		background: #f0f0f0;
-		padding: 0.1rem 0.4rem;
-		border-radius: 999px;
-	}
-
-	.train-text {
-		color: #222;
-		line-height: 1.5;
-		margin-bottom: 0.2rem;
-	}
-
-	.train-ddl {
-		color: #2c3e91;
-		font-size: 0.82rem;
-		line-height: 1.5;
-		border-left: 2px solid #c5cceb;
-		padding-left: 0.5rem;
-		margin-top: 0.25rem;
-	}
-
-	@media (max-width: 720px) {
-		.row {
-			grid-template-columns: 1fr;
-		}
-	}
+	details { margin-top: 1rem; font-size: 0.85rem; }
 </style>

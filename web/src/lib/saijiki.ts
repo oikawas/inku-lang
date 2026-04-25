@@ -66,5 +66,11 @@ export const SAIJIKI: SaijikiCategory[] = [
 		label: 'うごき',
 		en: 'motions',
 		words: ['置く', '並べる', '埋める', '散らす', '引く']
+	},
+	{
+		key: 'wariai',
+		label: 'わりあい',
+		en: 'proportions',
+		words: ['縦長', '横長', '全幅', '半幅', '半円', '上弦', '下弦', '三日月']
 	}
 ];

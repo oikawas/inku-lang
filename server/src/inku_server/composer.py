@@ -64,6 +64,35 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 赤・青・緑・黒の色とりどりの円を放射状に八つ並べる。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,"arrangement":{"count":8,"layout":"radial","color_cycle":["red","blue","green","black","gray","red","blue","green"]}}]}
 
+# わりあい (比率・描画範囲)
+
+- **縦長の四角** → size の高さ(size[1]) が幅(size[0]) の約2倍。例: size=[0.15,0.35]
+- **横長の四角** → size の幅(size[0]) が高さ(size[1]) の約2倍。例: size=[0.35,0.15]
+- **全幅の線** → from=[0.0,y] to=[1.0,y]
+- **半幅の線** → from=[0.25,y] to=[0.75,y]
+- **半円** → arc、angle_start=0、angle_end=180 (上半分)
+- **上弦** → arc、angle_start=270、angle_end=90 (右側半円、D字形)
+- **下弦** → arc、angle_start=90、angle_end=270 (左側半円、C字形)
+- **三日月** → arc、angle_start=210、angle_end=330 (細い下弦弧、約120°)
+
+入力: 縦長の四角を中央に置く。
+出力: {"instructions":[{"primitive":"square","position":[0.425,0.325],"size":[0.15,0.35]}]}
+
+入力: 全幅の横線を中央に引く。
+出力: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5]}]}
+
+入力: 半幅の横線を中央に引く。
+出力: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5]}]}
+
+入力: 半円の弧を中央に置く。半径は0.2。
+出力: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.2,"angle_start":0,"angle_end":180}]}
+
+入力: 上弦の弧を中央に置く。半径は0.15。
+出力: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.15,"angle_start":270,"angle_end":90}]}
+
+入力: 背景を黒で塗りつぶす。三日月の弧を右上に置く。半径は0.12。
+出力: {"background":"black","instructions":[{"primitive":"arc","center":[0.7,0.25],"radius":0.12,"angle_start":210,"angle_end":330,"color":"white"}]}
+
 説明・前置き禁止。submit_score 呼び出しのみ。"""
 
 

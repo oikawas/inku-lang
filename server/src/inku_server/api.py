@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from .coerce import coerce_score
 from .composer import compose
 from .composer import SYSTEM_PROMPT as STAGE2_PROMPT
 from .interpreter import interpret_detail
@@ -156,6 +157,8 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
+    score = coerce_score(score)
+
     try:
         svg = render(score)
     except Exception as e:  # noqa: BLE001
@@ -190,6 +193,9 @@ def api_paint(req: PaintRequest) -> PaintResponse:
         score = compose(ddl, model=req.stage2_model, original_text=req.text)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
+
+    score = coerce_score(score)
+
     t2 = time.perf_counter()
     try:
         svg = render(score)

@@ -130,8 +130,8 @@ def compose(
     model: str | None = None,
     original_text: str | None = None,
     system_prompt: str | None = None,
-) -> Score:
-    """system_prompt が指定された場合はスナップショットのプロンプトを使う。"""
+) -> tuple[Score, int | None, int | None]:
+    """(score, tokens_in, tokens_out) を返す。system_prompt 指定時はスナップショット使用。"""
     user_msg = _build_user_message(ddl, original_text)
     effective_prompt = system_prompt if system_prompt is not None else SYSTEM_PROMPT
     if model:
@@ -145,7 +145,7 @@ def compose(
     return _compose_anthropic(user_msg, system_prompt=effective_prompt)
 
 
-def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> Score:
+def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> tuple[Score, int | None, int | None]:
     from anthropic import Anthropic
 
     client = Anthropic()
@@ -157,13 +157,15 @@ def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt
         tool_choice={"type": "tool", "name": "submit_score"},
         messages=[{"role": "user", "content": user_msg}],
     )
+    tin = getattr(resp.usage, "input_tokens", None)
+    tout = getattr(resp.usage, "output_tokens", None)
     for block in resp.content:
         if block.type == "tool_use" and block.name == "submit_score":
-            return Score.model_validate(block.input)
+            return Score.model_validate(block.input), tin, tout
     raise RuntimeError("Anthropic did not return submit_score tool call")
 
 
-def _compose_openai(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> Score:
+def _compose_openai(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> tuple[Score, int | None, int | None]:
     from openai import OpenAI
 
     model = model or os.getenv("OPENAI_MODEL", "qwen-api")
@@ -198,19 +200,22 @@ def _compose_openai(user_msg: str, *, model: str | None = None, system_prompt: s
         tool_choice={"type": "function", "function": {"name": "submit_score"}},
         stream=False,
     )
+    usage = resp.usage
+    tin: int | None = getattr(usage, "prompt_tokens", None)
+    tout: int | None = getattr(usage, "completion_tokens", None)
 
     msg = resp.choices[0].message
     if msg.tool_calls:
         args = msg.tool_calls[0].function.arguments
-        return Score.model_validate(json.loads(args))
+        return Score.model_validate(json.loads(args)), tin, tout
 
     text = (msg.content or "").strip()
     args = _extract_tool_call_args(text)
     if args is not None:
-        return Score.model_validate(args)
+        return Score.model_validate(args), tin, tout
 
     data = _extract_json(text)
-    return Score.model_validate(data)
+    return Score.model_validate(data), tin, tout
 
 
 def _extract_tool_call_args(text: str) -> dict | None:

@@ -389,8 +389,8 @@ def _strip_prefix(model: str) -> str:
 
 
 def interpret(text: str, *, model: str | None = None) -> str:
-    """後方互換: DDL 本文のみ返す (thinking は捨てる)。"""
-    ddl, _ = interpret_detail(text, model=model, include_thinking=False)
+    """後方互換: DDL 本文のみ返す。"""
+    ddl, _, _, _ = interpret_detail(text, model=model, include_thinking=False)
     return ddl
 
 
@@ -400,22 +400,24 @@ def interpret_detail(
     model: str | None = None,
     include_thinking: bool = False,
     system_prompt_prefix: str | None = None,
-) -> tuple[str, str | None]:
-    """(ddl, thinking) を返す。system_prompt_prefix が指定された場合はスナップショットのプレフィックスを使う。"""
+) -> tuple[str, str | None, int | None, int | None]:
+    """(ddl, thinking, tokens_in, tokens_out) を返す。"""
     system_prompt = _build_system_prompt(text, prefix_override=system_prompt_prefix)
 
     if model:
         provider = _get_provider(model)
         if provider == "anthropic":
-            return _interpret_anthropic(text, model=_strip_prefix(model), system_prompt=system_prompt), None
+            ddl, tin, tout = _interpret_anthropic(text, model=_strip_prefix(model), system_prompt=system_prompt)
+            return ddl, None, tin, tout
         return _interpret_openai_detail(text, model=model, include_thinking=include_thinking, system_prompt=system_prompt)
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
         return _interpret_openai_detail(text, model=None, include_thinking=include_thinking, system_prompt=system_prompt)
-    return _interpret_anthropic(text, system_prompt=system_prompt), None
+    ddl, tin, tout = _interpret_anthropic(text, system_prompt=system_prompt)
+    return ddl, None, tin, tout
 
 
-def _interpret_anthropic(text: str, *, model: str | None = None, system_prompt: str) -> str:
+def _interpret_anthropic(text: str, *, model: str | None = None, system_prompt: str) -> tuple[str, int | None, int | None]:
     from anthropic import Anthropic
 
     client = Anthropic()
@@ -425,9 +427,11 @@ def _interpret_anthropic(text: str, *, model: str | None = None, system_prompt: 
         system=system_prompt,
         messages=[{"role": "user", "content": text}],
     )
+    tin = getattr(resp.usage, "input_tokens", None)
+    tout = getattr(resp.usage, "output_tokens", None)
     for block in resp.content:
         if getattr(block, "type", None) == "text":
-            return block.text.strip()
+            return block.text.strip(), tin, tout
     raise RuntimeError("Anthropic did not return text content")
 
 
@@ -437,7 +441,7 @@ def _interpret_openai_detail(
     model: str | None = None,
     include_thinking: bool = False,
     system_prompt: str,
-) -> tuple[str, str | None]:
+) -> tuple[str, str | None, int | None, int | None]:
     from openai import OpenAI
 
     model = model or os.getenv("OPENAI_MODEL_STAGE1", "qwen3-api")
@@ -467,6 +471,10 @@ def _interpret_openai_detail(
         ],
         stream=False,
     )
+    usage = resp.usage
+    tin: int | None = getattr(usage, "prompt_tokens", None)
+    tout: int | None = getattr(usage, "completion_tokens", None)
+
     raw = (resp.choices[0].message.content or "").strip()
 
     thinking: str | None = None
@@ -478,4 +486,4 @@ def _interpret_openai_detail(
         raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
 
     ddl = re.sub(r"^```(?:\w+)?\s*\n?|\n?```$", "", raw, flags=re.MULTILINE).strip()
-    return ddl, thinking
+    return ddl, thinking, tin, tout

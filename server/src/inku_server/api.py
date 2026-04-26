@@ -76,6 +76,8 @@ class ComposeResponse(BaseModel):
     score: Score
     svg: str
     elapsed_ms: int = 0
+    tokens_in: int | None = None
+    tokens_out: int | None = None
 
 
 class InterpretRequest(BaseModel):
@@ -92,6 +94,8 @@ class InterpretRequest(BaseModel):
 class InterpretResponse(BaseModel):
     ddl: str
     thinking: str | None = None
+    tokens_in: int | None = None
+    tokens_out: int | None = None
 
 
 class PaintRequest(BaseModel):
@@ -110,6 +114,10 @@ class PaintResponse(BaseModel):
     elapsed_stage1_ms: int = 0
     elapsed_stage2_ms: int = 0
     elapsed_total_ms: int = 0
+    tokens_in_stage1: int | None = None
+    tokens_out_stage1: int | None = None
+    tokens_in_stage2: int | None = None
+    tokens_out_stage2: int | None = None
 
 
 class PromptsResponse(BaseModel):
@@ -126,6 +134,8 @@ class HistoryPostBody(BaseModel):
     elapsed_ms: int = 0
     stage1_model: str | None = None
     stage2_model: str | None = None
+    tokens_in: int | None = None
+    tokens_out: int | None = None
 
 
 class HistoryItem(HistoryPostBody):
@@ -168,7 +178,7 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
         if snap:
             stage2_prompt = snap.get("stage2_prompt")
     try:
-        score = compose(req.ddl, model=req.model, original_text=req.original_text, system_prompt=stage2_prompt)
+        score, tokens_in, tokens_out = compose(req.ddl, model=req.model, original_text=req.original_text, system_prompt=stage2_prompt)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -180,7 +190,7 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
 
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
-    return ComposeResponse(score=score, svg=svg, elapsed_ms=elapsed_ms)
+    return ComposeResponse(score=score, svg=svg, elapsed_ms=elapsed_ms, tokens_in=tokens_in, tokens_out=tokens_out)
 
 
 @app.post("/api/interpret", response_model=InterpretResponse)
@@ -191,7 +201,7 @@ def api_interpret(req: InterpretRequest) -> InterpretResponse:
         if snap:
             stage1_prefix = snap.get("stage1_prefix")
     try:
-        ddl, thinking = interpret_detail(
+        ddl, thinking, tokens_in, tokens_out = interpret_detail(
             req.text,
             model=req.model,
             include_thinking=req.include_thinking,
@@ -199,21 +209,21 @@ def api_interpret(req: InterpretRequest) -> InterpretResponse:
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
-    return InterpretResponse(ddl=ddl, thinking=thinking)
+    return InterpretResponse(ddl=ddl, thinking=thinking, tokens_in=tokens_in, tokens_out=tokens_out)
 
 
 @app.post("/api/paint", response_model=PaintResponse)
 def api_paint(req: PaintRequest) -> PaintResponse:
     t0 = time.perf_counter()
     try:
-        ddl, thinking = interpret_detail(
+        ddl, thinking, s1_tin, s1_tout = interpret_detail(
             req.text, model=req.stage1_model, include_thinking=req.include_thinking
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     t1 = time.perf_counter()
     try:
-        score = compose(ddl, model=req.stage2_model, original_text=req.text)
+        score, s2_tin, s2_tout = compose(ddl, model=req.stage2_model, original_text=req.text)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -236,6 +246,10 @@ def api_paint(req: PaintRequest) -> PaintResponse:
         elapsed_stage1_ms=elapsed_stage1_ms,
         elapsed_stage2_ms=elapsed_stage2_ms,
         elapsed_total_ms=elapsed_total_ms,
+        tokens_in_stage1=s1_tin,
+        tokens_out_stage1=s1_tout,
+        tokens_in_stage2=s2_tin,
+        tokens_out_stage2=s2_tout,
     )
 
 

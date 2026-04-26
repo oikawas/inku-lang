@@ -26,6 +26,10 @@
 		elapsed_stage1_ms: number;
 		elapsed_stage2_ms: number;
 		elapsed_total_ms: number;
+		tokens_in_stage1: number | null;
+		tokens_out_stage1: number | null;
+		tokens_in_stage2: number | null;
+		tokens_out_stage2: number | null;
 	};
 
 	type Iteration = {
@@ -38,6 +42,8 @@
 		elapsed_ms?: number;
 		stage1_model?: string | null;
 		stage2_model?: string | null;
+		tokens_in?: number | null;
+		tokens_out?: number | null;
 	};
 
 	// ── Input ───────────────────────────────────────────────
@@ -83,6 +89,12 @@
 	let liveMs = $state(0);
 	let _timerStart = 0;
 	let _timerHandle: ReturnType<typeof setInterval> | null = null;
+
+	// ── Tokens ──────────────────────────────────────────────
+	let tokensInStage1 = $state<number | null>(null);
+	let tokensOutStage1 = $state<number | null>(null);
+	let tokensInStage2 = $state<number | null>(null);
+	let tokensOutStage2 = $state<number | null>(null);
 
 	// ── History ─────────────────────────────────────────────
 	let historyItems = $state<Iteration[]>([]);
@@ -131,10 +143,11 @@
 			const d = await r1.json().catch(() => ({})) as { detail?: string };
 			throw new Error(d.detail ?? `HTTP ${r1.status}`);
 		}
-		const d1 = (await r1.json()) as { ddl: string; thinking: string | null };
+		const d1 = (await r1.json()) as { ddl: string; thinking: string | null; tokens_in: number | null; tokens_out: number | null };
 		const t1 = Date.now();
+		const tokLabel = d1.tokens_in != null ? ` (${d1.tokens_in}→${d1.tokens_out ?? '?'}tok)` : '';
 
-		stageLabel = '構造化中…';
+		stageLabel = `構造化中…${tokLabel}`;
 		const r2 = await fetch('/api/compose', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -144,7 +157,7 @@
 			const d = await r2.json().catch(() => ({})) as { detail?: string };
 			throw new Error(d.detail ?? `HTTP ${r2.status}`);
 		}
-		const d2 = (await r2.json()) as { score: Score; svg: string };
+		const d2 = (await r2.json()) as { score: Score; svg: string; tokens_in: number | null; tokens_out: number | null };
 		const t2 = Date.now();
 
 		return {
@@ -154,7 +167,11 @@
 			svg: d2.svg,
 			elapsed_stage1_ms: t1 - t0,
 			elapsed_stage2_ms: t2 - t1,
-			elapsed_total_ms: t2 - t0
+			elapsed_total_ms: t2 - t0,
+			tokens_in_stage1: d1.tokens_in,
+			tokens_out_stage1: d1.tokens_out,
+			tokens_in_stage2: d2.tokens_in,
+			tokens_out_stage2: d2.tokens_out,
 		};
 	}
 
@@ -168,6 +185,10 @@
 		elapsedStage1Ms = 0;
 		elapsedStage2Ms = 0;
 		elapsedTotalMs = 0;
+		tokensInStage1 = null;
+		tokensOutStage1 = null;
+		tokensInStage2 = null;
+		tokensOutStage2 = null;
 		batchCurrent = 0;
 		batchTotal = 0;
 		startTimer();
@@ -182,6 +203,12 @@
 				elapsedStage1Ms = r.elapsed_stage1_ms;
 				elapsedStage2Ms = r.elapsed_stage2_ms;
 				elapsedTotalMs = r.elapsed_total_ms;
+				tokensInStage1 = r.tokens_in_stage1;
+				tokensOutStage1 = r.tokens_out_stage1;
+				tokensInStage2 = r.tokens_in_stage2;
+				tokensOutStage2 = r.tokens_out_stage2;
+				const totalIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0);
+				const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
 				await pushHistory({
 					input,
 					ddl: r.ddl,
@@ -191,7 +218,9 @@
 					at: Date.now(),
 					elapsed_ms: r.elapsed_total_ms,
 					stage1_model: stage1Model,
-					stage2_model: stage2Model
+					stage2_model: stage2Model,
+					tokens_in: totalIn || null,
+					tokens_out: totalOut || null,
 				});
 			} else {
 				const lines = batchLines.map((l) => l.trim()).filter((l) => l);
@@ -203,6 +232,8 @@
 					try {
 						const r = await paintOne(lines[i]);
 						result = r;
+						const totalIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0);
+						const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
 						await pushHistory({
 							input: lines[i],
 							ddl: r.ddl,
@@ -212,7 +243,9 @@
 							at: Date.now(),
 							elapsed_ms: r.elapsed_total_ms,
 							stage1_model: stage1Model,
-							stage2_model: stage2Model
+							stage2_model: stage2Model,
+							tokens_in: totalIn || null,
+							tokens_out: totalOut || null,
 						});
 					} catch {
 						// continue with next line
@@ -264,7 +297,9 @@
 					at: it.at,
 					elapsed_ms: it.elapsed_ms ?? 0,
 					stage1_model: it.stage1_model ?? null,
-					stage2_model: it.stage2_model ?? null
+					stage2_model: it.stage2_model ?? null,
+					tokens_in: it.tokens_in ?? null,
+					tokens_out: it.tokens_out ?? null,
 				})
 			});
 		} catch {
@@ -368,6 +403,70 @@
 		try { localStorage.setItem(MODEL_STAGE2_KEY, v); } catch {}
 	}
 
+	// ── Download ────────────────────────────────────────────
+	function escapeXml(s: string): string {
+		return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+	}
+
+	function svgWithDesc(svg: string, text: string): string {
+		const desc = `<desc>${escapeXml(text)}</desc>`;
+		return svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
+	}
+
+	function triggerDownload(blob: Blob, filename: string) {
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	function slugify(text: string): string {
+		return text.slice(0, 30).replace(/\s+/g, '-').replace(/[^\w\-]/g, '');
+	}
+
+	function downloadSVG() {
+		if (!result) return;
+		const svg = svgWithDesc(result.svg, input);
+		const blob = new Blob([svg], { type: 'image/svg+xml' });
+		triggerDownload(blob, `inku-${slugify(input)}.svg`);
+	}
+
+	async function downloadPNG(size: number) {
+		if (!result) return;
+		// Set explicit dimensions so Image renders at correct size
+		let svg = result.svg.replace(/(<svg)([^>]*)/, (_: string, tag: string, attrs: string) => {
+			const a = attrs.replace(/\s+width="[^"]*"/g, '').replace(/\s+height="[^"]*"/g, '');
+			return `${tag}${a} width="${size}" height="${size}"`;
+		});
+		const blob = new Blob([svg], { type: 'image/svg+xml' });
+		const url = URL.createObjectURL(blob);
+		try {
+			await new Promise<void>((resolve, reject) => {
+				const canvas = document.createElement('canvas');
+				canvas.width = size;
+				canvas.height = size;
+				const ctx = canvas.getContext('2d')!;
+				ctx.fillStyle = '#ffffff';
+				ctx.fillRect(0, 0, size, size);
+				const img = new Image();
+				img.onload = () => {
+					ctx.drawImage(img, 0, 0, size, size);
+					canvas.toBlob((b) => {
+						if (!b) { reject(new Error('canvas error')); return; }
+						triggerDownload(b, `inku-${slugify(input)}-${size}.png`);
+						resolve();
+					}, 'image/png');
+				};
+				img.onerror = () => reject(new Error('svg load error'));
+				img.src = url;
+			});
+		} finally {
+			URL.revokeObjectURL(url);
+		}
+	}
+
 	// ── Snapshots ───────────────────────────────────────────
 	async function fetchSnapshots() {
 		try {
@@ -399,6 +498,25 @@
 			await fetchSnapshots();
 		} catch {}
 	}
+
+	function shortModel(m: string | null | undefined): string {
+		if (!m) return '';
+		if (m.includes('opus')) return 'opus';
+		if (m.includes('haiku')) return 'haiku';
+		if (m.includes('sonnet')) return 'sonnet';
+		if (m.includes('qwen3')) return 'qwen3';
+		if (m.includes('qwen')) return 'qwen';
+		if (m.includes('gemma')) return 'gemma';
+		const last = m.split('/').pop() ?? m;
+		return last.slice(0, 8);
+	}
+
+	const tokenSummary = $derived(() => {
+		if (tokensInStage1 == null && tokensInStage2 == null) return '';
+		const s1 = tokensInStage1 != null ? `解釈 ${tokensInStage1}→${tokensOutStage1 ?? '?'}` : '';
+		const s2 = tokensInStage2 != null ? `構造化 ${tokensInStage2}→${tokensOutStage2 ?? '?'}` : '';
+		return [s1, s2].filter(Boolean).join(' / ') + ' tok';
+	});
 
 	const activeSnapshotName = $derived(
 		activeSnapshotId
@@ -615,6 +733,9 @@
 					{:else}
 						<span class="elapsed">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
 					{/if}
+					{#if tokenSummary()}
+						<span class="elapsed elapsed-tok">{tokenSummary()}</span>
+					{/if}
 				{/if}
 			</div>
 			{#if error}
@@ -711,6 +832,15 @@
 						<div class="placeholder">（まだ演奏されていない）</div>
 					{/if}
 				</div>
+				{#if result}
+					<div class="dl-bar">
+						<button class="dl-btn" onclick={downloadSVG} title="SVG（記述埋め込み）">↓ SVG</button>
+						<span class="dl-sep">PNG:</span>
+						{#each [1080, 2160, 1024, 2048] as size}
+							<button class="dl-btn" onclick={() => downloadPNG(size)}>{size}</button>
+						{/each}
+					</div>
+				{/if}
 			{:else if outputTab === 'prompts'}
 				{#if promptsData}
 					<div class="prompt-section">
@@ -761,7 +891,7 @@
 						class="thumb"
 						class:current={i === historyCursor}
 						onclick={() => loadIteration(i)}
-						title="{it.input}{it.stage1_model ? ` [${it.stage1_model}]` : ''}"
+						title="{it.input}{it.stage1_model ? ` [${it.stage1_model}/${it.stage2_model}]` : ''}{it.tokens_in != null ? ` in:${it.tokens_in} out:${it.tokens_out}` : ''}"
 					>
 						<div class="thumb-svg">{@html it.svg}</div>
 						<div class="thumb-label">
@@ -771,6 +901,12 @@
 								{historyPage * HISTORY_PAGE_SIZE + i + 1}
 							{/if}
 						</div>
+						{#if it.stage2_model}
+							<div class="thumb-model">{shortModel(it.stage2_model)}</div>
+						{/if}
+						{#if it.tokens_in != null}
+							<div class="thumb-tokens">{it.tokens_in}→{it.tokens_out}tok</div>
+						{/if}
 					</button>
 				{/each}
 			</div>
@@ -1424,6 +1560,57 @@
 		color: #888;
 		text-align: center;
 		border-top: 1px solid #eee;
+	}
+
+	.thumb-model {
+		padding: 0 0.2rem 0.1rem;
+		font-size: 0.68rem;
+		color: #aaa;
+		text-align: center;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.thumb-tokens {
+		padding: 0 0.2rem 0.2rem;
+		font-size: 0.65rem;
+		color: #bbb;
+		text-align: center;
+		white-space: nowrap;
+	}
+
+	/* ── Download bar ──────────────────────────────────────── */
+	.dl-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		margin-top: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	.dl-btn {
+		font-family: inherit;
+		font-size: 0.8rem;
+		padding: 0.2rem 0.55rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		background: #f8f8f8;
+		color: #444;
+		cursor: pointer;
+	}
+
+	.dl-btn:hover { background: #eee; }
+
+	.dl-sep {
+		font-size: 0.8rem;
+		color: #aaa;
+	}
+
+	/* ── Token elapsed ─────────────────────────────────────── */
+	.elapsed-tok {
+		color: #aaa;
+		font-size: 0.78rem;
 	}
 
 	/* ── Saijiki panel ─────────────────────────────────────── */

@@ -10,6 +10,8 @@ import json
 import os
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 
@@ -57,6 +59,41 @@ def _save_history() -> None:
 
 
 _load_history()
+
+# ── 出力ファイル保存 ────────────────────────────────────────────────────────────
+_DEFAULT_OUTPUT_DIR = Path.home() / ".local" / "share" / "inku" / "outputs"
+_OUTPUT_DIR = Path(os.getenv("INKU_OUTPUT_DIR", str(_DEFAULT_OUTPUT_DIR)))
+_OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
+_save_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-save")
+
+
+def _save_output(item_id: str, at_ms: int, input_text: str, ddl: str | None, score: dict, svg: str) -> None:
+    try:
+        import cairosvg  # lazy import — optional dependency
+    except ImportError:
+        return
+
+    dt = datetime.fromtimestamp(at_ms / 1000, tz=timezone.utc).astimezone()
+    date_dir = _OUTPUT_DIR / dt.strftime("%Y-%m-%d")
+    date_dir.mkdir(parents=True, exist_ok=True)
+
+    prefix = dt.strftime("%Y%m%d_%H%M%S") + "_" + item_id[:8]
+
+    try:
+        if input_text:
+            (date_dir / f"{prefix}_instruction.txt").write_text(input_text, encoding="utf-8")
+        if ddl:
+            (date_dir / f"{prefix}_normalized.ddl").write_text(ddl, encoding="utf-8")
+        (date_dir / f"{prefix}_score.json").write_text(
+            json.dumps(score, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        svg_bytes = svg.encode("utf-8")
+        (date_dir / f"{prefix}_output.svg").write_bytes(svg_bytes)
+        png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=_OUTPUT_PNG_SIZE)
+        (date_dir / f"{prefix}_output.png").write_bytes(png_bytes)
+    except Exception:  # noqa: BLE001
+        pass
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -304,6 +341,9 @@ def api_history_post(body: HistoryPostBody) -> HistoryItem:
     with _history_lock:
         _history.append(item.model_dump())
         _save_history()
+    _save_executor.submit(
+        _save_output, item.id, item.at, item.input, item.ddl, item.score, item.svg
+    )
     return item
 
 

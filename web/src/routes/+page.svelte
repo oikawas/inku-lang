@@ -384,12 +384,22 @@
 			: null
 	);
 
-	function gotoPrev() {
-		if (historyCursor < historyItems.length - 1) loadIteration(historyCursor + 1);
+	async function gotoPrev() {
+		if (historyCursor < historyItems.length - 1) {
+			loadIteration(historyCursor + 1);
+		} else if (historyPage < historyTotalPages - 1) {
+			await fetchHistoryPage(historyPage + 1);
+			loadIteration(0);
+		}
 	}
 
-	function gotoNext() {
-		if (historyCursor > 0) loadIteration(historyCursor - 1);
+	async function gotoNext() {
+		if (historyCursor > 0) {
+			loadIteration(historyCursor - 1);
+		} else if (historyPage > 0) {
+			await fetchHistoryPage(historyPage - 1);
+			loadIteration(historyItems.length - 1);
+		}
 	}
 
 	// ── Saijiki ─────────────────────────────────────────────
@@ -893,13 +903,13 @@
 						<button
 							class="nav-btn"
 							onclick={gotoPrev}
-							disabled={historyCursor >= historyItems.length - 1}
+							disabled={historyCursor >= historyItems.length - 1 && historyPage >= historyTotalPages - 1}
 						>{t().navOlderBtn}</button>
 						<span class="counter">{historyPage * HISTORY_PAGE_SIZE + historyCursor + 1} / {historyTotal}</span>
 						<button
 							class="nav-btn"
 							onclick={gotoNext}
-							disabled={historyCursor <= 0}
+							disabled={historyCursor <= 0 && historyPage <= 0}
 						>{t().navNewerBtn}</button>
 						{#if currentRenderedAt}
 							<span class="rendered-at">{t().historyRenderedAtLabel} {currentRenderedAt}</span>
@@ -955,13 +965,13 @@
 				{#if historyTotalPages > 1}
 					<div class="page-nav">
 						<button
-							onclick={() => fetchHistoryPage(historyPage - 1)}
+							onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }}
 							disabled={historyPage <= 0}
 							aria-label="新しいページ"
 					>{ t().historyNewerPage }</button>
 						<span>{historyPage + 1} / {historyTotalPages}</span>
 						<button
-							onclick={() => fetchHistoryPage(historyPage + 1)}
+							onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }}
 							disabled={historyPage >= historyTotalPages - 1}
 							aria-label="古いページ"
 					>{ t().historyOlderPage }</button>

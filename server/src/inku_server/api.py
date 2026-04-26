@@ -32,7 +32,9 @@ from . import snapshots as _snapshots
 app = FastAPI(title="inku-server", version="0.1.0")
 
 # ── 履歴ストレージ ──────────────────────────────────────────────────────────────
-_HISTORY_FILE = Path(os.getenv("INKU_HISTORY_FILE", "/tmp/inku-history.json"))
+_DEFAULT_HISTORY_FILE = Path.home() / ".local" / "share" / "inku" / "history.json"
+_HISTORY_FILE = Path(os.getenv("INKU_HISTORY_FILE", str(_DEFAULT_HISTORY_FILE)))
+_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
 _history: list[dict] = []
 _history_lock = Lock()
 

@@ -20,8 +20,10 @@ from pydantic import BaseModel, Field
 from .coerce import coerce_score
 from .composer import compose
 from .composer import SYSTEM_PROMPT as STAGE2_PROMPT
+from .composer import SYSTEM_PROMPT_EN as STAGE2_PROMPT_EN
 from .interpreter import interpret_detail
 from .interpreter import SYSTEM_PROMPT as STAGE1_PROMPT
+from .interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
 from .interpreter import SYSTEM_PROMPT_PREFIX as STAGE1_PREFIX
 from .renderer import render
 from .schema import Score
@@ -70,6 +72,7 @@ class ComposeRequest(BaseModel):
     )
     original_text: str | None = Field(default=None, description="元のユーザー記述 (省略可)")
     snapshot_id: str | None = Field(default=None, description="歳時記スナップショット ID")
+    lang: str = Field(default="ja", description="言語コード (ja / en)")
 
 
 class ComposeResponse(BaseModel):
@@ -89,6 +92,7 @@ class InterpretRequest(BaseModel):
         default=False, description="qwen3 の <think> 内容を別フィールドで返すか"
     )
     snapshot_id: str | None = Field(default=None, description="歳時記スナップショット ID")
+    lang: str = Field(default="ja", description="言語コード (ja / en)")
 
 
 class InterpretResponse(BaseModel):
@@ -103,6 +107,7 @@ class PaintRequest(BaseModel):
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
+    lang: str = Field(default="ja", description="言語コード (ja / en)")
 
 
 class PaintResponse(BaseModel):
@@ -165,8 +170,10 @@ def health() -> dict[str, bool]:
 
 
 @app.get("/api/prompts", response_model=PromptsResponse)
-def api_prompts() -> PromptsResponse:
-    return PromptsResponse(stage1_system=STAGE1_PROMPT, stage2_system=STAGE2_PROMPT)
+def api_prompts(lang: str = Query(default="ja")) -> PromptsResponse:
+    s1 = STAGE1_PROMPT_EN if lang == "en" else STAGE1_PROMPT
+    s2 = STAGE2_PROMPT_EN if lang == "en" else STAGE2_PROMPT
+    return PromptsResponse(stage1_system=s1, stage2_system=s2)
 
 
 @app.post("/api/compose", response_model=ComposeResponse)
@@ -178,7 +185,7 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
         if snap:
             stage2_prompt = snap.get("stage2_prompt")
     try:
-        score, tokens_in, tokens_out = compose(req.ddl, model=req.model, original_text=req.original_text, system_prompt=stage2_prompt)
+        score, tokens_in, tokens_out = compose(req.ddl, model=req.model, original_text=req.original_text, system_prompt=stage2_prompt, lang=req.lang)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -206,6 +213,7 @@ def api_interpret(req: InterpretRequest) -> InterpretResponse:
             model=req.model,
             include_thinking=req.include_thinking,
             system_prompt_prefix=stage1_prefix,
+            lang=req.lang,
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
@@ -217,13 +225,13 @@ def api_paint(req: PaintRequest) -> PaintResponse:
     t0 = time.perf_counter()
     try:
         ddl, thinking, s1_tin, s1_tout = interpret_detail(
-            req.text, model=req.stage1_model, include_thinking=req.include_thinking
+            req.text, model=req.stage1_model, include_thinking=req.include_thinking, lang=req.lang
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     t1 = time.perf_counter()
     try:
-        score, s2_tin, s2_tout = compose(ddl, model=req.stage2_model, original_text=req.text)
+        score, s2_tin, s2_tout = compose(ddl, model=req.stage2_model, original_text=req.text, lang=req.lang)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 

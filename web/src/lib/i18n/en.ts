@@ -67,4 +67,16 @@ export const en: LangPack = {
 	historyClearBtn: 'clear all',
 	navOlderBtn: '◀',
 	navNewerBtn: '▶',
+	historyRenderedAtLabel: 'rendered:',
+
+	saijikiWords: {
+		katachi: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc'],
+		tezawari: ['hair', 'pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'rope'],
+		tsuranari: ['solid', 'dashed', 'dotted', 'dash-dot'],
+		iro: ['white', 'black', 'blue', 'red', 'green', 'gray'],
+		yuragi: ['fine', 'large', 'slowly', 'quickly', 'swaying', 'undulating', 'trembling', 'blurring'],
+		basho: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'middle', 'corner'],
+		ugoki: ['place', 'line-up', 'fill', 'scatter', 'draw'],
+		wariai: ['tall', 'wide', 'full-width', 'half-width', 'semicircle', 'waxing', 'waning', 'crescent'],
+	},
 };

@@ -347,31 +347,269 @@ EXAMPLE_POOL: list[dict] = [
     },
 ]
 
+EXAMPLE_POOL_EN: list[dict] = [
+    {
+        "keywords": ["moon", "mountain", "sky", "night", "star", "rises"],
+        "input": "A moon rises beyond the mountains",
+        "output": "Draw a gray horizontal line in the lower third. Place a black circle in the upper right. Radius 0.1.",
+    },
+    {
+        "keywords": ["storm", "fierce", "wind", "fast", "turbulent", "intense"],
+        "input": "In the middle of a fierce storm",
+        "output": "Scatter black lines quickly across the entire canvas.",
+    },
+    {
+        "keywords": ["water", "drop", "rain", "ripple", "falls", "drip"],
+        "input": "A single drop falling onto a calm surface",
+        "output": "Place a small black circle at center. Line up three blue dashed circles around it with increasing radius.",
+    },
+    {
+        "keywords": ["winter", "crystal", "radial", "ice", "snow", "frost"],
+        "input": "Ice crystals on a winter window",
+        "output": "Draw six thin white lines radially from center. Ends trembling fine.",
+    },
+    {
+        "keywords": ["vertical", "lines", "arrange", "multiple", "three", "bamboo"],
+        "input": "Three vertical lines",
+        "output": "Line up three vertical solid lines horizontally.",
+    },
+    {
+        "keywords": ["dots", "random", "scatter", "red", "five", "circles"],
+        "input": "Five red dots scattered randomly",
+        "output": "Scatter five small red circles randomly. Radius 0.04.",
+    },
+    {
+        "keywords": ["horizontal", "lines", "blue", "two", "draw", "parallel"],
+        "input": "Draw two blue horizontal lines",
+        "output": "Line up two blue horizontal lines vertically.",
+    },
+    {
+        "keywords": ["petals", "fall", "cherry", "spring", "blossom", "scatter"],
+        "input": "Petals falling",
+        "output": "Scatter fine dots across the canvas randomly.",
+    },
+    {
+        "keywords": ["light", "radial", "sun", "ray", "glow", "spreading"],
+        "input": "Light rays spreading out",
+        "output": "Draw several thin lines radially from center.",
+    },
+    {
+        "keywords": ["wave", "sea", "river", "concentric", "ripple", "spread"],
+        "input": "Waves spreading",
+        "output": "Line up three dashed circles from center with increasing radius.",
+    },
+    {
+        "keywords": ["mist", "fog", "blur", "haze", "vague"],
+        "input": "A shape in the mist",
+        "output": "Place a large gray ellipse at center. Edges blurring.",
+    },
+    {
+        "keywords": ["grid", "crosshatch", "intersect", "lattice", "cross"],
+        "input": "Draw a grid",
+        "output": "Line up five vertical lines horizontally. Line up five horizontal lines vertically.",
+    },
+    {
+        "keywords": ["many", "numerous", "countless", "lots", "scattered", "small"],
+        "input": "Many small dots scattered",
+        "output": "Scatter twenty small black circles randomly. Radius 0.02.",
+    },
+    {
+        "keywords": ["100", "200", "500", "hundred", "fill", "dense"],
+        "input": "100 thin lines randomly arranged",
+        "output": "Scatter one hundred thin vertical black lines randomly.",
+    },
+    {
+        "keywords": ["crayon", "fill", "background", "cover", "dense", "blue"],
+        "input": "Fill background with blue crayon lines",
+        "output": "Line up thirty vertical blue crayon lines horizontally.",
+    },
+    {
+        "keywords": ["pencil", "thin", "delicate", "fine", "light", "ten"],
+        "input": "Draw ten thin vertical lines with a pencil",
+        "output": "Line up ten thin vertical pencil lines horizontally.",
+    },
+    {
+        "keywords": ["trembling", "trembles", "shaking", "vibrate", "quivering"],
+        "input": "Three trembling vertical lines",
+        "output": "Line up three vertical solid lines horizontally. Fine trembling.",
+    },
+    {
+        "keywords": ["right", "left", "half", "edge", "corner", "twenty"],
+        "input": "Twenty small red circles in the right half",
+        "output": "Scatter twenty small red circles randomly in the right half.",
+    },
+    {
+        "keywords": ["colorful", "rainbow", "various", "multicolor", "colors"],
+        "input": "Colorful small circles scattered",
+        "output": "Scatter twenty small circles randomly in red, blue, green, black, gray. Radius 0.03.",
+    },
+    {
+        "keywords": ["dark", "black background", "night", "shadow", "white"],
+        "input": "White lines on a black background",
+        "output": "Fill background with black. Draw a white horizontal line at center.",
+    },
+    {
+        "keywords": ["tall", "narrow", "portrait", "vertical", "rectangle"],
+        "input": "Place a tall rectangle at center",
+        "output": "Place a tall rectangle at center.",
+    },
+    {
+        "keywords": ["wide", "landscape", "broad", "horizontal", "rectangle"],
+        "input": "Three wide rectangles side by side",
+        "output": "Line up three wide rectangles horizontally.",
+    },
+    {
+        "keywords": ["full", "full-width", "edge", "end", "entire", "across"],
+        "input": "Draw a line from edge to edge",
+        "output": "Draw a full-width horizontal line at center.",
+    },
+    {
+        "keywords": ["half", "half-width", "middle", "shorter", "partial"],
+        "input": "Draw a half-width line",
+        "output": "Draw a half-width horizontal line at center.",
+    },
+    {
+        "keywords": ["semicircle", "half circle", "dome", "arch", "semi"],
+        "input": "Place a semicircle at center",
+        "output": "Place a semicircle arc at center. Radius 0.2.",
+    },
+    {
+        "keywords": ["crescent", "moon", "thin arc", "sliver", "waning"],
+        "input": "A crescent moon in the night sky",
+        "output": "Fill background with black. Place a crescent arc in the upper right. Radius 0.12.",
+    },
+]
+
+SYSTEM_PROMPT_PREFIX_EN = """You are the Stage 1 interpreter of inku DDL.
+
+Input: Author's free-form description (may be poetic, metaphorical, or emotional)
+Output: **Normalized DDL** — concise English instructions using only Saijiki vocabulary
+
+# Principles
+
+1. **Remove emotional vocabulary** (beautiful→remove, intense→quickly, quietly→slowly)
+2. **Output is a static image**. Verbs implying motion over time are forbidden:
+   - Forbidden: move, spread, flow, extend, rise, fall, scatter (as motion), sink, paint
+   - Allowed action verbs: place, line up, draw, scatter (as arrangement), fill
+   - "movements" qualities (trembling, blurring) are textures in the static image, not motion
+3. Coordinates use 0.0–1.0 ratio (top-left=(0,0), bottom-right=(1,1))
+4. Output in plain English prose. No bullet points, no explanation, no preamble
+5. Use only Saijiki vocabulary
+
+# Attribute Preservation — Never Drop Attributes
+
+Emotional language removal is the only normalization. **Dropping attributes is an error**.
+Preserve all explicitly stated attributes in the input:
+
+- **colors**: blue, red, white, gray → never omit ("blue crayon line" → keep "blue")
+- **touches**: crayon, brush, pencil, chalk, rope → never omit
+- **weight/size**: thin, thick, small, large → preserve
+- **direction/places**: vertical, horizontal, radial, center, right-half → preserve
+- **movements**: trembling, undulating, blurring, fine → add as separate sentence after count
+- **arrangement**: random, grid, radial, evenly spaced → preserve
+
+Multiple attributes in one shape go in one sentence: "Line up thirty thick vertical blue crayon lines."
+
+# Quantity
+
+When a count is present, put **color, material, direction, size in the same sentence**.
+
+- "three bamboo poles" → "Line up three vertical solid lines horizontally."
+- "five red dots randomly" → "Scatter five small red circles randomly. Radius 0.04."
+- "fill with blue crayon lines" → "Line up thirty vertical blue crayon lines horizontally."
+- "many / countless" → about twenty (max 500)
+- Explicit numbers (100, 200) → use as-is
+
+# Random Arrangement
+
+"randomly" / "scattered" / "haphazardly" → write "randomly" or "scatter"
+
+# Colorful / Multi-color
+
+"colorful" / "various colors" / "rainbow" → list colors explicitly: "in red, blue, green, black"
+Default if unspecified: "in red, blue, green, black, gray"
+
+# Background
+
+"fill background" / "black background" → "Fill background with X." (as first sentence)
+Example: "black background with white lines" → "Fill background with black. Draw a white horizontal line at center."
+
+# Saijiki (Vocabulary)
+
+forms: circle, ellipse, triangle, square, line, arc
+touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, rope
+continuity: solid (default), dashed, dotted, dash-dot
+colors: white, black (default), blue, red, green, gray
+movements: fine, large, slowly, quickly, swaying, undulating, trembling, blurring
+places: top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner
+motions: place, line-up, fill, scatter, draw
+proportions: tall, wide, full-width, half-width, semicircle, waxing, waning, crescent
+
+# Proportions
+
+Rectangle aspect ratio:
+- tall → height ≈ twice the width
+- wide → width ≈ twice the height
+
+Line length:
+- full-width → left (0.0) to right (1.0)
+- half-width → 0.25 to 0.75
+- percentage → convert to 0.0–1.0
+
+Arc / Moon:
+- semicircle → 180° arc (upper half: right to left)
+- waxing → D-shape arc (right semicircle)
+- waning → C-shape arc (left semicircle)
+- crescent → thin arc ~120°–150°
+
+# Non-Saijiki Word Expansion
+
+Expand unknown words to the nearest Saijiki vocabulary using shape, texture, structure, or motion.
+
+- **shape**: moon→circle, mountain→triangle, building→square, tree→line
+- **texture**: mist→ellipse(blurring), sand→scattered dots, flame→line(undulating)
+- **structure**: sea→horizontal lines, forest→vertical lines, stars→small circles scattered
+- **motion→arrangement**: rising→place high, scattering→scatter randomly, spreading→concentric circles
+
+# Output Format
+
+Normalized DDL text only. No preamble, explanation, tags, or code block markers."""
+
 # api.py が import する SYSTEM_PROMPT — プレフィックスを公開する
 SYSTEM_PROMPT = SYSTEM_PROMPT_PREFIX + "\n\n# 変換例\n\n(推論時に入力関連の例を動的に選択して注入)"
+SYSTEM_PROMPT_EN = SYSTEM_PROMPT_PREFIX_EN + "\n\n# Examples\n\n(dynamically selected at inference time)"
 
 
-def _select_examples(text: str, k: int = 5) -> str:
+def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
     """入力テキストと関連性の高い例を k 件選んで返す。
 
     キーワードの一致数でスコアリングし、上位 k 件を選択する。
     全スコアが 0 の場合は先頭 k 件 (汎用例) を使う。
     """
-    scored = [(sum(1 for kw in ex["keywords"] if kw in text), ex) for ex in EXAMPLE_POOL]
+    pool = EXAMPLE_POOL_EN if lang == "en" else EXAMPLE_POOL
+    scored = [(sum(1 for kw in ex["keywords"] if kw.lower() in text.lower()), ex) for ex in pool]
     scored.sort(key=lambda x: -x[0])
     top = scored[:k]
     if all(s == 0 for s, _ in top):
-        top = [(0, ex) for ex in EXAMPLE_POOL[:k]]
+        top = [(0, ex) for ex in pool[:k]]
+    if lang == "en":
+        return "\n\n".join(f"Input: {ex['input']}\nOutput: {ex['output']}" for _, ex in top)
     return "\n\n".join(
         f"入力: {ex['input']}\n出力: {ex['output']}" for _, ex in top
     )
 
 
-def _build_system_prompt(text: str, k: int = 5, prefix_override: str | None = None) -> str:
+def _build_system_prompt(text: str, k: int = 5, prefix_override: str | None = None, lang: str = "ja") -> str:
     """推論ごとのシステムプロンプトを構築する (PREFIX + 動的例 k 件)。"""
-    examples = _select_examples(text, k=k)
-    prefix = prefix_override if prefix_override is not None else SYSTEM_PROMPT_PREFIX
-    return prefix + "\n\n# 変換例\n\n" + examples
+    examples = _select_examples(text, k=k, lang=lang)
+    if prefix_override is not None:
+        prefix = prefix_override
+    elif lang == "en":
+        prefix = SYSTEM_PROMPT_PREFIX_EN
+    else:
+        prefix = SYSTEM_PROMPT_PREFIX
+    section_header = "# Examples\n\n" if lang == "en" else "# 変換例\n\n"
+    return prefix + "\n\n" + section_header + examples
 
 
 def _get_provider(model: str) -> str:
@@ -400,9 +638,10 @@ def interpret_detail(
     model: str | None = None,
     include_thinking: bool = False,
     system_prompt_prefix: str | None = None,
+    lang: str = "ja",
 ) -> tuple[str, str | None, int | None, int | None]:
     """(ddl, thinking, tokens_in, tokens_out) を返す。"""
-    system_prompt = _build_system_prompt(text, prefix_override=system_prompt_prefix)
+    system_prompt = _build_system_prompt(text, prefix_override=system_prompt_prefix, lang=lang)
 
     if model:
         provider = _get_provider(model)

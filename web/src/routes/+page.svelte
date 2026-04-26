@@ -133,12 +133,13 @@
 	// ── Core paint function (2-stage call) ──────────────────
 	async function paintOne(text: string): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const t0 = Date.now();
+		const lang = getLang();
 
 		stageLabel = t().stageInterpreting;
 		const r1 = await fetch('/api/interpret', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text, model: stage1Model, include_thinking: includeThinking, snapshot_id: activeSnapshotId })
+			body: JSON.stringify({ text, model: stage1Model, include_thinking: includeThinking, snapshot_id: activeSnapshotId, lang })
 		});
 		if (!r1.ok) {
 			const d = await r1.json().catch(() => ({})) as { detail?: string };
@@ -152,7 +153,7 @@
 		const r2 = await fetch('/api/compose', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, snapshot_id: activeSnapshotId })
+			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, snapshot_id: activeSnapshotId, lang })
 		});
 		if (!r2.ok) {
 			const d = await r2.json().catch(() => ({})) as { detail?: string };
@@ -236,7 +237,7 @@
 						const totalIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0);
 						const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
 						await pushHistory({
-							input: lines[i],
+							input: `#${i + 1} ${lines[i]}`,
 							ddl: r.ddl,
 							thinking: r.thinking,
 							score: r.score,
@@ -336,10 +337,20 @@
 			svg: it.svg,
 			elapsed_stage1_ms: 0,
 			elapsed_stage2_ms: 0,
-			elapsed_total_ms: it.elapsed_ms ?? 0
+			elapsed_total_ms: it.elapsed_ms ?? 0,
+			tokens_in_stage1: null,
+			tokens_out_stage1: null,
+			tokens_in_stage2: null,
+			tokens_out_stage2: null,
 		};
 		error = null;
 	}
+
+	const currentRenderedAt = $derived(
+		historyCursor >= 0 && historyItems[historyCursor]
+			? new Date(historyItems[historyCursor].at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US')
+			: null
+	);
 
 	function gotoPrev() {
 		if (historyCursor < historyItems.length - 1) loadIteration(historyCursor + 1);
@@ -522,10 +533,17 @@
 			: t().currentSetting
 	);
 
+	async function fetchPrompts(): Promise<void> {
+		try {
+			const r = await fetch(`/api/prompts?lang=${getLang()}`);
+			if (r.ok) promptsData = await r.json();
+		} catch {}
+	}
+
 	// ── Mount ───────────────────────────────────────────────
 	onMount(async () => {
 		initLang();
-		await Promise.all([fetchHistoryPage(0), fetchSnapshots()]);
+		await Promise.all([fetchHistoryPage(0), fetchSnapshots(), fetchPrompts()]);
 		if (historyItems.length > 0) loadIteration(0);
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null;
@@ -537,10 +555,11 @@
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY);
 			if (m2) stage2Model = m2;
 		} catch {}
-		try {
-			const r = await fetch('/api/prompts');
-			if (r.ok) promptsData = await r.json();
-		} catch {}
+	});
+
+	$effect(() => {
+		const _lang = getLang();
+		fetchPrompts();
 	});
 </script>
 
@@ -828,6 +847,9 @@
 							onclick={gotoNext}
 							disabled={historyCursor <= 0}
 						>{t().navNewerBtn}</button>
+						{#if currentRenderedAt}
+							<span class="rendered-at">{t().historyRenderedAtLabel} {currentRenderedAt}</span>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -937,10 +959,11 @@
 		</div>
 			<p class="saijiki-hint">{t().saijikiHint}</p>
 		{#each SAIJIKI as cat (cat.key)}
+			{@const words = t().saijikiWords[cat.key] ?? cat.words}
 			<section class="saijiki-cat">
 				<h3>{cat.label} <span class="en">{cat.en}</span></h3>
 				<div class="chips">
-					{#each cat.words as word (word)}
+					{#each words as word (word)}
 						<button class="chip" onclick={() => insertWord(word)}>{word}</button>
 					{/each}
 				</div>
@@ -1514,6 +1537,7 @@
 	.nav-btn:hover:not(:disabled) { background: #111; color: #fff; border-color: #111; }
 	.nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 	.counter { color: #666; min-width: 3rem; text-align: center; }
+	.rendered-at { color: #aaa; font-size: 0.78rem; margin-left: 0.5rem; }
 
 	/* ── History ───────────────────────────────────────────── */
 	.history {

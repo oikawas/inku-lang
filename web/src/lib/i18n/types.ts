@@ -76,4 +76,8 @@ export interface LangPack {
 	historyClearBtn: string;
 	navOlderBtn: string;
 	navNewerBtn: string;
+	historyRenderedAtLabel: string;
+
+	// Saijiki vocabulary (localized words per category key)
+	saijikiWords: Record<string, string[]>;
 }

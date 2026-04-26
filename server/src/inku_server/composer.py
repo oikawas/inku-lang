@@ -95,6 +95,62 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 説明・前置き禁止。submit_score 呼び出しのみ。"""
 
+SYSTEM_PROMPT_EN = """You are the Stage 2 compiler of inku DDL.
+Parse the normalized DDL and call submit_score.
+Field specifications in the submit_score schema descriptions are authoritative.
+If "original text" is provided, use normalized DDL as primary; use original text to fill missing attributes (color, material, count, etc.).
+
+# Conversion Rules (strict)
+
+- Coordinates: 0.0-1.0 ratio (top-left=(0,0) bottom-right=(1,1))
+- circle/ellipse/arc → center field. square/triangle → position field (bbox top-left)
+- center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
+- **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
+- variation only when movement is explicitly stated
+- **count is integer 1–1000. "many/countless" ≈ 20. Use explicit numbers from DDL**
+- **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
+- **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
+- **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
+
+# Examples (key patterns)
+
+Input: Line up three vertical solid lines horizontally.
+Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
+
+Input: Scatter five small blue circles randomly. Radius 0.04.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter"}}]}
+
+Input: Draw a horizontal line at center. Fine trembling.
+Output: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
+
+Input: Place a green square of side 0.4 at center.
+Output: {"instructions":[{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"color":"green"}]}
+
+Input: Place a filled red circle at center. Radius 0.2.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"color":"red","filled":true}]}
+
+Input: Fill background with black. Draw a white horizontal line at center.
+Output: {"background":"black","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"white"}]}
+
+Input: Arrange eight circles radially in red, blue, green, black.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,"arrangement":{"count":8,"layout":"radial","color_cycle":["red","blue","green","black","gray","red","blue","green"]}}]}
+
+# Proportions
+
+- **tall rectangle** → size[1] ≈ twice size[0]. e.g. size=[0.15,0.35]
+- **wide rectangle** → size[0] ≈ twice size[1]. e.g. size=[0.35,0.15]
+- **full-width line** → from=[0.0,y] to=[1.0,y]
+- **half-width line** → from=[0.25,y] to=[0.75,y]
+- **semicircle** → arc, angle_start=0, angle_end=180
+- **waxing** → arc, angle_start=270, angle_end=90
+- **waning** → arc, angle_start=90, angle_end=270
+- **crescent** → arc, angle_start=210, angle_end=330
+
+Input: Place a tall rectangle at center.
+Output: {"instructions":[{"primitive":"square","position":[0.425,0.325],"size":[0.15,0.35]}]}
+
+No explanation. Call submit_score only."""
+
 
 def _submit_tool() -> dict[str, Any]:
     return {
@@ -118,8 +174,10 @@ def _strip_prefix(model: str) -> str:
     return model
 
 
-def _build_user_message(ddl: str, original_text: str | None) -> str:
+def _build_user_message(ddl: str, original_text: str | None, lang: str = "ja") -> str:
     if original_text and original_text.strip() != ddl.strip():
+        if lang == "en":
+            return f"[original text]\n{original_text}\n\n[normalized DDL]\n{ddl}"
         return f"[原文]\n{original_text}\n\n[正規化DDL]\n{ddl}"
     return ddl
 
@@ -130,10 +188,16 @@ def compose(
     model: str | None = None,
     original_text: str | None = None,
     system_prompt: str | None = None,
+    lang: str = "ja",
 ) -> tuple[Score, int | None, int | None]:
     """(score, tokens_in, tokens_out) を返す。system_prompt 指定時はスナップショット使用。"""
-    user_msg = _build_user_message(ddl, original_text)
-    effective_prompt = system_prompt if system_prompt is not None else SYSTEM_PROMPT
+    user_msg = _build_user_message(ddl, original_text, lang=lang)
+    if system_prompt is not None:
+        effective_prompt = system_prompt
+    elif lang == "en":
+        effective_prompt = SYSTEM_PROMPT_EN
+    else:
+        effective_prompt = SYSTEM_PROMPT
     if model:
         provider = _get_provider(model)
         if provider == "anthropic":

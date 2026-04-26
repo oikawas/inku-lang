@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.2**
+**Version: v1.3**
 
 ---
 
@@ -1174,6 +1174,74 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.3 (2026-04-26)
+
+**Saijiki スナップショット + トークン表示 + ダウンロード + i18n**
+
+#### Saijiki スナップショット
+
+特定時点のシステムプロンプト状態を名前付きで保存・呼び出す機能を追加。
+
+- **`server/src/inku_server/snapshots.py` 新規作成**
+  - `create_snapshot(name, stage1_prefix, stage2_prompt)` → UUID + タイムスタンプ付きで保存
+  - ストレージ: `/tmp/inku-saijiki-snapshots.json` (env var `INKU_SNAPSHOTS_FILE`)
+  - `list_snapshots()` / `get_snapshot(id)` / `delete_snapshot(id)` の CRUD
+- **API エンドポイント追加**
+  - `GET /api/saijiki/snapshots` → `list[SnapshotMeta]`
+  - `POST /api/saijiki/snapshots` → スナップショット作成
+  - `DELETE /api/saijiki/snapshots/{id}` → 削除
+- **スナップショット適用**: `InterpretRequest` / `ComposeRequest` / `PaintRequest` に `snapshot_id` フィールド追加。推論時に一致するスナップショットのプロンプトを上書き
+- **設計**: Stage 1 はプレフィックス (`SYSTEM_PROMPT_PREFIX`) のみ保存し、EXAMPLE_POOL の動的例選択は引き続きリアルタイム動作。スナップショットはプレフィックスの変更のみをキャプチャ
+- **Web UI**: スナップショットパネル (折り畳み式) を歳時記エリアに追加。現在設定表示・名前入力・保存・削除・選択適用
+
+#### トークン数トラッキング
+
+LLM の消費トークンを処理中に表示し履歴にも記録。
+
+- **`interpreter.py`**: `interpret_detail()` が `(ddl, thinking, tokens_in, tokens_out)` の 4-tuple を返すように変更
+  - Anthropic: `resp.usage.input_tokens / output_tokens`
+  - OpenAI/OVMS: `resp.usage.prompt_tokens / completion_tokens`
+  - いずれも `getattr` で安全取得 (未対応モデルは `None`)
+- **`composer.py`**: `compose()` が `(Score, tokens_in, tokens_out)` の 3-tuple を返すように変更
+- **`api.py`**: `InterpretResponse` / `ComposeResponse` / `PaintResponse` に `tokens_in / tokens_out` フィールド追加
+- **Web UI**: 処理中の「構造化中…」ラベルにトークン数をリアルタイム表示。履歴サムネイルに `{in}→{out}tok` 表示
+
+#### ダウンロード機能
+
+完成した作品を SVG および複数解像度の PNG で保存可能に。
+
+- **SVG ダウンロード**: `<desc>` タグに元の記述テキストを埋め込んで出力。`svgWithDesc()` 関数で `<svg ...>` の直後に挿入
+- **PNG ダウンロード**: 4 解像度 (1080 / 2160 / 1024 / 2048px) をブラウザ Canvas API で変換
+  - SVG に `width` / `height` 属性を注入し `Image` に描画 → Canvas → `toBlob('image/png')` → `<a>` 要素でダウンロード
+  - Canvas 背景は白 (`#ffffff`) でプリフィル (透過 PNG にならないよう)
+- **UI**: キャンバス下部にダウンロードバーを追加。`↓ SVG` ボタン + `PNG:` ラベル + `1080 / 2160 / 1024 / 2048` ボタン
+
+#### 履歴: モデル名・トークン数表示
+
+- 履歴サムネイルに Stage 2 使用モデルの短縮名 (`shortModel()`) を表示
+- `Iteration` 型に `tokens_in / tokens_out` フィールド追加
+- `HistoryPostBody` にも `tokens_in / tokens_out` を追加してサーバー側履歴にも記録
+
+#### ハッカソン関連テキスト削除
+
+UI 全体からハッカソン関連の記述を削除。
+
+#### i18n — 日英言語パック
+
+UI の日本語 / 英語切り替えを実装。将来の多言語対応を設計から内包。
+
+- **`web/src/lib/i18n/types.ts`**: `LangPack` インターフェース定義
+  - 単純文字列フィールドと関数フィールド (`batchCount(n)`, `stageStructuring(tok)`, `tokenSummary(...)` 等) を混在
+- **`web/src/lib/i18n/ja.ts`** / **`en.ts`**: 日本語・英語パックを個別ファイルで管理
+- **`web/src/lib/i18n/index.svelte.ts`**: Svelte 5 `$state` ベースの言語ストア
+  - `t()` 関数でアクティブパックを返す (テンプレート内 `t().key` で全文字列を参照)
+  - `setLang(code)` + `localStorage` 永続化
+  - 新言語追加: `types.ts` にパック実装 + `PACKS` に登録するだけ
+- **`+page.svelte`**: 全ハードコード文字列を `t().xxx` に置き換え。`$derived.by(() => t().tokenSummary(...))` パターンで複合 derived を実装
+- **ヘッダー**: 言語切り替えボタン (`日本語` / `English`) をヘッダー右上に配置
+
+---
 
 ### v1.2 (2026-04-25)
 

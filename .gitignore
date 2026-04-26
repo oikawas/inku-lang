@@ -39,3 +39,7 @@ CLAUDE.md
 
 # ローカル運用メモ
 LOCAL_WORK.md
+
+# 履歴データ
+**/inku-history.json
+data/history.json

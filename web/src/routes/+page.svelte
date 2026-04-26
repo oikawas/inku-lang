@@ -34,6 +34,7 @@
 	};
 
 	type Iteration = {
+		id?: string;
 		input: string;
 		ddl: string | null;
 		thinking?: string | null;
@@ -979,7 +980,7 @@
 				{/if}
 			</div>
 			<div class="strip">
-				{#each historyItems as it, i (it.at)}
+				{#each historyItems as it, i (it.id ?? it.at)}
 					<button
 						class="thumb"
 						class:current={i === historyCursor}
@@ -1560,6 +1561,7 @@
 
 	.canvas {
 		aspect-ratio: 1 / 1;
+		max-height: 480px;
 		border: 1px solid #ccc;
 		border-radius: 4px;
 		background: #fff;

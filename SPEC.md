@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.4**
+**Version: v1.5**
 
 ---
 
@@ -1173,6 +1173,27 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.5 (2026-04-26)
+
+**UI fix: canvas max-height + 履歴サムネイル重複キー修正 / デプロイフロー整備**
+
+#### UI 修正
+
+- **canvas max-height 追加**: `.canvas { max-height: 480px }` を設定。`aspect-ratio: 1/1` のみでは canvas がビューポート幅（~560px）まで拡大し、history strip がビューポート外に押し出されていた問題を修正
+- **履歴 each キー修正**: `{#each historyItems as it, i (it.at)}` → `(it.id ?? it.at)`。同一タイムスタンプで複数アイテムが記録された場合の重複キーを解消。`Iteration` 型に `id?: string` 追加
+
+#### デプロイフロー整備
+
+pentala (Ubuntu dev server) との同期ミスが発生した教訓から、運用フローを整備。
+
+**問題の経緯**: rsync で直接転送後に git push を省略 → pentala の working tree に untracked/modified ファイルが残存 → 次回 `git pull` が "would be overwritten by merge" で失敗 → 手動での git stash + rm + pull + stash drop が必要になった
+
+**改善内容**:
+- `no-git-sync/scripts/deploy.sh` 作成: `git push` → pentala `git pull` → `systemctl --user restart inku-server.service` をワンコマンド化
+- `no-git-sync/scripts/sync-reset.sh` 作成: pentala の WT を `git reset --hard origin/main` でリセットするリカバリ用スクリプト
+- `LOCAL_WORK.md` 更新: rsync 後は必ず deploy.sh で完結させるルールを明文化、コンフリクト解消手順を改訂
+- スクリプトは `no-git-sync/`（gitignore 済み）に配置 — ローカル環境依存のため
 
 ### v1.4 (2026-04-26)
 SPEC.mdの内容精査。

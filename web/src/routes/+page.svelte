@@ -9,6 +9,7 @@
 		modelsForProvider,
 		type Provider
 	} from '$lib/models';
+	import { t, setLang, getLang, PACK_LIST, initLang } from '$lib/i18n/index.svelte';
 
 	declare const __BUILD_NUMBER__: string;
 
@@ -133,7 +134,7 @@
 	async function paintOne(text: string): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const t0 = Date.now();
 
-		stageLabel = '解釈中…';
+		stageLabel = t().stageInterpreting;
 		const r1 = await fetch('/api/interpret', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -147,7 +148,7 @@
 		const t1 = Date.now();
 		const tokLabel = d1.tokens_in != null ? ` (${d1.tokens_in}→${d1.tokens_out ?? '?'}tok)` : '';
 
-		stageLabel = `構造化中…${tokLabel}`;
+		stageLabel = t().stageStructuring(tokLabel);
 		const r2 = await fetch('/api/compose', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -511,21 +512,19 @@
 		return last.slice(0, 8);
 	}
 
-	const tokenSummary = $derived(() => {
-		if (tokensInStage1 == null && tokensInStage2 == null) return '';
-		const s1 = tokensInStage1 != null ? `解釈 ${tokensInStage1}→${tokensOutStage1 ?? '?'}` : '';
-		const s2 = tokensInStage2 != null ? `構造化 ${tokensInStage2}→${tokensOutStage2 ?? '?'}` : '';
-		return [s1, s2].filter(Boolean).join(' / ') + ' tok';
-	});
+	const tokenSummary = $derived.by(() =>
+		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
+	);
 
 	const activeSnapshotName = $derived(
 		activeSnapshotId
 			? (snapshots.find((s) => s.id === activeSnapshotId)?.name ?? '?')
-			: '現在の設定'
+			: t().currentSetting
 	);
 
 	// ── Mount ───────────────────────────────────────────────
 	onMount(async () => {
+		initLang();
 		await Promise.all([fetchHistoryPage(0), fetchSnapshots()]);
 		if (historyItems.length > 0) loadIteration(0);
 		try {
@@ -550,16 +549,27 @@
 		<div class="header-inner">
 			<div>
 				<h1>inku</h1>
-				<p class="sub">視覚的な短歌を書く</p>
+				<p class="sub">{t().subtitle}</p>
 			</div>
-			<span class="build-badge">#{__BUILD_NUMBER__}</span>
+			<div class="header-right">
+				<div class="lang-switcher">
+					{#each PACK_LIST as pack (pack.code)}
+						<button
+							class="lang-btn"
+							class:active={getLang() === pack.code}
+							onclick={() => setLang(pack.code)}
+						>{pack.label}</button>
+					{/each}
+				</div>
+				<span class="build-badge">#{__BUILD_NUMBER__}</span>
+			</div>
 		</div>
 	</header>
 
 	<div class="model-row">
 		<div class="model-group">
-			<span class="model-label">解釈</span>
-			<span class="field-label">接続先：</span>
+			<span class="model-label">{t().stage1Label}</span>
+			<span class="field-label">{t().providerLabel}</span>
 			<select
 				value={stage1Provider}
 				onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}
@@ -568,7 +578,7 @@
 					<option value={pg.id}>{pg.label}</option>
 				{/each}
 			</select>
-			<span class="field-label">モデル：</span>
+			<span class="field-label">{t().modelLabel}</span>
 			<select
 				value={stage1Model}
 				onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}
@@ -579,8 +589,8 @@
 			</select>
 		</div>
 		<div class="model-group">
-			<span class="model-label">構造化</span>
-			<span class="field-label">接続先：</span>
+			<span class="model-label">{t().stage2Label}</span>
+			<span class="field-label">{t().providerLabel}</span>
 			<select
 				value={stage2Provider}
 				onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}
@@ -589,7 +599,7 @@
 					<option value={pg.id}>{pg.label}</option>
 				{/each}
 			</select>
-			<span class="field-label">モデル：</span>
+			<span class="field-label">{t().modelLabel}</span>
 			<select
 				value={stage2Model}
 				onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}
@@ -602,13 +612,13 @@
 		{#if stage1Model.includes('qwen3')}
 			<label class="think-toggle">
 				<input type="checkbox" bind:checked={includeThinking} />
-				<span>思考を表示</span>
+				<span>{t().showThinkingLabel}</span>
 			</label>
 		{/if}
 	</div>
 
 	<div class="snapshot-row">
-		<span class="snapshot-label">歳時記:</span>
+		<span class="snapshot-label">{t().saijikiLabel}</span>
 		<button
 			class="snapshot-active-btn"
 			class:snapshot-default={!activeSnapshotId}
@@ -622,10 +632,10 @@
 						class="snapshot-name-input"
 						type="text"
 						bind:value={newSnapshotName}
-						placeholder="スナップショット名 (例: 歳時記v1)"
+						placeholder={t().snapshotNamePlaceholder}
 						onkeydown={(e) => { if (e.key === 'Enter') saveSnapshot(); }}
 					/>
-					<button class="snapshot-save-btn" onclick={saveSnapshot} disabled={!newSnapshotName.trim()}>現在を保存</button>
+					<button class="snapshot-save-btn" onclick={saveSnapshot} disabled={!newSnapshotName.trim()}>{t().saveCurrentBtn}</button>
 				</div>
 				<div class="snapshot-list">
 					<label class="snapshot-item">
@@ -635,7 +645,7 @@
 							checked={!activeSnapshotId}
 							onchange={() => (activeSnapshotId = null)}
 						/>
-						<span class="snapshot-item-name">現在の設定</span>
+						<span class="snapshot-item-name">{t().currentSetting}</span>
 					</label>
 					{#each snapshots as snap (snap.id)}
 						<div class="snapshot-item">
@@ -653,7 +663,7 @@
 						</div>
 					{/each}
 					{#if snapshots.length === 0}
-						<p class="snapshot-empty">保存済みスナップショットはありません</p>
+						<p class="snapshot-empty">{t().noSnapshots}</p>
 					{/if}
 				</div>
 			</div>
@@ -668,18 +678,18 @@
 						class="mode-btn"
 						class:active={inputMode === 'single'}
 						onclick={() => (inputMode = 'single')}
-					>記述</button>
+					>{t().modeSingle}</button>
 					<button
 						class="mode-btn"
 						class:active={inputMode === 'batch'}
 						onclick={() => (inputMode = 'batch')}
-					>バッチ</button>
+					>{t().modeBatch}</button>
 				</div>
 				<button
 					class="saijiki-toggle"
 					aria-expanded={saijikiOpen}
 					onclick={() => (saijikiOpen = !saijikiOpen)}
-				>歳時記</button>
+				>{t().saijikiToggleBtn}</button>
 			</div>
 
 			{#if inputMode === 'single'}
@@ -689,7 +699,7 @@
 					bind:value={input}
 					rows="8"
 					spellcheck="false"
-					placeholder="山の向こうに月が昇る"
+					placeholder={t().inputPlaceholder}
 				></textarea>
 			{:else}
 				<div class="batch-wrapper">
@@ -699,11 +709,11 @@
 						bind:value={batchInput}
 						rows="8"
 						spellcheck="false"
-						placeholder="山の向こうに月が昇る&#10;夜の霧が広がる&#10;青いクレヨンの線"
+						placeholder={t().batchPlaceholder}
 					></textarea>
 				</div>
 				{#if batchNonEmpty > 0}
-					<p class="batch-info">{batchNonEmpty} 件</p>
+					<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>
 				{/if}
 			{/if}
 
@@ -711,30 +721,30 @@
 				<button class="submit" onclick={submit} disabled={!canSubmit || (loading && inputMode === 'single')}>
 					{#if loading}
 						{#if batchTotal > 0}
-							{batchCurrent} / {batchTotal} 番目を演奏中…
+							{t().batchProgress(batchCurrent, batchTotal)}
 						{:else}
-							{stageLabel || '演奏中…'}
+							{stageLabel || t().submitBtn}
 						{/if}
 					{:else}
-						演奏する
+						{t().submitBtn}
 					{/if}
 				</button>
 				{#if loading && batchTotal > 0}
 					<span class="stage-label">{stageLabel}</span>
-					<button class="stop-btn" onclick={stopBatch}>停止</button>
+					<button class="stop-btn" onclick={stopBatch}>{t().stopBtn}</button>
 				{/if}
 				{#if loading}
 					<span class="elapsed elapsed-live">{(liveMs / 1000).toFixed(1)}s</span>
 				{:else if elapsedTotalMs > 0}
 					{#if elapsedStage1Ms > 0}
 						<span class="elapsed">
-							解釈 {(elapsedStage1Ms / 1000).toFixed(1)}s + 構造化 {(elapsedStage2Ms / 1000).toFixed(1)}s = {(elapsedTotalMs / 1000).toFixed(1)}s
+							{t().elapsedDetailed(elapsedStage1Ms / 1000, elapsedStage2Ms / 1000, elapsedTotalMs / 1000)}
 						</span>
 					{:else}
 						<span class="elapsed">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
 					{/if}
-					{#if tokenSummary()}
-						<span class="elapsed elapsed-tok">{tokenSummary()}</span>
+					{#if tokenSummary}
+						<span class="elapsed elapsed-tok">{tokenSummary}</span>
 					{/if}
 				{/if}
 			</div>
@@ -744,7 +754,7 @@
 
 			{#if result && inputMode === 'single'}
 				<div class="interpreted">
-					<label for="input-feedback">入力に含まれた語彙</label>
+					<label for="input-feedback">{t().vocabInInputLabel}</label>
 					<div id="input-feedback" class="annot-box">
 						{#each annotate(input) as part, i (i)}
 							{#if part.kind === 'saijiki'}
@@ -761,14 +771,14 @@
 
 			{#if thinking}
 				<details class="thinking" open>
-					<summary>思考 (qwen3 内部)</summary>
+					<summary>{t().thinkingLabel}</summary>
 					<pre>{thinking}</pre>
 				</details>
 			{/if}
 
 			{#if ddl}
 				<div class="interpreted">
-					<label for="ddl-interpret">解釈 (正規化DDL)</label>
+					<label for="ddl-interpret">{t().ddlLabel}</label>
 					<div id="ddl-interpret" class="annot-box ddl-box">
 						{#each annotate(ddl) as part, i (i)}
 							{#if part.kind === 'saijiki'}
@@ -791,35 +801,33 @@
 						class="tab-btn"
 						class:active={outputTab === 'canvas'}
 						onclick={() => (outputTab = 'canvas')}
-					>演奏</button>
+					>{t().tabCanvas}</button>
 					<button
 						class="tab-btn"
 						class:active={outputTab === 'prompts'}
 						onclick={() => (outputTab = 'prompts')}
 						disabled={!result}
-					>プロンプト</button>
+					>{t().tabPrompts}</button>
 					<button
 						class="tab-btn"
 						class:active={outputTab === 'score'}
 						onclick={() => (outputTab = 'score')}
 						disabled={!result}
-					>楽譜</button>
+					>{t().tabScore}</button>
 				</div>
 				{#if historyTotal > 0}
-					<div class="nav" aria-label="履歴ナビゲーション">
+					<div class="nav" aria-label="history navigation">
 						<button
 							class="nav-btn"
 							onclick={gotoPrev}
 							disabled={historyCursor >= historyItems.length - 1}
-							aria-label="古い演奏"
-						>◀</button>
+						>{t().navOlderBtn}</button>
 						<span class="counter">{historyPage * HISTORY_PAGE_SIZE + historyCursor + 1} / {historyTotal}</span>
 						<button
 							class="nav-btn"
 							onclick={gotoNext}
 							disabled={historyCursor <= 0}
-							aria-label="新しい演奏"
-						>▶</button>
+						>{t().navNewerBtn}</button>
 					</div>
 				{/if}
 			</div>
@@ -829,13 +837,13 @@
 					{#if result}
 						{@html result.svg}
 					{:else}
-						<div class="placeholder">（まだ演奏されていない）</div>
+						<div class="placeholder">{t().canvasPlaceholder}</div>
 					{/if}
 				</div>
 				{#if result}
 					<div class="dl-bar">
-						<button class="dl-btn" onclick={downloadSVG} title="SVG（記述埋め込み）">↓ SVG</button>
-						<span class="dl-sep">PNG:</span>
+						<button class="dl-btn" onclick={downloadSVG}>{t().dlSvgBtn}</button>
+						<span class="dl-sep">{t().dlPngLabel}</span>
 						{#each [1080, 2160, 1024, 2048] as size}
 							<button class="dl-btn" onclick={() => downloadPNG(size)}>{size}</button>
 						{/each}
@@ -844,19 +852,19 @@
 			{:else if outputTab === 'prompts'}
 				{#if promptsData}
 					<div class="prompt-section">
-						<p class="prompt-label">Stage 1 ユーザー入力</p>
-						<pre class="prompt-pre">{inputMode === 'single' ? input : '(バッチモード)'}</pre>
-						<p class="prompt-label">Stage 1 システムプロンプト</p>
+						<p class="prompt-label">{t().promptStage1Input}</p>
+						<pre class="prompt-pre">{inputMode === 'single' ? input : `(${t().modeBatch})`}</pre>
+						<p class="prompt-label">{t().promptStage1System}</p>
 						<pre class="prompt-pre prompt-pre-lg">{promptsData.stage1_system}</pre>
 						{#if ddl}
-							<p class="prompt-label">Stage 2 ユーザー入力 (正規化DDL)</p>
+							<p class="prompt-label">{t().promptStage2Input}</p>
 							<pre class="prompt-pre">{ddl}</pre>
 						{/if}
-						<p class="prompt-label">Stage 2 システムプロンプト</p>
+						<p class="prompt-label">{t().promptStage2System}</p>
 						<pre class="prompt-pre prompt-pre-lg">{promptsData.stage2_system}</pre>
 					</div>
 				{:else}
-					<p class="muted">読み込み中…</p>
+						<p class="muted">{t().promptLoading}</p>
 				{/if}
 			{:else if outputTab === 'score'}
 				<pre class="score-pre">{JSON.stringify(result?.score, null, 2)}</pre>
@@ -865,25 +873,25 @@
 	</div>
 
 	{#if historyTotal > 1}
-		<section class="history" aria-label="演奏履歴">
+		<section class="history" aria-label="history">
 			<div class="history-head">
-				<h2>履歴 <span class="muted">({historyTotal})</span></h2>
+				<h2>{t().historyTitle} <span class="muted">({historyTotal})</span></h2>
 				{#if historyTotalPages > 1}
 					<div class="page-nav">
 						<button
 							onclick={() => fetchHistoryPage(historyPage - 1)}
 							disabled={historyPage <= 0}
 							aria-label="新しいページ"
-						>← 新</button>
+					>{ t().historyNewerPage }</button>
 						<span>{historyPage + 1} / {historyTotalPages}</span>
 						<button
 							onclick={() => fetchHistoryPage(historyPage + 1)}
 							disabled={historyPage >= historyTotalPages - 1}
 							aria-label="古いページ"
-						>旧 →</button>
+					>{ t().historyOlderPage }</button>
 					</div>
 				{/if}
-				<button class="clear-btn" onclick={clearHistory}>全て消す</button>
+				<button class="clear-btn" onclick={clearHistory}>{t().historyClearBtn}</button>
 			</div>
 			<div class="strip">
 				{#each historyItems as it, i (it.at)}
@@ -924,10 +932,10 @@
 	></div>
 	<aside class="saijiki" aria-label="歳時記 - 語彙一覧">
 		<div class="saijiki-head">
-			<h2>歳時記 <span class="en">Saijiki</span></h2>
+			<h2>{t().saijikiTitle}</h2>
 			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label="閉じる">×</button>
 		</div>
-		<p class="saijiki-hint">語彙をクリックすると記述欄に挿入されます。</p>
+			<p class="saijiki-hint">{t().saijikiHint}</p>
 		{#each SAIJIKI as cat (cat.key)}
 			<section class="saijiki-cat">
 				<h3>{cat.label} <span class="en">{cat.en}</span></h3>
@@ -964,12 +972,43 @@
 		align-items: flex-end;
 	}
 
+	.header-right {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.4rem;
+	}
+
+	.lang-switcher {
+		display: flex;
+		gap: 0;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.lang-btn {
+		font-family: inherit;
+		font-size: 0.78rem;
+		padding: 0.2rem 0.6rem;
+		border: none;
+		border-right: 1px solid #ccc;
+		background: #fff;
+		color: #666;
+		cursor: pointer;
+	}
+
+	.lang-btn:last-child { border-right: none; }
+
+	.lang-btn.active {
+		background: #111;
+		color: #fff;
+	}
+
 	.build-badge {
 		font-size: 0.75rem;
 		color: #aaa;
 		font-variant-numeric: tabular-nums;
-		align-self: flex-start;
-		padding-top: 0.25rem;
 	}
 
 	h1 { font-size: 2rem; margin: 0; letter-spacing: 0.2em; }

@@ -124,27 +124,35 @@ def _build_user_message(ddl: str, original_text: str | None) -> str:
     return ddl
 
 
-def compose(ddl: str, *, model: str | None = None, original_text: str | None = None) -> Score:
+def compose(
+    ddl: str,
+    *,
+    model: str | None = None,
+    original_text: str | None = None,
+    system_prompt: str | None = None,
+) -> Score:
+    """system_prompt が指定された場合はスナップショットのプロンプトを使う。"""
     user_msg = _build_user_message(ddl, original_text)
+    effective_prompt = system_prompt if system_prompt is not None else SYSTEM_PROMPT
     if model:
         provider = _get_provider(model)
         if provider == "anthropic":
-            return _compose_anthropic(user_msg, model=_strip_prefix(model))
-        return _compose_openai(user_msg, model=model)
+            return _compose_anthropic(user_msg, model=_strip_prefix(model), system_prompt=effective_prompt)
+        return _compose_openai(user_msg, model=model, system_prompt=effective_prompt)
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        return _compose_openai(user_msg, model=None)
-    return _compose_anthropic(user_msg)
+        return _compose_openai(user_msg, model=None, system_prompt=effective_prompt)
+    return _compose_anthropic(user_msg, system_prompt=effective_prompt)
 
 
-def _compose_anthropic(user_msg: str, *, model: str | None = None) -> Score:
+def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> Score:
     from anthropic import Anthropic
 
     client = Anthropic()
     resp = client.messages.create(
         model=model or DEFAULT_ANTHROPIC_MODEL,
         max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT,
+        system=system_prompt,
         tools=[_submit_tool()],
         tool_choice={"type": "tool", "name": "submit_score"},
         messages=[{"role": "user", "content": user_msg}],
@@ -155,7 +163,7 @@ def _compose_anthropic(user_msg: str, *, model: str | None = None) -> Score:
     raise RuntimeError("Anthropic did not return submit_score tool call")
 
 
-def _compose_openai(user_msg: str, *, model: str | None = None) -> Score:
+def _compose_openai(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> Score:
     from openai import OpenAI
 
     model = model or os.getenv("OPENAI_MODEL", "qwen-api")
@@ -183,7 +191,7 @@ def _compose_openai(user_msg: str, *, model: str | None = None) -> Score:
         max_tokens=MAX_TOKENS,
         temperature=0.0,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg},
         ],
         tools=[tool],

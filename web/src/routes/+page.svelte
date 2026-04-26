@@ -69,6 +69,13 @@
 	let stage2Model = $state<string>(DEFAULT_MODEL);
 	let includeThinking = $state(false);
 
+	// ── Snapshots ───────────────────────────────────────────
+	type SnapshotMeta = { id: string; name: string; at: number };
+	let snapshots = $state<SnapshotMeta[]>([]);
+	let activeSnapshotId = $state<string | null>(null);
+	let newSnapshotName = $state('');
+	let snapshotPanelOpen = $state(false);
+
 	// ── Timer ───────────────────────────────────────────────
 	let elapsedStage1Ms = $state(0);
 	let elapsedStage2Ms = $state(0);
@@ -118,7 +125,7 @@
 		const r1 = await fetch('/api/interpret', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text, model: stage1Model, include_thinking: includeThinking })
+			body: JSON.stringify({ text, model: stage1Model, include_thinking: includeThinking, snapshot_id: activeSnapshotId })
 		});
 		if (!r1.ok) {
 			const d = await r1.json().catch(() => ({})) as { detail?: string };
@@ -131,7 +138,7 @@
 		const r2 = await fetch('/api/compose', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text })
+			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, snapshot_id: activeSnapshotId })
 		});
 		if (!r2.ok) {
 			const d = await r2.json().catch(() => ({})) as { detail?: string };
@@ -361,9 +368,47 @@
 		try { localStorage.setItem(MODEL_STAGE2_KEY, v); } catch {}
 	}
 
+	// ── Snapshots ───────────────────────────────────────────
+	async function fetchSnapshots() {
+		try {
+			const r = await fetch('/api/saijiki/snapshots');
+			if (r.ok) snapshots = await r.json();
+		} catch {}
+	}
+
+	async function saveSnapshot() {
+		const name = newSnapshotName.trim();
+		if (!name) return;
+		try {
+			const r = await fetch('/api/saijiki/snapshots', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name })
+			});
+			if (r.ok) {
+				newSnapshotName = '';
+				await fetchSnapshots();
+			}
+		} catch {}
+	}
+
+	async function deleteSnapshot(id: string) {
+		try {
+			await fetch(`/api/saijiki/snapshots/${id}`, { method: 'DELETE' });
+			if (activeSnapshotId === id) activeSnapshotId = null;
+			await fetchSnapshots();
+		} catch {}
+	}
+
+	const activeSnapshotName = $derived(
+		activeSnapshotId
+			? (snapshots.find((s) => s.id === activeSnapshotId)?.name ?? '?')
+			: '現在の設定'
+	);
+
 	// ── Mount ───────────────────────────────────────────────
 	onMount(async () => {
-		await fetchHistoryPage(0);
+		await Promise.all([fetchHistoryPage(0), fetchSnapshots()]);
 		if (historyItems.length > 0) loadIteration(0);
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null;
@@ -441,6 +486,59 @@
 				<input type="checkbox" bind:checked={includeThinking} />
 				<span>思考を表示</span>
 			</label>
+		{/if}
+	</div>
+
+	<div class="snapshot-row">
+		<span class="snapshot-label">歳時記:</span>
+		<button
+			class="snapshot-active-btn"
+			class:snapshot-default={!activeSnapshotId}
+			onclick={() => (snapshotPanelOpen = !snapshotPanelOpen)}
+		>{activeSnapshotName} ▾</button>
+
+		{#if snapshotPanelOpen}
+			<div class="snapshot-panel">
+				<div class="snapshot-save-row">
+					<input
+						class="snapshot-name-input"
+						type="text"
+						bind:value={newSnapshotName}
+						placeholder="スナップショット名 (例: 歳時記v1)"
+						onkeydown={(e) => { if (e.key === 'Enter') saveSnapshot(); }}
+					/>
+					<button class="snapshot-save-btn" onclick={saveSnapshot} disabled={!newSnapshotName.trim()}>現在を保存</button>
+				</div>
+				<div class="snapshot-list">
+					<label class="snapshot-item">
+						<input
+							type="radio"
+							name="snapshot"
+							checked={!activeSnapshotId}
+							onchange={() => (activeSnapshotId = null)}
+						/>
+						<span class="snapshot-item-name">現在の設定</span>
+					</label>
+					{#each snapshots as snap (snap.id)}
+						<div class="snapshot-item">
+							<label>
+								<input
+									type="radio"
+									name="snapshot"
+									checked={activeSnapshotId === snap.id}
+									onchange={() => (activeSnapshotId = snap.id)}
+								/>
+								<span class="snapshot-item-name">{snap.name}</span>
+								<span class="snapshot-item-date">{new Date(snap.at).toLocaleDateString('ja-JP')}</span>
+							</label>
+							<button class="snapshot-delete-btn" onclick={() => deleteSnapshot(snap.id)}>✕</button>
+						</div>
+					{/each}
+					{#if snapshots.length === 0}
+						<p class="snapshot-empty">保存済みスナップショットはありません</p>
+					{/if}
+				</div>
+			</div>
 		{/if}
 	</div>
 
@@ -776,6 +874,135 @@
 		font-size: 0.85rem;
 		color: #666;
 		cursor: pointer;
+	}
+
+	/* ── Snapshot row ──────────────────────────────────────── */
+	.snapshot-row {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		margin-bottom: 1.5rem;
+		position: relative;
+		font-size: 0.85rem;
+	}
+
+	.snapshot-label {
+		color: #888;
+		white-space: nowrap;
+		padding-top: 0.3rem;
+	}
+
+	.snapshot-active-btn {
+		font-family: inherit;
+		font-size: 0.85rem;
+		padding: 0.25rem 0.6rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		background: #fff;
+		color: #333;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.snapshot-active-btn.snapshot-default {
+		color: #888;
+	}
+
+	.snapshot-panel {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		z-index: 200;
+		background: #fff;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		padding: 0.75rem;
+		min-width: 320px;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+	}
+
+	.snapshot-save-row {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.snapshot-name-input {
+		flex: 1;
+		font-family: inherit;
+		font-size: 0.85rem;
+		padding: 0.25rem 0.5rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+	}
+
+	.snapshot-save-btn {
+		font-family: inherit;
+		font-size: 0.82rem;
+		padding: 0.25rem 0.6rem;
+		border: 1px solid #999;
+		border-radius: 3px;
+		background: #f0f0f0;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.snapshot-save-btn:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	.snapshot-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		max-height: 200px;
+		overflow-y: auto;
+	}
+
+	.snapshot-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.4rem;
+		font-size: 0.85rem;
+	}
+
+	.snapshot-item label {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		cursor: pointer;
+		flex: 1;
+	}
+
+	.snapshot-item-name {
+		font-weight: 500;
+	}
+
+	.snapshot-item-date {
+		color: #aaa;
+		font-size: 0.78rem;
+	}
+
+	.snapshot-delete-btn {
+		border: none;
+		background: none;
+		color: #bbb;
+		font-size: 0.8rem;
+		cursor: pointer;
+		padding: 0 0.2rem;
+		line-height: 1;
+	}
+
+	.snapshot-delete-btn:hover {
+		color: #e55;
+	}
+
+	.snapshot-empty {
+		color: #aaa;
+		font-size: 0.82rem;
+		margin: 0.25rem 0;
 	}
 
 	/* ── Layout ────────────────────────────────────────────── */

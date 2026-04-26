@@ -367,10 +367,11 @@ def _select_examples(text: str, k: int = 5) -> str:
     )
 
 
-def _build_system_prompt(text: str, k: int = 5) -> str:
+def _build_system_prompt(text: str, k: int = 5, prefix_override: str | None = None) -> str:
     """推論ごとのシステムプロンプトを構築する (PREFIX + 動的例 k 件)。"""
     examples = _select_examples(text, k=k)
-    return SYSTEM_PROMPT_PREFIX + "\n\n# 変換例\n\n" + examples
+    prefix = prefix_override if prefix_override is not None else SYSTEM_PROMPT_PREFIX
+    return prefix + "\n\n# 変換例\n\n" + examples
 
 
 def _get_provider(model: str) -> str:
@@ -398,9 +399,10 @@ def interpret_detail(
     *,
     model: str | None = None,
     include_thinking: bool = False,
+    system_prompt_prefix: str | None = None,
 ) -> tuple[str, str | None]:
-    """(ddl, thinking) を返す。"""
-    system_prompt = _build_system_prompt(text)
+    """(ddl, thinking) を返す。system_prompt_prefix が指定された場合はスナップショットのプレフィックスを使う。"""
+    system_prompt = _build_system_prompt(text, prefix_override=system_prompt_prefix)
 
     if model:
         provider = _get_provider(model)

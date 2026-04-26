@@ -46,6 +46,13 @@ export interface LangPack {
 	tabPrompts: string;
 	tabScore: string;
 
+	// Input
+	clearInputBtn: string;
+
+	// DDL edit
+	ddlEditBtn: string;
+	ddlDoneBtn: string;
+
 	// Canvas
 	canvasPlaceholder: string;
 

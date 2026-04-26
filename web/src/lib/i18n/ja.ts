@@ -21,6 +21,10 @@ export const ja: LangPack = {
 	saveCurrentBtn: '現在を保存',
 	snapshotNamePlaceholder: 'スナップショット名 (例: 歳時記v1)',
 
+	clearInputBtn: 'クリア',
+	ddlEditBtn: '編集',
+	ddlDoneBtn: '完了',
+
 	modeSingle: '記述',
 	modeBatch: 'バッチ',
 	inputPlaceholder: '山の向こうに月が昇る',

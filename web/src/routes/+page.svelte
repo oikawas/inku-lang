@@ -13,7 +13,7 @@
 
 	declare const __BUILD_NUMBER__: string;
 
-	const HISTORY_PAGE_SIZE = 10;
+	const HISTORY_PAGE_SIZE = 20;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
@@ -68,6 +68,8 @@
 	// ── UI ──────────────────────────────────────────────────
 	let saijikiOpen = $state(false);
 	let outputTab = $state<'canvas' | 'prompts' | 'score'>('canvas');
+	let ddlEditing = $state(false);
+	let baseDDL = $state<string | null>(null);
 
 	// ── Models ──────────────────────────────────────────────
 	let stage1Provider = $state<Provider>(DEFAULT_PROVIDER);
@@ -184,6 +186,8 @@
 		error = null;
 		ddl = null;
 		thinking = null;
+		baseDDL = null;
+		ddlEditing = false;
 		elapsedStage1Ms = 0;
 		elapsedStage2Ms = 0;
 		elapsedTotalMs = 0;
@@ -311,26 +315,54 @@
 		historyCursor = 0;
 	}
 
-	async function clearHistory(): Promise<void> {
-		try {
-			await fetch('/api/history', { method: 'DELETE' });
-		} catch {
-			// ignore
+	function clearInput() {
+		if (inputMode === 'single') input = '';
+		else batchInput = '';
+	}
+
+	type DiffPart = { text: string; changed: boolean };
+
+	function diffDDL(base: string, current: string): DiffPart[] {
+		const m = base.length, n = current.length;
+		const dp: Uint16Array[] = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+		for (let i = 1; i <= m; i++) {
+			for (let j = 1; j <= n; j++) {
+				dp[i][j] = base[i - 1] === current[j - 1]
+					? dp[i - 1][j - 1] + 1
+					: Math.max(dp[i - 1][j], dp[i][j - 1]);
+			}
 		}
-		historyItems = [];
-		historyTotal = 0;
-		historyPage = 0;
-		historyCursor = -1;
-		result = null;
-		ddl = null;
+		const chars: DiffPart[] = [];
+		let i = m, j = n;
+		while (i > 0 || j > 0) {
+			if (i > 0 && j > 0 && base[i - 1] === current[j - 1]) {
+				chars.push({ text: current[j - 1], changed: false });
+				i--; j--;
+			} else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+				chars.push({ text: current[j - 1], changed: true });
+				j--;
+			} else {
+				i--;
+			}
+		}
+		chars.reverse();
+		const parts: DiffPart[] = [];
+		for (const c of chars) {
+			const last = parts[parts.length - 1];
+			if (last && last.changed === c.changed) last.text += c.text;
+			else parts.push({ text: c.text, changed: c.changed });
+		}
+		return parts;
 	}
 
 	function loadIteration(idx: number) {
 		if (idx < 0 || idx >= historyItems.length) return;
 		historyCursor = idx;
+		ddlEditing = false;
 		const it = historyItems[idx];
 		input = it.input;
 		ddl = it.ddl;
+		baseDDL = it.ddl;
 		thinking = it.thinking ?? null;
 		result = {
 			score: it.score,
@@ -704,11 +736,16 @@
 						onclick={() => (inputMode = 'batch')}
 					>{t().modeBatch}</button>
 				</div>
-				<button
-					class="saijiki-toggle"
-					aria-expanded={saijikiOpen}
-					onclick={() => (saijikiOpen = !saijikiOpen)}
-				>{t().saijikiToggleBtn}</button>
+				<div class="input-header-right">
+					{#if (inputMode === 'single' ? input : batchInput)}
+						<button class="clear-input-btn" onclick={clearInput}>{t().clearInputBtn}</button>
+					{/if}
+					<button
+						class="saijiki-toggle"
+						aria-expanded={saijikiOpen}
+						onclick={() => (saijikiOpen = !saijikiOpen)}
+					>{t().saijikiToggleBtn}</button>
+				</div>
 			</div>
 
 			{#if inputMode === 'single'}
@@ -797,18 +834,35 @@
 
 			{#if ddl}
 				<div class="interpreted">
-					<label for="ddl-interpret">{t().ddlLabel}</label>
-					<div id="ddl-interpret" class="annot-box ddl-box">
-						{#each annotate(ddl) as part, i (i)}
-							{#if part.kind === 'saijiki'}
-								<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
-							{:else if part.kind === 'emotion'}
-								<span class="tok tok-emotion">{part.text}</span>
-							{:else}
-								<span class="tok tok-plain">{part.text}</span>
-							{/if}
-						{/each}
+					<div class="ddl-label-row">
+						<label for="ddl-interpret">{t().ddlLabel}</label>
+						{#if historyCursor >= 0}
+							<button class="ddl-edit-btn" onclick={() => (ddlEditing = !ddlEditing)}>
+								{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}
+							</button>
+						{/if}
 					</div>
+					{#if ddlEditing}
+						<textarea class="ddl-edit-ta" bind:value={ddl} rows="4" spellcheck="false"></textarea>
+					{:else}
+						<div id="ddl-interpret" class="annot-box ddl-box">
+							{#if baseDDL !== null && baseDDL !== ddl}
+								{#each diffDDL(baseDDL, ddl) as part, i (i)}
+									<span class={part.changed ? 'tok tok-diff-added' : 'tok tok-plain'}>{part.text}</span>
+								{/each}
+							{:else}
+								{#each annotate(ddl) as part, i (i)}
+									{#if part.kind === 'saijiki'}
+										<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
+									{:else if part.kind === 'emotion'}
+										<span class="tok tok-emotion">{part.text}</span>
+									{:else}
+										<span class="tok tok-plain">{part.text}</span>
+									{/if}
+								{/each}
+							{/if}
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</section>
@@ -913,7 +967,6 @@
 					>{ t().historyOlderPage }</button>
 					</div>
 				{/if}
-				<button class="clear-btn" onclick={clearHistory}>{t().historyClearBtn}</button>
 			</div>
 			<div class="strip">
 				{#each historyItems as it, i (it.at)}
@@ -1218,6 +1271,24 @@
 		margin-bottom: 0.5rem;
 	}
 
+	.input-header-right {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.clear-input-btn {
+		font-family: inherit;
+		font-size: 0.78rem;
+		padding: 0.25rem 0.55rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		background: #fff;
+		color: #888;
+		cursor: pointer;
+	}
+	.clear-input-btn:hover { color: #a2342a; border-color: #a2342a; }
+
 	.input-mode-tabs {
 		display: flex;
 		gap: 0;
@@ -1372,9 +1443,44 @@
 
 	.ddl-box { border-left: 3px solid #888; border-radius: 0 4px 4px 0; }
 
+	.ddl-label-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.5rem;
+	}
+	.ddl-label-row label { margin-bottom: 0; }
+
+	.ddl-edit-btn {
+		font-family: inherit;
+		font-size: 0.75rem;
+		padding: 0.15rem 0.45rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		background: #fff;
+		color: #666;
+		cursor: pointer;
+	}
+	.ddl-edit-btn:hover { background: #111; color: #fff; border-color: #111; }
+
+	.ddl-edit-ta {
+		width: 100%;
+		box-sizing: border-box;
+		font-family: inherit;
+		font-size: 0.95rem;
+		line-height: 1.9;
+		padding: 0.75rem;
+		border: 1px solid #bbb;
+		border-left: 3px solid #888;
+		border-radius: 0 4px 4px 0;
+		background: #fff;
+		resize: vertical;
+	}
+
 	.tok { transition: color 0.15s; }
 	.tok-saijiki { color: #2c3e91; font-weight: 500; }
 	.tok-plain { color: #9a9a9a; }
+	.tok-diff-added { color: #a2342a; font-weight: 500; }
 	.tok-emotion {
 		color: #c9a08a;
 		font-style: italic;
@@ -1580,22 +1686,11 @@
 
 	.muted { color: #aaa; font-weight: normal; font-size: 0.85rem; margin-left: 0.25rem; }
 
-	.clear-btn {
-		background: transparent;
-		border: 1px solid #ccc;
-		color: #888;
-		padding: 0.3rem 0.7rem;
-		border-radius: 3px;
-		cursor: pointer;
-		font-size: 0.8rem;
-		font-family: inherit;
-	}
-
-	.clear-btn:hover { color: #a2342a; border-color: #a2342a; }
-
 	.strip {
-		display: flex;
-		gap: 0.75rem;
+		display: grid;
+		grid-template-columns: repeat(10, 96px);
+		grid-template-rows: repeat(2, auto);
+		gap: 0.5rem;
 		overflow-x: auto;
 		padding-bottom: 0.5rem;
 	}

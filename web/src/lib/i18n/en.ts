@@ -21,6 +21,10 @@ export const en: LangPack = {
 	saveCurrentBtn: 'save current',
 	snapshotNamePlaceholder: 'snapshot name (e.g. saijiki-v1)',
 
+	clearInputBtn: 'clear',
+	ddlEditBtn: 'edit',
+	ddlDoneBtn: 'done',
+
 	modeSingle: 'describe',
 	modeBatch: 'batch',
 	inputPlaceholder: 'A moon rises beyond the mountains',

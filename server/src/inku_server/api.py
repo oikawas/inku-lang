@@ -13,7 +13,6 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from threading import Lock
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,36 +28,12 @@ from .interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
 from .interpreter import SYSTEM_PROMPT_PREFIX as STAGE1_PREFIX
 from .renderer import render
 from .schema import Score
+from . import db as _db
 from . import snapshots as _snapshots
 
 app = FastAPI(title="inku-server", version="0.1.0")
 
-# ── 履歴ストレージ ──────────────────────────────────────────────────────────────
-_DEFAULT_HISTORY_FILE = Path.home() / ".local" / "share" / "inku" / "history.json"
-_HISTORY_FILE = Path(os.getenv("INKU_HISTORY_FILE", str(_DEFAULT_HISTORY_FILE)))
-_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
-_history: list[dict] = []
-_history_lock = Lock()
-
-
-def _load_history() -> None:
-    global _history
-    if not _HISTORY_FILE.exists():
-        return
-    try:
-        _history = json.loads(_HISTORY_FILE.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
-        _history = []
-
-
-def _save_history() -> None:
-    try:
-        _HISTORY_FILE.write_text(json.dumps(_history), encoding="utf-8")
-    except Exception:  # noqa: BLE001
-        pass
-
-
-_load_history()
+_db.init_db()
 
 # ── 出力ファイル保存 ────────────────────────────────────────────────────────────
 _DEFAULT_OUTPUT_DIR = Path.home() / ".local" / "share" / "inku" / "outputs"
@@ -67,30 +42,30 @@ _OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
 _save_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-save")
 
 
-def _save_output(item_id: str, at_ms: int, input_text: str, ddl: str | None, score: dict, svg: str) -> None:
+def _output_prefix(item_id: str, at_ms: int) -> Path:
+    dt = datetime.fromtimestamp(at_ms / 1000, tz=timezone.utc).astimezone()
+    date_dir = _OUTPUT_DIR / dt.strftime("%Y-%m-%d")
+    return date_dir / (dt.strftime("%Y%m%d_%H%M%S") + "_" + item_id[:8])
+
+
+def _save_output_files(prefix: Path, input_text: str, ddl: str | None, score: dict, svg: str) -> None:
     try:
         import cairosvg  # lazy import — optional dependency
     except ImportError:
         return
-
-    dt = datetime.fromtimestamp(at_ms / 1000, tz=timezone.utc).astimezone()
-    date_dir = _OUTPUT_DIR / dt.strftime("%Y-%m-%d")
-    date_dir.mkdir(parents=True, exist_ok=True)
-
-    prefix = dt.strftime("%Y%m%d_%H%M%S") + "_" + item_id[:8]
-
     try:
+        prefix.parent.mkdir(parents=True, exist_ok=True)
         if input_text:
-            (date_dir / f"{prefix}_instruction.txt").write_text(input_text, encoding="utf-8")
+            Path(f"{prefix}_instruction.txt").write_text(input_text, encoding="utf-8")
         if ddl:
-            (date_dir / f"{prefix}_normalized.ddl").write_text(ddl, encoding="utf-8")
-        (date_dir / f"{prefix}_score.json").write_text(
+            Path(f"{prefix}_normalized.ddl").write_text(ddl, encoding="utf-8")
+        Path(f"{prefix}_score.json").write_text(
             json.dumps(score, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         svg_bytes = svg.encode("utf-8")
-        (date_dir / f"{prefix}_output.svg").write_bytes(svg_bytes)
+        Path(f"{prefix}_output.svg").write_bytes(svg_bytes)
         png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=_OUTPUT_PNG_SIZE)
-        (date_dir / f"{prefix}_output.png").write_bytes(png_bytes)
+        Path(f"{prefix}_output.png").write_bytes(png_bytes)
     except Exception:  # noqa: BLE001
         pass
 
@@ -184,6 +159,7 @@ class HistoryPostBody(BaseModel):
 
 class HistoryItem(HistoryPostBody):
     id: str
+    output_path: str | None = None
 
 
 class HistoryListResponse(BaseModel):
@@ -328,30 +304,28 @@ def api_history_get(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
 ) -> HistoryListResponse:
-    with _history_lock:
-        items_newest_first = list(reversed(_history))
-        total = len(items_newest_first)
-        page = items_newest_first[offset : offset + limit]
-    return HistoryListResponse(items=page, total=total, offset=offset, limit=limit)
+    items, total = _db.list_items(offset=offset, limit=limit)
+    return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
 @app.post("/api/history", response_model=HistoryItem)
 def api_history_post(body: HistoryPostBody) -> HistoryItem:
-    item = HistoryItem(id=str(uuid.uuid4()), **body.model_dump())
-    with _history_lock:
-        _history.append(item.model_dump())
-        _save_history()
+    item_id = str(uuid.uuid4())
+    prefix = _output_prefix(item_id, body.at)
+    item_dict = _db.add_item({
+        "id": item_id,
+        "output_path": str(prefix),
+        **body.model_dump(),
+    })
     _save_executor.submit(
-        _save_output, item.id, item.at, item.input, item.ddl, item.score, item.svg
+        _save_output_files, prefix, body.input, body.ddl, body.score, body.svg
     )
-    return item
+    return HistoryItem(**item_dict)
 
 
 @app.delete("/api/history")
 def api_history_delete() -> dict[str, bool]:
-    with _history_lock:
-        _history.clear()
-        _save_history()
+    _db.delete_all()
     return {"ok": True}
 
 

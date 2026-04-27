@@ -264,18 +264,19 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     return _apply_color_cycle([ins], arr.color_cycle)
 
 
-def render(score: Score) -> str:
+def render(score: Score, color_map: dict[str, str] | None = None) -> str:
+    cmap = {**COLOR_MAP, **(color_map or {})}
     dwg = svgwrite.Drawing(
         size=(CANVAS_PX, CANVAS_PX),
         viewBox=f"0 0 {CANVAS_PX} {CANVAS_PX}",
     )
-    bg = COLOR_MAP.get(score.background, BACKGROUND)
+    bg = cmap.get(score.background, BACKGROUND)
     dwg.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX), fill=bg))
 
     for ins in score.instructions:
         expanded = _expand_arrangement(ins) if ins.arrangement else [ins]
         for single in expanded:
-            element = _render_instruction(dwg, single)
+            element = _render_instruction(dwg, single, cmap)
             if element is not None:
                 dwg.add(element)
 
@@ -285,12 +286,12 @@ def render(score: Score) -> str:
 _CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})
 
 
-def _stroke_attrs(ins: Instruction) -> dict:
+def _stroke_attrs(ins: Instruction, cmap: dict[str, str]) -> dict:
     do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled
     attrs = {
-        "stroke": COLOR_MAP[ins.color],
+        "stroke": cmap[ins.color],
         "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight],
-        "fill": COLOR_MAP[ins.color] if do_fill else "none",
+        "fill": cmap[ins.color] if do_fill else "none",
         "stroke_linecap": "round",
     }
     dash = STYLE_TO_DASH[ins.style]
@@ -327,8 +328,8 @@ def _arc_path_d(cx: float, cy: float, r: float, start_deg: float, end_deg: float
     )
 
 
-def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction):
-    attrs = _stroke_attrs(ins)
+def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str, str] = COLOR_MAP):
+    attrs = _stroke_attrs(ins, cmap)
 
     if ins.primitive == "line":
         start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0))

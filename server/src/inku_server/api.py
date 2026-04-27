@@ -87,6 +87,7 @@ class ComposeRequest(BaseModel):
     original_text: str | None = Field(default=None, description="元のユーザー記述 (省略可)")
     snapshot_id: str | None = Field(default=None, description="歳時記スナップショット ID")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
+    color_map: dict[str, str] | None = Field(default=None, description="色カタログ (white/black/blue/red/green/gray → hex)")
 
 
 class ComposeResponse(BaseModel):
@@ -122,6 +123,7 @@ class PaintRequest(BaseModel):
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
+    color_map: dict[str, str] | None = Field(default=None, description="色カタログ")
 
 
 class PaintResponse(BaseModel):
@@ -207,7 +209,7 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
     score = coerce_score(score)
 
     try:
-        svg = render(score)
+        svg = render(score, color_map=req.color_map)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
 
@@ -254,7 +256,7 @@ def api_paint(req: PaintRequest) -> PaintResponse:
 
     t2 = time.perf_counter()
     try:
-        svg = render(score)
+        svg = render(score, color_map=req.color_map)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
     elapsed_stage1_ms = int((t1 - t0) * 1000)

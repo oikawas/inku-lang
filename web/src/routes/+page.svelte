@@ -10,14 +10,16 @@
 		type Provider
 	} from '$lib/models';
 	import { t, setLang, getLang, PACK_LIST, initLang } from '$lib/i18n/index.svelte';
+	import { COLOR_CATALOGS, getColorMap, type ColorMap } from '$lib/colors';
 
 	declare const __BUILD_NUMBER__: string;
 
 	const HISTORY_PAGE_SIZE = 20;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
-	const MODEL_STAGE1_KEY = 'inku-model-stage1';
+	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
-	const MODEL_STAGE2_KEY = 'inku-model-stage2';
+	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
+	const CATALOG_KEY         = 'inku-color-catalog';
 
 	type Score = { instructions: unknown[] };
 
@@ -49,71 +51,90 @@
 	};
 
 	// ── Input ───────────────────────────────────────────────
-	let inputMode = $state<'single' | 'batch'>('single');
-	let input = $state('山の向こうに月が昇る');
-	let batchInput = $state('');
-	let textareaEl = $state<HTMLTextAreaElement | null>(null);
+	let inputMode   = $state<'single' | 'batch'>('single');
+	let input       = $state('山の向こうに月が昇る');
+	let batchInput  = $state('');
+	let textareaEl  = $state<HTMLTextAreaElement | null>(null);
 
 	// ── Loading ─────────────────────────────────────────────
-	let loading = $state(false);
+	let loading    = $state(false);
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
-	let batchTotal = $state(0);
-	let error = $state<string | null>(null);
+	let batchTotal   = $state(0);
+	let error        = $state<string | null>(null);
+
+	// ── Replay ──────────────────────────────────────────────
+	let reloading   = $state(false);
+	let reloadError = $state<string | null>(null);
 
 	// ── Result ──────────────────────────────────────────────
-	let ddl = $state<string | null>(null);
+	let ddl      = $state<string | null>(null);
 	let thinking = $state<string | null>(null);
-	let result = $state<PaintResult | null>(null);
+	let result   = $state<PaintResult | null>(null);
 
 	// ── UI ──────────────────────────────────────────────────
-	let saijikiOpen = $state(false);
-	let outputTab = $state<'canvas' | 'prompts' | 'score'>('canvas');
-	let ddlEditing = $state(false);
-	let baseDDL = $state<string | null>(null);
+	let saijikiOpen  = $state(false);
+	let settingsOpen = $state(false);
+	let pngMenuOpen  = $state(false);
+	let catalogOpen  = $state(false);
+	let statsOpen    = $state(false);
+	let outputTab    = $state<'canvas' | 'prompts' | 'score'>('canvas');
+	let ddlEditing   = $state(false);
+	let baseDDL      = $state<string | null>(null);
+	let zoom         = $state(1);
+
+	// DOM refs for outside-click handling
+	let settingsWrapEl = $state<HTMLDivElement | null>(null);
+	let pngWrapEl      = $state<HTMLDivElement | null>(null);
+
+	// ── Color catalog ────────────────────────────────────────
+	let selectedCatalog = $state('default');
+
+	function activeColorMap(): ColorMap | null {
+		if (selectedCatalog === 'default') return null;
+		return getColorMap(selectedCatalog);
+	}
 
 	// ── Models ──────────────────────────────────────────────
-	let stage1Provider = $state<Provider>(DEFAULT_PROVIDER);
-	let stage1Model = $state<string>(DEFAULT_MODEL);
-	let stage2Provider = $state<Provider>(DEFAULT_PROVIDER);
-	let stage2Model = $state<string>(DEFAULT_MODEL);
+	let stage1Provider  = $state<Provider>(DEFAULT_PROVIDER);
+	let stage1Model     = $state<string>(DEFAULT_MODEL);
+	let stage2Provider  = $state<Provider>(DEFAULT_PROVIDER);
+	let stage2Model     = $state<string>(DEFAULT_MODEL);
 	let includeThinking = $state(false);
 
 	// ── Snapshots ───────────────────────────────────────────
 	type SnapshotMeta = { id: string; name: string; at: number };
-	let snapshots = $state<SnapshotMeta[]>([]);
+	let snapshots       = $state<SnapshotMeta[]>([]);
 	let activeSnapshotId = $state<string | null>(null);
-	let newSnapshotName = $state('');
-	let snapshotPanelOpen = $state(false);
 
 	// ── Timer ───────────────────────────────────────────────
 	let elapsedStage1Ms = $state(0);
 	let elapsedStage2Ms = $state(0);
-	let elapsedTotalMs = $state(0);
-	let liveMs = $state(0);
-	let _timerStart = 0;
+	let elapsedTotalMs  = $state(0);
+	let liveMs          = $state(0);
+	let _timerStart     = 0;
 	let _timerHandle: ReturnType<typeof setInterval> | null = null;
 
 	// ── Tokens ──────────────────────────────────────────────
-	let tokensInStage1 = $state<number | null>(null);
+	let tokensInStage1  = $state<number | null>(null);
 	let tokensOutStage1 = $state<number | null>(null);
-	let tokensInStage2 = $state<number | null>(null);
+	let tokensInStage2  = $state<number | null>(null);
 	let tokensOutStage2 = $state<number | null>(null);
 
 	// ── History ─────────────────────────────────────────────
 	let historyItems = $state<Iteration[]>([]);
 	let historyTotal = $state(0);
-	let historyPage = $state(0);
+	let historyPage  = $state(0);
 	let historyCursor = $state(-1);
 	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
 	// ── Batch derived ────────────────────────────────────────
-	const batchLines = $derived(batchInput.split('\n'));
+	const batchLines    = $derived(batchInput.split('\n'));
 	const lineNumbersText = $derived(batchLines.map((_, i) => String(i + 1)).join('\n'));
 	const batchNonEmpty = $derived(batchLines.filter((l) => l.trim()).length);
-	const canSubmit = $derived(
+	const canSubmit     = $derived(
 		inputMode === 'single' ? !!input.trim() : batchNonEmpty > 0
 	);
 
@@ -121,24 +142,18 @@
 	function startTimer() {
 		_timerStart = Date.now();
 		liveMs = 0;
-		_timerHandle = setInterval(() => {
-			liveMs = Date.now() - _timerStart;
-		}, 100);
+		_timerHandle = setInterval(() => { liveMs = Date.now() - _timerStart; }, 100);
 	}
-
 	function stopTimer() {
-		if (_timerHandle !== null) {
-			clearInterval(_timerHandle);
-			_timerHandle = null;
-		}
+		if (_timerHandle !== null) { clearInterval(_timerHandle); _timerHandle = null; }
 	}
 
-	// ── Core paint function (2-stage call) ──────────────────
+	// ── Core paint (2-stage) ─────────────────────────────────
 	async function paintOne(text: string): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
-		const t0 = Date.now();
+		const t0  = Date.now();
 		const lang = getLang();
-
 		stageLabel = t().stageInterpreting;
+
 		const r1 = await fetch('/api/interpret', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -148,132 +163,101 @@
 			const d = await r1.json().catch(() => ({})) as { detail?: string };
 			throw new Error(d.detail ?? `HTTP ${r1.status}`);
 		}
-		const d1 = (await r1.json()) as { ddl: string; thinking: string | null; tokens_in: number | null; tokens_out: number | null };
-		const t1 = Date.now();
+		const d1 = await r1.json() as { ddl: string; thinking: string | null; tokens_in: number | null; tokens_out: number | null };
+		const t1  = Date.now();
 		const tokLabel = d1.tokens_in != null ? ` (${d1.tokens_in}→${d1.tokens_out ?? '?'}tok)` : '';
 
 		stageLabel = t().stageStructuring(tokLabel);
 		const r2 = await fetch('/api/compose', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, snapshot_id: activeSnapshotId, lang })
+			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, snapshot_id: activeSnapshotId, lang, color_map: activeColorMap() })
 		});
 		if (!r2.ok) {
 			const d = await r2.json().catch(() => ({})) as { detail?: string };
 			throw new Error(d.detail ?? `HTTP ${r2.status}`);
 		}
-		const d2 = (await r2.json()) as { score: Score; svg: string; tokens_in: number | null; tokens_out: number | null };
-		const t2 = Date.now();
+		const d2 = await r2.json() as { score: Score; svg: string; tokens_in: number | null; tokens_out: number | null };
+		const t2  = Date.now();
 
 		return {
-			ddl: d1.ddl,
-			thinking: d1.thinking,
-			score: d2.score,
-			svg: d2.svg,
-			elapsed_stage1_ms: t1 - t0,
-			elapsed_stage2_ms: t2 - t1,
-			elapsed_total_ms: t2 - t0,
-			tokens_in_stage1: d1.tokens_in,
-			tokens_out_stage1: d1.tokens_out,
-			tokens_in_stage2: d2.tokens_in,
-			tokens_out_stage2: d2.tokens_out,
+			ddl: d1.ddl, thinking: d1.thinking, score: d2.score, svg: d2.svg,
+			elapsed_stage1_ms: t1 - t0, elapsed_stage2_ms: t2 - t1, elapsed_total_ms: t2 - t0,
+			tokens_in_stage1: d1.tokens_in, tokens_out_stage1: d1.tokens_out,
+			tokens_in_stage2: d2.tokens_in, tokens_out_stage2: d2.tokens_out,
 		};
 	}
 
 	// ── Submit ──────────────────────────────────────────────
 	async function submit() {
 		if (!canSubmit || loading) return;
-		loading = true;
-		error = null;
-		ddl = null;
-		thinking = null;
-		baseDDL = null;
-		ddlEditing = false;
-		elapsedStage1Ms = 0;
-		elapsedStage2Ms = 0;
-		elapsedTotalMs = 0;
-		tokensInStage1 = null;
-		tokensOutStage1 = null;
-		tokensInStage2 = null;
-		tokensOutStage2 = null;
-		batchCurrent = 0;
-		batchTotal = 0;
+		loading = true; error = null;
+		ddl = null; thinking = null; baseDDL = null; ddlEditing = false;
+		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
+		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
+		batchCurrent = 0; batchTotal = 0;
 		startTimer();
 
 		try {
 			if (inputMode === 'single') {
 				const r = await paintOne(input);
-				ddl = r.ddl;
-				thinking = r.thinking;
-				result = r;
-				outputTab = 'canvas';
-				elapsedStage1Ms = r.elapsed_stage1_ms;
-				elapsedStage2Ms = r.elapsed_stage2_ms;
-				elapsedTotalMs = r.elapsed_total_ms;
-				tokensInStage1 = r.tokens_in_stage1;
-				tokensOutStage1 = r.tokens_out_stage1;
-				tokensInStage2 = r.tokens_in_stage2;
-				tokensOutStage2 = r.tokens_out_stage2;
-				const totalIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0);
+				ddl = r.ddl; thinking = r.thinking; result = r; outputTab = 'canvas';
+				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
+				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
+				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
+				const totalIn  = (r.tokens_in_stage1 ?? 0)  + (r.tokens_in_stage2 ?? 0);
 				const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-				await pushHistory({
-					input,
-					ddl: r.ddl,
-					thinking: r.thinking,
-					score: r.score,
-					svg: r.svg,
-					at: Date.now(),
-					elapsed_ms: r.elapsed_total_ms,
-					stage1_model: stage1Model,
-					stage2_model: stage2Model,
-					tokens_in: totalIn || null,
-					tokens_out: totalOut || null,
-				});
+				await pushHistory({ input, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null });
 			} else {
 				const lines = batchLines.map((l) => l.trim()).filter((l) => l);
-				batchTotal = lines.length;
-				outputTab = 'canvas';
+				batchTotal = lines.length; outputTab = 'canvas';
 				for (let i = 0; i < lines.length; i++) {
 					if (!loading) break;
 					batchCurrent = i + 1;
 					try {
 						const r = await paintOne(lines[i]);
 						result = r;
-						const totalIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0);
+						const totalIn  = (r.tokens_in_stage1 ?? 0)  + (r.tokens_in_stage2 ?? 0);
 						const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-						await pushHistory({
-							input: `#${i + 1} ${lines[i]}`,
-							ddl: r.ddl,
-							thinking: r.thinking,
-							score: r.score,
-							svg: r.svg,
-							at: Date.now(),
-							elapsed_ms: r.elapsed_total_ms,
-							stage1_model: stage1Model,
-							stage2_model: stage2Model,
-							tokens_in: totalIn || null,
-							tokens_out: totalOut || null,
-						});
-					} catch {
-						// continue with next line
-					}
+						await pushHistory({ input: `#${i + 1} ${lines[i]}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null });
+					} catch { /* continue */ }
 				}
 				elapsedTotalMs = Date.now() - _timerStart;
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			result = null;
+			error = e instanceof Error ? e.message : String(e); result = null;
 		} finally {
-			stopTimer();
-			loading = false;
-			stageLabel = '';
-			batchCurrent = 0;
-			batchTotal = 0;
+			stopTimer(); loading = false; stageLabel = ''; batchCurrent = 0; batchTotal = 0;
 		}
 	}
 
-	function stopBatch() {
-		loading = false;
+	function stopBatch() { loading = false; }
+
+	// ── Replay (Stage 2 のみ) ────────────────────────────────
+	async function replay() {
+		if (!ddl || reloading) return;
+		reloading = true; reloadError = null;
+		const lang = getLang();
+		try {
+			const r = await fetch('/api/compose', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, snapshot_id: activeSnapshotId, lang, color_map: activeColorMap() })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const d = await r.json() as { score: Score; svg: string; tokens_in: number | null; tokens_out: number | null };
+			result = result
+				? { ...result, score: d.score, svg: d.svg }
+				: { score: d.score, svg: d.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+			outputTab = 'canvas';
+		} catch (e) {
+			reloadError = e instanceof Error ? e.message : String(e);
+		} finally {
+			reloading = false;
+		}
 	}
 
 	// ── History ─────────────────────────────────────────────
@@ -283,12 +267,8 @@
 			const r = await fetch(`/api/history?offset=${offset}&limit=${HISTORY_PAGE_SIZE}`);
 			if (!r.ok) return;
 			const data = await r.json();
-			historyItems = data.items;
-			historyTotal = data.total;
-			historyPage = page;
-		} catch {
-			// ignore
-		}
+			historyItems = data.items; historyTotal = data.total; historyPage = page;
+		} catch { /* ignore */ }
 	}
 
 	async function pushHistory(it: Iteration): Promise<void> {
@@ -296,55 +276,30 @@
 			await fetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					input: it.input,
-					ddl: it.ddl,
-					score: it.score,
-					svg: it.svg,
-					at: it.at,
-					elapsed_ms: it.elapsed_ms ?? 0,
-					stage1_model: it.stage1_model ?? null,
-					stage2_model: it.stage2_model ?? null,
-					tokens_in: it.tokens_in ?? null,
-					tokens_out: it.tokens_out ?? null,
-				})
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null })
 			});
-		} catch {
-			// ignore
-		}
+		} catch { /* ignore */ }
 		await fetchHistoryPage(0);
 		historyCursor = 0;
 	}
 
 	function clearInput() {
-		if (inputMode === 'single') input = '';
-		else batchInput = '';
+		if (inputMode === 'single') input = ''; else batchInput = '';
 	}
 
 	type DiffPart = { text: string; changed: boolean };
-
 	function diffDDL(base: string, current: string): DiffPart[] {
 		const m = base.length, n = current.length;
 		const dp: Uint16Array[] = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
-		for (let i = 1; i <= m; i++) {
-			for (let j = 1; j <= n; j++) {
-				dp[i][j] = base[i - 1] === current[j - 1]
-					? dp[i - 1][j - 1] + 1
-					: Math.max(dp[i - 1][j], dp[i][j - 1]);
-			}
-		}
+		for (let i = 1; i <= m; i++)
+			for (let j = 1; j <= n; j++)
+				dp[i][j] = base[i - 1] === current[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
 		const chars: DiffPart[] = [];
 		let i = m, j = n;
 		while (i > 0 || j > 0) {
-			if (i > 0 && j > 0 && base[i - 1] === current[j - 1]) {
-				chars.push({ text: current[j - 1], changed: false });
-				i--; j--;
-			} else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-				chars.push({ text: current[j - 1], changed: true });
-				j--;
-			} else {
-				i--;
-			}
+			if (i > 0 && j > 0 && base[i - 1] === current[j - 1]) { chars.push({ text: current[j - 1], changed: false }); i--; j--; }
+			else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) { chars.push({ text: current[j - 1], changed: true }); j--; }
+			else { i--; }
 		}
 		chars.reverse();
 		const parts: DiffPart[] = [];
@@ -358,24 +313,10 @@
 
 	function loadIteration(idx: number) {
 		if (idx < 0 || idx >= historyItems.length) return;
-		historyCursor = idx;
-		ddlEditing = false;
+		historyCursor = idx; ddlEditing = false;
 		const it = historyItems[idx];
-		input = it.input;
-		ddl = it.ddl;
-		baseDDL = it.ddl;
-		thinking = it.thinking ?? null;
-		result = {
-			score: it.score,
-			svg: it.svg,
-			elapsed_stage1_ms: 0,
-			elapsed_stage2_ms: 0,
-			elapsed_total_ms: it.elapsed_ms ?? 0,
-			tokens_in_stage1: null,
-			tokens_out_stage1: null,
-			tokens_in_stage2: null,
-			tokens_out_stage2: null,
-		};
+		input = it.input; ddl = it.ddl; baseDDL = it.ddl; thinking = it.thinking ?? null;
+		result = { score: it.score, svg: it.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: it.elapsed_ms ?? 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
 		error = null;
 	}
 
@@ -386,36 +327,25 @@
 	);
 
 	async function gotoPrev() {
-		if (historyCursor < historyItems.length - 1) {
-			loadIteration(historyCursor + 1);
-		} else if (historyPage < historyTotalPages - 1) {
-			await fetchHistoryPage(historyPage + 1);
-			loadIteration(0);
-		}
+		if (historyCursor < historyItems.length - 1) { loadIteration(historyCursor + 1); }
+		else if (historyPage < historyTotalPages - 1) { await fetchHistoryPage(historyPage + 1); loadIteration(0); }
+	}
+	async function gotoNext() {
+		if (historyCursor > 0) { loadIteration(historyCursor - 1); }
+		else if (historyPage > 0) { await fetchHistoryPage(historyPage - 1); loadIteration(historyItems.length - 1); }
 	}
 
-	async function gotoNext() {
-		if (historyCursor > 0) {
-			loadIteration(historyCursor - 1);
-		} else if (historyPage > 0) {
-			await fetchHistoryPage(historyPage - 1);
-			loadIteration(historyItems.length - 1);
-		}
-	}
+	const prevDisabled = $derived(historyCursor >= historyItems.length - 1 && historyPage >= historyTotalPages - 1);
+	const nextDisabled = $derived(historyCursor <= 0 && historyPage <= 0);
+	const navPos       = $derived(historyPage * HISTORY_PAGE_SIZE + historyCursor + 1);
 
 	// ── Saijiki ─────────────────────────────────────────────
 	function insertWord(word: string) {
-		if (inputMode === 'batch') {
-			batchInput = batchInput ? batchInput + word : word;
-			return;
-		}
+		if (inputMode === 'batch') { batchInput = batchInput ? batchInput + word : word; return; }
 		const ta = textareaEl;
-		if (!ta) {
-			input = input + word;
-			return;
-		}
+		if (!ta) { input = input + word; return; }
 		const start = ta.selectionStart ?? input.length;
-		const end = ta.selectionEnd ?? input.length;
+		const end   = ta.selectionEnd   ?? input.length;
 		input = input.slice(0, start) + word + input.slice(end);
 		requestAnimationFrame(() => {
 			if (!textareaEl) return;
@@ -426,132 +356,84 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' && saijikiOpen) saijikiOpen = false;
+		if (e.key === 'Escape') { saijikiOpen = false; settingsOpen = false; catalogOpen = false; }
+	}
+
+	function handleDocClick(e: MouseEvent) {
+		if (settingsOpen && settingsWrapEl && !settingsWrapEl.contains(e.target as Node)) settingsOpen = false;
+		if (pngMenuOpen  && pngWrapEl     && !pngWrapEl.contains(e.target as Node))      pngMenuOpen  = false;
 	}
 
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
-		stage1Provider = v;
-		stage1Model = modelsForProvider(v)[0]?.id ?? stage1Model;
-		try {
-			localStorage.setItem(PROVIDER_STAGE1_KEY, v);
-			localStorage.setItem(MODEL_STAGE1_KEY, stage1Model);
-		} catch {}
+		stage1Provider = v; stage1Model = modelsForProvider(v)[0]?.id ?? stage1Model;
+		try { localStorage.setItem(PROVIDER_STAGE1_KEY, v); localStorage.setItem(MODEL_STAGE1_KEY, stage1Model); } catch {}
 	}
-
 	function setStage1Model(v: string) {
-		stage1Model = v;
-		try { localStorage.setItem(MODEL_STAGE1_KEY, v); } catch {}
+		stage1Model = v; try { localStorage.setItem(MODEL_STAGE1_KEY, v); } catch {}
 	}
-
 	function setStage2Provider(v: Provider) {
-		stage2Provider = v;
-		stage2Model = modelsForProvider(v)[0]?.id ?? stage2Model;
-		try {
-			localStorage.setItem(PROVIDER_STAGE2_KEY, v);
-			localStorage.setItem(MODEL_STAGE2_KEY, stage2Model);
-		} catch {}
+		stage2Provider = v; stage2Model = modelsForProvider(v)[0]?.id ?? stage2Model;
+		try { localStorage.setItem(PROVIDER_STAGE2_KEY, v); localStorage.setItem(MODEL_STAGE2_KEY, stage2Model); } catch {}
 	}
-
 	function setStage2Model(v: string) {
-		stage2Model = v;
-		try { localStorage.setItem(MODEL_STAGE2_KEY, v); } catch {}
+		stage2Model = v; try { localStorage.setItem(MODEL_STAGE2_KEY, v); } catch {}
 	}
 
 	// ── Download ────────────────────────────────────────────
 	function escapeXml(s: string): string {
 		return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 	}
-
-	function svgWithDesc(svg: string, text: string): string {
-		const desc = `<desc>${escapeXml(text)}</desc>`;
-		return svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
-	}
-
 	function triggerDownload(blob: Blob, filename: string) {
 		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename;
-		a.click();
+		const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
 		URL.revokeObjectURL(url);
 	}
-
-	function slugify(text: string): string {
-		return text.slice(0, 30).replace(/\s+/g, '-').replace(/[^\w\-]/g, '');
-	}
+	function slugify(text: string): string { return text.slice(0, 30).replace(/\s+/g, '-').replace(/[^\w\-]/g, ''); }
 
 	function downloadSVG() {
 		if (!result) return;
-		const svg = svgWithDesc(result.svg, input);
-		const blob = new Blob([svg], { type: 'image/svg+xml' });
-		triggerDownload(blob, `inku-${slugify(input)}.svg`);
+		const desc = `<desc>${escapeXml(input)}</desc>`;
+		const svg  = result.svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
+		triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), `inku-${slugify(input)}.svg`);
 	}
 
 	async function downloadPNG(size: number) {
 		if (!result) return;
-		// Set explicit dimensions so Image renders at correct size
 		let svg = result.svg.replace(/(<svg)([^>]*)/, (_: string, tag: string, attrs: string) => {
 			const a = attrs.replace(/\s+width="[^"]*"/g, '').replace(/\s+height="[^"]*"/g, '');
 			return `${tag}${a} width="${size}" height="${size}"`;
 		});
 		const blob = new Blob([svg], { type: 'image/svg+xml' });
-		const url = URL.createObjectURL(blob);
+		const url  = URL.createObjectURL(blob);
 		try {
 			await new Promise<void>((resolve, reject) => {
 				const canvas = document.createElement('canvas');
-				canvas.width = size;
-				canvas.height = size;
+				canvas.width = size; canvas.height = size;
 				const ctx = canvas.getContext('2d')!;
-				ctx.fillStyle = '#ffffff';
-				ctx.fillRect(0, 0, size, size);
+				ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
 				const img = new Image();
 				img.onload = () => {
 					ctx.drawImage(img, 0, 0, size, size);
 					canvas.toBlob((b) => {
 						if (!b) { reject(new Error('canvas error')); return; }
-						triggerDownload(b, `inku-${slugify(input)}-${size}.png`);
-						resolve();
+						triggerDownload(b, `inku-${slugify(input)}-${size}.png`); resolve();
 					}, 'image/png');
 				};
 				img.onerror = () => reject(new Error('svg load error'));
 				img.src = url;
 			});
-		} finally {
-			URL.revokeObjectURL(url);
-		}
+		} finally { URL.revokeObjectURL(url); }
 	}
 
 	// ── Snapshots ───────────────────────────────────────────
 	async function fetchSnapshots() {
-		try {
-			const r = await fetch('/api/saijiki/snapshots');
-			if (r.ok) snapshots = await r.json();
-		} catch {}
+		try { const r = await fetch('/api/saijiki/snapshots'); if (r.ok) snapshots = await r.json(); } catch {}
 	}
 
-	async function saveSnapshot() {
-		const name = newSnapshotName.trim();
-		if (!name) return;
-		try {
-			const r = await fetch('/api/saijiki/snapshots', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name })
-			});
-			if (r.ok) {
-				newSnapshotName = '';
-				await fetchSnapshots();
-			}
-		} catch {}
-	}
-
-	async function deleteSnapshot(id: string) {
-		try {
-			await fetch(`/api/saijiki/snapshots/${id}`, { method: 'DELETE' });
-			if (activeSnapshotId === id) activeSnapshotId = null;
-			await fetchSnapshots();
-		} catch {}
+	// ── Prompts ─────────────────────────────────────────────
+	async function fetchPrompts(): Promise<void> {
+		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
 	}
 
 	function shortModel(m: string | null | undefined): string {
@@ -562,26 +444,22 @@
 		if (m.includes('qwen3')) return 'qwen3';
 		if (m.includes('qwen')) return 'qwen';
 		if (m.includes('gemma')) return 'gemma';
-		const last = m.split('/').pop() ?? m;
-		return last.slice(0, 8);
+		return (m.split('/').pop() ?? m).slice(0, 8);
 	}
 
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
 	);
 
-	const activeSnapshotName = $derived(
-		activeSnapshotId
-			? (snapshots.find((s) => s.id === activeSnapshotId)?.name ?? '?')
-			: t().currentSetting
-	);
-
-	async function fetchPrompts(): Promise<void> {
-		try {
-			const r = await fetch(`/api/prompts?lang=${getLang()}`);
-			if (r.ok) promptsData = await r.json();
-		} catch {}
-	}
+	// ── Stats string ─────────────────────────────────────────
+	const statsLine = $derived.by(() => {
+		if (!result) return '';
+		const s1 = (result.elapsed_stage1_ms / 1000).toFixed(1);
+		const s2 = (result.elapsed_stage2_ms / 1000).toFixed(1);
+		const total = (result.elapsed_total_ms / 1000).toFixed(1);
+		if (result.elapsed_stage1_ms > 0) return `解釈 ${s1}s + 構造化 ${s2}s = ${total}s`;
+		return `${total}s`;
+	});
 
 	// ── Mount ───────────────────────────────────────────────
 	onMount(async () => {
@@ -589,1287 +467,1133 @@
 		await Promise.all([fetchHistoryPage(0), fetchSnapshots(), fetchPrompts()]);
 		if (historyItems.length > 0) loadIteration(0);
 		try {
-			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null;
-			if (p1) stage1Provider = p1;
-			const m1 = localStorage.getItem(MODEL_STAGE1_KEY);
-			if (m1) stage1Model = m1;
-			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null;
-			if (p2) stage2Provider = p2;
-			const m2 = localStorage.getItem(MODEL_STAGE2_KEY);
-			if (m2) stage2Model = m2;
+			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null; if (p1) stage1Provider = p1;
+			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
+			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
+			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
+			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
 		} catch {}
 	});
 
-	$effect(() => {
-		const _lang = getLang();
-		fetchPrompts();
-	});
+	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 </script>
 
-<main>
-	<header>
-		<div class="header-inner">
-			<div>
-				<h1>inku</h1>
-				<p class="sub">{t().subtitle}</p>
+<svelte:window onkeydown={handleKeydown} onclick={handleDocClick} />
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--  ROOT                                                       -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="root">
+
+	<!-- ══ HEADER ══ -->
+	<header class="header">
+		<div class="logo-area">
+			<div class="logo">inku</div>
+			<div class="logo-sub">{t().subtitle}</div>
+		</div>
+
+		<div class="header-right">
+			<!-- ⚙ 接続設定 popover -->
+			<div class="settings-wrap" bind:this={settingsWrapEl}>
+				<button
+					class="settings-btn"
+					class:active={settingsOpen}
+					onclick={(e) => { e.stopPropagation(); settingsOpen = !settingsOpen; }}
+				>⚙ 接続設定</button>
+
+				{#if settingsOpen}
+					<div class="settings-popover" onclick={(e) => e.stopPropagation()}>
+						<div class="popover-title">接続設定</div>
+
+						<div class="popover-group">
+							<div class="popover-group-label">{t().stage1Label}</div>
+							<div class="popover-row">
+								<span class="popover-row-label">{t().providerLabel}</span>
+								<select value={stage1Provider} onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
+									{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+								</select>
+							</div>
+							<div class="popover-row">
+								<span class="popover-row-label">{t().modelLabel}</span>
+								<select value={stage1Model} onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}>
+									{#each modelsForProvider(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
+								</select>
+							</div>
+							{#if stage1Model.includes('qwen3')}
+								<label class="popover-think-label">
+									<input type="checkbox" bind:checked={includeThinking} />
+									<span>{t().showThinkingLabel}</span>
+								</label>
+							{/if}
+						</div>
+
+						<div class="popover-group">
+							<div class="popover-group-label">{t().stage2Label}</div>
+							<div class="popover-row">
+								<span class="popover-row-label">{t().providerLabel}</span>
+								<select value={stage2Provider} onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
+									{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+								</select>
+							</div>
+							<div class="popover-row">
+								<span class="popover-row-label">{t().modelLabel}</span>
+								<select value={stage2Model} onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}>
+									{#each modelsForProvider(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
+								</select>
+							</div>
+						</div>
+
+						<!-- Saijiki snapshot -->
+						{#if snapshots.length > 0}
+							<div class="popover-group">
+								<div class="popover-group-label">{t().saijikiLabel}</div>
+								<select
+									value={activeSnapshotId ?? ''}
+									onchange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; activeSnapshotId = v || null; }}
+								>
+									<option value="">{t().currentSetting}</option>
+									{#each snapshots as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+								</select>
+							</div>
+						{/if}
+
+						<button class="popover-close" onclick={() => settingsOpen = false}>閉じる</button>
+					</div>
+				{/if}
 			</div>
-			<div class="header-right">
-				<div class="lang-switcher">
-					{#each PACK_LIST as pack (pack.code)}
-						<button
-							class="lang-btn"
-							class:active={getLang() === pack.code}
-							onclick={() => setLang(pack.code)}
-						>{pack.label}</button>
-					{/each}
-				</div>
-				<span class="build-badge">#{__BUILD_NUMBER__}</span>
+
+			<!-- Lang -->
+			<div class="lang-switcher">
+				{#each PACK_LIST as pack (pack.code)}
+					<button class="lang-btn" class:active={getLang() === pack.code} onclick={() => setLang(pack.code)}>{pack.label}</button>
+				{/each}
 			</div>
+
+			<!-- カタログ設定 -->
+			<button class="header-link" onclick={() => catalogOpen = true}>カタログ設定</button>
+			<span class="header-sep">|</span>
+
+			<!-- 歳時記 -->
+			<button class="header-link" class:underlined={saijikiOpen} onclick={() => saijikiOpen = !saijikiOpen}>歳時記</button>
+			<span class="header-sep">|</span>
+
+			<!-- Build -->
+			<span class="build-badge">Build {__BUILD_NUMBER__}</span>
 		</div>
 	</header>
 
-	<div class="model-row">
-		<div class="model-group">
-			<span class="model-label">{t().stage1Label}</span>
-			<span class="field-label">{t().providerLabel}</span>
-			<select
-				value={stage1Provider}
-				onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}
-			>
-				{#each PROVIDER_GROUPS as pg (pg.id)}
-					<option value={pg.id}>{pg.label}</option>
-				{/each}
-			</select>
-			<span class="field-label">{t().modelLabel}</span>
-			<select
-				value={stage1Model}
-				onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}
-			>
-				{#each modelsForProvider(stage1Provider) as m (m.id)}
-					<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>
-				{/each}
-			</select>
-		</div>
-		<div class="model-group">
-			<span class="model-label">{t().stage2Label}</span>
-			<span class="field-label">{t().providerLabel}</span>
-			<select
-				value={stage2Provider}
-				onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}
-			>
-				{#each PROVIDER_GROUPS as pg (pg.id)}
-					<option value={pg.id}>{pg.label}</option>
-				{/each}
-			</select>
-			<span class="field-label">{t().modelLabel}</span>
-			<select
-				value={stage2Model}
-				onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}
-			>
-				{#each modelsForProvider(stage2Provider) as m (m.id)}
-					<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>
-				{/each}
-			</select>
-		</div>
-		{#if stage1Model.includes('qwen3')}
-			<label class="think-toggle">
-				<input type="checkbox" bind:checked={includeThinking} />
-				<span>{t().showThinkingLabel}</span>
-			</label>
-		{/if}
-	</div>
+	<!-- ══ BODY ══ -->
+	<div class="body">
 
-	<div class="snapshot-row">
-		<span class="snapshot-label">{t().saijikiLabel}</span>
-		<button
-			class="snapshot-active-btn"
-			class:snapshot-default={!activeSnapshotId}
-			onclick={() => (snapshotPanelOpen = !snapshotPanelOpen)}
-		>{activeSnapshotName} ▾</button>
+		<!-- ── LEFT PANEL ── -->
+		<div class="left-panel">
+			<!-- Input mode tabs -->
+			<div class="panel-tabs">
+				{#each [['single', t().modeSingle], ['batch', t().modeBatch]] as [mode, label] (mode)}
+					<button class="panel-tab" class:active={inputMode === mode} onclick={() => (inputMode = mode as 'single' | 'batch')}>{label}</button>
+				{/each}
+			</div>
 
-		{#if snapshotPanelOpen}
-			<div class="snapshot-panel">
-				<div class="snapshot-save-row">
-					<input
-						class="snapshot-name-input"
-						type="text"
-						bind:value={newSnapshotName}
-						placeholder={t().snapshotNamePlaceholder}
-						onkeydown={(e) => { if (e.key === 'Enter') saveSnapshot(); }}
-					/>
-					<button class="snapshot-save-btn" onclick={saveSnapshot} disabled={!newSnapshotName.trim()}>{t().saveCurrentBtn}</button>
-				</div>
-				<div class="snapshot-list">
-					<label class="snapshot-item">
-						<input
-							type="radio"
-							name="snapshot"
-							checked={!activeSnapshotId}
-							onchange={() => (activeSnapshotId = null)}
-						/>
-						<span class="snapshot-item-name">{t().currentSetting}</span>
-					</label>
-					{#each snapshots as snap (snap.id)}
-						<div class="snapshot-item">
-							<label>
-								<input
-									type="radio"
-									name="snapshot"
-									checked={activeSnapshotId === snap.id}
-									onchange={() => (activeSnapshotId = snap.id)}
-								/>
-								<span class="snapshot-item-name">{snap.name}</span>
-								<span class="snapshot-item-date">{new Date(snap.at).toLocaleDateString('ja-JP')}</span>
-							</label>
-							<button class="snapshot-delete-btn" onclick={() => deleteSnapshot(snap.id)}>✕</button>
+			<div class="panel-scroll">
+
+				<!-- 指示 section -->
+				<section class="panel-section">
+					<div class="section-head">
+						<span class="section-label">指示</span>
+						<div class="section-actions">
+							<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>歳時記</button>
+							<button class="ghost-btn" onclick={clearInput}>クリア</button>
 						</div>
-					{/each}
-					{#if snapshots.length === 0}
-						<p class="snapshot-empty">{t().noSnapshots}</p>
-					{/if}
-				</div>
-			</div>
-		{/if}
-	</div>
+					</div>
 
-	<div class="row">
-		<section class="input">
-			<div class="input-header">
-				<div class="input-mode-tabs">
-					<button
-						class="mode-btn"
-						class:active={inputMode === 'single'}
-						onclick={() => (inputMode = 'single')}
-					>{t().modeSingle}</button>
-					<button
-						class="mode-btn"
-						class:active={inputMode === 'batch'}
-						onclick={() => (inputMode = 'batch')}
-					>{t().modeBatch}</button>
-				</div>
-				<div class="input-header-right">
-					{#if (inputMode === 'single' ? input : batchInput)}
-						<button class="clear-input-btn" onclick={clearInput}>{t().clearInputBtn}</button>
+					{#if inputMode === 'single'}
+						<textarea
+							bind:this={textareaEl}
+							bind:value={input}
+							rows="5"
+							spellcheck="false"
+							placeholder={t().inputPlaceholder}
+							class="input-ta"
+						></textarea>
+					{:else}
+						<div class="batch-wrap">
+							<div class="line-nums" aria-hidden="true">{lineNumbersText}</div>
+							<textarea class="batch-ta" bind:value={batchInput} rows="5" spellcheck="false" placeholder={t().batchPlaceholder}></textarea>
+						</div>
+						{#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 					{/if}
-					<button
-						class="saijiki-toggle"
-						aria-expanded={saijikiOpen}
-						onclick={() => (saijikiOpen = !saijikiOpen)}
-					>{t().saijikiToggleBtn}</button>
-				</div>
-			</div>
 
-			{#if inputMode === 'single'}
-				<textarea
-					id="input-ta"
-					bind:this={textareaEl}
-					bind:value={input}
-					rows="8"
-					spellcheck="false"
-					placeholder={t().inputPlaceholder}
-				></textarea>
-			{:else}
-				<div class="batch-wrapper">
-					<div class="line-nums" aria-hidden="true">{lineNumbersText}</div>
-					<textarea
-						class="batch-ta"
-						bind:value={batchInput}
-						rows="8"
-						spellcheck="false"
-						placeholder={t().batchPlaceholder}
-					></textarea>
-				</div>
-				{#if batchNonEmpty > 0}
-					<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>
+					<!-- 演奏する / progress -->
+					{#if loading && inputMode === 'single'}
+						<div class="progress-wrap">
+							<div class="progress-phases">
+								{#each ['解釈', '構造化'] as ph, i (ph)}
+									{#if i > 0}<span class="phase-sep">›</span>{/if}
+									<span class="phase-item" class:phase-done={stageLabel.includes('構造化') && ph === '解釈'} class:phase-active={stageLabel.includes(ph === '解釈' ? '解釈' : '構造化') && !(stageLabel.includes('構造化') && ph === '解釈')}>
+										{#if stageLabel.includes('構造化') && ph === '解釈'}<span class="phase-check">✓</span>{/if}
+										{#if !(stageLabel.includes('構造化') && ph === '解釈') && stageLabel.includes(ph === '解釈' ? '解釈' : '構造化')}<span class="phase-dot"></span>{/if}
+										{ph}
+									</span>
+								{/each}
+							</div>
+							<div class="progress-right">
+								<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
+								<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
+							</div>
+						</div>
+						<div class="progress-bar-track"><div class="progress-bar-fill" style="width: {stageLabel.includes('構造化') ? '65' : '30'}%"></div></div>
+						<div class="progress-stage-text">{stageLabel}</div>
+					{:else if loading && batchTotal > 0}
+						<div class="batch-progress">
+							<span>{t().batchProgress(batchCurrent, batchTotal)}</span>
+							<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
+							<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
+						</div>
+					{:else}
+						<button class="play-btn" onclick={submit} disabled={!canSubmit}>▶ <span>{t().submitBtn}</span></button>
+					{/if}
+
+					{#if error}<p class="error-text">{error}</p>{/if}
+				</section>
+
+				<!-- 入力に含まれた語彙 -->
+				{#if result && inputMode === 'single'}
+					<section class="panel-section">
+						<span class="section-label">{t().vocabInInputLabel}</span>
+						<div class="annot-box">
+							{#each annotate(input) as part, i (i)}
+								{#if part.kind === 'saijiki'}<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
+								{:else if part.kind === 'emotion'}<span class="tok tok-emotion">{part.text}</span>
+								{:else}<span class="tok tok-plain">{part.text}</span>{/if}
+							{/each}
+						</div>
+					</section>
 				{/if}
-			{/if}
 
-			<div class="submit-row">
-				<button class="submit" onclick={submit} disabled={!canSubmit || (loading && inputMode === 'single')}>
-					{#if loading}
-						{#if batchTotal > 0}
-							{t().batchProgress(batchCurrent, batchTotal)}
+				<!-- thinking -->
+				{#if thinking}
+					<section class="panel-section">
+						<details class="thinking-details">
+							<summary>{t().thinkingLabel}</summary>
+							<pre>{thinking}</pre>
+						</details>
+					</section>
+				{/if}
+
+				<!-- 解釈 (正規化DDL) -->
+				{#if ddl !== null}
+					<section class="panel-section">
+						<div class="section-head">
+							<span class="section-label">{t().ddlLabel}</span>
+							{#if historyCursor >= 0}
+								<button class="ghost-btn" class:ghost-active={ddlEditing} onclick={() => (ddlEditing = !ddlEditing)}>{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}</button>
+							{/if}
+						</div>
+						{#if ddlEditing}
+							<textarea class="ddl-edit-ta" bind:value={ddl} rows="4" spellcheck="false"></textarea>
 						{:else}
-							{stageLabel || t().submitBtn}
+							<div class="annot-box ddl-box">
+								{#if baseDDL !== null && baseDDL !== ddl}
+									{#each diffDDL(baseDDL, ddl) as part, i (i)}<span class={part.changed ? 'tok tok-diff-added' : 'tok tok-plain'}>{part.text}</span>{/each}
+								{:else}
+									{#each annotate(ddl) as part, i (i)}
+										{#if part.kind === 'saijiki'}<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
+										{:else if part.kind === 'emotion'}<span class="tok tok-emotion">{part.text}</span>
+										{:else}<span class="tok tok-plain">{part.text}</span>{/if}
+									{/each}
+								{/if}
+							</div>
 						{/if}
-					{:else}
-						{t().submitBtn}
-					{/if}
-				</button>
-				{#if loading && batchTotal > 0}
-					<span class="stage-label">{stageLabel}</span>
-					<button class="stop-btn" onclick={stopBatch}>{t().stopBtn}</button>
+
+						<!-- 再演奏 progress -->
+						{#if reloading}
+							<div class="progress-wrap">
+								<div class="progress-phases">
+									<span class="phase-item phase-active"><span class="phase-dot"></span>構造化</span>
+								</div>
+								<div class="progress-right">
+									<span class="progress-time">…</span>
+								</div>
+							</div>
+							<div class="progress-bar-track"><div class="progress-bar-fill" style="width: 55%"></div></div>
+						{/if}
+						{#if reloadError}<p class="error-text">{reloadError}</p>{/if}
+
+						<button
+							class="replay-btn"
+							onclick={replay}
+							disabled={reloading || !ddl}
+						>↺ 再演奏</button>
+					</section>
 				{/if}
-				{#if loading}
-					<span class="elapsed elapsed-live">{(liveMs / 1000).toFixed(1)}s</span>
-				{:else if elapsedTotalMs > 0}
-					{#if elapsedStage1Ms > 0}
-						<span class="elapsed">
-							{t().elapsedDetailed(elapsedStage1Ms / 1000, elapsedStage2Ms / 1000, elapsedTotalMs / 1000)}
-						</span>
-					{:else}
-						<span class="elapsed">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
-					{/if}
-					{#if tokenSummary}
-						<span class="elapsed elapsed-tok">{tokenSummary}</span>
-					{/if}
+
+				<!-- 統計 -->
+				{#if result && elapsedTotalMs > 0}
+					<section class="panel-section stats-section">
+						<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
+							<span class="stats-arrow" class:open={statsOpen}>▶</span>
+							{statsLine}
+						</button>
+						{#if statsOpen}
+							<div class="stats-detail">
+								{#if elapsedStage1Ms > 0}
+									<div class="stats-grid">
+										<span class="stats-key">解釈</span><span>{(elapsedStage1Ms / 1000).toFixed(1)}s{tokensInStage1 != null ? ` — ${tokensInStage1}→${tokensOutStage1}tok` : ''}</span>
+										<span class="stats-key">構造化</span><span>{(elapsedStage2Ms / 1000).toFixed(1)}s{tokensInStage2 != null ? ` — ${tokensInStage2}→${tokensOutStage2}tok` : ''}</span>
+										<span class="stats-key">合計</span><span class="stats-total">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
+									</div>
+								{:else}
+									<span>{(elapsedTotalMs / 1000).toFixed(1)}s</span>
+								{/if}
+							</div>
+						{/if}
+					</section>
+				{/if}
+
+			</div><!-- /panel-scroll -->
+		</div><!-- /left-panel -->
+
+		<!-- ── RIGHT PANEL ── -->
+		<div class="right-panel">
+
+			<!-- Tab bar -->
+			<div class="right-tabs">
+				<button class="rtab" class:active={outputTab === 'canvas'}  onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
+				<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result}>{t().tabPrompts}</button>
+				<button class="rtab" class:active={outputTab === 'score'}   onclick={() => (outputTab = 'score')}   disabled={!result}>{t().tabScore}</button>
+				<div class="rtab-spacer"></div>
+				{#if currentRenderedAt}
+					<span class="rendered-at">{currentRenderedAt}</span>
 				{/if}
 			</div>
-			{#if error}
-				<p class="error">{error}</p>
-			{/if}
 
-			{#if result && inputMode === 'single'}
-				<div class="interpreted">
-					<label for="input-feedback">{t().vocabInInputLabel}</label>
-					<div id="input-feedback" class="annot-box">
-						{#each annotate(input) as part, i (i)}
-							{#if part.kind === 'saijiki'}
-								<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
-							{:else if part.kind === 'emotion'}
-								<span class="tok tok-emotion" title="感情語彙 (正規化で置換)">{part.text}</span>
-							{:else}
-								<span class="tok tok-plain">{part.text}</span>
-							{/if}
-						{/each}
-					</div>
+			<!-- Canvas area -->
+			<div class="canvas-area">
+
+				<!-- Prev nav -->
+				<div class="nav-left">
+					<button class="nav-circle" onclick={gotoPrev} disabled={prevDisabled}>‹</button>
 				</div>
-			{/if}
 
-			{#if thinking}
-				<details class="thinking" open>
-					<summary>{t().thinkingLabel}</summary>
-					<pre>{thinking}</pre>
-				</details>
-			{/if}
-
-			{#if ddl}
-				<div class="interpreted">
-					<div class="ddl-label-row">
-						<label for="ddl-interpret">{t().ddlLabel}</label>
-						{#if historyCursor >= 0}
-							<button class="ddl-edit-btn" onclick={() => (ddlEditing = !ddlEditing)}>
-								{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}
-							</button>
-						{/if}
-					</div>
-					{#if ddlEditing}
-						<textarea class="ddl-edit-ta" bind:value={ddl} rows="4" spellcheck="false"></textarea>
-					{:else}
-						<div id="ddl-interpret" class="annot-box ddl-box">
-							{#if baseDDL !== null && baseDDL !== ddl}
-								{#each diffDDL(baseDDL, ddl) as part, i (i)}
-									<span class={part.changed ? 'tok tok-diff-added' : 'tok tok-plain'}>{part.text}</span>
-								{/each}
+				<!-- Content -->
+				<div class="canvas-content">
+					{#if outputTab === 'canvas'}
+						<div
+							class="canvas-box"
+							style="transform: scale({zoom}); transform-origin: center center; transition: transform 0.15s;"
+						>
+							{#if result}
+								{@html result.svg}
 							{:else}
-								{#each annotate(ddl) as part, i (i)}
-									{#if part.kind === 'saijiki'}
-										<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
-									{:else if part.kind === 'emotion'}
-										<span class="tok tok-emotion">{part.text}</span>
-									{:else}
-										<span class="tok tok-plain">{part.text}</span>
-									{/if}
-								{/each}
+								<div class="canvas-placeholder">{t().canvasPlaceholder}</div>
 							{/if}
+						</div>
+					{:else if outputTab === 'prompts'}
+						{#if promptsData}
+							<div class="prompt-section">
+								<p class="prompt-label">{t().promptStage1Input}</p>
+								<pre class="prompt-pre">{inputMode === 'single' ? input : `(${t().modeBatch})`}</pre>
+								<p class="prompt-label">{t().promptStage1System}</p>
+								<pre class="prompt-pre prompt-pre-lg">{promptsData.stage1_system}</pre>
+								{#if ddl}
+									<p class="prompt-label">{t().promptStage2Input}</p>
+									<pre class="prompt-pre">{ddl}</pre>
+								{/if}
+								<p class="prompt-label">{t().promptStage2System}</p>
+								<pre class="prompt-pre prompt-pre-lg">{promptsData.stage2_system}</pre>
+							</div>
+						{:else}
+							<p class="muted-center">{t().promptLoading}</p>
+						{/if}
+					{:else if outputTab === 'score'}
+						<pre class="score-pre">{JSON.stringify(result?.score, null, 2)}</pre>
+					{/if}
+				</div>
+
+				<!-- Zoom controls (canvas tab only) -->
+				{#if outputTab === 'canvas'}
+					<div class="zoom-controls">
+						<button onclick={() => (zoom = Math.max(0.5, +(zoom - 0.25).toFixed(2)))}>−</button>
+						<span class="zoom-pct">{Math.round(zoom * 100)}%</span>
+						<button onclick={() => (zoom = Math.min(3, +(zoom + 0.25).toFixed(2)))}>＋</button>
+						<button class="zoom-reset" onclick={() => (zoom = 1)}>⊙</button>
+					</div>
+				{/if}
+
+				<!-- Next nav + counter -->
+				<div class="nav-right">
+					<button class="nav-circle" onclick={gotoNext} disabled={nextDisabled}>›</button>
+					{#if historyTotal > 0}
+						<span class="nav-counter">{navPos} / {historyTotal}</span>
+					{/if}
+				</div>
+
+			</div><!-- /canvas-area -->
+
+			<!-- Export bar -->
+			<div class="export-bar">
+				<span class="export-label">エクスポート</span>
+				<button class="ghost-btn" onclick={downloadSVG} disabled={!result}>↓ SVG</button>
+				<div class="png-wrap" bind:this={pngWrapEl}>
+					<button class="ghost-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>↓ PNG ▾</button>
+					{#if pngMenuOpen}
+						<div class="png-menu" onclick={(e) => e.stopPropagation()}>
+							{#each [[1080,'標準'],[2160,'高解像度 (2×)'],[1024,'正方形'],[2048,'正方形 高解像度']] as [size, label]}
+								<button onclick={() => { downloadPNG(size as number); pngMenuOpen = false; }}>
+									<span class="png-size">PNG {size}px</span>
+									<span class="png-sub">{label}</span>
+								</button>
+							{/each}
 						</div>
 					{/if}
 				</div>
-			{/if}
-		</section>
-
-		<section class="output">
-			<div class="output-head">
-				<div class="output-tabs">
-					<button
-						class="tab-btn"
-						class:active={outputTab === 'canvas'}
-						onclick={() => (outputTab = 'canvas')}
-					>{t().tabCanvas}</button>
-					<button
-						class="tab-btn"
-						class:active={outputTab === 'prompts'}
-						onclick={() => (outputTab = 'prompts')}
-						disabled={!result}
-					>{t().tabPrompts}</button>
-					<button
-						class="tab-btn"
-						class:active={outputTab === 'score'}
-						onclick={() => (outputTab = 'score')}
-						disabled={!result}
-					>{t().tabScore}</button>
-				</div>
-				{#if historyTotal > 0}
-					<div class="nav" aria-label="history navigation">
-						<button
-							class="nav-btn"
-							onclick={gotoPrev}
-							disabled={historyCursor >= historyItems.length - 1 && historyPage >= historyTotalPages - 1}
-						>{t().navOlderBtn}</button>
-						<span class="counter">{historyPage * HISTORY_PAGE_SIZE + historyCursor + 1} / {historyTotal}</span>
-						<button
-							class="nav-btn"
-							onclick={gotoNext}
-							disabled={historyCursor <= 0 && historyPage <= 0}
-						>{t().navNewerBtn}</button>
-						{#if currentRenderedAt}
-							<span class="rendered-at">{t().historyRenderedAtLabel} {currentRenderedAt}</span>
-						{/if}
-					</div>
-				{/if}
 			</div>
 
-			{#if outputTab === 'canvas'}
-				<div id="canvas" class="canvas">
-					{#if result}
-						{@html result.svg}
-					{:else}
-						<div class="placeholder">{t().canvasPlaceholder}</div>
-					{/if}
-				</div>
-				{#if result}
-					<div class="dl-bar">
-						<button class="dl-btn" onclick={downloadSVG}>{t().dlSvgBtn}</button>
-						<span class="dl-sep">{t().dlPngLabel}</span>
-						{#each [1080, 2160, 1024, 2048] as size}
-							<button class="dl-btn" onclick={() => downloadPNG(size)}>{size}</button>
-						{/each}
-					</div>
-				{/if}
-			{:else if outputTab === 'prompts'}
-				{#if promptsData}
-					<div class="prompt-section">
-						<p class="prompt-label">{t().promptStage1Input}</p>
-						<pre class="prompt-pre">{inputMode === 'single' ? input : `(${t().modeBatch})`}</pre>
-						<p class="prompt-label">{t().promptStage1System}</p>
-						<pre class="prompt-pre prompt-pre-lg">{promptsData.stage1_system}</pre>
-						{#if ddl}
-							<p class="prompt-label">{t().promptStage2Input}</p>
-							<pre class="prompt-pre">{ddl}</pre>
-						{/if}
-						<p class="prompt-label">{t().promptStage2System}</p>
-						<pre class="prompt-pre prompt-pre-lg">{promptsData.stage2_system}</pre>
-					</div>
-				{:else}
-						<p class="muted">{t().promptLoading}</p>
-				{/if}
-			{:else if outputTab === 'score'}
-				<pre class="score-pre">{JSON.stringify(result?.score, null, 2)}</pre>
-			{/if}
-		</section>
-	</div>
+		</div><!-- /right-panel -->
+	</div><!-- /body -->
 
-	{#if historyTotal > 1}
-		<section class="history" aria-label="history">
+	<!-- ══ HISTORY STRIP ══ -->
+	{#if historyTotal > 0}
+		<div class="history-strip">
 			<div class="history-head">
-				<h2>{t().historyTitle} <span class="muted">({historyTotal})</span></h2>
+				<span class="history-title">{t().historyTitle} <span class="history-count">({historyTotal})</span></span>
 				{#if historyTotalPages > 1}
-					<div class="page-nav">
-						<button
-							onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }}
-							disabled={historyPage <= 0}
-							aria-label="新しいページ"
-					>{ t().historyNewerPage }</button>
-						<span>{historyPage + 1} / {historyTotalPages}</span>
-						<button
-							onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }}
-							disabled={historyPage >= historyTotalPages - 1}
-							aria-label="古いページ"
-					>{ t().historyOlderPage }</button>
+					<div class="history-page-nav">
+						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 新</button>
+						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
+						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>旧 →</button>
 					</div>
 				{/if}
 			</div>
-			<div class="strip">
+			<div class="thumb-strip">
 				{#each historyItems as it, i (it.id ?? it.at)}
 					<button
 						class="thumb"
 						class:current={i === historyCursor}
 						onclick={() => loadIteration(i)}
-						title="{it.input}{it.stage1_model ? ` [${it.stage1_model}/${it.stage2_model}]` : ''}{it.tokens_in != null ? ` in:${it.tokens_in} out:${it.tokens_out}` : ''}"
+						title={it.input}
 					>
 						<div class="thumb-svg">{@html it.svg}</div>
-						<div class="thumb-label">
-							{#if it.elapsed_ms && it.elapsed_ms > 0}
-								{(it.elapsed_ms / 1000).toFixed(1)}s
-							{:else}
-								{historyPage * HISTORY_PAGE_SIZE + i + 1}
-							{/if}
+						<div class="thumb-meta">
+							<span class="thumb-time">{it.elapsed_ms ? (it.elapsed_ms / 1000).toFixed(1) + 's' : String(historyPage * HISTORY_PAGE_SIZE + i + 1)}</span>
+							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
 						</div>
-						{#if it.stage2_model}
-							<div class="thumb-model">{shortModel(it.stage2_model)}</div>
-						{/if}
-						{#if it.tokens_in != null}
-							<div class="thumb-tokens">{it.tokens_in}→{it.tokens_out}tok</div>
+						{#if i === historyCursor}
+							<div class="thumb-current-badge">表示中</div>
 						{/if}
 					</button>
 				{/each}
 			</div>
-		</section>
+		</div>
 	{/if}
-</main>
 
-<svelte:window onkeydown={handleKeydown} />
+</div><!-- /root -->
 
-{#if saijikiOpen}
-	<div
-		class="saijiki-backdrop"
-		onclick={() => (saijikiOpen = false)}
-		aria-hidden="true"
-	></div>
-	<aside class="saijiki" aria-label="歳時記 - 語彙一覧">
+<!-- ══ SAIJIKI DRAWER (fixed right) ══ -->
+<div class="saijiki-drawer" class:open={saijikiOpen} aria-hidden={!saijikiOpen}>
+	<div class="saijiki-inner">
 		<div class="saijiki-head">
-			<h2>{t().saijikiTitle}</h2>
+			<div>
+				<div class="saijiki-title">歳時記</div>
+				<div class="saijiki-hint">{t().saijikiHint}</div>
+			</div>
 			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label="閉じる">×</button>
 		</div>
-			<p class="saijiki-hint">{t().saijikiHint}</p>
-		{#each SAIJIKI as cat (cat.key)}
-			{@const words = t().saijikiWords[cat.key] ?? cat.words}
-			<section class="saijiki-cat">
-				<h3>{cat.label} <span class="en">{cat.en}</span></h3>
-				<div class="chips">
-					{#each words as word (word)}
-						<button class="chip" onclick={() => insertWord(word)}>{word}</button>
-					{/each}
+		<div class="saijiki-body">
+			{#each SAIJIKI as cat, ci (cat.key)}
+				{@const words = t().saijikiWords[cat.key] ?? cat.words}
+				<div class="saijiki-cat" style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
+					<div class="saijiki-cat-head">
+						<span class="saijiki-cat-ja">{cat.label}</span>
+						<span class="saijiki-cat-en">{cat.en}</span>
+					</div>
+					<div class="saijiki-chips">
+						{#each words as word (word)}
+							<button class="saijiki-chip" onclick={() => insertWord(word)}>{word}</button>
+						{/each}
+					</div>
 				</div>
-			</section>
-		{/each}
-	</aside>
+			{/each}
+		</div>
+	</div>
+</div>
+
+<!-- ══ CATALOG MODAL ══ -->
+{#if catalogOpen}
+	<div class="modal-backdrop" onclick={() => (catalogOpen = false)} aria-hidden="true"></div>
+	<div class="catalog-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
+		<div class="catalog-modal-head">
+			<div class="catalog-modal-title">カタログ設定</div>
+			<button class="catalog-close" onclick={() => (catalogOpen = false)}>×</button>
+		</div>
+		<div class="catalog-scroll">
+			{#each COLOR_CATALOGS as cat (cat.id)}
+				{@const active = selectedCatalog === cat.id}
+				<button
+					class="catalog-item"
+					class:active
+					onclick={() => { selectedCatalog = cat.id; try { localStorage.setItem(CATALOG_KEY, cat.id); } catch {} }}
+				>
+					<div class="catalog-swatches">
+						{#each cat.swatches as hex (hex)}
+							<div class="catalog-swatch" style="background:{hex}"></div>
+						{/each}
+					</div>
+					<div class="catalog-info">
+						<div class="catalog-name">{cat.name}</div>
+						<div class="catalog-sub">{cat.sub}</div>
+					</div>
+					{#if active}<span class="catalog-check">✓</span>{/if}
+				</button>
+			{/each}
+		</div>
+	</div>
 {/if}
 
 <style>
-	:global(body) {
-		background: #f7f5ef;
-		color: #111;
-		font-family:
-			-apple-system, 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
-		margin: 0;
+	/* ── CSS Variables ──────────────────────────────────────── */
+	:global(:root) {
+		--bg:           #f5f3ef;
+		--bg2:          #eceae4;
+		--bg3:          #e2dfd8;
+		--fg:           #1a1917;
+		--fg2:          #5a5751;
+		--fg3:          #9a9690;
+		--accent:       #2a4a72;
+		--accent-light: #e8eef5;
+		--border:       #d4d0c8;
+		--border2:      #c4c0b8;
+		--r:            4px;
+		--r-lg:         8px;
 	}
 
-	main {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 2rem 1.5rem;
+	:global(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }
+
+	:global(html), :global(body) {
+		height: 100%;
+		font-family: -apple-system, 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+		font-size: 13px;
+		background: var(--bg);
+		color: var(--fg);
 	}
 
-	header { margin-bottom: 1.5rem; }
+	:global(::-webkit-scrollbar) { width: 6px; height: 6px; }
+	:global(::-webkit-scrollbar-track) { background: transparent; }
+	:global(::-webkit-scrollbar-thumb) { background: var(--border2); border-radius: 3px; }
 
-	.header-inner {
+	/* ── Root layout ────────────────────────────────────────── */
+	.root {
 		display: flex;
-		justify-content: space-between;
-		align-items: flex-end;
+		flex-direction: column;
+		height: 100vh;
+		overflow: hidden;
 	}
+
+	/* ── Header ─────────────────────────────────────────────── */
+	.header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 10px 20px;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg);
+		flex-shrink: 0;
+		gap: 12px;
+	}
+
+	.logo { font-size: 22px; font-weight: 300; letter-spacing: 0.05em; line-height: 1.1; }
+	.logo-sub { font-size: 11px; color: var(--fg3); margin-top: 2px; }
 
 	.header-right {
 		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 0.4rem;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+
+	.settings-wrap { position: relative; }
+
+	.settings-btn {
+		display: flex; align-items: center; gap: 4px;
+		padding: 5px 11px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: #fff;
+		color: var(--fg2);
+		font-size: 12px;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.settings-btn.active, .settings-btn:hover { background: var(--bg2); }
+
+	.settings-popover {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		z-index: 200;
+		background: #fff;
+		border: 1px solid var(--border2);
+		border-radius: var(--r-lg);
+		padding: 16px;
+		box-shadow: 0 6px 24px rgba(0,0,0,0.13);
+		width: 340px;
+	}
+
+	.popover-title { font-weight: 500; margin-bottom: 12px; font-size: 13px; }
+
+	.popover-group {
+		background: var(--bg);
+		border-radius: var(--r);
+		padding: 10px;
+		margin-bottom: 8px;
+	}
+	.popover-group-label {
+		font-size: 10px; color: var(--fg3); font-weight: 500;
+		letter-spacing: 0.07em; text-transform: uppercase;
+		margin-bottom: 7px;
+	}
+	.popover-row {
+		display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+	}
+	.popover-row-label { width: 50px; color: var(--fg2); font-size: 11px; flex-shrink: 0; }
+	.popover-row select {
+		flex: 1; padding: 4px 6px;
+		border: 1px solid var(--border2); border-radius: var(--r);
+		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+	}
+	.popover-think-label {
+		display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg2);
+		cursor: pointer; margin-top: 4px;
+	}
+	.popover-close {
+		margin-top: 4px; width: 100%; padding: 7px;
+		background: var(--fg); color: #fff;
+		border: none; border-radius: var(--r);
+		font-size: 12px; cursor: pointer; font-family: inherit;
 	}
 
 	.lang-switcher {
 		display: flex;
-		gap: 0;
-		border: 1px solid #ccc;
-		border-radius: 4px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		overflow: hidden;
+	}
+	.lang-btn {
+		padding: 4px 10px; border: none; border-right: 1px solid var(--border2);
+		background: #fff; color: var(--fg2); font-size: 12px; cursor: pointer; font-family: inherit;
+	}
+	.lang-btn:last-child { border-right: none; }
+	.lang-btn.active { background: var(--fg); color: #fff; }
+
+	.header-link {
+		padding: 4px 0; border: none; border-bottom: 1px solid transparent;
+		background: none; color: var(--fg3); font-size: 12px; cursor: pointer; font-family: inherit;
+		transition: color 0.15s;
+	}
+	.header-link:hover { color: var(--fg); }
+	.header-link.underlined { color: var(--fg); border-bottom-color: var(--fg); }
+
+	.header-sep { color: var(--border); font-size: 11px; }
+	.build-badge { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+
+	/* ── Body ───────────────────────────────────────────────── */
+	.body {
+		display: flex;
+		flex: 1;
 		overflow: hidden;
 	}
 
-	.lang-btn {
-		font-family: inherit;
-		font-size: 0.78rem;
-		padding: 0.2rem 0.6rem;
-		border: none;
-		border-right: 1px solid #ccc;
-		background: #fff;
-		color: #666;
-		cursor: pointer;
-	}
-
-	.lang-btn:last-child { border-right: none; }
-
-	.lang-btn.active {
-		background: #111;
-		color: #fff;
-	}
-
-	.build-badge {
-		font-size: 0.75rem;
-		color: #aaa;
-		font-variant-numeric: tabular-nums;
-	}
-
-	h1 { font-size: 2rem; margin: 0; letter-spacing: 0.2em; }
-	.sub { color: #666; margin: 0.25rem 0 0; }
-
-	/* ── Model row ─────────────────────────────────────────── */
-	.model-row {
-		display: flex;
-		gap: 1rem;
-		margin-bottom: 1.5rem;
-		flex-wrap: wrap;
-	}
-
-	.model-group {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.85rem;
-	}
-
-	.model-label { color: #888; min-width: 2.5rem; }
-	.field-label { color: #aaa; font-size: 0.8rem; white-space: nowrap; }
-
-	.model-group select {
-		font-family: inherit;
-		font-size: 0.85rem;
-		padding: 0.25rem 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 3px;
-		background: #fff;
-		color: #333;
-	}
-
-	.think-toggle {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.85rem;
-		color: #666;
-		cursor: pointer;
-	}
-
-	/* ── Snapshot row ──────────────────────────────────────── */
-	.snapshot-row {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.5rem;
-		margin-bottom: 1.5rem;
-		position: relative;
-		font-size: 0.85rem;
-	}
-
-	.snapshot-label {
-		color: #888;
-		white-space: nowrap;
-		padding-top: 0.3rem;
-	}
-
-	.snapshot-active-btn {
-		font-family: inherit;
-		font-size: 0.85rem;
-		padding: 0.25rem 0.6rem;
-		border: 1px solid #ccc;
-		border-radius: 3px;
-		background: #fff;
-		color: #333;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	.snapshot-active-btn.snapshot-default {
-		color: #888;
-	}
-
-	.snapshot-panel {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		z-index: 200;
-		background: #fff;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		padding: 0.75rem;
-		min-width: 320px;
-		box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-	}
-
-	.snapshot-save-row {
-		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 0.75rem;
-	}
-
-	.snapshot-name-input {
-		flex: 1;
-		font-family: inherit;
-		font-size: 0.85rem;
-		padding: 0.25rem 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 3px;
-	}
-
-	.snapshot-save-btn {
-		font-family: inherit;
-		font-size: 0.82rem;
-		padding: 0.25rem 0.6rem;
-		border: 1px solid #999;
-		border-radius: 3px;
-		background: #f0f0f0;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	.snapshot-save-btn:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.snapshot-list {
+	/* ── Left panel ─────────────────────────────────────────── */
+	.left-panel {
+		width: 440px;
+		flex-shrink: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 0.3rem;
-		max-height: 200px;
+		border-right: 1px solid var(--border);
+		overflow: hidden;
+	}
+
+	.panel-tabs {
+		display: flex;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg);
+		flex-shrink: 0;
+	}
+	.panel-tab {
+		padding: 9px 16px; border: none; border-bottom: 2px solid transparent;
+		background: none; color: var(--fg2); font-size: 13px; cursor: pointer;
+		font-family: inherit; transition: color 0.1s;
+	}
+	.panel-tab.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 500; }
+	.panel-tab:hover:not(.active) { color: var(--fg); }
+
+	.panel-scroll {
+		flex: 1;
 		overflow-y: auto;
-	}
-
-	.snapshot-item {
+		padding: 14px 16px;
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.4rem;
-		font-size: 0.85rem;
+		flex-direction: column;
+		gap: 14px;
 	}
 
-	.snapshot-item label {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		cursor: pointer;
-		flex: 1;
-	}
+	.panel-section { display: flex; flex-direction: column; gap: 6px; }
 
-	.snapshot-item-name {
-		font-weight: 500;
-	}
-
-	.snapshot-item-date {
-		color: #aaa;
-		font-size: 0.78rem;
-	}
-
-	.snapshot-delete-btn {
-		border: none;
-		background: none;
-		color: #bbb;
-		font-size: 0.8rem;
-		cursor: pointer;
-		padding: 0 0.2rem;
-		line-height: 1;
-	}
-
-	.snapshot-delete-btn:hover {
-		color: #e55;
-	}
-
-	.snapshot-empty {
-		color: #aaa;
-		font-size: 0.82rem;
-		margin: 0.25rem 0;
-	}
-
-	/* ── Layout ────────────────────────────────────────────── */
-	.row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 2rem;
-	}
-
-	/* ── Input section ─────────────────────────────────────── */
-	.input-header {
+	.section-head {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 0.5rem;
 	}
 
-	.input-header-right {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
+	.section-label {
+		font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+		color: var(--fg3); text-transform: uppercase;
 	}
 
-	.clear-input-btn {
-		font-family: inherit;
-		font-size: 0.78rem;
-		padding: 0.25rem 0.55rem;
-		border: 1px solid #ccc;
-		border-radius: 3px;
+	.section-actions { display: flex; gap: 5px; }
+
+	.ghost-btn {
+		padding: 4px 10px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
 		background: #fff;
-		color: #888;
-		cursor: pointer;
-	}
-	.clear-input-btn:hover { color: #a2342a; border-color: #a2342a; }
-
-	.input-mode-tabs {
-		display: flex;
-		gap: 0;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.mode-btn {
-		background: #fff;
-		border: none;
-		border-right: 1px solid #ccc;
-		color: #666;
-		padding: 0.3rem 0.9rem;
+		color: var(--fg2);
+		font-size: 11px;
 		cursor: pointer;
 		font-family: inherit;
-		font-size: 0.85rem;
-		line-height: 1;
 	}
+	.ghost-btn:hover { background: var(--bg2); }
+	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
 
-	.mode-btn:last-child { border-right: none; }
-
-	.mode-btn:hover:not(.active) { background: #f5f5f5; }
-
-	.mode-btn.active {
-		background: #111;
-		color: #fff;
+	/* Input textarea */
+	.input-ta, .batch-ta {
+		width: 100%; padding: 9px 10px;
+		border: 1px solid var(--border2); border-radius: var(--r);
+		background: #fff; color: var(--fg);
+		font-family: inherit; font-size: 13px; line-height: 1.65;
+		resize: vertical; outline: none;
 	}
+	.input-ta:focus, .batch-ta:focus { border-color: var(--accent); }
 
-	textarea {
-		width: 100%;
-		padding: 0.75rem;
-		font-family: inherit;
-		font-size: 1rem;
-		line-height: 1.6;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		background: #fff;
-		box-sizing: border-box;
-		resize: vertical;
-	}
-
-	/* ── Batch ─────────────────────────────────────────────── */
-	.batch-wrapper {
+	.batch-wrap {
 		display: flex;
-		border: 1px solid #ccc;
-		border-radius: 4px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
 		overflow: hidden;
 	}
-
 	.line-nums {
-		background: #f5f5f5;
-		border-right: 1px solid #ddd;
-		padding: 0.75rem 0.5rem;
-		font-family: 'SF Mono', 'Menlo', monospace;
-		font-size: 1rem;
-		line-height: 1.6;
-		text-align: right;
-		color: #bbb;
-		user-select: none;
-		white-space: pre;
-		min-width: 2rem;
+		background: var(--bg2); border-right: 1px solid var(--border);
+		padding: 9px 6px; font-size: 12px; line-height: 1.65;
+		text-align: right; color: var(--fg3); user-select: none;
+		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
+	}
+	.batch-ta { flex: 1; border: none; border-radius: 0; }
+	.batch-info { font-size: 11px; color: var(--fg3); }
+
+	/* Progress */
+	.progress-wrap {
+		display: flex; align-items: center; justify-content: space-between;
+		padding: 8px 10px 6px;
+		border: 1px solid var(--border2); border-radius: var(--r) var(--r) 0 0;
+		background: #fff;
+		margin-top: 8px;
+	}
+	.progress-phases { display: flex; align-items: center; gap: 4px; }
+	.phase-sep { color: var(--border); font-size: 9px; margin: 0 1px; }
+	.phase-item { font-size: 11px; color: var(--border2); display: flex; align-items: center; gap: 3px; }
+	.phase-item.phase-active { color: var(--fg); font-weight: 500; }
+	.phase-item.phase-done { color: var(--fg3); }
+	.phase-dot {
+		display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+		background: var(--accent); flex-shrink: 0;
+		animation: inkupulse 1s ease-in-out infinite;
+	}
+	.phase-check { color: #27ae60; font-size: 10px; }
+	.progress-right { display: flex; align-items: center; gap: 7px; }
+	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+	.stop-sm {
+		padding: 2px 7px; border: 1px solid var(--border2);
+		border-radius: var(--r); background: none;
+		color: var(--fg2); font-size: 11px; cursor: pointer; font-family: inherit;
+	}
+	.progress-bar-track {
+		height: 3px; background: var(--bg3);
+		border-left: 1px solid var(--border2); border-right: 1px solid var(--border2);
+	}
+	.progress-bar-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+	.progress-stage-text {
+		font-size: 11px; color: var(--fg3);
+		padding: 5px 10px 7px;
+		border: 1px solid var(--border2); border-top: none;
+		border-radius: 0 0 var(--r) var(--r);
+		background: #fff;
 	}
 
-	.batch-ta {
-		flex: 1;
-		border: none;
-		border-radius: 0;
-		padding: 0.75rem;
-		font-family: inherit;
-		font-size: 1rem;
-		line-height: 1.6;
-		resize: vertical;
-		min-height: 8rem;
+	.batch-progress {
+		display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+		padding: 8px 10px;
+		border: 1px solid var(--border2); border-radius: var(--r);
+		background: #fff; font-size: 12px; color: var(--fg2);
+		margin-top: 8px;
 	}
 
-	.batch-info {
-		margin: 0.3rem 0 0;
-		font-size: 0.8rem;
-		color: #999;
+	/* Play button */
+	.play-btn {
+		width: 100%; margin-top: 8px; padding: 9px;
+		font-size: 14px; font-weight: 500;
+		background: var(--fg); color: #fff;
+		border: none; border-radius: var(--r);
+		letter-spacing: 0.08em; cursor: pointer;
+		display: flex; align-items: center; justify-content: center; gap: 8px;
+		font-family: inherit; transition: background 0.15s;
 	}
+	.play-btn:hover:not(:disabled) { background: #333; }
+	.play-btn:disabled { background: var(--fg3); cursor: not-allowed; }
 
-	/* ── Submit row ────────────────────────────────────────── */
-	.submit-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-top: 0.75rem;
-		flex-wrap: wrap;
-	}
+	.error-text { color: #a2342a; font-size: 12px; }
 
-	button.submit {
-		padding: 0.5rem 1.25rem;
-		background: #111;
-		color: #fff;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-		font-size: 0.95rem;
-		font-family: inherit;
-	}
-
-	button.submit:disabled {
-		background: #999;
-		cursor: not-allowed;
-	}
-
-	.stop-btn {
-		padding: 0.4rem 0.9rem;
-		background: transparent;
-		border: 1px solid #a2342a;
-		color: #a2342a;
-		border-radius: 4px;
-		cursor: pointer;
-		font-size: 0.85rem;
-		font-family: inherit;
-	}
-
-	.stop-btn:hover { background: #a2342a; color: #fff; }
-
-	.stage-label {
-		font-size: 0.8rem;
-		color: #888;
-		font-style: italic;
-	}
-
-	.elapsed { font-size: 0.8rem; color: #888; font-variant-numeric: tabular-nums; }
-	.elapsed-live { color: #c9a08a; }
-
-	.error { color: #a2342a; margin-top: 0.75rem; }
-
-	/* ── Annotations ───────────────────────────────────────── */
-	.interpreted { margin-top: 1.5rem; }
-
-	label {
-		display: block;
-		font-size: 0.85rem;
-		color: #666;
-		margin-bottom: 0.5rem;
-	}
-
+	/* Annotations */
 	.annot-box {
-		padding: 0.75rem;
-		background: #fff;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		font-size: 0.95rem;
-		line-height: 1.9;
-		white-space: pre-wrap;
-		word-break: break-word;
+		padding: 9px 10px; background: #fff;
+		border: 1px solid var(--border); border-radius: var(--r);
+		font-size: 13px; line-height: 1.85; white-space: pre-wrap; word-break: break-word;
 	}
+	.ddl-box { border-left: 3px solid var(--border2); border-radius: 0 var(--r) var(--r) 0; }
 
-	.ddl-box { border-left: 3px solid #888; border-radius: 0 4px 4px 0; }
-
-	.ddl-label-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 0.5rem;
-	}
-	.ddl-label-row label { margin-bottom: 0; }
-
-	.ddl-edit-btn {
-		font-family: inherit;
-		font-size: 0.75rem;
-		padding: 0.15rem 0.45rem;
-		border: 1px solid #ccc;
-		border-radius: 3px;
-		background: #fff;
-		color: #666;
-		cursor: pointer;
-	}
-	.ddl-edit-btn:hover { background: #111; color: #fff; border-color: #111; }
+	.tok { }
+	.tok-saijiki { color: #2c3e91; font-weight: 500; }
+	.tok-plain   { color: var(--fg3); }
+	.tok-emotion { color: #c9a08a; font-style: italic; text-decoration: line-through; text-decoration-color: rgba(162,52,42,0.4); }
+	.tok-diff-added { color: #a2342a; font-weight: 500; }
 
 	.ddl-edit-ta {
-		width: 100%;
-		box-sizing: border-box;
-		font-family: inherit;
-		font-size: 0.95rem;
-		line-height: 1.9;
-		padding: 0.75rem;
-		border: 1px solid #bbb;
-		border-left: 3px solid #888;
-		border-radius: 0 4px 4px 0;
-		background: #fff;
-		resize: vertical;
+		width: 100%; padding: 9px 10px;
+		border: 1px solid var(--accent); border-left: 3px solid var(--border2);
+		border-radius: 0 var(--r) var(--r) 0;
+		background: #fff; color: var(--fg);
+		font-family: inherit; font-size: 13px; line-height: 1.75; resize: vertical; outline: none;
 	}
 
-	.tok { transition: color 0.15s; }
-	.tok-saijiki { color: #2c3e91; font-weight: 500; }
-	.tok-plain { color: #9a9a9a; }
-	.tok-diff-added { color: #a2342a; font-weight: 500; }
-	.tok-emotion {
-		color: #c9a08a;
-		font-style: italic;
-		text-decoration: line-through;
-		text-decoration-color: rgba(162, 52, 42, 0.4);
-		text-decoration-thickness: 1px;
+	/* thinking */
+	.thinking-details {
+		font-size: 12px; background: #f3efe6;
+		border-left: 3px solid #c9a08a; border-radius: 0 3px 3px 0; padding: 6px 10px;
+	}
+	.thinking-details summary { cursor: pointer; color: #8a6f5a; font-style: italic; }
+	.thinking-details pre {
+		white-space: pre-wrap; word-break: break-word; color: #6b5340;
+		font-family: inherit; line-height: 1.6; margin-top: 6px;
+		max-height: 180px; overflow-y: auto; font-size: 12px;
 	}
 
-	.thinking {
-		margin-top: 1rem;
-		font-size: 0.85rem;
-		background: #f3efe6;
-		border-left: 3px solid #c9a08a;
-		border-radius: 0 3px 3px 0;
-		padding: 0.5rem 0.75rem;
+	/* Replay */
+	.replay-btn {
+		width: 100%; margin-top: 6px; padding: 7px;
+		font-size: 13px; background: none; color: var(--fg2);
+		border: 1px solid var(--border2); border-radius: var(--r);
+		letter-spacing: 0.06em; cursor: pointer;
+		display: flex; align-items: center; justify-content: center; gap: 6px;
+		font-family: inherit; transition: background 0.1s;
 	}
+	.replay-btn:hover:not(:disabled) { background: var(--bg2); }
+	.replay-btn:disabled { color: var(--fg3); cursor: not-allowed; }
 
-	.thinking summary { cursor: pointer; color: #8a6f5a; font-style: italic; }
-
-	.thinking pre {
-		white-space: pre-wrap;
-		word-break: break-word;
-		color: #6b5340;
-		font-family: inherit;
-		line-height: 1.6;
-		margin: 0.5rem 0 0;
-		max-height: 240px;
-		overflow-y: auto;
-		background: transparent;
-		border: none;
-		padding: 0;
+	/* Stats */
+	.stats-section { }
+	.stats-toggle {
+		display: flex; align-items: center; gap: 5px;
+		width: 100%; padding: 4px 2px;
+		border: none; background: none;
+		color: var(--fg3); font-size: 11px; cursor: pointer;
+		text-align: left; font-family: inherit;
 	}
-
-	/* ── Output section ────────────────────────────────────── */
-	.output-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 0.5rem;
-		gap: 0.5rem;
+	.stats-arrow {
+		display: inline-block; font-size: 9px;
+		transition: transform 0.15s;
 	}
+	.stats-arrow.open { transform: rotate(90deg); }
+	.stats-detail {
+		background: var(--bg2); border-radius: var(--r); border-left: 2px solid var(--border2);
+		padding: 8px 12px; font-size: 11px; color: var(--fg2); line-height: 1.9;
+	}
+	.stats-grid { display: grid; grid-template-columns: auto 1fr; gap: 0 12px; }
+	.stats-key { color: var(--fg3); }
+	.stats-total { font-weight: 500; }
 
-	.output-tabs {
-		display: flex;
-		gap: 0;
-		border: 1px solid #ccc;
-		border-radius: 4px;
+	/* ── Right panel ────────────────────────────────────────── */
+	.right-panel {
+		flex: 1; min-width: 0;
+		display: flex; flex-direction: column;
 		overflow: hidden;
 	}
 
-	.tab-btn {
-		background: #fff;
-		border: none;
-		border-right: 1px solid #ccc;
-		color: #666;
-		padding: 0.3rem 0.9rem;
-		cursor: pointer;
-		font-family: inherit;
-		font-size: 0.85rem;
-		line-height: 1;
+	.right-tabs {
+		display: flex; align-items: center;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg); padding: 0 16px; flex-shrink: 0;
+	}
+	.rtab {
+		padding: 9px 16px; border: none; border-bottom: 2px solid transparent;
+		background: none; color: var(--fg2); font-size: 13px; cursor: pointer;
+		font-family: inherit; white-space: nowrap;
+	}
+	.rtab.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 500; }
+	.rtab:hover:not(.active):not(:disabled) { color: var(--fg); }
+	.rtab:disabled { opacity: 0.35; cursor: not-allowed; }
+	.rtab-spacer { flex: 1; }
+	.rendered-at { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+
+	/* Canvas area */
+	.canvas-area {
+		flex: 1; display: flex; align-items: center; justify-content: center;
+		background: var(--bg2); position: relative; overflow: hidden;
 	}
 
-	.tab-btn:last-child { border-right: none; }
-	.tab-btn:hover:not(:disabled):not(.active) { background: #f5f5f5; }
-	.tab-btn.active { background: #111; color: #fff; }
-	.tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+	.nav-left {
+		position: absolute; left: 14px; z-index: 10;
+		display: flex; flex-direction: column; align-items: center; gap: 6px;
+	}
+	.nav-right {
+		position: absolute; right: 14px; z-index: 10;
+		display: flex; flex-direction: column; align-items: center; gap: 6px;
+	}
+	.nav-circle {
+		width: 38px; height: 38px; border-radius: 50%;
+		background: rgba(255,255,255,0.88); border: 1px solid var(--border2);
+		font-size: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+		display: flex; align-items: center; justify-content: center;
+		color: var(--fg); cursor: pointer; font-family: inherit;
+		transition: background 0.1s;
+	}
+	.nav-circle:hover:not(:disabled) { background: #fff; }
+	.nav-circle:disabled { opacity: 0.35; cursor: not-allowed; }
+	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-	.canvas {
-		aspect-ratio: 1 / 1;
-		max-height: 480px;
-		border: 1px solid #ccc;
-		border-radius: 4px;
+	.canvas-content {
+		position: relative; width: 100%; height: 100%;
+		display: flex; align-items: center; justify-content: center; overflow: hidden;
+	}
+
+	.canvas-box {
+		width: 400px;
+		height: 400px;
 		background: #fff;
+		box-shadow: 0 8px 32px rgba(0,0,0,0.18);
 		overflow: hidden;
+		flex-shrink: 0;
 	}
 
-	.canvas :global(svg) { width: 100%; height: 100%; display: block; }
+	.canvas-box :global(svg) { width: 100%; height: 100%; display: block; }
 
-	.placeholder {
-		height: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #999;
+	.canvas-placeholder {
+		width: 100%; height: 100%; min-height: 200px;
+		display: flex; align-items: center; justify-content: center;
+		color: var(--fg3); font-size: 13px;
 	}
 
-	/* ── Prompts tab ───────────────────────────────────────── */
+	/* Zoom controls */
+	.zoom-controls {
+		position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+		z-index: 10;
+		display: flex; align-items: center; gap: 0;
+		background: rgba(255,255,255,0.9); border: 1px solid var(--border2);
+		border-radius: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.1); overflow: hidden;
+	}
+	.zoom-controls button {
+		width: 32px; height: 28px; border: none; background: none;
+		font-size: 16px; color: var(--fg); cursor: pointer;
+		display: flex; align-items: center; justify-content: center; font-family: inherit;
+	}
+	.zoom-controls button:hover { background: var(--bg2); }
+	.zoom-pct {
+		font-size: 11px; color: var(--fg2); font-variant-numeric: tabular-nums;
+		min-width: 38px; text-align: center; user-select: none;
+	}
+	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: 11px !important; color: var(--fg3) !important; }
+
+	/* Prompts / Score tabs */
 	.prompt-section {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		max-height: 680px;
-		overflow-y: auto;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		padding: 0.75rem;
-		background: #fff;
-	}
-
-	.prompt-label {
-		margin: 0.5rem 0 0.2rem;
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: #555;
-	}
-
-	.prompt-pre {
-		background: #f8f6f0;
-		padding: 0.65rem 0.75rem;
-		border-radius: 4px;
-		border: 1px solid #ddd;
-		overflow-x: auto;
-		max-height: 160px;
-		white-space: pre-wrap;
-		word-break: break-word;
-		font-size: 0.78rem;
-		line-height: 1.5;
-		margin: 0;
-	}
-
-	.prompt-pre-lg {
-		max-height: 400px;
-	}
-
-	/* ── Score tab ─────────────────────────────────────────── */
-	.score-pre {
-		background: #fff;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		padding: 0.75rem;
-		overflow: auto;
-		max-height: 620px;
-		font-size: 0.82rem;
-		line-height: 1.5;
-		white-space: pre-wrap;
-		word-break: break-word;
-		box-sizing: border-box;
+		flex: 1; display: flex; flex-direction: column; gap: 4px;
+		overflow-y: auto; padding: 12px;
 		width: 100%;
 	}
-
-	/* ── Nav ───────────────────────────────────────────────── */
-	.nav { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
-
-	.nav-btn {
-		background: transparent;
-		border: 1px solid #bbb;
-		color: #333;
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		cursor: pointer;
-		font-size: 0.7rem;
-		padding: 0;
-		line-height: 1;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
+	.prompt-label { margin: 8px 0 3px; font-size: 11px; font-weight: 600; color: var(--fg2); }
+	.prompt-pre {
+		background: var(--bg2); padding: 8px 10px; border-radius: var(--r);
+		border: 1px solid var(--border); overflow-x: auto; max-height: 140px;
+		white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.5; margin: 0;
 		font-family: inherit;
 	}
-
-	.nav-btn:hover:not(:disabled) { background: #111; color: #fff; border-color: #111; }
-	.nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-	.counter { color: #666; min-width: 3rem; text-align: center; }
-	.rendered-at { color: #aaa; font-size: 0.78rem; margin-left: 0.5rem; }
-
-	/* ── History ───────────────────────────────────────────── */
-	.history {
-		margin-top: 2.5rem;
-		border-top: 1px solid #ddd;
-		padding-top: 1.5rem;
+	.prompt-pre-lg { max-height: 320px; }
+	.score-pre {
+		background: #fff; border: 1px solid var(--border); border-radius: var(--r);
+		padding: 12px; overflow: auto; font-size: 12px; line-height: 1.5;
+		white-space: pre-wrap; word-break: break-word;
+		width: 100%; height: 100%; margin: 0;
+		font-family: inherit;
 	}
+	.muted-center { color: var(--fg3); font-size: 13px; padding: 16px; }
 
+	/* Export bar */
+	.export-bar {
+		display: flex; align-items: center; gap: 6px;
+		padding: 8px 16px; border-top: 1px solid var(--border);
+		background: var(--bg); flex-shrink: 0;
+	}
+	.export-label { font-size: 11px; color: var(--fg3); margin-right: auto; }
+
+	.png-wrap { position: relative; }
+	.png-menu {
+		position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 100;
+		background: #fff; border: 1px solid var(--border2);
+		border-radius: var(--r-lg); overflow: hidden;
+		box-shadow: 0 4px 18px rgba(0,0,0,0.12); min-width: 190px;
+	}
+	.png-menu button {
+		display: flex; align-items: center; gap: 8px;
+		width: 100%; text-align: left;
+		padding: 8px 14px; background: none; border: none;
+		border-bottom: 1px solid var(--border); color: var(--fg); cursor: pointer;
+		font-family: inherit; font-size: 13px;
+	}
+	.png-menu button:last-child { border-bottom: none; }
+	.png-menu button:hover { background: var(--bg); }
+	.png-size { font-weight: 500; }
+	.png-sub { color: var(--fg3); font-size: 11px; }
+
+	/* ── History strip ───────────────────────────────────────── */
+	.history-strip {
+		border-top: 1px solid var(--border);
+		background: var(--bg);
+		padding: 8px 16px 10px;
+		flex-shrink: 0;
+	}
 	.history-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 0.75rem;
-		margin-bottom: 0.75rem;
+		display: flex; justify-content: space-between; align-items: center;
+		margin-bottom: 7px;
 	}
+	.history-title { font-size: 12px; font-weight: 500; color: var(--fg2); }
+	.history-count { color: var(--fg3); font-weight: 400; }
+	.history-page-nav { display: flex; align-items: center; gap: 6px; }
+	.history-page-indicator { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; }
 
-	.history h2 { font-size: 1rem; font-weight: 600; color: #555; margin: 0; }
-
-	.page-nav {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.8rem;
-		color: #666;
-	}
-
-	.page-nav button {
-		background: transparent;
-		border: 1px solid #ccc;
-		color: #555;
-		padding: 0.2rem 0.5rem;
-		border-radius: 3px;
-		cursor: pointer;
-		font-size: 0.75rem;
-		font-family: inherit;
-	}
-
-	.page-nav button:disabled { opacity: 0.35; cursor: not-allowed; }
-	.page-nav button:hover:not(:disabled) { background: #111; color: #fff; border-color: #111; }
-
-	.muted { color: #aaa; font-weight: normal; font-size: 0.85rem; margin-left: 0.25rem; }
-
-	.strip {
-		display: grid;
-		grid-template-columns: repeat(10, 96px);
-		grid-template-rows: repeat(2, auto);
-		gap: 0.5rem;
-		overflow-x: auto;
-		padding-bottom: 0.5rem;
+	.thumb-strip {
+		display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px;
 	}
 
 	.thumb {
-		flex: 0 0 auto;
-		width: 96px;
-		background: #fff;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		padding: 0;
-		cursor: pointer;
-		overflow: hidden;
-		font-family: inherit;
+		flex-shrink: 0; width: 82px;
+		border: 2px solid transparent;
+		border-radius: var(--r); overflow: hidden; background: #fff;
+		cursor: pointer; padding: 0; font-family: inherit; position: relative;
+		transition: border-color 0.1s;
 	}
-
-	.thumb.current { border-color: #111; box-shadow: 0 0 0 2px #11111133; }
-
-	.thumb-svg { width: 96px; height: 96px; overflow: hidden; }
+	.thumb.current { border-color: var(--accent); }
+	.thumb-svg { width: 82px; height: 58px; overflow: hidden; }
 	.thumb-svg :global(svg) { width: 100%; height: 100%; display: block; }
-
-	.thumb-label {
-		padding: 0.2rem;
-		font-size: 0.75rem;
-		color: #888;
-		text-align: center;
-		border-top: 1px solid #eee;
+	.thumb-meta {
+		padding: 3px 5px; border-top: 1px solid var(--border);
+		display: flex; flex-direction: column; gap: 1px;
+	}
+	.thumb-time  { font-size: 11px; font-weight: 500; color: var(--fg2); }
+	.thumb-model { font-size: 10px; color: var(--fg3); }
+	.thumb-current-badge {
+		position: absolute; bottom: 22px; right: 3px;
+		background: var(--accent); color: #fff;
+		font-size: 9px; padding: 1px 4px; border-radius: 2px;
 	}
 
-	.thumb-model {
-		padding: 0 0.2rem 0.1rem;
-		font-size: 0.68rem;
-		color: #aaa;
-		text-align: center;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+	/* ── Saijiki drawer ─────────────────────────────────────── */
+	.saijiki-drawer {
+		position: fixed; top: 0; right: 0; bottom: 0;
+		width: 0; overflow: hidden; z-index: 300;
+		transition: width 0.25s cubic-bezier(0.4,0,0.2,1);
+		pointer-events: none;
 	}
+	.saijiki-drawer.open { width: 280px; pointer-events: all; }
 
-	.thumb-tokens {
-		padding: 0 0.2rem 0.2rem;
-		font-size: 0.65rem;
-		color: #bbb;
-		text-align: center;
-		white-space: nowrap;
-	}
-
-	/* ── Download bar ──────────────────────────────────────── */
-	.dl-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		margin-top: 0.5rem;
-		flex-wrap: wrap;
-	}
-
-	.dl-btn {
-		font-family: inherit;
-		font-size: 0.8rem;
-		padding: 0.2rem 0.55rem;
-		border: 1px solid #ccc;
-		border-radius: 3px;
-		background: #f8f8f8;
-		color: #444;
-		cursor: pointer;
-	}
-
-	.dl-btn:hover { background: #eee; }
-
-	.dl-sep {
-		font-size: 0.8rem;
-		color: #aaa;
-	}
-
-	/* ── Token elapsed ─────────────────────────────────────── */
-	.elapsed-tok {
-		color: #aaa;
-		font-size: 0.78rem;
-	}
-
-	/* ── Saijiki panel ─────────────────────────────────────── */
-	.saijiki-toggle {
-		background: transparent;
-		border: 1px solid #888;
-		color: #333;
-		padding: 0.4rem 1rem;
-		border-radius: 999px;
-		cursor: pointer;
-		font-size: 0.9rem;
-		font-family: inherit;
-	}
-
-	.saijiki-toggle:hover { background: #111; color: #fff; border-color: #111; }
-
-	.saijiki-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.2);
-		z-index: 10;
-	}
-
-	.saijiki {
-		position: fixed;
-		top: 0;
-		right: 0;
-		bottom: 0;
-		width: min(380px, 90vw);
-		background: #fbf9f3;
-		border-left: 1px solid #ccc;
-		box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
-		overflow-y: auto;
-		padding: 1.5rem;
-		z-index: 11;
+	.saijiki-inner {
+		width: 280px; height: 100%;
+		background: #faf9f6; border-left: 1px solid var(--border);
+		display: flex; flex-direction: column;
+		box-shadow: -4px 0 24px rgba(0,0,0,0.08);
 	}
 
 	.saijiki-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		margin-bottom: 0.25rem;
+		padding: 16px 18px 12px;
+		border-bottom: 1px solid var(--border);
+		display: flex; align-items: flex-start; justify-content: space-between;
+		flex-shrink: 0;
 	}
-
-	.saijiki-head h2 { margin: 0; font-size: 1.3rem; letter-spacing: 0.1em; }
-	.saijiki-head .en { font-size: 0.75rem; color: #888; font-weight: normal; }
-
+	.saijiki-title {
+		font-size: 17px; font-weight: 300; letter-spacing: 0.06em; color: var(--fg);
+	}
+	.saijiki-hint { font-size: 10px; color: var(--fg3); margin-top: 3px; line-height: 1.5; }
 	.saijiki-close {
-		background: transparent;
-		border: none;
-		font-size: 1.5rem;
-		color: #666;
-		cursor: pointer;
-		line-height: 1;
-		padding: 0 0.25rem;
+		width: 24px; height: 24px; border: none; background: none;
+		color: var(--fg3); font-size: 16px; cursor: pointer; flex-shrink: 0; margin-top: 2px;
 	}
+	.saijiki-body { flex: 1; overflow-y: auto; padding: 8px 0; }
 
-	.saijiki-hint { color: #888; font-size: 0.8rem; margin: 0 0 1rem; }
-	.saijiki-cat { margin-bottom: 1.5rem; }
-	.saijiki-cat h3 { margin: 0 0 0.5rem; font-size: 0.95rem; color: #333; font-weight: 600; }
-	.saijiki-cat .en { font-size: 0.7rem; color: #aaa; font-weight: normal; margin-left: 0.25rem; }
+	.saijiki-cat { padding: 10px 18px; }
+	.saijiki-cat-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 8px; }
+	.saijiki-cat-ja { font-size: 13px; font-weight: 400; color: var(--fg); letter-spacing: 0.05em; }
+	.saijiki-cat-en { font-size: 9px; color: var(--fg3); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; }
 
-	.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-
-	.chip {
-		background: #fff;
-		border: 1px solid #ddd;
-		color: #333;
-		padding: 0.3rem 0.7rem;
-		border-radius: 3px;
-		cursor: pointer;
-		font-size: 0.9rem;
-		font-family: inherit;
+	.saijiki-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+	.saijiki-chip {
+		padding: 4px 9px; border: 1px solid var(--border2); border-radius: 3px;
+		background: #fff; color: var(--fg); font-size: 12px; cursor: pointer;
+		font-family: inherit; line-height: 1.3; transition: background 0.1s, border-color 0.1s;
 	}
+	.saijiki-chip:hover { background: var(--bg2); border-color: var(--fg3); }
 
-	.chip:hover { background: #111; color: #fff; border-color: #111; }
-
-	@media (max-width: 720px) {
-		.row { grid-template-columns: 1fr; }
+	/* ── Catalog modal ───────────────────────────────────────── */
+	.modal-backdrop {
+		position: fixed; inset: 0; z-index: 400;
+		background: rgba(0,0,0,0.25); backdrop-filter: blur(2px);
 	}
-
-	pre {
-		background: #fff;
-		padding: 0.75rem;
-		border-radius: 4px;
-		border: 1px solid #ddd;
-		overflow: auto;
-		max-height: 300px;
+	.catalog-modal {
+		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+		z-index: 401;
+		width: 540px; max-height: 80vh;
+		background: #faf9f6; border-radius: var(--r-lg);
+		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+		display: flex; flex-direction: column; overflow: hidden;
 	}
+	.catalog-modal-head {
+		display: flex; align-items: center; justify-content: space-between;
+		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+	}
+	.catalog-modal-title { font-size: 15px; font-weight: 300; letter-spacing: 0.05em; }
+	.catalog-close {
+		width: 24px; height: 24px; border: none; background: none;
+		color: var(--fg3); font-size: 18px; cursor: pointer; line-height: 1;
+	}
+	.catalog-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 
-	details { margin-top: 1rem; font-size: 0.85rem; }
+	.catalog-item {
+		display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+		border: 1px solid var(--border); border-radius: var(--r);
+		background: #fff; cursor: pointer; text-align: left;
+		transition: border-color 0.12s, background 0.12s; font-family: inherit; width: 100%;
+	}
+	.catalog-item.active { border: 1.5px solid var(--accent); background: var(--accent-light); }
+	.catalog-item:hover:not(.active) { background: var(--bg); }
+
+	.catalog-swatches {
+		display: flex; flex-shrink: 0; border-radius: 3px; overflow: hidden; height: 32px; width: 64px;
+	}
+	.catalog-swatch { flex: 1; }
+
+	.catalog-info { flex: 1; min-width: 0; }
+	.catalog-name { font-size: 12px; font-weight: 500; color: var(--fg); margin-bottom: 1px; }
+	.catalog-sub  { font-size: 11px; color: var(--fg3); }
+	.catalog-check { color: var(--accent); font-size: 13px; flex-shrink: 0; }
+
+	/* ── Animations ─────────────────────────────────────────── */
+	@keyframes inkupulse {
+		0%, 100% { opacity: 1; transform: scale(1); }
+		50%       { opacity: 0.4; transform: scale(0.7); }
+	}
 </style>

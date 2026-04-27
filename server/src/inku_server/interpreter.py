@@ -202,6 +202,24 @@ EXAMPLE_POOL: list[dict] = [
         "input": "鉛筆で細い縦線を十本引く",
         "output": "鉛筆の細い縦線を横に十本並べる。",
     },
+    # てざわり保持: 筆 + ゆらぎ
+    {
+        "keywords": ["筆", "太筆", "細筆", "毛筆", "墨", "にじむ", "にじみ"],
+        "input": "太筆で横線を五本引く",
+        "output": "太筆の横線を縦に五本並べる。",
+    },
+    # てざわり保持: 縄
+    {
+        "keywords": ["縄", "ロープ", "太い", "麻", "荒い"],
+        "input": "縄のような太い線を引く",
+        "output": "縄の横線を中央に引く。",
+    },
+    # てざわり保持: ロットリング + 精密
+    {
+        "keywords": ["ロットリング", "精密", "製図", "設計", "0.3mm", "細"],
+        "input": "ロットリングで精密な線を引く",
+        "output": "ロットリングの縦線を横に五本並べる。",
+    },
     # 属性保持: ゆらぎ + 数量 (揺らぎは別文)
     {
         "keywords": ["震え", "震える", "揺れ", "揺らぐ", "波打つ", "ぶれ"],
@@ -427,6 +445,21 @@ EXAMPLE_POOL_EN: list[dict] = [
         "keywords": ["pencil", "thin", "delicate", "fine", "light", "ten"],
         "input": "Draw ten thin vertical lines with a pencil",
         "output": "Line up ten thin vertical pencil lines horizontally.",
+    },
+    {
+        "keywords": ["thick brush", "brushstroke", "ink", "calligraphy", "bold"],
+        "input": "Draw five bold horizontal brushstrokes",
+        "output": "Line up five thick-brush horizontal lines vertically.",
+    },
+    {
+        "keywords": ["chalk", "chalkboard", "white", "rough", "texture"],
+        "input": "Draw with chalk on a dark background",
+        "output": "Fill background with black. Place a white chalk circle at center. Edges blurring.",
+    },
+    {
+        "keywords": ["rope", "thick", "coarse", "heavy"],
+        "input": "A thick rope-like line across the center",
+        "output": "Draw a rope horizontal line at center.",
     },
     {
         "keywords": ["trembling", "trembles", "shaking", "vibrate", "quivering"],

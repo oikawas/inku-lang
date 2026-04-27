@@ -93,6 +93,34 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 背景を黒で塗りつぶす。三日月の弧を右上に置く。半径は0.12。
 出力: {"background":"black","instructions":[{"primitive":"arc","center":[0.7,0.25],"radius":0.12,"angle_start":210,"angle_end":330,"color":"white"}]}
 
+# てざわり → weight 変換 (必須)
+
+正規化DDL に素材語が含まれる場合は必ず weight フィールドに反映せよ。省略は禁止。
+
+| 素材語 | weight 値 |
+|---|---|
+| 髪・ヘア | hair |
+| 鉛筆 | pencil |
+| ペン (既定) | pen |
+| ロットリング | rotring |
+| クレヨン | crayon |
+| チョーク | chalk |
+| 細筆 | brush_thin |
+| 太筆 | brush_thick |
+| 縄 | rope |
+
+入力: 青いクレヨンの縦線を横に三十本並べる。
+出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"blue","weight":"crayon","arrangement":{"count":30,"layout":"horizontal"}}]}
+
+入力: 鉛筆の細い縦線を横に十本並べる。
+出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"weight":"pencil","arrangement":{"count":10,"layout":"horizontal"}}]}
+
+入力: 中央に白いチョークの円を置く。境界が滲む。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1,"color":"white","weight":"chalk","variation":{"amplitude":"medium","frequency":"medium","quality":"pink","dimensions":["position_x","position_y"]}}]}
+
+入力: 太筆の黒い横線を縦に五本並べる。
+出力: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"weight":"brush_thick","arrangement":{"count":5,"layout":"vertical"}}]}
+
 説明・前置き禁止。submit_score 呼び出しのみ。"""
 
 SYSTEM_PROMPT_EN = """You are the Stage 2 compiler of inku DDL.
@@ -148,6 +176,31 @@ Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,
 
 Input: Place a tall rectangle at center.
 Output: {"instructions":[{"primitive":"square","position":[0.425,0.325],"size":[0.15,0.35]}]}
+
+# Touches → weight (required)
+
+When the normalized DDL contains a material word, always set the weight field. Omission is forbidden.
+
+| material word | weight value |
+|---|---|
+| hair | hair |
+| pencil | pencil |
+| pen (default) | pen |
+| rotring | rotring |
+| crayon | crayon |
+| chalk | chalk |
+| fine-brush | brush_thin |
+| thick-brush | brush_thick |
+| rope | rope |
+
+Input: Line up thirty vertical blue crayon lines horizontally.
+Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"blue","weight":"crayon","arrangement":{"count":30,"layout":"horizontal"}}]}
+
+Input: Line up ten thin vertical pencil lines horizontally.
+Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"weight":"pencil","arrangement":{"count":10,"layout":"horizontal"}}]}
+
+Input: Place a white chalk circle at center. Edges blurring.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1,"color":"white","weight":"chalk","variation":{"amplitude":"medium","frequency":"medium","quality":"pink","dimensions":["position_x","position_y"]}}]}
 
 No explanation. Call submit_score only."""
 

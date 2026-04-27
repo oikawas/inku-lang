@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.6**
+**Version: v1.8**
 
 ---
 
@@ -1032,6 +1032,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 | 項目 | 状態 | 備考 |
 |---|---|---|
 | line 揺らぎ | 実装済 (v0.8) | 80 segments polyline、perlin/wave/pink/white |
+| 滲む (pink quality) | 実装済 (v1.8) | SVG `feGaussianBlur` フィルター、`BLUR_STD` dict で amplitude 別 stdDeviation |
 | circle 揺らぎ | 未実装 | 円周 polygon 化 → radius or 位置の揺らぎ注入 |
 | ellipse 揺らぎ | 未実装 | circle と同様 (rx/ry 方向別揺らぎ可能) |
 | triangle 揺らぎ | 未実装 | 3 辺それぞれ polyline に展開 |
@@ -1039,19 +1040,21 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 | arc 揺らぎ | 未実装 | path を N 分割して radius 揺らぎ |
 | `thickness` dimension | 未対応 | stroke-width を segment 毎に変化 (1 line = 複数 path 必要) |
 | `angle` / `rotation` / `length` dimension | 未対応 | 線の端点位置に作用する軸 |
-| 揺らぎの視覚品質 | MVP 水準 | 鉛筆 / 筆の物理的リアリズムは未着手 (SPEC §13.5) |
+| てざわり視覚品質 | 線幅のみ (v1.8) | `WEIGHT_TO_STROKE_WIDTH` で stroke-width を変化させるが、クレヨンのザラつき・チョークのかすれ等の物理リアリズムは未実装 (SPEC §13.5)。SVG `feTurbulence` や `feDisplacementMap` フィルターが候補 |
 
 ### B. Stage 2 composer (精度改善)
 
 - qwen-api の fixture 合格率 9/15、残 6 件の改善案:
   - center/position 混同の対比例を EXAMPLE_POOL 形式で追加
   - 複数命令並列用の例を追加
+- **てざわり → weight フィールド変換**: v1.8 で対応テーブル + 4 例追加済み。fixture 16〜20 としててざわり専用ケースの追加が望ましい（クレヨン・チョーク・太筆・縄）
 - Anthropic Haiku 4.5 path の fidelity 測定 (ベースライン比較)
 - Gemma3-4B 対応: tool parameters 用の flat schema 生成ヘルパ (`_flatten_schema_for_tool()`)
 - tolerance `±0.05` の妥当性 (複数 LLM 横断比較で再調整)
 
 ### C. Stage 1 interpreter
 
+- EXAMPLE_POOL 現在 45 件 (v1.8 時点)。k=5 動的選択
 - EXAMPLE_POOL に arc 例 (弧を使う詩句 → `弧を引く` 等) 追加、弧出力を誘導
 - Stage 1 → Stage 2 の E2E 汎化試験 (interpret 結果が composer を通るか)
 - SPEC §2 原則5 違反動詞の混入率測定 (v0.7 強化 + v1.0 属性保持強化後の再評価)
@@ -1087,6 +1090,8 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 ### G. 既に解消済 (参考)
 
+- ~~てざわり語彙 (クレヨン・チョーク等) が Stage 2 の weight フィールドに変換されない~~ → v1.8 で composer.py にてざわり→weight 対応表 + 4 例追加。EXAMPLE_POOL にも太筆・縄・ロットリング等の例を追加
+- ~~滲む (ゆらぎ quality=pink) が実装されていない~~ → v1.8 で SVG `feGaussianBlur` フィルター実装 (`BLUR_STD` dict: fine=2px / medium=6px / broad=15px)
 - ~~arc primitive の角度フィールド仕様~~ → v0.7 で解消 (現 v0.8 付録参照)
 - ~~Renderer 揺らぎの基本実装~~ → v0.8 で line に実装
 - ~~Opus 4.7 API の利用方針 (二段階 vs 一段階)~~ → v0.3 二段階確定
@@ -1163,8 +1168,8 @@ inku-lang/                         # github.com/oikawas/inku-lang
 `server/src/inku_server/`:
 - `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
 - `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
-- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 38件、k=5 動的選択、非 Saijiki 語展開・わりあいルール)
-- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例)
+- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
+- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
 - `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
@@ -1178,6 +1183,89 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.8 (2026-04-27)
+
+**てざわり→weight 変換修正 + 滲む SVG フィルター実装**
+
+#### てざわり → weight フィールド変換の修正 (`composer.py`)
+
+**問題**: Stage 1 が正規化DDL に「青いクレヨンの縦線」と正しく出力していても、Stage 2 (composer.py) には `weight` フィールドへの変換例・指示が一切なく、常にデフォルト `pen` が出力されていた。
+
+**修正内容**:
+- `SYSTEM_PROMPT` / `SYSTEM_PROMPT_EN` に「てざわり → weight 変換 (必須)」セクションを追加
+  - 素材語9種 (髪・鉛筆・ペン・ロットリング・クレヨン・チョーク・細筆・太筆・縄) と対応 weight 値の対応表
+  - 4 つの変換例: クレヨン/鉛筆/チョーク+滲む/太筆
+- `EXAMPLE_POOL` に てざわり例を追加: 太筆・縄・ロットリング・チョーク (日本語)、thick-brush・chalk・rope (英語)
+
+**影響範囲**: `server/src/inku_server/composer.py`, `server/src/inku_server/interpreter.py`
+
+**次のステップ**: `server/tests/fixtures/stage2/` にてざわりフィクスチャ (16〜20 番) を追加して regression を防ぐ。
+
+#### 滲む (quality=pink) → SVG feGaussianBlur 実装 (`renderer.py`)
+
+**問題**: `variation.quality = "pink"` が JSON Score に含まれても、renderer が blur フィルターを生成していなかった。
+
+**実装内容**:
+- `BLUR_STD` dict: `{fine: 2.0, medium: 6.0, broad: 15.0}` (pixel単位 stdDeviation)
+- `_needs_blur(v)`: quality=pink のとき True を返す判定関数
+- `render()`: blur 必要な要素に id を付与し `_inject_blur_filters()` でまとめてフィルター定義を `<defs>` に注入
+- `_inject_blur_filters()`: `<defs />` / `<defs/>` / `<defs>` の3形式に対応 (svgwrite の出力方言差吸収)
+
+**フィルター設計**: 要素ごとではなくアンプリチュード別に1つのフィルター定義 (`blur-fine`等) を共有し、SVGサイズを最小化。
+
+---
+
+### v1.7 (2026-04-27)
+
+**UI 8改善 — 感情語ヒント注入 + 履歴 catalog_id 保存 + ナビ修正**
+
+#### 感情語 → DDL ヒント自動注入
+
+Stage 1 解釈時に感情語を検出し、DDL語彙への変換ヒントを入力末尾に付加。
+
+- **`EMOTION_DDL_MAP`** (16語): 「美しい」「激しい」「静かな」「儚い」「神秘的」等 → weight/variation/color の具体値を対応付け
+- `buildEmotionHint(text)`: `annotate()` で `kind === 'emotion'` を抽出 → ヒント文字列生成
+- Stage 1 API 送信直前に `text + buildEmotionHint(text)` を `augmented` として送信 (表示テキストは変更なし)
+
+#### 履歴 catalog_id 保存
+
+選択中の色カタログを履歴レコードに永続化。
+
+- **`db.py`**: `HistoryRow` に `catalog_id VARCHAR` カラム追加。`_migrate_columns()` で `ALTER TABLE ADD COLUMN` (既存 DB への無害マイグレーション)
+- **`api.py`**: `HistoryPostBody` に `catalog_id: str | None` 追加
+- **frontend**: `PaintResult` 型 + `pushHistory` 呼び出しに `catalog_id` 追加。`selectedCatalog !== 'default'` のときのみ保存
+
+#### 歳時記ボタンをヘッダーから削除
+
+入力エリアの歳時記ボタンを残し、ヘッダーリンクを削除。
+
+#### 入力内語彙表示ボックス削除
+
+`result && inputMode === 'single'` のときに表示していた「入力に含まれた語彙」セクション (`annot-box`) を削除。感情語はヒント注入で活用するため、インライン表示は不要と判断。
+
+#### ヒストリーストリップの動的幅
+
+`visibleThumbCount = Math.max(1, Math.floor((windowWidth - 40) / 89))` でウィンドウ幅に応じてサムネイル表示数を動的決定。`window.resize` イベントで `windowWidth` を更新（`onMount` で listener 登録 + cleanup）。
+
+#### ナビ矢印方向の修正
+
+`‹`（左） = 新しい（newer）、`›`（右） = 古い（older）に修正。旧実装では `‹`/`›` と `gotoPrev`/`gotoNext` の対応が逆だった。
+
+#### エクスポートファイル名の統一
+
+`slugify(input)` ベースから日時スタンプ形式へ変更。
+
+- 形式: `inku-YYYY-MM-DD-HH-MM[-size].ext`
+- `exportFilename(ext, size?)` ヘルパー関数を追加
+- SVG / PNG 両方に適用
+
+#### CSS 修正
+
+- `.prompt-area` と `.prompt-pre` に `align-self: stretch; min-height: 0` を追加 → プロンプトタブの縦スクロールが正常化
+- `.thumb-strip` を `overflow: hidden` に変更 (横スクロール廃止、`visibleThumbCount` でクリップ)
+
+---
 
 ### v1.6 (2026-04-27)
 

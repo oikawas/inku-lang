@@ -48,6 +48,7 @@
 		stage2_model?: string | null;
 		tokens_in?: number | null;
 		tokens_out?: number | null;
+		catalog_id?: string | null;
 	};
 
 	// ── Input ───────────────────────────────────────────────
@@ -73,6 +74,7 @@
 	let result   = $state<PaintResult | null>(null);
 
 	// ── UI ──────────────────────────────────────────────────
+	let windowWidth  = $state(1200);
 	let saijikiOpen  = $state(false);
 	let settingsOpen = $state(false);
 	let pngMenuOpen  = $state(false);
@@ -93,6 +95,46 @@
 	function activeColorMap(): ColorMap | null {
 		if (selectedCatalog === 'default') return null;
 		return getColorMap(selectedCatalog);
+	}
+
+	// ── 感情語 → DDL ヒント ──────────────────────────────────
+	const EMOTION_DDL_MAP: Record<string, string> = {
+		'美しい':  '線は細く(pencil)、揺らぎは小さく(fine)、動きはゆっくり(slow)',
+		'美しく':  '線は細く(pencil)、揺らぎは小さく(fine)、動きはゆっくり(slow)',
+		'激しい':  '線は太く(brush_thick)、揺らぎは大きく(broad)、動きは速く(high)',
+		'激しく':  '線は太く(brush_thick)、揺らぎは大きく(broad)、動きは速く(high)',
+		'静かな':  '揺らぎなし(none)、線は細く(hair)、密度を低く',
+		'静かに':  '揺らぎなし(none)、線は細く(hair)、密度を低く',
+		'素敵':    '線は細く(pen)、揺らぎは小さく(fine)、配置は整然と',
+		'きれい':  '線は細く(pencil)、揺らぎは小さく(fine)、密度を低く',
+		'やさしい':'揺らぎは波(wave)、振幅は小さく(fine)、線は細く(pencil)',
+		'切ない':  '色は青(blue)か灰(gray)、線は細く(hair)、揺らぎはゆっくり(slow)',
+		'哀しい':  '色は青(blue)、線は細く(hair)、要素数は少なく',
+		'儚い':    '線は最細(hair)、破線か点線(dashed/dotted)、要素は散らす(scatter)',
+		'神秘的':  '背景は黒(black)、円や弧を使う(circle/arc)、放射状(radial)',
+		'幻想的':  '揺らぎはperlin、振幅は大きく(broad)、複数色(color_cycle)',
+		'寂しい':  '要素数は少なく、間隔を広く、色は灰(gray)',
+		'爽やか':  '色は青(blue)か白(white)背景、線は細く(pen)、揺らぎなし(none)',
+	};
+
+	function buildEmotionHint(text: string): string {
+		const emotions = annotate(text).filter(p => p.kind === 'emotion').map(p => p.text);
+		if (emotions.length === 0) return '';
+		const hints = emotions.map(e => {
+			const h = EMOTION_DDL_MAP[e];
+			return h ? `「${e}」→ ${h}` : `「${e}」`;
+		});
+		return `\n\n[感情語をDDLに反映してください: ${hints.join('、')}]`;
+	}
+
+	// ── エクスポートファイル名 ────────────────────────────────
+	function exportFilename(ext: string, size?: number): string {
+		const now = new Date();
+		const pad = (n: number) => String(n).padStart(2, '0');
+		const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+		const time = `${pad(now.getHours())}-${pad(now.getMinutes())}`;
+		const sizeStr = size != null ? `-${size}` : '';
+		return `inku-${date}-${time}${sizeStr}.${ext}`;
 	}
 
 	// ── Models ──────────────────────────────────────────────
@@ -154,10 +196,11 @@
 		const lang = getLang();
 		stageLabel = t().stageInterpreting;
 
+		const augmented = text + buildEmotionHint(text);
 		const r1 = await fetch('/api/interpret', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text, model: stage1Model, include_thinking: includeThinking, snapshot_id: activeSnapshotId, lang })
+			body: JSON.stringify({ text: augmented, model: stage1Model, include_thinking: includeThinking, snapshot_id: activeSnapshotId, lang })
 		});
 		if (!r1.ok) {
 			const d = await r1.json().catch(() => ({})) as { detail?: string };
@@ -207,7 +250,7 @@
 				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
 				const totalIn  = (r.tokens_in_stage1 ?? 0)  + (r.tokens_in_stage2 ?? 0);
 				const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-				await pushHistory({ input, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null });
+				await pushHistory({ input, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
 			} else {
 				const lines = batchLines.map((l) => l.trim()).filter((l) => l);
 				batchTotal = lines.length; outputTab = 'canvas';
@@ -219,7 +262,7 @@
 						result = r;
 						const totalIn  = (r.tokens_in_stage1 ?? 0)  + (r.tokens_in_stage2 ?? 0);
 						const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-						await pushHistory({ input: `#${i + 1} ${lines[i]}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null });
+						await pushHistory({ input: `#${i + 1} ${lines[i]}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
 					} catch { /* continue */ }
 				}
 				elapsedTotalMs = Date.now() - _timerStart;
@@ -276,7 +319,7 @@
 			await fetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null })
 			});
 		} catch { /* ignore */ }
 		await fetchHistoryPage(0);
@@ -389,13 +432,11 @@
 		const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
 		URL.revokeObjectURL(url);
 	}
-	function slugify(text: string): string { return text.slice(0, 30).replace(/\s+/g, '-').replace(/[^\w\-]/g, ''); }
-
 	function downloadSVG() {
 		if (!result) return;
 		const desc = `<desc>${escapeXml(input)}</desc>`;
 		const svg  = result.svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
-		triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), `inku-${slugify(input)}.svg`);
+		triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), exportFilename('svg'));
 	}
 
 	async function downloadPNG(size: number) {
@@ -417,7 +458,7 @@
 					ctx.drawImage(img, 0, 0, size, size);
 					canvas.toBlob((b) => {
 						if (!b) { reject(new Error('canvas error')); return; }
-						triggerDownload(b, `inku-${slugify(input)}-${size}.png`); resolve();
+						triggerDownload(b, exportFilename('png', size)); resolve();
 					}, 'image/png');
 				};
 				img.onerror = () => reject(new Error('svg load error'));
@@ -461,8 +502,14 @@
 		return `${total}s`;
 	});
 
+	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
+
 	// ── Mount ───────────────────────────────────────────────
 	onMount(async () => {
+		windowWidth = window.innerWidth;
+		function onResize() { windowWidth = window.innerWidth; }
+		window.addEventListener('resize', onResize);
+
 		initLang();
 		await Promise.all([fetchHistoryPage(0), fetchSnapshots(), fetchPrompts()]);
 		if (historyItems.length > 0) loadIteration(0);
@@ -473,6 +520,8 @@
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
 		} catch {}
+
+		return () => window.removeEventListener('resize', onResize);
 	});
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
@@ -573,10 +622,6 @@
 			<button class="header-link" onclick={() => catalogOpen = true}>カタログ設定</button>
 			<span class="header-sep">|</span>
 
-			<!-- 歳時記 -->
-			<button class="header-link" class:underlined={saijikiOpen} onclick={() => saijikiOpen = !saijikiOpen}>歳時記</button>
-			<span class="header-sep">|</span>
-
 			<!-- Build -->
 			<span class="build-badge">Build {__BUILD_NUMBER__}</span>
 		</div>
@@ -655,20 +700,6 @@
 
 					{#if error}<p class="error-text">{error}</p>{/if}
 				</section>
-
-				<!-- 入力に含まれた語彙 -->
-				{#if result && inputMode === 'single'}
-					<section class="panel-section">
-						<span class="section-label">{t().vocabInInputLabel}</span>
-						<div class="annot-box">
-							{#each annotate(input) as part, i (i)}
-								{#if part.kind === 'saijiki'}<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
-								{:else if part.kind === 'emotion'}<span class="tok tok-emotion">{part.text}</span>
-								{:else}<span class="tok tok-plain">{part.text}</span>{/if}
-							{/each}
-						</div>
-					</section>
-				{/if}
 
 				<!-- thinking -->
 				{#if thinking}
@@ -770,9 +801,9 @@
 			<!-- Canvas area -->
 			<div class="canvas-area">
 
-				<!-- Prev nav -->
+				<!-- Prev nav (newer items = left) -->
 				<div class="nav-left">
-					<button class="nav-circle" onclick={gotoPrev} disabled={prevDisabled}>‹</button>
+					<button class="nav-circle" onclick={gotoNext} disabled={nextDisabled}>‹</button>
 				</div>
 
 				<!-- Content -->
@@ -820,9 +851,9 @@
 					</div>
 				{/if}
 
-				<!-- Next nav + counter -->
+				<!-- Next nav (older items = right) -->
 				<div class="nav-right">
-					<button class="nav-circle" onclick={gotoNext} disabled={nextDisabled}>›</button>
+					<button class="nav-circle" onclick={gotoPrev} disabled={prevDisabled}>›</button>
 					{#if historyTotal > 0}
 						<span class="nav-counter">{navPos} / {historyTotal}</span>
 					{/if}
@@ -866,7 +897,7 @@
 				{/if}
 			</div>
 			<div class="thumb-strip">
-				{#each historyItems as it, i (it.id ?? it.at)}
+				{#each historyItems.slice(0, visibleThumbCount) as it, i (it.id ?? it.at)}
 					<button
 						class="thumb"
 						class:current={i === historyCursor}
@@ -1416,6 +1447,7 @@
 		flex: 1; display: flex; flex-direction: column; gap: 4px;
 		overflow-y: auto; padding: 12px;
 		width: 100%;
+		align-self: stretch; min-height: 0;
 	}
 	.prompt-label { margin: 8px 0 3px; font-size: 11px; font-weight: 600; color: var(--fg2); }
 	.prompt-pre {
@@ -1431,6 +1463,7 @@
 		white-space: pre-wrap; word-break: break-word;
 		width: 100%; height: 100%; margin: 0;
 		font-family: inherit;
+		align-self: stretch; min-height: 0;
 	}
 	.muted-center { color: var(--fg3); font-size: 13px; padding: 16px; }
 
@@ -1478,7 +1511,7 @@
 	.history-page-indicator { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; }
 
 	.thumb-strip {
-		display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px;
+		display: flex; gap: 7px; overflow: hidden;
 	}
 
 	.thumb {

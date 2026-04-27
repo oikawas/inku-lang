@@ -157,6 +157,7 @@ class HistoryPostBody(BaseModel):
     stage2_model: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
+    catalog_id: str | None = None
 
 
 class HistoryItem(HistoryPostBody):

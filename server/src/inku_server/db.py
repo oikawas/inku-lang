@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Column, Integer, String, Text, create_engine, func
+from sqlalchemy import BigInteger, Column, Integer, String, Text, create_engine, func, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 _DEFAULT_DB = "sqlite:///" + str(Path.home() / ".local" / "share" / "inku" / "inku.db")
@@ -39,6 +39,7 @@ class HistoryRow(Base):
     stage2_model = Column(String,     nullable=True)
     tokens_in    = Column(Integer,    nullable=True)
     tokens_out   = Column(Integer,    nullable=True)
+    catalog_id   = Column(String,     nullable=True)
 
 
 def init_db() -> None:
@@ -46,6 +47,16 @@ def init_db() -> None:
         db_path = Path(_DB_URL[len("sqlite:///"):]).expanduser()
         db_path.parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(engine)
+    _migrate_columns()
+
+
+def _migrate_columns() -> None:
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE history ADD COLUMN catalog_id VARCHAR"))
+            conn.commit()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _row_to_dict(row: HistoryRow) -> dict:
@@ -62,6 +73,7 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "stage2_model": row.stage2_model,
         "tokens_in":    row.tokens_in,
         "tokens_out":   row.tokens_out,
+        "catalog_id":   row.catalog_id,
     }
 
 
@@ -79,6 +91,7 @@ def add_item(item: dict) -> dict:
         stage2_model=item.get("stage2_model"),
         tokens_in=item.get("tokens_in"),
         tokens_out=item.get("tokens_out"),
+        catalog_id=item.get("catalog_id"),
     )
     with SessionLocal() as session:
         session.add(row)

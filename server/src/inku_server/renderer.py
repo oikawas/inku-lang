@@ -51,6 +51,9 @@ AMPLITUDE_PX: dict[str, float] = {"fine": 4.0, "medium": 12.0, "broad": 30.0}
 FREQUENCY_CYCLES: dict[str, float] = {"slow": 2.0, "medium": 6.0, "high": 14.0}
 SEGMENT_COUNT = 80  # polyline の分割数
 
+# 滲む (quality=pink): SVG feGaussianBlur の stdDeviation
+BLUR_STD: dict[str, float] = {"fine": 2.0, "medium": 6.0, "broad": 15.0}
+
 
 def _seed_for_instruction(ins: Instruction) -> int:
     """同一 Score は同一 SVG を出す (決定的)。"""
@@ -76,10 +79,16 @@ def _value_noise_1d(x: float, seed: int) -> float:
     return v1 * (1 - t) + v2 * t
 
 
-def _needs_variation(v: Variation | None) -> bool:
+def _needs_blur(v: Variation | None) -> bool:
+    """quality=pink → SVG feGaussianBlur で滲み表現。"""
+    return v is not None and v.quality == "pink"
+
+
+def _needs_path_variation(v: Variation | None) -> bool:
+    """quality=perlin/wave/white かつ dimensions 指定あり → polyline 揺らぎ。pink は blur で処理。"""
     if v is None:
         return False
-    if v.quality == "none":
+    if v.quality in ("none", "pink"):
         return False
     return any(d in ("position_x", "position_y") for d in v.dimensions)
 
@@ -264,6 +273,31 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     return _apply_color_cycle([ins], arr.color_cycle)
 
 
+def _inject_blur_filters(
+    svg: str,
+    blur_needed: dict[str, float],
+    blur_elems: list[tuple[str, str]],
+) -> str:
+    """feGaussianBlur フィルター定義を defs に注入し、対象要素に filter 属性を付与する。"""
+    filter_xml = "".join(
+        f'<filter id="blur-{amp}" x="-30%" y="-30%" width="160%" height="160%">'
+        f'<feGaussianBlur in="SourceGraphic" stdDeviation="{std:.1f}"/>'
+        f'</filter>'
+        for amp, std in sorted(blur_needed.items())
+    )
+    # svgwrite は "<defs />" を出力する (スペースあり)
+    if "<defs />" in svg:
+        svg = svg.replace("<defs />", f"<defs>{filter_xml}</defs>", 1)
+    elif "<defs/>" in svg:
+        svg = svg.replace("<defs/>", f"<defs>{filter_xml}</defs>", 1)
+    else:
+        svg = svg.replace("<defs>", f"<defs>{filter_xml}", 1)
+
+    for eid, amp in blur_elems:
+        svg = svg.replace(f'id="{eid}"', f'id="{eid}" filter="url(#blur-{amp})"', 1)
+    return svg
+
+
 def render(score: Score, color_map: dict[str, str] | None = None) -> str:
     cmap = {**COLOR_MAP, **(color_map or {})}
     dwg = svgwrite.Drawing(
@@ -273,14 +307,29 @@ def render(score: Score, color_map: dict[str, str] | None = None) -> str:
     bg = cmap.get(score.background, BACKGROUND)
     dwg.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX), fill=bg))
 
+    blur_needed: dict[str, float] = {}
+    blur_elems: list[tuple[str, str]] = []
+    elem_idx = 0
+
     for ins in score.instructions:
         expanded = _expand_arrangement(ins) if ins.arrangement else [ins]
         for single in expanded:
             element = _render_instruction(dwg, single, cmap)
             if element is not None:
+                if _needs_blur(single.variation):
+                    v = single.variation
+                    assert v is not None
+                    blur_needed[v.amplitude] = BLUR_STD[v.amplitude]
+                    eid = f"e{elem_idx}"
+                    element["id"] = eid
+                    blur_elems.append((eid, v.amplitude))
                 dwg.add(element)
+            elem_idx += 1
 
-    return dwg.tostring()
+    svg = dwg.tostring()
+    if blur_elems:
+        svg = _inject_blur_filters(svg, blur_needed, blur_elems)
+    return svg
 
 
 _CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})
@@ -334,7 +383,7 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
     if ins.primitive == "line":
         start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0))
         end = _px(ins.to if ins.to is not None else (0.5, 1.0))
-        if _needs_variation(ins.variation):
+        if _needs_path_variation(ins.variation):
             assert ins.variation is not None
             points = _line_with_variation(
                 start, end, ins.variation, _seed_for_instruction(ins)

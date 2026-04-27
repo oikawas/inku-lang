@@ -6,7 +6,7 @@ def test_render_empty_score_has_background():
     svg = render(Score(instructions=[]))
     assert "<svg" in svg
     assert 'viewBox="0 0 1000 1000"' in svg
-    assert "#f7f5ef" in svg
+    assert "#ffffff" in svg
 
 
 def test_render_single_line_solid_pen_black():
@@ -295,9 +295,66 @@ def test_render_line_quality_none_still_straight():
     assert "<polyline" not in svg
 
 
-def test_line_missing_endpoints_raises():
-    import pytest
-
+def test_line_missing_endpoints_uses_default():
     score = Score(instructions=[Instruction(primitive="line")])
-    with pytest.raises(ValueError):
-        render(score)
+    svg = render(score)
+    assert "<line" in svg
+
+
+def test_render_circle_with_pink_variation_emits_blur_filter():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.2,
+                    "variation": {"quality": "pink", "amplitude": "medium"},
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "feGaussianBlur" in svg
+    assert 'filter="url(#blur-medium)"' in svg
+    assert "<circle" in svg
+    assert "<polyline" not in svg
+
+
+def test_render_line_with_pink_variation_emits_blur_not_polyline():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "variation": {
+                        "quality": "pink",
+                        "amplitude": "fine",
+                        "dimensions": ["position_y"],
+                    },
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "feGaussianBlur" in svg
+    assert "<line" in svg
+    assert "<polyline" not in svg
+
+
+def test_render_pink_variation_deterministic():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.3, 0.3],
+                    "size": [0.2, 0.4],
+                    "variation": {"quality": "pink", "amplitude": "broad"},
+                }
+            ]
+        }
+    )
+    assert render(score) == render(score)

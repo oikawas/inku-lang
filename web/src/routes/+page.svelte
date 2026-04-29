@@ -698,6 +698,27 @@
 
 	<!-- ══ BODY ══ -->
 	<div class="body">
+		{#if loading || reloading}
+			<div class="flying-bird-layer" aria-hidden="true">
+				<div class="flying-bird-y">
+					<div class="flying-bird-x">
+						<svg class="flying-bird" width="38" height="28" viewBox="0 0 38 28">
+							<ellipse cx="18" cy="17" rx="8" ry="5" fill="#6b7b2a" opacity="0.92" />
+							<path d="M25,18 Q31,22 30,16" fill="#4a5820" opacity="0.85" />
+							<path d="M10,15.5 L6,13.5" stroke="#b8940a" stroke-width="1.5" fill="none" stroke-linecap="round" />
+							<circle cx="12" cy="14.5" r="1.5" fill="#fff" />
+							<circle cx="12.4" cy="14.5" r="0.7" fill="#1a1917" />
+							<path fill="#8b9b3a" opacity="0.88">
+								<animate attributeName="d" values="M14,17 Q19,6 24,17;M14,17 Q19,26 24,17;M14,17 Q19,6 24,17" dur="0.38s" repeatCount="indefinite" />
+							</path>
+							<path fill="#a8b855" opacity="0.5">
+								<animate attributeName="d" values="M15,16 Q19,9 23,16;M15,16 Q19,23 23,16;M15,16 Q19,9 23,16" dur="0.38s" repeatCount="indefinite" />
+							</path>
+						</svg>
+					</div>
+				</div>
+			</div>
+		{/if}
 
 		<!-- ── LEFT PANEL ── -->
 		<div class="left-panel">
@@ -758,9 +779,9 @@
 						</div>
 						<div class="progress-bar-track">
 							<div class="progress-bar-fill" style="width: {stageLabel.includes('構造化') ? '65' : '30'}%"></div>
-							<svg class="progress-bird" class:done={!loading} width="16" height="10" viewBox="0 0 16 10" aria-hidden="true">
-								<path d="M0,5 Q4,0 8,5 Q12,0 16,5" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.7">
-									<animate attributeName="d" values="M0,5 Q4,0 8,5 Q12,0 16,5;M0,5 Q4,8 8,5 Q12,8 16,5;M0,5 Q4,0 8,5 Q12,0 16,5" dur="0.4s" repeatCount="indefinite" />
+							<svg class="progress-bird" class:done={!loading} width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
+								<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
+									<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
 								</path>
 							</svg>
 						</div>
@@ -825,9 +846,9 @@
 							</div>
 							<div class="progress-bar-track">
 								<div class="progress-bar-fill" style="width: 55%"></div>
-								<svg class="progress-bird" width="16" height="10" viewBox="0 0 16 10" aria-hidden="true">
-									<path d="M0,5 Q4,0 8,5 Q12,0 16,5" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.7">
-										<animate attributeName="d" values="M0,5 Q4,0 8,5 Q12,0 16,5;M0,5 Q4,8 8,5 Q12,8 16,5;M0,5 Q4,0 8,5 Q12,0 16,5" dur="0.4s" repeatCount="indefinite" />
+								<svg class="progress-bird" width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
+									<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
+										<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
 									</path>
 								</svg>
 							</div>
@@ -1439,6 +1460,29 @@
 		display: flex;
 		flex: 1;
 		overflow: hidden;
+		position: relative;
+	}
+
+	.flying-bird-layer {
+		position: fixed;
+		top: 54px;
+		left: 0;
+		width: 440px;
+		height: calc(100vh - 136px);
+		pointer-events: none;
+		z-index: 50;
+		overflow: hidden;
+	}
+	.flying-bird-y {
+		position: absolute;
+		animation: freeBirdY 6.5s ease-in-out infinite;
+	}
+	.flying-bird-x {
+		position: relative;
+		animation: freeBirdX 4.8s ease-in-out infinite;
+	}
+	.flying-bird {
+		filter: drop-shadow(0 2px 4px rgba(107,123,42,0.3));
 	}
 
 	/* ── Left panel ─────────────────────────────────────────── */
@@ -2125,5 +2169,23 @@
 	@keyframes birdFly {
 		0% { left: -20px; }
 		100% { left: calc(100% + 4px); }
+	}
+	@keyframes freeBirdX {
+		0% { transform: translateX(30px); }
+		18% { transform: translateX(340px); }
+		35% { transform: translateX(120px); }
+		52% { transform: translateX(390px); }
+		68% { transform: translateX(60px); }
+		83% { transform: translateX(280px); }
+		100% { transform: translateX(30px); }
+	}
+	@keyframes freeBirdY {
+		0% { top: 70px; }
+		22% { top: 220px; }
+		38% { top: 40px; }
+		55% { top: 180px; }
+		70% { top: 20px; }
+		85% { top: 140px; }
+		100% { top: 70px; }
 	}
 </style>

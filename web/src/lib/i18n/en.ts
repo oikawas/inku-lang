@@ -51,7 +51,7 @@ export const en: LangPack = {
 
 	tabCanvas: 'drawing',
 	tabPrompts: 'prompts',
-	tabScore: 'score',
+	tabScore: 'JSON',
 
 	canvasPlaceholder: '(not yet drawn)',
 

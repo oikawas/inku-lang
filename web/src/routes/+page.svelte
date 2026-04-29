@@ -1123,6 +1123,31 @@
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
 	);
+	const scoreJsonLines = $derived(
+		result ? JSON.stringify(result.score, null, 2).split('\n') : []
+	);
+	const scoreJsonHighlightedLines = $derived(scoreJsonLines.map(highlightJsonLine));
+	const scoreJsonHighlighted = $derived(scoreJsonHighlightedLines.join('\n'));
+
+	function escapeHtml(value: string) {
+		return value
+			.replaceAll('&', '&amp;')
+			.replaceAll('<', '&lt;')
+			.replaceAll('>', '&gt;');
+	}
+
+	function highlightJsonLine(line: string) {
+		return escapeHtml(line).replace(
+			/("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\btrue\b|\bfalse\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+			(match, _token, keySuffix) => {
+				if (keySuffix) return `<span class="json-key">${match}</span>`;
+				if (match.startsWith('"')) return `<span class="json-string">${match}</span>`;
+				if (match === 'true' || match === 'false') return `<span class="json-bool">${match}</span>`;
+				if (match === 'null') return `<span class="json-null">${match}</span>`;
+				return `<span class="json-number">${match}</span>`;
+			}
+		);
+	}
 
 	// ── Stats string ─────────────────────────────────────────
 	const statsLine = $derived.by(() => {
@@ -1563,7 +1588,14 @@
 							<p class="muted-center">{t().promptLoading}</p>
 						{/if}
 					{:else if outputTab === 'score'}
-						<pre class="score-pre">{JSON.stringify(result?.score, null, 2)}</pre>
+						<div class="score-view">
+							<div class="score-line-nums" aria-hidden="true">
+								{#each scoreJsonLines as _, i (i)}
+									<div>{i + 1}</div>
+								{/each}
+							</div>
+							<pre class="score-pre">{@html scoreJsonHighlighted}</pre>
+						</div>
 					{/if}
 				</div>
 
@@ -2696,14 +2728,46 @@
 		font-family: inherit;
 	}
 	.prompt-pre-lg { max-height: 320px; }
-	.score-pre {
-		background: #fff; border: 1px solid var(--border); border-radius: var(--r);
-		padding: 12px; overflow: auto; font-size: 12px; line-height: 1.5;
-		white-space: pre-wrap; word-break: break-word;
-		width: 100%; height: 100%; margin: 0;
-		font-family: inherit;
-		align-self: stretch; min-height: 0;
+	.score-view {
+		display: flex;
+		width: 100%;
+		height: 100%;
+		min-height: 0;
+		align-self: stretch;
+		background: #fff;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		overflow: auto;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+		font-size: 12px;
+		line-height: 1.5;
 	}
+	.score-line-nums {
+		flex-shrink: 0;
+		min-width: 42px;
+		min-height: 100%;
+		height: max-content;
+		padding: 12px 8px;
+		border-right: 1px solid var(--border);
+		background: var(--bg2);
+		color: var(--fg3);
+		text-align: right;
+		user-select: none;
+		font-variant-numeric: tabular-nums;
+	}
+	.score-pre {
+		background: #fff;
+		padding: 12px; overflow: visible; font-size: inherit; line-height: inherit;
+		white-space: pre; word-break: normal;
+		width: 100%; min-height: 100%; height: max-content; margin: 0;
+		font-family: inherit;
+		align-self: flex-start;
+	}
+	.score-pre :global(.json-key) { color: #6f4bb8; font-weight: 600; }
+	.score-pre :global(.json-string) { color: #116329; }
+	.score-pre :global(.json-number) { color: #0b63ce; }
+	.score-pre :global(.json-bool) { color: #b54708; font-weight: 600; }
+	.score-pre :global(.json-null) { color: #6b7280; font-style: italic; }
 	.muted-center { color: var(--fg3); font-size: 13px; padding: 16px; }
 
 	/* Export bar */

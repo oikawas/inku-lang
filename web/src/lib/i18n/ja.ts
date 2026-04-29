@@ -51,7 +51,7 @@ export const ja: LangPack = {
 
 	tabCanvas: '描画',
 	tabPrompts: 'プロンプト',
-	tabScore: '楽譜',
+	tabScore: 'JSON',
 
 	canvasPlaceholder: '（まだ描画されていない）',
 

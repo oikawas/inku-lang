@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -42,6 +42,9 @@ _OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
 _save_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-save")
 _logger = logging.getLogger(__name__)
 _HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
+_SESSION_COOKIE_NAME = "inku_session"
+_SESSION_COOKIE_MAX_AGE = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
+_SESSION_COOKIE_SECURE = os.getenv("INKU_SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
 
 
 def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
@@ -246,7 +249,6 @@ class LoginBody(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    token: str
     user: UserAccountItem
 
 
@@ -272,21 +274,40 @@ class SettingsStatusResponse(BaseModel):
     plugins: PluginSettingsStatus
 
 
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        _SESSION_COOKIE_NAME,
+        token,
+        max_age=_SESSION_COOKIE_MAX_AGE,
+        httponly=True,
+        secure=_SESSION_COOKIE_SECURE,
+        samesite="lax",
+        path="/",
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(_SESSION_COOKIE_NAME, path="/", samesite="lax")
+
+
+def _session_token(
+    authorization: str | None = Header(default=None),
+    session_cookie: str | None = Cookie(default=None, alias=_SESSION_COOKIE_NAME),
+) -> str:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization.removeprefix("Bearer ").strip()
+    if session_cookie:
+        return session_cookie
+    raise HTTPException(status_code=401, detail="authentication required")
+
+
 def _bearer_token(authorization: str | None = Header(default=None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="authentication required")
     return authorization.removeprefix("Bearer ").strip()
 
 
-def _current_user(token: str = Depends(_bearer_token)) -> dict:
-    user = _db.get_session_user(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="invalid session")
-    return user
-
-
-def _current_user_from_authorization(authorization: str | None) -> dict:
-    token = _bearer_token(authorization)
+def _current_user(token: str = Depends(_session_token)) -> dict:
     user = _db.get_session_user(token)
     if not user:
         raise HTTPException(status_code=401, detail="invalid session")
@@ -322,12 +343,13 @@ def health() -> dict[str, bool]:
 
 
 @app.post("/api/auth/login", response_model=LoginResponse)
-def api_auth_login(body: LoginBody) -> LoginResponse:
+def api_auth_login(body: LoginBody, response: Response) -> LoginResponse:
     user = _db.authenticate_user(body.username, body.password)
     if not user:
         raise HTTPException(status_code=401, detail="invalid username or password")
     token = _db.create_session(user["id"])
-    return LoginResponse(token=token, user=UserAccountItem(**user))
+    _set_session_cookie(response, token)
+    return LoginResponse(user=UserAccountItem(**user))
 
 
 @app.get("/api/auth/me", response_model=UserAccountItem)
@@ -350,8 +372,9 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
 
 
 @app.post("/api/auth/logout")
-def api_auth_logout(token: str = Depends(_bearer_token)) -> dict[str, bool]:
+def api_auth_logout(response: Response, token: str = Depends(_session_token)) -> dict[str, bool]:
     _db.delete_session(token)
+    _clear_session_cookie(response)
     return {"ok": True}
 
 
@@ -414,7 +437,7 @@ def _call_interpret_detail(
 
 
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
-def api_compose(req: ComposeRequest) -> ComposeResponse:
+def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> ComposeResponse:
     t0 = time.perf_counter()
     try:
         score, tokens_in, tokens_out = _call_compose_detail(
@@ -439,7 +462,7 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
 
 
 @app.post("/api/interpret")
-def api_interpret(req: InterpretRequest) -> dict:
+def api_interpret(req: InterpretRequest, _actor: dict = Depends(_current_user)) -> dict:
     try:
         ddl, thinking, tokens_in, tokens_out = _call_interpret_detail(
             req.text,
@@ -499,7 +522,7 @@ def _add_history_item(
 
 
 @app.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
-def api_paint(req: PaintRequest, authorization: str | None = Header(default=None)) -> PaintResponse:
+def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintResponse:
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
     try:
@@ -529,7 +552,6 @@ def api_paint(req: PaintRequest, authorization: str | None = Header(default=None
     history_id = None
     history_at = None
     if req.save_history:
-        actor = _current_user_from_authorization(authorization)
         history_at = req.history_at or int(time.time() * 1000)
         item = _add_history_item(
             actor=actor,

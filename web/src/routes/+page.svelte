@@ -25,7 +25,6 @@
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
-	const AUTH_TOKEN_KEY      = 'inku-auth-token';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -224,8 +223,7 @@
 
 	function apiFetch(path: string, init: RequestInit = {}) {
 		const headers = new Headers(init.headers);
-		if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
-		return fetch(path, { ...init, headers });
+		return fetch(path, { ...init, headers, credentials: 'same-origin' });
 	}
 
 	function openSettings(tab: typeof settingsTab = 'db') {
@@ -288,13 +286,11 @@
 	}
 
 	async function loadCurrentUser() {
-		if (!authToken) {
-			return;
-		}
 		try {
 			const r = await apiFetch('/api/auth/me');
 			if (!r.ok) throw new Error('session expired');
 			currentUser = await r.json();
+			authToken = 'cookie';
 			loginStatus = null;
 			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
@@ -309,7 +305,6 @@
 			historyTotal = 0;
 			trashItems = [];
 			trashTotal = 0;
-			try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
 		}
 	}
 
@@ -319,14 +314,15 @@
 			const r = await fetch('/api/auth/login', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
+				credentials: 'same-origin',
 				body: JSON.stringify({ username: loginUserName, password: loginPassword })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
 				throw new Error(d.detail ?? `HTTP ${r.status}`);
 			}
-			const data = await r.json() as { token: string; user: UserItem };
-			authToken = data.token;
+			const data = await r.json() as { user: UserItem };
+			authToken = 'cookie';
 			currentUser = data.user;
 			loginStatus = null;
 			historyItems = [];
@@ -338,7 +334,6 @@
 			managerTrashItems = [];
 			managerTrashTotal = 0;
 			loginPassword = '';
-			try { localStorage.setItem(AUTH_TOKEN_KEY, authToken); } catch {}
 			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
@@ -350,7 +345,7 @@
 	}
 
 	async function logout() {
-		if (authToken) {
+		if (currentUser || authToken) {
 			try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
 		}
 		authToken = null;
@@ -368,7 +363,6 @@
 		managerHistoryTotal = 0;
 		managerTrashItems = [];
 		managerTrashTotal = 0;
-		try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
 	}
 
 	async function addUser() {
@@ -778,7 +772,7 @@
 		const lang = getLang();
 		const startedAt = Date.now();
 		try {
-			const r = await fetch('/api/compose', {
+			const r = await apiFetch('/api/compose', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, lang, color_map: activeColorMap() })
@@ -1365,7 +1359,6 @@
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			const savedBatchFailureReport = loadBatchFailureReport();
 			setBatchFailureReport(savedBatchFailureReport);
-			authToken = localStorage.getItem(AUTH_TOKEN_KEY);
 			miscSettingsLoaded = true;
 		} catch {}
 		void (async () => {

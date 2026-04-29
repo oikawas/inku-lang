@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.12**
+**Version: v1.14**
 
 ---
 
@@ -1126,6 +1126,8 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~描画履歴が全ユーザーで共有される~~ → v1.10 で `history.user_id` を追加し、履歴取得・保存・削除をログインユーザー単位に分離。既存履歴は初回起動時に admin 所有へ移行
 - ~~DB設定 / プラグイン管理が prototype UI のみ~~ → v1.11 で管理者向け read-only API に接続し、DB は `INKU_DB_URL` 起動時設定、プラグインは未実装であることを UI に明示
 - ~~履歴保存時に Web UI から送られた SVG を DB に保存できる~~ → v1.12 で `/api/paint` が生成直後に履歴保存し、Web UI から履歴保存用 SVG を送り返さない形へ変更。互換用 `POST /api/history` でもリクエスト `svg` は無視してサーバー側で再レンダリングする
+- ~~生成系 API の認証境界が弱い~~ → v1.13 で `/api/interpret`、`/api/compose`、`/api/paint` を認証必須化。未認証リクエストは 401 を返す
+- ~~セッショントークンを localStorage に保存している~~ → v1.14 で Web UI はセッショントークンを保持せず、サーバーが HttpOnly / SameSite=Lax Cookie としてセッションを管理する形へ変更
 
 ---
 
@@ -1192,6 +1194,34 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.14 (2026-04-29)
+
+**セッション Cookie の HttpOnly 化**
+
+Web UI がセッショントークンを localStorage に保存する方式を廃止した。
+
+- `/api/auth/login` はレスポンス本文にトークンを返さず、`inku_session` Cookie を発行する
+- `inku_session` Cookie は `HttpOnly` / `SameSite=Lax` / `Path=/` を付与する
+- `INKU_SESSION_COOKIE_SECURE=1` の場合は Cookie に `Secure` を付与する
+- `/api/auth/me`、生成 API、履歴 API、管理 API は Cookie セッションで認証する
+- 互換性のため Authorization Bearer も引き続き受け付ける
+- `/api/auth/logout` は DB セッションを削除し、Cookie を削除する
+- Web UI はログイン後もトークン値を JavaScript state や localStorage に保持しない
+- Build 73
+
+### v1.13 (2026-04-29)
+
+**生成系 API の認証必須化**
+
+LLM 呼び出しや描画生成を行う API をログイン済みユーザーに限定した。
+
+- `/api/interpret` は有効な Bearer セッションを要求する
+- `/api/compose` は有効な Bearer セッションを要求する
+- `/api/paint` は保存有無にかかわらず有効な Bearer セッションを要求する
+- Web UI の再描画 (`/api/compose`) 呼び出しを、認証ヘッダー付きの `apiFetch` 経由へ変更
+- 未認証の生成 API 呼び出しは 401 を返す
+- Build 72
 
 ### v1.12 (2026-04-29)
 

@@ -36,7 +36,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
 - variation は明示された揺らぎがある場合のみ付ける
-- **count は 1〜1000 の整数。「たくさん・多数・無数」は 20 程度。DDL に明示的な数があればその値を使う**
+- **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
+- **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
+- **小さな点・星・雨・雪・砂・粒は多め、大きな図形・太い線・主役形状は少なめにする**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
 - **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
@@ -49,6 +51,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 青い小さな円をランダムに五つ散らす。半径0.04。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter"}}]}
+
+入力: 白い小さな円をランダムに六百十個散らす。半径は0.01。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.01,"color":"white","arrangement":{"count":610,"layout":"scatter"}}]}
 
 入力: 上から半分に横線。小刻みに震える。
 出力: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
@@ -151,7 +156,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
 - variation only when movement is explicitly stated
-- **count is integer 1–1000. "many/countless" ≈ 20. Use explicit numbers from DDL**
+- **count is integer 1–1000. Use explicit numbers from DDL**
+- **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
+- **Use more for small dots/stars/rain/snow/sand/particles; use fewer for large shapes, thick lines, or main-subject shapes**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
 - **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
@@ -164,6 +171,9 @@ Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"ar
 
 Input: Scatter five small blue circles randomly. Radius 0.04.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter"}}]}
+
+Input: Scatter six hundred ten small white circles randomly. Radius 0.01.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.01,"color":"white","arrangement":{"count":610,"layout":"scatter"}}]}
 
 Input: Draw a horizontal line at center. Fine trembling.
 Output: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}

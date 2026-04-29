@@ -1,6 +1,8 @@
 """Stage 2 composer integration tests.
 
-LLM backend は `INKU_LLM_BACKEND` で切替 (anthropic | openai)。
+LLM fixture は当面 NVIDIA NIM のみを対象にする。
+`INKU_LLM_BACKEND=openai`、`NVIDIA_API_KEY`、`OPENAI_MODEL` に `/` を含む
+NVIDIA model ID が設定されている場合だけ実行する。
 
 厳密比較軸:
 - primitive / color / weight / style / variation: 完全一致
@@ -28,15 +30,14 @@ def _cases() -> list[Path]:
 
 
 def _backend_available() -> bool:
-    backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
-    if backend == "openai":
-        return True
-    return bool(os.getenv("ANTHROPIC_API_KEY"))
+    backend = os.getenv("INKU_LLM_BACKEND", "").lower()
+    model = os.getenv("OPENAI_MODEL", "")
+    return backend == "openai" and bool(os.getenv("NVIDIA_API_KEY")) and "/" in model
 
 
 requires_api_key = pytest.mark.skipif(
     not _backend_available(),
-    reason="no LLM backend configured (set ANTHROPIC_API_KEY or INKU_LLM_BACKEND=openai)",
+    reason="NVIDIA NIM test backend is not configured",
 )
 
 
@@ -89,7 +90,7 @@ def test_compose_fixture(case_dir: Path):
     ddl = (case_dir / "input.txt").read_text(encoding="utf-8").strip()
     expected = Score.model_validate_json((case_dir / "expected.json").read_text())
 
-    actual = compose(ddl)
+    actual, _, _ = compose(ddl)
 
     if len(actual.instructions) != len(expected.instructions):
         raise AssertionError(
@@ -119,3 +120,19 @@ def test_submit_tool_schema_is_valid():
     schema = tool["input_schema"]
     assert schema["type"] == "object"
     assert "instructions" in schema["properties"]
+
+
+def test_composer_prompt_keeps_dynamic_quantity_guidance():
+    from inku_server.composer import SYSTEM_PROMPT, SYSTEM_PROMPT_EN
+
+    assert "40〜120" in SYSTEM_PROMPT
+    assert "300〜800" in SYSTEM_PROMPT
+    assert "700〜1000" in SYSTEM_PROMPT
+    assert "610" in SYSTEM_PROMPT
+    assert "20 程度" not in SYSTEM_PROMPT
+
+    assert "40–120" in SYSTEM_PROMPT_EN
+    assert "300–800" in SYSTEM_PROMPT_EN
+    assert "700–1000" in SYSTEM_PROMPT_EN
+    assert "610" in SYSTEM_PROMPT_EN
+    assert "≈ 20" not in SYSTEM_PROMPT_EN

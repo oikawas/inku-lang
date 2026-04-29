@@ -15,7 +15,7 @@ import os
 
 import pytest
 
-from inku_server.interpreter import interpret
+from inku_server.interpreter import _build_system_prompt, interpret
 
 FORMS = ["円", "楕円", "三角", "四角", "線", "弧"]
 EMOTION_WORDS = [
@@ -53,15 +53,14 @@ NOVEL_SOURCES = [
 
 
 def _backend_available() -> bool:
-    backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
-    if backend == "openai":
-        return True
-    return bool(os.getenv("ANTHROPIC_API_KEY"))
+    backend = os.getenv("INKU_LLM_BACKEND", "").lower()
+    model = os.getenv("OPENAI_MODEL_STAGE1", "")
+    return backend == "openai" and bool(os.getenv("NVIDIA_API_KEY")) and "/" in model
 
 
 requires_llm = pytest.mark.skipif(
     not _backend_available(),
-    reason="no LLM backend configured",
+    reason="NVIDIA NIM test backend is not configured",
 )
 
 
@@ -89,3 +88,25 @@ def test_interpret_leaked(source: str):
 @pytest.mark.parametrize("source", NOVEL_SOURCES, ids=lambda s: f"novel:{s}")
 def test_interpret_novel(source: str):
     _assert_valid_ddl(source, interpret(source))
+
+
+def test_quantity_prompt_uses_dynamic_range():
+    prompt = _build_system_prompt("満天の星空に砂のような点を埋め尽くす")
+
+    assert "数量レンジ" in prompt
+    assert "700〜1000" in prompt
+    assert "固定値に丸めてはいけない" in prompt
+    assert "二十個程度" not in prompt
+    assert "六百十個" in prompt
+    assert "八百九十個" in prompt
+
+
+def test_quantity_prompt_en_uses_dynamic_range():
+    prompt = _build_system_prompt("a sky full of stars and sand-like dots", lang="en")
+
+    assert "Count Ranges" in prompt
+    assert "700–1000" in prompt
+    assert "one fixed number" in prompt
+    assert "about twenty" not in prompt
+    assert "six hundred ten" in prompt
+    assert "eight hundred ninety" in prompt

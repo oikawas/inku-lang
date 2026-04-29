@@ -57,9 +57,31 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 - 「三本の竹を縦に並べる」→「縦の実線を横に三本並べる。」
 - 「五つの赤い点をランダムに置く」→「赤い小さな円をランダムに五つ散らす。」
-- 「背景を青のクレヨン線で埋め尽くす」→「青いクレヨンの縦線を横に三十本並べる。」
-- 「たくさん」「多数」「無数」「いっぱい」→ 二十個程度 (上限500)
-- 100本・200個などの具体的な数 → そのまま記述する
+- 「背景を青のクレヨン線で埋め尽くす」→「青いクレヨンの縦線を横に百二十本並べる。」
+- 100本・200個などの具体的な数 → そのまま記述する。1000 を超える場合のみ 1000 に丸める。
+
+## 数量レンジ — 1〜1000 の振れ幅を使う
+
+曖昧な数量語を固定値に丸めてはいけない。語の強さ、対象の種類、画面密度から具体数を選ぶ。
+
+- ひとつ、一本、一点、孤独、単独、ぽつんと → 1
+- ふたつ、対、向かい合う → 2
+- 少し、数個、まばら、控えめ → 3〜8
+- いくつか、点々、ちらほら → 8〜20
+- 並ぶ、列、リズム、反復 → 12〜40
+- たくさん、多数、いっぱい → 40〜120
+- 密集、びっしり、埋める、覆う → 120〜350
+- 無数、満天、砂、雨、雪、群れ、ノイズ → 300〜800
+- 画面を埋め尽くす、全面、非常に細かい粒子 → 700〜1000
+
+対象別の補正:
+- 大きな図形、太い線、主役になる形 → 少なめ
+- 小さな点、星、雨、雪、砂、粒、短い線 → 多め
+- 放射状・円環・対称配置 → 6, 8, 12, 16, 24, 32 など構造が見える数
+- 格子・縞・等間隔配置 → 5, 7, 9, 12, 16, 24, 36 など規則が見える数
+- ランダム散布 → 17, 29, 47, 83, 137, 233, 377, 610 など偏りにくい数も使ってよい
+
+「たくさん」「無数」「いっぱい」のまま出力せず、必ず具体的な数量詞に変換する。
 
 # ランダム配置
 
@@ -193,7 +215,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["たくさん", "多数", "無数", "いっぱい", "沢山", "大量"],
         "input": "たくさんの小さな点を散らす",
-        "output": "黒い小さな円をランダムに二十個散らす。半径は0.02。",
+        "output": "黒い小さな円をランダムに八十三個散らす。半径は0.02。",
     },
     {
         "keywords": ["100", "200", "500", "1000", "百", "千", "本"],
@@ -204,7 +226,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["クレヨン", "背景", "埋め", "埋め尽く", "全体", "びっしり"],
         "input": "背景を青のクレヨン線で埋め尽くす",
-        "output": "青いクレヨンの縦線を横に三十本並べる。",
+        "output": "青いクレヨンの縦線を横に百二十本並べる。",
     },
     # 属性保持: 素材 + 太さ
     {
@@ -275,7 +297,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["色とりどり", "カラフル", "虹", "様々な色", "多色", "いろいろな色"],
         "input": "色とりどりの小さな円を散らす",
-        "output": "赤・青・緑・黒・灰の色とりどりの小さな円をランダムに二十個散らす。半径は0.03。",
+        "output": "赤・青・緑・黒・灰の色とりどりの小さな円をランダムに四十七個散らす。半径は0.03。",
     },
     {
         "keywords": ["色とりどり", "カラフル", "放射", "虹", "輪"],
@@ -291,7 +313,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["星", "星空", "夜空", "銀河", "宇宙", "天の川"],
         "input": "満天の星空",
-        "output": "背景を黒で塗りつぶす。白い小さな円をランダムに五十個散らす。半径は0.02。",
+        "output": "背景を黒で塗りつぶす。白い小さな円をランダムに六百十個散らす。半径は0.01。",
     },
     {
         "keywords": ["水平線", "地平線", "水面", "海面", "湖面"],
@@ -307,12 +329,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["木", "森", "林", "樹", "草木"],
         "input": "森の中に立つ木々",
-        "output": "緑の縦線を横に十本並べる。",
+        "output": "緑の細い縦線を横に百四十四本並べる。",
     },
     {
         "keywords": ["雪", "吹雪", "雪原", "粉雪", "積雪"],
         "input": "雪がしんしんと降る",
-        "output": "白い小さな円をランダムに三十個散らす。半径は0.02。",
+        "output": "白い小さな円をランダムに百三十七個散らす。半径は0.015。",
     },
     {
         "keywords": ["炎", "火", "燃え", "燃える", "焔", "篝火"],
@@ -328,7 +350,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["散る", "舞う", "飛ぶ", "漂う", "漂い"],
         "input": "花びらが風に舞い散る",
-        "output": "白い小さな円をランダムに二十個散らす。半径は0.03。大きく揺れる。",
+        "output": "白い小さな円をランダムに四十七個散らす。半径は0.03。大きく揺れる。",
+    },
+    {
+        "keywords": ["砂", "粒", "粒子", "細かい", "全面", "埋め尽くす"],
+        "input": "砂のような点で画面を埋める",
+        "output": "灰色の小さな円をランダムに八百九十個散らす。半径は0.006。",
     },
     # わりあい: 縦横比
     {
@@ -439,7 +466,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["many", "numerous", "countless", "lots", "scattered", "small"],
         "input": "Many small dots scattered",
-        "output": "Scatter twenty small black circles randomly. Radius 0.02.",
+        "output": "Scatter eighty-three small black circles randomly. Radius 0.02.",
     },
     {
         "keywords": ["100", "200", "500", "hundred", "fill", "dense"],
@@ -449,7 +476,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["crayon", "fill", "background", "cover", "dense", "blue"],
         "input": "Fill background with blue crayon lines",
-        "output": "Line up thirty vertical blue crayon lines horizontally.",
+        "output": "Line up one hundred twenty vertical blue crayon lines horizontally.",
     },
     {
         "keywords": ["pencil", "thin", "delicate", "fine", "light", "ten"],
@@ -484,7 +511,17 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["colorful", "rainbow", "various", "multicolor", "colors"],
         "input": "Colorful small circles scattered",
-        "output": "Scatter twenty small circles randomly in red, blue, green, black, gray. Radius 0.03.",
+        "output": "Scatter forty-seven small circles randomly in red, blue, green, black, gray. Radius 0.03.",
+    },
+    {
+        "keywords": ["starry", "stars", "galaxy", "night sky", "countless"],
+        "input": "A sky full of stars",
+        "output": "Fill background with black. Scatter six hundred ten small white circles randomly. Radius 0.01.",
+    },
+    {
+        "keywords": ["sand", "particles", "fine", "fill", "whole"],
+        "input": "Fill the canvas with sand-like dots",
+        "output": "Scatter eight hundred ninety small gray circles randomly. Radius 0.006.",
     },
     {
         "keywords": ["dark", "black background", "night", "shadow", "white"],
@@ -559,9 +596,31 @@ When a count is present, put **color, material, direction, size in the same sent
 
 - "three bamboo poles" → "Line up three vertical solid lines horizontally."
 - "five red dots randomly" → "Scatter five small red circles randomly. Radius 0.04."
-- "fill with blue crayon lines" → "Line up thirty vertical blue crayon lines horizontally."
-- "many / countless" → about twenty (max 500)
-- Explicit numbers (100, 200) → use as-is
+- "fill with blue crayon lines" → "Line up one hundred twenty vertical blue crayon lines horizontally."
+- Explicit numbers (100, 200) → use as-is. Clamp only values above 1000 to 1000.
+
+## Count Ranges — use the full 1–1000 range
+
+Do not collapse vague quantity words to one fixed number. Choose a concrete count from wording strength, object type, and canvas density.
+
+- one, single, solitary, alone → 1
+- pair, two, facing each other → 2
+- a few, sparse, restrained → 3–8
+- several, dotted, here and there → 8–20
+- row, rhythm, repetition → 12–40
+- many, numerous, lots → 40–120
+- dense, packed, fill, cover → 120–350
+- countless, starry sky, sand, rain, snow, swarm, noise → 300–800
+- fill the whole canvas, all-over, extremely fine particles → 700–1000
+
+Object-specific correction:
+- large shapes, thick lines, main subject → use fewer
+- small dots, stars, rain, snow, sand, particles, short lines → use more
+- radial / circular / symmetric layouts → prefer structural counts such as 6, 8, 12, 16, 24, 32
+- grid / stripe / evenly spaced layouts → prefer visible-order counts such as 5, 7, 9, 12, 16, 24, 36
+- random scatter → you may use less regular counts such as 17, 29, 47, 83, 137, 233, 377, 610
+
+Never output vague words such as "many" or "countless"; always convert them to a concrete count.
 
 # Random Arrangement
 

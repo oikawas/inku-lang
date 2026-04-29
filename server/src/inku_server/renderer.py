@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 import struct
 
 import svgwrite
@@ -35,6 +36,19 @@ COLOR_MAP: dict[str, str] = {
     "red": "#a2342a",
     "green": "#2f6b3a",
     "gray": "#888888",
+}
+
+HUE_HINTS: dict[str, tuple[str, ...]] = {
+    "white": ("white", "ivory", "paper", "linen", "blanc", "bianco", "aspro", "白", "胡粉", "象牙", "生成"),
+    "black": ("black", "ink", "sumi", "obsidian", "basalt", "skotadi", "黒", "墨", "玄", "暗"),
+    "blue": ("blue", "cyan", "azure", "ultramarine", "cobalt", "lapis", "bleu", "blu", "ai", "azul", "青", "藍", "水色", "空色", "瑠璃"),
+    "green": ("green", "verd", "vert", "jade", "olive", "cactus", "tall", "緑", "青緑", "翡翠", "常磐", "玉", "草"),
+    "gray": ("gray", "grey", "silver", "ash", "stone", "granit", "petra", "灰", "鼠", "銀", "石"),
+    "red": ("red", "rose", "pink", "carmine", "cinnabar", "terra", "rosa", "shu", "vermilion", "赤", "朱", "紅", "桜", "桃", "薔薇"),
+    "yellow": ("yellow", "gold", "ochre", "ocra", "giallo", "jaune", "napoli", "kesar", "haldi", "sun", "ilios", "山吹", "金", "黄", "琉璃金"),
+    "orange": ("orange", "apricot", "terracotta", "cempasuchil", "ff4d00", "橙", "蜜柑"),
+    "purple": ("purple", "violet", "lilac", "murasaki", "宮廷紫", "藤", "紫"),
+    "brown": ("brown", "sienna", "umber", "ombra", "chandan", "lera", "sepia", "茶", "土", "焦"),
 }
 
 STYLE_TO_DASH: dict[str, str | None] = {
@@ -223,6 +237,7 @@ def _apply_color_cycle(items: list[Instruction], cycle: list) -> list[Instructio
     for i, single in enumerate(items):
         data = single.model_dump(by_alias=True)
         data["color"] = cycle[i % len(cycle)]
+        data["color_hint"] = None
         result.append(Instruction.model_validate(data))
     return result
 
@@ -335,12 +350,107 @@ def render(score: Score, color_map: dict[str, str] | None = None) -> str:
 _CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})
 
 
+def _norm_label(value: str) -> str:
+    return re.sub(r"[\s:_()'\".,/-]+", " ", value.lower()).strip()
+
+
+def _hex_to_rgb(value: str) -> tuple[int, int, int] | None:
+    m = re.fullmatch(r"#?([0-9a-fA-F]{6})", value.strip())
+    if not m:
+        return None
+    raw = m.group(1)
+    return int(raw[0:2], 16), int(raw[2:4], 16), int(raw[4:6], 16)
+
+
+def _hue_from_hex(value: str) -> str | None:
+    rgb = _hex_to_rgb(value)
+    if rgb is None:
+        return None
+    r, g, b = [c / 255 for c in rgb]
+    mx = max(r, g, b)
+    mn = min(r, g, b)
+    lightness = (mx + mn) / 2
+    if mx - mn < 0.08:
+        if lightness > 0.82:
+            return "white"
+        if lightness < 0.2:
+            return "black"
+        return "gray"
+    if mx == r:
+        hue = (60 * ((g - b) / (mx - mn)) + 360) % 360
+    elif mx == g:
+        hue = 60 * ((b - r) / (mx - mn)) + 120
+    else:
+        hue = 60 * ((r - g) / (mx - mn)) + 240
+    if 15 <= hue < 45:
+        return "orange"
+    if 45 <= hue < 75:
+        return "yellow"
+    if 75 <= hue < 165:
+        return "green"
+    if 165 <= hue < 255:
+        return "blue"
+    if 255 <= hue < 315:
+        return "purple"
+    return "red"
+
+
+def _hint_hues(hint: str) -> set[str]:
+    normalized = _norm_label(hint)
+    hues: set[str] = set()
+    for hue, tokens in HUE_HINTS.items():
+        if any(token.lower() in normalized or token in hint for token in tokens):
+            hues.add(hue)
+    return hues
+
+
+def _resolve_color(color: str, color_hint: str | None, cmap: dict[str, str]) -> str:
+    fallback = cmap[color]
+    if not color_hint:
+        return fallback
+
+    hint = _norm_label(color_hint)
+    desired_hues = _hint_hues(color_hint)
+    if not hint and not desired_hues:
+        return fallback
+
+    best_score = 0
+    best_hex = fallback
+    for key, hex_value in cmap.items():
+        if not isinstance(hex_value, str) or not hex_value.startswith("#"):
+            continue
+        is_palette = key.startswith("palette:")
+        label = _norm_label(key.removeprefix("palette:"))
+        score = 0
+        if label and label in hint:
+            score += 6
+        for part in label.split():
+            if len(part) >= 3 and part in hint:
+                score += 3
+        candidate_hue = _hue_from_hex(hex_value)
+        if candidate_hue in desired_hues:
+            score += 4
+        for hue in desired_hues:
+            if is_palette and any(token.lower() in label for token in HUE_HINTS[hue]):
+                score += 2
+        if is_palette and score > 0:
+            score += 1
+        if key == color:
+            score += 1
+        if score > best_score:
+            best_score = score
+            best_hex = hex_value
+
+    return best_hex
+
+
 def _stroke_attrs(ins: Instruction, cmap: dict[str, str]) -> dict:
     do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled
+    color = _resolve_color(ins.color, ins.color_hint, cmap)
     attrs = {
-        "stroke": cmap[ins.color],
+        "stroke": color,
         "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight],
-        "fill": cmap[ins.color] if do_fill else "none",
+        "fill": color if do_fill else "none",
         "stroke_linecap": "round",
     }
     dash = STYLE_TO_DASH[ins.style]

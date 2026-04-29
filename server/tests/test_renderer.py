@@ -122,6 +122,43 @@ def test_render_triangle():
     assert "#2f6b3a" in svg
 
 
+def test_render_color_hint_uses_catalog_palette_match():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.2,
+                    "color": "red",
+                    "color_hint": "桜色",
+                }
+            ]
+        }
+    )
+    svg = render(score, color_map={"palette:Rose Pastel": "#ffc1cc"})
+    assert "#ffc1cc" in svg
+    assert "#a2342a" not in svg
+
+
+def test_render_color_hint_falls_back_to_abstract_color():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "color": "blue",
+                    "color_hint": "透明な気配",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "#2c3e91" in svg
+
+
 def test_ellipse_missing_size_raises():
     import pytest
 

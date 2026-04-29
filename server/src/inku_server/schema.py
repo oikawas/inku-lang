@@ -161,6 +161,13 @@ class Instruction(BaseModel):
         default="black",
         description="white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰",
     )
+    color_hint: Optional[str] = Field(
+        default=None,
+        description=(
+            "色ニュアンスの原文保持。例: 桜色、朱に近い赤、冷たい青緑。"
+            "color は抽象色のまま、Renderer が色カタログ解決時に補助情報として使う"
+        ),
+    )
     variation: Optional[Variation] = Field(
         default=None,
         description="揺らぎ。明示された場合のみ付ける",

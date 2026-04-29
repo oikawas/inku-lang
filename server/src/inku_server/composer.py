@@ -39,6 +39,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **count は 1〜1000 の整数。「たくさん・多数・無数」は 20 程度。DDL に明示的な数があればその値を使う**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
+- **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
 - **色とりどり・ランダム配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
 
 # 例 (最重要パターン)
@@ -57,6 +58,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 赤い塗りつぶし円を中央に。半径0.2。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"color":"red","filled":true}]}
+
+入力: 桜色の小さな円を中央に。半径0.1。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1,"color":"red","color_hint":"桜色"}]}
 
 入力: 背景を黒で塗りつぶす。中央に白い横線を引く。
 出力: {"background":"black","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"white"}]}
@@ -138,6 +142,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **count is integer 1–1000. "many/countless" ≈ 20. Use explicit numbers from DDL**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
+- **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
 - **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
 
 # Examples (key patterns)
@@ -156,6 +161,9 @@ Output: {"instructions":[{"primitive":"square","position":[0.3,0.3],"size":[0.4,
 
 Input: Place a filled red circle at center. Radius 0.2.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"color":"red","filled":true}]}
+
+Input: Place a small cherry-blossom pink circle at center. Radius 0.1.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1,"color":"red","color_hint":"cherry-blossom pink"}]}
 
 Input: Fill background with black. Draw a white horizontal line at center.
 Output: {"background":"black","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"white"}]}

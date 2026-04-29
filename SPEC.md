@@ -1520,11 +1520,17 @@ type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
 
 - `default`（規定値）= 既存 `renderer.py` COLOR_MAP と完全一致
 - 追加10種: Japanese Tradition / Italian Renaissance / French Impressionism / Chinese Imperial / Scandinavian Minimalism / Indian Spice / Egyptian Sands / Mexican Vibrant / British Heritage / Greek Aegean
-- 各カタログは `map`（6色 ColorMap）+ `swatches`（表示用8色）を持つ
+- 各カタログは `map`（6色 ColorMap）+ `swatches`（表示用8色）+ `palette`（名称付き8色）を持つ
 
 「カタログ設定」モーダル（ヘッダー右端）から選択。選択は `localStorage` に永続化。
 
 **バックエンド**: `renderer.render()` に `color_map: dict[str, str] | None = None` パラメータ追加。`ComposeRequest` / `PaintRequest` に `color_map` フィールド追加。演奏ごとに選択中のカタログ色マップがサーバーに送信され、SVG 出力に反映される。
+
+#### 色ニュアンス `color_hint`
+
+JSON Score の各 `instruction` は任意の `color_hint` を持てる。`color` は従来どおり `white / black / blue / red / green / gray` の抽象色とし、`color_hint` には「桜色」「朱に近い赤」「冷たい青緑」など、指示に含まれた具体的な色ニュアンスを短く保存する。
+
+Stage 2 は具体色を抽象色へ丸めつつ、元のニュアンスを `color_hint` に保持する。Renderer は選択中の色カタログの `map` と `palette` を受け取り、`color_hint` がある場合はパレット名・色相ヒントを使ってより近い実色を選ぶ。ヒントがない場合、または解決できない場合は従来どおり `color` の抽象色を使う。
 
 #### その他
 

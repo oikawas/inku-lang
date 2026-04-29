@@ -1,5 +1,6 @@
 export type ColorKey = 'white' | 'black' | 'blue' | 'red' | 'green' | 'gray';
 export type ColorMap = Record<ColorKey, string>;
+export type RenderColorMap = Record<string, string>;
 
 export type ColorCatalog = {
 	id: string;
@@ -216,4 +217,14 @@ export function getCatalogById(id: string): ColorCatalog | undefined {
 
 export function getColorMap(catalogId: string): ColorMap {
 	return getCatalogById(catalogId)?.map ?? DEFAULT_COLOR_MAP;
+}
+
+export function getRenderColorMap(catalogId: string): RenderColorMap {
+	const catalog = getCatalogById(catalogId);
+	if (!catalog) return DEFAULT_COLOR_MAP;
+	const entries: RenderColorMap = { ...catalog.map };
+	for (const color of catalog.palette) {
+		entries[`palette:${color.name}`] = color.code;
+	}
+	return entries;
 }

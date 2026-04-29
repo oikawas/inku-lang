@@ -14,7 +14,7 @@
 		type Provider
 	} from '$lib/models';
 	import { t, setLang, getLang, PACK_LIST, initLang } from '$lib/i18n/index.svelte';
-	import { COLOR_CATALOGS, getCatalogById, getColorMap, type ColorMap } from '$lib/colors';
+	import { COLOR_CATALOGS, getCatalogById, getRenderColorMap, type RenderColorMap } from '$lib/colors';
 
 	const HISTORY_MANAGER_PAGE_SIZE = 100;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
@@ -181,9 +181,9 @@
 	let selectedCatalog = $state('default');
 	const currentCatalog = $derived(getCatalogById(selectedCatalog) ?? COLOR_CATALOGS[0]);
 
-	function activeColorMap(): ColorMap | null {
+	function activeColorMap(): RenderColorMap | null {
 		if (selectedCatalog === 'default') return null;
-		return getColorMap(selectedCatalog);
+		return getRenderColorMap(selectedCatalog);
 	}
 
 	function isLightColor(hex: string): boolean {
@@ -1449,6 +1449,12 @@
 		</div>
 
 		<div class="header-right">
+			{#if currentUser}
+				<div class="user-badge" title={currentUser.email || currentUser.username}>
+					<span class="user-badge-name">{currentUser.username}</span>
+				</div>
+			{/if}
+
 			<button
 				class="settings-btn"
 				class:active={settingsOpen}
@@ -1584,7 +1590,7 @@
 					{/if}
 
 					{#if error}<p class="error-text">{error}</p>{/if}
-					{#if batchFailureReport && !loading}
+					{#if inputMode === 'batch' && batchFailureReport && !loading}
 						<div class="batch-summary has-failures">
 							<div class="batch-summary-line">{t().batchSummary(batchFailureReport.success, batchFailureReport.failures.length, batchFailureReport.total)}</div>
 							<div class="batch-failure-title">{t().batchFailureTitle}</div>
@@ -2393,6 +2399,27 @@
 		flex-shrink: 0;
 	}
 
+	.user-badge {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		max-width: 220px;
+		padding: 0 2px;
+		border-left: 1px solid var(--border);
+		padding-left: 10px;
+		background: transparent;
+		color: var(--fg2);
+		font-size: 12px;
+		min-width: 0;
+		cursor: default;
+	}
+	.user-badge-name {
+		font-weight: 400;
+		color: var(--fg2);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.settings-wrap { position: relative; }
 
 	.settings-btn {
@@ -3139,7 +3166,13 @@
 	}
 	.tooltip-date { color: rgba(255,255,255,0.55); margin-top: 3px; }
 	.thumb-svg { width: 82px; height: 58px; overflow: hidden; }
-	.thumb-svg :global(svg) { width: 100%; height: 100%; display: block; }
+	.thumb-svg :global(svg) {
+		width: 100%;
+		height: 100%;
+		display: block;
+		overflow: hidden;
+		clip-path: inset(0);
+	}
 	.thumb-meta {
 		padding: 3px 5px; border-top: 1px solid var(--border);
 		display: flex; flex-direction: column; gap: 1px;
@@ -3680,7 +3713,13 @@
 	}
 	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
 	.history-mini { width: 48px; height: 36px; overflow: hidden; background: #fff; border: 1px solid var(--border); }
-	.history-mini :global(svg) { width: 100%; height: 100%; display: block; }
+	.history-mini :global(svg) {
+		width: 100%;
+		height: 100%;
+		display: block;
+		overflow: hidden;
+		clip-path: inset(0);
+	}
 	.confirm-layer {
 		position: fixed; inset: 0; z-index: 600;
 		display: flex; align-items: center; justify-content: center;

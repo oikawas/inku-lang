@@ -2391,7 +2391,11 @@
 		display: flex; flex-direction: column; overflow: hidden;
 	}
 	.settings-modal { width: min(680px, calc(100vw - 32px)); max-height: 88vh; }
-	.history-modal { width: min(920px, calc(100vw - 32px)); max-height: 88vh; }
+	.history-modal {
+		width: min(920px, calc(100vw - 32px));
+		height: min(720px, calc(100vh - 32px));
+		max-height: 88vh;
+	}
 	.settings-tabs {
 		display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg);
 	}
@@ -2497,6 +2501,7 @@
 		margin-right: 2px;
 	}
 	.history-search { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--fg2); font-size: 12px; }
+	.history-search input { width: min(240px, 30vw); }
 	.history-thumb-grid-wrap,
 	.history-table-wrap {
 		flex: 1;

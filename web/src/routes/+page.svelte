@@ -99,6 +99,7 @@
 	let windowWidth  = $state(1200);
 	let saijikiOpen  = $state(false);
 	let settingsOpen = $state(false);
+	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<'connection' | 'db' | 'plugins' | 'users' | 'misc'>('connection');
 	let pngMenuOpen  = $state(false);
 	let catalogOpen  = $state(false);
@@ -834,7 +835,7 @@
 			<button
 				class="settings-btn"
 				class:active={settingsOpen}
-				onclick={() => { settingsTab = 'db'; settingsOpen = true; }}
+				onclick={() => { settingsMode = 'settings'; settingsTab = 'db'; settingsOpen = true; }}
 			>⚙ 設定</button>
 
 			<!-- Lang -->
@@ -889,9 +890,9 @@
 					<div class="section-head">
 						<span class="section-label">指示</span>
 						<div class="section-actions">
-							<button class="ghost-btn" onclick={() => { settingsTab = 'connection'; settingsOpen = true; }}>モデル選択</button>
+							<button class="ghost-btn" onclick={() => { settingsMode = 'model'; settingsTab = 'connection'; settingsOpen = true; }}>モデル選択</button>
 							<button class="ghost-btn" onclick={() => (catalogOpen = true)}>色カタログ</button>
-							<button class="ghost-btn" onclick={clearInput}>新規作成</button>
+							<button class="ghost-btn create-btn" onclick={clearInput}>新規作成</button>
 						</div>
 					</div>
 
@@ -1241,18 +1242,19 @@
 	<div class="modal-backdrop" onclick={() => (settingsOpen = false)} aria-hidden="true"></div>
 	<div class="settings-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="modal-head">
-			<div class="catalog-modal-title">{settingsTab === 'connection' ? 'モデル選択' : '設定'}</div>
+			<div class="catalog-modal-title">{settingsMode === 'model' ? 'モデル選択' : '設定'}</div>
 			<button class="catalog-close" onclick={() => (settingsOpen = false)}>×</button>
 		</div>
-		<div class="settings-tabs">
-			<button class:active={settingsTab === 'connection'} onclick={() => (settingsTab = 'connection')}>モデル選択</button>
-			<button class:active={settingsTab === 'db'} onclick={() => (settingsTab = 'db')}>DB設定</button>
-			<button class:active={settingsTab === 'plugins'} onclick={() => (settingsTab = 'plugins')}>プラグイン</button>
-			<button class:active={settingsTab === 'users'} onclick={() => (settingsTab = 'users')}>ユーザー管理</button>
-			<button class:active={settingsTab === 'misc'} onclick={() => (settingsTab = 'misc')}>その他</button>
-		</div>
+		{#if settingsMode === 'settings'}
+			<div class="settings-tabs">
+				<button class:active={settingsTab === 'db'} onclick={() => (settingsTab = 'db')}>DB設定</button>
+				<button class:active={settingsTab === 'plugins'} onclick={() => (settingsTab = 'plugins')}>プラグイン</button>
+				<button class:active={settingsTab === 'users'} onclick={() => (settingsTab = 'users')}>ユーザー管理</button>
+				<button class:active={settingsTab === 'misc'} onclick={() => (settingsTab = 'misc')}>その他</button>
+			</div>
+		{/if}
 		<div class="settings-body">
-			{#if settingsTab === 'connection'}
+			{#if settingsMode === 'model'}
 				<div class="popover-group">
 					<div class="popover-group-label">{t().stage1Label}</div>
 					<div class="form-row">
@@ -1289,15 +1291,6 @@
 						</select>
 					</div>
 				</div>
-				{#if snapshots.length > 0}
-					<div class="popover-group">
-						<div class="popover-group-label">{t().saijikiLabel}</div>
-						<select class="full-select" value={activeSnapshotId ?? ''} onchange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; activeSnapshotId = v || null; }}>
-							<option value="">{t().currentSetting}</option>
-							{#each snapshots as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
-						</select>
-					</div>
-				{/if}
 			{:else if settingsTab === 'db'}
 				<div class="popover-group">
 					<div class="form-row">
@@ -1823,6 +1816,18 @@
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
+	.create-btn {
+		background: #fff7e8;
+		border-color: #d8b36a;
+		color: #6c4a10;
+		font-weight: 600;
+		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
+	}
+	.create-btn:hover {
+		background: #ffefd0;
+		border-color: #bd8f34;
+		color: #4f360b;
+	}
 
 	/* Input textarea */
 	.input-ta, .batch-ta {
@@ -2399,7 +2404,7 @@
 		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
 	}
 	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
-	.form-row input, .form-row select, .full-select, .plugin-add input, .history-search input {
+	.form-row input, .form-row select, .plugin-add input, .history-search input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;

@@ -1,18 +1,17 @@
 // @ts-nocheck
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { resolve, dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const buildNumberFile = resolve(__dirname, '.build-number');
+const buildNumberFile = resolve(__dirname, 'BUILD_NUMBER');
 
 let buildNumber = 1;
 try {
-	buildNumber = parseInt(readFileSync(buildNumberFile, 'utf-8').trim(), 10) + 1;
+	buildNumber = parseInt(readFileSync(buildNumberFile, 'utf-8').trim(), 10);
 } catch { /* first run */ }
-writeFileSync(buildNumberFile, String(buildNumber));
 
 export default defineConfig({
 	define: {

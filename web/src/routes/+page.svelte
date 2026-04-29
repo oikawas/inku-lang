@@ -60,10 +60,26 @@
 	};
 
 	type PluginItem = {
-		id: string;
 		name: string;
 		version: string;
-		enabled: boolean;
+		status: string;
+	};
+	type SettingsStatus = {
+		database: {
+			backend: string;
+			driver: string;
+			url: string;
+			database: string | null;
+			is_default: boolean;
+			runtime_editable: boolean;
+			note: string;
+		};
+		plugins: {
+			enabled: boolean;
+			loaded: PluginItem[];
+			runtime_editable: boolean;
+			note: string;
+		};
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
@@ -151,22 +167,9 @@
 	}
 
 	// ── Settings tabs ────────────────────────────────────────
-	let dbType = $state<'sqlite' | 'postgres'>('sqlite');
-	let sqlitePath = $state('~/.local/share/inku/inku.db');
-	let pgHost = $state('');
-	let pgPort = $state('5432');
-	let pgUser = $state('');
-	let pgPassword = $state('');
-	let pgDatabase = $state('');
-	let showPgPassword = $state(false);
-	let dbTestResult = $state<string | null>(null);
-	let plugins = $state<PluginItem[]>([
-		{ id: 'nature', name: 'inku-nature', version: 'v0.1.0', enabled: true },
-		{ id: 'bamboo', name: 'inku-bamboo', version: 'v0.1.0', enabled: false },
-	]);
-	let pluginAddOpen = $state(false);
-	let pluginPath = $state('');
-	let pluginPendingDelete = $state<PluginItem | null>(null);
+	let settingsStatus = $state<SettingsStatus | null>(null);
+	let settingsStatusError = $state<string | null>(null);
+	let settingsStatusLoading = $state(false);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
@@ -193,20 +196,16 @@
 		return fetch(path, { ...init, headers });
 	}
 
-	function testDbConnection() {
-		dbTestResult = dbType === 'sqlite'
-			? `SQLite path is set: ${sqlitePath || '(empty)'}`
-			: pgHost && pgUser && pgDatabase
-				? `Ready to test PostgreSQL at ${pgHost}:${pgPort}`
-				: 'PostgreSQL settings are incomplete.';
+	function openSettings(tab: typeof settingsTab = 'db') {
+		settingsMode = 'settings';
+		settingsTab = tab;
+		settingsOpen = true;
+		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
 	}
 
-	function addPlugin() {
-		const name = pluginPath.trim();
-		if (!name) return;
-		plugins = [...plugins, { id: `${Date.now()}`, name, version: 'local', enabled: true }];
-		pluginPath = '';
-		pluginAddOpen = false;
+	function selectSettingsTab(tab: typeof settingsTab) {
+		settingsTab = tab;
+		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
 	}
 
 	async function loadUserSettings() {
@@ -231,18 +230,45 @@
 		}
 	}
 
+	async function loadSettingsStatus() {
+		if (!currentUser || currentUser.role !== 'admin') {
+			settingsStatus = null;
+			settingsStatusError = currentUser
+				? 'DB設定とプラグイン状態は管理者のみ確認できます。'
+				: 'ログイン後に設定状態を確認できます。';
+			return;
+		}
+		settingsStatusLoading = true;
+		try {
+			const r = await apiFetch('/api/settings/status');
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			settingsStatus = await r.json();
+			settingsStatusError = null;
+		} catch (e) {
+			settingsStatus = null;
+			settingsStatusError = e instanceof Error ? e.message : String(e);
+		} finally {
+			settingsStatusLoading = false;
+		}
+	}
+
 	async function loadCurrentUser() {
 		if (!authToken) return;
 		try {
 			const r = await apiFetch('/api/auth/me');
 			if (!r.ok) throw new Error('session expired');
 			currentUser = await r.json();
-			await loadUserSettings();
+			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
 			authToken = null;
 			currentUser = null;
+			settingsStatus = null;
+			settingsStatusError = 'ログイン後に設定状態を確認できます。';
 			historyItems = [];
 			historyTotal = 0;
 			trashItems = [];
@@ -275,7 +301,7 @@
 			managerTrashTotal = 0;
 			loginPassword = '';
 			try { localStorage.setItem(AUTH_TOKEN_KEY, authToken); } catch {}
-			await loadUserSettings();
+			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -289,6 +315,8 @@
 		}
 		authToken = null;
 		currentUser = null;
+		settingsStatus = null;
+		settingsStatusError = 'ログイン後に設定状態を確認できます。';
 		users = [];
 		groups = [];
 		historyItems = [];
@@ -1086,7 +1114,7 @@
 			<button
 				class="settings-btn"
 				class:active={settingsOpen}
-				onclick={() => { settingsMode = 'settings'; settingsTab = 'db'; settingsOpen = true; }}
+				onclick={() => openSettings('db')}
 			>⚙ 設定</button>
 
 			<!-- Lang -->
@@ -1498,10 +1526,10 @@
 		</div>
 		{#if settingsMode === 'settings'}
 			<div class="settings-tabs">
-				<button class:active={settingsTab === 'db'} onclick={() => (settingsTab = 'db')}>DB設定</button>
-				<button class:active={settingsTab === 'plugins'} onclick={() => (settingsTab = 'plugins')}>プラグイン</button>
-				<button class:active={settingsTab === 'users'} onclick={() => (settingsTab = 'users')}>ユーザー管理</button>
-				<button class:active={settingsTab === 'misc'} onclick={() => (settingsTab = 'misc')}>その他</button>
+				<button class:active={settingsTab === 'db'} onclick={() => selectSettingsTab('db')}>DB設定</button>
+				<button class:active={settingsTab === 'plugins'} onclick={() => selectSettingsTab('plugins')}>プラグイン</button>
+				<button class:active={settingsTab === 'users'} onclick={() => selectSettingsTab('users')}>ユーザー管理</button>
+				<button class:active={settingsTab === 'misc'} onclick={() => selectSettingsTab('misc')}>その他</button>
 			</div>
 		{/if}
 		<div class="settings-body">
@@ -1544,67 +1572,56 @@
 				</div>
 			{:else if settingsTab === 'db'}
 				<div class="popover-group">
-					<div class="form-row">
-						<label>DBタイプ:</label>
-						<select bind:value={dbType}>
-							<option value="sqlite">内蔵SQLite</option>
-							<option value="postgres">PostgreSQL</option>
-						</select>
-					</div>
+					<div class="popover-group-label">現在のサーバーDB</div>
+					{#if settingsStatusLoading}
+						<div class="inline-message">設定状態を読み込んでいます。</div>
+					{:else if settingsStatus}
+						<div class="settings-readonly-grid">
+							<span>Backend</span><strong>{settingsStatus.database.backend}</strong>
+							<span>Driver</span><strong>{settingsStatus.database.driver}</strong>
+							<span>URL</span><code>{settingsStatus.database.url}</code>
+							<span>Database</span><strong>{settingsStatus.database.database ?? '-'}</strong>
+							<span>Default</span><strong>{settingsStatus.database.is_default ? 'はい' : 'いいえ'}</strong>
+						</div>
+						<div class="db-test-result">{settingsStatus.database.note}</div>
+					{:else}
+						<div class="inline-message">{settingsStatusError ?? '設定状態を取得できません。'}</div>
+					{/if}
 				</div>
-				{#if dbType === 'sqlite'}
-					<div class="popover-group">
-						<div class="popover-group-label">SQLite</div>
-						<div class="form-row">
-							<label>保存先パス:</label>
-							<input bind:value={sqlitePath} />
-						</div>
-					</div>
-				{:else}
-					<div class="popover-group">
-						<div class="popover-group-label">PostgreSQL</div>
-						<div class="form-row"><label>サーバー:</label><input bind:value={pgHost} /></div>
-						<div class="form-row"><label>ポート:</label><input bind:value={pgPort} /></div>
-						<div class="form-row"><label>ユーザー:</label><input bind:value={pgUser} /></div>
-						<div class="form-row">
-							<label>パスワード:</label>
-							<input type={showPgPassword ? 'text' : 'password'} bind:value={pgPassword} />
-							<button class="ghost-btn" onclick={() => (showPgPassword = !showPgPassword)}>{showPgPassword ? '隠す' : '表示'}</button>
-						</div>
-						<div class="form-row"><label>DB名:</label><input bind:value={pgDatabase} /></div>
-					</div>
-				{/if}
 				<div class="settings-inline-actions">
-					<button class="ghost-btn" onclick={testDbConnection}>接続テスト</button>
-					{#if dbTestResult}<span class="db-test-result">{dbTestResult}</span>{/if}
+					<button class="ghost-btn" onclick={loadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>再読み込み</button>
 				</div>
 			{:else if settingsTab === 'plugins'}
-				<div class="plugin-list">
-					{#each plugins as plugin (plugin.id)}
-						<div class="plugin-row">
-							<label class="check-row">
-								<input type="checkbox" checked={plugin.enabled} onchange={(e) => { plugin.enabled = (e.currentTarget as HTMLInputElement).checked; plugins = [...plugins]; }} />
-								<span>{plugin.name}</span>
-							</label>
-							<span class="plugin-version">{plugin.version}</span>
-							<button class="ghost-btn" onclick={() => (pluginPendingDelete = plugin)}>削除</button>
+				<div class="popover-group">
+					<div class="popover-group-label">プラグイン状態</div>
+					{#if settingsStatusLoading}
+						<div class="inline-message">設定状態を読み込んでいます。</div>
+					{:else if settingsStatus}
+						<div class="settings-readonly-grid">
+							<span>Loader</span><strong>{settingsStatus.plugins.enabled ? '有効' : '未実装'}</strong>
+							<span>Runtime edit</span><strong>{settingsStatus.plugins.runtime_editable ? '可' : '不可'}</strong>
 						</div>
-					{/each}
+						{#if settingsStatus.plugins.loaded.length > 0}
+							<div class="plugin-list">
+								{#each settingsStatus.plugins.loaded as plugin (plugin.name)}
+									<div class="plugin-row">
+										<span>{plugin.name}</span>
+										<span class="plugin-version">{plugin.version}</span>
+										<span class="plugin-version">{plugin.status}</span>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<div class="inline-message">読み込まれているプラグインはありません。</div>
+						{/if}
+						<div class="db-test-result">{settingsStatus.plugins.note}</div>
+					{:else}
+						<div class="inline-message">{settingsStatusError ?? '設定状態を取得できません。'}</div>
+					{/if}
 				</div>
-				<button class="ghost-btn" onclick={() => (pluginAddOpen = !pluginAddOpen)}>＋ プラグインを追加</button>
-				{#if pluginAddOpen}
-					<div class="plugin-add">
-						<input bind:value={pluginPath} placeholder="plugin path or name" />
-						<button class="ghost-btn" onclick={addPlugin}>追加</button>
-					</div>
-				{/if}
-				{#if pluginPendingDelete}
-					<div class="inline-confirm">
-						<span>{pluginPendingDelete.name} を削除しますか？</span>
-						<button class="ghost-btn" onclick={() => (pluginPendingDelete = null)}>キャンセル</button>
-						<button class="danger-btn" onclick={() => { plugins = plugins.filter((p) => p.id !== pluginPendingDelete?.id); pluginPendingDelete = null; }}>削除</button>
-					</div>
-				{/if}
+				<div class="settings-inline-actions">
+					<button class="ghost-btn" onclick={loadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>再読み込み</button>
+				</div>
 			{:else if settingsTab === 'users'}
 				<div class="popover-group">
 					<div class="popover-group-label">ユーザー</div>
@@ -2728,6 +2745,26 @@
 	.check-row { display: flex; align-items: center; gap: 7px; color: var(--fg2); font-size: 12px; }
 	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
 	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.settings-readonly-grid {
+		display: grid;
+		grid-template-columns: 120px minmax(0, 1fr);
+		gap: 7px 12px;
+		align-items: baseline;
+		margin-bottom: 9px;
+		font-size: 12px;
+	}
+	.settings-readonly-grid span { color: var(--fg3); }
+	.settings-readonly-grid strong { color: var(--fg); font-weight: 500; min-width: 0; word-break: break-word; }
+	.settings-readonly-grid code {
+		min-width: 0;
+		padding: 2px 4px;
+		border-radius: var(--r);
+		background: var(--bg);
+		color: var(--fg2);
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-size: 11px;
+		word-break: break-all;
+	}
 	.inline-message {
 		padding: 7px 9px;
 		border: 1px solid var(--border);

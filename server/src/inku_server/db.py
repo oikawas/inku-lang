@@ -195,6 +195,17 @@ def admin_history_owner_id() -> str | None:
     return _history_owner_user_id()
 
 
+def database_info() -> dict:
+    url = engine.url
+    return {
+        "backend": url.get_backend_name(),
+        "driver": url.get_driver_name(),
+        "url": url.render_as_string(hide_password=True),
+        "database": url.database,
+        "is_default": _DB_URL == _DEFAULT_DB,
+    }
+
+
 def _assign_unowned_history_to_admin() -> None:
     owner_id = _history_owner_user_id()
     if not owner_id:

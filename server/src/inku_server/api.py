@@ -234,6 +234,28 @@ class LoginResponse(BaseModel):
     user: UserAccountItem
 
 
+class DatabaseSettingsStatus(BaseModel):
+    backend: str
+    driver: str
+    url: str
+    database: str | None = None
+    is_default: bool
+    runtime_editable: bool = False
+    note: str
+
+
+class PluginSettingsStatus(BaseModel):
+    enabled: bool = False
+    loaded: list[dict[str, str]] = Field(default_factory=list)
+    runtime_editable: bool = False
+    note: str
+
+
+class SettingsStatusResponse(BaseModel):
+    database: DatabaseSettingsStatus
+    plugins: PluginSettingsStatus
+
+
 def _bearer_token(authorization: str | None = Header(default=None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="authentication required")
@@ -250,6 +272,12 @@ def _current_user(token: str = Depends(_bearer_token)) -> dict:
 def _user_manager(actor: dict = Depends(_current_user)) -> dict:
     if actor["role"] not in {"admin", "group_lead"}:
         raise HTTPException(status_code=403, detail="user management is not permitted")
+    return actor
+
+
+def _admin_user(actor: dict = Depends(_current_user)) -> dict:
+    if actor["role"] != "admin":
+        raise HTTPException(status_code=403, detail="administrator permission is required")
     return actor
 
 
@@ -281,6 +309,20 @@ def api_auth_login(body: LoginBody) -> LoginResponse:
 @app.get("/api/auth/me", response_model=UserAccountItem)
 def api_auth_me(actor: dict = Depends(_current_user)) -> UserAccountItem:
     return UserAccountItem(**actor)
+
+
+@app.get("/api/settings/status", response_model=SettingsStatusResponse)
+def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusResponse:
+    db_info = _db.database_info()
+    return SettingsStatusResponse(
+        database=DatabaseSettingsStatus(
+            **db_info,
+            note="DB connection is selected at server startup by INKU_DB_URL. Restart the server after changing it.",
+        ),
+        plugins=PluginSettingsStatus(
+            note="Plugin loading is not implemented in this reference server yet. The UI is read-only until a loader API exists.",
+        ),
+    )
 
 
 @app.post("/api/auth/logout")

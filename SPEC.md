@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.10**
+**Version: v1.11**
 
 ---
 
@@ -1072,7 +1072,6 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - 解釈フィードバック色パレットの確定 (v0.6 で `墨の濃淡` 採用、朱色追加要否)
 - サンプル記述集 (SPEC §14.3 Phase 2)
 - **Saijiki スナップショット UI の復旧** — API と state は残存しているが、v1.9 時点の UI から選択・作成導線が消えている
-- **設定系 UI の実体化または明示的な未実装表示** — ユーザー管理は v1.10 で DB/API 接続済み。DB設定 / プラグインは v1.10 時点では UI prototype で、実サーバー設定変更・プラグイン読込には未接続
 - **履歴管理のスケール対応** — v1.10 の履歴管理ダイアログはログインユーザー単位で全件ロード + 全件 DOM 展開。履歴が数千件規模になる前にサーバー検索 / ページング / 仮想リスト化が必要
 
 ### E. テスト / CI / 運用
@@ -1126,6 +1125,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~スクロール型レイアウトで全要素の関係が見えにくい~~ → v1.6 で固定ビューポート2ペイン構成に刷新
 - ~~ユーザー管理が prototype UI のみ~~ → v1.10 で認証、ユーザー/グループ管理 API、DB 永続化、権限制御を実装
 - ~~描画履歴が全ユーザーで共有される~~ → v1.10 で `history.user_id` を追加し、履歴取得・保存・削除をログインユーザー単位に分離。既存履歴は初回起動時に admin 所有へ移行
+- ~~DB設定 / プラグイン管理が prototype UI のみ~~ → v1.11 で管理者向け read-only API に接続し、DB は `INKU_DB_URL` 起動時設定、プラグインは未実装であることを UI に明示
 
 ---
 
@@ -1158,7 +1158,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 │       ├── test_renderer.py       # 10 cases
 │       ├── test_composer.py       # 15 fixture + 厳密比較
 │       ├── test_interpreter.py    # 5 smoke cases (Saijiki 語彙検査)
-│       ├── test_api.py            # FastAPI TestClient 10 cases
+│       ├── test_api.py            # FastAPI TestClient 11 cases
 │       └── fixtures/stage2/       # 正規化DDL ↔ Score ペア
 │           └── {01..15}/{input.txt,expected.json}
 └── web/                           # SvelteKit 2 + Svelte 5 + TS (inku-web 0.1.0)
@@ -1184,7 +1184,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
 - `db.py` — SQLAlchemy DB 層。履歴、ユーザーグループ、ユーザーアカウント、セッションを管理。パスワードは PBKDF2-SHA256 + salt で保存
-- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/api/auth/*`/`/api/users`/`/api/user-groups`/`/health`
+- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
 **開発環境 (ローカル運用手順は `LOCAL_WORK.md` を参照、未コミット)**
@@ -1196,6 +1196,19 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.11 (2026-04-29)
+
+**設定 UI の実挙動接続**
+
+設定 > DB設定 / プラグインを prototype state からサーバー状態表示へ変更した。
+
+- `GET /api/settings/status` を追加
+- 管理者のみ設定状態を取得可能
+- DB設定タブは現在の SQLAlchemy backend / driver / masked URL / database を表示
+- DB接続はランタイム変更できず、`INKU_DB_URL` 変更後にサーバー再起動が必要であることを明示
+- プラグインタブは reference server では loader 未実装であることをサーバー状態として表示
+- フロントエンド上だけでプラグイン追加・削除・有効化できる prototype UI を廃止
 
 ### v1.10 (2026-04-29)
 

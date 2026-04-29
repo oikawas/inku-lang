@@ -98,6 +98,51 @@ def test_cors_allows_localhost(monkeypatch):
     assert r.headers.get("access-control-allow-origin") == "http://localhost:5173"
 
 
+def test_settings_status_is_admin_only():
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"settings-{suffix}")
+    admin = db.add_user(
+        username=f"settings-admin-{suffix}",
+        email=f"settings-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    user = db.add_user(
+        username=f"settings-user-{suffix}",
+        email=f"settings-user-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+
+    assert client.get("/api/settings/status").status_code == 401
+
+    user_token = client.post(
+        "/api/auth/login",
+        json={"username": user["username"], "password": "password-123"},
+    ).json()["token"]
+    assert client.get("/api/settings/status", headers={"Authorization": f"Bearer {user_token}"}).status_code == 403
+
+    admin_token = client.post(
+        "/api/auth/login",
+        json={"username": admin["username"], "password": "password-123"},
+    ).json()["token"]
+    r = client.get("/api/settings/status", headers={"Authorization": f"Bearer {admin_token}"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["database"]["backend"]
+    assert data["database"]["runtime_editable"] is False
+    assert "INKU_DB_URL" in data["database"]["note"]
+    assert data["plugins"]["enabled"] is False
+    assert data["plugins"]["runtime_editable"] is False
+    assert data["plugins"]["loaded"] == []
+
+    db.delete_user(admin["id"])
+    db.delete_user(user["id"])
+    db.delete_user_group(group["id"])
+
+
 def test_user_management_crud():
     suffix = uuid.uuid4().hex[:8]
     admin_group = db.add_user_group(f"admins-{suffix}")

@@ -1,0 +1,18 @@
+[Unit]
+Description=inku Vite dev server (SvelteKit web UI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ddl-server
+Group=ddl-server
+WorkingDirectory=/home/ddl-server/inku-lang/web
+ExecStart=/usr/bin/node node_modules/.bin/vite dev --host 0.0.0.0 --port 5173 --strictPort
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

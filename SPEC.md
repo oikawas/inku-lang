@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.9**
+**Version: v1.10**
 
 ---
 
@@ -1072,8 +1072,8 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - 解釈フィードバック色パレットの確定 (v0.6 で `墨の濃淡` 採用、朱色追加要否)
 - サンプル記述集 (SPEC §14.3 Phase 2)
 - **Saijiki スナップショット UI の復旧** — API と state は残存しているが、v1.9 時点の UI から選択・作成導線が消えている
-- **設定系 UI の実体化または明示的な未実装表示** — DB / プラグイン / ユーザー管理は v1.9 時点では UI prototype で、サーバー設定・認証・プラグイン読込には未接続
-- **履歴管理のスケール対応** — v1.9 の履歴管理ダイアログは全件ロード + 全件 DOM 展開。履歴が数千件規模になる前にサーバー検索 / ページング / 仮想リスト化が必要
+- **設定系 UI の実体化または明示的な未実装表示** — ユーザー管理は v1.10 で DB/API 接続済み。DB設定 / プラグインは v1.10 時点では UI prototype で、実サーバー設定変更・プラグイン読込には未接続
+- **履歴管理のスケール対応** — v1.10 の履歴管理ダイアログはログインユーザー単位で全件ロード + 全件 DOM 展開。履歴が数千件規模になる前にサーバー検索 / ページング / 仮想リスト化が必要
 
 ### E. テスト / CI / 運用
 
@@ -1091,7 +1091,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - **Saijiki 辞書の配信形式** — `web/src/lib/saijiki.ts` 内ハードコード中、将来的に `inku-saijiki` パッケージ
 - **Base Language** — 英語版 Saijiki + 英語 prompt (SPEC §5)
 - **短歌的制約の強化** — 文字数カウント、句跨ぎの扱い
-- **リーダーボード / 作品保存** — ユーザーごとの作品コレクション (P2P or 集約サーバー)
+- **リーダーボード / 作品共有** — v1.10 でユーザーごとの履歴分離は実装済み。グループ内共有・公開作品コレクションは将来機能
 
 ### G. 既に解消済 (参考)
 
@@ -1124,6 +1124,8 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~固定の6色制約~~ → v1.6 で色カタログシステム導入（default + 10文化パレット選択可）
 - ~~キャンバスのズーム不可~~ → v1.6 でズームUI追加（0.5×〜3×）
 - ~~スクロール型レイアウトで全要素の関係が見えにくい~~ → v1.6 で固定ビューポート2ペイン構成に刷新
+- ~~ユーザー管理が prototype UI のみ~~ → v1.10 で認証、ユーザー/グループ管理 API、DB 永続化、権限制御を実装
+- ~~描画履歴が全ユーザーで共有される~~ → v1.10 で `history.user_id` を追加し、履歴取得・保存・削除をログインユーザー単位に分離。既存履歴は初回起動時に admin 所有へ移行
 
 ---
 
@@ -1136,6 +1138,9 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ├── LICENSE                        # MIT License
 ├── SPEC.md                        # 本書（設計哲学・言語設計）
 ├── CLAUDE.md                      # Claude Code 用コンテキスト (gitignore)
+├── ops/
+│   └── systemd/
+│       └── inku-vite.service      # pentala Vite dev system service unit
 ├── server/                        # Python バックエンド (uv管理)
 │   ├── pyproject.toml             # inku-server 0.1.0
 │   ├── uv.lock
@@ -1145,13 +1150,15 @@ inku-lang/                         # github.com/oikawas/inku-lang
 │   │   ├── schema.py              # JSON Score Pydantic モデル
 │   │   ├── renderer.py            # Score → SVG (svgwrite)
 │   │   ├── composer.py            # 正規化DDL → Score (Haiku 4.5)
+│   │   ├── db.py                  # 履歴 / ユーザー / セッション DB 層
+│   │   ├── migrate_history.py     # history.json → DB 移行
 │   │   └── coerce.py              # Score 構造補修 (PRIMITIVE_SPECS テーブル駆動)
 │   └── tests/
 │       ├── conftest.py            # dotenv 読込
 │       ├── test_renderer.py       # 10 cases
 │       ├── test_composer.py       # 15 fixture + 厳密比較
 │       ├── test_interpreter.py    # 5 smoke cases (Saijiki 語彙検査)
-│       ├── test_api.py            # FastAPI TestClient 8 cases
+│       ├── test_api.py            # FastAPI TestClient 10 cases
 │       └── fixtures/stage2/       # 正規化DDL ↔ Score ペア
 │           └── {01..15}/{input.txt,expected.json}
 └── web/                           # SvelteKit 2 + Svelte 5 + TS (inku-web 0.1.0)
@@ -1176,7 +1183,8 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
-- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/health`
+- `db.py` — SQLAlchemy DB 層。履歴、ユーザーグループ、ユーザーアカウント、セッションを管理。パスワードは PBKDF2-SHA256 + salt で保存
+- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/api/auth/*`/`/api/users`/`/api/user-groups`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
 **開発環境 (ローカル運用手順は `LOCAL_WORK.md` を参照、未コミット)**
@@ -1188,6 +1196,99 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.10 (2026-04-29)
+
+**マルチユーザー基盤 + ユーザー別履歴分離 + Vite system service 化**
+
+#### 認証 / ユーザー管理
+
+設定 > ユーザー管理タブを prototype UI から DB/API 接続済みの管理画面へ更新した。
+
+- ユーザーアカウントを DB に永続化
+- アカウント属性:
+  - ユーザー名
+  - メールアドレス
+  - パスワード
+  - ユーザー種類
+  - 所属ユーザーグループ
+- ユーザー種類:
+  - 管理者: 全設定、ユーザー管理、ユーザーグループ追加・削除・管理が可能
+  - グループリード: 自分のユーザーグループ内の一般ユーザー管理が可能
+  - ユーザー: 作品制作が可能
+- ユーザーグループは教室やイベントのチーム単位として扱う。グループ内作品共有は将来機能
+- パスワードは PBKDF2-SHA256 + 16 byte salt + 310,000 iterations でハッシュ化して保存
+- セッション token は SHA-256 hash のみ DB に保存
+- 初回起動時、ユーザーが存在しない場合は bootstrap admin を作成
+  - username: `admin`
+  - email: `admin@local`
+  - password: `inku-admin`
+  - 環境変数 `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` / `INKU_BOOTSTRAP_ADMIN_PASSWORD` で上書き可
+
+#### ユーザー管理 API
+
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `GET /api/user-groups`
+- `POST /api/user-groups`
+- `DELETE /api/user-groups/{group_id}`
+- `GET /api/users`
+- `POST /api/users`
+- `PATCH /api/users/{user_id}`
+- `DELETE /api/users/{user_id}`
+
+権限制御:
+
+- 管理者は全ユーザー / 全グループを管理できる
+- グループリードは自グループ内の一般ユーザーのみ作成・変更・削除できる
+- グループリードは role 昇格、他グループ移動、グループ作成・削除はできない
+- 一般ユーザーはユーザー管理 API を利用できない
+
+#### ユーザー管理 UI
+
+- 未ログイン時はログイン UI を表示
+- ログイン後、現在ユーザー / 権限 / 所属グループを表示
+- 管理者 / グループリードの場合:
+  - ユーザー追加パネル
+  - ユーザー変更パネル
+  - ユーザー一覧の変更 / 削除操作
+- 管理者の場合:
+  - グループ追加
+  - グループ削除
+- グループリードの場合:
+  - 追加ユーザーの role は `user` に固定
+  - 所属グループは自グループに固定
+
+#### ユーザー別履歴保存
+
+履歴 DB をユーザー単位に分離した。
+
+- `history.user_id` カラム追加
+- 既存履歴は初回起動時マイグレーションで admin 所有に移行
+- `GET /api/history` はログインユーザーの履歴のみ返す
+- `POST /api/history` はログインユーザーの履歴として保存
+- `DELETE /api/history` / trash / restore / permanent-delete はログインユーザーの履歴 ID のみ対象
+- 他ユーザーの履歴 ID を指定しても変更されない
+- 履歴を持つユーザー削除は孤立データ防止のため拒否する
+- 出力ファイル保存先は `outputs/{user_id}/YYYY-MM-DD/...` へ分離
+- 旧 `history.json` 移行スクリプトも admin 所有として取り込む
+
+#### pentala Vite system service
+
+pentala の Vite dev server を user service ではなく system service として運用する方針に変更した。
+
+背景:
+
+- `ddl-server` ユーザーは `Linger=no`
+- `systemctl --user` の `inku-vite.service` は SSH セッション終了に巻き込まれて停止する
+- その結果、Mac/Brave から `http://192.168.0.89:5173/` が `ERR_CONNECTION_REFUSED` になることがあった
+
+対応:
+
+- `ops/systemd/inku-vite.service` を追加
+- `/etc/systemd/system/inku-vite.service` へ配置して `sudo systemctl enable --now inku-vite.service` で常駐させる運用へ変更
+- `LOCAL_WORK.md` / `AGENTS.md` に操作手順を記録
 
 ### v1.9 (2026-04-29)
 
@@ -1234,7 +1335,7 @@ UI 上の作品生成表現を「演奏」から「描画」へ寄せた。
   - 白背景時アルファチャンネル設定 On/Off
   - 解釈を再編集した場合も新バージョンとして保存する On/Off
 
-**注意**: v1.9 時点で DB / プラグイン / ユーザー管理はフロントエンド上の prototype UI。実 DB 接続変更、認証、プラグイン読込には未接続。
+**注意**: v1.9 時点では DB / プラグイン / ユーザー管理はフロントエンド上の prototype UI だった。v1.10 でユーザー管理は DB/API 接続済みとなったが、DB設定変更とプラグイン読込は引き続き未接続。
 
 #### 履歴ストリップ / 履歴管理
 
@@ -1285,7 +1386,7 @@ rsync 手打ちミスにより `web/src/` の中身が pentala の `web/` 直下
 
 #### 既知課題（v1.9 review）
 
-- 設定ダイアログの DB / プラグイン / ユーザー管理は実処理に未接続
+- 設定ダイアログの DB / プラグインは実処理に未接続。ユーザー管理は v1.10 で実装済み
 - Saijiki スナップショットの UI 導線が消えている
 - 履歴管理は全件ロード + 全件 DOM 展開のため、大量履歴ではサーバー検索 / ページング / 仮想リスト化が必要
 - 出力ファイル保存の失敗がサーバーログにも UI にも出ない

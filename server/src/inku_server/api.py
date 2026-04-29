@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -42,9 +42,9 @@ _OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
 _save_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-save")
 
 
-def _output_prefix(item_id: str, at_ms: int) -> Path:
+def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
     dt = datetime.fromtimestamp(at_ms / 1000, tz=timezone.utc).astimezone()
-    date_dir = _OUTPUT_DIR / dt.strftime("%Y-%m-%d")
+    date_dir = _OUTPUT_DIR / user_id / dt.strftime("%Y-%m-%d")
     return date_dir / (dt.strftime("%Y%m%d_%H%M%S") + "_" + item_id[:8])
 
 
@@ -187,8 +187,105 @@ class SnapshotCreateBody(BaseModel):
     name: str = Field(..., min_length=1, description="スナップショット名")
 
 
+class UserGroupItem(BaseModel):
+    id: str
+    name: str
+    at: int
+
+
+class UserGroupCreateBody(BaseModel):
+    name: str = Field(..., min_length=1, description="ユーザーグループ名")
+
+
+class UserAccountItem(BaseModel):
+    id: str
+    username: str
+    email: str
+    role: str
+    role_label: str
+    group_id: str | None = None
+    group_name: str | None = None
+    at: int
+
+
+class UserAccountCreateBody(BaseModel):
+    username: str = Field(..., min_length=1)
+    email: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=8)
+    role: str = Field(default="user")
+    group_id: str | None = None
+
+
+class UserAccountUpdateBody(BaseModel):
+    username: str | None = Field(default=None, min_length=1)
+    email: str | None = Field(default=None, min_length=1)
+    password: str | None = Field(default=None, min_length=8)
+    role: str | None = None
+    group_id: str | None = None
+
+
+class LoginBody(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
+class LoginResponse(BaseModel):
+    token: str
+    user: UserAccountItem
+
+
+def _bearer_token(authorization: str | None = Header(default=None)) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="authentication required")
+    return authorization.removeprefix("Bearer ").strip()
+
+
+def _current_user(token: str = Depends(_bearer_token)) -> dict:
+    user = _db.get_session_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid session")
+    return user
+
+
+def _user_manager(actor: dict = Depends(_current_user)) -> dict:
+    if actor["role"] not in {"admin", "group_lead"}:
+        raise HTTPException(status_code=403, detail="user management is not permitted")
+    return actor
+
+
+def _can_manage_user(actor: dict, target: dict) -> bool:
+    if actor["role"] == "admin":
+        return True
+    return (
+        actor["role"] == "group_lead"
+        and actor.get("group_id")
+        and target.get("group_id") == actor.get("group_id")
+        and target.get("role") == "user"
+    )
+
+
 @app.get("/health")
 def health() -> dict[str, bool]:
+    return {"ok": True}
+
+
+@app.post("/api/auth/login", response_model=LoginResponse)
+def api_auth_login(body: LoginBody) -> LoginResponse:
+    user = _db.authenticate_user(body.username, body.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid username or password")
+    token = _db.create_session(user["id"])
+    return LoginResponse(token=token, user=UserAccountItem(**user))
+
+
+@app.get("/api/auth/me", response_model=UserAccountItem)
+def api_auth_me(actor: dict = Depends(_current_user)) -> UserAccountItem:
+    return UserAccountItem(**actor)
+
+
+@app.post("/api/auth/logout")
+def api_auth_logout(token: str = Depends(_bearer_token)) -> dict[str, bool]:
+    _db.delete_session(token)
     return {"ok": True}
 
 
@@ -371,22 +468,125 @@ def api_snapshots_delete(snapshot_id: str) -> dict[str, bool]:
     return {"ok": True}
 
 
+@app.get("/api/user-groups", response_model=list[UserGroupItem])
+def api_user_groups_list(actor: dict = Depends(_user_manager)) -> list[UserGroupItem]:
+    groups = _db.list_user_groups()
+    if actor["role"] == "group_lead":
+        groups = [group for group in groups if group["id"] == actor.get("group_id")]
+    return [UserGroupItem(**group) for group in groups]
+
+
+@app.post("/api/user-groups", response_model=UserGroupItem)
+def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_user_manager)) -> UserGroupItem:
+    if actor["role"] != "admin":
+        raise HTTPException(status_code=403, detail="only administrators can create groups")
+    try:
+        return UserGroupItem(**_db.add_user_group(body.name))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=409, detail=f"group create failed: {e}") from e
+
+
+@app.delete("/api/user-groups/{group_id}")
+def api_user_groups_delete(group_id: str, actor: dict = Depends(_user_manager)) -> dict[str, bool]:
+    if actor["role"] != "admin":
+        raise HTTPException(status_code=403, detail="only administrators can delete groups")
+    try:
+        found = _db.delete_user_group(group_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    if not found:
+        raise HTTPException(status_code=404, detail="group not found")
+    return {"ok": True}
+
+
+@app.get("/api/users", response_model=list[UserAccountItem])
+def api_users_list(actor: dict = Depends(_user_manager)) -> list[UserAccountItem]:
+    return [UserAccountItem(**user) for user in _db.list_users_for_actor(actor)]
+
+
+@app.post("/api/users", response_model=UserAccountItem)
+def api_users_create(body: UserAccountCreateBody, actor: dict = Depends(_user_manager)) -> UserAccountItem:
+    if actor["role"] == "group_lead":
+        if body.role != "user" or body.group_id != actor.get("group_id"):
+            raise HTTPException(status_code=403, detail="group leads can create users only in their own group")
+    try:
+        user = _db.add_user(
+            username=body.username,
+            email=body.email,
+            password=body.password,
+            role=body.role,
+            group_id=body.group_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=409, detail=f"user create failed: {e}") from e
+    return UserAccountItem(**user)
+
+
+@app.patch("/api/users/{user_id}", response_model=UserAccountItem)
+def api_users_update(
+    user_id: str,
+    body: UserAccountUpdateBody,
+    actor: dict = Depends(_user_manager),
+) -> UserAccountItem:
+    target = _db.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="user not found")
+    if not _can_manage_user(actor, target):
+        raise HTTPException(status_code=403, detail="user update is not permitted")
+    if actor["role"] == "group_lead":
+        if body.role and body.role != "user":
+            raise HTTPException(status_code=403, detail="group leads cannot change user roles")
+        if body.group_id is not None and body.group_id != actor.get("group_id"):
+            raise HTTPException(status_code=403, detail="group leads cannot move users outside their group")
+    try:
+        user = _db.update_user(user_id, **body.model_dump(exclude_unset=True))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=409, detail=f"user update failed: {e}") from e
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+    return UserAccountItem(**user)
+
+
+@app.delete("/api/users/{user_id}")
+def api_users_delete(user_id: str, actor: dict = Depends(_user_manager)) -> dict[str, bool]:
+    target = _db.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="user not found")
+    if not _can_manage_user(actor, target):
+        raise HTTPException(status_code=403, detail="user delete is not permitted")
+    try:
+        found = _db.delete_user(user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    if not found:
+        raise HTTPException(status_code=404, detail="user not found")
+    return {"ok": True}
+
+
 @app.get("/api/history", response_model=HistoryListResponse)
 def api_history_get(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
     trashed: bool = Query(default=False),
+    actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
-    items, total = _db.list_items(offset=offset, limit=limit, trashed=trashed)
+    items, total = _db.list_items(actor["id"], offset=offset, limit=limit, trashed=trashed)
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
 @app.post("/api/history", response_model=HistoryItem)
-def api_history_post(body: HistoryPostBody) -> HistoryItem:
+def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
     item_id = str(uuid.uuid4())
-    prefix = _output_prefix(item_id, body.at)
+    prefix = _output_prefix(actor["id"], item_id, body.at)
     item_dict = _db.add_item({
         "id": item_id,
+        "user_id": actor["id"],
         "output_path": str(prefix),
         **body.model_dump(),
     })
@@ -397,26 +597,26 @@ def api_history_post(body: HistoryPostBody) -> HistoryItem:
 
 
 @app.delete("/api/history")
-def api_history_delete() -> dict[str, bool]:
-    _db.delete_all()
+def api_history_delete(actor: dict = Depends(_current_user)) -> dict[str, bool]:
+    _db.delete_all(actor["id"])
     return {"ok": True}
 
 
 @app.post("/api/history/trash")
-def api_history_trash(body: HistoryIdsBody) -> dict[str, int | bool]:
-    count = _db.trash_items(body.ids)
+def api_history_trash(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    count = _db.trash_items(actor["id"], body.ids)
     return {"ok": True, "count": count}
 
 
 @app.post("/api/history/restore")
-def api_history_restore(body: HistoryIdsBody) -> dict[str, int | bool]:
-    count = _db.restore_items(body.ids)
+def api_history_restore(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    count = _db.restore_items(actor["id"], body.ids)
     return {"ok": True, "count": count}
 
 
 @app.post("/api/history/permanent-delete")
-def api_history_permanent_delete(body: HistoryIdsBody) -> dict[str, int | bool]:
-    count = _db.delete_items(body.ids)
+def api_history_permanent_delete(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    count = _db.delete_items(actor["id"], body.ids)
     return {"ok": True, "count": count}
 
 

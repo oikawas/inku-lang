@@ -26,6 +26,7 @@
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
+	const AUTH_TOKEN_KEY      = 'inku-auth-token';
 
 	type Score = { instructions: unknown[] };
 
@@ -65,13 +66,27 @@
 		enabled: boolean;
 	};
 
-	type UserRole = '管理者' | 'グループリード' | 'ユーザー';
-	type UserItem = {
+	type UserRole = 'admin' | 'group_lead' | 'user';
+	type UserGroup = {
 		id: string;
 		name: string;
-		password: string;
-		group: UserRole;
+		at: number;
 	};
+	type UserItem = {
+		id: string;
+		username: string;
+		email: string;
+		role: UserRole;
+		role_label: string;
+		group_id: string | null;
+		group_name: string | null;
+		at: number;
+	};
+	const USER_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+		{ value: 'admin', label: '管理者' },
+		{ value: 'group_lead', label: 'グループリード' },
+		{ value: 'user', label: 'ユーザー' },
+	];
 
 	// ── Input ───────────────────────────────────────────────
 	let inputMode   = $state<'single' | 'batch'>('single');
@@ -152,14 +167,31 @@
 	let pluginAddOpen = $state(false);
 	let pluginPath = $state('');
 	let pluginPendingDelete = $state<PluginItem | null>(null);
-	let users = $state<UserItem[]>([
-		{ id: 'admin', name: 'admin', password: '', group: '管理者' },
-	]);
-	let groups = $state<UserRole[]>(['管理者', 'グループリード', 'ユーザー']);
+	let users = $state<UserItem[]>([]);
+	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
+	let newUserEmail = $state('');
 	let newUserPassword = $state('');
-	let newUserGroup = $state<UserRole>('ユーザー');
+	let newUserRole = $state<UserRole>('user');
+	let newUserGroupId = $state('');
+	let selectedUserId = $state<string | null>(null);
+	let editUserName = $state('');
+	let editUserEmail = $state('');
+	let editUserPassword = $state('');
+	let editUserRole = $state<UserRole>('user');
+	let editUserGroupId = $state('');
 	let newGroupName = $state('');
+	let userSettingsStatus = $state<string | null>(null);
+	let authToken = $state<string | null>(null);
+	let currentUser = $state<UserItem | null>(null);
+	let loginUserName = $state('admin');
+	let loginPassword = $state('');
+
+	function apiFetch(path: string, init: RequestInit = {}) {
+		const headers = new Headers(init.headers);
+		if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
+		return fetch(path, { ...init, headers });
+	}
 
 	function testDbConnection() {
 		dbTestResult = dbType === 'sqlite'
@@ -177,33 +209,234 @@
 		pluginAddOpen = false;
 	}
 
-	function addUser() {
+	async function loadUserSettings() {
+		if (!currentUser || !['admin', 'group_lead'].includes(currentUser.role)) return;
+		try {
+			const [groupsResponse, usersResponse] = await Promise.all([
+				apiFetch('/api/user-groups'),
+				apiFetch('/api/users'),
+			]);
+			if (!groupsResponse.ok || !usersResponse.ok) throw new Error('ユーザー情報を読み込めませんでした。');
+			groups = await groupsResponse.json();
+			users = await usersResponse.json();
+			if (!newUserGroupId && groups[0]) newUserGroupId = groups[0].id;
+			if (selectedUserId) {
+				const selected = users.find((user) => user.id === selectedUserId);
+				if (selected) setEditUser(selected);
+				else clearEditUser();
+			}
+			userSettingsStatus = null;
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function loadCurrentUser() {
+		if (!authToken) return;
+		try {
+			const r = await apiFetch('/api/auth/me');
+			if (!r.ok) throw new Error('session expired');
+			currentUser = await r.json();
+			await loadUserSettings();
+			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
+			if (historyItems.length > 0) loadIteration(0);
+		} catch {
+			authToken = null;
+			currentUser = null;
+			historyItems = [];
+			historyTotal = 0;
+			trashItems = [];
+			trashTotal = 0;
+			try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
+		}
+	}
+
+	async function login() {
+		try {
+			const r = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ username: loginUserName, password: loginPassword })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const data = await r.json() as { token: string; user: UserItem };
+			authToken = data.token;
+			currentUser = data.user;
+			historyItems = [];
+			historyTotal = 0;
+			trashItems = [];
+			trashTotal = 0;
+			managerHistoryItems = [];
+			managerHistoryTotal = 0;
+			managerTrashItems = [];
+			managerTrashTotal = 0;
+			loginPassword = '';
+			try { localStorage.setItem(AUTH_TOKEN_KEY, authToken); } catch {}
+			await loadUserSettings();
+			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
+			if (historyItems.length > 0) loadIteration(0);
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function logout() {
+		if (authToken) {
+			try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+		}
+		authToken = null;
+		currentUser = null;
+		users = [];
+		groups = [];
+		historyItems = [];
+		historyTotal = 0;
+		trashItems = [];
+		trashTotal = 0;
+		managerHistoryItems = [];
+		managerHistoryTotal = 0;
+		managerTrashItems = [];
+		managerTrashTotal = 0;
+		try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
+	}
+
+	async function addUser() {
 		const name = newUserName.trim();
+		const email = newUserEmail.trim();
+		if (currentUser?.role === 'group_lead') {
+			newUserRole = 'user';
+			newUserGroupId = currentUser.group_id ?? '';
+		}
+		if (!name || !email || newUserPassword.length < 8) {
+			userSettingsStatus = 'ユーザー名、メールアドレス、8文字以上のパスワードを入力してください。';
+			return;
+		}
+		try {
+			const r = await apiFetch('/api/users', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ username: name, email, password: newUserPassword, role: newUserRole, group_id: newUserGroupId || null })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			newUserName = '';
+			newUserEmail = '';
+			newUserPassword = '';
+			newUserRole = 'user';
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function updateUser(user: UserItem, patch: Partial<UserItem> & { password?: string }) {
+		try {
+			const r = await apiFetch(`/api/users/${user.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(patch)
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+			await loadUserSettings();
+		}
+	}
+
+	function setEditUser(user: UserItem) {
+		selectedUserId = user.id;
+		editUserName = user.username;
+		editUserEmail = user.email;
+		editUserPassword = '';
+		editUserRole = user.role;
+		editUserGroupId = user.group_id ?? '';
+	}
+
+	function clearEditUser() {
+		selectedUserId = null;
+		editUserName = '';
+		editUserEmail = '';
+		editUserPassword = '';
+		editUserRole = 'user';
+		editUserGroupId = '';
+	}
+
+	async function saveUserEdit() {
+		const user = users.find((item) => item.id === selectedUserId);
+		if (!user) return;
+		const username = editUserName.trim();
+		const email = editUserEmail.trim();
+		if (!username || !email) {
+			userSettingsStatus = 'ユーザー名とメールアドレスを入力してください。';
+			return;
+		}
+		if (editUserPassword && editUserPassword.length < 8) {
+			userSettingsStatus = 'パスワードは8文字以上で入力してください。';
+			return;
+		}
+		const patch: Partial<UserItem> & { password?: string } = {
+			username,
+			email,
+			role: currentUser?.role === 'group_lead' ? 'user' : editUserRole,
+			group_id: currentUser?.role === 'group_lead' ? currentUser.group_id : (editUserGroupId || null),
+		};
+		if (editUserPassword) patch.password = editUserPassword;
+		await updateUser(user, patch);
+	}
+
+	async function removeUser(id: string) {
+		try {
+			const r = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			if (selectedUserId === id) clearEditUser();
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function addGroup() {
+		const name = newGroupName.trim();
 		if (!name) return;
-		users = [...users, { id: `${Date.now()}`, name, password: newUserPassword, group: newUserGroup }];
-		newUserName = '';
-		newUserPassword = '';
-		newUserGroup = groups.includes('ユーザー') ? 'ユーザー' : groups[0];
+		try {
+			const r = await apiFetch('/api/user-groups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			newGroupName = '';
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
 	}
 
-	function removeUser(id: string) {
-		users = users.filter((user) => user.id !== id);
-	}
-
-	function addGroup() {
-		const name = newGroupName.trim() as UserRole;
-		if (!name || groups.includes(name)) return;
-		groups = [...groups, name];
-		newGroupName = '';
-		if (!newUserGroup) newUserGroup = name;
-	}
-
-	function removeGroup(group: UserRole) {
-		if (groups.length <= 1) return;
-		groups = groups.filter((g) => g !== group);
-		const fallback = groups[0];
-		users = users.map((user) => user.group === group ? { ...user, group: fallback } : user);
-		if (newUserGroup === group) newUserGroup = fallback;
+	async function removeGroup(group: UserGroup) {
+		try {
+			const r = await apiFetch(`/api/user-groups/${group.id}`, { method: 'DELETE' });
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
 	}
 
 	function persistMiscSettings() {
@@ -464,9 +697,14 @@
 
 	// ── History ─────────────────────────────────────────────
 	async function fetchHistoryPage(page: number): Promise<void> {
+		if (!authToken) {
+			historyItems = [];
+			historyTotal = 0;
+			return;
+		}
 		const offset = page * HISTORY_PAGE_SIZE;
 		try {
-			const r = await fetch(`/api/history?offset=${offset}&limit=${HISTORY_PAGE_SIZE}`);
+			const r = await apiFetch(`/api/history?offset=${offset}&limit=${HISTORY_PAGE_SIZE}`);
 			if (!r.ok) return;
 			const data = await r.json();
 			historyItems = data.items; historyTotal = data.total; historyPage = page;
@@ -474,8 +712,13 @@
 	}
 
 	async function fetchTrashPage(): Promise<void> {
+		if (!authToken) {
+			trashItems = [];
+			trashTotal = 0;
+			return;
+		}
 		try {
-			const r = await fetch(`/api/history?offset=0&limit=100&trashed=true`);
+			const r = await apiFetch(`/api/history?offset=0&limit=100&trashed=true`);
 			if (!r.ok) return;
 			const data = await r.json();
 			trashItems = data.items; trashTotal = data.total;
@@ -483,11 +726,12 @@
 	}
 
 	async function fetchAllHistory(trashed: boolean): Promise<{ items: Iteration[]; total: number }> {
+		if (!authToken) return { items: [], total: 0 };
 		let offset = 0;
 		let total = 0;
 		const items: Iteration[] = [];
 		do {
-			const r = await fetch(`/api/history?offset=${offset}&limit=${HISTORY_MANAGER_PAGE_SIZE}${trashed ? '&trashed=true' : ''}`);
+			const r = await apiFetch(`/api/history?offset=${offset}&limit=${HISTORY_MANAGER_PAGE_SIZE}${trashed ? '&trashed=true' : ''}`);
 			if (!r.ok) break;
 			const data = await r.json();
 			items.push(...data.items);
@@ -508,8 +752,9 @@
 	}
 
 	async function pushHistory(it: Iteration): Promise<void> {
+		if (!authToken) return;
 		try {
-			await fetch('/api/history', {
+			await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null })
@@ -535,7 +780,8 @@
 	}
 
 	async function postHistoryIds(path: string, ids: string[]) {
-		await fetch(path, {
+		if (!authToken) return;
+		await apiFetch(path, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ids })
@@ -795,10 +1041,6 @@
 		window.addEventListener('resize', onResize);
 
 		initLang();
-		void (async () => {
-			await Promise.all([fetchHistoryPage(0), fetchTrashPage(), fetchSnapshots(), fetchPrompts()]);
-			if (historyItems.length > 0) loadIteration(0);
-		})();
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null; if (p1) stage1Provider = p1;
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
@@ -808,8 +1050,13 @@
 			const birds = localStorage.getItem(SHOW_BIRDS_KEY); if (birds !== null) showBirds = birds !== '0';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
+			authToken = localStorage.getItem(AUTH_TOKEN_KEY);
 			miscSettingsLoaded = true;
 		} catch {}
+		void (async () => {
+			await Promise.all([fetchSnapshots(), fetchPrompts()]);
+			await loadCurrentUser();
+		})();
 
 		return () => window.removeEventListener('resize', onResize);
 	});
@@ -1361,46 +1608,107 @@
 			{:else if settingsTab === 'users'}
 				<div class="popover-group">
 					<div class="popover-group-label">ユーザー</div>
-					<div class="user-add-grid">
-						<input bind:value={newUserName} placeholder="ユーザー名" />
-						<input bind:value={newUserPassword} type="password" placeholder="パスワード" />
-						<select bind:value={newUserGroup}>
-							{#each groups as group (group)}
-								<option value={group}>{group}</option>
+					{#if userSettingsStatus}
+						<div class="inline-message">{userSettingsStatus}</div>
+					{/if}
+					{#if !currentUser}
+						<div class="login-grid">
+							<input bind:value={loginUserName} placeholder="ユーザー名" />
+							<input bind:value={loginPassword} type="password" placeholder="パスワード" onkeydown={(e) => { if (e.key === 'Enter') void login(); }} />
+							<button class="ghost-btn" onclick={login}>ログイン</button>
+						</div>
+						<div class="db-test-result">初期管理者は username: admin / password: inku-admin です。環境変数 INKU_BOOTSTRAP_ADMIN_PASSWORD で変更できます。</div>
+					{:else}
+						<div class="user-session-row">
+							<span>{currentUser.username} / {currentUser.role_label}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
+							<button class="ghost-btn" onclick={logout}>ログアウト</button>
+						</div>
+						{#if currentUser.role === 'admin' || currentUser.role === 'group_lead'}
+							<div class="user-editor-grid">
+								<div class="user-editor-panel">
+									<div class="user-editor-title">ユーザー追加</div>
+									<div class="user-form-grid">
+										<input bind:value={newUserName} placeholder="ユーザー名" />
+										<input bind:value={newUserEmail} type="email" placeholder="メールアドレス" />
+										<input bind:value={newUserPassword} type="password" placeholder="パスワード" />
+										<select bind:value={newUserRole} disabled={currentUser.role === 'group_lead'}>
+											{#each USER_ROLE_OPTIONS as role (role.value)}
+												<option value={role.value}>{role.label}</option>
+											{/each}
+										</select>
+										<select bind:value={newUserGroupId} disabled={currentUser.role === 'group_lead'}>
+											<option value="">所属なし</option>
+											{#each groups as group (group.id)}
+												<option value={group.id}>{group.name}</option>
+											{/each}
+										</select>
+									</div>
+									<div class="user-form-actions">
+										<button class="ghost-btn" onclick={addUser}>ユーザー追加</button>
+									</div>
+								</div>
+								<div class="user-editor-panel">
+									<div class="user-editor-title">ユーザー変更</div>
+									{#if selectedUserId}
+										<div class="user-form-grid">
+											<input bind:value={editUserName} placeholder="ユーザー名" />
+											<input bind:value={editUserEmail} type="email" placeholder="メールアドレス" />
+											<input bind:value={editUserPassword} type="password" placeholder="新しいパスワード" />
+											<select bind:value={editUserRole} disabled={currentUser.role === 'group_lead'}>
+												{#each USER_ROLE_OPTIONS as role (role.value)}
+													<option value={role.value}>{role.label}</option>
+												{/each}
+											</select>
+											<select bind:value={editUserGroupId} disabled={currentUser.role === 'group_lead'}>
+												<option value="">所属なし</option>
+												{#each groups as group (group.id)}
+													<option value={group.id}>{group.name}</option>
+												{/each}
+											</select>
+										</div>
+										<div class="user-form-actions">
+											<button class="ghost-btn" onclick={clearEditUser}>選択解除</button>
+											<button class="ghost-btn primary-inline" onclick={saveUserEdit}>変更を保存</button>
+										</div>
+									{:else}
+										<div class="inline-message">一覧から変更するユーザーを選択してください。</div>
+									{/if}
+								</div>
+							</div>
+							<div class="user-list">
+								{#each users as user (user.id)}
+									<div class="user-row" class:selected={selectedUserId === user.id}>
+										<button class="ghost-btn" onclick={() => setEditUser(user)}>変更</button>
+										<span class="user-cell user-name">{user.username}</span>
+										<span class="user-cell">{user.email}</span>
+										<span class="user-cell">{user.role_label}</span>
+										<span class="user-cell">{user.group_name ?? '所属なし'}</span>
+										<button class="ghost-btn" onclick={() => removeUser(user.id)}>削除</button>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<div class="inline-message">ユーザー管理は管理者またはグループリードのみ利用できます。</div>
+						{/if}
+					{/if}
+				</div>
+				{#if currentUser?.role === 'admin'}
+					<div class="popover-group">
+						<div class="popover-group-label">グループ</div>
+						<div class="plugin-add">
+							<input bind:value={newGroupName} placeholder="グループ名" />
+							<button class="ghost-btn" onclick={addGroup}>追加</button>
+						</div>
+						<div class="group-list">
+							{#each groups as group (group.id)}
+								<div class="group-row">
+									<span>{group.name}</span>
+									<button class="ghost-btn" onclick={() => removeGroup(group)}>削除</button>
+								</div>
 							{/each}
-						</select>
-						<button class="ghost-btn" onclick={addUser}>追加</button>
+						</div>
 					</div>
-					<div class="user-list">
-						{#each users as user (user.id)}
-							<div class="user-row">
-								<input value={user.name} onchange={(e) => { user.name = (e.currentTarget as HTMLInputElement).value; users = [...users]; }} />
-								<input type="password" value={user.password} onchange={(e) => { user.password = (e.currentTarget as HTMLInputElement).value; users = [...users]; }} />
-								<select value={user.group} onchange={(e) => { user.group = (e.currentTarget as HTMLSelectElement).value as UserRole; users = [...users]; }}>
-									{#each groups as group (group)}
-										<option value={group}>{group}</option>
-									{/each}
-								</select>
-								<button class="ghost-btn" onclick={() => removeUser(user.id)}>削除</button>
-							</div>
-						{/each}
-					</div>
-				</div>
-				<div class="popover-group">
-					<div class="popover-group-label">グループ</div>
-					<div class="plugin-add">
-						<input bind:value={newGroupName} placeholder="グループ名" />
-						<button class="ghost-btn" onclick={addGroup}>追加</button>
-					</div>
-					<div class="group-list">
-						{#each groups as group (group)}
-							<div class="group-row">
-								<span>{group}</span>
-								<button class="ghost-btn" onclick={() => removeGroup(group)} disabled={groups.length <= 1}>削除</button>
-							</div>
-						{/each}
-					</div>
-				</div>
+				{/if}
 			{:else}
 				<div class="popover-group">
 					<div class="popover-group-label">表示</div>
@@ -2390,7 +2698,7 @@
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
 	}
-	.settings-modal { width: min(680px, calc(100vw - 32px)); max-height: 88vh; }
+	.settings-modal { width: min(860px, calc(100vw - 32px)); max-height: 88vh; }
 	.history-modal {
 		width: min(920px, calc(100vw - 32px));
 		height: min(720px, calc(100vh - 32px));
@@ -2412,7 +2720,7 @@
 		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
 	}
 	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
-	.form-row input, .form-row select, .plugin-add input, .history-search input {
+	.form-row input, .form-row select, .plugin-add input, .history-search input, .login-grid input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
@@ -2420,6 +2728,14 @@
 	.check-row { display: flex; align-items: center; gap: 7px; color: var(--fg2); font-size: 12px; }
 	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
 	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.inline-message {
+		padding: 7px 9px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		color: var(--fg2);
+		font-size: 12px;
+	}
 	.plugin-list {
 		border: 1px solid var(--border); border-radius: var(--r);
 		background: #fff; overflow: hidden;
@@ -2431,17 +2747,63 @@
 	.plugin-row:last-child { border-bottom: none; }
 	.plugin-version { color: var(--fg3); font-size: 11px; }
 	.plugin-add { display: flex; gap: 8px; align-items: center; }
-	.user-add-grid {
+	.login-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px auto;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 		gap: 8px;
 		align-items: center;
 	}
-	.user-add-grid input, .user-add-grid select,
-	.user-row input, .user-row select {
+	.user-session-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 10px;
+		padding: 7px 9px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		color: var(--fg2);
+		font-size: 12px;
+	}
+	.user-editor-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+		margin-top: 10px;
+	}
+	.user-editor-panel {
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		padding: 10px;
+		min-width: 0;
+	}
+	.user-editor-title {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--fg2);
+		margin-bottom: 8px;
+	}
+	.user-form-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 8px;
+	}
+	.user-form-grid input, .user-form-grid select {
 		min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+	}
+	.user-form-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.primary-inline {
+		border-color: var(--accent);
+		background: var(--accent-light);
+		color: var(--accent);
 	}
 	.user-list, .group-list {
 		display: flex;
@@ -2451,10 +2813,17 @@
 	}
 	.user-row {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px auto;
+		grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.35fr) 120px 120px auto;
 		gap: 8px;
 		align-items: center;
+		padding: 7px 9px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
 	}
+	.user-row.selected { border-color: var(--accent); background: var(--accent-light); }
+	.user-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg2); font-size: 12px; }
+	.user-name { color: var(--fg); font-weight: 500; }
 	.group-row {
 		display: flex;
 		align-items: center;

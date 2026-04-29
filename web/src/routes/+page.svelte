@@ -1,3 +1,7 @@
+<script module lang="ts">
+	declare const __BUILD_NUMBER__: string;
+</script>
+
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SAIJIKI } from '$lib/saijiki';
@@ -10,9 +14,7 @@
 		type Provider
 	} from '$lib/models';
 	import { t, setLang, getLang, PACK_LIST, initLang } from '$lib/i18n/index.svelte';
-	import { COLOR_CATALOGS, getColorMap, type ColorMap } from '$lib/colors';
-
-	declare const __BUILD_NUMBER__: string;
+	import { COLOR_CATALOGS, getCatalogById, getColorMap, type ColorMap } from '$lib/colors';
 
 	const HISTORY_PAGE_SIZE = 20;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
@@ -49,6 +51,14 @@
 		tokens_in?: number | null;
 		tokens_out?: number | null;
 		catalog_id?: string | null;
+		trashed?: boolean;
+	};
+
+	type PluginItem = {
+		id: string;
+		name: string;
+		version: string;
+		enabled: boolean;
 	};
 
 	// ── Input ───────────────────────────────────────────────
@@ -77,6 +87,7 @@
 	let windowWidth  = $state(1200);
 	let saijikiOpen  = $state(false);
 	let settingsOpen = $state(false);
+	let settingsTab  = $state<'connection' | 'db' | 'plugins'>('connection');
 	let pngMenuOpen  = $state(false);
 	let catalogOpen  = $state(false);
 	let statsOpen    = $state(false);
@@ -84,17 +95,61 @@
 	let ddlEditing   = $state(false);
 	let baseDDL      = $state<string | null>(null);
 	let zoom         = $state(1);
+	let promptStage1Expanded = $state(false);
+	let promptStage2Expanded = $state(false);
 
 	// DOM refs for outside-click handling
-	let settingsWrapEl = $state<HTMLDivElement | null>(null);
 	let pngWrapEl      = $state<HTMLDivElement | null>(null);
 
 	// ── Color catalog ────────────────────────────────────────
 	let selectedCatalog = $state('default');
+	const currentCatalog = $derived(getCatalogById(selectedCatalog) ?? COLOR_CATALOGS[0]);
 
 	function activeColorMap(): ColorMap | null {
 		if (selectedCatalog === 'default') return null;
 		return getColorMap(selectedCatalog);
+	}
+
+	function isLightColor(hex: string): boolean {
+		const value = hex.replace('#', '');
+		const r = parseInt(value.slice(0, 2), 16);
+		const g = parseInt(value.slice(2, 4), 16);
+		const b = parseInt(value.slice(4, 6), 16);
+		return (r * 299 + g * 587 + b * 114) / 1000 > 224;
+	}
+
+	// ── Settings tabs ────────────────────────────────────────
+	let dbType = $state<'sqlite' | 'postgres'>('sqlite');
+	let sqlitePath = $state('~/.local/share/inku/inku.db');
+	let pgHost = $state('');
+	let pgPort = $state('5432');
+	let pgUser = $state('');
+	let pgPassword = $state('');
+	let pgDatabase = $state('');
+	let showPgPassword = $state(false);
+	let dbTestResult = $state<string | null>(null);
+	let plugins = $state<PluginItem[]>([
+		{ id: 'nature', name: 'inku-nature', version: 'v0.1.0', enabled: true },
+		{ id: 'bamboo', name: 'inku-bamboo', version: 'v0.1.0', enabled: false },
+	]);
+	let pluginAddOpen = $state(false);
+	let pluginPath = $state('');
+	let pluginPendingDelete = $state<PluginItem | null>(null);
+
+	function testDbConnection() {
+		dbTestResult = dbType === 'sqlite'
+			? `SQLite path is set: ${sqlitePath || '(empty)'}`
+			: pgHost && pgUser && pgDatabase
+				? `Ready to test PostgreSQL at ${pgHost}:${pgPort}`
+				: 'PostgreSQL settings are incomplete.';
+	}
+
+	function addPlugin() {
+		const name = pluginPath.trim();
+		if (!name) return;
+		plugins = [...plugins, { id: `${Date.now()}`, name, version: 'local', enabled: true }];
+		pluginPath = '';
+		pluginAddOpen = false;
 	}
 
 	// ── 感情語 → DDL ヒント ──────────────────────────────────
@@ -169,6 +224,22 @@
 	let historyPage  = $state(0);
 	let historyCursor = $state(-1);
 	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
+	let historyManagerOpen = $state(false);
+	let historyManagerView = $state<'active' | 'trash'>('active');
+	let trashItems = $state<Iteration[]>([]);
+	let trashTotal = $state(0);
+	let historySearch = $state('');
+	let selectedHistoryIds = $state<string[]>([]);
+	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean } | null>(null);
+	const managedHistoryItems = $derived(historyManagerView === 'trash' ? trashItems : historyItems);
+	const filteredManagedHistory = $derived.by(() => {
+		const q = historySearch.trim().toLowerCase();
+		if (!q) return managedHistoryItems;
+		return managedHistoryItems.filter((it) =>
+			[it.input, it.ddl ?? '', it.stage1_model ?? '', it.stage2_model ?? '', it.catalog_id ?? '']
+				.some((v) => v.toLowerCase().includes(q))
+		);
+	});
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
@@ -314,6 +385,15 @@
 		} catch { /* ignore */ }
 	}
 
+	async function fetchTrashPage(): Promise<void> {
+		try {
+			const r = await fetch(`/api/history?offset=0&limit=100&trashed=true`);
+			if (!r.ok) return;
+			const data = await r.json();
+			trashItems = data.items; trashTotal = data.total;
+		} catch { /* ignore */ }
+	}
+
 	async function pushHistory(it: Iteration): Promise<void> {
 		try {
 			await fetch('/api/history', {
@@ -328,6 +408,53 @@
 
 	function clearInput() {
 		if (inputMode === 'single') input = ''; else batchInput = '';
+	}
+
+	function toggleHistorySelection(id: string) {
+		selectedHistoryIds = selectedHistoryIds.includes(id)
+			? selectedHistoryIds.filter((x) => x !== id)
+			: [...selectedHistoryIds, id];
+	}
+
+	function selectAllManagedHistory() {
+		const ids = filteredManagedHistory.map((it) => it.id).filter((id): id is string => !!id);
+		selectedHistoryIds = selectedHistoryIds.length === ids.length ? [] : ids;
+	}
+
+	async function postHistoryIds(path: string, ids: string[]) {
+		await fetch(path, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ids })
+		});
+		selectedHistoryIds = [];
+		await Promise.all([fetchHistoryPage(historyPage), fetchTrashPage()]);
+		if (historyItems.length === 0 && historyPage > 0) await fetchHistoryPage(historyPage - 1);
+	}
+
+	function askTrash(ids: string[]) {
+		if (ids.length === 0) return;
+		confirmAction = {
+			message: `${ids.length}件をごみ箱に移動しますか？`,
+			run: () => { void postHistoryIds('/api/history/trash', ids); }
+		};
+	}
+
+	function askRestore(ids: string[]) {
+		if (ids.length === 0) return;
+		confirmAction = {
+			message: `${ids.length}件を復元しますか？`,
+			run: () => { void postHistoryIds('/api/history/restore', ids); }
+		};
+	}
+
+	function askPermanentDelete(ids: string[]) {
+		if (ids.length === 0) return;
+		confirmAction = {
+			message: `${ids.length}件を完全に削除しますか？`,
+			destructive: true,
+			run: () => { void postHistoryIds('/api/history/permanent-delete', ids); }
+		};
 	}
 
 	type DiffPart = { text: string; changed: boolean };
@@ -399,11 +526,10 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') { saijikiOpen = false; settingsOpen = false; catalogOpen = false; }
+		if (e.key === 'Escape') { saijikiOpen = false; settingsOpen = false; catalogOpen = false; historyManagerOpen = false; confirmAction = null; }
 	}
 
 	function handleDocClick(e: MouseEvent) {
-		if (settingsOpen && settingsWrapEl && !settingsWrapEl.contains(e.target as Node)) settingsOpen = false;
 		if (pngMenuOpen  && pngWrapEl     && !pngWrapEl.contains(e.target as Node))      pngMenuOpen  = false;
 	}
 
@@ -488,6 +614,14 @@
 		return (m.split('/').pop() ?? m).slice(0, 8);
 	}
 
+	function catalogName(id: string | null | undefined): string {
+		return getCatalogById(id ?? 'default')?.name ?? 'inku Default';
+	}
+
+	function formatHistoryDate(at: number): string {
+		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
+	}
+
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
 	);
@@ -505,14 +639,16 @@
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 
 	// ── Mount ───────────────────────────────────────────────
-	onMount(async () => {
+	onMount(() => {
 		windowWidth = window.innerWidth;
 		function onResize() { windowWidth = window.innerWidth; }
 		window.addEventListener('resize', onResize);
 
 		initLang();
-		await Promise.all([fetchHistoryPage(0), fetchSnapshots(), fetchPrompts()]);
-		if (historyItems.length > 0) loadIteration(0);
+		void (async () => {
+			await Promise.all([fetchHistoryPage(0), fetchTrashPage(), fetchSnapshots(), fetchPrompts()]);
+			if (historyItems.length > 0) loadIteration(0);
+		})();
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null; if (p1) stage1Provider = p1;
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
@@ -542,74 +678,11 @@
 		</div>
 
 		<div class="header-right">
-			<!-- ⚙ 接続設定 popover -->
-			<div class="settings-wrap" bind:this={settingsWrapEl}>
-				<button
-					class="settings-btn"
-					class:active={settingsOpen}
-					onclick={(e) => { e.stopPropagation(); settingsOpen = !settingsOpen; }}
-				>⚙ 接続設定</button>
-
-				{#if settingsOpen}
-					<div class="settings-popover" onclick={(e) => e.stopPropagation()}>
-						<div class="popover-title">接続設定</div>
-
-						<div class="popover-group">
-							<div class="popover-group-label">{t().stage1Label}</div>
-							<div class="popover-row">
-								<span class="popover-row-label">{t().providerLabel}</span>
-								<select value={stage1Provider} onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-									{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-								</select>
-							</div>
-							<div class="popover-row">
-								<span class="popover-row-label">{t().modelLabel}</span>
-								<select value={stage1Model} onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}>
-									{#each modelsForProvider(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
-								</select>
-							</div>
-							{#if stage1Model.includes('qwen3')}
-								<label class="popover-think-label">
-									<input type="checkbox" bind:checked={includeThinking} />
-									<span>{t().showThinkingLabel}</span>
-								</label>
-							{/if}
-						</div>
-
-						<div class="popover-group">
-							<div class="popover-group-label">{t().stage2Label}</div>
-							<div class="popover-row">
-								<span class="popover-row-label">{t().providerLabel}</span>
-								<select value={stage2Provider} onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-									{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-								</select>
-							</div>
-							<div class="popover-row">
-								<span class="popover-row-label">{t().modelLabel}</span>
-								<select value={stage2Model} onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}>
-									{#each modelsForProvider(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
-								</select>
-							</div>
-						</div>
-
-						<!-- Saijiki snapshot -->
-						{#if snapshots.length > 0}
-							<div class="popover-group">
-								<div class="popover-group-label">{t().saijikiLabel}</div>
-								<select
-									value={activeSnapshotId ?? ''}
-									onchange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; activeSnapshotId = v || null; }}
-								>
-									<option value="">{t().currentSetting}</option>
-									{#each snapshots as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
-								</select>
-							</div>
-						{/if}
-
-						<button class="popover-close" onclick={() => settingsOpen = false}>閉じる</button>
-					</div>
-				{/if}
-			</div>
+			<button
+				class="settings-btn"
+				class:active={settingsOpen}
+				onclick={() => { settingsTab = 'connection'; settingsOpen = true; }}
+			>⚙ 接続設定</button>
 
 			<!-- Lang -->
 			<div class="lang-switcher">
@@ -617,10 +690,6 @@
 					<button class="lang-btn" class:active={getLang() === pack.code} onclick={() => setLang(pack.code)}>{pack.label}</button>
 				{/each}
 			</div>
-
-			<!-- カタログ設定 -->
-			<button class="header-link" onclick={() => catalogOpen = true}>カタログ設定</button>
-			<span class="header-sep">|</span>
 
 			<!-- Build -->
 			<span class="build-badge">Build {__BUILD_NUMBER__}</span>
@@ -647,7 +716,8 @@
 						<span class="section-label">指示</span>
 						<div class="section-actions">
 							<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>歳時記</button>
-							<button class="ghost-btn" onclick={clearInput}>クリア</button>
+							<button class="ghost-btn" onclick={() => (catalogOpen = true)}>カタログ設定</button>
+							<button class="ghost-btn" onclick={clearInput}>新規作成</button>
 						</div>
 					</div>
 
@@ -668,7 +738,7 @@
 						{#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 					{/if}
 
-					<!-- 演奏する / progress -->
+					<!-- 描画する / progress -->
 					{#if loading && inputMode === 'single'}
 						<div class="progress-wrap">
 							<div class="progress-phases">
@@ -686,7 +756,14 @@
 								<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
 							</div>
 						</div>
-						<div class="progress-bar-track"><div class="progress-bar-fill" style="width: {stageLabel.includes('構造化') ? '65' : '30'}%"></div></div>
+						<div class="progress-bar-track">
+							<div class="progress-bar-fill" style="width: {stageLabel.includes('構造化') ? '65' : '30'}%"></div>
+							<svg class="progress-bird" class:done={!loading} width="16" height="10" viewBox="0 0 16 10" aria-hidden="true">
+								<path d="M0,5 Q4,0 8,5 Q12,0 16,5" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.7">
+									<animate attributeName="d" values="M0,5 Q4,0 8,5 Q12,0 16,5;M0,5 Q4,8 8,5 Q12,8 16,5;M0,5 Q4,0 8,5 Q12,0 16,5" dur="0.4s" repeatCount="indefinite" />
+								</path>
+							</svg>
+						</div>
 						<div class="progress-stage-text">{stageLabel}</div>
 					{:else if loading && batchTotal > 0}
 						<div class="batch-progress">
@@ -736,7 +813,7 @@
 							</div>
 						{/if}
 
-						<!-- 再演奏 progress -->
+						<!-- 描画（解釈から） progress -->
 						{#if reloading}
 							<div class="progress-wrap">
 								<div class="progress-phases">
@@ -746,7 +823,14 @@
 									<span class="progress-time">…</span>
 								</div>
 							</div>
-							<div class="progress-bar-track"><div class="progress-bar-fill" style="width: 55%"></div></div>
+							<div class="progress-bar-track">
+								<div class="progress-bar-fill" style="width: 55%"></div>
+								<svg class="progress-bird" width="16" height="10" viewBox="0 0 16 10" aria-hidden="true">
+									<path d="M0,5 Q4,0 8,5 Q12,0 16,5" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.7">
+										<animate attributeName="d" values="M0,5 Q4,0 8,5 Q12,0 16,5;M0,5 Q4,8 8,5 Q12,8 16,5;M0,5 Q4,0 8,5 Q12,0 16,5" dur="0.4s" repeatCount="indefinite" />
+									</path>
+								</svg>
+							</div>
 						{/if}
 						{#if reloadError}<p class="error-text">{reloadError}</p>{/if}
 
@@ -754,7 +838,7 @@
 							class="replay-btn"
 							onclick={replay}
 							disabled={reloading || !ddl}
-						>↺ 再演奏</button>
+						>↺ 描画（解釈から）</button>
 					</section>
 				{/if}
 
@@ -823,15 +907,27 @@
 						{#if promptsData}
 							<div class="prompt-section">
 								<p class="prompt-label">{t().promptStage1Input}</p>
-								<pre class="prompt-pre">{inputMode === 'single' ? input : `(${t().modeBatch})`}</pre>
-								<p class="prompt-label">{t().promptStage1System}</p>
-								<pre class="prompt-pre prompt-pre-lg">{promptsData.stage1_system}</pre>
+								<textarea class="prompt-textarea prompt-user" readonly value={inputMode === 'single' ? input : `(${t().modeBatch})`}></textarea>
+								<div class="prompt-collapsible-head">
+									<p class="prompt-label">{t().promptStage1System}</p>
+									<button class="ghost-btn" onclick={() => (promptStage1Expanded = !promptStage1Expanded)}>{promptStage1Expanded ? '折りたたむ' : '展開'}</button>
+								</div>
+								<div class="prompt-collapse" class:expanded={promptStage1Expanded}>
+									<textarea class="prompt-textarea prompt-system" readonly value={promptsData.stage1_system}></textarea>
+									{#if !promptStage1Expanded}<div class="prompt-fade"></div>{/if}
+								</div>
 								{#if ddl}
 									<p class="prompt-label">{t().promptStage2Input}</p>
-									<pre class="prompt-pre">{ddl}</pre>
+									<textarea class="prompt-textarea prompt-user" readonly value={ddl}></textarea>
 								{/if}
-								<p class="prompt-label">{t().promptStage2System}</p>
-								<pre class="prompt-pre prompt-pre-lg">{promptsData.stage2_system}</pre>
+								<div class="prompt-collapsible-head">
+									<p class="prompt-label">{t().promptStage2System}</p>
+									<button class="ghost-btn" onclick={() => (promptStage2Expanded = !promptStage2Expanded)}>{promptStage2Expanded ? '折りたたむ' : '展開'}</button>
+								</div>
+								<div class="prompt-collapse" class:expanded={promptStage2Expanded}>
+									<textarea class="prompt-textarea prompt-system" readonly value={promptsData.stage2_system}></textarea>
+									{#if !promptStage2Expanded}<div class="prompt-fade"></div>{/if}
+								</div>
 							</div>
 						{:else}
 							<p class="muted-center">{t().promptLoading}</p>
@@ -887,12 +983,14 @@
 	{#if historyTotal > 0}
 		<div class="history-strip">
 			<div class="history-head">
-				<span class="history-title">{t().historyTitle} <span class="history-count">({historyTotal})</span></span>
+				<button class="history-title-btn" onclick={() => { historyManagerOpen = true; historyManagerView = 'active'; selectedHistoryIds = []; void fetchTrashPage(); }}>
+					{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
+				</button>
 				{#if historyTotalPages > 1}
 					<div class="history-page-nav">
-						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 新</button>
+						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 前のページ</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
-						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>旧 →</button>
+						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>次のページ →</button>
 					</div>
 				{/if}
 			</div>
@@ -902,8 +1000,14 @@
 						class="thumb"
 						class:current={i === historyCursor}
 						onclick={() => loadIteration(i)}
-						title={it.input}
 					>
+						<div class="thumb-tooltip">
+							<div class="tooltip-title">#{historyPage * HISTORY_PAGE_SIZE + i + 1}</div>
+							<div>モデル: {shortModel(it.stage2_model)}</div>
+							<div>時間: {it.elapsed_ms ? (it.elapsed_ms / 1000).toFixed(1) + 's' : '-'}</div>
+							<div>色: {catalogName(it.catalog_id)}</div>
+							<div class="tooltip-date">{formatHistoryDate(it.at)}</div>
+						</div>
 						<div class="thumb-svg">{@html it.svg}</div>
 						<div class="thumb-meta">
 							<span class="thumb-time">{it.elapsed_ms ? (it.elapsed_ms / 1000).toFixed(1) + 's' : String(historyPage * HISTORY_PAGE_SIZE + i + 1)}</span>
@@ -949,6 +1053,134 @@
 	</div>
 </div>
 
+<!-- ══ SETTINGS MODAL ══ -->
+{#if settingsOpen}
+	<div class="modal-backdrop" onclick={() => (settingsOpen = false)} aria-hidden="true"></div>
+	<div class="settings-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">接続設定</div>
+			<button class="catalog-close" onclick={() => (settingsOpen = false)}>×</button>
+		</div>
+		<div class="settings-tabs">
+			<button class:active={settingsTab === 'connection'} onclick={() => (settingsTab = 'connection')}>接続設定</button>
+			<button class:active={settingsTab === 'db'} onclick={() => (settingsTab = 'db')}>DB設定</button>
+			<button class:active={settingsTab === 'plugins'} onclick={() => (settingsTab = 'plugins')}>プラグイン</button>
+		</div>
+		<div class="settings-body">
+			{#if settingsTab === 'connection'}
+				<div class="popover-group">
+					<div class="popover-group-label">{t().stage1Label}</div>
+					<div class="form-row">
+						<label>{t().providerLabel}</label>
+						<select value={stage1Provider} onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
+							{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+						</select>
+					</div>
+					<div class="form-row">
+						<label>{t().modelLabel}</label>
+						<select value={stage1Model} onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}>
+							{#each modelsForProvider(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
+						</select>
+					</div>
+					{#if stage1Model.includes('qwen3')}
+						<label class="check-row">
+							<input type="checkbox" bind:checked={includeThinking} />
+							<span>{t().showThinkingLabel}</span>
+						</label>
+					{/if}
+				</div>
+				<div class="popover-group">
+					<div class="popover-group-label">{t().stage2Label}</div>
+					<div class="form-row">
+						<label>{t().providerLabel}</label>
+						<select value={stage2Provider} onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
+							{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+						</select>
+					</div>
+					<div class="form-row">
+						<label>{t().modelLabel}</label>
+						<select value={stage2Model} onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}>
+							{#each modelsForProvider(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
+						</select>
+					</div>
+				</div>
+				{#if snapshots.length > 0}
+					<div class="popover-group">
+						<div class="popover-group-label">{t().saijikiLabel}</div>
+						<select class="full-select" value={activeSnapshotId ?? ''} onchange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; activeSnapshotId = v || null; }}>
+							<option value="">{t().currentSetting}</option>
+							{#each snapshots as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+						</select>
+					</div>
+				{/if}
+			{:else if settingsTab === 'db'}
+				<div class="popover-group">
+					<div class="form-row">
+						<label>DBタイプ:</label>
+						<select bind:value={dbType}>
+							<option value="sqlite">内蔵SQLite</option>
+							<option value="postgres">PostgreSQL</option>
+						</select>
+					</div>
+				</div>
+				{#if dbType === 'sqlite'}
+					<div class="popover-group">
+						<div class="popover-group-label">SQLite</div>
+						<div class="form-row">
+							<label>保存先パス:</label>
+							<input bind:value={sqlitePath} />
+						</div>
+					</div>
+				{:else}
+					<div class="popover-group">
+						<div class="popover-group-label">PostgreSQL</div>
+						<div class="form-row"><label>サーバー:</label><input bind:value={pgHost} /></div>
+						<div class="form-row"><label>ポート:</label><input bind:value={pgPort} /></div>
+						<div class="form-row"><label>ユーザー:</label><input bind:value={pgUser} /></div>
+						<div class="form-row">
+							<label>パスワード:</label>
+							<input type={showPgPassword ? 'text' : 'password'} bind:value={pgPassword} />
+							<button class="ghost-btn" onclick={() => (showPgPassword = !showPgPassword)}>{showPgPassword ? '隠す' : '表示'}</button>
+						</div>
+						<div class="form-row"><label>DB名:</label><input bind:value={pgDatabase} /></div>
+					</div>
+				{/if}
+				<div class="settings-inline-actions">
+					<button class="ghost-btn" onclick={testDbConnection}>接続テスト</button>
+					{#if dbTestResult}<span class="db-test-result">{dbTestResult}</span>{/if}
+				</div>
+			{:else}
+				<div class="plugin-list">
+					{#each plugins as plugin (plugin.id)}
+						<div class="plugin-row">
+							<label class="check-row">
+								<input type="checkbox" checked={plugin.enabled} onchange={(e) => { plugin.enabled = (e.currentTarget as HTMLInputElement).checked; plugins = [...plugins]; }} />
+								<span>{plugin.name}</span>
+							</label>
+							<span class="plugin-version">{plugin.version}</span>
+							<button class="ghost-btn" onclick={() => (pluginPendingDelete = plugin)}>削除</button>
+						</div>
+					{/each}
+				</div>
+				<button class="ghost-btn" onclick={() => (pluginAddOpen = !pluginAddOpen)}>＋ プラグインを追加</button>
+				{#if pluginAddOpen}
+					<div class="plugin-add">
+						<input bind:value={pluginPath} placeholder="plugin path or name" />
+						<button class="ghost-btn" onclick={addPlugin}>追加</button>
+					</div>
+				{/if}
+				{#if pluginPendingDelete}
+					<div class="inline-confirm">
+						<span>{pluginPendingDelete.name} を削除しますか？</span>
+						<button class="ghost-btn" onclick={() => (pluginPendingDelete = null)}>キャンセル</button>
+						<button class="danger-btn" onclick={() => { plugins = plugins.filter((p) => p.id !== pluginPendingDelete?.id); pluginPendingDelete = null; }}>削除</button>
+					</div>
+				{/if}
+			{/if}
+		</div>
+	</div>
+{/if}
+
 <!-- ══ CATALOG MODAL ══ -->
 {#if catalogOpen}
 	<div class="modal-backdrop" onclick={() => (catalogOpen = false)} aria-hidden="true"></div>
@@ -977,6 +1209,81 @@
 					{#if active}<span class="catalog-check">✓</span>{/if}
 				</button>
 			{/each}
+		</div>
+		<div class="catalog-detail">
+			<div class="section-label">{currentCatalog.name} — 詳細</div>
+			<div class="catalog-detail-list">
+				{#each currentCatalog.palette as color (color.code)}
+					<div class="catalog-color-row">
+						<div class="catalog-color-box" class:light={isLightColor(color.code)} style="background:{color.code}"></div>
+						<span class="catalog-color-name">{color.name}</span>
+						<span class="catalog-color-code">{color.code}</span>
+					</div>
+				{/each}
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ══ HISTORY MANAGER MODAL ══ -->
+{#if historyManagerOpen}
+	<div class="modal-backdrop" onclick={() => (historyManagerOpen = false)} aria-hidden="true"></div>
+	<div class="history-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">履歴管理</div>
+			<div class="modal-head-actions">
+				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => { historyManagerView = historyManagerView === 'trash' ? 'active' : 'trash'; selectedHistoryIds = []; void fetchTrashPage(); }}>ごみ箱 ({trashTotal})</button>
+				<button class="catalog-close" onclick={() => (historyManagerOpen = false)}>×</button>
+			</div>
+		</div>
+		<div class="history-tools">
+			<button class="ghost-btn" onclick={selectAllManagedHistory}>すべて選択</button>
+			{#if historyManagerView === 'active'}
+				<button class="ghost-btn" onclick={() => askTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択削除</button>
+			{:else}
+				<button class="ghost-btn" onclick={() => askRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択復元</button>
+				<button class="danger-btn" onclick={() => askPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>完全削除</button>
+			{/if}
+			<label class="history-search">検索: <input bind:value={historySearch} /></label>
+		</div>
+		<div class="history-table-wrap">
+			<table class="history-table">
+				<thead>
+					<tr><th></th><th>画像</th><th>作成日時</th><th>モデル</th><th>時間</th><th>操作</th></tr>
+				</thead>
+				<tbody>
+					{#each filteredManagedHistory as it (it.id ?? it.at)}
+						<tr>
+							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} /></td>
+							<td><div class="history-mini">{@html it.svg}</div></td>
+							<td>{formatHistoryDate(it.at)}</td>
+							<td>{shortModel(it.stage2_model)}</td>
+							<td>{it.elapsed_ms ? (it.elapsed_ms / 1000).toFixed(1) + 's' : '-'}</td>
+							<td>
+								{#if historyManagerView === 'active'}
+									<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>削除</button>
+								{:else}
+									<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>復元</button>
+									<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>完全削除</button>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</div>
+{/if}
+
+{#if confirmAction}
+	<div class="confirm-layer">
+		<div class="confirm-backdrop" onclick={() => (confirmAction = null)}></div>
+		<div class="confirm-box">
+			<p>{confirmAction.message}</p>
+			<div class="confirm-actions">
+				<button class="ghost-btn" onclick={() => (confirmAction = null)}>キャンセル</button>
+				<button class={confirmAction.destructive ? 'danger-btn' : 'confirm-btn'} onclick={() => { const run = confirmAction?.run; confirmAction = null; run?.(); }}>{confirmAction.destructive ? '削除' : '実行'}</button>
+			</div>
 		</div>
 	</div>
 {/if}
@@ -1219,6 +1526,7 @@
 		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
 	}
 	.batch-ta { flex: 1; border: none; border-radius: 0; }
+	.batch-wrap .batch-ta { min-height: 240px; }
 	.batch-info { font-size: 11px; color: var(--fg3); }
 
 	/* Progress */
@@ -1248,10 +1556,26 @@
 		color: var(--fg2); font-size: 11px; cursor: pointer; font-family: inherit;
 	}
 	.progress-bar-track {
-		height: 3px; background: var(--bg3);
+		position: relative;
+		height: 20px; background: transparent;
 		border-left: 1px solid var(--border2); border-right: 1px solid var(--border2);
+		overflow: visible;
 	}
-	.progress-bar-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+	.progress-bar-track::before {
+		content: "";
+		position: absolute; top: 8px; left: 0; right: 0; height: 3px;
+		background: var(--bg3);
+	}
+	.progress-bar-fill {
+		position: absolute; top: 8px; left: 0; height: 3px;
+		background: var(--accent); transition: width 0.3s ease;
+	}
+	.progress-bird {
+		position: absolute; top: 1px; left: -20px;
+		animation: birdFly 2.4s linear infinite;
+		pointer-events: none;
+	}
+	.progress-bird.done { animation: none; left: calc(100% - 16px); }
 	.progress-stage-text {
 		font-size: 11px; color: var(--fg3);
 		padding: 5px 10px 7px;
@@ -1319,15 +1643,15 @@
 
 	/* Replay */
 	.replay-btn {
-		width: 100%; margin-top: 6px; padding: 7px;
-		font-size: 13px; background: none; color: var(--fg2);
-		border: 1px solid var(--border2); border-radius: var(--r);
-		letter-spacing: 0.06em; cursor: pointer;
+		width: 100%; margin-top: 6px; padding: 10px;
+		font-size: 14px; font-weight: 500; background: var(--fg); color: #fff;
+		border: none; border-radius: var(--r);
+		letter-spacing: 0.08em; cursor: pointer;
 		display: flex; align-items: center; justify-content: center; gap: 6px;
-		font-family: inherit; transition: background 0.1s;
+		font-family: inherit; transition: background 0.15s;
 	}
-	.replay-btn:hover:not(:disabled) { background: var(--bg2); }
-	.replay-btn:disabled { color: var(--fg3); cursor: not-allowed; }
+	.replay-btn:hover:not(:disabled) { background: #333; }
+	.replay-btn:disabled { background: var(--fg3); cursor: not-allowed; }
 
 	/* Stats */
 	.stats-section { }
@@ -1450,6 +1774,39 @@
 		align-self: stretch; min-height: 0;
 	}
 	.prompt-label { margin: 8px 0 3px; font-size: 11px; font-weight: 600; color: var(--fg2); }
+	.prompt-collapsible-head {
+		display: flex; align-items: center; justify-content: space-between;
+		margin-top: 8px;
+	}
+	.prompt-collapsible-head .prompt-label { margin: 0; }
+	.prompt-textarea {
+		width: 100%;
+		background: var(--bg2); padding: 8px 10px; border-radius: var(--r);
+		border: 1px solid var(--border); overflow: auto;
+		white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.5; margin: 0;
+		font-family: inherit; color: var(--fg);
+		resize: vertical;
+	}
+	.prompt-user { min-height: 120px; }
+	.prompt-system { min-height: 120px; height: 220px; }
+	.prompt-collapse {
+		position: relative;
+		max-height: 80px;
+		overflow: hidden;
+	}
+	.prompt-collapse.expanded {
+		max-height: none;
+		overflow: visible;
+	}
+	.prompt-collapse:not(.expanded) .prompt-system {
+		height: 120px;
+		resize: none;
+	}
+	.prompt-fade {
+		position: absolute; left: 0; right: 0; bottom: 0; height: 32px;
+		background: linear-gradient(transparent, var(--bg));
+		pointer-events: none;
+	}
 	.prompt-pre {
 		background: var(--bg2); padding: 8px 10px; border-radius: var(--r);
 		border: 1px solid var(--border); overflow-x: auto; max-height: 140px;
@@ -1506,6 +1863,11 @@
 		margin-bottom: 7px;
 	}
 	.history-title { font-size: 12px; font-weight: 500; color: var(--fg2); }
+	.history-title-btn {
+		border: none; background: none; color: var(--fg2);
+		font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
+	}
+	.history-title-btn:hover { color: var(--fg); }
 	.history-count { color: var(--fg3); font-weight: 400; }
 	.history-page-nav { display: flex; align-items: center; gap: 6px; }
 	.history-page-indicator { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; }
@@ -1521,7 +1883,25 @@
 		cursor: pointer; padding: 0; font-family: inherit; position: relative;
 		transition: border-color 0.1s;
 	}
+	.thumb:hover { overflow: visible; z-index: 20; }
 	.thumb.current { border-color: var(--accent); }
+	.thumb-tooltip {
+		position: absolute; bottom: calc(100% + 6px); left: 50%;
+		transform: translateX(-50%) translateY(4px);
+		opacity: 0; pointer-events: none;
+		background: rgba(26,25,23,0.92); color: #fff;
+		font-size: 11px; border-radius: var(--r);
+		padding: 7px 10px; white-space: nowrap;
+		z-index: 500; line-height: 1.7;
+		transition: opacity 0.15s, transform 0.15s;
+		box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+	}
+	.thumb:hover .thumb-tooltip {
+		opacity: 1;
+		transform: translateX(-50%) translateY(0);
+	}
+	.tooltip-title { font-weight: 500; margin-bottom: 3px; }
+	.tooltip-date { color: rgba(255,255,255,0.55); margin-top: 3px; }
 	.thumb-svg { width: 82px; height: 58px; overflow: hidden; }
 	.thumb-svg :global(svg) { width: 100%; height: 100%; display: block; }
 	.thumb-meta {
@@ -1589,7 +1969,7 @@
 	.catalog-modal {
 		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
 		z-index: 401;
-		width: 540px; max-height: 80vh;
+		width: 540px; max-height: 88vh;
 		background: #faf9f6; border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
@@ -1623,10 +2003,127 @@
 	.catalog-name { font-size: 12px; font-weight: 500; color: var(--fg); margin-bottom: 1px; }
 	.catalog-sub  { font-size: 11px; color: var(--fg3); }
 	.catalog-check { color: var(--accent); font-size: 13px; flex-shrink: 0; }
+	.catalog-detail {
+		border-top: 1px solid var(--border);
+		padding: 12px 16px 14px;
+		background: #fff;
+		flex-shrink: 0;
+	}
+	.catalog-detail-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+	.catalog-color-row {
+		display: flex; align-items: center; gap: 10px;
+		font-size: 12px;
+	}
+	.catalog-color-box {
+		width: 28px; height: 28px; border-radius: 3px; flex-shrink: 0;
+	}
+	.catalog-color-box.light { border: 1px solid var(--border); }
+	.catalog-color-name { color: var(--fg); flex: 1; }
+	.catalog-color-code {
+		font-size: 11px; color: var(--fg3);
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	}
+
+	/* ── Modal shared / settings / history ─────────────────── */
+	.modal-head {
+		display: flex; align-items: center; justify-content: space-between;
+		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+	}
+	.settings-modal, .history-modal {
+		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+		z-index: 401;
+		background: #faf9f6; border-radius: var(--r-lg);
+		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+		display: flex; flex-direction: column; overflow: hidden;
+	}
+	.settings-modal { width: min(680px, calc(100vw - 32px)); max-height: 88vh; }
+	.history-modal { width: min(920px, calc(100vw - 32px)); max-height: 88vh; }
+	.settings-tabs {
+		display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg);
+	}
+	.settings-tabs button {
+		padding: 9px 16px; border: none; border-bottom: 2px solid transparent;
+		background: none; color: var(--fg2); font-size: 13px; cursor: pointer; font-family: inherit;
+	}
+	.settings-tabs button.active { color: var(--fg); border-bottom-color: var(--fg); font-weight: 500; }
+	.settings-body {
+		padding: 14px 16px; overflow-y: auto;
+		display: flex; flex-direction: column; gap: 10px;
+	}
+	.form-row {
+		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
+	}
+	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
+	.form-row input, .form-row select, .full-select, .plugin-add input, .history-search input {
+		flex: 1; min-width: 0; padding: 5px 7px;
+		border: 1px solid var(--border2); border-radius: var(--r);
+		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+	}
+	.check-row { display: flex; align-items: center; gap: 7px; color: var(--fg2); font-size: 12px; }
+	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
+	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.plugin-list {
+		border: 1px solid var(--border); border-radius: var(--r);
+		background: #fff; overflow: hidden;
+	}
+	.plugin-row {
+		display: grid; grid-template-columns: 1fr auto auto; gap: 10px;
+		align-items: center; padding: 9px 10px; border-bottom: 1px solid var(--border);
+	}
+	.plugin-row:last-child { border-bottom: none; }
+	.plugin-version { color: var(--fg3); font-size: 11px; }
+	.plugin-add { display: flex; gap: 8px; align-items: center; }
+	.inline-confirm {
+		display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+		background: #fff; border: 1px solid var(--border); border-radius: var(--r);
+		padding: 9px 10px; font-size: 12px; color: var(--fg2);
+	}
+	.danger-btn, .confirm-btn {
+		padding: 4px 10px; border: none; border-radius: var(--r);
+		color: #fff; font-size: 11px; cursor: pointer; font-family: inherit;
+	}
+	.danger-btn { background: #c0392b; }
+	.confirm-btn { background: var(--fg); }
+	.danger-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+	.modal-head-actions { display: flex; align-items: center; gap: 8px; }
+	.history-tools {
+		display: flex; align-items: center; gap: 8px;
+		padding: 10px 14px; border-bottom: 1px solid var(--border);
+	}
+	.history-search { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--fg2); font-size: 12px; }
+	.history-table-wrap { overflow: auto; padding: 0 14px 14px; }
+	.history-table {
+		width: 100%; border-collapse: collapse; background: #fff;
+		font-size: 12px; margin-top: 12px;
+	}
+	.history-table th, .history-table td {
+		border: 1px solid var(--border); padding: 7px 8px; text-align: left; vertical-align: middle;
+	}
+	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
+	.history-mini { width: 48px; height: 36px; overflow: hidden; background: #fff; border: 1px solid var(--border); }
+	.history-mini :global(svg) { width: 100%; height: 100%; display: block; }
+	.confirm-layer {
+		position: fixed; inset: 0; z-index: 600;
+		display: flex; align-items: center; justify-content: center;
+	}
+	.confirm-backdrop {
+		position: absolute; inset: 0; background: rgba(0,0,0,0.3);
+	}
+	.confirm-box {
+		position: relative; background: #fff; border-radius: var(--r-lg);
+		padding: 22px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+		min-width: 280px; text-align: center;
+	}
+	.confirm-box p { margin-bottom: 16px; font-size: 13px; color: var(--fg); }
+	.confirm-actions { display: flex; gap: 8px; justify-content: center; }
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50%       { opacity: 0.4; transform: scale(0.7); }
+	}
+	@keyframes birdFly {
+		0% { left: -20px; }
+		100% { left: calc(100% + 4px); }
 	}
 </style>

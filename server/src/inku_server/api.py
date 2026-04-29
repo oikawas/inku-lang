@@ -163,6 +163,7 @@ class HistoryPostBody(BaseModel):
 class HistoryItem(HistoryPostBody):
     id: str
     output_path: str | None = None
+    trashed: bool = False
 
 
 class HistoryListResponse(BaseModel):
@@ -170,6 +171,10 @@ class HistoryListResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+class HistoryIdsBody(BaseModel):
+    ids: list[str] = Field(default_factory=list)
 
 
 class SnapshotMeta(BaseModel):
@@ -194,7 +199,58 @@ def api_prompts(lang: str = Query(default="ja")) -> PromptsResponse:
     return PromptsResponse(stage1_system=s1, stage2_system=s2)
 
 
-@app.post("/api/compose", response_model=ComposeResponse)
+def _call_compose_detail(
+    ddl: str,
+    *,
+    model: str | None = None,
+    original_text: str | None = None,
+    system_prompt: str | None = None,
+    lang: str = "ja",
+) -> tuple[Score, int | None, int | None]:
+    try:
+        value = compose(
+            ddl,
+            model=model,
+            original_text=original_text,
+            system_prompt=system_prompt,
+            lang=lang,
+        )
+    except TypeError as e:
+        if "unexpected keyword argument" not in str(e):
+            raise
+        value = compose(ddl, model=model)
+    if isinstance(value, tuple):
+        return value
+    return value, None, None
+
+
+def _call_interpret_detail(
+    text: str,
+    *,
+    model: str | None = None,
+    include_thinking: bool = False,
+    system_prompt_prefix: str | None = None,
+    lang: str = "ja",
+) -> tuple[str, str | None, int | None, int | None]:
+    try:
+        value = interpret_detail(
+            text,
+            model=model,
+            include_thinking=include_thinking,
+            system_prompt_prefix=system_prompt_prefix,
+            lang=lang,
+        )
+    except TypeError as e:
+        if "unexpected keyword argument" not in str(e):
+            raise
+        value = interpret_detail(text, model=model, include_thinking=include_thinking)
+    if len(value) == 4:
+        return value
+    ddl, thinking = value
+    return ddl, thinking, None, None
+
+
+@app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
 def api_compose(req: ComposeRequest) -> ComposeResponse:
     t0 = time.perf_counter()
     stage2_prompt: str | None = None
@@ -203,7 +259,13 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
         if snap:
             stage2_prompt = snap.get("stage2_prompt")
     try:
-        score, tokens_in, tokens_out = compose(req.ddl, model=req.model, original_text=req.original_text, system_prompt=stage2_prompt, lang=req.lang)
+        score, tokens_in, tokens_out = _call_compose_detail(
+            req.ddl,
+            model=req.model,
+            original_text=req.original_text,
+            system_prompt=stage2_prompt,
+            lang=req.lang,
+        )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -218,15 +280,15 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
     return ComposeResponse(score=score, svg=svg, elapsed_ms=elapsed_ms, tokens_in=tokens_in, tokens_out=tokens_out)
 
 
-@app.post("/api/interpret", response_model=InterpretResponse)
-def api_interpret(req: InterpretRequest) -> InterpretResponse:
+@app.post("/api/interpret")
+def api_interpret(req: InterpretRequest) -> dict:
     stage1_prefix: str | None = None
     if req.snapshot_id:
         snap = _snapshots.get_snapshot(req.snapshot_id)
         if snap:
             stage1_prefix = snap.get("stage1_prefix")
     try:
-        ddl, thinking, tokens_in, tokens_out = interpret_detail(
+        ddl, thinking, tokens_in, tokens_out = _call_interpret_detail(
             req.text,
             model=req.model,
             include_thinking=req.include_thinking,
@@ -235,21 +297,28 @@ def api_interpret(req: InterpretRequest) -> InterpretResponse:
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
-    return InterpretResponse(ddl=ddl, thinking=thinking, tokens_in=tokens_in, tokens_out=tokens_out)
+    data: dict = {"ddl": ddl, "thinking": thinking}
+    if tokens_in is not None:
+        data["tokens_in"] = tokens_in
+    if tokens_out is not None:
+        data["tokens_out"] = tokens_out
+    return data
 
 
-@app.post("/api/paint", response_model=PaintResponse)
+@app.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
 def api_paint(req: PaintRequest) -> PaintResponse:
     t0 = time.perf_counter()
     try:
-        ddl, thinking, s1_tin, s1_tout = interpret_detail(
+        ddl, thinking, s1_tin, s1_tout = _call_interpret_detail(
             req.text, model=req.stage1_model, include_thinking=req.include_thinking, lang=req.lang
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     t1 = time.perf_counter()
     try:
-        score, s2_tin, s2_tout = compose(ddl, model=req.stage2_model, original_text=req.text, lang=req.lang)
+        score, s2_tin, s2_tout = _call_compose_detail(
+            ddl, model=req.stage2_model, original_text=req.text, lang=req.lang
+        )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -306,8 +375,9 @@ def api_snapshots_delete(snapshot_id: str) -> dict[str, bool]:
 def api_history_get(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
+    trashed: bool = Query(default=False),
 ) -> HistoryListResponse:
-    items, total = _db.list_items(offset=offset, limit=limit)
+    items, total = _db.list_items(offset=offset, limit=limit, trashed=trashed)
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
@@ -330,6 +400,24 @@ def api_history_post(body: HistoryPostBody) -> HistoryItem:
 def api_history_delete() -> dict[str, bool]:
     _db.delete_all()
     return {"ok": True}
+
+
+@app.post("/api/history/trash")
+def api_history_trash(body: HistoryIdsBody) -> dict[str, int | bool]:
+    count = _db.trash_items(body.ids)
+    return {"ok": True, "count": count}
+
+
+@app.post("/api/history/restore")
+def api_history_restore(body: HistoryIdsBody) -> dict[str, int | bool]:
+    count = _db.restore_items(body.ids)
+    return {"ok": True, "count": count}
+
+
+@app.post("/api/history/permanent-delete")
+def api_history_permanent_delete(body: HistoryIdsBody) -> dict[str, int | bool]:
+    count = _db.delete_items(body.ids)
+    return {"ok": True, "count": count}
 
 
 

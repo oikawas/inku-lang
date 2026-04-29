@@ -21,7 +21,7 @@ export const en: LangPack = {
 	saveCurrentBtn: 'save current',
 	snapshotNamePlaceholder: 'snapshot name (e.g. saijiki-v1)',
 
-	clearInputBtn: 'clear',
+	clearInputBtn: 'new',
 	ddlEditBtn: 'edit',
 	ddlDoneBtn: 'done',
 
@@ -31,21 +31,21 @@ export const en: LangPack = {
 	batchPlaceholder: 'A moon rises beyond the mountains\nMist spreads at night\nBlue crayon lines',
 	batchCount: (n) => `${n} items`,
 
-	submitBtn: 'perform',
+	submitBtn: 'draw',
 	stopBtn: 'stop',
 	stageInterpreting: 'interpreting…',
 	stageStructuring: (tok) => `structuring…${tok}`,
-	batchProgress: (cur, tot) => `performing ${cur} / ${tot}…`,
+	batchProgress: (cur, tot) => `drawing ${cur} / ${tot}…`,
 
 	vocabInInputLabel: 'vocabulary in input',
 	thinkingLabel: 'thinking (qwen3 internal)',
 	ddlLabel: 'interpretation (normalized DDL)',
 
-	tabCanvas: 'performance',
+	tabCanvas: 'drawing',
 	tabPrompts: 'prompts',
 	tabScore: 'score',
 
-	canvasPlaceholder: '(not yet performed)',
+	canvasPlaceholder: '(not yet drawn)',
 
 	promptStage1Input: 'Stage 1 user input',
 	promptStage1System: 'Stage 1 system prompt',

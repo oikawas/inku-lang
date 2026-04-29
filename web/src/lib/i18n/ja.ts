@@ -21,7 +21,7 @@ export const ja: LangPack = {
 	saveCurrentBtn: '現在を保存',
 	snapshotNamePlaceholder: 'スナップショット名 (例: 歳時記v1)',
 
-	clearInputBtn: 'クリア',
+	clearInputBtn: '新規作成',
 	ddlEditBtn: '編集',
 	ddlDoneBtn: '完了',
 
@@ -31,21 +31,21 @@ export const ja: LangPack = {
 	batchPlaceholder: '山の向こうに月が昇る\n夜の霧が広がる\n青いクレヨンの線',
 	batchCount: (n) => `${n} 件`,
 
-	submitBtn: '演奏する',
+	submitBtn: '描画する',
 	stopBtn: '停止',
 	stageInterpreting: '解釈中…',
 	stageStructuring: (tok) => `構造化中…${tok}`,
-	batchProgress: (cur, tot) => `${cur} / ${tot} 番目を演奏中…`,
+	batchProgress: (cur, tot) => `${cur} / ${tot} 番目を描画中…`,
 
 	vocabInInputLabel: '入力に含まれた語彙',
 	thinkingLabel: '思考 (qwen3 内部)',
 	ddlLabel: '解釈 (正規化DDL)',
 
-	tabCanvas: '演奏',
+	tabCanvas: '描画',
 	tabPrompts: 'プロンプト',
 	tabScore: '楽譜',
 
-	canvasPlaceholder: '（まだ演奏されていない）',
+	canvasPlaceholder: '（まだ描画されていない）',
 
 	promptStage1Input: 'Stage 1 ユーザー入力',
 	promptStage1System: 'Stage 1 システムプロンプト',

@@ -1076,7 +1076,6 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 ### E. テスト / CI / 運用
 
-- GitHub Actions 等の CI 未設定 (全テスト pentala 手動実行)
 - LLM fixture テストを夜間バッチ化、model × fixture 行列で記録
 - latency / token usage メトリクス収集
 - LLM hallucination エラー回復 (SPEC §12.8) 未実装
@@ -1138,11 +1137,6 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ├── LICENSE                        # MIT License
 ├── SPEC.md                        # 本書（設計哲学・言語設計）
 ├── CLAUDE.md                      # Claude Code 用コンテキスト (gitignore)
-├── ops/
-│   ├── systemd/
-│       └── inku-vite.service      # pentala Vite dev system service unit
-│   └── sudoers/
-│       └── ddl-server-inku-vite   # ddl-server 用 Vite restart NOPASSWD sudoers 片
 ├── server/                        # Python バックエンド (uv管理)
 │   ├── pyproject.toml             # inku-server 0.1.0
 │   ├── uv.lock
@@ -1189,7 +1183,6 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
-**開発環境 (ローカル運用手順は `LOCAL_WORK.md` を参照、未コミット)**
 
 **別リポジトリ / 別 PoC**:
 - `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
@@ -1214,7 +1207,6 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ### v1.10 (2026-04-29)
 
-**マルチユーザー基盤 + ユーザー別履歴分離 + Vite system service 化**
 
 #### 認証 / ユーザー管理
 
@@ -1288,24 +1280,6 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - 履歴を持つユーザー削除は孤立データ防止のため拒否する
 - 出力ファイル保存先は `outputs/{user_id}/YYYY-MM-DD/...` へ分離
 - 旧 `history.json` 移行スクリプトも admin 所有として取り込む
-
-#### pentala Vite system service
-
-pentala の Vite dev server を user service ではなく system service として運用する方針に変更した。
-
-背景:
-
-- `ddl-server` ユーザーは `Linger=no`
-- `systemctl --user` の `inku-vite.service` は SSH セッション終了に巻き込まれて停止する
-- その結果、Mac/Brave から `http://192.168.0.89:5173/` が `ERR_CONNECTION_REFUSED` になることがあった
-
-対応:
-
-- `ops/systemd/inku-vite.service` を追加
-- `/etc/systemd/system/inku-vite.service` へ配置して `sudo systemctl enable --now inku-vite.service` で常駐させる運用へ変更
-- `LOCAL_WORK.md` / `AGENTS.md` に操作手順を記録
-- `ops/sudoers/ddl-server-inku-vite` を `/etc/sudoers.d/ddl-server-inku-vite` に配置すると、`ddl-server` は `sudo systemctl restart inku-vite.service` のみパスワードなしで実行できる
-- pentala 上では `scripts/install-vite-sudoers.sh` を一度だけ sudo パスワード付きで実行し、以後は SSH 越しにパスワードなし restart できる
 
 ### v1.9 (2026-04-29)
 
@@ -1391,15 +1365,6 @@ UI 上の作品生成表現を「演奏」から「描画」へ寄せた。
 - `.build-number` の自動増分方式を廃止
 - `web/BUILD_NUMBER` を Git 追跡対象に変更
 - アプリに変更を加えるたびに `BUILD_NUMBER` を明示的に更新する運用へ移行
-
-#### pentala 同期安全化
-
-rsync 手打ちミスにより `web/src/` の中身が pentala の `web/` 直下に展開された問題を受け、検証同期用スクリプトを追加。
-
-- `scripts/sync-web-to-pentala.sh`
-  - `web/src/` は必ず `~/inku-lang/web/src/` へ同期
-  - `web/vite.config.ts` と `web/BUILD_NUMBER` は `~/inku-lang/web/` へ同期
-  - 同期後に `web/routes`, `web/lib`, `web/app.html`, `web/app.d.ts` が誤配置されていないことを検査
 
 #### 既知課題（v1.9 review）
 
@@ -1555,24 +1520,11 @@ type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
 
 ### v1.5 (2026-04-26)
 
-**UI fix: canvas max-height + 履歴サムネイル重複キー修正 / デプロイフロー整備**
 
 #### UI 修正
 
 - **canvas max-height 追加**: `.canvas { max-height: 480px }` を設定。`aspect-ratio: 1/1` のみでは canvas がビューポート幅（~560px）まで拡大し、history strip がビューポート外に押し出されていた問題を修正
 - **履歴 each キー修正**: `{#each historyItems as it, i (it.at)}` → `(it.id ?? it.at)`。同一タイムスタンプで複数アイテムが記録された場合の重複キーを解消。`Iteration` 型に `id?: string` 追加
-
-#### デプロイフロー整備
-
-pentala (Ubuntu dev server) との同期ミスが発生した教訓から、運用フローを整備。
-
-**問題の経緯**: rsync で直接転送後に git push を省略 → pentala の working tree に untracked/modified ファイルが残存 → 次回 `git pull` が "would be overwritten by merge" で失敗 → 手動での git stash + rm + pull + stash drop が必要になった
-
-**改善内容**:
-- `no-git-sync/scripts/deploy.sh` 作成: `git push` → pentala `git pull` → `systemctl --user restart inku-server.service` をワンコマンド化
-- `no-git-sync/scripts/sync-reset.sh` 作成: pentala の WT を `git reset --hard origin/main` でリセットするリカバリ用スクリプト
-- `LOCAL_WORK.md` 更新: rsync 後は必ず deploy.sh で完結させるルールを明文化、コンフリクト解消手順を改訂
-- スクリプトは `no-git-sync/`（gitignore 済み）に配置 — ローカル環境依存のため
 
 ### v1.4 (2026-04-26)
 SPEC.mdの内容精査。
@@ -1857,7 +1809,6 @@ localStorage の容量制限を解消し、セッション跨ぎの履歴を実�
   - その他 → OVMS (ローカル OpenAI 互換)
 - UI: プロバイダー選択 (NVIDIA NIM / Anthropic / ローカル) + モデル選択の 2 段 dropdown、localStorage 永続化
 - `web/src/lib/models.ts` に `PROVIDER_GROUPS` 構造を追加
-- NVIDIA_API_KEY は `no-git-sync/.env` + systemd `EnvironmentFile=` で管理
 
 #### arrangement フィールド (本数・個数の JSON サイズ問題)
 
@@ -1949,7 +1900,6 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
   - `POST /api/interpret`: 自由記述 → 正規化DDL
   - `POST /api/paint`: 自由記述 → 正規化DDL → Score → SVG (フルパイプライン)
   - 既存 `POST /api/compose`, `GET /health` は維持
-  - FastAPI 既定 port を `8000 → 8100` へ変更 (pentala 上で 8000 が他サービスと衝突)
   - 起動時 env: `INKU_SERVER_HOST`, `INKU_SERVER_PORT` で上書き可
 
 - **Stage 2 fidelity 記録 (qwen-api strict モード)**
@@ -1968,11 +1918,6 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
   - 反復履歴: in-memory、最大 20 件、`◀ N/M ▶` 移動ボタンで input/output/DDL を過去状態に復元
   - サムネイル列: 履歴 2 件以上で下段に 96px 方形ミニチュア SVG を横並べ、クリックで jump
 
-- **運用 / 非公開メモ**
-  - `LOCAL_WORK.md` に同期フロー・起動手順・トラブルシュートを集約 (gitignore 済)
-  - Mac は SSH tunnel or `http://pentala:5173` でブラウザアクセス、コード編集のみ
-  - dev server は pentala 上で nohup 常駐 (`/tmp/inku-server.log`, `/tmp/inku-web.log`)
-
 ### v0.5 (2026-04-23)
 
 **Phase 1 続き — FastAPI + Web クライアント 立ち上げ**
@@ -1988,15 +1933,9 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
 - **SvelteKit Web クライアント (`web/`)**
   - SvelteKit 2.57 + Svelte 5.55 (runes モード) + Vite 8 + TypeScript
   - 単一ルート `/`: 記述 textarea + 演奏 (SVG インライン表示) + 楽譜 (JSON Score collapsible)
-  - Vite dev proxy: `/api` → `http://127.0.0.1:8000` (CORS 回避)
   - スタイル: Renderer パレットと整合 (背景 #f7f5ef, 墨 #111)、和文フォント優先
   - 名前: `inku-web` v0.1.0
   - svelte-check: 0 error, 0 warning
-
-- **ホスト構成**
-  - server + web ともに pentala (Ubuntu 22.04.5) で常時起動
-  - Mac はブラウザクライアント専用 (SSH tunnel `-L 5173 -L 8000`)
-  - Node.js 22.22.2 (NodeSource apt、システム PATH)、Python 3.10.12 + uv
 
 - **次段階への布石**
   - `/api/compose` は Stage 2 のみ。Stage 1 (Opus 解釈) エンドポイントは未実装
@@ -2009,7 +1948,6 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
 
 - **リポジトリ構成**
   - `inku-lang` リポジトリを GitHub (`github.com/oikawas/inku-lang`) に作成
-  - 開発フロー: `pentala` (Ubuntu 22.04.5) 中心開発 + Mac git sync
   - `server/` と `web/` の2スロット構成。`server/` 先行実装
 
 - **Python プロジェクト: inku-server 0.1.0**

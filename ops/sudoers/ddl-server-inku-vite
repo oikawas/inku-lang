@@ -1,1 +1,0 @@
-ddl-server ALL=(root) NOPASSWD: /usr/bin/systemctl restart inku-vite.service

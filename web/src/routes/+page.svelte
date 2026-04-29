@@ -1,3 +1,7 @@
+<script module lang="ts">
+	declare const __BUILD_NUMBER__: string;
+</script>
+
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SAIJIKI } from '$lib/saijiki';
@@ -10,16 +14,18 @@
 		type Provider
 	} from '$lib/models';
 	import { t, setLang, getLang, PACK_LIST, initLang } from '$lib/i18n/index.svelte';
-	import { COLOR_CATALOGS, getColorMap, type ColorMap } from '$lib/colors';
-
-	declare const __BUILD_NUMBER__: string;
+	import { COLOR_CATALOGS, getCatalogById, getColorMap, type ColorMap } from '$lib/colors';
 
 	const HISTORY_PAGE_SIZE = 20;
+	const HISTORY_MANAGER_PAGE_SIZE = 100;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
 	const CATALOG_KEY         = 'inku-color-catalog';
+	const SHOW_BIRDS_KEY      = 'inku-show-birds';
+	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
+	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 
 	type Score = { instructions: unknown[] };
 
@@ -49,6 +55,22 @@
 		tokens_in?: number | null;
 		tokens_out?: number | null;
 		catalog_id?: string | null;
+		trashed?: boolean;
+	};
+
+	type PluginItem = {
+		id: string;
+		name: string;
+		version: string;
+		enabled: boolean;
+	};
+
+	type UserRole = '管理者' | 'グループリード' | 'ユーザー';
+	type UserItem = {
+		id: string;
+		name: string;
+		password: string;
+		group: UserRole;
 	};
 
 	// ── Input ───────────────────────────────────────────────
@@ -77,6 +99,8 @@
 	let windowWidth  = $state(1200);
 	let saijikiOpen  = $state(false);
 	let settingsOpen = $state(false);
+	let settingsMode = $state<'model' | 'settings'>('settings');
+	let settingsTab  = $state<'connection' | 'db' | 'plugins' | 'users' | 'misc'>('connection');
 	let pngMenuOpen  = $state(false);
 	let catalogOpen  = $state(false);
 	let statsOpen    = $state(false);
@@ -84,17 +108,110 @@
 	let ddlEditing   = $state(false);
 	let baseDDL      = $state<string | null>(null);
 	let zoom         = $state(1);
+	let promptStage1Expanded = $state(false);
+	let promptStage2Expanded = $state(false);
+	let showBirds = $state(true);
+	let pngAlphaWhite = $state(false);
+	let saveReplayAsNewVersion = $state(true);
+	let miscSettingsLoaded = $state(false);
 
 	// DOM refs for outside-click handling
-	let settingsWrapEl = $state<HTMLDivElement | null>(null);
 	let pngWrapEl      = $state<HTMLDivElement | null>(null);
 
 	// ── Color catalog ────────────────────────────────────────
 	let selectedCatalog = $state('default');
+	const currentCatalog = $derived(getCatalogById(selectedCatalog) ?? COLOR_CATALOGS[0]);
 
 	function activeColorMap(): ColorMap | null {
 		if (selectedCatalog === 'default') return null;
 		return getColorMap(selectedCatalog);
+	}
+
+	function isLightColor(hex: string): boolean {
+		const value = hex.replace('#', '');
+		const r = parseInt(value.slice(0, 2), 16);
+		const g = parseInt(value.slice(2, 4), 16);
+		const b = parseInt(value.slice(4, 6), 16);
+		return (r * 299 + g * 587 + b * 114) / 1000 > 224;
+	}
+
+	// ── Settings tabs ────────────────────────────────────────
+	let dbType = $state<'sqlite' | 'postgres'>('sqlite');
+	let sqlitePath = $state('~/.local/share/inku/inku.db');
+	let pgHost = $state('');
+	let pgPort = $state('5432');
+	let pgUser = $state('');
+	let pgPassword = $state('');
+	let pgDatabase = $state('');
+	let showPgPassword = $state(false);
+	let dbTestResult = $state<string | null>(null);
+	let plugins = $state<PluginItem[]>([
+		{ id: 'nature', name: 'inku-nature', version: 'v0.1.0', enabled: true },
+		{ id: 'bamboo', name: 'inku-bamboo', version: 'v0.1.0', enabled: false },
+	]);
+	let pluginAddOpen = $state(false);
+	let pluginPath = $state('');
+	let pluginPendingDelete = $state<PluginItem | null>(null);
+	let users = $state<UserItem[]>([
+		{ id: 'admin', name: 'admin', password: '', group: '管理者' },
+	]);
+	let groups = $state<UserRole[]>(['管理者', 'グループリード', 'ユーザー']);
+	let newUserName = $state('');
+	let newUserPassword = $state('');
+	let newUserGroup = $state<UserRole>('ユーザー');
+	let newGroupName = $state('');
+
+	function testDbConnection() {
+		dbTestResult = dbType === 'sqlite'
+			? `SQLite path is set: ${sqlitePath || '(empty)'}`
+			: pgHost && pgUser && pgDatabase
+				? `Ready to test PostgreSQL at ${pgHost}:${pgPort}`
+				: 'PostgreSQL settings are incomplete.';
+	}
+
+	function addPlugin() {
+		const name = pluginPath.trim();
+		if (!name) return;
+		plugins = [...plugins, { id: `${Date.now()}`, name, version: 'local', enabled: true }];
+		pluginPath = '';
+		pluginAddOpen = false;
+	}
+
+	function addUser() {
+		const name = newUserName.trim();
+		if (!name) return;
+		users = [...users, { id: `${Date.now()}`, name, password: newUserPassword, group: newUserGroup }];
+		newUserName = '';
+		newUserPassword = '';
+		newUserGroup = groups.includes('ユーザー') ? 'ユーザー' : groups[0];
+	}
+
+	function removeUser(id: string) {
+		users = users.filter((user) => user.id !== id);
+	}
+
+	function addGroup() {
+		const name = newGroupName.trim() as UserRole;
+		if (!name || groups.includes(name)) return;
+		groups = [...groups, name];
+		newGroupName = '';
+		if (!newUserGroup) newUserGroup = name;
+	}
+
+	function removeGroup(group: UserRole) {
+		if (groups.length <= 1) return;
+		groups = groups.filter((g) => g !== group);
+		const fallback = groups[0];
+		users = users.map((user) => user.group === group ? { ...user, group: fallback } : user);
+		if (newUserGroup === group) newUserGroup = fallback;
+	}
+
+	function persistMiscSettings() {
+		try {
+			localStorage.setItem(SHOW_BIRDS_KEY, showBirds ? '1' : '0');
+			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
+			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
+		} catch {}
 	}
 
 	// ── 感情語 → DDL ヒント ──────────────────────────────────
@@ -169,6 +286,28 @@
 	let historyPage  = $state(0);
 	let historyCursor = $state(-1);
 	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
+	let historyManagerOpen = $state(false);
+	let historyManagerView = $state<'active' | 'trash'>('active');
+	let historyManagerTab = $state<'thumbs' | 'list'>('thumbs');
+	let managerHistoryItems = $state<Iteration[]>([]);
+	let managerHistoryTotal = $state(0);
+	let managerTrashItems = $state<Iteration[]>([]);
+	let managerTrashTotal = $state(0);
+	let trashItems = $state<Iteration[]>([]);
+	let trashTotal = $state(0);
+	let historySearch = $state('');
+	let selectedHistoryIds = $state<string[]>([]);
+	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean } | null>(null);
+	const managedHistoryItems = $derived(historyManagerView === 'trash' ? managerTrashItems : managerHistoryItems);
+	const managedHistoryTotal = $derived(historyManagerView === 'trash' ? managerTrashTotal : managerHistoryTotal);
+	const filteredManagedHistory = $derived.by(() => {
+		const q = historySearch.trim().toLowerCase();
+		if (!q) return managedHistoryItems;
+		return managedHistoryItems.filter((it) =>
+			[it.input, it.ddl ?? '', it.stage1_model ?? '', it.stage2_model ?? '', it.catalog_id ?? '']
+				.some((v) => v.toLowerCase().includes(q))
+		);
+	});
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
@@ -281,6 +420,7 @@
 		if (!ddl || reloading) return;
 		reloading = true; reloadError = null;
 		const lang = getLang();
+		const startedAt = Date.now();
 		try {
 			const r = await fetch('/api/compose', {
 				method: 'POST',
@@ -292,9 +432,28 @@
 				throw new Error(d.detail ?? `HTTP ${r.status}`);
 			}
 			const d = await r.json() as { score: Score; svg: string; tokens_in: number | null; tokens_out: number | null };
+			const elapsedMs = Date.now() - startedAt;
 			result = result
 				? { ...result, score: d.score, svg: d.svg }
-				: { score: d.score, svg: d.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				: { score: d.score, svg: d.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+			if (result) {
+				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+			}
+			if (saveReplayAsNewVersion) {
+				await pushHistory({
+					input,
+					ddl,
+					score: d.score,
+					svg: d.svg,
+					at: Date.now(),
+					elapsed_ms: elapsedMs,
+					stage1_model: stage1Model,
+					stage2_model: stage2Model,
+					tokens_in: d.tokens_in,
+					tokens_out: d.tokens_out,
+					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
+				});
+			}
 			outputTab = 'canvas';
 		} catch (e) {
 			reloadError = e instanceof Error ? e.message : String(e);
@@ -314,6 +473,40 @@
 		} catch { /* ignore */ }
 	}
 
+	async function fetchTrashPage(): Promise<void> {
+		try {
+			const r = await fetch(`/api/history?offset=0&limit=100&trashed=true`);
+			if (!r.ok) return;
+			const data = await r.json();
+			trashItems = data.items; trashTotal = data.total;
+		} catch { /* ignore */ }
+	}
+
+	async function fetchAllHistory(trashed: boolean): Promise<{ items: Iteration[]; total: number }> {
+		let offset = 0;
+		let total = 0;
+		const items: Iteration[] = [];
+		do {
+			const r = await fetch(`/api/history?offset=${offset}&limit=${HISTORY_MANAGER_PAGE_SIZE}${trashed ? '&trashed=true' : ''}`);
+			if (!r.ok) break;
+			const data = await r.json();
+			items.push(...data.items);
+			total = data.total;
+			offset += data.items.length;
+			if (data.items.length === 0) break;
+		} while (items.length < total);
+		return { items, total };
+	}
+
+	async function fetchHistoryManager(): Promise<void> {
+		try {
+			const [active, trash] = await Promise.all([fetchAllHistory(false), fetchAllHistory(true)]);
+			managerHistoryItems = active.items; managerHistoryTotal = active.total;
+			managerTrashItems = trash.items; managerTrashTotal = trash.total;
+			trashItems = trash.items.slice(0, 100); trashTotal = trash.total;
+		} catch { /* ignore */ }
+	}
+
 	async function pushHistory(it: Iteration): Promise<void> {
 		try {
 			await fetch('/api/history', {
@@ -328,6 +521,53 @@
 
 	function clearInput() {
 		if (inputMode === 'single') input = ''; else batchInput = '';
+	}
+
+	function toggleHistorySelection(id: string) {
+		selectedHistoryIds = selectedHistoryIds.includes(id)
+			? selectedHistoryIds.filter((x) => x !== id)
+			: [...selectedHistoryIds, id];
+	}
+
+	function selectAllManagedHistory() {
+		const ids = filteredManagedHistory.map((it) => it.id).filter((id): id is string => !!id);
+		selectedHistoryIds = selectedHistoryIds.length === ids.length ? [] : ids;
+	}
+
+	async function postHistoryIds(path: string, ids: string[]) {
+		await fetch(path, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ids })
+		});
+		selectedHistoryIds = [];
+		await Promise.all([fetchHistoryPage(historyPage), fetchTrashPage(), fetchHistoryManager()]);
+		if (historyItems.length === 0 && historyPage > 0) await fetchHistoryPage(historyPage - 1);
+	}
+
+	function askTrash(ids: string[]) {
+		if (ids.length === 0) return;
+		confirmAction = {
+			message: `${ids.length}件をごみ箱に移動しますか？`,
+			run: () => { void postHistoryIds('/api/history/trash', ids); }
+		};
+	}
+
+	function askRestore(ids: string[]) {
+		if (ids.length === 0) return;
+		confirmAction = {
+			message: `${ids.length}件を復元しますか？`,
+			run: () => { void postHistoryIds('/api/history/restore', ids); }
+		};
+	}
+
+	function askPermanentDelete(ids: string[]) {
+		if (ids.length === 0) return;
+		confirmAction = {
+			message: `${ids.length}件を完全に削除しますか？`,
+			destructive: true,
+			run: () => { void postHistoryIds('/api/history/permanent-delete', ids); }
+		};
 	}
 
 	type DiffPart = { text: string; changed: boolean };
@@ -357,7 +597,10 @@
 	function loadIteration(idx: number) {
 		if (idx < 0 || idx >= historyItems.length) return;
 		historyCursor = idx; ddlEditing = false;
-		const it = historyItems[idx];
+		loadIterationItem(historyItems[idx]);
+	}
+
+	function loadIterationItem(it: Iteration) {
 		input = it.input; ddl = it.ddl; baseDDL = it.ddl; thinking = it.thinking ?? null;
 		result = { score: it.score, svg: it.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: it.elapsed_ms ?? 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
 		error = null;
@@ -399,11 +642,10 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') { saijikiOpen = false; settingsOpen = false; catalogOpen = false; }
+		if (e.key === 'Escape') { saijikiOpen = false; settingsOpen = false; catalogOpen = false; historyManagerOpen = false; confirmAction = null; }
 	}
 
 	function handleDocClick(e: MouseEvent) {
-		if (settingsOpen && settingsWrapEl && !settingsWrapEl.contains(e.target as Node)) settingsOpen = false;
 		if (pngMenuOpen  && pngWrapEl     && !pngWrapEl.contains(e.target as Node))      pngMenuOpen  = false;
 	}
 
@@ -452,7 +694,9 @@
 				const canvas = document.createElement('canvas');
 				canvas.width = size; canvas.height = size;
 				const ctx = canvas.getContext('2d')!;
-				ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+				if (!pngAlphaWhite) {
+					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+				}
 				const img = new Image();
 				img.onload = () => {
 					ctx.drawImage(img, 0, 0, size, size);
@@ -488,6 +732,45 @@
 		return (m.split('/').pop() ?? m).slice(0, 8);
 	}
 
+	function catalogName(id: string | null | undefined): string {
+		return getCatalogById(id ?? 'default')?.name ?? 'inku Default';
+	}
+
+	function formatHistoryDate(at: number): string {
+		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
+	}
+
+	function formatElapsed(ms: number | null | undefined): string {
+		return ms ? `${(ms / 1000).toFixed(1)}s` : '-';
+	}
+
+	function historyModelSummary(it: Iteration): string {
+		const s1 = it.stage1_model ? shortModel(it.stage1_model) : '-';
+		const s2 = it.stage2_model ? shortModel(it.stage2_model) : '-';
+		return `${s1} → ${s2}`;
+	}
+
+	function historyTokenSummary(it: Iteration): string {
+		if (it.tokens_in == null && it.tokens_out == null) return '-';
+		return `${it.tokens_in ?? '?'} → ${it.tokens_out ?? '?'} tok`;
+	}
+
+	function historyPreviewText(text: string): string {
+		return text.length > 42 ? `${text.slice(0, 42)}...` : text;
+	}
+
+	function openHistoryManager() {
+		historyManagerOpen = true;
+		historyManagerView = 'active';
+		historyManagerTab = 'thumbs';
+		selectedHistoryIds = [];
+		managerHistoryItems = historyItems;
+		managerHistoryTotal = historyTotal;
+		managerTrashItems = trashItems;
+		managerTrashTotal = trashTotal;
+		void fetchHistoryManager();
+	}
+
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
 	);
@@ -503,28 +786,39 @@
 	});
 
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
+	const historyNavSpan = $derived(Math.min(visibleThumbCount, HISTORY_PAGE_SIZE));
 
 	// ── Mount ───────────────────────────────────────────────
-	onMount(async () => {
+	onMount(() => {
 		windowWidth = window.innerWidth;
 		function onResize() { windowWidth = window.innerWidth; }
 		window.addEventListener('resize', onResize);
 
 		initLang();
-		await Promise.all([fetchHistoryPage(0), fetchSnapshots(), fetchPrompts()]);
-		if (historyItems.length > 0) loadIteration(0);
+		void (async () => {
+			await Promise.all([fetchHistoryPage(0), fetchTrashPage(), fetchSnapshots(), fetchPrompts()]);
+			if (historyItems.length > 0) loadIteration(0);
+		})();
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null; if (p1) stage1Provider = p1;
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
+			const birds = localStorage.getItem(SHOW_BIRDS_KEY); if (birds !== null) showBirds = birds !== '0';
+			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
+			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
+			miscSettingsLoaded = true;
 		} catch {}
 
 		return () => window.removeEventListener('resize', onResize);
 	});
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
+	$effect(() => {
+		showBirds; pngAlphaWhite; saveReplayAsNewVersion;
+		if (miscSettingsLoaded) persistMiscSettings();
+	});
 </script>
 
 <svelte:window onkeydown={handleKeydown} onclick={handleDocClick} />
@@ -542,74 +836,11 @@
 		</div>
 
 		<div class="header-right">
-			<!-- ⚙ 接続設定 popover -->
-			<div class="settings-wrap" bind:this={settingsWrapEl}>
-				<button
-					class="settings-btn"
-					class:active={settingsOpen}
-					onclick={(e) => { e.stopPropagation(); settingsOpen = !settingsOpen; }}
-				>⚙ 接続設定</button>
-
-				{#if settingsOpen}
-					<div class="settings-popover" onclick={(e) => e.stopPropagation()}>
-						<div class="popover-title">接続設定</div>
-
-						<div class="popover-group">
-							<div class="popover-group-label">{t().stage1Label}</div>
-							<div class="popover-row">
-								<span class="popover-row-label">{t().providerLabel}</span>
-								<select value={stage1Provider} onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-									{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-								</select>
-							</div>
-							<div class="popover-row">
-								<span class="popover-row-label">{t().modelLabel}</span>
-								<select value={stage1Model} onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}>
-									{#each modelsForProvider(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
-								</select>
-							</div>
-							{#if stage1Model.includes('qwen3')}
-								<label class="popover-think-label">
-									<input type="checkbox" bind:checked={includeThinking} />
-									<span>{t().showThinkingLabel}</span>
-								</label>
-							{/if}
-						</div>
-
-						<div class="popover-group">
-							<div class="popover-group-label">{t().stage2Label}</div>
-							<div class="popover-row">
-								<span class="popover-row-label">{t().providerLabel}</span>
-								<select value={stage2Provider} onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-									{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-								</select>
-							</div>
-							<div class="popover-row">
-								<span class="popover-row-label">{t().modelLabel}</span>
-								<select value={stage2Model} onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}>
-									{#each modelsForProvider(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
-								</select>
-							</div>
-						</div>
-
-						<!-- Saijiki snapshot -->
-						{#if snapshots.length > 0}
-							<div class="popover-group">
-								<div class="popover-group-label">{t().saijikiLabel}</div>
-								<select
-									value={activeSnapshotId ?? ''}
-									onchange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; activeSnapshotId = v || null; }}
-								>
-									<option value="">{t().currentSetting}</option>
-									{#each snapshots as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
-								</select>
-							</div>
-						{/if}
-
-						<button class="popover-close" onclick={() => settingsOpen = false}>閉じる</button>
-					</div>
-				{/if}
-			</div>
+			<button
+				class="settings-btn"
+				class:active={settingsOpen}
+				onclick={() => { settingsMode = 'settings'; settingsTab = 'db'; settingsOpen = true; }}
+			>⚙ 設定</button>
 
 			<!-- Lang -->
 			<div class="lang-switcher">
@@ -618,10 +849,6 @@
 				{/each}
 			</div>
 
-			<!-- カタログ設定 -->
-			<button class="header-link" onclick={() => catalogOpen = true}>カタログ設定</button>
-			<span class="header-sep">|</span>
-
 			<!-- Build -->
 			<span class="build-badge">Build {__BUILD_NUMBER__}</span>
 		</div>
@@ -629,6 +856,27 @@
 
 	<!-- ══ BODY ══ -->
 	<div class="body">
+		{#if showBirds && (loading || reloading)}
+			<div class="flying-bird-layer" aria-hidden="true">
+				<div class="flying-bird-y">
+					<div class="flying-bird-x">
+						<svg class="flying-bird" width="38" height="28" viewBox="0 0 38 28">
+							<ellipse cx="18" cy="17" rx="8" ry="5" fill="#6b7b2a" opacity="0.92" />
+							<path d="M25,18 Q31,22 30,16" fill="#4a5820" opacity="0.85" />
+							<path d="M10,15.5 L6,13.5" stroke="#b8940a" stroke-width="1.5" fill="none" stroke-linecap="round" />
+							<circle cx="12" cy="14.5" r="1.5" fill="#fff" />
+							<circle cx="12.4" cy="14.5" r="0.7" fill="#1a1917" />
+							<path fill="#8b9b3a" opacity="0.88">
+								<animate attributeName="d" values="M14,17 Q19,6 24,17;M14,17 Q19,26 24,17;M14,17 Q19,6 24,17" dur="0.38s" repeatCount="indefinite" />
+							</path>
+							<path fill="#a8b855" opacity="0.5">
+								<animate attributeName="d" values="M15,16 Q19,9 23,16;M15,16 Q19,23 23,16;M15,16 Q19,9 23,16" dur="0.38s" repeatCount="indefinite" />
+							</path>
+						</svg>
+					</div>
+				</div>
+			</div>
+		{/if}
 
 		<!-- ── LEFT PANEL ── -->
 		<div class="left-panel">
@@ -646,8 +894,9 @@
 					<div class="section-head">
 						<span class="section-label">指示</span>
 						<div class="section-actions">
-							<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>歳時記</button>
-							<button class="ghost-btn" onclick={clearInput}>クリア</button>
+							<button class="ghost-btn" onclick={() => { settingsMode = 'model'; settingsTab = 'connection'; settingsOpen = true; }}>モデル選択</button>
+							<button class="ghost-btn" onclick={() => (catalogOpen = true)}>色カタログ</button>
+							<button class="ghost-btn create-btn" onclick={clearInput}>新規作成</button>
 						</div>
 					</div>
 
@@ -668,7 +917,7 @@
 						{#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 					{/if}
 
-					<!-- 演奏する / progress -->
+					<!-- 描画する / progress -->
 					{#if loading && inputMode === 'single'}
 						<div class="progress-wrap">
 							<div class="progress-phases">
@@ -686,7 +935,16 @@
 								<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
 							</div>
 						</div>
-						<div class="progress-bar-track"><div class="progress-bar-fill" style="width: {stageLabel.includes('構造化') ? '65' : '30'}%"></div></div>
+						<div class="progress-bar-track">
+							<div class="progress-bar-fill" style="width: {stageLabel.includes('構造化') ? '65' : '30'}%"></div>
+							{#if showBirds}
+								<svg class="progress-bird" class:done={!loading} width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
+									<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
+										<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
+									</path>
+								</svg>
+							{/if}
+						</div>
 						<div class="progress-stage-text">{stageLabel}</div>
 					{:else if loading && batchTotal > 0}
 						<div class="batch-progress">
@@ -716,9 +974,12 @@
 					<section class="panel-section">
 						<div class="section-head">
 							<span class="section-label">{t().ddlLabel}</span>
-							{#if historyCursor >= 0}
-								<button class="ghost-btn" class:ghost-active={ddlEditing} onclick={() => (ddlEditing = !ddlEditing)}>{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}</button>
-							{/if}
+							<div class="section-actions">
+								<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>歳時記</button>
+								{#if historyCursor >= 0}
+									<button class="ghost-btn" class:ghost-active={ddlEditing} onclick={() => (ddlEditing = !ddlEditing)}>{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}</button>
+								{/if}
+							</div>
 						</div>
 						{#if ddlEditing}
 							<textarea class="ddl-edit-ta" bind:value={ddl} rows="4" spellcheck="false"></textarea>
@@ -736,7 +997,7 @@
 							</div>
 						{/if}
 
-						<!-- 再演奏 progress -->
+						<!-- 描画（解釈から） progress -->
 						{#if reloading}
 							<div class="progress-wrap">
 								<div class="progress-phases">
@@ -746,7 +1007,16 @@
 									<span class="progress-time">…</span>
 								</div>
 							</div>
-							<div class="progress-bar-track"><div class="progress-bar-fill" style="width: 55%"></div></div>
+							<div class="progress-bar-track">
+								<div class="progress-bar-fill" style="width: 55%"></div>
+								{#if showBirds}
+									<svg class="progress-bird" width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
+										<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
+											<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
+										</path>
+									</svg>
+								{/if}
+							</div>
 						{/if}
 						{#if reloadError}<p class="error-text">{reloadError}</p>{/if}
 
@@ -754,7 +1024,7 @@
 							class="replay-btn"
 							onclick={replay}
 							disabled={reloading || !ddl}
-						>↺ 再演奏</button>
+						>↺ 解釈から描画</button>
 					</section>
 				{/if}
 
@@ -823,15 +1093,27 @@
 						{#if promptsData}
 							<div class="prompt-section">
 								<p class="prompt-label">{t().promptStage1Input}</p>
-								<pre class="prompt-pre">{inputMode === 'single' ? input : `(${t().modeBatch})`}</pre>
-								<p class="prompt-label">{t().promptStage1System}</p>
-								<pre class="prompt-pre prompt-pre-lg">{promptsData.stage1_system}</pre>
+								<textarea class="prompt-textarea prompt-user" readonly value={inputMode === 'single' ? input : `(${t().modeBatch})`}></textarea>
+								<div class="prompt-collapsible-head">
+									<p class="prompt-label">{t().promptStage1System}</p>
+									<button class="ghost-btn" onclick={() => (promptStage1Expanded = !promptStage1Expanded)}>{promptStage1Expanded ? '折りたたむ' : '展開'}</button>
+								</div>
+								<div class="prompt-collapse" class:expanded={promptStage1Expanded}>
+									<textarea class="prompt-textarea prompt-system" readonly value={promptsData.stage1_system}></textarea>
+									{#if !promptStage1Expanded}<div class="prompt-fade"></div>{/if}
+								</div>
 								{#if ddl}
 									<p class="prompt-label">{t().promptStage2Input}</p>
-									<pre class="prompt-pre">{ddl}</pre>
+									<textarea class="prompt-textarea prompt-user" readonly value={ddl}></textarea>
 								{/if}
-								<p class="prompt-label">{t().promptStage2System}</p>
-								<pre class="prompt-pre prompt-pre-lg">{promptsData.stage2_system}</pre>
+								<div class="prompt-collapsible-head">
+									<p class="prompt-label">{t().promptStage2System}</p>
+									<button class="ghost-btn" onclick={() => (promptStage2Expanded = !promptStage2Expanded)}>{promptStage2Expanded ? '折りたたむ' : '展開'}</button>
+								</div>
+								<div class="prompt-collapse" class:expanded={promptStage2Expanded}>
+									<textarea class="prompt-textarea prompt-system" readonly value={promptsData.stage2_system}></textarea>
+									{#if !promptStage2Expanded}<div class="prompt-fade"></div>{/if}
+								</div>
 							</div>
 						{:else}
 							<p class="muted-center">{t().promptLoading}</p>
@@ -887,12 +1169,14 @@
 	{#if historyTotal > 0}
 		<div class="history-strip">
 			<div class="history-head">
-				<span class="history-title">{t().historyTitle} <span class="history-count">({historyTotal})</span></span>
+				<button class="history-title-btn" onclick={openHistoryManager}>
+					{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
+				</button>
 				{#if historyTotalPages > 1}
 					<div class="history-page-nav">
-						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 新</button>
+						<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 新しい{historyNavSpan}件</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
-						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>旧 →</button>
+						<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>古い{historyNavSpan}件 →</button>
 					</div>
 				{/if}
 			</div>
@@ -902,11 +1186,19 @@
 						class="thumb"
 						class:current={i === historyCursor}
 						onclick={() => loadIteration(i)}
-						title={it.input}
 					>
+						<div class="thumb-tooltip">
+							<div class="tooltip-title">#{historyPage * HISTORY_PAGE_SIZE + i + 1}</div>
+							<div>モデル: {historyModelSummary(it)}</div>
+							<div>保存時間: {formatHistoryDate(it.at)}</div>
+							<div>秒数: {formatElapsed(it.elapsed_ms)}</div>
+							<div>色カタログ: {catalogName(it.catalog_id)}</div>
+							<div>トークン: {historyTokenSummary(it)}</div>
+							<div class="tooltip-date">{historyPreviewText(it.input)}</div>
+						</div>
 						<div class="thumb-svg">{@html it.svg}</div>
 						<div class="thumb-meta">
-							<span class="thumb-time">{it.elapsed_ms ? (it.elapsed_ms / 1000).toFixed(1) + 's' : String(historyPage * HISTORY_PAGE_SIZE + i + 1)}</span>
+							<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyPage * HISTORY_PAGE_SIZE + i + 1)}</span>
 							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
 						</div>
 						{#if i === historyCursor}
@@ -949,34 +1241,342 @@
 	</div>
 </div>
 
+<!-- ══ SETTINGS MODAL ══ -->
+{#if settingsOpen}
+	<div class="modal-backdrop" onclick={() => (settingsOpen = false)} aria-hidden="true"></div>
+	<div class="settings-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">{settingsMode === 'model' ? 'モデル選択' : '設定'}</div>
+			<button class="catalog-close" onclick={() => (settingsOpen = false)}>×</button>
+		</div>
+		{#if settingsMode === 'settings'}
+			<div class="settings-tabs">
+				<button class:active={settingsTab === 'db'} onclick={() => (settingsTab = 'db')}>DB設定</button>
+				<button class:active={settingsTab === 'plugins'} onclick={() => (settingsTab = 'plugins')}>プラグイン</button>
+				<button class:active={settingsTab === 'users'} onclick={() => (settingsTab = 'users')}>ユーザー管理</button>
+				<button class:active={settingsTab === 'misc'} onclick={() => (settingsTab = 'misc')}>その他</button>
+			</div>
+		{/if}
+		<div class="settings-body">
+			{#if settingsMode === 'model'}
+				<div class="popover-group">
+					<div class="popover-group-label">{t().stage1Label}</div>
+					<div class="form-row">
+						<label>{t().providerLabel}</label>
+						<select value={stage1Provider} onchange={(e) => setStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
+							{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+						</select>
+					</div>
+					<div class="form-row">
+						<label>{t().modelLabel}</label>
+						<select value={stage1Model} onchange={(e) => setStage1Model((e.currentTarget as HTMLSelectElement).value)}>
+							{#each modelsForProvider(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
+						</select>
+					</div>
+					{#if stage1Model.includes('qwen3')}
+						<label class="check-row">
+							<input type="checkbox" bind:checked={includeThinking} />
+							<span>{t().showThinkingLabel}</span>
+						</label>
+					{/if}
+				</div>
+				<div class="popover-group">
+					<div class="popover-group-label">{t().stage2Label}</div>
+					<div class="form-row">
+						<label>{t().providerLabel}</label>
+						<select value={stage2Provider} onchange={(e) => setStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
+							{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+						</select>
+					</div>
+					<div class="form-row">
+						<label>{t().modelLabel}</label>
+						<select value={stage2Model} onchange={(e) => setStage2Model((e.currentTarget as HTMLSelectElement).value)}>
+							{#each modelsForProvider(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` — ${m.notes}` : ''}</option>{/each}
+						</select>
+					</div>
+				</div>
+			{:else if settingsTab === 'db'}
+				<div class="popover-group">
+					<div class="form-row">
+						<label>DBタイプ:</label>
+						<select bind:value={dbType}>
+							<option value="sqlite">内蔵SQLite</option>
+							<option value="postgres">PostgreSQL</option>
+						</select>
+					</div>
+				</div>
+				{#if dbType === 'sqlite'}
+					<div class="popover-group">
+						<div class="popover-group-label">SQLite</div>
+						<div class="form-row">
+							<label>保存先パス:</label>
+							<input bind:value={sqlitePath} />
+						</div>
+					</div>
+				{:else}
+					<div class="popover-group">
+						<div class="popover-group-label">PostgreSQL</div>
+						<div class="form-row"><label>サーバー:</label><input bind:value={pgHost} /></div>
+						<div class="form-row"><label>ポート:</label><input bind:value={pgPort} /></div>
+						<div class="form-row"><label>ユーザー:</label><input bind:value={pgUser} /></div>
+						<div class="form-row">
+							<label>パスワード:</label>
+							<input type={showPgPassword ? 'text' : 'password'} bind:value={pgPassword} />
+							<button class="ghost-btn" onclick={() => (showPgPassword = !showPgPassword)}>{showPgPassword ? '隠す' : '表示'}</button>
+						</div>
+						<div class="form-row"><label>DB名:</label><input bind:value={pgDatabase} /></div>
+					</div>
+				{/if}
+				<div class="settings-inline-actions">
+					<button class="ghost-btn" onclick={testDbConnection}>接続テスト</button>
+					{#if dbTestResult}<span class="db-test-result">{dbTestResult}</span>{/if}
+				</div>
+			{:else if settingsTab === 'plugins'}
+				<div class="plugin-list">
+					{#each plugins as plugin (plugin.id)}
+						<div class="plugin-row">
+							<label class="check-row">
+								<input type="checkbox" checked={plugin.enabled} onchange={(e) => { plugin.enabled = (e.currentTarget as HTMLInputElement).checked; plugins = [...plugins]; }} />
+								<span>{plugin.name}</span>
+							</label>
+							<span class="plugin-version">{plugin.version}</span>
+							<button class="ghost-btn" onclick={() => (pluginPendingDelete = plugin)}>削除</button>
+						</div>
+					{/each}
+				</div>
+				<button class="ghost-btn" onclick={() => (pluginAddOpen = !pluginAddOpen)}>＋ プラグインを追加</button>
+				{#if pluginAddOpen}
+					<div class="plugin-add">
+						<input bind:value={pluginPath} placeholder="plugin path or name" />
+						<button class="ghost-btn" onclick={addPlugin}>追加</button>
+					</div>
+				{/if}
+				{#if pluginPendingDelete}
+					<div class="inline-confirm">
+						<span>{pluginPendingDelete.name} を削除しますか？</span>
+						<button class="ghost-btn" onclick={() => (pluginPendingDelete = null)}>キャンセル</button>
+						<button class="danger-btn" onclick={() => { plugins = plugins.filter((p) => p.id !== pluginPendingDelete?.id); pluginPendingDelete = null; }}>削除</button>
+					</div>
+				{/if}
+			{:else if settingsTab === 'users'}
+				<div class="popover-group">
+					<div class="popover-group-label">ユーザー</div>
+					<div class="user-add-grid">
+						<input bind:value={newUserName} placeholder="ユーザー名" />
+						<input bind:value={newUserPassword} type="password" placeholder="パスワード" />
+						<select bind:value={newUserGroup}>
+							{#each groups as group (group)}
+								<option value={group}>{group}</option>
+							{/each}
+						</select>
+						<button class="ghost-btn" onclick={addUser}>追加</button>
+					</div>
+					<div class="user-list">
+						{#each users as user (user.id)}
+							<div class="user-row">
+								<input value={user.name} onchange={(e) => { user.name = (e.currentTarget as HTMLInputElement).value; users = [...users]; }} />
+								<input type="password" value={user.password} onchange={(e) => { user.password = (e.currentTarget as HTMLInputElement).value; users = [...users]; }} />
+								<select value={user.group} onchange={(e) => { user.group = (e.currentTarget as HTMLSelectElement).value as UserRole; users = [...users]; }}>
+									{#each groups as group (group)}
+										<option value={group}>{group}</option>
+									{/each}
+								</select>
+								<button class="ghost-btn" onclick={() => removeUser(user.id)}>削除</button>
+							</div>
+						{/each}
+					</div>
+				</div>
+				<div class="popover-group">
+					<div class="popover-group-label">グループ</div>
+					<div class="plugin-add">
+						<input bind:value={newGroupName} placeholder="グループ名" />
+						<button class="ghost-btn" onclick={addGroup}>追加</button>
+					</div>
+					<div class="group-list">
+						{#each groups as group (group)}
+							<div class="group-row">
+								<span>{group}</span>
+								<button class="ghost-btn" onclick={() => removeGroup(group)} disabled={groups.length <= 1}>削除</button>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{:else}
+				<div class="popover-group">
+					<div class="popover-group-label">表示</div>
+					<label class="setting-toggle">
+						<input type="checkbox" bind:checked={showBirds} />
+						<span>小鳥を表示する</span>
+					</label>
+				</div>
+				<div class="popover-group">
+					<div class="popover-group-label">書き出し</div>
+					<label class="setting-toggle">
+						<input type="checkbox" bind:checked={pngAlphaWhite} />
+						<span>白背景時アルファチャンネルを有効にする</span>
+					</label>
+				</div>
+				<div class="popover-group">
+					<div class="popover-group-label">履歴</div>
+					<label class="setting-toggle">
+						<input type="checkbox" bind:checked={saveReplayAsNewVersion} />
+						<span>解釈を再編集した場合も新バージョンとして保存する</span>
+					</label>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}
+
 <!-- ══ CATALOG MODAL ══ -->
 {#if catalogOpen}
 	<div class="modal-backdrop" onclick={() => (catalogOpen = false)} aria-hidden="true"></div>
 	<div class="catalog-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="catalog-modal-head">
-			<div class="catalog-modal-title">カタログ設定</div>
+			<div class="catalog-modal-title">色カタログ</div>
 			<button class="catalog-close" onclick={() => (catalogOpen = false)}>×</button>
 		</div>
-		<div class="catalog-scroll">
-			{#each COLOR_CATALOGS as cat (cat.id)}
-				{@const active = selectedCatalog === cat.id}
-				<button
-					class="catalog-item"
-					class:active
-					onclick={() => { selectedCatalog = cat.id; try { localStorage.setItem(CATALOG_KEY, cat.id); } catch {} }}
-				>
-					<div class="catalog-swatches">
-						{#each cat.swatches as hex (hex)}
-							<div class="catalog-swatch" style="background:{hex}"></div>
+		<div class="catalog-body">
+			<div class="catalog-scroll">
+				{#each COLOR_CATALOGS as cat (cat.id)}
+					{@const active = selectedCatalog === cat.id}
+					<button
+						class="catalog-item"
+						class:active
+						onclick={() => { selectedCatalog = cat.id; try { localStorage.setItem(CATALOG_KEY, cat.id); } catch {} }}
+					>
+						<div class="catalog-swatches">
+							{#each cat.swatches as hex (hex)}
+								<div class="catalog-swatch" style="background:{hex}"></div>
+							{/each}
+						</div>
+						<div class="catalog-info">
+							<div class="catalog-name">{cat.name}</div>
+							<div class="catalog-sub">{cat.sub}</div>
+						</div>
+						{#if active}<span class="catalog-check">✓</span>{/if}
+					</button>
+				{/each}
+			</div>
+			<div class="catalog-detail">
+				<div class="section-label">{currentCatalog.name} — 詳細</div>
+				<div class="catalog-detail-list">
+					{#each currentCatalog.palette as color (color.code)}
+						<div class="catalog-color-row">
+							<div class="catalog-color-box" class:light={isLightColor(color.code)} style="background:{color.code}"></div>
+							<span class="catalog-color-name">{color.name}</span>
+							<span class="catalog-color-code">{color.code}</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ══ HISTORY MANAGER MODAL ══ -->
+{#if historyManagerOpen}
+	<div class="modal-backdrop" onclick={() => (historyManagerOpen = false)} aria-hidden="true"></div>
+	<div class="history-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">履歴管理</div>
+			<div class="modal-head-actions">
+				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => { historyManagerView = historyManagerView === 'trash' ? 'active' : 'trash'; selectedHistoryIds = []; void fetchHistoryManager(); }}>ごみ箱 ({managerTrashTotal || trashTotal})</button>
+				<button class="catalog-close" onclick={() => (historyManagerOpen = false)}>×</button>
+			</div>
+		</div>
+		<div class="settings-tabs history-mode-tabs">
+			<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>サムネイル</button>
+			<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>リスト</button>
+		</div>
+		<div class="history-tools">
+			<span class="history-manager-count">{filteredManagedHistory.length} / {managedHistoryTotal}</span>
+			<button class="ghost-btn" onclick={selectAllManagedHistory}>すべて選択</button>
+			{#if historyManagerView === 'active'}
+				<button class="ghost-btn" onclick={() => askTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択削除</button>
+			{:else}
+				<button class="ghost-btn" onclick={() => askRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択復元</button>
+				<button class="danger-btn" onclick={() => askPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>完全削除</button>
+			{/if}
+			<label class="history-search">検索: <input bind:value={historySearch} /></label>
+		</div>
+		{#if historyManagerTab === 'thumbs'}
+			<div class="history-thumb-grid-wrap">
+				<div class="history-thumb-grid">
+					{#each filteredManagedHistory as it, i (it.id ?? it.at)}
+						<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
+							<label class="manager-check">
+								<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} />
+							</label>
+							<button class="thumb manager-thumb" onclick={() => historyManagerView === 'active' && loadIterationItem(it)}>
+								<div class="thumb-tooltip">
+									<div class="tooltip-title">#{i + 1}</div>
+									<div>モデル: {historyModelSummary(it)}</div>
+									<div>保存時間: {formatHistoryDate(it.at)}</div>
+									<div>秒数: {formatElapsed(it.elapsed_ms)}</div>
+									<div>色カタログ: {catalogName(it.catalog_id)}</div>
+									<div>トークン: {historyTokenSummary(it)}</div>
+									<div class="tooltip-date">{historyPreviewText(it.input)}</div>
+								</div>
+								<div class="thumb-svg">{@html it.svg}</div>
+								<div class="thumb-meta">
+									<span class="thumb-time">{formatElapsed(it.elapsed_ms)}</span>
+									{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
+								</div>
+							</button>
+							<div class="manager-thumb-actions">
+								{#if historyManagerView === 'active'}
+									<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>削除</button>
+								{:else}
+									<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>復元</button>
+									<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>完全削除</button>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{:else}
+			<div class="history-table-wrap">
+				<table class="history-table">
+					<thead>
+						<tr><th></th><th>画像</th><th>作成日時</th><th>モデル</th><th>秒数</th><th>色カタログ</th><th>操作</th></tr>
+					</thead>
+					<tbody>
+						{#each filteredManagedHistory as it (it.id ?? it.at)}
+							<tr>
+								<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} /></td>
+								<td><div class="history-mini">{@html it.svg}</div></td>
+								<td>{formatHistoryDate(it.at)}</td>
+								<td>{historyModelSummary(it)}</td>
+								<td>{formatElapsed(it.elapsed_ms)}</td>
+								<td>{catalogName(it.catalog_id)}</td>
+								<td>
+									{#if historyManagerView === 'active'}
+										<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>削除</button>
+									{:else}
+										<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>復元</button>
+										<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>完全削除</button>
+									{/if}
+								</td>
+							</tr>
 						{/each}
-					</div>
-					<div class="catalog-info">
-						<div class="catalog-name">{cat.name}</div>
-						<div class="catalog-sub">{cat.sub}</div>
-					</div>
-					{#if active}<span class="catalog-check">✓</span>{/if}
-				</button>
-			{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
+	</div>
+{/if}
+
+{#if confirmAction}
+	<div class="confirm-layer">
+		<div class="confirm-backdrop" onclick={() => (confirmAction = null)}></div>
+		<div class="confirm-box">
+			<p>{confirmAction.message}</p>
+			<div class="confirm-actions">
+				<button class="ghost-btn" onclick={() => (confirmAction = null)}>キャンセル</button>
+				<button class={confirmAction.destructive ? 'danger-btn' : 'confirm-btn'} onclick={() => { const run = confirmAction?.run; confirmAction = null; run?.(); }}>{confirmAction.destructive ? '削除' : '実行'}</button>
+			</div>
 		</div>
 	</div>
 {/if}
@@ -1132,6 +1732,31 @@
 		display: flex;
 		flex: 1;
 		overflow: hidden;
+		position: relative;
+	}
+
+	.flying-bird-layer {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: min(820px, 100vw);
+		height: min(620px, 72vh);
+		pointer-events: none;
+		z-index: 260;
+		overflow: hidden;
+	}
+	.flying-bird-y {
+		position: absolute;
+		animation: freeBirdY 15s ease-in-out infinite;
+	}
+	.flying-bird-x {
+		position: relative;
+		animation: freeBirdX 18s ease-in-out infinite;
+	}
+	.flying-bird {
+		width: 76px;
+		height: 56px;
+		filter: drop-shadow(0 4px 8px rgba(107,123,42,0.28));
 	}
 
 	/* ── Left panel ─────────────────────────────────────────── */
@@ -1195,6 +1820,18 @@
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
+	.create-btn {
+		background: #fff7e8;
+		border-color: #d8b36a;
+		color: #6c4a10;
+		font-weight: 600;
+		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
+	}
+	.create-btn:hover {
+		background: #ffefd0;
+		border-color: #bd8f34;
+		color: #4f360b;
+	}
 
 	/* Input textarea */
 	.input-ta, .batch-ta {
@@ -1219,6 +1856,7 @@
 		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
 	}
 	.batch-ta { flex: 1; border: none; border-radius: 0; }
+	.batch-wrap .batch-ta { min-height: 240px; }
 	.batch-info { font-size: 11px; color: var(--fg3); }
 
 	/* Progress */
@@ -1248,10 +1886,26 @@
 		color: var(--fg2); font-size: 11px; cursor: pointer; font-family: inherit;
 	}
 	.progress-bar-track {
-		height: 3px; background: var(--bg3);
+		position: relative;
+		height: 20px; background: transparent;
 		border-left: 1px solid var(--border2); border-right: 1px solid var(--border2);
+		overflow: visible;
 	}
-	.progress-bar-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+	.progress-bar-track::before {
+		content: "";
+		position: absolute; top: 8px; left: 0; right: 0; height: 3px;
+		background: var(--bg3);
+	}
+	.progress-bar-fill {
+		position: absolute; top: 8px; left: 0; height: 3px;
+		background: var(--accent); transition: width 0.3s ease;
+	}
+	.progress-bird {
+		position: absolute; top: 1px; left: -20px;
+		animation: birdFly 2.4s linear infinite;
+		pointer-events: none;
+	}
+	.progress-bird.done { animation: none; left: calc(100% - 16px); }
 	.progress-stage-text {
 		font-size: 11px; color: var(--fg3);
 		padding: 5px 10px 7px;
@@ -1319,15 +1973,15 @@
 
 	/* Replay */
 	.replay-btn {
-		width: 100%; margin-top: 6px; padding: 7px;
-		font-size: 13px; background: none; color: var(--fg2);
-		border: 1px solid var(--border2); border-radius: var(--r);
-		letter-spacing: 0.06em; cursor: pointer;
+		width: 100%; margin-top: 6px; padding: 10px;
+		font-size: 14px; font-weight: 500; background: #e8f1fb; color: #234c78;
+		border: 1px solid #9fb9d6; border-radius: var(--r);
+		letter-spacing: 0.08em; cursor: pointer;
 		display: flex; align-items: center; justify-content: center; gap: 6px;
-		font-family: inherit; transition: background 0.1s;
+		font-family: inherit; transition: background 0.15s, border-color 0.15s, color 0.15s;
 	}
-	.replay-btn:hover:not(:disabled) { background: var(--bg2); }
-	.replay-btn:disabled { color: var(--fg3); cursor: not-allowed; }
+	.replay-btn:hover:not(:disabled) { background: #d7e8f8; border-color: #6f98c3; color: #173f68; }
+	.replay-btn:disabled { background: var(--bg2); border-color: var(--border2); color: var(--fg3); cursor: not-allowed; }
 
 	/* Stats */
 	.stats-section { }
@@ -1450,6 +2104,39 @@
 		align-self: stretch; min-height: 0;
 	}
 	.prompt-label { margin: 8px 0 3px; font-size: 11px; font-weight: 600; color: var(--fg2); }
+	.prompt-collapsible-head {
+		display: flex; align-items: center; justify-content: space-between;
+		margin-top: 8px;
+	}
+	.prompt-collapsible-head .prompt-label { margin: 0; }
+	.prompt-textarea {
+		width: 100%;
+		background: var(--bg2); padding: 8px 10px; border-radius: var(--r);
+		border: 1px solid var(--border); overflow: auto;
+		white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.5; margin: 0;
+		font-family: inherit; color: var(--fg);
+		resize: vertical;
+	}
+	.prompt-user { min-height: 120px; }
+	.prompt-system { min-height: 120px; height: 220px; }
+	.prompt-collapse {
+		position: relative;
+		max-height: 80px;
+		overflow: hidden;
+	}
+	.prompt-collapse.expanded {
+		max-height: none;
+		overflow: visible;
+	}
+	.prompt-collapse:not(.expanded) .prompt-system {
+		height: 120px;
+		resize: none;
+	}
+	.prompt-fade {
+		position: absolute; left: 0; right: 0; bottom: 0; height: 32px;
+		background: linear-gradient(transparent, var(--bg));
+		pointer-events: none;
+	}
 	.prompt-pre {
 		background: var(--bg2); padding: 8px 10px; border-radius: var(--r);
 		border: 1px solid var(--border); overflow-x: auto; max-height: 140px;
@@ -1506,9 +2193,29 @@
 		margin-bottom: 7px;
 	}
 	.history-title { font-size: 12px; font-weight: 500; color: var(--fg2); }
+	.history-title-btn {
+		border: 1px solid var(--border2);
+		border-radius: 16px;
+		background: #fff;
+		color: var(--fg2);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+		padding: 5px 12px;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+		transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
+	}
+	.history-title-btn:hover {
+		color: var(--fg);
+		background: var(--accent-light);
+		border-color: var(--accent);
+		box-shadow: 0 2px 8px rgba(42,74,114,0.16);
+	}
 	.history-count { color: var(--fg3); font-weight: 400; }
 	.history-page-nav { display: flex; align-items: center; gap: 6px; }
 	.history-page-indicator { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; }
+	.history-nav-btn { min-width: 92px; }
 
 	.thumb-strip {
 		display: flex; gap: 7px; overflow: hidden;
@@ -1521,7 +2228,27 @@
 		cursor: pointer; padding: 0; font-family: inherit; position: relative;
 		transition: border-color 0.1s;
 	}
+	.thumb:hover { overflow: visible; z-index: 20; }
 	.thumb.current { border-color: var(--accent); }
+	.thumb-tooltip {
+		position: absolute; bottom: calc(100% + 6px); left: 50%;
+		transform: translateX(-50%) translateY(4px);
+		opacity: 0; pointer-events: none;
+		background: rgba(26,25,23,0.92); color: #fff;
+		font-size: 11px; border-radius: var(--r);
+		padding: 7px 10px; white-space: nowrap;
+		text-align: left;
+		max-width: 280px;
+		z-index: 500; line-height: 1.7;
+		transition: opacity 0.15s, transform 0.15s;
+		box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+	}
+	.thumb:hover .thumb-tooltip {
+		opacity: 1;
+		transform: translateX(-50%) translateY(0);
+	}
+	.tooltip-title { font-weight: 500; margin-bottom: 3px; }
+	.tooltip-date { color: rgba(255,255,255,0.55); margin-top: 3px; }
 	.thumb-svg { width: 82px; height: 58px; overflow: hidden; }
 	.thumb-svg :global(svg) { width: 100%; height: 100%; display: block; }
 	.thumb-meta {
@@ -1589,7 +2316,7 @@
 	.catalog-modal {
 		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
 		z-index: 401;
-		width: 540px; max-height: 80vh;
+		width: min(820px, calc(100vw - 32px)); max-height: 88vh;
 		background: #faf9f6; border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
@@ -1603,7 +2330,13 @@
 		width: 24px; height: 24px; border: none; background: none;
 		color: var(--fg3); font-size: 18px; cursor: pointer; line-height: 1;
 	}
-	.catalog-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+	.catalog-body {
+		display: grid;
+		grid-template-columns: minmax(340px, 1fr) minmax(260px, 0.75fr);
+		flex: 1;
+		min-height: 0;
+	}
+	.catalog-scroll { min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 
 	.catalog-item {
 		display: flex; align-items: center; gap: 12px; padding: 10px 12px;
@@ -1623,10 +2356,256 @@
 	.catalog-name { font-size: 12px; font-weight: 500; color: var(--fg); margin-bottom: 1px; }
 	.catalog-sub  { font-size: 11px; color: var(--fg3); }
 	.catalog-check { color: var(--accent); font-size: 13px; flex-shrink: 0; }
+	.catalog-detail {
+		border-left: 1px solid var(--border);
+		padding: 12px 16px 14px;
+		background: #fff;
+		min-height: 0;
+		overflow-y: auto;
+	}
+	.catalog-detail-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+	.catalog-color-row {
+		display: flex; align-items: center; gap: 10px;
+		font-size: 12px;
+	}
+	.catalog-color-box {
+		width: 28px; height: 28px; border-radius: 3px; flex-shrink: 0;
+	}
+	.catalog-color-box.light { border: 1px solid var(--border); }
+	.catalog-color-name { color: var(--fg); flex: 1; }
+	.catalog-color-code {
+		font-size: 11px; color: var(--fg3);
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	}
+
+	/* ── Modal shared / settings / history ─────────────────── */
+	.modal-head {
+		display: flex; align-items: center; justify-content: space-between;
+		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+	}
+	.settings-modal, .history-modal {
+		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+		z-index: 401;
+		background: #faf9f6; border-radius: var(--r-lg);
+		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+		display: flex; flex-direction: column; overflow: hidden;
+	}
+	.settings-modal { width: min(680px, calc(100vw - 32px)); max-height: 88vh; }
+	.history-modal {
+		width: min(920px, calc(100vw - 32px));
+		height: min(720px, calc(100vh - 32px));
+		max-height: 88vh;
+	}
+	.settings-tabs {
+		display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg);
+	}
+	.settings-tabs button {
+		padding: 9px 16px; border: none; border-bottom: 2px solid transparent;
+		background: none; color: var(--fg2); font-size: 13px; cursor: pointer; font-family: inherit;
+	}
+	.settings-tabs button.active { color: var(--fg); border-bottom-color: var(--fg); font-weight: 500; }
+	.settings-body {
+		padding: 14px 16px; overflow-y: auto;
+		display: flex; flex-direction: column; gap: 10px;
+	}
+	.form-row {
+		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
+	}
+	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
+	.form-row input, .form-row select, .plugin-add input, .history-search input {
+		flex: 1; min-width: 0; padding: 5px 7px;
+		border: 1px solid var(--border2); border-radius: var(--r);
+		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+	}
+	.check-row { display: flex; align-items: center; gap: 7px; color: var(--fg2); font-size: 12px; }
+	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
+	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.plugin-list {
+		border: 1px solid var(--border); border-radius: var(--r);
+		background: #fff; overflow: hidden;
+	}
+	.plugin-row {
+		display: grid; grid-template-columns: 1fr auto auto; gap: 10px;
+		align-items: center; padding: 9px 10px; border-bottom: 1px solid var(--border);
+	}
+	.plugin-row:last-child { border-bottom: none; }
+	.plugin-version { color: var(--fg3); font-size: 11px; }
+	.plugin-add { display: flex; gap: 8px; align-items: center; }
+	.user-add-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px auto;
+		gap: 8px;
+		align-items: center;
+	}
+	.user-add-grid input, .user-add-grid select,
+	.user-row input, .user-row select {
+		min-width: 0; padding: 5px 7px;
+		border: 1px solid var(--border2); border-radius: var(--r);
+		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+	}
+	.user-list, .group-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-top: 10px;
+	}
+	.user-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px auto;
+		gap: 8px;
+		align-items: center;
+	}
+	.group-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		background: #fff;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		padding: 7px 9px;
+		font-size: 12px;
+		color: var(--fg2);
+	}
+	.setting-toggle {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 12px;
+		color: var(--fg2);
+		cursor: pointer;
+	}
+	.inline-confirm {
+		display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+		background: #fff; border: 1px solid var(--border); border-radius: var(--r);
+		padding: 9px 10px; font-size: 12px; color: var(--fg2);
+	}
+	.danger-btn, .confirm-btn {
+		padding: 4px 10px; border: none; border-radius: var(--r);
+		color: #fff; font-size: 11px; cursor: pointer; font-family: inherit;
+	}
+	.danger-btn { background: #c0392b; }
+	.confirm-btn { background: var(--fg); }
+	.danger-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+	.modal-head-actions { display: flex; align-items: center; gap: 8px; }
+	.history-tools {
+		display: flex; align-items: center; gap: 8px;
+		padding: 10px 14px; border-bottom: 1px solid var(--border);
+		flex-wrap: wrap;
+	}
+	.history-mode-tabs { flex-shrink: 0; }
+	.history-manager-count {
+		font-size: 11px;
+		color: var(--fg3);
+		font-variant-numeric: tabular-nums;
+		margin-right: 2px;
+	}
+	.history-search { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--fg2); font-size: 12px; }
+	.history-search input { width: min(240px, 30vw); }
+	.history-thumb-grid-wrap,
+	.history-table-wrap {
+		flex: 1;
+		overflow: auto;
+		padding: 12px 14px 14px;
+		min-height: 0;
+	}
+	.history-thumb-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+		gap: 12px;
+		align-items: start;
+	}
+	.manager-thumb-wrap {
+		position: relative;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		padding: 7px;
+		transition: border-color 0.12s, box-shadow 0.12s;
+	}
+	.manager-thumb-wrap.selected {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px var(--accent-light);
+	}
+	.manager-check {
+		position: absolute;
+		top: 6px;
+		left: 6px;
+		z-index: 30;
+		background: rgba(255,255,255,0.86);
+		border-radius: 3px;
+		line-height: 1;
+		padding: 2px;
+	}
+	.manager-thumb {
+		width: 100%;
+	}
+	.manager-thumb .thumb-svg {
+		width: 100%;
+		aspect-ratio: 82 / 58;
+		height: auto;
+	}
+	.manager-thumb-actions {
+		display: flex;
+		gap: 5px;
+		margin-top: 7px;
+		flex-wrap: wrap;
+	}
+	.manager-thumb-actions .ghost-btn,
+	.manager-thumb-actions .danger-btn {
+		font-size: 10px;
+		padding: 3px 7px;
+	}
+	.history-table {
+		width: 100%; border-collapse: collapse; background: #fff;
+		font-size: 12px;
+	}
+	.history-table th, .history-table td {
+		border: 1px solid var(--border); padding: 7px 8px; text-align: left; vertical-align: middle;
+	}
+	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
+	.history-mini { width: 48px; height: 36px; overflow: hidden; background: #fff; border: 1px solid var(--border); }
+	.history-mini :global(svg) { width: 100%; height: 100%; display: block; }
+	.confirm-layer {
+		position: fixed; inset: 0; z-index: 600;
+		display: flex; align-items: center; justify-content: center;
+	}
+	.confirm-backdrop {
+		position: absolute; inset: 0; background: rgba(0,0,0,0.3);
+	}
+	.confirm-box {
+		position: relative; background: #fff; border-radius: var(--r-lg);
+		padding: 22px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+		min-width: 280px; text-align: center;
+	}
+	.confirm-box p { margin-bottom: 16px; font-size: 13px; color: var(--fg); }
+	.confirm-actions { display: flex; gap: 8px; justify-content: center; }
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50%       { opacity: 0.4; transform: scale(0.7); }
+	}
+	@keyframes birdFly {
+		0% { left: -20px; }
+		100% { left: calc(100% + 4px); }
+	}
+	@keyframes freeBirdX {
+		0% { transform: translateX(24px); }
+		16% { transform: translateX(min(680px, calc(100vw - 110px))); }
+		34% { transform: translateX(180px); }
+		52% { transform: translateX(min(730px, calc(100vw - 86px))); }
+		70% { transform: translateX(70px); }
+		86% { transform: translateX(min(520px, calc(100vw - 130px))); }
+		100% { transform: translateX(24px); }
+	}
+	@keyframes freeBirdY {
+		0% { top: 78px; }
+		18% { top: min(430px, calc(72vh - 90px)); }
+		36% { top: 48px; }
+		54% { top: min(340px, calc(72vh - 120px)); }
+		72% { top: 24px; }
+		88% { top: min(260px, calc(72vh - 110px)); }
+		100% { top: 78px; }
 	}
 </style>

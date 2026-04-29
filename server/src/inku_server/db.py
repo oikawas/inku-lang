@@ -40,6 +40,7 @@ class HistoryRow(Base):
     tokens_in    = Column(Integer,    nullable=True)
     tokens_out   = Column(Integer,    nullable=True)
     catalog_id   = Column(String,     nullable=True)
+    trashed      = Column(Integer,    nullable=False, default=0)
 
 
 def init_db() -> None:
@@ -54,6 +55,11 @@ def _migrate_columns() -> None:
     with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE history ADD COLUMN catalog_id VARCHAR"))
+            conn.commit()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            conn.execute(text("ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0"))
             conn.commit()
         except Exception:  # noqa: BLE001
             pass
@@ -74,6 +80,7 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "tokens_in":    row.tokens_in,
         "tokens_out":   row.tokens_out,
         "catalog_id":   row.catalog_id,
+        "trashed":      bool(row.trashed),
     }
 
 
@@ -92,6 +99,7 @@ def add_item(item: dict) -> dict:
         tokens_in=item.get("tokens_in"),
         tokens_out=item.get("tokens_out"),
         catalog_id=item.get("catalog_id"),
+        trashed=0,
     )
     with SessionLocal() as session:
         session.add(row)
@@ -100,11 +108,12 @@ def add_item(item: dict) -> dict:
         return _row_to_dict(row)
 
 
-def list_items(offset: int = 0, limit: int = 10) -> tuple[list[dict], int]:
+def list_items(offset: int = 0, limit: int = 10, trashed: bool = False) -> tuple[list[dict], int]:
     with SessionLocal() as session:
-        total: int = session.query(func.count(HistoryRow.id)).scalar() or 0
+        query = session.query(HistoryRow).filter(HistoryRow.trashed == (1 if trashed else 0))
+        total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
         rows = (
-            session.query(HistoryRow)
+            query
             .order_by(HistoryRow.at.desc())
             .offset(offset)
             .limit(limit)
@@ -117,3 +126,38 @@ def delete_all() -> None:
     with SessionLocal() as session:
         session.query(HistoryRow).delete()
         session.commit()
+
+
+def trash_items(ids: list[str]) -> int:
+    if not ids:
+        return 0
+    with SessionLocal() as session:
+        count = (
+            session.query(HistoryRow)
+            .filter(HistoryRow.id.in_(ids), HistoryRow.trashed == 0)
+            .update({HistoryRow.trashed: 1}, synchronize_session=False)
+        )
+        session.commit()
+        return count
+
+
+def restore_items(ids: list[str]) -> int:
+    if not ids:
+        return 0
+    with SessionLocal() as session:
+        count = (
+            session.query(HistoryRow)
+            .filter(HistoryRow.id.in_(ids), HistoryRow.trashed == 1)
+            .update({HistoryRow.trashed: 0}, synchronize_session=False)
+        )
+        session.commit()
+        return count
+
+
+def delete_items(ids: list[str]) -> int:
+    if not ids:
+        return 0
+    with SessionLocal() as session:
+        count = session.query(HistoryRow).filter(HistoryRow.id.in_(ids)).delete(synchronize_session=False)
+        session.commit()
+        return count

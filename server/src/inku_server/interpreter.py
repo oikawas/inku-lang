@@ -36,6 +36,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 3. 座標は 0.0〜1.0 の比率で考える (左上=(0,0), 右下=(1,1))
 4. 出力は普通の日本語。箇条書き禁止、説明禁止、前置き禁止
 5. 使えるのは Saijiki の語彙のみ
+6. **正規化DDLに「ランダム」という語を出力してはいけない**。入力にあっても必ず「画面全体に点々と」「中央付近に」「上から下へ」「波打つ軌跡に沿って」などの明示配置へ置き換える
 
 # 属性保持 — 脱落禁止
 
@@ -47,7 +48,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - **太さ・サイズ**: 細い・太い・小さな・大きな → 保持
 - **方向・ばしょ**: 縦・横・放射状・中央・右端・右半分など → 保持
 - **ゆらぎ**: 震える・波打つ・滲む・細かく → 数量文の後に別文で記述
-- **配置パターン**: ランダム・格子・放射状・等間隔 → 保持
+- **配置パターン**: 格子・放射状・等間隔・画面全体・上から下・右半分など → 保持
 
 複数属性を持つ図形は 1 文に収める: 「青いクレヨンの太い縦線を横に三十本並べる。」
 
@@ -56,7 +57,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 数量詞が含まれる場合、**色・素材・方向・サイズとともに 1 文に**まとめよ。
 
 - 「三本の竹を縦に並べる」→「縦の実線を横に三本並べる。」
-- 「五つの赤い点をランダムに置く」→「赤い小さな円をランダムに五つ散らす。」
+- 「五つの赤い点を置く」→「赤い小さな円を中央付近に五つ散らす。」
 - 「背景を青のクレヨン線で埋め尽くす」→「青いクレヨンの縦線を横に百二十本並べる。」
 - 100本・200個などの具体的な数 → そのまま記述する。1000 を超える場合のみ 1000 に丸める。
 
@@ -79,15 +80,26 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - 小さな点、星、雨、雪、砂、粒、短い線 → 多め
 - 放射状・円環・対称配置 → 6, 8, 12, 16, 24, 32 など構造が見える数
 - 格子・縞・等間隔配置 → 5, 7, 9, 12, 16, 24, 36 など規則が見える数
-- ランダム散布 → 17, 29, 47, 83, 137, 233, 377, 610 など偏りにくい数も使ってよい
+- 全面散布 → 17, 29, 47, 83, 137, 233, 377, 610 など偏りにくい数も使ってよい
 
 「たくさん」「無数」「いっぱい」のまま出力せず、必ず具体的な数量詞に変換する。
 
-# ランダム配置
+# 配置選択 — 必ず配置ガイダンスを与える
 
-「ランダムに」「バラバラに」「散らばって」→ そのまま「ランダムに」「散らす」と記述する。
+「散らす」は無配置ではない。常に **ばしょ・うごき・ゆらぎの軌跡** を使って配置を決める。
+出力では「どこに」「どの方向へ」「どんな軌跡で」を明示する。
+「ランダム」は正規化DDLの禁止語。入力に「ランダム」が含まれていても出力には書かない。
 
-# 色とりどり・ランダム配色
+- 「バラバラに」「無秩序に」→ 画面全体に点々と散らす
+- 「上から降る」「雨」「雪」「落ちる」→ 上から下へ縦に散らす
+- 「流れる」「川」「風」「横切る」→ 左から右へ横に並べる。必要なら波打つ
+- 「舞う」「漂う」「ゆらぐ」→ 波打つ軌跡に沿って散らす
+- 「広がる」「波紋」「ひろがり」→ 中心から同心円状、または放射状に並べる
+- 「満天」「星空」「全面」「埋める」→ 画面全体に点々と散らす
+- 「右半分」「左端」「上端」「中央」などの場所語 → その場所を必ず含める
+- 迷った場合 → 「画面全体に点々と」「中央付近に」「上から下へ」のいずれかを選ぶ
+
+# 色とりどり・多色配色
 
 「色とりどり」「カラフル」「様々な色」「虹色」「多色」→ 使う色を明示して「赤・青・緑・黒の色とりどりに」と記述する。
 色の指定がない場合は「赤・青・緑・黒・灰の色とりどりに」をデフォルトとして使う。
@@ -142,8 +154,8 @@ Saijiki にない語が入力にあるとき、その語のイメージ・形・
 展開の四つの切り口:
 - **形状**: 月→円、山→三角、建物→四角、木→縦線
 - **質感**: 霧→楕円(滲む)、砂→点を散らす、炎→縦線(波打つ)
-- **構造**: 海→横線を複数、森→縦線を複数、星空→小さな円をランダムに
-- **動作→配置**: 昇る→上方に置く、散る→ランダムに散らす、広がる→同心円状に並べる
+- **構造**: 海→横線を複数、森→縦線を複数、星空→画面全体に小さな円
+- **動作→配置**: 昇る→上方に置く、散る→上から下または波打つ軌跡に散らす、広がる→同心円状に並べる
 
 # 出力形式
 
@@ -178,9 +190,9 @@ EXAMPLE_POOL: list[dict] = [
         "output": "縦の実線を横に三本並べる。",
     },
     {
-        "keywords": ["点", "ランダム", "散ら", "バラバラ", "撒く", "無秩序"],
-        "input": "五つの赤い点をランダムに置く",
-        "output": "赤い小さな円をランダムに五つ散らす。半径は0.04。",
+        "keywords": ["点", "散ら", "バラバラ", "撒く", "無秩序"],
+        "input": "五つの赤い点を置く",
+        "output": "赤い小さな円を中央付近に五つ散らす。半径は0.04。",
     },
     {
         "keywords": ["横線", "本", "引く", "並べ", "青", "二", "水平"],
@@ -190,7 +202,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["花", "散る", "散", "桜", "春", "花びら"],
         "input": "花びらが散る",
-        "output": "画面全体に細かい点をランダムに散らす。",
+        "output": "上から下へ白い小さな円を四十七個散らす。大きく揺れる。",
     },
     {
         "keywords": ["光", "放射", "差す", "太陽", "輝", "レイ"],
@@ -215,12 +227,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["たくさん", "多数", "無数", "いっぱい", "沢山", "大量"],
         "input": "たくさんの小さな点を散らす",
-        "output": "黒い小さな円をランダムに八十三個散らす。半径は0.02。",
+        "output": "画面全体に黒い小さな円を点々と八十三個散らす。半径は0.02。",
     },
     {
         "keywords": ["100", "200", "500", "1000", "百", "千", "本"],
-        "input": "100本の細い線をランダムに並べる",
-        "output": "黒い細い縦線をランダムに百本散らす。",
+        "input": "100本の細い線を画面全体に並べる",
+        "output": "黒い細い縦線を画面全体に百本散らす。",
     },
     # 属性保持: 素材 + 色 + 数量 + 配置
     {
@@ -262,7 +274,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["右", "左", "半分", "端", "角", "隅"],
         "input": "右半分に赤い小さな円を二十個散らす",
-        "output": "赤い小さな円を右半分にランダムに二十個散らす。",
+        "output": "赤い小さな円を右半分に縦に二十個散らす。",
     },
     # 属性保持: 素材 + 太さ + 色 + 大量
     {
@@ -293,11 +305,11 @@ EXAMPLE_POOL: list[dict] = [
         "input": "青い背景に黒い縦線を五本引く",
         "output": "背景を青で塗りつぶす。黒い縦線を横に五本並べる。",
     },
-    # 色とりどり・ランダム配色
+    # 色とりどり・多色配色
     {
         "keywords": ["色とりどり", "カラフル", "虹", "様々な色", "多色", "いろいろな色"],
         "input": "色とりどりの小さな円を散らす",
-        "output": "赤・青・緑・黒・灰の色とりどりの小さな円をランダムに四十七個散らす。半径は0.03。",
+        "output": "赤・青・緑・黒・灰の色とりどりの小さな円を画面全体に点々と四十七個散らす。半径は0.03。",
     },
     {
         "keywords": ["色とりどり", "カラフル", "放射", "虹", "輪"],
@@ -313,7 +325,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["星", "星空", "夜空", "銀河", "宇宙", "天の川"],
         "input": "満天の星空",
-        "output": "背景を黒で塗りつぶす。白い小さな円をランダムに六百十個散らす。半径は0.01。",
+        "output": "背景を黒で塗りつぶす。白い小さな円を画面全体に点々と六百十個散らす。半径は0.01。",
     },
     {
         "keywords": ["水平線", "地平線", "水面", "海面", "湖面"],
@@ -334,7 +346,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["雪", "吹雪", "雪原", "粉雪", "積雪"],
         "input": "雪がしんしんと降る",
-        "output": "白い小さな円をランダムに百三十七個散らす。半径は0.015。",
+        "output": "白い小さな円を上から下へ百三十七個散らす。半径は0.015。ゆっくり揺れる。",
     },
     {
         "keywords": ["炎", "火", "燃え", "燃える", "焔", "篝火"],
@@ -350,12 +362,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["散る", "舞う", "飛ぶ", "漂う", "漂い"],
         "input": "花びらが風に舞い散る",
-        "output": "白い小さな円をランダムに四十七個散らす。半径は0.03。大きく揺れる。",
+        "output": "白い小さな円を波打つ軌跡に沿って四十七個散らす。半径は0.03。大きく揺れる。",
     },
     {
         "keywords": ["砂", "粒", "粒子", "細かい", "全面", "埋め尽くす"],
         "input": "砂のような点で画面を埋める",
-        "output": "灰色の小さな円をランダムに八百九十個散らす。半径は0.006。",
+        "output": "灰色の小さな円を画面全体に細かく八百九十個散らす。半径は0.006。",
     },
     # わりあい: 縦横比
     {
@@ -429,9 +441,9 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Line up three vertical solid lines horizontally.",
     },
     {
-        "keywords": ["dots", "random", "scatter", "red", "five", "circles"],
-        "input": "Five red dots scattered randomly",
-        "output": "Scatter five small red circles randomly. Radius 0.04.",
+        "keywords": ["dots", "scatter", "red", "five", "circles"],
+        "input": "Five red dots scattered",
+        "output": "Scatter five small red circles near the center. Radius 0.04.",
     },
     {
         "keywords": ["horizontal", "lines", "blue", "two", "draw", "parallel"],
@@ -441,7 +453,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["petals", "fall", "cherry", "spring", "blossom", "scatter"],
         "input": "Petals falling",
-        "output": "Scatter fine dots across the canvas randomly.",
+        "output": "Scatter forty-seven small white circles from top to bottom. Radius 0.03. Swaying broadly.",
     },
     {
         "keywords": ["light", "radial", "sun", "ray", "glow", "spreading"],
@@ -466,12 +478,12 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["many", "numerous", "countless", "lots", "scattered", "small"],
         "input": "Many small dots scattered",
-        "output": "Scatter eighty-three small black circles randomly. Radius 0.02.",
+        "output": "Scatter eighty-three small black circles dotted across the whole canvas. Radius 0.02.",
     },
     {
         "keywords": ["100", "200", "500", "hundred", "fill", "dense"],
-        "input": "100 thin lines randomly arranged",
-        "output": "Scatter one hundred thin vertical black lines randomly.",
+        "input": "100 thin lines arranged across the canvas",
+        "output": "Scatter one hundred thin vertical black lines across the whole canvas.",
     },
     {
         "keywords": ["crayon", "fill", "background", "cover", "dense", "blue"],
@@ -506,22 +518,22 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["right", "left", "half", "edge", "corner", "twenty"],
         "input": "Twenty small red circles in the right half",
-        "output": "Scatter twenty small red circles randomly in the right half.",
+        "output": "Scatter twenty small red circles vertically in the right half.",
     },
     {
         "keywords": ["colorful", "rainbow", "various", "multicolor", "colors"],
         "input": "Colorful small circles scattered",
-        "output": "Scatter forty-seven small circles randomly in red, blue, green, black, gray. Radius 0.03.",
+        "output": "Scatter forty-seven small circles dotted across the whole canvas in red, blue, green, black, gray. Radius 0.03.",
     },
     {
         "keywords": ["starry", "stars", "galaxy", "night sky", "countless"],
         "input": "A sky full of stars",
-        "output": "Fill background with black. Scatter six hundred ten small white circles randomly. Radius 0.01.",
+        "output": "Fill background with black. Scatter six hundred ten small white circles dotted across the whole canvas. Radius 0.01.",
     },
     {
         "keywords": ["sand", "particles", "fine", "fill", "whole"],
         "input": "Fill the canvas with sand-like dots",
-        "output": "Scatter eight hundred ninety small gray circles randomly. Radius 0.006.",
+        "output": "Scatter eight hundred ninety small gray circles finely across the whole canvas. Radius 0.006.",
     },
     {
         "keywords": ["dark", "black background", "night", "shadow", "white"],
@@ -575,6 +587,7 @@ Output: **Normalized DDL** — concise English instructions using only Saijiki v
 3. Coordinates use 0.0–1.0 ratio (top-left=(0,0), bottom-right=(1,1))
 4. Output in plain English prose. No bullet points, no explanation, no preamble
 5. Use only Saijiki vocabulary
+6. **Do not output the word "random" or "randomly" in normalized DDL**. Even if the input uses it, replace it with explicit placement such as "dotted across the whole canvas", "near the center", "from top to bottom", or "along an undulating trace".
 
 # Attribute Preservation — Never Drop Attributes
 
@@ -586,7 +599,7 @@ Preserve all explicitly stated attributes in the input:
 - **weight/size**: thin, thick, small, large → preserve
 - **direction/places**: vertical, horizontal, radial, center, right-half → preserve
 - **movements**: trembling, undulating, blurring, fine → add as separate sentence after count
-- **arrangement**: random, grid, radial, evenly spaced → preserve
+- **arrangement**: grid, radial, evenly spaced, all-over, top-to-bottom, right-half → preserve
 
 Multiple attributes in one shape go in one sentence: "Line up thirty thick vertical blue crayon lines."
 
@@ -595,7 +608,7 @@ Multiple attributes in one shape go in one sentence: "Line up thirty thick verti
 When a count is present, put **color, material, direction, size in the same sentence**.
 
 - "three bamboo poles" → "Line up three vertical solid lines horizontally."
-- "five red dots randomly" → "Scatter five small red circles randomly. Radius 0.04."
+- "five red dots" → "Scatter five small red circles near the center. Radius 0.04."
 - "fill with blue crayon lines" → "Line up one hundred twenty vertical blue crayon lines horizontally."
 - Explicit numbers (100, 200) → use as-is. Clamp only values above 1000 to 1000.
 
@@ -618,13 +631,24 @@ Object-specific correction:
 - small dots, stars, rain, snow, sand, particles, short lines → use more
 - radial / circular / symmetric layouts → prefer structural counts such as 6, 8, 12, 16, 24, 32
 - grid / stripe / evenly spaced layouts → prefer visible-order counts such as 5, 7, 9, 12, 16, 24, 36
-- random scatter → you may use less regular counts such as 17, 29, 47, 83, 137, 233, 377, 610
+- all-over scatter → you may use less regular counts such as 17, 29, 47, 83, 137, 233, 377, 610
 
 Never output vague words such as "many" or "countless"; always convert them to a concrete count.
 
-# Random Arrangement
+# Arrangement Choice — always provide placement guidance
 
-"randomly" / "scattered" / "haphazardly" → write "randomly" or "scatter"
+"scatter" is not placement by itself. Always choose placement from **place words, motion words, and movement traces**, and specify where, in which direction, or along what trace the objects are distributed.
+The words "random" and "randomly" are forbidden in normalized DDL. Do not write them in the output.
+
+- "haphazardly" / "disordered" → scatter dotted across the whole canvas
+- "falling" / "rain" / "snow" / "from above" → scatter vertically from top to bottom
+- "flowing" / "river" / "wind" / "crossing" → line up from left to right; add undulating if needed
+- "floating" / "drifting" / "swaying" → scatter along an undulating trace
+- "spreading" / "ripples" → line up concentrically or radially from center
+- "starry sky" / "all-over" / "fill" → scatter dotted across the whole canvas
+- place words such as "right half", "left edge", "top edge", "center" → always preserve the place
+
+If unsure, choose one explicit placement: "dotted across the whole canvas", "near the center", or "from top to bottom".
 
 # Colorful / Multi-color
 
@@ -680,8 +704,8 @@ Expand unknown words to the nearest Saijiki vocabulary using shape, texture, str
 
 - **shape**: moon→circle, mountain→triangle, building→square, tree→line
 - **texture**: mist→ellipse(blurring), sand→scattered dots, flame→line(undulating)
-- **structure**: sea→horizontal lines, forest→vertical lines, stars→small circles scattered
-- **motion→arrangement**: rising→place high, scattering→scatter randomly, spreading→concentric circles
+- **structure**: sea→horizontal lines, forest→vertical lines, stars→small circles across the whole canvas
+- **motion→arrangement**: rising→place high, falling→scatter top to bottom, drifting→undulating trace, spreading→concentric circles
 
 # Output Format
 
@@ -738,6 +762,21 @@ def _strip_prefix(model: str) -> str:
     return model
 
 
+def _sanitize_placement_words(ddl: str) -> str:
+    """Remove forbidden vague placement words from normalized DDL."""
+    replacements = (
+        (r"ランダムに", "画面全体に点々と"),
+        (r"ランダムな", "画面全体に点々とした"),
+        (r"ランダム", "画面全体に点々"),
+        (r"\brandomly\b", "dotted across the whole canvas"),
+        (r"\brandom\b", "all-over"),
+    )
+    sanitized = ddl
+    for pattern, replacement in replacements:
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+    return sanitized
+
+
 def interpret(text: str, *, model: str | None = None) -> str:
     """後方互換: DDL 本文のみ返す。"""
     ddl, _, _, _ = interpret_detail(text, model=model, include_thinking=False)
@@ -759,13 +798,25 @@ def interpret_detail(
         provider = _get_provider(model)
         if provider == "anthropic":
             ddl, tin, tout = _interpret_anthropic(text, model=_strip_prefix(model), system_prompt=system_prompt)
-            return ddl, None, tin, tout
-        return _interpret_openai_detail(text, model=model, include_thinking=include_thinking, system_prompt=system_prompt)
+            return _sanitize_placement_words(ddl), None, tin, tout
+        ddl, thinking, tin, tout = _interpret_openai_detail(
+            text,
+            model=model,
+            include_thinking=include_thinking,
+            system_prompt=system_prompt,
+        )
+        return _sanitize_placement_words(ddl), thinking, tin, tout
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        return _interpret_openai_detail(text, model=None, include_thinking=include_thinking, system_prompt=system_prompt)
+        ddl, thinking, tin, tout = _interpret_openai_detail(
+            text,
+            model=None,
+            include_thinking=include_thinking,
+            system_prompt=system_prompt,
+        )
+        return _sanitize_placement_words(ddl), thinking, tin, tout
     ddl, tin, tout = _interpret_anthropic(text, system_prompt=system_prompt)
-    return ddl, None, tin, tout
+    return _sanitize_placement_words(ddl), None, tin, tout
 
 
 def _interpret_anthropic(text: str, *, model: str | None = None, system_prompt: str) -> tuple[str, int | None, int | None]:

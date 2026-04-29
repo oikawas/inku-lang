@@ -24,7 +24,8 @@ from .coerce import coerce_score
 from .composer import compose
 from .composer import SYSTEM_PROMPT as STAGE2_PROMPT
 from .composer import SYSTEM_PROMPT_EN as STAGE2_PROMPT_EN
-from .interpreter import interpret_detail
+from .ddl_expander import expand_intermediate_ddl
+from .interpreter import _sanitize_placement_words, interpret_detail
 from .interpreter import SYSTEM_PROMPT as STAGE1_PROMPT
 from .interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
 from .renderer import render
@@ -411,6 +412,7 @@ def _call_compose_detail(
     system_prompt: str | None = None,
     lang: str = "ja",
 ) -> tuple[Score, int | None, int | None]:
+    ddl = expand_intermediate_ddl(ddl, lang=lang)
     try:
         value = compose(
             ddl,
@@ -449,9 +451,10 @@ def _call_interpret_detail(
             raise
         value = interpret_detail(text, model=model, include_thinking=include_thinking)
     if len(value) == 4:
-        return value
+        ddl, thinking, tokens_in, tokens_out = value
+        return _sanitize_placement_words(ddl), thinking, tokens_in, tokens_out
     ddl, thinking = value
-    return ddl, thinking, None, None
+    return _sanitize_placement_words(ddl), thinking, None, None
 
 
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
@@ -522,7 +525,7 @@ def _add_history_item(
         "user_id": actor["id"],
         "output_path": str(prefix),
         "input": input_text,
-        "ddl": ddl,
+        "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
         "score": score_dict,
         "svg": svg,
         "at": at,
@@ -547,6 +550,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
+    ddl = expand_intermediate_ddl(ddl, lang=req.lang)
     t1 = time.perf_counter()
     try:
         score, s2_tin, s2_tout = _call_compose_detail(

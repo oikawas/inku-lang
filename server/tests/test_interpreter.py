@@ -15,7 +15,7 @@ import os
 
 import pytest
 
-from inku_server.interpreter import _build_system_prompt, interpret
+from inku_server.interpreter import _build_system_prompt, _sanitize_placement_words, interpret
 
 FORMS = ["円", "楕円", "三角", "四角", "線", "弧"]
 EMOTION_WORDS = [
@@ -96,9 +96,18 @@ def test_quantity_prompt_uses_dynamic_range():
     assert "数量レンジ" in prompt
     assert "700〜1000" in prompt
     assert "固定値に丸めてはいけない" in prompt
+    assert "必ず配置ガイダンスを与える" in prompt
+    assert "正規化DDLに「ランダム」という語を出力してはいけない" in prompt
+    assert "どこに" in prompt
+    assert "どの方向へ" in prompt
+    assert "どんな軌跡で" in prompt
     assert "二十個程度" not in prompt
     assert "六百十個" in prompt
     assert "八百九十個" in prompt
+    assert "画面全体に点々と六百十個" in prompt
+    assert "画面全体に細かく八百九十個" in prompt
+    assert "ランダムに六百十個" not in prompt
+    assert "ランダムに八百九十個" not in prompt
 
 
 def test_quantity_prompt_en_uses_dynamic_range():
@@ -107,6 +116,20 @@ def test_quantity_prompt_en_uses_dynamic_range():
     assert "Count Ranges" in prompt
     assert "700–1000" in prompt
     assert "one fixed number" in prompt
+    assert "always provide placement guidance" in prompt
+    assert 'Do not output the word "random"' in prompt
+    assert "where, in which direction, or along what trace" in prompt
     assert "about twenty" not in prompt
     assert "six hundred ten" in prompt
     assert "eight hundred ninety" in prompt
+    assert "dotted across the whole canvas" in prompt
+    assert "finely across the whole canvas" in prompt
+    assert "six hundred ten small white circles randomly" not in prompt
+    assert "eight hundred ninety small gray circles randomly" not in prompt
+
+
+def test_sanitize_placement_words_removes_random_terms():
+    assert _sanitize_placement_words("赤い円をランダムに五つ散らす。") == "赤い円を画面全体に点々と五つ散らす。"
+    assert "random" not in _sanitize_placement_words(
+        "Scatter five red circles randomly. Radius 0.04."
+    ).lower()

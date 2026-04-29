@@ -136,6 +136,23 @@ def test_compose_happy_path(monkeypatch, auth_context):
     assert "<circle" in data["svg"]
 
 
+def test_compose_sanitizes_random_ddl_before_stage2(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    captured: dict[str, str] = {}
+
+    def fake_compose(ddl: str, model=None):
+        captured["ddl"] = ddl
+        return Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+    r = client.post("/api/compose", json={"ddl": "赤い円をランダムに十二個散らす。"}, headers=headers)
+    assert r.status_code == 200
+    assert "赤い円を画面全体に点々と十二個散らす。" in captured["ddl"]
+    assert "右上の黄金比の位置" in captured["ddl"]
+
+
 def test_compose_empty_ddl_rejected(auth_context):
     headers, _, _ = auth_context
     r = client.post("/api/compose", json={"ddl": ""}, headers=headers)
@@ -161,6 +178,18 @@ def test_interpret_happy_path(monkeypatch, auth_context):
     assert r.json() == {"ddl": "中心に黒い円を置く。", "thinking": None}
 
 
+def test_interpret_sanitizes_random_placement(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("赤い小さな円をランダムに十二個散らす。", None),
+    )
+    r = client.post("/api/interpret", json={"text": "赤い点を散らす"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["ddl"] == "赤い小さな円を画面全体に点々と十二個散らす。"
+
+
 def test_interpret_empty_rejected(auth_context):
     headers, _, _ = auth_context
     r = client.post("/api/interpret", json={"text": ""}, headers=headers)
@@ -179,9 +208,33 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert r.status_code == 200
     data = r.json()
     assert data["text"] == "一滴の墨"
-    assert data["ddl"] == "中心に黒い円を置く。"
+    assert data["ddl"].startswith("中心に黒い円を置く。")
+    assert "右上の黄金比の位置" in data["ddl"]
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
+
+
+def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("赤い小さな円をランダムに十二個散らす。", None),
+    )
+
+    def fake_compose(ddl: str, model=None):
+        captured["ddl"] = ddl
+        return Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+    r = client.post("/api/paint", json={"text": "赤い点を散らす"}, headers=headers)
+    assert r.status_code == 200
+    assert "赤い小さな円を画面全体に点々と十二個散らす。" in r.json()["ddl"]
+    assert "右上の黄金比の位置" in r.json()["ddl"]
+    assert r.json()["ddl"] == captured["ddl"]
 
 
 def test_paint_can_save_server_generated_history(monkeypatch, auth_context):

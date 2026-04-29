@@ -129,10 +129,30 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "300〜800" in SYSTEM_PROMPT
     assert "700〜1000" in SYSTEM_PROMPT
     assert "610" in SYSTEM_PROMPT
+    assert "配置語を優先" in SYSTEM_PROMPT
+    assert "上から下へ散らす" in SYSTEM_PROMPT
+    assert "三分割の交点" in SYSTEM_PROMPT
+    assert "白銀比の位置" in SYSTEM_PROMPT
+    assert "正五角形の頂点" in SYSTEM_PROMPT
+    assert "対位法の反行" in SYSTEM_PROMPT
+    assert "倍音列" in SYSTEM_PROMPT
+    assert "輪唱のずれ" in SYSTEM_PROMPT
+    assert '"layout":"vertical"' in SYSTEM_PROMPT
+    assert "ランダム" not in SYSTEM_PROMPT
     assert "20 程度" not in SYSTEM_PROMPT
 
     assert "40–120" in SYSTEM_PROMPT_EN
     assert "300–800" in SYSTEM_PROMPT_EN
     assert "700–1000" in SYSTEM_PROMPT_EN
     assert "610" in SYSTEM_PROMPT_EN
+    assert "prioritize that placement phrase" in SYSTEM_PROMPT_EN
+    assert "top to bottom" in SYSTEM_PROMPT_EN
+    assert "rule-of-thirds point" in SYSTEM_PROMPT_EN
+    assert "silver-ratio position" in SYSTEM_PROMPT_EN
+    assert "regular pentagon vertices" in SYSTEM_PROMPT_EN
+    assert "contrapuntal contrary motion" in SYSTEM_PROMPT_EN
+    assert "harmonic overtone series" in SYSTEM_PROMPT_EN
+    assert "canon offset" in SYSTEM_PROMPT_EN
+    assert '"layout":"vertical"' in SYSTEM_PROMPT_EN
+    assert "random" not in SYSTEM_PROMPT_EN.lower()
     assert "≈ 20" not in SYSTEM_PROMPT_EN

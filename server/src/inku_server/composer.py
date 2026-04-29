@@ -42,18 +42,56 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
 - **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
-- **色とりどり・ランダム配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
+- **色とりどり・多色配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
+- **正規化DDL は必ず配置語を含む。正規化DDL が「中央付近」「上から下」「縦に」「右半分」「放射状」「同心円状」「画面全体に点々」「波打つ軌跡」を含む場合は、その配置語を優先する**
+- **「画面全体に点々」「全面に細かく」は layout=scatter でよいが、意味は無秩序ではなく全面分布として扱う**
+- **「上から下へ散らす」は layout=vertical。「左から右へ」「横に」は layout=horizontal。「放射状」「同心円状」は layout=radial**
+- **「右上の黄金比の位置」→ center=[0.618,0.382]。左下なら [0.382,0.618]。数学的な均衡点として扱う**
+- **「左上の三分割の交点」→ center=[0.333,0.333]。「右下の三分割の交点」→ center=[0.667,0.667]。三分割構図として扱う**
+- **「左下の白銀比の位置」→ center=[0.414,0.586]。「右上の白銀比の位置」→ center=[0.586,0.414]。白銀比の余白として扱う**
+- **「正五角形の頂点に五個」→ arrangement count=5 layout=radial。五芒星的な均衡の点列として扱う**
+- **「フィボナッチ」「十三」「二十一」などの数量はそのまま使い、意外性のある規則的な層として扱う**
+- **「対位法の反行」→ 既存方向と反対の斜線層。右下がり=rotation=30、右上がり=rotation=-30**
+- **「倍音列」→ 整数比の放射層。弧または円を count=4 layout=radial として扱う**
+- **「輪唱のずれ」→ 同形を少しずつ横方向に並べる反復。layout=horizontal、count は DDL の数を使う**
 
 # 例 (最重要パターン)
 
 入力: 縦の実線を横に三本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
 
-入力: 青い小さな円をランダムに五つ散らす。半径0.04。
-出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter"}}]}
+入力: 青い小さな円を中央付近に五つ散らす。半径0.04。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
 
-入力: 白い小さな円をランダムに六百十個散らす。半径は0.01。
+入力: 白い小さな円を画面全体に点々と六百十個散らす。半径は0.01。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.01,"color":"white","arrangement":{"count":610,"layout":"scatter"}}]}
+
+入力: 白い小さな円を上から下へ百三十七個散らす。半径は0.015。ゆっくり揺れる。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.015,"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_x"]}}]}
+
+入力: 赤い小さな円を右半分に縦に二十個散らす。
+出力: {"instructions":[{"primitive":"circle","center":[0.75,0.5],"radius":0.04,"color":"red","arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
+
+入力: 白い小さな円を右上の黄金比の位置に一点置く。半径は0.025。
+出力: {"instructions":[{"primitive":"circle","center":[0.618,0.382],"radius":0.025,"color":"white"}]}
+
+入力: 白い小さな円を左上の三分割の交点に一点置く。半径は0.018。
+出力: {"instructions":[{"primitive":"circle","center":[0.333,0.333],"radius":0.018,"color":"white"}]}
+
+入力: 白い小さな円を左下の白銀比の位置に一点置く。半径は0.016。
+出力: {"instructions":[{"primitive":"circle","center":[0.414,0.586],"radius":0.016,"color":"white"}]}
+
+入力: 赤い小さな円を正五角形の頂点に五個並べる。半径は0.022。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.022,"color":"red","arrangement":{"count":5,"layout":"radial"}}]}
+
+入力: 白い細い線を対位法の反行として右下がりに三本並べる。細かく震える。
+出力: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"color":"white","rotation":30,"arrangement":{"count":3,"layout":"vertical"},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
+
+入力: 白い細い弧を倍音列として中心から放射状に四つ並べる。半径は0.07。
+出力: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.24}}]}
+
+入力: 赤い小さな円を輪唱のずれとして左から右へ七個並べる。半径は0.014。ゆっくり揺れる。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.014,"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
 
 入力: 上から半分に横線。小刻みに震える。
 出力: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
@@ -163,17 +201,55 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
 - **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
 - **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
+- **Normalized DDL must include placement words. If normalized DDL says "near the center", "top to bottom", "vertical", "right half", "radial", "concentric", "dotted across the whole canvas", or "undulating trace", prioritize that placement phrase**
+- **"dotted across the whole canvas" / "finely across the whole canvas" may use layout=scatter, but treat it as all-over distribution, not disorder**
+- **"top to bottom" → layout=vertical. "left to right" / "horizontal" → layout=horizontal. "radial" / "concentric" → layout=radial**
+- **"upper-right golden-ratio position" → center=[0.618,0.382]. Lower-left uses [0.382,0.618]. Treat it as a mathematical balance point**
+- **"upper-left rule-of-thirds point" → center=[0.333,0.333]. "lower-right rule-of-thirds point" → center=[0.667,0.667]. Treat it as rule-of-thirds composition**
+- **"lower-left silver-ratio position" → center=[0.414,0.586]. "upper-right silver-ratio position" → center=[0.586,0.414]. Treat it as silver-ratio spacing**
+- **"regular pentagon vertices" → arrangement count=5 layout=radial. Treat it as a pentagonal balance layer**
+- **Fibonacci-like counts such as thirteen and twenty-one are intentional; keep them as explicit counts**
+- **"contrapuntal contrary motion" → a line layer moving against the main direction. Falling to the right uses rotation=30; rising to the right uses rotation=-30**
+- **"harmonic overtone series" → an integer-ratio radial arc/circle layer. Keep the explicit count**
+- **"canon offset" → repeated same shape with slight horizontal delay. Use layout=horizontal and the explicit count**
 
 # Examples (key patterns)
 
 Input: Line up three vertical solid lines horizontally.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
 
-Input: Scatter five small blue circles randomly. Radius 0.04.
-Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter"}}]}
+Input: Scatter five small blue circles near the center. Radius 0.04.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
 
-Input: Scatter six hundred ten small white circles randomly. Radius 0.01.
+Input: Scatter six hundred ten small white circles dotted across the whole canvas. Radius 0.01.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.01,"color":"white","arrangement":{"count":610,"layout":"scatter"}}]}
+
+Input: Scatter one hundred thirty-seven small white circles from top to bottom. Radius 0.015. Swaying slowly.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.015,"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_x"]}}]}
+
+Input: Scatter twenty small red circles vertically in the right half.
+Output: {"instructions":[{"primitive":"circle","center":[0.75,0.5],"radius":0.04,"color":"red","arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
+
+Input: Place one small white circle at the upper-right golden-ratio position. Radius 0.025.
+Output: {"instructions":[{"primitive":"circle","center":[0.618,0.382],"radius":0.025,"color":"white"}]}
+
+Input: Place one small white circle at the upper-left rule-of-thirds point. Radius 0.018.
+Output: {"instructions":[{"primitive":"circle","center":[0.333,0.333],"radius":0.018,"color":"white"}]}
+
+Input: Place one small white circle at the lower-left silver-ratio position. Radius 0.016.
+Output: {"instructions":[{"primitive":"circle","center":[0.414,0.586],"radius":0.016,"color":"white"}]}
+
+Input: Line up five small red circles on regular pentagon vertices. Radius 0.022.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.022,"color":"red","arrangement":{"count":5,"layout":"radial"}}]}
+
+Input: Line up three thin white lines falling to the right as contrapuntal contrary motion. Fine trembling.
+Output: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"color":"white","rotation":30,"arrangement":{"count":3,"layout":"vertical"},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
+
+Input: Line up four thin white arcs radially from center as a harmonic overtone series. Radius 0.07.
+Output: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.24}}]}
+
+Input: Line up seven small red circles left to right as a canon offset. Radius 0.014. Swaying slowly.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.014,"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
 
 Input: Draw a horizontal line at center. Fine trembling.
 Output: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}

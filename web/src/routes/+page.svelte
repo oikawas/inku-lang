@@ -26,6 +26,9 @@
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const AUTH_TOKEN_KEY      = 'inku-auth-token';
+	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
+	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
+	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 
 	type Score = { instructions: unknown[] };
 
@@ -61,6 +64,11 @@
 		line: number;
 		input: string;
 		message: string;
+	};
+	type BatchFailureReport = {
+		success: number;
+		total: number;
+		failures: BatchFailure[];
 	};
 
 	type PluginItem = {
@@ -127,6 +135,7 @@
 	let batchTotal   = $state(0);
 	let batchSuccess = $state(0);
 	let batchFailures = $state<BatchFailure[]>([]);
+	let batchFailureReport = $state<BatchFailureReport | null>(null);
 	let error        = $state<string | null>(null);
 
 	// ── Replay ──────────────────────────────────────────────
@@ -614,6 +623,49 @@
 	function stopTimer() {
 		if (_timerHandle !== null) { clearInterval(_timerHandle); _timerHandle = null; }
 	}
+	function compactBatchFailureReport(report: BatchFailureReport): BatchFailureReport {
+		return {
+			success: report.success,
+			total: report.total,
+			failures: report.failures.slice(0, BATCH_FAILURE_REPORT_MAX_ITEMS).map((failure) => ({
+				line: failure.line,
+				input: failure.input.slice(0, BATCH_FAILURE_REPORT_MAX_TEXT),
+				message: failure.message.slice(0, BATCH_FAILURE_REPORT_MAX_TEXT),
+			})),
+		};
+	}
+	function setBatchFailureReport(report: BatchFailureReport | null) {
+		const compactReport = report ? compactBatchFailureReport(report) : null;
+		batchFailureReport = compactReport;
+		try {
+			if (compactReport) localStorage.setItem(BATCH_FAILURE_REPORT_KEY, JSON.stringify(compactReport));
+			else localStorage.removeItem(BATCH_FAILURE_REPORT_KEY);
+		} catch {
+			try { localStorage.removeItem(BATCH_FAILURE_REPORT_KEY); } catch {}
+		}
+	}
+	function loadBatchFailureReport(): BatchFailureReport | null {
+		try {
+			const raw = localStorage.getItem(BATCH_FAILURE_REPORT_KEY);
+			if (!raw) return null;
+			const report = JSON.parse(raw) as Partial<BatchFailureReport>;
+			if (
+				typeof report.success !== 'number' ||
+				typeof report.total !== 'number' ||
+				!Array.isArray(report.failures)
+			) return null;
+			const failures = report.failures
+				.filter((failure): failure is BatchFailure =>
+					typeof failure?.line === 'number' &&
+					typeof failure.input === 'string' &&
+					typeof failure.message === 'string'
+				);
+			if (failures.length === 0) return null;
+			return compactBatchFailureReport({ success: report.success, total: report.total, failures });
+		} catch {
+			return null;
+		}
+	}
 
 	// ── Core paint (2-stage) ─────────────────────────────────
 	async function paintOne(text: string): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
@@ -664,7 +716,7 @@
 		ddl = null; thinking = null; baseDDL = null; ddlEditing = false;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0; batchTotal = 0; batchSuccess = 0; batchFailures = [];
+		batchCurrent = 0;
 		startTimer();
 
 		try {
@@ -678,6 +730,7 @@
 				const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
 				await pushHistory({ input, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
 			} else {
+				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
 					.filter((item) => item.input);
@@ -693,6 +746,9 @@
 						const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
 						await pushHistory({ input: `#${lines[i].line} ${lines[i].input}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
 						batchSuccess += 1;
+						if (batchFailures.length > 0) {
+							setBatchFailureReport({ success: batchSuccess, total: batchTotal, failures: batchFailures });
+						}
 					} catch (e) {
 						batchFailures = [
 							...batchFailures,
@@ -702,9 +758,17 @@
 								message: e instanceof Error ? e.message : String(e),
 							},
 						];
+						setBatchFailureReport({ success: batchSuccess, total: batchTotal, failures: batchFailures });
 					}
 				}
 				elapsedTotalMs = Date.now() - _timerStart;
+				if (batchFailures.length > 0) {
+					setBatchFailureReport({
+						success: batchSuccess,
+						total: batchTotal,
+						failures: batchFailures,
+					});
+				}
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e); result = null;
@@ -1282,6 +1346,8 @@
 			const birds = localStorage.getItem(SHOW_BIRDS_KEY); if (birds !== null) showBirds = birds !== '0';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
+			const savedBatchFailureReport = loadBatchFailureReport();
+			setBatchFailureReport(savedBatchFailureReport);
 			authToken = localStorage.getItem(AUTH_TOKEN_KEY);
 			miscSettingsLoaded = true;
 		} catch {}
@@ -1518,21 +1584,19 @@
 					{/if}
 
 					{#if error}<p class="error-text">{error}</p>{/if}
-					{#if inputMode === 'batch' && batchTotal > 0 && !loading}
-						<div class="batch-summary" class:has-failures={batchFailures.length > 0}>
-							<div class="batch-summary-line">{t().batchSummary(batchSuccess, batchFailures.length, batchTotal)}</div>
-							{#if batchFailures.length > 0}
-								<div class="batch-failure-title">{t().batchFailureTitle}</div>
-								<ul class="batch-failure-list">
-									{#each batchFailures as failure (failure.line)}
-										<li>
-											<span class="batch-failure-line">{t().batchFailureLine(failure.line)}</span>
-											<span class="batch-failure-input">{failure.input}</span>
-											<span class="batch-failure-message">{failure.message}</span>
-										</li>
-									{/each}
-								</ul>
-							{/if}
+					{#if batchFailureReport && !loading}
+						<div class="batch-summary has-failures">
+							<div class="batch-summary-line">{t().batchSummary(batchFailureReport.success, batchFailureReport.failures.length, batchFailureReport.total)}</div>
+							<div class="batch-failure-title">{t().batchFailureTitle}</div>
+							<ul class="batch-failure-list">
+								{#each batchFailureReport.failures as failure (failure.line)}
+									<li>
+										<span class="batch-failure-line">{t().batchFailureLine(failure.line)}</span>
+										<span class="batch-failure-input">{failure.input}</span>
+										<span class="batch-failure-message">{failure.message}</span>
+									</li>
+								{/each}
+							</ul>
 						</div>
 					{/if}
 				</section>

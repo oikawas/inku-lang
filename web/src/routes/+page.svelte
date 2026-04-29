@@ -58,6 +58,11 @@
 		catalog_id?: string | null;
 		trashed?: boolean;
 	};
+	type BatchFailure = {
+		line: number;
+		input: string;
+		message: string;
+	};
 
 	type PluginItem = {
 		name: string;
@@ -115,6 +120,8 @@
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
+	let batchSuccess = $state(0);
+	let batchFailures = $state<BatchFailure[]>([]);
 	let error        = $state<string | null>(null);
 
 	// ── Replay ──────────────────────────────────────────────
@@ -641,7 +648,7 @@
 		ddl = null; thinking = null; baseDDL = null; ddlEditing = false;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0; batchTotal = 0;
+		batchCurrent = 0; batchTotal = 0; batchSuccess = 0; batchFailures = [];
 		startTimer();
 
 		try {
@@ -655,25 +662,38 @@
 				const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
 				await pushHistory({ input, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
 			} else {
-				const lines = batchLines.map((l) => l.trim()).filter((l) => l);
+				const lines = batchLines
+					.map((line, index) => ({ line: index + 1, input: line.trim() }))
+					.filter((item) => item.input);
 				batchTotal = lines.length; outputTab = 'canvas';
 				for (let i = 0; i < lines.length; i++) {
 					if (!loading) break;
 					batchCurrent = i + 1;
 					try {
-						const r = await paintOne(lines[i]);
+						const r = await paintOne(lines[i].input);
 						result = r;
+						ddl = r.ddl; thinking = r.thinking;
 						const totalIn  = (r.tokens_in_stage1 ?? 0)  + (r.tokens_in_stage2 ?? 0);
 						const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-						await pushHistory({ input: `#${i + 1} ${lines[i]}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
-					} catch { /* continue */ }
+						await pushHistory({ input: `#${lines[i].line} ${lines[i].input}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
+						batchSuccess += 1;
+					} catch (e) {
+						batchFailures = [
+							...batchFailures,
+							{
+								line: lines[i].line,
+								input: lines[i].input,
+								message: e instanceof Error ? e.message : String(e),
+							},
+						];
+					}
 				}
 				elapsedTotalMs = Date.now() - _timerStart;
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e); result = null;
 		} finally {
-			stopTimer(); loading = false; stageLabel = ''; batchCurrent = 0; batchTotal = 0;
+			stopTimer(); loading = false; stageLabel = ''; batchCurrent = 0;
 		}
 	}
 
@@ -1289,7 +1309,7 @@
 					{:else}
 						<div class="batch-wrap">
 							<div class="line-nums" aria-hidden="true">{lineNumbersText}</div>
-							<textarea class="batch-ta" bind:value={batchInput} rows="5" spellcheck="false" placeholder={t().batchPlaceholder}></textarea>
+							<textarea class="batch-ta" bind:value={batchInput} rows="5" spellcheck="false" wrap="off" placeholder={t().batchPlaceholder}></textarea>
 						</div>
 						{#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 					{/if}
@@ -1334,6 +1354,23 @@
 					{/if}
 
 					{#if error}<p class="error-text">{error}</p>{/if}
+					{#if inputMode === 'batch' && batchTotal > 0 && !loading}
+						<div class="batch-summary" class:has-failures={batchFailures.length > 0}>
+							<div class="batch-summary-line">{t().batchSummary(batchSuccess, batchFailures.length, batchTotal)}</div>
+							{#if batchFailures.length > 0}
+								<div class="batch-failure-title">{t().batchFailureTitle}</div>
+								<ul class="batch-failure-list">
+									{#each batchFailures as failure (failure.line)}
+										<li>
+											<span class="batch-failure-line">{t().batchFailureLine(failure.line)}</span>
+											<span class="batch-failure-input">{failure.input}</span>
+											<span class="batch-failure-message">{failure.message}</span>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+					{/if}
 				</section>
 
 				<!-- thinking -->
@@ -2290,11 +2327,19 @@
 	}
 	.line-nums {
 		background: var(--bg2); border-right: 1px solid var(--border);
-		padding: 9px 6px; font-size: 12px; line-height: 1.65;
+		padding: 9px 6px; font-size: 13px; line-height: 1.65;
 		text-align: right; color: var(--fg3); user-select: none;
+		font-family: inherit;
 		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
 	}
-	.batch-ta { flex: 1; border: none; border-radius: 0; }
+	.batch-ta {
+		flex: 1;
+		border: none;
+		border-radius: 0;
+		white-space: pre;
+		overflow-wrap: normal;
+		overflow-x: auto;
+	}
 	.batch-wrap .batch-ta { min-height: 240px; }
 	.batch-info { font-size: 11px; color: var(--fg3); }
 
@@ -2359,6 +2404,48 @@
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; font-size: 12px; color: var(--fg2);
 		margin-top: 8px;
+	}
+	.batch-summary {
+		margin-top: 8px;
+		padding: 8px 10px;
+		border: 1px solid #b8c7ab;
+		border-radius: var(--r);
+		background: #f5f8f1;
+		color: #40552b;
+		font-size: 12px;
+	}
+	.batch-summary.has-failures {
+		border-color: #d9b4ae;
+		background: #fff6f4;
+		color: #7c332b;
+	}
+	.batch-summary-line { font-weight: 500; }
+	.batch-failure-title { margin-top: 6px; color: var(--fg2); font-size: 11px; }
+	.batch-failure-list {
+		margin: 4px 0 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.batch-failure-list li {
+		display: grid;
+		grid-template-columns: 48px minmax(0, 1fr);
+		gap: 3px 8px;
+	}
+	.batch-failure-line { color: var(--fg2); font-variant-numeric: tabular-nums; }
+	.batch-failure-input {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.batch-failure-message {
+		grid-column: 2;
+		color: #a2342a;
+		font-size: 11px;
+		word-break: break-word;
 	}
 
 	/* Play button */

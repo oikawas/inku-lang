@@ -34,6 +34,9 @@ export interface LangPack {
 	inputPlaceholder: string;
 	batchPlaceholder: string;
 	batchCount: (n: number) => string;
+	batchSummary: (success: number, failed: number, total: number) => string;
+	batchFailureTitle: string;
+	batchFailureLine: (line: number) => string;
 
 	// Submit / loading
 	submitBtn: string;

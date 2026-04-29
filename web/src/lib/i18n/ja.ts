@@ -35,6 +35,9 @@ export const ja: LangPack = {
 	inputPlaceholder: '山の向こうに月が昇る',
 	batchPlaceholder: '山の向こうに月が昇る\n夜の霧が広がる\n青いクレヨンの線',
 	batchCount: (n) => `${n} 件`,
+	batchSummary: (success, failed, total) => `成功 ${success} / 失敗 ${failed} / 全 ${total}`,
+	batchFailureTitle: '失敗した行',
+	batchFailureLine: (line) => `${line}行目`,
 
 	submitBtn: '描画する',
 	stopBtn: '停止',

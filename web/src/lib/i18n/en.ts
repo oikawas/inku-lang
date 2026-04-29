@@ -35,6 +35,9 @@ export const en: LangPack = {
 	inputPlaceholder: 'A moon rises beyond the mountains',
 	batchPlaceholder: 'A moon rises beyond the mountains\nMist spreads at night\nBlue crayon lines',
 	batchCount: (n) => `${n} items`,
+	batchSummary: (success, failed, total) => `${success} succeeded / ${failed} failed / ${total} total`,
+	batchFailureTitle: 'Failed lines',
+	batchFailureLine: (line) => `line ${line}`,
 
 	submitBtn: 'draw',
 	stopBtn: 'stop',

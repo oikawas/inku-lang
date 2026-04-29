@@ -17,7 +17,7 @@
 	import { COLOR_CATALOGS, getCatalogById, getColorMap, type ColorMap } from '$lib/colors';
 
 	const HISTORY_PAGE_SIZE = 20;
-	const HISTORY_MANAGER_PAGE_SIZE = 200;
+	const HISTORY_MANAGER_PAGE_SIZE = 100;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
@@ -764,6 +764,10 @@
 		historyManagerView = 'active';
 		historyManagerTab = 'thumbs';
 		selectedHistoryIds = [];
+		managerHistoryItems = historyItems;
+		managerHistoryTotal = historyTotal;
+		managerTrashItems = trashItems;
+		managerTrashTotal = trashTotal;
 		void fetchHistoryManager();
 	}
 

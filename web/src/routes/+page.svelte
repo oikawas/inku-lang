@@ -2976,19 +2976,19 @@
 		position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 100;
 		background: #fff; border: 1px solid var(--border2);
 		border-radius: var(--r-lg); overflow: hidden;
-		box-shadow: 0 4px 18px rgba(0,0,0,0.12); min-width: 190px;
+		box-shadow: 0 4px 18px rgba(0,0,0,0.12); min-width: 220px;
 	}
 	.png-menu button {
 		display: flex; align-items: center; gap: 8px;
 		width: 100%; text-align: left;
 		padding: 8px 14px; background: none; border: none;
 		border-bottom: 1px solid var(--border); color: var(--fg); cursor: pointer;
-		font-family: inherit; font-size: 13px;
+		font-family: inherit; font-size: 13px; white-space: nowrap;
 	}
 	.png-menu button:last-child { border-bottom: none; }
 	.png-menu button:hover { background: var(--bg); }
 	.png-size { font-weight: 500; }
-	.png-sub { color: var(--fg3); font-size: 11px; }
+	.png-sub { color: var(--fg3); font-size: 11px; white-space: nowrap; }
 
 	/* ── History strip ───────────────────────────────────────── */
 	.history-strip {

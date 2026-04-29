@@ -117,6 +117,7 @@
 	let inputMode   = $state<'single' | 'batch'>('single');
 	let input       = $state('山の向こうに月が昇る');
 	let batchInput  = $state('');
+	let stage1UserPrompt = $state('');
 	let textareaEl  = $state<HTMLTextAreaElement | null>(null);
 
 	// ── Loading ─────────────────────────────────────────────
@@ -621,6 +622,7 @@
 		stageLabel = t().stageInterpreting;
 
 		const augmented = text + buildEmotionHint(text);
+		stage1UserPrompt = augmented;
 		const r1 = await fetch('/api/interpret', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -934,7 +936,9 @@
 	}
 
 	function loadIterationItem(it: Iteration) {
+		inputMode = 'single';
 		input = it.input; ddl = it.ddl; baseDDL = it.ddl; thinking = it.thinking ?? null;
+		stage1UserPrompt = it.input ? it.input + buildEmotionHint(it.input) : '';
 		result = { score: it.score, svg: it.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: it.elapsed_ms ?? 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
 		error = null;
 	}
@@ -1711,7 +1715,7 @@
 						{#if promptsData}
 							<div class="prompt-section">
 								<p class="prompt-label">{t().promptStage1Input}</p>
-								<textarea class="prompt-textarea prompt-user" readonly value={inputMode === 'single' ? input : `(${t().modeBatch})`}></textarea>
+								<textarea class="prompt-textarea prompt-user" readonly value={stage1UserPrompt || (inputMode === 'single' ? input : batchInput)}></textarea>
 								<div class="prompt-collapsible-head">
 									<p class="prompt-label">{t().promptStage1System}</p>
 									<button class="ghost-btn" onclick={() => (promptStage1Expanded = !promptStage1Expanded)}>{promptStage1Expanded ? t().promptCollapse : t().promptExpand}</button>

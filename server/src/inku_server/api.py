@@ -36,6 +36,7 @@ app = FastAPI(title="inku-server", version="0.1.0")
 _db.init_db()
 
 # ── 出力ファイル保存 ────────────────────────────────────────────────────────────
+# DB の履歴レコードを正本とし、ここで作る SVG/JSON/PNG 等は再生成可能な副産物として扱う。
 _DEFAULT_OUTPUT_DIR = Path.home() / ".local" / "share" / "inku" / "outputs"
 _OUTPUT_DIR = Path(os.getenv("INKU_OUTPUT_DIR", str(_DEFAULT_OUTPUT_DIR)))
 _OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
@@ -80,6 +81,23 @@ def _save_output_files(prefix: Path, input_text: str, ddl: str | None, score: di
         Path(f"{prefix}_output.png").write_bytes(png_bytes)
     except Exception:
         _logger.exception("failed to save PNG output: prefix=%s", prefix)
+
+
+def _history_output_prefix(item: dict) -> Path:
+    output_path = item.get("output_path")
+    if output_path:
+        return Path(output_path)
+    return _output_prefix(item["user_id"], item["id"], item["at"])
+
+
+def _save_history_artifacts(item: dict) -> None:
+    _save_output_files(
+        _history_output_prefix(item),
+        item.get("input", ""),
+        item.get("ddl"),
+        item.get("score", {}),
+        item.get("svg", ""),
+    )
 
 
 def _validated_color_map(color_map: dict[str, str] | None) -> dict[str, str] | None:
@@ -515,9 +533,7 @@ def _add_history_item(
         "tokens_out": tokens_out,
         "catalog_id": catalog_id,
     })
-    _save_executor.submit(
-        _save_output_files, prefix, input_text, ddl, score_dict, svg
-    )
+    _save_executor.submit(_save_history_artifacts, item_dict)
     return item_dict
 
 
@@ -741,6 +757,14 @@ def api_history_trash(body: HistoryIdsBody, actor: dict = Depends(_current_user)
 def api_history_restore(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
     count = _db.restore_items(actor["id"], body.ids)
     return {"ok": True, "count": count}
+
+
+@app.post("/api/history/rebuild-output-files")
+def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    items = _db.get_items(actor["id"], body.ids)
+    for item in items:
+        _save_history_artifacts(item)
+    return {"ok": True, "count": len(items)}
 
 
 @app.post("/api/history/permanent-delete")

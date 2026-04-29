@@ -214,6 +214,8 @@
 	let editUserGroupId = $state('');
 	let newGroupName = $state('');
 	let userSettingsStatus = $state<string | null>(null);
+	let userSettingsLoading = $state(false);
+	let userSettingsRequestId = 0;
 	let authToken = $state<string | null>(null);
 	let currentUser = $state<UserItem | null>(null);
 	let loginUserName = $state('admin');
@@ -231,23 +233,43 @@
 		settingsTab = tab;
 		settingsOpen = true;
 		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
+		if (tab === 'users') void loadUserSettings();
 	}
 
 	function selectSettingsTab(tab: typeof settingsTab) {
 		settingsTab = tab;
 		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
+		if (tab === 'users') void loadUserSettings();
 	}
 
 	async function loadUserSettings() {
-		if (!currentUser || !['admin', 'group_lead'].includes(currentUser.role)) return;
+		const requestId = ++userSettingsRequestId;
+		userSettingsLoading = true;
 		try {
+			const meResponse = await apiFetch('/api/auth/me', { cache: 'no-store' });
+			if (!meResponse.ok) throw new Error(t().loginRequiredMessage);
+			const actor = await meResponse.json() as UserItem;
+			if (requestId !== userSettingsRequestId) return;
+			currentUser = actor;
+			authToken = 'cookie';
+			if (!['admin', 'group_lead'].includes(actor.role)) {
+				users = [];
+				groups = [];
+				userSettingsStatus = null;
+				return;
+			}
 			const [groupsResponse, usersResponse] = await Promise.all([
-				apiFetch('/api/user-groups'),
-				apiFetch('/api/users'),
+				apiFetch('/api/user-groups', { cache: 'no-store' }),
+				apiFetch('/api/users', { cache: 'no-store' }),
 			]);
 			if (!groupsResponse.ok || !usersResponse.ok) throw new Error(t().userInfoLoadFailed);
-			groups = await groupsResponse.json();
-			users = await usersResponse.json();
+			const [nextGroups, nextUsers] = await Promise.all([
+				groupsResponse.json() as Promise<UserGroup[]>,
+				usersResponse.json() as Promise<UserItem[]>,
+			]);
+			if (requestId !== userSettingsRequestId) return;
+			groups = nextGroups;
+			users = nextUsers;
 			if (!newUserGroupId && groups[0]) newUserGroupId = groups[0].id;
 			if (selectedUserId) {
 				const selected = users.find((user) => user.id === selectedUserId);
@@ -256,7 +278,10 @@
 			}
 			userSettingsStatus = null;
 		} catch (e) {
+			if (requestId !== userSettingsRequestId) return;
 			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			if (requestId === userSettingsRequestId) userSettingsLoading = false;
 		}
 	}
 
@@ -2067,9 +2092,15 @@
 						<div class="db-test-result">{t().bootstrapAdminNote}</div>
 					{:else}
 						<div class="user-session-row">
-							<span>{currentUser.username} / {currentUser.role_label}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
+							<span>{currentUser.username} / {currentUser.role}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
 							<button class="ghost-btn" onclick={logout}>{t().logoutButton}</button>
 						</div>
+						<div class="settings-inline-actions">
+							<button class="ghost-btn" onclick={loadUserSettings} disabled={userSettingsLoading || !['admin', 'group_lead'].includes(currentUser.role)}>{t().settingsReload}</button>
+						</div>
+						{#if userSettingsLoading}
+							<div class="inline-message">{t().settingsLoading}</div>
+						{/if}
 						{#if currentUser.role === 'admin' || currentUser.role === 'group_lead'}
 							<div class="user-editor-grid">
 								<div class="user-editor-panel">
@@ -2128,7 +2159,7 @@
 										<button class="ghost-btn" onclick={() => setEditUser(user)}>{t().editButton}</button>
 										<span class="user-cell user-name">{user.username}</span>
 										<span class="user-cell">{user.email}</span>
-										<span class="user-cell">{userRoleLabel(user.role)}</span>
+										<span class="user-cell">{user.role}</span>
 										<span class="user-cell">{user.group_name ?? t().userNoGroup}</span>
 										<button class="ghost-btn" onclick={() => removeUser(user.id)}>{t().deleteButton}</button>
 									</div>

@@ -162,12 +162,27 @@ def _ensure_default_user_group() -> None:
         session.commit()
 
 
+def _bootstrap_admin_password() -> str | None:
+    password = os.getenv("INKU_BOOTSTRAP_ADMIN_PASSWORD")
+    if password is not None:
+        if len(password) < 8:
+            raise ValueError("INKU_BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters")
+        return password
+
+    allow_insecure = os.getenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", "").lower() in {"1", "true", "yes"}
+    if allow_insecure:
+        return "inku-admin"
+    return None
+
+
 def _ensure_bootstrap_admin() -> None:
     with SessionLocal() as session:
         if session.query(UserAccountRow).first():
             return
         group = session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).first()
-        password = os.getenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", "inku-admin")
+        password = _bootstrap_admin_password()
+        if password is None:
+            return
         session.add(
             UserAccountRow(
                 id=str(uuid.uuid4()),
@@ -498,6 +513,19 @@ def list_items(
             .all()
         )
         return [_row_to_dict(r) for r in rows], total
+
+
+def get_items(user_id: str, ids: list[str]) -> list[dict]:
+    if not ids:
+        return []
+    order = {item_id: index for index, item_id in enumerate(ids)}
+    with SessionLocal() as session:
+        rows = (
+            session.query(HistoryRow)
+            .filter(HistoryRow.user_id == user_id, HistoryRow.id.in_(ids))
+            .all()
+        )
+        return sorted((_row_to_dict(row) for row in rows), key=lambda item: order.get(item["id"], len(order)))
 
 
 def delete_all(user_id: str) -> None:

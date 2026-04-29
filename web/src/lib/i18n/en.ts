@@ -128,7 +128,7 @@ export const en: LangPack = {
 	userValidationCreate: 'Enter a username, email address, and password of at least 8 characters.',
 	userValidationUpdate: 'Enter a username and email address.',
 	userPasswordTooShort: 'Enter a password of at least 8 characters.',
-	bootstrapAdminNote: 'Initial admin: username: admin / password: inku-admin. Override with INKU_BOOTSTRAP_ADMIN_PASSWORD.',
+	bootstrapAdminNote: 'An initial admin is created only for a new DB when INKU_BOOTSTRAP_ADMIN_PASSWORD is set.',
 	userNamePlaceholder: 'Username',
 	userEmailPlaceholder: 'Email address',
 	userPasswordPlaceholder: 'Password',

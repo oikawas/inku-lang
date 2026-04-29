@@ -92,6 +92,31 @@ def test_login_uses_httponly_session_cookie():
     db.delete_user_group(group["id"])
 
 
+def test_bootstrap_admin_password_requires_explicit_env(monkeypatch):
+    monkeypatch.delenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", raising=False)
+    monkeypatch.delenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", raising=False)
+    assert db._bootstrap_admin_password() is None
+
+
+def test_bootstrap_admin_password_rejects_short_env(monkeypatch):
+    monkeypatch.setenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", "short")
+    monkeypatch.delenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", raising=False)
+    with pytest.raises(ValueError, match="at least 8 characters"):
+        db._bootstrap_admin_password()
+
+
+def test_bootstrap_admin_password_allows_explicit_env(monkeypatch):
+    monkeypatch.setenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", "secure-password")
+    monkeypatch.delenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", raising=False)
+    assert db._bootstrap_admin_password() == "secure-password"
+
+
+def test_bootstrap_admin_password_allows_explicit_insecure_dev_flag(monkeypatch):
+    monkeypatch.delenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", raising=False)
+    monkeypatch.setenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", "1")
+    assert db._bootstrap_admin_password() == "inku-admin"
+
+
 def test_compose_happy_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     fake_score = Score.model_validate(
@@ -235,6 +260,45 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert (tmp_path / "out" / "sample_output.svg").read_text(encoding="utf-8") == "<svg></svg>"
     assert not (tmp_path / "out" / "sample_output.png").exists()
     assert "skipped PNG output" in caplog.text
+
+
+def test_history_output_files_are_rebuildable_from_db(tmp_path):
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"artifact-{suffix}")
+    user = db.add_user(
+        username=f"artifact-{suffix}",
+        email=f"artifact-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    headers, token = _auth_headers(user)
+    item_id = str(uuid.uuid4())
+    prefix = tmp_path / "outputs" / "sample"
+    item = db.add_item({
+        "id": item_id,
+        "user_id": user["id"],
+        "output_path": str(prefix),
+        "input": "artifact source",
+        "ddl": "中心に円",
+        "score": {"instructions": []},
+        "svg": "<svg><desc>from db</desc></svg>",
+        "at": 1_700_000_000_000,
+    })
+
+    assert not (tmp_path / "outputs" / "sample_output.svg").exists()
+    r = client.post("/api/history/rebuild-output-files", json={"ids": [item["id"]]}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["count"] == 1
+    assert (tmp_path / "outputs" / "sample_instruction.txt").read_text(encoding="utf-8") == "artifact source"
+    assert (tmp_path / "outputs" / "sample_normalized.ddl").read_text(encoding="utf-8") == "中心に円"
+    assert (tmp_path / "outputs" / "sample_score.json").exists()
+    assert (tmp_path / "outputs" / "sample_output.svg").read_text(encoding="utf-8") == "<svg><desc>from db</desc></svg>"
+
+    db.delete_items(user["id"], [item["id"]])
+    db.delete_session(token)
+    db.delete_user(user["id"])
+    db.delete_user_group(group["id"])
 
 
 def test_settings_status_is_admin_only():

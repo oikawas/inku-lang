@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.14**
+**Version: v1.16**
 
 ---
 
@@ -1128,6 +1128,8 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~履歴保存時に Web UI から送られた SVG を DB に保存できる~~ → v1.12 で `/api/paint` が生成直後に履歴保存し、Web UI から履歴保存用 SVG を送り返さない形へ変更。互換用 `POST /api/history` でもリクエスト `svg` は無視してサーバー側で再レンダリングする
 - ~~生成系 API の認証境界が弱い~~ → v1.13 で `/api/interpret`、`/api/compose`、`/api/paint` を認証必須化。未認証リクエストは 401 を返す
 - ~~セッショントークンを localStorage に保存している~~ → v1.14 で Web UI はセッショントークンを保持せず、サーバーが HttpOnly / SameSite=Lax Cookie としてセッションを管理する形へ変更
+- ~~履歴DBと出力ファイル保存の整合性~~ → v1.15 で DB の履歴レコードを正本、出力ファイルを再生成可能な副産物と定義。`POST /api/history/rebuild-output-files` で DB から出力ファイルを再生成できる
+- ~~初期管理者アカウントが既知のデフォルトパスワードで作成される~~ → v1.16 で `INKU_BOOTSTRAP_ADMIN_PASSWORD` が明示された新規DBの場合のみ bootstrap admin を作成する形へ変更
 
 ---
 
@@ -1194,6 +1196,32 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.16 (2026-04-29)
+
+**初期管理者アカウントの明示設定化**
+
+新規DB作成時の bootstrap admin は、環境変数で初期パスワードが明示された場合のみ作成する。
+
+- `INKU_BOOTSTRAP_ADMIN_PASSWORD` が未設定の場合、既知のデフォルトパスワードを持つ admin は作成しない
+- `INKU_BOOTSTRAP_ADMIN_PASSWORD` は8文字以上を必須とする
+- `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` は bootstrap admin 作成時のみ利用する
+- ローカル開発で従来の `inku-admin` を使う場合のみ `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN=1` を明示する
+- 設定画面の bootstrap admin 説明文から既定パスワードの案内を削除
+- Build 75
+
+### v1.15 (2026-04-29)
+
+**履歴DBを正本とする出力ファイル扱い**
+
+履歴データの正本は DB とし、出力ファイルは副産物として扱う方針を明確化した。
+
+- 履歴の `input` / `ddl` / JSON Score / SVG / メタデータは DB レコードを正本とする
+- 出力ファイル保存先の `output_path` は副産物の保存先ヒントとして扱う
+- SVG / JSON / 入力 / DDL / PNG ファイルは、DB履歴から再生成可能な artifacts とする
+- `POST /api/history/rebuild-output-files` を追加し、指定した履歴IDの artifacts を DB から再生成できる
+- artifacts 保存失敗は DB の履歴保存失敗とは扱わず、サーバーログに記録する
+- Build 74
 
 ### v1.14 (2026-04-29)
 
@@ -1284,11 +1312,13 @@ LLM 呼び出しや描画生成を行う API をログイン済みユーザー�
 - ユーザーグループは教室やイベントのチーム単位として扱う。グループ内作品共有は将来機能
 - パスワードは PBKDF2-SHA256 + 16 byte salt + 310,000 iterations でハッシュ化して保存
 - セッション token は SHA-256 hash のみ DB に保存
-- 初回起動時、ユーザーが存在しない場合は bootstrap admin を作成
+- 初回起動時、ユーザーが存在せず `INKU_BOOTSTRAP_ADMIN_PASSWORD` が設定されている場合のみ bootstrap admin を作成
   - username: `admin`
   - email: `admin@local`
-  - password: `inku-admin`
-  - 環境変数 `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` / `INKU_BOOTSTRAP_ADMIN_PASSWORD` で上書き可
+  - password: `INKU_BOOTSTRAP_ADMIN_PASSWORD` の値。8文字以上必須
+  - 環境変数 `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` で username / email を上書き可
+  - `INKU_BOOTSTRAP_ADMIN_PASSWORD` 未設定時は既知のデフォルトパスワードを持つ admin を作成しない
+  - ローカル開発で従来の `inku-admin` を使う場合のみ `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN=1` を明示する
 
 #### ユーザー管理 API
 

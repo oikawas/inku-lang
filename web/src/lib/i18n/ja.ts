@@ -128,7 +128,7 @@ export const ja: LangPack = {
 	userValidationCreate: 'ユーザー名、メールアドレス、8文字以上のパスワードを入力してください。',
 	userValidationUpdate: 'ユーザー名とメールアドレスを入力してください。',
 	userPasswordTooShort: 'パスワードは8文字以上で入力してください。',
-	bootstrapAdminNote: '初期管理者は username: admin / password: inku-admin です。環境変数 INKU_BOOTSTRAP_ADMIN_PASSWORD で変更できます。',
+	bootstrapAdminNote: '初期管理者は INKU_BOOTSTRAP_ADMIN_PASSWORD を設定した新規DBでのみ作成されます。',
 	userNamePlaceholder: 'ユーザー名',
 	userEmailPlaceholder: 'メールアドレス',
 	userPasswordPlaceholder: 'パスワード',

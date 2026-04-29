@@ -24,9 +24,7 @@ export const ja: LangPack = {
 	saijikiTitle: '歳時記',
 	saijikiHint: '語彙をクリックすると記述欄に挿入されます。',
 	currentSetting: '現在の設定',
-	noSnapshots: '保存済みスナップショットはありません',
 	saveCurrentBtn: '現在を保存',
-	snapshotNamePlaceholder: 'スナップショット名 (例: 歳時記v1)',
 
 	clearInputBtn: '新規作成',
 	ddlEditBtn: '編集',

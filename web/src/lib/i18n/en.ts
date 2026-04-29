@@ -24,9 +24,7 @@ export const en: LangPack = {
 	saijikiTitle: 'Saijiki',
 	saijikiHint: 'Click a word to insert it into the description.',
 	currentSetting: 'current settings',
-	noSnapshots: 'no snapshots saved',
 	saveCurrentBtn: 'save current',
-	snapshotNamePlaceholder: 'snapshot name (e.g. saijiki-v1)',
 
 	clearInputBtn: 'new',
 	ddlEditBtn: 'edit',

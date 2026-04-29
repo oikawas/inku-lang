@@ -533,11 +533,6 @@
 	let stage2Model     = $state<string>(DEFAULT_MODEL);
 	let includeThinking = $state(false);
 
-	// ── Snapshots ───────────────────────────────────────────
-	type SnapshotMeta = { id: string; name: string; at: number };
-	let snapshots       = $state<SnapshotMeta[]>([]);
-	let activeSnapshotId = $state<string | null>(null);
-
 	// ── Timer ───────────────────────────────────────────────
 	let elapsedStage1Ms = $state(0);
 	let elapsedStage2Ms = $state(0);
@@ -561,6 +556,8 @@
 	let historyManagerOpen = $state(false);
 	let historyManagerView = $state<'active' | 'trash'>('active');
 	let historyManagerTab = $state<'thumbs' | 'list'>('thumbs');
+	let historyManagerPage = $state(0);
+	let historyManagerLoading = $state(false);
 	let managerHistoryItems = $state<Iteration[]>([]);
 	let managerHistoryTotal = $state(0);
 	let managerTrashItems = $state<Iteration[]>([]);
@@ -572,14 +569,9 @@
 	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean } | null>(null);
 	const managedHistoryItems = $derived(historyManagerView === 'trash' ? managerTrashItems : managerHistoryItems);
 	const managedHistoryTotal = $derived(historyManagerView === 'trash' ? managerTrashTotal : managerHistoryTotal);
-	const filteredManagedHistory = $derived.by(() => {
-		const q = historySearch.trim().toLowerCase();
-		if (!q) return managedHistoryItems;
-		return managedHistoryItems.filter((it) =>
-			[it.input, it.ddl ?? '', it.stage1_model ?? '', it.stage2_model ?? '', it.catalog_id ?? '']
-				.some((v) => v.toLowerCase().includes(q))
-		);
-	});
+	const historyManagerTotalPages = $derived(Math.max(1, Math.ceil(managedHistoryTotal / HISTORY_MANAGER_PAGE_SIZE)));
+	const historyManagerOffset = $derived(historyManagerPage * HISTORY_MANAGER_PAGE_SIZE);
+	const historyManagerShownTo = $derived(Math.min(historyManagerOffset + managedHistoryItems.length, managedHistoryTotal));
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
@@ -611,7 +603,7 @@
 		const r1 = await fetch('/api/interpret', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text: augmented, model: stage1Model, include_thinking: includeThinking, snapshot_id: activeSnapshotId, lang })
+			body: JSON.stringify({ text: augmented, model: stage1Model, include_thinking: includeThinking, lang })
 		});
 		if (!r1.ok) {
 			const d = await r1.json().catch(() => ({})) as { detail?: string };
@@ -625,7 +617,7 @@
 		const r2 = await fetch('/api/compose', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, snapshot_id: activeSnapshotId, lang, color_map: activeColorMap() })
+			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, lang, color_map: activeColorMap() })
 		});
 		if (!r2.ok) {
 			const d = await r2.json().catch(() => ({})) as { detail?: string };
@@ -697,7 +689,7 @@
 			const r = await fetch('/api/compose', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, snapshot_id: activeSnapshotId, lang, color_map: activeColorMap() })
+				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, lang, color_map: activeColorMap() })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -764,30 +756,40 @@
 		} catch { /* ignore */ }
 	}
 
-	async function fetchAllHistory(trashed: boolean): Promise<{ items: Iteration[]; total: number }> {
-		if (!authToken) return { items: [], total: 0 };
-		let offset = 0;
-		let total = 0;
-		const items: Iteration[] = [];
-		do {
-			const r = await apiFetch(`/api/history?offset=${offset}&limit=${HISTORY_MANAGER_PAGE_SIZE}${trashed ? '&trashed=true' : ''}`);
-			if (!r.ok) break;
-			const data = await r.json();
-			items.push(...data.items);
-			total = data.total;
-			offset += data.items.length;
-			if (data.items.length === 0) break;
-		} while (items.length < total);
-		return { items, total };
-	}
-
 	async function fetchHistoryManager(): Promise<void> {
+		if (!authToken) return;
+		historyManagerLoading = true;
 		try {
-			const [active, trash] = await Promise.all([fetchAllHistory(false), fetchAllHistory(true)]);
-			managerHistoryItems = active.items; managerHistoryTotal = active.total;
-			managerTrashItems = trash.items; managerTrashTotal = trash.total;
-			trashItems = trash.items.slice(0, 100); trashTotal = trash.total;
+			const trashed = historyManagerView === 'trash';
+			const offset = historyManagerPage * HISTORY_MANAGER_PAGE_SIZE;
+			const params = new URLSearchParams({
+				offset: String(offset),
+				limit: String(HISTORY_MANAGER_PAGE_SIZE),
+				q: historySearch.trim(),
+			});
+			if (trashed) params.set('trashed', 'true');
+			const r = await apiFetch(`/api/history?${params.toString()}`);
+			if (!r.ok) return;
+			const data = await r.json();
+			if (trashed) {
+				managerTrashItems = data.items;
+				managerTrashTotal = data.total;
+				if (!historySearch.trim()) {
+					trashItems = data.items.slice(0, 100);
+					trashTotal = data.total;
+				}
+			} else {
+				managerHistoryItems = data.items;
+				managerHistoryTotal = data.total;
+			}
+			if (data.items.length === 0 && data.total > 0 && historyManagerPage > 0) {
+				historyManagerPage -= 1;
+				await fetchHistoryManager();
+			}
 		} catch { /* ignore */ }
+		finally {
+			historyManagerLoading = false;
+		}
 	}
 
 	async function pushHistory(it: Iteration): Promise<void> {
@@ -814,7 +816,7 @@
 	}
 
 	function selectAllManagedHistory() {
-		const ids = filteredManagedHistory.map((it) => it.id).filter((id): id is string => !!id);
+		const ids = managedHistoryItems.map((it) => it.id).filter((id): id is string => !!id);
 		selectedHistoryIds = selectedHistoryIds.length === ids.length ? [] : ids;
 	}
 
@@ -996,11 +998,6 @@
 		} finally { URL.revokeObjectURL(url); }
 	}
 
-	// ── Snapshots ───────────────────────────────────────────
-	async function fetchSnapshots() {
-		try { const r = await fetch('/api/saijiki/snapshots'); if (r.ok) snapshots = await r.json(); } catch {}
-	}
-
 	// ── Prompts ─────────────────────────────────────────────
 	async function fetchPrompts(): Promise<void> {
 		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
@@ -1048,13 +1045,42 @@
 		historyManagerOpen = true;
 		historyManagerView = 'active';
 		historyManagerTab = 'thumbs';
+		historyManagerPage = 0;
+		historySearch = '';
 		selectedHistoryIds = [];
 		managerHistoryItems = historyItems;
 		managerHistoryTotal = historyTotal;
-		managerTrashItems = trashItems;
+		managerTrashItems = [];
 		managerTrashTotal = trashTotal;
 		void fetchHistoryManager();
 	}
+
+	function setHistoryManagerView(view: 'active' | 'trash') {
+		historyManagerView = view;
+		historyManagerPage = 0;
+		selectedHistoryIds = [];
+		void fetchHistoryManager();
+	}
+
+	function setHistoryManagerPage(page: number) {
+		const nextPage = Math.max(0, Math.min(page, historyManagerTotalPages - 1));
+		if (nextPage === historyManagerPage) return;
+		historyManagerPage = nextPage;
+		selectedHistoryIds = [];
+		void fetchHistoryManager();
+	}
+
+	$effect(() => {
+		const q = historySearch.trim();
+		if (!historyManagerOpen) return;
+		historyManagerView;
+		const handle = setTimeout(() => {
+			historyManagerPage = 0;
+			selectedHistoryIds = [];
+			void fetchHistoryManager();
+		}, q ? 250 : 0);
+		return () => clearTimeout(handle);
+	});
 
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
@@ -1093,7 +1119,7 @@
 			miscSettingsLoaded = true;
 		} catch {}
 		void (async () => {
-			await Promise.all([loadCurrentUser(), fetchSnapshots(), fetchPrompts()]);
+			await Promise.all([loadCurrentUser(), fetchPrompts()]);
 		})();
 
 		return () => window.removeEventListener('resize', onResize);
@@ -1882,7 +1908,7 @@
 		<div class="modal-head">
 			<div class="catalog-modal-title">履歴管理</div>
 			<div class="modal-head-actions">
-				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => { historyManagerView = historyManagerView === 'trash' ? 'active' : 'trash'; selectedHistoryIds = []; void fetchHistoryManager(); }}>ごみ箱 ({managerTrashTotal || trashTotal})</button>
+				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => setHistoryManagerView(historyManagerView === 'trash' ? 'active' : 'trash')}>ごみ箱 ({managerTrashTotal || trashTotal})</button>
 				<button class="catalog-close" onclick={() => (historyManagerOpen = false)}>×</button>
 			</div>
 		</div>
@@ -1891,7 +1917,13 @@
 			<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>リスト</button>
 		</div>
 		<div class="history-tools">
-			<span class="history-manager-count">{filteredManagedHistory.length} / {managedHistoryTotal}</span>
+			<span class="history-manager-count">
+				{#if managedHistoryTotal === 0}
+					0 / 0
+				{:else}
+					{historyManagerOffset + 1}-{historyManagerShownTo} / {managedHistoryTotal}
+				{/if}
+			</span>
 			<button class="ghost-btn" onclick={selectAllManagedHistory}>すべて選択</button>
 			{#if historyManagerView === 'active'}
 				<button class="ghost-btn" onclick={() => askTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択削除</button>
@@ -1901,17 +1933,22 @@
 			{/if}
 			<label class="history-search">検索: <input bind:value={historySearch} /></label>
 		</div>
+		<div class="history-manager-pager">
+			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>← 前</button>
+			<span>{historyManagerLoading ? '読み込み中' : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
+			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>次 →</button>
+		</div>
 		{#if historyManagerTab === 'thumbs'}
 			<div class="history-thumb-grid-wrap">
 				<div class="history-thumb-grid">
-					{#each filteredManagedHistory as it, i (it.id ?? it.at)}
+					{#each managedHistoryItems as it, i (it.id ?? it.at)}
 						<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 							<label class="manager-check">
 								<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} />
 							</label>
 							<button class="thumb manager-thumb" onclick={() => historyManagerView === 'active' && loadIterationItem(it)}>
 								<div class="thumb-tooltip">
-									<div class="tooltip-title">#{i + 1}</div>
+									<div class="tooltip-title">#{historyManagerOffset + i + 1}</div>
 									<div>モデル: {historyModelSummary(it)}</div>
 									<div>保存時間: {formatHistoryDate(it.at)}</div>
 									<div>秒数: {formatElapsed(it.elapsed_ms)}</div>
@@ -1944,7 +1981,7 @@
 						<tr><th></th><th>画像</th><th>作成日時</th><th>モデル</th><th>秒数</th><th>色カタログ</th><th>操作</th></tr>
 					</thead>
 					<tbody>
-						{#each filteredManagedHistory as it (it.id ?? it.at)}
+						{#each managedHistoryItems as it (it.id ?? it.at)}
 							<tr>
 								<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} /></td>
 								<td><div class="history-mini">{@html it.svg}</div></td>
@@ -3119,6 +3156,17 @@
 	}
 	.history-search { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--fg2); font-size: 12px; }
 	.history-search input { width: min(240px, 30vw); }
+	.history-manager-pager {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 8px 14px;
+		border-bottom: 1px solid var(--border);
+		color: var(--fg3);
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+	}
 	.history-thumb-grid-wrap,
 	.history-table-wrap {
 		flex: 1;

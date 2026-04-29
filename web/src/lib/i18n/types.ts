@@ -20,15 +20,13 @@ export interface LangPack {
 	modelLabel: string;
 	showThinkingLabel: string;
 
-	// Saijiki / Snapshot
+	// Saijiki
 	saijikiLabel: string;
 	saijikiToggleBtn: string;
 	saijikiTitle: string;
 	saijikiHint: string;
 	currentSetting: string;
-	noSnapshots: string;
 	saveCurrentBtn: string;
-	snapshotNamePlaceholder: string;
 
 	// Input
 	modeSingle: string;

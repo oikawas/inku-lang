@@ -277,11 +277,28 @@ def test_history_is_scoped_to_authenticated_user():
     post_a = client.post("/api/history", json=payload, headers=headers_a)
     assert post_a.status_code == 200
     item_a = post_a.json()
+    post_a_second = client.post(
+        "/api/history",
+        json={**payload, "input": "blue crayon search target", "ddl": "青い線", "at": payload["at"] + 1},
+        headers=headers_a,
+    )
+    assert post_a_second.status_code == 200
+    item_a_second = post_a_second.json()
 
     list_a = client.get("/api/history", headers=headers_a)
     assert list_a.status_code == 200
-    assert list_a.json()["total"] == 1
-    assert list_a.json()["items"][0]["id"] == item_a["id"]
+    assert list_a.json()["total"] == 2
+    assert list_a.json()["items"][0]["id"] == item_a_second["id"]
+
+    page_a = client.get("/api/history?offset=1&limit=1", headers=headers_a)
+    assert page_a.status_code == 200
+    assert page_a.json()["total"] == 2
+    assert page_a.json()["items"][0]["id"] == item_a["id"]
+
+    search_a = client.get("/api/history?q=crayon", headers=headers_a)
+    assert search_a.status_code == 200
+    assert search_a.json()["total"] == 1
+    assert search_a.json()["items"][0]["id"] == item_a_second["id"]
 
     list_b = client.get("/api/history", headers=headers_b)
     assert list_b.status_code == 200
@@ -295,7 +312,7 @@ def test_history_is_scoped_to_authenticated_user():
     assert trash_a.status_code == 200
     assert trash_a.json()["count"] == 1
 
-    db.delete_items(user_a["id"], [item_a["id"]])
+    db.delete_items(user_a["id"], [item_a["id"], item_a_second["id"]])
     db.delete_user(user_a["id"])
     db.delete_user(user_b["id"])
     db.delete_user_group(group["id"])

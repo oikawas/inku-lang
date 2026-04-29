@@ -12,7 +12,7 @@ import uuid
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text, create_engine, func, text
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text, create_engine, func, or_, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 _DEFAULT_DB = "sqlite:///" + str(Path.home() / ".local" / "share" / "inku" / "inku.db")
@@ -467,12 +467,28 @@ def delete_user(user_id: str) -> bool:
         return True
 
 
-def list_items(user_id: str, offset: int = 0, limit: int = 10, trashed: bool = False) -> tuple[list[dict], int]:
+def list_items(
+    user_id: str,
+    offset: int = 0,
+    limit: int = 10,
+    trashed: bool = False,
+    query_text: str = "",
+) -> tuple[list[dict], int]:
     with SessionLocal() as session:
         query = session.query(HistoryRow).filter(
             HistoryRow.user_id == user_id,
             HistoryRow.trashed == (1 if trashed else 0),
         )
+        search = query_text.strip()
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(or_(
+                HistoryRow.input.ilike(pattern),
+                HistoryRow.ddl.ilike(pattern),
+                HistoryRow.stage1_model.ilike(pattern),
+                HistoryRow.stage2_model.ilike(pattern),
+                HistoryRow.catalog_id.ilike(pattern),
+            ))
         total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
         rows = (
             query

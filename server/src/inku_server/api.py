@@ -25,11 +25,9 @@ from .composer import SYSTEM_PROMPT_EN as STAGE2_PROMPT_EN
 from .interpreter import interpret_detail
 from .interpreter import SYSTEM_PROMPT as STAGE1_PROMPT
 from .interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
-from .interpreter import SYSTEM_PROMPT_PREFIX as STAGE1_PREFIX
 from .renderer import render
 from .schema import Score
 from . import db as _db
-from . import snapshots as _snapshots
 
 app = FastAPI(title="inku-server", version="0.1.0")
 
@@ -85,7 +83,6 @@ class ComposeRequest(BaseModel):
         default=None, description="Stage 2 モデル名 (未指定時は OPENAI_MODEL 既定)"
     )
     original_text: str | None = Field(default=None, description="元のユーザー記述 (省略可)")
-    snapshot_id: str | None = Field(default=None, description="歳時記スナップショット ID")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
     color_map: dict[str, str] | None = Field(default=None, description="色カタログ (white/black/blue/red/green/gray → hex)")
 
@@ -106,7 +103,6 @@ class InterpretRequest(BaseModel):
     include_thinking: bool = Field(
         default=False, description="qwen3 の <think> 内容を別フィールドで返すか"
     )
-    snapshot_id: str | None = Field(default=None, description="歳時記スナップショット ID")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
 
 
@@ -175,16 +171,6 @@ class HistoryListResponse(BaseModel):
 
 class HistoryIdsBody(BaseModel):
     ids: list[str] = Field(default_factory=list)
-
-
-class SnapshotMeta(BaseModel):
-    id: str
-    name: str
-    at: int
-
-
-class SnapshotCreateBody(BaseModel):
-    name: str = Field(..., min_length=1, description="スナップショット名")
 
 
 class UserGroupItem(BaseModel):
@@ -392,17 +378,12 @@ def _call_interpret_detail(
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
 def api_compose(req: ComposeRequest) -> ComposeResponse:
     t0 = time.perf_counter()
-    stage2_prompt: str | None = None
-    if req.snapshot_id:
-        snap = _snapshots.get_snapshot(req.snapshot_id)
-        if snap:
-            stage2_prompt = snap.get("stage2_prompt")
     try:
         score, tokens_in, tokens_out = _call_compose_detail(
             req.ddl,
             model=req.model,
             original_text=req.original_text,
-            system_prompt=stage2_prompt,
+            system_prompt=None,
             lang=req.lang,
         )
     except Exception as e:  # noqa: BLE001
@@ -421,17 +402,12 @@ def api_compose(req: ComposeRequest) -> ComposeResponse:
 
 @app.post("/api/interpret")
 def api_interpret(req: InterpretRequest) -> dict:
-    stage1_prefix: str | None = None
-    if req.snapshot_id:
-        snap = _snapshots.get_snapshot(req.snapshot_id)
-        if snap:
-            stage1_prefix = snap.get("stage1_prefix")
     try:
         ddl, thinking, tokens_in, tokens_out = _call_interpret_detail(
             req.text,
             model=req.model,
             include_thinking=req.include_thinking,
-            system_prompt_prefix=stage1_prefix,
+            system_prompt_prefix=None,
             lang=req.lang,
         )
     except Exception as e:  # noqa: BLE001
@@ -485,29 +461,6 @@ def api_paint(req: PaintRequest) -> PaintResponse:
         tokens_in_stage2=s2_tin,
         tokens_out_stage2=s2_tout,
     )
-
-
-@app.get("/api/saijiki/snapshots", response_model=list[SnapshotMeta])
-def api_snapshots_list() -> list[SnapshotMeta]:
-    return [SnapshotMeta(**s) for s in _snapshots.list_snapshots()]
-
-
-@app.post("/api/saijiki/snapshots", response_model=SnapshotMeta)
-def api_snapshots_create(body: SnapshotCreateBody) -> SnapshotMeta:
-    meta = _snapshots.create_snapshot(
-        name=body.name,
-        stage1_prefix=STAGE1_PREFIX,
-        stage2_prompt=STAGE2_PROMPT,
-    )
-    return SnapshotMeta(**meta)
-
-
-@app.delete("/api/saijiki/snapshots/{snapshot_id}")
-def api_snapshots_delete(snapshot_id: str) -> dict[str, bool]:
-    found = _snapshots.delete_snapshot(snapshot_id)
-    if not found:
-        raise HTTPException(status_code=404, detail="snapshot not found")
-    return {"ok": True}
 
 
 @app.get("/api/user-groups", response_model=list[UserGroupItem])
@@ -616,9 +569,10 @@ def api_history_get(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
     trashed: bool = Query(default=False),
+    q: str = Query(default="", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
-    items, total = _db.list_items(actor["id"], offset=offset, limit=limit, trashed=trashed)
+    items, total = _db.list_items(actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q)
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 

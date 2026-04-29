@@ -16,7 +16,6 @@
 	import { t, setLang, getLang, PACK_LIST, initLang } from '$lib/i18n/index.svelte';
 	import { COLOR_CATALOGS, getCatalogById, getColorMap, type ColorMap } from '$lib/colors';
 
-	const HISTORY_PAGE_SIZE = 20;
 	const HISTORY_MANAGER_PAGE_SIZE = 100;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
@@ -557,9 +556,12 @@
 	// ── History ─────────────────────────────────────────────
 	let historyItems = $state<Iteration[]>([]);
 	let historyTotal = $state(0);
-	let historyPage  = $state(0);
+	let historyOffset = $state(0);
 	let historyCursor = $state(-1);
-	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
+	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
+	const historyWindowSize = $derived(visibleThumbCount);
+	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
+	const historyTotalPages = $derived(Math.max(1, Math.ceil(historyTotal / historyWindowSize)));
 	let historyManagerOpen = $state(false);
 	let historyManagerView = $state<'active' | 'trash'>('active');
 	let historyManagerTab = $state<'thumbs' | 'list'>('thumbs');
@@ -747,19 +749,31 @@
 	}
 
 	// ── History ─────────────────────────────────────────────
-	async function fetchHistoryPage(page: number): Promise<void> {
+	async function fetchHistoryOffset(offset: number): Promise<void> {
 		if (!authToken) {
 			historyItems = [];
 			historyTotal = 0;
+			historyOffset = 0;
 			return;
 		}
-		const offset = page * HISTORY_PAGE_SIZE;
+		const safeOffset = Math.max(0, offset);
 		try {
-			const r = await apiFetch(`/api/history?offset=${offset}&limit=${HISTORY_PAGE_SIZE}`);
+			const r = await apiFetch(`/api/history?offset=${safeOffset}&limit=${historyWindowSize}`);
 			if (!r.ok) return;
 			const data = await r.json();
-			historyItems = data.items; historyTotal = data.total; historyPage = page;
+			if (data.items.length === 0 && data.total > 0 && safeOffset > 0) {
+				const lastOffset = Math.floor((data.total - 1) / historyWindowSize) * historyWindowSize;
+				await fetchHistoryOffset(lastOffset);
+				return;
+			}
+			historyItems = data.items; historyTotal = data.total; historyOffset = safeOffset;
+			if (historyCursor >= data.items.length) historyCursor = data.items.length > 0 ? 0 : -1;
+			if (historyCursor < 0 && data.items.length > 0) historyCursor = 0;
 		} catch { /* ignore */ }
+	}
+
+	async function fetchHistoryPage(page: number): Promise<void> {
+		await fetchHistoryOffset(page * historyWindowSize);
 	}
 
 	async function fetchTrashPage(): Promise<void> {
@@ -821,7 +835,7 @@
 				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null })
 			});
 		} catch { /* ignore */ }
-		await fetchHistoryPage(0);
+		await fetchHistoryOffset(0);
 		historyCursor = 0;
 	}
 
@@ -848,8 +862,8 @@
 			body: JSON.stringify({ ids })
 		});
 		selectedHistoryIds = [];
-		await Promise.all([fetchHistoryPage(historyPage), fetchTrashPage(), fetchHistoryManager()]);
-		if (historyItems.length === 0 && historyPage > 0) await fetchHistoryPage(historyPage - 1);
+		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), fetchHistoryManager()]);
+		if (historyItems.length === 0 && historyOffset > 0) await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize));
 	}
 
 	function askTrash(ids: string[]) {
@@ -921,16 +935,16 @@
 
 	async function gotoPrev() {
 		if (historyCursor < historyItems.length - 1) { loadIteration(historyCursor + 1); }
-		else if (historyPage < historyTotalPages - 1) { await fetchHistoryPage(historyPage + 1); loadIteration(0); }
+		else if (historyOffset + historyWindowSize < historyTotal) { await fetchHistoryOffset(historyOffset + historyWindowSize); loadIteration(0); }
 	}
 	async function gotoNext() {
 		if (historyCursor > 0) { loadIteration(historyCursor - 1); }
-		else if (historyPage > 0) { await fetchHistoryPage(historyPage - 1); loadIteration(historyItems.length - 1); }
+		else if (historyOffset > 0) { await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize)); loadIteration(historyItems.length - 1); }
 	}
 
-	const prevDisabled = $derived(historyCursor >= historyItems.length - 1 && historyPage >= historyTotalPages - 1);
-	const nextDisabled = $derived(historyCursor <= 0 && historyPage <= 0);
-	const navPos       = $derived(historyPage * HISTORY_PAGE_SIZE + historyCursor + 1);
+	const prevDisabled = $derived(historyCursor < 0 || historyOffset + historyCursor >= historyTotal - 1);
+	const nextDisabled = $derived(historyCursor <= 0 && historyOffset <= 0);
+	const navPos       = $derived(historyOffset + historyCursor + 1);
 
 	// ── Saijiki ─────────────────────────────────────────────
 	function insertWord(word: string) {
@@ -1061,6 +1075,10 @@
 		return text.length > 42 ? `${text.slice(0, 42)}...` : text;
 	}
 
+	function historyIndexLabel(index: number): number {
+		return historyOffset + index + 1;
+	}
+
 	function openHistoryManager() {
 		historyManagerOpen = true;
 		historyManagerView = 'active';
@@ -1116,8 +1134,20 @@
 		return `${total}s`;
 	});
 
-	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
-	const historyNavSpan = $derived(Math.min(visibleThumbCount, HISTORY_PAGE_SIZE));
+	const historyNavSpan = $derived(historyWindowSize);
+	let lastHistoryWindowSize = 0;
+
+	$effect(() => {
+		const size = historyWindowSize;
+		if (lastHistoryWindowSize === 0) {
+			lastHistoryWindowSize = size;
+			return;
+		}
+		if (size === lastHistoryWindowSize) return;
+		lastHistoryWindowSize = size;
+		if (!authToken || historyTotal <= 0) return;
+		void fetchHistoryOffset(historyOffset);
+	});
 
 	// ── Mount ───────────────────────────────────────────────
 	onMount(() => {
@@ -1586,33 +1616,29 @@
 				<button class="history-title-btn" onclick={openHistoryManager}>
 					{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
 				</button>
-				{#if historyTotalPages > 1}
-					<div class="history-page-nav">
-						<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 新しい{historyNavSpan}件</button>
-						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
-						<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>古い{historyNavSpan}件 →</button>
-					</div>
-				{/if}
+				<div class="history-page-nav">
+					<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 新しい{historyNavSpan}件</button>
+					<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
+					<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>古い{historyNavSpan}件 →</button>
+				</div>
 			</div>
 			<div class="thumb-strip">
-				{#each historyItems.slice(0, visibleThumbCount) as it, i (it.id ?? it.at)}
+				{#each historyItems as it, i (it.id ?? it.at)}
 					<button
 						class="thumb"
 						class:current={i === historyCursor}
 						onclick={() => loadIteration(i)}
 					>
 						<div class="thumb-tooltip">
-							<div class="tooltip-title">#{historyPage * HISTORY_PAGE_SIZE + i + 1}</div>
-							<div>モデル: {historyModelSummary(it)}</div>
-							<div>保存時間: {formatHistoryDate(it.at)}</div>
-							<div>秒数: {formatElapsed(it.elapsed_ms)}</div>
-							<div>色カタログ: {catalogName(it.catalog_id)}</div>
-							<div>トークン: {historyTokenSummary(it)}</div>
-							<div class="tooltip-date">{historyPreviewText(it.input)}</div>
+							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
+							<div class="tooltip-row"><span>モデル</span><strong>{historyModelSummary(it)}</strong></div>
+							<div class="tooltip-row"><span>保存時間</span><strong>{formatHistoryDate(it.at)}</strong></div>
+							<div class="tooltip-row"><span>秒数</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
+							<div class="tooltip-row"><span>色カタログ</span><strong>{catalogName(it.catalog_id)}</strong></div>
 						</div>
 						<div class="thumb-svg">{@html it.svg}</div>
 						<div class="thumb-meta">
-							<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyPage * HISTORY_PAGE_SIZE + i + 1)}</span>
+							<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyIndexLabel(i))}</span>
 							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
 						</div>
 						{#if i === historyCursor}
@@ -2709,6 +2735,8 @@
 
 	/* ── History strip ───────────────────────────────────────── */
 	.history-strip {
+		position: relative;
+		z-index: 30;
 		border-top: 1px solid var(--border);
 		background: var(--bg);
 		padding: 8px 16px 10px;
@@ -2744,7 +2772,7 @@
 	.history-nav-btn { min-width: 92px; }
 
 	.thumb-strip {
-		display: flex; gap: 7px; overflow: hidden;
+		display: flex; gap: 7px; overflow: visible;
 	}
 
 	.thumb {
@@ -2754,7 +2782,7 @@
 		cursor: pointer; padding: 0; font-family: inherit; position: relative;
 		transition: border-color 0.1s;
 	}
-	.thumb:hover { overflow: visible; z-index: 20; }
+	.thumb:hover { overflow: visible; z-index: 2000; }
 	.thumb.current { border-color: var(--accent); }
 	.thumb-tooltip {
 		position: absolute; bottom: calc(100% + 6px); left: 50%;
@@ -2762,10 +2790,11 @@
 		opacity: 0; pointer-events: none;
 		background: rgba(26,25,23,0.92); color: #fff;
 		font-size: 11px; border-radius: var(--r);
-		padding: 7px 10px; white-space: nowrap;
+		padding: 8px 10px; white-space: nowrap;
 		text-align: left;
-		max-width: 280px;
-		z-index: 500; line-height: 1.7;
+		width: max-content;
+		max-width: min(360px, calc(100vw - 24px));
+		z-index: 3000; line-height: 1.7;
 		transition: opacity 0.15s, transform 0.15s;
 		box-shadow: 0 4px 18px rgba(0,0,0,0.18);
 	}
@@ -2774,6 +2803,19 @@
 		transform: translateX(-50%) translateY(0);
 	}
 	.tooltip-title { font-weight: 500; margin-bottom: 3px; }
+	.tooltip-row {
+		display: grid;
+		grid-template-columns: 54px minmax(0, 1fr);
+		gap: 8px;
+		align-items: baseline;
+	}
+	.tooltip-row span { color: rgba(255,255,255,0.62); }
+	.tooltip-row strong {
+		font-weight: 500;
+		color: #fff;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 	.tooltip-date { color: rgba(255,255,255,0.55); margin-top: 3px; }
 	.thumb-svg { width: 82px; height: 58px; overflow: hidden; }
 	.thumb-svg :global(svg) { width: 100%; height: 100%; display: block; }

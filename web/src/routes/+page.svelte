@@ -17,6 +17,7 @@
 	import { COLOR_CATALOGS, getCatalogById, getColorMap, type ColorMap } from '$lib/colors';
 
 	const HISTORY_PAGE_SIZE = 20;
+	const HISTORY_MANAGER_PAGE_SIZE = 200;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
@@ -286,12 +287,18 @@
 	const historyTotalPages = $derived(Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 	let historyManagerOpen = $state(false);
 	let historyManagerView = $state<'active' | 'trash'>('active');
+	let historyManagerTab = $state<'thumbs' | 'list'>('thumbs');
+	let managerHistoryItems = $state<Iteration[]>([]);
+	let managerHistoryTotal = $state(0);
+	let managerTrashItems = $state<Iteration[]>([]);
+	let managerTrashTotal = $state(0);
 	let trashItems = $state<Iteration[]>([]);
 	let trashTotal = $state(0);
 	let historySearch = $state('');
 	let selectedHistoryIds = $state<string[]>([]);
 	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean } | null>(null);
-	const managedHistoryItems = $derived(historyManagerView === 'trash' ? trashItems : historyItems);
+	const managedHistoryItems = $derived(historyManagerView === 'trash' ? managerTrashItems : managerHistoryItems);
+	const managedHistoryTotal = $derived(historyManagerView === 'trash' ? managerTrashTotal : managerHistoryTotal);
 	const filteredManagedHistory = $derived.by(() => {
 		const q = historySearch.trim().toLowerCase();
 		if (!q) return managedHistoryItems;
@@ -474,6 +481,31 @@
 		} catch { /* ignore */ }
 	}
 
+	async function fetchAllHistory(trashed: boolean): Promise<{ items: Iteration[]; total: number }> {
+		let offset = 0;
+		let total = 0;
+		const items: Iteration[] = [];
+		do {
+			const r = await fetch(`/api/history?offset=${offset}&limit=${HISTORY_MANAGER_PAGE_SIZE}${trashed ? '&trashed=true' : ''}`);
+			if (!r.ok) break;
+			const data = await r.json();
+			items.push(...data.items);
+			total = data.total;
+			offset += data.items.length;
+			if (data.items.length === 0) break;
+		} while (items.length < total);
+		return { items, total };
+	}
+
+	async function fetchHistoryManager(): Promise<void> {
+		try {
+			const [active, trash] = await Promise.all([fetchAllHistory(false), fetchAllHistory(true)]);
+			managerHistoryItems = active.items; managerHistoryTotal = active.total;
+			managerTrashItems = trash.items; managerTrashTotal = trash.total;
+			trashItems = trash.items.slice(0, 100); trashTotal = trash.total;
+		} catch { /* ignore */ }
+	}
+
 	async function pushHistory(it: Iteration): Promise<void> {
 		try {
 			await fetch('/api/history', {
@@ -508,7 +540,7 @@
 			body: JSON.stringify({ ids })
 		});
 		selectedHistoryIds = [];
-		await Promise.all([fetchHistoryPage(historyPage), fetchTrashPage()]);
+		await Promise.all([fetchHistoryPage(historyPage), fetchTrashPage(), fetchHistoryManager()]);
 		if (historyItems.length === 0 && historyPage > 0) await fetchHistoryPage(historyPage - 1);
 	}
 
@@ -564,7 +596,10 @@
 	function loadIteration(idx: number) {
 		if (idx < 0 || idx >= historyItems.length) return;
 		historyCursor = idx; ddlEditing = false;
-		const it = historyItems[idx];
+		loadIterationItem(historyItems[idx]);
+	}
+
+	function loadIterationItem(it: Iteration) {
 		input = it.input; ddl = it.ddl; baseDDL = it.ddl; thinking = it.thinking ?? null;
 		result = { score: it.score, svg: it.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: it.elapsed_ms ?? 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
 		error = null;
@@ -704,6 +739,33 @@
 		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
 	}
 
+	function formatElapsed(ms: number | null | undefined): string {
+		return ms ? `${(ms / 1000).toFixed(1)}s` : '-';
+	}
+
+	function historyModelSummary(it: Iteration): string {
+		const s1 = it.stage1_model ? shortModel(it.stage1_model) : '-';
+		const s2 = it.stage2_model ? shortModel(it.stage2_model) : '-';
+		return `${s1} → ${s2}`;
+	}
+
+	function historyTokenSummary(it: Iteration): string {
+		if (it.tokens_in == null && it.tokens_out == null) return '-';
+		return `${it.tokens_in ?? '?'} → ${it.tokens_out ?? '?'} tok`;
+	}
+
+	function historyPreviewText(text: string): string {
+		return text.length > 42 ? `${text.slice(0, 42)}...` : text;
+	}
+
+	function openHistoryManager() {
+		historyManagerOpen = true;
+		historyManagerView = 'active';
+		historyManagerTab = 'thumbs';
+		selectedHistoryIds = [];
+		void fetchHistoryManager();
+	}
+
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
 	);
@@ -719,6 +781,7 @@
 	});
 
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
+	const historyNavSpan = $derived(Math.min(visibleThumbCount, HISTORY_PAGE_SIZE));
 
 	// ── Mount ───────────────────────────────────────────────
 	onMount(() => {
@@ -1098,14 +1161,14 @@
 	{#if historyTotal > 0}
 		<div class="history-strip">
 			<div class="history-head">
-				<button class="history-title-btn" onclick={() => { historyManagerOpen = true; historyManagerView = 'active'; selectedHistoryIds = []; void fetchTrashPage(); }}>
+				<button class="history-title-btn" onclick={openHistoryManager}>
 					{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
 				</button>
 				{#if historyTotalPages > 1}
 					<div class="history-page-nav">
-						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 前のページ</button>
+						<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 新しい{historyNavSpan}件</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
-						<button class="ghost-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>次のページ →</button>
+						<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>古い{historyNavSpan}件 →</button>
 					</div>
 				{/if}
 			</div>
@@ -1118,14 +1181,16 @@
 					>
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyPage * HISTORY_PAGE_SIZE + i + 1}</div>
-							<div>モデル: {shortModel(it.stage2_model)}</div>
-							<div>時間: {it.elapsed_ms ? (it.elapsed_ms / 1000).toFixed(1) + 's' : '-'}</div>
-							<div>色: {catalogName(it.catalog_id)}</div>
-							<div class="tooltip-date">{formatHistoryDate(it.at)}</div>
+							<div>モデル: {historyModelSummary(it)}</div>
+							<div>保存時間: {formatHistoryDate(it.at)}</div>
+							<div>秒数: {formatElapsed(it.elapsed_ms)}</div>
+							<div>色カタログ: {catalogName(it.catalog_id)}</div>
+							<div>トークン: {historyTokenSummary(it)}</div>
+							<div class="tooltip-date">{historyPreviewText(it.input)}</div>
 						</div>
 						<div class="thumb-svg">{@html it.svg}</div>
 						<div class="thumb-meta">
-							<span class="thumb-time">{it.elapsed_ms ? (it.elapsed_ms / 1000).toFixed(1) + 's' : String(historyPage * HISTORY_PAGE_SIZE + i + 1)}</span>
+							<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyPage * HISTORY_PAGE_SIZE + i + 1)}</span>
 							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
 						</div>
 						{#if i === historyCursor}
@@ -1371,37 +1436,39 @@
 			<div class="catalog-modal-title">カタログ設定</div>
 			<button class="catalog-close" onclick={() => (catalogOpen = false)}>×</button>
 		</div>
-		<div class="catalog-scroll">
-			{#each COLOR_CATALOGS as cat (cat.id)}
-				{@const active = selectedCatalog === cat.id}
-				<button
-					class="catalog-item"
-					class:active
-					onclick={() => { selectedCatalog = cat.id; try { localStorage.setItem(CATALOG_KEY, cat.id); } catch {} }}
-				>
-					<div class="catalog-swatches">
-						{#each cat.swatches as hex (hex)}
-							<div class="catalog-swatch" style="background:{hex}"></div>
-						{/each}
-					</div>
-					<div class="catalog-info">
-						<div class="catalog-name">{cat.name}</div>
-						<div class="catalog-sub">{cat.sub}</div>
-					</div>
-					{#if active}<span class="catalog-check">✓</span>{/if}
-				</button>
-			{/each}
-		</div>
-		<div class="catalog-detail">
-			<div class="section-label">{currentCatalog.name} — 詳細</div>
-			<div class="catalog-detail-list">
-				{#each currentCatalog.palette as color (color.code)}
-					<div class="catalog-color-row">
-						<div class="catalog-color-box" class:light={isLightColor(color.code)} style="background:{color.code}"></div>
-						<span class="catalog-color-name">{color.name}</span>
-						<span class="catalog-color-code">{color.code}</span>
-					</div>
+		<div class="catalog-body">
+			<div class="catalog-scroll">
+				{#each COLOR_CATALOGS as cat (cat.id)}
+					{@const active = selectedCatalog === cat.id}
+					<button
+						class="catalog-item"
+						class:active
+						onclick={() => { selectedCatalog = cat.id; try { localStorage.setItem(CATALOG_KEY, cat.id); } catch {} }}
+					>
+						<div class="catalog-swatches">
+							{#each cat.swatches as hex (hex)}
+								<div class="catalog-swatch" style="background:{hex}"></div>
+							{/each}
+						</div>
+						<div class="catalog-info">
+							<div class="catalog-name">{cat.name}</div>
+							<div class="catalog-sub">{cat.sub}</div>
+						</div>
+						{#if active}<span class="catalog-check">✓</span>{/if}
+					</button>
 				{/each}
+			</div>
+			<div class="catalog-detail">
+				<div class="section-label">{currentCatalog.name} — 詳細</div>
+				<div class="catalog-detail-list">
+					{#each currentCatalog.palette as color (color.code)}
+						<div class="catalog-color-row">
+							<div class="catalog-color-box" class:light={isLightColor(color.code)} style="background:{color.code}"></div>
+							<span class="catalog-color-name">{color.name}</span>
+							<span class="catalog-color-code">{color.code}</span>
+						</div>
+					{/each}
+				</div>
 			</div>
 		</div>
 	</div>
@@ -1414,11 +1481,16 @@
 		<div class="modal-head">
 			<div class="catalog-modal-title">履歴管理</div>
 			<div class="modal-head-actions">
-				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => { historyManagerView = historyManagerView === 'trash' ? 'active' : 'trash'; selectedHistoryIds = []; void fetchTrashPage(); }}>ごみ箱 ({trashTotal})</button>
+				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => { historyManagerView = historyManagerView === 'trash' ? 'active' : 'trash'; selectedHistoryIds = []; void fetchHistoryManager(); }}>ごみ箱 ({managerTrashTotal || trashTotal})</button>
 				<button class="catalog-close" onclick={() => (historyManagerOpen = false)}>×</button>
 			</div>
 		</div>
+		<div class="settings-tabs history-mode-tabs">
+			<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>サムネイル</button>
+			<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>リスト</button>
+		</div>
 		<div class="history-tools">
+			<span class="history-manager-count">{filteredManagedHistory.length} / {managedHistoryTotal}</span>
 			<button class="ghost-btn" onclick={selectAllManagedHistory}>すべて選択</button>
 			{#if historyManagerView === 'active'}
 				<button class="ghost-btn" onclick={() => askTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択削除</button>
@@ -1428,32 +1500,71 @@
 			{/if}
 			<label class="history-search">検索: <input bind:value={historySearch} /></label>
 		</div>
-		<div class="history-table-wrap">
-			<table class="history-table">
-				<thead>
-					<tr><th></th><th>画像</th><th>作成日時</th><th>モデル</th><th>時間</th><th>操作</th></tr>
-				</thead>
-				<tbody>
-					{#each filteredManagedHistory as it (it.id ?? it.at)}
-						<tr>
-							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} /></td>
-							<td><div class="history-mini">{@html it.svg}</div></td>
-							<td>{formatHistoryDate(it.at)}</td>
-							<td>{shortModel(it.stage2_model)}</td>
-							<td>{it.elapsed_ms ? (it.elapsed_ms / 1000).toFixed(1) + 's' : '-'}</td>
-							<td>
+		{#if historyManagerTab === 'thumbs'}
+			<div class="history-thumb-grid-wrap">
+				<div class="history-thumb-grid">
+					{#each filteredManagedHistory as it, i (it.id ?? it.at)}
+						<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
+							<label class="manager-check">
+								<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} />
+							</label>
+							<button class="thumb manager-thumb" onclick={() => historyManagerView === 'active' && loadIterationItem(it)}>
+								<div class="thumb-tooltip">
+									<div class="tooltip-title">#{i + 1}</div>
+									<div>モデル: {historyModelSummary(it)}</div>
+									<div>保存時間: {formatHistoryDate(it.at)}</div>
+									<div>秒数: {formatElapsed(it.elapsed_ms)}</div>
+									<div>色カタログ: {catalogName(it.catalog_id)}</div>
+									<div>トークン: {historyTokenSummary(it)}</div>
+									<div class="tooltip-date">{historyPreviewText(it.input)}</div>
+								</div>
+								<div class="thumb-svg">{@html it.svg}</div>
+								<div class="thumb-meta">
+									<span class="thumb-time">{formatElapsed(it.elapsed_ms)}</span>
+									{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
+								</div>
+							</button>
+							<div class="manager-thumb-actions">
 								{#if historyManagerView === 'active'}
 									<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>削除</button>
 								{:else}
 									<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>復元</button>
 									<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>完全削除</button>
 								{/if}
-							</td>
-						</tr>
+							</div>
+						</div>
 					{/each}
-				</tbody>
-			</table>
-		</div>
+				</div>
+			</div>
+		{:else}
+			<div class="history-table-wrap">
+				<table class="history-table">
+					<thead>
+						<tr><th></th><th>画像</th><th>作成日時</th><th>モデル</th><th>秒数</th><th>色カタログ</th><th>操作</th></tr>
+					</thead>
+					<tbody>
+						{#each filteredManagedHistory as it (it.id ?? it.at)}
+							<tr>
+								<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} /></td>
+								<td><div class="history-mini">{@html it.svg}</div></td>
+								<td>{formatHistoryDate(it.at)}</td>
+								<td>{historyModelSummary(it)}</td>
+								<td>{formatElapsed(it.elapsed_ms)}</td>
+								<td>{catalogName(it.catalog_id)}</td>
+								<td>
+									{#if historyManagerView === 'active'}
+										<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>削除</button>
+									{:else}
+										<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>復元</button>
+										<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>完全削除</button>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
 	</div>
 {/if}
 
@@ -2092,6 +2203,7 @@
 	.history-count { color: var(--fg3); font-weight: 400; }
 	.history-page-nav { display: flex; align-items: center; gap: 6px; }
 	.history-page-indicator { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; }
+	.history-nav-btn { min-width: 92px; }
 
 	.thumb-strip {
 		display: flex; gap: 7px; overflow: hidden;
@@ -2113,6 +2225,8 @@
 		background: rgba(26,25,23,0.92); color: #fff;
 		font-size: 11px; border-radius: var(--r);
 		padding: 7px 10px; white-space: nowrap;
+		text-align: left;
+		max-width: 280px;
 		z-index: 500; line-height: 1.7;
 		transition: opacity 0.15s, transform 0.15s;
 		box-shadow: 0 4px 18px rgba(0,0,0,0.18);
@@ -2190,7 +2304,7 @@
 	.catalog-modal {
 		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
 		z-index: 401;
-		width: 540px; max-height: 88vh;
+		width: min(820px, calc(100vw - 32px)); max-height: 88vh;
 		background: #faf9f6; border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
@@ -2204,7 +2318,13 @@
 		width: 24px; height: 24px; border: none; background: none;
 		color: var(--fg3); font-size: 18px; cursor: pointer; line-height: 1;
 	}
-	.catalog-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+	.catalog-body {
+		display: grid;
+		grid-template-columns: minmax(340px, 1fr) minmax(260px, 0.75fr);
+		flex: 1;
+		min-height: 0;
+	}
+	.catalog-scroll { min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 
 	.catalog-item {
 		display: flex; align-items: center; gap: 12px; padding: 10px 12px;
@@ -2225,10 +2345,11 @@
 	.catalog-sub  { font-size: 11px; color: var(--fg3); }
 	.catalog-check { color: var(--accent); font-size: 13px; flex-shrink: 0; }
 	.catalog-detail {
-		border-top: 1px solid var(--border);
+		border-left: 1px solid var(--border);
 		padding: 12px 16px 14px;
 		background: #fff;
-		flex-shrink: 0;
+		min-height: 0;
+		overflow-y: auto;
 	}
 	.catalog-detail-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 	.catalog-color-row {
@@ -2354,12 +2475,73 @@
 	.history-tools {
 		display: flex; align-items: center; gap: 8px;
 		padding: 10px 14px; border-bottom: 1px solid var(--border);
+		flex-wrap: wrap;
+	}
+	.history-mode-tabs { flex-shrink: 0; }
+	.history-manager-count {
+		font-size: 11px;
+		color: var(--fg3);
+		font-variant-numeric: tabular-nums;
+		margin-right: 2px;
 	}
 	.history-search { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--fg2); font-size: 12px; }
-	.history-table-wrap { overflow: auto; padding: 0 14px 14px; }
+	.history-thumb-grid-wrap,
+	.history-table-wrap {
+		flex: 1;
+		overflow: auto;
+		padding: 12px 14px 14px;
+		min-height: 0;
+	}
+	.history-thumb-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+		gap: 12px;
+		align-items: start;
+	}
+	.manager-thumb-wrap {
+		position: relative;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		padding: 7px;
+		transition: border-color 0.12s, box-shadow 0.12s;
+	}
+	.manager-thumb-wrap.selected {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px var(--accent-light);
+	}
+	.manager-check {
+		position: absolute;
+		top: 6px;
+		left: 6px;
+		z-index: 30;
+		background: rgba(255,255,255,0.86);
+		border-radius: 3px;
+		line-height: 1;
+		padding: 2px;
+	}
+	.manager-thumb {
+		width: 100%;
+	}
+	.manager-thumb .thumb-svg {
+		width: 100%;
+		aspect-ratio: 82 / 58;
+		height: auto;
+	}
+	.manager-thumb-actions {
+		display: flex;
+		gap: 5px;
+		margin-top: 7px;
+		flex-wrap: wrap;
+	}
+	.manager-thumb-actions .ghost-btn,
+	.manager-thumb-actions .danger-btn {
+		font-size: 10px;
+		padding: 3px 7px;
+	}
 	.history-table {
 		width: 100%; border-collapse: collapse; background: #fff;
-		font-size: 12px; margin-top: 12px;
+		font-size: 12px;
 	}
 	.history-table th, .history-table td {
 		border: 1px solid var(--border); padding: 7px 8px; text-align: left; vertical-align: middle;

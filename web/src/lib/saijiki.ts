@@ -68,6 +68,12 @@ export const SAIJIKI: SaijikiCategory[] = [
 		words: ['置く', '並べる', '埋める', '散らす', '引く']
 	},
 	{
+		key: 'katamuki',
+		label: 'かたむき',
+		en: 'angles',
+		words: ['水平', '垂直', '斜め', '右上がり', '右下がり', '回転']
+	},
+	{
 		key: 'wariai',
 		label: 'わりあい',
 		en: 'proportions',

@@ -78,6 +78,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 # Saijiki (歳時記)
 
 かたち: 円、楕円、三角、四角、線、弧
+かたむき: 水平、垂直、斜め、右上がり、右下がり、回転
 てざわり: 髪、鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、縄
 つらなり: 実線(既定)、破線、点線、一点鎖線
 いろ: 白、黒(既定)、青、赤、緑、灰
@@ -101,6 +102,15 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - 上弦 → D字形の弧 (右側半円)
 - 下弦 → C字形の弧 (左側半円)
 - 三日月 → 細い弧 約120°〜150°
+
+# かたむき (角度・回転)
+
+- 水平 → 0°。線なら横線。
+- 垂直 → 90°。線なら縦線。
+- 斜め → 約45°。
+- 右上がり → 約-30°。左下から右上へ向かう。
+- 右下がり → 約30°。左上から右下へ向かう。
+- 回転 → 図形全体を約30°傾ける。角度が明示されていればその値を使う。
 
 # 非 Saijiki 語の展開
 
@@ -570,6 +580,7 @@ Example: "black background with white lines" → "Fill background with black. Dr
 # Saijiki (Vocabulary)
 
 forms: circle, ellipse, triangle, square, line, arc
+angles: horizontal, vertical, diagonal, rising, falling, rotated
 touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, rope
 continuity: solid (default), dashed, dotted, dash-dot
 colors: white, black (default), blue, red, green, gray
@@ -594,6 +605,15 @@ Arc / Moon:
 - waxing → D-shape arc (right semicircle)
 - waning → C-shape arc (left semicircle)
 - crescent → thin arc ~120°–150°
+
+# Angles / Rotation
+
+- horizontal → 0°. For line, make it a horizontal line.
+- vertical → 90°. For line, make it a vertical line.
+- diagonal → about 45°.
+- rising → about -30°. From lower-left toward upper-right.
+- falling → about 30°. From upper-left toward lower-right.
+- rotated → rotate the whole shape by about 30°. Use an explicit angle when supplied.
 
 # Non-Saijiki Word Expansion
 

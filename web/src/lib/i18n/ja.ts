@@ -67,6 +67,8 @@ export const ja: LangPack = {
 	promptLoading: '読み込み中…',
 	promptExpand: '展開',
 	promptCollapse: '折りたたむ',
+	promptCopy: 'コピー',
+	promptCopied: 'コピーしました',
 
 	exportLabel: 'エクスポート',
 	dlSvgBtn: '↓ SVG',
@@ -119,6 +121,7 @@ export const ja: LangPack = {
 	settingsSaveReplay: '解釈を再編集した場合も新バージョンとして保存する',
 	colorCatalogTitle: '色カタログ',
 	colorCatalogDetail: '詳細',
+	colorCatalogConfirm: '決定',
 	userRoleAdmin: '管理者',
 	userRoleGroupLead: 'グループリード',
 	userRoleUser: 'ユーザー',
@@ -182,6 +185,7 @@ export const ja: LangPack = {
 
 	saijikiWords: {
 		katachi: ['円', '楕円', '三角', '四角', '線', '弧'],
+		katamuki: ['水平', '垂直', '斜め', '右上がり', '右下がり', '回転'],
 		tezawari: ['髪', '鉛筆', 'ペン', 'ロットリング', 'クレヨン', 'チョーク', '細筆', '太筆', '縄'],
 		tsuranari: ['実線', '破線', '点線', '一点鎖線'],
 		iro: ['白', '黒', '青', '赤', '緑', '灰'],

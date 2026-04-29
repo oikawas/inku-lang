@@ -78,6 +78,12 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **上弦** → arc、angle_start=270、angle_end=90 (右側半円、D字形)
 - **下弦** → arc、angle_start=90、angle_end=270 (左側半円、C字形)
 - **三日月** → arc、angle_start=210、angle_end=330 (細い下弦弧、約120°)
+- **水平** → rotation=0。線なら from=[0.0,y], to=[1.0,y] の横線
+- **垂直** → rotation=90。線なら from=[x,0.0], to=[x,1.0] の縦線
+- **斜め** → rotation=45
+- **右上がり** → rotation=-30
+- **右下がり** → rotation=30
+- **回転** → rotation=30。角度が明示されていればその値を使う
 
 入力: 縦長の四角を中央に置く。
 出力: {"instructions":[{"primitive":"square","position":[0.425,0.325],"size":[0.15,0.35]}]}
@@ -96,6 +102,12 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 背景を黒で塗りつぶす。三日月の弧を右上に置く。半径は0.12。
 出力: {"background":"black","instructions":[{"primitive":"arc","center":[0.7,0.25],"radius":0.12,"angle_start":210,"angle_end":330,"color":"white"}]}
+
+入力: 右上がりの横長の四角を中央に置く。
+出力: {"instructions":[{"primitive":"square","position":[0.325,0.425],"size":[0.35,0.15],"rotation":-30}]}
+
+入力: 斜めの線を中央に引く。
+出力: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"rotation":45}]}
 
 # てざわり → weight 変換 (必須)
 
@@ -181,6 +193,12 @@ Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,
 - **waxing** → arc, angle_start=270, angle_end=90
 - **waning** → arc, angle_start=90, angle_end=270
 - **crescent** → arc, angle_start=210, angle_end=330
+- **horizontal** → rotation=0. For line, use from=[0.0,y], to=[1.0,y]
+- **vertical** → rotation=90. For line, use from=[x,0.0], to=[x,1.0]
+- **diagonal** → rotation=45
+- **rising** → rotation=-30
+- **falling** → rotation=30
+- **rotated** → rotation=30, unless an explicit angle is given
 
 Input: Place a tall rectangle at center.
 Output: {"instructions":[{"primitive":"square","position":[0.425,0.325],"size":[0.15,0.35]}]}

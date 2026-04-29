@@ -358,7 +358,8 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 
 | カテゴリ | 語彙例 |
 |---|---|
-| かたち | 円、三角、四角、線、弧 |
+| かたち | 円、楕円、三角、四角、線、弧 |
+| かたむき | 水平、垂直、斜め、右上がり、右下がり、回転 |
 | てざわり | ペン、筆、クレヨン、チョーク、縄 |
 | うごき | 置く、並べる、埋める、散らす |
 | ばしょ | 上、下、中心、端、隅 |
@@ -367,7 +368,8 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 
 | Category | Vocabulary |
 |---|---|
-| forms | circle, triangle, square, line, arc |
+| forms | circle, ellipse, triangle, square, line, arc |
+| angles | horizontal, vertical, diagonal, rising, falling, rotated |
 | touches | pen, brush, crayon, chalk, rope |
 | motions | place, align, fill, scatter |
 | places | top, bottom, center, edge, corner |
@@ -674,7 +676,8 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
 あなたは、正規化DDLをJSON Scoreに変換する関数です。
 入力は以下のコア語彙のみを含みます:
 
-かたち: 円、三角、四角、線、弧
+かたち: 円、楕円、三角、四角、線、弧
+かたむき: 水平、垂直、斜め、右上がり、右下がり、回転
 てざわり: ペン、筆、クレヨン、チョーク、縄
 うごき: 置く、並べる、埋める、散らす
 ばしょ: 上、下、中心、端、隅
@@ -2023,7 +2026,7 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
 - **Web UI: モード切替 + Saijiki 参照 + 反復履歴**
   - タブ: 自由記述 / 正規化DDL (それぞれ /api/paint と /api/compose に繋ぐ)
   - 自由記述モード: 解釈結果 (正規化DDL) を左カラム下部に常時表示
-  - 歳時記ドロワー: 右スライドイン、7 カテゴリ (かたち/てざわり/つらなり/いろ/ゆらぎ/ばしょ/うごき)、chip クリックで textarea の caret 位置に挿入
+  - 歳時記ドロワー: 右スライドイン、9 カテゴリ (かたち/かたむき/てざわり/つらなり/いろ/ゆらぎ/ばしょ/うごき/わりあい)、chip クリックで textarea の caret 位置に挿入
   - Saijiki 辞書は `web/src/lib/saijiki.ts` に分離
   - 反復履歴: in-memory、最大 20 件、`◀ N/M ▶` 移動ボタンで input/output/DDL を過去状態に復元
   - サムネイル列: 履歴 2 件以上で下段に 96px 方形ミニチュア SVG を横並べ、クリックで jump
@@ -2070,6 +2073,7 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
   - `extra="forbid"` で未知フィールド拒否、schema 厳密化
   - `populate_by_name=True` + alias で予約語回避 (`from` → `from_`)
   - Primitive: `line | circle | ellipse | triangle | square | arc`
+  - `rotation`: 図形全体の回転角。0=水平、正=時計回り、負=反時計回り。線・楕円・四角・三角・弧を中心まわりに回転
   - Weight 9種、Color 6種、LineStyle 4種、Variation 4フィールド (amplitude/frequency/quality/dimensions)
   - `Score.model_json_schema()` を Anthropic tool input_schema にそのまま渡せる形
 

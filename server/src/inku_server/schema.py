@@ -141,6 +141,13 @@ class Instruction(BaseModel):
         default=None,
         description="arc 終端角(度) 同上",
     )
+    rotation: Optional[float] = Field(
+        default=None,
+        description=(
+            "図形全体の回転角(度)。0=水平、正=時計回り、負=反時計回り。"
+            "線・楕円・四角・三角・弧を中心まわりに回転する。"
+        ),
+    )
 
     filled: bool = Field(
         default=False,

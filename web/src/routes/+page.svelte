@@ -145,6 +145,13 @@
 	let ddlEditing   = $state(false);
 	let baseDDL      = $state<string | null>(null);
 	let zoom         = $state(1);
+	let panX         = $state(0);
+	let panY         = $state(0);
+	let canvasDragging = $state(false);
+	let dragStartX   = 0;
+	let dragStartY   = 0;
+	let dragStartPanX = 0;
+	let dragStartPanY = 0;
 	let promptStage1Expanded = $state(false);
 	let promptStage2Expanded = $state(false);
 	let showBirds = $state(true);
@@ -964,6 +971,15 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') { saijikiOpen = false; settingsOpen = false; catalogOpen = false; historyManagerOpen = false; confirmAction = null; }
+		if (!shouldIgnoreCanvasShortcut(e)) handleCanvasKeydown(e);
+	}
+
+	function shouldIgnoreCanvasShortcut(e: KeyboardEvent) {
+		if (!currentUser || settingsOpen || catalogOpen || historyManagerOpen || confirmAction) return true;
+		const target = e.target;
+		if (!(target instanceof HTMLElement)) return false;
+		if (target.isContentEditable) return true;
+		return !!target.closest('input, textarea, select, [contenteditable="true"]');
 	}
 
 	function handleDocClick(e: MouseEvent) {
@@ -1149,6 +1165,72 @@
 		);
 	}
 
+	function setZoom(nextZoom: number) {
+		zoom = Math.max(0.5, Math.min(10, +nextZoom.toFixed(2)));
+		if (zoom <= 1) {
+			panX = 0;
+			panY = 0;
+		}
+	}
+
+	function resetZoom() {
+		zoom = 1;
+		panX = 0;
+		panY = 0;
+		canvasDragging = false;
+	}
+
+	function startCanvasDrag(event: PointerEvent) {
+		if (outputTab !== 'canvas' || zoom <= 1 || event.button !== 0) return;
+		canvasDragging = true;
+		dragStartX = event.clientX;
+		dragStartY = event.clientY;
+		dragStartPanX = panX;
+		dragStartPanY = panY;
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		event.preventDefault();
+	}
+
+	function moveCanvasDrag(event: PointerEvent) {
+		if (!canvasDragging) return;
+		panX = dragStartPanX + event.clientX - dragStartX;
+		panY = dragStartPanY + event.clientY - dragStartY;
+	}
+
+	function endCanvasDrag(event: PointerEvent) {
+		if (!canvasDragging) return;
+		canvasDragging = false;
+		const target = event.currentTarget as HTMLElement;
+		if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+	}
+
+	function handleCanvasKeydown(event: KeyboardEvent) {
+		if (outputTab !== 'canvas') return;
+		if (event.key === '+' || event.key === '=' || event.code === 'Equal' || event.code === 'NumpadAdd') {
+			setZoom(zoom + 0.25);
+			event.preventDefault();
+			return;
+		}
+		if (event.key === '-' || event.key === '_' || event.code === 'Minus' || event.code === 'NumpadSubtract') {
+			setZoom(zoom - 0.25);
+			event.preventDefault();
+			return;
+		}
+		if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') {
+			resetZoom();
+			event.preventDefault();
+			return;
+		}
+		if (zoom <= 1) return;
+		const step = event.shiftKey ? 120 : 40;
+		if (event.key === 'ArrowLeft') panX += step;
+		else if (event.key === 'ArrowRight') panX -= step;
+		else if (event.key === 'ArrowUp') panY += step;
+		else if (event.key === 'ArrowDown') panY -= step;
+		else return;
+		event.preventDefault();
+	}
+
 	// ── Stats string ─────────────────────────────────────────
 	const statsLine = $derived.by(() => {
 		if (!result) return '';
@@ -1179,6 +1261,7 @@
 		windowWidth = window.innerWidth;
 		function onResize() { windowWidth = window.innerWidth; }
 		window.addEventListener('resize', onResize);
+		document.addEventListener('keydown', handleKeydown, true);
 
 		initLang();
 		try {
@@ -1197,7 +1280,10 @@
 			await Promise.all([loadCurrentUser(), fetchPrompts()]);
 		})();
 
-		return () => window.removeEventListener('resize', onResize);
+		return () => {
+			window.removeEventListener('resize', onResize);
+			document.removeEventListener('keydown', handleKeydown, true);
+		};
 	});
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
@@ -1207,7 +1293,7 @@
 	});
 </script>
 
-<svelte:window onkeydown={handleKeydown} onclick={handleDocClick} />
+<svelte:window onclick={handleDocClick} />
 
 <!-- ══════════════════════════════════════════════════════════ -->
 <!--  ROOT                                                       -->
@@ -1546,17 +1632,28 @@
 				</div>
 
 				<!-- Content -->
-				<div class="canvas-content">
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="canvas-content"
+					class:can-pan={outputTab === 'canvas' && zoom > 1}
+					class:dragging={canvasDragging}
+					onpointerdown={startCanvasDrag}
+					onpointermove={moveCanvasDrag}
+					onpointerup={endCanvasDrag}
+					onpointercancel={endCanvasDrag}
+				>
 					{#if outputTab === 'canvas'}
-						<div
-							class="canvas-box"
-							style="transform: scale({zoom}); transform-origin: center center; transition: transform 0.15s;"
-						>
-							{#if result}
-								{@html result.svg}
-							{:else}
-								<div class="canvas-placeholder">{t().canvasPlaceholder}</div>
-							{/if}
+						<div class="canvas-pan" style="transform: translate3d({panX}px, {panY}px, 0);">
+							<div
+								class="canvas-box"
+								style="transform: scale({zoom}); transform-origin: center center; transition: transform 0.15s;"
+							>
+								{#if result}
+									{@html result.svg}
+								{:else}
+									<div class="canvas-placeholder">{t().canvasPlaceholder}</div>
+								{/if}
+							</div>
 						</div>
 					{:else if outputTab === 'prompts'}
 						{#if promptsData}
@@ -1602,10 +1699,10 @@
 				<!-- Zoom controls (canvas tab only) -->
 				{#if outputTab === 'canvas'}
 					<div class="zoom-controls">
-						<button onclick={() => (zoom = Math.max(0.5, +(zoom - 0.25).toFixed(2)))}>−</button>
+						<button onclick={() => setZoom(zoom - 0.25)}>−</button>
 						<span class="zoom-pct">{Math.round(zoom * 100)}%</span>
-						<button onclick={() => (zoom = Math.min(3, +(zoom + 0.25).toFixed(2)))}>＋</button>
-						<button class="zoom-reset" onclick={() => (zoom = 1)}>⊙</button>
+						<button onclick={() => setZoom(zoom + 0.25)}>＋</button>
+						<button class="zoom-reset" onclick={resetZoom}>⊙</button>
 					</div>
 				{/if}
 
@@ -2641,6 +2738,15 @@
 	.canvas-content {
 		position: relative; width: 100%; height: 100%;
 		display: flex; align-items: center; justify-content: center; overflow: hidden;
+	}
+	.canvas-content.can-pan { cursor: grab; touch-action: none; }
+	.canvas-content.dragging { cursor: grabbing; }
+
+	.canvas-pan {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		will-change: transform;
 	}
 
 	.canvas-box {

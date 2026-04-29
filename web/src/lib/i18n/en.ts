@@ -67,6 +67,8 @@ export const en: LangPack = {
 	promptLoading: 'loading…',
 	promptExpand: 'expand',
 	promptCollapse: 'collapse',
+	promptCopy: 'copy',
+	promptCopied: 'copied',
 
 	exportLabel: 'export',
 	dlSvgBtn: '↓ SVG',
@@ -119,6 +121,7 @@ export const en: LangPack = {
 	settingsSaveReplay: 'save edited interpretation as a new version',
 	colorCatalogTitle: 'color catalog',
 	colorCatalogDetail: 'details',
+	colorCatalogConfirm: 'done',
 	userRoleAdmin: 'admin',
 	userRoleGroupLead: 'group lead',
 	userRoleUser: 'user',
@@ -182,6 +185,7 @@ export const en: LangPack = {
 
 	saijikiWords: {
 		katachi: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc'],
+		katamuki: ['horizontal', 'vertical', 'diagonal', 'rising', 'falling', 'rotated'],
 		tezawari: ['hair', 'pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'rope'],
 		tsuranari: ['solid', 'dashed', 'dotted', 'dash-dot'],
 		iro: ['white', 'black', 'blue', 'red', 'green', 'gray'],

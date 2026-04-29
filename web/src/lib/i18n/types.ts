@@ -78,6 +78,8 @@ export interface LangPack {
 	promptLoading: string;
 	promptExpand: string;
 	promptCollapse: string;
+	promptCopy: string;
+	promptCopied: string;
 
 	// Download
 	exportLabel: string;
@@ -133,6 +135,7 @@ export interface LangPack {
 	settingsSaveReplay: string;
 	colorCatalogTitle: string;
 	colorCatalogDetail: string;
+	colorCatalogConfirm: string;
 	userRoleAdmin: string;
 	userRoleGroupLead: string;
 	userRoleUser: string;

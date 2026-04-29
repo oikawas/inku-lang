@@ -11,6 +11,7 @@
 		DEFAULT_PROVIDER,
 		DEFAULT_MODEL,
 		modelsForProvider,
+		providerOfModel,
 		type Provider
 	} from '$lib/models';
 	import { t, setLang, getLang, PACK_LIST, initLang } from '$lib/i18n/index.svelte';
@@ -123,11 +124,16 @@
 	}
 
 	// ── Input ───────────────────────────────────────────────
+	const DEFAULT_INPUT = '山の向こうに月が昇る';
 	let inputMode   = $state<'single' | 'batch'>('single');
-	let input       = $state('山の向こうに月が昇る');
+	let input       = $state(DEFAULT_INPUT);
 	let batchInput  = $state('');
 	let stage1UserPrompt = $state('');
-	let textareaEl  = $state<HTMLTextAreaElement | null>(null);
+	let ddlTextareaEl = $state<HTMLTextAreaElement | null>(null);
+	let ddlHighlightEl = $state<HTMLDivElement | null>(null);
+	let ddlSelection = $state({ start: 0, end: 0 });
+	let ddlFocused = $state(false);
+	let copiedPrompt = $state<'stage1' | 'stage2' | null>(null);
 
 	// ── Loading ─────────────────────────────────────────────
 	let loading    = $state(false);
@@ -151,15 +157,16 @@
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
 	let saijikiOpen  = $state(false);
+	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let settingsOpen = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<'connection' | 'db' | 'plugins' | 'users' | 'misc'>('connection');
 	let pngMenuOpen  = $state(false);
+	let userMenuOpen = $state(false);
 	let catalogOpen  = $state(false);
+	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
 	let outputTab    = $state<'canvas' | 'prompts' | 'score'>('canvas');
-	let ddlEditing   = $state(false);
-	let baseDDL      = $state<string | null>(null);
 	let zoom         = $state(1);
 	let panX         = $state(0);
 	let panY         = $state(0);
@@ -170,6 +177,13 @@
 	let dragStartPanY = 0;
 	let promptStage1Expanded = $state(false);
 	let promptStage2Expanded = $state(false);
+	type ModelSelectionSnapshot = {
+		stage1Provider: Provider;
+		stage1Model: string;
+		stage2Provider: Provider;
+		stage2Model: string;
+	};
+	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
 	let showBirds = $state(true);
 	let pngAlphaWhite = $state(false);
 	let saveReplayAsNewVersion = $state(true);
@@ -177,6 +191,97 @@
 
 	// DOM refs for outside-click handling
 	let pngWrapEl      = $state<HTMLDivElement | null>(null);
+	let userMenuWrapEl = $state<HTMLDivElement | null>(null);
+
+	type SaijikiPreview = {
+		categoryKey: string;
+		word: string;
+		canonicalWord: string;
+		effect: string;
+		example: string;
+		svg: string;
+	};
+
+	function saijikiPreview(categoryKey: string, canonicalWord: string, word: string): SaijikiPreview {
+		const base = {
+			categoryKey,
+			word,
+			canonicalWord,
+			effect: '',
+			example: '',
+			svg: '',
+		};
+		const lineSvg = (attrs = '', strokeWidth = 5, lineCap = 'round', stroke = '#2b2b2b') => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M22 56 C56 26 95 76 158 38" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="${lineCap}" ${attrs}/></svg>`;
+		const shapeSvg = (shape: string) => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/>${shape}</svg>`;
+		const angleSvg = (rotation: number, line = false) => shapeSvg(line
+			? `<g transform="rotate(${rotation} 90 46)"><path d="M42 46 H138" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`
+			: `<g transform="rotate(${rotation} 90 46)"><rect x="58" y="29" width="64" height="34" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`);
+		const scatter = `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><circle cx="42" cy="35" r="5" fill="#2b2b2b"/><circle cx="84" cy="58" r="4" fill="#2b2b2b"/><circle cx="122" cy="30" r="5" fill="#2b2b2b"/><circle cx="146" cy="65" r="3.5" fill="#2b2b2b"/><circle cx="62" cy="72" r="3.5" fill="#2b2b2b"/></svg>`;
+		const previews: Record<string, Omit<SaijikiPreview, 'categoryKey' | 'word' | 'canonicalWord'>> = {
+			円: { effect: '正円を描く。中心と半径で配置される。', example: '中央に黒い円を置く', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
+			楕円: { effect: '横または縦に伸びた円を描く。', example: '横長の楕円を置く', svg: shapeSvg('<ellipse cx="90" cy="46" rx="42" ry="22" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
+			三角: { effect: '三つの頂点を持つ形を描く。', example: '上に三角を置く', svg: shapeSvg('<path d="M90 20 L132 70 L48 70 Z" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>') },
+			四角: { effect: '矩形を描く。比率語で縦長・横長にもなる。', example: '中央に四角を置く', svg: shapeSvg('<rect x="58" y="24" width="64" height="44" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/>') },
+			線: { effect: '始点から終点へ線を引く。', example: '左から右へ線を引く', svg: lineSvg() },
+			弧: { effect: '円周の一部を描く。半円や三日月の基礎になる。', example: '上弦の弧を引く', svg: shapeSvg('<path d="M44 58 Q90 18 136 58" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			水平: { effect: '0度の向き。線なら横線として扱う。', example: '水平の線を引く', svg: angleSvg(0, true) },
+			垂直: { effect: '90度の向き。線なら縦線として扱う。', example: '垂直の線を引く', svg: angleSvg(90, true) },
+			斜め: { effect: '約45度の傾きを与える。', example: '斜めの四角を置く', svg: angleSvg(45) },
+			右上がり: { effect: '左下から右上へ向かう傾き。', example: '右上がりの線', svg: angleSvg(-30, true) },
+			右下がり: { effect: '左上から右下へ向かう傾き。', example: '右下がりの線', svg: angleSvg(30, true) },
+			回転: { effect: '図形全体を中心まわりに回転させる。', example: '回転した横長の四角', svg: angleSvg(30) },
+			髪: { effect: '非常に細い線。繊細な輪郭に向く。', example: '髪のように細い線', svg: lineSvg('', 1.5) },
+			鉛筆: { effect: '細めで軽い線。素描のような質感。', example: '鉛筆の線を引く', svg: lineSvg('opacity="0.82"', 3) },
+			ペン: { effect: '標準的な太さの明瞭な線。', example: 'ペンの線を引く', svg: lineSvg('', 4) },
+			ロットリング: { effect: '均一で硬い製図ペン風の線。', example: 'ロットリングの円', svg: lineSvg('', 3, 'butt') },
+			クレヨン: { effect: '太く柔らかい描き味。色面にも向く。', example: '青いクレヨンの線', svg: lineSvg('opacity="0.72"', 9) },
+			チョーク: { effect: 'かすれを含む淡い線。', example: '白いチョークの線', svg: lineSvg('opacity="0.46"', 8) },
+			細筆: { effect: '筆圧のある細い筆線。', example: '細筆で弧を引く', svg: lineSvg('', 4) },
+			太筆: { effect: '太く存在感のある筆線。', example: '太筆で黒い線を引く', svg: lineSvg('', 11) },
+			縄: { effect: '太く荒い線。結び目や束の印象を作る。', example: '縄のような線', svg: lineSvg('stroke-dasharray="10 5"', 10) },
+			実線: { effect: '切れ目のない線。', example: '実線で引く', svg: lineSvg() },
+			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', svg: lineSvg('stroke-dasharray="14 9"') },
+			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', svg: lineSvg('stroke-dasharray="1 12"') },
+			一点鎖線: { effect: '長線と点を交互に並べる。', example: '一点鎖線を引く', svg: lineSvg('stroke-dasharray="18 7 2 7"') },
+			白: { effect: '白系の色で描く。背景との対比に注意。', example: '白い円', svg: shapeSvg('<rect x="48" y="18" width="84" height="56" fill="#2b2b2b" opacity="0.16"/><circle cx="90" cy="46" r="24" fill="#ffffff" stroke="#c9c2b5" stroke-width="4"/>') },
+			黒: { effect: '黒で描く。最も強い輪郭になる。', example: '黒い円', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="#2b2b2b"/>') },
+			青: { effect: '青系の色で描く。', example: '青い線', svg: lineSvg('', 5, 'round', '#2c5fb8') },
+			赤: { effect: '赤系の色で描く。', example: '赤い三角', svg: shapeSvg('<path d="M90 20 L132 70 L48 70 Z" fill="none" stroke="#c9362d" stroke-width="6" stroke-linejoin="round"/>') },
+			緑: { effect: '緑系の色で描く。', example: '緑の点を散らす', svg: scatter.replaceAll('#2b2b2b', '#2f8a4b') },
+			灰: { effect: '灰色で描く。弱い輪郭や背景に向く。', example: '灰色の四角', svg: shapeSvg('<rect x="58" y="24" width="64" height="44" fill="none" stroke="#777777" stroke-width="6" rx="2"/>') },
+			細かく: { effect: '小さな揺らぎを加える。', example: '細かく揺れる線', svg: lineSvg() },
+			大きく: { effect: '振幅の大きな揺らぎを加える。', example: '大きく波打つ線', svg: shapeSvg('<path d="M20 48 C42 8 64 84 88 48 S134 8 160 48" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>') },
+			ゆっくり: { effect: 'ゆったりした周期の動きとして解釈する。', example: 'ゆっくり波打つ線', svg: shapeSvg('<path d="M22 48 C62 20 112 76 158 48" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>') },
+			速く: { effect: '細かく速い振動として解釈する。', example: '速く震える線', svg: shapeSvg('<path d="M20 48 L32 40 L44 56 L56 40 L68 56 L80 40 L92 56 L104 40 L116 56 L128 40 L140 56 L158 48" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>') },
+			揺れる: { effect: '自然な揺れを線や配置に与える。', example: '揺れる線', svg: lineSvg() },
+			波打つ: { effect: '波形のうねりを作る。', example: '波打つ青い線', svg: shapeSvg('<path d="M20 48 C42 22 66 74 88 48 S134 22 160 48" fill="none" stroke="#2c5fb8" stroke-width="5" stroke-linecap="round"/>') },
+			震える: { effect: '細かい震えを作る。', example: '震える黒い線', svg: shapeSvg('<path d="M20 48 L30 45 L40 52 L50 44 L60 50 L70 43 L80 51 L90 45 L100 53 L110 44 L120 50 L130 43 L140 51 L160 48" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>') },
+			滲む: { effect: '輪郭をぼかし、墨が染みるようにする。', example: '滲む黒い円', svg: shapeSvg('<defs><filter id="pblur"><feGaussianBlur stdDeviation="3"/></filter></defs><circle cx="90" cy="46" r="24" fill="#2b2b2b" opacity="0.72" filter="url(#pblur)"/><circle cx="90" cy="46" r="20" fill="#2b2b2b" opacity="0.62"/>') },
+			上: { effect: '画面の上側へ配置する。', example: '上に円を置く', svg: shapeSvg('<circle cx="90" cy="25" r="14" fill="#2b2b2b"/><path d="M28 70 H152" stroke="#d7d1c4" stroke-width="2"/>') },
+			下: { effect: '画面の下側へ配置する。', example: '下に円を置く', svg: shapeSvg('<path d="M28 22 H152" stroke="#d7d1c4" stroke-width="2"/><circle cx="90" cy="67" r="14" fill="#2b2b2b"/>') },
+			中央: { effect: '中央付近へ配置する。', example: '中央に円を置く', svg: shapeSvg('<circle cx="90" cy="46" r="16" fill="#2b2b2b"/>') },
+			左端: { effect: '左端近くへ寄せる。', example: '左端に線を置く', svg: shapeSvg('<path d="M30 18 V74" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/><path d="M90 16 V76" stroke="#d7d1c4" stroke-width="2"/>') },
+			右端: { effect: '右端近くへ寄せる。', example: '右端に線を置く', svg: shapeSvg('<path d="M90 16 V76" stroke="#d7d1c4" stroke-width="2"/><path d="M150 18 V74" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>') },
+			上端: { effect: '上の縁へ寄せる。', example: '上端に線を引く', svg: shapeSvg('<path d="M30 18 H150" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/><path d="M28 46 H152" stroke="#d7d1c4" stroke-width="2"/>') },
+			下端: { effect: '下の縁へ寄せる。', example: '下端に線を引く', svg: shapeSvg('<path d="M28 46 H152" stroke="#d7d1c4" stroke-width="2"/><path d="M30 74 H150" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>') },
+			中心: { effect: '中心座標を基準に配置する。', example: '中心に円を置く', svg: shapeSvg('<path d="M90 14 V78 M32 46 H148" stroke="#d7d1c4" stroke-width="2"/><circle cx="90" cy="46" r="15" fill="#2b2b2b"/>') },
+			隅: { effect: '四隅のいずれかへ配置する。', example: '隅に小さな円を置く', svg: shapeSvg('<circle cx="36" cy="25" r="11" fill="#2b2b2b"/><circle cx="144" cy="67" r="11" fill="#2b2b2b" opacity="0.28"/>') },
+			置く: { effect: '指定した場所に一つ置く。', example: '中央に円を置く', svg: shapeSvg('<circle cx="90" cy="46" r="22" fill="#2b2b2b"/>') },
+			並べる: { effect: '同じ要素を列として並べる。', example: '円を横に並べる', svg: shapeSvg('<circle cx="55" cy="46" r="12" fill="#2b2b2b"/><circle cx="90" cy="46" r="12" fill="#2b2b2b"/><circle cx="125" cy="46" r="12" fill="#2b2b2b"/>') },
+			埋める: { effect: '面や領域を密に満たす。', example: '点で埋める', svg: shapeSvg('<circle cx="50" cy="28" r="5" fill="#2b2b2b"/><circle cx="80" cy="32" r="5" fill="#2b2b2b"/><circle cx="112" cy="29" r="5" fill="#2b2b2b"/><circle cx="62" cy="55" r="5" fill="#2b2b2b"/><circle cx="97" cy="58" r="5" fill="#2b2b2b"/><circle cx="132" cy="55" r="5" fill="#2b2b2b"/>') },
+			散らす: { effect: '要素を不規則に散布する。', example: '黒い点を散らす', svg: scatter },
+			引く: { effect: '線や弧を描く動作。', example: '線を引く', svg: lineSvg() },
+			縦長: { effect: '縦方向に長い比率にする。', example: '縦長の楕円', svg: shapeSvg('<ellipse cx="90" cy="46" rx="20" ry="34" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
+			横長: { effect: '横方向に長い比率にする。', example: '横長の楕円', svg: shapeSvg('<ellipse cx="90" cy="46" rx="42" ry="18" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
+			全幅: { effect: '画面幅いっぱいに広げる。', example: '全幅の線', svg: shapeSvg('<path d="M14 46 H166" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			半幅: { effect: '画面の半分程度の幅にする。', example: '半幅の線', svg: shapeSvg('<path d="M45 46 H135" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/><path d="M14 72 H166" stroke="#d7d1c4" stroke-width="2"/>') },
+			半円: { effect: '円の半分を描く。', example: '半円を置く', svg: shapeSvg('<path d="M50 60 A40 40 0 0 1 130 60" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			上弦: { effect: '上側に弦を持つ弧として扱う。', example: '上弦の月', svg: shapeSvg('<path d="M50 56 Q90 22 130 56" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			下弦: { effect: '下側に弦を持つ弧として扱う。', example: '下弦の月', svg: shapeSvg('<path d="M50 36 Q90 70 130 36" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			三日月: { effect: '細い月形を描く。', example: '三日月を置く', svg: shapeSvg('<path d="M106 18 C76 24 62 52 82 74 C52 63 50 27 82 14 C92 12 100 14 106 18 Z" fill="#2b2b2b"/>') },
+		};
+		return { ...base, ...(previews[canonicalWord] ?? { effect: '記述の解釈に影響する語彙です。', example: `${word}を使う`, svg: lineSvg() }) };
+	}
 
 	// ── Color catalog ────────────────────────────────────────
 	let selectedCatalog = $state('default');
@@ -234,6 +339,69 @@
 		settingsOpen = true;
 		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
 		if (tab === 'users') void loadUserSettings();
+	}
+
+	function openModelSelection() {
+		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model };
+		settingsMode = 'model';
+		settingsTab = 'connection';
+		settingsOpen = true;
+	}
+
+	function persistModelSelection() {
+		try {
+			localStorage.setItem(PROVIDER_STAGE1_KEY, stage1Provider);
+			localStorage.setItem(MODEL_STAGE1_KEY, stage1Model);
+			localStorage.setItem(PROVIDER_STAGE2_KEY, stage2Provider);
+			localStorage.setItem(MODEL_STAGE2_KEY, stage2Model);
+		} catch {}
+	}
+
+	function confirmModelSelection() {
+		modelSelectionSnapshot = null;
+		persistModelSelection();
+		settingsOpen = false;
+	}
+
+	function cancelModelSelection() {
+		if (modelSelectionSnapshot) {
+			stage1Provider = modelSelectionSnapshot.stage1Provider;
+			stage1Model = modelSelectionSnapshot.stage1Model;
+			stage2Provider = modelSelectionSnapshot.stage2Provider;
+			stage2Model = modelSelectionSnapshot.stage2Model;
+			persistModelSelection();
+		}
+		modelSelectionSnapshot = null;
+		settingsOpen = false;
+	}
+
+	function closeSettingsModal() {
+		if (settingsMode === 'model') cancelModelSelection();
+		else settingsOpen = false;
+	}
+
+	function openCatalogModal() {
+		catalogSelectionSnapshot = selectedCatalog;
+		catalogOpen = true;
+	}
+
+	function persistSelectedCatalog() {
+		try { localStorage.setItem(CATALOG_KEY, selectedCatalog); } catch {}
+	}
+
+	function confirmCatalogSelection() {
+		catalogSelectionSnapshot = null;
+		persistSelectedCatalog();
+		catalogOpen = false;
+	}
+
+	function cancelCatalogSelection() {
+		if (catalogSelectionSnapshot !== null) {
+			selectedCatalog = catalogSelectionSnapshot;
+			persistSelectedCatalog();
+		}
+		catalogSelectionSnapshot = null;
+		catalogOpen = false;
 	}
 
 	function selectSettingsTab(tab: typeof settingsTab) {
@@ -373,6 +541,7 @@
 		if (currentUser || authToken) {
 			try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
 		}
+		userMenuOpen = false;
 		authToken = null;
 		currentUser = null;
 		loginStatus = null;
@@ -601,6 +770,7 @@
 	let historyTotal = $state(0);
 	let historyOffset = $state(0);
 	let historyCursor = $state(-1);
+	let displayedHistoryItem = $state<Iteration | null>(null);
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 	const historyWindowSize = $derived(visibleThumbCount);
 	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
@@ -728,7 +898,8 @@
 	async function submit() {
 		if (!canSubmit || loading) return;
 		loading = true; error = null;
-		ddl = null; thinking = null; baseDDL = null; ddlEditing = false;
+		ddl = null; thinking = null; ddlSelection = { start: 0, end: 0 };
+		displayedHistoryItem = null;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		batchCurrent = 0;
@@ -737,7 +908,7 @@
 		try {
 			if (inputMode === 'single') {
 				const r = await paintOne(input);
-				ddl = r.ddl; thinking = r.thinking; result = r; outputTab = 'canvas';
+				ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
 				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
@@ -754,7 +925,7 @@
 					try {
 						const r = await paintOne(lines[i].input, `#${lines[i].line} ${lines[i].input}`);
 						result = r;
-						ddl = r.ddl; thinking = r.thinking;
+						ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking;
 						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
 						if (batchFailures.length > 0) {
@@ -794,6 +965,7 @@
 	async function replay() {
 		if (!ddl || reloading) return;
 		reloading = true; reloadError = null;
+		displayedHistoryItem = null;
 		const lang = getLang();
 		const startedAt = Date.now();
 		try {
@@ -930,6 +1102,25 @@
 
 	function clearInput() {
 		if (inputMode === 'single') input = ''; else batchInput = '';
+		ddl = null;
+		thinking = null;
+		result = null;
+		stage1UserPrompt = '';
+		error = null;
+		reloadError = null;
+		outputTab = 'canvas';
+		elapsedStage1Ms = 0;
+		elapsedStage2Ms = 0;
+		elapsedTotalMs = 0;
+		tokensInStage1 = null;
+		tokensOutStage1 = null;
+		tokensInStage2 = null;
+		tokensOutStage2 = null;
+		ddlFocused = false;
+		ddlSelection = { start: 0, end: 0 };
+		displayedHistoryItem = null;
+		historyCursor = -1;
+		resetZoom();
 	}
 
 	function toggleHistorySelection(id: string) {
@@ -980,39 +1171,17 @@
 		};
 	}
 
-	type DiffPart = { text: string; changed: boolean };
-	function diffDDL(base: string, current: string): DiffPart[] {
-		const m = base.length, n = current.length;
-		const dp: Uint16Array[] = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
-		for (let i = 1; i <= m; i++)
-			for (let j = 1; j <= n; j++)
-				dp[i][j] = base[i - 1] === current[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
-		const chars: DiffPart[] = [];
-		let i = m, j = n;
-		while (i > 0 || j > 0) {
-			if (i > 0 && j > 0 && base[i - 1] === current[j - 1]) { chars.push({ text: current[j - 1], changed: false }); i--; j--; }
-			else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) { chars.push({ text: current[j - 1], changed: true }); j--; }
-			else { i--; }
-		}
-		chars.reverse();
-		const parts: DiffPart[] = [];
-		for (const c of chars) {
-			const last = parts[parts.length - 1];
-			if (last && last.changed === c.changed) last.text += c.text;
-			else parts.push({ text: c.text, changed: c.changed });
-		}
-		return parts;
-	}
-
 	function loadIteration(idx: number) {
 		if (idx < 0 || idx >= historyItems.length) return;
-		historyCursor = idx; ddlEditing = false;
+		historyCursor = idx;
 		loadIterationItem(historyItems[idx]);
 	}
 
 	function loadIterationItem(it: Iteration) {
 		inputMode = 'single';
-		input = it.input; ddl = it.ddl; baseDDL = it.ddl; thinking = it.thinking ?? null;
+		displayedHistoryItem = it;
+		const itemDDL = it.ddl ?? '';
+		input = it.input; ddl = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
 		stage1UserPrompt = it.input ? it.input + buildEmotionHint(it.input) : '';
 		result = { score: it.score, svg: it.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: it.elapsed_ms ?? 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
 		error = null;
@@ -1039,22 +1208,54 @@
 
 	// ── Saijiki ─────────────────────────────────────────────
 	function insertWord(word: string) {
-		if (inputMode === 'batch') { batchInput = batchInput ? batchInput + word : word; return; }
-		const ta = textareaEl;
-		if (!ta) { input = input + word; return; }
-		const start = ta.selectionStart ?? input.length;
-		const end   = ta.selectionEnd   ?? input.length;
-		input = input.slice(0, start) + word + input.slice(end);
+		if (ddl === null) return;
+		const ta = ddlTextareaEl;
+		if (!ta) {
+			ddl = ddl + word;
+			ddlSelection = { start: ddl.length, end: ddl.length };
+			return;
+		}
+		const hasTextareaFocus = document.activeElement === ta;
+		const currentDDL = ddl;
+		const liveStart = ta.selectionStart ?? ddlSelection.start;
+		const liveEnd = ta.selectionEnd ?? ddlSelection.end;
+		const savedStart = ddlSelection.start;
+		const savedEnd = ddlSelection.end;
+		const start = Math.max(0, Math.min(currentDDL.length, hasTextareaFocus ? liveStart : savedStart));
+		const end = Math.max(start, Math.min(currentDDL.length, hasTextareaFocus ? liveEnd : savedEnd));
+		ddl = currentDDL.slice(0, start) + word + currentDDL.slice(end);
+		ddlSelection = { start: start + word.length, end: start + word.length };
 		requestAnimationFrame(() => {
-			if (!textareaEl) return;
-			textareaEl.focus();
-			const pos = start + word.length;
-			textareaEl.setSelectionRange(pos, pos);
+			if (!ddlTextareaEl) return;
+			ddlTextareaEl.focus();
+			ddlTextareaEl.setSelectionRange(ddlSelection.start, ddlSelection.end);
 		});
 	}
 
+	function rememberDDLSelection() {
+		const ta = ddlTextareaEl;
+		if (!ta || ddl === null) return;
+		ddlSelection = {
+			start: ta.selectionStart ?? ddl.length,
+			end: ta.selectionEnd ?? ddl.length,
+		};
+	}
+
+	function syncDDLHighlightScroll() {
+		if (!ddlTextareaEl || !ddlHighlightEl) return;
+		ddlHighlightEl.scrollTop = ddlTextareaEl.scrollTop;
+		ddlHighlightEl.scrollLeft = ddlTextareaEl.scrollLeft;
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') { saijikiOpen = false; settingsOpen = false; catalogOpen = false; historyManagerOpen = false; confirmAction = null; }
+		if (e.key === 'Escape') {
+			saijikiOpen = false;
+			userMenuOpen = false;
+			if (settingsOpen) closeSettingsModal();
+			if (catalogOpen) cancelCatalogSelection();
+			historyManagerOpen = false;
+			confirmAction = null;
+		}
 		if (!shouldIgnoreCanvasShortcut(e)) handleCanvasKeydown(e);
 	}
 
@@ -1068,22 +1269,29 @@
 
 	function handleDocClick(e: MouseEvent) {
 		if (pngMenuOpen  && pngWrapEl     && !pngWrapEl.contains(e.target as Node))      pngMenuOpen  = false;
+		if (userMenuOpen && userMenuWrapEl && !userMenuWrapEl.contains(e.target as Node)) userMenuOpen = false;
 	}
 
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
+		displayedHistoryItem = null;
 		stage1Provider = v; stage1Model = modelsForProvider(v)[0]?.id ?? stage1Model;
-		try { localStorage.setItem(PROVIDER_STAGE1_KEY, v); localStorage.setItem(MODEL_STAGE1_KEY, stage1Model); } catch {}
 	}
 	function setStage1Model(v: string) {
-		stage1Model = v; try { localStorage.setItem(MODEL_STAGE1_KEY, v); } catch {}
+		displayedHistoryItem = null;
+		stage1Model = v;
 	}
 	function setStage2Provider(v: Provider) {
+		displayedHistoryItem = null;
 		stage2Provider = v; stage2Model = modelsForProvider(v)[0]?.id ?? stage2Model;
-		try { localStorage.setItem(PROVIDER_STAGE2_KEY, v); localStorage.setItem(MODEL_STAGE2_KEY, stage2Model); } catch {}
 	}
 	function setStage2Model(v: string) {
-		stage2Model = v; try { localStorage.setItem(MODEL_STAGE2_KEY, v); } catch {}
+		displayedHistoryItem = null;
+		stage2Model = v;
+	}
+	function setSelectedCatalog(id: string) {
+		displayedHistoryItem = null;
+		selectedCatalog = id;
 	}
 
 	// ── Download ────────────────────────────────────────────
@@ -1137,6 +1345,31 @@
 		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
 	}
 
+	async function copyPromptText(kind: 'stage1' | 'stage2', text: string | null | undefined): Promise<void> {
+		const value = text ?? '';
+		try {
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(value);
+			} else {
+				const textarea = document.createElement('textarea');
+				textarea.value = value;
+				textarea.setAttribute('readonly', 'true');
+				textarea.style.position = 'fixed';
+				textarea.style.left = '-9999px';
+				document.body.appendChild(textarea);
+				textarea.select();
+				document.execCommand('copy');
+				document.body.removeChild(textarea);
+			}
+			copiedPrompt = kind;
+			window.setTimeout(() => {
+				if (copiedPrompt === kind) copiedPrompt = null;
+			}, 1200);
+		} catch {
+			copiedPrompt = null;
+		}
+	}
+
 	function shortModel(m: string | null | undefined): string {
 		if (!m) return '';
 		if (m.includes('opus')) return 'opus';
@@ -1148,9 +1381,23 @@
 		return (m.split('/').pop() ?? m).slice(0, 8);
 	}
 
+	function statusModelName(m: string | null | undefined): string {
+		if (!m) return '';
+		const model = modelsForProvider(providerOfModel(m)).find((option) => option.id === m);
+		return model?.label ?? m;
+	}
+
 	function catalogName(id: string | null | undefined): string {
 		return getCatalogById(id ?? 'default')?.name ?? 'inku Default';
 	}
+
+	const statusStage1Model = $derived(displayedHistoryItem
+		? (displayedHistoryItem.stage1_model ? statusModelName(displayedHistoryItem.stage1_model) : '-')
+		: statusModelName(stage1Model));
+	const statusStage2Model = $derived(displayedHistoryItem
+		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
+		: statusModelName(stage2Model));
+	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : currentCatalog.name);
 
 	function svgClipId(it: Iteration, scope: string): string {
 		return `thumb-clip-${scope}-${String(it.id ?? it.at).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
@@ -1253,6 +1500,9 @@
 	);
 	const scoreJsonHighlightedLines = $derived(scoreJsonLines.map(highlightJsonLine));
 	const scoreJsonHighlighted = $derived(scoreJsonHighlightedLines.join('\n'));
+	const ddlHighlighted = $derived(ddl !== null
+		? highlightDDL(ddl, ddlFocused && ddlSelection.start === ddlSelection.end ? ddlSelection.start : null)
+		: '');
 
 	function escapeHtml(value: string) {
 		return value
@@ -1272,6 +1522,56 @@
 				return `<span class="json-number">${match}</span>`;
 			}
 		);
+	}
+
+	function saijikiCategoryClass(category: string | undefined): string {
+		switch (category) {
+			case 'かたち': return 'shape';
+			case 'てざわり': return 'touch';
+			case 'つらなり': return 'line';
+			case 'いろ': return 'color';
+			case 'ゆらぎ': return 'motion';
+			case 'ばしょ': return 'place';
+			case 'うごき': return 'action';
+			case 'かたむき': return 'angle';
+			case 'わりあい': return 'ratio';
+			default: return 'word';
+		}
+	}
+
+	function ddlCaretMarkup(): string {
+		return '<span class="ddl-custom-caret"></span>';
+	}
+
+	function renderDDLPart(text: string, kind: string, category: string | undefined, caretOffset: number | null): string {
+		const before = caretOffset === null ? text : text.slice(0, caretOffset);
+		const after = caretOffset === null ? '' : text.slice(caretOffset);
+		const content = caretOffset === null ? escapeHtml(text) : `${escapeHtml(before)}${ddlCaretMarkup()}${escapeHtml(after)}`;
+		if (kind === 'saijiki') {
+			return `<span class="ddl-token ddl-token-${saijikiCategoryClass(category)}">${content}</span>`;
+		}
+		if (kind === 'emotion') {
+			return `<span class="ddl-token-emotion">${content}</span>`;
+		}
+		return content;
+	}
+
+	function highlightDDL(text: string, caretIndex: number | null = null): string {
+		const clampedCaret = caretIndex === null ? null : Math.max(0, Math.min(text.length, caretIndex));
+		let offset = 0;
+		const html = annotate(text).map((part) => {
+			const nextOffset = offset + part.text.length;
+			const localCaret = clampedCaret !== null
+				&& clampedCaret >= offset
+				&& (clampedCaret < nextOffset || (clampedCaret === text.length && clampedCaret === nextOffset))
+				? clampedCaret - offset
+				: null;
+			const rendered = renderDDLPart(part.text, part.kind, part.category, localCaret);
+			offset = nextOffset;
+			return rendered;
+		}).join('');
+		if (clampedCaret === text.length && text.length === 0) return ddlCaretMarkup();
+		return html;
 	}
 
 	function setZoom(nextZoom: number) {
@@ -1485,8 +1785,23 @@
 
 		<div class="header-right">
 			{#if currentUser}
-				<div class="user-badge" title={currentUser.email || currentUser.username}>
-					<span class="user-badge-name">{currentUser.username}</span>
+				<div class="user-menu-wrap" bind:this={userMenuWrapEl}>
+					<button
+						class="user-badge"
+						class:active={userMenuOpen}
+						type="button"
+						title={currentUser.email || currentUser.username}
+						aria-haspopup="menu"
+						aria-expanded={userMenuOpen}
+						onclick={() => (userMenuOpen = !userMenuOpen)}
+					>
+						<span class="user-badge-name">{currentUser.username}</span>
+					</button>
+					{#if userMenuOpen}
+						<div class="user-menu" role="menu">
+							<button type="button" role="menuitem" onclick={logout}>{t().logoutButton}</button>
+						</div>
+					{/if}
 				</div>
 			{/if}
 
@@ -1526,15 +1841,14 @@
 					<div class="section-head">
 						<span class="section-label">{t().inputSectionLabel}</span>
 						<div class="section-actions">
-							<button class="ghost-btn" onclick={() => { settingsMode = 'model'; settingsTab = 'connection'; settingsOpen = true; }}>{t().modelSelectButton}</button>
-							<button class="ghost-btn" onclick={() => (catalogOpen = true)}>{t().colorCatalogButton}</button>
+							<button class="ghost-btn" onclick={openModelSelection}>{t().modelSelectButton}</button>
+							<button class="ghost-btn" onclick={openCatalogModal}>{t().colorCatalogButton}</button>
 							<button class="ghost-btn create-btn" onclick={clearInput}>{t().clearInputBtn}</button>
 						</div>
 					</div>
 
 					{#if inputMode === 'single'}
 						<textarea
-							bind:this={textareaEl}
 							bind:value={input}
 							rows="5"
 							spellcheck="false"
@@ -1659,26 +1973,26 @@
 							<span class="section-label">{t().ddlLabel}</span>
 							<div class="section-actions">
 								<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>{t().saijikiToggleBtn}</button>
-								{#if historyCursor >= 0}
-									<button class="ghost-btn" class:ghost-active={ddlEditing} onclick={() => (ddlEditing = !ddlEditing)}>{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}</button>
-								{/if}
 							</div>
 						</div>
-						{#if ddlEditing}
-							<textarea class="ddl-edit-ta" bind:value={ddl} rows="4" spellcheck="false"></textarea>
-						{:else}
-							<div class="annot-box ddl-box">
-								{#if baseDDL !== null && baseDDL !== ddl}
-									{#each diffDDL(baseDDL, ddl) as part, i (i)}<span class={part.changed ? 'tok tok-diff-added' : 'tok tok-plain'}>{part.text}</span>{/each}
-								{:else}
-									{#each annotate(ddl) as part, i (i)}
-										{#if part.kind === 'saijiki'}<span class="tok tok-saijiki" title={part.category}>{part.text}</span>
-										{:else if part.kind === 'emotion'}<span class="tok tok-emotion">{part.text}</span>
-										{:else}<span class="tok tok-plain">{part.text}</span>{/if}
-									{/each}
-								{/if}
-							</div>
-						{/if}
+						<div class="ddl-highlight-wrap">
+							<div class="ddl-highlight" bind:this={ddlHighlightEl} aria-hidden="true">{@html ddlHighlighted}</div>
+							<textarea
+								class="ddl-edit-ta"
+								bind:this={ddlTextareaEl}
+								bind:value={ddl}
+								rows="4"
+								spellcheck="false"
+								onclick={rememberDDLSelection}
+								onfocus={() => { ddlFocused = true; rememberDDLSelection(); }}
+								onblur={() => { rememberDDLSelection(); ddlFocused = false; }}
+								oninput={() => { rememberDDLSelection(); syncDDLHighlightScroll(); }}
+								onkeyup={rememberDDLSelection}
+								onmouseup={rememberDDLSelection}
+								onselect={rememberDDLSelection}
+								onscroll={syncDDLHighlightScroll}
+							></textarea>
+						</div>
 
 						<!-- 描画（解釈から） progress -->
 						{#if reloading}
@@ -1798,6 +2112,7 @@
 					class="canvas-content"
 					class:can-pan={outputTab === 'canvas' && zoom > 1}
 					class:dragging={canvasDragging}
+					class:side-nav-safe={outputTab !== 'canvas'}
 					onpointerdown={startCanvasDrag}
 					onpointermove={moveCanvasDrag}
 					onpointerup={endCanvasDrag}
@@ -1812,14 +2127,40 @@
 								{#if result}
 									{@html result.svg}
 								{:else}
-									<div class="canvas-placeholder">{t().canvasPlaceholder}</div>
+									<div class="canvas-placeholder-art" aria-label={t().canvasPlaceholder}>
+										<svg viewBox="0 0 960 540" role="img">
+											<rect x="0" y="0" width="960" height="540" rx="6" fill="#fffdf8" />
+											<g opacity="0.72">
+												<path d="M158 364 C250 282 338 420 442 328 S624 214 792 312" fill="none" stroke="#cfc6b6" stroke-width="7" stroke-linecap="round" />
+												<path d="M168 206 C250 174 318 226 394 200 C474 172 542 118 638 152 C700 174 750 210 814 192" fill="none" stroke="#ded6c9" stroke-width="4" stroke-linecap="round" stroke-dasharray="18 18" />
+												<circle cx="312" cy="284" r="34" fill="none" stroke="#d8cfc0" stroke-width="6" />
+												<rect x="604" y="260" width="88" height="58" rx="2" fill="none" stroke="#d8cfc0" stroke-width="6" transform="rotate(-12 648 289)" />
+												<path d="M472 218 L522 306 L422 306 Z" fill="none" stroke="#d8cfc0" stroke-width="6" stroke-linejoin="round" />
+											</g>
+										</svg>
+									</div>
 								{/if}
 							</div>
 						</div>
 					{:else if outputTab === 'prompts'}
 						{#if promptsData}
 							<div class="prompt-section">
-								<p class="prompt-label">{t().promptStage1Input}</p>
+								<div class="prompt-head">
+									<p class="prompt-label">{t().promptStage1Input}</p>
+									<button
+										class="prompt-copy-btn"
+										class:copied={copiedPrompt === 'stage1'}
+										type="button"
+										title={copiedPrompt === 'stage1' ? t().promptCopied : t().promptCopy}
+										aria-label={copiedPrompt === 'stage1' ? t().promptCopied : t().promptCopy}
+										onclick={() => copyPromptText('stage1', stage1UserPrompt || (inputMode === 'single' ? input : batchInput))}
+									>
+										<svg viewBox="0 0 24 24" aria-hidden="true">
+											<rect x="9" y="9" width="10" height="10" rx="2"></rect>
+											<path d="M5 15V7a2 2 0 0 1 2-2h8"></path>
+										</svg>
+									</button>
+								</div>
 								<textarea class="prompt-textarea prompt-user" readonly value={stage1UserPrompt || (inputMode === 'single' ? input : batchInput)}></textarea>
 								<div class="prompt-collapsible-head">
 									<p class="prompt-label">{t().promptStage1System}</p>
@@ -1830,7 +2171,22 @@
 									{#if !promptStage1Expanded}<div class="prompt-fade"></div>{/if}
 								</div>
 								{#if ddl}
-									<p class="prompt-label">{t().promptStage2Input}</p>
+									<div class="prompt-head">
+										<p class="prompt-label">{t().promptStage2Input}</p>
+										<button
+											class="prompt-copy-btn"
+											class:copied={copiedPrompt === 'stage2'}
+											type="button"
+											title={copiedPrompt === 'stage2' ? t().promptCopied : t().promptCopy}
+											aria-label={copiedPrompt === 'stage2' ? t().promptCopied : t().promptCopy}
+											onclick={() => copyPromptText('stage2', ddl)}
+										>
+											<svg viewBox="0 0 24 24" aria-hidden="true">
+												<rect x="9" y="9" width="10" height="10" rx="2"></rect>
+												<path d="M5 15V7a2 2 0 0 1 2-2h8"></path>
+											</svg>
+										</button>
+									</div>
 									<textarea class="prompt-textarea prompt-user" readonly value={ddl}></textarea>
 								{/if}
 								<div class="prompt-collapsible-head">
@@ -1877,9 +2233,21 @@
 
 			</div><!-- /canvas-area -->
 
-			<!-- Export bar -->
-			<div class="export-bar">
-				<span class="export-label">{t().exportLabel}</span>
+			<!-- Status bar -->
+			<div class="status-bar">
+				<div class="status-summary" aria-label="current render status">
+					<span class="status-group">
+						<span class="status-label">LLM</span>
+						<span class="status-k">Stage1</span><span class="status-v">{statusStage1Model}</span>
+						<span class="status-k">Stage2</span><span class="status-v">{statusStage2Model}</span>
+					</span>
+					<span class="status-divider"></span>
+					<span class="status-group">
+						<span class="status-label">Color</span>
+						<span class="status-v">{statusCatalogName}</span>
+					</span>
+				</div>
+				<span class="status-export-label">{t().exportLabel}:</span>
 				<button class="ghost-btn" onclick={downloadSVG} disabled={!result}>↓ SVG</button>
 				<div class="png-wrap" bind:this={pngWrapEl}>
 					<button class="ghost-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>↓ PNG ▾</button>
@@ -1953,6 +2321,18 @@
 			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label={t().closeLabel}>×</button>
 		</div>
 		<div class="saijiki-body">
+			<div class="saijiki-preview" class:empty={!activeSaijikiPreview}>
+				{#if activeSaijikiPreview}
+					<div class="saijiki-preview-art">{@html activeSaijikiPreview.svg}</div>
+					<div class="saijiki-preview-copy">
+						<div class="saijiki-preview-title">{activeSaijikiPreview.word}</div>
+						<div class="saijiki-preview-effect">{activeSaijikiPreview.effect}</div>
+						<div class="saijiki-preview-example">{activeSaijikiPreview.example}</div>
+					</div>
+				{:else}
+					<div class="saijiki-preview-placeholder">語彙にマウスを重ねると、描画への効き方を表示します。</div>
+				{/if}
+			</div>
 			{#each SAIJIKI as cat, ci (cat.key)}
 				{@const words = t().saijikiWords[cat.key] ?? cat.words}
 				<div class="saijiki-cat" style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
@@ -1961,8 +2341,15 @@
 						<span class="saijiki-cat-en">{cat.en}</span>
 					</div>
 					<div class="saijiki-chips">
-						{#each words as word (word)}
-							<button class="saijiki-chip" onclick={() => insertWord(word)}>{word}</button>
+						{#each words as word, wi (word)}
+							{@const canonicalWord = cat.words[wi] ?? word}
+							<button
+								class="saijiki-chip"
+								onpointerdown={(e) => e.preventDefault()}
+								onclick={() => insertWord(word)}
+								onpointerenter={() => (activeSaijikiPreview = saijikiPreview(cat.key, canonicalWord, word))}
+								onfocus={() => (activeSaijikiPreview = saijikiPreview(cat.key, canonicalWord, word))}
+							>{word}</button>
 						{/each}
 					</div>
 				</div>
@@ -1973,11 +2360,13 @@
 
 <!-- ══ SETTINGS MODAL ══ -->
 {#if settingsOpen}
-	<div class="modal-backdrop" onclick={() => (settingsOpen = false)} aria-hidden="true"></div>
-	<div class="settings-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
+	<div class="modal-backdrop" onclick={closeSettingsModal} aria-hidden="true"></div>
+	<div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="modal-head">
 			<div class="catalog-modal-title">{settingsMode === 'model' ? t().modelSelectButton : t().settingsTitle}</div>
-			<button class="catalog-close" onclick={() => (settingsOpen = false)}>×</button>
+			{#if settingsMode !== 'model'}
+				<button class="catalog-close" onclick={() => (settingsOpen = false)}>×</button>
+			{/if}
 		</div>
 		{#if settingsMode === 'settings'}
 			<div class="settings-tabs">
@@ -2211,16 +2600,21 @@
 				</div>
 			{/if}
 		</div>
+		{#if settingsMode === 'model'}
+			<div class="catalog-modal-foot">
+				<button class="ghost-btn" onclick={cancelModelSelection}>{t().confirmCancel}</button>
+				<button class="ghost-btn primary-inline" onclick={confirmModelSelection}>{t().colorCatalogConfirm}</button>
+			</div>
+		{/if}
 	</div>
 {/if}
 
 <!-- ══ CATALOG MODAL ══ -->
 {#if catalogOpen}
-	<div class="modal-backdrop" onclick={() => (catalogOpen = false)} aria-hidden="true"></div>
+	<div class="modal-backdrop" onclick={cancelCatalogSelection} aria-hidden="true"></div>
 	<div class="catalog-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="catalog-modal-head">
 			<div class="catalog-modal-title">{t().colorCatalogTitle}</div>
-			<button class="catalog-close" onclick={() => (catalogOpen = false)}>×</button>
 		</div>
 		<div class="catalog-body">
 			<div class="catalog-scroll">
@@ -2229,7 +2623,7 @@
 					<button
 						class="catalog-item"
 						class:active
-						onclick={() => { selectedCatalog = cat.id; try { localStorage.setItem(CATALOG_KEY, cat.id); } catch {} }}
+						onclick={() => setSelectedCatalog(cat.id)}
 					>
 						<div class="catalog-swatches">
 							{#each cat.swatches as hex (hex)}
@@ -2256,6 +2650,10 @@
 					{/each}
 				</div>
 			</div>
+		</div>
+		<div class="catalog-modal-foot">
+			<button class="ghost-btn" onclick={cancelCatalogSelection}>{t().confirmCancel}</button>
+			<button class="ghost-btn primary-inline" onclick={confirmCatalogSelection}>{t().colorCatalogConfirm}</button>
 		</div>
 	</div>
 {/if}
@@ -2440,26 +2838,66 @@
 		flex-shrink: 0;
 	}
 
+	.user-menu-wrap {
+		position: relative;
+		min-width: 0;
+	}
 	.user-badge {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		gap: 6px;
 		max-width: 220px;
 		padding: 0 2px;
 		border-left: 1px solid var(--border);
+		border-top: none;
+		border-right: none;
+		border-bottom: none;
 		padding-left: 10px;
 		background: transparent;
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: 11px;
 		min-width: 0;
-		cursor: default;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.user-badge:hover,
+	.user-badge.active {
+		color: var(--fg);
 	}
 	.user-badge-name {
 		font-weight: 400;
-		color: var(--fg2);
+		color: inherit;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.user-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		z-index: 30;
+		min-width: 126px;
+		padding: 4px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		box-shadow: 0 8px 22px rgba(37, 34, 26, 0.14);
+	}
+	.user-menu button {
+		width: 100%;
+		padding: 7px 9px;
+		border: none;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--fg2);
+		font-size: 11px;
+		text-align: left;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.user-menu button:hover {
+		background: var(--bg2);
+		color: var(--fg);
 	}
 	.settings-wrap { position: relative; }
 
@@ -2837,26 +3275,87 @@
 
 	.error-text { color: #a2342a; font-size: 12px; }
 
-	/* Annotations */
-	.annot-box {
-		padding: 9px 10px; background: #fff;
-		border: 1px solid var(--border); border-radius: var(--r);
-		font-size: 13px; line-height: 1.85; white-space: pre-wrap; word-break: break-word;
-	}
-	.ddl-box { border-left: 3px solid var(--border2); border-radius: 0 var(--r) var(--r) 0; }
-
-	.tok { }
-	.tok-saijiki { color: #2c3e91; font-weight: 500; }
-	.tok-plain   { color: var(--fg3); }
-	.tok-emotion { color: #c9a08a; font-style: italic; text-decoration: line-through; text-decoration-color: rgba(162,52,42,0.4); }
-	.tok-diff-added { color: #a2342a; font-weight: 500; }
-
-	.ddl-edit-ta {
-		width: 100%; padding: 9px 10px;
+	.ddl-highlight-wrap {
+		position: relative;
+		width: 100%;
 		border: 1px solid var(--accent); border-left: 3px solid var(--border2);
 		border-radius: 0 var(--r) var(--r) 0;
-		background: #fff; color: var(--fg);
-		font-family: inherit; font-size: 13px; line-height: 1.75; resize: vertical; outline: none;
+		background: #fff;
+		overflow: hidden;
+	}
+	.ddl-highlight,
+	.ddl-edit-ta {
+		width: 100%; padding: 9px 10px;
+		box-sizing: border-box;
+		margin: 0;
+		font-family: inherit; font-size: 13px; font-weight: 400; font-style: normal; letter-spacing: 0;
+		line-height: 1.75; resize: vertical; outline: none;
+		white-space: pre-wrap; word-break: break-word;
+		tab-size: 4;
+		scrollbar-gutter: stable;
+	}
+	.ddl-highlight {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		overflow: auto;
+		color: var(--fg);
+		pointer-events: none;
+		scrollbar-width: none;
+	}
+	.ddl-highlight::-webkit-scrollbar {
+		display: none;
+	}
+	.ddl-edit-ta {
+		position: relative;
+		z-index: 1;
+		border: none;
+		background: transparent;
+		color: transparent;
+		caret-color: transparent;
+		overflow: auto;
+	}
+	.ddl-edit-ta::selection {
+		background: rgba(44, 62, 145, 0.22);
+	}
+	.ddl-highlight :global(.ddl-token) {
+		border-radius: 2px;
+		font-weight: inherit;
+	}
+	.ddl-highlight :global(.ddl-custom-caret) {
+		position: relative;
+		display: inline-block;
+		width: 0;
+		height: 1em;
+		vertical-align: text-bottom;
+	}
+	.ddl-highlight :global(.ddl-custom-caret)::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: -0.18em;
+		width: 3px;
+		height: 1.45em;
+		border-radius: 2px;
+		background: var(--fg);
+		animation: ddl-caret-blink 1s steps(2, start) infinite;
+	}
+	@keyframes ddl-caret-blink {
+		50% { opacity: 0; }
+	}
+	.ddl-highlight :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
+	.ddl-highlight :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
+	.ddl-highlight :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
+	.ddl-highlight :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
+	.ddl-highlight :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
+	.ddl-highlight :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
+	.ddl-highlight :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
+	.ddl-highlight :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
+	.ddl-highlight :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
+	.ddl-highlight :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
+	.ddl-highlight :global(.ddl-token-emotion) {
+		color: #9b7a66;
+		font-style: inherit;
 	}
 
 	/* thinking */
@@ -2958,6 +3457,11 @@
 		position: relative; width: 100%; height: 100%;
 		display: flex; align-items: center; justify-content: center; overflow: hidden;
 	}
+	.canvas-content.side-nav-safe {
+		box-sizing: border-box;
+		padding-left: 68px;
+		padding-right: 68px;
+	}
 	.canvas-content.can-pan { cursor: grab; touch-action: none; }
 	.canvas-content.dragging { cursor: grabbing; }
 
@@ -2979,10 +3483,18 @@
 
 	.canvas-box :global(svg) { width: 100%; height: 100%; display: block; }
 
-	.canvas-placeholder {
+	.canvas-placeholder-art {
 		width: 100%; height: 100%; min-height: 200px;
 		display: flex; align-items: center; justify-content: center;
 		color: var(--fg3); font-size: 13px;
+	}
+	.canvas-placeholder-art {
+		background: #fffdf8;
+	}
+	.canvas-placeholder-art svg {
+		width: 100%;
+		height: 100%;
+		display: block;
 	}
 
 	/* Zoom controls */
@@ -3012,7 +3524,46 @@
 		width: 100%;
 		align-self: stretch; min-height: 0;
 	}
+	.prompt-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.prompt-head .prompt-label { margin: 0; }
 	.prompt-label { margin: 8px 0 3px; font-size: 11px; font-weight: 600; color: var(--fg2); }
+	.prompt-copy-btn {
+		width: 24px;
+		height: 24px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex: 0 0 auto;
+		border: 1px solid transparent;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--fg3);
+		cursor: pointer;
+	}
+	.prompt-copy-btn:hover {
+		border-color: var(--border);
+		background: var(--bg2);
+		color: var(--fg);
+	}
+	.prompt-copy-btn.copied {
+		color: #2f6f45;
+		background: rgba(47, 111, 69, 0.08);
+	}
+	.prompt-copy-btn svg {
+		width: 15px;
+		height: 15px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
 	.prompt-collapsible-head {
 		display: flex; align-items: center; justify-content: space-between;
 		margin-top: 8px;
@@ -3095,13 +3646,59 @@
 	.score-pre :global(.json-null) { color: #6b7280; font-style: italic; }
 	.muted-center { color: var(--fg3); font-size: 13px; padding: 16px; }
 
-	/* Export bar */
-	.export-bar {
+	/* Status bar */
+	.status-bar {
 		display: flex; align-items: center; gap: 6px;
 		padding: 8px 16px; border-top: 1px solid var(--border);
 		background: var(--bg); flex-shrink: 0;
 	}
-	.export-label { font-size: 11px; color: var(--fg3); margin-right: auto; }
+	.status-summary {
+		min-width: 0;
+		margin-right: auto;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		color: var(--fg2);
+		font-size: 11px;
+		line-height: 1;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.status-group {
+		min-width: 0;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		line-height: 1;
+	}
+	.status-label {
+		color: var(--fg3);
+		font-size: 11px;
+		font-weight: 400;
+		letter-spacing: 0;
+		text-transform: none;
+	}
+	.status-k {
+		color: var(--fg3);
+		font-size: 11px;
+	}
+	.status-v {
+		min-width: 0;
+		max-width: 260px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		color: #4d5f86;
+		font-size: 11px;
+		font-weight: 400;
+	}
+	.status-divider {
+		width: 1px;
+		height: 16px;
+		background: var(--border2);
+		flex-shrink: 0;
+	}
+	.status-export-label { font-size: 11px; color: var(--fg3); white-space: nowrap; }
 
 	.png-wrap { position: relative; }
 	.png-menu {
@@ -3264,6 +3861,61 @@
 	}
 	.saijiki-body { flex: 1; overflow-y: auto; padding: 8px 0; }
 
+	.saijiki-preview {
+		position: sticky;
+		top: 0;
+		z-index: 2;
+		margin: 0 12px 8px;
+		padding: 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: rgba(255, 253, 248, 0.96);
+		box-shadow: 0 6px 18px rgba(37, 34, 26, 0.08);
+		backdrop-filter: blur(4px);
+	}
+	.saijiki-preview.empty {
+		box-shadow: none;
+		background: rgba(255, 255, 255, 0.72);
+	}
+	.saijiki-preview-art {
+		height: 92px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		overflow: hidden;
+		background: #fffdf8;
+	}
+	.saijiki-preview-art :global(svg) {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+	.saijiki-preview-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		margin-top: 8px;
+	}
+	.saijiki-preview-title {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--fg);
+	}
+	.saijiki-preview-effect {
+		font-size: 11px;
+		line-height: 1.45;
+		color: var(--fg2);
+	}
+	.saijiki-preview-example {
+		font-size: 10px;
+		line-height: 1.4;
+		color: var(--fg3);
+	}
+	.saijiki-preview-placeholder {
+		font-size: 11px;
+		line-height: 1.5;
+		color: var(--fg3);
+	}
+
 	.saijiki-cat { padding: 10px 18px; }
 	.saijiki-cat-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 8px; }
 	.saijiki-cat-ja { font-size: 13px; font-weight: 400; color: var(--fg); letter-spacing: 0.05em; }
@@ -3346,6 +3998,15 @@
 		font-size: 11px; color: var(--fg3);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	}
+	.catalog-modal-foot {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		padding: 10px 18px 14px;
+		border-top: 1px solid var(--border);
+		background: #faf9f6;
+		flex-shrink: 0;
+	}
 
 	/* ── Modal shared / settings / history ─────────────────── */
 	.modal-head {
@@ -3360,6 +4021,13 @@
 		display: flex; flex-direction: column; overflow: hidden;
 	}
 	.settings-modal { width: min(860px, calc(100vw - 32px)); max-height: 88vh; }
+	.settings-modal.model-modal {
+		/* Longest current option is 35 chars; add label, select chrome, and dialog padding. */
+		width: min(calc(35ch + 190px), calc(100vw - 32px));
+	}
+	.settings-modal.model-modal .form-row label {
+		width: 82px;
+	}
 	.login-screen {
 		min-height: 100vh;
 		display: grid;

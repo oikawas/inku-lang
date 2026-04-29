@@ -469,6 +469,14 @@ def _px(coord: tuple[float, float]) -> tuple[float, float]:
     return x * CANVAS_PX, y * CANVAS_PX
 
 
+def _apply_rotation(element, ins: Instruction):
+    if ins.rotation is None or abs(ins.rotation) < 1e-9:
+        return element
+    cx, cy = _px(_anchor(ins))
+    element.rotate(ins.rotation, center=(cx, cy))
+    return element
+
+
 def _arc_path_d(cx: float, cy: float, r: float, start_deg: float, end_deg: float) -> str:
     """SVG <path d> の A コマンドで弧を描く文字列を返す。
 
@@ -503,14 +511,16 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
             points = _line_with_variation(
                 start, end, ins.variation, _seed_for_instruction(ins)
             )
-            return dwg.polyline(points=points, **attrs)
-        return dwg.line(start=start, end=end, **attrs)
+            return _apply_rotation(dwg.polyline(points=points, **attrs), ins)
+        return _apply_rotation(dwg.line(start=start, end=end, **attrs), ins)
 
     if ins.primitive == "circle":
         if ins.center is None or ins.radius is None:
             raise ValueError("circle requires 'center' and 'radius'")
         cx, cy = _px(ins.center)
-        return dwg.circle(center=(cx, cy), r=ins.radius * CANVAS_PX, **attrs)
+        return _apply_rotation(
+            dwg.circle(center=(cx, cy), r=ins.radius * CANVAS_PX, **attrs), ins
+        )
 
     if ins.primitive == "ellipse":
         if ins.center is None or ins.size is None:
@@ -518,7 +528,7 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
         cx, cy = _px(ins.center)
         rx = ins.size[0] * CANVAS_PX / 2
         ry = ins.size[1] * CANVAS_PX / 2
-        return dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs)
+        return _apply_rotation(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs), ins)
 
     if ins.primitive == "square":
         if ins.position is None or ins.size is None:
@@ -526,7 +536,7 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
         x, y = _px(ins.position)
         w = ins.size[0] * CANVAS_PX
         h = ins.size[1] * CANVAS_PX
-        return dwg.rect(insert=(x, y), size=(w, h), **attrs)
+        return _apply_rotation(dwg.rect(insert=(x, y), size=(w, h), **attrs), ins)
 
     if ins.primitive == "triangle":
         if ins.position is None or ins.size is None:
@@ -539,7 +549,7 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
             (x, y + h),
             (x + w, y + h),
         ]
-        return dwg.polygon(points=points, **attrs)
+        return _apply_rotation(dwg.polygon(points=points, **attrs), ins)
 
     if ins.primitive == "arc":
         if ins.center is None or ins.radius is None:
@@ -549,6 +559,6 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
         cx, cy = _px(ins.center)
         r = ins.radius * CANVAS_PX
         path_d = _arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)
-        return dwg.path(d=path_d, **attrs)
+        return _apply_rotation(dwg.path(d=path_d, **attrs), ins)
 
     raise NotImplementedError(f"primitive '{ins.primitive}' not yet supported")

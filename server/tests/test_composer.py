@@ -59,7 +59,7 @@ def _diff_instruction(a: Instruction, e: Instruction) -> list[str]:
         if av != ev:
             errs.append(f"{field}: {av!r} vs {ev!r}")
 
-    for field in ("center", "radius", "from_", "to", "position", "size"):
+    for field in ("center", "radius", "from_", "to", "position", "size", "rotation"):
         av, ev = getattr(a, field), getattr(e, field)
         if av is None and ev is None:
             continue

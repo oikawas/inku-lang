@@ -139,6 +139,42 @@ def test_render_triangle():
     assert "#2f6b3a" in svg
 
 
+def test_render_square_rotation_applies_center_transform():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.35, 0.35],
+                    "size": [0.3, 0.3],
+                    "rotation": -30,
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<rect" in svg
+    assert 'transform="rotate(-30.0,500.0,500.0)"' in svg
+
+
+def test_render_line_rotation_applies_midpoint_transform():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.5],
+                    "to": [0.75, 0.5],
+                    "rotation": 45,
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert "<line" in svg
+    assert 'transform="rotate(45.0,500.0,500.0)"' in svg
+
+
 def test_render_color_hint_uses_catalog_palette_match():
     score = Score.model_validate(
         {

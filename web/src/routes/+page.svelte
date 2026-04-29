@@ -107,6 +107,11 @@
 		{ value: 'group_lead', label: 'グループリード' },
 		{ value: 'user', label: 'ユーザー' },
 	];
+	function userRoleLabel(role: UserRole) {
+		if (role === 'admin') return t().userRoleAdmin;
+		if (role === 'group_lead') return t().userRoleGroupLead;
+		return t().userRoleUser;
+	}
 
 	// ── Input ───────────────────────────────────────────────
 	let inputMode   = $state<'single' | 'batch'>('single');
@@ -230,7 +235,7 @@
 				apiFetch('/api/user-groups'),
 				apiFetch('/api/users'),
 			]);
-			if (!groupsResponse.ok || !usersResponse.ok) throw new Error('ユーザー情報を読み込めませんでした。');
+			if (!groupsResponse.ok || !usersResponse.ok) throw new Error(t().userInfoLoadFailed);
 			groups = await groupsResponse.json();
 			users = await usersResponse.json();
 			if (!newUserGroupId && groups[0]) newUserGroupId = groups[0].id;
@@ -249,8 +254,8 @@
 		if (!currentUser || currentUser.role !== 'admin') {
 			settingsStatus = null;
 			settingsStatusError = currentUser
-				? 'DB設定とプラグイン状態は管理者のみ確認できます。'
-				: 'ログイン後に設定状態を確認できます。';
+				? t().settingsAdminOnlyMessage
+				: t().loginRequiredMessage;
 			return;
 		}
 		settingsStatusLoading = true;
@@ -285,9 +290,9 @@
 		} catch {
 			authToken = null;
 			currentUser = null;
-			loginStatus = 'ログインしてください。';
+			loginStatus = t().loginRequiredMessage;
 			settingsStatus = null;
-			settingsStatusError = 'ログイン後に設定状態を確認できます。';
+			settingsStatusError = t().loginRequiredMessage;
 			historyItems = [];
 			historyTotal = 0;
 			trashItems = [];
@@ -340,7 +345,7 @@
 		currentUser = null;
 		loginStatus = null;
 		settingsStatus = null;
-		settingsStatusError = 'ログイン後に設定状態を確認できます。';
+		settingsStatusError = t().loginRequiredMessage;
 		users = [];
 		groups = [];
 		historyItems = [];
@@ -362,7 +367,7 @@
 			newUserGroupId = currentUser.group_id ?? '';
 		}
 		if (!name || !email || newUserPassword.length < 8) {
-			userSettingsStatus = 'ユーザー名、メールアドレス、8文字以上のパスワードを入力してください。';
+			userSettingsStatus = t().userValidationCreate;
 			return;
 		}
 		try {
@@ -427,11 +432,11 @@
 		const username = editUserName.trim();
 		const email = editUserEmail.trim();
 		if (!username || !email) {
-			userSettingsStatus = 'ユーザー名とメールアドレスを入力してください。';
+			userSettingsStatus = t().userValidationUpdate;
 			return;
 		}
 		if (editUserPassword && editUserPassword.length < 8) {
-			userSettingsStatus = 'パスワードは8文字以上で入力してください。';
+			userSettingsStatus = t().userPasswordTooShort;
 			return;
 		}
 		const patch: Partial<UserItem> & { password?: string } = {
@@ -876,7 +881,7 @@
 	function askTrash(ids: string[]) {
 		if (ids.length === 0) return;
 		confirmAction = {
-			message: `${ids.length}件をごみ箱に移動しますか？`,
+			message: t().confirmTrashMessage(ids.length),
 			run: () => { void postHistoryIds('/api/history/trash', ids); }
 		};
 	}
@@ -884,7 +889,7 @@
 	function askRestore(ids: string[]) {
 		if (ids.length === 0) return;
 		confirmAction = {
-			message: `${ids.length}件を復元しますか？`,
+			message: t().confirmRestoreMessage(ids.length),
 			run: () => { void postHistoryIds('/api/history/restore', ids); }
 		};
 	}
@@ -892,7 +897,7 @@
 	function askPermanentDelete(ids: string[]) {
 		if (ids.length === 0) return;
 		confirmAction = {
-			message: `${ids.length}件を完全に削除しますか？`,
+			message: t().confirmPermanentDeleteMessage(ids.length),
 			destructive: true,
 			run: () => { void postHistoryIds('/api/history/permanent-delete', ids); }
 		};
@@ -1237,7 +1242,7 @@
 		const s1 = (result.elapsed_stage1_ms / 1000).toFixed(1);
 		const s2 = (result.elapsed_stage2_ms / 1000).toFixed(1);
 		const total = (result.elapsed_total_ms / 1000).toFixed(1);
-		if (result.elapsed_stage1_ms > 0) return `解釈 ${s1}s + 構造化 ${s2}s = ${total}s`;
+		if (result.elapsed_stage1_ms > 0) return `${t().statsInterp} ${s1}s + ${t().statsStruct} ${s2}s = ${total}s`;
 		return `${total}s`;
 	});
 
@@ -1378,7 +1383,7 @@
 				class="settings-btn"
 				class:active={settingsOpen}
 				onclick={() => openSettings('db')}
-			>⚙ 設定</button>
+			>⚙ {t().settingsButton}</button>
 
 			<!-- Lang -->
 			<div class="lang-switcher">
@@ -1394,28 +1399,6 @@
 
 	<!-- ══ BODY ══ -->
 	<div class="body">
-		{#if showBirds && (loading || reloading)}
-			<div class="flying-bird-layer" aria-hidden="true">
-				<div class="flying-bird-y">
-					<div class="flying-bird-x">
-						<svg class="flying-bird" width="38" height="28" viewBox="0 0 38 28">
-							<ellipse cx="18" cy="17" rx="8" ry="5" fill="#6b7b2a" opacity="0.92" />
-							<path d="M25,18 Q31,22 30,16" fill="#4a5820" opacity="0.85" />
-							<path d="M10,15.5 L6,13.5" stroke="#b8940a" stroke-width="1.5" fill="none" stroke-linecap="round" />
-							<circle cx="12" cy="14.5" r="1.5" fill="#fff" />
-							<circle cx="12.4" cy="14.5" r="0.7" fill="#1a1917" />
-							<path fill="#8b9b3a" opacity="0.88">
-								<animate attributeName="d" values="M14,17 Q19,6 24,17;M14,17 Q19,26 24,17;M14,17 Q19,6 24,17" dur="0.38s" repeatCount="indefinite" />
-							</path>
-							<path fill="#a8b855" opacity="0.5">
-								<animate attributeName="d" values="M15,16 Q19,9 23,16;M15,16 Q19,23 23,16;M15,16 Q19,9 23,16" dur="0.38s" repeatCount="indefinite" />
-							</path>
-						</svg>
-					</div>
-				</div>
-			</div>
-		{/if}
-
 		<!-- ── LEFT PANEL ── -->
 		<div class="left-panel">
 			<!-- Input mode tabs -->
@@ -1430,11 +1413,11 @@
 				<!-- 指示 section -->
 				<section class="panel-section">
 					<div class="section-head">
-						<span class="section-label">指示</span>
+						<span class="section-label">{t().inputSectionLabel}</span>
 						<div class="section-actions">
-							<button class="ghost-btn" onclick={() => { settingsMode = 'model'; settingsTab = 'connection'; settingsOpen = true; }}>モデル選択</button>
-							<button class="ghost-btn" onclick={() => (catalogOpen = true)}>色カタログ</button>
-							<button class="ghost-btn create-btn" onclick={clearInput}>新規作成</button>
+							<button class="ghost-btn" onclick={() => { settingsMode = 'model'; settingsTab = 'connection'; settingsOpen = true; }}>{t().modelSelectButton}</button>
+							<button class="ghost-btn" onclick={() => (catalogOpen = true)}>{t().colorCatalogButton}</button>
+							<button class="ghost-btn create-btn" onclick={clearInput}>{t().clearInputBtn}</button>
 						</div>
 					</div>
 
@@ -1459,12 +1442,12 @@
 					{#if loading && inputMode === 'single'}
 						<div class="progress-wrap">
 							<div class="progress-phases">
-								{#each ['解釈', '構造化'] as ph, i (ph)}
+								{#each [{ key: '解釈', label: t().statsInterp }, { key: '構造化', label: t().statsStruct }] as ph, i (ph.key)}
 									{#if i > 0}<span class="phase-sep">›</span>{/if}
-									<span class="phase-item" class:phase-done={stageLabel.includes('構造化') && ph === '解釈'} class:phase-active={stageLabel.includes(ph === '解釈' ? '解釈' : '構造化') && !(stageLabel.includes('構造化') && ph === '解釈')}>
-										{#if stageLabel.includes('構造化') && ph === '解釈'}<span class="phase-check">✓</span>{/if}
-										{#if !(stageLabel.includes('構造化') && ph === '解釈') && stageLabel.includes(ph === '解釈' ? '解釈' : '構造化')}<span class="phase-dot"></span>{/if}
-										{ph}
+									<span class="phase-item" class:phase-done={stageLabel.includes('構造化') && ph.key === '解釈'} class:phase-active={stageLabel.includes(ph.key) && !(stageLabel.includes('構造化') && ph.key === '解釈')}>
+										{#if stageLabel.includes('構造化') && ph.key === '解釈'}<span class="phase-check">✓</span>{/if}
+										{#if !(stageLabel.includes('構造化') && ph.key === '解釈') && stageLabel.includes(ph.key)}<span class="phase-dot"></span>{/if}
+										{ph.label}
 									</span>
 								{/each}
 							</div>
@@ -1473,13 +1456,49 @@
 								<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
 							</div>
 						</div>
-						<div class="progress-bar-track">
-							<div class="progress-bar-fill" style="width: {stageLabel.includes('構造化') ? '65' : '30'}%"></div>
+						<div
+							class="progress-bar-track"
+							style="--progress-target: {stageLabel.includes('構造化') ? '65%' : '30%'}"
+						>
+							<div class="progress-bar-fill"></div>
 							{#if showBirds}
-								<svg class="progress-bird" class:done={!loading} width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
-									<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
-										<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
-									</path>
+								<svg class="progress-bird" viewBox="0 0 52 44" aria-hidden="true">
+									<g class="bird-peck">
+										<ellipse class="bird-shadow" cx="26" cy="38" rx="12" ry="2.4" />
+										<g class="bird-preen">
+											<g class="bird-view bird-view-side">
+												<path class="bird-tail" d="M33 25 Q43 24 47 19 Q44 29 34 30 Z" />
+												<ellipse class="bird-body" cx="27" cy="25" rx="11" ry="8" />
+												<path class="bird-wing" d="M24 23 Q31 15 37 24 Q31 30 25 29 Z" />
+												<g class="bird-head">
+													<circle class="bird-head-fill" cx="17" cy="19" r="5.8" />
+													<path class="bird-beak" d="M11.5 19 L5 16.9 L5 21.1 Z" />
+													<circle class="bird-eye" cx="15.4" cy="17.5" r="0.95" />
+												</g>
+											</g>
+											<g class="bird-view bird-view-front">
+												<ellipse class="bird-body" cx="26" cy="25.5" rx="9.2" ry="8.8" />
+												<circle class="bird-head-fill" cx="26" cy="17" r="6.4" />
+												<path class="bird-wing bird-wing-left" d="M18 24 Q13 25 11 30 Q18 31 22 27 Z" />
+												<path class="bird-wing bird-wing-right" d="M34 24 Q39 25 41 30 Q34 31 30 27 Z" />
+												<path class="bird-beak" d="M23 18.7 L26 22.4 L29 18.7 Z" />
+												<circle class="bird-eye" cx="23.4" cy="16.3" r="0.9" />
+												<circle class="bird-eye" cx="28.6" cy="16.3" r="0.9" />
+											</g>
+											<g class="bird-view bird-view-three">
+												<path class="bird-tail" d="M33 25 Q41 23 44 18 Q43 27 35 30 Z" />
+												<ellipse class="bird-body" cx="27" cy="25" rx="10" ry="8.5" />
+												<path class="bird-wing" d="M24 23 Q30 17 36 24 Q31 29 25 29 Z" />
+												<circle class="bird-head-fill" cx="20" cy="18" r="6.1" />
+												<path class="bird-beak" d="M16 19 L9.8 17.2 L10.8 21.2 Z" />
+												<circle class="bird-eye" cx="18.3" cy="16.5" r="0.95" />
+											</g>
+											<g class="bird-legs">
+												<path class="bird-leg bird-leg-a" d="M22 32 L20 37" />
+												<path class="bird-leg bird-leg-b" d="M30 32 L32 37" />
+											</g>
+										</g>
+									</g>
 								</svg>
 							{/if}
 						</div>
@@ -1530,7 +1549,7 @@
 						<div class="section-head">
 							<span class="section-label">{t().ddlLabel}</span>
 							<div class="section-actions">
-								<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>歳時記</button>
+								<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>{t().saijikiToggleBtn}</button>
 								{#if historyCursor >= 0}
 									<button class="ghost-btn" class:ghost-active={ddlEditing} onclick={() => (ddlEditing = !ddlEditing)}>{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}</button>
 								{/if}
@@ -1556,19 +1575,52 @@
 						{#if reloading}
 							<div class="progress-wrap">
 								<div class="progress-phases">
-									<span class="phase-item phase-active"><span class="phase-dot"></span>構造化</span>
+									<span class="phase-item phase-active"><span class="phase-dot"></span>{t().statsStruct}</span>
 								</div>
 								<div class="progress-right">
 									<span class="progress-time">…</span>
 								</div>
 							</div>
-							<div class="progress-bar-track">
-								<div class="progress-bar-fill" style="width: 55%"></div>
+							<div class="progress-bar-track" style="--progress-target: 55%">
+								<div class="progress-bar-fill"></div>
 								{#if showBirds}
-									<svg class="progress-bird" width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
-										<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
-											<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
-										</path>
+									<svg class="progress-bird" viewBox="0 0 52 44" aria-hidden="true">
+										<g class="bird-peck">
+											<ellipse class="bird-shadow" cx="26" cy="38" rx="12" ry="2.4" />
+											<g class="bird-preen">
+												<g class="bird-view bird-view-side">
+													<path class="bird-tail" d="M33 25 Q43 24 47 19 Q44 29 34 30 Z" />
+													<ellipse class="bird-body" cx="27" cy="25" rx="11" ry="8" />
+													<path class="bird-wing" d="M24 23 Q31 15 37 24 Q31 30 25 29 Z" />
+													<g class="bird-head">
+														<circle class="bird-head-fill" cx="17" cy="19" r="5.8" />
+														<path class="bird-beak" d="M11.5 19 L5 16.9 L5 21.1 Z" />
+														<circle class="bird-eye" cx="15.4" cy="17.5" r="0.95" />
+													</g>
+												</g>
+												<g class="bird-view bird-view-front">
+													<ellipse class="bird-body" cx="26" cy="25.5" rx="9.2" ry="8.8" />
+													<circle class="bird-head-fill" cx="26" cy="17" r="6.4" />
+													<path class="bird-wing bird-wing-left" d="M18 24 Q13 25 11 30 Q18 31 22 27 Z" />
+													<path class="bird-wing bird-wing-right" d="M34 24 Q39 25 41 30 Q34 31 30 27 Z" />
+													<path class="bird-beak" d="M23 18.7 L26 22.4 L29 18.7 Z" />
+													<circle class="bird-eye" cx="23.4" cy="16.3" r="0.9" />
+													<circle class="bird-eye" cx="28.6" cy="16.3" r="0.9" />
+												</g>
+												<g class="bird-view bird-view-three">
+													<path class="bird-tail" d="M33 25 Q41 23 44 18 Q43 27 35 30 Z" />
+													<ellipse class="bird-body" cx="27" cy="25" rx="10" ry="8.5" />
+													<path class="bird-wing" d="M24 23 Q30 17 36 24 Q31 29 25 29 Z" />
+													<circle class="bird-head-fill" cx="20" cy="18" r="6.1" />
+													<path class="bird-beak" d="M16 19 L9.8 17.2 L10.8 21.2 Z" />
+													<circle class="bird-eye" cx="18.3" cy="16.5" r="0.95" />
+												</g>
+												<g class="bird-legs">
+													<path class="bird-leg bird-leg-a" d="M22 32 L20 37" />
+													<path class="bird-leg bird-leg-b" d="M30 32 L32 37" />
+												</g>
+											</g>
+										</g>
 									</svg>
 								{/if}
 							</div>
@@ -1579,7 +1631,7 @@
 							class="replay-btn"
 							onclick={replay}
 							disabled={reloading || !ddl}
-						>↺ 解釈から描画</button>
+						>{t().replayFromDdlButton}</button>
 					</section>
 				{/if}
 
@@ -1594,9 +1646,9 @@
 							<div class="stats-detail">
 								{#if elapsedStage1Ms > 0}
 									<div class="stats-grid">
-										<span class="stats-key">解釈</span><span>{(elapsedStage1Ms / 1000).toFixed(1)}s{tokensInStage1 != null ? ` — ${tokensInStage1}→${tokensOutStage1}tok` : ''}</span>
-										<span class="stats-key">構造化</span><span>{(elapsedStage2Ms / 1000).toFixed(1)}s{tokensInStage2 != null ? ` — ${tokensInStage2}→${tokensOutStage2}tok` : ''}</span>
-										<span class="stats-key">合計</span><span class="stats-total">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
+										<span class="stats-key">{t().statsInterp}</span><span>{(elapsedStage1Ms / 1000).toFixed(1)}s{tokensInStage1 != null ? ` — ${tokensInStage1}→${tokensOutStage1}tok` : ''}</span>
+										<span class="stats-key">{t().statsStruct}</span><span>{(elapsedStage2Ms / 1000).toFixed(1)}s{tokensInStage2 != null ? ` — ${tokensInStage2}→${tokensOutStage2}tok` : ''}</span>
+										<span class="stats-key">{t().statsTotal}</span><span class="stats-total">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
 									</div>
 								{:else}
 									<span>{(elapsedTotalMs / 1000).toFixed(1)}s</span>
@@ -1662,7 +1714,7 @@
 								<textarea class="prompt-textarea prompt-user" readonly value={inputMode === 'single' ? input : `(${t().modeBatch})`}></textarea>
 								<div class="prompt-collapsible-head">
 									<p class="prompt-label">{t().promptStage1System}</p>
-									<button class="ghost-btn" onclick={() => (promptStage1Expanded = !promptStage1Expanded)}>{promptStage1Expanded ? '折りたたむ' : '展開'}</button>
+									<button class="ghost-btn" onclick={() => (promptStage1Expanded = !promptStage1Expanded)}>{promptStage1Expanded ? t().promptCollapse : t().promptExpand}</button>
 								</div>
 								<div class="prompt-collapse" class:expanded={promptStage1Expanded}>
 									<textarea class="prompt-textarea prompt-system" readonly value={promptsData.stage1_system}></textarea>
@@ -1674,7 +1726,7 @@
 								{/if}
 								<div class="prompt-collapsible-head">
 									<p class="prompt-label">{t().promptStage2System}</p>
-									<button class="ghost-btn" onclick={() => (promptStage2Expanded = !promptStage2Expanded)}>{promptStage2Expanded ? '折りたたむ' : '展開'}</button>
+									<button class="ghost-btn" onclick={() => (promptStage2Expanded = !promptStage2Expanded)}>{promptStage2Expanded ? t().promptCollapse : t().promptExpand}</button>
 								</div>
 								<div class="prompt-collapse" class:expanded={promptStage2Expanded}>
 									<textarea class="prompt-textarea prompt-system" readonly value={promptsData.stage2_system}></textarea>
@@ -1718,13 +1770,13 @@
 
 			<!-- Export bar -->
 			<div class="export-bar">
-				<span class="export-label">エクスポート</span>
+				<span class="export-label">{t().exportLabel}</span>
 				<button class="ghost-btn" onclick={downloadSVG} disabled={!result}>↓ SVG</button>
 				<div class="png-wrap" bind:this={pngWrapEl}>
 					<button class="ghost-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>↓ PNG ▾</button>
 					{#if pngMenuOpen}
 						<div class="png-menu" onclick={(e) => e.stopPropagation()}>
-							{#each [[1080,'標準'],[2160,'高解像度 (2×)'],[1024,'正方形'],[2048,'正方形 高解像度']] as [size, label]}
+							{#each [[1080,t().pngStandard],[2160,t().pngHighRes],[1024,t().pngSquare],[2048,t().pngSquareHighRes]] as [size, label]}
 								<button onclick={() => { downloadPNG(size as number); pngMenuOpen = false; }}>
 									<span class="png-size">PNG {size}px</span>
 									<span class="png-sub">{label}</span>
@@ -1746,9 +1798,9 @@
 					{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
 				</button>
 				<div class="history-page-nav">
-					<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>← 新しい{historyNavSpan}件</button>
+					<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage - 1); loadIteration(0); }} disabled={historyPage <= 0}>{t().historyNewerPage(historyNavSpan)}</button>
 					<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
-					<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>古い{historyNavSpan}件 →</button>
+					<button class="ghost-btn history-nav-btn" onclick={async () => { await fetchHistoryPage(historyPage + 1); loadIteration(0); }} disabled={historyPage >= historyTotalPages - 1}>{t().historyOlderPage(historyNavSpan)}</button>
 				</div>
 			</div>
 			<div class="thumb-strip">
@@ -1760,10 +1812,10 @@
 					>
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
-							<div class="tooltip-row"><span>モデル</span><strong>{historyModelSummary(it)}</strong></div>
-							<div class="tooltip-row"><span>保存時間</span><strong>{formatHistoryDate(it.at)}</strong></div>
-							<div class="tooltip-row"><span>秒数</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
-							<div class="tooltip-row"><span>色カタログ</span><strong>{catalogName(it.catalog_id)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(it)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 						</div>
 						<div class="thumb-svg">{@html it.svg}</div>
 						<div class="thumb-meta">
@@ -1771,7 +1823,7 @@
 							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
 						</div>
 						{#if i === historyCursor}
-							<div class="thumb-current-badge">表示中</div>
+							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
 						{/if}
 					</button>
 				{/each}
@@ -1786,10 +1838,10 @@
 	<div class="saijiki-inner">
 		<div class="saijiki-head">
 			<div>
-				<div class="saijiki-title">歳時記</div>
+				<div class="saijiki-title">{t().saijikiTitle}</div>
 				<div class="saijiki-hint">{t().saijikiHint}</div>
 			</div>
-			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label="閉じる">×</button>
+			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label={t().closeLabel}>×</button>
 		</div>
 		<div class="saijiki-body">
 			{#each SAIJIKI as cat, ci (cat.key)}
@@ -1815,15 +1867,15 @@
 	<div class="modal-backdrop" onclick={() => (settingsOpen = false)} aria-hidden="true"></div>
 	<div class="settings-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="modal-head">
-			<div class="catalog-modal-title">{settingsMode === 'model' ? 'モデル選択' : '設定'}</div>
+			<div class="catalog-modal-title">{settingsMode === 'model' ? t().modelSelectButton : t().settingsTitle}</div>
 			<button class="catalog-close" onclick={() => (settingsOpen = false)}>×</button>
 		</div>
 		{#if settingsMode === 'settings'}
 			<div class="settings-tabs">
-				<button class:active={settingsTab === 'db'} onclick={() => selectSettingsTab('db')}>DB設定</button>
-				<button class:active={settingsTab === 'plugins'} onclick={() => selectSettingsTab('plugins')}>プラグイン</button>
-				<button class:active={settingsTab === 'users'} onclick={() => selectSettingsTab('users')}>ユーザー管理</button>
-				<button class:active={settingsTab === 'misc'} onclick={() => selectSettingsTab('misc')}>その他</button>
+				<button class:active={settingsTab === 'db'} onclick={() => selectSettingsTab('db')}>{t().settingsTabDb}</button>
+				<button class:active={settingsTab === 'plugins'} onclick={() => selectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
+				<button class:active={settingsTab === 'users'} onclick={() => selectSettingsTab('users')}>{t().settingsTabUsers}</button>
+				<button class:active={settingsTab === 'misc'} onclick={() => selectSettingsTab('misc')}>{t().settingsTabMisc}</button>
 			</div>
 		{/if}
 		<div class="settings-body">
@@ -1866,34 +1918,34 @@
 				</div>
 			{:else if settingsTab === 'db'}
 				<div class="popover-group">
-					<div class="popover-group-label">現在のサーバーDB</div>
+					<div class="popover-group-label">{t().settingsCurrentDb}</div>
 					{#if settingsStatusLoading}
-						<div class="inline-message">設定状態を読み込んでいます。</div>
+						<div class="inline-message">{t().settingsLoading}</div>
 					{:else if settingsStatus}
 						<div class="settings-readonly-grid">
 							<span>Backend</span><strong>{settingsStatus.database.backend}</strong>
 							<span>Driver</span><strong>{settingsStatus.database.driver}</strong>
 							<span>URL</span><code>{settingsStatus.database.url}</code>
 							<span>Database</span><strong>{settingsStatus.database.database ?? '-'}</strong>
-							<span>Default</span><strong>{settingsStatus.database.is_default ? 'はい' : 'いいえ'}</strong>
+							<span>Default</span><strong>{settingsStatus.database.is_default ? t().settingsYes : t().settingsNo}</strong>
 						</div>
 						<div class="db-test-result">{settingsStatus.database.note}</div>
 					{:else}
-						<div class="inline-message">{settingsStatusError ?? '設定状態を取得できません。'}</div>
+						<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
 					{/if}
 				</div>
 				<div class="settings-inline-actions">
-					<button class="ghost-btn" onclick={loadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>再読み込み</button>
+					<button class="ghost-btn" onclick={loadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReload}</button>
 				</div>
 			{:else if settingsTab === 'plugins'}
 				<div class="popover-group">
-					<div class="popover-group-label">プラグイン状態</div>
+					<div class="popover-group-label">{t().settingsPluginsStatus}</div>
 					{#if settingsStatusLoading}
-						<div class="inline-message">設定状態を読み込んでいます。</div>
+						<div class="inline-message">{t().settingsLoading}</div>
 					{:else if settingsStatus}
 						<div class="settings-readonly-grid">
-							<span>Loader</span><strong>{settingsStatus.plugins.enabled ? '有効' : '未実装'}</strong>
-							<span>Runtime edit</span><strong>{settingsStatus.plugins.runtime_editable ? '可' : '不可'}</strong>
+							<span>Loader</span><strong>{settingsStatus.plugins.enabled ? t().settingsYes : t().settingsUnavailable}</strong>
+							<span>Runtime edit</span><strong>{settingsStatus.plugins.runtime_editable ? t().settingsYes : t().settingsUnavailable}</strong>
 						</div>
 						{#if settingsStatus.plugins.loaded.length > 0}
 							<div class="plugin-list">
@@ -1906,115 +1958,115 @@
 								{/each}
 							</div>
 						{:else}
-							<div class="inline-message">読み込まれているプラグインはありません。</div>
+							<div class="inline-message">{t().settingsPluginsEmpty}</div>
 						{/if}
 						<div class="db-test-result">{settingsStatus.plugins.note}</div>
 					{:else}
-						<div class="inline-message">{settingsStatusError ?? '設定状態を取得できません。'}</div>
+						<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
 					{/if}
 				</div>
 				<div class="settings-inline-actions">
-					<button class="ghost-btn" onclick={loadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>再読み込み</button>
+					<button class="ghost-btn" onclick={loadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReload}</button>
 				</div>
 			{:else if settingsTab === 'users'}
 				<div class="popover-group">
-					<div class="popover-group-label">ユーザー</div>
+					<div class="popover-group-label">{t().settingsUsersLabel}</div>
 					{#if userSettingsStatus}
 						<div class="inline-message">{userSettingsStatus}</div>
 					{/if}
 					{#if !currentUser}
 						<div class="login-grid">
-							<input bind:value={loginUserName} placeholder="ユーザー名" />
-							<input bind:value={loginPassword} type="password" placeholder="パスワード" onkeydown={(e) => { if (e.key === 'Enter') void login(); }} />
-							<button class="ghost-btn" onclick={login}>ログイン</button>
+							<input bind:value={loginUserName} placeholder={t().userNamePlaceholder} />
+							<input bind:value={loginPassword} type="password" placeholder={t().userPasswordPlaceholder} onkeydown={(e) => { if (e.key === 'Enter') void login(); }} />
+							<button class="ghost-btn" onclick={login}>{t().loginSubmit}</button>
 						</div>
-						<div class="db-test-result">初期管理者は username: admin / password: inku-admin です。環境変数 INKU_BOOTSTRAP_ADMIN_PASSWORD で変更できます。</div>
+						<div class="db-test-result">{t().bootstrapAdminNote}</div>
 					{:else}
 						<div class="user-session-row">
 							<span>{currentUser.username} / {currentUser.role_label}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
-							<button class="ghost-btn" onclick={logout}>ログアウト</button>
+							<button class="ghost-btn" onclick={logout}>{t().logoutButton}</button>
 						</div>
 						{#if currentUser.role === 'admin' || currentUser.role === 'group_lead'}
 							<div class="user-editor-grid">
 								<div class="user-editor-panel">
-									<div class="user-editor-title">ユーザー追加</div>
+									<div class="user-editor-title">{t().userAddTitle}</div>
 									<div class="user-form-grid">
-										<input bind:value={newUserName} placeholder="ユーザー名" />
-										<input bind:value={newUserEmail} type="email" placeholder="メールアドレス" />
-										<input bind:value={newUserPassword} type="password" placeholder="パスワード" />
+										<input bind:value={newUserName} placeholder={t().userNamePlaceholder} />
+										<input bind:value={newUserEmail} type="email" placeholder={t().userEmailPlaceholder} />
+										<input bind:value={newUserPassword} type="password" placeholder={t().userPasswordPlaceholder} />
 										<select bind:value={newUserRole} disabled={currentUser.role === 'group_lead'}>
 											{#each USER_ROLE_OPTIONS as role (role.value)}
-												<option value={role.value}>{role.label}</option>
+												<option value={role.value}>{userRoleLabel(role.value)}</option>
 											{/each}
 										</select>
 										<select bind:value={newUserGroupId} disabled={currentUser.role === 'group_lead'}>
-											<option value="">所属なし</option>
+											<option value="">{t().userNoGroup}</option>
 											{#each groups as group (group.id)}
 												<option value={group.id}>{group.name}</option>
 											{/each}
 										</select>
 									</div>
 									<div class="user-form-actions">
-										<button class="ghost-btn" onclick={addUser}>ユーザー追加</button>
+										<button class="ghost-btn" onclick={addUser}>{t().userAddButton}</button>
 									</div>
 								</div>
 								<div class="user-editor-panel">
-									<div class="user-editor-title">ユーザー変更</div>
+									<div class="user-editor-title">{t().userEditTitle}</div>
 									{#if selectedUserId}
 										<div class="user-form-grid">
-											<input bind:value={editUserName} placeholder="ユーザー名" />
-											<input bind:value={editUserEmail} type="email" placeholder="メールアドレス" />
-											<input bind:value={editUserPassword} type="password" placeholder="新しいパスワード" />
+											<input bind:value={editUserName} placeholder={t().userNamePlaceholder} />
+											<input bind:value={editUserEmail} type="email" placeholder={t().userEmailPlaceholder} />
+											<input bind:value={editUserPassword} type="password" placeholder={t().userNewPasswordPlaceholder} />
 											<select bind:value={editUserRole} disabled={currentUser.role === 'group_lead'}>
 												{#each USER_ROLE_OPTIONS as role (role.value)}
-													<option value={role.value}>{role.label}</option>
+													<option value={role.value}>{userRoleLabel(role.value)}</option>
 												{/each}
 											</select>
 											<select bind:value={editUserGroupId} disabled={currentUser.role === 'group_lead'}>
-												<option value="">所属なし</option>
+												<option value="">{t().userNoGroup}</option>
 												{#each groups as group (group.id)}
 													<option value={group.id}>{group.name}</option>
 												{/each}
 											</select>
 										</div>
 										<div class="user-form-actions">
-											<button class="ghost-btn" onclick={clearEditUser}>選択解除</button>
-											<button class="ghost-btn primary-inline" onclick={saveUserEdit}>変更を保存</button>
+											<button class="ghost-btn" onclick={clearEditUser}>{t().userClearSelection}</button>
+											<button class="ghost-btn primary-inline" onclick={saveUserEdit}>{t().userSaveChanges}</button>
 										</div>
 									{:else}
-										<div class="inline-message">一覧から変更するユーザーを選択してください。</div>
+										<div class="inline-message">{t().userSelectPrompt}</div>
 									{/if}
 								</div>
 							</div>
 							<div class="user-list">
 								{#each users as user (user.id)}
 									<div class="user-row" class:selected={selectedUserId === user.id}>
-										<button class="ghost-btn" onclick={() => setEditUser(user)}>変更</button>
+										<button class="ghost-btn" onclick={() => setEditUser(user)}>{t().editButton}</button>
 										<span class="user-cell user-name">{user.username}</span>
 										<span class="user-cell">{user.email}</span>
-										<span class="user-cell">{user.role_label}</span>
-										<span class="user-cell">{user.group_name ?? '所属なし'}</span>
-										<button class="ghost-btn" onclick={() => removeUser(user.id)}>削除</button>
+										<span class="user-cell">{userRoleLabel(user.role)}</span>
+										<span class="user-cell">{user.group_name ?? t().userNoGroup}</span>
+										<button class="ghost-btn" onclick={() => removeUser(user.id)}>{t().deleteButton}</button>
 									</div>
 								{/each}
 							</div>
 						{:else}
-							<div class="inline-message">ユーザー管理は管理者またはグループリードのみ利用できます。</div>
+							<div class="inline-message">{t().userManageUnavailable}</div>
 						{/if}
 					{/if}
 				</div>
 				{#if currentUser?.role === 'admin'}
 					<div class="popover-group">
-						<div class="popover-group-label">グループ</div>
+						<div class="popover-group-label">{t().userGroupLabel}</div>
 						<div class="plugin-add">
-							<input bind:value={newGroupName} placeholder="グループ名" />
-							<button class="ghost-btn" onclick={addGroup}>追加</button>
+							<input bind:value={newGroupName} placeholder={t().groupNamePlaceholder} />
+							<button class="ghost-btn" onclick={addGroup}>{t().addButton}</button>
 						</div>
 						<div class="group-list">
 							{#each groups as group (group.id)}
 								<div class="group-row">
 									<span>{group.name}</span>
-									<button class="ghost-btn" onclick={() => removeGroup(group)}>削除</button>
+									<button class="ghost-btn" onclick={() => removeGroup(group)}>{t().deleteButton}</button>
 								</div>
 							{/each}
 						</div>
@@ -2022,24 +2074,24 @@
 				{/if}
 			{:else}
 				<div class="popover-group">
-					<div class="popover-group-label">表示</div>
+					<div class="popover-group-label">{t().settingsDisplayLabel}</div>
 					<label class="setting-toggle">
 						<input type="checkbox" bind:checked={showBirds} />
-						<span>小鳥を表示する</span>
+						<span>{t().settingsShowBirds}</span>
 					</label>
 				</div>
 				<div class="popover-group">
-					<div class="popover-group-label">書き出し</div>
+					<div class="popover-group-label">{t().settingsExportLabel}</div>
 					<label class="setting-toggle">
 						<input type="checkbox" bind:checked={pngAlphaWhite} />
-						<span>白背景時アルファチャンネルを有効にする</span>
+						<span>{t().settingsPngAlpha}</span>
 					</label>
 				</div>
 				<div class="popover-group">
-					<div class="popover-group-label">履歴</div>
+					<div class="popover-group-label">{t().settingsHistoryLabel}</div>
 					<label class="setting-toggle">
 						<input type="checkbox" bind:checked={saveReplayAsNewVersion} />
-						<span>解釈を再編集した場合も新バージョンとして保存する</span>
+						<span>{t().settingsSaveReplay}</span>
 					</label>
 				</div>
 			{/if}
@@ -2052,7 +2104,7 @@
 	<div class="modal-backdrop" onclick={() => (catalogOpen = false)} aria-hidden="true"></div>
 	<div class="catalog-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="catalog-modal-head">
-			<div class="catalog-modal-title">色カタログ</div>
+			<div class="catalog-modal-title">{t().colorCatalogTitle}</div>
 			<button class="catalog-close" onclick={() => (catalogOpen = false)}>×</button>
 		</div>
 		<div class="catalog-body">
@@ -2078,7 +2130,7 @@
 				{/each}
 			</div>
 			<div class="catalog-detail">
-				<div class="section-label">{currentCatalog.name} — 詳細</div>
+				<div class="section-label">{currentCatalog.name} — {t().colorCatalogDetail}</div>
 				<div class="catalog-detail-list">
 					{#each currentCatalog.palette as color (color.code)}
 						<div class="catalog-color-row">
@@ -2098,15 +2150,15 @@
 	<div class="modal-backdrop" onclick={() => (historyManagerOpen = false)} aria-hidden="true"></div>
 	<div class="history-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="modal-head">
-			<div class="catalog-modal-title">履歴管理</div>
+			<div class="catalog-modal-title">{t().historyManagerTitle}</div>
 			<div class="modal-head-actions">
-				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => setHistoryManagerView(historyManagerView === 'trash' ? 'active' : 'trash')}>ごみ箱 ({managerTrashTotal || trashTotal})</button>
+				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => setHistoryManagerView(historyManagerView === 'trash' ? 'active' : 'trash')}>{t().historyTrashButton(managerTrashTotal || trashTotal)}</button>
 				<button class="catalog-close" onclick={() => (historyManagerOpen = false)}>×</button>
 			</div>
 		</div>
 		<div class="settings-tabs history-mode-tabs">
-			<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>サムネイル</button>
-			<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>リスト</button>
+			<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
+			<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
 		</div>
 		<div class="history-tools">
 			<span class="history-manager-count">
@@ -2116,19 +2168,19 @@
 					{historyManagerOffset + 1}-{historyManagerShownTo} / {managedHistoryTotal}
 				{/if}
 			</span>
-			<button class="ghost-btn" onclick={selectAllManagedHistory}>すべて選択</button>
+			<button class="ghost-btn" onclick={selectAllManagedHistory}>{t().historySelectAll}</button>
 			{#if historyManagerView === 'active'}
-				<button class="ghost-btn" onclick={() => askTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択削除</button>
+				<button class="ghost-btn" onclick={() => askTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyMoveToTrash}</button>
 			{:else}
-				<button class="ghost-btn" onclick={() => askRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択復元</button>
-				<button class="danger-btn" onclick={() => askPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>完全削除</button>
+				<button class="ghost-btn" onclick={() => askRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
+				<button class="danger-btn" onclick={() => askPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
 			{/if}
-			<label class="history-search">検索: <input bind:value={historySearch} /></label>
+			<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
 		</div>
 		<div class="history-manager-pager">
-			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>← 前</button>
-			<span>{historyManagerLoading ? '読み込み中' : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
-			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>次 →</button>
+			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
+			<span>{historyManagerLoading ? t().historyLoading : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
+			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
 		</div>
 		{#if historyManagerTab === 'thumbs'}
 			<div class="history-thumb-grid-wrap">
@@ -2141,11 +2193,11 @@
 							<button class="thumb manager-thumb" onclick={() => historyManagerView === 'active' && loadIterationItem(it)}>
 								<div class="thumb-tooltip">
 									<div class="tooltip-title">#{historyManagerOffset + i + 1}</div>
-									<div>モデル: {historyModelSummary(it)}</div>
-									<div>保存時間: {formatHistoryDate(it.at)}</div>
-									<div>秒数: {formatElapsed(it.elapsed_ms)}</div>
-									<div>色カタログ: {catalogName(it.catalog_id)}</div>
-									<div>トークン: {historyTokenSummary(it)}</div>
+									<div>{t().historyTooltipModel}: {historyModelSummary(it)}</div>
+									<div>{t().historyTooltipSavedAt}: {formatHistoryDate(it.at)}</div>
+									<div>{t().historyTooltipSeconds}: {formatElapsed(it.elapsed_ms)}</div>
+									<div>{t().historyTooltipColorCatalog}: {catalogName(it.catalog_id)}</div>
+									<div>{t().historyTooltipTokens}: {historyTokenSummary(it)}</div>
 									<div class="tooltip-date">{historyPreviewText(it.input)}</div>
 								</div>
 								<div class="thumb-svg">{@html it.svg}</div>
@@ -2156,10 +2208,10 @@
 							</button>
 							<div class="manager-thumb-actions">
 								{#if historyManagerView === 'active'}
-									<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>削除</button>
+									<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>{t().deleteButton}</button>
 								{:else}
-									<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>復元</button>
-									<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>完全削除</button>
+									<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>{t().historyRestore}</button>
+									<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
 								{/if}
 							</div>
 						</div>
@@ -2170,7 +2222,7 @@
 			<div class="history-table-wrap">
 				<table class="history-table">
 					<thead>
-						<tr><th></th><th>画像</th><th>作成日時</th><th>モデル</th><th>秒数</th><th>色カタログ</th><th>操作</th></tr>
+						<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyModelHeader}</th><th>{t().historySecondsHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historyActionHeader}</th></tr>
 					</thead>
 					<tbody>
 						{#each managedHistoryItems as it (it.id ?? it.at)}
@@ -2183,10 +2235,10 @@
 								<td>{catalogName(it.catalog_id)}</td>
 								<td>
 									{#if historyManagerView === 'active'}
-										<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>削除</button>
+										<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>{t().deleteButton}</button>
 									{:else}
-										<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>復元</button>
-										<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>完全削除</button>
+										<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>{t().historyRestore}</button>
+										<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
 									{/if}
 								</td>
 							</tr>
@@ -2204,8 +2256,8 @@
 		<div class="confirm-box">
 			<p>{confirmAction.message}</p>
 			<div class="confirm-actions">
-				<button class="ghost-btn" onclick={() => (confirmAction = null)}>キャンセル</button>
-				<button class={confirmAction.destructive ? 'danger-btn' : 'confirm-btn'} onclick={() => { const run = confirmAction?.run; confirmAction = null; run?.(); }}>{confirmAction.destructive ? '削除' : '実行'}</button>
+				<button class="ghost-btn" onclick={() => (confirmAction = null)}>{t().confirmCancel}</button>
+				<button class={confirmAction.destructive ? 'danger-btn' : 'confirm-btn'} onclick={() => { const run = confirmAction?.run; confirmAction = null; run?.(); }}>{confirmAction.destructive ? t().deleteButton : t().confirmRun}</button>
 			</div>
 		</div>
 	</div>
@@ -2366,30 +2418,6 @@
 		position: relative;
 	}
 
-	.flying-bird-layer {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: min(820px, 100vw);
-		height: min(620px, 72vh);
-		pointer-events: none;
-		z-index: 260;
-		overflow: hidden;
-	}
-	.flying-bird-y {
-		position: absolute;
-		animation: freeBirdY 15s ease-in-out infinite;
-	}
-	.flying-bird-x {
-		position: relative;
-		animation: freeBirdX 18s ease-in-out infinite;
-	}
-	.flying-bird {
-		width: 76px;
-		height: 56px;
-		filter: drop-shadow(0 4px 8px rgba(107,123,42,0.28));
-	}
-
 	/* ── Left panel ─────────────────────────────────────────── */
 	.left-panel {
 		width: 440px;
@@ -2526,25 +2554,80 @@
 	}
 	.progress-bar-track {
 		position: relative;
-		height: 20px; background: transparent;
+		height: 32px; background: transparent;
 		border-left: 1px solid var(--border2); border-right: 1px solid var(--border2);
 		overflow: visible;
 	}
 	.progress-bar-track::before {
 		content: "";
-		position: absolute; top: 8px; left: 0; right: 0; height: 3px;
+		position: absolute; top: 18px; left: 0; right: 0; height: 3px;
 		background: var(--bg3);
 	}
 	.progress-bar-fill {
-		position: absolute; top: 8px; left: 0; height: 3px;
+		position: absolute; top: 18px; left: 0; height: 3px;
+		width: var(--progress-target, 50%);
 		background: var(--accent); transition: width 0.3s ease;
 	}
 	.progress-bird {
-		position: absolute; top: 1px; left: -20px;
-		animation: birdFly 2.4s linear infinite;
+		position: absolute;
+		left: calc(var(--progress-target, 50%) - 26px);
+		bottom: 8px;
+		width: 52px;
+		height: 44px;
 		pointer-events: none;
+		overflow: visible;
+		filter: drop-shadow(0 2px 3px rgba(107, 123, 42, 0.18));
+		animation: birdWalk 12s ease-in-out infinite;
 	}
-	.progress-bird.done { animation: none; left: calc(100% - 16px); }
+	.bird-peck {
+		transform-origin: 22px 35px;
+		animation: birdPeck 7.8s ease-in-out infinite;
+	}
+	.bird-preen {
+		transform-origin: 28px 26px;
+		animation: birdPreen 11.5s ease-in-out infinite;
+	}
+	.bird-shadow { fill: rgba(60, 55, 39, 0.18); }
+	.bird-body, .bird-head-fill { fill: #7f8f35; }
+	.bird-tail { fill: #536523; }
+	.bird-view-side {
+		transform-origin: 26px 25px;
+		animation: birdSideView 12s ease-in-out infinite;
+	}
+	.bird-view-front {
+		opacity: 0;
+		transform-origin: 26px 25px;
+		animation: birdFrontView 12s ease-in-out infinite;
+	}
+	.bird-view-three {
+		opacity: 0;
+		transform-origin: 26px 25px;
+		animation: birdThreeQuarterView 12s ease-in-out infinite;
+	}
+	.bird-wing {
+		fill: #a7b45a;
+		transform-origin: 28px 25px;
+		animation: birdWing 5.6s ease-in-out infinite;
+	}
+	.bird-wing-left,
+	.bird-wing-right {
+		animation: none;
+	}
+	.bird-head {
+		transform-origin: 21px 25px;
+		animation: birdHead 7.8s ease-in-out infinite;
+	}
+	.bird-beak { fill: #bd8f34; }
+	.bird-eye { fill: #1f2114; }
+	.bird-leg {
+		fill: none;
+		stroke: #7a5a18;
+		stroke-width: 1.5;
+		stroke-linecap: round;
+		transform-origin: 26px 33px;
+	}
+	.bird-leg-a { animation: birdStepA 1.25s ease-in-out infinite; }
+	.bird-leg-b { animation: birdStepB 1.25s ease-in-out infinite; }
 	.progress-stage-text {
 		font-size: 11px; color: var(--fg3);
 		padding: 5px 10px 7px;
@@ -3550,26 +3633,62 @@
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50%       { opacity: 0.4; transform: scale(0.7); }
 	}
-	@keyframes birdFly {
-		0% { left: -20px; }
-		100% { left: calc(100% + 4px); }
+	@keyframes birdWalk {
+		0% { transform: translate(-28px, 0) scaleX(1); }
+		9% { transform: translate(-14px, -1px) scaleX(1); }
+		18% { transform: translate(-14px, 0) scaleX(1); }
+		28% { transform: translate(12px, -1px) scaleX(1); }
+		36% { transform: translate(12px, 0) scaleX(1); }
+		44% { transform: translate(5px, 0) scaleX(1); }
+		48% { transform: translate(2px, 0) scaleX(1); }
+		52% { transform: translate(0, 0) scaleX(-1); }
+		62% { transform: translate(-18px, -1px) scaleX(-1); }
+		72% { transform: translate(-18px, 0) scaleX(-1); }
+		82% { transform: translate(10px, -1px) scaleX(-1); }
+		90% { transform: translate(10px, 0) scaleX(-1); }
+		96% { transform: translate(-6px, 0) scaleX(-1); }
+		100% { transform: translate(-28px, 0) scaleX(1); }
 	}
-	@keyframes freeBirdX {
-		0% { transform: translateX(24px); }
-		16% { transform: translateX(min(680px, calc(100vw - 110px))); }
-		34% { transform: translateX(180px); }
-		52% { transform: translateX(min(730px, calc(100vw - 86px))); }
-		70% { transform: translateX(70px); }
-		86% { transform: translateX(min(520px, calc(100vw - 130px))); }
-		100% { transform: translateX(24px); }
+	@keyframes birdSideView {
+		0%, 40%, 56%, 94%, 100% { opacity: 1; transform: scaleX(1); }
+		46%, 50%, 98% { opacity: 0; transform: scaleX(0.72); }
 	}
-	@keyframes freeBirdY {
-		0% { top: 78px; }
-		18% { top: min(430px, calc(72vh - 90px)); }
-		36% { top: 48px; }
-		54% { top: min(340px, calc(72vh - 120px)); }
-		72% { top: 24px; }
-		88% { top: min(260px, calc(72vh - 110px)); }
-		100% { top: 78px; }
+	@keyframes birdFrontView {
+		0%, 42%, 56%, 96%, 100% { opacity: 0; transform: scaleX(0.86); }
+		47%, 50%, 53%, 98% { opacity: 1; transform: scaleX(1); }
+	}
+	@keyframes birdThreeQuarterView {
+		0%, 39%, 57%, 93%, 100% { opacity: 0; transform: rotate(0deg); }
+		43%, 55%, 95%, 99% { opacity: 0.92; transform: rotate(3deg); }
+	}
+	@keyframes birdWing {
+		0%, 18%, 38%, 55%, 72%, 100% { transform: rotate(0deg) scaleY(1); }
+		22%, 24%, 26% { transform: rotate(-28deg) scaleY(0.75); }
+		29% { transform: rotate(8deg) scaleY(1.08); }
+		78%, 80% { transform: rotate(-18deg) scaleY(0.82); }
+		82% { transform: rotate(6deg) scaleY(1.06); }
+	}
+	@keyframes birdPeck {
+		0%, 42%, 58%, 100% { transform: rotate(0deg) translateY(0); }
+		46%, 50%, 54% { transform: rotate(-16deg) translateY(5px); }
+		48%, 52%, 56% { transform: rotate(5deg) translateY(0); }
+	}
+	@keyframes birdPreen {
+		0%, 62%, 78%, 100% { transform: rotate(0deg); }
+		66%, 70%, 74% { transform: rotate(9deg) translateX(1px); }
+		68%, 72% { transform: rotate(-5deg) translateX(-1px); }
+	}
+	@keyframes birdHead {
+		0%, 42%, 58%, 62%, 100% { transform: rotate(0deg); }
+		46%, 50%, 54% { transform: rotate(-22deg) translate(-1px, 4px); }
+		66%, 70%, 74% { transform: rotate(18deg) translate(5px, 2px); }
+	}
+	@keyframes birdStepA {
+		0%, 100% { transform: rotate(0deg); }
+		45% { transform: rotate(14deg) translateX(1px); }
+	}
+	@keyframes birdStepB {
+		0%, 100% { transform: rotate(0deg); }
+		45% { transform: rotate(-14deg) translateX(-1px); }
 	}
 </style>

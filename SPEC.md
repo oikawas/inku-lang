@@ -1706,6 +1706,7 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
 **Phase 1 完了 — E2E パイプライン稼働 + UI 反復支援**
 
 - **LLM バックエンド 二系統併存**
+  - Claude Code hackathon:参加選考漏れに伴い、Loacl LLMの実装に変更
   - Stage 2 (composer): `qwen-api` (Qwen2.5-7B) 既定、Anthropic Haiku 4.5 併用可能
   - Stage 1 (interpreter): `qwen3-api` (Qwen3-8B) 既定、Anthropic Opus 4.7 併用可能
   - 切替: 環境変数 `INKU_LLM_BACKEND=openai|anthropic`

@@ -35,6 +35,8 @@
 	type PaintResult = {
 		svg: string;
 		score: Score;
+		history_id?: string | null;
+		history_at?: number | null;
 		elapsed_stage1_ms: number;
 		elapsed_stage2_ms: number;
 		elapsed_total_ms: number;
@@ -668,45 +670,39 @@
 	}
 
 	// ── Core paint (2-stage) ─────────────────────────────────
-	async function paintOne(text: string): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
-		const t0  = Date.now();
+	async function paintOne(text: string, historyInput = text): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const lang = getLang();
 		stageLabel = t().stageInterpreting;
 
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
-		const r1 = await fetch('/api/interpret', {
+		const r = await apiFetch('/api/paint', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text: augmented, model: stage1Model, include_thinking: includeThinking, lang })
+			body: JSON.stringify({
+				text: augmented,
+				original_text: text,
+				stage1_model: stage1Model,
+				stage2_model: stage2Model,
+				include_thinking: includeThinking,
+				lang,
+				color_map: activeColorMap(),
+				save_history: true,
+				history_input: historyInput,
+				catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
+			})
 		});
-		if (!r1.ok) {
-			const d = await r1.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r1.status}`);
+		if (!r.ok) {
+			const d = await r.json().catch(() => ({})) as { detail?: string };
+			throw new Error(d.detail ?? `HTTP ${r.status}`);
 		}
-		const d1 = await r1.json() as { ddl: string; thinking: string | null; tokens_in: number | null; tokens_out: number | null };
-		const t1  = Date.now();
-		const tokLabel = d1.tokens_in != null ? ` (${d1.tokens_in}→${d1.tokens_out ?? '?'}tok)` : '';
+		stageLabel = t().stageStructuring('');
+		return await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+	}
 
-		stageLabel = t().stageStructuring(tokLabel);
-		const r2 = await fetch('/api/compose', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, lang, color_map: activeColorMap() })
-		});
-		if (!r2.ok) {
-			const d = await r2.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r2.status}`);
-		}
-		const d2 = await r2.json() as { score: Score; svg: string; tokens_in: number | null; tokens_out: number | null };
-		const t2  = Date.now();
-
-		return {
-			ddl: d1.ddl, thinking: d1.thinking, score: d2.score, svg: d2.svg,
-			elapsed_stage1_ms: t1 - t0, elapsed_stage2_ms: t2 - t1, elapsed_total_ms: t2 - t0,
-			tokens_in_stage1: d1.tokens_in, tokens_out_stage1: d1.tokens_out,
-			tokens_in_stage2: d2.tokens_in, tokens_out_stage2: d2.tokens_out,
-		};
+	async function refreshHistoryAfterServerSave() {
+		await fetchHistoryOffset(0);
+		historyCursor = 0;
 	}
 
 	// ── Submit ──────────────────────────────────────────────
@@ -726,9 +722,7 @@
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
 				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
-				const totalIn  = (r.tokens_in_stage1 ?? 0)  + (r.tokens_in_stage2 ?? 0);
-				const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-				await pushHistory({ input, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
+				await refreshHistoryAfterServerSave();
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
 				const lines = batchLines
@@ -739,12 +733,10 @@
 					if (!loading) break;
 					batchCurrent = i + 1;
 					try {
-						const r = await paintOne(lines[i].input);
+						const r = await paintOne(lines[i].input, `#${lines[i].line} ${lines[i].input}`);
 						result = r;
 						ddl = r.ddl; thinking = r.thinking;
-						const totalIn  = (r.tokens_in_stage1 ?? 0)  + (r.tokens_in_stage2 ?? 0);
-						const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-						await pushHistory({ input: `#${lines[i].line} ${lines[i].input}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
+						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
 						if (batchFailures.length > 0) {
 							setBatchFailureReport({ success: batchSuccess, total: batchTotal, failures: batchFailures });
@@ -907,11 +899,11 @@
 	async function pushHistory(it: Iteration): Promise<void> {
 		if (!authToken) return;
 		try {
-			await apiFetch('/api/history', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null })
-			});
+				await apiFetch('/api/history', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, color_map: activeColorMap() })
+				});
 		} catch { /* ignore */ }
 		await fetchHistoryOffset(0);
 		historyCursor = 0;

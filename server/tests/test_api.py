@@ -87,6 +87,58 @@ def test_paint_pipeline(monkeypatch):
     assert "<svg" in data["svg"]
 
 
+def test_paint_can_save_server_generated_history(monkeypatch):
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"paint-history-{suffix}")
+    user = db.add_user(
+        username=f"paint-history-{suffix}",
+        email=f"paint-history-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    token = client.post(
+        "/api/auth/login",
+        json={"username": user["username"], "password": "password-123"},
+    ).json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post(
+        "/api/paint",
+        json={
+            "text": "一滴の墨\n\n感情: 静か",
+            "original_text": "一滴の墨",
+            "save_history": True,
+            "history_input": "一滴の墨",
+            "history_at": 1_700_000_000_000,
+            "catalog_id": "sample",
+        },
+        headers=headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["history_id"]
+    assert data["history_at"] == 1_700_000_000_000
+
+    history = client.get("/api/history", headers=headers).json()
+    assert history["total"] == 1
+    item = history["items"][0]
+    assert item["id"] == data["history_id"]
+    assert item["input"] == "一滴の墨"
+    assert item["catalog_id"] == "sample"
+    assert item["svg"] == data["svg"]
+
+    db.delete_items(user["id"], [data["history_id"]])
+    db.delete_user(user["id"])
+    db.delete_user_group(group["id"])
+
+
 def test_cors_allows_localhost(monkeypatch):
     fake_score = Score(instructions=[])
     monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
@@ -301,12 +353,15 @@ def test_history_is_scoped_to_authenticated_user():
         "input": "user scoped drawing",
         "ddl": "中心に円",
         "score": {"instructions": []},
-        "svg": "<svg></svg>",
+        "svg": "<svg><script>alert(1)</script></svg>",
         "at": 1_700_000_000_000,
     }
     post_a = client.post("/api/history", json=payload, headers=headers_a)
     assert post_a.status_code == 200
     item_a = post_a.json()
+    assert item_a["svg"] != payload["svg"]
+    assert "<script" not in item_a["svg"]
+    assert "<svg" in item_a["svg"]
     post_a_second = client.post(
         "/api/history",
         json={**payload, "input": "blue crayon search target", "ddl": "青い線", "at": payload["at"] + 1},

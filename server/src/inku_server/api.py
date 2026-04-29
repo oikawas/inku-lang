@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -40,6 +41,7 @@ _OUTPUT_DIR = Path(os.getenv("INKU_OUTPUT_DIR", str(_DEFAULT_OUTPUT_DIR)))
 _OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
 _save_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-save")
 _logger = logging.getLogger(__name__)
+_HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 
 
 def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
@@ -75,6 +77,17 @@ def _save_output_files(prefix: Path, input_text: str, ddl: str | None, score: di
         Path(f"{prefix}_output.png").write_bytes(png_bytes)
     except Exception:
         _logger.exception("failed to save PNG output: prefix=%s", prefix)
+
+
+def _validated_color_map(color_map: dict[str, str] | None) -> dict[str, str] | None:
+    if color_map is None:
+        return None
+    clean: dict[str, str] = {}
+    for key, value in color_map.items():
+        if not isinstance(key, str) or not isinstance(value, str) or not _HEX_COLOR_RE.fullmatch(value):
+            raise HTTPException(status_code=422, detail="color_map values must be #RRGGBB hex colors")
+        clean[key] = value
+    return clean
 
 
 app.add_middleware(
@@ -124,11 +137,16 @@ class InterpretResponse(BaseModel):
 
 class PaintRequest(BaseModel):
     text: str = Field(..., min_length=1, description="自由な自然言語の記述")
+    original_text: str | None = Field(default=None, description="元のユーザー記述")
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
     color_map: dict[str, str] | None = Field(default=None, description="色カタログ")
+    save_history: bool = Field(default=False, description="描画結果を履歴に保存するか")
+    history_input: str | None = Field(default=None, description="履歴に表示するユーザー記述")
+    history_at: int | None = Field(default=None, description="履歴保存時刻")
+    catalog_id: str | None = Field(default=None, description="使用した色カタログID")
 
 
 class PaintResponse(BaseModel):
@@ -137,6 +155,8 @@ class PaintResponse(BaseModel):
     thinking: str | None = None
     score: Score
     svg: str
+    history_id: str | None = None
+    history_at: int | None = None
     elapsed_stage1_ms: int = 0
     elapsed_stage2_ms: int = 0
     elapsed_total_ms: int = 0
@@ -155,7 +175,7 @@ class HistoryPostBody(BaseModel):
     input: str
     ddl: str | None = None
     score: dict
-    svg: str
+    svg: str = ""
     at: int
     elapsed_ms: int = 0
     stage1_model: str | None = None
@@ -163,6 +183,7 @@ class HistoryPostBody(BaseModel):
     tokens_in: int | None = None
     tokens_out: int | None = None
     catalog_id: str | None = None
+    color_map: dict[str, str] | None = Field(default=None, exclude=True)
 
 
 class HistoryItem(HistoryPostBody):
@@ -258,6 +279,14 @@ def _bearer_token(authorization: str | None = Header(default=None)) -> str:
 
 
 def _current_user(token: str = Depends(_bearer_token)) -> dict:
+    user = _db.get_session_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid session")
+    return user
+
+
+def _current_user_from_authorization(authorization: str | None) -> dict:
+    token = _bearer_token(authorization)
     user = _db.get_session_user(token)
     if not user:
         raise HTTPException(status_code=401, detail="invalid session")
@@ -429,9 +458,50 @@ def api_interpret(req: InterpretRequest) -> dict:
     return data
 
 
+def _add_history_item(
+    *,
+    actor: dict,
+    input_text: str,
+    ddl: str | None,
+    score: Score,
+    svg: str,
+    at: int,
+    elapsed_ms: int = 0,
+    stage1_model: str | None = None,
+    stage2_model: str | None = None,
+    tokens_in: int | None = None,
+    tokens_out: int | None = None,
+    catalog_id: str | None = None,
+) -> dict:
+    item_id = str(uuid.uuid4())
+    score_dict = score.model_dump(by_alias=True)
+    prefix = _output_prefix(actor["id"], item_id, at)
+    item_dict = _db.add_item({
+        "id": item_id,
+        "user_id": actor["id"],
+        "output_path": str(prefix),
+        "input": input_text,
+        "ddl": ddl,
+        "score": score_dict,
+        "svg": svg,
+        "at": at,
+        "elapsed_ms": elapsed_ms,
+        "stage1_model": stage1_model,
+        "stage2_model": stage2_model,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "catalog_id": catalog_id,
+    })
+    _save_executor.submit(
+        _save_output_files, prefix, input_text, ddl, score_dict, svg
+    )
+    return item_dict
+
+
 @app.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
-def api_paint(req: PaintRequest) -> PaintResponse:
+def api_paint(req: PaintRequest, authorization: str | None = Header(default=None)) -> PaintResponse:
     t0 = time.perf_counter()
+    source_text = req.original_text or req.text
     try:
         ddl, thinking, s1_tin, s1_tout = _call_interpret_detail(
             req.text, model=req.stage1_model, include_thinking=req.include_thinking, lang=req.lang
@@ -441,7 +511,7 @@ def api_paint(req: PaintRequest) -> PaintResponse:
     t1 = time.perf_counter()
     try:
         score, s2_tin, s2_tout = _call_compose_detail(
-            ddl, model=req.stage2_model, original_text=req.text, lang=req.lang
+            ddl, model=req.stage2_model, original_text=source_text, lang=req.lang
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
@@ -456,12 +526,34 @@ def api_paint(req: PaintRequest) -> PaintResponse:
     elapsed_stage1_ms = int((t1 - t0) * 1000)
     elapsed_stage2_ms = int((t2 - t1) * 1000)
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
+    history_id = None
+    history_at = None
+    if req.save_history:
+        actor = _current_user_from_authorization(authorization)
+        history_at = req.history_at or int(time.time() * 1000)
+        item = _add_history_item(
+            actor=actor,
+            input_text=req.history_input or source_text,
+            ddl=ddl,
+            score=score,
+            svg=svg,
+            at=history_at,
+            elapsed_ms=elapsed_total_ms,
+            stage1_model=req.stage1_model,
+            stage2_model=req.stage2_model,
+            tokens_in=(s1_tin or 0) + (s2_tin or 0) or None,
+            tokens_out=(s1_tout or 0) + (s2_tout or 0) or None,
+            catalog_id=req.catalog_id,
+        )
+        history_id = item["id"]
     return PaintResponse(
-        text=req.text,
+        text=source_text,
         ddl=ddl,
         thinking=thinking,
         score=score,
         svg=svg,
+        history_id=history_id,
+        history_at=history_at,
         elapsed_stage1_ms=elapsed_stage1_ms,
         elapsed_stage2_ms=elapsed_stage2_ms,
         elapsed_total_ms=elapsed_total_ms,
@@ -587,16 +679,26 @@ def api_history_get(
 
 @app.post("/api/history", response_model=HistoryItem)
 def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
-    item_id = str(uuid.uuid4())
-    prefix = _output_prefix(actor["id"], item_id, body.at)
-    item_dict = _db.add_item({
-        "id": item_id,
-        "user_id": actor["id"],
-        "output_path": str(prefix),
-        **body.model_dump(),
-    })
-    _save_executor.submit(
-        _save_output_files, prefix, body.input, body.ddl, body.score, body.svg
+    try:
+        score = coerce_score(Score.model_validate(body.score))
+        svg = render(score, color_map=_validated_color_map(body.color_map))
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"history score render failed: {e}") from e
+    item_dict = _add_history_item(
+        actor=actor,
+        input_text=body.input,
+        ddl=body.ddl,
+        score=score,
+        svg=svg,
+        at=body.at,
+        elapsed_ms=body.elapsed_ms,
+        stage1_model=body.stage1_model,
+        stage2_model=body.stage2_model,
+        tokens_in=body.tokens_in,
+        tokens_out=body.tokens_out,
+        catalog_id=body.catalog_id,
     )
     return HistoryItem(**item_dict)
 

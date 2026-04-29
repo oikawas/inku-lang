@@ -834,8 +834,8 @@
 			<button
 				class="settings-btn"
 				class:active={settingsOpen}
-				onclick={() => { settingsTab = 'connection'; settingsOpen = true; }}
-			>⚙ 接続設定</button>
+				onclick={() => { settingsTab = 'db'; settingsOpen = true; }}
+			>⚙ 設定</button>
 
 			<!-- Lang -->
 			<div class="lang-switcher">
@@ -889,8 +889,8 @@
 					<div class="section-head">
 						<span class="section-label">指示</span>
 						<div class="section-actions">
-							<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>歳時記</button>
-							<button class="ghost-btn" onclick={() => (catalogOpen = true)}>カタログ設定</button>
+							<button class="ghost-btn" onclick={() => { settingsTab = 'connection'; settingsOpen = true; }}>モデル選択</button>
+							<button class="ghost-btn" onclick={() => (catalogOpen = true)}>色カタログ</button>
 							<button class="ghost-btn" onclick={clearInput}>新規作成</button>
 						</div>
 					</div>
@@ -969,9 +969,12 @@
 					<section class="panel-section">
 						<div class="section-head">
 							<span class="section-label">{t().ddlLabel}</span>
-							{#if historyCursor >= 0}
-								<button class="ghost-btn" class:ghost-active={ddlEditing} onclick={() => (ddlEditing = !ddlEditing)}>{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}</button>
-							{/if}
+							<div class="section-actions">
+								<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>歳時記</button>
+								{#if historyCursor >= 0}
+									<button class="ghost-btn" class:ghost-active={ddlEditing} onclick={() => (ddlEditing = !ddlEditing)}>{ddlEditing ? t().ddlDoneBtn : t().ddlEditBtn}</button>
+								{/if}
+							</div>
 						</div>
 						{#if ddlEditing}
 							<textarea class="ddl-edit-ta" bind:value={ddl} rows="4" spellcheck="false"></textarea>
@@ -1016,7 +1019,7 @@
 							class="replay-btn"
 							onclick={replay}
 							disabled={reloading || !ddl}
-						>↺ 描画（解釈から）</button>
+						>↺ 解釈から描画</button>
 					</section>
 				{/if}
 
@@ -1238,11 +1241,11 @@
 	<div class="modal-backdrop" onclick={() => (settingsOpen = false)} aria-hidden="true"></div>
 	<div class="settings-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="modal-head">
-			<div class="catalog-modal-title">接続設定</div>
+			<div class="catalog-modal-title">{settingsTab === 'connection' ? 'モデル選択' : '設定'}</div>
 			<button class="catalog-close" onclick={() => (settingsOpen = false)}>×</button>
 		</div>
 		<div class="settings-tabs">
-			<button class:active={settingsTab === 'connection'} onclick={() => (settingsTab = 'connection')}>接続設定</button>
+			<button class:active={settingsTab === 'connection'} onclick={() => (settingsTab = 'connection')}>モデル選択</button>
 			<button class:active={settingsTab === 'db'} onclick={() => (settingsTab = 'db')}>DB設定</button>
 			<button class:active={settingsTab === 'plugins'} onclick={() => (settingsTab = 'plugins')}>プラグイン</button>
 			<button class:active={settingsTab === 'users'} onclick={() => (settingsTab = 'users')}>ユーザー管理</button>
@@ -1433,7 +1436,7 @@
 	<div class="modal-backdrop" onclick={() => (catalogOpen = false)} aria-hidden="true"></div>
 	<div class="catalog-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
 		<div class="catalog-modal-head">
-			<div class="catalog-modal-title">カタログ設定</div>
+			<div class="catalog-modal-title">色カタログ</div>
 			<button class="catalog-close" onclick={() => (catalogOpen = false)}>×</button>
 		</div>
 		<div class="catalog-body">
@@ -1962,14 +1965,14 @@
 	/* Replay */
 	.replay-btn {
 		width: 100%; margin-top: 6px; padding: 10px;
-		font-size: 14px; font-weight: 500; background: var(--fg); color: #fff;
-		border: none; border-radius: var(--r);
+		font-size: 14px; font-weight: 500; background: #e8f1fb; color: #234c78;
+		border: 1px solid #9fb9d6; border-radius: var(--r);
 		letter-spacing: 0.08em; cursor: pointer;
 		display: flex; align-items: center; justify-content: center; gap: 6px;
-		font-family: inherit; transition: background 0.15s;
+		font-family: inherit; transition: background 0.15s, border-color 0.15s, color 0.15s;
 	}
-	.replay-btn:hover:not(:disabled) { background: #333; }
-	.replay-btn:disabled { background: var(--fg3); cursor: not-allowed; }
+	.replay-btn:hover:not(:disabled) { background: #d7e8f8; border-color: #6f98c3; color: #173f68; }
+	.replay-btn:disabled { background: var(--bg2); border-color: var(--border2); color: var(--fg3); cursor: not-allowed; }
 
 	/* Stats */
 	.stats-section { }

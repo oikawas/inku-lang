@@ -6,6 +6,13 @@ export const en: LangPack = {
 
 	subtitle: 'write visual tanka',
 
+	loginTitle: 'Sign in',
+	loginUsernamePlaceholder: 'Username',
+	loginPasswordPlaceholder: 'Password',
+	loginSubmit: 'Sign in',
+	loginPasswordShow: 'Show password',
+	loginPasswordHide: 'Hide password',
+
 	stage1Label: 'interpret',
 	stage2Label: 'structure',
 	providerLabel: 'provider:',
@@ -17,9 +24,7 @@ export const en: LangPack = {
 	saijikiTitle: 'Saijiki',
 	saijikiHint: 'Click a word to insert it into the description.',
 	currentSetting: 'current settings',
-	noSnapshots: 'no snapshots saved',
 	saveCurrentBtn: 'save current',
-	snapshotNamePlaceholder: 'snapshot name (e.g. saijiki-v1)',
 
 	clearInputBtn: 'new',
 	ddlEditBtn: 'edit',
@@ -30,6 +35,9 @@ export const en: LangPack = {
 	inputPlaceholder: 'A moon rises beyond the mountains',
 	batchPlaceholder: 'A moon rises beyond the mountains\nMist spreads at night\nBlue crayon lines',
 	batchCount: (n) => `${n} items`,
+	batchSummary: (success, failed, total) => `${success} succeeded / ${failed} failed / ${total} total`,
+	batchFailureTitle: 'Failed lines',
+	batchFailureLine: (line) => `line ${line}`,
 
 	submitBtn: 'draw',
 	stopBtn: 'stop',

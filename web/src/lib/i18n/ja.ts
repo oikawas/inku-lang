@@ -6,6 +6,13 @@ export const ja: LangPack = {
 
 	subtitle: '視覚的な短歌を書く',
 
+	loginTitle: 'ログイン',
+	loginUsernamePlaceholder: 'ユーザー名',
+	loginPasswordPlaceholder: 'パスワード',
+	loginSubmit: 'ログイン',
+	loginPasswordShow: 'パスワードを表示',
+	loginPasswordHide: 'パスワードを隠す',
+
 	stage1Label: '解釈',
 	stage2Label: '構造化',
 	providerLabel: '接続先：',
@@ -17,9 +24,7 @@ export const ja: LangPack = {
 	saijikiTitle: '歳時記',
 	saijikiHint: '語彙をクリックすると記述欄に挿入されます。',
 	currentSetting: '現在の設定',
-	noSnapshots: '保存済みスナップショットはありません',
 	saveCurrentBtn: '現在を保存',
-	snapshotNamePlaceholder: 'スナップショット名 (例: 歳時記v1)',
 
 	clearInputBtn: '新規作成',
 	ddlEditBtn: '編集',
@@ -30,6 +35,9 @@ export const ja: LangPack = {
 	inputPlaceholder: '山の向こうに月が昇る',
 	batchPlaceholder: '山の向こうに月が昇る\n夜の霧が広がる\n青いクレヨンの線',
 	batchCount: (n) => `${n} 件`,
+	batchSummary: (success, failed, total) => `成功 ${success} / 失敗 ${failed} / 全 ${total}`,
+	batchFailureTitle: '失敗した行',
+	batchFailureLine: (line) => `${line}行目`,
 
 	submitBtn: '描画する',
 	stopBtn: '停止',

@@ -5,6 +5,14 @@ export interface LangPack {
 	// Header
 	subtitle: string;
 
+	// Login
+	loginTitle: string;
+	loginUsernamePlaceholder: string;
+	loginPasswordPlaceholder: string;
+	loginSubmit: string;
+	loginPasswordShow: string;
+	loginPasswordHide: string;
+
 	// Model row
 	stage1Label: string;
 	stage2Label: string;
@@ -12,15 +20,13 @@ export interface LangPack {
 	modelLabel: string;
 	showThinkingLabel: string;
 
-	// Saijiki / Snapshot
+	// Saijiki
 	saijikiLabel: string;
 	saijikiToggleBtn: string;
 	saijikiTitle: string;
 	saijikiHint: string;
 	currentSetting: string;
-	noSnapshots: string;
 	saveCurrentBtn: string;
-	snapshotNamePlaceholder: string;
 
 	// Input
 	modeSingle: string;
@@ -28,6 +34,9 @@ export interface LangPack {
 	inputPlaceholder: string;
 	batchPlaceholder: string;
 	batchCount: (n: number) => string;
+	batchSummary: (success: number, failed: number, total: number) => string;
+	batchFailureTitle: string;
+	batchFailureLine: (line: number) => string;
 
 	// Submit / loading
 	submitBtn: string;

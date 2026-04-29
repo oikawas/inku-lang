@@ -26,6 +26,7 @@
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
+	const AUTH_TOKEN_KEY      = 'inku-auth-token';
 
 	type Score = { instructions: unknown[] };
 
@@ -57,21 +58,56 @@
 		catalog_id?: string | null;
 		trashed?: boolean;
 	};
+	type BatchFailure = {
+		line: number;
+		input: string;
+		message: string;
+	};
 
 	type PluginItem = {
-		id: string;
 		name: string;
 		version: string;
-		enabled: boolean;
+		status: string;
+	};
+	type SettingsStatus = {
+		database: {
+			backend: string;
+			driver: string;
+			url: string;
+			database: string | null;
+			is_default: boolean;
+			runtime_editable: boolean;
+			note: string;
+		};
+		plugins: {
+			enabled: boolean;
+			loaded: PluginItem[];
+			runtime_editable: boolean;
+			note: string;
+		};
 	};
 
-	type UserRole = '管理者' | 'グループリード' | 'ユーザー';
-	type UserItem = {
+	type UserRole = 'admin' | 'group_lead' | 'user';
+	type UserGroup = {
 		id: string;
 		name: string;
-		password: string;
-		group: UserRole;
+		at: number;
 	};
+	type UserItem = {
+		id: string;
+		username: string;
+		email: string;
+		role: UserRole;
+		role_label: string;
+		group_id: string | null;
+		group_name: string | null;
+		at: number;
+	};
+	const USER_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+		{ value: 'admin', label: '管理者' },
+		{ value: 'group_lead', label: 'グループリード' },
+		{ value: 'user', label: 'ユーザー' },
+	];
 
 	// ── Input ───────────────────────────────────────────────
 	let inputMode   = $state<'single' | 'batch'>('single');
@@ -84,6 +120,8 @@
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
+	let batchSuccess = $state(0);
+	let batchFailures = $state<BatchFailure[]>([]);
 	let error        = $state<string | null>(null);
 
 	// ── Replay ──────────────────────────────────────────────
@@ -136,74 +174,315 @@
 	}
 
 	// ── Settings tabs ────────────────────────────────────────
-	let dbType = $state<'sqlite' | 'postgres'>('sqlite');
-	let sqlitePath = $state('~/.local/share/inku/inku.db');
-	let pgHost = $state('');
-	let pgPort = $state('5432');
-	let pgUser = $state('');
-	let pgPassword = $state('');
-	let pgDatabase = $state('');
-	let showPgPassword = $state(false);
-	let dbTestResult = $state<string | null>(null);
-	let plugins = $state<PluginItem[]>([
-		{ id: 'nature', name: 'inku-nature', version: 'v0.1.0', enabled: true },
-		{ id: 'bamboo', name: 'inku-bamboo', version: 'v0.1.0', enabled: false },
-	]);
-	let pluginAddOpen = $state(false);
-	let pluginPath = $state('');
-	let pluginPendingDelete = $state<PluginItem | null>(null);
-	let users = $state<UserItem[]>([
-		{ id: 'admin', name: 'admin', password: '', group: '管理者' },
-	]);
-	let groups = $state<UserRole[]>(['管理者', 'グループリード', 'ユーザー']);
+	let settingsStatus = $state<SettingsStatus | null>(null);
+	let settingsStatusError = $state<string | null>(null);
+	let settingsStatusLoading = $state(false);
+	let users = $state<UserItem[]>([]);
+	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
+	let newUserEmail = $state('');
 	let newUserPassword = $state('');
-	let newUserGroup = $state<UserRole>('ユーザー');
+	let newUserRole = $state<UserRole>('user');
+	let newUserGroupId = $state('');
+	let selectedUserId = $state<string | null>(null);
+	let editUserName = $state('');
+	let editUserEmail = $state('');
+	let editUserPassword = $state('');
+	let editUserRole = $state<UserRole>('user');
+	let editUserGroupId = $state('');
 	let newGroupName = $state('');
+	let userSettingsStatus = $state<string | null>(null);
+	let authToken = $state<string | null>(null);
+	let currentUser = $state<UserItem | null>(null);
+	let loginUserName = $state('admin');
+	let loginPassword = $state('');
+	let loginPasswordVisible = $state(false);
+	let loginStatus = $state<string | null>(null);
 
-	function testDbConnection() {
-		dbTestResult = dbType === 'sqlite'
-			? `SQLite path is set: ${sqlitePath || '(empty)'}`
-			: pgHost && pgUser && pgDatabase
-				? `Ready to test PostgreSQL at ${pgHost}:${pgPort}`
-				: 'PostgreSQL settings are incomplete.';
+	function apiFetch(path: string, init: RequestInit = {}) {
+		const headers = new Headers(init.headers);
+		if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
+		return fetch(path, { ...init, headers });
 	}
 
-	function addPlugin() {
-		const name = pluginPath.trim();
-		if (!name) return;
-		plugins = [...plugins, { id: `${Date.now()}`, name, version: 'local', enabled: true }];
-		pluginPath = '';
-		pluginAddOpen = false;
+	function openSettings(tab: typeof settingsTab = 'db') {
+		settingsMode = 'settings';
+		settingsTab = tab;
+		settingsOpen = true;
+		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
 	}
 
-	function addUser() {
+	function selectSettingsTab(tab: typeof settingsTab) {
+		settingsTab = tab;
+		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
+	}
+
+	async function loadUserSettings() {
+		if (!currentUser || !['admin', 'group_lead'].includes(currentUser.role)) return;
+		try {
+			const [groupsResponse, usersResponse] = await Promise.all([
+				apiFetch('/api/user-groups'),
+				apiFetch('/api/users'),
+			]);
+			if (!groupsResponse.ok || !usersResponse.ok) throw new Error('ユーザー情報を読み込めませんでした。');
+			groups = await groupsResponse.json();
+			users = await usersResponse.json();
+			if (!newUserGroupId && groups[0]) newUserGroupId = groups[0].id;
+			if (selectedUserId) {
+				const selected = users.find((user) => user.id === selectedUserId);
+				if (selected) setEditUser(selected);
+				else clearEditUser();
+			}
+			userSettingsStatus = null;
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function loadSettingsStatus() {
+		if (!currentUser || currentUser.role !== 'admin') {
+			settingsStatus = null;
+			settingsStatusError = currentUser
+				? 'DB設定とプラグイン状態は管理者のみ確認できます。'
+				: 'ログイン後に設定状態を確認できます。';
+			return;
+		}
+		settingsStatusLoading = true;
+		try {
+			const r = await apiFetch('/api/settings/status');
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			settingsStatus = await r.json();
+			settingsStatusError = null;
+		} catch (e) {
+			settingsStatus = null;
+			settingsStatusError = e instanceof Error ? e.message : String(e);
+		} finally {
+			settingsStatusLoading = false;
+		}
+	}
+
+	async function loadCurrentUser() {
+		if (!authToken) {
+			return;
+		}
+		try {
+			const r = await apiFetch('/api/auth/me');
+			if (!r.ok) throw new Error('session expired');
+			currentUser = await r.json();
+			loginStatus = null;
+			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
+			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
+			if (historyItems.length > 0) loadIteration(0);
+		} catch {
+			authToken = null;
+			currentUser = null;
+			loginStatus = 'ログインしてください。';
+			settingsStatus = null;
+			settingsStatusError = 'ログイン後に設定状態を確認できます。';
+			historyItems = [];
+			historyTotal = 0;
+			trashItems = [];
+			trashTotal = 0;
+			try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
+		}
+	}
+
+	async function login() {
+		loginStatus = null;
+		try {
+			const r = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ username: loginUserName, password: loginPassword })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const data = await r.json() as { token: string; user: UserItem };
+			authToken = data.token;
+			currentUser = data.user;
+			loginStatus = null;
+			historyItems = [];
+			historyTotal = 0;
+			trashItems = [];
+			trashTotal = 0;
+			managerHistoryItems = [];
+			managerHistoryTotal = 0;
+			managerTrashItems = [];
+			managerTrashTotal = 0;
+			loginPassword = '';
+			try { localStorage.setItem(AUTH_TOKEN_KEY, authToken); } catch {}
+			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
+			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
+			if (historyItems.length > 0) loadIteration(0);
+		} catch (e) {
+			const message = e instanceof Error ? e.message : String(e);
+			loginStatus = message;
+			userSettingsStatus = message;
+		}
+	}
+
+	async function logout() {
+		if (authToken) {
+			try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+		}
+		authToken = null;
+		currentUser = null;
+		loginStatus = null;
+		settingsStatus = null;
+		settingsStatusError = 'ログイン後に設定状態を確認できます。';
+		users = [];
+		groups = [];
+		historyItems = [];
+		historyTotal = 0;
+		trashItems = [];
+		trashTotal = 0;
+		managerHistoryItems = [];
+		managerHistoryTotal = 0;
+		managerTrashItems = [];
+		managerTrashTotal = 0;
+		try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
+	}
+
+	async function addUser() {
 		const name = newUserName.trim();
+		const email = newUserEmail.trim();
+		if (currentUser?.role === 'group_lead') {
+			newUserRole = 'user';
+			newUserGroupId = currentUser.group_id ?? '';
+		}
+		if (!name || !email || newUserPassword.length < 8) {
+			userSettingsStatus = 'ユーザー名、メールアドレス、8文字以上のパスワードを入力してください。';
+			return;
+		}
+		try {
+			const r = await apiFetch('/api/users', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ username: name, email, password: newUserPassword, role: newUserRole, group_id: newUserGroupId || null })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			newUserName = '';
+			newUserEmail = '';
+			newUserPassword = '';
+			newUserRole = 'user';
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function updateUser(user: UserItem, patch: Partial<UserItem> & { password?: string }) {
+		try {
+			const r = await apiFetch(`/api/users/${user.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(patch)
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+			await loadUserSettings();
+		}
+	}
+
+	function setEditUser(user: UserItem) {
+		selectedUserId = user.id;
+		editUserName = user.username;
+		editUserEmail = user.email;
+		editUserPassword = '';
+		editUserRole = user.role;
+		editUserGroupId = user.group_id ?? '';
+	}
+
+	function clearEditUser() {
+		selectedUserId = null;
+		editUserName = '';
+		editUserEmail = '';
+		editUserPassword = '';
+		editUserRole = 'user';
+		editUserGroupId = '';
+	}
+
+	async function saveUserEdit() {
+		const user = users.find((item) => item.id === selectedUserId);
+		if (!user) return;
+		const username = editUserName.trim();
+		const email = editUserEmail.trim();
+		if (!username || !email) {
+			userSettingsStatus = 'ユーザー名とメールアドレスを入力してください。';
+			return;
+		}
+		if (editUserPassword && editUserPassword.length < 8) {
+			userSettingsStatus = 'パスワードは8文字以上で入力してください。';
+			return;
+		}
+		const patch: Partial<UserItem> & { password?: string } = {
+			username,
+			email,
+			role: currentUser?.role === 'group_lead' ? 'user' : editUserRole,
+			group_id: currentUser?.role === 'group_lead' ? currentUser.group_id : (editUserGroupId || null),
+		};
+		if (editUserPassword) patch.password = editUserPassword;
+		await updateUser(user, patch);
+	}
+
+	async function removeUser(id: string) {
+		try {
+			const r = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			if (selectedUserId === id) clearEditUser();
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function addGroup() {
+		const name = newGroupName.trim();
 		if (!name) return;
-		users = [...users, { id: `${Date.now()}`, name, password: newUserPassword, group: newUserGroup }];
-		newUserName = '';
-		newUserPassword = '';
-		newUserGroup = groups.includes('ユーザー') ? 'ユーザー' : groups[0];
+		try {
+			const r = await apiFetch('/api/user-groups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			newGroupName = '';
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
 	}
 
-	function removeUser(id: string) {
-		users = users.filter((user) => user.id !== id);
-	}
-
-	function addGroup() {
-		const name = newGroupName.trim() as UserRole;
-		if (!name || groups.includes(name)) return;
-		groups = [...groups, name];
-		newGroupName = '';
-		if (!newUserGroup) newUserGroup = name;
-	}
-
-	function removeGroup(group: UserRole) {
-		if (groups.length <= 1) return;
-		groups = groups.filter((g) => g !== group);
-		const fallback = groups[0];
-		users = users.map((user) => user.group === group ? { ...user, group: fallback } : user);
-		if (newUserGroup === group) newUserGroup = fallback;
+	async function removeGroup(group: UserGroup) {
+		try {
+			const r = await apiFetch(`/api/user-groups/${group.id}`, { method: 'DELETE' });
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
 	}
 
 	function persistMiscSettings() {
@@ -261,11 +540,6 @@
 	let stage2Model     = $state<string>(DEFAULT_MODEL);
 	let includeThinking = $state(false);
 
-	// ── Snapshots ───────────────────────────────────────────
-	type SnapshotMeta = { id: string; name: string; at: number };
-	let snapshots       = $state<SnapshotMeta[]>([]);
-	let activeSnapshotId = $state<string | null>(null);
-
 	// ── Timer ───────────────────────────────────────────────
 	let elapsedStage1Ms = $state(0);
 	let elapsedStage2Ms = $state(0);
@@ -289,6 +563,8 @@
 	let historyManagerOpen = $state(false);
 	let historyManagerView = $state<'active' | 'trash'>('active');
 	let historyManagerTab = $state<'thumbs' | 'list'>('thumbs');
+	let historyManagerPage = $state(0);
+	let historyManagerLoading = $state(false);
 	let managerHistoryItems = $state<Iteration[]>([]);
 	let managerHistoryTotal = $state(0);
 	let managerTrashItems = $state<Iteration[]>([]);
@@ -300,14 +576,9 @@
 	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean } | null>(null);
 	const managedHistoryItems = $derived(historyManagerView === 'trash' ? managerTrashItems : managerHistoryItems);
 	const managedHistoryTotal = $derived(historyManagerView === 'trash' ? managerTrashTotal : managerHistoryTotal);
-	const filteredManagedHistory = $derived.by(() => {
-		const q = historySearch.trim().toLowerCase();
-		if (!q) return managedHistoryItems;
-		return managedHistoryItems.filter((it) =>
-			[it.input, it.ddl ?? '', it.stage1_model ?? '', it.stage2_model ?? '', it.catalog_id ?? '']
-				.some((v) => v.toLowerCase().includes(q))
-		);
-	});
+	const historyManagerTotalPages = $derived(Math.max(1, Math.ceil(managedHistoryTotal / HISTORY_MANAGER_PAGE_SIZE)));
+	const historyManagerOffset = $derived(historyManagerPage * HISTORY_MANAGER_PAGE_SIZE);
+	const historyManagerShownTo = $derived(Math.min(historyManagerOffset + managedHistoryItems.length, managedHistoryTotal));
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
@@ -339,7 +610,7 @@
 		const r1 = await fetch('/api/interpret', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text: augmented, model: stage1Model, include_thinking: includeThinking, snapshot_id: activeSnapshotId, lang })
+			body: JSON.stringify({ text: augmented, model: stage1Model, include_thinking: includeThinking, lang })
 		});
 		if (!r1.ok) {
 			const d = await r1.json().catch(() => ({})) as { detail?: string };
@@ -353,7 +624,7 @@
 		const r2 = await fetch('/api/compose', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, snapshot_id: activeSnapshotId, lang, color_map: activeColorMap() })
+			body: JSON.stringify({ ddl: d1.ddl, model: stage2Model, original_text: text, lang, color_map: activeColorMap() })
 		});
 		if (!r2.ok) {
 			const d = await r2.json().catch(() => ({})) as { detail?: string };
@@ -377,7 +648,7 @@
 		ddl = null; thinking = null; baseDDL = null; ddlEditing = false;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0; batchTotal = 0;
+		batchCurrent = 0; batchTotal = 0; batchSuccess = 0; batchFailures = [];
 		startTimer();
 
 		try {
@@ -391,25 +662,38 @@
 				const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
 				await pushHistory({ input, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
 			} else {
-				const lines = batchLines.map((l) => l.trim()).filter((l) => l);
+				const lines = batchLines
+					.map((line, index) => ({ line: index + 1, input: line.trim() }))
+					.filter((item) => item.input);
 				batchTotal = lines.length; outputTab = 'canvas';
 				for (let i = 0; i < lines.length; i++) {
 					if (!loading) break;
 					batchCurrent = i + 1;
 					try {
-						const r = await paintOne(lines[i]);
+						const r = await paintOne(lines[i].input);
 						result = r;
+						ddl = r.ddl; thinking = r.thinking;
 						const totalIn  = (r.tokens_in_stage1 ?? 0)  + (r.tokens_in_stage2 ?? 0);
 						const totalOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-						await pushHistory({ input: `#${i + 1} ${lines[i]}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
-					} catch { /* continue */ }
+						await pushHistory({ input: `#${lines[i].line} ${lines[i].input}`, ddl: r.ddl, thinking: r.thinking, score: r.score, svg: r.svg, at: Date.now(), elapsed_ms: r.elapsed_total_ms, stage1_model: stage1Model, stage2_model: stage2Model, tokens_in: totalIn || null, tokens_out: totalOut || null, catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null });
+						batchSuccess += 1;
+					} catch (e) {
+						batchFailures = [
+							...batchFailures,
+							{
+								line: lines[i].line,
+								input: lines[i].input,
+								message: e instanceof Error ? e.message : String(e),
+							},
+						];
+					}
 				}
 				elapsedTotalMs = Date.now() - _timerStart;
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e); result = null;
 		} finally {
-			stopTimer(); loading = false; stageLabel = ''; batchCurrent = 0; batchTotal = 0;
+			stopTimer(); loading = false; stageLabel = ''; batchCurrent = 0;
 		}
 	}
 
@@ -425,7 +709,7 @@
 			const r = await fetch('/api/compose', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, snapshot_id: activeSnapshotId, lang, color_map: activeColorMap() })
+				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, lang, color_map: activeColorMap() })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -464,9 +748,14 @@
 
 	// ── History ─────────────────────────────────────────────
 	async function fetchHistoryPage(page: number): Promise<void> {
+		if (!authToken) {
+			historyItems = [];
+			historyTotal = 0;
+			return;
+		}
 		const offset = page * HISTORY_PAGE_SIZE;
 		try {
-			const r = await fetch(`/api/history?offset=${offset}&limit=${HISTORY_PAGE_SIZE}`);
+			const r = await apiFetch(`/api/history?offset=${offset}&limit=${HISTORY_PAGE_SIZE}`);
 			if (!r.ok) return;
 			const data = await r.json();
 			historyItems = data.items; historyTotal = data.total; historyPage = page;
@@ -474,42 +763,59 @@
 	}
 
 	async function fetchTrashPage(): Promise<void> {
+		if (!authToken) {
+			trashItems = [];
+			trashTotal = 0;
+			return;
+		}
 		try {
-			const r = await fetch(`/api/history?offset=0&limit=100&trashed=true`);
+			const r = await apiFetch(`/api/history?offset=0&limit=100&trashed=true`);
 			if (!r.ok) return;
 			const data = await r.json();
 			trashItems = data.items; trashTotal = data.total;
 		} catch { /* ignore */ }
 	}
 
-	async function fetchAllHistory(trashed: boolean): Promise<{ items: Iteration[]; total: number }> {
-		let offset = 0;
-		let total = 0;
-		const items: Iteration[] = [];
-		do {
-			const r = await fetch(`/api/history?offset=${offset}&limit=${HISTORY_MANAGER_PAGE_SIZE}${trashed ? '&trashed=true' : ''}`);
-			if (!r.ok) break;
-			const data = await r.json();
-			items.push(...data.items);
-			total = data.total;
-			offset += data.items.length;
-			if (data.items.length === 0) break;
-		} while (items.length < total);
-		return { items, total };
-	}
-
 	async function fetchHistoryManager(): Promise<void> {
+		if (!authToken) return;
+		historyManagerLoading = true;
 		try {
-			const [active, trash] = await Promise.all([fetchAllHistory(false), fetchAllHistory(true)]);
-			managerHistoryItems = active.items; managerHistoryTotal = active.total;
-			managerTrashItems = trash.items; managerTrashTotal = trash.total;
-			trashItems = trash.items.slice(0, 100); trashTotal = trash.total;
+			const trashed = historyManagerView === 'trash';
+			const offset = historyManagerPage * HISTORY_MANAGER_PAGE_SIZE;
+			const params = new URLSearchParams({
+				offset: String(offset),
+				limit: String(HISTORY_MANAGER_PAGE_SIZE),
+				q: historySearch.trim(),
+			});
+			if (trashed) params.set('trashed', 'true');
+			const r = await apiFetch(`/api/history?${params.toString()}`);
+			if (!r.ok) return;
+			const data = await r.json();
+			if (trashed) {
+				managerTrashItems = data.items;
+				managerTrashTotal = data.total;
+				if (!historySearch.trim()) {
+					trashItems = data.items.slice(0, 100);
+					trashTotal = data.total;
+				}
+			} else {
+				managerHistoryItems = data.items;
+				managerHistoryTotal = data.total;
+			}
+			if (data.items.length === 0 && data.total > 0 && historyManagerPage > 0) {
+				historyManagerPage -= 1;
+				await fetchHistoryManager();
+			}
 		} catch { /* ignore */ }
+		finally {
+			historyManagerLoading = false;
+		}
 	}
 
 	async function pushHistory(it: Iteration): Promise<void> {
+		if (!authToken) return;
 		try {
-			await fetch('/api/history', {
+			await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null })
@@ -530,12 +836,13 @@
 	}
 
 	function selectAllManagedHistory() {
-		const ids = filteredManagedHistory.map((it) => it.id).filter((id): id is string => !!id);
+		const ids = managedHistoryItems.map((it) => it.id).filter((id): id is string => !!id);
 		selectedHistoryIds = selectedHistoryIds.length === ids.length ? [] : ids;
 	}
 
 	async function postHistoryIds(path: string, ids: string[]) {
-		await fetch(path, {
+		if (!authToken) return;
+		await apiFetch(path, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ids })
@@ -711,11 +1018,6 @@
 		} finally { URL.revokeObjectURL(url); }
 	}
 
-	// ── Snapshots ───────────────────────────────────────────
-	async function fetchSnapshots() {
-		try { const r = await fetch('/api/saijiki/snapshots'); if (r.ok) snapshots = await r.json(); } catch {}
-	}
-
 	// ── Prompts ─────────────────────────────────────────────
 	async function fetchPrompts(): Promise<void> {
 		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
@@ -763,13 +1065,42 @@
 		historyManagerOpen = true;
 		historyManagerView = 'active';
 		historyManagerTab = 'thumbs';
+		historyManagerPage = 0;
+		historySearch = '';
 		selectedHistoryIds = [];
 		managerHistoryItems = historyItems;
 		managerHistoryTotal = historyTotal;
-		managerTrashItems = trashItems;
+		managerTrashItems = [];
 		managerTrashTotal = trashTotal;
 		void fetchHistoryManager();
 	}
+
+	function setHistoryManagerView(view: 'active' | 'trash') {
+		historyManagerView = view;
+		historyManagerPage = 0;
+		selectedHistoryIds = [];
+		void fetchHistoryManager();
+	}
+
+	function setHistoryManagerPage(page: number) {
+		const nextPage = Math.max(0, Math.min(page, historyManagerTotalPages - 1));
+		if (nextPage === historyManagerPage) return;
+		historyManagerPage = nextPage;
+		selectedHistoryIds = [];
+		void fetchHistoryManager();
+	}
+
+	$effect(() => {
+		const q = historySearch.trim();
+		if (!historyManagerOpen) return;
+		historyManagerView;
+		const handle = setTimeout(() => {
+			historyManagerPage = 0;
+			selectedHistoryIds = [];
+			void fetchHistoryManager();
+		}, q ? 250 : 0);
+		return () => clearTimeout(handle);
+	});
 
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
@@ -795,10 +1126,6 @@
 		window.addEventListener('resize', onResize);
 
 		initLang();
-		void (async () => {
-			await Promise.all([fetchHistoryPage(0), fetchTrashPage(), fetchSnapshots(), fetchPrompts()]);
-			if (historyItems.length > 0) loadIteration(0);
-		})();
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null; if (p1) stage1Provider = p1;
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
@@ -808,8 +1135,12 @@
 			const birds = localStorage.getItem(SHOW_BIRDS_KEY); if (birds !== null) showBirds = birds !== '0';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
+			authToken = localStorage.getItem(AUTH_TOKEN_KEY);
 			miscSettingsLoaded = true;
 		} catch {}
+		void (async () => {
+			await Promise.all([loadCurrentUser(), fetchPrompts()]);
+		})();
 
 		return () => window.removeEventListener('resize', onResize);
 	});
@@ -826,6 +1157,72 @@
 <!-- ══════════════════════════════════════════════════════════ -->
 <!--  ROOT                                                       -->
 <!-- ══════════════════════════════════════════════════════════ -->
+{#if !currentUser}
+	<main class="login-screen">
+		<section class="login-panel" aria-labelledby="login-title">
+			<div class="login-brand">
+				<div class="login-brand-head">
+					<div>
+						<div class="login-logo">inku</div>
+						<div class="login-sub">{t().subtitle}</div>
+					</div>
+					<div class="login-lang-switcher" aria-label="Language">
+						{#each PACK_LIST as pack (pack.code)}
+							<button
+								type="button"
+								class="login-lang-btn"
+								class:active={getLang() === pack.code}
+								title={pack.label}
+								onclick={() => setLang(pack.code)}
+							>{pack.code.toUpperCase()}</button>
+						{/each}
+					</div>
+				</div>
+			</div>
+			<div class="login-title" id="login-title">{t().loginTitle}</div>
+			<div class="login-panel-body">
+				{#if loginStatus}
+					<div class="inline-message">{loginStatus}</div>
+				{/if}
+				<div class="login-grid">
+					<input bind:value={loginUserName} placeholder={t().loginUsernamePlaceholder} autocomplete="username" />
+					<div class="password-field">
+						<input
+							bind:value={loginPassword}
+							type={loginPasswordVisible ? 'text' : 'password'}
+							placeholder={t().loginPasswordPlaceholder}
+							autocomplete="current-password"
+							onkeydown={(e) => { if (e.key === 'Enter') void login(); }}
+						/>
+						<button
+							class="password-toggle"
+							type="button"
+							aria-pressed={loginPasswordVisible}
+							aria-label={loginPasswordVisible ? t().loginPasswordHide : t().loginPasswordShow}
+							title={loginPasswordVisible ? t().loginPasswordHide : t().loginPasswordShow}
+							onclick={() => (loginPasswordVisible = !loginPasswordVisible)}
+						>
+							{#if loginPasswordVisible}
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<path d="M3 3l18 18" />
+									<path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+									<path d="M8.4 5.4A10.5 10.5 0 0 1 12 4c5 0 8.5 4.6 9.7 6.4a1.8 1.8 0 0 1 0 2 17 17 0 0 1-2.3 2.8" />
+									<path d="M15.7 15.7A10.5 10.5 0 0 1 12 17c-5 0-8.5-4.6-9.7-6.4a1.8 1.8 0 0 1 0-2A17 17 0 0 1 5 5.4" />
+								</svg>
+							{:else}
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<path d="M2.3 10.6C3.5 8.8 7 4 12 4s8.5 4.8 9.7 6.6a1.8 1.8 0 0 1 0 2C20.5 14.4 17 19 12 19s-8.5-4.6-9.7-6.4a1.8 1.8 0 0 1 0-2Z" />
+									<circle cx="12" cy="11.6" r="2.7" />
+								</svg>
+							{/if}
+						</button>
+					</div>
+					<button class="ghost-btn login-submit" onclick={login}>{t().loginSubmit}</button>
+				</div>
+			</div>
+		</section>
+	</main>
+{:else}
 <div class="root">
 
 	<!-- ══ HEADER ══ -->
@@ -839,7 +1236,7 @@
 			<button
 				class="settings-btn"
 				class:active={settingsOpen}
-				onclick={() => { settingsMode = 'settings'; settingsTab = 'db'; settingsOpen = true; }}
+				onclick={() => openSettings('db')}
 			>⚙ 設定</button>
 
 			<!-- Lang -->
@@ -912,7 +1309,7 @@
 					{:else}
 						<div class="batch-wrap">
 							<div class="line-nums" aria-hidden="true">{lineNumbersText}</div>
-							<textarea class="batch-ta" bind:value={batchInput} rows="5" spellcheck="false" placeholder={t().batchPlaceholder}></textarea>
+							<textarea class="batch-ta" bind:value={batchInput} rows="5" spellcheck="false" wrap="off" placeholder={t().batchPlaceholder}></textarea>
 						</div>
 						{#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 					{/if}
@@ -957,6 +1354,23 @@
 					{/if}
 
 					{#if error}<p class="error-text">{error}</p>{/if}
+					{#if inputMode === 'batch' && batchTotal > 0 && !loading}
+						<div class="batch-summary" class:has-failures={batchFailures.length > 0}>
+							<div class="batch-summary-line">{t().batchSummary(batchSuccess, batchFailures.length, batchTotal)}</div>
+							{#if batchFailures.length > 0}
+								<div class="batch-failure-title">{t().batchFailureTitle}</div>
+								<ul class="batch-failure-list">
+									{#each batchFailures as failure (failure.line)}
+										<li>
+											<span class="batch-failure-line">{t().batchFailureLine(failure.line)}</span>
+											<span class="batch-failure-input">{failure.input}</span>
+											<span class="batch-failure-message">{failure.message}</span>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+					{/if}
 				</section>
 
 				<!-- thinking -->
@@ -1251,10 +1665,10 @@
 		</div>
 		{#if settingsMode === 'settings'}
 			<div class="settings-tabs">
-				<button class:active={settingsTab === 'db'} onclick={() => (settingsTab = 'db')}>DB設定</button>
-				<button class:active={settingsTab === 'plugins'} onclick={() => (settingsTab = 'plugins')}>プラグイン</button>
-				<button class:active={settingsTab === 'users'} onclick={() => (settingsTab = 'users')}>ユーザー管理</button>
-				<button class:active={settingsTab === 'misc'} onclick={() => (settingsTab = 'misc')}>その他</button>
+				<button class:active={settingsTab === 'db'} onclick={() => selectSettingsTab('db')}>DB設定</button>
+				<button class:active={settingsTab === 'plugins'} onclick={() => selectSettingsTab('plugins')}>プラグイン</button>
+				<button class:active={settingsTab === 'users'} onclick={() => selectSettingsTab('users')}>ユーザー管理</button>
+				<button class:active={settingsTab === 'misc'} onclick={() => selectSettingsTab('misc')}>その他</button>
 			</div>
 		{/if}
 		<div class="settings-body">
@@ -1297,110 +1711,160 @@
 				</div>
 			{:else if settingsTab === 'db'}
 				<div class="popover-group">
-					<div class="form-row">
-						<label>DBタイプ:</label>
-						<select bind:value={dbType}>
-							<option value="sqlite">内蔵SQLite</option>
-							<option value="postgres">PostgreSQL</option>
-						</select>
-					</div>
+					<div class="popover-group-label">現在のサーバーDB</div>
+					{#if settingsStatusLoading}
+						<div class="inline-message">設定状態を読み込んでいます。</div>
+					{:else if settingsStatus}
+						<div class="settings-readonly-grid">
+							<span>Backend</span><strong>{settingsStatus.database.backend}</strong>
+							<span>Driver</span><strong>{settingsStatus.database.driver}</strong>
+							<span>URL</span><code>{settingsStatus.database.url}</code>
+							<span>Database</span><strong>{settingsStatus.database.database ?? '-'}</strong>
+							<span>Default</span><strong>{settingsStatus.database.is_default ? 'はい' : 'いいえ'}</strong>
+						</div>
+						<div class="db-test-result">{settingsStatus.database.note}</div>
+					{:else}
+						<div class="inline-message">{settingsStatusError ?? '設定状態を取得できません。'}</div>
+					{/if}
 				</div>
-				{#if dbType === 'sqlite'}
-					<div class="popover-group">
-						<div class="popover-group-label">SQLite</div>
-						<div class="form-row">
-							<label>保存先パス:</label>
-							<input bind:value={sqlitePath} />
-						</div>
-					</div>
-				{:else}
-					<div class="popover-group">
-						<div class="popover-group-label">PostgreSQL</div>
-						<div class="form-row"><label>サーバー:</label><input bind:value={pgHost} /></div>
-						<div class="form-row"><label>ポート:</label><input bind:value={pgPort} /></div>
-						<div class="form-row"><label>ユーザー:</label><input bind:value={pgUser} /></div>
-						<div class="form-row">
-							<label>パスワード:</label>
-							<input type={showPgPassword ? 'text' : 'password'} bind:value={pgPassword} />
-							<button class="ghost-btn" onclick={() => (showPgPassword = !showPgPassword)}>{showPgPassword ? '隠す' : '表示'}</button>
-						</div>
-						<div class="form-row"><label>DB名:</label><input bind:value={pgDatabase} /></div>
-					</div>
-				{/if}
 				<div class="settings-inline-actions">
-					<button class="ghost-btn" onclick={testDbConnection}>接続テスト</button>
-					{#if dbTestResult}<span class="db-test-result">{dbTestResult}</span>{/if}
+					<button class="ghost-btn" onclick={loadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>再読み込み</button>
 				</div>
 			{:else if settingsTab === 'plugins'}
-				<div class="plugin-list">
-					{#each plugins as plugin (plugin.id)}
-						<div class="plugin-row">
-							<label class="check-row">
-								<input type="checkbox" checked={plugin.enabled} onchange={(e) => { plugin.enabled = (e.currentTarget as HTMLInputElement).checked; plugins = [...plugins]; }} />
-								<span>{plugin.name}</span>
-							</label>
-							<span class="plugin-version">{plugin.version}</span>
-							<button class="ghost-btn" onclick={() => (pluginPendingDelete = plugin)}>削除</button>
+				<div class="popover-group">
+					<div class="popover-group-label">プラグイン状態</div>
+					{#if settingsStatusLoading}
+						<div class="inline-message">設定状態を読み込んでいます。</div>
+					{:else if settingsStatus}
+						<div class="settings-readonly-grid">
+							<span>Loader</span><strong>{settingsStatus.plugins.enabled ? '有効' : '未実装'}</strong>
+							<span>Runtime edit</span><strong>{settingsStatus.plugins.runtime_editable ? '可' : '不可'}</strong>
 						</div>
-					{/each}
+						{#if settingsStatus.plugins.loaded.length > 0}
+							<div class="plugin-list">
+								{#each settingsStatus.plugins.loaded as plugin (plugin.name)}
+									<div class="plugin-row">
+										<span>{plugin.name}</span>
+										<span class="plugin-version">{plugin.version}</span>
+										<span class="plugin-version">{plugin.status}</span>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<div class="inline-message">読み込まれているプラグインはありません。</div>
+						{/if}
+						<div class="db-test-result">{settingsStatus.plugins.note}</div>
+					{:else}
+						<div class="inline-message">{settingsStatusError ?? '設定状態を取得できません。'}</div>
+					{/if}
 				</div>
-				<button class="ghost-btn" onclick={() => (pluginAddOpen = !pluginAddOpen)}>＋ プラグインを追加</button>
-				{#if pluginAddOpen}
-					<div class="plugin-add">
-						<input bind:value={pluginPath} placeholder="plugin path or name" />
-						<button class="ghost-btn" onclick={addPlugin}>追加</button>
-					</div>
-				{/if}
-				{#if pluginPendingDelete}
-					<div class="inline-confirm">
-						<span>{pluginPendingDelete.name} を削除しますか？</span>
-						<button class="ghost-btn" onclick={() => (pluginPendingDelete = null)}>キャンセル</button>
-						<button class="danger-btn" onclick={() => { plugins = plugins.filter((p) => p.id !== pluginPendingDelete?.id); pluginPendingDelete = null; }}>削除</button>
-					</div>
-				{/if}
+				<div class="settings-inline-actions">
+					<button class="ghost-btn" onclick={loadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>再読み込み</button>
+				</div>
 			{:else if settingsTab === 'users'}
 				<div class="popover-group">
 					<div class="popover-group-label">ユーザー</div>
-					<div class="user-add-grid">
-						<input bind:value={newUserName} placeholder="ユーザー名" />
-						<input bind:value={newUserPassword} type="password" placeholder="パスワード" />
-						<select bind:value={newUserGroup}>
-							{#each groups as group (group)}
-								<option value={group}>{group}</option>
+					{#if userSettingsStatus}
+						<div class="inline-message">{userSettingsStatus}</div>
+					{/if}
+					{#if !currentUser}
+						<div class="login-grid">
+							<input bind:value={loginUserName} placeholder="ユーザー名" />
+							<input bind:value={loginPassword} type="password" placeholder="パスワード" onkeydown={(e) => { if (e.key === 'Enter') void login(); }} />
+							<button class="ghost-btn" onclick={login}>ログイン</button>
+						</div>
+						<div class="db-test-result">初期管理者は username: admin / password: inku-admin です。環境変数 INKU_BOOTSTRAP_ADMIN_PASSWORD で変更できます。</div>
+					{:else}
+						<div class="user-session-row">
+							<span>{currentUser.username} / {currentUser.role_label}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
+							<button class="ghost-btn" onclick={logout}>ログアウト</button>
+						</div>
+						{#if currentUser.role === 'admin' || currentUser.role === 'group_lead'}
+							<div class="user-editor-grid">
+								<div class="user-editor-panel">
+									<div class="user-editor-title">ユーザー追加</div>
+									<div class="user-form-grid">
+										<input bind:value={newUserName} placeholder="ユーザー名" />
+										<input bind:value={newUserEmail} type="email" placeholder="メールアドレス" />
+										<input bind:value={newUserPassword} type="password" placeholder="パスワード" />
+										<select bind:value={newUserRole} disabled={currentUser.role === 'group_lead'}>
+											{#each USER_ROLE_OPTIONS as role (role.value)}
+												<option value={role.value}>{role.label}</option>
+											{/each}
+										</select>
+										<select bind:value={newUserGroupId} disabled={currentUser.role === 'group_lead'}>
+											<option value="">所属なし</option>
+											{#each groups as group (group.id)}
+												<option value={group.id}>{group.name}</option>
+											{/each}
+										</select>
+									</div>
+									<div class="user-form-actions">
+										<button class="ghost-btn" onclick={addUser}>ユーザー追加</button>
+									</div>
+								</div>
+								<div class="user-editor-panel">
+									<div class="user-editor-title">ユーザー変更</div>
+									{#if selectedUserId}
+										<div class="user-form-grid">
+											<input bind:value={editUserName} placeholder="ユーザー名" />
+											<input bind:value={editUserEmail} type="email" placeholder="メールアドレス" />
+											<input bind:value={editUserPassword} type="password" placeholder="新しいパスワード" />
+											<select bind:value={editUserRole} disabled={currentUser.role === 'group_lead'}>
+												{#each USER_ROLE_OPTIONS as role (role.value)}
+													<option value={role.value}>{role.label}</option>
+												{/each}
+											</select>
+											<select bind:value={editUserGroupId} disabled={currentUser.role === 'group_lead'}>
+												<option value="">所属なし</option>
+												{#each groups as group (group.id)}
+													<option value={group.id}>{group.name}</option>
+												{/each}
+											</select>
+										</div>
+										<div class="user-form-actions">
+											<button class="ghost-btn" onclick={clearEditUser}>選択解除</button>
+											<button class="ghost-btn primary-inline" onclick={saveUserEdit}>変更を保存</button>
+										</div>
+									{:else}
+										<div class="inline-message">一覧から変更するユーザーを選択してください。</div>
+									{/if}
+								</div>
+							</div>
+							<div class="user-list">
+								{#each users as user (user.id)}
+									<div class="user-row" class:selected={selectedUserId === user.id}>
+										<button class="ghost-btn" onclick={() => setEditUser(user)}>変更</button>
+										<span class="user-cell user-name">{user.username}</span>
+										<span class="user-cell">{user.email}</span>
+										<span class="user-cell">{user.role_label}</span>
+										<span class="user-cell">{user.group_name ?? '所属なし'}</span>
+										<button class="ghost-btn" onclick={() => removeUser(user.id)}>削除</button>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<div class="inline-message">ユーザー管理は管理者またはグループリードのみ利用できます。</div>
+						{/if}
+					{/if}
+				</div>
+				{#if currentUser?.role === 'admin'}
+					<div class="popover-group">
+						<div class="popover-group-label">グループ</div>
+						<div class="plugin-add">
+							<input bind:value={newGroupName} placeholder="グループ名" />
+							<button class="ghost-btn" onclick={addGroup}>追加</button>
+						</div>
+						<div class="group-list">
+							{#each groups as group (group.id)}
+								<div class="group-row">
+									<span>{group.name}</span>
+									<button class="ghost-btn" onclick={() => removeGroup(group)}>削除</button>
+								</div>
 							{/each}
-						</select>
-						<button class="ghost-btn" onclick={addUser}>追加</button>
+						</div>
 					</div>
-					<div class="user-list">
-						{#each users as user (user.id)}
-							<div class="user-row">
-								<input value={user.name} onchange={(e) => { user.name = (e.currentTarget as HTMLInputElement).value; users = [...users]; }} />
-								<input type="password" value={user.password} onchange={(e) => { user.password = (e.currentTarget as HTMLInputElement).value; users = [...users]; }} />
-								<select value={user.group} onchange={(e) => { user.group = (e.currentTarget as HTMLSelectElement).value as UserRole; users = [...users]; }}>
-									{#each groups as group (group)}
-										<option value={group}>{group}</option>
-									{/each}
-								</select>
-								<button class="ghost-btn" onclick={() => removeUser(user.id)}>削除</button>
-							</div>
-						{/each}
-					</div>
-				</div>
-				<div class="popover-group">
-					<div class="popover-group-label">グループ</div>
-					<div class="plugin-add">
-						<input bind:value={newGroupName} placeholder="グループ名" />
-						<button class="ghost-btn" onclick={addGroup}>追加</button>
-					</div>
-					<div class="group-list">
-						{#each groups as group (group)}
-							<div class="group-row">
-								<span>{group}</span>
-								<button class="ghost-btn" onclick={() => removeGroup(group)} disabled={groups.length <= 1}>削除</button>
-							</div>
-						{/each}
-					</div>
-				</div>
+				{/if}
 			{:else}
 				<div class="popover-group">
 					<div class="popover-group-label">表示</div>
@@ -1481,7 +1945,7 @@
 		<div class="modal-head">
 			<div class="catalog-modal-title">履歴管理</div>
 			<div class="modal-head-actions">
-				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => { historyManagerView = historyManagerView === 'trash' ? 'active' : 'trash'; selectedHistoryIds = []; void fetchHistoryManager(); }}>ごみ箱 ({managerTrashTotal || trashTotal})</button>
+				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => setHistoryManagerView(historyManagerView === 'trash' ? 'active' : 'trash')}>ごみ箱 ({managerTrashTotal || trashTotal})</button>
 				<button class="catalog-close" onclick={() => (historyManagerOpen = false)}>×</button>
 			</div>
 		</div>
@@ -1490,7 +1954,13 @@
 			<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>リスト</button>
 		</div>
 		<div class="history-tools">
-			<span class="history-manager-count">{filteredManagedHistory.length} / {managedHistoryTotal}</span>
+			<span class="history-manager-count">
+				{#if managedHistoryTotal === 0}
+					0 / 0
+				{:else}
+					{historyManagerOffset + 1}-{historyManagerShownTo} / {managedHistoryTotal}
+				{/if}
+			</span>
 			<button class="ghost-btn" onclick={selectAllManagedHistory}>すべて選択</button>
 			{#if historyManagerView === 'active'}
 				<button class="ghost-btn" onclick={() => askTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>選択削除</button>
@@ -1500,17 +1970,22 @@
 			{/if}
 			<label class="history-search">検索: <input bind:value={historySearch} /></label>
 		</div>
+		<div class="history-manager-pager">
+			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>← 前</button>
+			<span>{historyManagerLoading ? '読み込み中' : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
+			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>次 →</button>
+		</div>
 		{#if historyManagerTab === 'thumbs'}
 			<div class="history-thumb-grid-wrap">
 				<div class="history-thumb-grid">
-					{#each filteredManagedHistory as it, i (it.id ?? it.at)}
+					{#each managedHistoryItems as it, i (it.id ?? it.at)}
 						<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 							<label class="manager-check">
 								<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} />
 							</label>
 							<button class="thumb manager-thumb" onclick={() => historyManagerView === 'active' && loadIterationItem(it)}>
 								<div class="thumb-tooltip">
-									<div class="tooltip-title">#{i + 1}</div>
+									<div class="tooltip-title">#{historyManagerOffset + i + 1}</div>
 									<div>モデル: {historyModelSummary(it)}</div>
 									<div>保存時間: {formatHistoryDate(it.at)}</div>
 									<div>秒数: {formatElapsed(it.elapsed_ms)}</div>
@@ -1543,7 +2018,7 @@
 						<tr><th></th><th>画像</th><th>作成日時</th><th>モデル</th><th>秒数</th><th>色カタログ</th><th>操作</th></tr>
 					</thead>
 					<tbody>
-						{#each filteredManagedHistory as it (it.id ?? it.at)}
+						{#each managedHistoryItems as it (it.id ?? it.at)}
 							<tr>
 								<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} /></td>
 								<td><div class="history-mini">{@html it.svg}</div></td>
@@ -1579,6 +2054,7 @@
 			</div>
 		</div>
 	</div>
+{/if}
 {/if}
 
 <style>
@@ -1851,11 +2327,19 @@
 	}
 	.line-nums {
 		background: var(--bg2); border-right: 1px solid var(--border);
-		padding: 9px 6px; font-size: 12px; line-height: 1.65;
+		padding: 9px 6px; font-size: 13px; line-height: 1.65;
 		text-align: right; color: var(--fg3); user-select: none;
+		font-family: inherit;
 		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
 	}
-	.batch-ta { flex: 1; border: none; border-radius: 0; }
+	.batch-ta {
+		flex: 1;
+		border: none;
+		border-radius: 0;
+		white-space: pre;
+		overflow-wrap: normal;
+		overflow-x: auto;
+	}
 	.batch-wrap .batch-ta { min-height: 240px; }
 	.batch-info { font-size: 11px; color: var(--fg3); }
 
@@ -1920,6 +2404,48 @@
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; font-size: 12px; color: var(--fg2);
 		margin-top: 8px;
+	}
+	.batch-summary {
+		margin-top: 8px;
+		padding: 8px 10px;
+		border: 1px solid #b8c7ab;
+		border-radius: var(--r);
+		background: #f5f8f1;
+		color: #40552b;
+		font-size: 12px;
+	}
+	.batch-summary.has-failures {
+		border-color: #d9b4ae;
+		background: #fff6f4;
+		color: #7c332b;
+	}
+	.batch-summary-line { font-weight: 500; }
+	.batch-failure-title { margin-top: 6px; color: var(--fg2); font-size: 11px; }
+	.batch-failure-list {
+		margin: 4px 0 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.batch-failure-list li {
+		display: grid;
+		grid-template-columns: 48px minmax(0, 1fr);
+		gap: 3px 8px;
+	}
+	.batch-failure-line { color: var(--fg2); font-variant-numeric: tabular-nums; }
+	.batch-failure-input {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.batch-failure-message {
+		grid-column: 2;
+		color: #a2342a;
+		font-size: 11px;
+		word-break: break-word;
 	}
 
 	/* Play button */
@@ -2390,7 +2916,141 @@
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
 	}
-	.settings-modal { width: min(680px, calc(100vw - 32px)); max-height: 88vh; }
+	.settings-modal { width: min(860px, calc(100vw - 32px)); max-height: 88vh; }
+	.login-screen {
+		min-height: 100vh;
+		display: grid;
+		place-items: center;
+		padding: 32px;
+		position: relative;
+		overflow: hidden;
+		background:
+			linear-gradient(90deg, rgba(250, 249, 246, 0.96) 0%, rgba(250, 249, 246, 0.86) 42%, rgba(250, 249, 246, 0.34) 100%),
+			linear-gradient(180deg, rgba(245, 241, 232, 0.92) 0%, rgba(234, 229, 216, 0.74) 100%),
+			url('/login-background.svg') right 17% center / min(1120px, 112vw) auto no-repeat,
+			var(--bg);
+		color: var(--fg);
+	}
+	.login-screen::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(circle at 72% 44%, rgba(255, 255, 255, 0) 0 34%, rgba(250, 249, 246, 0.58) 76%);
+		pointer-events: none;
+	}
+	.login-panel {
+		width: min(420px, calc(100vw - 32px));
+		position: relative;
+		z-index: 1;
+		background: rgba(250, 249, 246, 0.94); border-radius: var(--r);
+		box-shadow: 0 18px 54px rgba(40, 35, 24, 0.18);
+		border: 1px solid rgba(90, 83, 68, 0.22);
+		-webkit-backdrop-filter: blur(10px);
+		backdrop-filter: blur(10px);
+		display: flex; flex-direction: column;
+		overflow: hidden;
+	}
+	.login-brand {
+		padding: 20px 24px 12px;
+		border-bottom: 1px solid var(--border);
+	}
+	.login-brand-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 18px;
+	}
+	.login-logo {
+		font-size: 22px;
+		font-weight: 300;
+		letter-spacing: 0.02em;
+	}
+	.login-sub {
+		margin-top: 2px;
+		color: var(--fg3);
+		font-size: 11px;
+	}
+	.login-lang-switcher {
+		display: flex;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		overflow: hidden;
+		flex-shrink: 0;
+	}
+	.login-lang-btn {
+		min-width: 34px;
+		height: 26px;
+		padding: 0 8px;
+		border: none;
+		border-right: 1px solid var(--border2);
+		background: rgba(255, 255, 255, 0.72);
+		color: var(--fg2);
+		font-family: inherit;
+		font-size: 11px;
+		font-weight: 500;
+		cursor: pointer;
+	}
+	.login-lang-btn:last-child { border-right: none; }
+	.login-lang-btn:hover { color: var(--fg); background: #fff; }
+	.login-lang-btn.active { background: var(--fg); color: #fff; }
+	.login-title {
+		padding: 18px 24px 0;
+		font-size: 16px;
+		font-weight: 500;
+	}
+	.login-panel-body {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 14px 24px 24px;
+	}
+	.login-panel .login-grid {
+		grid-template-columns: 1fr;
+		gap: 10px;
+	}
+	.login-panel .login-grid input {
+		min-height: 38px;
+		padding: 8px 10px;
+		font-size: 13px;
+	}
+	.login-submit {
+		min-height: 38px;
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.password-field {
+		display: flex;
+		align-items: stretch;
+		min-width: 0;
+	}
+	.password-field input {
+		border-top-right-radius: 0;
+		border-bottom-right-radius: 0;
+	}
+	.password-toggle {
+		width: 40px;
+		border: 1px solid var(--border2);
+		border-left: 0;
+		border-radius: 0 var(--r) var(--r) 0;
+		background: #f2f0eb;
+		color: var(--fg2);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+	}
+	.password-toggle:hover {
+		color: var(--fg);
+		background: #ebe8e1;
+	}
+	.password-toggle svg {
+		width: 18px;
+		height: 18px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
 	.history-modal {
 		width: min(920px, calc(100vw - 32px));
 		height: min(720px, calc(100vh - 32px));
@@ -2412,7 +3072,7 @@
 		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
 	}
 	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
-	.form-row input, .form-row select, .plugin-add input, .history-search input {
+	.form-row input, .form-row select, .plugin-add input, .history-search input, .login-grid input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
@@ -2420,6 +3080,34 @@
 	.check-row { display: flex; align-items: center; gap: 7px; color: var(--fg2); font-size: 12px; }
 	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
 	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.settings-readonly-grid {
+		display: grid;
+		grid-template-columns: 120px minmax(0, 1fr);
+		gap: 7px 12px;
+		align-items: baseline;
+		margin-bottom: 9px;
+		font-size: 12px;
+	}
+	.settings-readonly-grid span { color: var(--fg3); }
+	.settings-readonly-grid strong { color: var(--fg); font-weight: 500; min-width: 0; word-break: break-word; }
+	.settings-readonly-grid code {
+		min-width: 0;
+		padding: 2px 4px;
+		border-radius: var(--r);
+		background: var(--bg);
+		color: var(--fg2);
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-size: 11px;
+		word-break: break-all;
+	}
+	.inline-message {
+		padding: 7px 9px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		color: var(--fg2);
+		font-size: 12px;
+	}
 	.plugin-list {
 		border: 1px solid var(--border); border-radius: var(--r);
 		background: #fff; overflow: hidden;
@@ -2431,17 +3119,63 @@
 	.plugin-row:last-child { border-bottom: none; }
 	.plugin-version { color: var(--fg3); font-size: 11px; }
 	.plugin-add { display: flex; gap: 8px; align-items: center; }
-	.user-add-grid {
+	.login-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px auto;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 		gap: 8px;
 		align-items: center;
 	}
-	.user-add-grid input, .user-add-grid select,
-	.user-row input, .user-row select {
+	.user-session-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 10px;
+		padding: 7px 9px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		color: var(--fg2);
+		font-size: 12px;
+	}
+	.user-editor-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+		margin-top: 10px;
+	}
+	.user-editor-panel {
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
+		padding: 10px;
+		min-width: 0;
+	}
+	.user-editor-title {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--fg2);
+		margin-bottom: 8px;
+	}
+	.user-form-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 8px;
+	}
+	.user-form-grid input, .user-form-grid select {
 		min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+	}
+	.user-form-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.primary-inline {
+		border-color: var(--accent);
+		background: var(--accent-light);
+		color: var(--accent);
 	}
 	.user-list, .group-list {
 		display: flex;
@@ -2451,10 +3185,17 @@
 	}
 	.user-row {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px auto;
+		grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.35fr) 120px 120px auto;
 		gap: 8px;
 		align-items: center;
+		padding: 7px 9px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: #fff;
 	}
+	.user-row.selected { border-color: var(--accent); background: var(--accent-light); }
+	.user-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg2); font-size: 12px; }
+	.user-name { color: var(--fg); font-weight: 500; }
 	.group-row {
 		display: flex;
 		align-items: center;
@@ -2502,6 +3243,17 @@
 	}
 	.history-search { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--fg2); font-size: 12px; }
 	.history-search input { width: min(240px, 30vw); }
+	.history-manager-pager {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 8px 14px;
+		border-bottom: 1px solid var(--border);
+		color: var(--fg3);
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+	}
 	.history-thumb-grid-wrap,
 	.history-table-wrap {
 		flex: 1;

@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.9**
+**Version: v1.11**
 
 ---
 
@@ -1072,12 +1072,10 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - 解釈フィードバック色パレットの確定 (v0.6 で `墨の濃淡` 採用、朱色追加要否)
 - サンプル記述集 (SPEC §14.3 Phase 2)
 - **Saijiki スナップショット UI の復旧** — API と state は残存しているが、v1.9 時点の UI から選択・作成導線が消えている
-- **設定系 UI の実体化または明示的な未実装表示** — DB / プラグイン / ユーザー管理は v1.9 時点では UI prototype で、サーバー設定・認証・プラグイン読込には未接続
-- **履歴管理のスケール対応** — v1.9 の履歴管理ダイアログは全件ロード + 全件 DOM 展開。履歴が数千件規模になる前にサーバー検索 / ページング / 仮想リスト化が必要
+- **履歴管理のスケール対応** — v1.10 の履歴管理ダイアログはログインユーザー単位で全件ロード + 全件 DOM 展開。履歴が数千件規模になる前にサーバー検索 / ページング / 仮想リスト化が必要
 
 ### E. テスト / CI / 運用
 
-- GitHub Actions 等の CI 未設定 (全テスト pentala 手動実行)
 - LLM fixture テストを夜間バッチ化、model × fixture 行列で記録
 - latency / token usage メトリクス収集
 - LLM hallucination エラー回復 (SPEC §12.8) 未実装
@@ -1091,7 +1089,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - **Saijiki 辞書の配信形式** — `web/src/lib/saijiki.ts` 内ハードコード中、将来的に `inku-saijiki` パッケージ
 - **Base Language** — 英語版 Saijiki + 英語 prompt (SPEC §5)
 - **短歌的制約の強化** — 文字数カウント、句跨ぎの扱い
-- **リーダーボード / 作品保存** — ユーザーごとの作品コレクション (P2P or 集約サーバー)
+- **リーダーボード / 作品共有** — v1.10 でユーザーごとの履歴分離は実装済み。グループ内共有・公開作品コレクションは将来機能
 
 ### G. 既に解消済 (参考)
 
@@ -1124,6 +1122,9 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~固定の6色制約~~ → v1.6 で色カタログシステム導入（default + 10文化パレット選択可）
 - ~~キャンバスのズーム不可~~ → v1.6 でズームUI追加（0.5×〜3×）
 - ~~スクロール型レイアウトで全要素の関係が見えにくい~~ → v1.6 で固定ビューポート2ペイン構成に刷新
+- ~~ユーザー管理が prototype UI のみ~~ → v1.10 で認証、ユーザー/グループ管理 API、DB 永続化、権限制御を実装
+- ~~描画履歴が全ユーザーで共有される~~ → v1.10 で `history.user_id` を追加し、履歴取得・保存・削除をログインユーザー単位に分離。既存履歴は初回起動時に admin 所有へ移行
+- ~~DB設定 / プラグイン管理が prototype UI のみ~~ → v1.11 で管理者向け read-only API に接続し、DB は `INKU_DB_URL` 起動時設定、プラグインは未実装であることを UI に明示
 
 ---
 
@@ -1145,13 +1146,15 @@ inku-lang/                         # github.com/oikawas/inku-lang
 │   │   ├── schema.py              # JSON Score Pydantic モデル
 │   │   ├── renderer.py            # Score → SVG (svgwrite)
 │   │   ├── composer.py            # 正規化DDL → Score (Haiku 4.5)
+│   │   ├── db.py                  # 履歴 / ユーザー / セッション DB 層
+│   │   ├── migrate_history.py     # history.json → DB 移行
 │   │   └── coerce.py              # Score 構造補修 (PRIMITIVE_SPECS テーブル駆動)
 │   └── tests/
 │       ├── conftest.py            # dotenv 読込
 │       ├── test_renderer.py       # 10 cases
 │       ├── test_composer.py       # 15 fixture + 厳密比較
 │       ├── test_interpreter.py    # 5 smoke cases (Saijiki 語彙検査)
-│       ├── test_api.py            # FastAPI TestClient 8 cases
+│       ├── test_api.py            # FastAPI TestClient 11 cases
 │       └── fixtures/stage2/       # 正規化DDL ↔ Score ペア
 │           └── {01..15}/{input.txt,expected.json}
 └── web/                           # SvelteKit 2 + Svelte 5 + TS (inku-web 0.1.0)
@@ -1176,10 +1179,10 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
-- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/health`
+- `db.py` — SQLAlchemy DB 層。履歴、ユーザーグループ、ユーザーアカウント、セッションを管理。パスワードは PBKDF2-SHA256 + salt で保存
+- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
-**開発環境 (ローカル運用手順は `LOCAL_WORK.md` を参照、未コミット)**
 
 **別リポジトリ / 別 PoC**:
 - `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
@@ -1188,6 +1191,107 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.11 (2026-04-29)
+
+**設定 UI の実挙動接続**
+
+設定 > DB設定 / プラグインを prototype state からサーバー状態表示へ変更した。
+
+- `GET /api/settings/status` を追加
+- 管理者のみ設定状態を取得可能
+- DB設定タブは現在の SQLAlchemy backend / driver / masked URL / database を表示
+- DB接続はランタイム変更できず、`INKU_DB_URL` 変更後にサーバー再起動が必要であることを明示
+- プラグインタブは reference server では loader 未実装であることをサーバー状態として表示
+- フロントエンド上だけでプラグイン追加・削除・有効化できる prototype UI を廃止
+- 未ログイン、または保存済みセッションが無効な場合、アプリ本体ではなく単体ログイン画面を表示
+- ログインダイアログのパスワード欄は入力内容の表示 / 非表示を切り替え可能
+- ログイン画面の背景に inku 生成 SVG をトリミング配置し、単体ログイン画面としての視認性を改善
+- ログインパネルをコンパクトな寸法と抑えた余白へ調整し、業務利用に適した見た目へ整理
+- ログインパスワードの表示切替をテキストボタンからアイコンボタンへ変更
+- ログイン画面に言語切替ボタンを追加し、ログインフォーム文言も日本語 / English に対応
+- 履歴管理ダイアログは全履歴ロードをやめ、サーバーサイド検索 / 100 件単位ページングで現在ページのみ描画
+- Saijiki スナップショット機能は歳時記 v1 仕様確定まで一旦削除。API / フロント state / `snapshot_id` 配線を撤去し、後続仕様で再実装する
+- 出力ファイル保存は SVG/JSON/入力/DDL を PNG 変換と分離し、`cairosvg` 未導入や filesystem / PNG 変換エラーをサーバーログへ記録
+- バッチ描画は行単位の成功 / 失敗サマリーを表示し、失敗した入力行とエラー内容をユーザーが確認できる
+- バッチ入力欄は行番号と入力行がズレないよう、行番号と textarea の文字設定を揃え、長い行は折り返さず横スクロールで扱う
+- Web UI は SvelteKit フロントエンドと FastAPI バックエンドの 2 プロセス構成で動作し、開発時はフロントエンドから `/api/*` をバックエンドへ proxy する
+
+### v1.10 (2026-04-29)
+
+
+#### 認証 / ユーザー管理
+
+設定 > ユーザー管理タブを prototype UI から DB/API 接続済みの管理画面へ更新した。
+
+- ユーザーアカウントを DB に永続化
+- アカウント属性:
+  - ユーザー名
+  - メールアドレス
+  - パスワード
+  - ユーザー種類
+  - 所属ユーザーグループ
+- ユーザー種類:
+  - 管理者: 全設定、ユーザー管理、ユーザーグループ追加・削除・管理が可能
+  - グループリード: 自分のユーザーグループ内の一般ユーザー管理が可能
+  - ユーザー: 作品制作が可能
+- ユーザーグループは教室やイベントのチーム単位として扱う。グループ内作品共有は将来機能
+- パスワードは PBKDF2-SHA256 + 16 byte salt + 310,000 iterations でハッシュ化して保存
+- セッション token は SHA-256 hash のみ DB に保存
+- 初回起動時、ユーザーが存在しない場合は bootstrap admin を作成
+  - username: `admin`
+  - email: `admin@local`
+  - password: `inku-admin`
+  - 環境変数 `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` / `INKU_BOOTSTRAP_ADMIN_PASSWORD` で上書き可
+
+#### ユーザー管理 API
+
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `GET /api/user-groups`
+- `POST /api/user-groups`
+- `DELETE /api/user-groups/{group_id}`
+- `GET /api/users`
+- `POST /api/users`
+- `PATCH /api/users/{user_id}`
+- `DELETE /api/users/{user_id}`
+
+権限制御:
+
+- 管理者は全ユーザー / 全グループを管理できる
+- グループリードは自グループ内の一般ユーザーのみ作成・変更・削除できる
+- グループリードは role 昇格、他グループ移動、グループ作成・削除はできない
+- 一般ユーザーはユーザー管理 API を利用できない
+
+#### ユーザー管理 UI
+
+- 未ログイン時はログイン UI を表示
+- ログイン後、現在ユーザー / 権限 / 所属グループを表示
+- 管理者 / グループリードの場合:
+  - ユーザー追加パネル
+  - ユーザー変更パネル
+  - ユーザー一覧の変更 / 削除操作
+- 管理者の場合:
+  - グループ追加
+  - グループ削除
+- グループリードの場合:
+  - 追加ユーザーの role は `user` に固定
+  - 所属グループは自グループに固定
+
+#### ユーザー別履歴保存
+
+履歴 DB をユーザー単位に分離した。
+
+- `history.user_id` カラム追加
+- 既存履歴は初回起動時マイグレーションで admin 所有に移行
+- `GET /api/history` はログインユーザーの履歴のみ返す
+- `POST /api/history` はログインユーザーの履歴として保存
+- `DELETE /api/history` / trash / restore / permanent-delete はログインユーザーの履歴 ID のみ対象
+- 他ユーザーの履歴 ID を指定しても変更されない
+- 履歴を持つユーザー削除は孤立データ防止のため拒否する
+- 出力ファイル保存先は `outputs/{user_id}/YYYY-MM-DD/...` へ分離
+- 旧 `history.json` 移行スクリプトも admin 所有として取り込む
 
 ### v1.9 (2026-04-29)
 
@@ -1234,7 +1338,7 @@ UI 上の作品生成表現を「演奏」から「描画」へ寄せた。
   - 白背景時アルファチャンネル設定 On/Off
   - 解釈を再編集した場合も新バージョンとして保存する On/Off
 
-**注意**: v1.9 時点で DB / プラグイン / ユーザー管理はフロントエンド上の prototype UI。実 DB 接続変更、認証、プラグイン読込には未接続。
+**注意**: v1.9 時点では DB / プラグイン / ユーザー管理はフロントエンド上の prototype UI だった。v1.10 でユーザー管理は DB/API 接続済みとなったが、DB設定変更とプラグイン読込は引き続き未接続。
 
 #### 履歴ストリップ / 履歴管理
 
@@ -1274,18 +1378,9 @@ UI 上の作品生成表現を「演奏」から「描画」へ寄せた。
 - `web/BUILD_NUMBER` を Git 追跡対象に変更
 - アプリに変更を加えるたびに `BUILD_NUMBER` を明示的に更新する運用へ移行
 
-#### pentala 同期安全化
-
-rsync 手打ちミスにより `web/src/` の中身が pentala の `web/` 直下に展開された問題を受け、検証同期用スクリプトを追加。
-
-- `scripts/sync-web-to-pentala.sh`
-  - `web/src/` は必ず `~/inku-lang/web/src/` へ同期
-  - `web/vite.config.ts` と `web/BUILD_NUMBER` は `~/inku-lang/web/` へ同期
-  - 同期後に `web/routes`, `web/lib`, `web/app.html`, `web/app.d.ts` が誤配置されていないことを検査
-
 #### 既知課題（v1.9 review）
 
-- 設定ダイアログの DB / プラグイン / ユーザー管理は実処理に未接続
+- 設定ダイアログの DB / プラグインは実処理に未接続。ユーザー管理は v1.10 で実装済み
 - Saijiki スナップショットの UI 導線が消えている
 - 履歴管理は全件ロード + 全件 DOM 展開のため、大量履歴ではサーバー検索 / ページング / 仮想リスト化が必要
 - 出力ファイル保存の失敗がサーバーログにも UI にも出ない
@@ -1394,7 +1489,7 @@ Stage 1 解釈時に感情語を検出し、DDL語彙への変換ヒントを入
 
 #### 接続設定ポップオーバー
 
-Stage 1 / Stage 2 モデル選択 + スナップショット選択を「⚙ 接続設定」ボタン → ポップオーバーに集約。旧 model-row / snapshot-row は廃止。
+Stage 1 / Stage 2 モデル選択を「⚙ 接続設定」ボタン → ポップオーバーに集約。旧 model-row は廃止。スナップショット選択は v1.11 で歳時記 v1 仕様確定まで削除。
 
 #### 再演奏機能
 
@@ -1437,24 +1532,11 @@ type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
 
 ### v1.5 (2026-04-26)
 
-**UI fix: canvas max-height + 履歴サムネイル重複キー修正 / デプロイフロー整備**
 
 #### UI 修正
 
 - **canvas max-height 追加**: `.canvas { max-height: 480px }` を設定。`aspect-ratio: 1/1` のみでは canvas がビューポート幅（~560px）まで拡大し、history strip がビューポート外に押し出されていた問題を修正
 - **履歴 each キー修正**: `{#each historyItems as it, i (it.at)}` → `(it.id ?? it.at)`。同一タイムスタンプで複数アイテムが記録された場合の重複キーを解消。`Iteration` 型に `id?: string` 追加
-
-#### デプロイフロー整備
-
-pentala (Ubuntu dev server) との同期ミスが発生した教訓から、運用フローを整備。
-
-**問題の経緯**: rsync で直接転送後に git push を省略 → pentala の working tree に untracked/modified ファイルが残存 → 次回 `git pull` が "would be overwritten by merge" で失敗 → 手動での git stash + rm + pull + stash drop が必要になった
-
-**改善内容**:
-- `no-git-sync/scripts/deploy.sh` 作成: `git push` → pentala `git pull` → `systemctl --user restart inku-server.service` をワンコマンド化
-- `no-git-sync/scripts/sync-reset.sh` 作成: pentala の WT を `git reset --hard origin/main` でリセットするリカバリ用スクリプト
-- `LOCAL_WORK.md` 更新: rsync 後は必ず deploy.sh で完結させるルールを明文化、コンフリクト解消手順を改訂
-- スクリプトは `no-git-sync/`（gitignore 済み）に配置 — ローカル環境依存のため
 
 ### v1.4 (2026-04-26)
 SPEC.mdの内容精査。
@@ -1464,6 +1546,8 @@ SPEC.mdの内容精査。
 **Saijiki スナップショット + トークン表示 + ダウンロード + i18n**
 
 #### Saijiki スナップショット
+
+**注記**: この機能は v1.11 で歳時記 v1 仕様確定まで一旦削除。以下は v1.3 時点の履歴として残す。
 
 特定時点のシステムプロンプト状態を名前付きで保存・呼び出す機能を追加。
 
@@ -1739,7 +1823,6 @@ localStorage の容量制限を解消し、セッション跨ぎの履歴を実�
   - その他 → OVMS (ローカル OpenAI 互換)
 - UI: プロバイダー選択 (NVIDIA NIM / Anthropic / ローカル) + モデル選択の 2 段 dropdown、localStorage 永続化
 - `web/src/lib/models.ts` に `PROVIDER_GROUPS` 構造を追加
-- NVIDIA_API_KEY は `no-git-sync/.env` + systemd `EnvironmentFile=` で管理
 
 #### arrangement フィールド (本数・個数の JSON サイズ問題)
 
@@ -1831,7 +1914,6 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
   - `POST /api/interpret`: 自由記述 → 正規化DDL
   - `POST /api/paint`: 自由記述 → 正規化DDL → Score → SVG (フルパイプライン)
   - 既存 `POST /api/compose`, `GET /health` は維持
-  - FastAPI 既定 port を `8000 → 8100` へ変更 (pentala 上で 8000 が他サービスと衝突)
   - 起動時 env: `INKU_SERVER_HOST`, `INKU_SERVER_PORT` で上書き可
 
 - **Stage 2 fidelity 記録 (qwen-api strict モード)**
@@ -1850,11 +1932,6 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
   - 反復履歴: in-memory、最大 20 件、`◀ N/M ▶` 移動ボタンで input/output/DDL を過去状態に復元
   - サムネイル列: 履歴 2 件以上で下段に 96px 方形ミニチュア SVG を横並べ、クリックで jump
 
-- **運用 / 非公開メモ**
-  - `LOCAL_WORK.md` に同期フロー・起動手順・トラブルシュートを集約 (gitignore 済)
-  - Mac は SSH tunnel or `http://pentala:5173` でブラウザアクセス、コード編集のみ
-  - dev server は pentala 上で nohup 常駐 (`/tmp/inku-server.log`, `/tmp/inku-web.log`)
-
 ### v0.5 (2026-04-23)
 
 **Phase 1 続き — FastAPI + Web クライアント 立ち上げ**
@@ -1870,15 +1947,9 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
 - **SvelteKit Web クライアント (`web/`)**
   - SvelteKit 2.57 + Svelte 5.55 (runes モード) + Vite 8 + TypeScript
   - 単一ルート `/`: 記述 textarea + 演奏 (SVG インライン表示) + 楽譜 (JSON Score collapsible)
-  - Vite dev proxy: `/api` → `http://127.0.0.1:8000` (CORS 回避)
   - スタイル: Renderer パレットと整合 (背景 #f7f5ef, 墨 #111)、和文フォント優先
   - 名前: `inku-web` v0.1.0
   - svelte-check: 0 error, 0 warning
-
-- **ホスト構成**
-  - server + web ともに pentala (Ubuntu 22.04.5) で常時起動
-  - Mac はブラウザクライアント専用 (SSH tunnel `-L 5173 -L 8000`)
-  - Node.js 22.22.2 (NodeSource apt、システム PATH)、Python 3.10.12 + uv
 
 - **次段階への布石**
   - `/api/compose` は Stage 2 のみ。Stage 1 (Opus 解釈) エンドポイントは未実装
@@ -1891,7 +1962,6 @@ N 個の instruction を展開すると JSON が N 倍になる問題を解決�
 
 - **リポジトリ構成**
   - `inku-lang` リポジトリを GitHub (`github.com/oikawas/inku-lang`) に作成
-  - 開発フロー: `pentala` (Ubuntu 22.04.5) 中心開発 + Mac git sync
   - `server/` と `web/` の2スロット構成。`server/` 先行実装
 
 - **Python プロジェクト: inku-server 0.1.0**

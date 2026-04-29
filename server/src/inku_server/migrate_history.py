@@ -15,14 +15,17 @@ from . import db as _db
 from .db import SessionLocal, HistoryRow
 
 
-def _output_prefix_for(item_id: str, at_ms: int, output_dir: Path) -> Path:
+def _output_prefix_for(user_id: str, item_id: str, at_ms: int, output_dir: Path) -> Path:
     dt = datetime.fromtimestamp(at_ms / 1000, tz=timezone.utc).astimezone()
-    date_dir = output_dir / dt.strftime("%Y-%m-%d")
+    date_dir = output_dir / user_id / dt.strftime("%Y-%m-%d")
     return date_dir / (dt.strftime("%Y%m%d_%H%M%S") + "_" + item_id[:8])
 
 
 def migrate(json_path: Path, output_dir: Path) -> None:
     _db.init_db()
+    owner_id = _db.admin_history_owner_id()
+    if not owner_id:
+        raise RuntimeError("admin user is required before migrating history")
 
     items = json.loads(json_path.read_text(encoding="utf-8"))
     print(f"source: {len(items)} items")
@@ -39,10 +42,11 @@ def migrate(json_path: Path, output_dir: Path) -> None:
                 continue
 
             at_ms = item.get("at", 0)
-            prefix = _output_prefix_for(item_id, at_ms, output_dir)
+            prefix = _output_prefix_for(owner_id, item_id, at_ms, output_dir)
 
             row = HistoryRow(
                 id=item_id,
+                user_id=owner_id,
                 at=at_ms,
                 input=item.get("input", ""),
                 ddl=item.get("ddl"),

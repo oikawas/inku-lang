@@ -12,7 +12,7 @@ import struct
 
 import svgwrite
 
-from .schema import Arrangement, Instruction, Score, Variation
+from .schema import Instruction, Score, Variation
 
 CANVAS_PX = 1000
 

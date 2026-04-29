@@ -21,6 +21,23 @@ def test_render_single_line_solid_pen_black():
     assert "stroke-dasharray" not in svg
 
 
+def test_render_wraps_primitives_in_canvas_clip():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [-0.2, 0.5],
+                    "to": [1.2, 0.5],
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert 'clip-path="url(#canvas-clip)"' in svg
+    assert "<clipPath" in svg
+
+
 def test_render_dashed_line_has_dasharray():
     score = Score.model_validate(
         {

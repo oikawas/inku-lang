@@ -321,6 +321,10 @@ def render(score: Score, color_map: dict[str, str] | None = None) -> str:
     )
     bg = cmap.get(score.background, BACKGROUND)
     dwg.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX), fill=bg))
+    clip_id = "canvas-clip"
+    clip = dwg.defs.add(dwg.clipPath(id=clip_id))
+    clip.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX)))
+    content = dwg.g(clip_path=f"url(#{clip_id})")
 
     blur_needed: dict[str, float] = {}
     blur_elems: list[tuple[str, str]] = []
@@ -338,9 +342,10 @@ def render(score: Score, color_map: dict[str, str] | None = None) -> str:
                     eid = f"e{elem_idx}"
                     element["id"] = eid
                     blur_elems.append((eid, v.amplitude))
-                dwg.add(element)
+                content.add(element)
             elem_idx += 1
 
+    dwg.add(content)
     svg = dwg.tostring()
     if blur_elems:
         svg = _inject_blur_filters(svg, blur_needed, blur_elems)

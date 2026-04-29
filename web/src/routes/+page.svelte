@@ -1141,6 +1141,31 @@
 		return getCatalogById(id ?? 'default')?.name ?? 'inku Default';
 	}
 
+	function svgClipId(it: Iteration, scope: string): string {
+		return `thumb-clip-${scope}-${String(it.id ?? it.at).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+	}
+
+	function clippedHistorySvg(it: Iteration, scope: string): string {
+		if (!it.svg) return '';
+		const id = svgClipId(it, scope);
+		const viewBox = it.svg.match(/\sviewBox="([^"]+)"/)?.[1]?.split(/\s+/).map(Number);
+		const [x, y, w, h] = viewBox && viewBox.length === 4 && viewBox.every(Number.isFinite)
+			? viewBox
+			: [0, 0, 1000, 1000];
+		const clip = `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath></defs><g clip-path="url(#${id})">`;
+		return it.svg
+			.replace(/(<svg\b[^>]*)(>)/, (_match, open, close) => {
+				const attrs = String(open)
+					.replace(/\s+overflow="[^"]*"/g, '')
+					.replace(/\s+style="([^"]*)"/, (_styleMatch: string, style: string) => ` style="${style};overflow:hidden"`);
+				const withOverflow = attrs.includes(' style=')
+					? attrs
+					: `${attrs} style="overflow:hidden"`;
+				return `${withOverflow} overflow="hidden"${close}${clip}`;
+			})
+			.replace(/<\/svg>\s*$/i, '</g></svg>');
+	}
+
 	function formatHistoryDate(at: number): string {
 		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
 	}
@@ -1891,7 +1916,7 @@
 							<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 						</div>
-						<div class="thumb-svg">{@html it.svg}</div>
+						<div class="thumb-svg">{@html clippedHistorySvg(it, 'strip')}</div>
 						<div class="thumb-meta">
 							<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyIndexLabel(i))}</span>
 							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
@@ -2274,7 +2299,7 @@
 									<div>{t().historyTooltipTokens}: {historyTokenSummary(it)}</div>
 									<div class="tooltip-date">{historyPreviewText(it.input)}</div>
 								</div>
-								<div class="thumb-svg">{@html it.svg}</div>
+								<div class="thumb-svg">{@html clippedHistorySvg(it, 'manager')}</div>
 								<div class="thumb-meta">
 									<span class="thumb-time">{formatElapsed(it.elapsed_ms)}</span>
 									{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
@@ -2302,7 +2327,7 @@
 						{#each managedHistoryItems as it (it.id ?? it.at)}
 							<tr>
 								<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} /></td>
-								<td><div class="history-mini">{@html it.svg}</div></td>
+								<td><div class="history-mini">{@html clippedHistorySvg(it, 'table')}</div></td>
 								<td>{formatHistoryDate(it.at)}</td>
 								<td>{historyModelSummary(it)}</td>
 								<td>{formatElapsed(it.elapsed_ms)}</td>
@@ -3165,7 +3190,13 @@
 		text-overflow: ellipsis;
 	}
 	.tooltip-date { color: rgba(255,255,255,0.55); margin-top: 3px; }
-	.thumb-svg { width: 82px; height: 58px; overflow: hidden; }
+	.thumb-svg {
+		width: 82px; height: 58px;
+		overflow: hidden;
+		overflow: clip;
+		clip-path: inset(0);
+		contain: paint;
+	}
 	.thumb-svg :global(svg) {
 		width: 100%;
 		height: 100%;
@@ -3712,7 +3743,14 @@
 		border: 1px solid var(--border); padding: 7px 8px; text-align: left; vertical-align: middle;
 	}
 	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
-	.history-mini { width: 48px; height: 36px; overflow: hidden; background: #fff; border: 1px solid var(--border); }
+	.history-mini {
+		width: 48px; height: 36px;
+		overflow: hidden;
+		overflow: clip;
+		clip-path: inset(0);
+		contain: paint;
+		background: #fff; border: 1px solid var(--border);
+	}
 	.history-mini :global(svg) {
 		width: 100%;
 		height: 100%;

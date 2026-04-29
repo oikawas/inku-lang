@@ -22,6 +22,9 @@
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
 	const CATALOG_KEY         = 'inku-color-catalog';
+	const SHOW_BIRDS_KEY      = 'inku-show-birds';
+	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
+	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 
 	type Score = { instructions: unknown[] };
 
@@ -61,6 +64,14 @@
 		enabled: boolean;
 	};
 
+	type UserRole = '管理者' | 'グループリード' | 'ユーザー';
+	type UserItem = {
+		id: string;
+		name: string;
+		password: string;
+		group: UserRole;
+	};
+
 	// ── Input ───────────────────────────────────────────────
 	let inputMode   = $state<'single' | 'batch'>('single');
 	let input       = $state('山の向こうに月が昇る');
@@ -87,7 +98,7 @@
 	let windowWidth  = $state(1200);
 	let saijikiOpen  = $state(false);
 	let settingsOpen = $state(false);
-	let settingsTab  = $state<'connection' | 'db' | 'plugins'>('connection');
+	let settingsTab  = $state<'connection' | 'db' | 'plugins' | 'users' | 'misc'>('connection');
 	let pngMenuOpen  = $state(false);
 	let catalogOpen  = $state(false);
 	let statsOpen    = $state(false);
@@ -97,6 +108,10 @@
 	let zoom         = $state(1);
 	let promptStage1Expanded = $state(false);
 	let promptStage2Expanded = $state(false);
+	let showBirds = $state(true);
+	let pngAlphaWhite = $state(false);
+	let saveReplayAsNewVersion = $state(true);
+	let miscSettingsLoaded = $state(false);
 
 	// DOM refs for outside-click handling
 	let pngWrapEl      = $state<HTMLDivElement | null>(null);
@@ -135,6 +150,14 @@
 	let pluginAddOpen = $state(false);
 	let pluginPath = $state('');
 	let pluginPendingDelete = $state<PluginItem | null>(null);
+	let users = $state<UserItem[]>([
+		{ id: 'admin', name: 'admin', password: '', group: '管理者' },
+	]);
+	let groups = $state<UserRole[]>(['管理者', 'グループリード', 'ユーザー']);
+	let newUserName = $state('');
+	let newUserPassword = $state('');
+	let newUserGroup = $state<UserRole>('ユーザー');
+	let newGroupName = $state('');
 
 	function testDbConnection() {
 		dbTestResult = dbType === 'sqlite'
@@ -150,6 +173,43 @@
 		plugins = [...plugins, { id: `${Date.now()}`, name, version: 'local', enabled: true }];
 		pluginPath = '';
 		pluginAddOpen = false;
+	}
+
+	function addUser() {
+		const name = newUserName.trim();
+		if (!name) return;
+		users = [...users, { id: `${Date.now()}`, name, password: newUserPassword, group: newUserGroup }];
+		newUserName = '';
+		newUserPassword = '';
+		newUserGroup = groups.includes('ユーザー') ? 'ユーザー' : groups[0];
+	}
+
+	function removeUser(id: string) {
+		users = users.filter((user) => user.id !== id);
+	}
+
+	function addGroup() {
+		const name = newGroupName.trim() as UserRole;
+		if (!name || groups.includes(name)) return;
+		groups = [...groups, name];
+		newGroupName = '';
+		if (!newUserGroup) newUserGroup = name;
+	}
+
+	function removeGroup(group: UserRole) {
+		if (groups.length <= 1) return;
+		groups = groups.filter((g) => g !== group);
+		const fallback = groups[0];
+		users = users.map((user) => user.group === group ? { ...user, group: fallback } : user);
+		if (newUserGroup === group) newUserGroup = fallback;
+	}
+
+	function persistMiscSettings() {
+		try {
+			localStorage.setItem(SHOW_BIRDS_KEY, showBirds ? '1' : '0');
+			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
+			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
+		} catch {}
 	}
 
 	// ── 感情語 → DDL ヒント ──────────────────────────────────
@@ -352,6 +412,7 @@
 		if (!ddl || reloading) return;
 		reloading = true; reloadError = null;
 		const lang = getLang();
+		const startedAt = Date.now();
 		try {
 			const r = await fetch('/api/compose', {
 				method: 'POST',
@@ -363,9 +424,28 @@
 				throw new Error(d.detail ?? `HTTP ${r.status}`);
 			}
 			const d = await r.json() as { score: Score; svg: string; tokens_in: number | null; tokens_out: number | null };
+			const elapsedMs = Date.now() - startedAt;
 			result = result
 				? { ...result, score: d.score, svg: d.svg }
-				: { score: d.score, svg: d.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				: { score: d.score, svg: d.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+			if (result) {
+				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+			}
+			if (saveReplayAsNewVersion) {
+				await pushHistory({
+					input,
+					ddl,
+					score: d.score,
+					svg: d.svg,
+					at: Date.now(),
+					elapsed_ms: elapsedMs,
+					stage1_model: stage1Model,
+					stage2_model: stage2Model,
+					tokens_in: d.tokens_in,
+					tokens_out: d.tokens_out,
+					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
+				});
+			}
 			outputTab = 'canvas';
 		} catch (e) {
 			reloadError = e instanceof Error ? e.message : String(e);
@@ -578,7 +658,9 @@
 				const canvas = document.createElement('canvas');
 				canvas.width = size; canvas.height = size;
 				const ctx = canvas.getContext('2d')!;
-				ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+				if (!pngAlphaWhite) {
+					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+				}
 				const img = new Image();
 				img.onload = () => {
 					ctx.drawImage(img, 0, 0, size, size);
@@ -655,12 +737,20 @@
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
+			const birds = localStorage.getItem(SHOW_BIRDS_KEY); if (birds !== null) showBirds = birds !== '0';
+			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
+			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
+			miscSettingsLoaded = true;
 		} catch {}
 
 		return () => window.removeEventListener('resize', onResize);
 	});
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
+	$effect(() => {
+		showBirds; pngAlphaWhite; saveReplayAsNewVersion;
+		if (miscSettingsLoaded) persistMiscSettings();
+	});
 </script>
 
 <svelte:window onkeydown={handleKeydown} onclick={handleDocClick} />
@@ -698,7 +788,7 @@
 
 	<!-- ══ BODY ══ -->
 	<div class="body">
-		{#if loading || reloading}
+		{#if showBirds && (loading || reloading)}
 			<div class="flying-bird-layer" aria-hidden="true">
 				<div class="flying-bird-y">
 					<div class="flying-bird-x">
@@ -779,11 +869,13 @@
 						</div>
 						<div class="progress-bar-track">
 							<div class="progress-bar-fill" style="width: {stageLabel.includes('構造化') ? '65' : '30'}%"></div>
-							<svg class="progress-bird" class:done={!loading} width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
-								<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
-									<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
-								</path>
-							</svg>
+							{#if showBirds}
+								<svg class="progress-bird" class:done={!loading} width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
+									<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
+										<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
+									</path>
+								</svg>
+							{/if}
 						</div>
 						<div class="progress-stage-text">{stageLabel}</div>
 					{:else if loading && batchTotal > 0}
@@ -846,11 +938,13 @@
 							</div>
 							<div class="progress-bar-track">
 								<div class="progress-bar-fill" style="width: 55%"></div>
-								<svg class="progress-bird" width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
-									<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
-										<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
-									</path>
-								</svg>
+								{#if showBirds}
+									<svg class="progress-bird" width="8" height="6" viewBox="0 0 8 6" aria-hidden="true">
+										<path fill="none" stroke="#6b7b2a" stroke-width="1.2" opacity="0.7">
+											<animate attributeName="d" values="M0,3 Q2,1 4,3 Q6,1 8,3;M0,3 Q2,5 4,3 Q6,5 8,3;M0,3 Q2,1 4,3 Q6,1 8,3" dur="0.4s" repeatCount="indefinite" />
+										</path>
+									</svg>
+								{/if}
 							</div>
 						{/if}
 						{#if reloadError}<p class="error-text">{reloadError}</p>{/if}
@@ -1086,6 +1180,8 @@
 			<button class:active={settingsTab === 'connection'} onclick={() => (settingsTab = 'connection')}>接続設定</button>
 			<button class:active={settingsTab === 'db'} onclick={() => (settingsTab = 'db')}>DB設定</button>
 			<button class:active={settingsTab === 'plugins'} onclick={() => (settingsTab = 'plugins')}>プラグイン</button>
+			<button class:active={settingsTab === 'users'} onclick={() => (settingsTab = 'users')}>ユーザー管理</button>
+			<button class:active={settingsTab === 'misc'} onclick={() => (settingsTab = 'misc')}>その他</button>
 		</div>
 		<div class="settings-body">
 			{#if settingsTab === 'connection'}
@@ -1170,7 +1266,7 @@
 					<button class="ghost-btn" onclick={testDbConnection}>接続テスト</button>
 					{#if dbTestResult}<span class="db-test-result">{dbTestResult}</span>{/if}
 				</div>
-			{:else}
+			{:else if settingsTab === 'plugins'}
 				<div class="plugin-list">
 					{#each plugins as plugin (plugin.id)}
 						<div class="plugin-row">
@@ -1197,6 +1293,71 @@
 						<button class="danger-btn" onclick={() => { plugins = plugins.filter((p) => p.id !== pluginPendingDelete?.id); pluginPendingDelete = null; }}>削除</button>
 					</div>
 				{/if}
+			{:else if settingsTab === 'users'}
+				<div class="popover-group">
+					<div class="popover-group-label">ユーザー</div>
+					<div class="user-add-grid">
+						<input bind:value={newUserName} placeholder="ユーザー名" />
+						<input bind:value={newUserPassword} type="password" placeholder="パスワード" />
+						<select bind:value={newUserGroup}>
+							{#each groups as group (group)}
+								<option value={group}>{group}</option>
+							{/each}
+						</select>
+						<button class="ghost-btn" onclick={addUser}>追加</button>
+					</div>
+					<div class="user-list">
+						{#each users as user (user.id)}
+							<div class="user-row">
+								<input value={user.name} onchange={(e) => { user.name = (e.currentTarget as HTMLInputElement).value; users = [...users]; }} />
+								<input type="password" value={user.password} onchange={(e) => { user.password = (e.currentTarget as HTMLInputElement).value; users = [...users]; }} />
+								<select value={user.group} onchange={(e) => { user.group = (e.currentTarget as HTMLSelectElement).value as UserRole; users = [...users]; }}>
+									{#each groups as group (group)}
+										<option value={group}>{group}</option>
+									{/each}
+								</select>
+								<button class="ghost-btn" onclick={() => removeUser(user.id)}>削除</button>
+							</div>
+						{/each}
+					</div>
+				</div>
+				<div class="popover-group">
+					<div class="popover-group-label">グループ</div>
+					<div class="plugin-add">
+						<input bind:value={newGroupName} placeholder="グループ名" />
+						<button class="ghost-btn" onclick={addGroup}>追加</button>
+					</div>
+					<div class="group-list">
+						{#each groups as group (group)}
+							<div class="group-row">
+								<span>{group}</span>
+								<button class="ghost-btn" onclick={() => removeGroup(group)} disabled={groups.length <= 1}>削除</button>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{:else}
+				<div class="popover-group">
+					<div class="popover-group-label">表示</div>
+					<label class="setting-toggle">
+						<input type="checkbox" bind:checked={showBirds} />
+						<span>小鳥を表示する</span>
+					</label>
+				</div>
+				<div class="popover-group">
+					<div class="popover-group-label">書き出し</div>
+					<label class="setting-toggle">
+						<input type="checkbox" bind:checked={pngAlphaWhite} />
+						<span>白背景時アルファチャンネルを有効にする</span>
+					</label>
+				</div>
+				<div class="popover-group">
+					<div class="popover-group-label">履歴</div>
+					<label class="setting-toggle">
+						<input type="checkbox" bind:checked={saveReplayAsNewVersion} />
+						<span>解釈を再編集した場合も新バージョンとして保存する</span>
+					</label>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -1465,24 +1626,26 @@
 
 	.flying-bird-layer {
 		position: fixed;
-		top: 54px;
+		top: 0;
 		left: 0;
-		width: 440px;
-		height: calc(100vh - 136px);
+		width: min(820px, 100vw);
+		height: min(620px, 72vh);
 		pointer-events: none;
-		z-index: 50;
+		z-index: 260;
 		overflow: hidden;
 	}
 	.flying-bird-y {
 		position: absolute;
-		animation: freeBirdY 6.5s ease-in-out infinite;
+		animation: freeBirdY 15s ease-in-out infinite;
 	}
 	.flying-bird-x {
 		position: relative;
-		animation: freeBirdX 4.8s ease-in-out infinite;
+		animation: freeBirdX 18s ease-in-out infinite;
 	}
 	.flying-bird {
-		filter: drop-shadow(0 2px 4px rgba(107,123,42,0.3));
+		width: 76px;
+		height: 56px;
+		filter: drop-shadow(0 4px 8px rgba(107,123,42,0.28));
 	}
 
 	/* ── Left panel ─────────────────────────────────────────── */
@@ -1908,10 +2071,24 @@
 	}
 	.history-title { font-size: 12px; font-weight: 500; color: var(--fg2); }
 	.history-title-btn {
-		border: none; background: none; color: var(--fg2);
-		font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
+		border: 1px solid var(--border2);
+		border-radius: 16px;
+		background: #fff;
+		color: var(--fg2);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+		padding: 5px 12px;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+		transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
 	}
-	.history-title-btn:hover { color: var(--fg); }
+	.history-title-btn:hover {
+		color: var(--fg);
+		background: var(--accent-light);
+		border-color: var(--accent);
+		box-shadow: 0 2px 8px rgba(42,74,114,0.16);
+	}
 	.history-count { color: var(--fg3); font-weight: 400; }
 	.history-page-nav { display: flex; align-items: center; gap: 6px; }
 	.history-page-indicator { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; }
@@ -2117,6 +2294,50 @@
 	.plugin-row:last-child { border-bottom: none; }
 	.plugin-version { color: var(--fg3); font-size: 11px; }
 	.plugin-add { display: flex; gap: 8px; align-items: center; }
+	.user-add-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px auto;
+		gap: 8px;
+		align-items: center;
+	}
+	.user-add-grid input, .user-add-grid select,
+	.user-row input, .user-row select {
+		min-width: 0; padding: 5px 7px;
+		border: 1px solid var(--border2); border-radius: var(--r);
+		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+	}
+	.user-list, .group-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-top: 10px;
+	}
+	.user-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px auto;
+		gap: 8px;
+		align-items: center;
+	}
+	.group-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		background: #fff;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		padding: 7px 9px;
+		font-size: 12px;
+		color: var(--fg2);
+	}
+	.setting-toggle {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 12px;
+		color: var(--fg2);
+		cursor: pointer;
+	}
 	.inline-confirm {
 		display: flex; align-items: center; gap: 8px; justify-content: flex-end;
 		background: #fff; border: 1px solid var(--border); border-radius: var(--r);
@@ -2171,21 +2392,21 @@
 		100% { left: calc(100% + 4px); }
 	}
 	@keyframes freeBirdX {
-		0% { transform: translateX(30px); }
-		18% { transform: translateX(340px); }
-		35% { transform: translateX(120px); }
-		52% { transform: translateX(390px); }
-		68% { transform: translateX(60px); }
-		83% { transform: translateX(280px); }
-		100% { transform: translateX(30px); }
+		0% { transform: translateX(24px); }
+		16% { transform: translateX(min(680px, calc(100vw - 110px))); }
+		34% { transform: translateX(180px); }
+		52% { transform: translateX(min(730px, calc(100vw - 86px))); }
+		70% { transform: translateX(70px); }
+		86% { transform: translateX(min(520px, calc(100vw - 130px))); }
+		100% { transform: translateX(24px); }
 	}
 	@keyframes freeBirdY {
-		0% { top: 70px; }
-		22% { top: 220px; }
-		38% { top: 40px; }
-		55% { top: 180px; }
-		70% { top: 20px; }
-		85% { top: 140px; }
-		100% { top: 70px; }
+		0% { top: 78px; }
+		18% { top: min(430px, calc(72vh - 90px)); }
+		36% { top: 48px; }
+		54% { top: min(340px, calc(72vh - 120px)); }
+		72% { top: 24px; }
+		88% { top: min(260px, calc(72vh - 110px)); }
+		100% { top: 78px; }
 	}
 </style>

@@ -1139,8 +1139,10 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ├── SPEC.md                        # 本書（設計哲学・言語設計）
 ├── CLAUDE.md                      # Claude Code 用コンテキスト (gitignore)
 ├── ops/
-│   └── systemd/
+│   ├── systemd/
 │       └── inku-vite.service      # pentala Vite dev system service unit
+│   └── sudoers/
+│       └── ddl-server-inku-vite   # ddl-server 用 Vite restart NOPASSWD sudoers 片
 ├── server/                        # Python バックエンド (uv管理)
 │   ├── pyproject.toml             # inku-server 0.1.0
 │   ├── uv.lock
@@ -1302,6 +1304,8 @@ pentala の Vite dev server を user service ではなく system service とし�
 - `ops/systemd/inku-vite.service` を追加
 - `/etc/systemd/system/inku-vite.service` へ配置して `sudo systemctl enable --now inku-vite.service` で常駐させる運用へ変更
 - `LOCAL_WORK.md` / `AGENTS.md` に操作手順を記録
+- `ops/sudoers/ddl-server-inku-vite` を `/etc/sudoers.d/ddl-server-inku-vite` に配置すると、`ddl-server` は `sudo systemctl restart inku-vite.service` のみパスワードなしで実行できる
+- pentala 上では `scripts/install-vite-sudoers.sh` を一度だけ sudo パスワード付きで実行し、以後は SSH 越しにパスワードなし restart できる
 
 ### v1.9 (2026-04-29)
 

@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.11**
+**Version: v1.12**
 
 ---
 
@@ -1125,6 +1125,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~ユーザー管理が prototype UI のみ~~ → v1.10 で認証、ユーザー/グループ管理 API、DB 永続化、権限制御を実装
 - ~~描画履歴が全ユーザーで共有される~~ → v1.10 で `history.user_id` を追加し、履歴取得・保存・削除をログインユーザー単位に分離。既存履歴は初回起動時に admin 所有へ移行
 - ~~DB設定 / プラグイン管理が prototype UI のみ~~ → v1.11 で管理者向け read-only API に接続し、DB は `INKU_DB_URL` 起動時設定、プラグインは未実装であることを UI に明示
+- ~~履歴保存時に Web UI から送られた SVG を DB に保存できる~~ → v1.12 で `/api/paint` が生成直後に履歴保存し、Web UI から履歴保存用 SVG を送り返さない形へ変更。互換用 `POST /api/history` でもリクエスト `svg` は無視してサーバー側で再レンダリングする
 
 ---
 
@@ -1191,6 +1192,20 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.12 (2026-04-29)
+
+**履歴SVGのサーバー側保存**
+
+履歴保存時に Web UI から送られた SVG を DB に保存する経路を廃止した。
+
+- `/api/paint` は Stage 1 / Stage 2 / SVG レンダリング完了後、必要に応じてその場で履歴DBへ保存する
+- `/api/paint` のレスポンスに `history_id` / `history_at` を追加
+- Web UI の単発描画 / バッチ描画は、描画結果を表示しつつ、履歴保存は `/api/paint` のサーバー側処理に任せる
+- Web UI は履歴保存用に SVG を `/api/history` へ送り返さない
+- 互換用の `POST /api/history` は残すが、リクエストの `svg` は信用せず、受け取った JSON Score からサーバー側で SVG を再レンダリングして保存する
+- 色カタログは `color_map` としてサーバーに渡し、`#RRGGBB` 形式のみ検証してレンダリングに使う。`color_map` 自体は履歴メタデータとして保存しない
+- Build 71
 
 ### v1.11 (2026-04-29)
 

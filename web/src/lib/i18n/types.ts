@@ -5,6 +5,14 @@ export interface LangPack {
 	// Header
 	subtitle: string;
 
+	// Login
+	loginTitle: string;
+	loginUsernamePlaceholder: string;
+	loginPasswordPlaceholder: string;
+	loginSubmit: string;
+	loginPasswordShow: string;
+	loginPasswordHide: string;
+
 	// Model row
 	stage1Label: string;
 	stage2Label: string;

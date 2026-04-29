@@ -6,6 +6,13 @@ export const ja: LangPack = {
 
 	subtitle: '視覚的な短歌を書く',
 
+	loginTitle: 'ログイン',
+	loginUsernamePlaceholder: 'ユーザー名',
+	loginPasswordPlaceholder: 'パスワード',
+	loginSubmit: 'ログイン',
+	loginPasswordShow: 'パスワードを表示',
+	loginPasswordHide: 'パスワードを隠す',
+
 	stage1Label: '解釈',
 	stage2Label: '構造化',
 	providerLabel: '接続先：',

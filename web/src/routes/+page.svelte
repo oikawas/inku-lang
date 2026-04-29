@@ -189,6 +189,8 @@
 	let currentUser = $state<UserItem | null>(null);
 	let loginUserName = $state('admin');
 	let loginPassword = $state('');
+	let loginPasswordVisible = $state(false);
+	let loginStatus = $state<string | null>(null);
 
 	function apiFetch(path: string, init: RequestInit = {}) {
 		const headers = new Headers(init.headers);
@@ -256,17 +258,21 @@
 	}
 
 	async function loadCurrentUser() {
-		if (!authToken) return;
+		if (!authToken) {
+			return;
+		}
 		try {
 			const r = await apiFetch('/api/auth/me');
 			if (!r.ok) throw new Error('session expired');
 			currentUser = await r.json();
+			loginStatus = null;
 			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
 			authToken = null;
 			currentUser = null;
+			loginStatus = 'ログインしてください。';
 			settingsStatus = null;
 			settingsStatusError = 'ログイン後に設定状態を確認できます。';
 			historyItems = [];
@@ -278,6 +284,7 @@
 	}
 
 	async function login() {
+		loginStatus = null;
 		try {
 			const r = await fetch('/api/auth/login', {
 				method: 'POST',
@@ -291,6 +298,7 @@
 			const data = await r.json() as { token: string; user: UserItem };
 			authToken = data.token;
 			currentUser = data.user;
+			loginStatus = null;
 			historyItems = [];
 			historyTotal = 0;
 			trashItems = [];
@@ -305,7 +313,9 @@
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
-			userSettingsStatus = e instanceof Error ? e.message : String(e);
+			const message = e instanceof Error ? e.message : String(e);
+			loginStatus = message;
+			userSettingsStatus = message;
 		}
 	}
 
@@ -315,6 +325,7 @@
 		}
 		authToken = null;
 		currentUser = null;
+		loginStatus = null;
 		settingsStatus = null;
 		settingsStatusError = 'ログイン後に設定状態を確認できます。';
 		users = [];
@@ -1082,8 +1093,7 @@
 			miscSettingsLoaded = true;
 		} catch {}
 		void (async () => {
-			await Promise.all([fetchSnapshots(), fetchPrompts()]);
-			await loadCurrentUser();
+			await Promise.all([loadCurrentUser(), fetchSnapshots(), fetchPrompts()]);
 		})();
 
 		return () => window.removeEventListener('resize', onResize);
@@ -1101,6 +1111,72 @@
 <!-- ══════════════════════════════════════════════════════════ -->
 <!--  ROOT                                                       -->
 <!-- ══════════════════════════════════════════════════════════ -->
+{#if !currentUser}
+	<main class="login-screen">
+		<section class="login-panel" aria-labelledby="login-title">
+			<div class="login-brand">
+				<div class="login-brand-head">
+					<div>
+						<div class="login-logo">inku</div>
+						<div class="login-sub">{t().subtitle}</div>
+					</div>
+					<div class="login-lang-switcher" aria-label="Language">
+						{#each PACK_LIST as pack (pack.code)}
+							<button
+								type="button"
+								class="login-lang-btn"
+								class:active={getLang() === pack.code}
+								title={pack.label}
+								onclick={() => setLang(pack.code)}
+							>{pack.code.toUpperCase()}</button>
+						{/each}
+					</div>
+				</div>
+			</div>
+			<div class="login-title" id="login-title">{t().loginTitle}</div>
+			<div class="login-panel-body">
+				{#if loginStatus}
+					<div class="inline-message">{loginStatus}</div>
+				{/if}
+				<div class="login-grid">
+					<input bind:value={loginUserName} placeholder={t().loginUsernamePlaceholder} autocomplete="username" />
+					<div class="password-field">
+						<input
+							bind:value={loginPassword}
+							type={loginPasswordVisible ? 'text' : 'password'}
+							placeholder={t().loginPasswordPlaceholder}
+							autocomplete="current-password"
+							onkeydown={(e) => { if (e.key === 'Enter') void login(); }}
+						/>
+						<button
+							class="password-toggle"
+							type="button"
+							aria-pressed={loginPasswordVisible}
+							aria-label={loginPasswordVisible ? t().loginPasswordHide : t().loginPasswordShow}
+							title={loginPasswordVisible ? t().loginPasswordHide : t().loginPasswordShow}
+							onclick={() => (loginPasswordVisible = !loginPasswordVisible)}
+						>
+							{#if loginPasswordVisible}
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<path d="M3 3l18 18" />
+									<path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+									<path d="M8.4 5.4A10.5 10.5 0 0 1 12 4c5 0 8.5 4.6 9.7 6.4a1.8 1.8 0 0 1 0 2 17 17 0 0 1-2.3 2.8" />
+									<path d="M15.7 15.7A10.5 10.5 0 0 1 12 17c-5 0-8.5-4.6-9.7-6.4a1.8 1.8 0 0 1 0-2A17 17 0 0 1 5 5.4" />
+								</svg>
+							{:else}
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<path d="M2.3 10.6C3.5 8.8 7 4 12 4s8.5 4.8 9.7 6.6a1.8 1.8 0 0 1 0 2C20.5 14.4 17 19 12 19s-8.5-4.6-9.7-6.4a1.8 1.8 0 0 1 0-2Z" />
+									<circle cx="12" cy="11.6" r="2.7" />
+								</svg>
+							{/if}
+						</button>
+					</div>
+					<button class="ghost-btn login-submit" onclick={login}>{t().loginSubmit}</button>
+				</div>
+			</div>
+		</section>
+	</main>
+{:else}
 <div class="root">
 
 	<!-- ══ HEADER ══ -->
@@ -1904,6 +1980,7 @@
 			</div>
 		</div>
 	</div>
+{/if}
 {/if}
 
 <style>
@@ -2716,6 +2793,140 @@
 		display: flex; flex-direction: column; overflow: hidden;
 	}
 	.settings-modal { width: min(860px, calc(100vw - 32px)); max-height: 88vh; }
+	.login-screen {
+		min-height: 100vh;
+		display: grid;
+		place-items: center;
+		padding: 32px;
+		position: relative;
+		overflow: hidden;
+		background:
+			linear-gradient(90deg, rgba(250, 249, 246, 0.96) 0%, rgba(250, 249, 246, 0.86) 42%, rgba(250, 249, 246, 0.34) 100%),
+			linear-gradient(180deg, rgba(245, 241, 232, 0.92) 0%, rgba(234, 229, 216, 0.74) 100%),
+			url('/login-background.svg') right 17% center / min(1120px, 112vw) auto no-repeat,
+			var(--bg);
+		color: var(--fg);
+	}
+	.login-screen::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(circle at 72% 44%, rgba(255, 255, 255, 0) 0 34%, rgba(250, 249, 246, 0.58) 76%);
+		pointer-events: none;
+	}
+	.login-panel {
+		width: min(420px, calc(100vw - 32px));
+		position: relative;
+		z-index: 1;
+		background: rgba(250, 249, 246, 0.94); border-radius: var(--r);
+		box-shadow: 0 18px 54px rgba(40, 35, 24, 0.18);
+		border: 1px solid rgba(90, 83, 68, 0.22);
+		-webkit-backdrop-filter: blur(10px);
+		backdrop-filter: blur(10px);
+		display: flex; flex-direction: column;
+		overflow: hidden;
+	}
+	.login-brand {
+		padding: 20px 24px 12px;
+		border-bottom: 1px solid var(--border);
+	}
+	.login-brand-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 18px;
+	}
+	.login-logo {
+		font-size: 22px;
+		font-weight: 300;
+		letter-spacing: 0.02em;
+	}
+	.login-sub {
+		margin-top: 2px;
+		color: var(--fg3);
+		font-size: 11px;
+	}
+	.login-lang-switcher {
+		display: flex;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		overflow: hidden;
+		flex-shrink: 0;
+	}
+	.login-lang-btn {
+		min-width: 34px;
+		height: 26px;
+		padding: 0 8px;
+		border: none;
+		border-right: 1px solid var(--border2);
+		background: rgba(255, 255, 255, 0.72);
+		color: var(--fg2);
+		font-family: inherit;
+		font-size: 11px;
+		font-weight: 500;
+		cursor: pointer;
+	}
+	.login-lang-btn:last-child { border-right: none; }
+	.login-lang-btn:hover { color: var(--fg); background: #fff; }
+	.login-lang-btn.active { background: var(--fg); color: #fff; }
+	.login-title {
+		padding: 18px 24px 0;
+		font-size: 16px;
+		font-weight: 500;
+	}
+	.login-panel-body {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 14px 24px 24px;
+	}
+	.login-panel .login-grid {
+		grid-template-columns: 1fr;
+		gap: 10px;
+	}
+	.login-panel .login-grid input {
+		min-height: 38px;
+		padding: 8px 10px;
+		font-size: 13px;
+	}
+	.login-submit {
+		min-height: 38px;
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.password-field {
+		display: flex;
+		align-items: stretch;
+		min-width: 0;
+	}
+	.password-field input {
+		border-top-right-radius: 0;
+		border-bottom-right-radius: 0;
+	}
+	.password-toggle {
+		width: 40px;
+		border: 1px solid var(--border2);
+		border-left: 0;
+		border-radius: 0 var(--r) var(--r) 0;
+		background: #f2f0eb;
+		color: var(--fg2);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+	}
+	.password-toggle:hover {
+		color: var(--fg);
+		background: #ebe8e1;
+	}
+	.password-toggle svg {
+		width: 18px;
+		height: 18px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
 	.history-modal {
 		width: min(920px, calc(100vw - 32px));
 		height: min(720px, calc(100vh - 32px));

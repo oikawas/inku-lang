@@ -6,6 +6,13 @@ export const en: LangPack = {
 
 	subtitle: 'write visual tanka',
 
+	loginTitle: 'Sign in',
+	loginUsernamePlaceholder: 'Username',
+	loginPasswordPlaceholder: 'Password',
+	loginSubmit: 'Sign in',
+	loginPasswordShow: 'Show password',
+	loginPasswordHide: 'Hide password',
+
 	stage1Label: 'interpret',
 	stage2Label: 'structure',
 	providerLabel: 'provider:',

@@ -7,6 +7,7 @@ GET  /health      : liveness
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import uuid
@@ -38,6 +39,7 @@ _DEFAULT_OUTPUT_DIR = Path.home() / ".local" / "share" / "inku" / "outputs"
 _OUTPUT_DIR = Path(os.getenv("INKU_OUTPUT_DIR", str(_DEFAULT_OUTPUT_DIR)))
 _OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
 _save_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-save")
+_logger = logging.getLogger(__name__)
 
 
 def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
@@ -47,10 +49,6 @@ def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
 
 
 def _save_output_files(prefix: Path, input_text: str, ddl: str | None, score: dict, svg: str) -> None:
-    try:
-        import cairosvg  # lazy import — optional dependency
-    except ImportError:
-        return
     try:
         prefix.parent.mkdir(parents=True, exist_ok=True)
         if input_text:
@@ -62,10 +60,21 @@ def _save_output_files(prefix: Path, input_text: str, ddl: str | None, score: di
         )
         svg_bytes = svg.encode("utf-8")
         Path(f"{prefix}_output.svg").write_bytes(svg_bytes)
+    except Exception:
+        _logger.exception("failed to save output files: prefix=%s", prefix)
+        return
+
+    try:
+        import cairosvg  # lazy import — optional dependency
+    except ImportError:
+        _logger.warning("cairosvg is not installed; skipped PNG output: prefix=%s", prefix)
+        return
+
+    try:
         png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=_OUTPUT_PNG_SIZE)
         Path(f"{prefix}_output.png").write_bytes(png_bytes)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:
+        _logger.exception("failed to save PNG output: prefix=%s", prefix)
 
 
 app.add_middleware(

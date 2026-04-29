@@ -1212,6 +1212,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - ログイン画面に言語切替ボタンを追加し、ログインフォーム文言も日本語 / English に対応
 - 履歴管理ダイアログは全履歴ロードをやめ、サーバーサイド検索 / 100 件単位ページングで現在ページのみ描画
 - Saijiki スナップショット機能は歳時記 v1 仕様確定まで一旦削除。API / フロント state / `snapshot_id` 配線を撤去し、後続仕様で再実装する
+- 出力ファイル保存は SVG/JSON/入力/DDL を PNG 変換と分離し、`cairosvg` 未導入や filesystem / PNG 変換エラーをサーバーログへ記録
 - Web UI は SvelteKit フロントエンドと FastAPI バックエンドの 2 プロセス構成で動作し、開発時はフロントエンドから `/api/*` をバックエンドへ proxy する
 
 ### v1.10 (2026-04-29)

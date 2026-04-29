@@ -6,6 +6,8 @@ Stage 2 composer を monkeypatch でバイパスし、FastAPI のスキーマ/�
 
 from __future__ import annotations
 
+import builtins
+import logging
 import uuid
 
 from fastapi.testclient import TestClient
@@ -96,6 +98,34 @@ def test_cors_allows_localhost(monkeypatch):
     )
     assert r.status_code == 200
     assert r.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, caplog):
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "cairosvg":
+            raise ImportError("missing cairosvg")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    caplog.set_level(logging.WARNING, logger=api_module.__name__)
+
+    prefix = tmp_path / "out" / "sample"
+    api_module._save_output_files(
+        prefix,
+        "input text",
+        "normalized ddl",
+        {"instructions": []},
+        "<svg></svg>",
+    )
+
+    assert (tmp_path / "out" / "sample_instruction.txt").read_text(encoding="utf-8") == "input text"
+    assert (tmp_path / "out" / "sample_normalized.ddl").read_text(encoding="utf-8") == "normalized ddl"
+    assert (tmp_path / "out" / "sample_score.json").exists()
+    assert (tmp_path / "out" / "sample_output.svg").read_text(encoding="utf-8") == "<svg></svg>"
+    assert not (tmp_path / "out" / "sample_output.png").exists()
+    assert "skipped PNG output" in caplog.text
 
 
 def test_settings_status_is_admin_only():

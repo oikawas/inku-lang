@@ -1234,6 +1234,8 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~UIテーマがブラウザローカル状態に閉じている~~ → v1.21 でライト / ダークモードをユーザー設定としてサーバー DB に保存し、ログインユーザーごとに復元する
 - ~~バッチ指示履歴が端末ごとに分断される~~ → v1.21 でバッチ指示履歴をユーザーごとにサーバー DB へ保存し、プルダウン選択時点で即復元する
 - ~~気に入った履歴を後から抽出できない~~ → v1.21 で履歴 DB にスター状態を保存し、ステータスバー / 履歴ストリップ / 履歴管理でスター操作とスターのみ表示フィルタを追加
+- ~~FastAPI 起動が常に reload=True になっている~~ → v1.21 で `INKU_SERVER_RELOAD` が真値の場合のみ reload 起動とし、systemd 運用の既定は reload 無効に変更
+- ~~セッション Cookie の max-age と DB セッション寿命が連動していない~~ → v1.21 で DB セッションも `INKU_SESSION_COOKIE_MAX_AGE` に従って期限判定し、期限切れ行を削除する形へ変更
 
 ---
 
@@ -1366,6 +1368,15 @@ UI にライト / ダークモードを追加した。
 - バッチ進捗行に蟹のマスコットを表示する
 - 蟹は左右に移動し、鋏を上げる、目を動かす、砂に潜る、お辞儀する仕草を行う
 - 蟹は横移動できる生物として扱い、移動方向に合わせた左右反転は行わない
+
+サーバー運用時の安定性を調整した。
+
+- `inku-server` の FastAPI 起動は reload 無効を既定とする
+- `INKU_SERVER_RELOAD=1` / `true` / `yes` / `on` の場合のみ `uvicorn` reload を有効にする
+- systemd サービス運用では reloader プロセスを使わず、通常の単一 `uvicorn` 実行を前提にする
+- `inku_session` Cookie の max-age と DB セッション寿命を連動させる
+- DB セッションは `INKU_SESSION_COOKIE_MAX_AGE` を超えた時点で無効扱いにし、アクセス時に削除する
+- 新規セッション作成時にも期限切れセッションを掃除する
 
 - Build 151
 
@@ -1540,6 +1551,10 @@ Web UI がセッショントークンを localStorage に保存する方式を�
 - `/api/auth/login` はレスポンス本文にトークンを返さず、`inku_session` Cookie を発行する
 - `inku_session` Cookie は `HttpOnly` / `SameSite=Lax` / `Path=/` を付与する
 - `INKU_SESSION_COOKIE_SECURE=1` の場合は Cookie に `Secure` を付与する
+- Cookie の max-age は `INKU_SESSION_COOKIE_MAX_AGE` で指定し、既定は 30 日
+- DB の `user_sessions` も同じ `INKU_SESSION_COOKIE_MAX_AGE` に従って期限判定する
+- 期限切れ DB セッションは認証不可とし、アクセス時に削除する
+- 新規セッション作成時にも期限切れ DB セッションを掃除する
 - `/api/auth/me`、生成 API、履歴 API、管理 API は Cookie セッションで認証する
 - 互換性のため Authorization Bearer も引き続き受け付ける
 - `/api/auth/logout` は DB セッションを削除し、Cookie を削除する

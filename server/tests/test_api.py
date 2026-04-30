@@ -114,6 +114,60 @@ def test_login_uses_httponly_session_cookie():
     db.delete_user_group(group["id"])
 
 
+def test_expired_session_is_rejected_and_deleted(monkeypatch):
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"expired-session-{suffix}")
+    user = db.add_user(
+        username=f"expired-session-{suffix}",
+        email=f"expired-session-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    monkeypatch.setattr(db, "_SESSION_MAX_AGE_SECONDS", 1)
+    token = db.create_session(user["id"])
+    with db.SessionLocal() as session:
+        row = session.get(db.UserSessionRow, db._hash_token(token))
+        assert row is not None
+        row.at = db._now_ms() - 2_000
+        session.commit()
+
+    assert db.get_session_user(token) is None
+    with db.SessionLocal() as session:
+        assert session.get(db.UserSessionRow, db._hash_token(token)) is None
+
+    db.delete_user(user["id"])
+    db.delete_user_group(group["id"])
+
+
+def test_create_session_prunes_expired_sessions(monkeypatch):
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"session-prune-{suffix}")
+    user = db.add_user(
+        username=f"session-prune-{suffix}",
+        email=f"session-prune-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    monkeypatch.setattr(db, "_SESSION_MAX_AGE_SECONDS", 1)
+    old_token = db.create_session(user["id"])
+    with db.SessionLocal() as session:
+        row = session.get(db.UserSessionRow, db._hash_token(old_token))
+        assert row is not None
+        row.at = db._now_ms() - 2_000
+        session.commit()
+
+    new_token = db.create_session(user["id"])
+    with db.SessionLocal() as session:
+        assert session.get(db.UserSessionRow, db._hash_token(old_token)) is None
+        assert session.get(db.UserSessionRow, db._hash_token(new_token)) is not None
+
+    db.delete_session(new_token)
+    db.delete_user(user["id"])
+    db.delete_user_group(group["id"])
+
+
 def test_bootstrap_admin_password_requires_explicit_env(monkeypatch):
     monkeypatch.delenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", raising=False)
     monkeypatch.delenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", raising=False)

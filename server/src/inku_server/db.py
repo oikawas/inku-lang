@@ -17,6 +17,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 _DEFAULT_DB = "sqlite:///" + str(Path.home() / ".local" / "share" / "inku" / "inku.db")
 _DB_URL = os.getenv("INKU_DB_URL", _DEFAULT_DB)
+_SESSION_MAX_AGE_SECONDS = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
 
 _connect_args = {"check_same_thread": False} if _DB_URL.startswith("sqlite") else {}
 engine = create_engine(_DB_URL, echo=False, future=True, connect_args=_connect_args)
@@ -399,9 +400,28 @@ def create_session(user_id: str) -> str:
     with SessionLocal() as session:
         if not session.get(UserAccountRow, user_id):
             raise ValueError("user not found")
+        _delete_expired_sessions(session)
         session.add(UserSessionRow(token_hash=_hash_token(token), user_id=user_id, at=_now_ms()))
         session.commit()
     return token
+
+
+def _session_expiry_cutoff_ms(now_ms: int | None = None) -> int | None:
+    if _SESSION_MAX_AGE_SECONDS <= 0:
+        return None
+    now = _now_ms() if now_ms is None else now_ms
+    return now - (_SESSION_MAX_AGE_SECONDS * 1000)
+
+
+def _delete_expired_sessions(session) -> int:
+    cutoff = _session_expiry_cutoff_ms()
+    if cutoff is None:
+        return 0
+    return (
+        session.query(UserSessionRow)
+        .filter(UserSessionRow.at < cutoff)
+        .delete(synchronize_session=False)
+    )
 
 
 def get_session_user(token: str) -> dict | None:
@@ -409,8 +429,15 @@ def get_session_user(token: str) -> dict | None:
         session_row = session.get(UserSessionRow, _hash_token(token))
         if not session_row:
             return None
+        cutoff = _session_expiry_cutoff_ms()
+        if cutoff is not None and session_row.at < cutoff:
+            session.delete(session_row)
+            session.commit()
+            return None
         row = session.get(UserAccountRow, session_row.user_id)
         if not row:
+            session.delete(session_row)
+            session.commit()
             return None
         group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
         return _user_to_dict(row, group_name)

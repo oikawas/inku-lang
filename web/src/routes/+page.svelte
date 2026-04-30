@@ -138,6 +138,10 @@
 	let batchSuccess = $state(0);
 	let batchFailures = $state<BatchFailure[]>([]);
 	let batchFailureReport = $state<BatchFailureReport | null>(null);
+	let batchActiveLine = $state<number | null>(null);
+	let batchActiveDdl = $state<string | null>(null);
+	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
+	let batchScrollTop = $state(0);
 	let error        = $state<string | null>(null);
 
 	// ── Replay ──────────────────────────────────────────────
@@ -788,8 +792,14 @@
 	const batchLines    = $derived(batchInput.split('\n'));
 	const lineNumbersText = $derived(batchLines.map((_, i) => String(i + 1)).join('\n'));
 	const batchNonEmpty = $derived(batchLines.filter((l) => l.trim()).length);
+	const batchRunning = $derived(inputMode === 'batch' && loading);
 	const canSubmit     = $derived(
 		inputMode === 'single' ? !!input.trim() : batchNonEmpty > 0
+	);
+	const batchActiveLineStyle = $derived(
+		batchActiveLine === null
+			? ''
+			: `--batch-active-top: ${9 + (batchActiveLine - 1) * 21.45 - batchScrollTop}px`
 	);
 
 	// ── Timer ───────────────────────────────────────────────
@@ -889,7 +899,7 @@
 		displayedHistoryItem = null;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0;
+		batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
 		startTimer();
 
 		try {
@@ -909,10 +919,16 @@
 				for (let i = 0; i < lines.length; i++) {
 					if (!loading) break;
 					batchCurrent = i + 1;
+					batchActiveLine = lines[i].line;
 					try {
 						const r = await paintOne(lines[i].input, `#${lines[i].line} ${lines[i].input}`);
-						result = r;
-						ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking;
+						batchActiveDdl = r.ddl;
+						thinking = r.thinking;
+						if (displayedHistoryItem === null) {
+							result = r;
+							ddl = r.ddl;
+							ddlSelection = { start: r.ddl.length, end: r.ddl.length };
+						}
 						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
 						if (batchFailures.length > 0) {
@@ -942,7 +958,7 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e); result = null;
 		} finally {
-			stopTimer(); loading = false; stageLabel = ''; batchCurrent = 0;
+			stopTimer(); loading = false; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
 		}
 	}
 
@@ -1798,7 +1814,22 @@
 					{:else}
 						<div class="batch-wrap">
 							<div class="line-nums" aria-hidden="true">{lineNumbersText}</div>
-							<textarea class="batch-ta" bind:value={batchInput} rows="5" spellcheck="false" wrap="off" placeholder={t().batchPlaceholder}></textarea>
+							<div class="batch-ta-wrap">
+								{#if batchRunning && batchActiveLine !== null}
+									<div class="batch-active-line" style={batchActiveLineStyle}></div>
+								{/if}
+								<textarea
+									class="batch-ta"
+									bind:this={batchTextareaEl}
+									bind:value={batchInput}
+									rows="5"
+									spellcheck="false"
+									wrap="off"
+									placeholder={t().batchPlaceholder}
+									readonly={batchRunning}
+									onscroll={() => (batchScrollTop = batchTextareaEl?.scrollTop ?? 0)}
+								></textarea>
+							</div>
 						</div>
 						{#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 					{/if}
@@ -1879,6 +1910,15 @@
 					{/if}
 
 					{#if error}<p class="error-text">{error}</p>{/if}
+					{#if batchRunning}
+						<div class="batch-observe">
+							<div class="batch-observe-head">
+								<span>{t().batchActiveDdlLabel}</span>
+								{#if batchActiveLine !== null}<span>{t().batchActiveLine(batchActiveLine)}</span>{/if}
+							</div>
+							<pre>{batchActiveDdl ?? t().batchActiveDdlPending}</pre>
+						</div>
+					{/if}
 					{#if inputMode === 'batch' && batchFailureReport && !loading}
 						<div class="batch-summary has-failures">
 							<div class="batch-summary-line">{t().batchSummary(batchFailureReport.success, batchFailureReport.failures.length, batchFailureReport.total)}</div>
@@ -1912,7 +1952,9 @@
 						<div class="section-head">
 							<span class="section-label">{t().ddlLabel}</span>
 							<div class="section-actions">
-								<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>{t().saijikiToggleBtn}</button>
+								{#if inputMode === 'single'}
+									<button class="ghost-btn" onclick={() => (saijikiOpen = !saijikiOpen)}>{t().saijikiToggleBtn}</button>
+								{/if}
 							</div>
 						</div>
 						<div class="ddl-highlight-wrap">
@@ -1990,11 +2032,13 @@
 						{/if}
 						{#if reloadError}<p class="error-text">{reloadError}</p>{/if}
 
-						<button
-							class="replay-btn"
-							onclick={replay}
-							disabled={reloading || !ddl}
-						>{t().replayFromDdlButton}</button>
+						{#if inputMode === 'single'}
+							<button
+								class="replay-btn"
+								onclick={replay}
+								disabled={reloading || !ddl || loading}
+							>{t().replayFromDdlButton}</button>
+						{/if}
 					</section>
 				{/if}
 
@@ -2467,9 +2511,35 @@
 		white-space: pre;
 		overflow-wrap: normal;
 		overflow-x: auto;
+		background: transparent;
+		position: relative;
+		z-index: 1;
+	}
+	.batch-ta:read-only {
+		color: var(--fg2);
+		cursor: default;
+	}
+	.batch-ta-wrap {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		background: #fff;
+		overflow: hidden;
 	}
 	.batch-wrap .batch-ta { min-height: 240px; }
 	.batch-info { font-size: 11px; color: var(--fg3); }
+	.batch-active-line {
+		position: absolute;
+		top: var(--batch-active-top, -100px);
+		left: 0;
+		right: 0;
+		height: 21.45px;
+		background: #fff0c2;
+		border-top: 1px solid rgba(189, 143, 52, 0.25);
+		border-bottom: 1px solid rgba(189, 143, 52, 0.25);
+		pointer-events: none;
+		z-index: 0;
+	}
 
 	/* Progress */
 	.progress-wrap {
@@ -2629,6 +2699,40 @@
 		color: #a2342a;
 		font-size: 11px;
 		word-break: break-word;
+	}
+	.batch-observe {
+		margin-top: 8px;
+		border: 1px solid #c8d1bd;
+		border-radius: var(--r);
+		background: #fbfcf8;
+		overflow: hidden;
+	}
+	.batch-observe-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		padding: 6px 9px;
+		border-bottom: 1px solid #d9dfd1;
+		color: #4a5b38;
+		font-size: 11px;
+		font-weight: 600;
+	}
+	.batch-observe-head span:last-child {
+		color: var(--fg3);
+		font-weight: 400;
+		font-variant-numeric: tabular-nums;
+	}
+	.batch-observe pre {
+		margin: 0;
+		padding: 9px 10px;
+		max-height: 132px;
+		overflow: auto;
+		color: var(--fg2);
+		font-family: inherit;
+		font-size: 12px;
+		line-height: 1.55;
+		white-space: pre-wrap;
 	}
 
 	/* Play button */

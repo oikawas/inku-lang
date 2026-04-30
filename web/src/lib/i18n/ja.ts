@@ -43,6 +43,9 @@ export const ja: LangPack = {
 	batchSummary: (success, failed, total) => `成功 ${success} / 失敗 ${failed} / 全 ${total}`,
 	batchFailureTitle: '失敗した行',
 	batchFailureLine: (line) => `${line}行目`,
+	batchActiveDdlLabel: '処理中の解釈',
+	batchActiveDdlPending: '解釈を待機中…',
+	batchActiveLine: (line) => `${line}行目`,
 
 	submitBtn: '描画する',
 	stopBtn: '停止',

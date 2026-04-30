@@ -43,6 +43,9 @@ export const en: LangPack = {
 	batchSummary: (success, failed, total) => `${success} succeeded / ${failed} failed / ${total} total`,
 	batchFailureTitle: 'Failed lines',
 	batchFailureLine: (line) => `line ${line}`,
+	batchActiveDdlLabel: 'current interpretation',
+	batchActiveDdlPending: 'waiting for interpretation…',
+	batchActiveLine: (line) => `line ${line}`,
 
 	submitBtn: 'draw',
 	stopBtn: 'stop',

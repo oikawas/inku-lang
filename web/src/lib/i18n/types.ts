@@ -38,6 +38,9 @@ export interface LangPack {
 	batchSummary: (success: number, failed: number, total: number) => string;
 	batchFailureTitle: string;
 	batchFailureLine: (line: number) => string;
+	batchActiveDdlLabel: string;
+	batchActiveDdlPending: string;
+	batchActiveLine: (line: number) => string;
 
 	// Submit / loading
 	submitBtn: string;

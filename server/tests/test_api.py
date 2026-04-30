@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import builtins
 import logging
+import sys
+import types
 import uuid
 
 import pytest
@@ -135,6 +137,32 @@ def test_bootstrap_admin_password_allows_explicit_insecure_dev_flag(monkeypatch)
     monkeypatch.delenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", raising=False)
     monkeypatch.setenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", "1")
     assert db._bootstrap_admin_password() == "inku-admin"
+
+
+def test_api_main_disables_reload_by_default(monkeypatch):
+    calls = []
+    fake_uvicorn = types.SimpleNamespace(run=lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
+    monkeypatch.delenv("INKU_SERVER_RELOAD", raising=False)
+    monkeypatch.delenv("INKU_SERVER_HOST", raising=False)
+    monkeypatch.delenv("INKU_SERVER_PORT", raising=False)
+
+    api_module.main()
+
+    assert calls == [(("inku_server.api:app",), {"host": "127.0.0.1", "port": 8100, "reload": False})]
+
+
+def test_api_main_enables_reload_only_when_requested(monkeypatch):
+    calls = []
+    fake_uvicorn = types.SimpleNamespace(run=lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
+    monkeypatch.setenv("INKU_SERVER_RELOAD", "1")
+    monkeypatch.setenv("INKU_SERVER_HOST", "0.0.0.0")
+    monkeypatch.setenv("INKU_SERVER_PORT", "18100")
+
+    api_module.main()
+
+    assert calls == [(("inku_server.api:app",), {"host": "0.0.0.0", "port": 18100, "reload": True})]
 
 
 def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):

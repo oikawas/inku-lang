@@ -327,6 +327,13 @@ def _clear_session_cookie(response: Response) -> None:
     response.delete_cookie(_SESSION_COOKIE_NAME, path="/", samesite="lax")
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _session_token(
     authorization: str | None = Header(default=None),
     session_cookie: str | None = Cookie(default=None, alias=_SESSION_COOKIE_NAME),
@@ -847,4 +854,5 @@ def main() -> None:
 
     host = os.getenv("INKU_SERVER_HOST", "127.0.0.1")
     port = int(os.getenv("INKU_SERVER_PORT", "8100"))
-    uvicorn.run("inku_server.api:app", host=host, port=port, reload=True)
+    reload = _env_flag("INKU_SERVER_RELOAD", default=False)
+    uvicorn.run("inku_server.api:app", host=host, port=port, reload=reload)

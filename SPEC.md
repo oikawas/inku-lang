@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.19**
+**Version: v1.20**
 
 ---
 
@@ -1230,6 +1230,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~出力ファイル保存失敗が見えない~~ → v1.11 以降で SVG/JSON/入力/DDL 保存と PNG 変換を分離し、filesystem / PNG 変換エラーをサーバーログへ記録
 - ~~バッチ描画の行単位失敗が見えない~~ → v1.11 以降で成功 / 失敗サマリーと失敗行詳細を UI に保持表示。v1.20 で実行中の現在行ハイライトと処理中解釈の読み取り専用表示を追加
 - ~~UI実装が単一巨大コンポーネントに集中している~~ → v1.20 で AuthPanel / InputPanel / BatchPanel / DdlEditor / CanvasPanel / HistoryStrip / HistoryManager / SettingsModal / ColorCatalogModal / SaijikiDrawer / ConfirmDialog に分割し、`+page.svelte` はページ全体の orchestration を主責務とする形へ整理
+- ~~サムネイル用SVG加工がレンダーごとに文字列処理される~~ → v1.20 で `HistoryThumbnail` へ分離し、サムネイル単位の `$derived` で加工済み SVG を管理する形へ変更
 
 ---
 
@@ -1336,6 +1337,7 @@ UI 実装が単一巨大コンポーネントへ集中していた問題を緩�
 - `InputPanel`: 記述 / バッチ切替、指示入力、単発描画進捗
 - `BatchPanel`: バッチ入力、行番号、現在行ハイライト、処理中解釈、失敗レポート
 - `DdlEditor`: 解釈 box、歳時記ボタン、語彙ハイライト、解釈から描画
+- `HistoryThumbnail`: 履歴サムネイル SVG のクリップ加工と表示サイズ差分
 
 バッチ描画と単発記述の UI 文脈を整理した。
 
@@ -1351,7 +1353,9 @@ Svelte の既存 accessibility warning を整理し、`npm run check` が 0 erro
 
 `web/src/routes/+page.svelte` は UI 表示単位を子コンポーネントへ分割し、ページ側は API 呼び出し、履歴、認証、設定、実行状態の orchestration を主責務とする形へ整理した。
 
-- Build 122
+履歴サムネイルの SVG クリップ加工は `HistoryThumbnail` に集約した。`+page.svelte` のテンプレート経由で `clippedHistorySvg()` を呼び続ける形を廃止し、サムネイル単位の `$derived` で加工済み SVG を管理する。
+
+- Build 124
 
 ### v1.19 (2026-04-30)
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import OutputTabsContent from './OutputTabsContent.svelte';
 
@@ -15,6 +16,8 @@
 		historyTotal: number;
 		navPos: number;
 		zoom: number;
+		actualZoom: number;
+		canPan: boolean;
 		panX: number;
 		panY: number;
 		canvasDragging: boolean;
@@ -38,6 +41,7 @@
 		onPointerUp: (event: PointerEvent) => void;
 		onSetZoom: (zoom: number) => void;
 		onResetZoom: () => void;
+		onFitZoomChange: (zoom: number) => void;
 		onCopyPromptText: (kind: 'stage1' | 'stage2', text: string | null | undefined) => void | Promise<void>;
 		onDownloadSVG: () => void;
 		onDownloadPNG: (size: number) => void | Promise<void>;
@@ -52,6 +56,8 @@
 		historyTotal,
 		navPos,
 		zoom,
+		actualZoom,
+		canPan,
 		panX,
 		panY,
 		canvasDragging,
@@ -75,10 +81,29 @@
 		onPointerUp,
 		onSetZoom,
 		onResetZoom,
+		onFitZoomChange,
 		onCopyPromptText,
 		onDownloadSVG,
 		onDownloadPNG
 	}: Props = $props();
+
+	let canvasContentEl: HTMLDivElement | null = null;
+
+	function updateFitZoom() {
+		if (!canvasContentEl) return;
+		const rect = canvasContentEl.getBoundingClientRect();
+		const availableWidth = Math.max(120, rect.width - 120);
+		const availableHeight = Math.max(120, rect.height - 96);
+		const nextZoom = Math.max(0.25, Math.min(10, Math.min(availableWidth, availableHeight) / 400));
+		onFitZoomChange(+nextZoom.toFixed(2));
+	}
+
+	onMount(() => {
+		updateFitZoom();
+		const observer = new ResizeObserver(updateFitZoom);
+		if (canvasContentEl) observer.observe(canvasContentEl);
+		return () => observer.disconnect();
+	});
 </script>
 
 <div class="right-panel">
@@ -99,8 +124,9 @@
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
+			bind:this={canvasContentEl}
 			class="canvas-content"
-			class:can-pan={outputTab === 'canvas' && zoom > 1}
+			class:can-pan={outputTab === 'canvas' && canPan}
 			class:dragging={canvasDragging}
 			class:side-nav-safe={outputTab !== 'canvas'}
 			onpointerdown={onPointerDown}
@@ -112,7 +138,7 @@
 				<div class="canvas-pan" style="transform: translate3d({panX}px, {panY}px, 0);">
 					<div
 						class="canvas-box"
-						style="transform: scale({zoom}); transform-origin: center center; transition: transform 0.15s;"
+						style="transform: scale({actualZoom}); transform-origin: center center; transition: transform 0.15s;"
 					>
 						{#if result}
 							{@html result.svg}

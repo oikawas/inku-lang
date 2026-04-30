@@ -168,6 +168,7 @@
 	let statsOpen    = $state(false);
 	let outputTab    = $state<'canvas' | 'prompts' | 'score'>('canvas');
 	let zoom         = $state(1);
+	let canvasFitZoom = $state(1);
 	let panX         = $state(0);
 	let panY         = $state(0);
 	let canvasDragging = $state(false);
@@ -905,6 +906,7 @@
 			if (submittedMode === 'single') {
 				const r = await paintOne(input);
 				ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
+				fitCanvasZoom();
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
 				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
@@ -927,6 +929,7 @@
 							result = r;
 							ddl = r.ddl;
 							ddlSelection = { start: r.ddl.length, end: r.ddl.length };
+							fitCanvasZoom();
 						}
 						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
@@ -1004,6 +1007,7 @@
 				});
 			}
 			outputTab = 'canvas';
+			fitCanvasZoom();
 		} catch (e) {
 			reloadError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -1197,6 +1201,8 @@
 		stage1UserPrompt = it.input ? it.input + buildEmotionHint(it.input) : '';
 		result = { score: it.score, svg: it.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: it.elapsed_ms ?? 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
 		error = null;
+		outputTab = 'canvas';
+		fitCanvasZoom();
 	}
 
 	const currentRenderedAt = $derived(
@@ -1565,7 +1571,7 @@
 	}
 
 	function setZoom(nextZoom: number) {
-		zoom = Math.max(0.5, Math.min(10, +nextZoom.toFixed(2)));
+		zoom = Math.max(0.25, Math.min(10, +nextZoom.toFixed(2)));
 		if (zoom <= 1) {
 			panX = 0;
 			panY = 0;
@@ -1573,10 +1579,18 @@
 	}
 
 	function resetZoom() {
+		fitCanvasZoom();
+	}
+
+	function fitCanvasZoom() {
 		zoom = 1;
 		panX = 0;
 		panY = 0;
 		canvasDragging = false;
+	}
+
+	function updateCanvasFitZoom(nextZoom: number) {
+		canvasFitZoom = Math.max(0.25, Math.min(10, +nextZoom.toFixed(2)));
 	}
 
 	function startCanvasDrag(event: PointerEvent) {
@@ -1854,6 +1868,8 @@
 			{historyTotal}
 			{navPos}
 			{zoom}
+			actualZoom={canvasFitZoom * zoom}
+			canPan={zoom > 1}
 			{panX}
 			{panY}
 			{canvasDragging}
@@ -1873,6 +1889,7 @@
 			onPointerUp={endCanvasDrag}
 			onSetZoom={setZoom}
 			onResetZoom={resetZoom}
+			onFitZoomChange={updateCanvasFitZoom}
 			onCopyPromptText={copyPromptText}
 			onDownloadSVG={downloadSVG}
 			onDownloadPNG={downloadPNG}

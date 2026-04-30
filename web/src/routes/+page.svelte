@@ -5,6 +5,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { annotate } from '$lib/highlight';
+	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -22,7 +23,7 @@
 		providerOfModel,
 		type Provider
 	} from '$lib/models';
-	import { t, setLang, getLang, PACK_LIST, initLang } from '$lib/i18n/index.svelte';
+	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { COLOR_CATALOGS, getCatalogById, getRenderColorMap, type RenderColorMap } from '$lib/colors';
 
 	const HISTORY_MANAGER_PAGE_SIZE = 100;
@@ -1726,198 +1727,163 @@
 	/>
 {:else}
 <div class="root">
-
-	<!-- ══ HEADER ══ -->
-	<header class="header">
-		<div class="logo-area">
-			<div class="logo">inku</div>
-			<div class="logo-sub">{t().subtitle}</div>
-		</div>
-
-		<div class="header-right">
-			{#if currentUser}
-				<div class="user-menu-wrap" bind:this={userMenuWrapEl}>
-					<button
-						class="user-badge"
-						class:active={userMenuOpen}
-						type="button"
-						title={currentUser.email || currentUser.username}
-						aria-haspopup="menu"
-						aria-expanded={userMenuOpen}
-						onclick={() => (userMenuOpen = !userMenuOpen)}
-					>
-						<span class="user-badge-name">{currentUser.username}</span>
-					</button>
-					{#if userMenuOpen}
-						<div class="user-menu" role="menu">
-							<button type="button" role="menuitem" onclick={logout}>{t().logoutButton}</button>
-						</div>
-					{/if}
-				</div>
-			{/if}
-
-			<button
-				class="settings-btn"
-				class:active={settingsOpen}
-				onclick={() => openSettings('db')}
-			>⚙ {t().settingsButton}</button>
-
-			<!-- Lang -->
-			<div class="lang-switcher">
-				{#each PACK_LIST as pack (pack.code)}
-					<button class="lang-btn" class:active={getLang() === pack.code} onclick={() => setLang(pack.code)}>{pack.label}</button>
-				{/each}
-			</div>
-
-			<!-- Build -->
-			<span class="build-badge">Build {__BUILD_NUMBER__}</span>
-		</div>
-	</header>
+	<AppRail
+		{currentUser}
+		bind:userMenuOpen
+		bind:userMenuWrapEl
+		{settingsOpen}
+		buildNumber={__BUILD_NUMBER__}
+		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
+		onLogout={logout}
+		onOpenSettings={() => openSettings('db')}
+	/>
 
 	<!-- ══ BODY ══ -->
-	<div class="body">
-		<!-- ── LEFT PANEL ── -->
-		<div class="left-panel">
-			<div class="panel-scroll">
-				<InputPanel
-					bind:inputMode
-					bind:input
-					bind:batchInput
-					{lineNumbersText}
-					{batchNonEmpty}
-					{batchRunning}
-					{singleRunning}
-					{batchActiveLine}
-					{batchActiveDdlHighlighted}
-					{batchTotal}
-					{batchCurrent}
-					{liveMs}
-					{batchFailureReport}
-					{canSubmit}
-					{error}
-					{stageLabel}
-					{showBirds}
-					onOpenModelSelection={openModelSelection}
-					onOpenCatalogModal={openCatalogModal}
-					onClearInput={clearInput}
-					onSubmit={submit}
-					onStop={stopBatch}
-				/>
-
-				<!-- thinking -->
-				{#if thinking}
-					<section class="panel-section">
-						<details class="thinking-details">
-							<summary>{t().thinkingLabel}</summary>
-							<pre>{thinking}</pre>
-						</details>
-					</section>
-				{/if}
-
-				<!-- 解釈 (正規化DDL) -->
-				{#if ddl !== null && inputMode === 'single'}
-					<DdlEditor
-						bind:ddl
-						{ddlHighlighted}
-						bind:ddlTextareaEl
-						bind:ddlHighlightEl
-						bind:ddlFocused
-						{reloading}
-						{reloadError}
-						{loading}
+	<div class="main-shell">
+		<div class="body">
+			<!-- ── LEFT PANEL ── -->
+			<div class="left-panel">
+				<div class="panel-scroll">
+					<InputPanel
+						bind:inputMode
+						bind:input
+						bind:batchInput
+						{lineNumbersText}
+						{batchNonEmpty}
+						{batchRunning}
+						{singleRunning}
+						{batchActiveLine}
+						{batchActiveDdlHighlighted}
+						{batchTotal}
+						{batchCurrent}
+						{liveMs}
+						{batchFailureReport}
+						{canSubmit}
+						{error}
+						{stageLabel}
 						{showBirds}
-						onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
-						onRememberSelection={rememberDDLSelection}
-						onSyncHighlightScroll={syncDDLHighlightScroll}
-						onReplay={replay}
+						onOpenModelSelection={openModelSelection}
+						onOpenCatalogModal={openCatalogModal}
+						onClearInput={clearInput}
+						onSubmit={submit}
+						onStop={stopBatch}
 					/>
-				{/if}
 
-				<!-- 統計 -->
-				{#if result && elapsedTotalMs > 0}
-					<section class="panel-section stats-section">
-						<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
-							<span class="stats-arrow" class:open={statsOpen}>▶</span>
-							{statsLine}
-						</button>
-						{#if statsOpen}
-							<div class="stats-detail">
-								{#if elapsedStage1Ms > 0}
-									<div class="stats-grid">
-										<span class="stats-key">{t().statsInterp}</span><span>{(elapsedStage1Ms / 1000).toFixed(1)}s{tokensInStage1 != null ? ` — ${tokensInStage1}→${tokensOutStage1}tok` : ''}</span>
-										<span class="stats-key">{t().statsStruct}</span><span>{(elapsedStage2Ms / 1000).toFixed(1)}s{tokensInStage2 != null ? ` — ${tokensInStage2}→${tokensOutStage2}tok` : ''}</span>
-										<span class="stats-key">{t().statsTotal}</span><span class="stats-total">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
-									</div>
-								{:else}
-									<span>{(elapsedTotalMs / 1000).toFixed(1)}s</span>
-								{/if}
-							</div>
-						{/if}
-					</section>
-				{/if}
+					<!-- thinking -->
+					{#if thinking}
+						<section class="panel-section">
+							<details class="thinking-details">
+								<summary>{t().thinkingLabel}</summary>
+								<pre>{thinking}</pre>
+							</details>
+						</section>
+					{/if}
 
-			</div><!-- /panel-scroll -->
-		</div><!-- /left-panel -->
+					<!-- 解釈 (正規化DDL) -->
+					{#if ddl !== null && inputMode === 'single'}
+						<DdlEditor
+							bind:ddl
+							{ddlHighlighted}
+							bind:ddlTextareaEl
+							bind:ddlHighlightEl
+							bind:ddlFocused
+							{reloading}
+							{reloadError}
+							{loading}
+							{showBirds}
+							onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
+							onRememberSelection={rememberDDLSelection}
+							onSyncHighlightScroll={syncDDLHighlightScroll}
+							onReplay={replay}
+						/>
+					{/if}
 
-		<CanvasPanel
-			bind:outputTab
-			bind:promptStage1Expanded
-			bind:promptStage2Expanded
-			bind:pngMenuOpen
-			bind:pngWrapEl
-			{result}
-			{currentRenderedAt}
-			{nextDisabled}
-			{prevDisabled}
+					<!-- 統計 -->
+					{#if result && elapsedTotalMs > 0}
+						<section class="panel-section stats-section">
+							<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
+								<span class="stats-arrow" class:open={statsOpen}>▶</span>
+								{statsLine}
+							</button>
+							{#if statsOpen}
+								<div class="stats-detail">
+									{#if elapsedStage1Ms > 0}
+										<div class="stats-grid">
+											<span class="stats-key">{t().statsInterp}</span><span>{(elapsedStage1Ms / 1000).toFixed(1)}s{tokensInStage1 != null ? ` — ${tokensInStage1}→${tokensOutStage1}tok` : ''}</span>
+											<span class="stats-key">{t().statsStruct}</span><span>{(elapsedStage2Ms / 1000).toFixed(1)}s{tokensInStage2 != null ? ` — ${tokensInStage2}→${tokensOutStage2}tok` : ''}</span>
+											<span class="stats-key">{t().statsTotal}</span><span class="stats-total">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
+										</div>
+									{:else}
+										<span>{(elapsedTotalMs / 1000).toFixed(1)}s</span>
+									{/if}
+								</div>
+							{/if}
+						</section>
+					{/if}
+
+				</div><!-- /panel-scroll -->
+			</div><!-- /left-panel -->
+
+			<CanvasPanel
+				bind:outputTab
+				bind:promptStage1Expanded
+				bind:promptStage2Expanded
+				bind:pngMenuOpen
+				bind:pngWrapEl
+				{result}
+				{currentRenderedAt}
+				{nextDisabled}
+				{prevDisabled}
+				{historyTotal}
+				{navPos}
+				{zoom}
+				actualZoom={canvasFitZoom * zoom}
+				canPan={zoom > 1}
+				{panX}
+				{panY}
+				{canvasDragging}
+				{promptsData}
+				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : batchInput)}
+				{ddl}
+				{copiedPrompt}
+				{scoreJsonLines}
+				{scoreJsonHighlighted}
+				{statusStage1Model}
+				{statusStage2Model}
+				{statusCatalogName}
+				onGotoNext={gotoNext}
+				onGotoPrev={gotoPrev}
+				onPointerDown={startCanvasDrag}
+				onPointerMove={moveCanvasDrag}
+				onPointerUp={endCanvasDrag}
+				onSetZoom={setZoom}
+				onResetZoom={resetZoom}
+				onFitZoomChange={updateCanvasFitZoom}
+				onCopyPromptText={copyPromptText}
+				onDownloadSVG={downloadSVG}
+				onDownloadPNG={downloadPNG}
+			/>
+		</div><!-- /body -->
+
+		<HistoryStrip
+			{historyItems}
 			{historyTotal}
-			{navPos}
-			{zoom}
-			actualZoom={canvasFitZoom * zoom}
-			canPan={zoom > 1}
-			{panX}
-			{panY}
-			{canvasDragging}
-			{promptsData}
-			stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : batchInput)}
-			{ddl}
-			{copiedPrompt}
-			{scoreJsonLines}
-			{scoreJsonHighlighted}
-			{statusStage1Model}
-			{statusStage2Model}
-			{statusCatalogName}
-			onGotoNext={gotoNext}
-			onGotoPrev={gotoPrev}
-			onPointerDown={startCanvasDrag}
-			onPointerMove={moveCanvasDrag}
-			onPointerUp={endCanvasDrag}
-			onSetZoom={setZoom}
-			onResetZoom={resetZoom}
-			onFitZoomChange={updateCanvasFitZoom}
-			onCopyPromptText={copyPromptText}
-			onDownloadSVG={downloadSVG}
-			onDownloadPNG={downloadPNG}
+			{historyCursor}
+			{historyPage}
+			{historyTotalPages}
+			{historyNavSpan}
+			onOpenManager={openHistoryManager}
+			onNewerPage={gotoHistoryNewerPage}
+			onOlderPage={gotoHistoryOlderPage}
+			onLoadIteration={loadIteration}
+			{historyIndexLabel}
+			{historyModelSummary}
+			{formatHistoryDate}
+			{formatElapsed}
+			{catalogName}
+			{shortModel}
 		/>
-	</div><!-- /body -->
-
-	<HistoryStrip
-		{historyItems}
-		{historyTotal}
-		{historyCursor}
-		{historyPage}
-		{historyTotalPages}
-		{historyNavSpan}
-		onOpenManager={openHistoryManager}
-		onNewerPage={gotoHistoryNewerPage}
-		onOlderPage={gotoHistoryOlderPage}
-		onLoadIteration={loadIteration}
-		{historyIndexLabel}
-		{historyModelSummary}
-		{formatHistoryDate}
-		{formatElapsed}
-		{catalogName}
-		{shortModel}
-	/>
+	</div><!-- /main-shell -->
 
 </div><!-- /root -->
 
@@ -2076,123 +2042,20 @@
 	/* ── Root layout ────────────────────────────────────────── */
 	.root {
 		display: flex;
-		flex-direction: column;
+		flex-direction: row;
 		height: 100vh;
 		overflow: hidden;
 	}
 
-	/* ── Header ─────────────────────────────────────────────── */
-	.header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 10px 20px;
-		border-bottom: 1px solid var(--border);
-		background: var(--bg);
-		flex-shrink: 0;
-		gap: 12px;
-	}
-
-	.logo { font-size: 22px; font-weight: 300; letter-spacing: 0.05em; line-height: 1.1; }
-	.logo-sub { font-size: 11px; color: var(--fg3); margin-top: 2px; }
-
-	.header-right {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		flex-shrink: 0;
-	}
-
-	.user-menu-wrap {
-		position: relative;
-		min-width: 0;
-	}
-	.user-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		max-width: 220px;
-		padding: 0 2px;
-		border-left: 1px solid var(--border);
-		border-top: none;
-		border-right: none;
-		border-bottom: none;
-		padding-left: 10px;
-		background: transparent;
-		color: var(--fg2);
-		font-size: 11px;
-		min-width: 0;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.user-badge:hover,
-	.user-badge.active {
-		color: var(--fg);
-	}
-	.user-badge-name {
-		font-weight: 400;
-		color: inherit;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.user-menu {
-		position: absolute;
-		top: calc(100% + 6px);
-		right: 0;
-		z-index: 30;
-		min-width: 126px;
-		padding: 4px;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		background: #fff;
-		box-shadow: 0 8px 22px rgba(37, 34, 26, 0.14);
-	}
-	.user-menu button {
-		width: 100%;
-		padding: 7px 9px;
-		border: none;
-		border-radius: 4px;
-		background: transparent;
-		color: var(--fg2);
-		font-size: 11px;
-		text-align: left;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.user-menu button:hover {
-		background: var(--bg2);
-		color: var(--fg);
-	}
-	.settings-btn {
-		display: flex; align-items: center; gap: 4px;
-		padding: 5px 11px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: #fff;
-		color: var(--fg2);
-		font-size: 12px;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.settings-btn.active, .settings-btn:hover { background: var(--bg2); }
-
-	.lang-switcher {
-		display: flex;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		overflow: hidden;
-	}
-	.lang-btn {
-		padding: 4px 10px; border: none; border-right: 1px solid var(--border2);
-		background: #fff; color: var(--fg2); font-size: 12px; cursor: pointer; font-family: inherit;
-	}
-	.lang-btn:last-child { border-right: none; }
-	.lang-btn.active { background: var(--fg); color: #fff; }
-
-	.build-badge { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
-
 	/* ── Body ───────────────────────────────────────────────── */
+	.main-shell {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
 	.body {
 		display: flex;
 		flex: 1;

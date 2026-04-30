@@ -37,7 +37,11 @@
 
 <aside class="app-rail" class:expanded onmouseenter={() => (expanded = true)} onmouseleave={() => (expanded = false)}>
 	<div class="rail-brand">
-		<div class="rail-logo-row"><div class="rail-logo">inku</div></div>
+		<div class="rail-logo-row">
+			<div class="rail-logo">
+				<span class="rail-logo-core">inku</span>{#if expanded}<span class="rail-logo-suffix">-lang</span>{/if}
+			</div>
+		</div>
 		{#if expanded}<div class="rail-sub">{t().subtitle}</div>{/if}
 	</div>
 
@@ -119,15 +123,24 @@
 		align-items: center;
 	}
 	.rail-logo {
-		width: 30px;
+		width: auto;
+		display: flex;
+		align-items: center;
 		font-size: 15px;
 		font-weight: 300;
 		letter-spacing: 0;
 		line-height: 1;
 		color: var(--fg);
 		white-space: nowrap;
-		text-align: center;
 		transform-origin: left center;
+	}
+	.rail-logo-core {
+		width: 30px;
+		flex: 0 0 30px;
+		text-align: center;
+	}
+	.rail-logo-suffix {
+		flex: 0 0 auto;
 	}
 	.rail-sub {
 		margin-top: 4px;

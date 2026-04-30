@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
 import uuid
@@ -22,6 +23,8 @@ _SESSION_MAX_AGE_SECONDS = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 *
 _connect_args = {"check_same_thread": False} if _DB_URL.startswith("sqlite") else {}
 engine = create_engine(_DB_URL, echo=False, future=True, connect_args=_connect_args)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+_logger = logging.getLogger(__name__)
+_HISTORY_FTS_ENABLED = False
 
 
 class Base(DeclarativeBase):
@@ -156,6 +159,58 @@ def _migrate_columns() -> None:
                 conn.execute(text(ddl))
             except Exception as exc:  # noqa: BLE001
                 raise RuntimeError(f"failed to create migration index {index_name}") from exc
+        _migrate_history_search(conn)
+
+
+def _migrate_history_search(conn) -> None:
+    global _HISTORY_FTS_ENABLED
+
+    _HISTORY_FTS_ENABLED = False
+    if engine.dialect.name != "sqlite":
+        return
+
+    table_sql = (
+        "CREATE VIRTUAL TABLE IF NOT EXISTS history_fts USING fts5("
+        "input, ddl, stage1_model, stage2_model, catalog_id, "
+        "content='history', content_rowid='rowid', tokenize='trigram'"
+        ")"
+    )
+    try:
+        conn.execute(text(table_sql))
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("SQLite FTS5 trigram history search is unavailable; falling back to LIKE search: %s", exc)
+        return
+
+    trigger_sql = (
+        """
+        CREATE TRIGGER IF NOT EXISTS history_fts_ai AFTER INSERT ON history BEGIN
+            INSERT INTO history_fts(rowid, input, ddl, stage1_model, stage2_model, catalog_id)
+            VALUES (new.rowid, new.input, new.ddl, new.stage1_model, new.stage2_model, new.catalog_id);
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS history_fts_ad AFTER DELETE ON history BEGIN
+            INSERT INTO history_fts(history_fts, rowid, input, ddl, stage1_model, stage2_model, catalog_id)
+            VALUES ('delete', old.rowid, old.input, old.ddl, old.stage1_model, old.stage2_model, old.catalog_id);
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS history_fts_au AFTER UPDATE OF input, ddl, stage1_model, stage2_model, catalog_id ON history BEGIN
+            INSERT INTO history_fts(history_fts, rowid, input, ddl, stage1_model, stage2_model, catalog_id)
+            VALUES ('delete', old.rowid, old.input, old.ddl, old.stage1_model, old.stage2_model, old.catalog_id);
+            INSERT INTO history_fts(rowid, input, ddl, stage1_model, stage2_model, catalog_id)
+            VALUES (new.rowid, new.input, new.ddl, new.stage1_model, new.stage2_model, new.catalog_id);
+        END
+        """,
+    )
+    try:
+        for ddl in trigger_sql:
+            conn.execute(text(ddl))
+        conn.execute(text("INSERT INTO history_fts(history_fts) VALUES ('rebuild')"))
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("SQLite FTS5 history search setup failed; falling back to LIKE search: %s", exc)
+        return
+    _HISTORY_FTS_ENABLED = True
 
 
 def _now_ms() -> int:
@@ -609,6 +664,71 @@ def delete_user(user_id: str) -> bool:
         return True
 
 
+def _fts_match_query(search: str) -> str:
+    return '"' + search.replace('"', '""') + '"'
+
+
+def _use_history_fts(search: str) -> bool:
+    return _HISTORY_FTS_ENABLED and engine.dialect.name == "sqlite" and len(search) >= 3
+
+
+def _list_items_with_fts(
+    session,
+    user_id: str,
+    offset: int,
+    limit: int,
+    trashed: bool,
+    search: str,
+    starred: bool,
+) -> tuple[list[dict], int]:
+    params = {
+        "user_id": user_id,
+        "trashed": 1 if trashed else 0,
+        "match": _fts_match_query(search),
+        "limit": limit,
+        "offset": offset,
+    }
+    starred_clause = "AND h.starred = 1" if starred else ""
+    total = session.execute(
+        text(
+            f"""
+            SELECT count(h.id)
+            FROM history h
+            JOIN history_fts ON history_fts.rowid = h.rowid
+            WHERE h.user_id = :user_id
+              AND h.trashed = :trashed
+              {starred_clause}
+              AND history_fts MATCH :match
+            """
+        ),
+        params,
+    ).scalar() or 0
+    ids = [
+        row[0]
+        for row in session.execute(
+            text(
+                f"""
+                SELECT h.id
+                FROM history h
+                JOIN history_fts ON history_fts.rowid = h.rowid
+                WHERE h.user_id = :user_id
+                  AND h.trashed = :trashed
+                  {starred_clause}
+                  AND history_fts MATCH :match
+                ORDER BY h.at DESC
+                LIMIT :limit OFFSET :offset
+                """
+            ),
+            params,
+        )
+    ]
+    if not ids:
+        return [], int(total)
+    order = {item_id: index for index, item_id in enumerate(ids)}
+    rows = session.query(HistoryRow).filter(HistoryRow.id.in_(ids)).all()
+    return sorted((_row_to_dict(row) for row in rows), key=lambda item: order[item["id"]]), int(total)
+
+
 def list_items(
     user_id: str,
     offset: int = 0,
@@ -625,6 +745,8 @@ def list_items(
         if starred:
             query = query.filter(HistoryRow.starred == 1)
         search = query_text.strip()
+        if search and _use_history_fts(search):
+            return _list_items_with_fts(session, user_id, offset, limit, trashed, search, starred)
         if search:
             pattern = f"%{search}%"
             query = query.filter(or_(

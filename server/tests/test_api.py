@@ -260,6 +260,13 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
     assert {"ui_theme", "batch_prompt_history"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
+    with legacy_engine.connect() as conn:
+        sqlite_objects = {
+            row[0]
+            for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type IN ('table', 'trigger')"))
+        }
+    assert "history_fts" in sqlite_objects
+    assert {"history_fts_ai", "history_fts_ad", "history_fts_au"} <= sqlite_objects
 
 
 def test_migrate_columns_raises_when_history_inspection_fails(monkeypatch):

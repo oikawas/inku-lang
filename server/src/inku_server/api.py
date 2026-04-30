@@ -412,7 +412,7 @@ def _call_compose_detail(
     system_prompt: str | None = None,
     lang: str = "ja",
 ) -> tuple[Score, int | None, int | None]:
-    ddl = expand_intermediate_ddl(ddl, lang=lang)
+    ddl = expand_intermediate_ddl(ddl, lang=lang, context_text=original_text)
     try:
         value = compose(
             ddl,
@@ -550,7 +550,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
-    ddl = expand_intermediate_ddl(ddl, lang=req.lang)
+    ddl = expand_intermediate_ddl(ddl, lang=req.lang, context_text=source_text)
     t1 = time.perf_counter()
     try:
         score, s2_tin, s2_tout = _call_compose_detail(

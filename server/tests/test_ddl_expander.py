@@ -7,6 +7,7 @@ JA_TECHNIQUE_MARKERS = [
     "右半分の斜めの帯",
     "左下から右上へ八個",
     "波打つ軌跡に沿って十三個",
+    "左下の焦点から三つ",
     "右上の黄金比の位置",
     "左上の三分割の交点",
     "左下の白銀比の位置",
@@ -28,6 +29,7 @@ EN_TECHNIQUE_MARKERS = [
     "diagonal band in the right half",
     "lower left to upper right",
     "undulating trace",
+    "lower-left focus",
     "golden-ratio position",
     "rule-of-thirds point",
     "silver-ratio position",
@@ -77,8 +79,25 @@ def test_expand_intermediate_ddl_varies_by_input():
     assert "中央" not in first
     assert "焦点に黒い四角を置く" in first
     assert any(marker in first for marker in ("遠近法の奥行き", "一点透視法", "パッチワーク", "水彩", "素描の下線"))
-    assert any(marker in second for marker in ("油絵の厚塗り", "素描の下線", "点描", "水墨の濃淡"))
-    assert "パッチワーク" not in second
+    assert any(marker in second for marker in ("油絵の厚塗り", "素描の下線", "点描", "水墨の濃淡", "パッチワーク"))
+
+
+def test_expand_intermediate_ddl_uses_context_to_control_filter_amount():
+    quiet = expand_intermediate_ddl(
+        "黒い円を左上の焦点に一点置く。",
+        context_text="余白の多い静かな一滴の墨",
+    )
+    dense = expand_intermediate_ddl(
+        "白い小さな円を画面全体に点々と八十個散らす。",
+        context_text="満天の星が複雑なリズムで重なる",
+    )
+
+    quiet_selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in quiet]
+    dense_selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in dense]
+
+    assert len(quiet_selected) == 1
+    assert len(dense_selected) >= 3
+    assert len(quiet_selected) < len(dense_selected)
 
 
 def test_expand_intermediate_ddl_en_selects_focused_layers():

@@ -12,7 +12,7 @@ import uuid
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text, create_engine, func, or_, text
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text, create_engine, func, inspect, or_, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 _DEFAULT_DB = "sqlite:///" + str(Path.home() / ".local" / "share" / "inku" / "inku.db")
@@ -82,6 +82,18 @@ ROLE_LABELS = {
     "user": "ユーザー",
 }
 _UNSET = object()
+_HISTORY_COLUMN_MIGRATIONS = {
+    "user_id": "ALTER TABLE history ADD COLUMN user_id VARCHAR",
+    "catalog_id": "ALTER TABLE history ADD COLUMN catalog_id VARCHAR",
+    "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
+}
+_HISTORY_INDEX_MIGRATIONS = (
+    ("ix_history_user_id", "CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"),
+    (
+        "ix_history_user_trashed_at",
+        "CREATE INDEX IF NOT EXISTS ix_history_user_trashed_at ON history (user_id, trashed, at)",
+    ),
+)
 
 
 def init_db() -> None:
@@ -96,28 +108,25 @@ def init_db() -> None:
 
 
 def _migrate_columns() -> None:
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         try:
-            conn.execute(text("ALTER TABLE history ADD COLUMN user_id VARCHAR"))
-            conn.commit()
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            conn.execute(text("ALTER TABLE history ADD COLUMN catalog_id VARCHAR"))
-            conn.commit()
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            conn.execute(text("ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0"))
-            conn.commit()
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_history_user_trashed_at ON history (user_id, trashed, at)"))
-            conn.commit()
-        except Exception:  # noqa: BLE001
-            pass
+            existing_columns = {col["name"] for col in inspect(conn).get_columns("history")}
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError("failed to inspect history table columns for migration") from exc
+
+        for column, ddl in _HISTORY_COLUMN_MIGRATIONS.items():
+            if column in existing_columns:
+                continue
+            try:
+                conn.execute(text(ddl))
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(f"failed to migrate history.{column}") from exc
+
+        for index_name, ddl in _HISTORY_INDEX_MIGRATIONS:
+            try:
+                conn.execute(text(ddl))
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(f"failed to create migration index {index_name}") from exc
 
 
 def _now_ms() -> int:

@@ -12,6 +12,7 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, inspect, text
 
 from inku_server import db
 from inku_server import api as api_module
@@ -134,6 +135,46 @@ def test_bootstrap_admin_password_allows_explicit_insecure_dev_flag(monkeypatch)
     monkeypatch.delenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", raising=False)
     monkeypatch.setenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", "1")
     assert db._bootstrap_admin_password() == "inku-admin"
+
+
+def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
+    legacy_engine = create_engine(f"sqlite:///{tmp_path / 'legacy.db'}", future=True)
+    with legacy_engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE history (
+                id VARCHAR PRIMARY KEY,
+                at BIGINT NOT NULL,
+                input TEXT NOT NULL DEFAULT '',
+                ddl TEXT,
+                score TEXT NOT NULL DEFAULT '{}',
+                svg TEXT NOT NULL DEFAULT '',
+                output_path TEXT,
+                elapsed_ms INTEGER NOT NULL DEFAULT 0,
+                stage1_model VARCHAR,
+                stage2_model VARCHAR,
+                tokens_in INTEGER,
+                tokens_out INTEGER
+            )
+        """))
+
+    monkeypatch.setattr(db, "engine", legacy_engine)
+    db._migrate_columns()
+    db._migrate_columns()
+
+    columns = {col["name"] for col in inspect(legacy_engine).get_columns("history")}
+    assert {"user_id", "catalog_id", "trashed"} <= columns
+    indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
+    assert {"ix_history_user_id", "ix_history_user_trashed_at"} <= indexes
+
+
+def test_migrate_columns_raises_when_history_inspection_fails(monkeypatch):
+    class BadInspector:
+        def get_columns(self, table_name: str):
+            raise RuntimeError(f"cannot inspect {table_name}")
+
+    monkeypatch.setattr(db, "inspect", lambda conn: BadInspector())
+    with pytest.raises(RuntimeError, match="failed to inspect history table columns"):
+        db._migrate_columns()
 
 
 def test_compose_happy_path(monkeypatch, auth_context):

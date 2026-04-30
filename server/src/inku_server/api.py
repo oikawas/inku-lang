@@ -15,6 +15,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import BoundedSemaphore, Lock
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,7 +42,17 @@ _db.init_db()
 _DEFAULT_OUTPUT_DIR = Path.home() / ".local" / "share" / "inku" / "outputs"
 _OUTPUT_DIR = Path(os.getenv("INKU_OUTPUT_DIR", str(_DEFAULT_OUTPUT_DIR)))
 _OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
-_save_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-save")
+_SAVE_WORKERS = max(1, int(os.getenv("INKU_OUTPUT_SAVE_WORKERS", "2")))
+_SAVE_QUEUE_LIMIT = max(_SAVE_WORKERS, int(os.getenv("INKU_OUTPUT_SAVE_QUEUE_LIMIT", "32")))
+_save_executor = ThreadPoolExecutor(max_workers=_SAVE_WORKERS, thread_name_prefix="inku-save")
+_save_slots = BoundedSemaphore(_SAVE_QUEUE_LIMIT)
+_save_stats_lock = Lock()
+_save_stats = {
+    "submitted": 0,
+    "completed": 0,
+    "failed": 0,
+    "skipped": 0,
+}
 _logger = logging.getLogger(__name__)
 _HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 _SESSION_COOKIE_NAME = "inku_session"
@@ -99,6 +110,47 @@ def _save_history_artifacts(item: dict) -> None:
         item.get("score", {}),
         item.get("svg", ""),
     )
+
+
+def _increment_save_stat(name: str) -> None:
+    with _save_stats_lock:
+        _save_stats[name] = _save_stats.get(name, 0) + 1
+
+
+def _artifact_save_stats() -> dict[str, int]:
+    with _save_stats_lock:
+        return dict(_save_stats)
+
+
+def _run_history_artifact_save(item: dict) -> None:
+    try:
+        _save_history_artifacts(item)
+        _increment_save_stat("completed")
+    except Exception:
+        _increment_save_stat("failed")
+        _logger.exception("unexpected artifact save failure: history_id=%s", item.get("id"))
+    finally:
+        _save_slots.release()
+
+
+def _submit_history_artifact_save(item: dict) -> bool:
+    if not _save_slots.acquire(blocking=False):
+        _increment_save_stat("skipped")
+        _logger.warning(
+            "artifact save queue is full; skipped background save: history_id=%s queue_limit=%s",
+            item.get("id"),
+            _SAVE_QUEUE_LIMIT,
+        )
+        return False
+    _increment_save_stat("submitted")
+    try:
+        _save_executor.submit(_run_history_artifact_save, item)
+    except Exception:
+        _increment_save_stat("failed")
+        _save_slots.release()
+        _logger.exception("failed to submit artifact save job: history_id=%s", item.get("id"))
+        return False
+    return True
 
 
 def _validated_color_map(color_map: dict[str, str] | None) -> dict[str, str] | None:
@@ -306,9 +358,20 @@ class PluginSettingsStatus(BaseModel):
     note: str
 
 
+class OutputSaveStatus(BaseModel):
+    workers: int
+    queue_limit: int
+    submitted: int
+    completed: int
+    failed: int
+    skipped: int
+    note: str
+
+
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus
     plugins: PluginSettingsStatus
+    output_save: OutputSaveStatus
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -441,6 +504,12 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
         ),
         plugins=PluginSettingsStatus(
             note="Plugin loading is not implemented in this reference server yet. The UI is read-only until a loader API exists.",
+        ),
+        output_save=OutputSaveStatus(
+            workers=_SAVE_WORKERS,
+            queue_limit=_SAVE_QUEUE_LIMIT,
+            **_artifact_save_stats(),
+            note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
         ),
     )
 
@@ -591,7 +660,7 @@ def _add_history_item(
         "tokens_out": tokens_out,
         "catalog_id": catalog_id,
     })
-    _save_executor.submit(_save_history_artifacts, item_dict)
+    _submit_history_artifact_save(item_dict)
     return item_dict
 
 

@@ -565,6 +565,77 @@ def test_history_output_files_are_rebuildable_from_db(tmp_path):
     db.delete_user_group(group["id"])
 
 
+def test_artifact_save_submit_skips_when_queue_is_full(monkeypatch, caplog):
+    class FullSlots:
+        def acquire(self, blocking: bool = True):
+            assert blocking is False
+            return False
+
+    class FailingExecutor:
+        def submit(self, *args, **kwargs):
+            raise AssertionError("executor must not be called when artifact queue is full")
+
+    monkeypatch.setattr(api_module, "_save_slots", FullSlots())
+    monkeypatch.setattr(api_module, "_save_executor", FailingExecutor())
+    caplog.set_level(logging.WARNING, logger=api_module.__name__)
+
+    assert api_module._submit_history_artifact_save({"id": "history-full"}) is False
+    assert "artifact save queue is full" in caplog.text
+
+
+def test_artifact_save_submit_releases_slot_after_save(monkeypatch):
+    class AvailableSlots:
+        def __init__(self):
+            self.released = 0
+
+        def acquire(self, blocking: bool = True):
+            assert blocking is False
+            return True
+
+        def release(self):
+            self.released += 1
+
+    class InlineExecutor:
+        def submit(self, fn, item):
+            fn(item)
+
+    slots = AvailableSlots()
+    saved = []
+    monkeypatch.setattr(api_module, "_save_slots", slots)
+    monkeypatch.setattr(api_module, "_save_executor", InlineExecutor())
+    monkeypatch.setattr(api_module, "_save_history_artifacts", lambda item: saved.append(item["id"]))
+
+    assert api_module._submit_history_artifact_save({"id": "history-ok"}) is True
+    assert saved == ["history-ok"]
+    assert slots.released == 1
+
+
+def test_artifact_save_submit_releases_slot_when_executor_fails(monkeypatch, caplog):
+    class AvailableSlots:
+        def __init__(self):
+            self.released = 0
+
+        def acquire(self, blocking: bool = True):
+            assert blocking is False
+            return True
+
+        def release(self):
+            self.released += 1
+
+    class FailingExecutor:
+        def submit(self, *args, **kwargs):
+            raise RuntimeError("executor closed")
+
+    slots = AvailableSlots()
+    monkeypatch.setattr(api_module, "_save_slots", slots)
+    monkeypatch.setattr(api_module, "_save_executor", FailingExecutor())
+    caplog.set_level(logging.ERROR, logger=api_module.__name__)
+
+    assert api_module._submit_history_artifact_save({"id": "history-submit-fail"}) is False
+    assert slots.released == 1
+    assert "failed to submit artifact save job" in caplog.text
+
+
 def test_settings_status_is_admin_only():
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"settings-{suffix}")
@@ -598,6 +669,10 @@ def test_settings_status_is_admin_only():
     assert data["plugins"]["enabled"] is False
     assert data["plugins"]["runtime_editable"] is False
     assert data["plugins"]["loaded"] == []
+    assert data["output_save"]["workers"] >= 1
+    assert data["output_save"]["queue_limit"] >= data["output_save"]["workers"]
+    assert {"submitted", "completed", "failed", "skipped"} <= set(data["output_save"])
+    assert "source of truth" in data["output_save"]["note"]
 
     db.delete_session(admin_token)
     db.delete_session(user_token)

@@ -1305,7 +1305,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ### v1.22 (2026-05-01)
 
-**サーバー保存負荷制御 + 履歴検索高速化 + 履歴管理ページング安定化**
+**サーバー保存負荷制御 + 履歴検索高速化 + 履歴管理ページング安定化 + 状態分離**
 
 出力ファイル保存は DB 履歴保存とは分離し、バックグラウンド保存キューの上限を設けた。
 
@@ -1328,7 +1328,13 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - ページあたり件数は 100 件を維持する
 - 履歴管理のサムネイルは `content-visibility` を利用し、100 件表示のまま画面外 SVG の描画負荷を抑える
 
-- Build 153
+ページ orchestration の肥大化を抑えるため、履歴管理ダイアログ専用の状態と副作用を `HistoryManagerState` へ切り出した。
+
+- `web/src/lib/historyManagerState.svelte.ts` を追加する
+- 履歴管理ダイアログの active / trash 表示、ページング、検索、スター絞り込み、選択状態、request id による stale response 破棄を同 state に集約する
+- `+page.svelte` は履歴ストリップ、削除 / 復元確認、表示中履歴への反映などページ横断の接続を主責務とする
+
+- Build 154
 
 ### v1.21 (2026-04-30)
 

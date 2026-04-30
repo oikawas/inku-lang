@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import { annotate } from '$lib/highlight';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
+	import BatchPanel from '$lib/components/BatchPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
@@ -141,8 +142,6 @@
 	let batchFailureReport = $state<BatchFailureReport | null>(null);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
-	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
-	let batchScrollTop = $state(0);
 	let error        = $state<string | null>(null);
 
 	// ── Replay ──────────────────────────────────────────────
@@ -797,11 +796,6 @@
 	const singleRunning = $derived(activeRunMode === 'single' && loading);
 	const canSubmit     = $derived(
 		inputMode === 'single' ? !!input.trim() : batchNonEmpty > 0
-	);
-	const batchActiveLineStyle = $derived(
-		batchActiveLine === null
-			? ''
-			: `--batch-active-top: ${9 + (batchActiveLine - 1) * 21.45 - batchScrollTop}px`
 	);
 
 	// ── Timer ───────────────────────────────────────────────
@@ -1818,128 +1812,94 @@
 							placeholder={t().inputPlaceholder}
 							class="input-ta"
 						></textarea>
-					{:else}
-						<div class="batch-wrap">
-							<div class="line-nums" aria-hidden="true">{lineNumbersText}</div>
-							<div class="batch-ta-wrap">
-								{#if batchRunning && batchActiveLine !== null}
-									<div class="batch-active-line" style={batchActiveLineStyle}></div>
-								{/if}
-								<textarea
-									class="batch-ta"
-									bind:this={batchTextareaEl}
-									bind:value={batchInput}
-									rows="5"
-									spellcheck="false"
-									wrap="off"
-									placeholder={t().batchPlaceholder}
-									readonly={batchRunning}
-									onscroll={() => (batchScrollTop = batchTextareaEl?.scrollTop ?? 0)}
-								></textarea>
-							</div>
-						</div>
-						{#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
-					{/if}
 
-					<!-- 描画する / progress -->
-					{#if singleRunning}
-						<div class="progress-wrap">
-							<div class="progress-phases">
-								{#each [{ key: '解釈', label: t().statsInterp }, { key: '構造化', label: t().statsStruct }] as ph, i (ph.key)}
-									{#if i > 0}<span class="phase-sep">›</span>{/if}
-									<span class="phase-item" class:phase-done={stageLabel.includes('構造化') && ph.key === '解釈'} class:phase-active={stageLabel.includes(ph.key) && !(stageLabel.includes('構造化') && ph.key === '解釈')}>
-										{#if stageLabel.includes('構造化') && ph.key === '解釈'}<span class="phase-check">✓</span>{/if}
-										{#if !(stageLabel.includes('構造化') && ph.key === '解釈') && stageLabel.includes(ph.key)}<span class="phase-dot"></span>{/if}
-										{ph.label}
-									</span>
-								{/each}
+						<!-- 描画する / progress -->
+						{#if singleRunning}
+							<div class="progress-wrap">
+								<div class="progress-phases">
+									{#each [{ key: '解釈', label: t().statsInterp }, { key: '構造化', label: t().statsStruct }] as ph, i (ph.key)}
+										{#if i > 0}<span class="phase-sep">›</span>{/if}
+										<span class="phase-item" class:phase-done={stageLabel.includes('構造化') && ph.key === '解釈'} class:phase-active={stageLabel.includes(ph.key) && !(stageLabel.includes('構造化') && ph.key === '解釈')}>
+											{#if stageLabel.includes('構造化') && ph.key === '解釈'}<span class="phase-check">✓</span>{/if}
+											{#if !(stageLabel.includes('構造化') && ph.key === '解釈') && stageLabel.includes(ph.key)}<span class="phase-dot"></span>{/if}
+											{ph.label}
+										</span>
+									{/each}
+								</div>
+								<div class="progress-right">
+									<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
+									<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
+								</div>
 							</div>
-							<div class="progress-right">
-								<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
-								<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
-							</div>
-						</div>
-						<div
-							class="progress-bar-track"
-							style="--progress-target: {stageLabel.includes('構造化') ? '65%' : '30%'}"
-						>
-							<div class="progress-bar-fill"></div>
-							{#if showBirds}
-								<svg class="progress-bird" viewBox="0 0 52 44" aria-hidden="true">
-									<g class="bird-peck">
-										<ellipse class="bird-shadow" cx="26" cy="38" rx="12" ry="2.4" />
-										<g class="bird-preen">
-											<g class="bird-view bird-view-side">
-												<path class="bird-tail" d="M33 25 Q43 24 47 19 Q44 29 34 30 Z" />
-												<ellipse class="bird-body" cx="27" cy="25" rx="11" ry="8" />
-												<path class="bird-wing" d="M24 23 Q31 15 37 24 Q31 30 25 29 Z" />
-												<g class="bird-head">
-													<circle class="bird-head-fill" cx="17" cy="19" r="5.8" />
-													<path class="bird-beak" d="M11.5 19 L5 16.9 L5 21.1 Z" />
-													<circle class="bird-eye" cx="15.4" cy="17.5" r="0.95" />
+							<div
+								class="progress-bar-track"
+								style="--progress-target: {stageLabel.includes('構造化') ? '65%' : '30%'}"
+							>
+								<div class="progress-bar-fill"></div>
+								{#if showBirds}
+									<svg class="progress-bird" viewBox="0 0 52 44" aria-hidden="true">
+										<g class="bird-peck">
+											<ellipse class="bird-shadow" cx="26" cy="38" rx="12" ry="2.4" />
+											<g class="bird-preen">
+												<g class="bird-view bird-view-side">
+													<path class="bird-tail" d="M33 25 Q43 24 47 19 Q44 29 34 30 Z" />
+													<ellipse class="bird-body" cx="27" cy="25" rx="11" ry="8" />
+													<path class="bird-wing" d="M24 23 Q31 15 37 24 Q31 30 25 29 Z" />
+													<g class="bird-head">
+														<circle class="bird-head-fill" cx="17" cy="19" r="5.8" />
+														<path class="bird-beak" d="M11.5 19 L5 16.9 L5 21.1 Z" />
+														<circle class="bird-eye" cx="15.4" cy="17.5" r="0.95" />
+													</g>
+												</g>
+												<g class="bird-view bird-view-front">
+													<ellipse class="bird-body" cx="26" cy="25.5" rx="9.2" ry="8.8" />
+													<circle class="bird-head-fill" cx="26" cy="17" r="6.4" />
+													<path class="bird-wing bird-wing-left" d="M18 24 Q13 25 11 30 Q18 31 22 27 Z" />
+													<path class="bird-wing bird-wing-right" d="M34 24 Q39 25 41 30 Q34 31 30 27 Z" />
+													<path class="bird-beak" d="M23 18.7 L26 22.4 L29 18.7 Z" />
+													<circle class="bird-eye" cx="23.4" cy="16.3" r="0.9" />
+													<circle class="bird-eye" cx="28.6" cy="16.3" r="0.9" />
+												</g>
+												<g class="bird-view bird-view-three">
+													<path class="bird-tail" d="M33 25 Q41 23 44 18 Q43 27 35 30 Z" />
+													<ellipse class="bird-body" cx="27" cy="25" rx="10" ry="8.5" />
+													<path class="bird-wing" d="M24 23 Q30 17 36 24 Q31 29 25 29 Z" />
+													<circle class="bird-head-fill" cx="20" cy="18" r="6.1" />
+													<path class="bird-beak" d="M16 19 L9.8 17.2 L10.8 21.2 Z" />
+													<circle class="bird-eye" cx="18.3" cy="16.5" r="0.95" />
+												</g>
+												<g class="bird-legs">
+													<path class="bird-leg bird-leg-a" d="M22 32 L20 37" />
+													<path class="bird-leg bird-leg-b" d="M30 32 L32 37" />
 												</g>
 											</g>
-											<g class="bird-view bird-view-front">
-												<ellipse class="bird-body" cx="26" cy="25.5" rx="9.2" ry="8.8" />
-												<circle class="bird-head-fill" cx="26" cy="17" r="6.4" />
-												<path class="bird-wing bird-wing-left" d="M18 24 Q13 25 11 30 Q18 31 22 27 Z" />
-												<path class="bird-wing bird-wing-right" d="M34 24 Q39 25 41 30 Q34 31 30 27 Z" />
-												<path class="bird-beak" d="M23 18.7 L26 22.4 L29 18.7 Z" />
-												<circle class="bird-eye" cx="23.4" cy="16.3" r="0.9" />
-												<circle class="bird-eye" cx="28.6" cy="16.3" r="0.9" />
-											</g>
-											<g class="bird-view bird-view-three">
-												<path class="bird-tail" d="M33 25 Q41 23 44 18 Q43 27 35 30 Z" />
-												<ellipse class="bird-body" cx="27" cy="25" rx="10" ry="8.5" />
-												<path class="bird-wing" d="M24 23 Q30 17 36 24 Q31 29 25 29 Z" />
-												<circle class="bird-head-fill" cx="20" cy="18" r="6.1" />
-												<path class="bird-beak" d="M16 19 L9.8 17.2 L10.8 21.2 Z" />
-												<circle class="bird-eye" cx="18.3" cy="16.5" r="0.95" />
-											</g>
-											<g class="bird-legs">
-												<path class="bird-leg bird-leg-a" d="M22 32 L20 37" />
-												<path class="bird-leg bird-leg-b" d="M30 32 L32 37" />
-											</g>
 										</g>
-									</g>
-								</svg>
-							{/if}
-						</div>
-						<div class="progress-stage-text">{stageLabel}</div>
-					{:else if loading && batchTotal > 0}
-						<div class="batch-progress">
-							<span>{t().batchProgress(batchCurrent, batchTotal)}</span>
-							<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
-							<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
-						</div>
-					{:else}
-						<button class="play-btn" onclick={submit} disabled={!canSubmit}>▶ <span>{t().submitBtn}</span></button>
-					{/if}
-
-					{#if error}<p class="error-text">{error}</p>{/if}
-					{#if batchRunning}
-						<div class="batch-observe">
-							<div class="batch-observe-head">
-								<span>{t().batchActiveDdlLabel}</span>
-								{#if batchActiveLine !== null}<span>{t().batchActiveLine(batchActiveLine)}</span>{/if}
+									</svg>
+								{/if}
 							</div>
-							<div class="batch-observe-body">{@html batchActiveDdlHighlighted}</div>
-						</div>
-					{/if}
-					{#if inputMode === 'batch' && batchFailureReport && !loading}
-						<div class="batch-summary has-failures">
-							<div class="batch-summary-line">{t().batchSummary(batchFailureReport.success, batchFailureReport.failures.length, batchFailureReport.total)}</div>
-							<div class="batch-failure-title">{t().batchFailureTitle}</div>
-							<ul class="batch-failure-list">
-								{#each batchFailureReport.failures as failure (failure.line)}
-									<li>
-										<span class="batch-failure-line">{t().batchFailureLine(failure.line)}</span>
-										<span class="batch-failure-input">{failure.input}</span>
-										<span class="batch-failure-message">{failure.message}</span>
-									</li>
-								{/each}
-							</ul>
-						</div>
+							<div class="progress-stage-text">{stageLabel}</div>
+						{:else}
+							<button class="play-btn" onclick={submit} disabled={!canSubmit}>▶ <span>{t().submitBtn}</span></button>
+						{/if}
+
+						{#if error}<p class="error-text">{error}</p>{/if}
+					{:else}
+						<BatchPanel
+							bind:batchInput
+							{lineNumbersText}
+							{batchNonEmpty}
+							{batchRunning}
+							{batchActiveLine}
+							{batchActiveDdlHighlighted}
+							{batchTotal}
+							{batchCurrent}
+							{liveMs}
+							{batchFailureReport}
+							{canSubmit}
+							{error}
+							onSubmit={submit}
+							onStop={stopBatch}
+						/>
 					{/if}
 				</section>
 
@@ -2489,64 +2449,14 @@
 	}
 
 	/* Input textarea */
-	.input-ta, .batch-ta {
+	.input-ta {
 		width: 100%; padding: 9px 10px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; color: var(--fg);
 		font-family: inherit; font-size: 13px; line-height: 1.65;
 		resize: vertical; outline: none;
 	}
-	.input-ta:focus, .batch-ta:focus { border-color: var(--accent); }
-
-	.batch-wrap {
-		display: flex;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		overflow: hidden;
-	}
-	.line-nums {
-		background: var(--bg2); border-right: 1px solid var(--border);
-		padding: 9px 6px; font-size: 13px; line-height: 1.65;
-		text-align: right; color: var(--fg3); user-select: none;
-		font-family: inherit;
-		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
-	}
-	.batch-ta {
-		flex: 1;
-		border: none;
-		border-radius: 0;
-		white-space: pre;
-		overflow-wrap: normal;
-		overflow-x: auto;
-		background: transparent;
-		position: relative;
-		z-index: 1;
-	}
-	.batch-ta:read-only {
-		color: var(--fg2);
-		cursor: default;
-	}
-	.batch-ta-wrap {
-		position: relative;
-		flex: 1;
-		min-width: 0;
-		background: #fff;
-		overflow: hidden;
-	}
-	.batch-wrap .batch-ta { min-height: 240px; }
-	.batch-info { font-size: 11px; color: var(--fg3); }
-	.batch-active-line {
-		position: absolute;
-		top: var(--batch-active-top, -100px);
-		left: 0;
-		right: 0;
-		height: 21.45px;
-		background: #fff0c2;
-		border-top: 1px solid rgba(189, 143, 52, 0.25);
-		border-bottom: 1px solid rgba(189, 143, 52, 0.25);
-		pointer-events: none;
-		z-index: 0;
-	}
+	.input-ta:focus { border-color: var(--accent); }
 
 	/* Progress */
 	.progress-wrap {
@@ -2658,90 +2568,6 @@
 		background: #fff;
 	}
 
-	.batch-progress {
-		display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-		padding: 8px 10px;
-		border: 1px solid var(--border2); border-radius: var(--r);
-		background: #fff; font-size: 12px; color: var(--fg2);
-		margin-top: 8px;
-	}
-	.batch-summary {
-		margin-top: 8px;
-		padding: 8px 10px;
-		border: 1px solid #b8c7ab;
-		border-radius: var(--r);
-		background: #f5f8f1;
-		color: #40552b;
-		font-size: 12px;
-	}
-	.batch-summary.has-failures {
-		border-color: #d9b4ae;
-		background: #fff6f4;
-		color: #7c332b;
-	}
-	.batch-summary-line { font-weight: 500; }
-	.batch-failure-title { margin-top: 6px; color: var(--fg2); font-size: 11px; }
-	.batch-failure-list {
-		margin: 4px 0 0;
-		padding: 0;
-		list-style: none;
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-	.batch-failure-list li {
-		display: grid;
-		grid-template-columns: 48px minmax(0, 1fr);
-		gap: 3px 8px;
-	}
-	.batch-failure-line { color: var(--fg2); font-variant-numeric: tabular-nums; }
-	.batch-failure-input {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.batch-failure-message {
-		grid-column: 2;
-		color: #a2342a;
-		font-size: 11px;
-		word-break: break-word;
-	}
-	.batch-observe {
-		margin-top: 8px;
-		border: 1px solid #c8d1bd;
-		border-radius: var(--r);
-		background: #fbfcf8;
-		overflow: hidden;
-	}
-	.batch-observe-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 8px;
-		padding: 6px 9px;
-		border-bottom: 1px solid #d9dfd1;
-		color: #4a5b38;
-		font-size: 11px;
-		font-weight: 600;
-	}
-	.batch-observe-head span:last-child {
-		color: var(--fg3);
-		font-weight: 400;
-		font-variant-numeric: tabular-nums;
-	}
-	.batch-observe-body {
-		margin: 0;
-		padding: 9px 10px;
-		max-height: 132px;
-		overflow: auto;
-		color: var(--fg2);
-		font-family: inherit;
-		font-size: 12px;
-		line-height: 1.55;
-		white-space: pre-wrap;
-	}
-
 	/* Play button */
 	.play-btn {
 		width: 100%; margin-top: 8px; padding: 9px;
@@ -2800,8 +2626,7 @@
 	.ddl-edit-ta::selection {
 		background: rgba(44, 62, 145, 0.22);
 	}
-	.ddl-highlight :global(.ddl-token),
-	.batch-observe-body :global(.ddl-token) {
+	.ddl-highlight :global(.ddl-token) {
 		border-radius: 2px;
 		font-weight: inherit;
 	}
@@ -2826,18 +2651,17 @@
 	@keyframes ddl-caret-blink {
 		50% { opacity: 0; }
 	}
-	.ddl-highlight :global(.ddl-token-shape), .batch-observe-body :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
-	.ddl-highlight :global(.ddl-token-touch), .batch-observe-body :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
-	.ddl-highlight :global(.ddl-token-line), .batch-observe-body :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
-	.ddl-highlight :global(.ddl-token-color), .batch-observe-body :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
-	.ddl-highlight :global(.ddl-token-motion), .batch-observe-body :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
-	.ddl-highlight :global(.ddl-token-place), .batch-observe-body :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
-	.ddl-highlight :global(.ddl-token-action), .batch-observe-body :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
-	.ddl-highlight :global(.ddl-token-angle), .batch-observe-body :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
-	.ddl-highlight :global(.ddl-token-ratio), .batch-observe-body :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
-	.ddl-highlight :global(.ddl-token-word), .batch-observe-body :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
-	.ddl-highlight :global(.ddl-token-emotion),
-	.batch-observe-body :global(.ddl-token-emotion) {
+	.ddl-highlight :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
+	.ddl-highlight :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
+	.ddl-highlight :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
+	.ddl-highlight :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
+	.ddl-highlight :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
+	.ddl-highlight :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
+	.ddl-highlight :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
+	.ddl-highlight :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
+	.ddl-highlight :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
+	.ddl-highlight :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
+	.ddl-highlight :global(.ddl-token-emotion) {
 		color: #9b7a66;
 		font-style: inherit;
 	}

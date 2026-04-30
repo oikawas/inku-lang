@@ -7,6 +7,7 @@
 	import { annotate } from '$lib/highlight';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
@@ -2197,16 +2198,11 @@
 {/if}
 
 {#if confirmAction}
-	<div class="confirm-layer">
-		<div class="confirm-backdrop" onclick={() => (confirmAction = null)}></div>
-		<div class="confirm-box">
-			<p>{confirmAction.message}</p>
-			<div class="confirm-actions">
-				<button class="ghost-btn" onclick={() => (confirmAction = null)}>{t().confirmCancel}</button>
-				<button class={confirmAction.destructive ? 'danger-btn' : 'confirm-btn'} onclick={() => { const run = confirmAction?.run; confirmAction = null; run?.(); }}>{confirmAction.destructive ? t().deleteButton : t().confirmRun}</button>
-			</div>
-		</div>
-	</div>
+	<ConfirmDialog
+		action={confirmAction}
+		onCancel={() => (confirmAction = null)}
+		onRun={() => { const run = confirmAction?.run; confirmAction = null; run?.(); }}
+	/>
 {/if}
 {/if}
 
@@ -2777,28 +2773,6 @@
 	.stats-grid { display: grid; grid-template-columns: auto 1fr; gap: 0 12px; }
 	.stats-key { color: var(--fg3); }
 	.stats-total { font-weight: 500; }
-
-	.danger-btn, .confirm-btn {
-		padding: 4px 10px; border: none; border-radius: var(--r);
-		color: #fff; font-size: 11px; cursor: pointer; font-family: inherit;
-	}
-	.danger-btn { background: #c0392b; }
-	.confirm-btn { background: var(--fg); }
-	.danger-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.confirm-layer {
-		position: fixed; inset: 0; z-index: 600;
-		display: flex; align-items: center; justify-content: center;
-	}
-	.confirm-backdrop {
-		position: absolute; inset: 0; background: rgba(0,0,0,0.3);
-	}
-	.confirm-box {
-		position: relative; background: #fff; border-radius: var(--r-lg);
-		padding: 22px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-		min-width: 280px; text-align: center;
-	}
-	.confirm-box p { margin-bottom: 16px; font-size: 13px; color: var(--fg); }
-	.confirm-actions { display: flex; gap: 8px; justify-content: center; }
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {

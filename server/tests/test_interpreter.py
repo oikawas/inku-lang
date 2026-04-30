@@ -106,6 +106,7 @@ def test_quantity_prompt_uses_dynamic_range():
     assert "八百九十個" in prompt
     assert "画面全体に点々と六百十個" in prompt
     assert "画面全体に細かく八百九十個" in prompt
+    assert "背景色と主描画色を同じにしてはいけない" in prompt
     assert "ランダムに六百十個" not in prompt
     assert "ランダムに八百九十個" not in prompt
 
@@ -124,6 +125,7 @@ def test_quantity_prompt_en_uses_dynamic_range():
     assert "eight hundred ninety" in prompt
     assert "dotted across the whole canvas" in prompt
     assert "finely across the whole canvas" in prompt
+    assert "same foreground and background color" in prompt
     assert "six hundred ten small white circles randomly" not in prompt
     assert "eight hundred ninety small gray circles randomly" not in prompt
 
@@ -133,3 +135,25 @@ def test_sanitize_placement_words_removes_random_terms():
     assert "random" not in _sanitize_placement_words(
         "Scatter five red circles randomly. Radius 0.04."
     ).lower()
+
+
+def test_contrast_prompt_selects_invisible_examples():
+    prompt = _build_system_prompt("白い背景に白い線を引く")
+    assert "背景色と主描画色を同じにしてはいけない" in prompt
+    assert "面積の少ない方" in prompt
+    assert "背景を灰で塗りつぶす" in prompt
+    assert "灰背景は入力で明示された場合だけ" in prompt
+    assert "白い背景に白い線" in prompt
+    assert "黒い横線" in prompt
+    assert "青い短い線" in _build_system_prompt("白い雪を白い背景に散らす")
+
+
+def test_contrast_prompt_en_selects_invisible_examples():
+    prompt = _build_system_prompt("white lines on a white background", lang="en")
+    assert "same foreground and background color" in prompt
+    assert "smaller visual area" in prompt
+    assert "Fill background with gray" in prompt
+    assert "only when the input explicitly asks" in prompt
+    assert "White lines on a white background" in prompt
+    assert "black horizontal line" in prompt
+    assert "short blue lines" in _build_system_prompt("white snow on a white background", lang="en")

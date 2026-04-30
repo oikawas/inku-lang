@@ -111,6 +111,18 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 「背景を塗りつぶす」「背景を○色にする」「暗い背景」→ 「背景を○色で塗りつぶす。」(独立した文として最初に置く)。
 例: 「黒い背景に白い線」→ 「背景を黒で塗りつぶす。白い横線を中央に引く。」
 
+# コントラスト保持
+
+背景色と主描画色を同じにしてはいけない。実質的に見えない正規化は禁止。
+
+- 背景と描画が同色の場合、**面積の少ない方**を変更する。通常は線・小図形・点などの描画色を変える
+- 背景が小さな領域で、主題図形が大きい場合だけ背景側を変える
+- 白い背景 + 白い線/小図形 → 黒・青・赤・緑など、文脈に合う可視色へ変える
+- 黒い背景 + 黒い線/小図形 → 白・灰・青などへ変える
+- コントラスト調整のためだけに「背景を灰で塗りつぶす」を出力してはいけない。灰背景は入力で明示された場合だけ使う
+- 白い雪・白い星・白い月など白が主題の場合でも、必ず背景を灰にする必要はない。面積の少ない側や補助要素を青・黒・赤・緑などへ変えてよい
+- 明示的な色指定が背景と同じ場合 → 主題性と面積を見て、近い可視色または構図上自然な別色を選ぶ
+
 # Saijiki (歳時記)
 
 かたち: 円、楕円、三角、四角、線、弧
@@ -307,6 +319,21 @@ EXAMPLE_POOL: list[dict] = [
         "keywords": ["背景", "赤", "青", "緑", "灰", "空色", "地色"],
         "input": "青い背景に黒い縦線を五本引く",
         "output": "背景を青で塗りつぶす。黒い縦線を横に五本並べる。",
+    },
+    {
+        "keywords": ["白", "背景", "線", "見えない", "同じ色", "同化"],
+        "input": "白い背景に白い線を引く",
+        "output": "背景を白で塗りつぶす。黒い横線を中央に引く。",
+    },
+    {
+        "keywords": ["白", "雪", "星", "月", "背景", "夜"],
+        "input": "白い雪を白い背景に散らす",
+        "output": "背景を白で塗りつぶす。青い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。",
+    },
+    {
+        "keywords": ["白", "月", "大きい", "余白", "背景"],
+        "input": "白い大きな月を白い背景に置く",
+        "output": "背景を青で塗りつぶす。白い大きな円を上端近くに置く。半径は0.15。",
     },
     # 色とりどり・多色配色
     {
@@ -544,6 +571,21 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Fill background with black. Draw a white horizontal line at center.",
     },
     {
+        "keywords": ["white", "background", "line", "invisible", "same color", "contrast"],
+        "input": "White lines on a white background",
+        "output": "Fill background with white. Draw a black horizontal line at center.",
+    },
+    {
+        "keywords": ["white", "snow", "stars", "moon", "background", "night"],
+        "input": "White snow on a white background",
+        "output": "Fill background with white. Scatter one hundred thirty-seven short blue lines from top to bottom. Swaying slowly.",
+    },
+    {
+        "keywords": ["white", "moon", "large", "background", "dominant"],
+        "input": "A large white moon on a white background",
+        "output": "Fill background with blue. Place a large white circle near the top edge. Radius 0.15.",
+    },
+    {
         "keywords": ["tall", "narrow", "portrait", "vertical", "rectangle"],
         "input": "Place a tall rectangle at center",
         "output": "Place a tall rectangle at center.",
@@ -662,6 +704,18 @@ Default if unspecified: "in red, blue, green, black, gray"
 
 "fill background" / "black background" → "Fill background with X." (as first sentence)
 Example: "black background with white lines" → "Fill background with black. Draw a white horizontal line at center."
+
+# Contrast Preservation
+
+Do not normalize to the same foreground and background color. Invisible output is invalid.
+
+- if foreground and background match, change the **smaller visual area**. Usually this means changing lines, small shapes, or dots rather than the whole background
+- only change the background when the matching subject is large and visually dominant
+- white background + white line/small shape → change the drawing to a context-fitting visible color such as black, blue, red, or green
+- black background + black line/small shape → change the drawing to white, gray, or blue
+- Do not output "Fill background with gray" only as a contrast fallback. Use gray background only when the input explicitly asks for it
+- if white snow/stars/moon are the subject, do not always force gray. You may change the smaller side or supporting elements to blue, black, red, or green when that fits the context
+- if an explicit foreground color matches the background → choose a nearby visible color or a compositionally natural contrasting color
 
 # Saijiki (Vocabulary)
 

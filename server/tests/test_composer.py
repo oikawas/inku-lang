@@ -129,6 +129,14 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "300〜800" in SYSTEM_PROMPT
     assert "700〜1000" in SYSTEM_PROMPT
     assert "610" in SYSTEM_PROMPT
+    assert "実質的に見えない instruction" in SYSTEM_PROMPT
+    assert "面積の少ない側" in SYSTEM_PROMPT
+    assert "background=\"gray\"" in SYSTEM_PROMPT
+    assert "灰背景は正規化DDLで明示された場合のみ" in SYSTEM_PROMPT
+    assert "白い横線を中央に引く" in SYSTEM_PROMPT
+    assert "白い線を可視化" in SYSTEM_PROMPT
+    assert "白い短い線を上から下へ百三十七本" in SYSTEM_PROMPT
+    assert "color\":\"blue" in SYSTEM_PROMPT
     assert "配置語を優先" in SYSTEM_PROMPT
     assert "上から下へ散らす" in SYSTEM_PROMPT
     assert "三分割の交点" in SYSTEM_PROMPT
@@ -156,6 +164,13 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "300–800" in SYSTEM_PROMPT_EN
     assert "700–1000" in SYSTEM_PROMPT_EN
     assert "610" in SYSTEM_PROMPT_EN
+    assert "effectively invisible instructions" in SYSTEM_PROMPT_EN
+    assert "smaller visual area" in SYSTEM_PROMPT_EN
+    assert 'background="gray"' in SYSTEM_PROMPT_EN
+    assert "only when normalized DDL explicitly asks" in SYSTEM_PROMPT_EN
+    assert "white line made visible" in SYSTEM_PROMPT_EN
+    assert "short white lines from top to bottom" in SYSTEM_PROMPT_EN
+    assert "color\":\"blue" in SYSTEM_PROMPT_EN
     assert "prioritize that placement phrase" in SYSTEM_PROMPT_EN
     assert "top to bottom" in SYSTEM_PROMPT_EN
     assert "rule-of-thirds point" in SYSTEM_PROMPT_EN

@@ -130,6 +130,34 @@
 
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress">
+		<svg class="batch-crab" viewBox="0 0 74 42" aria-hidden="true">
+			<g class="crab-walk">
+				<ellipse class="crab-sand" cx="37" cy="35" rx="20" ry="3.5" />
+				<g class="crab-bow">
+					<g class="crab-bury">
+						<path class="crab-leg leg-a" d="M23 28 L14 34 M28 29 L22 37 M46 29 L52 37 M51 28 L60 34" />
+						<ellipse class="crab-body" cx="37" cy="24" rx="18" ry="11" />
+						<path class="crab-shell" d="M23 23 Q37 9 51 23" />
+						<g class="crab-claw claw-left">
+							<path d="M21 23 C10 18 9 10 16 8" />
+							<path class="claw-pincer" d="M15 8 C9 4 10 14 16 12 C21 16 22 6 15 8 Z" />
+						</g>
+						<g class="crab-claw claw-right">
+							<path d="M53 23 C64 18 65 10 58 8" />
+							<path class="claw-pincer" d="M59 8 C65 4 64 14 58 12 C53 16 52 6 59 8 Z" />
+						</g>
+						<g class="crab-eyes">
+							<path d="M31 15 L29 8 M43 15 L45 8" />
+							<circle class="eye-white" cx="29" cy="7" r="3.3" />
+							<circle class="eye-white" cx="45" cy="7" r="3.3" />
+							<circle class="eye-dot eye-left" cx="29" cy="7" r="1.2" />
+							<circle class="eye-dot eye-right" cx="45" cy="7" r="1.2" />
+						</g>
+						<path class="crab-mouth" d="M33 25 Q37 28 41 25" />
+					</g>
+				</g>
+			</g>
+		</svg>
 		<span>{t().batchProgress(batchCurrent, batchTotal)}</span>
 		<span class="batch-token-total">{t().batchTokenTotal(batchTokensInTotal, batchTokensOutTotal)}</span>
 		<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
@@ -251,6 +279,75 @@
 		background: var(--panel); font-size: 12px; color: var(--fg2);
 		margin-top: 8px;
 	}
+	.batch-crab {
+		width: 46px;
+		height: 28px;
+		flex: 0 0 46px;
+		overflow: visible;
+	}
+	.crab-sand {
+		fill: #cbb48a;
+		opacity: 0.45;
+		animation: crabSand 7.8s ease-in-out infinite;
+	}
+	.crab-walk {
+		transform-origin: 37px 24px;
+		animation: crabWalk 6.8s ease-in-out infinite;
+	}
+	.crab-bow {
+		transform-origin: 37px 30px;
+		animation: crabBow 8.4s ease-in-out infinite;
+	}
+	.crab-bury {
+		transform-origin: 37px 34px;
+		animation: crabBury 7.8s ease-in-out infinite;
+	}
+	.crab-body {
+		fill: #c75b43;
+		stroke: #7e2d24;
+		stroke-width: 2;
+	}
+	.crab-shell,
+	.crab-mouth {
+		fill: none;
+		stroke: #7e2d24;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+	}
+	.crab-leg,
+	.crab-claw path,
+	.crab-eyes path {
+		fill: none;
+		stroke: #7e2d24;
+		stroke-width: 2.4;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.leg-a { animation: crabLegs 0.72s ease-in-out infinite; transform-origin: 37px 30px; }
+	.crab-claw { transform-origin: 37px 24px; }
+	.claw-left {
+		animation: clawLeft 2.4s ease-in-out infinite;
+		transform-origin: 18px 21px;
+	}
+	.claw-right {
+		animation: clawRight 2.7s ease-in-out infinite;
+		transform-origin: 56px 21px;
+	}
+	.claw-pincer {
+		fill: #e07a52;
+		stroke: #7e2d24;
+		stroke-width: 1.8;
+	}
+	.eye-white {
+		fill: var(--panel);
+		stroke: #7e2d24;
+		stroke-width: 1.5;
+	}
+	.eye-dot {
+		fill: #20201f;
+		animation: crabEyes 1.9s steps(1, end) infinite;
+	}
+	.eye-right { animation-delay: 0.12s; }
 	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
 	.batch-token-total { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
 	.stop-sm {
@@ -375,5 +472,47 @@
 	.batch-observe-body :global(.ddl-token-emotion) {
 		color: #9b7a66;
 		font-style: inherit;
+	}
+	@keyframes crabWalk {
+		0%, 100% { transform: translateX(-8px); }
+		18% { transform: translateX(5px); }
+		34% { transform: translateX(10px); }
+		48% { transform: translateX(4px); }
+		66% { transform: translateX(-7px); }
+		84% { transform: translateX(-11px); }
+	}
+	@keyframes crabLegs {
+		0%, 100% { transform: translateX(0); }
+		50% { transform: translateX(1.6px); }
+	}
+	@keyframes clawLeft {
+		0%, 18%, 54%, 100% { transform: rotate(0deg); }
+		25%, 32% { transform: rotate(-24deg) translateY(-1px); }
+		40% { transform: rotate(7deg); }
+	}
+	@keyframes clawRight {
+		0%, 28%, 62%, 100% { transform: rotate(0deg); }
+		36%, 44% { transform: rotate(25deg) translateY(-1px); }
+		52% { transform: rotate(-7deg); }
+	}
+	@keyframes crabEyes {
+		0%, 100% { transform: translateX(0); }
+		22% { transform: translateX(-1.3px); }
+		44% { transform: translateX(1.3px); }
+		68% { transform: translateY(1px); }
+	}
+	@keyframes crabBury {
+		0%, 56%, 100% { transform: translateY(0); opacity: 1; }
+		67%, 72% { transform: translateY(9px); opacity: 0.62; }
+		80% { transform: translateY(2px); opacity: 1; }
+	}
+	@keyframes crabSand {
+		0%, 58%, 100% { transform: scaleX(1); opacity: 0.45; }
+		68%, 76% { transform: scaleX(1.35); opacity: 0.72; }
+	}
+	@keyframes crabBow {
+		0%, 42%, 88%, 100% { transform: rotate(0deg); }
+		48%, 56% { transform: rotate(7deg) translateY(2px); }
+		62% { transform: rotate(-3deg); }
 	}
 </style>

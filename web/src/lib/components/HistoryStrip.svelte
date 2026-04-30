@@ -56,45 +56,61 @@
 		catalogName,
 		shortModel
 	}: Props = $props();
+
+	let historyCollapsed = $state(false);
 </script>
 
 {#if historyTotal > 0}
-	<div class="history-strip">
+	<div class="history-strip" class:collapsed={historyCollapsed}>
 		<div class="history-head">
 			<button class="history-title-btn" onclick={onOpenManager}>
 				{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
 			</button>
-			<div class="history-page-nav">
-				<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={historyPage <= 0}>{t().historyNewerPage(historyNavSpan)}</button>
-				<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
-				<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={historyPage >= historyTotalPages - 1}>{t().historyOlderPage(historyNavSpan)}</button>
+			<div class="history-head-actions">
+				{#if !historyCollapsed}
+					<div class="history-page-nav">
+						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={historyPage <= 0}>{t().historyNewerPage(historyNavSpan)}</button>
+						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
+						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={historyPage >= historyTotalPages - 1}>{t().historyOlderPage(historyNavSpan)}</button>
+					</div>
+				{/if}
+				<button
+					class="ghost-btn history-collapse-btn"
+					onclick={() => (historyCollapsed = !historyCollapsed)}
+					aria-label={historyCollapsed ? t().historyExpand : t().historyCollapse}
+					title={historyCollapsed ? t().historyExpand : t().historyCollapse}
+				>
+					{historyCollapsed ? '⌃' : '⌄'}
+				</button>
 			</div>
 		</div>
-		<div class="thumb-strip">
-			{#each historyItems as it, i (it.id ?? it.at)}
-				<button
-					class="thumb"
-					class:current={i === historyCursor}
-					onclick={() => onLoadIteration(i)}
-				>
-					<div class="thumb-tooltip">
-						<div class="tooltip-title">#{historyIndexLabel(i)}</div>
-						<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(it)}</strong></div>
-						<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
-						<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
-						<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
-					</div>
-					<HistoryThumbnail item={it} scope="strip" size="strip" />
-					<div class="thumb-meta">
-						<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyIndexLabel(i))}</span>
-						{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
-					</div>
-					{#if i === historyCursor}
-						<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
-					{/if}
-				</button>
-			{/each}
-		</div>
+		{#if !historyCollapsed}
+			<div class="thumb-strip">
+				{#each historyItems as it, i (it.id ?? it.at)}
+					<button
+						class="thumb"
+						class:current={i === historyCursor}
+						onclick={() => onLoadIteration(i)}
+					>
+						<div class="thumb-tooltip">
+							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
+							<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(it)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
+						</div>
+						<HistoryThumbnail item={it} scope="strip" size="strip" />
+						<div class="thumb-meta">
+							<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyIndexLabel(i))}</span>
+							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
+						</div>
+						{#if i === historyCursor}
+							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
+						{/if}
+					</button>
+				{/each}
+			</div>
+		{/if}
 	</div>
 {/if}
 
@@ -107,11 +123,17 @@
 		padding: 8px 16px 10px;
 		flex-shrink: 0;
 	}
+	.history-strip.collapsed {
+		padding: 6px 16px;
+	}
 	.history-head {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		margin-bottom: 7px;
+	}
+	.history-strip.collapsed .history-head {
+		margin-bottom: 0;
 	}
 	.history-title-btn {
 		border: 1px solid var(--border2);
@@ -133,6 +155,7 @@
 		box-shadow: 0 2px 8px rgba(42,74,114,0.16);
 	}
 	.history-count { color: var(--fg3); font-weight: 400; }
+	.history-head-actions { display: flex; align-items: center; gap: 8px; }
 	.history-page-nav { display: flex; align-items: center; gap: 6px; }
 	.history-page-indicator {
 		font-size: 11px;
@@ -142,6 +165,14 @@
 		text-align: center;
 	}
 	.history-nav-btn { min-width: 92px; }
+	.history-collapse-btn {
+		width: 28px;
+		min-width: 28px;
+		height: 24px;
+		padding: 0;
+		font-size: 14px;
+		line-height: 1;
+	}
 	.thumb-strip {
 		display: flex;
 		gap: 7px;

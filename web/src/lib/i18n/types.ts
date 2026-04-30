@@ -107,6 +107,8 @@ export interface LangPack {
 
 	// History
 	historyTitle: string;
+	historyCollapse: string;
+	historyExpand: string;
 	historyNewerPage: (n: number) => string;
 	historyOlderPage: (n: number) => string;
 	historyClearBtn: string;

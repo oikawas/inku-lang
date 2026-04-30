@@ -94,6 +94,8 @@ export const en: LangPack = {
 	},
 
 	historyTitle: 'history',
+	historyCollapse: 'collapse history',
+	historyExpand: 'show history',
 	historyNewerPage: (n) => `← newer ${n}`,
 	historyOlderPage: (n) => `older ${n} →`,
 	historyClearBtn: 'clear all',

@@ -94,6 +94,8 @@ export const ja: LangPack = {
 	},
 
 	historyTitle: '履歴',
+	historyCollapse: '履歴エリアを仕舞う',
+	historyExpand: '履歴エリアを表示',
 	historyNewerPage: (n) => `← 新しい${n}件`,
 	historyOlderPage: (n) => `古い${n}件 →`,
 	historyClearBtn: '全て消す',

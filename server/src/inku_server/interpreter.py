@@ -16,6 +16,8 @@ from __future__ import annotations
 import os
 import re
 
+from .llm_retry import call_with_llm_retry
+
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"
 MAX_TOKENS = 1024
 
@@ -863,15 +865,17 @@ def _interpret_openai_detail(
     else:
         user_content = text
 
-    resp = client.chat.completions.create(
-        model=model,
-        max_tokens=MAX_TOKENS,
-        temperature=0.3,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content},
-        ],
-        stream=False,
+    resp = call_with_llm_retry(
+        lambda: client.chat.completions.create(
+            model=model,
+            max_tokens=MAX_TOKENS,
+            temperature=0.3,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            stream=False,
+        )
     )
     usage = resp.usage
     tin: int | None = getattr(usage, "prompt_tokens", None)

@@ -17,6 +17,7 @@ import os
 import re
 from typing import Any
 
+from .llm_retry import call_with_llm_retry
 from .schema import Score
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
@@ -483,17 +484,19 @@ def _compose_openai(user_msg: str, *, model: str | None = None, system_prompt: s
         },
     }
 
-    resp = client.chat.completions.create(
-        model=model,
-        max_tokens=MAX_TOKENS,
-        temperature=0.0,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_msg},
-        ],
-        tools=[tool],
-        tool_choice={"type": "function", "function": {"name": "submit_score"}},
-        stream=False,
+    resp = call_with_llm_retry(
+        lambda: client.chat.completions.create(
+            model=model,
+            max_tokens=MAX_TOKENS,
+            temperature=0.0,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_msg},
+            ],
+            tools=[tool],
+            tool_choice={"type": "function", "function": {"name": "submit_score"}},
+            stream=False,
+        )
     )
     usage = resp.usage
     tin: int | None = getattr(usage, "prompt_tokens", None)

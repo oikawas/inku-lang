@@ -3,7 +3,7 @@
 </script>
 
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { annotate } from '$lib/highlight';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
@@ -878,6 +878,7 @@
 	let historyManagerTab = $state<'thumbs' | 'list'>('thumbs');
 	let historyManagerPage = $state(0);
 	let historyManagerLoading = $state(false);
+	let historyManagerRequestId = 0;
 	let historyStarredOnly = $state(false);
 	let historyManagerStarredOnly = $state(false);
 	let managerHistoryItems = $state<Iteration[]>([]);
@@ -1187,26 +1188,40 @@
 		} catch { /* ignore */ }
 	}
 
-	async function fetchHistoryManager(): Promise<void> {
+	type HistoryManagerFetchOptions = {
+		view?: 'active' | 'trash';
+		page?: number;
+		search?: string;
+		starredOnly?: boolean;
+	};
+
+	async function fetchHistoryManager(options: HistoryManagerFetchOptions = {}): Promise<void> {
 		if (!authToken) return;
+		const requestId = ++historyManagerRequestId;
+		const view = options.view ?? historyManagerView;
+		const page = options.page ?? historyManagerPage;
+		const search = options.search ?? historySearch.trim();
+		const starredOnly = options.starredOnly ?? historyManagerStarredOnly;
 		historyManagerLoading = true;
 		try {
-			const trashed = historyManagerView === 'trash';
-			const offset = historyManagerPage * HISTORY_MANAGER_PAGE_SIZE;
+			const trashed = view === 'trash';
+			const offset = page * HISTORY_MANAGER_PAGE_SIZE;
 			const params = new URLSearchParams({
 				offset: String(offset),
 				limit: String(HISTORY_MANAGER_PAGE_SIZE),
-				q: historySearch.trim(),
+				q: search,
 			});
 			if (trashed) params.set('trashed', 'true');
-			if (historyManagerStarredOnly) params.set('starred', 'true');
+			if (starredOnly) params.set('starred', 'true');
 			const r = await apiFetch(`/api/history?${params.toString()}`);
+			if (requestId !== historyManagerRequestId) return;
 			if (!r.ok) return;
 			const data = await r.json();
+			if (requestId !== historyManagerRequestId) return;
 			if (trashed) {
 				managerTrashItems = data.items;
 				managerTrashTotal = data.total;
-				if (!historySearch.trim()) {
+				if (!search) {
 					trashItems = data.items.slice(0, 100);
 					trashTotal = data.total;
 				}
@@ -1214,13 +1229,20 @@
 				managerHistoryItems = data.items;
 				managerHistoryTotal = data.total;
 			}
-			if (data.items.length === 0 && data.total > 0 && historyManagerPage > 0) {
-				historyManagerPage -= 1;
-				await fetchHistoryManager();
+			if (data.items.length === 0 && data.total > 0 && page > 0) {
+				const fallbackPage = page - 1;
+				historyManagerPage = fallbackPage;
+				if (
+					historyManagerView === view &&
+					historySearch.trim() === search &&
+					historyManagerStarredOnly === starredOnly
+				) {
+					await fetchHistoryManager({ view, page: fallbackPage, search, starredOnly });
+				}
 			}
 		} catch { /* ignore */ }
 		finally {
-			historyManagerLoading = false;
+			if (requestId === historyManagerRequestId) historyManagerLoading = false;
 		}
 	}
 
@@ -1624,7 +1646,7 @@
 		historyManagerView = view;
 		historyManagerPage = 0;
 		selectedHistoryIds = [];
-		void fetchHistoryManager();
+		void fetchHistoryManager({ view, page: 0 });
 	}
 	function setHistoryStarredOnly(value: boolean) {
 		historyStarredOnly = value;
@@ -1636,7 +1658,7 @@
 		historyManagerStarredOnly = value;
 		historyManagerPage = 0;
 		selectedHistoryIds = [];
-		void fetchHistoryManager();
+		void fetchHistoryManager({ page: 0, starredOnly: value });
 	}
 
 	function setHistoryManagerPage(page: number) {
@@ -1644,7 +1666,7 @@
 		if (nextPage === historyManagerPage) return;
 		historyManagerPage = nextPage;
 		selectedHistoryIds = [];
-		void fetchHistoryManager();
+		void fetchHistoryManager({ page: nextPage });
 	}
 
 	$effect(() => {
@@ -1654,7 +1676,7 @@
 		const handle = setTimeout(() => {
 			historyManagerPage = 0;
 			selectedHistoryIds = [];
-			void fetchHistoryManager();
+			untrack(() => { void fetchHistoryManager({ page: 0, search: q }); });
 		}, q ? 250 : 0);
 		return () => clearTimeout(handle);
 	});
@@ -1841,14 +1863,6 @@
 		lastHistoryWindowSize = size;
 		if (!authToken || historyTotal <= 0) return;
 		void fetchHistoryOffset(historyOffset);
-	});
-
-	$effect(() => {
-		historyManagerStarredOnly;
-		if (!historyManagerOpen) return;
-		historyManagerPage = 0;
-		selectedHistoryIds = [];
-		void fetchHistoryManager();
 	});
 
 	// ── Mount ───────────────────────────────────────────────

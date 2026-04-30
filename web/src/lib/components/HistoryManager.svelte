@@ -410,6 +410,8 @@
 		background: var(--panel);
 		padding: 7px;
 		transition: border-color 0.12s, box-shadow 0.12s;
+		content-visibility: auto;
+		contain-intrinsic-size: 150px 164px;
 	}
 	.manager-thumb-wrap.selected {
 		border-color: var(--accent);
@@ -445,6 +447,10 @@
 	}
 	.thumb-star.starred { color: #d59b21; background: #fff6ce; border-color: rgba(213,155,33,0.45); }
 	.table-thumb-cell { position: relative; width: 66px; }
+	.table-thumb-cell :global(svg) {
+		content-visibility: auto;
+		contain-intrinsic-size: 48px 48px;
+	}
 	.table-thumb-cell .mini-star {
 		top: 2px;
 		right: 2px;

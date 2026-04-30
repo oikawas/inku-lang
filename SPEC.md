@@ -1303,6 +1303,33 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ## 変更履歴
 
+### v1.22 (2026-05-01)
+
+**サーバー保存負荷制御 + 履歴検索高速化 + 履歴管理ページング安定化**
+
+出力ファイル保存は DB 履歴保存とは分離し、バックグラウンド保存キューの上限を設けた。
+
+- `/api/paint` は履歴 DB への保存を正本とし、SVG / JSON / PNG などの artifact ファイル保存は副産物として扱う
+- artifact 保存用 executor は worker 数と queue 数に上限を持つ
+- 保存 queue が上限に達した場合、DB 履歴保存を優先し、artifact 保存だけをスキップできる
+- `/api/settings/status` は `output_save` に worker 数、queue 上限、使用中 slot 数、利用可能 slot 数を返す
+
+履歴検索は SQLite FTS5 を利用する。
+
+- `history_fts` virtual table を作成し、`history` の `input` / `ddl` / `stage1_prompt` / `stage2_prompt` / `model` / `catalog_id` を検索対象にする
+- insert / update / delete trigger で FTS index を履歴 DB と同期する
+- 検索語が短い場合や FTS が利用できない場合は従来の `LIKE` 検索へ fallback する
+
+履歴管理ダイアログのページングを安定化した。
+
+- 履歴管理のページ移動、検索、表示種別、スター絞り込みは、取得時点の条件を明示して `/api/history` を呼び出す
+- 古いレスポンスが後から返っても、最新リクエストでなければ表示状態へ反映しない
+- 検索の debounce effect は `untrack` で fetch を呼び、ページ移動やスター絞り込みの state 更新と競合しないようにする
+- ページあたり件数は 100 件を維持する
+- 履歴管理のサムネイルは `content-visibility` を利用し、100 件表示のまま画面外 SVG の描画負荷を抑える
+
+- Build 153
+
 ### v1.21 (2026-04-30)
 
 **アプリレール導入 + ダークモード導入 + ユーザー別 UI 状態保存 + スター付き履歴 + バッチ進捗視認性**

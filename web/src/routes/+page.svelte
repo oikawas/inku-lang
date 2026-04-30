@@ -132,6 +132,7 @@
 
 	// ── Loading ─────────────────────────────────────────────
 	let loading    = $state(false);
+	let activeRunMode = $state<'single' | 'batch' | null>(null);
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
@@ -792,7 +793,8 @@
 	const batchLines    = $derived(batchInput.split('\n'));
 	const lineNumbersText = $derived(batchLines.map((_, i) => String(i + 1)).join('\n'));
 	const batchNonEmpty = $derived(batchLines.filter((l) => l.trim()).length);
-	const batchRunning = $derived(inputMode === 'batch' && loading);
+	const batchRunning = $derived(activeRunMode === 'batch' && loading);
+	const singleRunning = $derived(activeRunMode === 'single' && loading);
 	const canSubmit     = $derived(
 		inputMode === 'single' ? !!input.trim() : batchNonEmpty > 0
 	);
@@ -894,7 +896,9 @@
 	// ── Submit ──────────────────────────────────────────────
 	async function submit() {
 		if (!canSubmit || loading) return;
+		const submittedMode = inputMode;
 		loading = true; error = null;
+		activeRunMode = submittedMode;
 		ddl = null; thinking = null; ddlSelection = { start: 0, end: 0 };
 		displayedHistoryItem = null;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
@@ -903,7 +907,7 @@
 		startTimer();
 
 		try {
-			if (inputMode === 'single') {
+			if (submittedMode === 'single') {
 				const r = await paintOne(input);
 				ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
@@ -958,7 +962,7 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e); result = null;
 		} finally {
-			stopTimer(); loading = false; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
+			stopTimer(); loading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
 		}
 	}
 
@@ -1516,6 +1520,9 @@
 	const ddlHighlighted = $derived(ddl !== null
 		? highlightDDL(ddl, ddlFocused && ddlSelection.start === ddlSelection.end ? ddlSelection.start : null)
 		: '');
+	const batchActiveDdlHighlighted = $derived(batchActiveDdl !== null
+		? highlightDDL(batchActiveDdl)
+		: escapeHtml(t().batchActiveDdlPending));
 
 	function escapeHtml(value: string) {
 		return value
@@ -1835,7 +1842,7 @@
 					{/if}
 
 					<!-- 描画する / progress -->
-					{#if loading && inputMode === 'single'}
+					{#if singleRunning}
 						<div class="progress-wrap">
 							<div class="progress-phases">
 								{#each [{ key: '解釈', label: t().statsInterp }, { key: '構造化', label: t().statsStruct }] as ph, i (ph.key)}
@@ -1916,7 +1923,7 @@
 								<span>{t().batchActiveDdlLabel}</span>
 								{#if batchActiveLine !== null}<span>{t().batchActiveLine(batchActiveLine)}</span>{/if}
 							</div>
-							<pre>{batchActiveDdl ?? t().batchActiveDdlPending}</pre>
+							<div class="batch-observe-body">{@html batchActiveDdlHighlighted}</div>
 						</div>
 					{/if}
 					{#if inputMode === 'batch' && batchFailureReport && !loading}
@@ -1947,7 +1954,7 @@
 				{/if}
 
 				<!-- 解釈 (正規化DDL) -->
-				{#if ddl !== null}
+				{#if ddl !== null && inputMode === 'single'}
 					<section class="panel-section">
 						<div class="section-head">
 							<span class="section-label">{t().ddlLabel}</span>
@@ -2723,7 +2730,7 @@
 		font-weight: 400;
 		font-variant-numeric: tabular-nums;
 	}
-	.batch-observe pre {
+	.batch-observe-body {
 		margin: 0;
 		padding: 9px 10px;
 		max-height: 132px;
@@ -2793,7 +2800,8 @@
 	.ddl-edit-ta::selection {
 		background: rgba(44, 62, 145, 0.22);
 	}
-	.ddl-highlight :global(.ddl-token) {
+	.ddl-highlight :global(.ddl-token),
+	.batch-observe-body :global(.ddl-token) {
 		border-radius: 2px;
 		font-weight: inherit;
 	}
@@ -2818,17 +2826,18 @@
 	@keyframes ddl-caret-blink {
 		50% { opacity: 0; }
 	}
-	.ddl-highlight :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
-	.ddl-highlight :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
-	.ddl-highlight :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
-	.ddl-highlight :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
-	.ddl-highlight :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
-	.ddl-highlight :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
-	.ddl-highlight :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
-	.ddl-highlight :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
-	.ddl-highlight :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
-	.ddl-highlight :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
-	.ddl-highlight :global(.ddl-token-emotion) {
+	.ddl-highlight :global(.ddl-token-shape), .batch-observe-body :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
+	.ddl-highlight :global(.ddl-token-touch), .batch-observe-body :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
+	.ddl-highlight :global(.ddl-token-line), .batch-observe-body :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
+	.ddl-highlight :global(.ddl-token-color), .batch-observe-body :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
+	.ddl-highlight :global(.ddl-token-motion), .batch-observe-body :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
+	.ddl-highlight :global(.ddl-token-place), .batch-observe-body :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
+	.ddl-highlight :global(.ddl-token-action), .batch-observe-body :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
+	.ddl-highlight :global(.ddl-token-angle), .batch-observe-body :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
+	.ddl-highlight :global(.ddl-token-ratio), .batch-observe-body :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
+	.ddl-highlight :global(.ddl-token-word), .batch-observe-body :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
+	.ddl-highlight :global(.ddl-token-emotion),
+	.batch-observe-body :global(.ddl-token-emotion) {
 		color: #9b7a66;
 		font-style: inherit;
 	}

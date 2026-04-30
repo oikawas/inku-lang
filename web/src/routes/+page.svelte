@@ -25,8 +25,12 @@
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { COLOR_CATALOGS, getCatalogById, getRenderColorMap, type RenderColorMap } from '$lib/colors';
+	import {
+		HistoryManagerState,
+		type HistoryItem,
+		type Score
+	} from '$lib/historyManagerState.svelte';
 
-	const HISTORY_MANAGER_PAGE_SIZE = 100;
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
@@ -40,8 +44,6 @@
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 	const BATCH_PROMPT_HISTORY_LIMIT = 20;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
-
-	type Score = { instructions: unknown[] };
 
 	type PaintResult = {
 		svg: string;
@@ -57,23 +59,7 @@
 		tokens_out_stage2: number | null;
 	};
 
-	type Iteration = {
-		id?: string;
-		input: string;
-		ddl: string | null;
-		thinking?: string | null;
-		score: Score;
-		svg: string;
-		at: number;
-		elapsed_ms?: number;
-		stage1_model?: string | null;
-		stage2_model?: string | null;
-		tokens_in?: number | null;
-		tokens_out?: number | null;
-		catalog_id?: string | null;
-		trashed?: boolean;
-		starred?: boolean;
-	};
+	type Iteration = HistoryItem;
 	type BatchFailure = {
 		line: number;
 		input: string;
@@ -593,6 +579,7 @@
 			historyTotal = 0;
 			trashItems = [];
 			trashTotal = 0;
+			historyManager.clear();
 		}
 	}
 
@@ -618,10 +605,7 @@
 			historyTotal = 0;
 			trashItems = [];
 			trashTotal = 0;
-			managerHistoryItems = [];
-			managerHistoryTotal = 0;
-			managerTrashItems = [];
-			managerTrashTotal = 0;
+			historyManager.clear();
 			loginPassword = '';
 			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
@@ -651,10 +635,7 @@
 		historyTotal = 0;
 		trashItems = [];
 		trashTotal = 0;
-		managerHistoryItems = [];
-		managerHistoryTotal = 0;
-		managerTrashItems = [];
-		managerTrashTotal = 0;
+		historyManager.clear();
 	}
 
 	async function addUser() {
@@ -873,28 +854,14 @@
 	const historyWindowSize = $derived(visibleThumbCount);
 	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
 	const historyTotalPages = $derived(Math.max(1, Math.ceil(historyTotal / historyWindowSize)));
-	let historyManagerOpen = $state(false);
-	let historyManagerView = $state<'active' | 'trash'>('active');
-	let historyManagerTab = $state<'thumbs' | 'list'>('thumbs');
-	let historyManagerPage = $state(0);
-	let historyManagerLoading = $state(false);
-	let historyManagerRequestId = 0;
 	let historyStarredOnly = $state(false);
-	let historyManagerStarredOnly = $state(false);
-	let managerHistoryItems = $state<Iteration[]>([]);
-	let managerHistoryTotal = $state(0);
-	let managerTrashItems = $state<Iteration[]>([]);
-	let managerTrashTotal = $state(0);
 	let trashItems = $state<Iteration[]>([]);
 	let trashTotal = $state(0);
-	let historySearch = $state('');
-	let selectedHistoryIds = $state<string[]>([]);
+	const historyManager = new HistoryManagerState(apiFetch, (items, total) => {
+		trashItems = items;
+		trashTotal = total;
+	});
 	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean } | null>(null);
-	const managedHistoryItems = $derived(historyManagerView === 'trash' ? managerTrashItems : managerHistoryItems);
-	const managedHistoryTotal = $derived(historyManagerView === 'trash' ? managerTrashTotal : managerHistoryTotal);
-	const historyManagerTotalPages = $derived(Math.max(1, Math.ceil(managedHistoryTotal / HISTORY_MANAGER_PAGE_SIZE)));
-	const historyManagerOffset = $derived(historyManagerPage * HISTORY_MANAGER_PAGE_SIZE);
-	const historyManagerShownTo = $derived(Math.min(historyManagerOffset + managedHistoryItems.length, managedHistoryTotal));
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
@@ -1188,71 +1155,12 @@
 		} catch { /* ignore */ }
 	}
 
-	type HistoryManagerFetchOptions = {
-		view?: 'active' | 'trash';
-		page?: number;
-		search?: string;
-		starredOnly?: boolean;
-	};
-
-	async function fetchHistoryManager(options: HistoryManagerFetchOptions = {}): Promise<void> {
-		if (!authToken) return;
-		const requestId = ++historyManagerRequestId;
-		const view = options.view ?? historyManagerView;
-		const page = options.page ?? historyManagerPage;
-		const search = options.search ?? historySearch.trim();
-		const starredOnly = options.starredOnly ?? historyManagerStarredOnly;
-		historyManagerLoading = true;
-		try {
-			const trashed = view === 'trash';
-			const offset = page * HISTORY_MANAGER_PAGE_SIZE;
-			const params = new URLSearchParams({
-				offset: String(offset),
-				limit: String(HISTORY_MANAGER_PAGE_SIZE),
-				q: search,
-			});
-			if (trashed) params.set('trashed', 'true');
-			if (starredOnly) params.set('starred', 'true');
-			const r = await apiFetch(`/api/history?${params.toString()}`);
-			if (requestId !== historyManagerRequestId) return;
-			if (!r.ok) return;
-			const data = await r.json();
-			if (requestId !== historyManagerRequestId) return;
-			if (trashed) {
-				managerTrashItems = data.items;
-				managerTrashTotal = data.total;
-				if (!search) {
-					trashItems = data.items.slice(0, 100);
-					trashTotal = data.total;
-				}
-			} else {
-				managerHistoryItems = data.items;
-				managerHistoryTotal = data.total;
-			}
-			if (data.items.length === 0 && data.total > 0 && page > 0) {
-				const fallbackPage = page - 1;
-				historyManagerPage = fallbackPage;
-				if (
-					historyManagerView === view &&
-					historySearch.trim() === search &&
-					historyManagerStarredOnly === starredOnly
-				) {
-					await fetchHistoryManager({ view, page: fallbackPage, search, starredOnly });
-				}
-			}
-		} catch { /* ignore */ }
-		finally {
-			if (requestId === historyManagerRequestId) historyManagerLoading = false;
-		}
-	}
-
 	type HistoryStarTarget = { id?: string; starred?: boolean };
 
 	function updateHistoryStarState(item: HistoryStarTarget) {
 		if (!item.id) return;
 		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
-		managerHistoryItems = managerHistoryItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
-		managerTrashItems = managerTrashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
+		historyManager.applyStarState(item);
 		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred };
 	}
@@ -1271,8 +1179,8 @@
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const updated = await r.json() as Iteration;
 			updateHistoryStarState(updated);
-			if (historyStarredOnly || historyManagerStarredOnly) {
-				await Promise.all([fetchHistoryOffset(historyOffset), fetchHistoryManager()]);
+			if (historyStarredOnly || historyManager.starredOnly) {
+				await Promise.all([fetchHistoryOffset(historyOffset), historyManager.fetch()]);
 			}
 		} catch (e) {
 			updateHistoryStarState(item);
@@ -1321,14 +1229,11 @@
 	}
 
 	function toggleHistorySelection(id: string) {
-		selectedHistoryIds = selectedHistoryIds.includes(id)
-			? selectedHistoryIds.filter((x) => x !== id)
-			: [...selectedHistoryIds, id];
+		historyManager.toggleSelection(id);
 	}
 
 	function selectAllManagedHistory() {
-		const ids = managedHistoryItems.map((it) => it.id).filter((id): id is string => !!id);
-		selectedHistoryIds = selectedHistoryIds.length === ids.length ? [] : ids;
+		historyManager.toggleSelectAll();
 	}
 
 	async function postHistoryIds(path: string, ids: string[]) {
@@ -1338,8 +1243,8 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ids })
 		});
-		selectedHistoryIds = [];
-		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), fetchHistoryManager()]);
+		historyManager.selectedIds = [];
+		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), historyManager.fetch()]);
 		if (historyItems.length === 0 && historyOffset > 0) await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize));
 	}
 
@@ -1452,14 +1357,14 @@
 			userMenuOpen = false;
 			if (settingsOpen) closeSettingsModal();
 			if (catalogOpen) cancelCatalogSelection();
-			historyManagerOpen = false;
+			historyManager.open = false;
 			confirmAction = null;
 		}
 		if (!shouldIgnoreCanvasShortcut(e)) handleCanvasKeydown(e);
 	}
 
 	function shouldIgnoreCanvasShortcut(e: KeyboardEvent) {
-		if (!currentUser || settingsOpen || catalogOpen || historyManagerOpen || confirmAction) return true;
+		if (!currentUser || settingsOpen || catalogOpen || historyManager.open || confirmAction) return true;
 		const target = e.target;
 		if (!(target instanceof HTMLElement)) return false;
 		if (target.isContentEditable) return true;
@@ -1629,54 +1534,22 @@
 	}
 
 	function openHistoryManager() {
-		historyManagerOpen = true;
-		historyManagerView = 'active';
-		historyManagerTab = 'thumbs';
-		historyManagerPage = 0;
-		historySearch = '';
-		selectedHistoryIds = [];
-		managerHistoryItems = historyItems;
-		managerHistoryTotal = historyTotal;
-		managerTrashItems = [];
-		managerTrashTotal = trashTotal;
-		void fetchHistoryManager();
+		historyManager.openWith(historyItems, historyTotal, trashTotal);
 	}
 
-	function setHistoryManagerView(view: 'active' | 'trash') {
-		historyManagerView = view;
-		historyManagerPage = 0;
-		selectedHistoryIds = [];
-		void fetchHistoryManager({ view, page: 0 });
-	}
 	function setHistoryStarredOnly(value: boolean) {
 		historyStarredOnly = value;
 		historyOffset = 0;
 		historyCursor = -1;
 		void fetchHistoryOffset(0);
 	}
-	function setHistoryManagerStarredOnly(value: boolean) {
-		historyManagerStarredOnly = value;
-		historyManagerPage = 0;
-		selectedHistoryIds = [];
-		void fetchHistoryManager({ page: 0, starredOnly: value });
-	}
-
-	function setHistoryManagerPage(page: number) {
-		const nextPage = Math.max(0, Math.min(page, historyManagerTotalPages - 1));
-		if (nextPage === historyManagerPage) return;
-		historyManagerPage = nextPage;
-		selectedHistoryIds = [];
-		void fetchHistoryManager({ page: nextPage });
-	}
 
 	$effect(() => {
-		const q = historySearch.trim();
-		if (!historyManagerOpen) return;
-		historyManagerView;
+		const q = historyManager.search.trim();
+		if (!historyManager.open) return;
+		historyManager.view;
 		const handle = setTimeout(() => {
-			historyManagerPage = 0;
-			selectedHistoryIds = [];
-			untrack(() => { void fetchHistoryManager({ page: 0, search: q }); });
+			untrack(() => { historyManager.searchChanged(q); });
 		}, q ? 250 : 0);
 		return () => clearTimeout(handle);
 	});
@@ -2173,26 +2046,26 @@
 {/if}
 
 <!-- ══ HISTORY MANAGER MODAL ══ -->
-{#if historyManagerOpen}
+{#if historyManager.open}
 	<HistoryManager
-		bind:historyManagerTab
-		bind:historySearch
-		{historyManagerView}
-		{historyManagerPage}
-		{historyManagerLoading}
-		{historyManagerTotalPages}
-		{historyManagerOffset}
-		{historyManagerShownTo}
-		{managedHistoryItems}
-		{managedHistoryTotal}
-		{managerTrashTotal}
+		bind:historyManagerTab={historyManager.tab}
+		bind:historySearch={historyManager.search}
+		historyManagerView={historyManager.view}
+		historyManagerPage={historyManager.page}
+		historyManagerLoading={historyManager.loading}
+		historyManagerTotalPages={historyManager.totalPages}
+		historyManagerOffset={historyManager.offset}
+		historyManagerShownTo={historyManager.shownTo}
+		managedHistoryItems={historyManager.items}
+		managedHistoryTotal={historyManager.total}
+		managerTrashTotal={historyManager.trashTotal}
 		{trashTotal}
-		{selectedHistoryIds}
-		{historyManagerStarredOnly}
-		onClose={() => (historyManagerOpen = false)}
-		onSetView={setHistoryManagerView}
-		onSetPage={setHistoryManagerPage}
-		onSetStarredOnly={setHistoryManagerStarredOnly}
+		selectedHistoryIds={historyManager.selectedIds}
+		historyManagerStarredOnly={historyManager.starredOnly}
+		onClose={() => (historyManager.open = false)}
+		onSetView={historyManager.setView}
+		onSetPage={historyManager.setPage}
+		onSetStarredOnly={historyManager.setStarredOnly}
 		onSelectAll={selectAllManagedHistory}
 		onAskTrash={askTrash}
 		onAskRestore={askRestore}

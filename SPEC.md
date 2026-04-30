@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.20**
+**Version: v1.21**
 
 ---
 
@@ -1231,6 +1231,9 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~バッチ描画の行単位失敗が見えない~~ → v1.11 以降で成功 / 失敗サマリーと失敗行詳細を UI に保持表示。v1.20 で実行中の現在行ハイライトと処理中解釈の読み取り専用表示を追加
 - ~~UI実装が単一巨大コンポーネントに集中している~~ → v1.20 で AuthPanel / InputPanel / BatchPanel / DdlEditor / CanvasPanel / HistoryStrip / HistoryManager / SettingsModal / ColorCatalogModal / SaijikiDrawer / ConfirmDialog に分割し、`+page.svelte` はページ全体の orchestration を主責務とする形へ整理
 - ~~サムネイル用SVG加工がレンダーごとに文字列処理される~~ → v1.20 で `HistoryThumbnail` へ分離し、サムネイル単位の `$derived` で加工済み SVG を管理する形へ変更
+- ~~UIテーマがブラウザローカル状態に閉じている~~ → v1.21 でライト / ダークモードをユーザー設定としてサーバー DB に保存し、ログインユーザーごとに復元する
+- ~~バッチ指示履歴が端末ごとに分断される~~ → v1.21 でバッチ指示履歴をユーザーごとにサーバー DB へ保存し、プルダウン選択時点で即復元する
+- ~~気に入った履歴を後から抽出できない~~ → v1.21 で履歴 DB にスター状態を保存し、ステータスバー / 履歴ストリップ / 履歴管理でスター操作とスターのみ表示フィルタを追加
 
 ---
 
@@ -1285,8 +1288,8 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
-- `db.py` — SQLAlchemy DB 層。履歴、ユーザーグループ、ユーザーアカウント、セッションを管理。パスワードは PBKDF2-SHA256 + salt で保存
-- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
+- `db.py` — SQLAlchemy DB 層。履歴、スター状態、ユーザーグループ、ユーザーアカウント、セッション、ユーザー別 UI 設定、バッチ指示履歴を管理。パスワードは PBKDF2-SHA256 + salt で保存
+- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/history/{id}/star`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
 
@@ -1297,6 +1300,51 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.21 (2026-04-30)
+
+**ユーザー別 UI 状態保存 + スター付き履歴 + バッチ進捗視認性**
+
+ライト / ダークモードをユーザー情報としてサーバー側に保存するようにした。
+
+- UI テーマは `user_accounts.ui_theme` に保存する
+- ログイン時に `/api/auth/me` から現在ユーザーの UI テーマを取得する
+- テーマ切替時は `PATCH /api/auth/me/settings` でサーバーへ保存する
+- ダークモードでは描画パネルの履歴移動ボタン、ズームボタン、倍率表示、記述 / バッチの描画ボタンのコントラストを確保する
+
+バッチパネルの指示履歴をユーザーごとのサーバー保存へ変更した。
+
+- `user_accounts.batch_prompt_history` に最大 20 件の指示履歴を保存する
+- `GET /api/auth/me/batch-prompt-history` / `PUT /api/auth/me/batch-prompt-history` を追加する
+- 指示履歴はプルダウンから選択した時点で指示 box へ復元する
+- 復元ボタンは廃止する
+- 新規作成時はバッチ指示 box と表示中のエラーをクリアする
+- バッチサンプルは 3 件分の入力例として、行番号 1〜3 に対応する形で表示する
+
+履歴にスター機能を追加した。
+
+- `history.starred` カラムを追加し、スター状態を DB に保存する
+- `PATCH /api/history/{item_id}/star` でスター状態を切り替える
+- `GET /api/history?starred=true` でスター付き履歴のみ取得できる
+- ステータスバー、履歴ストリップのサムネイル右上、履歴管理ダイアログのサムネイル右上でスターを表示 / 操作できる
+- 履歴ストリップと履歴管理ダイアログに、スター付きのみ表示するフィルタを追加する
+
+履歴管理ダイアログの視認性を調整した。
+
+- ダイアログ幅を広げ、サムネイル一覧とリスト表示の横方向の余裕を増やす
+- サムネイル hover のメタデータポップアップは fixed 表示にし、モーダルや画面端で切れないように viewport 内へ clamp する
+- ダークモード時のポップアップ色を調整する
+- hover からポップアップ表示までのディレイを長めにする
+
+バッチ実行中の進捗表示を強化した。
+
+- バッチパネルにも token 数を表示する
+- 現在行の token 数と、ここまでの累積 token 数を分けて表示する
+- バッチ進捗行に蟹のマスコットを表示する
+- 蟹は左右に移動し、鋏を上げる、目を動かす、砂に潜る、お辞儀する仕草を行う
+- 蟹は横移動できる生物として扱い、移動方向に合わせた左右反転は行わない
+
+- Build 151
 
 ### v1.20 (2026-04-30)
 
@@ -1561,6 +1609,9 @@ LLM 呼び出しや描画生成を行う API をログイン済みユーザー�
 
 - `POST /api/auth/login`
 - `GET /api/auth/me`
+- `PATCH /api/auth/me/settings`
+- `GET /api/auth/me/batch-prompt-history`
+- `PUT /api/auth/me/batch-prompt-history`
 - `POST /api/auth/logout`
 - `GET /api/user-groups`
 - `POST /api/user-groups`
@@ -1597,9 +1648,12 @@ LLM 呼び出しや描画生成を行う API をログイン済みユーザー�
 履歴 DB をユーザー単位に分離した。
 
 - `history.user_id` カラム追加
+- `history.starred` カラム追加
 - 既存履歴は初回起動時マイグレーションで admin 所有に移行
 - `GET /api/history` はログインユーザーの履歴のみ返す
+- `GET /api/history?starred=true` はログインユーザーのスター付き履歴のみ返す
 - `POST /api/history` はログインユーザーの履歴として保存
+- `PATCH /api/history/{item_id}/star` はログインユーザーの履歴 ID のみ対象
 - `DELETE /api/history` / trash / restore / permanent-delete はログインユーザーの履歴 ID のみ対象
 - 他ユーザーの履歴 ID を指定しても変更されない
 - 履歴を持つユーザー削除は孤立データ防止のため拒否する

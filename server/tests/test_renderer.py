@@ -56,6 +56,81 @@ def test_render_dashed_line_has_dasharray():
     assert "12,8" in svg
 
 
+def test_render_pencil_line_uses_material_texture():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "weight": "pencil",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert 'stroke-opacity="0.66"' in svg
+    assert 'stroke-dasharray="1,3"' in svg
+
+
+def test_render_chalk_line_uses_blurred_powder_texture():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "weight": "chalk",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert 'id="texture-chalk"' in svg
+    assert 'filter="url(#texture-chalk)"' in svg
+    assert 'stroke-dasharray="7,5,1,4"' in svg
+
+
+def test_render_rope_line_adds_twist_layers():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "weight": "rope",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert svg.count("<line") == 3
+    assert 'stroke-dasharray="14,5"' in svg
+    assert 'stroke-dasharray="4,8"' in svg
+
+
+def test_render_crayon_line_adds_rubbed_layers():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "weight": "crayon",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert svg.count("<line") == 3
+    assert 'stroke-dasharray="10,3,2,3"' in svg
+    assert 'stroke-dasharray="3,5"' in svg
+
+
 def test_render_circle():
     score = Score.model_validate(
         {

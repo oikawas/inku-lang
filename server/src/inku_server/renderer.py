@@ -58,6 +58,18 @@ STYLE_TO_DASH: dict[str, str | None] = {
     "dash_dot": "12,6,2,6",
 }
 
+WEIGHT_STYLE: dict[str, dict[str, str | float]] = {
+    "hair": {"stroke_opacity": 0.72, "stroke_linecap": "butt"},
+    "pencil": {"stroke_opacity": 0.66, "stroke_dasharray": "1,3"},
+    "pen": {"stroke_opacity": 1.0},
+    "rotring": {"stroke_opacity": 0.95, "stroke_linecap": "square"},
+    "crayon": {"stroke_opacity": 0.78, "stroke_dasharray": "10,3,2,3"},
+    "chalk": {"stroke_opacity": 0.7, "stroke_dasharray": "7,5,1,4"},
+    "brush_thin": {"stroke_opacity": 0.9, "stroke_linecap": "round"},
+    "brush_thick": {"stroke_opacity": 0.86, "stroke_linecap": "round"},
+    "rope": {"stroke_opacity": 0.88, "stroke_dasharray": "14,5"},
+}
+
 BACKGROUND = "#ffffff"
 
 # SPEC §13.8: 揺らぎは Renderer 層で生成する (JSON Score は決定的な楽譜)
@@ -67,6 +79,7 @@ SEGMENT_COUNT = 80  # polyline の分割数
 
 # 滲む (quality=pink): SVG feGaussianBlur の stdDeviation
 BLUR_STD: dict[str, float] = {"fine": 2.0, "medium": 6.0, "broad": 15.0}
+TEXTURE_BLUR_STD: dict[str, float] = {"chalk": 1.3, "brush_thick": 1.0}
 
 
 def _seed_for_instruction(ins: Instruction) -> int:
@@ -313,6 +326,22 @@ def _inject_blur_filters(
     return svg
 
 
+def _inject_texture_filters(svg: str, filters: dict[str, float]) -> str:
+    if not filters:
+        return svg
+    filter_xml = "".join(
+        f'<filter id="texture-{weight}" x="-20%" y="-20%" width="140%" height="140%">'
+        f'<feGaussianBlur in="SourceGraphic" stdDeviation="{std:.1f}"/>'
+        f'</filter>'
+        for weight, std in sorted(filters.items())
+    )
+    if "<defs />" in svg:
+        return svg.replace("<defs />", f"<defs>{filter_xml}</defs>", 1)
+    if "<defs/>" in svg:
+        return svg.replace("<defs/>", f"<defs>{filter_xml}</defs>", 1)
+    return svg.replace("<defs>", f"<defs>{filter_xml}", 1)
+
+
 def render(score: Score, color_map: dict[str, str] | None = None) -> str:
     cmap = {**COLOR_MAP, **(color_map or {})}
     dwg = svgwrite.Drawing(
@@ -327,6 +356,7 @@ def render(score: Score, color_map: dict[str, str] | None = None) -> str:
     content = dwg.g(clip_path=f"url(#{clip_id})")
 
     blur_needed: dict[str, float] = {}
+    texture_filters = {weight: TEXTURE_BLUR_STD[weight] for weight in _texture_filter_weights(score)}
     blur_elems: list[tuple[str, str]] = []
     elem_idx = 0
 
@@ -347,12 +377,21 @@ def render(score: Score, color_map: dict[str, str] | None = None) -> str:
 
     dwg.add(content)
     svg = dwg.tostring()
+    svg = _inject_texture_filters(svg, texture_filters)
     if blur_elems:
         svg = _inject_blur_filters(svg, blur_needed, blur_elems)
     return svg
 
 
 _CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})
+
+
+def _texture_filter_weights(score: Score) -> set[str]:
+    weights: set[str] = set()
+    for ins in score.instructions:
+        if ins.weight in TEXTURE_BLUR_STD:
+            weights.add(ins.weight)
+    return weights
 
 
 def _norm_label(value: str) -> str:
@@ -452,16 +491,78 @@ def _resolve_color(color: str, color_hint: str | None, cmap: dict[str, str]) -> 
 def _stroke_attrs(ins: Instruction, cmap: dict[str, str]) -> dict:
     do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled
     color = _resolve_color(ins.color, ins.color_hint, cmap)
+    weight_style = WEIGHT_STYLE.get(ins.weight, {})
     attrs = {
         "stroke": color,
         "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight],
         "fill": color if do_fill else "none",
-        "stroke_linecap": "round",
+        "stroke_linecap": weight_style.get("stroke_linecap", "round"),
     }
+    if "stroke_opacity" in weight_style:
+        attrs["stroke_opacity"] = weight_style["stroke_opacity"]
+    if ins.weight in TEXTURE_BLUR_STD:
+        attrs["filter"] = f"url(#texture-{ins.weight})"
     dash = STYLE_TO_DASH[ins.style]
+    texture_dash = weight_style.get("stroke_dasharray")
     if dash:
         attrs["stroke_dasharray"] = dash
+    elif texture_dash:
+        attrs["stroke_dasharray"] = texture_dash
     return attrs
+
+
+def _copy_attrs(attrs: dict) -> dict:
+    return dict(attrs)
+
+
+def _line_perp_offsets(start: tuple[float, float], end: tuple[float, float], amount: float) -> tuple[float, float]:
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length = math.hypot(dx, dy)
+    if length < 1e-6:
+        return 0.0, 0.0
+    return -dy / length * amount, dx / length * amount
+
+
+def _material_line_group(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    attrs: dict,
+):
+    if ins.weight not in ("crayon", "brush_thick", "rope"):
+        return None
+
+    group = dwg.g()
+    base = _copy_attrs(attrs)
+    group.add(dwg.line(start=start, end=end, **base))
+
+    if ins.weight == "rope":
+        ox, oy = _line_perp_offsets(start, end, 4.0)
+        twist_attrs = _copy_attrs(attrs)
+        twist_attrs["stroke_width"] = max(1.0, WEIGHT_TO_STROKE_WIDTH[ins.weight] * 0.35)
+        twist_attrs["stroke_opacity"] = 0.55
+        twist_attrs["stroke_dasharray"] = "4,8"
+        group.add(dwg.line(start=(start[0] + ox, start[1] + oy), end=(end[0] + ox, end[1] + oy), **twist_attrs))
+        group.add(dwg.line(start=(start[0] - ox, start[1] - oy), end=(end[0] - ox, end[1] - oy), **twist_attrs))
+    else:
+        seed = _seed_for_instruction(ins)
+        for idx, amount in enumerate((-2.2, 2.0)):
+            ox, oy = _line_perp_offsets(start, end, amount)
+            jitter = _hash_to_unit(idx, seed) * 1.5
+            layer_attrs = _copy_attrs(attrs)
+            layer_attrs["stroke_width"] = max(0.8, WEIGHT_TO_STROKE_WIDTH[ins.weight] * 0.35)
+            layer_attrs["stroke_opacity"] = 0.35 if ins.weight == "crayon" else 0.42
+            layer_attrs["stroke_dasharray"] = "3,5" if ins.weight == "crayon" else "18,7"
+            group.add(
+                dwg.line(
+                    start=(start[0] + ox + jitter, start[1] + oy),
+                    end=(end[0] + ox - jitter, end[1] + oy),
+                    **layer_attrs,
+                )
+            )
+    return _apply_rotation(group, ins)
 
 
 def _px(coord: tuple[float, float]) -> tuple[float, float]:
@@ -512,6 +613,9 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
                 start, end, ins.variation, _seed_for_instruction(ins)
             )
             return _apply_rotation(dwg.polyline(points=points, **attrs), ins)
+        textured = _material_line_group(dwg, ins, start, end, attrs)
+        if textured is not None:
+            return textured
         return _apply_rotation(dwg.line(start=start, end=end, **attrs), ins)
 
     if ins.primitive == "circle":

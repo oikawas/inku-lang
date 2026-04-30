@@ -237,11 +237,15 @@
 		border-radius: 2px;
 	}
 	.ghost-btn {
+		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
 		background: #fff;
-		color: var(--fg);
+		color: var(--fg2);
+		font-size: 11px;
 		font-family: inherit;
 		cursor: pointer;
 	}
+	.ghost-btn:hover { background: var(--bg2); }
+	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

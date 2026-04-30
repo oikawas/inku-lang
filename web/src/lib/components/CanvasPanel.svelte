@@ -196,7 +196,7 @@
 		<div class="png-wrap" bind:this={pngWrapEl}>
 			<button class="ghost-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>↓ PNG ▾</button>
 			{#if pngMenuOpen}
-				<div class="png-menu" onclick={(e) => e.stopPropagation()}>
+				<div class="png-menu">
 					{#each [[1080,t().pngStandard],[2160,t().pngHighRes],[1024,t().pngSquare],[2048,t().pngSquareHighRes]] as [size, label]}
 						<button onclick={() => { onDownloadPNG(size as number); pngMenuOpen = false; }}>
 							<span class="png-size">PNG {size}px</span>

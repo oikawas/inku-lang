@@ -86,7 +86,7 @@
 </script>
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
-<div class="history-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
+<div class="history-modal" role="dialog" aria-modal="true" tabindex="-1">
 	<div class="modal-head">
 		<div class="catalog-modal-title">{t().historyManagerTitle}</div>
 		<div class="modal-head-actions">

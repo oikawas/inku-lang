@@ -21,6 +21,10 @@
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
+		batchActiveTokensIn: number | null;
+		batchActiveTokensOut: number | null;
+		batchTokensInTotal: number;
+		batchTokensOutTotal: number;
 		liveMs: number;
 		batchFailureReport: BatchFailureReport | null;
 		canSubmit: boolean;
@@ -40,6 +44,10 @@
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
+		batchActiveTokensIn,
+		batchActiveTokensOut,
+		batchTokensInTotal,
+		batchTokensOutTotal,
 		liveMs,
 		batchFailureReport,
 		canSubmit,
@@ -123,6 +131,7 @@
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress">
 		<span>{t().batchProgress(batchCurrent, batchTotal)}</span>
+		<span class="batch-token-total">{t().batchTokenTotal(batchTokensInTotal, batchTokensOutTotal)}</span>
 		<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
 		<button class="stop-sm" onclick={onStop}>{t().stopBtn}</button>
 	</div>
@@ -135,7 +144,10 @@
 	<div class="batch-observe">
 		<div class="batch-observe-head">
 			<span>{t().batchActiveDdlLabel}</span>
-			{#if batchActiveLine !== null}<span>{t().batchActiveLine(batchActiveLine)}</span>{/if}
+			<div class="batch-observe-meta">
+				{#if batchActiveLine !== null}<span>{t().batchActiveLine(batchActiveLine)}</span>{/if}
+				<span>{t().batchTokenLine(batchActiveTokensIn, batchActiveTokensOut)}</span>
+			</div>
 		</div>
 		<div class="batch-observe-body">{@html batchActiveDdlHighlighted}</div>
 	</div>
@@ -240,6 +252,7 @@
 		margin-top: 8px;
 	}
 	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+	.batch-token-total { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
 	.stop-sm {
 		padding: 2px 7px; border: 1px solid var(--border2);
 		border-radius: var(--r); background: none;
@@ -321,7 +334,15 @@
 		font-size: 11px;
 		font-weight: 600;
 	}
-	.batch-observe-head span:last-child {
+	.batch-observe-meta {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: var(--fg3);
+		font-weight: 400;
+		font-variant-numeric: tabular-nums;
+	}
+	.batch-observe-meta span {
 		color: var(--fg3);
 		font-weight: 400;
 		font-variant-numeric: tabular-nums;

@@ -46,6 +46,8 @@ export interface LangPack {
 	batchActiveDdlLabel: string;
 	batchActiveDdlPending: string;
 	batchActiveLine: (line: number) => string;
+	batchTokenLine: (input: number | null, output: number | null) => string;
+	batchTokenTotal: (input: number, output: number) => string;
 
 	// Submit / loading
 	submitBtn: string;

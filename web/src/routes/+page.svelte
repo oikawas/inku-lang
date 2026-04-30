@@ -149,6 +149,10 @@
 	let batchPromptHistory = $state<string[]>([]);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
+	let batchActiveTokensIn = $state<number | null>(null);
+	let batchActiveTokensOut = $state<number | null>(null);
+	let batchTokensInTotal = $state(0);
+	let batchTokensOutTotal = $state(0);
 	let error        = $state<string | null>(null);
 
 	// ── Replay ──────────────────────────────────────────────
@@ -1003,6 +1007,7 @@
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
+		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 		startTimer();
 
 		try {
@@ -1016,6 +1021,7 @@
 				await refreshHistoryAfterServerSave();
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
+				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
 					.filter((item) => item.input);
@@ -1024,9 +1030,15 @@
 					if (!loading) break;
 					batchCurrent = i + 1;
 					batchActiveLine = lines[i].line;
+					batchActiveTokensIn = null;
+					batchActiveTokensOut = null;
 					try {
 						const r = await paintOne(lines[i].input, `#${lines[i].line} ${lines[i].input}`);
 						batchActiveDdl = r.ddl;
+						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
+						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
+						batchTokensInTotal += batchActiveTokensIn ?? 0;
+						batchTokensOutTotal += batchActiveTokensOut ?? 0;
 						thinking = r.thinking;
 						if (displayedHistoryItem === null) {
 							result = r;
@@ -1063,7 +1075,7 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e); result = null;
 		} finally {
-			stopTimer(); loading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
+			stopTimer(); loading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
 		}
 	}
 
@@ -1927,6 +1939,10 @@
 						{batchActiveDdlHighlighted}
 						{batchTotal}
 						{batchCurrent}
+						{batchActiveTokensIn}
+						{batchActiveTokensOut}
+						{batchTokensInTotal}
+						{batchTokensOutTotal}
 						{liveMs}
 						{batchFailureReport}
 						{batchPromptHistory}

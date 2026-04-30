@@ -51,6 +51,8 @@ export const ja: LangPack = {
 	batchActiveDdlLabel: '処理中の解釈',
 	batchActiveDdlPending: '解釈を待機中…',
 	batchActiveLine: (line) => `${line}行目`,
+	batchTokenLine: (input, output) => `現在 ${input ?? '-'}→${output ?? '-'}tok`,
+	batchTokenTotal: (input, output) => `累計 ${input}→${output}tok`,
 
 	submitBtn: '描画する',
 	stopBtn: '停止',

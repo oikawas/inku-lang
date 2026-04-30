@@ -51,6 +51,8 @@ export const en: LangPack = {
 	batchActiveDdlLabel: 'current interpretation',
 	batchActiveDdlPending: 'waiting for interpretation…',
 	batchActiveLine: (line) => `line ${line}`,
+	batchTokenLine: (input, output) => `current ${input ?? '-'}→${output ?? '-'}tok`,
+	batchTokenTotal: (input, output) => `total ${input}→${output}tok`,
 
 	submitBtn: 'draw',
 	stopBtn: 'stop',

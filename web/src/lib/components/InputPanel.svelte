@@ -25,6 +25,10 @@
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
+		batchActiveTokensIn: number | null;
+		batchActiveTokensOut: number | null;
+		batchTokensInTotal: number;
+		batchTokensOutTotal: number;
 		liveMs: number;
 		batchFailureReport: BatchFailureReport | null;
 		canSubmit: boolean;
@@ -52,6 +56,10 @@
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
+		batchActiveTokensIn,
+		batchActiveTokensOut,
+		batchTokensInTotal,
+		batchTokensOutTotal,
 		liveMs,
 		batchFailureReport,
 		canSubmit,
@@ -172,6 +180,10 @@
 			{batchActiveDdlHighlighted}
 			{batchTotal}
 			{batchCurrent}
+			{batchActiveTokensIn}
+			{batchActiveTokensOut}
+			{batchTokensInTotal}
+			{batchTokensOutTotal}
 			{liveMs}
 			{batchFailureReport}
 			{canSubmit}

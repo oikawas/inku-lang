@@ -4,11 +4,13 @@
 
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { SAIJIKI } from '$lib/saijiki';
 	import { annotate } from '$lib/highlight';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
+	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
+	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
+	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import {
 		PROVIDER_GROUPS,
 		DEFAULT_PROVIDER,
@@ -293,14 +295,6 @@
 	function activeColorMap(): RenderColorMap | null {
 		if (selectedCatalog === 'default') return null;
 		return getRenderColorMap(selectedCatalog);
-	}
-
-	function isLightColor(hex: string): boolean {
-		const value = hex.replace('#', '');
-		const r = parseInt(value.slice(0, 2), 16);
-		const g = parseInt(value.slice(2, 4), 16);
-		const b = parseInt(value.slice(4, 6), 16);
-		return (r * 299 + g * 587 + b * 114) / 1000 > 224;
 	}
 
 	// ── Settings tabs ────────────────────────────────────────
@@ -2100,53 +2094,13 @@
 
 </div><!-- /root -->
 
-<!-- ══ SAIJIKI DRAWER (fixed right) ══ -->
-<div class="saijiki-drawer" class:open={saijikiOpen} aria-hidden={!saijikiOpen}>
-	<div class="saijiki-inner">
-		<div class="saijiki-head">
-			<div>
-				<div class="saijiki-title">{t().saijikiTitle}</div>
-				<div class="saijiki-hint">{t().saijikiHint}</div>
-			</div>
-			<button class="saijiki-close" onclick={() => (saijikiOpen = false)} aria-label={t().closeLabel}>×</button>
-		</div>
-		<div class="saijiki-body">
-			<div class="saijiki-preview" class:empty={!activeSaijikiPreview}>
-				{#if activeSaijikiPreview}
-					<div class="saijiki-preview-art">{@html activeSaijikiPreview.svg}</div>
-					<div class="saijiki-preview-copy">
-						<div class="saijiki-preview-title">{activeSaijikiPreview.word}</div>
-						<div class="saijiki-preview-effect">{activeSaijikiPreview.effect}</div>
-						<div class="saijiki-preview-example">{activeSaijikiPreview.example}</div>
-					</div>
-				{:else}
-					<div class="saijiki-preview-placeholder">語彙にマウスを重ねると、描画への効き方を表示します。</div>
-				{/if}
-			</div>
-			{#each SAIJIKI as cat, ci (cat.key)}
-				{@const words = t().saijikiWords[cat.key] ?? cat.words}
-				<div class="saijiki-cat" style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
-					<div class="saijiki-cat-head">
-						<span class="saijiki-cat-ja">{cat.label}</span>
-						<span class="saijiki-cat-en">{cat.en}</span>
-					</div>
-					<div class="saijiki-chips">
-						{#each words as word, wi (word)}
-							{@const canonicalWord = cat.words[wi] ?? word}
-							<button
-								class="saijiki-chip"
-								onpointerdown={(e) => e.preventDefault()}
-								onclick={() => insertWord(word)}
-								onpointerenter={() => (activeSaijikiPreview = saijikiPreview(cat.key, canonicalWord, word))}
-								onfocus={() => (activeSaijikiPreview = saijikiPreview(cat.key, canonicalWord, word))}
-							>{word}</button>
-						{/each}
-					</div>
-				</div>
-			{/each}
-		</div>
-	</div>
-</div>
+<SaijikiDrawer
+	open={saijikiOpen}
+	bind:activePreview={activeSaijikiPreview}
+	onClose={() => (saijikiOpen = false)}
+	onInsertWord={insertWord}
+	previewForWord={saijikiPreview}
+/>
 
 <!-- ══ SETTINGS MODAL ══ -->
 {#if settingsOpen}
@@ -2401,156 +2355,49 @@
 
 <!-- ══ CATALOG MODAL ══ -->
 {#if catalogOpen}
-	<div class="modal-backdrop" onclick={cancelCatalogSelection} aria-hidden="true"></div>
-	<div class="catalog-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
-		<div class="catalog-modal-head">
-			<div class="catalog-modal-title">{t().colorCatalogTitle}</div>
-		</div>
-		<div class="catalog-body">
-			<div class="catalog-scroll">
-				{#each COLOR_CATALOGS as cat (cat.id)}
-					{@const active = selectedCatalog === cat.id}
-					<button
-						class="catalog-item"
-						class:active
-						onclick={() => setSelectedCatalog(cat.id)}
-					>
-						<div class="catalog-swatches">
-							{#each cat.swatches as hex (hex)}
-								<div class="catalog-swatch" style="background:{hex}"></div>
-							{/each}
-						</div>
-						<div class="catalog-info">
-							<div class="catalog-name">{cat.name}</div>
-							<div class="catalog-sub">{cat.sub}</div>
-						</div>
-						{#if active}<span class="catalog-check">✓</span>{/if}
-					</button>
-				{/each}
-			</div>
-			<div class="catalog-detail">
-				<div class="section-label">{currentCatalog.name} — {t().colorCatalogDetail}</div>
-				<div class="catalog-detail-list">
-					{#each currentCatalog.palette as color (color.code)}
-						<div class="catalog-color-row">
-							<div class="catalog-color-box" class:light={isLightColor(color.code)} style="background:{color.code}"></div>
-							<span class="catalog-color-name">{color.name}</span>
-							<span class="catalog-color-code">{color.code}</span>
-						</div>
-					{/each}
-				</div>
-			</div>
-		</div>
-		<div class="catalog-modal-foot">
-			<button class="ghost-btn" onclick={cancelCatalogSelection}>{t().confirmCancel}</button>
-			<button class="ghost-btn primary-inline" onclick={confirmCatalogSelection}>{t().colorCatalogConfirm}</button>
-		</div>
-	</div>
+	<ColorCatalogModal
+		{selectedCatalog}
+		{currentCatalog}
+		onSelectCatalog={setSelectedCatalog}
+		onCancel={cancelCatalogSelection}
+		onConfirm={confirmCatalogSelection}
+	/>
 {/if}
 
 <!-- ══ HISTORY MANAGER MODAL ══ -->
 {#if historyManagerOpen}
-	<div class="modal-backdrop" onclick={() => (historyManagerOpen = false)} aria-hidden="true"></div>
-	<div class="history-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
-		<div class="modal-head">
-			<div class="catalog-modal-title">{t().historyManagerTitle}</div>
-			<div class="modal-head-actions">
-				<button class="ghost-btn" class:ghost-active={historyManagerView === 'trash'} onclick={() => setHistoryManagerView(historyManagerView === 'trash' ? 'active' : 'trash')}>{t().historyTrashButton(managerTrashTotal || trashTotal)}</button>
-				<button class="catalog-close" onclick={() => (historyManagerOpen = false)}>×</button>
-			</div>
-		</div>
-		<div class="settings-tabs history-mode-tabs">
-			<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
-			<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
-		</div>
-		<div class="history-tools">
-			<span class="history-manager-count">
-				{#if managedHistoryTotal === 0}
-					0 / 0
-				{:else}
-					{historyManagerOffset + 1}-{historyManagerShownTo} / {managedHistoryTotal}
-				{/if}
-			</span>
-			<button class="ghost-btn" onclick={selectAllManagedHistory}>{t().historySelectAll}</button>
-			{#if historyManagerView === 'active'}
-				<button class="ghost-btn" onclick={() => askTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyMoveToTrash}</button>
-			{:else}
-				<button class="ghost-btn" onclick={() => askRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
-				<button class="danger-btn" onclick={() => askPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
-			{/if}
-			<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
-		</div>
-		<div class="history-manager-pager">
-			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
-			<span>{historyManagerLoading ? t().historyLoading : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
-			<button class="ghost-btn history-nav-btn" onclick={() => setHistoryManagerPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
-		</div>
-		{#if historyManagerTab === 'thumbs'}
-			<div class="history-thumb-grid-wrap">
-				<div class="history-thumb-grid">
-					{#each managedHistoryItems as it, i (it.id ?? it.at)}
-						<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
-							<label class="manager-check">
-								<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} />
-							</label>
-							<button class="thumb manager-thumb" onclick={() => historyManagerView === 'active' && loadIterationItem(it)}>
-								<div class="thumb-tooltip">
-									<div class="tooltip-title">#{historyManagerOffset + i + 1}</div>
-									<div>{t().historyTooltipModel}: {historyModelSummary(it)}</div>
-									<div>{t().historyTooltipSavedAt}: {formatHistoryDate(it.at)}</div>
-									<div>{t().historyTooltipSeconds}: {formatElapsed(it.elapsed_ms)}</div>
-									<div>{t().historyTooltipColorCatalog}: {catalogName(it.catalog_id)}</div>
-									<div>{t().historyTooltipTokens}: {historyTokenSummary(it)}</div>
-									<div class="tooltip-date">{historyPreviewText(it.input)}</div>
-								</div>
-								<div class="thumb-svg">{@html clippedHistorySvg(it, 'manager')}</div>
-								<div class="thumb-meta">
-									<span class="thumb-time">{formatElapsed(it.elapsed_ms)}</span>
-									{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
-								</div>
-							</button>
-							<div class="manager-thumb-actions">
-								{#if historyManagerView === 'active'}
-									<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>{t().deleteButton}</button>
-								{:else}
-									<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>{t().historyRestore}</button>
-									<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
-								{/if}
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{:else}
-			<div class="history-table-wrap">
-				<table class="history-table">
-					<thead>
-						<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyModelHeader}</th><th>{t().historySecondsHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historyActionHeader}</th></tr>
-					</thead>
-					<tbody>
-						{#each managedHistoryItems as it (it.id ?? it.at)}
-							<tr>
-								<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && toggleHistorySelection(it.id)} /></td>
-								<td><div class="history-mini">{@html clippedHistorySvg(it, 'table')}</div></td>
-								<td>{formatHistoryDate(it.at)}</td>
-								<td>{historyModelSummary(it)}</td>
-								<td>{formatElapsed(it.elapsed_ms)}</td>
-								<td>{catalogName(it.catalog_id)}</td>
-								<td>
-									{#if historyManagerView === 'active'}
-										<button class="ghost-btn" onclick={() => it.id && askTrash([it.id])}>{t().deleteButton}</button>
-									{:else}
-										<button class="ghost-btn" onclick={() => it.id && askRestore([it.id])}>{t().historyRestore}</button>
-										<button class="danger-btn" onclick={() => it.id && askPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
-	</div>
+	<HistoryManager
+		bind:historyManagerTab
+		bind:historySearch
+		{historyManagerView}
+		{historyManagerPage}
+		{historyManagerLoading}
+		{historyManagerTotalPages}
+		{historyManagerOffset}
+		{historyManagerShownTo}
+		{managedHistoryItems}
+		{managedHistoryTotal}
+		{managerTrashTotal}
+		{trashTotal}
+		{selectedHistoryIds}
+		onClose={() => (historyManagerOpen = false)}
+		onSetView={setHistoryManagerView}
+		onSetPage={setHistoryManagerPage}
+		onSelectAll={selectAllManagedHistory}
+		onAskTrash={askTrash}
+		onAskRestore={askRestore}
+		onAskPermanentDelete={askPermanentDelete}
+		onToggleSelection={toggleHistorySelection}
+		onLoadItem={loadIterationItem}
+		{historyModelSummary}
+		{formatHistoryDate}
+		{formatElapsed}
+		{catalogName}
+		{historyTokenSummary}
+		{historyPreviewText}
+		{clippedHistorySvg}
+		{shortModel}
+	/>
 {/if}
 
 {#if confirmAction}
@@ -2842,7 +2689,6 @@
 	}
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
 	.create-btn {
 		background: #fff7e8;
 		border-color: #d8b36a;
@@ -3194,225 +3040,15 @@
 	.stats-key { color: var(--fg3); }
 	.stats-total { font-weight: 500; }
 
-	.history-nav-btn { min-width: 92px; }
-
-	.thumb {
-		flex-shrink: 0; width: 82px;
-		border: 2px solid transparent;
-		border-radius: var(--r); overflow: hidden; background: #fff;
-		cursor: pointer; padding: 0; font-family: inherit; position: relative;
-		transition: border-color 0.1s;
-	}
-	.thumb:hover { overflow: visible; z-index: 2000; }
-	.thumb-tooltip {
-		position: absolute; bottom: calc(100% + 6px); left: 50%;
-		transform: translateX(-50%) translateY(4px);
-		opacity: 0; pointer-events: none;
-		background: rgba(26,25,23,0.92); color: #fff;
-		font-size: 11px; border-radius: var(--r);
-		padding: 8px 10px; white-space: nowrap;
-		text-align: left;
-		width: max-content;
-		max-width: min(360px, calc(100vw - 24px));
-		z-index: 3000; line-height: 1.7;
-		transition: opacity 0.15s, transform 0.15s;
-		box-shadow: 0 4px 18px rgba(0,0,0,0.18);
-	}
-	.thumb:hover .thumb-tooltip {
-		opacity: 1;
-		transform: translateX(-50%) translateY(0);
-	}
-	.tooltip-title { font-weight: 500; margin-bottom: 3px; }
-	.tooltip-date { color: rgba(255,255,255,0.55); margin-top: 3px; }
-	.thumb-svg {
-		width: 82px; height: 58px;
-		overflow: hidden;
-		overflow: clip;
-		clip-path: inset(0);
-		contain: paint;
-	}
-	.thumb-svg :global(svg) {
-		width: 100%;
-		height: 100%;
-		display: block;
-		overflow: hidden;
-		clip-path: inset(0);
-	}
-	.thumb-meta {
-		padding: 3px 5px; border-top: 1px solid var(--border);
-		display: flex; flex-direction: column; gap: 1px;
-	}
-	.thumb-time  { font-size: 11px; font-weight: 500; color: var(--fg2); }
-	.thumb-model { font-size: 10px; color: var(--fg3); }
-
-	/* ── Saijiki drawer ─────────────────────────────────────── */
-	.saijiki-drawer {
-		position: fixed; top: 0; right: 0; bottom: 0;
-		width: 0; overflow: hidden; z-index: 300;
-		transition: width 0.25s cubic-bezier(0.4,0,0.2,1);
-		pointer-events: none;
-	}
-	.saijiki-drawer.open { width: 280px; pointer-events: all; }
-
-	.saijiki-inner {
-		width: 280px; height: 100%;
-		background: #faf9f6; border-left: 1px solid var(--border);
-		display: flex; flex-direction: column;
-		box-shadow: -4px 0 24px rgba(0,0,0,0.08);
-	}
-
-	.saijiki-head {
-		padding: 16px 18px 12px;
-		border-bottom: 1px solid var(--border);
-		display: flex; align-items: flex-start; justify-content: space-between;
-		flex-shrink: 0;
-	}
-	.saijiki-title {
-		font-size: 17px; font-weight: 300; letter-spacing: 0.06em; color: var(--fg);
-	}
-	.saijiki-hint { font-size: 10px; color: var(--fg3); margin-top: 3px; line-height: 1.5; }
-	.saijiki-close {
-		width: 24px; height: 24px; border: none; background: none;
-		color: var(--fg3); font-size: 16px; cursor: pointer; flex-shrink: 0; margin-top: 2px;
-	}
-	.saijiki-body { flex: 1; overflow-y: auto; padding: 8px 0; }
-
-	.saijiki-preview {
-		position: sticky;
-		top: 0;
-		z-index: 2;
-		margin: 0 12px 8px;
-		padding: 10px;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		background: rgba(255, 253, 248, 0.96);
-		box-shadow: 0 6px 18px rgba(37, 34, 26, 0.08);
-		backdrop-filter: blur(4px);
-	}
-	.saijiki-preview.empty {
-		box-shadow: none;
-		background: rgba(255, 255, 255, 0.72);
-	}
-	.saijiki-preview-art {
-		height: 92px;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		overflow: hidden;
-		background: #fffdf8;
-	}
-	.saijiki-preview-art :global(svg) {
-		display: block;
-		width: 100%;
-		height: 100%;
-	}
-	.saijiki-preview-copy {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-		margin-top: 8px;
-	}
-	.saijiki-preview-title {
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--fg);
-	}
-	.saijiki-preview-effect {
-		font-size: 11px;
-		line-height: 1.45;
-		color: var(--fg2);
-	}
-	.saijiki-preview-example {
-		font-size: 10px;
-		line-height: 1.4;
-		color: var(--fg3);
-	}
-	.saijiki-preview-placeholder {
-		font-size: 11px;
-		line-height: 1.5;
-		color: var(--fg3);
-	}
-
-	.saijiki-cat { padding: 10px 18px; }
-	.saijiki-cat-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 8px; }
-	.saijiki-cat-ja { font-size: 13px; font-weight: 400; color: var(--fg); letter-spacing: 0.05em; }
-	.saijiki-cat-en { font-size: 9px; color: var(--fg3); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; }
-
-	.saijiki-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-	.saijiki-chip {
-		padding: 4px 9px; border: 1px solid var(--border2); border-radius: 3px;
-		background: #fff; color: var(--fg); font-size: 12px; cursor: pointer;
-		font-family: inherit; line-height: 1.3; transition: background 0.1s, border-color 0.1s;
-	}
-	.saijiki-chip:hover { background: var(--bg2); border-color: var(--fg3); }
-
 	/* ── Catalog modal ───────────────────────────────────────── */
 	.modal-backdrop {
 		position: fixed; inset: 0; z-index: 400;
 		background: rgba(0,0,0,0.25); backdrop-filter: blur(2px);
 	}
-	.catalog-modal {
-		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-		z-index: 401;
-		width: min(820px, calc(100vw - 32px)); max-height: 88vh;
-		background: #faf9f6; border-radius: var(--r-lg);
-		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
-		display: flex; flex-direction: column; overflow: hidden;
-	}
-	.catalog-modal-head {
-		display: flex; align-items: center; justify-content: space-between;
-		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-	}
 	.catalog-modal-title { font-size: 15px; font-weight: 300; letter-spacing: 0.05em; }
 	.catalog-close {
 		width: 24px; height: 24px; border: none; background: none;
 		color: var(--fg3); font-size: 18px; cursor: pointer; line-height: 1;
-	}
-	.catalog-body {
-		display: grid;
-		grid-template-columns: minmax(340px, 1fr) minmax(260px, 0.75fr);
-		flex: 1;
-		min-height: 0;
-	}
-	.catalog-scroll { min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-
-	.catalog-item {
-		display: flex; align-items: center; gap: 12px; padding: 10px 12px;
-		border: 1px solid var(--border); border-radius: var(--r);
-		background: #fff; cursor: pointer; text-align: left;
-		transition: border-color 0.12s, background 0.12s; font-family: inherit; width: 100%;
-	}
-	.catalog-item.active { border: 1.5px solid var(--accent); background: var(--accent-light); }
-	.catalog-item:hover:not(.active) { background: var(--bg); }
-
-	.catalog-swatches {
-		display: flex; flex-shrink: 0; border-radius: 3px; overflow: hidden; height: 32px; width: 64px;
-	}
-	.catalog-swatch { flex: 1; }
-
-	.catalog-info { flex: 1; min-width: 0; }
-	.catalog-name { font-size: 12px; font-weight: 500; color: var(--fg); margin-bottom: 1px; }
-	.catalog-sub  { font-size: 11px; color: var(--fg3); }
-	.catalog-check { color: var(--accent); font-size: 13px; flex-shrink: 0; }
-	.catalog-detail {
-		border-left: 1px solid var(--border);
-		padding: 12px 16px 14px;
-		background: #fff;
-		min-height: 0;
-		overflow-y: auto;
-	}
-	.catalog-detail-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-	.catalog-color-row {
-		display: flex; align-items: center; gap: 10px;
-		font-size: 12px;
-	}
-	.catalog-color-box {
-		width: 28px; height: 28px; border-radius: 3px; flex-shrink: 0;
-	}
-	.catalog-color-box.light { border: 1px solid var(--border); }
-	.catalog-color-name { color: var(--fg); flex: 1; }
-	.catalog-color-code {
-		font-size: 11px; color: var(--fg3);
-		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	}
 	.catalog-modal-foot {
 		display: flex;
@@ -3424,12 +3060,12 @@
 		flex-shrink: 0;
 	}
 
-	/* ── Modal shared / settings / history ─────────────────── */
+	/* ── Modal shared / settings ───────────────────────────── */
 	.modal-head {
 		display: flex; align-items: center; justify-content: space-between;
 		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 	}
-	.settings-modal, .history-modal {
+	.settings-modal {
 		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
 		z-index: 401;
 		background: #faf9f6; border-radius: var(--r-lg);
@@ -3443,11 +3079,6 @@
 	}
 	.settings-modal.model-modal .form-row label {
 		width: 82px;
-	}
-	.history-modal {
-		width: min(920px, calc(100vw - 32px));
-		height: min(720px, calc(100vh - 32px));
-		max-height: 88vh;
 	}
 	.settings-tabs {
 		display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg);
@@ -3465,7 +3096,7 @@
 		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
 	}
 	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
-	.form-row input, .form-row select, .plugin-add input, .history-search input, .login-grid input {
+	.form-row input, .form-row select, .plugin-add input, .login-grid input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
@@ -3621,109 +3252,6 @@
 	.danger-btn { background: #c0392b; }
 	.confirm-btn { background: var(--fg); }
 	.danger-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.modal-head-actions { display: flex; align-items: center; gap: 8px; }
-	.history-tools {
-		display: flex; align-items: center; gap: 8px;
-		padding: 10px 14px; border-bottom: 1px solid var(--border);
-		flex-wrap: wrap;
-	}
-	.history-mode-tabs { flex-shrink: 0; }
-	.history-manager-count {
-		font-size: 11px;
-		color: var(--fg3);
-		font-variant-numeric: tabular-nums;
-		margin-right: 2px;
-	}
-	.history-search { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--fg2); font-size: 12px; }
-	.history-search input { width: min(240px, 30vw); }
-	.history-manager-pager {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
-		padding: 8px 14px;
-		border-bottom: 1px solid var(--border);
-		color: var(--fg3);
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
-	}
-	.history-thumb-grid-wrap,
-	.history-table-wrap {
-		flex: 1;
-		overflow: auto;
-		padding: 12px 14px 14px;
-		min-height: 0;
-	}
-	.history-thumb-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-		gap: 12px;
-		align-items: start;
-	}
-	.manager-thumb-wrap {
-		position: relative;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		background: #fff;
-		padding: 7px;
-		transition: border-color 0.12s, box-shadow 0.12s;
-	}
-	.manager-thumb-wrap.selected {
-		border-color: var(--accent);
-		box-shadow: 0 0 0 2px var(--accent-light);
-	}
-	.manager-check {
-		position: absolute;
-		top: 6px;
-		left: 6px;
-		z-index: 30;
-		background: rgba(255,255,255,0.86);
-		border-radius: 3px;
-		line-height: 1;
-		padding: 2px;
-	}
-	.manager-thumb {
-		width: 100%;
-	}
-	.manager-thumb .thumb-svg {
-		width: 100%;
-		aspect-ratio: 82 / 58;
-		height: auto;
-	}
-	.manager-thumb-actions {
-		display: flex;
-		gap: 5px;
-		margin-top: 7px;
-		flex-wrap: wrap;
-	}
-	.manager-thumb-actions .ghost-btn,
-	.manager-thumb-actions .danger-btn {
-		font-size: 10px;
-		padding: 3px 7px;
-	}
-	.history-table {
-		width: 100%; border-collapse: collapse; background: #fff;
-		font-size: 12px;
-	}
-	.history-table th, .history-table td {
-		border: 1px solid var(--border); padding: 7px 8px; text-align: left; vertical-align: middle;
-	}
-	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
-	.history-mini {
-		width: 48px; height: 36px;
-		overflow: hidden;
-		overflow: clip;
-		clip-path: inset(0);
-		contain: paint;
-		background: #fff; border: 1px solid var(--border);
-	}
-	.history-mini :global(svg) {
-		width: 100%;
-		height: 100%;
-		display: block;
-		overflow: hidden;
-		clip-path: inset(0);
-	}
 	.confirm-layer {
 		position: fixed; inset: 0; z-index: 600;
 		display: flex; align-items: center; justify-content: center;

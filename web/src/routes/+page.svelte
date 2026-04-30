@@ -1411,31 +1411,6 @@
 		: statusModelName(stage2Model));
 	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : currentCatalog.name);
 
-	function svgClipId(it: Iteration, scope: string): string {
-		return `thumb-clip-${scope}-${String(it.id ?? it.at).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-	}
-
-	function clippedHistorySvg(it: Iteration, scope: string): string {
-		if (!it.svg) return '';
-		const id = svgClipId(it, scope);
-		const viewBox = it.svg.match(/\sviewBox="([^"]+)"/)?.[1]?.split(/\s+/).map(Number);
-		const [x, y, w, h] = viewBox && viewBox.length === 4 && viewBox.every(Number.isFinite)
-			? viewBox
-			: [0, 0, 1000, 1000];
-		const clip = `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath></defs><g clip-path="url(#${id})">`;
-		return it.svg
-			.replace(/(<svg\b[^>]*)(>)/, (_match, open, close) => {
-				const attrs = String(open)
-					.replace(/\s+overflow="[^"]*"/g, '')
-					.replace(/\s+style="([^"]*)"/, (_styleMatch: string, style: string) => ` style="${style};overflow:hidden"`);
-				const withOverflow = attrs.includes(' style=')
-					? attrs
-					: `${attrs} style="overflow:hidden"`;
-				return `${withOverflow} overflow="hidden"${close}${clip}`;
-			})
-			.replace(/<\/svg>\s*$/i, '</g></svg>');
-	}
-
 	function formatHistoryDate(at: number): string {
 		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
 	}
@@ -1920,7 +1895,6 @@
 		{formatHistoryDate}
 		{formatElapsed}
 		{catalogName}
-		{clippedHistorySvg}
 		{shortModel}
 	/>
 
@@ -2034,7 +2008,6 @@
 		{catalogName}
 		{historyTokenSummary}
 		{historyPreviewText}
-		{clippedHistorySvg}
 		{shortModel}
 	/>
 {/if}

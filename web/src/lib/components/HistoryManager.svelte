@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 
 	type HistoryItem = {
 		id?: string;
@@ -47,7 +48,6 @@
 		catalogName: (id: string | null | undefined) => string;
 		historyTokenSummary: (item: HistoryItem) => string;
 		historyPreviewText: (text: string) => string;
-		clippedHistorySvg: (item: HistoryItem, scope: string) => string;
 		shortModel: (model: string | null | undefined) => string;
 	};
 
@@ -80,7 +80,6 @@
 		catalogName,
 		historyTokenSummary,
 		historyPreviewText,
-		clippedHistorySvg,
 		shortModel
 	}: Props = $props();
 </script>
@@ -142,7 +141,7 @@
 								<div>{t().historyTooltipTokens}: {historyTokenSummary(it)}</div>
 								<div class="tooltip-date">{historyPreviewText(it.input)}</div>
 							</div>
-							<div class="thumb-svg">{@html clippedHistorySvg(it, 'manager')}</div>
+							<HistoryThumbnail item={it} scope="manager" size="manager" />
 							<div class="thumb-meta">
 								<span class="thumb-time">{formatElapsed(it.elapsed_ms)}</span>
 								{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
@@ -170,7 +169,7 @@
 					{#each managedHistoryItems as it (it.id ?? it.at)}
 						<tr>
 							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && onToggleSelection(it.id)} /></td>
-							<td><div class="history-mini">{@html clippedHistorySvg(it, 'table')}</div></td>
+							<td><HistoryThumbnail item={it} scope="table" size="mini" /></td>
 							<td>{formatHistoryDate(it.at)}</td>
 							<td>{historyModelSummary(it)}</td>
 							<td>{formatElapsed(it.elapsed_ms)}</td>
@@ -375,21 +374,6 @@
 	}
 	.tooltip-title { font-weight: 500; margin-bottom: 3px; }
 	.tooltip-date { color: rgba(255,255,255,0.55); margin-top: 3px; }
-	.thumb-svg {
-		width: 82px;
-		height: 58px;
-		overflow: hidden;
-		overflow: clip;
-		clip-path: inset(0);
-		contain: paint;
-	}
-	.thumb-svg :global(svg) {
-		width: 100%;
-		height: 100%;
-		display: block;
-		overflow: hidden;
-		clip-path: inset(0);
-	}
 	.thumb-meta {
 		padding: 3px 5px;
 		border-top: 1px solid var(--border);
@@ -401,11 +385,6 @@
 	.thumb-model { font-size: 10px; color: var(--fg3); }
 	.manager-thumb {
 		width: 100%;
-	}
-	.manager-thumb .thumb-svg {
-		width: 100%;
-		aspect-ratio: 82 / 58;
-		height: auto;
 	}
 	.manager-thumb-actions {
 		display: flex;
@@ -432,23 +411,6 @@
 		vertical-align: middle;
 	}
 	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
-	.history-mini {
-		width: 48px;
-		height: 36px;
-		overflow: hidden;
-		overflow: clip;
-		clip-path: inset(0);
-		contain: paint;
-		background: #fff;
-		border: 1px solid var(--border);
-	}
-	.history-mini :global(svg) {
-		width: 100%;
-		height: 100%;
-		display: block;
-		overflow: hidden;
-		clip-path: inset(0);
-	}
 	.ghost-btn {
 		padding: 4px 10px;
 		border: 1px solid var(--border2);

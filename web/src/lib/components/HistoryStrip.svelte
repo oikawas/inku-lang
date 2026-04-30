@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 
 	type HistoryItem = {
 		id?: string;
@@ -34,7 +35,6 @@
 		formatHistoryDate: (at: number) => string;
 		formatElapsed: (ms: number | null | undefined) => string;
 		catalogName: (id: string | null | undefined) => string;
-		clippedHistorySvg: (item: HistoryItem, scope: string) => string;
 		shortModel: (model: string | null | undefined) => string;
 	};
 
@@ -54,7 +54,6 @@
 		formatHistoryDate,
 		formatElapsed,
 		catalogName,
-		clippedHistorySvg,
 		shortModel
 	}: Props = $props();
 </script>
@@ -85,7 +84,7 @@
 						<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
 						<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 					</div>
-					<div class="thumb-svg">{@html clippedHistorySvg(it, 'strip')}</div>
+					<HistoryThumbnail item={it} scope="strip" size="strip" />
 					<div class="thumb-meta">
 						<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyIndexLabel(i))}</span>
 						{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
@@ -201,21 +200,6 @@
 		color: #fff;
 		overflow: hidden;
 		text-overflow: ellipsis;
-	}
-	.thumb-svg {
-		width: 82px;
-		height: 58px;
-		overflow: hidden;
-		overflow: clip;
-		clip-path: inset(0);
-		contain: paint;
-	}
-	.thumb-svg :global(svg) {
-		width: 100%;
-		height: 100%;
-		display: block;
-		overflow: hidden;
-		clip-path: inset(0);
 	}
 	.thumb-meta {
 		padding: 3px 5px;

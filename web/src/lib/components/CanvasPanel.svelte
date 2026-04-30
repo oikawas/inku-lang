@@ -6,6 +6,7 @@
 	type OutputTab = 'canvas' | 'prompts' | 'score';
 	type PaintResult = { svg: string; score: { instructions: unknown[] } };
 	type PromptsData = { stage1_system: string; stage2_system: string };
+	type HistoryItem = { id?: string; starred?: boolean };
 
 	type Props = {
 		outputTab: OutputTab;
@@ -32,6 +33,7 @@
 		statusStage1Model: string;
 		statusStage2Model: string;
 		statusCatalogName: string;
+		statusHistoryItem: HistoryItem | null;
 		pngMenuOpen: boolean;
 		pngWrapEl: HTMLDivElement | null;
 		onGotoNext: () => void | Promise<void>;
@@ -43,6 +45,7 @@
 		onResetZoom: () => void;
 		onFitZoomChange: (zoom: number) => void;
 		onCopyPromptText: (kind: 'stage1' | 'stage2', text: string | null | undefined) => void | Promise<void>;
+		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onDownloadSVG: () => void;
 		onDownloadPNG: (size: number) => void | Promise<void>;
 	};
@@ -72,6 +75,7 @@
 		statusStage1Model,
 		statusStage2Model,
 		statusCatalogName,
+		statusHistoryItem,
 		pngMenuOpen = $bindable(false),
 		pngWrapEl = $bindable(null),
 		onGotoNext,
@@ -83,6 +87,7 @@
 		onResetZoom,
 		onFitZoomChange,
 		onCopyPromptText,
+		onToggleStar,
 		onDownloadSVG,
 		onDownloadPNG
 	}: Props = $props();
@@ -217,6 +222,14 @@
 				<span class="status-v">{statusCatalogName}</span>
 			</span>
 		</div>
+		<button
+			class="star-btn status-star"
+			class:starred={!!statusHistoryItem?.starred}
+			disabled={!statusHistoryItem?.id}
+			onclick={(event) => onToggleStar(statusHistoryItem, event)}
+			title={statusHistoryItem?.starred ? t().starOn : t().starOff}
+			aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
+		>★</button>
 		<span class="status-export-label">{t().exportLabel}:</span>
 		<button class="ghost-btn" onclick={onDownloadSVG} disabled={!result}>↓ SVG</button>
 		<div class="png-wrap" bind:this={pngWrapEl}>
@@ -453,6 +466,24 @@
 		flex-shrink: 0;
 	}
 	.status-export-label { font-size: 11px; color: var(--fg3); white-space: nowrap; }
+	.star-btn {
+		width: 24px;
+		height: 24px;
+		border: 1px solid var(--border2);
+		border-radius: 50%;
+		background: var(--panel);
+		color: var(--fg3);
+		font-size: 15px;
+		line-height: 1;
+		cursor: pointer;
+		font-family: inherit;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.star-btn.starred { color: #d59b21; border-color: rgba(213,155,33,0.55); background: #fff7dc; }
+	.star-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+	.status-star { flex-shrink: 0; }
 	.png-wrap { position: relative; }
 	.png-menu {
 		position: absolute;

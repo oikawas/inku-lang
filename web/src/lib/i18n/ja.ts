@@ -67,6 +67,9 @@ export const ja: LangPack = {
 	tabScore: 'JSON',
 
 	canvasPlaceholder: '（まだ描画されていない）',
+	starOn: 'スターを外す',
+	starOff: 'スターを付ける',
+	historyStarredOnly: 'スターのみ',
 
 	promptStage1Input: 'Stage 1 ユーザー入力',
 	promptStage1System: 'Stage 1 システムプロンプト',

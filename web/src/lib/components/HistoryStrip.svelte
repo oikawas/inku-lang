@@ -17,6 +17,7 @@
 		tokens_out?: number | null;
 		catalog_id?: string | null;
 		trashed?: boolean;
+		starred?: boolean;
 	};
 
 	type Props = {
@@ -30,6 +31,9 @@
 		onNewerPage: () => void | Promise<void>;
 		onOlderPage: () => void | Promise<void>;
 		onLoadIteration: (index: number) => void;
+		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
+		historyStarredOnly: boolean;
+		onSetStarredOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
 		historyModelSummary: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
@@ -49,6 +53,9 @@
 		onNewerPage,
 		onOlderPage,
 		onLoadIteration,
+		onToggleStar,
+		historyStarredOnly,
+		onSetStarredOnly,
 		historyIndexLabel,
 		historyModelSummary,
 		formatHistoryDate,
@@ -58,6 +65,12 @@
 	}: Props = $props();
 
 	let historyCollapsed = $state(false);
+
+	function handleThumbKeydown(event: KeyboardEvent, index: number) {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		onLoadIteration(index);
+	}
 </script>
 
 {#if historyTotal > 0}
@@ -69,6 +82,11 @@
 			<div class="history-head-actions">
 				{#if !historyCollapsed}
 					<div class="history-page-nav">
+						<button
+							class="ghost-btn history-filter-btn"
+							class:ghost-active={historyStarredOnly}
+							onclick={() => onSetStarredOnly(!historyStarredOnly)}
+						>{t().historyStarredOnly}</button>
 						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={historyPage <= 0}>{t().historyNewerPage(historyNavSpan)}</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
 						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={historyPage >= historyTotalPages - 1}>{t().historyOlderPage(historyNavSpan)}</button>
@@ -87,10 +105,13 @@
 		{#if !historyCollapsed}
 			<div class="thumb-strip">
 				{#each historyItems as it, i (it.id ?? it.at)}
-					<button
+					<div
 						class="thumb"
 						class:current={i === historyCursor}
 						onclick={() => onLoadIteration(i)}
+						onkeydown={(event) => handleThumbKeydown(event, i)}
+						role="button"
+						tabindex="0"
 					>
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
@@ -100,6 +121,13 @@
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 						</div>
 						<HistoryThumbnail item={it} scope="strip" size="strip" />
+						<button
+							class="thumb-star"
+							class:starred={!!it.starred}
+							onclick={(event) => onToggleStar(it, event)}
+							title={it.starred ? t().starOn : t().starOff}
+							aria-label={it.starred ? t().starOn : t().starOff}
+						>★</button>
 						<div class="thumb-meta">
 							<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyIndexLabel(i))}</span>
 							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
@@ -107,7 +135,7 @@
 						{#if i === historyCursor}
 							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
 						{/if}
-					</button>
+					</div>
 				{/each}
 			</div>
 		{/if}
@@ -165,6 +193,8 @@
 		text-align: center;
 	}
 	.history-nav-btn { min-width: 92px; }
+	.history-filter-btn { min-width: 76px; }
+	.ghost-btn.ghost-active { background: var(--fg); color: var(--panel); border-color: var(--fg); }
 	.history-collapse-btn {
 		width: 28px;
 		min-width: 28px;
@@ -193,6 +223,25 @@
 	}
 	.thumb:hover { overflow: visible; z-index: 2000; }
 	.thumb.current { border-color: var(--accent); }
+	.thumb-star {
+		position: absolute;
+		top: 3px;
+		right: 3px;
+		z-index: 20;
+		width: 20px;
+		height: 20px;
+		border: 1px solid rgba(0,0,0,0.12);
+		border-radius: 50%;
+		background: rgba(255,255,255,0.86);
+		color: rgba(40,36,30,0.42);
+		font-size: 13px;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.thumb-star.starred { color: #d59b21; background: #fff6ce; border-color: rgba(213,155,33,0.45); }
 	.thumb-tooltip {
 		position: absolute;
 		bottom: calc(100% + 6px);

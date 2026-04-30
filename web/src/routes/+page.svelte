@@ -38,6 +38,8 @@
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
+	const BATCH_PROMPT_HISTORY_LIMIT = 20;
+	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
 
 	type Score = { instructions: unknown[] };
 
@@ -70,6 +72,7 @@
 		tokens_out?: number | null;
 		catalog_id?: string | null;
 		trashed?: boolean;
+		starred?: boolean;
 	};
 	type BatchFailure = {
 		line: number;
@@ -143,6 +146,7 @@
 	let batchSuccess = $state(0);
 	let batchFailures = $state<BatchFailure[]>([]);
 	let batchFailureReport = $state<BatchFailureReport | null>(null);
+	let batchPromptHistory = $state<string[]>([]);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
 	let error        = $state<string | null>(null);
@@ -333,6 +337,65 @@
 		darkMode = user?.ui_theme === 'dark';
 	}
 
+	function normalizeBatchPromptHistory(items: string[]): string[] {
+		const normalized: string[] = [];
+		const seen = new Set<string>();
+		for (const item of items) {
+			const prompt = item.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+			if (!prompt || seen.has(prompt) || prompt.length > BATCH_PROMPT_HISTORY_MAX_TEXT) continue;
+			normalized.push(prompt);
+			seen.add(prompt);
+			if (normalized.length >= BATCH_PROMPT_HISTORY_LIMIT) break;
+		}
+		return normalized;
+	}
+
+	async function loadBatchPromptHistory() {
+		if (!currentUser) {
+			batchPromptHistory = [];
+			return;
+		}
+		try {
+			const r = await apiFetch('/api/auth/me/batch-prompt-history', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { items?: unknown };
+			batchPromptHistory = Array.isArray(data.items)
+				? normalizeBatchPromptHistory(data.items.filter((item): item is string => typeof item === 'string'))
+				: [];
+		} catch (e) {
+			batchPromptHistory = [];
+			console.warn('failed to load batch prompt history', e);
+		}
+	}
+
+	async function rememberBatchPrompt(prompt: string) {
+		if (!currentUser) return;
+		const previous = batchPromptHistory;
+		const next = normalizeBatchPromptHistory([prompt, ...batchPromptHistory]);
+		if (next.length === previous.length && next.every((item, i) => item === previous[i])) return;
+		batchPromptHistory = next;
+		try {
+			const r = await apiFetch('/api/auth/me/batch-prompt-history', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ items: next })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const data = await r.json() as { items?: unknown };
+			if (Array.isArray(data.items)) {
+				batchPromptHistory = normalizeBatchPromptHistory(
+					data.items.filter((item): item is string => typeof item === 'string')
+				);
+			}
+		} catch (e) {
+			batchPromptHistory = previous;
+			console.warn('failed to update batch prompt history', e);
+		}
+	}
+
 	async function updateUiTheme(nextDarkMode: boolean) {
 		if (!currentUser) return;
 		const previousDarkMode = darkMode;
@@ -511,13 +574,14 @@
 			applyUserTheme(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
 			authToken = null;
 			currentUser = null;
 			applyUserTheme(null);
+			batchPromptHistory = [];
 			loginStatus = t().loginRequiredMessage;
 			settingsStatus = null;
 			settingsStatusError = t().loginRequiredMessage;
@@ -555,7 +619,7 @@
 			managerTrashItems = [];
 			managerTrashTotal = 0;
 			loginPassword = '';
-			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -573,6 +637,7 @@
 		authToken = null;
 		currentUser = null;
 		applyUserTheme(null);
+		batchPromptHistory = [];
 		loginStatus = null;
 		settingsStatus = null;
 		settingsStatusError = t().loginRequiredMessage;
@@ -809,6 +874,8 @@
 	let historyManagerTab = $state<'thumbs' | 'list'>('thumbs');
 	let historyManagerPage = $state(0);
 	let historyManagerLoading = $state(false);
+	let historyStarredOnly = $state(false);
+	let historyManagerStarredOnly = $state(false);
 	let managerHistoryItems = $state<Iteration[]>([]);
 	let managerHistoryTotal = $state(0);
 	let managerTrashItems = $state<Iteration[]>([]);
@@ -1061,7 +1128,12 @@
 		}
 		const safeOffset = Math.max(0, offset);
 		try {
-			const r = await apiFetch(`/api/history?offset=${safeOffset}&limit=${historyWindowSize}`);
+			const params = new URLSearchParams({
+				offset: String(safeOffset),
+				limit: String(historyWindowSize),
+			});
+			if (historyStarredOnly) params.set('starred', 'true');
+			const r = await apiFetch(`/api/history?${params.toString()}`);
 			if (!r.ok) return;
 			const data = await r.json();
 			if (data.items.length === 0 && data.total > 0 && safeOffset > 0) {
@@ -1115,6 +1187,7 @@
 				q: historySearch.trim(),
 			});
 			if (trashed) params.set('trashed', 'true');
+			if (historyManagerStarredOnly) params.set('starred', 'true');
 			const r = await apiFetch(`/api/history?${params.toString()}`);
 			if (!r.ok) return;
 			const data = await r.json();
@@ -1136,6 +1209,40 @@
 		} catch { /* ignore */ }
 		finally {
 			historyManagerLoading = false;
+		}
+	}
+
+	type HistoryStarTarget = { id?: string; starred?: boolean };
+
+	function updateHistoryStarState(item: HistoryStarTarget) {
+		if (!item.id) return;
+		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
+		managerHistoryItems = managerHistoryItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
+		managerTrashItems = managerTrashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
+		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
+		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred };
+	}
+
+	async function toggleHistoryStar(item: HistoryStarTarget | null | undefined, event?: Event): Promise<void> {
+		event?.stopPropagation();
+		if (!item?.id) return;
+		const nextStarred = !item.starred;
+		updateHistoryStarState({ ...item, starred: nextStarred });
+		try {
+			const r = await apiFetch(`/api/history/${item.id}/star`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ starred: nextStarred })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const updated = await r.json() as Iteration;
+			updateHistoryStarState(updated);
+			if (historyStarredOnly || historyManagerStarredOnly) {
+				await Promise.all([fetchHistoryOffset(historyOffset), fetchHistoryManager()]);
+			}
+		} catch (e) {
+			updateHistoryStarState(item);
+			console.warn('failed to update history star', e);
 		}
 	}
 
@@ -1456,6 +1563,9 @@
 		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
 		: statusModelName(stage2Model));
 	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : currentCatalog.name);
+	const statusHistoryItem = $derived(displayedHistoryItem ?? (
+		historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null
+	));
 
 	function formatHistoryDate(at: number): string {
 		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
@@ -1500,6 +1610,18 @@
 
 	function setHistoryManagerView(view: 'active' | 'trash') {
 		historyManagerView = view;
+		historyManagerPage = 0;
+		selectedHistoryIds = [];
+		void fetchHistoryManager();
+	}
+	function setHistoryStarredOnly(value: boolean) {
+		historyStarredOnly = value;
+		historyOffset = 0;
+		historyCursor = -1;
+		void fetchHistoryOffset(0);
+	}
+	function setHistoryManagerStarredOnly(value: boolean) {
+		historyManagerStarredOnly = value;
 		historyManagerPage = 0;
 		selectedHistoryIds = [];
 		void fetchHistoryManager();
@@ -1709,6 +1831,14 @@
 		void fetchHistoryOffset(historyOffset);
 	});
 
+	$effect(() => {
+		historyManagerStarredOnly;
+		if (!historyManagerOpen) return;
+		historyManagerPage = 0;
+		selectedHistoryIds = [];
+		void fetchHistoryManager();
+	});
+
 	// ── Mount ───────────────────────────────────────────────
 	onMount(() => {
 		windowWidth = window.innerWidth;
@@ -1799,6 +1929,7 @@
 						{batchCurrent}
 						{liveMs}
 						{batchFailureReport}
+						{batchPromptHistory}
 						{canSubmit}
 						{error}
 						{stageLabel}
@@ -1806,6 +1937,7 @@
 						onOpenModelSelection={openModelSelection}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
+						onRememberBatchPrompt={rememberBatchPrompt}
 						onSubmit={submit}
 						onStop={stopBatch}
 					/>
@@ -1892,6 +2024,7 @@
 				{statusStage1Model}
 				{statusStage2Model}
 				{statusCatalogName}
+				{statusHistoryItem}
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}
 				onPointerDown={startCanvasDrag}
@@ -1901,6 +2034,7 @@
 				onResetZoom={resetZoom}
 				onFitZoomChange={updateCanvasFitZoom}
 				onCopyPromptText={copyPromptText}
+				onToggleStar={toggleHistoryStar}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
 			/>
@@ -1917,6 +2051,9 @@
 			onNewerPage={gotoHistoryNewerPage}
 			onOlderPage={gotoHistoryOlderPage}
 			onLoadIteration={loadIteration}
+			onToggleStar={toggleHistoryStar}
+			{historyStarredOnly}
+			onSetStarredOnly={setHistoryStarredOnly}
 			{historyIndexLabel}
 			{historyModelSummary}
 			{formatHistoryDate}
@@ -2021,15 +2158,18 @@
 		{managerTrashTotal}
 		{trashTotal}
 		{selectedHistoryIds}
+		{historyManagerStarredOnly}
 		onClose={() => (historyManagerOpen = false)}
 		onSetView={setHistoryManagerView}
 		onSetPage={setHistoryManagerPage}
+		onSetStarredOnly={setHistoryManagerStarredOnly}
 		onSelectAll={selectAllManagedHistory}
 		onAskTrash={askTrash}
 		onAskRestore={askRestore}
 		onAskPermanentDelete={askPermanentDelete}
 		onToggleSelection={toggleHistorySelection}
 		onLoadItem={loadIterationItem}
+		onToggleStar={toggleHistoryStar}
 		{historyModelSummary}
 		{formatHistoryDate}
 		{formatElapsed}

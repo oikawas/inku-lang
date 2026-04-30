@@ -77,6 +77,9 @@ export interface LangPack {
 
 	// Canvas
 	canvasPlaceholder: string;
+	starOn: string;
+	starOff: string;
+	historyStarredOnly: string;
 
 	// Prompts tab
 	promptStage1Input: string;

@@ -173,11 +173,11 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
     db._migrate_columns()
 
     columns = {col["name"] for col in inspect(legacy_engine).get_columns("history")}
-    assert {"user_id", "catalog_id", "trashed"} <= columns
+    assert {"user_id", "catalog_id", "trashed", "starred"} <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
-    assert "ui_theme" in user_columns
+    assert {"ui_theme", "batch_prompt_history"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
-    assert {"ix_history_user_id", "ix_history_user_trashed_at"} <= indexes
+    assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
 
 
 def test_migrate_columns_raises_when_history_inspection_fails(monkeypatch):
@@ -207,6 +207,42 @@ def test_current_user_theme_can_be_updated(auth_context):
 
     invalid = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "sepia"})
     assert invalid.status_code == 400
+
+
+def test_current_user_batch_prompt_history_is_persisted(auth_context):
+    headers, user, group = auth_context
+    other_user = db.add_user(
+        username=f"api-batch-history-{uuid.uuid4().hex[:8]}",
+        email=f"api-batch-history-{uuid.uuid4().hex[:8]}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    other_headers, other_token = _auth_headers(other_user)
+    try:
+        empty = client.get("/api/auth/me/batch-prompt-history", headers=headers)
+        assert empty.status_code == 200
+        assert empty.json() == {"items": []}
+
+        body = {"items": ["  one\n two  ", "one\n two", "", "three"]}
+        updated = client.put("/api/auth/me/batch-prompt-history", headers=headers, json=body)
+        assert updated.status_code == 200
+        assert updated.json() == {"items": ["one\n two", "three"]}
+
+        persisted = client.get("/api/auth/me/batch-prompt-history", headers=headers)
+        assert persisted.status_code == 200
+        assert persisted.json() == {"items": ["one\n two", "three"]}
+
+        isolated = client.get("/api/auth/me/batch-prompt-history", headers=other_headers)
+        assert isolated.status_code == 200
+        assert isolated.json() == {"items": []}
+
+        too_long = "x" * 20_001
+        invalid = client.put("/api/auth/me/batch-prompt-history", headers=headers, json={"items": [too_long]})
+        assert invalid.status_code == 400
+    finally:
+        db.delete_session(other_token)
+        db.delete_user(other_user["id"])
 
 
 def test_compose_happy_path(monkeypatch, auth_context):
@@ -631,9 +667,20 @@ def test_history_is_scoped_to_authenticated_user():
     assert search_a.json()["total"] == 1
     assert search_a.json()["items"][0]["id"] == item_a_second["id"]
 
+    star_a = client.patch(f"/api/history/{item_a_second['id']}/star", json={"starred": True}, headers=headers_a)
+    assert star_a.status_code == 200
+    assert star_a.json()["starred"] is True
+    starred_a = client.get("/api/history?starred=true", headers=headers_a)
+    assert starred_a.status_code == 200
+    assert starred_a.json()["total"] == 1
+    assert starred_a.json()["items"][0]["id"] == item_a_second["id"]
+
     list_b = client.get("/api/history", headers=headers_b)
     assert list_b.status_code == 200
     assert list_b.json()["total"] == 0
+
+    star_b = client.patch(f"/api/history/{item_a_second['id']}/star", json={"starred": False}, headers=headers_b)
+    assert star_b.status_code == 404
 
     trash_b = client.post("/api/history/trash", json={"ids": [item_a["id"]]}, headers=headers_b)
     assert trash_b.status_code == 200

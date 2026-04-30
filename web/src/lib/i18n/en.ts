@@ -67,6 +67,9 @@ export const en: LangPack = {
 	tabScore: 'JSON',
 
 	canvasPlaceholder: '(not yet drawn)',
+	starOn: 'remove star',
+	starOff: 'add star',
+	historyStarredOnly: 'starred only',
 
 	promptStage1Input: 'Stage 1 user input',
 	promptStage1System: 'Stage 1 system prompt',

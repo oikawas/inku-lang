@@ -1,9 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-
-	const BATCH_PROMPT_HISTORY_KEY = 'inku-batch-prompt-history';
-	const BATCH_PROMPT_HISTORY_LIMIT = 20;
 
 	type BatchFailure = {
 		line: number;
@@ -29,6 +25,8 @@
 		batchFailureReport: BatchFailureReport | null;
 		canSubmit: boolean;
 		error: string | null;
+		batchPromptHistory: string[];
+		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
 	};
@@ -46,13 +44,14 @@
 		batchFailureReport,
 		canSubmit,
 		error,
+		batchPromptHistory,
+		onRememberBatchPrompt,
 		onSubmit,
 		onStop,
 	}: Props = $props();
 
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
 	let batchScrollTop = $state(0);
-	let batchPromptHistory = $state<string[]>([]);
 	let selectedHistoryPrompt = $state('');
 	const displayLineNumbersText = $derived(batchInput.trim() ? lineNumbersText : t().batchPlaceholder.split('\n').map((_, i) => String(i + 1)).join('\n'));
 	const batchActiveLineStyle = $derived(
@@ -65,31 +64,10 @@
 		return text.trim().replace(/\r\n/g, '\n');
 	}
 
-	function loadPromptHistory() {
-		try {
-			const parsed = JSON.parse(localStorage.getItem(BATCH_PROMPT_HISTORY_KEY) ?? '[]');
-			if (!Array.isArray(parsed)) return;
-			batchPromptHistory = parsed
-				.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-				.slice(0, BATCH_PROMPT_HISTORY_LIMIT);
-		} catch {
-			batchPromptHistory = [];
-		}
-	}
-
-	function savePromptHistory(nextHistory: string[]) {
-		batchPromptHistory = nextHistory.slice(0, BATCH_PROMPT_HISTORY_LIMIT);
-		try {
-			localStorage.setItem(BATCH_PROMPT_HISTORY_KEY, JSON.stringify(batchPromptHistory));
-		} catch {
-			// localStorage failure should not block drawing.
-		}
-	}
-
 	function rememberCurrentPrompt() {
 		const prompt = normalizePrompt(batchInput);
 		if (!prompt) return;
-		savePromptHistory([prompt, ...batchPromptHistory.filter((item) => item !== prompt)]);
+		void onRememberBatchPrompt(prompt);
 	}
 
 	function restoreSelectedHistoryPrompt() {
@@ -101,8 +79,6 @@
 		rememberCurrentPrompt();
 		void onSubmit();
 	}
-
-	onMount(loadPromptHistory);
 </script>
 
 <div class="batch-wrap">

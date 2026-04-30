@@ -212,6 +212,7 @@ class HistoryItem(HistoryPostBody):
     id: str
     output_path: str | None = None
     trashed: bool = False
+    starred: bool = False
 
 
 class HistoryListResponse(BaseModel):
@@ -223,6 +224,10 @@ class HistoryListResponse(BaseModel):
 
 class HistoryIdsBody(BaseModel):
     ids: list[str] = Field(default_factory=list)
+
+
+class HistoryStarBody(BaseModel):
+    starred: bool = False
 
 
 class UserGroupItem(BaseModel):
@@ -274,6 +279,14 @@ class LoginResponse(BaseModel):
 
 class UserSettingsBody(BaseModel):
     ui_theme: str = Field(default="light")
+
+
+class BatchPromptHistoryBody(BaseModel):
+    items: list[str] = Field(default_factory=list)
+
+
+class BatchPromptHistoryResponse(BaseModel):
+    items: list[str] = Field(default_factory=list)
 
 
 class DatabaseSettingsStatus(BaseModel):
@@ -390,6 +403,25 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)
+
+
+@app.get("/api/auth/me/batch-prompt-history", response_model=BatchPromptHistoryResponse)
+def api_auth_me_batch_prompt_history(actor: dict = Depends(_current_user)) -> BatchPromptHistoryResponse:
+    return BatchPromptHistoryResponse(items=_db.get_user_batch_prompt_history(actor["id"]))
+
+
+@app.put("/api/auth/me/batch-prompt-history", response_model=BatchPromptHistoryResponse)
+def api_auth_me_update_batch_prompt_history(
+    body: BatchPromptHistoryBody,
+    actor: dict = Depends(_current_user),
+) -> BatchPromptHistoryResponse:
+    try:
+        items = _db.update_user_batch_prompt_history(actor["id"], body.items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if items is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    return BatchPromptHistoryResponse(items=items)
 
 
 @app.get("/api/settings/status", response_model=SettingsStatusResponse)
@@ -728,10 +760,18 @@ def api_history_get(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
     trashed: bool = Query(default=False),
+    starred: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
-    items, total = _db.list_items(actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q)
+    items, total = _db.list_items(
+        actor["id"],
+        offset=offset,
+        limit=limit,
+        trashed=trashed,
+        query_text=q,
+        starred=starred,
+    )
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
@@ -777,6 +817,14 @@ def api_history_trash(body: HistoryIdsBody, actor: dict = Depends(_current_user)
 def api_history_restore(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
     count = _db.restore_items(actor["id"], body.ids)
     return {"ok": True, "count": count}
+
+
+@app.patch("/api/history/{item_id}/star", response_model=HistoryItem)
+def api_history_star(item_id: str, body: HistoryStarBody, actor: dict = Depends(_current_user)) -> HistoryItem:
+    item = _db.set_item_starred(actor["id"], item_id, body.starred)
+    if not item:
+        raise HTTPException(status_code=404, detail="history item not found")
+    return HistoryItem(**item)
 
 
 @app.post("/api/history/rebuild-output-files")

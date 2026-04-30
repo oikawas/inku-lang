@@ -29,11 +29,13 @@
 		batchFailureReport: BatchFailureReport | null;
 		canSubmit: boolean;
 		error: string | null;
+		batchPromptHistory: string[];
 		stageLabel: string;
 		showBirds: boolean;
 		onOpenModelSelection: () => void;
 		onOpenCatalogModal: () => void;
 		onClearInput: () => void;
+		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
 	};
@@ -54,11 +56,13 @@
 		batchFailureReport,
 		canSubmit,
 		error,
+		batchPromptHistory,
 		stageLabel,
 		showBirds,
 		onOpenModelSelection,
 		onOpenCatalogModal,
 		onClearInput,
+		onRememberBatchPrompt,
 		onSubmit,
 		onStop,
 	}: Props = $props();
@@ -172,6 +176,8 @@
 			{batchFailureReport}
 			{canSubmit}
 			{error}
+			{batchPromptHistory}
+			{onRememberBatchPrompt}
 			onSubmit={onSubmit}
 			onStop={onStop}
 		/>

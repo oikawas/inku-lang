@@ -45,6 +45,7 @@ class HistoryRow(Base):
     tokens_out   = Column(Integer,    nullable=True)
     catalog_id   = Column(String,     nullable=True)
     trashed      = Column(Integer,    nullable=False, default=0)
+    starred      = Column(Integer,    nullable=False, default=0)
 
 
 class UserGroupRow(Base):
@@ -65,6 +66,7 @@ class UserAccountRow(Base):
     role          = Column(String, nullable=False, index=True)
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
     ui_theme      = Column(String, nullable=False, default="light")
+    batch_prompt_history = Column(Text, nullable=False, default="[]")
     at            = Column(BigInteger, nullable=False, index=True)
 
 
@@ -87,15 +89,23 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "user_id": "ALTER TABLE history ADD COLUMN user_id VARCHAR",
     "catalog_id": "ALTER TABLE history ADD COLUMN catalog_id VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
+    "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
 }
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
+    "batch_prompt_history": "ALTER TABLE user_accounts ADD COLUMN batch_prompt_history TEXT NOT NULL DEFAULT '[]'",
 }
+_BATCH_PROMPT_HISTORY_LIMIT = 20
+_BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
 _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_user_id", "CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"),
     (
         "ix_history_user_trashed_at",
         "CREATE INDEX IF NOT EXISTS ix_history_user_trashed_at ON history (user_id, trashed, at)",
+    ),
+    (
+        "ix_history_user_starred_trashed_at",
+        "CREATE INDEX IF NOT EXISTS ix_history_user_starred_trashed_at ON history (user_id, starred, trashed, at)",
     ),
 )
 
@@ -277,6 +287,7 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "tokens_out":   row.tokens_out,
         "catalog_id":   row.catalog_id,
         "trashed":      bool(row.trashed),
+        "starred":      bool(row.starred),
     }
 
 
@@ -315,6 +326,7 @@ def add_item(item: dict) -> dict:
         tokens_out=item.get("tokens_out"),
         catalog_id=item.get("catalog_id"),
         trashed=0,
+        starred=0,
     )
     with SessionLocal() as session:
         session.add(row)
@@ -512,6 +524,52 @@ def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
         return _user_to_dict(row, group_name)
 
 
+def _normalize_batch_prompt_history(items: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, str):
+            raise ValueError("batch prompt history must contain strings")
+        prompt = item.strip().replace("\r\n", "\n").replace("\r", "\n")
+        if not prompt or prompt in seen:
+            continue
+        if len(prompt) > _BATCH_PROMPT_HISTORY_MAX_TEXT:
+            raise ValueError("batch prompt history item is too long")
+        normalized.append(prompt)
+        seen.add(prompt)
+        if len(normalized) >= _BATCH_PROMPT_HISTORY_LIMIT:
+            break
+    return normalized
+
+
+def get_user_batch_prompt_history(user_id: str) -> list[str]:
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return []
+        try:
+            parsed = json.loads(row.batch_prompt_history or "[]")
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        try:
+            return _normalize_batch_prompt_history(parsed)
+        except ValueError:
+            return []
+
+
+def update_user_batch_prompt_history(user_id: str, items: list[str]) -> list[str] | None:
+    prompts = _normalize_batch_prompt_history(items)
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        row.batch_prompt_history = json.dumps(prompts, ensure_ascii=False)
+        session.commit()
+        return prompts
+
+
 def delete_user(user_id: str) -> bool:
     with SessionLocal() as session:
         row = session.get(UserAccountRow, user_id)
@@ -530,12 +588,15 @@ def list_items(
     limit: int = 10,
     trashed: bool = False,
     query_text: str = "",
+    starred: bool = False,
 ) -> tuple[list[dict], int]:
     with SessionLocal() as session:
         query = session.query(HistoryRow).filter(
             HistoryRow.user_id == user_id,
             HistoryRow.trashed == (1 if trashed else 0),
         )
+        if starred:
+            query = query.filter(HistoryRow.starred == 1)
         search = query_text.strip()
         if search:
             pattern = f"%{search}%"
@@ -555,6 +616,21 @@ def list_items(
             .all()
         )
         return [_row_to_dict(r) for r in rows], total
+
+
+def set_item_starred(user_id: str, item_id: str, starred: bool) -> dict | None:
+    with SessionLocal() as session:
+        row = (
+            session.query(HistoryRow)
+            .filter(HistoryRow.user_id == user_id, HistoryRow.id == item_id)
+            .first()
+        )
+        if not row:
+            return None
+        row.starred = 1 if starred else 0
+        session.commit()
+        session.refresh(row)
+        return _row_to_dict(row)
 
 
 def get_items(user_id: str, ids: list[str]) -> list[dict]:

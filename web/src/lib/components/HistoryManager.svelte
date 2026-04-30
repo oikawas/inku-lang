@@ -17,6 +17,7 @@
 		tokens_out?: number | null;
 		catalog_id?: string | null;
 		trashed?: boolean;
+		starred?: boolean;
 	};
 
 	type Props = {
@@ -33,15 +34,18 @@
 		trashTotal: number;
 		selectedHistoryIds: string[];
 		historySearch: string;
+		historyManagerStarredOnly: boolean;
 		onClose: () => void;
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
+		onSetStarredOnly: (value: boolean) => void;
 		onSelectAll: () => void;
 		onAskTrash: (ids: string[]) => void;
 		onAskRestore: (ids: string[]) => void;
 		onAskPermanentDelete: (ids: string[]) => void;
 		onToggleSelection: (id: string) => void;
 		onLoadItem: (item: HistoryItem) => void;
+		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		historyModelSummary: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
 		formatElapsed: (ms: number | null | undefined) => string;
@@ -65,15 +69,18 @@
 		trashTotal,
 		selectedHistoryIds,
 		historySearch = $bindable(''),
+		historyManagerStarredOnly,
 		onClose,
 		onSetView,
 		onSetPage,
+		onSetStarredOnly,
 		onSelectAll,
 		onAskTrash,
 		onAskRestore,
 		onAskPermanentDelete,
 		onToggleSelection,
 		onLoadItem,
+		onToggleStar,
 		historyModelSummary,
 		formatHistoryDate,
 		formatElapsed,
@@ -82,6 +89,54 @@
 		historyPreviewText,
 		shortModel
 	}: Props = $props();
+
+	type TooltipState = {
+		item: HistoryItem;
+		index: number;
+		x: number;
+		y: number;
+		placement: 'below' | 'above';
+	};
+
+	let tooltipState = $state<TooltipState | null>(null);
+	let tooltipTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function handleThumbKeydown(event: KeyboardEvent, item: HistoryItem) {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		if (historyManagerView === 'active') onLoadItem(item);
+	}
+
+	function hideTooltip() {
+		if (tooltipTimer !== null) {
+			clearTimeout(tooltipTimer);
+			tooltipTimer = null;
+		}
+		tooltipState = null;
+	}
+
+	function scheduleTooltip(target: HTMLElement, item: HistoryItem, index: number) {
+		hideTooltip();
+		tooltipTimer = setTimeout(() => {
+			const rect = target.getBoundingClientRect();
+			const tooltipWidth = 340;
+			const tooltipHeight = 150;
+			const margin = 14;
+			const x = Math.max(
+				margin + tooltipWidth / 2,
+				Math.min(window.innerWidth - margin - tooltipWidth / 2, rect.left + rect.width / 2)
+			);
+			const belowY = rect.bottom + 10;
+			const fitsBelow = belowY + tooltipHeight <= window.innerHeight - margin;
+			tooltipState = {
+				item,
+				index,
+				x,
+				y: fitsBelow ? belowY : Math.max(margin, rect.top - 10),
+				placement: fitsBelow ? 'below' : 'above',
+			};
+		}, 700);
+	}
 </script>
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -110,6 +165,11 @@
 			{/if}
 		</span>
 		<button class="ghost-btn" onclick={onSelectAll}>{t().historySelectAll}</button>
+		<button
+			class="ghost-btn"
+			class:ghost-active={historyManagerStarredOnly}
+			onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
+		>{t().historyStarredOnly}</button>
 		{#if historyManagerView === 'active'}
 			<button class="ghost-btn" onclick={() => onAskTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyMoveToTrash}</button>
 		{:else}
@@ -131,22 +191,30 @@
 						<label class="manager-check">
 							<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && onToggleSelection(it.id)} />
 						</label>
-						<button class="thumb manager-thumb" onclick={() => historyManagerView === 'active' && onLoadItem(it)}>
-							<div class="thumb-tooltip">
-								<div class="tooltip-title">#{historyManagerOffset + i + 1}</div>
-								<div>{t().historyTooltipModel}: {historyModelSummary(it)}</div>
-								<div>{t().historyTooltipSavedAt}: {formatHistoryDate(it.at)}</div>
-								<div>{t().historyTooltipSeconds}: {formatElapsed(it.elapsed_ms)}</div>
-								<div>{t().historyTooltipColorCatalog}: {catalogName(it.catalog_id)}</div>
-								<div>{t().historyTooltipTokens}: {historyTokenSummary(it)}</div>
-								<div class="tooltip-date">{historyPreviewText(it.input)}</div>
-							</div>
+						<div
+							class="thumb manager-thumb"
+							onclick={() => historyManagerView === 'active' && onLoadItem(it)}
+							onkeydown={(event) => handleThumbKeydown(event, it)}
+							onmouseenter={(event) => scheduleTooltip(event.currentTarget as HTMLElement, it, i)}
+							onmouseleave={hideTooltip}
+							onfocus={(event) => scheduleTooltip(event.currentTarget as HTMLElement, it, i)}
+							onblur={hideTooltip}
+							role="button"
+							tabindex={historyManagerView === 'active' ? 0 : -1}
+						>
 							<HistoryThumbnail item={it} scope="manager" size="manager" />
+							<button
+								class="thumb-star"
+								class:starred={!!it.starred}
+								onclick={(event) => onToggleStar(it, event)}
+								title={it.starred ? t().starOn : t().starOff}
+								aria-label={it.starred ? t().starOn : t().starOff}
+							>★</button>
 							<div class="thumb-meta">
 								<span class="thumb-time">{formatElapsed(it.elapsed_ms)}</span>
 								{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
 							</div>
-						</button>
+						</div>
 						<div class="manager-thumb-actions">
 							{#if historyManagerView === 'active'}
 								<button class="ghost-btn" onclick={() => it.id && onAskTrash([it.id])}>{t().deleteButton}</button>
@@ -169,7 +237,16 @@
 					{#each managedHistoryItems as it (it.id ?? it.at)}
 						<tr>
 							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && onToggleSelection(it.id)} /></td>
-							<td><HistoryThumbnail item={it} scope="table" size="mini" /></td>
+							<td class="table-thumb-cell">
+								<HistoryThumbnail item={it} scope="table" size="mini" />
+								<button
+									class="thumb-star mini-star"
+									class:starred={!!it.starred}
+									onclick={(event) => onToggleStar(it, event)}
+									title={it.starred ? t().starOn : t().starOff}
+									aria-label={it.starred ? t().starOn : t().starOff}
+								>★</button>
+							</td>
 							<td>{formatHistoryDate(it.at)}</td>
 							<td>{historyModelSummary(it)}</td>
 							<td>{formatElapsed(it.elapsed_ms)}</td>
@@ -189,6 +266,21 @@
 		</div>
 	{/if}
 </div>
+{#if tooltipState}
+	<div
+		class="manager-tooltip"
+		class:above={tooltipState.placement === 'above'}
+		style="left: {tooltipState.x}px; top: {tooltipState.y}px;"
+	>
+		<div class="tooltip-title">#{historyManagerOffset + tooltipState.index + 1}</div>
+		<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(tooltipState.item)}</strong></div>
+		<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(tooltipState.item.at)}</strong></div>
+		<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(tooltipState.item.elapsed_ms)}</strong></div>
+		<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(tooltipState.item.catalog_id)}</strong></div>
+		<div class="tooltip-row"><span>{t().historyTooltipTokens}</span><strong>{historyTokenSummary(tooltipState.item)}</strong></div>
+		<div class="tooltip-date">{historyPreviewText(tooltipState.item.input)}</div>
+	</div>
+{/if}
 
 <style>
 	.modal-backdrop {
@@ -210,7 +302,7 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		width: min(920px, calc(100vw - 32px));
+		width: min(1240px, calc(100vw - 24px));
 		height: min(720px, calc(100vh - 32px));
 		max-height: 88vh;
 	}
@@ -333,6 +425,33 @@
 		line-height: 1;
 		padding: 2px;
 	}
+	.thumb-star {
+		position: absolute;
+		top: 5px;
+		right: 5px;
+		z-index: 31;
+		width: 22px;
+		height: 22px;
+		border: 1px solid rgba(0,0,0,0.12);
+		border-radius: 50%;
+		background: rgba(255,255,255,0.88);
+		color: rgba(40,36,30,0.42);
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.thumb-star.starred { color: #d59b21; background: #fff6ce; border-color: rgba(213,155,33,0.45); }
+	.table-thumb-cell { position: relative; width: 66px; }
+	.table-thumb-cell .mini-star {
+		top: 2px;
+		right: 2px;
+		width: 18px;
+		height: 18px;
+		font-size: 11px;
+	}
 	.thumb {
 		flex-shrink: 0;
 		width: 82px;
@@ -347,33 +466,48 @@
 		transition: border-color 0.1s;
 	}
 	.thumb:hover { overflow: visible; z-index: 2000; }
-	.thumb-tooltip {
-		position: absolute;
-		bottom: calc(100% + 6px);
-		left: 50%;
-		transform: translateX(-50%) translateY(4px);
-		opacity: 0;
+	.manager-tooltip {
+		position: fixed;
+		transform: translateX(-50%);
 		pointer-events: none;
-		background: var(--tooltip-bg);
-		color: #fff;
+		background: var(--panel);
+		color: var(--fg);
 		font-size: 11px;
 		border-radius: var(--r);
-		padding: 8px 10px;
-		white-space: nowrap;
+		border: 1px solid var(--border2);
+		padding: 9px 11px;
 		text-align: left;
-		width: max-content;
-		max-width: min(360px, calc(100vw - 24px));
-		z-index: 3000;
+		width: min(340px, calc(100vw - 28px));
+		z-index: 5000;
 		line-height: 1.7;
-		transition: opacity 0.15s, transform 0.15s;
-		box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+		box-shadow: 0 12px 36px rgba(0,0,0,0.22);
 	}
-	.thumb:hover .thumb-tooltip {
-		opacity: 1;
-		transform: translateX(-50%) translateY(0);
+	.manager-tooltip.above {
+		transform: translateX(-50%) translateY(-100%);
 	}
 	.tooltip-title { font-weight: 500; margin-bottom: 3px; }
-	.tooltip-date { color: rgba(255,255,255,0.55); margin-top: 3px; }
+	.tooltip-row {
+		display: grid;
+		grid-template-columns: 70px minmax(0, 1fr);
+		gap: 8px;
+		align-items: baseline;
+	}
+	.tooltip-row span { color: var(--fg3); }
+	.tooltip-row strong {
+		font-weight: 500;
+		color: var(--fg);
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.tooltip-date {
+		color: var(--fg2);
+		margin-top: 3px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.thumb-meta {
 		padding: 3px 5px;
 		border-top: 1px solid var(--border);

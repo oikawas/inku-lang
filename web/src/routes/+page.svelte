@@ -6,12 +6,12 @@
 	import { onMount } from 'svelte';
 	import { annotate } from '$lib/highlight';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
-	import BatchPanel from '$lib/components/BatchPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
+	import InputPanel from '$lib/components/InputPanel.svelte';
 	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import {
@@ -1784,124 +1784,31 @@
 	<div class="body">
 		<!-- ── LEFT PANEL ── -->
 		<div class="left-panel">
-			<!-- Input mode tabs -->
-			<div class="panel-tabs">
-				{#each [['single', t().modeSingle], ['batch', t().modeBatch]] as [mode, label] (mode)}
-					<button class="panel-tab" class:active={inputMode === mode} onclick={() => (inputMode = mode as 'single' | 'batch')}>{label}</button>
-				{/each}
-			</div>
-
 			<div class="panel-scroll">
-
-				<!-- 指示 section -->
-				<section class="panel-section">
-					<div class="section-head">
-						<span class="section-label">{t().inputSectionLabel}</span>
-						<div class="section-actions">
-							<button class="ghost-btn" onclick={openModelSelection}>{t().modelSelectButton}</button>
-							<button class="ghost-btn" onclick={openCatalogModal}>{t().colorCatalogButton}</button>
-							<button class="ghost-btn create-btn" onclick={clearInput}>{t().clearInputBtn}</button>
-						</div>
-					</div>
-
-					{#if inputMode === 'single'}
-						<textarea
-							bind:value={input}
-							rows="5"
-							spellcheck="false"
-							placeholder={t().inputPlaceholder}
-							class="input-ta"
-						></textarea>
-
-						<!-- 描画する / progress -->
-						{#if singleRunning}
-							<div class="progress-wrap">
-								<div class="progress-phases">
-									{#each [{ key: '解釈', label: t().statsInterp }, { key: '構造化', label: t().statsStruct }] as ph, i (ph.key)}
-										{#if i > 0}<span class="phase-sep">›</span>{/if}
-										<span class="phase-item" class:phase-done={stageLabel.includes('構造化') && ph.key === '解釈'} class:phase-active={stageLabel.includes(ph.key) && !(stageLabel.includes('構造化') && ph.key === '解釈')}>
-											{#if stageLabel.includes('構造化') && ph.key === '解釈'}<span class="phase-check">✓</span>{/if}
-											{#if !(stageLabel.includes('構造化') && ph.key === '解釈') && stageLabel.includes(ph.key)}<span class="phase-dot"></span>{/if}
-											{ph.label}
-										</span>
-									{/each}
-								</div>
-								<div class="progress-right">
-									<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
-									<button class="stop-sm" onclick={stopBatch}>{t().stopBtn}</button>
-								</div>
-							</div>
-							<div
-								class="progress-bar-track"
-								style="--progress-target: {stageLabel.includes('構造化') ? '65%' : '30%'}"
-							>
-								<div class="progress-bar-fill"></div>
-								{#if showBirds}
-									<svg class="progress-bird" viewBox="0 0 52 44" aria-hidden="true">
-										<g class="bird-peck">
-											<ellipse class="bird-shadow" cx="26" cy="38" rx="12" ry="2.4" />
-											<g class="bird-preen">
-												<g class="bird-view bird-view-side">
-													<path class="bird-tail" d="M33 25 Q43 24 47 19 Q44 29 34 30 Z" />
-													<ellipse class="bird-body" cx="27" cy="25" rx="11" ry="8" />
-													<path class="bird-wing" d="M24 23 Q31 15 37 24 Q31 30 25 29 Z" />
-													<g class="bird-head">
-														<circle class="bird-head-fill" cx="17" cy="19" r="5.8" />
-														<path class="bird-beak" d="M11.5 19 L5 16.9 L5 21.1 Z" />
-														<circle class="bird-eye" cx="15.4" cy="17.5" r="0.95" />
-													</g>
-												</g>
-												<g class="bird-view bird-view-front">
-													<ellipse class="bird-body" cx="26" cy="25.5" rx="9.2" ry="8.8" />
-													<circle class="bird-head-fill" cx="26" cy="17" r="6.4" />
-													<path class="bird-wing bird-wing-left" d="M18 24 Q13 25 11 30 Q18 31 22 27 Z" />
-													<path class="bird-wing bird-wing-right" d="M34 24 Q39 25 41 30 Q34 31 30 27 Z" />
-													<path class="bird-beak" d="M23 18.7 L26 22.4 L29 18.7 Z" />
-													<circle class="bird-eye" cx="23.4" cy="16.3" r="0.9" />
-													<circle class="bird-eye" cx="28.6" cy="16.3" r="0.9" />
-												</g>
-												<g class="bird-view bird-view-three">
-													<path class="bird-tail" d="M33 25 Q41 23 44 18 Q43 27 35 30 Z" />
-													<ellipse class="bird-body" cx="27" cy="25" rx="10" ry="8.5" />
-													<path class="bird-wing" d="M24 23 Q30 17 36 24 Q31 29 25 29 Z" />
-													<circle class="bird-head-fill" cx="20" cy="18" r="6.1" />
-													<path class="bird-beak" d="M16 19 L9.8 17.2 L10.8 21.2 Z" />
-													<circle class="bird-eye" cx="18.3" cy="16.5" r="0.95" />
-												</g>
-												<g class="bird-legs">
-													<path class="bird-leg bird-leg-a" d="M22 32 L20 37" />
-													<path class="bird-leg bird-leg-b" d="M30 32 L32 37" />
-												</g>
-											</g>
-										</g>
-									</svg>
-								{/if}
-							</div>
-							<div class="progress-stage-text">{stageLabel}</div>
-						{:else}
-							<button class="play-btn" onclick={submit} disabled={!canSubmit}>▶ <span>{t().submitBtn}</span></button>
-						{/if}
-
-						{#if error}<p class="error-text">{error}</p>{/if}
-					{:else}
-						<BatchPanel
-							bind:batchInput
-							{lineNumbersText}
-							{batchNonEmpty}
-							{batchRunning}
-							{batchActiveLine}
-							{batchActiveDdlHighlighted}
-							{batchTotal}
-							{batchCurrent}
-							{liveMs}
-							{batchFailureReport}
-							{canSubmit}
-							{error}
-							onSubmit={submit}
-							onStop={stopBatch}
-						/>
-					{/if}
-				</section>
+				<InputPanel
+					bind:inputMode
+					bind:input
+					bind:batchInput
+					{lineNumbersText}
+					{batchNonEmpty}
+					{batchRunning}
+					{singleRunning}
+					{batchActiveLine}
+					{batchActiveDdlHighlighted}
+					{batchTotal}
+					{batchCurrent}
+					{liveMs}
+					{batchFailureReport}
+					{canSubmit}
+					{error}
+					{stageLabel}
+					{showBirds}
+					onOpenModelSelection={openModelSelection}
+					onOpenCatalogModal={openCatalogModal}
+					onClearInput={clearInput}
+					onSubmit={submit}
+					onStop={stopBatch}
+				/>
 
 				<!-- thinking -->
 				{#if thinking}
@@ -2385,20 +2292,6 @@
 		overflow: hidden;
 	}
 
-	.panel-tabs {
-		display: flex;
-		border-bottom: 1px solid var(--border);
-		background: var(--bg);
-		flex-shrink: 0;
-	}
-	.panel-tab {
-		padding: 9px 16px; border: none; border-bottom: 2px solid transparent;
-		background: none; color: var(--fg2); font-size: 13px; cursor: pointer;
-		font-family: inherit; transition: color 0.1s;
-	}
-	.panel-tab.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 500; }
-	.panel-tab:hover:not(.active) { color: var(--fg); }
-
 	.panel-scroll {
 		flex: 1;
 		overflow-y: auto;
@@ -2435,28 +2328,6 @@
 	}
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.create-btn {
-		background: #fff7e8;
-		border-color: #d8b36a;
-		color: #6c4a10;
-		font-weight: 600;
-		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
-	}
-	.create-btn:hover {
-		background: #ffefd0;
-		border-color: #bd8f34;
-		color: #4f360b;
-	}
-
-	/* Input textarea */
-	.input-ta {
-		width: 100%; padding: 9px 10px;
-		border: 1px solid var(--border2); border-radius: var(--r);
-		background: #fff; color: var(--fg);
-		font-family: inherit; font-size: 13px; line-height: 1.65;
-		resize: vertical; outline: none;
-	}
-	.input-ta:focus { border-color: var(--accent); }
 
 	/* Progress */
 	.progress-wrap {
@@ -2467,23 +2338,15 @@
 		margin-top: 8px;
 	}
 	.progress-phases { display: flex; align-items: center; gap: 4px; }
-	.phase-sep { color: var(--border); font-size: 9px; margin: 0 1px; }
 	.phase-item { font-size: 11px; color: var(--border2); display: flex; align-items: center; gap: 3px; }
 	.phase-item.phase-active { color: var(--fg); font-weight: 500; }
-	.phase-item.phase-done { color: var(--fg3); }
 	.phase-dot {
 		display: inline-block; width: 6px; height: 6px; border-radius: 50%;
 		background: var(--accent); flex-shrink: 0;
 		animation: inkupulse 1s ease-in-out infinite;
 	}
-	.phase-check { color: #27ae60; font-size: 10px; }
 	.progress-right { display: flex; align-items: center; gap: 7px; }
 	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
-	.stop-sm {
-		padding: 2px 7px; border: 1px solid var(--border2);
-		border-radius: var(--r); background: none;
-		color: var(--fg2); font-size: 11px; cursor: pointer; font-family: inherit;
-	}
 	.progress-bar-track {
 		position: relative;
 		height: 32px; background: transparent;
@@ -2560,26 +2423,6 @@
 	}
 	.bird-leg-a { animation: birdStepA 1.25s ease-in-out infinite; }
 	.bird-leg-b { animation: birdStepB 1.25s ease-in-out infinite; }
-	.progress-stage-text {
-		font-size: 11px; color: var(--fg3);
-		padding: 5px 10px 7px;
-		border: 1px solid var(--border2); border-top: none;
-		border-radius: 0 0 var(--r) var(--r);
-		background: #fff;
-	}
-
-	/* Play button */
-	.play-btn {
-		width: 100%; margin-top: 8px; padding: 9px;
-		font-size: 14px; font-weight: 500;
-		background: var(--fg); color: #fff;
-		border: none; border-radius: var(--r);
-		letter-spacing: 0.08em; cursor: pointer;
-		display: flex; align-items: center; justify-content: center; gap: 8px;
-		font-family: inherit; transition: background 0.15s;
-	}
-	.play-btn:hover:not(:disabled) { background: #333; }
-	.play-btn:disabled { background: var(--fg3); cursor: not-allowed; }
 
 	.error-text { color: #a2342a; font-size: 12px; }
 

@@ -20,6 +20,25 @@ from inku_server.schema import Score
 
 client = TestClient(app)
 
+EXPANSION_MARKERS = (
+    "黄金比の位置",
+    "三分割の交点",
+    "白銀比の位置",
+    "正五角形の頂点",
+    "対位法の反行",
+    "倍音列",
+    "輪唱のずれ",
+    "一点透視法",
+    "遠近法の奥行き",
+    "素描の下線",
+    "点描",
+    "油絵の厚塗り",
+    "水彩",
+    "パッチワーク",
+    "フレスコの下地",
+    "水墨の濃淡",
+)
+
 
 def _auth_headers(user: dict) -> tuple[dict[str, str], str]:
     token = db.create_session(user["id"])
@@ -150,7 +169,7 @@ def test_compose_sanitizes_random_ddl_before_stage2(monkeypatch, auth_context):
     r = client.post("/api/compose", json={"ddl": "赤い円をランダムに十二個散らす。"}, headers=headers)
     assert r.status_code == 200
     assert "赤い円を画面全体に点々と十二個散らす。" in captured["ddl"]
-    assert "右上の黄金比の位置" in captured["ddl"]
+    assert any(marker in captured["ddl"] for marker in EXPANSION_MARKERS)
 
 
 def test_compose_empty_ddl_rejected(auth_context):
@@ -208,8 +227,9 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert r.status_code == 200
     data = r.json()
     assert data["text"] == "一滴の墨"
-    assert data["ddl"].startswith("中心に黒い円を置く。")
-    assert "右上の黄金比の位置" in data["ddl"]
+    assert "黒い円を置く。" in data["ddl"]
+    assert "中心" not in data["ddl"]
+    assert any(marker in data["ddl"] for marker in EXPANSION_MARKERS)
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
 
@@ -233,7 +253,7 @@ def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
     r = client.post("/api/paint", json={"text": "赤い点を散らす"}, headers=headers)
     assert r.status_code == 200
     assert "赤い小さな円を画面全体に点々と十二個散らす。" in r.json()["ddl"]
-    assert "右上の黄金比の位置" in r.json()["ddl"]
+    assert any(marker in r.json()["ddl"] for marker in EXPANSION_MARKERS)
     assert r.json()["ddl"] == captured["ddl"]
 
 

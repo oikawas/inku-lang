@@ -137,6 +137,14 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "対位法の反行" in SYSTEM_PROMPT
     assert "倍音列" in SYSTEM_PROMPT
     assert "輪唱のずれ" in SYSTEM_PROMPT
+    assert "一点透視法" in SYSTEM_PROMPT
+    assert "遠近法の奥行き" in SYSTEM_PROMPT
+    assert "点描" in SYSTEM_PROMPT
+    assert "油絵の厚塗り" in SYSTEM_PROMPT
+    assert "水彩" in SYSTEM_PROMPT
+    assert "パッチワーク" in SYSTEM_PROMPT
+    assert "フレスコの下地" in SYSTEM_PROMPT
+    assert "水墨" in SYSTEM_PROMPT
     assert '"layout":"vertical"' in SYSTEM_PROMPT
     assert "ランダム" not in SYSTEM_PROMPT
     assert "20 程度" not in SYSTEM_PROMPT
@@ -153,6 +161,14 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "contrapuntal contrary motion" in SYSTEM_PROMPT_EN
     assert "harmonic overtone series" in SYSTEM_PROMPT_EN
     assert "canon offset" in SYSTEM_PROMPT_EN
+    assert "one-point perspective" in SYSTEM_PROMPT_EN
+    assert "perspective depth" in SYSTEM_PROMPT_EN
+    assert "pointillism" in SYSTEM_PROMPT_EN
+    assert "oil impasto" in SYSTEM_PROMPT_EN
+    assert "watercolor" in SYSTEM_PROMPT_EN
+    assert "patchwork" in SYSTEM_PROMPT_EN
+    assert "fresco ground" in SYSTEM_PROMPT_EN
+    assert "ink-wash value" in SYSTEM_PROMPT_EN
     assert '"layout":"vertical"' in SYSTEM_PROMPT_EN
     assert "random" not in SYSTEM_PROMPT_EN.lower()
     assert "≈ 20" not in SYSTEM_PROMPT_EN

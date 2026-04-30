@@ -49,11 +49,23 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「右上の黄金比の位置」→ center=[0.618,0.382]。左下なら [0.382,0.618]。数学的な均衡点として扱う**
 - **「左上の三分割の交点」→ center=[0.333,0.333]。「右下の三分割の交点」→ center=[0.667,0.667]。三分割構図として扱う**
 - **「左下の白銀比の位置」→ center=[0.414,0.586]。「右上の白銀比の位置」→ center=[0.586,0.414]。白銀比の余白として扱う**
+- **「右上の焦点」→ center=[0.72,0.28]。「左上の焦点」→ [0.28,0.28]。「右下の焦点」→ [0.72,0.72]。「左下の焦点」→ [0.28,0.72]。中央の代替焦点として扱う**
+- **「上端寄りの焦点」→ center=[0.5,0.18]。「右半分の焦点」→ center=[0.72,0.5]**
 - **「正五角形の頂点に五個」→ arrangement count=5 layout=radial。五芒星的な均衡の点列として扱う**
 - **「フィボナッチ」「十三」「二十一」などの数量はそのまま使い、意外性のある規則的な層として扱う**
 - **「対位法の反行」→ 既存方向と反対の斜線層。右下がり=rotation=30、右上がり=rotation=-30**
 - **「倍音列」→ 整数比の放射層。弧または円を count=4 layout=radial として扱う**
 - **「輪唱のずれ」→ 同形を少しずつ横方向に並べる反復。layout=horizontal、count は DDL の数を使う**
+- **「一点透視法」→ DDL の焦点語へ向かう細線層。右上の焦点なら右上へ向かう補助線として扱う**
+- **「遠近法の奥行き」→ 横線を上方向に複数並べ、奥へ狭まる構図として扱う**
+- **「明暗」「濃淡」→ 黒/灰/白の対比層。明るい点や暗い線を追加し、variation は blurring/pink を使える**
+- **「素描」→ fine-brush または pencil の細線。下線・補助線として count を保つ**
+- **「点描」→ 小さな circle の scatter。半径は小さく、count を保つ**
+- **「油絵の厚塗り」→ weight=brush_thick の短い線。反復層として扱う**
+- **「水彩」→ ellipse/circle に blurring を付ける。淡い重なりとして扱う**
+- **「パッチワーク」→ square の horizontal/vertical 反復。色とりどりなら color_cycle を使う**
+- **「フレスコの下地」→ chalk の横線や灰色面。blurring で古い壁面として扱う**
+- **「水墨」→ brush_thin/brush_thick の黒/灰線。濃淡は blurring または細太の対比で扱う**
 
 # 例 (最重要パターン)
 
@@ -81,17 +93,38 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 白い小さな円を左下の白銀比の位置に一点置く。半径は0.016。
 出力: {"instructions":[{"primitive":"circle","center":[0.414,0.586],"radius":0.016,"color":"white"}]}
 
+入力: 黒い円を右上の焦点に置く。
+出力: {"instructions":[{"primitive":"circle","center":[0.72,0.28],"radius":0.1,"color":"black"}]}
+
 入力: 赤い小さな円を正五角形の頂点に五個並べる。半径は0.022。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.022,"color":"red","arrangement":{"count":5,"layout":"radial"}}]}
 
 入力: 白い細い線を対位法の反行として右下がりに三本並べる。細かく震える。
 出力: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"color":"white","rotation":30,"arrangement":{"count":3,"layout":"vertical"},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
 
-入力: 白い細い弧を倍音列として中心から放射状に四つ並べる。半径は0.07。
-出力: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.24}}]}
+入力: 白い細い弧を倍音列として右下の焦点から四つ並べる。半径は0.07。
+出力: {"instructions":[{"primitive":"arc","center":[0.72,0.68],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.18}}]}
 
 入力: 赤い小さな円を輪唱のずれとして左から右へ七個並べる。半径は0.014。ゆっくり揺れる。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.014,"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
+
+入力: 白い細い線を一点透視法として右上の焦点へ向けて八本引く。
+出力: {"instructions":[{"primitive":"line","from":[0.12,0.85],"to":[0.78,0.28],"color":"white","arrangement":{"count":8,"layout":"vertical","margin":0.08}}]}
+
+入力: 赤い小さな円を点描として画面全体に点々と三十四個散らす。半径は0.006。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.006,"color":"red","arrangement":{"count":34,"layout":"scatter"}}]}
+
+入力: 赤い太筆の短い線を油絵の厚塗りとして横に七本並べる。
+出力: {"instructions":[{"primitive":"line","from":[0.35,0.5],"to":[0.65,0.5],"color":"red","weight":"brush_thick","arrangement":{"count":7,"layout":"vertical"}}]}
+
+入力: 白い薄い水彩の楕円を左上に三つ重ねる。境界が滲む。
+出力: {"instructions":[{"primitive":"ellipse","center":[0.32,0.28],"size":[0.24,0.14],"color":"white","arrangement":{"count":3,"layout":"scatter","margin":0.18},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
+
+入力: 赤・青・緑・灰の小さな四角をパッチワークとして格子状に十六個並べる。
+出力: {"instructions":[{"primitive":"square","position":[0.45,0.45],"size":[0.08,0.08],"arrangement":{"count":16,"layout":"scatter","margin":0.18,"color_cycle":["red","blue","green","gray"]}}]}
+
+入力: 黒い細筆の縦線を水墨の濃淡として左から右へ五本並べる。境界が滲む。
+出力: {"instructions":[{"primitive":"line","from":[0.5,0.2],"to":[0.5,0.8],"color":"black","weight":"brush_thin","arrangement":{"count":5,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x"]}}]}
 
 入力: 上から半分に横線。小刻みに震える。
 出力: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
@@ -207,11 +240,23 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"upper-right golden-ratio position" → center=[0.618,0.382]. Lower-left uses [0.382,0.618]. Treat it as a mathematical balance point**
 - **"upper-left rule-of-thirds point" → center=[0.333,0.333]. "lower-right rule-of-thirds point" → center=[0.667,0.667]. Treat it as rule-of-thirds composition**
 - **"lower-left silver-ratio position" → center=[0.414,0.586]. "upper-right silver-ratio position" → center=[0.586,0.414]. Treat it as silver-ratio spacing**
+- **"upper-right focus" → center=[0.72,0.28]. "upper-left focus" → [0.28,0.28]. "lower-right focus" → [0.72,0.72]. "lower-left focus" → [0.28,0.72]. Treat these as dynamic alternatives to canvas center**
+- **"upper-edge focus" → center=[0.5,0.18]. "right-half focus" → center=[0.72,0.5]**
 - **"regular pentagon vertices" → arrangement count=5 layout=radial. Treat it as a pentagonal balance layer**
 - **Fibonacci-like counts such as thirteen and twenty-one are intentional; keep them as explicit counts**
 - **"contrapuntal contrary motion" → a line layer moving against the main direction. Falling to the right uses rotation=30; rising to the right uses rotation=-30**
 - **"harmonic overtone series" → an integer-ratio radial arc/circle layer. Keep the explicit count**
 - **"canon offset" → repeated same shape with slight horizontal delay. Use layout=horizontal and the explicit count**
+- **"one-point perspective" → thin guide lines toward the DDL focus. If the focus is upper right, use guide lines converging there**
+- **"perspective depth" → repeated horizontal lines upward, preserving count**
+- **"value" / "light and shade" → black/gray/white contrast layers; blurring may express soft value transitions**
+- **"drawing underlines" → fine-brush or pencil thin lines; preserve count**
+- **"pointillism" → small circle scatter with small radius; preserve count**
+- **"oil impasto" → short brush_thick line repetition**
+- **"watercolor" → ellipse/circle with blurring, layered softly**
+- **"patchwork" → square repetition; use color_cycle for multiple colors**
+- **"fresco ground" → chalk gray horizontal lines or ground plane with blurring**
+- **"ink-wash value" → black/gray brush lines with blurring or weight contrast**
 
 # Examples (key patterns)
 
@@ -239,17 +284,38 @@ Output: {"instructions":[{"primitive":"circle","center":[0.333,0.333],"radius":0
 Input: Place one small white circle at the lower-left silver-ratio position. Radius 0.016.
 Output: {"instructions":[{"primitive":"circle","center":[0.414,0.586],"radius":0.016,"color":"white"}]}
 
+Input: Place a black circle at the upper-right focus.
+Output: {"instructions":[{"primitive":"circle","center":[0.72,0.28],"radius":0.1,"color":"black"}]}
+
 Input: Line up five small red circles on regular pentagon vertices. Radius 0.022.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.022,"color":"red","arrangement":{"count":5,"layout":"radial"}}]}
 
 Input: Line up three thin white lines falling to the right as contrapuntal contrary motion. Fine trembling.
 Output: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"color":"white","rotation":30,"arrangement":{"count":3,"layout":"vertical"},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
 
-Input: Line up four thin white arcs radially from center as a harmonic overtone series. Radius 0.07.
-Output: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.24}}]}
+Input: Line up four thin white arcs from a lower-right focus as a harmonic overtone series. Radius 0.07.
+Output: {"instructions":[{"primitive":"arc","center":[0.72,0.68],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.18}}]}
 
 Input: Line up seven small red circles left to right as a canon offset. Radius 0.014. Swaying slowly.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.014,"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
+
+Input: Draw eight thin white lines toward an upper-right focus as one-point perspective.
+Output: {"instructions":[{"primitive":"line","from":[0.12,0.85],"to":[0.78,0.28],"color":"white","arrangement":{"count":8,"layout":"vertical","margin":0.08}}]}
+
+Input: Scatter thirty-four small red circles dotted across the whole canvas as pointillism. Radius 0.006.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.006,"color":"red","arrangement":{"count":34,"layout":"scatter"}}]}
+
+Input: Line up seven short red thick-brush lines horizontally as oil impasto.
+Output: {"instructions":[{"primitive":"line","from":[0.35,0.5],"to":[0.65,0.5],"color":"red","weight":"brush_thick","arrangement":{"count":7,"layout":"vertical"}}]}
+
+Input: Layer three pale watercolor ellipses in the upper left. Edges blurring.
+Output: {"instructions":[{"primitive":"ellipse","center":[0.32,0.28],"size":[0.24,0.14],"color":"white","arrangement":{"count":3,"layout":"scatter","margin":0.18},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
+
+Input: Line up sixteen small squares in red, blue, green, gray as patchwork grid.
+Output: {"instructions":[{"primitive":"square","position":[0.45,0.45],"size":[0.08,0.08],"arrangement":{"count":16,"layout":"scatter","margin":0.18,"color_cycle":["red","blue","green","gray"]}}]}
+
+Input: Line up five black fine-brush vertical lines left to right as ink-wash value. Edges blurring.
+Output: {"instructions":[{"primitive":"line","from":[0.5,0.2],"to":[0.5,0.8],"color":"black","weight":"brush_thin","arrangement":{"count":5,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x"]}}]}
 
 Input: Draw a horizontal line at center. Fine trembling.
 Output: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}

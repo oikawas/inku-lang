@@ -335,12 +335,12 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
     context = f"{context_text or ''}\n{ddl}"
     profile = _profile_ja(context)
 
-    if any(token in ddl for token in ("円", "点", "粒", "星")):
-        structural.append(f"{main_color}小さな円を右半分の斜めの帯に三個並べる。半径は0.022。")
-        structural.append(f"{main_color}小さな円を左下から右上へ八個散らす。半径は0.018。細かく震える。")
+    if any(token in ddl for token in ("円", "点", "粒", "星", "楕円", "四角")):
+        structural.append(f"{main_color}右上がりの小さな楕円を右半分の斜めの帯に三個並べる。横長にする。")
+        structural.append(f"{main_color}短い線を左下から右上へ八本散らす。細かく震える。")
 
     if any(token in ddl for token in ("散らす", "点々", "舞", "漂", "雪", "雨")):
-        structural.append(f"{main_color}小さな円を波打つ軌跡に沿って十三個散らす。半径は0.012。ゆっくり揺れる。")
+        structural.append(f"{main_color}右下がりの小さな楕円を波打つ軌跡に沿って十三個散らす。ゆっくり揺れる。")
 
     if "線" in ddl:
         structural.append(f"{contrast_color}細い斜め線を右上がりに三本並べる。細かく震える。")
@@ -351,16 +351,16 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
     music = [
         _FilterCandidate(f"{contrast_color}細い線を対位法の反行として右下がりに二本並べる。細かく震える。", frozenset(("line", "music", "contrast"))),
         _FilterCandidate(f"{contrast_color}細い弧を倍音列として右下の焦点から三つ並べる。半径は0.07。", frozenset(("music", "water", "soft"))),
-        _FilterCandidate(f"{main_color}小さな円を輪唱のずれとして左から右へ四個並べる。半径は0.014。ゆっくり揺れる。", frozenset(("particle", "music"))),
+        _FilterCandidate(f"{main_color}短い線を輪唱のずれとして左から右へ四本並べる。ゆっくり揺れる。", frozenset(("particle", "music", "line"))),
     ]
     painting = [
         _FilterCandidate(f"{contrast_color}細い線を一点透視法として右上の焦点へ向けて三本引く。", frozenset(("space", "line", "geometry"))),
         _FilterCandidate("灰色の細い横線を遠近法の奥行きとして上へ細かく三本並べる。", frozenset(("space", "line"))),
         _FilterCandidate("黒い細筆の細い線を素描の下線として左から右へ三本並べる。細かく震える。", frozenset(("line", "quiet"))),
-        _FilterCandidate(f"{main_color}小さな円を点描として画面全体に点々と十三個散らす。半径は0.006。", frozenset(("particle", "dense"))),
+        _FilterCandidate(f"{main_color}回転した小さな四角を点描として画面全体に点々と十三個散らす。", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"{main_color}太筆の短い線を油絵の厚塗りとして横に三本並べる。", frozenset(("dense", "contrast"))),
         _FilterCandidate(f"{contrast_color}薄い水彩の楕円を左上に二つ重ねる。境界が滲む。", frozenset(("water", "soft", "quiet"))),
-        _FilterCandidate("赤・青・緑・灰の小さな四角をパッチワークとして格子状に六個並べる。", frozenset(("geometry", "dense"))),
+        _FilterCandidate("赤・青・緑・灰の回転した小さな四角をパッチワークとして格子状に六個並べる。", frozenset(("geometry", "dense"))),
         _FilterCandidate("灰色のチョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。", frozenset(("space", "line", "soft"))),
         _FilterCandidate("黒い細筆の縦線を水墨の濃淡として左から右へ三本並べる。境界が滲む。", frozenset(("water", "contrast", "quiet"))),
     ]
@@ -391,13 +391,13 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
     context = f"{context_text or ''}\n{ddl}"
     profile = _profile_en(context)
 
-    if any(token in lower for token in ("circle", "dot", "particle", "star")):
-        structural.append(f"Line up three small {main_color} circles along a diagonal band in the right half. Radius 0.022.")
-        structural.append(f"Scatter eight small {main_color} circles from lower left to upper right. Radius 0.018. Fine trembling.")
+    if any(token in lower for token in ("circle", "dot", "particle", "star", "ellipse", "square")):
+        structural.append(f"Line up three small {main_color} ellipses rising to the right along a diagonal band in the right half. Make them wide.")
+        structural.append(f"Scatter eight short {main_color} lines from lower left to upper right. Fine trembling.")
 
     if any(token in lower for token in ("scatter", "dotted", "drift", "snow", "rain")):
         structural.append(
-            f"Scatter thirteen small {main_color} circles along an undulating trace. Radius 0.012. Swaying slowly."
+            f"Scatter thirteen small {main_color} ellipses falling to the right along an undulating trace. Swaying slowly."
         )
 
     if "line" in lower:
@@ -409,16 +409,16 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
     music = [
         _FilterCandidate(f"Line up two thin {contrast_color} lines falling to the right as contrapuntal contrary motion. Fine trembling.", frozenset(("line", "music", "contrast"))),
         _FilterCandidate(f"Line up three thin {contrast_color} arcs from a lower-right focus as a harmonic overtone series. Radius 0.07.", frozenset(("music", "water", "soft"))),
-        _FilterCandidate(f"Line up four small {main_color} circles left to right as a canon offset. Radius 0.014. Swaying slowly.", frozenset(("particle", "music"))),
+        _FilterCandidate(f"Line up four short {main_color} lines left to right as a canon offset. Swaying slowly.", frozenset(("particle", "music", "line"))),
     ]
     painting = [
         _FilterCandidate(f"Draw three thin {contrast_color} lines toward an upper-right focus as one-point perspective.", frozenset(("space", "line", "geometry"))),
         _FilterCandidate("Line up three thin gray horizontal lines upward as perspective depth.", frozenset(("space", "line"))),
         _FilterCandidate("Line up three thin black fine-brush lines left to right as drawing underlines. Fine trembling.", frozenset(("line", "quiet"))),
-        _FilterCandidate(f"Scatter thirteen small {main_color} circles dotted across the whole canvas as pointillism. Radius 0.006.", frozenset(("particle", "dense"))),
+        _FilterCandidate(f"Scatter thirteen small rotated {main_color} squares dotted across the whole canvas as pointillism.", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"Line up three short {main_color} thick-brush lines horizontally as oil impasto.", frozenset(("dense", "contrast"))),
         _FilterCandidate("Layer two pale watercolor ellipses in the upper left. Edges blurring.", frozenset(("water", "soft", "quiet"))),
-        _FilterCandidate("Line up six small squares in red, blue, green, gray as patchwork grid.", frozenset(("geometry", "dense"))),
+        _FilterCandidate("Line up six small rotated squares in red, blue, green, gray as patchwork grid.", frozenset(("geometry", "dense"))),
         _FilterCandidate("Line up three gray chalk horizontal lines at the bottom as fresco ground. Edges blurring.", frozenset(("space", "line", "soft"))),
         _FilterCandidate("Line up three black fine-brush vertical lines left to right as ink-wash value. Edges blurring.", frozenset(("water", "contrast", "quiet"))),
     ]

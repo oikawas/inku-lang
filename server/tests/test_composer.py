@@ -140,6 +140,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "一点透視法" in SYSTEM_PROMPT
     assert "遠近法の奥行き" in SYSTEM_PROMPT
     assert "点描" in SYSTEM_PROMPT
+    assert "rotation を付けて水平/垂直対称を崩す" in SYSTEM_PROMPT
+    assert '"rotation":30' in SYSTEM_PROMPT
+    assert '"rotation":-30' in SYSTEM_PROMPT
     assert "油絵の厚塗り" in SYSTEM_PROMPT
     assert "水彩" in SYSTEM_PROMPT
     assert "パッチワーク" in SYSTEM_PROMPT
@@ -164,6 +167,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "one-point perspective" in SYSTEM_PROMPT_EN
     assert "perspective depth" in SYSTEM_PROMPT_EN
     assert "pointillism" in SYSTEM_PROMPT_EN
+    assert "add rotation to break axis symmetry" in SYSTEM_PROMPT_EN
+    assert '"rotation":30' in SYSTEM_PROMPT_EN
+    assert '"rotation":-30' in SYSTEM_PROMPT_EN
     assert "oil impasto" in SYSTEM_PROMPT_EN
     assert "watercolor" in SYSTEM_PROMPT_EN
     assert "patchwork" in SYSTEM_PROMPT_EN

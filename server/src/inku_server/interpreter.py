@@ -59,7 +59,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 数量詞が含まれる場合、**色・素材・方向・サイズとともに 1 文に**まとめよ。
 
 - 「三本の竹を縦に並べる」→「縦の実線を横に三本並べる。」
-- 「五つの赤い点を置く」→「赤い小さな円を中央付近に五つ散らす。」
+- 「五つの赤い点を置く」→「赤い小さな楕円を中央付近に五つ散らす。」
 - 「背景を青のクレヨン線で埋め尽くす」→「青いクレヨンの縦線を横に百二十本並べる。」
 - 100本・200個などの具体的な数 → そのまま記述する。1000 を超える場合のみ 1000 に丸める。
 
@@ -79,7 +79,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 対象別の補正:
 - 大きな図形、太い線、主役になる形 → 少なめ
-- 小さな点、星、雨、雪、砂、粒、短い線 → 多め
+- 小さな点、星、雨、雪、砂、粒、短い線 → 多め。ただし真円へ固定せず、楕円・四角・短線へ分散
 - 放射状・円環・対称配置 → 6, 8, 12, 16, 24, 32 など構造が見える数
 - 格子・縞・等間隔配置 → 5, 7, 9, 12, 16, 24, 36 など規則が見える数
 - 全面散布 → 17, 29, 47, 83, 137, 233, 377, 610 など偏りにくい数も使ってよい
@@ -155,8 +155,9 @@ Saijiki にない語が入力にあるとき、その語のイメージ・形・
 
 展開の四つの切り口:
 - **形状**: 月→円、山→三角、建物→四角、木→縦線
-- **質感**: 霧→楕円(滲む)、砂→点を散らす、炎→縦線(波打つ)
-- **構造**: 海→横線を複数、森→縦線を複数、星空→画面全体に小さな円
+- **形の偏りを避ける**: 「円・丸・月・太陽」が明示された場合だけ真円を主役にする。点・粒・星・雪・雨・砂・花びらは真円に固定せず、文脈に応じて小さな楕円、短い線、小さな四角へ分散する
+- **質感**: 霧→楕円(滲む)、砂→小さな四角または短い線を散らす、炎→縦線(波打つ)
+- **構造**: 海→横線を複数、森→縦線を複数、星空→画面全体に小さな四角や短い線
 - **動作→配置**: 昇る→上方に置く、散る→上から下または波打つ軌跡に散らす、広がる→同心円状に並べる
 
 # 出力形式
@@ -194,7 +195,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["点", "散ら", "バラバラ", "撒く", "無秩序"],
         "input": "五つの赤い点を置く",
-        "output": "赤い小さな円を中央付近に五つ散らす。半径は0.04。",
+        "output": "赤い右上がりの小さな楕円を中央付近に五つ散らす。横長にする。",
     },
     {
         "keywords": ["横線", "本", "引く", "並べ", "青", "二", "水平"],
@@ -204,7 +205,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["花", "散る", "散", "桜", "春", "花びら"],
         "input": "花びらが散る",
-        "output": "上から下へ白い小さな円を四十七個散らす。大きく揺れる。",
+        "output": "上から下へ白い右下がりの小さな楕円を四十七個散らす。大きく揺れる。",
     },
     {
         "keywords": ["光", "放射", "差す", "太陽", "輝", "レイ"],
@@ -229,7 +230,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["たくさん", "多数", "無数", "いっぱい", "沢山", "大量"],
         "input": "たくさんの小さな点を散らす",
-        "output": "画面全体に黒い小さな円を点々と八十三個散らす。半径は0.02。",
+        "output": "画面全体に黒い回転した小さな四角を点々と八十三個散らす。",
     },
     {
         "keywords": ["100", "200", "500", "1000", "百", "千", "本"],
@@ -276,7 +277,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["右", "左", "半分", "端", "角", "隅"],
         "input": "右半分に赤い小さな円を二十個散らす",
-        "output": "赤い小さな円を右半分に縦に二十個散らす。",
+        "output": "赤い右上がりの小さな楕円を右半分に縦に二十個散らす。",
     },
     # 属性保持: 素材 + 太さ + 色 + 大量
     {
@@ -311,12 +312,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["色とりどり", "カラフル", "虹", "様々な色", "多色", "いろいろな色"],
         "input": "色とりどりの小さな円を散らす",
-        "output": "赤・青・緑・黒・灰の色とりどりの小さな円を画面全体に点々と四十七個散らす。半径は0.03。",
+        "output": "赤・青・緑・黒・灰の色とりどりの右上がりの小さな楕円を画面全体に点々と四十七個散らす。",
     },
     {
         "keywords": ["色とりどり", "カラフル", "放射", "虹", "輪"],
         "input": "色とりどりの点を放射状に並べる",
-        "output": "赤・青・緑・黒の色とりどりの小さな円を放射状に八つ並べる。",
+        "output": "赤・青・緑・黒の色とりどりの短い線を放射状に八つ並べる。",
     },
     # 非 Saijiki 語の展開: 天体
     {
@@ -327,7 +328,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["星", "星空", "夜空", "銀河", "宇宙", "天の川"],
         "input": "満天の星空",
-        "output": "背景を黒で塗りつぶす。白い小さな円を画面全体に点々と六百十個散らす。半径は0.01。",
+        "output": "背景を黒で塗りつぶす。白い回転した小さな四角を画面全体に点々と六百十個散らす。",
     },
     {
         "keywords": ["水平線", "地平線", "水面", "海面", "湖面"],
@@ -348,7 +349,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["雪", "吹雪", "雪原", "粉雪", "積雪"],
         "input": "雪がしんしんと降る",
-        "output": "白い小さな円を上から下へ百三十七個散らす。半径は0.015。ゆっくり揺れる。",
+        "output": "白い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。",
     },
     {
         "keywords": ["炎", "火", "燃え", "燃える", "焔", "篝火"],
@@ -364,12 +365,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["散る", "舞う", "飛ぶ", "漂う", "漂い"],
         "input": "花びらが風に舞い散る",
-        "output": "白い小さな円を波打つ軌跡に沿って四十七個散らす。半径は0.03。大きく揺れる。",
+        "output": "白い右下がりの小さな楕円を波打つ軌跡に沿って四十七個散らす。大きく揺れる。",
     },
     {
         "keywords": ["砂", "粒", "粒子", "細かい", "全面", "埋め尽くす"],
         "input": "砂のような点で画面を埋める",
-        "output": "灰色の小さな円を画面全体に細かく八百九十個散らす。半径は0.006。",
+        "output": "灰色の回転した小さな四角を画面全体に細かく八百九十個散らす。",
     },
     # わりあい: 縦横比
     {
@@ -445,7 +446,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["dots", "scatter", "red", "five", "circles"],
         "input": "Five red dots scattered",
-        "output": "Scatter five small red circles near the center. Radius 0.04.",
+        "output": "Scatter five small red ellipses rising to the right near the center. Make them wide.",
     },
     {
         "keywords": ["horizontal", "lines", "blue", "two", "draw", "parallel"],
@@ -455,7 +456,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["petals", "fall", "cherry", "spring", "blossom", "scatter"],
         "input": "Petals falling",
-        "output": "Scatter forty-seven small white circles from top to bottom. Radius 0.03. Swaying broadly.",
+        "output": "Scatter forty-seven small white ellipses falling to the right from top to bottom. Swaying broadly.",
     },
     {
         "keywords": ["light", "radial", "sun", "ray", "glow", "spreading"],
@@ -480,7 +481,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["many", "numerous", "countless", "lots", "scattered", "small"],
         "input": "Many small dots scattered",
-        "output": "Scatter eighty-three small black circles dotted across the whole canvas. Radius 0.02.",
+        "output": "Scatter eighty-three small rotated black squares dotted across the whole canvas.",
     },
     {
         "keywords": ["100", "200", "500", "hundred", "fill", "dense"],
@@ -520,22 +521,22 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["right", "left", "half", "edge", "corner", "twenty"],
         "input": "Twenty small red circles in the right half",
-        "output": "Scatter twenty small red circles vertically in the right half.",
+        "output": "Scatter twenty small red ellipses rising to the right vertically in the right half.",
     },
     {
         "keywords": ["colorful", "rainbow", "various", "multicolor", "colors"],
         "input": "Colorful small circles scattered",
-        "output": "Scatter forty-seven small circles dotted across the whole canvas in red, blue, green, black, gray. Radius 0.03.",
+        "output": "Scatter forty-seven small ellipses rising to the right dotted across the whole canvas in red, blue, green, black, gray.",
     },
     {
         "keywords": ["starry", "stars", "galaxy", "night sky", "countless"],
         "input": "A sky full of stars",
-        "output": "Fill background with black. Scatter six hundred ten small white circles dotted across the whole canvas. Radius 0.01.",
+        "output": "Fill background with black. Scatter six hundred ten small rotated white squares dotted across the whole canvas.",
     },
     {
         "keywords": ["sand", "particles", "fine", "fill", "whole"],
         "input": "Fill the canvas with sand-like dots",
-        "output": "Scatter eight hundred ninety small gray circles finely across the whole canvas. Radius 0.006.",
+        "output": "Scatter eight hundred ninety small rotated gray squares finely across the whole canvas.",
     },
     {
         "keywords": ["dark", "black background", "night", "shadow", "white"],
@@ -610,7 +611,7 @@ Multiple attributes in one shape go in one sentence: "Line up thirty thick verti
 When a count is present, put **color, material, direction, size in the same sentence**.
 
 - "three bamboo poles" → "Line up three vertical solid lines horizontally."
-- "five red dots" → "Scatter five small red circles near the center. Radius 0.04."
+- "five red dots" → "Scatter five small red ellipses rising to the right near the center. Make them wide."
 - "fill with blue crayon lines" → "Line up one hundred twenty vertical blue crayon lines horizontally."
 - Explicit numbers (100, 200) → use as-is. Clamp only values above 1000 to 1000.
 
@@ -630,7 +631,7 @@ Do not collapse vague quantity words to one fixed number. Choose a concrete coun
 
 Object-specific correction:
 - large shapes, thick lines, main subject → use fewer
-- small dots, stars, rain, snow, sand, particles, short lines → use more
+- small dots, stars, rain, snow, sand, particles, short lines → use more, but vary them across ellipses, squares, and short lines instead of true circles
 - radial / circular / symmetric layouts → prefer structural counts such as 6, 8, 12, 16, 24, 32
 - grid / stripe / evenly spaced layouts → prefer visible-order counts such as 5, 7, 9, 12, 16, 24, 36
 - all-over scatter → you may use less regular counts such as 17, 29, 47, 83, 137, 233, 377, 610
@@ -704,9 +705,10 @@ Arc / Moon:
 
 Expand unknown words to the nearest Saijiki vocabulary using shape, texture, structure, or motion.
 
+- **avoid shape bias**: Use true circles mainly when the input explicitly says circle, round, moon, or sun. For dots, particles, stars, snow, rain, sand, and petals, vary the form across small ellipses, short lines, and small squares instead of defaulting to true circles.
 - **shape**: moon→circle, mountain→triangle, building→square, tree→line
-- **texture**: mist→ellipse(blurring), sand→scattered dots, flame→line(undulating)
-- **structure**: sea→horizontal lines, forest→vertical lines, stars→small circles across the whole canvas
+- **texture**: mist→ellipse(blurring), sand→small squares or short lines, flame→line(undulating)
+- **structure**: sea→horizontal lines, forest→vertical lines, stars→small squares or short lines across the whole canvas
 - **motion→arrangement**: rising→place high, falling→scatter top to bottom, drifting→undulating trace, spreading→concentric circles
 
 # Output Format

@@ -39,7 +39,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - variation は明示された揺らぎがある場合のみ付ける
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
 - **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
-- **小さな点・星・雨・雪・砂・粒は多め、大きな図形・太い線・主役形状は少なめにする**
+- **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
 - **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
@@ -61,10 +61,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「遠近法の奥行き」→ 横線を上方向に複数並べ、奥へ狭まる構図として扱う**
 - **「明暗」「濃淡」→ 黒/灰/白の対比層。明るい点や暗い線を追加し、variation は blurring/pink を使える**
 - **「素描」→ fine-brush または pencil の細線。下線・補助線として count を保つ**
-- **「点描」→ 小さな circle の scatter。半径は小さく、count を保つ**
+- **「点描」→ 小さな square または ellipse の scatter。真円を連発せず、rotation を付けて水平/垂直対称を崩す**
 - **「油絵の厚塗り」→ weight=brush_thick の短い線。反復層として扱う**
-- **「水彩」→ ellipse/circle に blurring を付ける。淡い重なりとして扱う**
-- **「パッチワーク」→ square の horizontal/vertical 反復。色とりどりなら color_cycle を使う**
+- **「水彩」→ 主に ellipse に blurring を付ける。淡い重なりとして扱う**
+- **「パッチワーク」→ square の反復。色とりどりなら color_cycle を使い、rotation で小片の角度を少し崩す**
 - **「フレスコの下地」→ chalk の横線や灰色面。blurring で古い壁面として扱う**
 - **「水墨」→ brush_thin/brush_thick の黒/灰線。濃淡は blurring または細太の対比で扱う**
 
@@ -73,17 +73,17 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 縦の実線を横に三本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
 
-入力: 青い小さな円を中央付近に五つ散らす。半径0.04。
-出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
+入力: 青い右上がりの小さな楕円を中央付近に五つ散らす。横長にする。
+出力: {"instructions":[{"primitive":"ellipse","center":[0.5,0.5],"size":[0.06,0.03],"color":"blue","rotation":-30,"arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
 
-入力: 白い小さな円を画面全体に点々と六百十個散らす。半径は0.01。
-出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.01,"color":"white","arrangement":{"count":610,"layout":"scatter"}}]}
+入力: 白い回転した小さな四角を画面全体に点々と六百十個散らす。
+出力: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.012,0.012],"color":"white","rotation":30,"arrangement":{"count":610,"layout":"scatter"}}]}
 
-入力: 白い小さな円を上から下へ百三十七個散らす。半径は0.015。ゆっくり揺れる。
-出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.015,"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_x"]}}]}
+入力: 白い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。
+出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_x"]}}]}
 
-入力: 赤い小さな円を右半分に縦に二十個散らす。
-出力: {"instructions":[{"primitive":"circle","center":[0.75,0.5],"radius":0.04,"color":"red","arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
+入力: 赤い右上がりの小さな楕円を右半分に縦に二十個散らす。
+出力: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
 
 入力: 白い小さな円を右上の黄金比の位置に一点置く。半径は0.025。
 出力: {"instructions":[{"primitive":"circle","center":[0.618,0.382],"radius":0.025,"color":"white"}]}
@@ -106,23 +106,23 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 白い細い弧を倍音列として右下の焦点から四つ並べる。半径は0.07。
 出力: {"instructions":[{"primitive":"arc","center":[0.72,0.68],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.18}}]}
 
-入力: 赤い小さな円を輪唱のずれとして左から右へ七個並べる。半径は0.014。ゆっくり揺れる。
-出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.014,"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
+入力: 赤い短い線を輪唱のずれとして左から右へ七本並べる。ゆっくり揺れる。
+出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
 
 入力: 白い細い線を一点透視法として右上の焦点へ向けて八本引く。
 出力: {"instructions":[{"primitive":"line","from":[0.12,0.85],"to":[0.78,0.28],"color":"white","arrangement":{"count":8,"layout":"vertical","margin":0.08}}]}
 
-入力: 赤い小さな円を点描として画面全体に点々と三十四個散らす。半径は0.006。
-出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.006,"color":"red","arrangement":{"count":34,"layout":"scatter"}}]}
+入力: 赤い回転した小さな四角を点描として画面全体に点々と三十四個散らす。
+出力: {"instructions":[{"primitive":"square","position":[0.497,0.497],"size":[0.006,0.006],"color":"red","rotation":30,"arrangement":{"count":34,"layout":"scatter"}}]}
 
 入力: 赤い太筆の短い線を油絵の厚塗りとして横に七本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.35,0.5],"to":[0.65,0.5],"color":"red","weight":"brush_thick","arrangement":{"count":7,"layout":"vertical"}}]}
 
-入力: 白い薄い水彩の楕円を左上に三つ重ねる。境界が滲む。
-出力: {"instructions":[{"primitive":"ellipse","center":[0.32,0.28],"size":[0.24,0.14],"color":"white","arrangement":{"count":3,"layout":"scatter","margin":0.18},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
+入力: 白い右上がりの薄い水彩の楕円を左上に三つ重ねる。境界が滲む。
+出力: {"instructions":[{"primitive":"ellipse","center":[0.32,0.28],"size":[0.24,0.14],"color":"white","rotation":-15,"arrangement":{"count":3,"layout":"scatter","margin":0.18},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
 
-入力: 赤・青・緑・灰の小さな四角をパッチワークとして格子状に十六個並べる。
-出力: {"instructions":[{"primitive":"square","position":[0.45,0.45],"size":[0.08,0.08],"arrangement":{"count":16,"layout":"scatter","margin":0.18,"color_cycle":["red","blue","green","gray"]}}]}
+入力: 赤・青・緑・灰の回転した小さな四角をパッチワークとして格子状に十六個並べる。
+出力: {"instructions":[{"primitive":"square","position":[0.45,0.45],"size":[0.08,0.08],"rotation":15,"arrangement":{"count":16,"layout":"scatter","margin":0.18,"color_cycle":["red","blue","green","gray"]}}]}
 
 入力: 黒い細筆の縦線を水墨の濃淡として左から右へ五本並べる。境界が滲む。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.2],"to":[0.5,0.8],"color":"black","weight":"brush_thin","arrangement":{"count":5,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x"]}}]}
@@ -230,7 +230,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - variation only when movement is explicitly stated
 - **count is integer 1–1000. Use explicit numbers from DDL**
 - **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
-- **Use more for small dots/stars/rain/snow/sand/particles; use fewer for large shapes, thick lines, or main-subject shapes**
+- **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
 - **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
@@ -252,10 +252,10 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"perspective depth" → repeated horizontal lines upward, preserving count**
 - **"value" / "light and shade" → black/gray/white contrast layers; blurring may express soft value transitions**
 - **"drawing underlines" → fine-brush or pencil thin lines; preserve count**
-- **"pointillism" → small circle scatter with small radius; preserve count**
+- **"pointillism" → small square or ellipse scatter; avoid repeated true circles and add rotation to break axis symmetry**
 - **"oil impasto" → short brush_thick line repetition**
-- **"watercolor" → ellipse/circle with blurring, layered softly**
-- **"patchwork" → square repetition; use color_cycle for multiple colors**
+- **"watercolor" → primarily ellipse with blurring, layered softly**
+- **"patchwork" → square repetition; use color_cycle for multiple colors and add slight rotation to the pieces**
 - **"fresco ground" → chalk gray horizontal lines or ground plane with blurring**
 - **"ink-wash value" → black/gray brush lines with blurring or weight contrast**
 
@@ -264,17 +264,17 @@ If "original text" is provided, use normalized DDL as primary; use original text
 Input: Line up three vertical solid lines horizontally.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
 
-Input: Scatter five small blue circles near the center. Radius 0.04.
-Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.04,"color":"blue","arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
+Input: Scatter five small blue ellipses rising to the right near the center. Make them wide.
+Output: {"instructions":[{"primitive":"ellipse","center":[0.5,0.5],"size":[0.06,0.03],"color":"blue","rotation":-30,"arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
 
-Input: Scatter six hundred ten small white circles dotted across the whole canvas. Radius 0.01.
-Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.01,"color":"white","arrangement":{"count":610,"layout":"scatter"}}]}
+Input: Scatter six hundred ten small rotated white squares dotted across the whole canvas.
+Output: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.012,0.012],"color":"white","rotation":30,"arrangement":{"count":610,"layout":"scatter"}}]}
 
-Input: Scatter one hundred thirty-seven small white circles from top to bottom. Radius 0.015. Swaying slowly.
-Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.015,"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_x"]}}]}
+Input: Scatter one hundred thirty-seven short white lines from top to bottom. Swaying slowly.
+Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_x"]}}]}
 
-Input: Scatter twenty small red circles vertically in the right half.
-Output: {"instructions":[{"primitive":"circle","center":[0.75,0.5],"radius":0.04,"color":"red","arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
+Input: Scatter twenty small red ellipses rising to the right vertically in the right half.
+Output: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
 
 Input: Place one small white circle at the upper-right golden-ratio position. Radius 0.025.
 Output: {"instructions":[{"primitive":"circle","center":[0.618,0.382],"radius":0.025,"color":"white"}]}
@@ -297,23 +297,23 @@ Output: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"
 Input: Line up four thin white arcs from a lower-right focus as a harmonic overtone series. Radius 0.07.
 Output: {"instructions":[{"primitive":"arc","center":[0.72,0.68],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.18}}]}
 
-Input: Line up seven small red circles left to right as a canon offset. Radius 0.014. Swaying slowly.
-Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.014,"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
+Input: Line up seven short red lines left to right as a canon offset. Swaying slowly.
+Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
 
 Input: Draw eight thin white lines toward an upper-right focus as one-point perspective.
 Output: {"instructions":[{"primitive":"line","from":[0.12,0.85],"to":[0.78,0.28],"color":"white","arrangement":{"count":8,"layout":"vertical","margin":0.08}}]}
 
-Input: Scatter thirty-four small red circles dotted across the whole canvas as pointillism. Radius 0.006.
-Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.006,"color":"red","arrangement":{"count":34,"layout":"scatter"}}]}
+Input: Scatter thirty-four small rotated red squares dotted across the whole canvas as pointillism.
+Output: {"instructions":[{"primitive":"square","position":[0.497,0.497],"size":[0.006,0.006],"color":"red","rotation":30,"arrangement":{"count":34,"layout":"scatter"}}]}
 
 Input: Line up seven short red thick-brush lines horizontally as oil impasto.
 Output: {"instructions":[{"primitive":"line","from":[0.35,0.5],"to":[0.65,0.5],"color":"red","weight":"brush_thick","arrangement":{"count":7,"layout":"vertical"}}]}
 
-Input: Layer three pale watercolor ellipses in the upper left. Edges blurring.
-Output: {"instructions":[{"primitive":"ellipse","center":[0.32,0.28],"size":[0.24,0.14],"color":"white","arrangement":{"count":3,"layout":"scatter","margin":0.18},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
+Input: Layer three pale watercolor ellipses rising to the right in the upper left. Edges blurring.
+Output: {"instructions":[{"primitive":"ellipse","center":[0.32,0.28],"size":[0.24,0.14],"color":"white","rotation":-15,"arrangement":{"count":3,"layout":"scatter","margin":0.18},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
 
-Input: Line up sixteen small squares in red, blue, green, gray as patchwork grid.
-Output: {"instructions":[{"primitive":"square","position":[0.45,0.45],"size":[0.08,0.08],"arrangement":{"count":16,"layout":"scatter","margin":0.18,"color_cycle":["red","blue","green","gray"]}}]}
+Input: Line up sixteen small rotated squares in red, blue, green, gray as patchwork grid.
+Output: {"instructions":[{"primitive":"square","position":[0.45,0.45],"size":[0.08,0.08],"rotation":15,"arrangement":{"count":16,"layout":"scatter","margin":0.18,"color_cycle":["red","blue","green","gray"]}}]}
 
 Input: Line up five black fine-brush vertical lines left to right as ink-wash value. Edges blurring.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.2],"to":[0.5,0.8],"color":"black","weight":"brush_thin","arrangement":{"count":5,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x"]}}]}

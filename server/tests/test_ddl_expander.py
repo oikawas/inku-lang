@@ -5,7 +5,7 @@ from inku_server.ddl_expander import expand_intermediate_ddl
 
 JA_TECHNIQUE_MARKERS = [
     "右半分の斜めの帯",
-    "左下から右上へ八個",
+    "左下から右上へ八本",
     "波打つ軌跡に沿って十三個",
     "左下の焦点から三つ",
     "右上の黄金比の位置",
@@ -62,6 +62,9 @@ def test_expand_intermediate_ddl_selects_focused_layers():
     assert 2 <= len(selected) <= 4
     assert len(selected) < len(JA_TECHNIQUE_MARKERS)
     assert expanded.count("。") <= ddl.count("。") + 8
+    assert expanded.count("小さな円") <= ddl.count("小さな円")
+    assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角"))
+    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した"))
 
 
 def test_expand_intermediate_ddl_is_idempotent_after_expansion():
@@ -78,7 +81,7 @@ def test_expand_intermediate_ddl_varies_by_input():
     assert "中心" not in first
     assert "中央" not in first
     assert "焦点に黒い四角を置く" in first
-    assert any(marker in first for marker in ("遠近法の奥行き", "一点透視法", "パッチワーク", "水彩", "素描の下線"))
+    assert any(marker in first for marker in ("遠近法の奥行き", "一点透視法", "パッチワーク", "水彩", "素描の下線", "点描"))
     assert any(marker in second for marker in ("油絵の厚塗り", "素描の下線", "点描", "水墨の濃淡", "パッチワーク"))
 
 
@@ -98,6 +101,17 @@ def test_expand_intermediate_ddl_uses_context_to_control_filter_amount():
     assert len(quiet_selected) == 1
     assert len(dense_selected) >= 3
     assert len(quiet_selected) < len(dense_selected)
+
+
+def test_expand_intermediate_ddl_does_not_add_true_circles_for_particles():
+    expanded = expand_intermediate_ddl(
+        "背景を黒で塗りつぶす。白い小さな四角を画面全体に点々と六百十個散らす。",
+        context_text="満天の星空",
+    )
+
+    assert "小さな円" not in expanded
+    assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角"))
+    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した"))
 
 
 def test_expand_intermediate_ddl_en_selects_focused_layers():

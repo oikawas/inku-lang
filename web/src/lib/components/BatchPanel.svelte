@@ -92,7 +92,7 @@
 		savePromptHistory([prompt, ...batchPromptHistory.filter((item) => item !== prompt)]);
 	}
 
-	function restoreHistoryPrompt() {
+	function restoreSelectedHistoryPrompt() {
 		if (!selectedHistoryPrompt || batchRunning) return;
 		batchInput = selectedHistoryPrompt;
 	}
@@ -129,13 +129,16 @@
 	<div class="batch-tools">
 		{#if batchPromptHistory.length > 0}
 			<div class="batch-history">
-				<select bind:value={selectedHistoryPrompt} aria-label={t().batchHistoryLabel}>
+				<select
+					bind:value={selectedHistoryPrompt}
+					aria-label={t().batchHistoryLabel}
+					onchange={restoreSelectedHistoryPrompt}
+				>
 					<option value="">{t().batchHistoryPlaceholder}</option>
 					{#each batchPromptHistory as prompt, i (`${i}-${prompt}`)}
 						<option value={prompt}>{prompt.split('\n')[0]}</option>
 					{/each}
 				</select>
-				<button class="history-apply-btn" onclick={restoreHistoryPrompt} disabled={!selectedHistoryPrompt}>{t().batchHistoryApply}</button>
 			</div>
 		{/if}
 	</div>
@@ -230,18 +233,6 @@
 		gap: 5px;
 		flex-wrap: wrap;
 	}
-	.history-apply-btn {
-		padding: 3px 8px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: 11px;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.history-apply-btn:hover:not(:disabled) { background: var(--bg2); }
-	.history-apply-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 	.batch-history select {
 		flex: 1;
 		min-width: min(220px, 100%);

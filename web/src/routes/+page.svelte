@@ -1124,6 +1124,10 @@
 		stage1UserPrompt = '';
 		error = null;
 		reloadError = null;
+		batchFailures = [];
+		setBatchFailureReport(null);
+		batchActiveLine = null;
+		batchActiveDdl = null;
 		outputTab = 'canvas';
 		elapsedStage1Ms = 0;
 		elapsedStage2Ms = 0;

@@ -1,5 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+
+	const BATCH_PROMPT_HISTORY_KEY = 'inku-batch-prompt-history';
+	const BATCH_PROMPT_HISTORY_LIMIT = 20;
 
 	type BatchFailure = {
 		line: number;
@@ -48,15 +52,61 @@
 
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
 	let batchScrollTop = $state(0);
+	let batchPromptHistory = $state<string[]>([]);
+	let selectedHistoryPrompt = $state('');
+	const displayLineNumbersText = $derived(batchInput.trim() ? lineNumbersText : t().batchPlaceholder.split('\n').map((_, i) => String(i + 1)).join('\n'));
 	const batchActiveLineStyle = $derived(
 		batchActiveLine === null
 			? ''
 			: `--batch-active-top: ${9 + (batchActiveLine - 1) * 21.45 - batchScrollTop}px`
 	);
+
+	function normalizePrompt(text: string): string {
+		return text.trim().replace(/\r\n/g, '\n');
+	}
+
+	function loadPromptHistory() {
+		try {
+			const parsed = JSON.parse(localStorage.getItem(BATCH_PROMPT_HISTORY_KEY) ?? '[]');
+			if (!Array.isArray(parsed)) return;
+			batchPromptHistory = parsed
+				.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+				.slice(0, BATCH_PROMPT_HISTORY_LIMIT);
+		} catch {
+			batchPromptHistory = [];
+		}
+	}
+
+	function savePromptHistory(nextHistory: string[]) {
+		batchPromptHistory = nextHistory.slice(0, BATCH_PROMPT_HISTORY_LIMIT);
+		try {
+			localStorage.setItem(BATCH_PROMPT_HISTORY_KEY, JSON.stringify(batchPromptHistory));
+		} catch {
+			// localStorage failure should not block drawing.
+		}
+	}
+
+	function rememberCurrentPrompt() {
+		const prompt = normalizePrompt(batchInput);
+		if (!prompt) return;
+		savePromptHistory([prompt, ...batchPromptHistory.filter((item) => item !== prompt)]);
+	}
+
+	function restoreHistoryPrompt() {
+		if (!selectedHistoryPrompt || batchRunning) return;
+		batchInput = selectedHistoryPrompt;
+	}
+
+	function submitAndRemember() {
+		rememberCurrentPrompt();
+		void onSubmit();
+	}
+
+	onMount(loadPromptHistory);
 </script>
 
 <div class="batch-wrap">
-	<div class="line-nums" aria-hidden="true">{lineNumbersText}</div>
+	<div class="line-nums" aria-hidden="true">{displayLineNumbersText}</div>
 	<div class="batch-ta-wrap">
 		{#if batchRunning && batchActiveLine !== null}
 			<div class="batch-active-line" style={batchActiveLineStyle}></div>
@@ -75,6 +125,21 @@
 	</div>
 </div>
 {#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
+{#if !batchRunning}
+	<div class="batch-tools">
+		{#if batchPromptHistory.length > 0}
+			<div class="batch-history">
+				<select bind:value={selectedHistoryPrompt} aria-label={t().batchHistoryLabel}>
+					<option value="">{t().batchHistoryPlaceholder}</option>
+					{#each batchPromptHistory as prompt, i (`${i}-${prompt}`)}
+						<option value={prompt}>{prompt.split('\n')[0]}</option>
+					{/each}
+				</select>
+				<button class="history-apply-btn" onclick={restoreHistoryPrompt} disabled={!selectedHistoryPrompt}>{t().batchHistoryApply}</button>
+			</div>
+		{/if}
+	</div>
+{/if}
 
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress">
@@ -83,7 +148,7 @@
 		<button class="stop-sm" onclick={onStop}>{t().stopBtn}</button>
 	</div>
 {:else}
-	<button class="play-btn" onclick={onSubmit} disabled={!canSubmit}>▶ <span>{t().submitBtn}</span></button>
+	<button class="play-btn" onclick={submitAndRemember} disabled={!canSubmit}>▶ <span>{t().submitBtn}</span></button>
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}
@@ -153,6 +218,41 @@
 		overflow: hidden;
 	}
 	.batch-info { font-size: 11px; color: var(--fg3); }
+	.batch-tools {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-top: 2px;
+	}
+	.batch-history {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		flex-wrap: wrap;
+	}
+	.history-apply-btn {
+		padding: 3px 8px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: #fff;
+		color: var(--fg2);
+		font-size: 11px;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.history-apply-btn:hover:not(:disabled) { background: var(--bg2); }
+	.history-apply-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+	.batch-history select {
+		flex: 1;
+		min-width: min(220px, 100%);
+		padding: 4px 7px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: #fff;
+		color: var(--fg2);
+		font-family: inherit;
+		font-size: 11px;
+	}
 	.batch-active-line {
 		position: absolute;
 		top: var(--batch-active-top, -100px);

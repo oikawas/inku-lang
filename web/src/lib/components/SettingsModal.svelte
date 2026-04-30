@@ -431,7 +431,7 @@
 	.settings-modal {
 		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
 		z-index: 401;
-		background: #faf9f6; border-radius: var(--r-lg);
+		background: var(--panel2); border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
 		width: min(860px, calc(100vw - 32px)); max-height: 88vh;
@@ -456,7 +456,7 @@
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		padding: 12px;
-		background: #fff;
+		background: var(--panel);
 	}
 	.popover-group-label {
 		font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;
@@ -469,7 +469,7 @@
 	.form-row select, .plugin-add input, .login-grid input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
-		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+		background: var(--panel); color: var(--fg); font-size: 12px; font-family: inherit;
 	}
 	.check-row { display: flex; align-items: center; gap: 7px; color: var(--fg2); font-size: 12px; }
 	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
@@ -498,13 +498,13 @@
 		padding: 7px 9px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 12px;
 	}
 	.plugin-list {
 		border: 1px solid var(--border); border-radius: var(--r);
-		background: #fff; overflow: hidden;
+		background: var(--panel); overflow: hidden;
 	}
 	.plugin-row {
 		display: grid; grid-template-columns: 1fr auto auto; gap: 10px;
@@ -527,7 +527,7 @@
 		padding: 7px 9px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 12px;
 	}
@@ -540,7 +540,7 @@
 	.user-editor-panel {
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		padding: 10px;
 		min-width: 0;
 	}
@@ -558,7 +558,7 @@
 	.user-form-grid input, .user-form-grid select {
 		min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
-		background: #fff; color: var(--fg); font-size: 12px; font-family: inherit;
+		background: var(--panel); color: var(--fg); font-size: 12px; font-family: inherit;
 	}
 	.user-form-actions {
 		display: flex;
@@ -585,7 +585,7 @@
 		padding: 7px 9px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 	}
 	.user-row.selected { border-color: var(--accent); background: var(--accent-light); }
 	.user-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg2); font-size: 12px; }
@@ -595,7 +595,7 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
-		background: #fff;
+		background: var(--panel);
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		padding: 7px 9px;
@@ -616,14 +616,14 @@
 		gap: 8px;
 		padding: 10px 18px 14px;
 		border-top: 1px solid var(--border);
-		background: #faf9f6;
+		background: var(--panel2);
 		flex-shrink: 0;
 	}
 	.ghost-btn {
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		cursor: pointer;

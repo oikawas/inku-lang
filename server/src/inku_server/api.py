@@ -243,6 +243,7 @@ class UserAccountItem(BaseModel):
     role_label: str
     group_id: str | None = None
     group_name: str | None = None
+    ui_theme: str = "light"
     at: int
 
 
@@ -269,6 +270,10 @@ class LoginBody(BaseModel):
 
 class LoginResponse(BaseModel):
     user: UserAccountItem
+
+
+class UserSettingsBody(BaseModel):
+    ui_theme: str = Field(default="light")
 
 
 class DatabaseSettingsStatus(BaseModel):
@@ -374,6 +379,17 @@ def api_auth_login(body: LoginBody, response: Response) -> LoginResponse:
 @app.get("/api/auth/me", response_model=UserAccountItem)
 def api_auth_me(actor: dict = Depends(_current_user)) -> UserAccountItem:
     return UserAccountItem(**actor)
+
+
+@app.patch("/api/auth/me/settings", response_model=UserAccountItem)
+def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_user)) -> UserAccountItem:
+    try:
+        user = _db.update_user_theme(actor["id"], body.ui_theme)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+    return UserAccountItem(**user)
 
 
 @app.get("/api/settings/status", response_model=SettingsStatusResponse)

@@ -204,7 +204,7 @@
 		left: 50%;
 		transform: translate(-50%, -50%);
 		z-index: 401;
-		background: #faf9f6;
+		background: var(--panel2);
 		border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex;
@@ -281,7 +281,7 @@
 		padding: 5px 7px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg);
 		font-size: 12px;
 		font-family: inherit;
@@ -315,7 +315,7 @@
 		position: relative;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		padding: 7px;
 		transition: border-color 0.12s, box-shadow 0.12s;
 	}
@@ -339,7 +339,7 @@
 		border: 2px solid transparent;
 		border-radius: var(--r);
 		overflow: hidden;
-		background: #fff;
+		background: var(--panel);
 		cursor: pointer;
 		padding: 0;
 		font-family: inherit;
@@ -354,7 +354,7 @@
 		transform: translateX(-50%) translateY(4px);
 		opacity: 0;
 		pointer-events: none;
-		background: rgba(26,25,23,0.92);
+		background: var(--tooltip-bg);
 		color: #fff;
 		font-size: 11px;
 		border-radius: var(--r);
@@ -400,7 +400,7 @@
 	.history-table {
 		width: 100%;
 		border-collapse: collapse;
-		background: #fff;
+		background: var(--panel);
 		font-size: 12px;
 	}
 	.history-table th,
@@ -415,7 +415,7 @@
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		cursor: pointer;

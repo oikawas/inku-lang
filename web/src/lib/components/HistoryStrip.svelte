@@ -138,7 +138,7 @@
 	.history-title-btn {
 		border: 1px solid var(--border2);
 		border-radius: 16px;
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 12px;
 		font-weight: 500;
@@ -184,7 +184,7 @@
 		border: 2px solid transparent;
 		border-radius: var(--r);
 		overflow: hidden;
-		background: #fff;
+		background: var(--panel);
 		cursor: pointer;
 		padding: 0;
 		font-family: inherit;
@@ -200,7 +200,7 @@
 		transform: translateX(-50%) translateY(4px);
 		opacity: 0;
 		pointer-events: none;
-		background: rgba(26,25,23,0.92);
+		background: var(--tooltip-bg);
 		color: #fff;
 		font-size: 11px;
 		border-radius: var(--r);
@@ -255,7 +255,7 @@
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		font-family: inherit;

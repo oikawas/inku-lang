@@ -138,7 +138,7 @@
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		cursor: pointer;
@@ -150,7 +150,7 @@
 		width: 100%;
 		border: 1px solid var(--accent); border-left: 3px solid var(--border2);
 		border-radius: 0 var(--r) var(--r) 0;
-		background: #fff;
+		background: var(--panel);
 		overflow: hidden;
 	}
 	.ddl-highlight,
@@ -224,7 +224,7 @@
 		display: flex; align-items: center; justify-content: space-between;
 		padding: 8px 10px 6px;
 		border: 1px solid var(--border2); border-radius: var(--r) var(--r) 0 0;
-		background: #fff;
+		background: var(--panel);
 		margin-top: 8px;
 	}
 	.progress-phases { display: flex; align-items: center; gap: 4px; }

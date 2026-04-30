@@ -6,6 +6,8 @@ export const ja: LangPack = {
 
 	subtitle: '視覚的な短歌を書く',
 	settingsButton: '設定',
+	themeLight: 'ライトモード',
+	themeDark: 'ダークモード',
 
 	loginTitle: 'ログイン',
 	loginUsernamePlaceholder: 'ユーザー名',

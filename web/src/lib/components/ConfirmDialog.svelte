@@ -36,7 +36,7 @@
 		position: absolute; inset: 0; background: rgba(0,0,0,0.3);
 	}
 	.confirm-box {
-		position: relative; background: #fff; border-radius: var(--r-lg);
+		position: relative; background: var(--panel); border-radius: var(--r-lg);
 		padding: 22px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
 		min-width: 280px; text-align: center;
 	}
@@ -46,7 +46,7 @@
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		cursor: pointer;

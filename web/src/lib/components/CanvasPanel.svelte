@@ -291,20 +291,25 @@
 		width: 38px;
 		height: 38px;
 		border-radius: 50%;
-		background: rgba(255,255,255,0.88);
+		background: var(--floating-control-bg);
 		border: 1px solid var(--border2);
 		font-size: 20px;
 		box-shadow: 0 1px 6px rgba(0,0,0,0.1);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--fg);
+		color: var(--floating-control-fg);
 		cursor: pointer;
 		font-family: inherit;
 		transition: background 0.1s;
 	}
-	.nav-circle:hover:not(:disabled) { background: #fff; }
-	.nav-circle:disabled { opacity: 0.35; cursor: not-allowed; }
+	.nav-circle:hover:not(:disabled) { background: var(--floating-control-hover); }
+	.nav-circle:disabled {
+		background: var(--floating-control-disabled-bg);
+		color: var(--floating-control-muted);
+		opacity: 1;
+		cursor: not-allowed;
+	}
 	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 	.canvas-content {
 		position: relative;
@@ -331,7 +336,7 @@
 	.canvas-box {
 		width: 400px;
 		height: 400px;
-		background: #fff;
+		background: var(--panel);
 		box-shadow: 0 8px 32px rgba(0,0,0,0.18);
 		overflow: hidden;
 		flex-shrink: 0;
@@ -346,7 +351,7 @@
 		justify-content: center;
 		color: var(--fg3);
 		font-size: 13px;
-		background: #fffdf8;
+		background: var(--canvas-paper);
 	}
 	.canvas-placeholder-art svg {
 		width: 100%;
@@ -362,7 +367,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0;
-		background: rgba(255,255,255,0.9);
+		background: var(--floating-control-bg);
 		border: 1px solid var(--border2);
 		border-radius: 20px;
 		box-shadow: 0 1px 6px rgba(0,0,0,0.1);
@@ -374,23 +379,24 @@
 		border: none;
 		background: none;
 		font-size: 16px;
-		color: var(--fg);
+		color: var(--floating-control-fg);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-family: inherit;
 	}
-	.zoom-controls button:hover { background: var(--bg2); }
+	.zoom-controls button:hover { background: var(--floating-control-hover); }
 	.zoom-pct {
 		font-size: 11px;
-		color: var(--fg2);
+		color: var(--floating-control-fg);
+		font-weight: 500;
 		font-variant-numeric: tabular-nums;
 		min-width: 38px;
 		text-align: center;
 		user-select: none;
 	}
-	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: 11px !important; color: var(--fg3) !important; }
+	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: 11px !important; color: var(--floating-control-muted) !important; }
 	.status-bar {
 		display: flex;
 		align-items: center;
@@ -453,7 +459,7 @@
 		bottom: calc(100% + 6px);
 		right: 0;
 		z-index: 100;
-		background: #fff;
+		background: var(--panel);
 		border: 1px solid var(--border2);
 		border-radius: var(--r-lg);
 		overflow: hidden;
@@ -484,7 +490,7 @@
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		font-family: inherit;

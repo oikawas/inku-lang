@@ -6,6 +6,8 @@ export const en: LangPack = {
 
 	subtitle: 'write visual tanka',
 	settingsButton: 'settings',
+	themeLight: 'light mode',
+	themeDark: 'dark mode',
 
 	loginTitle: 'Sign in',
 	loginUsernamePlaceholder: 'Username',

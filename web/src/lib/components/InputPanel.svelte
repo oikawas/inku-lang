@@ -201,7 +201,7 @@
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		cursor: pointer;
@@ -223,7 +223,7 @@
 	.input-ta {
 		width: 100%; padding: 9px 10px;
 		border: 1px solid var(--border2); border-radius: var(--r);
-		background: #fff; color: var(--fg);
+		background: var(--panel); color: var(--fg);
 		font-family: inherit; font-size: 13px; line-height: 1.65;
 		resize: vertical; outline: none;
 	}
@@ -232,7 +232,7 @@
 		display: flex; align-items: center; justify-content: space-between;
 		padding: 8px 10px 6px;
 		border: 1px solid var(--border2); border-radius: var(--r) var(--r) 0 0;
-		background: #fff;
+		background: var(--panel);
 		margin-top: 8px;
 	}
 	.progress-phases { display: flex; align-items: center; gap: 4px; }
@@ -307,19 +307,23 @@
 		padding: 5px 10px 7px;
 		border: 1px solid var(--border2); border-top: none;
 		border-radius: 0 0 var(--r) var(--r);
-		background: #fff;
+		background: var(--panel);
 	}
 	.play-btn {
 		width: 100%; margin-top: 8px; padding: 9px;
 		font-size: 14px; font-weight: 500;
-		background: var(--fg); color: #fff;
+		background: var(--action-bg); color: var(--action-fg);
 		border: none; border-radius: var(--r);
 		letter-spacing: 0.08em; cursor: pointer;
 		display: flex; align-items: center; justify-content: center; gap: 8px;
 		font-family: inherit; transition: background 0.15s;
 	}
-	.play-btn:hover:not(:disabled) { background: #333; }
-	.play-btn:disabled { background: var(--fg3); cursor: not-allowed; }
+	.play-btn:hover:not(:disabled) { background: var(--action-hover); }
+	.play-btn:disabled {
+		background: var(--action-disabled-bg);
+		color: var(--action-disabled-fg);
+		cursor: not-allowed;
+	}
 	.error-text { color: #a2342a; font-size: 12px; }
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }

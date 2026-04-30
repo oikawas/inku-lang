@@ -86,7 +86,7 @@
 
 	.saijiki-inner {
 		width: 280px; height: 100%;
-		background: #faf9f6; border-left: 1px solid var(--border);
+		background: var(--panel2); border-left: 1px solid var(--border);
 		display: flex; flex-direction: column;
 		box-shadow: -4px 0 24px rgba(0,0,0,0.08);
 	}
@@ -127,7 +127,7 @@
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		overflow: hidden;
-		background: #fffdf8;
+		background: var(--canvas-paper);
 	}
 	.saijiki-preview-art :global(svg) {
 		display: block;
@@ -168,7 +168,7 @@
 	.saijiki-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 	.saijiki-chip {
 		padding: 4px 9px; border: 1px solid var(--border2); border-radius: 3px;
-		background: #fff; color: var(--fg); font-size: 12px; cursor: pointer;
+		background: var(--panel); color: var(--fg); font-size: 12px; cursor: pointer;
 		font-family: inherit; line-height: 1.3; transition: background 0.1s, border-color 0.1s;
 	}
 	.saijiki-chip:hover { background: var(--bg2); border-color: var(--fg3); }

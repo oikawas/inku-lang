@@ -47,7 +47,7 @@
 		overflow: clip;
 		clip-path: inset(0);
 		contain: paint;
-		background: #fff;
+		background: var(--panel);
 	}
 	.history-thumbnail.strip {
 		width: 82px;

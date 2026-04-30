@@ -64,6 +64,7 @@ class UserAccountRow(Base):
     password_hash = Column(Text, nullable=False)
     role          = Column(String, nullable=False, index=True)
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
+    ui_theme      = Column(String, nullable=False, default="light")
     at            = Column(BigInteger, nullable=False, index=True)
 
 
@@ -86,6 +87,9 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "user_id": "ALTER TABLE history ADD COLUMN user_id VARCHAR",
     "catalog_id": "ALTER TABLE history ADD COLUMN catalog_id VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
+}
+_USER_ACCOUNT_COLUMN_MIGRATIONS = {
+    "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
 }
 _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_user_id", "CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"),
@@ -110,17 +114,31 @@ def init_db() -> None:
 def _migrate_columns() -> None:
     with engine.begin() as conn:
         try:
-            existing_columns = {col["name"] for col in inspect(conn).get_columns("history")}
+            inspector = inspect(conn)
+            existing_history_columns = {col["name"] for col in inspector.get_columns("history")}
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError("failed to inspect history table columns for migration") from exc
 
         for column, ddl in _HISTORY_COLUMN_MIGRATIONS.items():
-            if column in existing_columns:
+            if column in existing_history_columns:
                 continue
             try:
                 conn.execute(text(ddl))
             except Exception as exc:  # noqa: BLE001
                 raise RuntimeError(f"failed to migrate history.{column}") from exc
+
+        try:
+            existing_user_columns = {col["name"] for col in inspector.get_columns("user_accounts")}
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError("failed to inspect user_accounts table columns for migration") from exc
+
+        for column, ddl in _USER_ACCOUNT_COLUMN_MIGRATIONS.items():
+            if column in existing_user_columns:
+                continue
+            try:
+                conn.execute(text(ddl))
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(f"failed to migrate user_accounts.{column}") from exc
 
         for index_name, ddl in _HISTORY_INDEX_MIGRATIONS:
             try:
@@ -275,6 +293,7 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "role_label": ROLE_LABELS.get(row.role, row.role),
         "group_id": row.group_id,
         "group_name": group_name,
+        "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
         "at": row.at,
     }
 
@@ -473,6 +492,20 @@ def update_user(
             if group_id and not session.get(UserGroupRow, group_id):
                 raise ValueError("group not found")
             row.group_id = group_id or None
+        session.commit()
+        session.refresh(row)
+        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+        return _user_to_dict(row, group_name)
+
+
+def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
+    if ui_theme not in {"light", "dark"}:
+        raise ValueError("invalid ui theme")
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        row.ui_theme = ui_theme
         session.commit()
         session.refresh(row)
         group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None

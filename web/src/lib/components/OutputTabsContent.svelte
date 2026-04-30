@@ -205,7 +205,7 @@
 		height: 100%;
 		min-height: 0;
 		align-self: stretch;
-		background: #fff;
+		background: var(--panel);
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		overflow: auto;
@@ -227,7 +227,7 @@
 		font-variant-numeric: tabular-nums;
 	}
 	.score-pre {
-		background: #fff;
+		background: var(--panel);
 		padding: 12px;
 		overflow: visible;
 		font-size: inherit;
@@ -251,7 +251,7 @@
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		cursor: pointer;

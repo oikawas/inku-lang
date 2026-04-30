@@ -5,6 +5,8 @@ export interface LangPack {
 	// Header
 	subtitle: string;
 	settingsButton: string;
+	themeLight: string;
+	themeDark: string;
 
 	// Login
 	loginTitle: string;

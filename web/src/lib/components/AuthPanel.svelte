@@ -160,7 +160,7 @@
 		cursor: pointer;
 	}
 	.login-lang-btn:last-child { border-right: none; }
-	.login-lang-btn:hover { color: var(--fg); background: #fff; }
+	.login-lang-btn:hover { color: var(--fg); background: var(--panel); }
 	.login-lang-btn.active { background: var(--fg); color: #fff; }
 	.login-title {
 		padding: 18px 24px 0;
@@ -207,7 +207,7 @@
 		border: 1px solid var(--border2);
 		border-left: none;
 		border-radius: 0 var(--r) var(--r) 0;
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		display: grid;
 		place-items: center;
@@ -233,7 +233,7 @@
 	.ghost-btn {
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg);
 		font-family: inherit;
 		cursor: pointer;

@@ -214,7 +214,7 @@
 		position: relative;
 		flex: 1;
 		min-width: 0;
-		background: #fff;
+		background: var(--panel);
 		overflow: hidden;
 	}
 	.batch-info { font-size: 11px; color: var(--fg3); }
@@ -234,7 +234,7 @@
 		padding: 3px 8px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		cursor: pointer;
@@ -248,7 +248,7 @@
 		padding: 4px 7px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-family: inherit;
 		font-size: 11px;
@@ -269,7 +269,7 @@
 		display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 		padding: 8px 10px;
 		border: 1px solid var(--border2); border-radius: var(--r);
-		background: #fff; font-size: 12px; color: var(--fg2);
+		background: var(--panel); font-size: 12px; color: var(--fg2);
 		margin-top: 8px;
 	}
 	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
@@ -281,14 +281,18 @@
 	.play-btn {
 		width: 100%; margin-top: 8px; padding: 9px;
 		font-size: 14px; font-weight: 500;
-		background: var(--fg); color: #fff;
+		background: var(--action-bg); color: var(--action-fg);
 		border: none; border-radius: var(--r);
 		letter-spacing: 0.08em; cursor: pointer;
 		display: flex; align-items: center; justify-content: center; gap: 8px;
 		font-family: inherit; transition: background 0.15s;
 	}
-	.play-btn:hover:not(:disabled) { background: #333; }
-	.play-btn:disabled { background: var(--fg3); cursor: not-allowed; }
+	.play-btn:hover:not(:disabled) { background: var(--action-hover); }
+	.play-btn:disabled {
+		background: var(--action-disabled-bg);
+		color: var(--action-disabled-fg);
+		cursor: not-allowed;
+	}
 	.error-text { color: #a2342a; font-size: 12px; }
 	.batch-summary {
 		margin-top: 8px;

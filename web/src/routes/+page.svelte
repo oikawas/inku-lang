@@ -119,6 +119,7 @@
 		role_label: string;
 		group_id: string | null;
 		group_name: string | null;
+		ui_theme?: 'light' | 'dark';
 		at: number;
 	};
 	// ── Input ───────────────────────────────────────────────
@@ -164,6 +165,7 @@
 	let settingsTab  = $state<'connection' | 'db' | 'plugins' | 'users' | 'misc'>('connection');
 	let pngMenuOpen  = $state(false);
 	let userMenuOpen = $state(false);
+	let darkMode     = $state(false);
 	let catalogOpen  = $state(false);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
@@ -327,6 +329,34 @@
 		return fetch(path, { ...init, headers, credentials: 'same-origin' });
 	}
 
+	function applyUserTheme(user: UserItem | null) {
+		darkMode = user?.ui_theme === 'dark';
+	}
+
+	async function updateUiTheme(nextDarkMode: boolean) {
+		if (!currentUser) return;
+		const previousDarkMode = darkMode;
+		const previousUser = currentUser;
+		darkMode = nextDarkMode;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ui_theme: nextDarkMode ? 'dark' : 'light' })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			currentUser = await r.json() as UserItem;
+			applyUserTheme(currentUser);
+		} catch (e) {
+			currentUser = previousUser;
+			darkMode = previousDarkMode;
+			console.warn('failed to update UI theme', e);
+		}
+	}
+
 	function openSettings(tab: typeof settingsTab = 'db') {
 		settingsMode = 'settings';
 		settingsTab = tab;
@@ -413,6 +443,7 @@
 			const actor = await meResponse.json() as UserItem;
 			if (requestId !== userSettingsRequestId) return;
 			currentUser = actor;
+			applyUserTheme(actor);
 			authToken = 'cookie';
 			if (!['admin', 'group_lead'].includes(actor.role)) {
 				users = [];
@@ -476,7 +507,8 @@
 		try {
 			const r = await apiFetch('/api/auth/me');
 			if (!r.ok) throw new Error('session expired');
-			currentUser = await r.json();
+			currentUser = await r.json() as UserItem;
+			applyUserTheme(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
 			await Promise.all([loadUserSettings(), loadSettingsStatus()]);
@@ -485,6 +517,7 @@
 		} catch {
 			authToken = null;
 			currentUser = null;
+			applyUserTheme(null);
 			loginStatus = t().loginRequiredMessage;
 			settingsStatus = null;
 			settingsStatusError = t().loginRequiredMessage;
@@ -511,6 +544,7 @@
 			const data = await r.json() as { user: UserItem };
 			authToken = 'cookie';
 			currentUser = data.user;
+			applyUserTheme(data.user);
 			loginStatus = null;
 			historyItems = [];
 			historyTotal = 0;
@@ -538,6 +572,7 @@
 		userMenuOpen = false;
 		authToken = null;
 		currentUser = null;
+		applyUserTheme(null);
 		loginStatus = null;
 		settingsStatus = null;
 		settingsStatusError = t().loginRequiredMessage;
@@ -1710,6 +1745,10 @@
 		showBirds; pngAlphaWhite; saveReplayAsNewVersion;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+	});
 </script>
 
 <svelte:window onclick={handleDocClick} />
@@ -1732,10 +1771,12 @@
 		bind:userMenuOpen
 		bind:userMenuWrapEl
 		{settingsOpen}
+		{darkMode}
 		buildNumber={__BUILD_NUMBER__}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
 		onLogout={logout}
 		onOpenSettings={() => openSettings('db')}
+		onToggleTheme={() => void updateUiTheme(!darkMode)}
 	/>
 
 	<!-- ══ BODY ══ -->
@@ -2017,12 +2058,54 @@
 		--fg:           #1a1917;
 		--fg2:          #5a5751;
 		--fg3:          #9a9690;
+		--panel:        #ffffff;
+		--panel2:       #faf9f6;
+		--canvas-paper: #fffdf8;
+		--tooltip-bg:   rgba(26,25,23,0.92);
+		--floating-control-bg: rgba(255,255,255,0.9);
+		--floating-control-hover: #fff;
+		--floating-control-disabled-bg: rgba(255,255,255,0.72);
+		--floating-control-fg: #1a1917;
+		--floating-control-muted: #6d6860;
+		--action-bg:    #1a1917;
+		--action-hover: #33302b;
+		--action-fg:    #fff;
+		--action-disabled-bg: #807a70;
+		--action-disabled-fg: #f7f3eb;
 		--accent:       #2a4a72;
 		--accent-light: #e8eef5;
 		--border:       #d4d0c8;
 		--border2:      #c4c0b8;
 		--r:            4px;
 		--r-lg:         8px;
+	}
+
+	:global(html[data-theme='dark']) {
+		color-scheme: dark;
+		--bg:           #171716;
+		--bg2:          #20201f;
+		--bg3:          #2b2926;
+		--fg:           #eee9df;
+		--fg2:          #c8c0b3;
+		--fg3:          #90877a;
+		--panel:        #242321;
+		--panel2:       #1d1c1b;
+		--canvas-paper: #f5f1e9;
+		--tooltip-bg:   rgba(12,12,11,0.94);
+		--floating-control-bg: rgba(45,43,39,0.96);
+		--floating-control-hover: #38342f;
+		--floating-control-disabled-bg: rgba(58,54,49,0.92);
+		--floating-control-fg: #eee9df;
+		--floating-control-muted: #b8afa1;
+		--action-bg:    #6f92bd;
+		--action-hover: #83a5ce;
+		--action-fg:    #11151a;
+		--action-disabled-bg: #4c5258;
+		--action-disabled-fg: #d2d7dc;
+		--accent:       #9ab7dc;
+		--accent-light: #253246;
+		--border:       #38342f;
+		--border2:      #514b43;
 	}
 
 	:global(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }

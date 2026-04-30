@@ -82,7 +82,7 @@
 		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
 		z-index: 401;
 		width: min(820px, calc(100vw - 32px)); max-height: 88vh;
-		background: #faf9f6; border-radius: var(--r-lg);
+		background: var(--panel2); border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
 	}
@@ -101,7 +101,7 @@
 	.catalog-item {
 		display: flex; align-items: center; gap: 12px; padding: 10px 12px;
 		border: 1px solid var(--border); border-radius: var(--r);
-		background: #fff; cursor: pointer; text-align: left;
+		background: var(--panel); cursor: pointer; text-align: left;
 		transition: border-color 0.12s, background 0.12s; font-family: inherit; width: 100%;
 	}
 	.catalog-item.active { border: 1.5px solid var(--accent); background: var(--accent-light); }
@@ -117,7 +117,7 @@
 	.catalog-detail {
 		border-left: 1px solid var(--border);
 		padding: 12px 16px 14px;
-		background: #fff;
+		background: var(--panel);
 		min-height: 0;
 		overflow-y: auto;
 	}
@@ -145,14 +145,14 @@
 		gap: 8px;
 		padding: 10px 18px 14px;
 		border-top: 1px solid var(--border);
-		background: #faf9f6;
+		background: var(--panel2);
 		flex-shrink: 0;
 	}
 	.ghost-btn {
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 11px;
 		cursor: pointer;

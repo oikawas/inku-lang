@@ -11,10 +11,12 @@
 		userMenuOpen: boolean;
 		userMenuWrapEl: HTMLDivElement | null;
 		settingsOpen: boolean;
+		darkMode: boolean;
 		buildNumber: string;
 		onToggleUserMenu: () => void;
 		onLogout: () => void | Promise<void>;
 		onOpenSettings: () => void;
+		onToggleTheme: () => void;
 	};
 
 	let {
@@ -22,10 +24,12 @@
 		userMenuOpen = $bindable(false),
 		userMenuWrapEl = $bindable(null),
 		settingsOpen,
+		darkMode,
 		buildNumber,
 		onToggleUserMenu,
 		onLogout,
 		onOpenSettings,
+		onToggleTheme,
 	}: Props = $props();
 
 	let expanded = $state(false);
@@ -61,6 +65,11 @@
 		<button class="rail-action" class:active={settingsOpen} onclick={onOpenSettings} title={t().settingsButton}>
 			<span class="rail-icon gear-icon" aria-hidden="true"></span>
 			{#if expanded}<span class="rail-label">{t().settingsButton}</span>{/if}
+		</button>
+
+		<button class="rail-action" onclick={onToggleTheme} title={darkMode ? t().themeLight : t().themeDark}>
+			<span class="rail-icon theme-icon" class:dark={darkMode} aria-hidden="true"></span>
+			{#if expanded}<span class="rail-label">{darkMode ? t().themeLight : t().themeDark}</span>{/if}
 		</button>
 
 		<div class="rail-lang" class:expanded>
@@ -153,7 +162,7 @@
 	}
 	.rail-action:hover,
 	.rail-action.active {
-		background: #fff;
+		background: var(--panel);
 		border-color: var(--border2);
 		color: var(--fg);
 	}
@@ -166,7 +175,7 @@
 		justify-content: center;
 		border: 1px solid var(--border2);
 		border-radius: 50%;
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		position: relative;
 	}
@@ -220,6 +229,19 @@
 		border-radius: 50%;
 		background: currentColor;
 	}
+	.theme-icon::before {
+		content: "";
+		position: absolute;
+		inset: 5px;
+		border-radius: 50%;
+		background: currentColor;
+		box-shadow: 4px -3px 0 0 var(--panel);
+	}
+	.theme-icon.dark::before {
+		inset: 4px;
+		box-shadow: none;
+		background: #d9c46a;
+	}
 	.rail-action:not(:hover):not(.active) .gear-icon {
 		color: var(--fg3);
 		opacity: 0.86;
@@ -239,7 +261,7 @@
 		padding: 4px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		box-shadow: 0 8px 22px rgba(37, 34, 26, 0.14);
 	}
 	.rail-user-menu button {
@@ -272,7 +294,7 @@
 		padding: 4px 5px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
-		background: #fff;
+		background: var(--panel);
 		color: var(--fg2);
 		font-size: 10px;
 		cursor: pointer;
@@ -280,7 +302,7 @@
 	}
 	.rail-lang button.active {
 		background: var(--fg);
-		color: #fff;
+		color: var(--panel);
 		border-color: var(--fg);
 	}
 	.rail-spacer {

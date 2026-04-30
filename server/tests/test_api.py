@@ -156,6 +156,17 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
                 tokens_out INTEGER
             )
         """))
+        conn.execute(text("""
+            CREATE TABLE user_accounts (
+                id VARCHAR PRIMARY KEY,
+                username VARCHAR NOT NULL,
+                email VARCHAR NOT NULL,
+                password_hash TEXT NOT NULL,
+                role VARCHAR NOT NULL,
+                group_id VARCHAR,
+                at BIGINT NOT NULL
+            )
+        """))
 
     monkeypatch.setattr(db, "engine", legacy_engine)
     db._migrate_columns()
@@ -163,6 +174,8 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
 
     columns = {col["name"] for col in inspect(legacy_engine).get_columns("history")}
     assert {"user_id", "catalog_id", "trashed"} <= columns
+    user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
+    assert "ui_theme" in user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at"} <= indexes
 
@@ -175,6 +188,25 @@ def test_migrate_columns_raises_when_history_inspection_fails(monkeypatch):
     monkeypatch.setattr(db, "inspect", lambda conn: BadInspector())
     with pytest.raises(RuntimeError, match="failed to inspect history table columns"):
         db._migrate_columns()
+
+
+def test_current_user_theme_can_be_updated(auth_context):
+    headers, _, _ = auth_context
+
+    me = client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["ui_theme"] == "light"
+
+    updated = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "dark"})
+    assert updated.status_code == 200
+    assert updated.json()["ui_theme"] == "dark"
+
+    me_again = client.get("/api/auth/me", headers=headers)
+    assert me_again.status_code == 200
+    assert me_again.json()["ui_theme"] == "dark"
+
+    invalid = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "sepia"})
+    assert invalid.status_code == 400
 
 
 def test_compose_happy_path(monkeypatch, auth_context):

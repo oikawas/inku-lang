@@ -24,10 +24,15 @@ cd /Users/oikawas/projects/ddl-server/cli
 uv run inku-cli login --base-url http://192.168.0.89:8100 -u admin
 ```
 
-Stage 1 / Stage 2 の既定モデルは CLI 側に保存できる。保存後は `paint` / `batch` で自動的に使われ、描画時にも stderr に表示される。
+Stage 1 / Stage 2 の既定 provider / model は CLI 側に保存できる。保存後は `paint` / `batch` で自動的に使われ、描画時にも stderr に表示される。provider は `nvidia` / `anthropic` / `local` のいずれか。
 
 ```sh
-uv run inku-cli models --stage1-model qwen3-api --stage2-model qwen-api
+uv run inku-cli models \
+  --timeout-seconds 600 \
+  --stage1-provider nvidia \
+  --stage1-model google/gemma-4-31b-it \
+  --stage2-provider nvidia \
+  --stage2-model google/gemma-4-31b-it
 uv run inku-cli models
 ```
 

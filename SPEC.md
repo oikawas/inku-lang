@@ -1329,8 +1329,10 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - `me` / `logout` / `paint` / `batch` / `demo-instruction` / `history` を初期コマンドとして提供する
 - `paint` / `batch` は SVG / JSON をファイル出力でき、必要に応じて PNG も生成できる
 - `paint` / `batch` は Stage 1 / Stage 2 モデル指定、履歴保存、artifact 保存、言語指定、thinking 取得を指定できる
-- `models` コマンドで Stage 1 / Stage 2 の CLI 既定モデルを確認・保存できる
-- `paint` / `batch` は使用する Stage 1 / Stage 2 モデルを描画開始時に stderr へ表示し、JSON summary にも含める
+- `models` コマンドで Stage 1 / Stage 2 の CLI 既定 provider / model を確認・保存できる
+- provider は `nvidia` / `anthropic` / `local` を保存できる。API へ送るのは model ID で、provider は CLI 側の接続先・運用管理用メタデータとして扱う
+- timeout 秒数も CLI ローカル設定に保存でき、コマンド引数 > ローカル設定 > 600 秒の順で解決する
+- `paint` / `batch` は使用する Stage 1 / Stage 2 provider / model を描画開始時に stderr へ表示し、JSON summary にも含める
 - 描画系 API 呼び出しの既定 timeout は 600 秒とし、長い Stage 2 推論を待てるようにする
 - 描画中は stderr に経過秒数と簡易テキストアニメーションを表示し、停止していないことを確認できる
 - 初期目的は、CLI から指示と画像を生成し、AI による成果物画像の品質判定を組み合わせて Stage 1 / 1.5 / 2 調整用のフィードバックループを構築すること

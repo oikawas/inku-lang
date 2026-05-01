@@ -22,6 +22,8 @@ SESSION_COOKIE_NAME = "inku_session"
 DEFAULT_BASE_URL = "http://127.0.0.1:8100"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 600
 SERVER_DEFAULT_MODEL_LABEL = "server default"
+SERVER_DEFAULT_PROVIDER_LABEL = "server default"
+PROVIDERS = ("nvidia", "anthropic", "local")
 T = TypeVar("T")
 
 
@@ -34,8 +36,11 @@ class CliConfig:
     base_url: str = DEFAULT_BASE_URL
     token: str | None = None
     username: str | None = None
+    stage1_provider: str | None = None
     stage1_model: str | None = None
+    stage2_provider: str | None = None
     stage2_model: str | None = None
+    timeout_seconds: int | None = None
 
 
 def _config_path() -> Path:
@@ -49,7 +54,11 @@ def _config_path() -> Path:
 def load_config(path: Path | None = None) -> CliConfig:
     path = path or _config_path()
     if not path.exists():
-        return CliConfig(base_url=os.getenv("INKU_BASE_URL", DEFAULT_BASE_URL))
+        timeout_env = os.getenv("INKU_CLI_TIMEOUT_SECONDS")
+        return CliConfig(
+            base_url=os.getenv("INKU_BASE_URL", DEFAULT_BASE_URL),
+            timeout_seconds=int(timeout_env) if timeout_env else None,
+        )
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -58,8 +67,11 @@ def load_config(path: Path | None = None) -> CliConfig:
         base_url=str(raw.get("base_url") or os.getenv("INKU_BASE_URL") or DEFAULT_BASE_URL),
         token=raw.get("token") or None,
         username=raw.get("username") or None,
+        stage1_provider=raw.get("stage1_provider") or None,
         stage1_model=raw.get("stage1_model") or None,
+        stage2_provider=raw.get("stage2_provider") or None,
         stage2_model=raw.get("stage2_model") or None,
+        timeout_seconds=int(raw["timeout_seconds"]) if raw.get("timeout_seconds") is not None else None,
     )
 
 
@@ -70,8 +82,11 @@ def save_config(config: CliConfig, path: Path | None = None) -> None:
         "base_url": config.base_url,
         "token": config.token,
         "username": config.username,
+        "stage1_provider": config.stage1_provider,
         "stage1_model": config.stage1_model,
+        "stage2_provider": config.stage2_provider,
         "stage2_model": config.stage2_model,
+        "timeout_seconds": config.timeout_seconds,
     }
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     try:
@@ -162,6 +177,18 @@ def _display_model(model: str | None) -> str:
     return model or SERVER_DEFAULT_MODEL_LABEL
 
 
+def _display_provider(provider: str | None) -> str:
+    return provider or SERVER_DEFAULT_PROVIDER_LABEL
+
+
+def _resolved_stage1_provider(args: argparse.Namespace, config: CliConfig) -> str | None:
+    return args.stage1_provider or config.stage1_provider
+
+
+def _resolved_stage2_provider(args: argparse.Namespace, config: CliConfig) -> str | None:
+    return args.stage2_provider or config.stage2_provider
+
+
 def _resolved_stage1_model(args: argparse.Namespace, config: CliConfig) -> str | None:
     return args.stage1_model or config.stage1_model
 
@@ -170,17 +197,39 @@ def _resolved_stage2_model(args: argparse.Namespace, config: CliConfig) -> str |
     return args.stage2_model or config.stage2_model
 
 
-def _model_summary(stage1_model: str | None, stage2_model: str | None) -> dict[str, str | None]:
+def _resolved_timeout_seconds(args: argparse.Namespace, config: CliConfig) -> int:
+    return args.timeout_seconds or config.timeout_seconds or DEFAULT_REQUEST_TIMEOUT_SECONDS
+
+
+def _model_summary(
+    stage1_model: str | None,
+    stage2_model: str | None,
+    *,
+    stage1_provider: str | None = None,
+    stage2_provider: str | None = None,
+) -> dict[str, str | None]:
     return {
+        "stage1_provider": stage1_provider,
         "stage1_model": stage1_model,
+        "stage2_provider": stage2_provider,
         "stage2_model": stage2_model,
+        "stage1_provider_display": _display_provider(stage1_provider),
         "stage1_model_display": _display_model(stage1_model),
+        "stage2_provider_display": _display_provider(stage2_provider),
         "stage2_model_display": _display_model(stage2_model),
     }
 
 
-def _print_model_summary(stage1_model: str | None, stage2_model: str | None) -> None:
+def _print_model_summary(
+    stage1_model: str | None,
+    stage2_model: str | None,
+    *,
+    stage1_provider: str | None = None,
+    stage2_provider: str | None = None,
+) -> None:
+    print(f"Stage1 provider: {_display_provider(stage1_provider)}", file=sys.stderr)
     print(f"Stage1 model: {_display_model(stage1_model)}", file=sys.stderr)
+    print(f"Stage2 provider: {_display_provider(stage2_provider)}", file=sys.stderr)
     print(f"Stage2 model: {_display_model(stage2_model)}", file=sys.stderr)
 
 
@@ -281,8 +330,10 @@ def _paint_payload(
 
 def command_login(args: argparse.Namespace) -> int:
     password = args.password or getpass.getpass("Password: ")
-    base_url = args.base_url or load_config().base_url
-    client = ApiClient(base_url, timeout_seconds=args.timeout_seconds)
+    existing = load_config()
+    base_url = args.base_url or existing.base_url
+    timeout_seconds = _resolved_timeout_seconds(args, existing)
+    client = ApiClient(base_url, timeout_seconds=timeout_seconds)
     data, response = client.request(
         "POST",
         "/api/auth/login",
@@ -293,13 +344,15 @@ def command_login(args: argparse.Namespace) -> int:
     if not token:
         raise CliError("login succeeded but session cookie was not returned")
     username = data.get("user", {}).get("username") or args.username
-    existing = load_config()
     save_config(CliConfig(
         base_url=base_url,
         token=token,
         username=username,
+        stage1_provider=existing.stage1_provider,
         stage1_model=existing.stage1_model,
+        stage2_provider=existing.stage2_provider,
         stage2_model=existing.stage2_model,
+        timeout_seconds=timeout_seconds,
     ))
     print(f"logged in as {username}")
     return 0
@@ -308,7 +361,11 @@ def command_login(args: argparse.Namespace) -> int:
 def command_logout(args: argparse.Namespace) -> int:
     config = load_config()
     if config.token:
-        client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=args.timeout_seconds)
+        client = ApiClient(
+            args.base_url or config.base_url,
+            config.token,
+            timeout_seconds=_resolved_timeout_seconds(args, config),
+        )
         try:
             client.request("POST", "/api/auth/logout")
         except CliError:
@@ -320,7 +377,11 @@ def command_logout(args: argparse.Namespace) -> int:
 
 def command_me(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=args.timeout_seconds)
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
     data, _ = client.request("GET", "/api/auth/me")
     _print_json(data)
     return 0
@@ -328,19 +389,35 @@ def command_me(args: argparse.Namespace) -> int:
 
 def command_models(args: argparse.Namespace) -> int:
     config = load_config()
-    if args.stage1_model is not None or args.stage2_model is not None:
+    timeout_seconds = _resolved_timeout_seconds(args, config)
+    if (
+        args.stage1_provider is not None
+        or args.stage1_model is not None
+        or args.stage2_provider is not None
+        or args.stage2_model is not None
+        or args.timeout_seconds is not None
+    ):
         config = CliConfig(
             base_url=args.base_url or config.base_url,
             token=config.token,
             username=config.username,
+            stage1_provider=args.stage1_provider if args.stage1_provider is not None else config.stage1_provider,
             stage1_model=args.stage1_model if args.stage1_model is not None else config.stage1_model,
+            stage2_provider=args.stage2_provider if args.stage2_provider is not None else config.stage2_provider,
             stage2_model=args.stage2_model if args.stage2_model is not None else config.stage2_model,
+            timeout_seconds=timeout_seconds,
         )
         save_config(config)
     data = {
         "base_url": args.base_url or config.base_url,
         "username": config.username,
-        **_model_summary(config.stage1_model, config.stage2_model),
+        "timeout_seconds": config.timeout_seconds or DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        **_model_summary(
+            config.stage1_model,
+            config.stage2_model,
+            stage1_provider=config.stage1_provider,
+            stage2_provider=config.stage2_provider,
+        ),
     }
     _print_json(data)
     return 0
@@ -348,12 +425,20 @@ def command_models(args: argparse.Namespace) -> int:
 
 def command_paint(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=args.timeout_seconds)
+    timeout_seconds = _resolved_timeout_seconds(args, config)
+    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
     text = _read_text_argument(args.text, args.file)
     started = int(time.time() * 1000)
+    stage1_provider = _resolved_stage1_provider(args, config)
     stage1_model = _resolved_stage1_model(args, config)
+    stage2_provider = _resolved_stage2_provider(args, config)
     stage2_model = _resolved_stage2_model(args, config)
-    _print_model_summary(stage1_model, stage2_model)
+    _print_model_summary(
+        stage1_model,
+        stage2_model,
+        stage1_provider=stage1_provider,
+        stage2_provider=stage2_provider,
+    )
     result, _ = _run_with_progress(
         "drawing",
         lambda: client.request("POST", "/api/paint", data=_paint_payload(
@@ -368,7 +453,13 @@ def command_paint(args: argparse.Namespace) -> int:
     paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
     summary = {
         "text": result.get("text"),
-        **_model_summary(stage1_model, stage2_model),
+        **_model_summary(
+            stage1_model,
+            stage2_model,
+            stage1_provider=stage1_provider,
+            stage2_provider=stage2_provider,
+        ),
+        "timeout_seconds": timeout_seconds,
         "history_id": result.get("history_id"),
         "elapsed_total_ms": result.get("elapsed_total_ms"),
         "tokens_in": (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0) or None,
@@ -376,7 +467,17 @@ def command_paint(args: argparse.Namespace) -> int:
         "paths": paths,
     }
     if args.full_json:
-        _print_json({**result, **_model_summary(stage1_model, stage2_model), "paths": paths})
+        _print_json({
+            **result,
+            **_model_summary(
+                stage1_model,
+                stage2_model,
+                stage1_provider=stage1_provider,
+                stage2_provider=stage2_provider,
+            ),
+            "timeout_seconds": timeout_seconds,
+            "paths": paths,
+        })
     else:
         _print_json(summary)
     return 0
@@ -384,7 +485,8 @@ def command_paint(args: argparse.Namespace) -> int:
 
 def command_batch(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=args.timeout_seconds)
+    timeout_seconds = _resolved_timeout_seconds(args, config)
+    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
     raw = _read_text_argument(None, args.file)
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
     if not lines:
@@ -395,9 +497,16 @@ def command_batch(args: argparse.Namespace) -> int:
     total_in = 0
     total_out = 0
     total_elapsed = 0
+    stage1_provider = _resolved_stage1_provider(args, config)
     stage1_model = _resolved_stage1_model(args, config)
+    stage2_provider = _resolved_stage2_provider(args, config)
     stage2_model = _resolved_stage2_model(args, config)
-    _print_model_summary(stage1_model, stage2_model)
+    _print_model_summary(
+        stage1_model,
+        stage2_model,
+        stage1_provider=stage1_provider,
+        stage2_provider=stage2_provider,
+    )
     for index, line in enumerate(lines, start=1):
         try:
             result, _ = _run_with_progress(
@@ -421,7 +530,13 @@ def command_batch(args: argparse.Namespace) -> int:
             results.append({
                 "line": index,
                 "text": result.get("text"),
-                **_model_summary(stage1_model, stage2_model),
+                **_model_summary(
+                    stage1_model,
+                    stage2_model,
+                    stage1_provider=stage1_provider,
+                    stage2_provider=stage2_provider,
+                ),
+                "timeout_seconds": timeout_seconds,
                 "history_id": result.get("history_id"),
                 "elapsed_total_ms": elapsed,
                 "tokens_in": tokens_in or None,
@@ -438,7 +553,13 @@ def command_batch(args: argparse.Namespace) -> int:
         "success": len(results),
         "failed": len(failures),
         "total": len(lines),
-        **_model_summary(stage1_model, stage2_model),
+        **_model_summary(
+            stage1_model,
+            stage2_model,
+            stage1_provider=stage1_provider,
+            stage2_provider=stage2_provider,
+        ),
+        "timeout_seconds": timeout_seconds,
         "elapsed_total_ms": total_elapsed,
         "tokens_in": total_in or None,
         "tokens_out": total_out or None,
@@ -450,7 +571,11 @@ def command_batch(args: argparse.Namespace) -> int:
 
 def command_demo_instruction(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=args.timeout_seconds)
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
     data, _ = client.request(
         "POST",
         "/api/demo/instruction",
@@ -462,7 +587,11 @@ def command_demo_instruction(args: argparse.Namespace) -> int:
 
 def command_history(args: argparse.Namespace) -> int:
     config = load_config()
-    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=args.timeout_seconds)
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
     data, _ = client.request(
         "GET",
         "/api/history",
@@ -477,7 +606,7 @@ def _add_common_server_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--timeout-seconds",
         type=int,
-        default=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        default=None,
         help=f"HTTP timeout in seconds (default: {DEFAULT_REQUEST_TIMEOUT_SECONDS})",
     )
 
@@ -492,7 +621,9 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     parser.add_argument("--prefix", help="output filename prefix")
     parser.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
+    parser.add_argument("--stage1-provider", choices=PROVIDERS)
     parser.add_argument("--stage1-model")
+    parser.add_argument("--stage2-provider", choices=PROVIDERS)
     parser.add_argument("--stage2-model")
     parser.add_argument("--original-text")
     parser.add_argument("--history-input")
@@ -528,7 +659,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     models = subparsers.add_parser("models", help="show or set CLI default Stage 1 / Stage 2 models")
     _add_common_server_args(models)
+    models.add_argument("--stage1-provider", choices=PROVIDERS, help="save the default Stage 1 provider")
     models.add_argument("--stage1-model", help="save the default Stage 1 model for paint and batch")
+    models.add_argument("--stage2-provider", choices=PROVIDERS, help="save the default Stage 2 provider")
     models.add_argument("--stage2-model", help="save the default Stage 2 model for paint and batch")
     models.set_defaults(func=command_models)
 

@@ -15,8 +15,8 @@ Constraints on vocabulary, primitives, and coordinate space are not limitations.
 ## Concept
 
 ```
-description (DDL text)  →  score (JSON)  →  performance (SVG)
-written by a human         interpreted by LLM   rendered by machine
+description  →  normalized DDL  →  expanded DDL  →  score (JSON)  →  performance (SVG)
+human           Stage 1             Stage 1.5        Stage 2          Renderer
 ```
 
 The description is permanent. The performance is one-time. The output varies slightly each time — by design. The evolution and variance of models themselves become a source of this variation.
@@ -70,12 +70,14 @@ Someone else's instruction (song) can be rewritten, and since the output is vect
 
 ## Architecture
 
-inku uses a **two-stage conversion pipeline**:
+inku uses a **Stage 1 / Stage 1.5 / Stage 2 / Renderer** pipeline:
 
-1. **Interpretation stage** (designed for advanced, frontier-class models — accessed via API or local GPU environments) — reads free-form descriptions in the author's native language and produces a normalized DDL using only core vocabulary
-2. **Structuring stage** (designed for lightweight, mature models — typically local LLMs) — converts the normalized DDL into a valid JSON Score
+1. **Stage 1: Interpretation** — reads free-form descriptions in the author's native language and produces a normalized DDL using only core vocabulary
+2. **Stage 1.5: Intermediate filter** — a deterministic expander that selectively introduces mathematical, geometric, musical, and painting-technique structure, while adjusting focus and negative space
+3. **Stage 2: Structuring** — converts normalized DDL into a valid JSON Score
+4. **Renderer: Performance** — renders the JSON Score as SVG
 
-This separation lets each stage focus on what it does best. The interpretation stage handles the creative, associative reading of natural language. The structuring stage handles the rule-following generation of structured output.
+This separation lets natural-language interpretation, expression expansion, structure generation, and rendering be tuned independently. API models, local LLMs, and NVIDIA NIM-style endpoints can be selected per stage.
 
 ---
 
@@ -86,12 +88,13 @@ The reference vocabulary dictionary is called **Saijiki**（歳時記）— a te
 | Category (EN) | Category (JA) | Vocabulary |
 |---|---|---|
 | forms | かたち | circle, ellipse, triangle, square, line, arc |
-| touches | てざわり | pen, brush, crayon, chalk, rope |
+| touches | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
 | motions | うごき | place, align, fill, scatter |
 | places | ばしょ | top, bottom, center, edge, corner |
 | continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | movements | ゆらぎ | fine, broad, quick, slow, wobble, undulate, tremble, blur |
 | colors | いろ | white, black, blue, red, green, gray |
+| rotation | かたむき | horizontal, vertical, diagonal, rotated |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, first-quarter, last-quarter, crescent |
 
 Only physical and observational words are allowed. Emotional evaluation — "beautifully," "delicately," "powerfully" — is not part of the core.
@@ -107,24 +110,22 @@ Only physical and observational words are allowed. Emotional evaluation — "bea
 5. Output is still — the viewer moves, not the image
 6. Input is a constrained DSL, not free-form natural language
 
-For the full design rationale, see [SPEC.md](./SPEC.md).
+For the full design rationale, see [SPEC.md](SPEC.md).
 
 ---
 
-## Capabilities (v1.2)
+## Capabilities
 
 The web version is operational. Current features:
 
-- **Two-stage pipeline** — interpretation (frontier LLM) + structuring (lightweight LLM), with live stage display during rendering
-- **Primitives** — line, circle, ellipse, arc, square, triangle; all with weight, color, style, and variation
-- **Arrangement** — horizontal, vertical, radial, scatter layouts; count up to 1,000; color cycle
-- **Variation (揺らぎ)** — perlin, wave, pink, white noise applied to position axes
-- **Background color** — canvas background controllable per drawing
-- **Closed-shape fill** — circle, ellipse, square, triangle fill automatically when color is specified
-- **Proportions vocabulary (わりあい)** — tall/wide rectangles, full/half-width lines, arc-based moon shapes
-- **Batch mode** — enter multiple descriptions line-by-line; processed sequentially with progress display
-- **History** — server-side, unlimited, paginated; thumbnail strip with model info
-- **Saijiki panel** — vocabulary reference, click-to-insert
+- **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with model, token, and elapsed-time metadata
+- **Primitives** — line, circle, ellipse, arc, square, triangle; each can carry material, color, style, variation, rotation, and arrangement
+- **Arrangement** — horizontal, vertical, radial, scatter, plus paths such as wave, diagonal band, top-to-bottom, left-to-right, and right-half
+- **Material rendering** — pencil, rotring, crayon, chalk, brushes, and rope are rendered with texture filters, particles, secondary strokes, or twist marks, not only stroke width
+- **Robust rendering** — invisible colors, over-dense arrangements, duplicate instructions, empty instructions, and slow LLM responses are corrected or routed to deterministic fallback
+- **Batch / Demo / CLI** — single drawing, batch drawing, demo loop, and `inku-cli` login/paint/batch/benchmark workflows are supported
+- **History** — DB-backed per-user history with pagination, search, stars, thumbnails, model/color-catalog metadata, and token counts
+- **UI** — Saijiki drawer, JSON/prompt views, light/dark mode, collapsible history strip, and zoom/pan canvas
 
 ---
 
@@ -133,7 +134,8 @@ The web version is operational. Current features:
 Current implementations:
 
 - **Web version** — operational (Python FastAPI + SvelteKit, runs locally or on a server)
-- **Android app** — end-to-end working demo on Pixel 9 with Gemma 4 running locally
+- **CLI** — implemented as an independent `cli/` project; controls the API for login, drawing, batch generation, and benchmark output
+- **Android app** — an older DDL demo has been verified on Pixel 9, but an Android version for the current inku-lang specification is not prepared yet
 
 ---
 
@@ -160,7 +162,7 @@ The internal JSON Score layer is language-neutral (English keys), so only the su
 
 ## License
 
-MIT License. See [LICENSE](./LICENSE).
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
@@ -176,4 +178,4 @@ The experience of reaching into one's own mind with words, and finding in the re
 
 ## Other Languages
 
-- [日本語 README](./README.ja.md)
+- [日本語 README](README.ja.md)

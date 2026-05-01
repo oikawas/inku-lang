@@ -98,7 +98,7 @@ uv run inku-cli paint "霧の朝、古い橋の影が川面にほどけていく
 - 真円 / 楕円 / 四角など特定図形に偏っていないか
 - 色コントラストが確保されているか
 - `filled` 指定と SVG 出力が一致しているか
-- Stage 2 が遅すぎないか
+- Stage 2 が遅すぎないか（ただし、接続先がdeveloper用LLM APIであり、待ち行列の状況次第で応答速度が変わるので、指標としては重要では無い）
 
 ### パイプライン観点
 
@@ -470,7 +470,361 @@ UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
 - `arrangement.path` は表現幅を広げるが、過度に使うと作品が軌跡パターンへ寄る可能性があるため、ベンチでは `path_not_reflected` とあわせて `path_overused` も観察対象にする。
 - `てざわり` は SVG レンダリング上は改善したが、作品としての差が十分かは PNG ベースの評価で確認する。
 
-## 11. 進め方
+## 11. 100件ベンチ: DDL / JSON / SVG 伝達検証
+
+Date: 2026-05-01
+
+Branch: `tune-ddl-generation-cli-bench`
+
+Model:
+
+- Stage 1: `nvidia` / `google/gemma-4-31b-it`
+- Stage 2: `nvidia` / `google/gemma-4-31b-it`
+
+Artifacts:
+
+- inputs: `cli/out/tune-bench-100/prompts.txt`
+- results: `cli/out/tune-bench-100/`
+- contact sheet: `cli/out/tune-bench-100/contact-sheet.png`
+
+実行:
+
+```sh
+cd /Users/oikawas/projects/ddl-server/cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli batch \
+  --base-url http://192.168.0.89:8100 \
+  -f ./out/tune-bench-100/prompts.txt \
+  -o ./out/tune-bench-100 \
+  --prefix bench100 \
+  --png \
+  --continue-on-error
+```
+
+### 実行結果
+
+- success: 96
+- failed: 4
+- total: 100
+- total elapsed: 5,747,603 ms
+- average elapsed: 59,871 ms
+- median elapsed: 18,650 ms
+- p90 elapsed: 184,094 ms
+- max elapsed: 274,635 ms
+- elapsed > 120s: 20 / 96
+- tokens in: 1,172,941
+- tokens out: 100,231
+- average tokens out: 1,044
+
+失敗:
+
+- line 54: `夕暮れの空き地で、枯れ草が低い金色の波になっている。`
+  - `HTTP 502: interpret failed: inference connection error`
+- line 55: `雨の夜道に、信号の赤が濡れた靴先まで伸びている。`
+  - `HTTP 502: interpret failed: inference connection error`
+- line 56: `薄い霧の墓地で、石の角だけが静かに浮かび上がる。`
+  - `HTTP 502: interpret failed: inference connection error`
+- line 92: `夕暮れの校庭で、鉄棒の影が長く曲がっている。`
+  - `HTTP 502: compose failed: inference connection error`
+
+失敗はいずれも推論接続エラーであり、DDL / JSON 変換ロジック固有の失敗とは判断しない。ただし、ベンチ運用上は retry / resume / partial report が必須。
+
+### 集計
+
+背景:
+
+- white: 62
+- black: 24
+- blue: 5
+- red: 4
+- green: 1
+
+プリミティブ:
+
+- line: 196
+- square: 45
+- ellipse: 37
+- arc: 16
+- circle: 14
+- triangle: 3
+
+素材 / weight:
+
+- pen: 289
+- pencil: 13
+- crayon: 4
+- brush_thin: 2
+- rope: 2
+- rotring: 1
+
+塗り:
+
+- filled=false: 298
+- filled=true: 13
+
+JSON Score:
+
+- instructions average: 3.24
+- instructions median: 3
+- instructions max: 20
+- expanded primitive count average: 116.17
+- expanded primitive count median: 26
+- expanded primitive count p90: 237
+- expanded primitive count max: 3,001
+- `color_hint`: 148 / 311 instructions
+
+arrangement:
+
+- layout: vertical 118, scatter 77, horizontal 49, none 43, radial 24
+- path: none 152, wave 65, right_half 45, top_to_bottom 20, diagonal 17, left_to_right 12
+- max `arrangement.count`: 300
+
+variation:
+
+- variation instructions: 46 / 311
+- quality: perlin 18, pink 15, wave 13
+
+重複:
+
+- 同一 instruction の重複あり: 19 / 96
+- 重複で余分に増えた instruction: 63
+- 代表例:
+  - `bench100-001`: DDL は「横線を二十本並べる」だが、JSON は `arrangement.count=20` の同一 line instruction を20個複製した。
+  - `bench100-022`: DDL は「鉛筆の細い横線を十二本並べる」だが、JSON は `arrangement.count=12` の同一 line instruction を12個複製した。
+  - `bench100-030`: DDL は「白い細筆の縦線を三百本」だが、JSON は `count=300` の instruction を複数複製し、過密化しやすい構造になった。
+
+### 入力文 -> DDL の評価
+
+良い点:
+
+- 入力文の主要な視覚名詞は概ね拾えている。光、影、水、窓、雨、雪、壁、机、線、点、道、港、寺、駅といった要素は DDL の色、背景、線、四角、楕円、配置へ変換されている。
+- 季節や時間帯は背景色、明度、線の密度に変換される傾向がある。夜、冬、雪、月、雨、朝などは比較的安定して抽象化される。
+- `消える`、`ほどける`、`滲む`、`揺れる`、`沈む` のような動詞は、波、散布、にじみ、細線、低彩度として DDL に反映されることがある。
+- 以前の 30件ベンチより、真円への偏りと灰背景への偏りは抑制されている。
+
+問題:
+
+- 入力文の「雰囲気、エモーション、感情」は DDL へ部分的にしか伝わっていない。感情語を含む入力 47 件のうち、DDL 側でも感情語または近い語が残ったものは 30 件程度。さらに JSON 側まで語として残ったものは 8 件程度だった。
+- 感情はしばしば「黒背景」「白線」「細線」「点散布」「波打つ」に圧縮される。孤独、沈黙、余韻、記憶、ためらい、気配、眠気、病後、寒さなどの違いが、見た目上は同じ語彙に収束しやすい。
+- 場面固有の主題が落ちることがある。例: `風鈴の余韻`、`言えなかった言葉`、`待つ人の気配`、`小さな温度` は DDL では線や楕円の一般表現になり、情景の固有性が弱くなる。
+- Stage 1.5 の技法語や数学語が入るケースでは、主題よりも追加技法が目立つことがある。対位法、倍音、フレスコ、点描などが説明的に挿入され、入力文の感情を上書きする場合がある。
+- `中央付近` は減ったが、`上端寄りの焦点`、`右下の焦点`、`画面下半分` といったテンプレート的な焦点表現はまだ多い。主題から動的に重心を決めるところまでは不十分。
+
+### DDL -> JSON の評価
+
+良い点:
+
+- 背景色、プリミティブ種別、基本色、数量、配置方向は多くのサンプルで JSON に落ちている。
+- `arrangement.path` は機能しており、`wave`、`top_to_bottom`、`right_half`、`diagonal`、`left_to_right` は実データに出ている。
+- `color_hint` は 148 instruction で使われ、抽象色へ丸めた後も「白い息」「雨の膜」「墨絵」「黄色」などの元意図を一部保持している。
+- `filled` は非塗りが多く、塗りつぶし一辺倒にはなっていない。
+
+重大な問題:
+
+- Stage 2 が `arrangement.count` つき instruction を複製してしまう。これは DDL -> JSON の最大の欠陥。`count=20` の line instruction が20個並ぶと、レンダラーでは 400 本相当の構造になりうる。作品の過密化、実行時間増、SVG肥大、似た見た目の増加につながる。
+- DDL の素材語が JSON の `weight` へ落ちにくい。素材語を含む DDL は 73 件程度あったが、JSON 側で `pen` 以外の weight や素材語として確認できたものは 12 件程度に留まった。結果として、細筆、鉛筆、クレヨン、水墨、油絵、フレスコ、点描の違いがレンダラーへ十分渡らない。
+- DDL の `細かく揺れる`、`ゆっくり揺れる`、`境界が滲む` は、JSON で `variation` に落ちる場合と落ちない場合がある。落ちた場合も、どの primitive に適用するべきか曖昧なままになりやすい。
+- DDL の色名が抽象色へ丸められる際、`color_hint` は残るが、実際の `color` が主題とずれる例がある。`黄色い楕円` が gray / red / green / blue の色サイクルになり、黄色の印象が弱いケースがあった。
+- `fallback from DDL` の JSON は情報量を落としすぎる。例: `bench100-004` は DDL に水面、花びら、37個、波、細かい揺れがあるが、JSON は青い楕円7個に圧縮された。
+- DDL に複数要素がある場合、Stage 2 が一部だけを採用することがある。例: `bench100-059` は泉、縦線233本、油絵厚塗り3本が DDL にあるが、JSON は緑背景と黒楕円にほぼ縮退した。
+
+### JSON -> SVG レンダリングの評価
+
+良い点:
+
+- JSON に落ちた背景、基本形状、配置、回転、色、非塗り/塗りは概ね SVG に反映されている。
+- `arrangement.path=wave` や `right_half` は、レンダリング結果として見えるケースがある。
+- contact sheet を見る限り、完全な空白描画や極端な低コントラストは大きく減っている。
+
+問題:
+
+- レンダラーは JSON を忠実に展開するため、Stage 2 の重複 instruction をそのまま過密な SVG にしてしまう。レンダラー側にも重複検知または上限防御が必要。
+- 素材表現は改善済みだが、JSON の weight がほぼ `pen` で渡るため、renderer の表現力が使われていない。
+- `filled=false` が 298 / 311 と多く、非塗り線中心の作品に寄る。塗りと非塗りのバランスは DDL/JSON/renderer のどこかで制御する必要がある。
+- 黒背景 + 白線、白背景 + 黒線の視認性は高いが、シリーズとして二値的な図案に寄る。中間調、透明度、重ね、薄い色面の使い方が不足している。
+- 小点散布は見えるが、密度勾配や欠落の意味が弱いと「粒を散らしただけ」に見える。renderer は arrangement を機械配置するだけでなく、主題に応じた密度関数を持つべき。
+
+### 視覚評価
+
+contact sheet 全体では、96件のうち視認性は概ね確保されている。以前の灰背景問題、白地に白線問題、真円過多は改善している。
+
+一方で、現代抽象画としてはまだ以下の収束が目立つ。
+
+- 黒地に白/灰の線群
+- 白地に細い水平線/垂直線
+- 点散布
+- 右端/上端/下半分への定型配置
+- 太い単色背景に少数の形
+- 線の束による「気配」の表現
+
+良い方向のサンプル:
+
+- `bench100-005`: 黒い海と灯台光のような、少数要素で主題が立つ。
+- `bench100-008`: 白い余白と薄い線だけで静かな午後の感覚が出ている。
+- `bench100-026`: 線と小さな黒要素の関係が、影の先行という入力に合っている。
+- `bench100-083`: 蜘蛛の巣 / 雨粒 / 虹の分解が斜線と色線で比較的よく出ている。
+- `bench100-099`: 障子、枝、墨絵の重なりが右側の線構成として成立している。
+- `bench100-100`: ベンチ、手袋、残る温度が面と小形で比較的読み取れる。
+
+弱い方向のサンプル:
+
+- `bench100-001`: 情緒はあるが、同一 line instruction 重複により構造が過剰。
+- `bench100-003`: 埃の散布は見えるが、図書館・午後・静けさは一般化されすぎている。
+- `bench100-004`: DDL から JSON で水面、花びら、波、37個が大きく落ちている。
+- `bench100-017`: 竹林の輪郭と風のほどけが、単一斜線に縮退している。
+- `bench100-030`: DDL/JSON とも要素が多く、透明な膜よりも密集した白い矩形に見える。
+- `bench100-059`: 小さな泉と暗い緑の含みが黒楕円に縮退している。
+- `bench100-078`: 水たまりと割れる傘色が赤い矩形群になり、入力の繊細さが失われている。
+- `bench100-089`: 雪、瓦、濡れの質が、黒い四角散布へ縮退している。
+
+### 改善点: Stage 1
+
+- 入力文から抽出する対象を `visual_subject`、`emotional_tone`、`spatial_context`、`motion_or_change`、`material_suggestion` に分ける。
+- DDL へ変換する前に、作品の中心命題を1つ決める。例: `absence as thin horizontal breath`、`memory as fading density`、`hesitation as interrupted flow`。
+- 感情語を色や線に即時変換せず、まず構図上の関係へ変換する。
+  - 孤独: 小さな焦点と広い空白
+  - 余韻: 反復の減衰
+  - ためらい: 途中停止、途切れ、弱い蛇行
+  - 記憶: 薄い重なり、欠落、半透明
+  - 沈黙: 低密度、長い間、少数の重い面
+  - 不安: わずかな角度差、密度の偏り、端への緊張
+- DDL に情緒語をそのまま残すか、`雰囲気:` 相当の短い注釈を含める。Stage 2 が JSON へ移すための足場になる。
+- 主題の固有名詞を少なくとも1つ `color_hint` または `motif_hint` に残すよう、Stage 1 の出力制約を追加する。
+- DDL の数量は動的でよいが、感情が繊細な場合は上限を抑える。静けさ、余韻、孤独、病後、忘れ物のような入力で 200〜300 個を出しすぎない。
+- `背景を黒で塗りつぶす` と `背景を白で塗りつぶす` の二値選択に寄りすぎないよう、背景を「面」「余白」「薄層」として扱う選択肢を増やす。
+- 「何を描くか」だけでなく、「何を描かないか」を DDL に明示する。余白を主題化する。
+
+### 改善点: Stage 1.5
+
+- Stage 1.5 は技法を追加する段ではなく、構図と伝達を整理するフィルタとして再定義する。
+- 1件の描画に適用する技法は、主技法1つ、副次的な揺らぎ1つまでに制限する。
+- 数学・音楽・絵画技法は「選択的」に使う。全件に近い頻度で技法語を入れると、シリーズが均質化する。
+- `composition_mode` を1つ選ぶ。
+  - `negative_space_dominant`
+  - `edge_focus`
+  - `single_tension`
+  - `field_and_interruption`
+  - `density_gradient`
+  - `layered_trace`
+  - `asymmetric_rhythm`
+  - `off_canvas_continuation`
+- `emotion_strategy` を1つ選ぶ。
+  - `reduction`
+  - `echo`
+  - `fade`
+  - `interruption`
+  - `compression`
+  - `drift`
+  - `residue`
+- `material_strategy` を1つ選ぶ。
+  - `dry_line`
+  - `soft_bleed`
+  - `grain`
+  - `hard_edge`
+  - `wash`
+  - `thick_patch`
+- Stage 1.5 で DDL の instruction 数と expanded primitive count の見込みを制御する。繊細な入力では expanded 10〜80 程度、都市/雨/群衆では 80〜180 程度など、主題別に密度目安を持つ。
+- `中央`、`画面全体`、`等間隔`、`点々と散らす` の頻発を抑える。使う場合は、必ず非対称性、欠落、密度勾配、画面外への継続のいずれかを付ける。
+- `色とりどり` は安易に使わない。水たまりや傘など色が多い入力でも、主色2つ + 微細な差し色程度に抑える。
+
+### 改善点: Stage 2
+
+- 最優先: 同一 instruction の重複禁止を system prompt と schema 後処理に追加する。複数個の同形状は、必ず1 instruction + `arrangement.count` で表す。
+- `arrangement.count` を持つ instruction が複数ある場合、同一 primitive / geometry / color / arrangement の重複を coerce で統合する。
+- `arrangement.count` の展開後上限を設ける。例: 1 score あたり expanded primitive count は通常 200 以下、明示的に大密度が必要な場合でも 400 以下。
+- DDL の各文を JSON instruction へ対応させる coverage check を追加する。Stage 2 出力後に、DDL 文ごとに `covered_by_instruction` を内部検査する。
+- DDL の素材語を `weight` へ確実に写像する。
+  - 細筆 -> `brush_thin`
+  - 太筆 -> `brush`
+  - 鉛筆 -> `pencil`
+  - クレヨン -> `crayon`
+  - チョーク -> `chalk`
+  - 水墨 -> `ink_wash`
+  - ロットリング -> `rotring`
+  - 縄 -> `rope`
+  - 油絵 / 厚塗り -> `oil_impasto`
+  - 水彩 -> `watercolor`
+  - 点描 -> `pointillist`
+- DDL の感情・雰囲気を JSON に残すフィールドを検討する。例: `mood_hint`, `motion_hint`, `material_hint`, `focus_hint`。現状の `color_hint` だけでは保持先が狭い。
+- `variation` の対象を明示する。例: `applies_to: ["outline", "position", "opacity"]`。今は `dimensions` があるが、DDL の「線が揺れる」「境界が滲む」「配置が漂う」の区別が弱い。
+- `fallback from DDL` を改善する。fallback は単一形状への縮退ではなく、DDL の文数、数量、配置、素材、揺れを最低限保持する deterministic parser に寄せる。
+- Stage 2 の長大出力を抑える。目標は 3〜6 instructions、tokens out は通常 800 以下。4,000 tokens 超の出力はほぼ失敗扱いにして再試行する。
+- Stage 2 の retry reason を返す。`empty_instructions`、`duplicate_arrangement`、`overexpanded_count`、`coverage_low` などを API レスポンスや CLI JSON に残す。
+- 色解決では、抽象色 `color` と元色 `color_hint` の関係を明確にする。黄色や金色が必要な場合に gray / red / green / blue へばらけるのではなく、カタログ解決で近似可能な hue family を保持する。
+- `filled` は DDL の「塗る」「面」「厚塗り」「色面」「影」から推定する。現状は非塗りに寄りすぎている。
+
+### 改善点: SVG renderer / coerce
+
+- 同一 instruction 重複を renderer 前に検知し、統合または警告する。Stage 2 の問題だが、renderer 側にも安全弁が必要。
+- expanded primitive count の上限を renderer/coerce で持つ。上限超過時は、count を減らすだけでなく密度勾配、透明度、間引きで意味を保つ。
+- `weight` ごとの素材表現をさらに強める。ただし線幅差だけでなく、端部、透明度、ざらつき、破線、重なり、にじみ、輪郭の不規則性で変える。
+- `filled=false` が多すぎる場合、主題に応じて一部を薄い面や半透明の塗りへ変換する coerce を検討する。
+- `mood_hint` または `motion_hint` が導入された場合、renderer は opacity、blur、jitter、density、edge softness に反映する。
+- `arrangement.path=wave` は現状見えるが、どのサンプルでも似た波になりやすい。波長、振幅、位相、減衰、局所欠落を主題から変える。
+- `scatter` は完全な均等ランダムではなく、密度関数を選ぶ。
+  - fade-out
+  - edge accumulation
+  - diagonal drift
+  - center void
+  - local cluster
+  - interrupted trail
+- 背景を単色塗りだけでなく、薄い層、透明な面、部分的な wash として扱う。ただし実装は SVG の軽量性を保つ。
+- 低コントラスト補正は継続しつつ、白地に白、黒地に黒を機械的に反対色へ寄せるだけではなく、主題が白/黒である場合は線端、影、透明度、隣接色で見せる。
+- レンダリング後の自動メトリクスを追加する。
+  - visible pixel ratio
+  - dominant background ratio
+  - foreground color count
+  - edge contact count
+  - near-empty / overfilled 判定
+  - duplicate arrangement warning
+
+### 追加すべきテスト / ベンチ機能
+
+- `inku-cli bench-report` を追加し、JSON 群から以下を自動集計する。
+  - success / failed
+  - elapsed / tokens
+  - background / primitive / weight / filled
+  - instruction count
+  - expanded primitive count
+  - duplicate instruction count
+  - DDL 文 coverage
+  - DDL 色名 coverage
+  - DDL 素材語 coverage
+  - DDL path / movement coverage
+- `bench-compare` を追加し、同一 prompts に対する修正前後の差分を比較する。
+- fixture に、感情語の伝達テストを追加する。
+  - 孤独
+  - 余韻
+  - ためらい
+  - 記憶
+  - 沈黙
+  - 寒さ
+  - 温度
+  - 気配
+- Stage 2 fixture に、同一 `arrangement.count` instruction の複製を禁止するテストを追加する。
+- DDL 文ごとの coverage をユニットテスト化する。最低限、数量・配置・素材・色・揺れの5軸で欠落を検出する。
+- SVG レンダラーに snapshot / image metric テストを追加し、過密、空白、不可視、素材差の退行を検知する。
+
+### 優先順位
+
+1. Stage 2 の同一 arrangement instruction 重複を禁止・統合する。
+2. Stage 2 / coerce に expanded primitive count 上限を入れる。
+3. DDL 素材語を JSON `weight` へ安定写像する。
+4. DDL 文 coverage check を追加する。
+5. 感情・雰囲気を `color_hint` 以外のフィールドで保持する。
+6. Stage 1.5 を composition / emotion / material strategy の選択フィルタへ整理する。
+7. `fallback from DDL` を縮退ではなく deterministic coverage に寄せる。
+8. renderer に重複・過密・不可視の安全弁と画像メトリクスを追加する。
+9. 同一 prompts で修正前後の 30件 / 100件比較を行う。
+
+### 結論
+
+100件ベンチでは、入力文の大枠は DDL に届いているが、雰囲気・エモーション・感情はまだ細い経路でしか伝わっていない。DDL は詩的な入力を、色・線・散布・波・背景へ変換できている一方で、情緒の種類ごとの違いが小さく、複数の入力が似た構造へ収束している。
+
+DDL から JSON への変換では、配置・数量・色の基本は通るが、重複 instruction、素材語の脱落、variation の弱さ、fallback の縮退が品質を大きく落としている。SVG レンダラーは JSON を概ね忠実に描いているため、上流の欠落がそのまま絵に出る。ただし renderer/coerce 側にも、過密・重複・素材差・密度関数の安全弁を持たせるべき。
+
+次の改修は、表現の追加よりも「伝達の欠落を減らす」「選択を鋭くする」「重複と過密を抑える」方向を優先する。
+
+## 12. 進め方
 
 1. 10 件パイロットを実施する
 2. 評価ラベルを調整する

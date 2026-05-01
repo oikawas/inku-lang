@@ -99,6 +99,12 @@ The canvas display reads the actual SVG `viewBox` when possible, so old history
 items keep their original aspect ratio even after the current plugin setting is
 changed.
 
+The drawing status bar also exposes the active canvas aspect.  For a fresh
+render it displays the current `canvas-aspect` selection; for history display it
+prefers the saved JSON Score `canvas` value, so the user can see which canvas
+type produced that item.  Export controls stay separate from this context
+display and use compact download icons for SVG / PNG actions.
+
 ## Adding Another Hook
 
 Future hooks should follow the same shape:

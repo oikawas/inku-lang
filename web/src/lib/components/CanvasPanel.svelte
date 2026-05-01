@@ -255,10 +255,20 @@
 			title={statusHistoryItem?.starred ? t().starOn : t().starOff}
 			aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
 		>★</button>
-		<span class="status-export-label">{t().exportLabel}:</span>
-		<button class="ghost-btn" onclick={onDownloadSVG} disabled={!result}>↓ SVG</button>
+		<button class="ghost-btn export-btn" onclick={onDownloadSVG} disabled={!result}>
+			<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+				<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+			</svg>
+			<span>SVG</span>
+		</button>
 		<div class="png-wrap" bind:this={pngWrapEl}>
-			<button class="ghost-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>↓ PNG ▾</button>
+			<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>
+				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+				</svg>
+				<span>PNG</span>
+				<span class="menu-caret">▾</span>
+			</button>
 			{#if pngMenuOpen}
 				<div class="png-menu">
 					{#each [[1080,t().pngStandard],[2160,t().pngHighRes],[1024,t().pngSquare],[2048,t().pngSquareHighRes]] as [size, label]}
@@ -490,7 +500,30 @@
 		background: var(--border2);
 		flex-shrink: 0;
 	}
-	.status-export-label { font-size: 11px; color: var(--fg3); white-space: nowrap; }
+	.export-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 5px;
+		line-height: 1;
+	}
+	.download-icon {
+		width: 14px;
+		height: 14px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		flex: 0 0 auto;
+		display: block;
+		transform: translateY(0.5px);
+	}
+	.menu-caret {
+		color: var(--fg3);
+		font-size: 10px;
+		line-height: 1;
+	}
 	.star-btn {
 		width: 24px;
 		height: 24px;

@@ -79,7 +79,34 @@ SEGMENT_COUNT = 80  # polyline の分割数
 
 # 滲む (quality=pink): SVG feGaussianBlur の stdDeviation
 BLUR_STD: dict[str, float] = {"fine": 2.0, "medium": 6.0, "broad": 15.0}
-TEXTURE_BLUR_STD: dict[str, float] = {"chalk": 1.3, "brush_thick": 1.0}
+TEXTURE_FILTERS: dict[str, str] = {
+    "pencil": (
+        '<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%">'
+        '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" result="noise"/>'
+        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/>'
+        '</filter>'
+    ),
+    "crayon": (
+        '<filter id="texture-crayon" x="-18%" y="-18%" width="136%" height="136%">'
+        '<feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="17" result="noise"/>'
+        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8"/>'
+        '</filter>'
+    ),
+    "chalk": (
+        '<filter id="texture-chalk" x="-25%" y="-25%" width="150%" height="150%">'
+        '<feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="23" result="noise"/>'
+        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2"/>'
+        '<feGaussianBlur stdDeviation="0.9"/>'
+        '</filter>'
+    ),
+    "brush_thick": (
+        '<filter id="texture-brush_thick" x="-20%" y="-20%" width="140%" height="140%">'
+        '<feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="2" seed="31" result="noise"/>'
+        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4"/>'
+        '<feGaussianBlur stdDeviation="0.6"/>'
+        '</filter>'
+    ),
+}
 
 
 def _seed_for_instruction(ins: Instruction) -> int:
@@ -326,15 +353,10 @@ def _inject_blur_filters(
     return svg
 
 
-def _inject_texture_filters(svg: str, filters: dict[str, float]) -> str:
+def _inject_texture_filters(svg: str, filters: set[str]) -> str:
     if not filters:
         return svg
-    filter_xml = "".join(
-        f'<filter id="texture-{weight}" x="-20%" y="-20%" width="140%" height="140%">'
-        f'<feGaussianBlur in="SourceGraphic" stdDeviation="{std:.1f}"/>'
-        f'</filter>'
-        for weight, std in sorted(filters.items())
-    )
+    filter_xml = "".join(TEXTURE_FILTERS[weight] for weight in sorted(filters))
     if "<defs />" in svg:
         return svg.replace("<defs />", f"<defs>{filter_xml}</defs>", 1)
     if "<defs/>" in svg:
@@ -356,7 +378,7 @@ def render(score: Score, color_map: dict[str, str] | None = None) -> str:
     content = dwg.g(clip_path=f"url(#{clip_id})")
 
     blur_needed: dict[str, float] = {}
-    texture_filters = {weight: TEXTURE_BLUR_STD[weight] for weight in _texture_filter_weights(score)}
+    texture_filters = _texture_filter_weights(score)
     blur_elems: list[tuple[str, str]] = []
     elem_idx = 0
 
@@ -389,7 +411,7 @@ _CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})
 def _texture_filter_weights(score: Score) -> set[str]:
     weights: set[str] = set()
     for ins in score.instructions:
-        if ins.weight in TEXTURE_BLUR_STD:
+        if ins.weight in TEXTURE_FILTERS:
             weights.add(ins.weight)
     return weights
 
@@ -500,7 +522,7 @@ def _stroke_attrs(ins: Instruction, cmap: dict[str, str]) -> dict:
     }
     if "stroke_opacity" in weight_style:
         attrs["stroke_opacity"] = weight_style["stroke_opacity"]
-    if ins.weight in TEXTURE_BLUR_STD:
+    if ins.weight in TEXTURE_FILTERS:
         attrs["filter"] = f"url(#texture-{ins.weight})"
     dash = STYLE_TO_DASH[ins.style]
     texture_dash = weight_style.get("stroke_dasharray")
@@ -524,6 +546,81 @@ def _line_perp_offsets(start: tuple[float, float], end: tuple[float, float], amo
     return -dy / length * amount, dx / length * amount
 
 
+def _point_on_line(start: tuple[float, float], end: tuple[float, float], t: float) -> tuple[float, float]:
+    return (start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t)
+
+
+def _line_direction(start: tuple[float, float], end: tuple[float, float]) -> tuple[float, float]:
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length = math.hypot(dx, dy)
+    if length < 1e-6:
+        return 1.0, 0.0
+    return dx / length, dy / length
+
+
+def _add_powder_specks(
+    dwg: svgwrite.Drawing,
+    group,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    attrs: dict,
+    seed: int,
+    *,
+    count: int,
+    spread: float,
+    radius: float,
+    opacity: float,
+) -> None:
+    color = attrs.get("stroke", "#111111")
+    for idx in range(count):
+        t = (idx + 0.5) / count
+        px, py = _point_on_line(start, end, t)
+        ox, oy = _line_perp_offsets(start, end, _hash_to_unit(idx, seed) * spread)
+        along = _hash_to_unit(idx + 101, seed) * spread * 0.45
+        ux, uy = _line_direction(start, end)
+        group.add(
+            dwg.circle(
+                center=(px + ox + ux * along, py + oy + uy * along),
+                r=max(0.35, radius * (0.75 + abs(_hash_to_unit(idx + 202, seed)) * 0.7)),
+                fill=color,
+                stroke="none",
+                opacity=opacity,
+            )
+        )
+
+
+def _add_rope_twists(
+    dwg: svgwrite.Drawing,
+    group,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    attrs: dict,
+    seed: int,
+) -> None:
+    ux, uy = _line_direction(start, end)
+    px, py = -uy, ux
+    color = attrs.get("stroke", "#111111")
+    for idx in range(13):
+        t = (idx + 0.5) / 13
+        cx, cy = _point_on_line(start, end, t)
+        phase = -1 if idx % 2 else 1
+        span = 8.0 + abs(_hash_to_unit(idx, seed)) * 2.5
+        half_u = 3.0
+        p1 = (cx - ux * half_u + px * span * phase, cy - uy * half_u + py * span * phase)
+        p2 = (cx + ux * half_u - px * span * phase, cy + uy * half_u - py * span * phase)
+        group.add(
+            dwg.line(
+                start=p1,
+                end=p2,
+                stroke=color,
+                stroke_width=1.2,
+                stroke_opacity=0.42,
+                stroke_linecap="round",
+            )
+        )
+
+
 def _material_line_group(
     dwg: svgwrite.Drawing,
     ins: Instruction,
@@ -531,30 +628,23 @@ def _material_line_group(
     end: tuple[float, float],
     attrs: dict,
 ):
-    if ins.weight not in ("crayon", "brush_thick", "rope"):
+    if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "rope"):
         return None
 
     group = dwg.g()
     base = _copy_attrs(attrs)
     group.add(dwg.line(start=start, end=end, **base))
+    seed = _seed_for_instruction(ins)
 
-    if ins.weight == "rope":
-        ox, oy = _line_perp_offsets(start, end, 4.0)
-        twist_attrs = _copy_attrs(attrs)
-        twist_attrs["stroke_width"] = max(1.0, WEIGHT_TO_STROKE_WIDTH[ins.weight] * 0.35)
-        twist_attrs["stroke_opacity"] = 0.55
-        twist_attrs["stroke_dasharray"] = "4,8"
-        group.add(dwg.line(start=(start[0] + ox, start[1] + oy), end=(end[0] + ox, end[1] + oy), **twist_attrs))
-        group.add(dwg.line(start=(start[0] - ox, start[1] - oy), end=(end[0] - ox, end[1] - oy), **twist_attrs))
-    else:
-        seed = _seed_for_instruction(ins)
-        for idx, amount in enumerate((-2.2, 2.0)):
+    if ins.weight == "pencil":
+        for idx, amount in enumerate((-0.9, 1.1)):
             ox, oy = _line_perp_offsets(start, end, amount)
-            jitter = _hash_to_unit(idx, seed) * 1.5
             layer_attrs = _copy_attrs(attrs)
-            layer_attrs["stroke_width"] = max(0.8, WEIGHT_TO_STROKE_WIDTH[ins.weight] * 0.35)
-            layer_attrs["stroke_opacity"] = 0.35 if ins.weight == "crayon" else 0.42
-            layer_attrs["stroke_dasharray"] = "3,5" if ins.weight == "crayon" else "18,7"
+            layer_attrs["stroke_width"] = 0.45
+            layer_attrs["stroke_opacity"] = 0.26
+            layer_attrs["stroke_dasharray"] = "1,7"
+            layer_attrs["filter"] = "url(#texture-pencil)"
+            jitter = _hash_to_unit(idx, seed) * 0.6
             group.add(
                 dwg.line(
                     start=(start[0] + ox + jitter, start[1] + oy),
@@ -562,6 +652,65 @@ def _material_line_group(
                     **layer_attrs,
                 )
             )
+        _add_powder_specks(dwg, group, start, end, attrs, seed, count=18, spread=1.8, radius=0.45, opacity=0.20)
+    elif ins.weight == "chalk":
+        for idx, amount in enumerate((-3.0, 3.4)):
+            ox, oy = _line_perp_offsets(start, end, amount)
+            layer_attrs = _copy_attrs(attrs)
+            layer_attrs["stroke_width"] = 1.1
+            layer_attrs["stroke_opacity"] = 0.28
+            layer_attrs["stroke_dasharray"] = "8,12,1,8"
+            jitter = _hash_to_unit(idx, seed) * 1.4
+            group.add(
+                dwg.line(
+                    start=(start[0] + ox + jitter, start[1] + oy),
+                    end=(end[0] + ox - jitter, end[1] + oy),
+                    **layer_attrs,
+                )
+            )
+        _add_powder_specks(dwg, group, start, end, attrs, seed, count=34, spread=5.5, radius=0.9, opacity=0.26)
+    elif ins.weight == "brush_thin":
+        for idx, amount in enumerate((-1.4, 1.8)):
+            ox, oy = _line_perp_offsets(start, end, amount)
+            layer_attrs = _copy_attrs(attrs)
+            layer_attrs["stroke_width"] = 0.9 + idx * 0.5
+            layer_attrs["stroke_opacity"] = 0.32
+            layer_attrs["stroke_dasharray"] = "22,9"
+            jitter = _hash_to_unit(idx, seed) * 1.1
+            group.add(
+                dwg.line(
+                    start=(start[0] + ox + jitter, start[1] + oy),
+                    end=(end[0] + ox - jitter, end[1] + oy),
+                    **layer_attrs,
+                )
+            )
+    elif ins.weight == "rope":
+        ox, oy = _line_perp_offsets(start, end, 4.0)
+        twist_attrs = _copy_attrs(attrs)
+        twist_attrs["stroke_width"] = max(1.0, WEIGHT_TO_STROKE_WIDTH[ins.weight] * 0.35)
+        twist_attrs["stroke_opacity"] = 0.55
+        twist_attrs["stroke_dasharray"] = "4,8"
+        group.add(dwg.line(start=(start[0] + ox, start[1] + oy), end=(end[0] + ox, end[1] + oy), **twist_attrs))
+        group.add(dwg.line(start=(start[0] - ox, start[1] - oy), end=(end[0] - ox, end[1] - oy), **twist_attrs))
+        _add_rope_twists(dwg, group, start, end, attrs, seed)
+    else:
+        amounts = (-3.2, -1.4, 2.0, 3.6) if ins.weight == "crayon" else (-3.5, 2.8, 5.0)
+        for idx, amount in enumerate(amounts):
+            ox, oy = _line_perp_offsets(start, end, amount)
+            jitter = _hash_to_unit(idx, seed) * (2.2 if ins.weight == "crayon" else 2.8)
+            layer_attrs = _copy_attrs(attrs)
+            layer_attrs["stroke_width"] = max(0.8, WEIGHT_TO_STROKE_WIDTH[ins.weight] * (0.25 if ins.weight == "crayon" else 0.30))
+            layer_attrs["stroke_opacity"] = 0.24 if ins.weight == "crayon" else 0.38
+            layer_attrs["stroke_dasharray"] = "2,5,9,7" if ins.weight == "crayon" else "18,7,3,11"
+            group.add(
+                dwg.line(
+                    start=(start[0] + ox + jitter, start[1] + oy),
+                    end=(end[0] + ox - jitter, end[1] + oy),
+                    **layer_attrs,
+                )
+            )
+        if ins.weight == "crayon":
+            _add_powder_specks(dwg, group, start, end, attrs, seed, count=26, spread=4.0, radius=0.75, opacity=0.18)
     return _apply_rotation(group, ins)
 
 

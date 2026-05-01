@@ -46,6 +46,10 @@ _JA_EXPANSION_MARKERS = (
     "パッチワーク",
     "フレスコの下地",
     "水墨の濃淡",
+    "鉛筆の余白線",
+    "クレヨンの擦れ",
+    "ロットリングの均一線",
+    "縄の撚り",
 )
 _EN_EXPANSION_MARKERS = (
     "diagonal band in the right half",
@@ -68,6 +72,10 @@ _EN_EXPANSION_MARKERS = (
     "patchwork",
     "fresco ground",
     "ink-wash value",
+    "pencil negative-space line",
+    "crayon rubbing",
+    "rotring uniform lines",
+    "rope twist",
 )
 
 
@@ -394,6 +402,10 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
         _FilterCandidate(f"{contrast_color}細い線を一点透視法として右上の焦点へ向けて三本引く。", frozenset(("space", "line", "geometry"))),
         _FilterCandidate(f"{contrast_color}細い横線を遠近法の奥行きとして上へ細かく三本並べる。", frozenset(("space", "line"))),
         _FilterCandidate("黒い細筆の細い線を素描の下線として左から右へ三本並べる。細かく震える。", frozenset(("line", "quiet"))),
+        _FilterCandidate(f"{contrast_color}鉛筆の細い線を余白線として上端寄りに二本並べる。細かく震える。", frozenset(("line", "quiet", "soft"))),
+        _FilterCandidate(f"{main_color}クレヨンの短い線を擦れとして右半分の斜めの帯に七本散らす。", frozenset(("particle", "dense", "soft"))),
+        _FilterCandidate(f"{contrast_color}ロットリングの細い線を均一線として左から右へ五本並べる。", frozenset(("line", "geometry", "contrast"))),
+        _FilterCandidate(f"{contrast_color}縄の横線を撚りとして下端寄りに一本引く。ゆっくり揺れる。", frozenset(("line", "dense", "contrast"))),
         _FilterCandidate(f"{main_color}回転した小さな四角を点描として右半分の斜めの帯に十三個散らす。", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"{main_color}太筆の短い線を油絵の厚塗りとして横に三本並べる。", frozenset(("dense", "contrast"))),
         _FilterCandidate(f"{contrast_color}薄い水彩の楕円を左上に二つ重ねる。境界が滲む。", frozenset(("water", "soft", "quiet"))),
@@ -452,6 +464,10 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
         _FilterCandidate(f"Draw three thin {contrast_color} lines toward an upper-right focus as one-point perspective.", frozenset(("space", "line", "geometry"))),
         _FilterCandidate(f"Line up three thin {contrast_color} horizontal lines upward as perspective depth.", frozenset(("space", "line"))),
         _FilterCandidate("Line up three thin black fine-brush lines left to right as drawing underlines. Fine trembling.", frozenset(("line", "quiet"))),
+        _FilterCandidate(f"Line up two thin {contrast_color} pencil lines near the top edge as pencil negative-space line. Fine trembling.", frozenset(("line", "quiet", "soft"))),
+        _FilterCandidate(f"Scatter seven short {main_color} crayon lines along a diagonal band in the right half as crayon rubbing.", frozenset(("particle", "dense", "soft"))),
+        _FilterCandidate(f"Line up five thin {contrast_color} rotring uniform lines left to right.", frozenset(("line", "geometry", "contrast"))),
+        _FilterCandidate(f"Draw one {contrast_color} rope horizontal line near the bottom edge as rope twist. Swaying slowly.", frozenset(("line", "dense", "contrast"))),
         _FilterCandidate(f"Scatter thirteen small rotated {main_color} squares along a diagonal band in the right half as pointillism.", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"Line up three short {main_color} thick-brush lines horizontally as oil impasto.", frozenset(("dense", "contrast"))),
         _FilterCandidate("Layer two pale watercolor ellipses in the upper left. Edges blurring.", frozenset(("water", "soft", "quiet"))),

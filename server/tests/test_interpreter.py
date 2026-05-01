@@ -157,3 +157,27 @@ def test_contrast_prompt_en_selects_invisible_examples():
     assert "White lines on a white background" in prompt
     assert "black horizontal line" in prompt
     assert "short blue lines" in _build_system_prompt("white snow on a white background", lang="en")
+
+
+def test_touch_choice_prompt_selects_material_variations():
+    prompt = _build_system_prompt("乾いた壁に残った粉の跡")
+
+    assert "てざわり選択" in prompt
+    assert "毎回ペンに寄せない" in prompt
+    assert "粉、粉っぽい、かすれ" in prompt
+    assert "チョーク" in prompt
+    assert "クレヨン" in prompt
+    assert "ロットリング" in prompt
+    assert "チョークの横線" in prompt
+
+
+def test_touch_choice_prompt_en_selects_material_variations():
+    prompt = _build_system_prompt("a dry powder trace left on a wall", lang="en")
+
+    assert "Touch Choice" in prompt
+    assert "Do not default everything to pen" in prompt
+    assert "powder, dusty" in prompt
+    assert "chalk" in prompt
+    assert "crayon" in prompt
+    assert "rotring" in prompt
+    assert "chalk horizontal lines" in prompt

@@ -54,6 +54,20 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 複数属性を持つ図形は 1 文に収める: 「青いクレヨンの太い縦線を横に三十本並べる。」
 
+# てざわり選択 — 素材未指定でも物理感を選ぶ
+
+入力に明示的な素材がなくても、質感・文脈から最も近いてざわりを選んでよい。毎回ペンに寄せない。
+
+- 薄い、淡い、繊細、かすかな、下書き、素描 → 鉛筆 または 細筆
+- 粉、粉っぽい、かすれ、白亜、黒板、壁、乾いた → チョーク
+- 子供、手描き、こすれ、塗り、柔らかい色面、蝋 → クレヨン
+- 墨、にじみ、書、筆跡、流麗、濃淡 → 細筆 または 太筆
+- 精密、設計、硬い、機械的、均一、図面 → ロットリング
+- 太い、荒い、撚り、重い、結び、綱 → 縄
+- 素材手がかりがない短い線・点列は、ペン固定にせず、鉛筆・細筆・クレヨン・チョークから文脈に合うものを選ぶ
+
+てざわりは DDL に明示する: 「鉛筆の細い線」「チョークの横線」「クレヨンの短い線」「細筆の縦線」。
+
 # 数量表現
 
 数量詞が含まれる場合、**色・素材・方向・サイズとともに 1 文に**まとめよ。
@@ -250,6 +264,26 @@ EXAMPLE_POOL: list[dict] = [
         "keywords": ["霧", "霞", "滲む", "ぼんやり", "曖昧"],
         "input": "霧の中の輪郭",
         "output": "中央に灰色の大きな円を置く。境界が滲む。",
+    },
+    {
+        "keywords": ["薄い", "淡い", "繊細", "かすか", "下書き", "素描"],
+        "input": "かすかな下書きのような線",
+        "output": "鉛筆の細い横線を上端寄りに三本並べる。",
+    },
+    {
+        "keywords": ["粉", "粉っぽい", "乾いた", "壁", "白亜", "かすれ"],
+        "input": "乾いた壁に残った粉の跡",
+        "output": "チョークの横線を画面下に三本並べる。境界が滲む。",
+    },
+    {
+        "keywords": ["手描き", "こすれ", "蝋", "子供", "柔らかい色面"],
+        "input": "こすれた手描きの赤い線",
+        "output": "赤いクレヨンの短い線を右半分の斜めの帯に十七本散らす。",
+    },
+    {
+        "keywords": ["精密", "機械", "均一", "図面", "設計", "硬い"],
+        "input": "機械的で均一な図面の線",
+        "output": "ロットリングの細い縦線を横に七本並べる。",
     },
     {
         "keywords": ["格子", "網", "交差", "縦横", "マス"],
@@ -518,6 +552,26 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Place a large gray ellipse at center. Edges blurring.",
     },
     {
+        "keywords": ["pale", "delicate", "faint", "sketch", "draft", "underline"],
+        "input": "Faint sketch-like lines",
+        "output": "Line up three thin pencil horizontal lines near the top edge.",
+    },
+    {
+        "keywords": ["powder", "dusty", "dry", "wall", "chalky", "rubbed"],
+        "input": "A dry powder trace left on a wall",
+        "output": "Line up three chalk horizontal lines at the bottom. Edges blurring.",
+    },
+    {
+        "keywords": ["hand-drawn", "waxy", "childlike", "rubbed", "soft color"],
+        "input": "Rubbed hand-drawn red lines",
+        "output": "Scatter seventeen short red crayon lines along a diagonal band in the right half.",
+    },
+    {
+        "keywords": ["precise", "mechanical", "uniform", "blueprint", "technical", "diagram"],
+        "input": "Mechanical uniform diagram lines",
+        "output": "Line up seven thin rotring vertical lines horizontally.",
+    },
+    {
         "keywords": ["grid", "crosshatch", "intersect", "lattice", "cross"],
         "input": "Draw a grid",
         "output": "Line up five vertical lines horizontally. Line up five horizontal lines vertically.",
@@ -664,6 +718,20 @@ Preserve all explicitly stated attributes in the input:
 - **arrangement**: grid, radial, evenly spaced, all-over, top-to-bottom, right-half → preserve
 
 Multiple attributes in one shape go in one sentence: "Line up thirty thick vertical blue crayon lines."
+
+# Touch Choice — choose physical material even when implicit
+
+If the input does not name a material, infer the nearest touch from texture and context. Do not default everything to pen.
+
+- pale, delicate, faint, sketch, draft, drawing underline → pencil or fine-brush
+- powder, dusty, chalky, blackboard, wall, dry, rubbed → chalk
+- childlike, hand-drawn, waxy, rubbed color, soft color field → crayon
+- ink, wash, calligraphy, stroke, value, bleeding → fine-brush or thick-brush
+- precise, technical, mechanical, uniform, blueprint, diagram → rotring
+- thick, coarse, twisted, heavy, knot, cord → rope
+- If a short line or dotted layer has no material clue, choose from pencil, fine-brush, crayon, or chalk by context instead of always using pen
+
+Write the touch explicitly in normalized DDL: "thin pencil line", "chalk horizontal line", "short crayon line", "fine-brush vertical line".
 
 # Quantity
 

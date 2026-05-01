@@ -72,6 +72,9 @@ def test_render_pencil_line_uses_material_texture():
     svg = render(score)
     assert 'stroke-opacity="0.66"' in svg
     assert 'stroke-dasharray="1,3"' in svg
+    assert 'id="texture-pencil"' in svg
+    assert 'filter="url(#texture-pencil)"' in svg
+    assert svg.count("<circle") >= 18
 
 
 def test_render_chalk_line_uses_blurred_powder_texture():
@@ -91,6 +94,9 @@ def test_render_chalk_line_uses_blurred_powder_texture():
     assert 'id="texture-chalk"' in svg
     assert 'filter="url(#texture-chalk)"' in svg
     assert 'stroke-dasharray="7,5,1,4"' in svg
+    assert "<feTurbulence" in svg
+    assert "<feDisplacementMap" in svg
+    assert svg.count("<circle") >= 34
 
 
 def test_render_rope_line_adds_twist_layers():
@@ -107,9 +113,10 @@ def test_render_rope_line_adds_twist_layers():
         }
     )
     svg = render(score)
-    assert svg.count("<line") == 3
+    assert svg.count("<line") >= 16
     assert 'stroke-dasharray="14,5"' in svg
     assert 'stroke-dasharray="4,8"' in svg
+    assert 'stroke-opacity="0.42"' in svg
 
 
 def test_render_crayon_line_adds_rubbed_layers():
@@ -126,9 +133,37 @@ def test_render_crayon_line_adds_rubbed_layers():
         }
     )
     svg = render(score)
-    assert svg.count("<line") == 3
+    assert svg.count("<line") >= 5
     assert 'stroke-dasharray="10,3,2,3"' in svg
-    assert 'stroke-dasharray="3,5"' in svg
+    assert 'stroke-dasharray="2,5,9,7"' in svg
+    assert 'id="texture-crayon"' in svg
+    assert svg.count("<circle") >= 26
+
+
+def test_render_brush_lines_use_layered_material_texture():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.4],
+                    "to": [1.0, 0.4],
+                    "weight": "brush_thin",
+                },
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.6],
+                    "to": [1.0, 0.6],
+                    "weight": "brush_thick",
+                },
+            ]
+        }
+    )
+    svg = render(score)
+    assert svg.count("<line") >= 7
+    assert 'stroke-dasharray="22,9"' in svg
+    assert 'stroke-dasharray="18,7,3,11"' in svg
+    assert 'id="texture-brush_thick"' in svg
 
 
 def test_render_circle():

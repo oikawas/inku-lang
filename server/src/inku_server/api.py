@@ -13,6 +13,7 @@ import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import BoundedSemaphore, Lock
@@ -189,6 +190,9 @@ class ComposeResponse(BaseModel):
     elapsed_ms: int = 0
     tokens_in: int | None = None
     tokens_out: int | None = None
+    retry_count: int = 0
+    retry_reasons: list[str] = Field(default_factory=list)
+    fallback_used: bool = False
 
 
 class InterpretRequest(BaseModel):
@@ -239,6 +243,19 @@ class PaintResponse(BaseModel):
     tokens_out_stage1: int | None = None
     tokens_in_stage2: int | None = None
     tokens_out_stage2: int | None = None
+    compose_retry_count: int = 0
+    compose_retry_reasons: list[str] = Field(default_factory=list)
+    compose_fallback_used: bool = False
+
+
+@dataclass
+class ComposeDetail:
+    score: Score
+    tokens_in: int | None = None
+    tokens_out: int | None = None
+    retry_count: int = 0
+    retry_reasons: list[str] = field(default_factory=list)
+    fallback_used: bool = False
 
 
 class PromptsResponse(BaseModel):
@@ -685,6 +702,22 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
     return Score.model_validate({"background": background, "instructions": [instruction]})
 
 
+def _compose_retry_reason(score: Score, *, tokens_out: int | None, elapsed_ms: int) -> str:
+    token_limit = int(os.getenv("INKU_STAGE2_RETRY_TOKENS_OUT", "3800"))
+    elapsed_limit = int(os.getenv("INKU_STAGE2_RETRY_ELAPSED_MS", "120000"))
+    if not score.instructions:
+        return "empty_instructions"
+    if tokens_out is not None and tokens_out >= token_limit:
+        return "excessive_tokens_out"
+    if elapsed_ms >= elapsed_limit and len(score.instructions) <= 1:
+        return "slow_single_instruction"
+    return "none"
+
+
+def _should_retry_compose_result(score: Score, *, tokens_out: int | None, elapsed_ms: int) -> bool:
+    return _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms) != "none"
+
+
 def _call_compose_detail(
     ddl: str,
     *,
@@ -692,10 +725,14 @@ def _call_compose_detail(
     original_text: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
-) -> tuple[Score, int | None, int | None]:
+) -> ComposeDetail:
     ddl = expand_intermediate_ddl(ddl, lang=lang, context_text=original_text)
+    retry_count = 0
+    retry_reasons: list[str] = []
+    fallback_used = False
 
-    def invoke(prompt: str | None) -> tuple[Score, int | None, int | None]:
+    def invoke(prompt: str | None) -> tuple[Score, int | None, int | None, int]:
+        started = time.perf_counter()
         try:
             value = compose(
                 ddl,
@@ -708,33 +745,51 @@ def _call_compose_detail(
             if "unexpected keyword argument" not in str(e):
                 raise
             value = compose(ddl, model=model)
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
         if isinstance(value, tuple):
-            return value
-        return value, None, None
+            return value[0], value[1], value[2], elapsed_ms
+        return value, None, None, elapsed_ms
 
-    score, tokens_in, tokens_out = invoke(system_prompt)
-    if score.instructions:
-        return score, tokens_in, tokens_out
+    score, tokens_in, tokens_out, elapsed_ms = invoke(system_prompt)
+    if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
+        return ComposeDetail(score=score, tokens_in=tokens_in, tokens_out=tokens_out)
 
     base_prompt = system_prompt or (STAGE2_PROMPT_EN if lang == "en" else STAGE2_PROMPT)
+    reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
+    retry_count += 1
+    retry_reasons.append(reason)
     rescue_note = (
-        "\n\n# Empty result retry\n"
-        "The previous output had no drawable instructions. This is invalid. "
-        "Return at least one visible line, ellipse, square, triangle, circle, or arc derived from the normalized DDL. "
-        "Do not return an empty instructions array."
+        "\n\n# Compact result retry\n"
+        f"The previous Stage 2 result was invalid or inefficient: {reason}. "
+        "Return 2-5 concise drawable instructions. "
+        "Do not return an empty instructions array. "
+        "Use one instruction plus arrangement for repeated shapes. "
+        "Keep the response compact and avoid restating the DDL."
         if lang == "en"
-        else "\n\n# 空描画リトライ\n"
-        "直前の出力は描画命令が空であり無効。正規化DDLから、見える線・楕円・四角・三角・円・弧のうち少なくとも一つを必ず返す。"
+        else "\n\n# 空描画リトライ / コンパクト描画リトライ\n"
+        f"直前の Stage 2 出力は無効または非効率: {reason}。"
+        "2〜5個の簡潔な描画命令を返す。"
         "instructions を空配列にしてはいけない。"
+        "繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。"
+        "DDLを説明し直さず、JSONを短く保つ。"
     )
-    retry_score, retry_tokens_in, retry_tokens_out = invoke(base_prompt + rescue_note)
+    retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(base_prompt + rescue_note)
     if retry_tokens_in is not None:
         tokens_in = (tokens_in or 0) + retry_tokens_in
     if retry_tokens_out is not None:
         tokens_out = (tokens_out or 0) + retry_tokens_out
     if not retry_score.instructions:
-        return _fallback_score_from_ddl(ddl, lang=lang), tokens_in, tokens_out
-    return retry_score, tokens_in, tokens_out
+        fallback_used = True
+        retry_reasons.append("fallback_after_empty_retry")
+        retry_score = _fallback_score_from_ddl(ddl, lang=lang)
+    return ComposeDetail(
+        score=retry_score,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        retry_count=retry_count,
+        retry_reasons=retry_reasons,
+        fallback_used=fallback_used,
+    )
 
 
 def _call_interpret_detail(
@@ -768,7 +823,7 @@ def _call_interpret_detail(
 def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> ComposeResponse:
     t0 = time.perf_counter()
     try:
-        score, tokens_in, tokens_out = _call_compose_detail(
+        compose_detail = _call_compose_detail(
             req.ddl,
             model=req.model,
             original_text=req.original_text,
@@ -779,6 +834,7 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
     try:
+        score = compose_detail.score
         ensure_renderable_score(score)
         score = coerce_score(score, ddl=req.ddl)
     except Exception as e:  # noqa: BLE001
@@ -790,7 +846,16 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
 
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
-    return ComposeResponse(score=score, svg=svg, elapsed_ms=elapsed_ms, tokens_in=tokens_in, tokens_out=tokens_out)
+    return ComposeResponse(
+        score=score,
+        svg=svg,
+        elapsed_ms=elapsed_ms,
+        tokens_in=compose_detail.tokens_in,
+        tokens_out=compose_detail.tokens_out,
+        retry_count=compose_detail.retry_count,
+        retry_reasons=compose_detail.retry_reasons,
+        fallback_used=compose_detail.fallback_used,
+    )
 
 
 @app.post("/api/interpret")
@@ -934,13 +999,14 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     ddl = expand_intermediate_ddl(ddl, lang=req.lang, context_text=source_text)
     t1 = time.perf_counter()
     try:
-        score, s2_tin, s2_tout = _call_compose_detail(
+        compose_detail = _call_compose_detail(
             ddl, model=req.stage2_model, original_text=source_text, lang=req.lang
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
     try:
+        score = compose_detail.score
         ensure_renderable_score(score)
         score = coerce_score(score, ddl=ddl)
     except Exception as e:  # noqa: BLE001
@@ -969,8 +1035,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             elapsed_ms=elapsed_total_ms,
             stage1_model=req.stage1_model,
             stage2_model=req.stage2_model,
-            tokens_in=(s1_tin or 0) + (s2_tin or 0) or None,
-            tokens_out=(s1_tout or 0) + (s2_tout or 0) or None,
+            tokens_in=(s1_tin or 0) + (compose_detail.tokens_in or 0) or None,
+            tokens_out=(s1_tout or 0) + (compose_detail.tokens_out or 0) or None,
             catalog_id=req.catalog_id,
             save_artifacts=save_artifacts,
         )
@@ -1002,8 +1068,11 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         elapsed_total_ms=elapsed_total_ms,
         tokens_in_stage1=s1_tin,
         tokens_out_stage1=s1_tout,
-        tokens_in_stage2=s2_tin,
-        tokens_out_stage2=s2_tout,
+        tokens_in_stage2=compose_detail.tokens_in,
+        tokens_out_stage2=compose_detail.tokens_out,
+        compose_retry_count=compose_detail.retry_count,
+        compose_retry_reasons=compose_detail.retry_reasons,
+        compose_fallback_used=compose_detail.fallback_used,
     )
 
 

@@ -1010,13 +1010,55 @@ UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_compo
 
 次の実装候補:
 
-- Stage 2 が `tokens_out` 4000近辺、または elapsed 120秒超になった場合の retry / fail 判定。
-- retry した場合の attempt count / error reason / stage 別 elapsed を CLI と JSON に保存する。
-- instruction が1件に縮退した場合、DDL coverage check で主要要素を再補完する。
-- `expanded primitive count` の単純縮小だけでなく、密度を下げながら構成要素の種類を保つ圧縮を行う。
+- ~~Stage 2 が `tokens_out` 4000近辺、または elapsed 120秒超になった場合の retry / fail 判定。~~ → 実装済み。空 instructions、過大 tokens out、長時間かつ単一 instruction を retry 対象にする。
+- ~~retry した場合の attempt count / error reason / stage 別 elapsed を CLI と JSON に保存する。~~ → 実装済み。API は retry count / reasons / fallback used を返し、CLI summary JSON にも含める。
+- ~~instruction が1件に縮退した場合、DDL coverage check で主要要素を再補完する。~~ → 実装済み。coerce layer が DDL の複数視覚句から最大5命令まで補完する。
+- ~~`expanded primitive count` の単純縮小だけでなく、密度を下げながら構成要素の種類を保つ圧縮を行う。~~ → 一部実装。単一 arrangement count の上限と、複数 instruction の最低1件保持を行う。
 - 背景色を white / black に寄せすぎない Stage 1.5 の tone strategy を追加する。
 
-## 14. 進め方
+## 14. 修正後30件ベンチを受けた追加実装
+
+Date: 2026-05-01
+
+実装内容:
+
+- `_call_compose_detail()` を診断情報付きに変更した。
+- Stage 2 の初回結果が以下の条件に該当した場合、コンパクトな描画命令を要求して1回 retry する。
+  - `empty_instructions`
+  - `excessive_tokens_out`
+  - `slow_single_instruction`
+- retry しても空の場合は deterministic fallback score を使用し、`fallback_used=true` として返す。
+- `/api/compose` は `retry_count`、`retry_reasons`、`fallback_used` を返す。
+- `/api/paint` は `compose_retry_count`、`compose_retry_reasons`、`compose_fallback_used` を返す。
+- `inku-cli paint` / `batch` の summary JSON に上記 retry/fallback 情報を含める。
+- `coerce_score(score, ddl=...)` は、Stage 2 が1 instruction へ縮退した場合、DDL の複数視覚句から coverage 補完 instruction を追加する。
+- 単一 `arrangement.count` にも上限を設け、1 instruction が過密の大半を占める状態を抑える。
+
+期待効果:
+
+- line 12 / 28 / 30 のような、長時間応答かつ単一 instruction へ縮退するケースを検知しやすくする。
+- retry / fallback の有無をベンチ結果に残し、後続分析で「成功だが補正された描画」を区別できる。
+- DDL の複数要素が Stage 2 で落ちた場合でも、主要な形・色・素材の一部を Score に戻す。
+- 過密抑制時に、構成要素の種類を残したまま密度を下げやすくする。
+
+検証:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
+
+cd ../cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
+```
+
+結果:
+
+- `ruff`: all checks passed
+- server pytest: `105 passed, 30 skipped`
+- cli pytest: `8 passed`
+
+## 15. 進め方
 
 1. 10 件パイロットを実施する
 2. 評価ラベルを調整する

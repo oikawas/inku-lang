@@ -1362,6 +1362,43 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ## 変更履歴
 
+### v1.27 (2026-05-01)
+
+**Stage 2 過長応答対策 + DDL coverage 補完**
+
+修正後30件ベンチで、重複・過密は改善した一方、Stage 2 が長時間応答した末に 1 instruction へ縮退するケースが残ったため、追加の診断と補完を実装した。
+
+- Stage 2 の結果が空、`tokens_out` 過大、または長時間かつ単一 instruction の場合は、コンパクトな描画命令を要求して1回再試行する
+- 再試行理由は `empty_instructions` / `excessive_tokens_out` / `slow_single_instruction` として API レスポンスに残す
+- `/api/compose` は `retry_count` / `retry_reasons` / `fallback_used` を返す
+- `/api/paint` は `compose_retry_count` / `compose_retry_reasons` / `compose_fallback_used` を返す
+- `inku-cli paint` / `batch` の summary JSON に Stage 2 retry/fallback 情報を含める
+- Score coerce layer は、Stage 2 が1命令へ縮退した場合、DDL の複数視覚句から最大5命令まで coverage 補完を行う
+- 1つの `arrangement` が過大になりすぎないよう、単一 instruction の展開数にも上限を設ける
+
+追加テスト:
+
+- `test_coerce.py`
+  - 単一 arrangement count の上限
+  - 1命令縮退時の DDL coverage 補完
+
+検証:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
+
+cd ../cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
+```
+
+結果:
+
+- `ruff`: all checks passed
+- server pytest: `105 passed, 30 skipped`
+- cli pytest: `8 passed`
+
 ### v1.26 (2026-05-01)
 
 **軌跡フィールドの追加**

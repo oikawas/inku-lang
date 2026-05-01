@@ -102,6 +102,27 @@ def test_coerce_score_caps_total_expanded_density():
     assert total <= 400
 
 
+def test_coerce_score_caps_single_arrangement_density():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "arrangement": {"count": 377, "layout": "vertical"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score)
+
+    assert fixed.instructions[0].arrangement is not None
+    assert fixed.instructions[0].arrangement.count == 240
+    assert "single arrangement density capped" in (fixed.instructions[0].color_hint or "")
+
+
 def test_coerce_score_infers_material_and_variation_from_ddl():
     score = Score.model_validate(
         {
@@ -122,6 +143,31 @@ def test_coerce_score_infers_material_and_variation_from_ddl():
     assert ins.weight == "crayon"
     assert ins.variation is not None
     assert ins.variation.quality == "perlin"
+
+
+def test_coerce_score_adds_ddl_coverage_when_stage2_collapses_to_one_instruction():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "white",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="白い線を三本並べる。赤い小さな四角を八個散らす。青い弧を二本置く。",
+    )
+
+    assert len(fixed.instructions) >= 3
+    assert {ins.primitive for ins in fixed.instructions} >= {"line", "square", "arc"}
+    assert any("coverage from DDL clause" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_count_hint_from_ddl_extracts_japanese_numbers():

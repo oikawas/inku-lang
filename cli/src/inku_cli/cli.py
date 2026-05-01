@@ -464,6 +464,9 @@ def command_paint(args: argparse.Namespace) -> int:
         "elapsed_total_ms": result.get("elapsed_total_ms"),
         "tokens_in": (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0) or None,
         "tokens_out": (result.get("tokens_out_stage1") or 0) + (result.get("tokens_out_stage2") or 0) or None,
+        "compose_retry_count": result.get("compose_retry_count", 0),
+        "compose_retry_reasons": result.get("compose_retry_reasons", []),
+        "compose_fallback_used": result.get("compose_fallback_used", False),
         "paths": paths,
     }
     if args.full_json:
@@ -541,6 +544,9 @@ def command_batch(args: argparse.Namespace) -> int:
                 "elapsed_total_ms": elapsed,
                 "tokens_in": tokens_in or None,
                 "tokens_out": tokens_out or None,
+                "compose_retry_count": result.get("compose_retry_count", 0),
+                "compose_retry_reasons": result.get("compose_retry_reasons", []),
+                "compose_fallback_used": result.get("compose_fallback_used", False),
                 "paths": paths,
             })
             print(f"{index}/{len(lines)} ok {elapsed}ms", file=sys.stderr)

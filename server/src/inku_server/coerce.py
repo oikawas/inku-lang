@@ -148,6 +148,7 @@ MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 MAX_EXPANDED_PRIMITIVES = 400
+MAX_EXPANDED_PER_INSTRUCTION = 240
 
 
 def _visible_background(background: str) -> str:
@@ -293,6 +294,22 @@ def _with_arrangement_count(ins: Instruction, count: int, note: str) -> Instruct
     return Instruction.model_validate(data)
 
 
+def _with_per_instruction_density_budget(instructions: list[Instruction]) -> list[Instruction]:
+    adjusted: list[Instruction] = []
+    for ins in instructions:
+        if ins.arrangement is None or ins.arrangement.count <= MAX_EXPANDED_PER_INSTRUCTION:
+            adjusted.append(ins)
+            continue
+        adjusted.append(
+            _with_arrangement_count(
+                ins,
+                MAX_EXPANDED_PER_INSTRUCTION,
+                "single arrangement density capped to preserve negative space",
+            )
+        )
+    return adjusted
+
+
 def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruction]:
     total = sum(_expanded_count(ins) for ins in instructions)
     if total <= MAX_EXPANDED_PRIMITIVES:
@@ -318,6 +335,114 @@ def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruct
         adjusted.append(adjusted_ins)
         remaining_budget -= _expanded_count(adjusted_ins)
     return adjusted
+
+
+def _ddl_clauses(ddl: str | None) -> list[str]:
+    if not ddl:
+        return []
+    clauses = [part.strip() for part in re.split(r"[。\n;；]+", ddl) if part.strip()]
+    markers = (
+        "線", "点", "円", "楕円", "四角", "三角", "弧", "塗りつぶす", "散らす", "並べる",
+        "line", "dot", "circle", "ellipse", "square", "triangle", "arc", "scatter", "fill",
+    )
+    return [
+        clause
+        for clause in clauses
+        if not (clause.startswith("背景") or clause.lower().startswith("background"))
+        and any(marker in clause for marker in markers)
+    ]
+
+
+def _color_from_clause(clause: str, background: str) -> str:
+    lower = clause.lower()
+    candidates = (
+        (("白", "white"), "white"),
+        (("黒", "black"), "black"),
+        (("青", "blue"), "blue"),
+        (("赤", "red"), "red"),
+        (("緑", "green"), "green"),
+        (("灰", "gray", "grey"), "gray"),
+    )
+    for markers, color in candidates:
+        if any(marker in clause or marker in lower for marker in markers):
+            if color != background:
+                return color
+    return VISIBLE_ON_BACKGROUND.get(background, "black")
+
+
+def _weight_from_clause(clause: str) -> str:
+    lower = clause.lower()
+    for markers, weight in MATERIAL_WEIGHT_HINTS:
+        if any(marker.lower() in lower for marker in markers):
+            return weight
+    return "pen"
+
+
+def _primitive_from_clause(clause: str) -> str:
+    lower = clause.lower()
+    if ("四角" in clause) or ("square" in lower) or ("rectangle" in lower):
+        return "square"
+    if ("三角" in clause) or ("triangle" in lower):
+        return "triangle"
+    if ("弧" in clause) or ("arc" in lower):
+        return "arc"
+    if ("円" in clause) or ("楕円" in clause) or ("circle" in lower) or ("ellipse" in lower):
+        return "ellipse"
+    return "line"
+
+
+def _fallback_instruction_from_clause(clause: str, *, index: int, background: str) -> Instruction:
+    primitive = _primitive_from_clause(clause)
+    color = _color_from_clause(clause, background)
+    weight = _weight_from_clause(clause)
+    common: dict[str, Any] = {
+        "primitive": primitive,
+        "color": color,
+        "weight": weight,
+        "color_hint": f"coverage from DDL clause: {clause[:48]}",
+    }
+    offset = min(index, 4) * 0.09
+    if primitive == "line":
+        common.update({"from": [0.16 + offset, 0.76 - offset], "to": [0.78, 0.30 + offset], "rotation": -8 + index * 7})
+    elif primitive == "arc":
+        common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.11, "angle_start": 210, "angle_end": 330})
+    elif primitive == "ellipse":
+        common.update({"center": [0.68 - offset / 2, 0.30 + offset], "size": [0.16, 0.09], "rotation": -18 + index * 9})
+    else:
+        common.update({"position": [0.58 - offset / 2, 0.24 + offset], "size": [0.14, 0.10], "rotation": -12 + index * 8})
+
+    count = count_hint_from_ddl(clause)
+    lower = clause.lower()
+    if count and (("散らす" in clause) or ("scatter" in lower)):
+        common["arrangement"] = {"count": min(count, 120), "layout": "scatter", "margin": 0.18}
+    elif count and (("並べる" in clause) or ("line up" in lower)):
+        common["arrangement"] = {"count": min(count, 80), "layout": "horizontal", "margin": 0.1}
+    return Instruction.model_validate(common)
+
+
+def _with_ddl_coverage(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+    clauses = _ddl_clauses(ddl)
+    if len(instructions) != 1 or len(clauses) <= 1:
+        return instructions
+    existing = {
+        (
+            ins.primitive,
+            ins.color,
+            ins.weight,
+        )
+        for ins in instructions
+    }
+    augmented = list(instructions)
+    for clause in clauses:
+        if len(augmented) >= 5:
+            break
+        fallback = _fallback_instruction_from_clause(clause, index=len(augmented), background=background)
+        key = (fallback.primitive, fallback.color, fallback.weight)
+        if key in existing:
+            continue
+        augmented.append(fallback)
+        existing.add(key)
+    return augmented
 
 
 _KANJI_NUMBERS: dict[str, int] = {
@@ -447,6 +572,8 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
         for ins in score.instructions
     ]
     instructions = _dedupe_instructions(instructions)
+    instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
+    instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)
     data["background"] = background

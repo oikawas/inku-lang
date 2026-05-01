@@ -43,3 +43,6 @@ LOCAL_WORK.md
 # 履歴データ
 **/inku-history.json
 data/history.json
+
+# CLI generated outputs
+server/out/

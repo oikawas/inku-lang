@@ -1303,6 +1303,24 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ## 変更履歴
 
+### v1.23 (2026-05-01)
+
+**inku-cli 初期実装**
+
+macOS 開発環境から `inku-api` を操作する CLI を追加した。
+
+- `inku-cli` を `server/pyproject.toml` の console script として登録する
+- CLI はサーバー内部ロジックを直接呼ばず、Web UI と同じ FastAPI API を操作する
+- `login` は `/api/auth/login` の `inku_session` Cookie を取得し、以後は `Authorization: Bearer` として送信する
+- セッション設定は `~/.config/inku-cli/config.json` に保存し、ファイル権限は可能な限り `0600` にする
+- `me` / `logout` / `paint` / `batch` / `demo-instruction` / `history` を初期コマンドとして提供する
+- `paint` / `batch` は SVG / JSON をファイル出力でき、必要に応じて PNG も生成できる
+- `paint` / `batch` は Stage 1 / Stage 2 モデル指定、履歴保存、artifact 保存、言語指定、thinking 取得を指定できる
+- 初期目的は、CLI から指示と画像を生成し、AI による成果物画像の品質判定を組み合わせて Stage 1 / 1.5 / 2 調整用のフィードバックループを構築すること
+- CLI import 時にサーバー API / DB migration が走らないよう、`inku_server.__init__` の API import を遅延化する
+- macOS から pentala の `inku-api` へ LAN 経由で接続し、`login` / `paint` / SVG・JSON・PNG 出力の動作を確認した
+- CLI の確認で生成される `server/out/` はローカル成果物として Git 追跡対象外にする
+
 ### v1.22 (2026-05-01)
 
 **サーバー保存負荷制御 + 履歴検索高速化 + 履歴管理ページング安定化 + 状態分離 + デモタブ**

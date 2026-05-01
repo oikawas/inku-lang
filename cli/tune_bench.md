@@ -403,7 +403,74 @@ CLI 実行結果:
 - 色カタログ解決後の foreground/background visibility と、DDL 色名から score 色名への対応を検査するテストを追加する。
 - ベンチ評価用に visible pixel ratio、背景色、プリミティブ種別、命令数、elapsed 外れ値を自動集計する `inku-cli bench-report` 相当を追加する。
 
-## 10. 進め方
+## 10. DDL -> JSON 要素落ち検証
+
+30件ベンチ後のチューニングで、DDL に含まれる配置・軌跡・揺れ・素材の一部が JSON Score または SVG レンダリングへ十分に伝わらないケースを確認した。
+
+### 人間によって発見された課題と、その原因
+
+- `波打つ軌跡に沿って`、`上から下へ散らす`、`右半分` のような配置語が、既存の `arrangement.layout` だけでは安定して表現できなかった。
+- `layout=scatter` は決定的な散布としてレンダリングされるため、DDL 上の「軌跡」「方向」「領域」のニュアンスが失われやすかった。
+- `細かく揺れる`、`ゆっくり揺れる` は `variation` へ入っていても、線や配置の視覚差として弱いケースがあった。
+- `てざわり` は `weight` 差だけに見えやすく、鉛筆、クレヨン、チョーク、水墨、縄などの物理的な差が SVG の見た目に十分出ていなかった。
+- Stage 2 fixture の比較が `arrangement` を見ていなかったため、`count`、`layout`、`path`、`color_cycle`、`margin` の欠落を検知できなかった。
+- Stage 2 が空 `instructions` を返した後の fallback score では、DDL の配置語が保持されず、特に `波打つ軌跡` や `上から下へ散らす` が落ちていた。
+
+### 対応
+
+- JSON Score schema の `Arrangement` に `path` を追加した。
+  - `none`
+  - `diagonal`
+  - `wave`
+  - `top_to_bottom`
+  - `left_to_right`
+  - `right_half`
+- Stage 2 prompt に、配置語から `arrangement.path` へ写像するルールと例を追加した。
+  - `波打つ軌跡に沿って` -> `layout=scatter`, `path=wave`
+  - `斜めの帯` -> `path=diagonal`
+  - `上から下へ散らす` -> `layout=vertical`, `path=top_to_bottom`
+  - `左から右へ` -> `layout=horizontal`, `path=left_to_right`
+  - `右半分` -> `path=right_half`
+- renderer で `arrangement.path` を実際の配置座標へ反映するようにした。
+  - `wave` は水平方向に進む波状軌跡
+  - `diagonal` は斜め帯
+  - `top_to_bottom` は縦方向の進行
+  - `left_to_right` は横方向の進行
+  - `right_half` は右半分へ制約
+- `variation` の見た目を強化した。
+  - `fine/perlin` は細かい震えとして線や輪郭に反映
+  - `slow/wave` はゆっくりした波・位置揺れとして反映
+- `てざわり` の renderer 表現を強化した。
+  - 線だけでなく `circle`、`ellipse`、`square`、`arc` の輪郭にも素材処理を適用
+  - pencil / crayon / chalk / brush / rope などが線幅差だけでなく、透明度、重ね、破線、粒状感、輪郭の揺れとして出るようにした
+- Stage 2 fixture 比較で `arrangement` 全体を検査するようにした。
+- submit tool schema に `arrangement.path` が含まれることをテストで検証するようにした。
+- fallback score でも `散らす` を arrangement として保持し、配置語から `path` を復元するようにした。
+  - 図形だけでなく線の `散らす` も対象にした。
+- renderer / composer / API の回帰テストを追加した。
+
+### 検証結果
+
+実行:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py -q
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+```
+
+結果:
+
+- `95 passed, 30 skipped`
+- `ruff`: all checks passed
+
+### 残る確認ポイント
+
+- 実 LLM で `path` が安定して出るかは、NVIDIA backend 有効時の fixture / bench で継続確認する。
+- `arrangement.path` は表現幅を広げるが、過度に使うと作品が軌跡パターンへ寄る可能性があるため、ベンチでは `path_not_reflected` とあわせて `path_overused` も観察対象にする。
+- `てざわり` は SVG レンダリング上は改善したが、作品としての差が十分かは PNG ベースの評価で確認する。
+
+## 11. 進め方
 
 1. 10 件パイロットを実施する
 2. 評価ラベルを調整する

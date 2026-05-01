@@ -22,7 +22,7 @@ from .llm_retry import call_with_llm_retry
 from .schema import Score
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 4096
+MAX_TOKENS = 2048
 
 # 手順のみ。フィールド仕様は submit_score スキーマの description を参照。
 # 例は「最も非自明なパターン」に絞る — 追加は EXAMPLE_POOL (interpreter.py) と同じ方針で。
@@ -38,6 +38,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
 - **正規化DDL に図形・線・弧の指示がある場合、instructions を空配列にしてはいけない。変換不能なら最も近い線・楕円・四角へ落とし込む**
+- **出力は 1〜5 instructions に圧縮する。DDL 全文を説明し直さず、主題を成立させる主要な視覚関係だけを JSON 化する**
+- **作品ごとに主技法は一つだけ。DDL に複数の技法語があっても、最も主題に合うものを一つ選び、残りは必要な場合だけ小さな補助層にする**
+- **余白は構図要素。小さな焦点、端寄りの線、反復の欠落、画面外へ続く方向で余白に圧力を作る。余白を全面散布で埋めない**
 - variation は明示された揺らぎがある場合のみ付ける
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
 - **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
@@ -52,6 +55,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **色とりどり・多色配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
 - **正規化DDL は必ず配置語を含む。正規化DDL が「中央付近」「上から下」「縦に」「右半分」「放射状」「同心円状」「画面全体に点々」「波打つ軌跡」を含む場合は、その配置語を優先する**
 - **「画面全体に点々」「全面に細かく」は layout=scatter でよいが、意味は無秩序ではなく全面分布として扱う**
+- **scatter は均一な乱数ではない。密度勾配、端部の薄れ、斜めの帯、右半分、上から下など、DDL の配置語に沿った偏りを持つものとして扱う**
 - **「上から下へ散らす」は layout=vertical。「左から右へ」「横に」は layout=horizontal。「放射状」「同心円状」は layout=radial**
 - **「右上の黄金比の位置」→ center=[0.618,0.382]。左下なら [0.382,0.618]。数学的な均衡点として扱う**
 - **「左上の三分割の交点」→ center=[0.333,0.333]。「右下の三分割の交点」→ center=[0.667,0.667]。三分割構図として扱う**
@@ -73,6 +77,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「パッチワーク」→ square の反復。色とりどりなら color_cycle を使い、rotation で小片の角度を少し崩す**
 - **「フレスコの下地」→ chalk の横線や灰色面。blurring で古い壁面として扱う**
 - **「水墨」→ brush_thin/brush_thick の黒/灰線。濃淡は blurring または細太の対比で扱う**
+- **強い単色背景 (black/red/blue/green) は DDL が明示する、または夜・炎・標識・海など主題に必要な場合だけ使う。迷ったら white を使う**
 
 # 例 (最重要パターン)
 
@@ -243,6 +248,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
 - **If normalized DDL contains shapes, lines, or arcs, instructions must not be empty. If exact conversion is difficult, map it to the nearest line, ellipse, or square**
+- **Compress the output to 1–5 instructions. Do not restate the whole DDL; convert only the main visual relationship that makes the work readable**
+- **Use one dominant technique per work. If the DDL contains multiple technique words, choose the one that best fits the subject and keep the others only as small supporting layers when needed**
+- **Negative space is compositional pressure. Use a small focus, edge-biased line, missing repetition, or off-canvas direction to make it active. Do not fill it with all-over scatter**
 - variation only when movement is explicitly stated
 - **count is integer 1–1000. Use explicit numbers from DDL**
 - **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
@@ -257,6 +265,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
 - **Normalized DDL must include placement words. If normalized DDL says "near the center", "top to bottom", "vertical", "right half", "radial", "concentric", "dotted across the whole canvas", or "undulating trace", prioritize that placement phrase**
 - **"dotted across the whole canvas" / "finely across the whole canvas" may use layout=scatter, but treat it as all-over distribution, not disorder**
+- **scatter is not uniform noise. Treat it as biased by density gradient, fading edges, diagonal band, right half, or top-to-bottom placement from the DDL**
 - **"top to bottom" → layout=vertical. "left to right" / "horizontal" → layout=horizontal. "radial" / "concentric" → layout=radial**
 - **"upper-right golden-ratio position" → center=[0.618,0.382]. Lower-left uses [0.382,0.618]. Treat it as a mathematical balance point**
 - **"upper-left rule-of-thirds point" → center=[0.333,0.333]. "lower-right rule-of-thirds point" → center=[0.667,0.667]. Treat it as rule-of-thirds composition**
@@ -278,6 +287,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"patchwork" → square repetition; use color_cycle for multiple colors and add slight rotation to the pieces**
 - **"fresco ground" → chalk gray horizontal lines or ground plane with blurring**
 - **"ink-wash value" → black/gray brush lines with blurring or weight contrast**
+- **Strong solid backgrounds (black/red/blue/green) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
 
 # Examples (key patterns)
 

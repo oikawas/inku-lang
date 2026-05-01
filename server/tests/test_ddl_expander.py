@@ -5,8 +5,8 @@ from inku_server.ddl_expander import expand_intermediate_ddl
 
 JA_TECHNIQUE_MARKERS = [
     "右半分の斜めの帯",
-    "左下から右上へ八本",
-    "波打つ軌跡に沿って十三個",
+    "左下から右上へ三本",
+    "波打つ軌跡に沿って七個",
     "左下の焦点から三つ",
     "右上の黄金比の位置",
     "左上の三分割の交点",
@@ -84,7 +84,7 @@ def test_expand_intermediate_ddl_varies_by_input():
     assert "中央" not in first
     assert "焦点に黒い四角を置く" in first
     assert any(marker in first for marker in ("遠近法の奥行き", "一点透視法", "パッチワーク", "水彩", "素描の下線", "点描"))
-    assert any(marker in second for marker in ("左下の焦点から三つ", "波打つ軌跡に沿って十三個", "左下から右上へ八本"))
+    assert any(marker in second for marker in ("左下の焦点から三つ", "波打つ軌跡に沿って七個", "左下から右上へ三本"))
 
 
 def test_expand_intermediate_ddl_uses_context_to_control_filter_amount():

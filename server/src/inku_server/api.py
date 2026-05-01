@@ -567,6 +567,86 @@ def api_prompts(lang: str = Query(default="ja")) -> PromptsResponse:
     return PromptsResponse(stage1_system=s1, stage2_system=s2)
 
 
+def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
+    """Build a minimal visible score when Stage 2 returns empty twice."""
+    lower = ddl.lower()
+
+    if ("背景を黒" in ddl) or ("fill background with black" in lower):
+        background = "black"
+        color = "white"
+    elif ("背景を赤" in ddl) or ("fill background with red" in lower):
+        background = "red"
+        color = "black"
+    elif ("背景を青" in ddl) or ("fill background with blue" in lower):
+        background = "blue"
+        color = "white"
+    elif ("背景を緑" in ddl) or ("fill background with green" in lower):
+        background = "green"
+        color = "black"
+    else:
+        background = "white"
+        color = "black"
+
+    if (("白" in ddl) or ("white" in lower)) and background != "white":
+        color = "white"
+    elif (("青" in ddl) or ("blue" in lower)) and background != "blue":
+        color = "blue"
+    elif (("赤" in ddl) or ("red" in lower)) and background != "red":
+        color = "red"
+    elif (("緑" in ddl) or ("green" in lower)) and background != "green":
+        color = "green"
+    elif (("灰" in ddl) or ("gray" in lower) or ("grey" in lower)) and background != "gray":
+        color = "gray"
+
+    if color == background:
+        color = "white" if background in {"black", "blue"} else "black"
+
+    if ("四角" in ddl) or ("square" in lower) or ("rectangle" in lower):
+        instruction = {
+            "primitive": "square",
+            "position": [0.62, 0.28],
+            "size": [0.18, 0.12],
+            "rotation": -12,
+            "color": color,
+            "filled": "塗" in ddl or "fill" in lower,
+            "color_hint": "fallback from DDL",
+        }
+    elif ("円" in ddl) or ("circle" in lower) or ("moon" in lower) or ("月" in ddl):
+        instruction = {
+            "primitive": "ellipse",
+            "center": [0.72, 0.32],
+            "size": [0.18, 0.11],
+            "rotation": -18,
+            "color": color,
+            "filled": "塗" in ddl or "fill" in lower,
+            "color_hint": "fallback from DDL",
+        }
+    elif ("弧" in ddl) or ("arc" in lower) or ("crescent" in lower):
+        instruction = {
+            "primitive": "arc",
+            "center": [0.72, 0.32],
+            "radius": 0.16,
+            "angle_start": 210,
+            "angle_end": 330,
+            "color": color,
+            "color_hint": "fallback from DDL",
+        }
+    else:
+        instruction = {
+            "primitive": "line",
+            "from": [0.16, 0.78],
+            "to": [0.84, 0.28],
+            "rotation": -8,
+            "color": color,
+            "color_hint": "fallback from DDL",
+        }
+
+    if (("散らす" in ddl) or ("点々" in ddl) or ("scatter" in lower) or ("dotted" in lower)) and instruction["primitive"] != "line":
+        instruction["arrangement"] = {"count": 7, "layout": "scatter", "margin": 0.18}
+
+    return Score.model_validate({"background": background, "instructions": [instruction]})
+
+
 def _call_compose_detail(
     ddl: str,
     *,
@@ -614,6 +694,8 @@ def _call_compose_detail(
         tokens_in = (tokens_in or 0) + retry_tokens_in
     if retry_tokens_out is not None:
         tokens_out = (tokens_out or 0) + retry_tokens_out
+    if not retry_score.instructions:
+        return _fallback_score_from_ddl(ddl, lang=lang), tokens_in, tokens_out
     return retry_score, tokens_in, tokens_out
 
 

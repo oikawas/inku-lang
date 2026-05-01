@@ -102,6 +102,21 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - 「右半分」「左端」「上端」「中央」などの場所語 → その場所を必ず含める
 - 迷った場合 → 「画面全体に点々と」「中央付近に」「上から下へ」のいずれかを選ぶ
 
+# 抽象構図の選択
+
+入力文から「何を描くか」だけでなく、画面内で成立させる視覚的関係を一つ選ぶ。
+選んだ関係に合うように、焦点・余白・反復・線質を決める。
+
+- 静か、余白、薄い、一点、一本 → 要素を絞り、余白を広く残す
+- 残響、影、痕跡、埃、霧 → 小さな焦点と薄い線・点の層を使う
+- 風、流れ、舞う、香る → 波打つ軌跡や斜めの帯を使う
+- 道、廊下、橋、線路、奥 → 画面外へ続く斜線や端寄りの焦点を使う
+- 反復、列、糸、柵、鍵盤 → 等間隔にしすぎず、少しだけ欠落や角度差を含める
+
+「中央」は明示されている場合だけ使う。迷った場合は右上・左上・右下・左下・上端寄り・右半分などの動的な焦点を選ぶ。
+強い単色背景（黒・赤・青・緑）は、夜・炎・標識・海など文脈上必要な場合だけ使う。
+一つの出力に複数の技法を詰め込まない。主技法を一つ、必要なら副次的なゆらぎを一つまでにする。
+
 # 色とりどり・多色配色
 
 「色とりどり」「カラフル」「様々な色」「虹色」「多色」→ 使う色を明示して「赤・青・緑・黒の色とりどりに」と記述する。
@@ -697,6 +712,21 @@ The words "random" and "randomly" are forbidden in normalized DDL. Do not write 
 - place words such as "right half", "left edge", "top edge", "center" → always preserve the place
 
 If unsure, choose one explicit placement: "dotted across the whole canvas", "near the center", or "from top to bottom".
+
+# Abstract Composition Choice
+
+From the source text, choose one visual relationship before choosing shapes.
+Use that relationship to decide focus, negative space, repetition, and line quality.
+
+- quiet, negative space, pale, single, one → use few elements and preserve broad negative space
+- resonance, shadow, trace, dust, mist → use a small focus with a thin layer of lines or points
+- wind, flow, drifting, scent → use an undulating trace or diagonal band
+- road, corridor, bridge, rail, depth → use an off-edge diagonal or edge-biased focus
+- repetition, row, thread, fence, keyboard → avoid perfect spacing; include a small gap or angle difference
+
+Use "center" only when explicitly requested. If unsure, choose a dynamic focus: upper right, upper left, lower right, lower left, upper edge, or right half.
+Strong solid backgrounds such as black, red, blue, or green are allowed only when the context needs them.
+Do not pack multiple techniques into one output. Use one dominant technique and at most one supporting movement/texture.
 
 # Colorful / Multi-color
 

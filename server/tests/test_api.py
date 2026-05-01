@@ -442,7 +442,7 @@ def test_compose_empty_instruction_result_is_retried(monkeypatch, auth_context):
     assert "空描画リトライ" in calls[1]
 
 
-def test_compose_empty_instruction_result_returns_502_after_retry(monkeypatch, auth_context):
+def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
         api_module,
@@ -452,8 +452,11 @@ def test_compose_empty_instruction_result_returns_502_after_retry(monkeypatch, a
 
     r = client.post("/api/compose", json={"ddl": "黒い線を引く。"}, headers=headers)
 
-    assert r.status_code == 502
-    assert "no drawable instructions" in r.json()["detail"]
+    assert r.status_code == 200
+    data = r.json()
+    assert data["score"]["instructions"]
+    assert data["score"]["instructions"][0]["primitive"] == "line"
+    assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
 
 
 def test_interpret_happy_path(monkeypatch, auth_context):

@@ -113,6 +113,7 @@ def _pick(items: list[str], count: int, *, text: str, salt: str) -> list[str]:
 class _FilterProfile:
     intensity: int
     tags: frozenset[str]
+    mode: str
 
 
 @dataclass(frozen=True)
@@ -128,60 +129,76 @@ def _has_any(text: str, tokens: tuple[str, ...]) -> bool:
 def _profile_ja(text: str) -> _FilterProfile:
     tags: set[str] = set()
     intensity = 2
+    mode = "asymmetric_rhythm"
 
     if _has_any(text, ("余白", "静か", "一滴", "一本", "ひとつ", "孤独", "ぽつん", "霧", "淡", "薄い")):
         intensity = 1
         tags.update(("quiet", "space"))
+        mode = "single_tension"
     if _has_any(text, ("満天", "無数", "密集", "びっしり", "埋め尽く", "嵐", "群れ", "祭", "都市", "複雑")):
         intensity = 3
         tags.add("dense")
+        mode = "layered_trace"
 
     if _has_any(text, ("円", "粒", "星", "雪", "雨", "砂", "花びら", "散らす", "点々")):
         tags.add("particle")
     if _has_any(text, ("線", "糸", "水平", "垂直", "縦", "横", "斜め")):
         tags.add("line")
+        mode = "asymmetric_rhythm" if mode != "single_tension" else mode
     if _has_any(text, ("水", "波", "月", "霧", "滲", "淡", "雲")):
         tags.update(("water", "soft"))
     if _has_any(text, ("音", "リズム", "歌", "輪唱", "響", "反復", "揺", "舞", "流")):
         tags.add("music")
     if _has_any(text, ("建物", "都市", "寺", "古刹", "部屋", "道", "遠く", "奥", "畑")):
         tags.add("space")
+        mode = "edge_focus" if mode != "single_tension" else mode
     if _has_any(text, ("黒", "白", "影", "明暗", "暗", "光", "灰")):
         tags.add("contrast")
     if _has_any(text, ("四角", "格子", "幾何", "均衡", "法則", "対称")):
         tags.add("geometry")
 
-    return _FilterProfile(intensity=intensity, tags=frozenset(tags))
+    if _has_any(text, ("影", "痕跡", "埃", "足跡", "残", "冷え", "錆")) and mode != "single_tension":
+        mode = "field_and_interruption"
+
+    return _FilterProfile(intensity=intensity, tags=frozenset(tags), mode=mode)
 
 
 def _profile_en(text: str) -> _FilterProfile:
     lower = text.lower()
     tags: set[str] = set()
     intensity = 2
+    mode = "asymmetric_rhythm"
 
     if _has_any(lower, ("empty space", "quiet", "single", "one ", "alone", "solitary", "mist", "pale")):
         intensity = 1
         tags.update(("quiet", "space"))
+        mode = "single_tension"
     if _has_any(lower, ("starry", "countless", "dense", "packed", "fill", "storm", "crowd", "city", "complex")):
         intensity = 3
         tags.add("dense")
+        mode = "layered_trace"
 
     if _has_any(lower, ("circle", "dot", "particle", "star", "snow", "rain", "sand", "petal", "scatter", "dotted")):
         tags.add("particle")
     if _has_any(lower, ("line", "thread", "horizontal", "vertical", "diagonal")):
         tags.add("line")
+        mode = "asymmetric_rhythm" if mode != "single_tension" else mode
     if _has_any(lower, ("water", "wave", "moon", "mist", "blur", "pale", "cloud")):
         tags.update(("water", "soft"))
     if _has_any(lower, ("sound", "rhythm", "song", "canon", "echo", "repeat", "sway", "drift")):
         tags.add("music")
     if _has_any(lower, ("building", "city", "temple", "room", "road", "distant", "depth", "field")):
         tags.add("space")
+        mode = "edge_focus" if mode != "single_tension" else mode
     if _has_any(lower, ("black", "white", "shadow", "value", "dark", "light", "gray")):
         tags.add("contrast")
     if _has_any(lower, ("square", "grid", "geometric", "balance", "law", "symmetry")):
         tags.add("geometry")
 
-    return _FilterProfile(intensity=intensity, tags=frozenset(tags))
+    if _has_any(lower, ("shadow", "trace", "dust", "footprint", "remains", "cold", "rust")) and mode != "single_tension":
+        mode = "field_and_interruption"
+
+    return _FilterProfile(intensity=intensity, tags=frozenset(tags), mode=mode)
 
 
 def _select_category(
@@ -208,17 +225,19 @@ def _category_plan(profile: _FilterProfile, *, has_structural: bool) -> tuple[in
         return (0, 0, 0)
 
     if profile.intensity >= 3:
-        return (
-            1 if has_structural else 0,
-            1 if "music" in profile.tags else 0,
-            1 if profile.tags & {"geometry", "space", "water"} else 0,
-        )
+        if "music" in profile.tags:
+            return (1 if has_structural else 0, 1, 0)
+        return (1 if has_structural else 0, 0, 1 if profile.tags & {"geometry", "space", "water"} else 0)
 
     if "music" in profile.tags:
-        return (1 if has_structural else 0, 1, 0)
+        return (0, 1, 0)
     if profile.tags & {"geometry", "space"}:
-        return (1 if has_structural else 0, 0, 1)
+        return (0, 0, 1)
     return (1 if has_structural else 0, 0, 0)
+
+
+def _mode_salt(profile: _FilterProfile, category: str) -> str:
+    return f"{profile.mode}:{category}"
 
 
 def _limit_centered(items: list[str], *, centered_tokens: tuple[str, ...], max_count: int = 1) -> list[str]:
@@ -355,10 +374,10 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
 
     if any(token in ddl for token in ("円", "点", "粒", "星", "楕円", "四角")):
         structural.append(f"{main_color}右上がりの小さな楕円を右半分の斜めの帯に三個並べる。横長にする。")
-        structural.append(f"{main_color}短い線を左下から右上へ八本散らす。細かく震える。")
+        structural.append(f"{main_color}短い線を左下から右上へ三本散らす。細かく震える。")
 
     if any(token in ddl for token in ("散らす", "点々", "舞", "漂", "雪", "雨")):
-        structural.append(f"{main_color}右下がりの小さな楕円を波打つ軌跡に沿って十三個散らす。ゆっくり揺れる。")
+        structural.append(f"{main_color}右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。")
 
     if "線" in ddl:
         structural.append(f"{contrast_color}細い斜め線を右上がりに三本並べる。細かく震える。")
@@ -386,9 +405,9 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
     structural_count, music_count, painting_count = _category_plan(profile, has_structural=bool(structural_candidates))
 
     selected = (
-        _select_category(structural_candidates, structural_count, profile=profile, text=context, salt="ja-structure")
-        + _select_category(music, music_count, profile=profile, text=context, salt="ja-music")
-        + _select_category(painting, painting_count, profile=profile, text=context, salt="ja-painting")
+        _select_category(structural_candidates, structural_count, profile=profile, text=context, salt=_mode_salt(profile, "ja-structure"))
+        + _select_category(music, music_count, profile=profile, text=context, salt=_mode_salt(profile, "ja-music"))
+        + _select_category(painting, painting_count, profile=profile, text=context, salt=_mode_salt(profile, "ja-painting"))
     )
     selected = _limit_centered(selected, centered_tokens=("中心", "中央", "放射状", "同心円状"))
 
@@ -411,11 +430,11 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
 
     if any(token in lower for token in ("circle", "dot", "particle", "star", "ellipse", "square")):
         structural.append(f"Line up three small {main_color} ellipses rising to the right along a diagonal band in the right half. Make them wide.")
-        structural.append(f"Scatter eight short {main_color} lines from lower left to upper right. Fine trembling.")
+        structural.append(f"Scatter three short {main_color} lines from lower left to upper right. Fine trembling.")
 
     if any(token in lower for token in ("scatter", "dotted", "drift", "snow", "rain")):
         structural.append(
-            f"Scatter thirteen small {main_color} ellipses falling to the right along an undulating trace. Swaying slowly."
+            f"Scatter seven small {main_color} ellipses falling to the right along an undulating trace. Swaying slowly."
         )
 
     if "line" in lower:
@@ -444,9 +463,9 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
     structural_count, music_count, painting_count = _category_plan(profile, has_structural=bool(structural_candidates))
 
     selected = (
-        _select_category(structural_candidates, structural_count, profile=profile, text=context, salt="en-structure")
-        + _select_category(music, music_count, profile=profile, text=context, salt="en-music")
-        + _select_category(painting, painting_count, profile=profile, text=context, salt="en-painting")
+        _select_category(structural_candidates, structural_count, profile=profile, text=context, salt=_mode_salt(profile, "en-structure"))
+        + _select_category(music, music_count, profile=profile, text=context, salt=_mode_salt(profile, "en-music"))
+        + _select_category(painting, painting_count, profile=profile, text=context, salt=_mode_salt(profile, "en-painting"))
     )
     selected = _limit_centered(
         selected,

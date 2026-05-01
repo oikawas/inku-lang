@@ -155,6 +155,7 @@ v1.29 時点では、参照実装として `canvas-aspect` プラグインを追
 - 現在のフックは **canvas-size hook** のみ
 - ユーザーごとのプラグイン設定は DB の plugin extension storage に JSON として保存する
 - Web UI のプラグイン呼び出しボタンは、モデル選択ボタンの左側に配置する
+- キャンバス比率を変更した場合、既存の描画表示はクリアし、選択比率に合わせたプレースホルダー画像へ切り替える
 - `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を決定する
 - 正規化座標は 0.0〜1.0 のまま維持する。円・弧の半径は短辺基準とし、ワイド/縦長キャンバスで真円が不自然に引き伸ばされないようにする
 
@@ -162,7 +163,7 @@ v1.29 時点では、参照実装として `canvas-aspect` プラグインを追
 
 実装方法と将来のプラグイン作成手順は `PLUGIN.md` に記録する。
 
-### 4.4 プラグインの展開モデル
+### 4.5 プラグインの展開モデル
 
 プラグインは「コア語彙の組み合わせに名前を付けたもの」として定義される。
 
@@ -1389,8 +1390,9 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `/api/auth/me/plugin-storage` と `/api/auth/me/plugin-storage/{plugin_id}` を追加
 - `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を変更
 - Web UI ではモデル選択ボタンの左側にプラグイン呼び出しボタンを追加
+- キャンバス比率変更時は現在の描画コンテキストをクリアし、選択比率のプレースホルダー画像を表示
 - プラグイン作成のリファレンスとして `PLUGIN.md` を追加
-- build number: 173
+- build number: 174
 
 ### v1.28 (2026-05-01)
 

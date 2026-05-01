@@ -11,6 +11,7 @@ The plugin system currently has one hook:
 ```text
 canvas-size hook
   UI plugin button -> per-user plugin storage -> API request field -> renderer canvas size
+                   -> aspect-aware placeholder before the next render
 ```
 
 Core code owns authentication, DDL generation, JSON Score validation, history,
@@ -88,6 +89,11 @@ selected.
 The plugin invocation button is placed in the prompt header before model
 selection.  A plugin UI should live in its own Svelte component and should not
 embed large behavior directly in `+page.svelte`.
+
+When a user selects a new canvas aspect, the current rendered SVG is cleared and
+the drawing panel returns to an aspect-aware placeholder.  This avoids showing a
+previous square or wide render under a newly selected canvas setting.  The next
+paint/compose request then renders with the selected `canvas_aspect`.
 
 The canvas display reads the actual SVG `viewBox` when possible, so old history
 items keep their original aspect ratio even after the current plugin setting is

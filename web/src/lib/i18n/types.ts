@@ -86,6 +86,8 @@ export interface LangPack {
 
 	// Input
 	inputSectionLabel: string;
+	canvasAspectButton: string;
+	canvasAspectTitle: string;
 	modelSelectButton: string;
 	colorCatalogButton: string;
 	clearInputBtn: string;
@@ -157,6 +159,15 @@ export interface LangPack {
 	settingsReload: string;
 	settingsPluginsStatus: string;
 	settingsPluginsEmpty: string;
+	settingsSystemPlugins: string;
+	settingsCanvasPluginTitle: string;
+	settingsCanvasPluginDescription: string;
+	settingsPluginEnabled: string;
+	settingsPluginDisabled: string;
+	settingsUserPlugins: string;
+	settingsUserPluginsAddTitle: string;
+	settingsUserPluginsAddDescription: string;
+	settingsUserPluginPathPlaceholder: string;
 	settingsYes: string;
 	settingsNo: string;
 	settingsUnavailable: string;

@@ -367,6 +367,44 @@ def test_current_user_demo_settings_are_persisted(auth_context):
     assert invalid.status_code == 422
 
 
+def test_current_user_plugin_storage_is_persisted(auth_context):
+    headers, user, group = auth_context
+    other_user = db.add_user(
+        username=f"api-plugin-storage-{uuid.uuid4().hex[:8]}",
+        email=f"api-plugin-storage-{uuid.uuid4().hex[:8]}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    other_headers, other_token = _auth_headers(other_user)
+    try:
+        initial = client.get("/api/auth/me/plugin-storage", headers=headers)
+        assert initial.status_code == 200
+        assert initial.json() == {"storage": {}}
+
+        updated = client.put(
+            "/api/auth/me/plugin-storage/canvas-aspect",
+            headers=headers,
+            json={"value": {"selected": "golden"}},
+        )
+        assert updated.status_code == 200
+        assert updated.json() == {"storage": {"canvas-aspect": {"selected": "golden"}}}
+
+        persisted = client.get("/api/auth/me/plugin-storage", headers=headers)
+        assert persisted.status_code == 200
+        assert persisted.json() == {"storage": {"canvas-aspect": {"selected": "golden"}}}
+
+        isolated = client.get("/api/auth/me/plugin-storage", headers=other_headers)
+        assert isolated.status_code == 200
+        assert isolated.json() == {"storage": {}}
+
+        invalid = client.put("/api/auth/me/plugin-storage/bad id", headers=headers, json={"value": {}})
+        assert invalid.status_code == 400
+    finally:
+        db.delete_session(other_token)
+        db.delete_user(other_user["id"])
+
+
 def test_compose_happy_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     fake_score = Score.model_validate(
@@ -384,6 +422,23 @@ def test_compose_happy_path(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
     assert "<circle" in data["svg"]
+
+
+def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    fake_score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}
+            ]
+        }
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post("/api/compose", json={"ddl": "横線", "canvas_aspect": "pillar"}, headers=headers)
+
+    assert r.status_code == 200
+    assert 'viewBox="0 0 200 1000"' in r.json()["svg"]
 
 
 def test_compose_sanitizes_random_ddl_before_stage2(monkeypatch, auth_context):
@@ -839,9 +894,9 @@ def test_settings_status_is_admin_only():
     assert data["database"]["backend"]
     assert data["database"]["runtime_editable"] is False
     assert "INKU_DB_URL" in data["database"]["note"]
-    assert data["plugins"]["enabled"] is False
+    assert data["plugins"]["enabled"] is True
     assert data["plugins"]["runtime_editable"] is False
-    assert data["plugins"]["loaded"] == []
+    assert data["plugins"]["loaded"] == [{"name": "canvas-aspect", "version": "0.1.0", "status": "enabled"}]
     assert data["output_save"]["workers"] >= 1
     assert data["output_save"]["queue_limit"] >= data["output_save"]["workers"]
     assert {"submitted", "completed", "failed", "skipped"} <= set(data["output_save"])

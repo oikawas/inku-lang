@@ -27,6 +27,13 @@
 	import { COLOR_CATALOGS, getCatalogById, getRenderColorMap, type RenderColorMap } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import {
+		CANVAS_ASPECT_PLUGIN_ID,
+		DEFAULT_CANVAS_ASPECT_ID,
+		getCanvasAspectOption,
+		normalizeCanvasAspectId,
+		type CanvasAspectId,
+	} from '$lib/plugins/canvasAspect';
+	import {
 		HistoryManagerState,
 		type HistoryItem,
 		type Score
@@ -181,6 +188,9 @@
 	let userMenuOpen = $state(false);
 	let darkMode     = $state(false);
 	let catalogOpen  = $state(false);
+	let canvasAspectMenuOpen = $state(false);
+	let canvasAspectEnabled = $state(true);
+	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
 	let outputTab    = $state<'canvas' | 'prompts' | 'score'>('canvas');
@@ -386,6 +396,73 @@
 			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
 			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
 		};
+	}
+
+	async function loadPluginStorage() {
+		if (!currentUser) {
+			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
+			return;
+		}
+		try {
+			const r = await apiFetch('/api/auth/me/plugin-storage', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { storage?: Record<string, unknown> };
+			const canvasValue = data.storage?.[CANVAS_ASPECT_PLUGIN_ID] as { selected?: unknown; enabled?: unknown } | undefined;
+			canvasAspectEnabled = canvasValue?.enabled !== false;
+			canvasAspectId = normalizeCanvasAspectId(canvasValue?.selected);
+		} catch (e) {
+			canvasAspectEnabled = true;
+			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
+			console.warn('failed to load plugin storage', e);
+		}
+	}
+
+	function canvasAspectPluginValue() {
+		return { enabled: canvasAspectEnabled, selected: canvasAspectId };
+	}
+
+	function effectiveCanvasAspectId(): CanvasAspectId {
+		return canvasAspectEnabled ? canvasAspectId : DEFAULT_CANVAS_ASPECT_ID;
+	}
+
+	async function saveCanvasAspectPluginValue() {
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch(`/api/auth/me/plugin-storage/${CANVAS_ASPECT_PLUGIN_ID}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ value: canvasAspectPluginValue() })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		} catch (e) {
+			console.warn('failed to save canvas aspect plugin storage', e);
+		}
+	}
+
+	async function setCanvasAspectEnabled(value: boolean) {
+		canvasAspectEnabled = value;
+		canvasAspectMenuOpen = false;
+		if (!value) {
+			result = null;
+			displayedHistoryItem = null;
+			historyCursor = -1;
+			outputTab = 'canvas';
+			pngMenuOpen = false;
+			fitCanvasZoom();
+		}
+		await saveCanvasAspectPluginValue();
+	}
+
+	async function selectCanvasAspect(id: CanvasAspectId) {
+		canvasAspectId = normalizeCanvasAspectId(id);
+		canvasAspectMenuOpen = false;
+		result = null;
+		displayedHistoryItem = null;
+		historyCursor = -1;
+		outputTab = 'canvas';
+		pngMenuOpen = false;
+		fitCanvasZoom();
+		await saveCanvasAspectPluginValue();
 	}
 
 	async function loadDemoSettings() {
@@ -629,7 +706,7 @@
 			applyUserTheme(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -639,6 +716,8 @@
 			batchPromptHistory = [];
 			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 			demoSettingsLoaded = false;
+			canvasAspectEnabled = true;
+			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			loginStatus = t().loginRequiredMessage;
 			settingsStatus = null;
 			settingsStatusError = t().loginRequiredMessage;
@@ -674,7 +753,7 @@
 			trashTotal = 0;
 			historyManager.clear();
 			loginPassword = '';
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -695,6 +774,8 @@
 		batchPromptHistory = [];
 		demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 		demoSettingsLoaded = false;
+		canvasAspectEnabled = true;
+		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		loginStatus = null;
 		settingsStatus = null;
 		settingsStatusError = t().loginRequiredMessage;
@@ -1030,6 +1111,7 @@
 				include_thinking: includeThinking,
 				lang,
 				color_map: activeColorMap(),
+				canvas_aspect: effectiveCanvasAspectId(),
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
 				history_input: historyInput,
@@ -1263,7 +1345,7 @@
 			const r = await apiFetch('/api/compose', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, lang, color_map: activeColorMap() })
+				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, lang, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -1397,7 +1479,7 @@
 				await apiFetch('/api/history', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, save_artifacts: true, color_map: activeColorMap() })
+					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, save_artifacts: true, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
 				});
 		} catch { /* ignore */ }
 		await fetchHistoryOffset(0);
@@ -1425,6 +1507,7 @@
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null,
 					save_artifacts: demoSettings.save_files,
 					color_map: activeColorMap(),
+					canvas_aspect: effectiveCanvasAspectId(),
 				})
 			});
 			if (!r.ok) {
@@ -1629,6 +1712,7 @@
 	function handleDocClick(e: MouseEvent) {
 		if (pngMenuOpen  && pngWrapEl     && !pngWrapEl.contains(e.target as Node))      pngMenuOpen  = false;
 		if (userMenuOpen && userMenuWrapEl && !userMenuWrapEl.contains(e.target as Node)) userMenuOpen = false;
+		if (canvasAspectMenuOpen) canvasAspectMenuOpen = false;
 	}
 
 	// ── Model selection ─────────────────────────────────────
@@ -1671,23 +1755,27 @@
 
 	async function downloadPNG(size: number) {
 		if (!result) return;
+		const aspect = getCanvasAspectOption(effectiveCanvasAspectId());
+		const maxRatio = Math.max(aspect.ratioW, aspect.ratioH, 1);
+		const pngWidth = Math.round(size * aspect.ratioW / maxRatio);
+		const pngHeight = Math.round(size * aspect.ratioH / maxRatio);
 		let svg = result.svg.replace(/(<svg)([^>]*)/, (_: string, tag: string, attrs: string) => {
 			const a = attrs.replace(/\s+width="[^"]*"/g, '').replace(/\s+height="[^"]*"/g, '');
-			return `${tag}${a} width="${size}" height="${size}"`;
+			return `${tag}${a} width="${pngWidth}" height="${pngHeight}"`;
 		});
 		const blob = new Blob([svg], { type: 'image/svg+xml' });
 		const url  = URL.createObjectURL(blob);
 		try {
 			await new Promise<void>((resolve, reject) => {
 				const canvas = document.createElement('canvas');
-				canvas.width = size; canvas.height = size;
+				canvas.width = pngWidth; canvas.height = pngHeight;
 				const ctx = canvas.getContext('2d')!;
 				if (!pngAlphaWhite) {
 					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
 				}
 				const img = new Image();
 				img.onload = () => {
-					ctx.drawImage(img, 0, 0, size, size);
+					ctx.drawImage(img, 0, 0, pngWidth, pngHeight);
 					canvas.toBlob((b) => {
 						if (!b) { reject(new Error('canvas error')); return; }
 						triggerDownload(b, exportFilename('png', size)); resolve();
@@ -1750,6 +1838,21 @@
 		return getCatalogById(id ?? 'default')?.name ?? 'inku Default';
 	}
 
+	function svgAspect(svg: string | null | undefined): { ratioW: number; ratioH: number } | null {
+		if (!svg) return null;
+		const viewBox = svg.match(/\bviewBox="[^"]*?([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)"/);
+		if (viewBox) {
+			const width = Number(viewBox[3]);
+			const height = Number(viewBox[4]);
+			if (width > 0 && height > 0) return { ratioW: width, ratioH: height };
+		}
+		const widthMatch = svg.match(/\bwidth="([\d.]+)"/);
+		const heightMatch = svg.match(/\bheight="([\d.]+)"/);
+		const width = widthMatch ? Number(widthMatch[1]) : 0;
+		const height = heightMatch ? Number(heightMatch[1]) : 0;
+		return width > 0 && height > 0 ? { ratioW: width, ratioH: height } : null;
+	}
+
 	const statusStage1Model = $derived(displayedHistoryItem
 		? (displayedHistoryItem.stage1_model ? statusModelName(displayedHistoryItem.stage1_model) : '-')
 		: statusModelName(stage1Model));
@@ -1757,6 +1860,8 @@
 		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
 		: statusModelName(stage2Model));
 	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : currentCatalog.name);
+	const currentCanvasAspect = $derived(getCanvasAspectOption(effectiveCanvasAspectId()));
+	const displayCanvasAspect = $derived(svgAspect(result?.svg) ?? currentCanvasAspect);
 	const statusHistoryItem = $derived.by(() => {
 		if (displayedHistoryItem) return displayedHistoryItem;
 		if (result?.history_id) {
@@ -2122,6 +2227,11 @@
 						{error}
 						{stageLabel}
 						{showBirds}
+						{canvasAspectEnabled}
+						{canvasAspectId}
+						{canvasAspectMenuOpen}
+						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
+						onSelectCanvasAspect={selectCanvasAspect}
 						onOpenModelSelection={openModelSelection}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
@@ -2202,6 +2312,8 @@
 				{prevDisabled}
 				{historyTotal}
 				{navPos}
+				canvasAspectWidth={displayCanvasAspect.ratioW}
+				canvasAspectHeight={displayCanvasAspect.ratioH}
 				{zoom}
 				actualZoom={canvasFitZoom * zoom}
 				canPan={zoom > 1}
@@ -2302,6 +2414,8 @@
 		bind:showBirds
 		bind:pngAlphaWhite
 		bind:saveReplayAsNewVersion
+		{canvasAspectEnabled}
+		onSetCanvasAspectEnabled={setCanvasAspectEnabled}
 		onClose={closeSettingsModal}
 		onCloseSettings={() => (settingsOpen = false)}
 		onSelectSettingsTab={selectSettingsTab}

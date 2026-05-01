@@ -13,6 +13,7 @@ import struct
 
 import svgwrite
 
+from .plugins import CanvasSize, canvas_size_for_aspect
 from .schema import Instruction, Score, Variation
 
 CANVAS_PX = 1000
@@ -410,17 +411,23 @@ def _inject_texture_filters(svg: str, filters: set[str]) -> str:
     return svg.replace("<defs>", f"<defs>{filter_xml}", 1)
 
 
-def render(score: Score, color_map: dict[str, str] | None = None) -> str:
+def render(
+    score: Score,
+    color_map: dict[str, str] | None = None,
+    *,
+    canvas_aspect: str | None = None,
+) -> str:
     cmap = {**COLOR_MAP, **(color_map or {})}
+    canvas = canvas_size_for_aspect(canvas_aspect)
     dwg = svgwrite.Drawing(
-        size=(CANVAS_PX, CANVAS_PX),
-        viewBox=f"0 0 {CANVAS_PX} {CANVAS_PX}",
+        size=(canvas.width, canvas.height),
+        viewBox=f"0 0 {canvas.width} {canvas.height}",
     )
     bg = cmap.get(score.background, BACKGROUND)
-    dwg.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX), fill=bg))
+    dwg.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=bg))
     clip_id = "canvas-clip"
     clip = dwg.defs.add(dwg.clipPath(id=clip_id))
-    clip.add(dwg.rect(insert=(0, 0), size=(CANVAS_PX, CANVAS_PX)))
+    clip.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height)))
     content = dwg.g(clip_path=f"url(#{clip_id})")
 
     blur_needed: dict[str, float] = {}
@@ -431,7 +438,7 @@ def render(score: Score, color_map: dict[str, str] | None = None) -> str:
     for ins in score.instructions:
         expanded = _expand_arrangement(ins) if ins.arrangement else [ins]
         for single in expanded:
-            element = _render_instruction(dwg, single, cmap)
+            element = _render_instruction(dwg, single, cmap, canvas)
             if element is not None:
                 if _needs_blur(single.variation):
                     v = single.variation
@@ -881,6 +888,7 @@ def _material_line_group(
     start: tuple[float, float],
     end: tuple[float, float],
     attrs: dict,
+    canvas: CanvasSize,
 ):
     if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "rope"):
         return None
@@ -965,18 +973,18 @@ def _material_line_group(
             )
         if ins.weight == "crayon":
             _add_powder_specks(dwg, group, start, end, attrs, seed, count=26, spread=4.0, radius=0.75, opacity=0.18)
-    return _apply_rotation(group, ins)
+    return _apply_rotation(group, ins, canvas)
 
 
-def _px(coord: tuple[float, float]) -> tuple[float, float]:
+def _px(coord: tuple[float, float], canvas: CanvasSize) -> tuple[float, float]:
     x, y = coord
-    return x * CANVAS_PX, y * CANVAS_PX
+    return x * canvas.width, y * canvas.height
 
 
-def _apply_rotation(element, ins: Instruction):
+def _apply_rotation(element, ins: Instruction, canvas: CanvasSize):
     if ins.rotation is None or abs(ins.rotation) < 1e-9:
         return element
-    cx, cy = _px(_anchor(ins))
+    cx, cy = _px(_anchor(ins), canvas)
     element.rotate(ins.rotation, center=(cx, cy))
     return element
 
@@ -1004,87 +1012,93 @@ def _arc_path_d(cx: float, cy: float, r: float, start_deg: float, end_deg: float
     )
 
 
-def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str, str] = COLOR_MAP):
+def _render_instruction(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    cmap: dict[str, str] = COLOR_MAP,
+    canvas: CanvasSize | None = None,
+):
+    canvas = canvas or canvas_size_for_aspect(None)
     attrs = _stroke_attrs(ins, cmap)
 
     if ins.primitive == "line":
-        start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0))
-        end = _px(ins.to if ins.to is not None else (0.5, 1.0))
+        start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0), canvas)
+        end = _px(ins.to if ins.to is not None else (0.5, 1.0), canvas)
         if _needs_path_variation(ins.variation):
             assert ins.variation is not None
             points = _line_with_variation(
                 start, end, ins.variation, _seed_for_instruction(ins)
             )
-            return _apply_rotation(dwg.polyline(points=points, **attrs), ins)
-        textured = _material_line_group(dwg, ins, start, end, attrs)
+            return _apply_rotation(dwg.polyline(points=points, **attrs), ins, canvas)
+        textured = _material_line_group(dwg, ins, start, end, attrs, canvas)
         if textured is not None:
             return textured
-        return _apply_rotation(dwg.line(start=start, end=end, **attrs), ins)
+        return _apply_rotation(dwg.line(start=start, end=end, **attrs), ins, canvas)
 
     if ins.primitive == "circle":
         if ins.center is None or ins.radius is None:
             raise ValueError("circle requires 'center' and 'radius'")
-        cx, cy = _px(ins.center)
-        r = ins.radius * CANVAS_PX
+        cx, cy = _px(ins.center, canvas)
+        r = ins.radius * canvas.unit
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(dwg.circle(center=(cx, cy), r=r, **attrs))
             _add_material_circle_outline(dwg, group, ins, attrs, cx, cy, r)
-            return _apply_rotation(group, ins)
-        return _apply_rotation(dwg.circle(center=(cx, cy), r=r, **attrs), ins)
+            return _apply_rotation(group, ins, canvas)
+        return _apply_rotation(dwg.circle(center=(cx, cy), r=r, **attrs), ins, canvas)
 
     if ins.primitive == "ellipse":
         if ins.center is None or ins.size is None:
             raise ValueError("ellipse requires 'center' and 'size'")
-        cx, cy = _px(ins.center)
-        rx = ins.size[0] * CANVAS_PX / 2
-        ry = ins.size[1] * CANVAS_PX / 2
+        cx, cy = _px(ins.center, canvas)
+        rx = ins.size[0] * canvas.width / 2
+        ry = ins.size[1] * canvas.height / 2
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs))
             _add_material_ellipse_outline(dwg, group, ins, attrs, cx, cy, rx, ry)
-            return _apply_rotation(group, ins)
-        return _apply_rotation(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs), ins)
+            return _apply_rotation(group, ins, canvas)
+        return _apply_rotation(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs), ins, canvas)
 
     if ins.primitive == "square":
         if ins.position is None or ins.size is None:
             raise ValueError("square requires 'position' and 'size'")
-        x, y = _px(ins.position)
-        w = ins.size[0] * CANVAS_PX
-        h = ins.size[1] * CANVAS_PX
+        x, y = _px(ins.position, canvas)
+        w = ins.size[0] * canvas.width
+        h = ins.size[1] * canvas.height
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(dwg.rect(insert=(x, y), size=(w, h), **attrs))
             _add_material_rect_outline(dwg, group, ins, attrs, x, y, w, h)
-            return _apply_rotation(group, ins)
-        return _apply_rotation(dwg.rect(insert=(x, y), size=(w, h), **attrs), ins)
+            return _apply_rotation(group, ins, canvas)
+        return _apply_rotation(dwg.rect(insert=(x, y), size=(w, h), **attrs), ins, canvas)
 
     if ins.primitive == "triangle":
         if ins.position is None or ins.size is None:
             raise ValueError("triangle requires 'position' and 'size'")
-        x, y = _px(ins.position)
-        w = ins.size[0] * CANVAS_PX
-        h = ins.size[1] * CANVAS_PX
+        x, y = _px(ins.position, canvas)
+        w = ins.size[0] * canvas.width
+        h = ins.size[1] * canvas.height
         points = [
             (x + w / 2, y),
             (x, y + h),
             (x + w, y + h),
         ]
-        return _apply_rotation(dwg.polygon(points=points, **attrs), ins)
+        return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
 
     if ins.primitive == "arc":
         if ins.center is None or ins.radius is None:
             raise ValueError("arc requires 'center' and 'radius'")
         if ins.angle_start is None or ins.angle_end is None:
             raise ValueError("arc requires 'angle_start' and 'angle_end'")
-        cx, cy = _px(ins.center)
-        r = ins.radius * CANVAS_PX
+        cx, cy = _px(ins.center, canvas)
+        r = ins.radius * canvas.unit
         path_d = _arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(dwg.path(d=path_d, **attrs))
             _add_material_arc_outline(dwg, group, ins, attrs, cx, cy, r, ins.angle_start, ins.angle_end)
-            return _apply_rotation(group, ins)
-        return _apply_rotation(dwg.path(d=path_d, **attrs), ins)
+            return _apply_rotation(group, ins, canvas)
+        return _apply_rotation(dwg.path(d=path_d, **attrs), ins, canvas)
 
     raise NotImplementedError(f"primitive '{ins.primitive}' not yet supported")

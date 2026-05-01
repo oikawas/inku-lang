@@ -86,6 +86,8 @@ export interface LangPack {
 
 	// Input
 	inputSectionLabel: string;
+	canvasAspectButton: string;
+	canvasAspectTitle: string;
 	modelSelectButton: string;
 	colorCatalogButton: string;
 	clearInputBtn: string;

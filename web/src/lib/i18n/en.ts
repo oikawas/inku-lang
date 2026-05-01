@@ -31,6 +31,8 @@ export const en: LangPack = {
 
 	clearInputBtn: 'new',
 	inputSectionLabel: 'prompt',
+	canvasAspectButton: 'canvas aspect',
+	canvasAspectTitle: 'Canvas aspect',
 	modelSelectButton: 'model selection',
 	colorCatalogButton: 'color catalog',
 	replayFromDdlButton: '↺ draw from interpretation',

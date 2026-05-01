@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.23**
+**Version: v1.29**
 
 ---
 
@@ -147,6 +147,20 @@ DDLが短歌を目指すなら、**Go 寄りの姿勢**が合う。短歌に「�
 
 **原則5: コアだけで書ける**
 どんなプラグインも、コア語彙で書いた記述に「展開」できる。プラグインは省略記法であって、新機能ではない。
+
+### 4.4 実装上のプラグインフック
+
+v1.29 時点では、参照実装として `canvas-aspect` プラグインを追加する。
+
+- 現在のフックは **canvas-size hook** のみ
+- ユーザーごとのプラグイン設定は DB の plugin extension storage に JSON として保存する
+- Web UI のプラグイン呼び出しボタンは、モデル選択ボタンの左側に配置する
+- `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を決定する
+- 正規化座標は 0.0〜1.0 のまま維持する。円・弧の半径は短辺基準とし、ワイド/縦長キャンバスで真円が不自然に引き伸ばされないようにする
+
+`canvas-aspect` が扱う比率は、`square`、`golden`、`a4`、`b4`、`pillar`、`oban`、`wide`、`vertical` とする。
+
+実装方法と将来のプラグイン作成手順は `PLUGIN.md` に記録する。
 
 ### 4.4 プラグインの展開モデル
 
@@ -1343,10 +1357,11 @@ inku-lang/                         # github.com/oikawas/inku-lang
 `server/src/inku_server/`:
 - `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
 - `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
+- `plugins.py` — プラグインレジストリと hook 補助。v1.29 時点では `canvas-aspect` の canvas-size hook を提供
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
-- `db.py` — SQLAlchemy DB 層。履歴、スター状態、ユーザーグループ、ユーザーアカウント、セッション、ユーザー別 UI 設定、バッチ指示履歴を管理。パスワードは PBKDF2-SHA256 + salt で保存
+- `db.py` — SQLAlchemy DB 層。履歴、スター状態、ユーザーグループ、ユーザーアカウント、セッション、ユーザー別 UI 設定、バッチ指示履歴、プラグイン拡張記憶域を管理。パスワードは PBKDF2-SHA256 + salt で保存
 - `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/history/{id}/star`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
@@ -1361,6 +1376,21 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.29 (2026-05-01)
+
+**プラグインサポートの初期実装**
+
+アプリケーションのコア要素とノンコア拡張を分離するため、最初のプラグインフックとして canvas-size hook を導入した。
+
+- `canvas-aspect` 参照プラグインを追加
+- キャンバス比率として `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `vertical` をサポート
+- ユーザーごとのプラグイン設定を DB の `plugin_storage` に JSON として保存
+- `/api/auth/me/plugin-storage` と `/api/auth/me/plugin-storage/{plugin_id}` を追加
+- `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を変更
+- Web UI ではモデル選択ボタンの左側にプラグイン呼び出しボタンを追加
+- プラグイン作成のリファレンスとして `PLUGIN.md` を追加
+- build number: 173
 
 ### v1.28 (2026-05-01)
 

@@ -1,0 +1,110 @@
+# inku Plugin Guide
+
+inku keeps the drawing pipeline small and treats optional behavior as plugins.
+The first reference plugin is `canvas-aspect`, which changes the SVG canvas
+aspect ratio without changing the Stage 1/Stage 2 DDL or JSON Score contract.
+
+## Current Architecture
+
+The plugin system currently has one hook:
+
+```text
+canvas-size hook
+  UI plugin button -> per-user plugin storage -> API request field -> renderer canvas size
+```
+
+Core code owns authentication, DDL generation, JSON Score validation, history,
+and SVG rendering.  A plugin should provide a narrow option surface and pass its
+state through the hook.  This keeps the core schema stable while allowing
+extensions to affect rendering.
+
+## Reference Plugin: canvas-aspect
+
+Files:
+
+```text
+server/src/inku_server/plugins.py
+web/src/lib/plugins/canvasAspect.ts
+web/src/lib/components/CanvasAspectPlugin.svelte
+```
+
+The plugin supports these aspect identifiers:
+
+| Category | ID | Ratio | Purpose |
+| --- | --- | --- | --- |
+| Basic | `square` | 1:1 | Default ordered square canvas |
+| Standard | `golden` | 1.618:1 | Golden-ratio rectangle |
+| Modern | `a4` | 1:1.414 | Root rectangle / print standard |
+| Modern | `b4` | 1:1.414 | Root rectangle / print standard |
+| Classic JP | `pillar` | 1:5 | Tall Japanese pillar-picture format |
+| Ukiyoe | `oban` | 2:3 | Ukiyo-e oban proportion |
+| Cinema | `wide` | 2.35:1 | Cinematic panorama |
+| Mobile | `vertical` | 9:16 | Smartphone vertical format |
+
+## User Storage
+
+Each user has a JSON plugin extension field in the server DB:
+
+```json
+{
+  "canvas-aspect": {
+    "selected": "golden"
+  }
+}
+```
+
+API endpoints:
+
+```text
+GET /api/auth/me/plugin-storage
+PUT /api/auth/me/plugin-storage
+PUT /api/auth/me/plugin-storage/{plugin_id}
+```
+
+The storage object is intentionally generic.  Plugin IDs must be short,
+non-empty strings using alphanumeric characters plus `-`, `_`, or `.`.  Values
+must be JSON objects, and total storage is size-limited.
+
+## Renderer Contract
+
+The renderer receives `canvas_aspect` from `/api/paint`, `/api/compose`, and
+history replay/save paths.  The canvas-size hook changes SVG `width`, `height`,
+and `viewBox`.
+
+Normalized coordinates remain `0.0-1.0`:
+
+```text
+x -> canvas width
+y -> canvas height
+circle radius / arc radius -> shorter canvas side
+ellipse / rectangle size -> canvas width and height
+```
+
+This avoids stretching circles into ellipses when a wide or vertical canvas is
+selected.
+
+## UI Contract
+
+The plugin invocation button is placed in the prompt header before model
+selection.  A plugin UI should live in its own Svelte component and should not
+embed large behavior directly in `+page.svelte`.
+
+The canvas display reads the actual SVG `viewBox` when possible, so old history
+items keep their original aspect ratio even after the current plugin setting is
+changed.
+
+## Adding Another Hook
+
+Future hooks should follow the same shape:
+
+1. Add a typed server-side registry entry in `server/src/inku_server/plugins.py`.
+2. Add a focused frontend plugin module under `web/src/lib/plugins/`.
+3. Add a component under `web/src/lib/components/` only for the visible plugin UI.
+4. Store user choices under `/api/auth/me/plugin-storage/{plugin_id}`.
+5. Pass only the needed hook value into the core API or renderer.
+6. Document the hook contract in this file.
+
+For example, a future natural-primitive plugin such as `leaf` should first
+define whether it extends JSON Score, Stage 2 composition, or only the SVG
+renderer.  If it changes the score schema, it needs a stricter compatibility
+plan than the canvas-size hook.

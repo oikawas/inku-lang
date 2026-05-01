@@ -72,6 +72,7 @@ class UserAccountRow(Base):
     ui_theme      = Column(String, nullable=False, default="light")
     batch_prompt_history = Column(Text, nullable=False, default="[]")
     demo_settings = Column(Text, nullable=False, default="{}")
+    plugin_storage = Column(Text, nullable=False, default="{}")
     at            = Column(BigInteger, nullable=False, index=True)
 
 
@@ -100,9 +101,11 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
     "batch_prompt_history": "ALTER TABLE user_accounts ADD COLUMN batch_prompt_history TEXT NOT NULL DEFAULT '[]'",
     "demo_settings": "ALTER TABLE user_accounts ADD COLUMN demo_settings TEXT NOT NULL DEFAULT '{}'",
+    "plugin_storage": "ALTER TABLE user_accounts ADD COLUMN plugin_storage TEXT NOT NULL DEFAULT '{}'",
 }
 _BATCH_PROMPT_HISTORY_LIMIT = 20
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
+_PLUGIN_STORAGE_MAX_BYTES = 20_000
 _DEMO_DEFAULT_SETTINGS = {
     "save_db": False,
     "save_files": False,
@@ -721,6 +724,58 @@ def update_user_demo_settings(user_id: str, settings: dict) -> dict | None:
         row.demo_settings = json.dumps(clean, ensure_ascii=False)
         session.commit()
         return clean
+
+
+def _normalize_plugin_storage(storage: dict) -> dict:
+    if not isinstance(storage, dict):
+        raise ValueError("plugin storage must be an object")
+    normalized: dict[str, dict] = {}
+    for plugin_id, value in storage.items():
+        if not isinstance(plugin_id, str) or not plugin_id:
+            raise ValueError("plugin id must be a non-empty string")
+        if len(plugin_id) > 80 or not all(ch.isalnum() or ch in "-_." for ch in plugin_id):
+            raise ValueError("plugin id contains unsupported characters")
+        if not isinstance(value, dict):
+            raise ValueError("plugin storage values must be objects")
+        normalized[plugin_id] = value
+    raw = json.dumps(normalized, ensure_ascii=False)
+    if len(raw.encode("utf-8")) > _PLUGIN_STORAGE_MAX_BYTES:
+        raise ValueError("plugin storage is too large")
+    return normalized
+
+
+def get_user_plugin_storage(user_id: str) -> dict:
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return {}
+        try:
+            parsed = json.loads(row.plugin_storage or "{}")
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(parsed, dict):
+            return {}
+        try:
+            return _normalize_plugin_storage(parsed)
+        except ValueError:
+            return {}
+
+
+def update_user_plugin_storage(user_id: str, storage: dict) -> dict | None:
+    clean = _normalize_plugin_storage(storage)
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        row.plugin_storage = json.dumps(clean, ensure_ascii=False)
+        session.commit()
+        return clean
+
+
+def update_user_plugin_value(user_id: str, plugin_id: str, value: dict) -> dict | None:
+    current = get_user_plugin_storage(user_id)
+    current[plugin_id] = value
+    return update_user_plugin_storage(user_id, current)
 
 
 def delete_user(user_id: str) -> bool:

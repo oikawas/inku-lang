@@ -9,6 +9,19 @@ def test_render_empty_score_has_background():
     assert "#ffffff" in svg
 
 
+def test_render_canvas_aspect_plugin_changes_viewbox_without_stretching_circle():
+    score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2}]}
+    )
+
+    svg = render(score, canvas_aspect="wide")
+
+    assert 'viewBox="0 0 2350 1000"' in svg
+    assert 'cx="1175.0"' in svg
+    assert 'cy="500.0"' in svg
+    assert 'r="200.0"' in svg
+
+
 def test_render_single_line_solid_pen_black():
     score = Score.model_validate(
         {"instructions": [{"primitive": "line", "from": [0.0, 0.33], "to": [1.0, 0.33]}]}

@@ -31,6 +31,8 @@ export const ja: LangPack = {
 
 	clearInputBtn: '新規作成',
 	inputSectionLabel: '指示',
+	canvasAspectButton: 'キャンバス比率',
+	canvasAspectTitle: 'キャンバス比率',
 	modelSelectButton: 'モデル選択',
 	colorCatalogButton: '色カタログ',
 	replayFromDdlButton: '↺ 解釈から描画',

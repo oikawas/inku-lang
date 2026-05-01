@@ -30,6 +30,11 @@ from .ddl_expander import expand_intermediate_ddl
 from .interpreter import _sanitize_placement_words, interpret_detail
 from .interpreter import SYSTEM_PROMPT as STAGE1_PROMPT
 from .interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
+from .plugins import (
+    canvas_aspect_ids,
+    normalize_canvas_aspect_id,
+    plugin_status_items,
+)
 from .renderer import render
 from .schema import Score
 from . import db as _db
@@ -165,6 +170,14 @@ def _validated_color_map(color_map: dict[str, str] | None) -> dict[str, str] | N
     return clean
 
 
+def _validated_canvas_aspect(value: str | None) -> str:
+    if value is None:
+        return normalize_canvas_aspect_id(None)
+    if value not in canvas_aspect_ids():
+        raise HTTPException(status_code=422, detail=f"unsupported canvas aspect: {value}")
+    return value
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?",
@@ -182,6 +195,7 @@ class ComposeRequest(BaseModel):
     original_text: str | None = Field(default=None, description="元のユーザー記述 (省略可)")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
     color_map: dict[str, str] | None = Field(default=None, description="色カタログ (white/black/blue/red/green/gray → hex)")
+    canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
 
 
 class ComposeResponse(BaseModel):
@@ -221,6 +235,7 @@ class PaintRequest(BaseModel):
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
     color_map: dict[str, str] | None = Field(default=None, description="色カタログ")
+    canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     save_history: bool = Field(default=False, description="描画結果を履歴に保存するか")
     save_artifacts: bool | None = Field(default=None, description="SVG/JSON/PNG などの副産物ファイルを保存するか")
     history_input: str | None = Field(default=None, description="履歴に表示するユーザー記述")
@@ -289,6 +304,7 @@ class HistoryPostBody(BaseModel):
     catalog_id: str | None = None
     save_artifacts: bool = True
     color_map: dict[str, str] | None = Field(default=None, exclude=True)
+    canvas_aspect: str | None = Field(default=None, exclude=True)
 
 
 class HistoryItem(HistoryPostBody):
@@ -370,6 +386,14 @@ class BatchPromptHistoryBody(BaseModel):
 
 class BatchPromptHistoryResponse(BaseModel):
     items: list[str] = Field(default_factory=list)
+
+
+class PluginStorageBody(BaseModel):
+    storage: dict = Field(default_factory=dict)
+
+
+class PluginValueBody(BaseModel):
+    value: dict = Field(default_factory=dict)
 
 
 class DemoSettingsBody(BaseModel):
@@ -543,6 +567,40 @@ def api_auth_me_update_batch_prompt_history(
     return BatchPromptHistoryResponse(items=items)
 
 
+@app.get("/api/auth/me/plugin-storage", response_model=PluginStorageBody)
+def api_auth_me_plugin_storage(actor: dict = Depends(_current_user)) -> PluginStorageBody:
+    return PluginStorageBody(storage=_db.get_user_plugin_storage(actor["id"]))
+
+
+@app.put("/api/auth/me/plugin-storage", response_model=PluginStorageBody)
+def api_auth_me_update_plugin_storage(
+    body: PluginStorageBody,
+    actor: dict = Depends(_current_user),
+) -> PluginStorageBody:
+    try:
+        storage = _db.update_user_plugin_storage(actor["id"], body.storage)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if storage is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    return PluginStorageBody(storage=storage)
+
+
+@app.put("/api/auth/me/plugin-storage/{plugin_id}", response_model=PluginStorageBody)
+def api_auth_me_update_plugin_value(
+    plugin_id: str,
+    body: PluginValueBody,
+    actor: dict = Depends(_current_user),
+) -> PluginStorageBody:
+    try:
+        storage = _db.update_user_plugin_value(actor["id"], plugin_id, body.value)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if storage is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    return PluginStorageBody(storage=storage)
+
+
 @app.get("/api/auth/me/demo-settings", response_model=DemoSettingsBody)
 def api_auth_me_demo_settings(actor: dict = Depends(_current_user)) -> DemoSettingsBody:
     return DemoSettingsBody(**_db.get_user_demo_settings(actor["id"]))
@@ -571,7 +629,9 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             note="DB connection is selected at server startup by INKU_DB_URL. Restart the server after changing it.",
         ),
         plugins=PluginSettingsStatus(
-            note="Plugin loading is not implemented in this reference server yet. The UI is read-only until a loader API exists.",
+            enabled=True,
+            loaded=plugin_status_items(),
+            note="Reference plugin hook is enabled for canvas aspect selection. Third-party plugin loading is not implemented yet.",
         ),
         output_save=OutputSaveStatus(
             workers=_SAVE_WORKERS,
@@ -894,7 +954,7 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
     try:
-        svg = render(score, color_map=req.color_map)
+        svg = render(score, color_map=req.color_map, canvas_aspect=_validated_canvas_aspect(req.canvas_aspect))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
 
@@ -1111,7 +1171,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
 
     t2 = time.perf_counter()
     try:
-        svg = render(score, color_map=req.color_map)
+        svg = render(score, color_map=req.color_map, canvas_aspect=_validated_canvas_aspect(req.canvas_aspect))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
     elapsed_stage1_ms = int((t1 - t0) * 1000)
@@ -1300,7 +1360,11 @@ def api_history_get(
 def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
     try:
         score = coerce_score(Score.model_validate(body.score))
-        svg = render(score, color_map=_validated_color_map(body.color_map))
+        svg = render(
+            score,
+            color_map=_validated_color_map(body.color_map),
+            canvas_aspect=_validated_canvas_aspect(body.canvas_aspect),
+        )
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001

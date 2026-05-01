@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import BatchPanel from './BatchPanel.svelte';
+	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
 	import type { DemoSettings } from '$lib/demo';
+	import type { CanvasAspectId } from '$lib/plugins/canvasAspect';
 
 	type BatchFailure = {
 		line: number;
@@ -56,6 +58,10 @@
 		lockNonDemo: boolean;
 		stageLabel: string;
 		showBirds: boolean;
+		canvasAspectId: CanvasAspectId;
+		canvasAspectMenuOpen: boolean;
+		onToggleCanvasAspectMenu: () => void;
+		onSelectCanvasAspect: (id: CanvasAspectId) => void | Promise<void>;
 		onOpenModelSelection: () => void;
 		onOpenCatalogModal: () => void;
 		onClearInput: () => void;
@@ -109,6 +115,10 @@
 		lockNonDemo,
 		stageLabel,
 		showBirds,
+		canvasAspectId,
+		canvasAspectMenuOpen,
+		onToggleCanvasAspectMenu,
+		onSelectCanvasAspect,
 		onOpenModelSelection,
 		onOpenCatalogModal,
 		onClearInput,
@@ -151,6 +161,12 @@
 	<div class="section-head">
 		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
+			<CanvasAspectPlugin
+				selected={canvasAspectId}
+				open={canvasAspectMenuOpen}
+				onToggle={onToggleCanvasAspectMenu}
+				onSelect={onSelectCanvasAspect}
+			/>
 			<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			<button class="ghost-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			{#if inputMode !== 'demo'}

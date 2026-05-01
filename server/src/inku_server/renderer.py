@@ -73,7 +73,7 @@ WEIGHT_STYLE: dict[str, dict[str, str | float]] = {
 BACKGROUND = "#ffffff"
 
 # SPEC §13.8: 揺らぎは Renderer 層で生成する (JSON Score は決定的な楽譜)
-AMPLITUDE_PX: dict[str, float] = {"fine": 4.0, "medium": 12.0, "broad": 30.0}
+AMPLITUDE_PX: dict[str, float] = {"fine": 7.0, "medium": 12.0, "broad": 30.0}
 FREQUENCY_CYCLES: dict[str, float] = {"slow": 2.0, "medium": 6.0, "high": 14.0}
 SEGMENT_COUNT = 80  # polyline の分割数
 

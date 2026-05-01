@@ -1036,6 +1036,17 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 
 **記述者はこの構造を直接書かない**。運動語彙・weight・プラグインの組み合わせから、第二段階の構造化層が生成する。
 
+現行実装では、線の揺らぎは Renderer で polyline 化して表現する。1000px キャンバス上の振幅は `fine=7px` / `medium=12px` / `broad=30px` とし、サムネイルでも「細かく揺れる」効果が見えることを優先する。
+
+`quality` の使い分けは以下を基本とする。
+
+- `perlin`: 「震える」「細かく揺れる」などの微細で不規則な線の揺らぎ
+- `wave`: 「ゆっくり揺れる」「波打つ」などの低周期で読み取りやすいうねり
+- `pink`: 「滲む」などの境界のぼかし
+- `white`: 粗いノイズ的なばらつき
+
+短い line に揺らぎを付ける場合は、`dimensions=["position_x","position_y"]` を優先し、線の長さに対して揺れが潰れないようにする。長い横線・縦線では、横線なら `position_y`、縦線なら `position_x` を基本軸とする。
+
 スキーマレベルでは variation は保持するが、DDLテキスト層のインターフェースからは見えない。プラグインや素材を実装する人だけがこの次元を扱う。
 
 ### 13.10 記述例と展開
@@ -1314,6 +1325,18 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.24 (2026-05-01)
+
+**揺らぎの視認性改善**
+
+DDL の「細かく揺れる」「ゆっくり揺れる」が JSON Score と SVG 上で視認しやすくなるように、Stage 2 と Renderer の扱いを調整した。
+
+- Renderer の `fine` 揺れ幅を 1000px キャンバス上で 7px とし、サムネイルでも細かい揺れが読めるようにする
+- 「ゆっくり揺れる」/ `Swaying slowly` は Stage 2 で `variation.quality="wave"` / `frequency="slow"` を優先する
+- 「震える」「細かく揺れる」は `quality="perlin"` を基本とし、微細な不規則性として扱う
+- 短い line の揺らぎは `dimensions=["position_x","position_y"]` を優先し、短線上で揺れが潰れないようにする
+- `schema.py` の `variation.quality` 説明も、`perlin` と `wave` の役割が分かれるように更新した
 
 ### v1.23 (2026-05-01)
 

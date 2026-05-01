@@ -142,6 +142,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "白い横線を中央に引く" in SYSTEM_PROMPT
     assert "白い線を可視化" in SYSTEM_PROMPT
     assert "白い短い線を上から下へ百三十七本" in SYSTEM_PROMPT
+    assert "ゆっくり揺れる" in SYSTEM_PROMPT
+    assert 'quality":"wave"' in SYSTEM_PROMPT
+    assert '"dimensions":["position_x","position_y"]' in SYSTEM_PROMPT
     assert "color\":\"blue" in SYSTEM_PROMPT
     assert "配置語を優先" in SYSTEM_PROMPT
     assert "上から下へ散らす" in SYSTEM_PROMPT
@@ -179,6 +182,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert 'Treat gray subjects as foreground color="gray"' in SYSTEM_PROMPT_EN
     assert "white line made visible" in SYSTEM_PROMPT_EN
     assert "short white lines from top to bottom" in SYSTEM_PROMPT_EN
+    assert "Swaying slowly" in SYSTEM_PROMPT_EN
+    assert 'quality":"wave"' in SYSTEM_PROMPT_EN
+    assert '"dimensions":["position_x","position_y"]' in SYSTEM_PROMPT_EN
     assert "color\":\"blue" in SYSTEM_PROMPT_EN
     assert "prioritize that placement phrase" in SYSTEM_PROMPT_EN
     assert "top to bottom" in SYSTEM_PROMPT_EN

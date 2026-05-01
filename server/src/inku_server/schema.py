@@ -47,7 +47,7 @@ class Variation(BaseModel):
     )
     quality: Quality = Field(
         default="none",
-        description="揺れ種類: perlin=揺れ・震える / wave=波打つ / pink=滲む / white=白色雑音 / none=なし",
+        description="揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし",
     )
     dimensions: list[Dimension] = Field(
         default_factory=list,

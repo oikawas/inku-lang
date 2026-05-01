@@ -42,6 +42,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **作品ごとに主技法は一つだけ。DDL に複数の技法語があっても、最も主題に合うものを一つ選び、残りは必要な場合だけ小さな補助層にする**
 - **余白は構図要素。小さな焦点、端寄りの線、反復の欠落、画面外へ続く方向で余白に圧力を作る。余白を全面散布で埋めない**
 - variation は明示された揺らぎがある場合のみ付ける
+- **「ゆっくり揺れる」→ variation quality="wave", frequency="slow" を優先する。perlin は「震える」「細かく揺れる」に使う**
+- **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
 - **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
 - **余白を残す。小さな scatter が 200 個を超える場合は、全面密度ではなく斜めの帯・上から下・右半分などの配置語を尊重し、要素サイズを小さくしすぎない**
@@ -91,7 +93,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.012,0.012],"color":"white","rotation":30,"arrangement":{"count":610,"layout":"scatter"}}]}
 
 入力: 白い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。
-出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_x"]}}]}
+出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 入力: 赤い右上がりの小さな楕円を右半分に縦に二十個散らす。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
@@ -118,7 +120,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"instructions":[{"primitive":"arc","center":[0.72,0.68],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.18}}]}
 
 入力: 赤い短い線を輪唱のずれとして左から右へ七本並べる。ゆっくり揺れる。
-出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
+出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 入力: 白い細い線を一点透視法として右上の焦点へ向けて八本引く。
 出力: {"instructions":[{"primitive":"line","from":[0.12,0.85],"to":[0.78,0.28],"color":"white","arrangement":{"count":8,"layout":"vertical","margin":0.08}}]}
@@ -252,6 +254,8 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Use one dominant technique per work. If the DDL contains multiple technique words, choose the one that best fits the subject and keep the others only as small supporting layers when needed**
 - **Negative space is compositional pressure. Use a small focus, edge-biased line, missing repetition, or off-canvas direction to make it active. Do not fill it with all-over scatter**
 - variation only when movement is explicitly stated
+- **"swaying slowly" / "slowly swaying" → prefer variation quality="wave", frequency="slow". Use perlin for trembling or fine swaying**
+- **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
 - **count is integer 1–1000. Use explicit numbers from DDL**
 - **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
 - **Preserve negative space. When tiny scatter exceeds 200 items, do not turn it into uniform full-canvas density; respect placement phrases such as diagonal band, top to bottom, or right half, and keep elements visible enough**
@@ -301,7 +305,7 @@ Input: Scatter six hundred ten small rotated white squares dotted across the who
 Output: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.012,0.012],"color":"white","rotation":30,"arrangement":{"count":610,"layout":"scatter"}}]}
 
 Input: Scatter one hundred thirty-seven short white lines from top to bottom. Swaying slowly.
-Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_x"]}}]}
+Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 Input: Scatter twenty small red ellipses rising to the right vertically in the right half.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
@@ -328,7 +332,7 @@ Input: Line up four thin white arcs from a lower-right focus as a harmonic overt
 Output: {"instructions":[{"primitive":"arc","center":[0.72,0.68],"radius":0.07,"angle_start":0,"angle_end":180,"color":"white","arrangement":{"count":4,"layout":"radial","radius":0.18}}]}
 
 Input: Line up seven short red lines left to right as a canon offset. Swaying slowly.
-Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"perlin","dimensions":["position_y"]}}]}
+Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"red","arrangement":{"count":7,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 Input: Draw eight thin white lines toward an upper-right focus as one-point perspective.
 Output: {"instructions":[{"primitive":"line","from":[0.12,0.85],"to":[0.78,0.28],"color":"white","arrangement":{"count":8,"layout":"vertical","margin":0.08}}]}

@@ -48,6 +48,11 @@
 		const model = modelsForProvider(provider)[0]?.id ?? settings.prompt_model;
 		updateSettings({ prompt_model: model });
 	}
+
+	function stepInterval(delta: number) {
+		const next = Math.max(1, Math.min(999, Math.round(settings.interval_seconds + delta)));
+		updateSettings({ interval_seconds: next });
+	}
 </script>
 
 <div class="demo-panel">
@@ -98,14 +103,19 @@
 		</label>
 		<label>
 			<span>{t().demoInterval}</span>
-			<input
-				type="number"
-				min="1"
-				max="3600"
-				value={settings.interval_seconds}
-				disabled={running}
-				oninput={(event) => updateSettings({ interval_seconds: Number((event.currentTarget as HTMLInputElement).value) || 1 })}
-			/>
+			<div class="interval-control">
+				<button type="button" class="step-btn" disabled={running || settings.interval_seconds <= 1} onclick={() => stepInterval(-1)}>−</button>
+				<input
+					class="interval-input"
+					type="number"
+					min="1"
+					max="999"
+					value={settings.interval_seconds}
+					disabled={running}
+					oninput={(event) => updateSettings({ interval_seconds: Math.max(1, Math.min(999, Number((event.currentTarget as HTMLInputElement).value) || 1)) })}
+				/>
+				<button type="button" class="step-btn" disabled={running || settings.interval_seconds >= 999} onclick={() => stepInterval(1)}>+</button>
+			</div>
 		</label>
 	</div>
 
@@ -175,6 +185,29 @@
 		padding: 6px 8px;
 	}
 	textarea { resize: vertical; line-height: 1.5; }
+	.interval-control {
+		display: inline-grid;
+		grid-template-columns: 26px 4.5em 26px;
+		align-items: stretch;
+		gap: 4px;
+		width: max-content;
+	}
+	.interval-input {
+		width: 4.5em;
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+	}
+	.step-btn {
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg2);
+		font: inherit;
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.step-btn:disabled { opacity: 0.42; cursor: not-allowed; }
 	.demo-actions {
 		display: flex;
 		align-items: center;

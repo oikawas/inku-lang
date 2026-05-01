@@ -1383,6 +1383,10 @@
 				const d = await r.json().catch(() => ({})) as { detail?: string };
 				throw new Error(d.detail ?? `HTTP ${r.status}`);
 			}
+			const saved = await r.json() as Iteration;
+			if (result) {
+				result = { ...result, history_id: saved.id, history_at: saved.at };
+			}
 			demoCurrentSaved = true;
 			demoSaveStatus = t().demoSavedCurrent;
 			await fetchHistoryOffset(0);
@@ -1703,9 +1707,17 @@
 		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
 		: statusModelName(stage2Model));
 	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : currentCatalog.name);
-	const statusHistoryItem = $derived(displayedHistoryItem ?? (
-		historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null
-	));
+	const statusHistoryItem = $derived.by(() => {
+		if (displayedHistoryItem) return displayedHistoryItem;
+		if (result?.history_id) {
+			return historyItems.find((item) => item.id === result?.history_id) ?? {
+				id: result.history_id,
+				starred: false,
+			};
+		}
+		if (inputMode === 'demo' || activeRunMode === 'demo') return null;
+		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
+	});
 
 	function formatHistoryDate(at: number): string {
 		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');

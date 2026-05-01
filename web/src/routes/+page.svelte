@@ -25,6 +25,7 @@
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { COLOR_CATALOGS, getCatalogById, getRenderColorMap, type RenderColorMap } from '$lib/colors';
+	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import {
 		HistoryManagerState,
 		type HistoryItem,
@@ -113,7 +114,7 @@
 	};
 	// ── Input ───────────────────────────────────────────────
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
-	let inputMode   = $state<'single' | 'batch'>('single');
+	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
 	let input       = $state(DEFAULT_INPUT);
 	let batchInput  = $state('');
 	let stage1UserPrompt = $state('');
@@ -125,7 +126,7 @@
 
 	// ── Loading ─────────────────────────────────────────────
 	let loading    = $state(false);
-	let activeRunMode = $state<'single' | 'batch' | null>(null);
+	let activeRunMode = $state<'single' | 'batch' | 'demo' | null>(null);
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
@@ -140,6 +141,16 @@
 	let batchTokensInTotal = $state(0);
 	let batchTokensOutTotal = $state(0);
 	let error        = $state<string | null>(null);
+	let demoSettings = $state<DemoSettings>({ ...DEFAULT_DEMO_SETTINGS });
+	let demoGeneratedPrompt = $state('');
+	let demoGeneratedDdl = $state<string | null>(null);
+	let demoError = $state<string | null>(null);
+	let demoSaveStatus = $state<string | null>(null);
+	let demoSavingCurrent = $state(false);
+	let demoCurrentSaved = $state(false);
+	let demoWaitingSeconds = $state<number | null>(null);
+	let demoSettingsLoaded = $state(false);
+	let demoRunId = 0;
 
 	// ── Replay ──────────────────────────────────────────────
 	let reloading   = $state(false);
@@ -358,6 +369,51 @@
 		}
 	}
 
+	function normalizeDemoSettings(settings: DemoSettings): DemoSettings {
+		return {
+			save_db: !!settings.save_db,
+			save_files: !!settings.save_files,
+			prompt_model: settings.prompt_model || DEFAULT_MODEL,
+			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
+			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
+		};
+	}
+
+	async function loadDemoSettings() {
+		if (!currentUser) {
+			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
+			demoSettingsLoaded = false;
+			return;
+		}
+		try {
+			const r = await apiFetch('/api/auth/me/demo-settings', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			demoSettings = normalizeDemoSettings(await r.json() as DemoSettings);
+			demoSettingsLoaded = true;
+		} catch (e) {
+			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
+			demoSettingsLoaded = false;
+			console.warn('failed to load demo settings', e);
+		}
+	}
+
+	async function saveDemoSettings(settings: DemoSettings) {
+		const next = normalizeDemoSettings(settings);
+		demoSettings = next;
+		if (!currentUser || !demoSettingsLoaded) return;
+		try {
+			const r = await apiFetch('/api/auth/me/demo-settings', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(next)
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			demoSettings = normalizeDemoSettings(await r.json() as DemoSettings);
+		} catch (e) {
+			console.warn('failed to save demo settings', e);
+		}
+	}
+
 	async function rememberBatchPrompt(prompt: string) {
 		if (!currentUser) return;
 		const previous = batchPromptHistory;
@@ -564,7 +620,7 @@
 			applyUserTheme(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -572,6 +628,8 @@
 			currentUser = null;
 			applyUserTheme(null);
 			batchPromptHistory = [];
+			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
+			demoSettingsLoaded = false;
 			loginStatus = t().loginRequiredMessage;
 			settingsStatus = null;
 			settingsStatusError = t().loginRequiredMessage;
@@ -607,7 +665,7 @@
 			trashTotal = 0;
 			historyManager.clear();
 			loginPassword = '';
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -626,6 +684,8 @@
 		currentUser = null;
 		applyUserTheme(null);
 		batchPromptHistory = [];
+		demoSettings = { ...DEFAULT_DEMO_SETTINGS };
+		demoSettingsLoaded = false;
 		loginStatus = null;
 		settingsStatus = null;
 		settingsStatusError = t().loginRequiredMessage;
@@ -871,8 +931,10 @@
 	const batchNonEmpty = $derived(batchLines.filter((l) => l.trim()).length);
 	const batchRunning = $derived(activeRunMode === 'batch' && loading);
 	const singleRunning = $derived(activeRunMode === 'single' && loading);
+	const demoRunning = $derived(activeRunMode === 'demo' && loading);
+	const demoCanSaveCurrent = $derived(!!result && !!demoGeneratedPrompt && !!demoGeneratedDdl && !demoCurrentSaved);
 	const canSubmit     = $derived(
-		inputMode === 'single' ? !!input.trim() : batchNonEmpty > 0
+		inputMode === 'single' ? !!input.trim() : inputMode === 'batch' ? batchNonEmpty > 0 : false
 	);
 
 	// ── Timer ───────────────────────────────────────────────
@@ -929,9 +991,16 @@
 	}
 
 	// ── Core paint (2-stage) ─────────────────────────────────
-	async function paintOne(text: string, historyInput = text): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
+	type PaintOptions = {
+		historyInput?: string;
+		saveHistory?: boolean;
+		saveArtifacts?: boolean;
+	};
+
+	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const lang = getLang();
 		stageLabel = t().stageInterpreting;
+		const historyInput = options.historyInput ?? text;
 
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
@@ -946,7 +1015,8 @@
 				include_thinking: includeThinking,
 				lang,
 				color_map: activeColorMap(),
-				save_history: true,
+				save_history: options.saveHistory ?? true,
+				save_artifacts: options.saveArtifacts ?? true,
 				history_input: historyInput,
 				catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
 			})
@@ -962,6 +1032,91 @@
 	async function refreshHistoryAfterServerSave() {
 		await fetchHistoryOffset(0);
 		historyCursor = 0;
+	}
+
+	function sleep(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	async function generateDemoInstruction(settings: DemoSettings): Promise<string> {
+		const r = await apiFetch('/api/demo/instruction', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				seed_phrase: settings.seed_phrase,
+				model: settings.prompt_model,
+				lang: getLang(),
+			})
+		});
+		if (!r.ok) {
+			const d = await r.json().catch(() => ({})) as { detail?: string };
+			throw new Error(d.detail ?? `HTTP ${r.status}`);
+		}
+		const data = await r.json() as { instruction: string };
+		return data.instruction;
+	}
+
+	async function runDemoLoop(runId: number) {
+		while (demoRunId === runId && loading) {
+			const startedAt = Date.now();
+			demoWaitingSeconds = null;
+			try {
+				const settings = normalizeDemoSettings(demoSettings);
+				await saveDemoSettings(settings);
+				demoGeneratedPrompt = await generateDemoInstruction(settings);
+				if (demoRunId !== runId || !loading) break;
+				const r = await paintOne(demoGeneratedPrompt, {
+					saveHistory: settings.save_db,
+					saveArtifacts: settings.save_files,
+					historyInput: `[demo] ${demoGeneratedPrompt}`,
+				});
+				if (demoRunId !== runId || !loading) break;
+				demoGeneratedDdl = r.ddl;
+				demoCurrentSaved = !!r.history_id;
+				demoSaveStatus = null;
+				ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
+				fitCanvasZoom();
+				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
+				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
+				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
+				if (settings.save_db) await refreshHistoryAfterServerSave();
+				const remainingMs = Math.max(0, settings.interval_seconds * 1000 - (Date.now() - startedAt));
+				for (let left = Math.ceil(remainingMs / 1000); left > 0 && demoRunId === runId && loading; left--) {
+					demoWaitingSeconds = left;
+					await sleep(Math.min(1000, remainingMs));
+				}
+			} catch (e) {
+				demoError = e instanceof Error ? e.message : String(e);
+				await sleep(1000);
+			}
+		}
+		if (demoRunId === runId) {
+			stopTimer();
+			loading = false;
+			activeRunMode = null;
+			stageLabel = '';
+			demoWaitingSeconds = null;
+		}
+	}
+
+	async function startDemo() {
+		if (loading) return;
+		demoError = null;
+		demoSaveStatus = null;
+		demoCurrentSaved = false;
+		error = null;
+		demoGeneratedDdl = null;
+		displayedHistoryItem = null;
+		activeRunMode = 'demo';
+		loading = true;
+		demoRunId += 1;
+		startTimer();
+		await runDemoLoop(demoRunId);
+	}
+
+	function stopDemo() {
+		demoRunId += 1;
+		loading = false;
 	}
 
 	// ── Submit ──────────────────────────────────────────────
@@ -1001,7 +1156,7 @@
 					batchActiveTokensIn = null;
 					batchActiveTokensOut = null;
 					try {
-						const r = await paintOne(lines[i].input, `#${lines[i].line} ${lines[i].input}`);
+						const r = await paintOne(lines[i].input, { historyInput: `#${lines[i].line} ${lines[i].input}` });
 						batchActiveDdl = r.ddl;
 						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
 						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
@@ -1194,15 +1349,61 @@
 				await apiFetch('/api/history', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, color_map: activeColorMap() })
+					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, save_artifacts: true, color_map: activeColorMap() })
 				});
 		} catch { /* ignore */ }
 		await fetchHistoryOffset(0);
 		historyCursor = 0;
 	}
 
+	async function saveCurrentDemoToHistory(): Promise<void> {
+		if (!result || !demoGeneratedPrompt || !demoGeneratedDdl || demoSavingCurrent || demoCurrentSaved) return;
+		demoSavingCurrent = true;
+		demoSaveStatus = null;
+		try {
+			const r = await apiFetch('/api/history', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					input: `[demo] ${demoGeneratedPrompt}`,
+					ddl: demoGeneratedDdl,
+					score: result.score,
+					at: Date.now(),
+					elapsed_ms: result.elapsed_total_ms ?? 0,
+					stage1_model: stage1Model,
+					stage2_model: stage2Model,
+					tokens_in: (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null,
+					tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
+					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null,
+					save_artifacts: demoSettings.save_files,
+					color_map: activeColorMap(),
+				})
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			demoCurrentSaved = true;
+			demoSaveStatus = t().demoSavedCurrent;
+			await fetchHistoryOffset(0);
+			historyCursor = 0;
+		} catch (e) {
+			demoError = e instanceof Error ? e.message : String(e);
+		} finally {
+			demoSavingCurrent = false;
+		}
+	}
+
 	function clearInput() {
-		if (inputMode === 'single') input = ''; else batchInput = '';
+		if (inputMode === 'single') input = '';
+		if (inputMode === 'batch') batchInput = '';
+		if (inputMode === 'demo') {
+			demoGeneratedPrompt = '';
+			demoGeneratedDdl = null;
+			demoError = null;
+			demoSaveStatus = null;
+			demoCurrentSaved = false;
+		}
 		ddl = null;
 		thinking = null;
 		result = null;
@@ -1568,6 +1769,9 @@
 	const batchActiveDdlHighlighted = $derived(batchActiveDdl !== null
 		? highlightDDL(batchActiveDdl)
 		: escapeHtml(t().batchActiveDdlPending));
+	const demoGeneratedDdlHighlighted = $derived(demoGeneratedDdl !== null
+		? highlightDDL(demoGeneratedDdl)
+		: '');
 
 	function escapeHtml(value: string) {
 		return value
@@ -1833,6 +2037,15 @@
 						{liveMs}
 						{batchFailureReport}
 						{batchPromptHistory}
+						bind:demoSettings
+						{demoRunning}
+						{demoWaitingSeconds}
+						{demoGeneratedPrompt}
+						{demoGeneratedDdlHighlighted}
+						{demoCanSaveCurrent}
+						{demoSavingCurrent}
+						{demoSaveStatus}
+						{demoError}
 						{canSubmit}
 						{error}
 						{stageLabel}
@@ -1841,6 +2054,10 @@
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
 						onRememberBatchPrompt={rememberBatchPrompt}
+						onDemoSettingsChange={saveDemoSettings}
+						onSaveCurrentDemo={saveCurrentDemoToHistory}
+						onStartDemo={startDemo}
+						onStopDemo={stopDemo}
 						onSubmit={submit}
 						onStop={stopBatch}
 					/>

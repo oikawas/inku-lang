@@ -34,6 +34,7 @@ export interface LangPack {
 	// Input
 	modeSingle: string;
 	modeBatch: string;
+	modeDemo: string;
 	inputPlaceholder: string;
 	batchPlaceholder: string;
 	batchCount: (n: number) => string;
@@ -48,6 +49,19 @@ export interface LangPack {
 	batchActiveLine: (line: number) => string;
 	batchTokenLine: (input: number | null, output: number | null) => string;
 	batchTokenTotal: (input: number, output: number) => string;
+	demoSaveDb: string;
+	demoSaveFiles: string;
+	demoPromptModel: string;
+	demoSeedPhrase: string;
+	demoInterval: string;
+	demoStart: string;
+	demoStop: string;
+	demoRunning: string;
+	demoGeneratedPrompt: string;
+	demoGeneratedDdl: string;
+	demoSaveCurrent: string;
+	demoSavedCurrent: string;
+	demoWaiting: (seconds: number) => string;
 
 	// Submit / loading
 	submitBtn: string;

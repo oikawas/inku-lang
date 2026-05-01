@@ -218,6 +218,7 @@ class PaintRequest(BaseModel):
     lang: str = Field(default="ja", description="言語コード (ja / en)")
     color_map: dict[str, str] | None = Field(default=None, description="色カタログ")
     save_history: bool = Field(default=False, description="描画結果を履歴に保存するか")
+    save_artifacts: bool | None = Field(default=None, description="SVG/JSON/PNG などの副産物ファイルを保存するか")
     history_input: str | None = Field(default=None, description="履歴に表示するユーザー記述")
     history_at: int | None = Field(default=None, description="履歴保存時刻")
     catalog_id: str | None = Field(default=None, description="使用した色カタログID")
@@ -257,6 +258,7 @@ class HistoryPostBody(BaseModel):
     tokens_in: int | None = None
     tokens_out: int | None = None
     catalog_id: str | None = None
+    save_artifacts: bool = True
     color_map: dict[str, str] | None = Field(default=None, exclude=True)
 
 
@@ -339,6 +341,24 @@ class BatchPromptHistoryBody(BaseModel):
 
 class BatchPromptHistoryResponse(BaseModel):
     items: list[str] = Field(default_factory=list)
+
+
+class DemoSettingsBody(BaseModel):
+    save_db: bool = False
+    save_files: bool = False
+    prompt_model: str = Field(default="google/gemma-4-31b-it", min_length=1)
+    seed_phrase: str = Field(default="日本の四季を感じさせる文章を40語以内で生成", min_length=1, max_length=1000)
+    interval_seconds: int = Field(default=30, ge=1, le=3600)
+
+
+class DemoInstructionBody(BaseModel):
+    seed_phrase: str = Field(..., min_length=1, max_length=1000)
+    model: str | None = Field(default=None)
+    lang: str = Field(default="ja")
+
+
+class DemoInstructionResponse(BaseModel):
+    instruction: str
 
 
 class DatabaseSettingsStatus(BaseModel):
@@ -494,6 +514,25 @@ def api_auth_me_update_batch_prompt_history(
     return BatchPromptHistoryResponse(items=items)
 
 
+@app.get("/api/auth/me/demo-settings", response_model=DemoSettingsBody)
+def api_auth_me_demo_settings(actor: dict = Depends(_current_user)) -> DemoSettingsBody:
+    return DemoSettingsBody(**_db.get_user_demo_settings(actor["id"]))
+
+
+@app.put("/api/auth/me/demo-settings", response_model=DemoSettingsBody)
+def api_auth_me_update_demo_settings(
+    body: DemoSettingsBody,
+    actor: dict = Depends(_current_user),
+) -> DemoSettingsBody:
+    try:
+        settings = _db.update_user_demo_settings(actor["id"], body.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if settings is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    return DemoSettingsBody(**settings)
+
+
 @app.get("/api/settings/status", response_model=SettingsStatusResponse)
 def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusResponse:
     db_info = _db.database_info()
@@ -626,6 +665,74 @@ def api_interpret(req: InterpretRequest, _actor: dict = Depends(_current_user)) 
     return data
 
 
+def _strip_anthropic_prefix(model: str) -> str:
+    return model.removeprefix("anthropic:")
+
+
+def _demo_instruction_system(lang: str) -> str:
+    if lang == "en":
+        return (
+            "Generate one short, concrete visual prompt for inku. "
+            "Return only the prompt text. Keep it under 40 words. "
+            "Use sensory detail and a clear scene, but do not explain."
+        )
+    return (
+        "inkuのデモ描画に使う短い指示文を1つ生成してください。"
+        "返答は指示文のみ。40語以内。"
+        "情景、質感、動きが感じられる具体的な文章にし、説明は不要です。"
+    )
+
+
+def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str) -> str:
+    model_name = model or os.getenv("OPENAI_MODEL_STAGE1") or os.getenv("OPENAI_MODEL") or "qwen-api"
+    if model_name.startswith("anthropic:"):
+        import anthropic
+
+        client = anthropic.Anthropic()
+        resp = client.messages.create(
+            model=_strip_anthropic_prefix(model_name),
+            max_tokens=180,
+            temperature=0.9,
+            system=_demo_instruction_system(lang),
+            messages=[{"role": "user", "content": seed_phrase}],
+        )
+        parts = [getattr(block, "text", "") for block in resp.content if getattr(block, "type", "") == "text"]
+        text = "\n".join(parts).strip()
+    else:
+        from openai import OpenAI
+
+        if "/" in model_name:
+            base_url = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
+            api_key = os.getenv("NVIDIA_API_KEY", "")
+        else:
+            base_url = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v3")
+            api_key = os.getenv("OPENAI_API_KEY", "dummy")
+        client = OpenAI(base_url=base_url, api_key=api_key)
+        resp = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": _demo_instruction_system(lang)},
+                {"role": "user", "content": seed_phrase},
+            ],
+            temperature=0.9,
+            max_tokens=180,
+        )
+        text = (resp.choices[0].message.content or "").strip()
+    text = text.strip().strip("\"'“”‘’")
+    if not text:
+        raise ValueError("empty demo instruction")
+    return text
+
+
+@app.post("/api/demo/instruction", response_model=DemoInstructionResponse)
+def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_current_user)) -> DemoInstructionResponse:
+    try:
+        instruction = _generate_demo_instruction(req.seed_phrase, model=req.model, lang=req.lang)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"demo instruction failed: {e}") from e
+    return DemoInstructionResponse(instruction=instruction)
+
+
 def _add_history_item(
     *,
     actor: dict,
@@ -640,6 +747,7 @@ def _add_history_item(
     tokens_in: int | None = None,
     tokens_out: int | None = None,
     catalog_id: str | None = None,
+    save_artifacts: bool = True,
 ) -> dict:
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
@@ -660,7 +768,8 @@ def _add_history_item(
         "tokens_out": tokens_out,
         "catalog_id": catalog_id,
     })
-    _submit_history_artifact_save(item_dict)
+    if save_artifacts:
+        _submit_history_artifact_save(item_dict)
     return item_dict
 
 
@@ -695,6 +804,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
     history_id = None
     history_at = None
+    save_artifacts = req.save_artifacts if req.save_artifacts is not None else req.save_history
     if req.save_history:
         history_at = req.history_at or int(time.time() * 1000)
         item = _add_history_item(
@@ -710,8 +820,23 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             tokens_in=(s1_tin or 0) + (s2_tin or 0) or None,
             tokens_out=(s1_tout or 0) + (s2_tout or 0) or None,
             catalog_id=req.catalog_id,
+            save_artifacts=save_artifacts,
         )
         history_id = item["id"]
+    elif save_artifacts:
+        history_at = req.history_at or int(time.time() * 1000)
+        item_id = str(uuid.uuid4())
+        score_dict = score.model_dump(by_alias=True)
+        _submit_history_artifact_save({
+            "id": item_id,
+            "user_id": actor["id"],
+            "output_path": str(_output_prefix(actor["id"], item_id, history_at)),
+            "input": req.history_input or source_text,
+            "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
+            "score": score_dict,
+            "svg": svg,
+            "at": history_at,
+        })
     return PaintResponse(
         text=source_text,
         ddl=ddl,
@@ -873,6 +998,7 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         tokens_in=body.tokens_in,
         tokens_out=body.tokens_out,
         catalog_id=body.catalog_id,
+        save_artifacts=body.save_artifacts,
     )
     return HistoryItem(**item_dict)
 

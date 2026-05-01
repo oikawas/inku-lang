@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import BatchPanel from './BatchPanel.svelte';
+	import DemoPanel from './DemoPanel.svelte';
+	import type { DemoSettings } from '$lib/demo';
 
 	type BatchFailure = {
 		line: number;
@@ -14,7 +16,7 @@
 	};
 
 	type Props = {
-		inputMode: 'single' | 'batch';
+		inputMode: 'single' | 'batch' | 'demo';
 		input: string;
 		batchInput: string;
 		lineNumbersText: string;
@@ -34,12 +36,25 @@
 		canSubmit: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
+		demoSettings: DemoSettings;
+		demoRunning: boolean;
+		demoWaitingSeconds: number | null;
+		demoGeneratedPrompt: string;
+		demoGeneratedDdlHighlighted: string;
+		demoCanSaveCurrent: boolean;
+		demoSavingCurrent: boolean;
+		demoSaveStatus: string | null;
+		demoError: string | null;
 		stageLabel: string;
 		showBirds: boolean;
 		onOpenModelSelection: () => void;
 		onOpenCatalogModal: () => void;
 		onClearInput: () => void;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
+		onDemoSettingsChange: (settings: DemoSettings) => void | Promise<void>;
+		onSaveCurrentDemo: () => void | Promise<void>;
+		onStartDemo: () => void | Promise<void>;
+		onStopDemo: () => void;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
 	};
@@ -65,20 +80,33 @@
 		canSubmit,
 		error,
 		batchPromptHistory,
+		demoSettings = $bindable(),
+		demoRunning,
+		demoWaitingSeconds,
+		demoGeneratedPrompt,
+		demoGeneratedDdlHighlighted,
+		demoCanSaveCurrent,
+		demoSavingCurrent,
+		demoSaveStatus,
+		demoError,
 		stageLabel,
 		showBirds,
 		onOpenModelSelection,
 		onOpenCatalogModal,
 		onClearInput,
 		onRememberBatchPrompt,
+		onDemoSettingsChange,
+		onSaveCurrentDemo,
+		onStartDemo,
+		onStopDemo,
 		onSubmit,
 		onStop,
 	}: Props = $props();
 </script>
 
 <div class="panel-tabs">
-	{#each [['single', t().modeSingle], ['batch', t().modeBatch]] as [mode, label] (mode)}
-		<button class="panel-tab" class:active={inputMode === mode} onclick={() => (inputMode = mode as 'single' | 'batch')}>{label}</button>
+	{#each [['single', t().modeSingle], ['batch', t().modeBatch], ['demo', t().modeDemo]] as [mode, label] (mode)}
+		<button class="panel-tab" class:active={inputMode === mode} onclick={() => (inputMode = mode as 'single' | 'batch' | 'demo')}>{label}</button>
 	{/each}
 </div>
 
@@ -170,7 +198,7 @@
 		{/if}
 
 		{#if error}<p class="error-text">{error}</p>{/if}
-	{:else}
+	{:else if inputMode === 'batch'}
 		<BatchPanel
 			bind:batchInput
 			{lineNumbersText}
@@ -192,6 +220,23 @@
 			{onRememberBatchPrompt}
 			onSubmit={onSubmit}
 			onStop={onStop}
+		/>
+	{:else}
+		<DemoPanel
+			bind:settings={demoSettings}
+			running={demoRunning}
+			{liveMs}
+			waitingSeconds={demoWaitingSeconds}
+			generatedPrompt={demoGeneratedPrompt}
+			generatedDdlHighlighted={demoGeneratedDdlHighlighted}
+			canSaveCurrent={demoCanSaveCurrent}
+			savingCurrent={demoSavingCurrent}
+			saveStatus={demoSaveStatus}
+			error={demoError}
+			onSettingsChange={onDemoSettingsChange}
+			onSaveCurrent={onSaveCurrentDemo}
+			onStart={onStartDemo}
+			onStop={onStopDemo}
 		/>
 	{/if}
 </section>

@@ -71,6 +71,7 @@ class UserAccountRow(Base):
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
     ui_theme      = Column(String, nullable=False, default="light")
     batch_prompt_history = Column(Text, nullable=False, default="[]")
+    demo_settings = Column(Text, nullable=False, default="{}")
     at            = Column(BigInteger, nullable=False, index=True)
 
 
@@ -98,9 +99,17 @@ _HISTORY_COLUMN_MIGRATIONS = {
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
     "batch_prompt_history": "ALTER TABLE user_accounts ADD COLUMN batch_prompt_history TEXT NOT NULL DEFAULT '[]'",
+    "demo_settings": "ALTER TABLE user_accounts ADD COLUMN demo_settings TEXT NOT NULL DEFAULT '{}'",
 }
 _BATCH_PROMPT_HISTORY_LIMIT = 20
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
+_DEMO_DEFAULT_SETTINGS = {
+    "save_db": False,
+    "save_files": False,
+    "prompt_model": "google/gemma-4-31b-it",
+    "seed_phrase": "日本の四季を感じさせる文章を40語以内で生成",
+    "interval_seconds": 30,
+}
 _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_user_id", "CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"),
     (
@@ -650,6 +659,68 @@ def update_user_batch_prompt_history(user_id: str, items: list[str]) -> list[str
         row.batch_prompt_history = json.dumps(prompts, ensure_ascii=False)
         session.commit()
         return prompts
+
+
+def _normalize_demo_settings(settings: dict) -> dict:
+    if not isinstance(settings, dict):
+        raise ValueError("demo settings must be an object")
+    clean = dict(_DEMO_DEFAULT_SETTINGS)
+    if "save_db" in settings:
+        clean["save_db"] = bool(settings["save_db"])
+    if "save_files" in settings:
+        clean["save_files"] = bool(settings["save_files"])
+    if "prompt_model" in settings:
+        model = settings["prompt_model"]
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("demo prompt model is required")
+        clean["prompt_model"] = model.strip()
+    if "seed_phrase" in settings:
+        phrase = settings["seed_phrase"]
+        if not isinstance(phrase, str):
+            raise ValueError("demo seed phrase must be a string")
+        phrase = phrase.strip()
+        if not phrase:
+            raise ValueError("demo seed phrase is required")
+        if len(phrase) > 1000:
+            raise ValueError("demo seed phrase is too long")
+        clean["seed_phrase"] = phrase
+    if "interval_seconds" in settings:
+        try:
+            interval = int(settings["interval_seconds"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("demo interval must be an integer") from exc
+        if interval < 1 or interval > 3600:
+            raise ValueError("demo interval must be between 1 and 3600 seconds")
+        clean["interval_seconds"] = interval
+    return clean
+
+
+def get_user_demo_settings(user_id: str) -> dict:
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return dict(_DEMO_DEFAULT_SETTINGS)
+        try:
+            parsed = json.loads(row.demo_settings or "{}")
+        except json.JSONDecodeError:
+            return dict(_DEMO_DEFAULT_SETTINGS)
+        if not isinstance(parsed, dict):
+            return dict(_DEMO_DEFAULT_SETTINGS)
+        try:
+            return _normalize_demo_settings(parsed)
+        except ValueError:
+            return dict(_DEMO_DEFAULT_SETTINGS)
+
+
+def update_user_demo_settings(user_id: str, settings: dict) -> dict | None:
+    clean = _normalize_demo_settings(settings)
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        row.demo_settings = json.dumps(clean, ensure_ascii=False)
+        session.commit()
+        return clean
 
 
 def delete_user(user_id: str) -> bool:

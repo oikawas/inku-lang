@@ -257,7 +257,7 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
     columns = {col["name"] for col in inspect(legacy_engine).get_columns("history")}
     assert {"user_id", "catalog_id", "trashed", "starred"} <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
-    assert {"ui_theme", "batch_prompt_history"} <= user_columns
+    assert {"ui_theme", "batch_prompt_history", "demo_settings"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
     with legacy_engine.connect() as conn:
@@ -332,6 +332,34 @@ def test_current_user_batch_prompt_history_is_persisted(auth_context):
     finally:
         db.delete_session(other_token)
         db.delete_user(other_user["id"])
+
+
+def test_current_user_demo_settings_are_persisted(auth_context):
+    headers, _, _ = auth_context
+
+    initial = client.get("/api/auth/me/demo-settings", headers=headers)
+    assert initial.status_code == 200
+    assert initial.json()["save_db"] is False
+    assert initial.json()["save_files"] is False
+    assert initial.json()["interval_seconds"] == 30
+
+    body = {
+        "save_db": True,
+        "save_files": False,
+        "prompt_model": "meta/llama-3.3-70b-instruct",
+        "seed_phrase": "短い冬の情景を生成",
+        "interval_seconds": 45,
+    }
+    updated = client.put("/api/auth/me/demo-settings", headers=headers, json=body)
+    assert updated.status_code == 200
+    assert updated.json() == body
+
+    persisted = client.get("/api/auth/me/demo-settings", headers=headers)
+    assert persisted.status_code == 200
+    assert persisted.json() == body
+
+    invalid = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "interval_seconds": 0})
+    assert invalid.status_code == 422
 
 
 def test_compose_happy_path(monkeypatch, auth_context):

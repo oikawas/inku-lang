@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from copy import deepcopy
 from typing import Any
 
 from .llm_retry import call_with_llm_retry
@@ -406,11 +407,35 @@ Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1,"
 No explanation. Call submit_score only."""
 
 
+def _score_tool_schema() -> dict[str, Any]:
+    schema = Score.model_json_schema()
+    defs = schema.pop("$defs", {})
+
+    def inline(node: Any, seen: set[str] | None = None) -> Any:
+        if seen is None:
+            seen = set()
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/$defs/"):
+                name = ref.removeprefix("#/$defs/")
+                if name in seen:
+                    return {k: inline(v, seen) for k, v in node.items() if k != "$ref"}
+                target = deepcopy(defs.get(name, {}))
+                merged = {**target, **{k: v for k, v in node.items() if k != "$ref"}}
+                return inline(merged, seen | {name})
+            return {k: inline(v, seen) for k, v in node.items() if k != "$defs"}
+        if isinstance(node, list):
+            return [inline(item, seen) for item in node]
+        return node
+
+    return inline(schema)
+
+
 def _submit_tool() -> dict[str, Any]:
     return {
         "name": "submit_score",
         "description": "正規化DDLから導出した JSON Score を提出する。",
-        "input_schema": Score.model_json_schema(),
+        "input_schema": _score_tool_schema(),
     }
 
 
@@ -502,7 +527,7 @@ def _compose_openai(user_msg: str, *, model: str | None = None, system_prompt: s
         "function": {
             "name": "submit_score",
             "description": "正規化DDLから導出した JSON Score を提出する。",
-            "parameters": Score.model_json_schema(),
+            "parameters": _score_tool_schema(),
         },
     }
 

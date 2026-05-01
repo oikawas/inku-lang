@@ -13,6 +13,7 @@ NVIDIA model ID が設定されている場合だけ実行する。
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 
 import pytest
@@ -120,6 +121,8 @@ def test_submit_tool_schema_is_valid():
     schema = tool["input_schema"]
     assert schema["type"] == "object"
     assert "instructions" in schema["properties"]
+    assert "$defs" not in schema
+    assert "$ref" not in json.dumps(schema)
 
 
 def test_composer_prompt_keeps_dynamic_quantity_guidance():

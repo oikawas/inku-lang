@@ -189,6 +189,7 @@
 	let darkMode     = $state(false);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
+	let canvasAspectEnabled = $state(true);
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
@@ -406,12 +407,50 @@
 			const r = await apiFetch('/api/auth/me/plugin-storage', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const data = await r.json() as { storage?: Record<string, unknown> };
-			const canvasValue = data.storage?.[CANVAS_ASPECT_PLUGIN_ID] as { selected?: unknown } | undefined;
+			const canvasValue = data.storage?.[CANVAS_ASPECT_PLUGIN_ID] as { selected?: unknown; enabled?: unknown } | undefined;
+			canvasAspectEnabled = canvasValue?.enabled !== false;
 			canvasAspectId = normalizeCanvasAspectId(canvasValue?.selected);
 		} catch (e) {
+			canvasAspectEnabled = true;
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			console.warn('failed to load plugin storage', e);
 		}
+	}
+
+	function canvasAspectPluginValue() {
+		return { enabled: canvasAspectEnabled, selected: canvasAspectId };
+	}
+
+	function effectiveCanvasAspectId(): CanvasAspectId {
+		return canvasAspectEnabled ? canvasAspectId : DEFAULT_CANVAS_ASPECT_ID;
+	}
+
+	async function saveCanvasAspectPluginValue() {
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch(`/api/auth/me/plugin-storage/${CANVAS_ASPECT_PLUGIN_ID}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ value: canvasAspectPluginValue() })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		} catch (e) {
+			console.warn('failed to save canvas aspect plugin storage', e);
+		}
+	}
+
+	async function setCanvasAspectEnabled(value: boolean) {
+		canvasAspectEnabled = value;
+		canvasAspectMenuOpen = false;
+		if (!value) {
+			result = null;
+			displayedHistoryItem = null;
+			historyCursor = -1;
+			outputTab = 'canvas';
+			pngMenuOpen = false;
+			fitCanvasZoom();
+		}
+		await saveCanvasAspectPluginValue();
 	}
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
@@ -423,17 +462,7 @@
 		outputTab = 'canvas';
 		pngMenuOpen = false;
 		fitCanvasZoom();
-		if (!currentUser) return;
-		try {
-			const r = await apiFetch(`/api/auth/me/plugin-storage/${CANVAS_ASPECT_PLUGIN_ID}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ value: { selected: canvasAspectId } })
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-		} catch (e) {
-			console.warn('failed to save canvas aspect plugin storage', e);
-		}
+		await saveCanvasAspectPluginValue();
 	}
 
 	async function loadDemoSettings() {
@@ -687,6 +716,7 @@
 			batchPromptHistory = [];
 			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 			demoSettingsLoaded = false;
+			canvasAspectEnabled = true;
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			loginStatus = t().loginRequiredMessage;
 			settingsStatus = null;
@@ -744,6 +774,7 @@
 		batchPromptHistory = [];
 		demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 		demoSettingsLoaded = false;
+		canvasAspectEnabled = true;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		loginStatus = null;
 		settingsStatus = null;
@@ -1080,7 +1111,7 @@
 				include_thinking: includeThinking,
 				lang,
 				color_map: activeColorMap(),
-				canvas_aspect: canvasAspectId,
+				canvas_aspect: effectiveCanvasAspectId(),
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
 				history_input: historyInput,
@@ -1314,7 +1345,7 @@
 			const r = await apiFetch('/api/compose', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, lang, color_map: activeColorMap(), canvas_aspect: canvasAspectId })
+				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, lang, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -1448,7 +1479,7 @@
 				await apiFetch('/api/history', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, save_artifacts: true, color_map: activeColorMap(), canvas_aspect: canvasAspectId })
+					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, save_artifacts: true, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
 				});
 		} catch { /* ignore */ }
 		await fetchHistoryOffset(0);
@@ -1476,7 +1507,7 @@
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null,
 					save_artifacts: demoSettings.save_files,
 					color_map: activeColorMap(),
-					canvas_aspect: canvasAspectId,
+					canvas_aspect: effectiveCanvasAspectId(),
 				})
 			});
 			if (!r.ok) {
@@ -1724,7 +1755,7 @@
 
 	async function downloadPNG(size: number) {
 		if (!result) return;
-		const aspect = getCanvasAspectOption(canvasAspectId);
+		const aspect = getCanvasAspectOption(effectiveCanvasAspectId());
 		const maxRatio = Math.max(aspect.ratioW, aspect.ratioH, 1);
 		const pngWidth = Math.round(size * aspect.ratioW / maxRatio);
 		const pngHeight = Math.round(size * aspect.ratioH / maxRatio);
@@ -1829,7 +1860,7 @@
 		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
 		: statusModelName(stage2Model));
 	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : currentCatalog.name);
-	const currentCanvasAspect = $derived(getCanvasAspectOption(canvasAspectId));
+	const currentCanvasAspect = $derived(getCanvasAspectOption(effectiveCanvasAspectId()));
 	const displayCanvasAspect = $derived(svgAspect(result?.svg) ?? currentCanvasAspect);
 	const statusHistoryItem = $derived.by(() => {
 		if (displayedHistoryItem) return displayedHistoryItem;
@@ -2196,6 +2227,7 @@
 						{error}
 						{stageLabel}
 						{showBirds}
+						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
@@ -2382,6 +2414,8 @@
 		bind:showBirds
 		bind:pngAlphaWhite
 		bind:saveReplayAsNewVersion
+		{canvasAspectEnabled}
+		onSetCanvasAspectEnabled={setCanvasAspectEnabled}
 		onClose={closeSettingsModal}
 		onCloseSettings={() => (settingsOpen = false)}
 		onSelectSettingsTab={selectSettingsTab}

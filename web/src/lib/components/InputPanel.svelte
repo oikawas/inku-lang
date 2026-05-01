@@ -58,6 +58,7 @@
 		lockNonDemo: boolean;
 		stageLabel: string;
 		showBirds: boolean;
+		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
 		onToggleCanvasAspectMenu: () => void;
@@ -115,6 +116,7 @@
 		lockNonDemo,
 		stageLabel,
 		showBirds,
+		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
 		onToggleCanvasAspectMenu,
@@ -161,12 +163,14 @@
 	<div class="section-head">
 		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
-			<CanvasAspectPlugin
-				selected={canvasAspectId}
-				open={canvasAspectMenuOpen}
-				onToggle={onToggleCanvasAspectMenu}
-				onSelect={onSelectCanvasAspect}
-			/>
+			{#if canvasAspectEnabled}
+				<CanvasAspectPlugin
+					selected={canvasAspectId}
+					open={canvasAspectMenuOpen}
+					onToggle={onToggleCanvasAspectMenu}
+					onSelect={onSelectCanvasAspect}
+				/>
+			{/if}
 			<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			<button class="ghost-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			{#if inputMode !== 'demo'}

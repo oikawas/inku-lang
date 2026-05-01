@@ -76,6 +76,7 @@
 		showBirds: boolean;
 		pngAlphaWhite: boolean;
 		saveReplayAsNewVersion: boolean;
+		canvasAspectEnabled: boolean;
 		onClose: () => void;
 		onCloseSettings: () => void;
 		onSelectSettingsTab: (tab: SettingsTab) => void;
@@ -94,6 +95,7 @@
 		onRemoveUser: (id: string) => void | Promise<void>;
 		onAddGroup: () => void | Promise<void>;
 		onRemoveGroup: (group: UserGroup) => void | Promise<void>;
+		onSetCanvasAspectEnabled: (enabled: boolean) => void | Promise<void>;
 		onCancelModelSelection: () => void;
 		onConfirmModelSelection: () => void;
 	};
@@ -131,6 +133,7 @@
 		showBirds = $bindable(),
 		pngAlphaWhite = $bindable(),
 		saveReplayAsNewVersion = $bindable(),
+		canvasAspectEnabled,
 		onClose,
 		onCloseSettings,
 		onSelectSettingsTab,
@@ -149,6 +152,7 @@
 		onRemoveUser,
 		onAddGroup,
 		onRemoveGroup,
+		onSetCanvasAspectEnabled,
 		onCancelModelSelection,
 		onConfirmModelSelection,
 	}: Props = $props();
@@ -176,9 +180,9 @@
 	</div>
 	{#if settingsMode === 'settings'}
 		<div class="settings-tabs">
-			<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
 			<button class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
 			<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
+			<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
 			<button class:active={settingsTab === 'misc'} onclick={() => onSelectSettingsTab('misc')}>{t().settingsTabMisc}</button>
 		</div>
 	{/if}
@@ -243,31 +247,46 @@
 			</div>
 		{:else if settingsTab === 'plugins'}
 			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsPluginsStatus}</div>
+				<div class="popover-group-label">{t().settingsSystemPlugins}</div>
 				{#if settingsStatusLoading}
 					<div class="inline-message">{t().settingsLoading}</div>
 				{:else if settingsStatus}
-					<div class="settings-readonly-grid">
-						<span>Loader</span><strong>{settingsStatus.plugins.enabled ? t().settingsYes : t().settingsUnavailable}</strong>
-						<span>Runtime edit</span><strong>{settingsStatus.plugins.runtime_editable ? t().settingsYes : t().settingsUnavailable}</strong>
-					</div>
-					{#if settingsStatus.plugins.loaded.length > 0}
-						<div class="plugin-list">
-							{#each settingsStatus.plugins.loaded as plugin (plugin.name)}
-								<div class="plugin-row">
-									<span>{plugin.name}</span>
-									<span class="plugin-version">{plugin.version}</span>
-									<span class="plugin-version">{plugin.status}</span>
-								</div>
-							{/each}
+					<div class="system-plugin-panel">
+						<div class="system-plugin-main">
+							<div class="system-plugin-title-row">
+								<div class="system-plugin-title">{t().settingsCanvasPluginTitle}</div>
+								<span class="plugin-version-pill">v0.1.0</span>
+							</div>
+							<div class="system-plugin-desc">{t().settingsCanvasPluginDescription}</div>
 						</div>
-					{:else}
-						<div class="inline-message">{t().settingsPluginsEmpty}</div>
-					{/if}
-					<div class="db-test-result">{settingsStatus.plugins.note}</div>
+						<button
+							type="button"
+							class="plugin-switch"
+							class:plugin-enabled={canvasAspectEnabled}
+							role="switch"
+							aria-checked={canvasAspectEnabled}
+							onclick={() => void onSetCanvasAspectEnabled(!canvasAspectEnabled)}
+						>
+							<span class="switch-track"><span class="switch-knob"></span></span>
+							<span class="switch-label">{canvasAspectEnabled ? t().settingsPluginEnabled : t().settingsPluginDisabled}</span>
+						</button>
+					</div>
 				{:else}
 					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
 				{/if}
+			</div>
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsUserPlugins}</div>
+				<div class="user-plugin-skeleton">
+					<div>
+						<div class="system-plugin-title">{t().settingsUserPluginsAddTitle}</div>
+						<div class="system-plugin-desc">{t().settingsUserPluginsAddDescription}</div>
+					</div>
+					<div class="plugin-add">
+						<input placeholder={t().settingsUserPluginPathPlaceholder} disabled />
+						<button class="ghost-btn" disabled>{t().addButton}</button>
+					</div>
+				</div>
 			</div>
 			<div class="settings-inline-actions">
 				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReload}</button>
@@ -429,15 +448,20 @@
 		color: var(--fg3); font-size: 18px; cursor: pointer; line-height: 1;
 	}
 	.settings-modal {
-		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+		position: fixed;
+		top: 6vh;
+		left: 50%;
+		transform: translateX(-50%);
 		z-index: 401;
 		background: var(--panel2); border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
 		width: min(860px, calc(100vw - 32px)); max-height: 88vh;
+		height: min(760px, 88vh);
 	}
 	.settings-modal.model-modal {
 		width: min(calc(35ch + 190px), calc(100vw - 32px));
+		height: auto;
 	}
 	.settings-modal.model-modal .form-row label { width: 82px; }
 	.settings-tabs {
@@ -502,17 +526,90 @@
 		color: var(--fg2);
 		font-size: 12px;
 	}
-	.plugin-list {
-		border: 1px solid var(--border); border-radius: var(--r);
-		background: var(--panel); overflow: hidden;
-	}
-	.plugin-row {
-		display: grid; grid-template-columns: 1fr auto auto; gap: 10px;
-		align-items: center; padding: 9px 10px; border-bottom: 1px solid var(--border);
-	}
-	.plugin-row:last-child { border-bottom: none; }
-	.plugin-version { color: var(--fg3); font-size: 11px; }
 	.plugin-add { display: flex; gap: 8px; align-items: center; }
+	.system-plugin-panel {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 12px;
+		align-items: center;
+		padding: 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel);
+	}
+	.system-plugin-main { min-width: 0; }
+	.system-plugin-title-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 4px;
+	}
+	.system-plugin-title {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--fg);
+	}
+	.plugin-version-pill {
+		padding: 2px 6px;
+		border: 1px solid var(--border2);
+		border-radius: 999px;
+		color: var(--fg3);
+		background: var(--bg);
+		font-size: 11px;
+		line-height: 1.2;
+		font-variant-numeric: tabular-nums;
+	}
+	.system-plugin-desc {
+		font-size: 12px;
+		color: var(--fg2);
+		line-height: 1.45;
+	}
+	.plugin-switch {
+		border: none;
+		background: transparent;
+		padding: 0;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		color: var(--fg3);
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 12px;
+	}
+	.switch-track {
+		position: relative;
+		width: 40px;
+		height: 22px;
+		border-radius: 999px;
+		background: var(--border2);
+		box-shadow: inset 0 0 0 1px var(--border2);
+		transition: background 0.14s ease;
+	}
+	.switch-knob {
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--panel);
+		box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+		transition: transform 0.14s ease;
+	}
+	.plugin-switch.plugin-enabled {
+		color: var(--accent);
+	}
+	.plugin-switch.plugin-enabled .switch-track {
+		background: var(--accent);
+	}
+	.plugin-switch.plugin-enabled .switch-knob {
+		transform: translateX(18px);
+	}
+	.user-plugin-skeleton {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 10px;
+	}
 	.login-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;

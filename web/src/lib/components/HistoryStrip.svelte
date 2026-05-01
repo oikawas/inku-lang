@@ -32,6 +32,7 @@
 		onOlderPage: () => void | Promise<void>;
 		onLoadIteration: (index: number) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
+		interactionLocked: boolean;
 		historyStarredOnly: boolean;
 		onSetStarredOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
@@ -54,6 +55,7 @@
 		onOlderPage,
 		onLoadIteration,
 		onToggleStar,
+		interactionLocked,
 		historyStarredOnly,
 		onSetStarredOnly,
 		historyIndexLabel,
@@ -69,6 +71,7 @@
 	function handleThumbKeydown(event: KeyboardEvent, index: number) {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
+		if (interactionLocked) return;
 		onLoadIteration(index);
 	}
 </script>
@@ -76,7 +79,7 @@
 {#if historyTotal > 0}
 	<div class="history-strip" class:collapsed={historyCollapsed}>
 		<div class="history-head">
-			<button class="history-title-btn" onclick={onOpenManager}>
+			<button class="history-title-btn" onclick={onOpenManager} disabled={interactionLocked}>
 				{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
 			</button>
 			<div class="history-head-actions">
@@ -87,9 +90,9 @@
 							class:ghost-active={historyStarredOnly}
 							onclick={() => onSetStarredOnly(!historyStarredOnly)}
 						>{t().historyStarredOnly}</button>
-						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={historyPage <= 0}>{t().historyNewerPage(historyNavSpan)}</button>
+						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || historyPage <= 0}>{t().historyNewerPage(historyNavSpan)}</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
-						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={historyPage >= historyTotalPages - 1}>{t().historyOlderPage(historyNavSpan)}</button>
+						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={interactionLocked || historyPage >= historyTotalPages - 1}>{t().historyOlderPage(historyNavSpan)}</button>
 					</div>
 				{/if}
 				<button
@@ -108,10 +111,10 @@
 					<div
 						class="thumb"
 						class:current={i === historyCursor}
-						onclick={() => onLoadIteration(i)}
+						onclick={() => !interactionLocked && onLoadIteration(i)}
 						onkeydown={(event) => handleThumbKeydown(event, i)}
 						role="button"
-						tabindex="0"
+						tabindex={interactionLocked ? -1 : 0}
 					>
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
@@ -176,7 +179,8 @@
 		box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 		transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
 	}
-	.history-title-btn:hover {
+	.history-title-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+	.history-title-btn:hover:not(:disabled) {
 		color: var(--fg);
 		background: var(--accent-light);
 		border-color: var(--accent);

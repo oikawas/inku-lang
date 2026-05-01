@@ -1479,12 +1479,14 @@
 	}
 
 	function loadIteration(idx: number) {
+		if (demoRunning) return;
 		if (idx < 0 || idx >= historyItems.length) return;
 		historyCursor = idx;
 		loadIterationItem(historyItems[idx]);
 	}
 
 	function loadIterationItem(it: Iteration) {
+		if (demoRunning) return;
 		inputMode = 'single';
 		displayedHistoryItem = it;
 		const itemDDL = it.ddl ?? '';
@@ -1747,6 +1749,7 @@
 	}
 
 	function openHistoryManager() {
+		if (demoRunning) return;
 		historyManager.openWith(historyItems, historyTotal, trashTotal);
 	}
 
@@ -2058,6 +2061,7 @@
 						{demoSavingCurrent}
 						{demoSaveStatus}
 						{demoError}
+						lockNonDemo={demoRunning}
 						{canSubmit}
 						{error}
 						{stageLabel}
@@ -2172,7 +2176,7 @@
 			/>
 		</div><!-- /body -->
 
-		<HistoryStrip
+			<HistoryStrip
 			{historyItems}
 			{historyTotal}
 			{historyCursor}
@@ -2184,6 +2188,7 @@
 			onOlderPage={gotoHistoryOlderPage}
 			onLoadIteration={loadIteration}
 			onToggleStar={toggleHistoryStar}
+			interactionLocked={demoRunning}
 			{historyStarredOnly}
 			onSetStarredOnly={setHistoryStarredOnly}
 			{historyIndexLabel}

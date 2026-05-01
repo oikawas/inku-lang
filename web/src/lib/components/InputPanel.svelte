@@ -45,6 +45,7 @@
 		demoSavingCurrent: boolean;
 		demoSaveStatus: string | null;
 		demoError: string | null;
+		lockNonDemo: boolean;
 		stageLabel: string;
 		showBirds: boolean;
 		onOpenModelSelection: () => void;
@@ -89,6 +90,7 @@
 		demoSavingCurrent,
 		demoSaveStatus,
 		demoError,
+		lockNonDemo,
 		stageLabel,
 		showBirds,
 		onOpenModelSelection,
@@ -106,7 +108,15 @@
 
 <div class="panel-tabs">
 	{#each [['single', t().modeSingle], ['batch', t().modeBatch], ['demo', t().modeDemo]] as [mode, label] (mode)}
-		<button class="panel-tab" class:active={inputMode === mode} onclick={() => (inputMode = mode as 'single' | 'batch' | 'demo')}>{label}</button>
+		<button
+			class="panel-tab"
+			class:active={inputMode === mode}
+			disabled={lockNonDemo && mode !== 'demo'}
+			onclick={() => {
+				if (lockNonDemo && mode !== 'demo') return;
+				inputMode = mode as 'single' | 'batch' | 'demo';
+			}}
+		>{label}</button>
 	{/each}
 </div>
 
@@ -249,6 +259,7 @@
 		font-family: inherit; border-bottom: 2px solid transparent;
 	}
 	.panel-tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+	.panel-tab:disabled { opacity: 0.38; cursor: not-allowed; }
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
 	.section-head {
 		display: flex;

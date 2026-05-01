@@ -22,6 +22,21 @@ def test_render_canvas_aspect_plugin_changes_viewbox_without_stretching_circle()
     assert 'r="200.0"' in svg
 
 
+def test_render_uses_score_canvas_when_no_explicit_aspect():
+    score = Score.model_validate(
+        {
+            "canvas": "golden",
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}
+            ],
+        }
+    )
+
+    svg = render(score)
+
+    assert 'viewBox="0 0 1618 1000"' in svg
+
+
 def test_render_single_line_solid_pen_black():
     score = Score.model_validate(
         {"instructions": [{"primitive": "line", "from": [0.0, 0.33], "to": [1.0, 0.33]}]}

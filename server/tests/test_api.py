@@ -438,7 +438,9 @@ def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
     r = client.post("/api/compose", json={"ddl": "横線", "canvas_aspect": "pillar"}, headers=headers)
 
     assert r.status_code == 200
-    assert 'viewBox="0 0 200 1000"' in r.json()["svg"]
+    data = r.json()
+    assert data["score"]["canvas"] == "pillar"
+    assert 'viewBox="0 0 200 1000"' in data["svg"]
 
 
 def test_compose_sanitizes_random_ddl_before_stage2(monkeypatch, auth_context):

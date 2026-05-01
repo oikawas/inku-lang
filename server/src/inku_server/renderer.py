@@ -418,7 +418,7 @@ def render(
     canvas_aspect: str | None = None,
 ) -> str:
     cmap = {**COLOR_MAP, **(color_map or {})}
-    canvas = canvas_size_for_aspect(canvas_aspect)
+    canvas = canvas_size_for_aspect(canvas_aspect or score.canvas)
     dwg = svgwrite.Drawing(
         size=(canvas.width, canvas.height),
         viewBox=f"0 0 {canvas.width} {canvas.height}",

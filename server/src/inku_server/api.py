@@ -178,6 +178,18 @@ def _validated_canvas_aspect(value: str | None) -> str:
     return value
 
 
+def _validated_canvas_aspect_override(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return _validated_canvas_aspect(value)
+
+
+def _score_with_canvas(score: Score, canvas_aspect: str) -> Score:
+    data = score.model_dump(by_alias=True)
+    data["canvas"] = canvas_aspect
+    return Score.model_validate(data)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?",
@@ -953,8 +965,10 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
+    canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
+    score = _score_with_canvas(score, canvas_aspect)
     try:
-        svg = render(score, color_map=req.color_map, canvas_aspect=_validated_canvas_aspect(req.canvas_aspect))
+        svg = render(score, color_map=req.color_map)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
 
@@ -1169,9 +1183,11 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
+    canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
+    score = _score_with_canvas(score, canvas_aspect)
     t2 = time.perf_counter()
     try:
-        svg = render(score, color_map=req.color_map, canvas_aspect=_validated_canvas_aspect(req.canvas_aspect))
+        svg = render(score, color_map=req.color_map)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
     elapsed_stage1_ms = int((t1 - t0) * 1000)
@@ -1360,10 +1376,12 @@ def api_history_get(
 def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
     try:
         score = coerce_score(Score.model_validate(body.score))
+        canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
+        if canvas_aspect is not None:
+            score = _score_with_canvas(score, canvas_aspect)
         svg = render(
             score,
             color_map=_validated_color_map(body.color_map),
-            canvas_aspect=_validated_canvas_aspect(body.canvas_aspect),
         )
     except HTTPException:
         raise

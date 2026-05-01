@@ -18,6 +18,7 @@ Weight = Literal[
     "brush_thin", "brush_thick", "rope",
 ]
 Color = Literal["white", "black", "blue", "red", "green", "gray"]
+Canvas = Literal["square", "golden", "a4", "b4", "pillar", "oban", "wide", "vertical"]
 
 Amplitude = Literal["fine", "medium", "broad"]
 Frequency = Literal["slow", "medium", "high"]
@@ -198,7 +199,7 @@ class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: str = "0.1.0"
-    canvas: Literal["square"] = "square"
+    canvas: Canvas = "square"
     background: Color = Field(
         default="white",
         description="背景色 (省略=white)。「背景を黒で塗りつぶす」→ black",

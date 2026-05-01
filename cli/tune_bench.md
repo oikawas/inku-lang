@@ -1068,3 +1068,120 @@ UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
 6. 修正案を Stage 別に整理する
 7. 影響が大きく、実装が局所的なものから修正する
 8. 修正後に同じ入力セットで再実行し、差分を見る
+
+## 16. 不正・矛盾・曖昧入力30件ストレステスト
+
+Date: 2026-05-01
+
+目的:
+
+- 通常の絵画指示ではなく、矛盾、否定、会話、メタ指示、XML/script 風文字列、エラー文、空描画誘導、不可視色、過大数量、曖昧語を混ぜる。
+- LLM 側のエラー、Stage 2 の空 instructions、retry/fallback、描画破綻の出方を見る。
+
+出力:
+
+- `cli/out/invalid-bench-030/`
+
+実行結果:
+
+- 成功: 30件
+- 失敗: 0件
+- elapsed total: 1,790,085ms
+- tokens in: 332,541
+- tokens out: 16,228
+- retry 発生: 4件
+- fallback 使用: 2件
+
+retry / fallback:
+
+| line | 入力概要 | elapsed | tokens out | reasons | fallback |
+| ---: | --- | ---: | ---: | --- | --- |
+| 2 | 「赤い円を描くな。青い四角も描くな。では、何かを描いて。」 | 191,669ms | 4,114 | `empty_instructions`, `fallback_after_empty_retry` | yes |
+| 3 | 白背景に白い雪・白い息 | 261,016ms | 257 | `slow_single_instruction` | no |
+| 13 | 一万本の極細線で霧、余白九割 | 130,579ms | 2,245 | `empty_instructions` | no |
+| 28 | 読めない文字を読めないまま描く | 448,738ms | 4,129 | `empty_instructions`, `fallback_after_empty_retry` | yes |
+
+過長応答:
+
+- `elapsed > 120s` は 5件。
+- line 2 / 3 / 13 / 28 は Stage 2 側。
+- line 21 は Stage 1 側が 124,492ms で、Stage 2 は 7,949ms。入力は「ランダムにしてください。ただしランダムという言葉は使わないで。」で、Stage 1 の解釈に時間がかかった。
+- 現在の retry 判定は「返ってきた結果を見て再試行・診断する」ため、進行中の LLM request を 120秒で強制中断しない。このため line 28 のように 448秒待つケースが残る。
+
+描画・構造:
+
+- API / renderer 破綻はなし。
+- expanded primitive max: 250
+- expanded primitive avg: 99
+- instruction max: 5
+- instruction avg: 2.1
+- background: white 23 / black 5 / blue 1 / green 1
+- primitive: line 45 / square 11 / ellipse 6 / circle 1 / arc 1
+- XML/script 風入力は SVG/script として混入せず、通常の抽象描画に落ちた。
+- 「白地に白」や「灰色に灰色」は不可視破綻せず、見える描画に補正された。
+- 「空配列にしてください」は空描画に落ちず、通常成功した。
+
+観察:
+
+- 不正・矛盾入力でも API と renderer は落ちない。
+- 空 instructions retry/fallback は機能している。
+- ただし fallback 使用時の入力意味の保持は弱い。line 2 / 28 は「落ちない」ことは達成したが、作品としての妥当性は低い。
+- Stage 2 の長時間空応答は依然としてコストが高い。返却後 retry ではなく、Stage 単位の hard timeout / fail-fast / deterministic fallback への切替が必要。
+- Stage 1 も矛盾・メタ指示で長時間化しうるため、Stage 1 にも同様の hard timeout と診断情報が必要。
+
+次の実装候補:
+
+- ~~Stage 1 / Stage 2 の LLM request に per-stage hard timeout を設け、timeout 時は deterministic fallback へ切り替える。~~ → 実装済み。
+- retry 前の初回応答が `tokens_out` 4000超かつ empty の場合、追加 LLM retry せず即 fallback する。
+- fallback score の DDL coverage を改善し、line 2 / 28 のような否定・読めない文字の含意をより保持する。
+- CLI batch summary をファイル保存するオプションを追加し、長い標準出力に依存せず後続分析できるようにする。
+
+## 17. hard timeout 実装
+
+Date: 2026-05-01
+
+不正入力30件ストレステストで、LLM が最終的には返るものの Stage 1 / Stage 2 が長時間ブロックされるケースが確認された。特に line 28 は 448,738ms かかったため、API 層で Stage 単位の hard timeout を追加した。
+
+実装内容:
+
+- Stage 1 hard timeout:
+  - 環境変数: `INKU_STAGE1_HARD_TIMEOUT_SECONDS`
+  - 既定値: 120秒
+  - timeout 時は、元入力から deterministic fallback DDL を生成する
+  - `/api/interpret` は fallback 時のみ `fallback_used` / `fallback_reasons` を返す
+  - `/api/paint` は `interpret_fallback_used` / `interpret_fallback_reasons` を返す
+- Stage 2 hard timeout:
+  - 環境変数: `INKU_STAGE2_HARD_TIMEOUT_SECONDS`
+  - 既定値: 120秒
+  - 初回 timeout 時は `stage2_hard_timeout` として fallback Score へ切り替える
+  - retry timeout 時は `stage2_retry_hard_timeout` として fallback Score へ切り替える
+- `inku-cli paint` / `batch` の summary JSON に Stage 1 fallback 情報を追加した。
+
+期待効果:
+
+- line 2 / 3 / 13 / 28 のような Stage 2 長時間応答を、既定 120秒で fallback へ切り替える。
+- line 21 のような Stage 1 長時間解釈を、既定 120秒で fallback DDL へ切り替える。
+- ベンチ結果で Stage 1 fallback と Stage 2 fallback を区別できる。
+
+注意:
+
+- Python thread を強制停止するわけではないため、timeout した LLM 呼び出しのワーカースレッドは背後で完了する可能性がある。
+- API レスポンスは hard timeout 時点で返すため、ユーザー操作や CLI batch は長時間ブロックされにくくなる。
+- 将来的には、HTTP クライアント側の request cancellation や非同期 worker / queue 化で、背後の LLM 呼び出し自体もより明確に制御する余地がある。
+
+検証:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
+
+cd ../cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
+```
+
+結果:
+
+- `ruff`: all checks passed
+- server pytest: `107 passed, 30 skipped`
+- cli pytest: `8 passed`

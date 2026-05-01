@@ -12,7 +12,7 @@ import os
 import re
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -243,9 +243,21 @@ class PaintResponse(BaseModel):
     tokens_out_stage1: int | None = None
     tokens_in_stage2: int | None = None
     tokens_out_stage2: int | None = None
+    interpret_fallback_used: bool = False
+    interpret_fallback_reasons: list[str] = Field(default_factory=list)
     compose_retry_count: int = 0
     compose_retry_reasons: list[str] = Field(default_factory=list)
     compose_fallback_used: bool = False
+
+
+@dataclass
+class InterpretDetail:
+    ddl: str
+    thinking: str | None = None
+    tokens_in: int | None = None
+    tokens_out: int | None = None
+    fallback_used: bool = False
+    fallback_reasons: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -733,24 +745,39 @@ def _call_compose_detail(
 
     def invoke(prompt: str | None) -> tuple[Score, int | None, int | None, int]:
         started = time.perf_counter()
-        try:
-            value = compose(
-                ddl,
-                model=model,
-                original_text=original_text,
-                system_prompt=prompt,
-                lang=lang,
-            )
-        except TypeError as e:
-            if "unexpected keyword argument" not in str(e):
-                raise
-            value = compose(ddl, model=model)
+
+        def run_compose():
+            try:
+                return compose(
+                    ddl,
+                    model=model,
+                    original_text=original_text,
+                    system_prompt=prompt,
+                    lang=lang,
+                )
+            except TypeError as e:
+                if "unexpected keyword argument" not in str(e):
+                    raise
+                return compose(ddl, model=model)
+
+        value = _run_with_hard_timeout(
+            "stage2",
+            _hard_timeout_seconds("INKU_STAGE2_HARD_TIMEOUT_SECONDS"),
+            run_compose,
+        )
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         if isinstance(value, tuple):
             return value[0], value[1], value[2], elapsed_ms
         return value, None, None, elapsed_ms
 
-    score, tokens_in, tokens_out, elapsed_ms = invoke(system_prompt)
+    try:
+        score, tokens_in, tokens_out, elapsed_ms = invoke(system_prompt)
+    except StageHardTimeoutError:
+        return ComposeDetail(
+            score=_fallback_score_from_ddl(ddl, lang=lang),
+            retry_reasons=["stage2_hard_timeout"],
+            fallback_used=True,
+        )
     if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
         return ComposeDetail(score=score, tokens_in=tokens_in, tokens_out=tokens_out)
 
@@ -773,7 +800,14 @@ def _call_compose_detail(
         "繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。"
         "DDLを説明し直さず、JSONを短く保つ。"
     )
-    retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(base_prompt + rescue_note)
+    try:
+        retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(base_prompt + rescue_note)
+    except StageHardTimeoutError:
+        fallback_used = True
+        retry_reasons.append("stage2_retry_hard_timeout")
+        retry_score = _fallback_score_from_ddl(ddl, lang=lang)
+        retry_tokens_in = None
+        retry_tokens_out = None
     if retry_tokens_in is not None:
         tokens_in = (tokens_in or 0) + retry_tokens_in
     if retry_tokens_out is not None:
@@ -799,24 +833,43 @@ def _call_interpret_detail(
     include_thinking: bool = False,
     system_prompt_prefix: str | None = None,
     lang: str = "ja",
-) -> tuple[str, str | None, int | None, int | None]:
+) -> InterpretDetail:
+    def run_interpret():
+        try:
+            return interpret_detail(
+                text,
+                model=model,
+                include_thinking=include_thinking,
+                system_prompt_prefix=system_prompt_prefix,
+                lang=lang,
+            )
+        except TypeError as e:
+            if "unexpected keyword argument" not in str(e):
+                raise
+            return interpret_detail(text, model=model, include_thinking=include_thinking)
+
     try:
-        value = interpret_detail(
-            text,
-            model=model,
-            include_thinking=include_thinking,
-            system_prompt_prefix=system_prompt_prefix,
-            lang=lang,
+        value = _run_with_hard_timeout(
+            "stage1",
+            _hard_timeout_seconds("INKU_STAGE1_HARD_TIMEOUT_SECONDS"),
+            run_interpret,
         )
-    except TypeError as e:
-        if "unexpected keyword argument" not in str(e):
-            raise
-        value = interpret_detail(text, model=model, include_thinking=include_thinking)
+    except StageHardTimeoutError:
+        return InterpretDetail(
+            ddl=_fallback_ddl_from_text(text, lang=lang),
+            fallback_used=True,
+            fallback_reasons=["stage1_hard_timeout"],
+        )
     if len(value) == 4:
         ddl, thinking, tokens_in, tokens_out = value
-        return _sanitize_placement_words(ddl), thinking, tokens_in, tokens_out
+        return InterpretDetail(
+            ddl=_sanitize_placement_words(ddl),
+            thinking=thinking,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+        )
     ddl, thinking = value
-    return _sanitize_placement_words(ddl), thinking, None, None
+    return InterpretDetail(ddl=_sanitize_placement_words(ddl), thinking=thinking)
 
 
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
@@ -861,7 +914,7 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
 @app.post("/api/interpret")
 def api_interpret(req: InterpretRequest, _actor: dict = Depends(_current_user)) -> dict:
     try:
-        ddl, thinking, tokens_in, tokens_out = _call_interpret_detail(
+        detail = _call_interpret_detail(
             req.text,
             model=req.model,
             include_thinking=req.include_thinking,
@@ -870,16 +923,59 @@ def api_interpret(req: InterpretRequest, _actor: dict = Depends(_current_user)) 
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
-    data: dict = {"ddl": ddl, "thinking": thinking}
-    if tokens_in is not None:
-        data["tokens_in"] = tokens_in
-    if tokens_out is not None:
-        data["tokens_out"] = tokens_out
+    data: dict = {"ddl": detail.ddl, "thinking": detail.thinking}
+    if detail.tokens_in is not None:
+        data["tokens_in"] = detail.tokens_in
+    if detail.tokens_out is not None:
+        data["tokens_out"] = detail.tokens_out
+    if detail.fallback_used:
+        data["fallback_used"] = detail.fallback_used
+        data["fallback_reasons"] = detail.fallback_reasons
     return data
 
 
 def _strip_anthropic_prefix(model: str) -> str:
     return model.removeprefix("anthropic:")
+
+
+class StageHardTimeoutError(TimeoutError):
+    pass
+
+
+def _hard_timeout_seconds(env_name: str, default: str = "120") -> float:
+    return max(0.1, float(os.getenv(env_name, default)))
+
+
+def _run_with_hard_timeout(label: str, timeout_seconds: float, operation):
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"inku-{label}-timeout")
+    future = executor.submit(operation)
+    try:
+        return future.result(timeout=timeout_seconds)
+    except FutureTimeoutError as exc:
+        future.cancel()
+        raise StageHardTimeoutError(f"{label} exceeded {timeout_seconds:g}s hard timeout") from exc
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
+def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
+    lower = text.lower()
+    if lang == "en":
+        background = "black" if "night" in lower or "dark" in lower or "black" in lower else "white"
+        foreground = "white" if background == "black" else "black"
+        return (
+            f"Fill background with {background}. "
+            f"Draw three thin {foreground} diagonal lines. "
+            "Scatter twelve small gray dots across the whole canvas."
+        )
+    background = "黒" if ("夜" in text or "黒" in text or "暗" in text) else "白"
+    foreground = "白" if background == "黒" else "黒"
+    accent = "青" if foreground == "黒" and ("白" in text or "雪" in text) else "灰色"
+    return (
+        f"背景を{background}で塗りつぶす。"
+        f"{foreground}い細い斜めの線を三本並べる。"
+        f"{accent}の小さな点を十二個、画面全体に点々と散らす。"
+    )
 
 
 def _demo_instruction_system(lang: str) -> str:
@@ -991,11 +1087,12 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
     try:
-        ddl, thinking, s1_tin, s1_tout = _call_interpret_detail(
+        interpret_detail_result = _call_interpret_detail(
             req.text, model=req.stage1_model, include_thinking=req.include_thinking, lang=req.lang
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
+    ddl = interpret_detail_result.ddl
     ddl = expand_intermediate_ddl(ddl, lang=req.lang, context_text=source_text)
     t1 = time.perf_counter()
     try:
@@ -1035,8 +1132,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             elapsed_ms=elapsed_total_ms,
             stage1_model=req.stage1_model,
             stage2_model=req.stage2_model,
-            tokens_in=(s1_tin or 0) + (compose_detail.tokens_in or 0) or None,
-            tokens_out=(s1_tout or 0) + (compose_detail.tokens_out or 0) or None,
+            tokens_in=(interpret_detail_result.tokens_in or 0) + (compose_detail.tokens_in or 0) or None,
+            tokens_out=(interpret_detail_result.tokens_out or 0) + (compose_detail.tokens_out or 0) or None,
             catalog_id=req.catalog_id,
             save_artifacts=save_artifacts,
         )
@@ -1058,7 +1155,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     return PaintResponse(
         text=source_text,
         ddl=ddl,
-        thinking=thinking,
+        thinking=interpret_detail_result.thinking,
         score=score,
         svg=svg,
         history_id=history_id,
@@ -1066,10 +1163,12 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         elapsed_stage1_ms=elapsed_stage1_ms,
         elapsed_stage2_ms=elapsed_stage2_ms,
         elapsed_total_ms=elapsed_total_ms,
-        tokens_in_stage1=s1_tin,
-        tokens_out_stage1=s1_tout,
+        tokens_in_stage1=interpret_detail_result.tokens_in,
+        tokens_out_stage1=interpret_detail_result.tokens_out,
         tokens_in_stage2=compose_detail.tokens_in,
         tokens_out_stage2=compose_detail.tokens_out,
+        interpret_fallback_used=interpret_detail_result.fallback_used,
+        interpret_fallback_reasons=interpret_detail_result.fallback_reasons,
         compose_retry_count=compose_detail.retry_count,
         compose_retry_reasons=compose_detail.retry_reasons,
         compose_fallback_used=compose_detail.fallback_used,

@@ -1362,6 +1362,44 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ## 変更履歴
 
+### v1.28 (2026-05-01)
+
+**Stage 1 / Stage 2 hard timeout と deterministic fallback**
+
+不正・矛盾・曖昧入力30件ストレステストで、API / renderer は落ちない一方、Stage 1 / Stage 2 の LLM 応答が数分単位で返るケースが確認された。これに対し、LLM クライアントの read timeout とは別に、API 層で Stage 単位の hard timeout を実装した。
+
+- Stage 1 は `INKU_STAGE1_HARD_TIMEOUT_SECONDS` を超えた場合、入力文から deterministic fallback DDL を生成する
+- Stage 2 は `INKU_STAGE2_HARD_TIMEOUT_SECONDS` を超えた場合、追加 retry を待たず deterministic fallback Score へ切り替える
+- 既定値はいずれも 120 秒
+- `/api/interpret` は fallback 時のみ `fallback_used` / `fallback_reasons` を返す
+- `/api/paint` は `interpret_fallback_used` / `interpret_fallback_reasons` を返す
+- `/api/compose` / `/api/paint` の Stage 2 診断には `stage2_hard_timeout` / `stage2_retry_hard_timeout` を記録する
+- `inku-cli paint` / `batch` の summary JSON に Stage 1 fallback 情報も含める
+- build number: 172
+
+追加テスト:
+
+- `test_api.py`
+  - Stage 2 hard timeout 時に `/api/compose` が fallback Score を返す
+  - Stage 1 hard timeout 時に `/api/paint` が fallback DDL で継続する
+
+検証:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
+
+cd ../cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
+```
+
+結果:
+
+- `ruff`: all checks passed
+- server pytest: `107 passed, 30 skipped`
+- cli pytest: `8 passed`
+
 ### v1.27 (2026-05-01)
 
 **Stage 2 過長応答対策 + DDL coverage 補完**

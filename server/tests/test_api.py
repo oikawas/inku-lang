@@ -9,6 +9,7 @@ from __future__ import annotations
 import builtins
 import logging
 import sys
+import time
 import types
 import uuid
 
@@ -501,6 +502,27 @@ def test_compose_fallback_preserves_line_arrangement_path(monkeypatch, auth_cont
     assert instruction["arrangement"]["path"] == "top_to_bottom"
 
 
+def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setenv("INKU_STAGE2_HARD_TIMEOUT_SECONDS", "0.01")
+
+    def slow_compose(ddl: str, model=None, original_text=None, system_prompt=None, lang="ja"):
+        time.sleep(0.2)
+        return Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", slow_compose)
+
+    r = client.post("/api/compose", json={"ddl": "黒い線を引く。"}, headers=headers)
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["fallback_used"] is True
+    assert data["retry_reasons"] == ["stage2_hard_timeout"]
+    assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
+
+
 def test_interpret_happy_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
@@ -543,6 +565,35 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert "中心" not in data["ddl"]
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
+
+
+def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setenv("INKU_STAGE1_HARD_TIMEOUT_SECONDS", "0.01")
+
+    def slow_interpret(text, model=None, include_thinking=False, system_prompt_prefix=None, lang="ja"):
+        time.sleep(0.2)
+        return "中心に黒い円を置く。", None, None, None
+
+    captured: dict[str, str] = {}
+
+    def fake_compose(ddl: str, model=None, original_text=None, system_prompt=None, lang="ja"):
+        captured["ddl"] = ddl
+        return Score.model_validate(
+            {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
+        )
+
+    monkeypatch.setattr(api_module, "interpret_detail", slow_interpret)
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    r = client.post("/api/paint", json={"text": "応答しない指示"}, headers=headers)
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["interpret_fallback_used"] is True
+    assert data["interpret_fallback_reasons"] == ["stage1_hard_timeout"]
+    assert "斜めの線を三本" in data["ddl"]
+    assert captured["ddl"] == data["ddl"]
 
 
 def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):

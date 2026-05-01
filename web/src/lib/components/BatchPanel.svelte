@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import PaintButton from './PaintButton.svelte';
 
 	type BatchFailure = {
 		line: number;
@@ -164,7 +165,7 @@
 		<button class="stop-sm" onclick={onStop}>{t().stopBtn}</button>
 	</div>
 {:else}
-	<button class="play-btn" onclick={submitAndRemember} disabled={!canSubmit}>▶ <span>{t().submitBtn}</span></button>
+	<PaintButton onclick={submitAndRemember} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}
@@ -354,21 +355,6 @@
 		padding: 2px 7px; border: 1px solid var(--border2);
 		border-radius: var(--r); background: none;
 		color: var(--fg2); font-size: 11px; cursor: pointer; font-family: inherit;
-	}
-	.play-btn {
-		width: 100%; margin-top: 8px; padding: 9px;
-		font-size: 14px; font-weight: 500;
-		background: var(--action-bg); color: var(--action-fg);
-		border: none; border-radius: var(--r);
-		letter-spacing: 0.08em; cursor: pointer;
-		display: flex; align-items: center; justify-content: center; gap: 8px;
-		font-family: inherit; transition: background 0.15s;
-	}
-	.play-btn:hover:not(:disabled) { background: var(--action-hover); }
-	.play-btn:disabled {
-		background: var(--action-disabled-bg);
-		color: var(--action-disabled-fg);
-		cursor: not-allowed;
 	}
 	.error-text { color: #a2342a; font-size: 12px; }
 	.batch-summary {

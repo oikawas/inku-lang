@@ -1862,6 +1862,9 @@
 	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : currentCatalog.name);
 	const currentCanvasAspect = $derived(getCanvasAspectOption(effectiveCanvasAspectId()));
 	const displayCanvasAspect = $derived(svgAspect(result?.svg) ?? currentCanvasAspect);
+	const statusCanvasName = $derived(getCanvasAspectOption(
+		displayedHistoryItem?.score?.canvas ?? result?.score?.canvas ?? effectiveCanvasAspectId()
+	).label);
 	const statusHistoryItem = $derived.by(() => {
 		if (displayedHistoryItem) return displayedHistoryItem;
 		if (result?.history_id) {
@@ -2329,6 +2332,7 @@
 				{statusStage1Model}
 				{statusStage2Model}
 				{statusCatalogName}
+				{statusCanvasName}
 				{statusHistoryItem}
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}

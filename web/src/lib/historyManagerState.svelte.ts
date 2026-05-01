@@ -3,7 +3,7 @@ export const HISTORY_MANAGER_PAGE_SIZE = 100;
 export type HistoryManagerView = 'active' | 'trash';
 export type HistoryManagerTab = 'thumbs' | 'list';
 
-export type Score = { instructions: unknown[] };
+export type Score = { instructions: unknown[]; canvas?: string | null };
 
 export type HistoryItem = {
 	id?: string;

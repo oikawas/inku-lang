@@ -3,6 +3,7 @@
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
+	import PaintButton from './PaintButton.svelte';
 	import type { DemoSettings } from '$lib/demo';
 	import type { CanvasAspectId } from '$lib/plugins/canvasAspect';
 
@@ -253,7 +254,7 @@
 			</div>
 			<div class="progress-stage-text">{stageLabel}</div>
 		{:else}
-			<button class="play-btn" onclick={onSubmit} disabled={!canSubmit}>▶ <span>{t().submitBtn}</span></button>
+			<PaintButton onclick={onSubmit} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
 		{/if}
 
 		{#if error}<p class="error-text">{error}</p>{/if}
@@ -467,21 +468,6 @@
 		border: 1px solid var(--border2); border-top: none;
 		border-radius: 0 0 var(--r) var(--r);
 		background: var(--panel);
-	}
-	.play-btn {
-		width: 100%; margin-top: 8px; padding: 9px;
-		font-size: 14px; font-weight: 500;
-		background: var(--action-bg); color: var(--action-fg);
-		border: none; border-radius: var(--r);
-		letter-spacing: 0.08em; cursor: pointer;
-		display: flex; align-items: center; justify-content: center; gap: 8px;
-		font-family: inherit; transition: background 0.15s;
-	}
-	.play-btn:hover:not(:disabled) { background: var(--action-hover); }
-	.play-btn:disabled {
-		background: var(--action-disabled-bg);
-		color: var(--action-disabled-fg);
-		cursor: not-allowed;
 	}
 	.error-text { color: #a2342a; font-size: 12px; }
 	@keyframes inkupulse {

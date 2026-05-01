@@ -4,7 +4,7 @@
 	import OutputTabsContent from './OutputTabsContent.svelte';
 
 	type OutputTab = 'canvas' | 'prompts' | 'score';
-	type PaintResult = { svg: string; score: { instructions: unknown[] } };
+	type PaintResult = { svg: string; score: { instructions: unknown[]; canvas?: string | null } };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean };
 
@@ -36,6 +36,7 @@
 		statusStage1Model: string;
 		statusStage2Model: string;
 		statusCatalogName: string;
+		statusCanvasName: string;
 		statusHistoryItem: HistoryItem | null;
 		pngMenuOpen: boolean;
 		pngWrapEl: HTMLDivElement | null;
@@ -81,6 +82,7 @@
 		statusStage1Model,
 		statusStage2Model,
 		statusCatalogName,
+		statusCanvasName,
 		statusHistoryItem,
 		pngMenuOpen = $bindable(false),
 		pngWrapEl = $bindable(null),
@@ -238,6 +240,11 @@
 			<span class="status-group">
 				<span class="status-label">Color</span>
 				<span class="status-v">{statusCatalogName}</span>
+			</span>
+			<span class="status-divider"></span>
+			<span class="status-group">
+				<span class="status-label">Canvas</span>
+				<span class="status-v">{statusCanvasName}</span>
 			</span>
 		</div>
 		<button

@@ -2,6 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { PROVIDER_GROUPS, modelsForProvider, providerOfModel, type Provider } from '$lib/models';
 	import type { DemoSettings } from '$lib/demo';
+	import PaintButton from './PaintButton.svelte';
 
 	type Props = {
 		settings: DemoSettings;
@@ -156,7 +157,7 @@
 			</div>
 			<button class="stop-sm" onclick={onStop}>{t().demoStop}</button>
 		{:else}
-			<button class="play-btn" onclick={onStart} disabled={!settings.seed_phrase.trim()}>▶ <span>{t().demoStart}</span></button>
+			<PaintButton onclick={onStart} disabled={!settings.seed_phrase.trim()}>{t().demoStart}</PaintButton>
 		{/if}
 	</div>
 
@@ -291,17 +292,6 @@
 		color: var(--fg3);
 		margin-left: auto;
 	}
-	.play-btn {
-		width: 100%;
-		padding: 9px 12px;
-		border: none;
-		border-radius: var(--r);
-		background: var(--accent);
-		color: white;
-		font-weight: 500;
-		cursor: pointer;
-	}
-	.play-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 	.stop-sm {
 		border: 1px solid rgba(154, 61, 61, 0.35);
 		background: rgba(154, 61, 61, 0.08);

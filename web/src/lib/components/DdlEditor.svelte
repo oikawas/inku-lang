@@ -47,7 +47,7 @@
 			class="ddl-edit-ta"
 			bind:this={ddlTextareaEl}
 			bind:value={ddl}
-			rows="4"
+			rows="8"
 			spellcheck="false"
 			onclick={onRememberSelection}
 			onfocus={() => { ddlFocused = true; onRememberSelection(); }}
@@ -160,6 +160,7 @@
 		margin: 0;
 		font-family: inherit; font-size: 13px; font-weight: 400; font-style: normal; letter-spacing: 0;
 		line-height: 1.75; resize: vertical; outline: none;
+		min-height: 15.5em;
 		white-space: pre-wrap; word-break: break-word;
 		tab-size: 4;
 		scrollbar-gutter: stable;

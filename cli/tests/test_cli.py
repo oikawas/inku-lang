@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from inku_server import cli
+from inku_cli import cli
 
 
 def test_extract_session_token_from_login_cookie():

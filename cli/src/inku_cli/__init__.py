@@ -1,0 +1,2 @@
+"""inku command line client."""
+

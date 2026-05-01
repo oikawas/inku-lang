@@ -45,4 +45,5 @@ LOCAL_WORK.md
 data/history.json
 
 # CLI generated outputs
+cli/out/
 server/out/

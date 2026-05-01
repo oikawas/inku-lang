@@ -1248,6 +1248,15 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ├── LICENSE                        # MIT License
 ├── SPEC.md                        # 本書（設計哲学・言語設計）
 ├── CLAUDE.md                      # Claude Code 用コンテキスト (gitignore)
+├── cli/                           # Python CLI クライアント (uv管理)
+│   ├── pyproject.toml             # inku-cli 0.1.0
+│   ├── uv.lock
+│   ├── README.md
+│   ├── src/inku_cli/
+│   │   ├── __init__.py
+│   │   └── cli.py                 # FastAPI API を操作する CLI 本体
+│   └── tests/
+│       └── test_cli.py            # CLI 設定 / payload / 出力テスト
 ├── server/                        # Python バックエンド (uv管理)
 │   ├── pyproject.toml             # inku-server 0.1.0
 │   ├── uv.lock
@@ -1294,6 +1303,9 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/history/{id}/star`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
+`cli/src/inku_cli/`:
+- `cli.py` — `inku-api` を操作する API クライアント CLI。`login` / `logout` / `me` / `paint` / `batch` / `demo-instruction` / `history` を提供する。サーバー内部モジュールを import せず、HTTP API のみを利用する
+
 
 **別リポジトリ / 別 PoC**:
 - `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
@@ -1317,8 +1329,13 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - `me` / `logout` / `paint` / `batch` / `demo-instruction` / `history` を初期コマンドとして提供する
 - `paint` / `batch` は SVG / JSON をファイル出力でき、必要に応じて PNG も生成できる
 - `paint` / `batch` は Stage 1 / Stage 2 モデル指定、履歴保存、artifact 保存、言語指定、thinking 取得を指定できる
+- `models` コマンドで Stage 1 / Stage 2 の CLI 既定モデルを確認・保存できる
+- `paint` / `batch` は使用する Stage 1 / Stage 2 モデルを描画開始時に stderr へ表示し、JSON summary にも含める
+- 描画系 API 呼び出しの既定 timeout は 600 秒とし、長い Stage 2 推論を待てるようにする
+- 描画中は stderr に経過秒数と簡易テキストアニメーションを表示し、停止していないことを確認できる
 - 初期目的は、CLI から指示と画像を生成し、AI による成果物画像の品質判定を組み合わせて Stage 1 / 1.5 / 2 調整用のフィードバックループを構築すること
 - CLI は `inku_server` を import せず、単独の API クライアントとして起動する
+- 開発時は `cd cli && uv run inku-cli ...` で実行する
 - macOS から pentala の `inku-api` へ LAN 経由で接続し、`login` / `paint` / SVG・JSON・PNG 出力の動作を確認した
 - CLI の確認で生成される `cli/out/` はローカル成果物として Git 追跡対象外にする
 

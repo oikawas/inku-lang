@@ -13,7 +13,13 @@ def test_extract_session_token_from_login_cookie():
 
 def test_config_roundtrip(tmp_path):
     path = tmp_path / "config.json"
-    config = cli.CliConfig(base_url="http://example.test", token="token-1", username="admin")
+    config = cli.CliConfig(
+        base_url="http://example.test",
+        token="token-1",
+        username="admin",
+        stage1_model="stage1",
+        stage2_model="stage2",
+    )
     cli.save_config(config, path)
 
     assert path.stat().st_mode & 0o777 == 0o600
@@ -35,6 +41,25 @@ def test_paint_payload_drops_none_values():
     assert payload["include_thinking"] is False
     assert "stage2_model" not in payload
     assert "history_input" not in payload
+
+
+def test_paint_payload_uses_resolved_models():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨"])
+
+    payload = cli._paint_payload(args, "一滴の墨", stage1_model="s1", stage2_model="s2")
+
+    assert payload["stage1_model"] == "s1"
+    assert payload["stage2_model"] == "s2"
+
+
+def test_model_summary_marks_server_default():
+    summary = cli._model_summary(None, "gemma")
+
+    assert summary["stage1_model"] is None
+    assert summary["stage1_model_display"] == "server default"
+    assert summary["stage2_model"] == "gemma"
+    assert summary["stage2_model_display"] == "gemma"
 
 
 def test_write_paint_outputs(tmp_path):

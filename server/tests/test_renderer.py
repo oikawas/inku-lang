@@ -166,6 +166,85 @@ def test_render_brush_lines_use_layered_material_texture():
     assert 'id="texture-brush_thick"' in svg
 
 
+def test_render_circle_material_applies_outline_texture():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.18,
+                    "weight": "chalk",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert svg.count("<circle") >= 38
+    assert 'id="texture-chalk"' in svg
+    assert 'stroke-dasharray="8,12,1,8"' in svg
+
+
+def test_render_ellipse_material_applies_outline_texture():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.4, 0.2],
+                    "weight": "crayon",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert svg.count("<ellipse") >= 4
+    assert svg.count("<circle") >= 28
+    assert 'id="texture-crayon"' in svg
+    assert 'stroke-dasharray="2,5,9,7"' in svg
+
+
+def test_render_square_material_applies_outline_texture():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.3, 0.3],
+                    "size": [0.3, 0.3],
+                    "weight": "pencil",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert svg.count("<rect") >= 4
+    assert svg.count("<circle") >= 18
+    assert 'id="texture-pencil"' in svg
+    assert 'stroke-dasharray="1,7"' in svg
+
+
+def test_render_arc_material_applies_outline_texture():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.5, 0.5],
+                    "radius": 0.25,
+                    "angle_start": 0,
+                    "angle_end": 180,
+                    "weight": "rope",
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert svg.count("<path") >= 3
+    assert 'stroke-dasharray="4,8"' in svg
+
+
 def test_render_circle():
     score = Score.model_validate(
         {

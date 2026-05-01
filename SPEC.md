@@ -916,11 +916,14 @@ DDLの揺らぎは、この意味での揺らぎである。
 | weight | 揺らぎの質 | 特性 |
 |---|---|---|
 | hair | almost_none | ほぼ揺らぎなし（正確） |
-| pencil | perlin_fine | パーリン寄り（手の連続性） |
-| pen | perlin_minimal | わずかなパーリン |
-| chalk | perlin_plus_noise | パーリン + ざらつき |
-| brush | perlin_strong | 強いパーリン + 太さのバラつき |
-| rope | slow_wave | 大きな波、ゆっくりした揺らぎ |
+| pencil | perlin_fine | パーリン寄り（手の連続性）、薄い副線、微細な粒 |
+| pen | perlin_minimal | わずかなパーリン。基準となる標準線 |
+| rotring | almost_none | 均一幅、角端、硬い製図線 |
+| crayon | rubbed_noise | 擦れ、短い破線、粒状の欠け |
+| chalk | perlin_plus_noise | パーリン + 粉っぽいかすれ、blur |
+| brush_thin | perlin_strong | 細い筆跡、副線、濃淡 |
+| brush_thick | pressure_blur | 太い筆圧、擦れ副線、軽い blur |
+| rope | slow_wave | 大きな波、撚り線、斜めの短い撚り |
 
 **揺らぎのノイズ種別:**
 - **ホワイトノイズ**: 各点独立・相関なし・ギザギザ
@@ -928,6 +931,8 @@ DDLの揺らぎは、この意味での揺らぎである。
 - **1/f揺らぎ（ピンクノイズ）**: 自然界に多い・人間が「自然」と感じる
 
 手描きの線は手の慣性から連続性を持つため、パーリンノイズ寄りが自然。
+
+現行 Renderer は `weight` を単なる線幅ではなく SVG 構造として描き分ける。`pencil` / `crayon` / `chalk` / `brush_thick` は `feTurbulence` + `feDisplacementMap` などの texture filter を持ち、`crayon` / `chalk` は粒状の副要素、`rope` は撚りを示す斜め短線を追加する。line だけでなく circle / ellipse / square / arc の輪郭にも同じ素材処理を適用する。JSON Score では `weight` を保持し、物理的な質感差は SVG レンダリング時に演奏される。
 
 ### 13.6 運動語彙のカテゴリ
 
@@ -1149,14 +1154,14 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 | arc 揺らぎ | 未実装 | path を N 分割して radius 揺らぎ |
 | `thickness` dimension | 未対応 | stroke-width を segment 毎に変化 (1 line = 複数 path 必要) |
 | `angle` / `rotation` / `length` dimension | 未対応 | 線の端点位置に作用する軸 |
-| てざわり視覚品質 | 線幅のみ (v1.8) | `WEIGHT_TO_STROKE_WIDTH` で stroke-width を変化させるが、クレヨンのザラつき・チョークのかすれ等の物理リアリズムは未実装 (SPEC §13.5)。SVG `feTurbulence` や `feDisplacementMap` フィルターが候補 |
+| てざわり視覚品質 | 実装済 (v1.25) | `weight` ごとに stroke 属性、texture filter、副線、粒、撚り線を生成。line / circle / ellipse / square / arc の輪郭に適用 |
 
 ### B. Stage 2 composer (精度改善)
 
 - qwen-api の fixture 合格率 9/15、残 6 件の改善案:
   - center/position 混同の対比例を EXAMPLE_POOL 形式で追加
   - 複数命令並列用の例を追加
-- **てざわり → weight フィールド変換**: v1.8 で対応テーブル + 4 例追加済み。fixture 16〜20 としててざわり専用ケースの追加が望ましい（クレヨン・チョーク・太筆・縄）
+- **てざわり → weight フィールド変換**: v1.25 で Stage 1 に文脈からの素材選択ルールを追加し、Stage 1.5 に鉛筆・クレヨン・ロットリング・縄の追加DDL候補を追加。fixture 16〜20 としててざわり専用ケースの追加が望ましい
 - Anthropic Haiku 4.5 path の fidelity 測定 (ベースライン比較)
 - Gemma3-4B 対応: tool parameters 用の flat schema 生成ヘルパ (`_flatten_schema_for_tool()`)
 - tolerance `±0.05` の妥当性 (複数 LLM 横断比較で再調整)
@@ -1325,6 +1330,26 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.25 (2026-05-01)
+
+**てざわり選択と物理素材レンダリング**
+
+DDL の「てざわり」が線幅差だけに見えないよう、Stage 1 / Stage 1.5 / Renderer の各層で素材差を強化した。
+
+- Stage 1 に「てざわり選択」ルールを追加し、明示素材がない入力でも文脈から素材を選ぶ
+  - 薄い / 淡い / 下書き / 素描 → 鉛筆または細筆
+  - 粉 / かすれ / 乾いた / 黒板 / 壁 → チョーク
+  - 手描き / こすれ / 蝋 / 柔らかい色面 → クレヨン
+  - 墨 / 書 / 筆跡 / 濃淡 → 細筆または太筆
+  - 精密 / 機械的 / 均一 / 図面 → ロットリング
+  - 太い / 荒い / 撚り / 重い / 綱 → 縄
+- Stage 1 の few-shot に鉛筆、チョーク、クレヨン、ロットリングの質感例を追加した
+- Stage 1.5 の拡張DDL候補に `鉛筆の余白線`、`クレヨンの擦れ`、`ロットリングの均一線`、`縄の撚り` を追加した
+- Renderer は `weight` ごとに SVG 属性・texture filter・副線・粒・撚り短線を生成する
+- line に加えて circle / ellipse / square / arc の輪郭にも素材処理を適用する
+- `pencil` / `crayon` / `chalk` / `brush_thick` は `feTurbulence` / `feDisplacementMap` を使い、線幅だけではない質感差を出す
+- `rope` は平行な撚り線に加え、周期的な斜め短線で撚りを表現する
 
 ### v1.24 (2026-05-01)
 

@@ -590,6 +590,82 @@ def _add_powder_specks(
         )
 
 
+def _add_specks_at_points(
+    dwg: svgwrite.Drawing,
+    group,
+    points: list[tuple[float, float]],
+    attrs: dict,
+    seed: int,
+    *,
+    spread: float,
+    radius: float,
+    opacity: float,
+) -> None:
+    color = attrs.get("stroke", "#111111")
+    for idx, (px, py) in enumerate(points):
+        ox = _hash_to_unit(idx, seed) * spread
+        oy = _hash_to_unit(idx + 157, seed) * spread
+        group.add(
+            dwg.circle(
+                center=(px + ox, py + oy),
+                r=max(0.35, radius * (0.75 + abs(_hash_to_unit(idx + 263, seed)) * 0.7)),
+                fill=color,
+                stroke="none",
+                opacity=opacity,
+            )
+        )
+
+
+def _circle_points(cx: float, cy: float, rx: float, ry: float, count: int) -> list[tuple[float, float]]:
+    return [
+        (
+            cx + math.cos(i * 2 * math.pi / count) * rx,
+            cy + math.sin(i * 2 * math.pi / count) * ry,
+        )
+        for i in range(count)
+    ]
+
+
+def _rect_points(x: float, y: float, w: float, h: float, count: int) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    perimeter = max(1.0, 2 * (w + h))
+    for i in range(count):
+        d = ((i + 0.5) / count) * perimeter
+        if d <= w:
+            points.append((x + d, y))
+        elif d <= w + h:
+            points.append((x + w, y + d - w))
+        elif d <= 2 * w + h:
+            points.append((x + w - (d - w - h), y + h))
+        else:
+            points.append((x, y + h - (d - 2 * w - h)))
+    return points
+
+
+def _arc_points(cx: float, cy: float, r: float, start_deg: float, end_deg: float, count: int) -> list[tuple[float, float]]:
+    if count <= 1:
+        count = 2
+    start = math.radians(start_deg)
+    end = math.radians(end_deg)
+    return [
+        (
+            cx + math.cos(start + (end - start) * i / (count - 1)) * r,
+            cy - math.sin(start + (end - start) * i / (count - 1)) * r,
+        )
+        for i in range(count)
+    ]
+
+
+def _outline_attrs(attrs: dict, *, stroke_width: float, opacity: float, dash: str | None = None) -> dict:
+    result = _copy_attrs(attrs)
+    result["fill"] = "none"
+    result["stroke_width"] = stroke_width
+    result["stroke_opacity"] = opacity
+    if dash is not None:
+        result["stroke_dasharray"] = dash
+    return result
+
+
 def _add_rope_twists(
     dwg: svgwrite.Drawing,
     group,
@@ -619,6 +695,138 @@ def _add_rope_twists(
                 stroke_linecap="round",
             )
         )
+
+
+def _material_outline_profile(weight: str, base_width: float) -> list[tuple[float, float, float, str | None]]:
+    if weight == "pencil":
+        return [(-1.0, 0.45, 0.24, "1,7"), (1.2, 0.5, 0.20, "1,5")]
+    if weight == "chalk":
+        return [(-3.2, 1.2, 0.30, "8,12,1,8"), (3.6, 1.0, 0.24, "5,10,1,6")]
+    if weight == "brush_thin":
+        return [(-1.6, 1.0, 0.32, "22,9"), (1.8, 1.4, 0.28, "14,8")]
+    if weight == "brush_thick":
+        return [(-4.0, base_width * 0.28, 0.36, "18,7,3,11"), (3.2, base_width * 0.22, 0.28, "11,9")]
+    if weight == "crayon":
+        return [(-3.4, base_width * 0.24, 0.24, "2,5,9,7"), (-1.5, base_width * 0.20, 0.20, "4,8"), (2.4, base_width * 0.22, 0.22, "2,5,9,7")]
+    if weight == "rope":
+        return [(-5.0, base_width * 0.35, 0.46, "4,8"), (5.0, base_width * 0.35, 0.46, "4,8")]
+    return []
+
+
+def _speck_profile(weight: str) -> tuple[int, float, float, float] | None:
+    if weight == "pencil":
+        return 18, 1.8, 0.45, 0.20
+    if weight == "crayon":
+        return 28, 4.0, 0.75, 0.18
+    if weight == "chalk":
+        return 36, 5.5, 0.9, 0.26
+    return None
+
+
+def _uses_material_outline(weight: str) -> bool:
+    return bool(_material_outline_profile(weight, WEIGHT_TO_STROKE_WIDTH[weight])) or _speck_profile(weight) is not None
+
+
+def _add_material_circle_outline(
+    dwg: svgwrite.Drawing,
+    group,
+    ins: Instruction,
+    attrs: dict,
+    cx: float,
+    cy: float,
+    r: float,
+) -> None:
+    seed = _seed_for_instruction(ins)
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
+        group.add(dwg.circle(center=(cx, cy), r=max(0.0, r + offset), **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash)))
+    if ins.weight == "rope":
+        for idx, (px, py) in enumerate(_circle_points(cx, cy, r, 16)):
+            angle = math.atan2(py - cy, px - cx)
+            tangent = (-math.sin(angle), math.cos(angle))
+            normal = (math.cos(angle), math.sin(angle))
+            span = 6.0 + abs(_hash_to_unit(idx, seed)) * 2.0
+            p1 = (px + tangent[0] * 3.0 + normal[0] * span, py + tangent[1] * 3.0 + normal[1] * span)
+            p2 = (px - tangent[0] * 3.0 - normal[0] * span, py - tangent[1] * 3.0 - normal[1] * span)
+            group.add(dwg.line(start=p1, end=p2, stroke=attrs.get("stroke", "#111111"), stroke_width=1.1, stroke_opacity=0.40, stroke_linecap="round"))
+    specks = _speck_profile(ins.weight)
+    if specks is not None:
+        count, spread, radius, opacity = specks
+        _add_specks_at_points(dwg, group, _circle_points(cx, cy, r, r, count), attrs, seed, spread=spread, radius=radius, opacity=opacity)
+
+
+def _add_material_ellipse_outline(
+    dwg: svgwrite.Drawing,
+    group,
+    ins: Instruction,
+    attrs: dict,
+    cx: float,
+    cy: float,
+    rx: float,
+    ry: float,
+) -> None:
+    seed = _seed_for_instruction(ins)
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
+        group.add(
+            dwg.ellipse(
+                center=(cx, cy),
+                r=(max(0.0, rx + offset), max(0.0, ry + offset)),
+                **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash),
+            )
+        )
+    specks = _speck_profile(ins.weight)
+    if specks is not None:
+        count, spread, radius, opacity = specks
+        _add_specks_at_points(dwg, group, _circle_points(cx, cy, rx, ry, count), attrs, seed, spread=spread, radius=radius, opacity=opacity)
+
+
+def _add_material_rect_outline(
+    dwg: svgwrite.Drawing,
+    group,
+    ins: Instruction,
+    attrs: dict,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+) -> None:
+    seed = _seed_for_instruction(ins)
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
+        group.add(
+            dwg.rect(
+                insert=(x - offset, y - offset),
+                size=(max(0.0, w + offset * 2), max(0.0, h + offset * 2)),
+                **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash),
+            )
+        )
+    specks = _speck_profile(ins.weight)
+    if specks is not None:
+        count, spread, radius, opacity = specks
+        _add_specks_at_points(dwg, group, _rect_points(x, y, w, h, count), attrs, seed, spread=spread, radius=radius, opacity=opacity)
+
+
+def _add_material_arc_outline(
+    dwg: svgwrite.Drawing,
+    group,
+    ins: Instruction,
+    attrs: dict,
+    cx: float,
+    cy: float,
+    r: float,
+    start_deg: float,
+    end_deg: float,
+) -> None:
+    seed = _seed_for_instruction(ins)
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
+        group.add(
+            dwg.path(
+                d=_arc_path_d(cx, cy, max(0.0, r + offset), start_deg, end_deg),
+                **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash),
+            )
+        )
+    specks = _speck_profile(ins.weight)
+    if specks is not None:
+        count, spread, radius, opacity = specks
+        _add_specks_at_points(dwg, group, _arc_points(cx, cy, r, start_deg, end_deg, count), attrs, seed, spread=spread, radius=radius, opacity=opacity)
 
 
 def _material_line_group(
@@ -771,9 +979,13 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
         if ins.center is None or ins.radius is None:
             raise ValueError("circle requires 'center' and 'radius'")
         cx, cy = _px(ins.center)
-        return _apply_rotation(
-            dwg.circle(center=(cx, cy), r=ins.radius * CANVAS_PX, **attrs), ins
-        )
+        r = ins.radius * CANVAS_PX
+        if _uses_material_outline(ins.weight):
+            group = dwg.g()
+            group.add(dwg.circle(center=(cx, cy), r=r, **attrs))
+            _add_material_circle_outline(dwg, group, ins, attrs, cx, cy, r)
+            return _apply_rotation(group, ins)
+        return _apply_rotation(dwg.circle(center=(cx, cy), r=r, **attrs), ins)
 
     if ins.primitive == "ellipse":
         if ins.center is None or ins.size is None:
@@ -781,6 +993,11 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
         cx, cy = _px(ins.center)
         rx = ins.size[0] * CANVAS_PX / 2
         ry = ins.size[1] * CANVAS_PX / 2
+        if _uses_material_outline(ins.weight):
+            group = dwg.g()
+            group.add(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs))
+            _add_material_ellipse_outline(dwg, group, ins, attrs, cx, cy, rx, ry)
+            return _apply_rotation(group, ins)
         return _apply_rotation(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs), ins)
 
     if ins.primitive == "square":
@@ -789,6 +1006,11 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
         x, y = _px(ins.position)
         w = ins.size[0] * CANVAS_PX
         h = ins.size[1] * CANVAS_PX
+        if _uses_material_outline(ins.weight):
+            group = dwg.g()
+            group.add(dwg.rect(insert=(x, y), size=(w, h), **attrs))
+            _add_material_rect_outline(dwg, group, ins, attrs, x, y, w, h)
+            return _apply_rotation(group, ins)
         return _apply_rotation(dwg.rect(insert=(x, y), size=(w, h), **attrs), ins)
 
     if ins.primitive == "triangle":
@@ -812,6 +1034,11 @@ def _render_instruction(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str,
         cx, cy = _px(ins.center)
         r = ins.radius * CANVAS_PX
         path_d = _arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)
+        if _uses_material_outline(ins.weight):
+            group = dwg.g()
+            group.add(dwg.path(d=path_d, **attrs))
+            _add_material_arc_outline(dwg, group, ins, attrs, cx, cy, r, ins.angle_start, ins.angle_end)
+            return _apply_rotation(group, ins)
         return _apply_rotation(dwg.path(d=path_d, **attrs), ins)
 
     raise NotImplementedError(f"primitive '{ins.primitive}' not yet supported")

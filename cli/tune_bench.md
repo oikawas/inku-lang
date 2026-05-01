@@ -824,7 +824,199 @@ DDL から JSON への変換では、配置・数量・色の基本は通るが�
 
 次の改修は、表現の追加よりも「伝達の欠落を減らす」「選択を鋭くする」「重複と過密を抑える」方向を優先する。
 
-## 12. 進め方
+## 12. 100件ベンチ後の実装反映
+
+Date: 2026-05-01
+
+Commit:
+
+- `806e30a fix: harden llm retry and score coercion`
+
+100件ベンチの結果から、まず「生成表現の拡張」ではなく「失敗を適切に扱う」「DDL から JSON への伝達欠落を減らす」「過密化を防ぐ」ためのサーバー側防御を実装した。
+
+### NVIDIA Free API 前提の retry / fail
+
+NVIDIA NIM は開発用の Free API 接続先であり SLA はない。31B モデル自体はクエリが渡れば適切な時間内に返る想定だが、Free API 側の混雑や一時障害により、接続エラーや遅延が発生しうる。
+
+その前提で `llm_retry.py` を拡張した。
+
+- retry 対象:
+  - `429 Too Many Requests`
+  - `408 / 500 / 502 / 503 / 504`
+  - `inference connection error`
+  - connection reset / aborted / timeout / gateway 系
+- retry しない対象:
+  - JSON grammar / schema compile error
+  - bad request
+  - authentication / authorization error
+  - not found
+- retry delay は exponential backoff + jitter
+- `Retry-After` header があれば優先
+- retry 回数と delay は環境変数で調整可能
+
+環境変数:
+
+```sh
+INKU_LLM_RETRY_ATTEMPTS
+INKU_LLM_RETRY_BASE_DELAY
+INKU_LLM_RETRY_MAX_DELAY
+INKU_LLM_RETRY_JITTER
+INKU_LLM_REQUEST_TIMEOUT_SECONDS
+```
+
+`INKU_LLM_REQUEST_TIMEOUT_SECONDS` はサーバーから LLM API への 1 request timeout。CLI の `timeout_seconds` は CLI から inku-api への HTTP timeout であり、別レイヤーとして扱う。
+
+### 実装済み: Stage 2 / coerce
+
+100件ベンチの優先順位のうち、以下を実装済みとした。
+
+1. Stage 2 の同一 arrangement instruction 重複を禁止・統合する。
+2. Stage 2 / coerce に expanded primitive count 上限を入れる。
+3. DDL 素材語を JSON `weight` へ安定写像する。
+7. `fallback from DDL` を縮退ではなく deterministic coverage に寄せる。
+8. renderer に重複・過密・不可視の安全弁を追加する。
+
+具体的な実装:
+
+- `coerce_score(score, ddl=...)` に DDL を渡せるようにした。
+- `/api/compose` と `/api/paint` は renderer 前に `coerce_score(score, ddl=...)` を呼ぶ。
+- 完全一致する instruction は renderer 前に重複排除する。
+- expanded primitive count の総量が 400 を超える場合、`arrangement.count` を縮小する。
+- density cap が入った場合は `color_hint` に注記を残す。
+- DDL に素材語があるのに Stage 2 が `weight=pen` のまま返した場合、coerce で補完する。
+- DDL に揺れ / 滲み語があるのに Stage 2 が `variation` を落とした場合、coerce で補完する。
+- fallback score でも DDL の数量詞と素材語を反映する。
+
+素材語の補完:
+
+- ロットリング -> `rotring`
+- 鉛筆 -> `pencil`
+- クレヨン -> `crayon`
+- チョーク -> `chalk`
+- 細筆 / 水墨 / 墨 -> `brush_thin`
+- 太筆 / 油絵 / 厚塗り -> `brush_thick`
+- 縄 / ロープ -> `rope`
+
+揺らぎの補完:
+
+- `ゆっくり揺れる` / `ゆっくり波打つ` -> `quality=wave`, `frequency=slow`
+- `細かく揺れる` / `細かく震える` / `震える` -> `quality=perlin`
+- `滲む` / `境界が滲む` -> `quality=pink`
+
+### 実装による期待効果
+
+- `bench100-001`、`bench100-022`、`bench100-030` のような `arrangement.count` 付き instruction の重複は renderer 前に統合される。
+- `count=300` の instruction が複数出た場合でも、expanded primitive count が上限内へ圧縮される。
+- Stage 2 が素材語を落としても、DDL 側の `鉛筆`、`クレヨン`、`チョーク`、`水墨` などから renderer に渡る `weight` を回復できる。
+- `細かく震える`、`ゆっくり揺れる`、`滲む` が JSON で落ちた場合でも、最低限の `variation` を補完できる。
+- NVIDIA Free API の一時的な混雑や接続失敗に対して、すぐ fail せず合理的に retry できる。
+- JSON grammar / schema compile error のような恒久エラーは retry せず、問題の切り分けを早くする。
+
+### 検証
+
+実行:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
+```
+
+結果:
+
+- `ruff`: all checks passed
+- `pytest`: `103 passed, 30 skipped`
+
+### 残件
+
+今回の実装は、ベンチ結果から見えた欠陥のうち、サーバー側で deterministic に補正できるものを先に潰した。以下は未実装。
+
+- DDL 文ごとの coverage check。
+- `mood_hint` / `motion_hint` / `material_hint` / `focus_hint` のような、感情・雰囲気を保持する新フィールド。
+- Stage 1.5 の composition / emotion / material strategy 化。
+- Stage 2 tokens out が過大な場合の retry / fail 判定。
+- `bench-report` / `bench-compare` の CLI コマンド化。
+- renderer の visible pixel ratio / overfilled / near-empty などの画像メトリクス。
+- `filled=false` 過多への表現上の補正。
+- 色名解決の改善。特に黄色、金色、銀色、桃色、紫などを抽象色と `color_hint` からどう安定解決するか。
+
+### 次のベンチ方針
+
+同一 `cli/out/tune-bench-100/prompts.txt` を使い、修正後の 30件または100件ベンチを再実行する。
+
+比較時に見る指標:
+
+- success / failed
+- inference connection error の retry 後成功率
+- duplicate instruction count
+- expanded primitive count
+- `weight=pen` への収束率
+- `variation` 付与率
+- fallback 使用件数
+- contact sheet 上の過密サンプル数
+
+## 13. 修正後30件ベンチ
+
+実行条件:
+
+- 入力: `cli/out/tune-bench-100/prompts.txt` の先頭30件
+- 出力: `cli/out/tune-bench-030-after-806e30a/`
+- Stage 1 provider/model: `nvidia` / `google/gemma-4-31b-it`
+- Stage 2 provider/model: `nvidia` / `google/gemma-4-31b-it`
+- CLI timeout: 600秒
+- サーバー側 retry/fail と `coerce_score(score, ddl=...)` 実装後
+
+実行結果:
+
+- 成功: 30件
+- 失敗: 0件
+- elapsed total: 1,979,125ms
+- tokens in: 352,734
+- tokens out: 27,132
+
+前回100件ベンチの先頭30件との比較:
+
+| 指標 | 修正前 first30 | 修正後30 |
+| --- | ---: | ---: |
+| success | 30 | 30 |
+| failed | 0 | 0 |
+| instruction avg | 3.80 | 2.30 |
+| instruction max | 20 | 5 |
+| expanded primitive avg | 158.17 | 49.23 |
+| expanded primitive max | 3001 | 234 |
+| duplicate extra total | 44 | 0 |
+| duplicate rows | 7件 | 0件 |
+| elapsed avg | 68,054ms | 65,971ms |
+| elapsed max | 234,586ms | 481,445ms |
+| elapsed >120s | 8件 | 4件 |
+| tokens out avg | 1,218 | 904 |
+| tokens out max | 4,141 | 4,148 |
+
+効いた点:
+
+- 同一 instruction の重複は 44件から0件に減った。
+- expanded primitive count の最大値は 3001 から 234 に落ち、過密・爆発は抑制された。
+- `weight=pen` への収束は弱まり、`brush_thin`、`crayon`、`pencil`、`brush_thick`、`rope`、`rotring`、`chalk` へ分散した。
+- `bench100-001`、`bench100-022`、`bench100-030` 型の arrangement 重複は再現しなかった。
+- NVIDIA Free API に対する接続エラー・429・empty drawable failure は今回の30件では発生しなかった。
+
+残った問題:
+
+- Stage 2 の過長応答は残っている。特に line 12 は Stage 2 が 454,629ms、line 28 は 312,364ms、line 30 は 131,449ms。
+- tokens out が 4,100台まで伸びるケースが残り、長い応答なのに最終 instruction は1件だけという縮退がある。
+- 過密抑制の副作用として、line 28 / line 30 のように単一の大きな要素だけで終わるケースがある。
+- 背景色の分布は修正前と同じで、白18、黒9、赤2、青1。背景選択の多様性は今回の修正対象外だった。
+- contact sheet 上では、重複爆発は消えたが、表現の複雑さと空間構成の差はまだ不足している。
+
+次の実装候補:
+
+- Stage 2 が `tokens_out` 4000近辺、または elapsed 120秒超になった場合の retry / fail 判定。
+- retry した場合の attempt count / error reason / stage 別 elapsed を CLI と JSON に保存する。
+- instruction が1件に縮退した場合、DDL coverage check で主要要素を再補完する。
+- `expanded primitive count` の単純縮小だけでなく、密度を下げながら構成要素の種類を保つ圧縮を行う。
+- 背景色を white / black に寄せすぎない Stage 1.5 の tone strategy を追加する。
+
+## 14. 進め方
 
 1. 10 件パイロットを実施する
 2. 評価ラベルを調整する

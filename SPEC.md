@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.21**
+**Version: v1.23**
 
 ---
 
@@ -1431,6 +1431,80 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - 開発時は `cd cli && uv run inku-cli ...` で実行する
 - macOS から pentala の `inku-api` へ LAN 経由で接続し、`login` / `paint` / SVG・JSON・PNG 出力の動作を確認した
 - CLI の確認で生成される `cli/out/` はローカル成果物として Git 追跡対象外にする
+
+### v1.23 (2026-05-01)
+
+**NVIDIA Free API 前提の LLM retry / fail 機構 + 100件ベンチ由来の Score 補正**
+
+NVIDIA NIM は開発用の Free API 接続先として扱う。SLA は保証されず、リクエスト集中時には `inference connection error`、一時的な 5xx、応答遅延が発生しうる。その前提で、合理的な retry / fail 機構をサーバー側に追加した。
+
+- OpenAI 互換 LLM 呼び出しは `call_with_llm_retry()` を通す
+- retry 対象:
+  - `429 Too Many Requests`
+  - `408 / 500 / 502 / 503 / 504`
+  - `inference connection error`
+  - connection reset / aborted / timeout / gateway 系の一時エラー
+- retry 対象外:
+  - JSON grammar / schema compile error
+  - bad request
+  - authentication / authorization error
+  - not found
+  - その他、クエリや schema 自体の恒久的な問題
+- retry 回数、base delay、max delay、jitter は環境変数で調整できる:
+  - `INKU_LLM_RETRY_ATTEMPTS`
+  - `INKU_LLM_RETRY_BASE_DELAY`
+  - `INKU_LLM_RETRY_MAX_DELAY`
+  - `INKU_LLM_RETRY_JITTER`
+- OpenAI 互換クライアントには request timeout を設定し、無制限に待ち続けない:
+  - `INKU_LLM_REQUEST_TIMEOUT_SECONDS`
+  - 既定値は 120 秒
+- CLI 側の HTTP timeout は従来どおり長い描画待ち用に 600 秒を既定とする。サーバー内の LLM request timeout と、CLI から API への HTTP timeout は別レイヤーとして扱う
+
+100件ベンチで確認した DDL -> JSON の伝達欠落に対し、Score coerce layer を強化した。
+
+- Stage 2 が同一 `arrangement.count` 付き instruction を複製した場合、renderer 前に重複を統合する
+- renderer 展開後の総プリミティブ数に上限を設け、過密化と SVG 肥大を抑制する
+- 現時点の expanded primitive count 上限は 400
+- 上限超過時は `arrangement.count` を縮小し、`color_hint` に density cap の注記を残す
+- DDL の素材語から JSON Score の `weight` を補完する:
+  - ロットリング -> `rotring`
+  - 鉛筆 -> `pencil`
+  - クレヨン -> `crayon`
+  - チョーク -> `chalk`
+  - 細筆 / 水墨 / 墨 -> `brush_thin`
+  - 太筆 / 油絵 / 厚塗り -> `brush_thick`
+  - 縄 / ロープ -> `rope`
+- DDL の揺れ・滲み語から `variation` を補完する:
+  - `ゆっくり揺れる` / `ゆっくり波打つ` -> `quality=wave`, `frequency=slow`
+  - `細かく揺れる` / `細かく震える` / `震える` -> `quality=perlin`
+  - `滲む` / `境界が滲む` -> `quality=pink`
+- `/api/compose` と `/api/paint` は `coerce_score(score, ddl=...)` を呼び、DDL の素材・揺らぎ情報を補正に利用する
+- Stage 2 が空 `instructions` を返した後の deterministic fallback は、DDL の数量と素材語を可能な範囲で保持する
+
+追加テスト:
+
+- `test_llm_retry.py`
+  - rate limit retry
+  - inference connection error retry
+  - schema / grammar 系 bad request は retry しない
+- `test_coerce.py`
+  - repeated arranged instruction の重複統合
+  - expanded primitive count の上限
+  - DDL からの素材 / variation 補完
+  - 日本語数量詞からの count hint 抽出
+
+検証:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
+```
+
+結果:
+
+- `ruff`: all checks passed
+- `pytest`: `103 passed, 30 skipped`
 
 ### v1.22 (2026-05-01)
 

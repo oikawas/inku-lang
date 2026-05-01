@@ -21,7 +21,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Resp
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .coerce import coerce_score
+from .coerce import coerce_score, ensure_renderable_score
 from .composer import compose
 from .composer import SYSTEM_PROMPT as STAGE2_PROMPT
 from .composer import SYSTEM_PROMPT_EN as STAGE2_PROMPT_EN
@@ -576,21 +576,45 @@ def _call_compose_detail(
     lang: str = "ja",
 ) -> tuple[Score, int | None, int | None]:
     ddl = expand_intermediate_ddl(ddl, lang=lang, context_text=original_text)
-    try:
-        value = compose(
-            ddl,
-            model=model,
-            original_text=original_text,
-            system_prompt=system_prompt,
-            lang=lang,
-        )
-    except TypeError as e:
-        if "unexpected keyword argument" not in str(e):
-            raise
-        value = compose(ddl, model=model)
-    if isinstance(value, tuple):
-        return value
-    return value, None, None
+
+    def invoke(prompt: str | None) -> tuple[Score, int | None, int | None]:
+        try:
+            value = compose(
+                ddl,
+                model=model,
+                original_text=original_text,
+                system_prompt=prompt,
+                lang=lang,
+            )
+        except TypeError as e:
+            if "unexpected keyword argument" not in str(e):
+                raise
+            value = compose(ddl, model=model)
+        if isinstance(value, tuple):
+            return value
+        return value, None, None
+
+    score, tokens_in, tokens_out = invoke(system_prompt)
+    if score.instructions:
+        return score, tokens_in, tokens_out
+
+    base_prompt = system_prompt or (STAGE2_PROMPT_EN if lang == "en" else STAGE2_PROMPT)
+    rescue_note = (
+        "\n\n# Empty result retry\n"
+        "The previous output had no drawable instructions. This is invalid. "
+        "Return at least one visible line, ellipse, square, triangle, circle, or arc derived from the normalized DDL. "
+        "Do not return an empty instructions array."
+        if lang == "en"
+        else "\n\n# 空描画リトライ\n"
+        "直前の出力は描画命令が空であり無効。正規化DDLから、見える線・楕円・四角・三角・円・弧のうち少なくとも一つを必ず返す。"
+        "instructions を空配列にしてはいけない。"
+    )
+    retry_score, retry_tokens_in, retry_tokens_out = invoke(base_prompt + rescue_note)
+    if retry_tokens_in is not None:
+        tokens_in = (tokens_in or 0) + retry_tokens_in
+    if retry_tokens_out is not None:
+        tokens_out = (tokens_out or 0) + retry_tokens_out
+    return retry_score, tokens_in, tokens_out
 
 
 def _call_interpret_detail(
@@ -634,7 +658,11 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
-    score = coerce_score(score)
+    try:
+        ensure_renderable_score(score)
+        score = coerce_score(score)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
     try:
         svg = render(score, color_map=req.color_map)
@@ -792,7 +820,11 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
-    score = coerce_score(score)
+    try:
+        ensure_renderable_score(score)
+        score = coerce_score(score)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
     t2 = time.perf_counter()
     try:

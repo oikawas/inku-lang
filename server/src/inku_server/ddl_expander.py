@@ -83,6 +83,17 @@ def _join_sentences(sentences: list[str], *, lang: str) -> str:
     return "".join(s if s.endswith("。") else f"{s}。" for s in sentences)
 
 
+def _avoid_gray_background(text: str, *, lang: str) -> str:
+    if lang == "en":
+        return re.sub(
+            r"Fill background with gr[ae]y\.?",
+            "Fill background with white.",
+            text,
+            flags=re.IGNORECASE,
+        )
+    return re.sub(r"背景を灰(?:色)?で塗りつぶす。?", "背景を白で塗りつぶす。", text)
+
+
 def _seed(text: str, salt: str) -> int:
     digest = hashlib.sha256(f"{salt}:{text}".encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big")
@@ -194,14 +205,20 @@ def _select_category(
 
 def _category_plan(profile: _FilterProfile, *, has_structural: bool) -> tuple[int, int, int]:
     if profile.intensity <= 1:
-        return (0, 0, 1)
+        return (0, 0, 0)
 
     if profile.intensity >= 3:
-        return (1 if has_structural else 0, 1, 1)
+        return (
+            1 if has_structural else 0,
+            1 if "music" in profile.tags else 0,
+            1 if profile.tags & {"geometry", "space", "water"} else 0,
+        )
 
     if "music" in profile.tags:
         return (1 if has_structural else 0, 1, 0)
-    return (1 if has_structural else 0, 0, 1)
+    if profile.tags & {"geometry", "space"}:
+        return (1 if has_structural else 0, 0, 1)
+    return (1 if has_structural else 0, 0, 0)
 
 
 def _limit_centered(items: list[str], *, centered_tokens: tuple[str, ...], max_count: int = 1) -> list[str]:
@@ -283,9 +300,9 @@ def _dominant_ja_color(ddl: str) -> str:
 
 
 def _contrast_ja_color(ddl: str) -> str:
-    if "背景を黒" in ddl or "背景を灰" in ddl or "暗い背景" in ddl:
+    if "背景を黒" in ddl or "暗い背景" in ddl:
         return "白い"
-    return "灰色の"
+    return "黒い"
 
 
 def _dominant_en_color(ddl: str) -> str:
@@ -299,9 +316,9 @@ def _dominant_en_color(ddl: str) -> str:
 
 def _contrast_en_color(ddl: str) -> str:
     lower = ddl.lower()
-    if "fill background with black" in lower or "fill background with gray" in lower:
+    if "fill background with black" in lower:
         return "white"
-    return "gray"
+    return "black"
 
 
 def expand_intermediate_ddl(ddl: str, *, lang: str = "ja", context_text: str | None = None) -> str:
@@ -316,6 +333,7 @@ def expand_intermediate_ddl(ddl: str, *, lang: str = "ja", context_text: str | N
     """
 
     sanitized = _sanitize_placement_words(ddl).strip()
+    sanitized = _avoid_gray_background(sanitized, lang=lang)
     if not sanitized:
         return sanitized
     if lang == "en":
@@ -355,13 +373,13 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
     ]
     painting = [
         _FilterCandidate(f"{contrast_color}細い線を一点透視法として右上の焦点へ向けて三本引く。", frozenset(("space", "line", "geometry"))),
-        _FilterCandidate("灰色の細い横線を遠近法の奥行きとして上へ細かく三本並べる。", frozenset(("space", "line"))),
+        _FilterCandidate(f"{contrast_color}細い横線を遠近法の奥行きとして上へ細かく三本並べる。", frozenset(("space", "line"))),
         _FilterCandidate("黒い細筆の細い線を素描の下線として左から右へ三本並べる。細かく震える。", frozenset(("line", "quiet"))),
-        _FilterCandidate(f"{main_color}回転した小さな四角を点描として画面全体に点々と十三個散らす。", frozenset(("particle", "dense", "geometry"))),
+        _FilterCandidate(f"{main_color}回転した小さな四角を点描として右半分の斜めの帯に十三個散らす。", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"{main_color}太筆の短い線を油絵の厚塗りとして横に三本並べる。", frozenset(("dense", "contrast"))),
         _FilterCandidate(f"{contrast_color}薄い水彩の楕円を左上に二つ重ねる。境界が滲む。", frozenset(("water", "soft", "quiet"))),
         _FilterCandidate("赤・青・緑・灰の回転した小さな四角をパッチワークとして格子状に六個並べる。", frozenset(("geometry", "dense"))),
-        _FilterCandidate("灰色のチョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。", frozenset(("space", "line", "soft"))),
+        _FilterCandidate(f"{contrast_color}チョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。", frozenset(("space", "line", "soft"))),
         _FilterCandidate("黒い細筆の縦線を水墨の濃淡として左から右へ三本並べる。境界が滲む。", frozenset(("water", "contrast", "quiet"))),
     ]
     structural_candidates = [_FilterCandidate(text, frozenset(("particle", "line", "water", "space"))) for text in structural]
@@ -413,13 +431,13 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
     ]
     painting = [
         _FilterCandidate(f"Draw three thin {contrast_color} lines toward an upper-right focus as one-point perspective.", frozenset(("space", "line", "geometry"))),
-        _FilterCandidate("Line up three thin gray horizontal lines upward as perspective depth.", frozenset(("space", "line"))),
+        _FilterCandidate(f"Line up three thin {contrast_color} horizontal lines upward as perspective depth.", frozenset(("space", "line"))),
         _FilterCandidate("Line up three thin black fine-brush lines left to right as drawing underlines. Fine trembling.", frozenset(("line", "quiet"))),
-        _FilterCandidate(f"Scatter thirteen small rotated {main_color} squares dotted across the whole canvas as pointillism.", frozenset(("particle", "dense", "geometry"))),
+        _FilterCandidate(f"Scatter thirteen small rotated {main_color} squares along a diagonal band in the right half as pointillism.", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"Line up three short {main_color} thick-brush lines horizontally as oil impasto.", frozenset(("dense", "contrast"))),
         _FilterCandidate("Layer two pale watercolor ellipses in the upper left. Edges blurring.", frozenset(("water", "soft", "quiet"))),
         _FilterCandidate("Line up six small rotated squares in red, blue, green, gray as patchwork grid.", frozenset(("geometry", "dense"))),
-        _FilterCandidate("Line up three gray chalk horizontal lines at the bottom as fresco ground. Edges blurring.", frozenset(("space", "line", "soft"))),
+        _FilterCandidate(f"Line up three {contrast_color} chalk horizontal lines at the bottom as fresco ground. Edges blurring.", frozenset(("space", "line", "soft"))),
         _FilterCandidate("Line up three black fine-brush vertical lines left to right as ink-wash value. Edges blurring.", frozenset(("water", "contrast", "quiet"))),
     ]
     structural_candidates = [_FilterCandidate(text, frozenset(("particle", "line", "water", "space"))) for text in structural]

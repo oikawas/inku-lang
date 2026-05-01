@@ -142,7 +142,7 @@ def test_contrast_prompt_selects_invisible_examples():
     assert "背景色と主描画色を同じにしてはいけない" in prompt
     assert "面積の少ない方" in prompt
     assert "背景を灰で塗りつぶす" in prompt
-    assert "灰背景は入力で明示された場合だけ" in prompt
+    assert "出力してはいけない" in prompt
     assert "白い背景に白い線" in prompt
     assert "黒い横線" in prompt
     assert "青い短い線" in _build_system_prompt("白い雪を白い背景に散らす")
@@ -153,7 +153,7 @@ def test_contrast_prompt_en_selects_invisible_examples():
     assert "same foreground and background color" in prompt
     assert "smaller visual area" in prompt
     assert "Fill background with gray" in prompt
-    assert "only when the input explicitly asks" in prompt
+    assert "Do not output" in prompt
     assert "White lines on a white background" in prompt
     assert "black horizontal line" in prompt
     assert "short blue lines" in _build_system_prompt("white snow on a white background", lang="en")

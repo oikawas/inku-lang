@@ -82,7 +82,8 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - 小さな点、星、雨、雪、砂、粒、短い線 → 多め。ただし真円へ固定せず、楕円・四角・短線へ分散
 - 放射状・円環・対称配置 → 6, 8, 12, 16, 24, 32 など構造が見える数
 - 格子・縞・等間隔配置 → 5, 7, 9, 12, 16, 24, 36 など規則が見える数
-- 全面散布 → 17, 29, 47, 83, 137, 233, 377, 610 など偏りにくい数も使ってよい
+- 全面散布 → 17, 29, 47, 83, 137, 233, 377, 610 など偏りにくい数も使ってよい。ただし入力が静か・余白・薄い・ひとつ・一本を示す場合は 17〜83 程度に抑える
+- 余白を残す。粒子・点描・埃・霧などは、全面を均一に埋めるより、斜めの帯・上端から下端・右半分などの偏りを持たせる
 
 「たくさん」「無数」「いっぱい」のまま出力せず、必ず具体的な数量詞に変換する。
 
@@ -119,7 +120,8 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - 背景が小さな領域で、主題図形が大きい場合だけ背景側を変える
 - 白い背景 + 白い線/小図形 → 黒・青・赤・緑など、文脈に合う可視色へ変える
 - 黒い背景 + 黒い線/小図形 → 白・灰・青などへ変える
-- コントラスト調整のためだけに「背景を灰で塗りつぶす」を出力してはいけない。灰背景は入力で明示された場合だけ使う
+- 「背景を灰で塗りつぶす」を出力してはいけない。入力が灰色背景を求めても、背景は白・黒・青・赤・緑の文脈に合う色へ置き換える
+- 灰色は背景ではなく、必要なときだけ前景の線・点・四角の色として使う。灰だけで構成せず、黒・白・青・赤・緑など見える描画色を併用する
 - 白い雪・白い星・白い月など白が主題の場合でも、必ず背景を灰にする必要はない。面積の少ない側や補助要素を青・黒・赤・緑などへ変えてよい
 - 明示的な色指定が背景と同じ場合 → 主題性と面積を見て、近い可視色または構図上自然な別色を選ぶ
 
@@ -676,7 +678,8 @@ Object-specific correction:
 - small dots, stars, rain, snow, sand, particles, short lines → use more, but vary them across ellipses, squares, and short lines instead of true circles
 - radial / circular / symmetric layouts → prefer structural counts such as 6, 8, 12, 16, 24, 32
 - grid / stripe / evenly spaced layouts → prefer visible-order counts such as 5, 7, 9, 12, 16, 24, 36
-- all-over scatter → you may use less regular counts such as 17, 29, 47, 83, 137, 233, 377, 610
+- all-over scatter → you may use less regular counts such as 17, 29, 47, 83, 137, 233, 377, 610. If the input is quiet, pale, sparse, single, or about negative space, keep it around 17–83
+- preserve negative space. For dust, mist, pointillism, and particles, prefer a biased path such as a diagonal band, top-to-bottom drift, or right-half placement instead of uniform full-canvas filling
 
 Never output vague words such as "many" or "countless"; always convert them to a concrete count.
 
@@ -713,7 +716,8 @@ Do not normalize to the same foreground and background color. Invisible output i
 - only change the background when the matching subject is large and visually dominant
 - white background + white line/small shape → change the drawing to a context-fitting visible color such as black, blue, red, or green
 - black background + black line/small shape → change the drawing to white, gray, or blue
-- Do not output "Fill background with gray" only as a contrast fallback. Use gray background only when the input explicitly asks for it
+- Do not output "Fill background with gray". Even if the input asks for a gray background, replace the background with contextual white, black, blue, red, or green
+- Use gray only as a foreground color for lines, dots, or shapes when needed. Do not build gray-only drawings; combine it with visible black, white, blue, red, or green
 - if white snow/stars/moon are the subject, do not always force gray. You may change the smaller side or supporting elements to blue, black, red, or green when that fits the context
 - if an explicit foreground color matches the background → choose a nearby visible color or a compositionally natural contrasting color
 

@@ -125,6 +125,100 @@ POST_COERCE: dict[str, Callable[[dict], None]] = {
 }
 
 
+VISIBLE_ON_BACKGROUND: dict[str, str] = {
+    "white": "black",
+    "black": "white",
+    "gray": "black",
+    "blue": "white",
+    "red": "white",
+    "green": "white",
+}
+
+
+def _visible_background(background: str) -> str:
+    if background == "gray":
+        return "white"
+    return background
+
+
+def _shape_extent(ins: Instruction) -> float:
+    if ins.primitive in ("circle", "arc"):
+        return float(ins.radius or 0.0) * 2
+    if ins.size:
+        return max(float(ins.size[0]), float(ins.size[1]))
+    if ins.from_ and ins.to:
+        return max(abs(ins.from_[0] - ins.to[0]), abs(ins.from_[1] - ins.to[1]))
+    return 0.0
+
+
+def _is_tiny_unfilled_particle(ins: Instruction) -> bool:
+    if ins.primitive not in ("circle", "ellipse", "square", "triangle"):
+        return False
+    if ins.filled:
+        return False
+    if not ins.arrangement or ins.arrangement.count < 40:
+        return False
+    return _shape_extent(ins) <= 0.012
+
+
+def _with_visible_color(ins: Instruction, background: str) -> Instruction:
+    if ins.color != background:
+        return ins
+    data = ins.model_dump(by_alias=True)
+    data["color"] = VISIBLE_ON_BACKGROUND.get(background, "black")
+    hint = data.get("color_hint")
+    note = f"{background} foreground made visible"
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
+def _with_visible_particle(ins: Instruction) -> Instruction:
+    if not _is_tiny_unfilled_particle(ins):
+        return ins
+    data = ins.model_dump(by_alias=True)
+    data["filled"] = True
+    if ins.primitive == "circle":
+        data["radius"] = max(float(ins.radius or 0.0), 0.006)
+    elif ins.size:
+        data["size"] = [max(float(ins.size[0]), 0.008), max(float(ins.size[1]), 0.008)]
+    return Instruction.model_validate(data)
+
+
+def _with_density_budget(ins: Instruction) -> Instruction:
+    arr = ins.arrangement
+    if arr is None or arr.layout != "scatter" or arr.count <= 240:
+        return ins
+    if _shape_extent(ins) > 0.018:
+        return ins
+    data = ins.model_dump(by_alias=True)
+    arr_data = dict(data["arrangement"])
+    arr_data["count"] = 240
+    data["arrangement"] = arr_data
+    hint = data.get("color_hint")
+    note = "scatter density capped to preserve negative space"
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
+def _repair_visibility(ins: Instruction, background: str) -> Instruction:
+    repaired = _with_visible_color(ins, background)
+    repaired = _with_visible_particle(repaired)
+    return _with_density_budget(repaired)
+
+
+def _coerce_and_repair_instruction(ins: Instruction, *, original_background: str, background: str) -> Instruction:
+    coerced = _coerce_instruction(ins)
+    if original_background == "gray" and coerced.color == "gray":
+        coerced = _with_visible_color(coerced, "gray")
+    return _repair_visibility(coerced, background)
+
+
+def ensure_renderable_score(score: Score) -> None:
+    """Raise when Stage 2 returned no drawable instructions."""
+    if not score.instructions:
+        raise ValueError("Stage 2 returned no drawable instructions")
+
+
 # ── 汎用補修ループ ────────────────────────────────────────────────────────────────
 
 def _coerce_instruction(ins: Instruction) -> Instruction:
@@ -166,7 +260,12 @@ def _coerce_instruction(ins: Instruction) -> Instruction:
 
 def coerce_score(score: Score) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。"""
-    instructions = [_coerce_instruction(ins) for ins in score.instructions]
+    background = _visible_background(score.background)
+    instructions = [
+        _coerce_and_repair_instruction(ins, original_background=score.background, background=background)
+        for ins in score.instructions
+    ]
     data = score.model_dump(by_alias=True)
+    data["background"] = background
     data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
     return Score.model_validate(data)

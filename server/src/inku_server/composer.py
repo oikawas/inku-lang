@@ -37,14 +37,17 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - circle/ellipse/arc → center フィールド。square/triangle → position フィールド (bbox 左上)
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
+- **正規化DDL に図形・線・弧の指示がある場合、instructions を空配列にしてはいけない。変換不能なら最も近い線・楕円・四角へ落とし込む**
 - variation は明示された揺らぎがある場合のみ付ける
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
 - **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
+- **余白を残す。小さな scatter が 200 個を超える場合は、全面密度ではなく斜めの帯・上から下・右半分などの配置語を尊重し、要素サイズを小さくしすぎない**
 - **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
 - **背景色と描画色が同じで、実質的に見えない instruction を作ってはいけない。background と同色なら面積の少ない側を変更する。通常は線・小図形・点の color を黒・白・青・赤・緑などの文脈に合う可視色へ寄せる。大きな主題図形が同色の場合だけ background 側を変更してよい**
-- **コントラスト調整のためだけに background="gray" を選んではいけない。灰背景は正規化DDLで明示された場合のみ使う。白い主題を見せる場合は、青・黒など文脈に合う背景を優先する**
+- **background="gray" を使ってはいけない。正規化DDL が灰背景を要求しても background は white/black/blue/red/green から文脈に合う色を選ぶ**
+- **灰色の主題は background ではなく foreground の color="gray" として扱う。灰の濃淡だけで構成せず、黒・白・青・赤・緑の可視色を併用する**
 - **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
 - **色とりどり・多色配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
 - **正規化DDL は必ず配置語を含む。正規化DDL が「中央付近」「上から下」「縦に」「右半分」「放射状」「同心円状」「画面全体に点々」「波打つ軌跡」を含む場合は、その配置語を優先する**
@@ -239,14 +242,17 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - circle/ellipse/arc → center field. square/triangle → position field (bbox top-left)
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
+- **If normalized DDL contains shapes, lines, or arcs, instructions must not be empty. If exact conversion is difficult, map it to the nearest line, ellipse, or square**
 - variation only when movement is explicitly stated
 - **count is integer 1–1000. Use explicit numbers from DDL**
 - **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
+- **Preserve negative space. When tiny scatter exceeds 200 items, do not turn it into uniform full-canvas density; respect placement phrases such as diagonal band, top to bottom, or right half, and keep elements visible enough**
 - **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
 - **Do not create effectively invisible instructions whose drawing color matches the background. If they match, change the smaller visual area. Usually change line/small-shape/dot color to a context-fitting visible color such as black, white, blue, red, or green. Change the background only when the matching subject is large and dominant**
-- **Do not choose background="gray" only as a contrast fallback. Use gray background only when normalized DDL explicitly asks for it. For white dominant subjects, prefer a contextual background such as blue or black**
+- **Do not use background="gray". Even if normalized DDL asks for a gray background, choose a contextual background from white/black/blue/red/green instead**
+- **Treat gray subjects as foreground color="gray", not as the background. Do not build gray value-only drawings; combine gray with visible black, white, blue, red, or green foreground**
 - **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
 - **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
 - **Normalized DDL must include placement words. If normalized DDL says "near the center", "top to bottom", "vertical", "right half", "radial", "concentric", "dotted across the whole canvas", or "undulating trace", prioritize that placement phrase**

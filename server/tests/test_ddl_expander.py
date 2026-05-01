@@ -55,16 +55,18 @@ def test_expand_intermediate_ddl_selects_focused_layers():
     selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in expanded]
 
     assert "ランダム" not in expanded
+    assert "背景を灰" not in expanded
+    assert "背景を白で塗りつぶす" in expanded
     assert "画面全体に点々と十二個" in expanded
     assert "正五角形" not in expanded
     assert "中心から" not in expanded
     assert "中央へ" not in expanded
-    assert 2 <= len(selected) <= 4
+    assert len(selected) <= 3
     assert len(selected) < len(JA_TECHNIQUE_MARKERS)
     assert expanded.count("。") <= ddl.count("。") + 8
     assert expanded.count("小さな円") <= ddl.count("小さな円")
-    assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角"))
-    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した"))
+    assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角", "細い弧"))
+    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した", "焦点"))
 
 
 def test_expand_intermediate_ddl_is_idempotent_after_expansion():
@@ -82,7 +84,7 @@ def test_expand_intermediate_ddl_varies_by_input():
     assert "中央" not in first
     assert "焦点に黒い四角を置く" in first
     assert any(marker in first for marker in ("遠近法の奥行き", "一点透視法", "パッチワーク", "水彩", "素描の下線", "点描"))
-    assert any(marker in second for marker in ("油絵の厚塗り", "素描の下線", "点描", "水墨の濃淡", "パッチワーク"))
+    assert any(marker in second for marker in ("左下の焦点から三つ", "波打つ軌跡に沿って十三個", "左下から右上へ八本"))
 
 
 def test_expand_intermediate_ddl_uses_context_to_control_filter_amount():
@@ -98,8 +100,8 @@ def test_expand_intermediate_ddl_uses_context_to_control_filter_amount():
     quiet_selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in quiet]
     dense_selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in dense]
 
-    assert len(quiet_selected) == 1
-    assert len(dense_selected) >= 3
+    assert len(quiet_selected) == 0
+    assert len(dense_selected) >= 2
     assert len(quiet_selected) < len(dense_selected)
 
 
@@ -125,8 +127,19 @@ def test_expand_intermediate_ddl_en_selects_focused_layers():
     assert "regular pentagon" not in expanded
     assert "from center" not in expanded
     assert "toward the center" not in expanded
-    assert 2 <= len(selected) <= 4
+    assert len(selected) <= 2
     assert len(selected) < len(EN_TECHNIQUE_MARKERS)
+    assert "rising to the right" in expanded
+
+
+def test_expand_intermediate_ddl_en_avoids_gray_background():
+    expanded = expand_intermediate_ddl(
+        "Fill background with gray. Draw three black horizontal lines.",
+        lang="en",
+    )
+
+    assert "background with gray" not in expanded.lower()
+    assert "Fill background with white." in expanded
 
 
 def test_expand_intermediate_ddl_en_reframes_center():

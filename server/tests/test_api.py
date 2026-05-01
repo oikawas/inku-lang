@@ -24,6 +24,10 @@ from inku_server.schema import Score
 client = TestClient(app)
 
 EXPANSION_MARKERS = (
+    "右半分の斜めの帯",
+    "左下から右上へ",
+    "波打つ軌跡に沿って",
+    "左下の焦点から三つ",
     "黄金比の位置",
     "三分割の交点",
     "白銀比の位置",
@@ -415,6 +419,43 @@ def test_compose_composer_failure_returns_502(monkeypatch, auth_context):
     assert "haiku unavailable" in r.json()["detail"]
 
 
+def test_compose_empty_instruction_result_is_retried(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    calls: list[str | None] = []
+
+    def fake_compose(ddl: str, model=None, original_text=None, system_prompt=None, lang="ja"):
+        calls.append(system_prompt)
+        if len(calls) == 1:
+            return Score(instructions=[])
+        return Score.model_validate(
+            {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    r = client.post("/api/compose", json={"ddl": "黒い線を引く。"}, headers=headers)
+
+    assert r.status_code == 200
+    assert len(calls) == 2
+    assert calls[0] is None
+    assert calls[1] is not None
+    assert "空描画リトライ" in calls[1]
+
+
+def test_compose_empty_instruction_result_returns_502_after_retry(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "compose",
+        lambda ddl, model=None, original_text=None, system_prompt=None, lang="ja": Score(instructions=[]),
+    )
+
+    r = client.post("/api/compose", json={"ddl": "黒い線を引く。"}, headers=headers)
+
+    assert r.status_code == 502
+    assert "no drawable instructions" in r.json()["detail"]
+
+
 def test_interpret_happy_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
@@ -455,7 +496,6 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert data["text"] == "一滴の墨"
     assert "黒い円を置く。" in data["ddl"]
     assert "中心" not in data["ddl"]
-    assert any(marker in data["ddl"] for marker in EXPANSION_MARKERS)
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
 
@@ -521,7 +561,9 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
 
 def test_cors_allows_localhost(monkeypatch, auth_context):
     headers, _, _ = auth_context
-    fake_score = Score(instructions=[])
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}]}
+    )
     monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post(

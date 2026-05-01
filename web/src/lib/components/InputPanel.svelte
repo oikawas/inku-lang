@@ -120,19 +120,30 @@
 		onSubmit,
 		onStop,
 	}: Props = $props();
+
+	const tabItems = $derived([
+		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning },
+		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning },
+		{ mode: 'demo' as const, label: t().modeDemo, running: demoRunning },
+	]);
 </script>
 
 <div class="panel-tabs">
-	{#each [['single', t().modeSingle], ['batch', t().modeBatch], ['demo', t().modeDemo]] as [mode, label] (mode)}
+	{#each tabItems as item (item.mode)}
 		<button
 			class="panel-tab"
-			class:active={inputMode === mode}
-			disabled={lockNonDemo && mode !== 'demo'}
+			class:active={inputMode === item.mode}
+			class:running={item.running}
+			aria-busy={item.running}
+			disabled={lockNonDemo && item.mode !== 'demo'}
 			onclick={() => {
-				if (lockNonDemo && mode !== 'demo') return;
-				inputMode = mode as 'single' | 'batch' | 'demo';
+				if (lockNonDemo && item.mode !== 'demo') return;
+				inputMode = item.mode;
 			}}
-		>{label}</button>
+		>
+			<span class="tab-label">{item.label}</span>
+			{#if item.running}<span class="tab-running-dot" aria-hidden="true"></span>{/if}
+		</button>
 	{/each}
 </div>
 
@@ -280,12 +291,40 @@
 <style>
 	.panel-tabs { display: flex; border-bottom: 1px solid var(--border); }
 	.panel-tab {
+		position: relative;
 		flex: 1; padding: 10px; background: none; border: none;
 		color: var(--fg3); font-size: 12px; cursor: pointer;
 		font-family: inherit; border-bottom: 2px solid transparent;
+		display: flex; align-items: center; justify-content: center; gap: 6px;
+		min-height: 38px;
 	}
 	.panel-tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+	.panel-tab.running {
+		color: var(--fg);
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
+	}
+	.panel-tab.running::before {
+		content: "";
+		position: absolute;
+		left: 12px;
+		right: 12px;
+		bottom: -2px;
+		height: 2px;
+		background: linear-gradient(90deg, transparent, var(--accent), transparent);
+		background-size: 180% 100%;
+		animation: tabrun 1.1s linear infinite;
+	}
+	.panel-tab.active.running::before { background: var(--accent); animation: none; }
 	.panel-tab:disabled { opacity: 0.38; cursor: not-allowed; }
+	.tab-label { line-height: 1; }
+	.tab-running-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--accent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+		animation: inkupulse 1s ease-in-out infinite;
+	}
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
 	.section-head {
 		display: flex;
@@ -428,6 +467,10 @@
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50% { opacity: 0.4; transform: scale(0.7); }
+	}
+	@keyframes tabrun {
+		from { background-position: 180% 0; }
+		to { background-position: -180% 0; }
 	}
 	@keyframes birdWalk {
 		0% { transform: translate(-28px, 0) scaleX(1); }

@@ -32,6 +32,7 @@ Dimension = Literal[
     "radius",
 ]
 Layout = Literal["horizontal", "vertical", "radial", "scatter"]
+Path = Literal["none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"]
 
 
 class Variation(BaseModel):
@@ -75,6 +76,14 @@ class Arrangement(BaseModel):
         description=(
             "horizontal=x軸等間隔 / vertical=y軸等間隔"
             " / radial=指定中心周囲に円状 / scatter=決定的ランダム散布"
+        ),
+    )
+    path: Path = Field(
+        default="none",
+        description=(
+            "配置軌跡。none=layout通り / diagonal=斜めの帯"
+            " / wave=波打つ軌跡 / top_to_bottom=上から下"
+            " / left_to_right=左から右 / right_half=右半分"
         ),
     )
     color_cycle: list[Color] = Field(

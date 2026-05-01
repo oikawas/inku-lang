@@ -82,6 +82,25 @@ def _diff_instruction(a: Instruction, e: Instruction) -> list[str]:
                 f"variation.dimensions: {va.dimensions} vs {ev_var.dimensions}"
             )
 
+    aa, ea = a.arrangement, e.arrangement
+    if (aa is None) != (ea is None):
+        errs.append(f"arrangement: {aa} vs {ea}")
+    elif aa is not None and ea is not None:
+        if aa.count != ea.count:
+            errs.append(f"arrangement.count: {aa.count} vs {ea.count}")
+        if aa.layout != ea.layout:
+            errs.append(f"arrangement.layout: {aa.layout} vs {ea.layout}")
+        if aa.path != ea.path:
+            errs.append(f"arrangement.path: {aa.path} vs {ea.path}")
+        if aa.color_cycle != ea.color_cycle:
+            errs.append(f"arrangement.color_cycle: {aa.color_cycle} vs {ea.color_cycle}")
+        if not _approx_equal(aa.margin, ea.margin):
+            errs.append(f"arrangement.margin: {aa.margin} vs {ea.margin}")
+        if not _approx_equal(aa.center, ea.center):
+            errs.append(f"arrangement.center: {aa.center} vs {ea.center}")
+        if not _approx_equal(aa.radius, ea.radius):
+            errs.append(f"arrangement.radius: {aa.radius} vs {ea.radius}")
+
     return errs
 
 
@@ -123,6 +142,16 @@ def test_submit_tool_schema_is_valid():
     assert "instructions" in schema["properties"]
     assert "$defs" not in schema
     assert "$ref" not in json.dumps(schema)
+    arrangement = schema["properties"]["instructions"]["items"]["properties"]["arrangement"]["anyOf"][0]
+    assert "path" in arrangement["properties"]
+    assert arrangement["properties"]["path"]["enum"] == [
+        "none",
+        "diagonal",
+        "wave",
+        "top_to_bottom",
+        "left_to_right",
+        "right_half",
+    ]
 
 
 def test_composer_prompt_keeps_dynamic_quantity_guidance():
@@ -148,6 +177,8 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "color\":\"blue" in SYSTEM_PROMPT
     assert "配置語を優先" in SYSTEM_PROMPT
     assert "上から下へ散らす" in SYSTEM_PROMPT
+    assert 'path":"wave"' in SYSTEM_PROMPT
+    assert 'path":"right_half"' in SYSTEM_PROMPT
     assert "三分割の交点" in SYSTEM_PROMPT
     assert "白銀比の位置" in SYSTEM_PROMPT
     assert "正五角形の頂点" in SYSTEM_PROMPT
@@ -188,6 +219,8 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "color\":\"blue" in SYSTEM_PROMPT_EN
     assert "prioritize that placement phrase" in SYSTEM_PROMPT_EN
     assert "top to bottom" in SYSTEM_PROMPT_EN
+    assert 'path":"wave"' in SYSTEM_PROMPT_EN
+    assert 'path":"right_half"' in SYSTEM_PROMPT_EN
     assert "rule-of-thirds point" in SYSTEM_PROMPT_EN
     assert "silver-ratio position" in SYSTEM_PROMPT_EN
     assert "regular pentagon vertices" in SYSTEM_PROMPT_EN

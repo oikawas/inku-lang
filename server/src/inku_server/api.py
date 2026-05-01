@@ -641,8 +641,24 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "color_hint": "fallback from DDL",
         }
 
-    if (("散らす" in ddl) or ("点々" in ddl) or ("scatter" in lower) or ("dotted" in lower)) and instruction["primitive"] != "line":
-        instruction["arrangement"] = {"count": 7, "layout": "scatter", "margin": 0.18}
+    arrangement: dict[str, object] | None = None
+    if ("散らす" in ddl) or ("点々" in ddl) or ("scatter" in lower) or ("dotted" in lower):
+        arrangement = {"count": 7, "layout": "scatter", "margin": 0.18}
+
+    if arrangement is not None:
+        if ("波打つ軌跡" in ddl) or ("undulating trace" in lower):
+            arrangement["path"] = "wave"
+        elif ("斜めの帯" in ddl) or ("diagonal band" in lower):
+            arrangement["path"] = "diagonal"
+        elif ("右半分" in ddl) or ("right half" in lower):
+            arrangement["path"] = "right_half"
+        elif ("上から下" in ddl) or ("top to bottom" in lower):
+            arrangement["layout"] = "vertical"
+            arrangement["path"] = "top_to_bottom"
+        elif ("左から右" in ddl) or ("left to right" in lower):
+            arrangement["layout"] = "horizontal"
+            arrangement["path"] = "left_to_right"
+        instruction["arrangement"] = arrangement
 
     return Score.model_validate({"background": background, "instructions": [instruction]})
 

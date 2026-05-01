@@ -58,7 +58,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **正規化DDL は必ず配置語を含む。正規化DDL が「中央付近」「上から下」「縦に」「右半分」「放射状」「同心円状」「画面全体に点々」「波打つ軌跡」を含む場合は、その配置語を優先する**
 - **「画面全体に点々」「全面に細かく」は layout=scatter でよいが、意味は無秩序ではなく全面分布として扱う**
 - **scatter は均一な乱数ではない。密度勾配、端部の薄れ、斜めの帯、右半分、上から下など、DDL の配置語に沿った偏りを持つものとして扱う**
-- **「上から下へ散らす」は layout=vertical。「左から右へ」「横に」は layout=horizontal。「放射状」「同心円状」は layout=radial**
+- **「波打つ軌跡に沿って」→ arrangement.path="wave"。「斜めの帯」→ path="diagonal"。「右半分」→ path="right_half"**
+- **「上から下へ散らす」は layout=vertical, path="top_to_bottom"。「左から右へ」「横に」は layout=horizontal, path="left_to_right"。「放射状」「同心円状」は layout=radial**
 - **「右上の黄金比の位置」→ center=[0.618,0.382]。左下なら [0.382,0.618]。数学的な均衡点として扱う**
 - **「左上の三分割の交点」→ center=[0.333,0.333]。「右下の三分割の交点」→ center=[0.667,0.667]。三分割構図として扱う**
 - **「左下の白銀比の位置」→ center=[0.414,0.586]。「右上の白銀比の位置」→ center=[0.586,0.414]。白銀比の余白として扱う**
@@ -96,7 +97,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 入力: 赤い右上がりの小さな楕円を右半分に縦に二十個散らす。
-出力: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
+出力: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
 
 入力: 白い小さな円を右上の黄金比の位置に一点置く。半径は0.025。
 出力: {"instructions":[{"primitive":"circle","center":[0.618,0.382],"radius":0.025,"color":"white"}]}
@@ -112,6 +113,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 赤い小さな円を正五角形の頂点に五個並べる。半径は0.022。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.022,"color":"red","arrangement":{"count":5,"layout":"radial"}}]}
+
+入力: 赤い小さな楕円を波打つ軌跡に沿って二十一個散らす。ゆっくり揺れる。
+出力: {"instructions":[{"primitive":"ellipse","center":[0.5,0.5],"size":[0.045,0.022],"color":"red","rotation":30,"arrangement":{"count":21,"layout":"scatter","path":"wave","margin":0.12},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 入力: 白い細い線を対位法の反行として右下がりに三本並べる。細かく震える。
 出力: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"color":"white","rotation":30,"arrangement":{"count":3,"layout":"vertical"},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
@@ -270,7 +274,8 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Normalized DDL must include placement words. If normalized DDL says "near the center", "top to bottom", "vertical", "right half", "radial", "concentric", "dotted across the whole canvas", or "undulating trace", prioritize that placement phrase**
 - **"dotted across the whole canvas" / "finely across the whole canvas" may use layout=scatter, but treat it as all-over distribution, not disorder**
 - **scatter is not uniform noise. Treat it as biased by density gradient, fading edges, diagonal band, right half, or top-to-bottom placement from the DDL**
-- **"top to bottom" → layout=vertical. "left to right" / "horizontal" → layout=horizontal. "radial" / "concentric" → layout=radial**
+- **"undulating trace" → arrangement.path="wave". "diagonal band" → path="diagonal". "right half" → path="right_half"**
+- **"top to bottom" → layout=vertical, path="top_to_bottom". "left to right" / "horizontal" → layout=horizontal, path="left_to_right". "radial" / "concentric" → layout=radial**
 - **"upper-right golden-ratio position" → center=[0.618,0.382]. Lower-left uses [0.382,0.618]. Treat it as a mathematical balance point**
 - **"upper-left rule-of-thirds point" → center=[0.333,0.333]. "lower-right rule-of-thirds point" → center=[0.667,0.667]. Treat it as rule-of-thirds composition**
 - **"lower-left silver-ratio position" → center=[0.414,0.586]. "upper-right silver-ratio position" → center=[0.586,0.414]. Treat it as silver-ratio spacing**
@@ -308,7 +313,7 @@ Input: Scatter one hundred thirty-seven short white lines from top to bottom. Sw
 Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 Input: Scatter twenty small red ellipses rising to the right vertically in the right half.
-Output: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","margin":0.1}}]}
+Output: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
 
 Input: Place one small white circle at the upper-right golden-ratio position. Radius 0.025.
 Output: {"instructions":[{"primitive":"circle","center":[0.618,0.382],"radius":0.025,"color":"white"}]}
@@ -324,6 +329,9 @@ Output: {"instructions":[{"primitive":"circle","center":[0.72,0.28],"radius":0.1
 
 Input: Line up five small red circles on regular pentagon vertices. Radius 0.022.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.022,"color":"red","arrangement":{"count":5,"layout":"radial"}}]}
+
+Input: Scatter twenty-one small red ellipses along an undulating trace. Swaying slowly.
+Output: {"instructions":[{"primitive":"ellipse","center":[0.5,0.5],"size":[0.045,0.022],"color":"red","rotation":30,"arrangement":{"count":21,"layout":"scatter","path":"wave","margin":0.12},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 Input: Line up three thin white lines falling to the right as contrapuntal contrary motion. Fine trembling.
 Output: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"color":"white","rotation":30,"arrangement":{"count":3,"layout":"vertical"},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}

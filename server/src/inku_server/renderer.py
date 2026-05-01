@@ -223,6 +223,44 @@ def _scatter_pos(i: int, seed: int, margin: float) -> tuple[float, float]:
     return (margin + xv * span, margin + yv * span)
 
 
+def _hash01(i: int, seed: int, salt: str) -> float:
+    h = hashlib.sha256(f"{seed}:{salt}:{i}".encode()).digest()
+    return struct.unpack("<I", h[:4])[0] / 0xFFFFFFFF
+
+
+def _path_pos(i: int, n: int, seed: int, margin: float, path: str) -> tuple[float, float]:
+    span = 1.0 - 2 * margin
+    t = i / max(n - 1, 1)
+    jitter_a = (_hash01(i, seed, "a") - 0.5)
+    jitter_b = (_hash01(i, seed, "b") - 0.5)
+
+    if path == "diagonal":
+        x = margin + t * span
+        y = 1.0 - margin - t * span
+        return _clamp01(x + jitter_a * 0.08), _clamp01(y + jitter_b * 0.08)
+    if path == "wave":
+        x = margin + t * span
+        y = 0.5 + math.sin(t * math.pi * 2.0) * 0.22 + jitter_b * 0.08
+        return _clamp01(x), _clamp01(y)
+    if path == "top_to_bottom":
+        x = 0.5 + jitter_a * 0.30
+        y = margin + t * span
+        return _clamp01(x), _clamp01(y)
+    if path == "left_to_right":
+        x = margin + t * span
+        y = 0.5 + jitter_b * 0.30
+        return _clamp01(x), _clamp01(y)
+    if path == "right_half":
+        x = 0.56 + _hash01(i, seed, "x") * (0.44 - margin)
+        y = margin + _hash01(i, seed, "y") * span
+        return _clamp01(x), _clamp01(y)
+    return _scatter_pos(i, seed, margin)
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
 def _ensure_line_coords(ins: Instruction) -> Instruction:
     """arrangement 付き line で from_/to が省略されたとき layout から補完する。
 
@@ -297,12 +335,20 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     seed = _seed_for_instruction(ins)
 
     if arr.layout == "horizontal":
+        if arr.path != "none":
+            targets = [_path_pos(i, n, seed, margin, arr.path) for i in range(n)]
+            result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+            return _apply_color_cycle(result, arr.color_cycle)
         span = 1.0 - 2 * margin
         targets = [(margin + i / max(n - 1, 1) * span, ay) for i in range(n)]
         result = [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "vertical":
+        if arr.path != "none":
+            targets = [_path_pos(i, n, seed, margin, arr.path) for i in range(n)]
+            result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+            return _apply_color_cycle(result, arr.color_cycle)
         span = 1.0 - 2 * margin
         targets = [(ax, margin + i / max(n - 1, 1) * span) for i in range(n)]
         result = [_shift(ins, 0.0, ty - ay) for _, ty in targets]
@@ -321,7 +367,7 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
         return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "scatter":
-        targets = [_scatter_pos(i, seed, margin) for i in range(n)]
+        targets = [_path_pos(i, n, seed, margin, arr.path) for i in range(n)]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 

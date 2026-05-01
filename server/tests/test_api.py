@@ -459,6 +459,48 @@ def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch,
     assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
 
 
+def test_compose_fallback_preserves_arrangement_path(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "compose",
+        lambda ddl, model=None, original_text=None, system_prompt=None, lang="ja": Score(instructions=[]),
+    )
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "赤い小さな楕円を波打つ軌跡に沿って二十一個散らす。"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    instruction = r.json()["score"]["instructions"][0]
+    assert instruction["primitive"] == "ellipse"
+    assert instruction["arrangement"]["layout"] == "scatter"
+    assert instruction["arrangement"]["path"] == "wave"
+
+
+def test_compose_fallback_preserves_line_arrangement_path(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "compose",
+        lambda ddl, model=None, original_text=None, system_prompt=None, lang="ja": Score(instructions=[]),
+    )
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "青い細い縦線を上から下へ散らす。"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    instruction = r.json()["score"]["instructions"][0]
+    assert instruction["primitive"] == "line"
+    assert instruction["arrangement"]["layout"] == "vertical"
+    assert instruction["arrangement"]["path"] == "top_to_bottom"
+
+
 def test_interpret_happy_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))

@@ -811,7 +811,7 @@ SVG
 - フレスコ: チョーク・灰色の下地線
 - 水墨: 黒や灰の筆線、滲み、濃淡
 
-これらはすべて JSON Score の既存フィールド（`primitive`, `weight`, `variation`, `arrangement`, `color_cycle` など）へ変換可能な形で表現する。
+これらはすべて JSON Score の既存フィールド（`primitive`, `weight`, `variation`, `arrangement`, `color_cycle` など）へ変換可能な形で表現する。波打つ軌跡、斜めの帯、上から下、右半分などの軌跡は `arrangement.path` として保持し、Renderer が安定した配置へ展開する。
 
 **例**
 
@@ -1054,7 +1054,38 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 
 スキーマレベルでは variation は保持するが、DDLテキスト層のインターフェースからは見えない。プラグインや素材を実装する人だけがこの次元を扱う。
 
-### 13.10 記述例と展開
+### 13.10 JSON Score の arrangement path
+
+`arrangement` は本数・個数だけでなく、連なり方と軌跡を保持する。
+
+```json
+{
+  "arrangement": {
+    "count": 21,
+    "layout": "scatter",
+    "path": "wave",
+    "margin": 0.12
+  }
+}
+```
+
+| フィールド | 値 | 説明 |
+|---|---|---|
+| `layout` | `horizontal` / `vertical` / `radial` / `scatter` | 基本配置 |
+| `path` | `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` | 配置軌跡 |
+
+対応関係:
+
+- 「波打つ軌跡に沿って」→ `layout="scatter"`, `path="wave"`
+- 「斜めの帯」→ `path="diagonal"`
+- 「上から下へ散らす」→ `layout="vertical"`, `path="top_to_bottom"`
+- 「左から右へ」「横に」→ `layout="horizontal"`, `path="left_to_right"`
+- 「右半分」→ `path="right_half"`
+- 「放射状」「同心円状」→ `layout="radial"`
+
+`path` が `none` の場合は従来どおり `layout` だけで配置する。`path` が指定された場合、Renderer は決定的な hash と連番を使い、同じ JSON Score から同じ軌跡配置を再現する。
+
+### 13.11 記述例と展開
 
 記述例：
 
@@ -1330,6 +1361,18 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.26 (2026-05-01)
+
+**軌跡フィールドの追加**
+
+DDL の「波打つ軌跡」「斜めの帯」「上から下」「右半分」などが `scatter` に埋もれないよう、JSON Score の `arrangement` に `path` フィールドを追加した。
+
+- `arrangement.path` は `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` を持つ
+- Stage 2 は「波打つ軌跡に沿って」を `path="wave"`、「斜めの帯」を `path="diagonal"`、「右半分」を `path="right_half"` として出力する
+- 「上から下へ散らす」は `layout="vertical"` に加えて `path="top_to_bottom"` を指定できる
+- Renderer は `path` が指定された arrangement を、決定的な軌跡座標として展開する
+- 既存 JSON 互換のため、`path` の既定値は `none` とする
 
 ### v1.25 (2026-05-01)
 
@@ -2379,9 +2422,10 @@ localStorage の容量制限を解消し、セッション跨ぎの履歴を実�
 
 N 個の instruction を展開すると JSON が N 倍になる問題を解決。Renderer 側で展開することで JSON は常に O(1)。
 
-- **schema.py**: `Arrangement` モデル追加 (`count` / `layout` / `margin` / `center` / `radius`)
+- **schema.py**: `Arrangement` モデル追加 (`count` / `layout` / `path` / `margin` / `center` / `radius`)
 - **renderer.py**: `_anchor()` / `_shift()` / `_expand_arrangement()` — Renderer 側で N 個に展開
-  - layout: `horizontal` / `vertical` / `radial` / `scatter` (決定的ランダム散布)
+  - layout: `horizontal` / `vertical` / `radial` / `scatter` (基本配置)
+  - path: `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` (軌跡指定)
   - `count=1` は展開せず単体返却。`ge=2` → `ge=1` に変更 (バリデーションエラー防止)
 - **interpreter.py EXAMPLE_POOL**: 数量表現を 1 文でまとめる例、ランダム配置例を収録
 - **composer.py**: arrangement 使用を SYSTEM_PROMPT で強制、複数 instruction 生成を禁止

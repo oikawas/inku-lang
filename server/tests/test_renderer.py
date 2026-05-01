@@ -140,6 +140,58 @@ def test_render_crayon_line_adds_rubbed_layers():
     assert svg.count("<circle") >= 26
 
 
+def test_render_scatter_path_wave_places_items_on_trace():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.01,
+                    "arrangement": {
+                        "count": 5,
+                        "layout": "scatter",
+                        "path": "wave",
+                        "margin": 0.1,
+                    },
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert 'cx="99.999' in svg
+    assert 'cx="300.000' in svg
+    assert 'cx="500.0"' in svg
+    assert 'cx="700.000' in svg
+    assert 'cx="900.0"' in svg
+    assert 'cy="716.' in svg
+    assert 'cy="263.' in svg
+
+
+def test_render_arrangement_path_right_half_constrains_x():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.01,
+                    "arrangement": {
+                        "count": 4,
+                        "layout": "scatter",
+                        "path": "right_half",
+                        "margin": 0.1,
+                    },
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    assert 'cx="300.' not in svg
+    assert 'cx="100.' not in svg
+    assert svg.count("<circle") == 4
+
+
 def test_render_brush_lines_use_layered_material_texture():
     score = Score.model_validate(
         {

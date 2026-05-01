@@ -21,7 +21,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Resp
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .coerce import coerce_score, ensure_renderable_score
+from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import compose
 from .composer import SYSTEM_PROMPT as STAGE2_PROMPT
 from .composer import SYSTEM_PROMPT_EN as STAGE2_PROMPT_EN
@@ -601,6 +601,22 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
     if color == background:
         color = "white" if background in {"black", "blue"} else "black"
 
+    weight = "pen"
+    if ("ロットリング" in ddl) or ("rotring" in lower):
+        weight = "rotring"
+    elif ("鉛筆" in ddl) or ("pencil" in lower):
+        weight = "pencil"
+    elif ("クレヨン" in ddl) or ("crayon" in lower):
+        weight = "crayon"
+    elif ("チョーク" in ddl) or ("chalk" in lower):
+        weight = "chalk"
+    elif ("太筆" in ddl) or ("thick-brush" in lower) or ("thick brush" in lower) or ("厚塗り" in ddl):
+        weight = "brush_thick"
+    elif ("細筆" in ddl) or ("水墨" in ddl) or ("墨" in ddl) or ("fine-brush" in lower) or ("ink" in lower):
+        weight = "brush_thin"
+    elif ("縄" in ddl) or ("rope" in lower):
+        weight = "rope"
+
     if ("四角" in ddl) or ("square" in lower) or ("rectangle" in lower):
         instruction = {
             "primitive": "square",
@@ -608,6 +624,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "size": [0.18, 0.12],
             "rotation": -12,
             "color": color,
+            "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
             "color_hint": "fallback from DDL",
         }
@@ -618,6 +635,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "size": [0.18, 0.11],
             "rotation": -18,
             "color": color,
+            "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
             "color_hint": "fallback from DDL",
         }
@@ -629,6 +647,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "angle_start": 210,
             "angle_end": 330,
             "color": color,
+            "weight": weight,
             "color_hint": "fallback from DDL",
         }
     else:
@@ -638,12 +657,15 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "to": [0.84, 0.28],
             "rotation": -8,
             "color": color,
+            "weight": weight,
             "color_hint": "fallback from DDL",
         }
 
     arrangement: dict[str, object] | None = None
     if ("散らす" in ddl) or ("点々" in ddl) or ("scatter" in lower) or ("dotted" in lower):
-        arrangement = {"count": 7, "layout": "scatter", "margin": 0.18}
+        arrangement = {"count": count_hint_from_ddl(ddl) or 7, "layout": "scatter", "margin": 0.18}
+    elif ("並べる" in ddl) or ("line up" in lower):
+        arrangement = {"count": count_hint_from_ddl(ddl) or 3, "layout": "horizontal", "margin": 0.1}
 
     if arrangement is not None:
         if ("波打つ軌跡" in ddl) or ("undulating trace" in lower):
@@ -758,7 +780,7 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
 
     try:
         ensure_renderable_score(score)
-        score = coerce_score(score)
+        score = coerce_score(score, ddl=req.ddl)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -920,7 +942,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
 
     try:
         ensure_renderable_score(score)
-        score = coerce_score(score)
+        score = coerce_score(score, ddl=ddl)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 

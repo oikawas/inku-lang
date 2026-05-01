@@ -548,7 +548,8 @@ def _compose_openai(user_msg: str, *, model: str | None = None, system_prompt: s
         base_url = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:18000/v3")
         api_key = os.getenv("OPENAI_API_KEY") or "none"
 
-    client = OpenAI(base_url=base_url, api_key=api_key)
+    timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
+    client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=0)
 
     tool = {
         "type": "function",

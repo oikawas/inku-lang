@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field as dc_field
 from typing import Any, Callable
 
@@ -134,6 +136,19 @@ VISIBLE_ON_BACKGROUND: dict[str, str] = {
     "green": "white",
 }
 
+MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("ロットリング", "rotring"), "rotring"),
+    (("鉛筆", "pencil"), "pencil"),
+    (("クレヨン", "crayon"), "crayon"),
+    (("チョーク", "chalk"), "chalk"),
+    (("細筆", "fine-brush", "fine brush"), "brush_thin"),
+    (("太筆", "thick-brush", "thick brush", "厚塗り", "油絵"), "brush_thick"),
+    (("水墨", "墨", "ink-wash", "ink wash"), "brush_thin"),
+    (("縄", "ロープ", "rope"), "rope"),
+)
+
+MAX_EXPANDED_PRIMITIVES = 400
+
 
 def _visible_background(background: str) -> str:
     if background == "gray":
@@ -200,14 +215,180 @@ def _with_density_budget(ins: Instruction) -> Instruction:
     return Instruction.model_validate(data)
 
 
+def _with_material_hint(ins: Instruction, ddl: str | None) -> Instruction:
+    if not ddl or ins.weight != "pen":
+        return ins
+    lower = ddl.lower()
+    for markers, weight in MATERIAL_WEIGHT_HINTS:
+        if any(marker.lower() in lower for marker in markers):
+            data = ins.model_dump(by_alias=True)
+            data["weight"] = weight
+            hint = data.get("color_hint")
+            note = f"material inferred from DDL: {weight}"
+            data["color_hint"] = f"{hint}; {note}" if hint else note
+            return Instruction.model_validate(data)
+    return ins
+
+
+def _with_variation_hint(ins: Instruction, ddl: str | None) -> Instruction:
+    if not ddl or ins.variation is not None:
+        return ins
+    lower = ddl.lower()
+    variation: dict[str, object] | None = None
+    if any(marker in ddl for marker in ("ゆっくり揺れる", "ゆっくり波打つ")) or "slow" in lower:
+        variation = {
+            "amplitude": "medium",
+            "frequency": "slow",
+            "quality": "wave",
+            "dimensions": ["position_x", "position_y"],
+        }
+    elif any(marker in ddl for marker in ("細かく揺れる", "細かく震える", "震える")) or "trembling" in lower:
+        variation = {
+            "amplitude": "fine",
+            "frequency": "medium",
+            "quality": "perlin",
+            "dimensions": ["position_y"] if ins.primitive == "line" else ["position_x", "position_y"],
+        }
+    elif any(marker in ddl for marker in ("滲む", "にじむ", "境界が滲む")) or "blurring" in lower:
+        variation = {
+            "amplitude": "medium",
+            "frequency": "medium",
+            "quality": "pink",
+            "dimensions": ["position_x", "position_y"],
+        }
+    if variation is None:
+        return ins
+    data = ins.model_dump(by_alias=True)
+    data["variation"] = variation
+    return Instruction.model_validate(data)
+
+
+def _dedupe_instructions(instructions: list[Instruction]) -> list[Instruction]:
+    deduped: list[Instruction] = []
+    seen: set[str] = set()
+    for ins in instructions:
+        key = json.dumps(ins.model_dump(by_alias=True, exclude_none=True), sort_keys=True, ensure_ascii=False)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(ins)
+    return deduped
+
+
+def _expanded_count(ins: Instruction) -> int:
+    if ins.arrangement is None:
+        return 1
+    return max(1, int(ins.arrangement.count))
+
+
+def _with_arrangement_count(ins: Instruction, count: int, note: str) -> Instruction:
+    if ins.arrangement is None or ins.arrangement.count == count:
+        return ins
+    data = ins.model_dump(by_alias=True)
+    arrangement = dict(data["arrangement"])
+    arrangement["count"] = max(1, int(count))
+    data["arrangement"] = arrangement
+    hint = data.get("color_hint")
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
+def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruction]:
+    total = sum(_expanded_count(ins) for ins in instructions)
+    if total <= MAX_EXPANDED_PRIMITIVES:
+        return instructions
+
+    remaining_budget = MAX_EXPANDED_PRIMITIVES
+    remaining = list(instructions)
+    adjusted: list[Instruction] = []
+    for index, ins in enumerate(remaining):
+        count = _expanded_count(ins)
+        rest_minimum = len(remaining) - index - 1
+        if ins.arrangement is None:
+            adjusted.append(ins)
+            remaining_budget -= 1
+            continue
+        if remaining_budget <= rest_minimum + 1:
+            allowed = 1
+        else:
+            remaining_total = sum(_expanded_count(item) for item in remaining[index:])
+            share = count / remaining_total if remaining_total > 0 else 0
+            allowed = max(1, int((remaining_budget - rest_minimum) * share))
+        adjusted_ins = _with_arrangement_count(ins, allowed, "expanded density capped to preserve negative space")
+        adjusted.append(adjusted_ins)
+        remaining_budget -= _expanded_count(adjusted_ins)
+    return adjusted
+
+
+_KANJI_NUMBERS: dict[str, int] = {
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+    "百": 100,
+}
+
+
+def _parse_small_japanese_number(text: str) -> int | None:
+    if not text:
+        return None
+    if text.isdigit():
+        return int(text)
+    if text == "百":
+        return 100
+    if text.endswith("百") and len(text) == 2:
+        return _KANJI_NUMBERS.get(text[0], 1) * 100
+    if "百" in text:
+        head, tail = text.split("百", 1)
+        value = (_KANJI_NUMBERS.get(head, 1) if head else 1) * 100
+        rest = _parse_small_japanese_number(tail)
+        return value + (rest or 0)
+    if text == "十":
+        return 10
+    if text.endswith("十") and len(text) == 2:
+        return _KANJI_NUMBERS.get(text[0], 1) * 10
+    if "十" in text:
+        head, tail = text.split("十", 1)
+        value = (_KANJI_NUMBERS.get(head, 1) if head else 1) * 10
+        return value + (_KANJI_NUMBERS.get(tail, 0) if tail else 0)
+    if len(text) == 1:
+        return _KANJI_NUMBERS.get(text)
+    return None
+
+
+def count_hint_from_ddl(ddl: str) -> int | None:
+    """Extract a conservative count hint from a normalized DDL fragment."""
+    match = re.search(r"(\d{1,4}|[一二三四五六七八九十百]{1,8})(?:本|個|つ|点|枚)", ddl)
+    if not match:
+        return None
+    value = _parse_small_japanese_number(match.group(1))
+    if value is None:
+        return None
+    return min(max(value, 1), 1000)
+
+
 def _repair_visibility(ins: Instruction, background: str) -> Instruction:
     repaired = _with_visible_color(ins, background)
     repaired = _with_visible_particle(repaired)
     return _with_density_budget(repaired)
 
 
-def _coerce_and_repair_instruction(ins: Instruction, *, original_background: str, background: str) -> Instruction:
+def _coerce_and_repair_instruction(
+    ins: Instruction,
+    *,
+    original_background: str,
+    background: str,
+    ddl: str | None,
+) -> Instruction:
     coerced = _coerce_instruction(ins)
+    coerced = _with_material_hint(coerced, ddl)
+    coerced = _with_variation_hint(coerced, ddl)
     if original_background == "gray" and coerced.color == "gray":
         coerced = _with_visible_color(coerced, "gray")
     return _repair_visibility(coerced, background)
@@ -258,13 +439,15 @@ def _coerce_instruction(ins: Instruction) -> Instruction:
     return Instruction.model_validate(data)
 
 
-def coerce_score(score: Score) -> Score:
+def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。"""
     background = _visible_background(score.background)
     instructions = [
-        _coerce_and_repair_instruction(ins, original_background=score.background, background=background)
+        _coerce_and_repair_instruction(ins, original_background=score.background, background=background, ddl=ddl)
         for ins in score.instructions
     ]
+    instructions = _dedupe_instructions(instructions)
+    instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)
     data["background"] = background
     data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]

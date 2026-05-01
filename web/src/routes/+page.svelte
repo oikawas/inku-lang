@@ -149,6 +149,15 @@
 	let demoSavingCurrent = $state(false);
 	let demoCurrentSaved = $state(false);
 	let demoWaitingSeconds = $state<number | null>(null);
+	let demoCurrentStartedAt: number | null = null;
+	let demoCurrentLiveMs = $state<number | null>(null);
+	let demoCurrentElapsedMs = $state<number | null>(null);
+	let demoCurrentTokensIn = $state<number | null>(null);
+	let demoCurrentTokensOut = $state<number | null>(null);
+	let demoTotalElapsedMs = $state(0);
+	let demoTotalTokensIn = $state(0);
+	let demoTotalTokensOut = $state(0);
+	let demoRenderCount = $state(0);
 	let demoSettingsLoaded = $state(false);
 	let demoRunId = 0;
 
@@ -941,7 +950,13 @@
 	function startTimer() {
 		_timerStart = Date.now();
 		liveMs = 0;
-		_timerHandle = setInterval(() => { liveMs = Date.now() - _timerStart; }, 100);
+		_timerHandle = setInterval(() => {
+			const now = Date.now();
+			liveMs = now - _timerStart;
+			if (demoCurrentStartedAt !== null) {
+				demoCurrentLiveMs = now - demoCurrentStartedAt;
+			}
+		}, 100);
 	}
 	function stopTimer() {
 		if (_timerHandle !== null) { clearInterval(_timerHandle); _timerHandle = null; }
@@ -1059,6 +1074,11 @@
 	async function runDemoLoop(runId: number) {
 		while (demoRunId === runId && loading) {
 			const startedAt = Date.now();
+			demoCurrentStartedAt = startedAt;
+			demoCurrentLiveMs = 0;
+			demoCurrentElapsedMs = null;
+			demoCurrentTokensIn = null;
+			demoCurrentTokensOut = null;
 			demoWaitingSeconds = null;
 			try {
 				const settings = normalizeDemoSettings(demoSettings);
@@ -1079,6 +1099,17 @@
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
 				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
+				const currentTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0);
+				const currentTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
+				demoCurrentElapsedMs = r.elapsed_total_ms;
+				demoCurrentLiveMs = r.elapsed_total_ms;
+				demoCurrentStartedAt = null;
+				demoCurrentTokensIn = currentTokensIn;
+				demoCurrentTokensOut = currentTokensOut;
+				demoTotalElapsedMs += r.elapsed_total_ms;
+				demoTotalTokensIn += currentTokensIn;
+				demoTotalTokensOut += currentTokensOut;
+				demoRenderCount += 1;
 				if (settings.save_db) await refreshHistoryAfterServerSave();
 				const remainingMs = Math.max(0, settings.interval_seconds * 1000 - (Date.now() - startedAt));
 				for (let left = Math.ceil(remainingMs / 1000); left > 0 && demoRunId === runId && loading; left--) {
@@ -1086,11 +1117,13 @@
 					await sleep(Math.min(1000, remainingMs));
 				}
 			} catch (e) {
+				demoCurrentStartedAt = null;
 				demoError = e instanceof Error ? e.message : String(e);
 				await sleep(1000);
 			}
 		}
 		if (demoRunId === runId) {
+			demoCurrentStartedAt = null;
 			stopTimer();
 			loading = false;
 			activeRunMode = null;
@@ -1101,11 +1134,21 @@
 
 	async function startDemo() {
 		if (loading) return;
+		clearInput();
 		demoError = null;
 		demoSaveStatus = null;
 		demoCurrentSaved = false;
 		error = null;
 		demoGeneratedDdl = null;
+		demoCurrentStartedAt = null;
+		demoCurrentLiveMs = null;
+		demoCurrentElapsedMs = null;
+		demoCurrentTokensIn = null;
+		demoCurrentTokensOut = null;
+		demoTotalElapsedMs = 0;
+		demoTotalTokensIn = 0;
+		demoTotalTokensOut = 0;
+		demoRenderCount = 0;
 		displayedHistoryItem = null;
 		activeRunMode = 'demo';
 		loading = true;
@@ -1116,7 +1159,12 @@
 
 	function stopDemo() {
 		demoRunId += 1;
+		demoCurrentStartedAt = null;
 		loading = false;
+		activeRunMode = null;
+		stageLabel = '';
+		demoWaitingSeconds = null;
+		stopTimer();
 	}
 
 	// ── Submit ──────────────────────────────────────────────
@@ -2055,6 +2103,14 @@
 						bind:demoSettings
 						{demoRunning}
 						{demoWaitingSeconds}
+						{demoCurrentLiveMs}
+						{demoCurrentElapsedMs}
+						{demoCurrentTokensIn}
+						{demoCurrentTokensOut}
+						{demoTotalElapsedMs}
+						{demoTotalTokensIn}
+						{demoTotalTokensOut}
+						{demoRenderCount}
 						{demoGeneratedPrompt}
 						{demoGeneratedDdlHighlighted}
 						{demoCanSaveCurrent}
@@ -2140,6 +2196,7 @@
 				bind:pngMenuOpen
 				bind:pngWrapEl
 				{result}
+				allowEmptyOutputTabs={inputMode === 'demo' || activeRunMode === 'demo'}
 				{currentRenderedAt}
 				{nextDisabled}
 				{prevDisabled}
@@ -2152,7 +2209,7 @@
 				{panY}
 				{canvasDragging}
 				{promptsData}
-				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : batchInput)}
+				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : demoGeneratedPrompt)}
 				{ddl}
 				{copiedPrompt}
 				{scoreJsonLines}

@@ -8,6 +8,14 @@
 		running: boolean;
 		liveMs: number;
 		waitingSeconds: number | null;
+		currentLiveMs: number | null;
+		currentElapsedMs: number | null;
+		currentTokensIn: number | null;
+		currentTokensOut: number | null;
+		totalElapsedMs: number;
+		totalTokensIn: number;
+		totalTokensOut: number;
+		demoRenderCount: number;
 		generatedPrompt: string;
 		generatedDdlHighlighted: string;
 		canSaveCurrent: boolean;
@@ -25,6 +33,14 @@
 		running,
 		liveMs,
 		waitingSeconds,
+		currentLiveMs,
+		currentElapsedMs,
+		currentTokensIn,
+		currentTokensOut,
+		totalElapsedMs,
+		totalTokensIn,
+		totalTokensOut,
+		demoRenderCount,
 		generatedPrompt,
 		generatedDdlHighlighted,
 		canSaveCurrent,
@@ -53,6 +69,18 @@
 		const next = Math.max(1, Math.min(999, Math.round(settings.interval_seconds + delta)));
 		updateSettings({ interval_seconds: next });
 	}
+
+	function formatMs(ms: number | null) {
+		if (ms === null) return t().demoStatsPending;
+		return `${(ms / 1000).toFixed(1)}s`;
+	}
+
+	function formatTokens(input: number | null, output: number | null) {
+		if (input === null || output === null) return t().demoStatsPending;
+		return `${input}->${output}tok`;
+	}
+
+	const displayedCurrentMs = $derived(currentElapsedMs ?? currentLiveMs);
 </script>
 
 <div class="demo-panel">
@@ -131,6 +159,22 @@
 			<button class="play-btn" onclick={onStart} disabled={!settings.seed_phrase.trim()}>▶ <span>{t().demoStart}</span></button>
 		{/if}
 	</div>
+
+	{#if running || demoRenderCount > 0}
+		<div class="demo-stats">
+			<div class="stats-row">
+				<span class="stats-label">{t().demoTotalStats}</span>
+				<span>{formatMs(totalElapsedMs)} / {formatTokens(totalTokensIn, totalTokensOut)}</span>
+				{#if demoRenderCount > 0}<span class="stats-count">{t().demoRenderCount(demoRenderCount)}</span>{/if}
+			</div>
+			{#if running}
+				<div class="stats-row">
+					<span class="stats-label">{t().demoCurrentStats}</span>
+					<span>{formatMs(displayedCurrentMs)} / {formatTokens(currentTokensIn, currentTokensOut)}</span>
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<div class="demo-save-row">
 		<button class="ghost-btn" onclick={onSaveCurrent} disabled={!canSaveCurrent || savingCurrent}>
@@ -221,6 +265,31 @@
 		color: var(--fg3);
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
+	}
+	.demo-stats {
+		display: grid;
+		gap: 4px;
+		padding: 7px 8px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--bg2);
+		color: var(--fg2);
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+	}
+	.stats-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+	.stats-label {
+		color: var(--fg3);
+		min-width: 4.5em;
+	}
+	.stats-count {
+		color: var(--fg3);
+		margin-left: auto;
 	}
 	.play-btn {
 		width: 100%;

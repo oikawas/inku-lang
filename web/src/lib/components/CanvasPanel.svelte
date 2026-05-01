@@ -11,6 +11,7 @@
 	type Props = {
 		outputTab: OutputTab;
 		result: PaintResult | null;
+		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
 		nextDisabled: boolean;
 		prevDisabled: boolean;
@@ -53,6 +54,7 @@
 	let {
 		outputTab = $bindable('canvas'),
 		result,
+		allowEmptyOutputTabs,
 		currentRenderedAt,
 		nextDisabled,
 		prevDisabled,
@@ -114,8 +116,8 @@
 <div class="right-panel">
 	<div class="right-tabs">
 		<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
-		<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result}>{t().tabPrompts}</button>
-		<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result}>{t().tabScore}</button>
+		<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
+		<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
 		<div class="rtab-spacer"></div>
 		{#if currentRenderedAt}
 			<span class="rendered-at">{currentRenderedAt}</span>

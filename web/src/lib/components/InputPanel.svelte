@@ -39,6 +39,14 @@
 		demoSettings: DemoSettings;
 		demoRunning: boolean;
 		demoWaitingSeconds: number | null;
+		demoCurrentLiveMs: number | null;
+		demoCurrentElapsedMs: number | null;
+		demoCurrentTokensIn: number | null;
+		demoCurrentTokensOut: number | null;
+		demoTotalElapsedMs: number;
+		demoTotalTokensIn: number;
+		demoTotalTokensOut: number;
+		demoRenderCount: number;
 		demoGeneratedPrompt: string;
 		demoGeneratedDdlHighlighted: string;
 		demoCanSaveCurrent: boolean;
@@ -84,6 +92,14 @@
 		demoSettings = $bindable(),
 		demoRunning,
 		demoWaitingSeconds,
+		demoCurrentLiveMs,
+		demoCurrentElapsedMs,
+		demoCurrentTokensIn,
+		demoCurrentTokensOut,
+		demoTotalElapsedMs,
+		demoTotalTokensIn,
+		demoTotalTokensOut,
+		demoRenderCount,
 		demoGeneratedPrompt,
 		demoGeneratedDdlHighlighted,
 		demoCanSaveCurrent,
@@ -126,7 +142,9 @@
 		<div class="section-actions">
 			<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			<button class="ghost-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
-			<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+			{#if inputMode !== 'demo'}
+				<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+			{/if}
 		</div>
 	</div>
 
@@ -237,6 +255,14 @@
 			running={demoRunning}
 			{liveMs}
 			waitingSeconds={demoWaitingSeconds}
+			currentLiveMs={demoCurrentLiveMs}
+			currentElapsedMs={demoCurrentElapsedMs}
+			currentTokensIn={demoCurrentTokensIn}
+			currentTokensOut={demoCurrentTokensOut}
+			totalElapsedMs={demoTotalElapsedMs}
+			totalTokensIn={demoTotalTokensIn}
+			totalTokensOut={demoTotalTokensOut}
+			{demoRenderCount}
 			generatedPrompt={demoGeneratedPrompt}
 			generatedDdlHighlighted={demoGeneratedDdlHighlighted}
 			canSaveCurrent={demoCanSaveCurrent}

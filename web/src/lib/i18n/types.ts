@@ -62,6 +62,10 @@ export interface LangPack {
 	demoSaveCurrent: string;
 	demoSavedCurrent: string;
 	demoWaiting: (seconds: number) => string;
+	demoTotalStats: string;
+	demoCurrentStats: string;
+	demoStatsPending: string;
+	demoRenderCount: (count: number) => string;
 
 	// Submit / loading
 	submitBtn: string;
@@ -133,6 +137,7 @@ export interface LangPack {
 	historyTitle: string;
 	historyCollapse: string;
 	historyExpand: string;
+	historyLockedDuringDemo: string;
 	historyNewerPage: (n: number) => string;
 	historyOlderPage: (n: number) => string;
 	historyClearBtn: string;

@@ -67,6 +67,10 @@ export const ja: LangPack = {
 	demoSaveCurrent: '現在の描画をDBに保存',
 	demoSavedCurrent: '履歴に保存しました',
 	demoWaiting: (seconds) => `次の描画まで ${seconds}s`,
+	demoTotalStats: '合計',
+	demoCurrentStats: '現在',
+	demoStatsPending: '計測中',
+	demoRenderCount: (count) => `${count}件`,
 
 	submitBtn: '描画する',
 	stopBtn: '停止',
@@ -120,6 +124,7 @@ export const ja: LangPack = {
 	historyTitle: '履歴',
 	historyCollapse: '履歴エリアを仕舞う',
 	historyExpand: '履歴エリアを表示',
+	historyLockedDuringDemo: 'デモ実行中は履歴操作をロックしています',
 	historyNewerPage: (n) => `← 新しい${n}件`,
 	historyOlderPage: (n) => `古い${n}件 →`,
 	historyClearBtn: '全て消す',

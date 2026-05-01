@@ -77,11 +77,17 @@
 </script>
 
 {#if historyTotal > 0}
-	<div class="history-strip" class:collapsed={historyCollapsed}>
+	<div class="history-strip" class:collapsed={historyCollapsed} class:locked={interactionLocked}>
 		<div class="history-head">
 			<button class="history-title-btn" onclick={onOpenManager} disabled={interactionLocked}>
 				{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
 			</button>
+			{#if interactionLocked}
+				<div class="history-lock-badge" role="status" aria-live="polite">
+					<span class="lock-icon" aria-hidden="true">◇</span>
+					<span>{t().historyLockedDuringDemo}</span>
+				</div>
+			{/if}
 			<div class="history-head-actions">
 				{#if !historyCollapsed}
 					<div class="history-page-nav">
@@ -154,6 +160,11 @@
 		padding: 8px 16px 10px;
 		flex-shrink: 0;
 	}
+	.history-strip.locked {
+		background:
+			repeating-linear-gradient(135deg, transparent 0, transparent 10px, rgba(122, 91, 47, 0.055) 10px, rgba(122, 91, 47, 0.055) 20px),
+			var(--bg);
+	}
 	.history-strip.collapsed {
 		padding: 6px 16px;
 	}
@@ -187,6 +198,22 @@
 		box-shadow: 0 2px 8px rgba(42,74,114,0.16);
 	}
 	.history-count { color: var(--fg3); font-weight: 400; }
+	.history-lock-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		border: 1px solid rgba(122, 91, 47, 0.28);
+		border-radius: 999px;
+		background: rgba(122, 91, 47, 0.09);
+		color: var(--fg2);
+		font-size: 11px;
+		padding: 4px 10px;
+		margin-left: 10px;
+	}
+	.lock-icon {
+		color: var(--fg3);
+		font-size: 10px;
+	}
 	.history-head-actions { display: flex; align-items: center; gap: 8px; }
 	.history-page-nav { display: flex; align-items: center; gap: 6px; }
 	.history-page-indicator {
@@ -227,6 +254,22 @@
 	}
 	.thumb:hover { overflow: visible; z-index: 2000; }
 	.thumb.current { border-color: var(--accent); }
+	.history-strip.locked .thumb {
+		opacity: 0.58;
+		cursor: not-allowed;
+	}
+	.history-strip.locked .thumb::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: var(--r);
+		background: rgba(247, 245, 239, 0.28);
+		pointer-events: none;
+		z-index: 18;
+	}
+	:global([data-theme="dark"]) .history-strip.locked .thumb::after {
+		background: rgba(20, 20, 20, 0.22);
+	}
 	.thumb-star {
 		position: absolute;
 		top: 3px;

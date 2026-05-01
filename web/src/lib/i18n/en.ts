@@ -67,6 +67,10 @@ export const en: LangPack = {
 	demoSaveCurrent: 'Save current to DB',
 	demoSavedCurrent: 'Saved to history',
 	demoWaiting: (seconds) => `Next render in ${seconds}s`,
+	demoTotalStats: 'Total',
+	demoCurrentStats: 'Current',
+	demoStatsPending: 'measuring',
+	demoRenderCount: (count) => `${count} renders`,
 
 	submitBtn: 'draw',
 	stopBtn: 'stop',
@@ -120,6 +124,7 @@ export const en: LangPack = {
 	historyTitle: 'history',
 	historyCollapse: 'collapse history',
 	historyExpand: 'show history',
+	historyLockedDuringDemo: 'History controls are locked during demo',
 	historyNewerPage: (n) => `← newer ${n}`,
 	historyOlderPage: (n) => `older ${n} →`,
 	historyClearBtn: 'clear all',

@@ -458,8 +458,32 @@ class DatabaseSettingsStatus(BaseModel):
     url: str
     database: str | None = None
     is_default: bool
+    file_size_bytes: int | None = None
+    file_path: str | None = None
     runtime_editable: bool = False
     note: str
+
+
+class DbBackupStatus(BaseModel):
+    supported: bool
+    interval_days: int
+    max_generations: int
+    last_auto_backup_at: int = 0
+    backup_dir: str
+    auto_count: int = 0
+    manual_count: int = 0
+
+
+class DbBackupSettingsBody(BaseModel):
+    interval_days: int = Field(default=7, ge=1, le=365)
+    max_generations: int = Field(default=4, ge=1, le=100)
+
+
+class DbBackupResult(BaseModel):
+    path: str
+    at: int
+    manual: bool
+    size_bytes: int | None = None
 
 
 class PluginSettingsStatus(BaseModel):
@@ -481,6 +505,7 @@ class OutputSaveStatus(BaseModel):
 
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus
+    db_backup: DbBackupStatus
     plugins: PluginSettingsStatus
     output_save: OutputSaveStatus
 
@@ -700,12 +725,14 @@ def api_auth_me_update_demo_settings(
 
 @app.get("/api/settings/status", response_model=SettingsStatusResponse)
 def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusResponse:
+    _db.ensure_scheduled_db_backup()
     db_info = _db.database_info()
     return SettingsStatusResponse(
         database=DatabaseSettingsStatus(
             **db_info,
             note="DB connection is selected at server startup by INKU_DB_URL. Restart the server after changing it.",
         ),
+        db_backup=DbBackupStatus(**_db.db_backup_status()),
         plugins=PluginSettingsStatus(
             enabled=True,
             loaded=plugin_status_items(),
@@ -718,6 +745,27 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
         ),
     )
+
+
+@app.put("/api/settings/db-backup", response_model=DbBackupStatus)
+def api_settings_update_db_backup(
+    body: DbBackupSettingsBody,
+    actor: dict = Depends(_admin_user),
+) -> DbBackupStatus:
+    try:
+        _db.update_db_backup_settings(body.interval_days, body.max_generations)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return DbBackupStatus(**_db.db_backup_status())
+
+
+@app.post("/api/settings/db-backup/run", response_model=DbBackupResult)
+def api_settings_run_db_backup(actor: dict = Depends(_admin_user)) -> DbBackupResult:
+    try:
+        result = _db.create_db_backup(manual=True)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return DbBackupResult(**result)
 
 
 @app.post("/api/auth/logout")

@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.36**
+**Version: v1.37**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -342,6 +342,15 @@ only to the `admin` role.  The plugins tab is visible to all signed-in users,
 but plugin setting changes and plugin-storage update APIs are restricted to
 `admin`.
 
+The DB settings tab also shows the current DB file size when the backend is a
+SQLite file database.  Admin users can configure DB replica backups with an
+interval in days and a maximum number of automatic generations.  The defaults
+are seven days and four generations.  Scheduled backups are created when the
+settings status endpoint is loaded after the interval has elapsed.  Manual
+backups can be created immediately and are stored separately from the automatic
+generation limit.  File-replica backups are reported as unavailable for
+non-SQLite DB backends.
+
 Operational details for the author's local server are intentionally not part of
 this public specification.  They belong in untracked local documents such as
 `AGENTS.md`, `LOCAL_WORK.md`, and `no-git-sync/`.
@@ -395,6 +404,7 @@ The reference implementation currently includes:
 - authenticated users and admin user management
 - signed-in user profile editing
 - role-aware settings visibility
+- DB file size display and SQLite backup settings
 - DB-backed history
 - star and trash history management
 - batch rendering

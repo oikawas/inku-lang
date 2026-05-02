@@ -96,8 +96,19 @@
 			url: string;
 			database: string | null;
 			is_default: boolean;
+			file_size_bytes: number | null;
+			file_path: string | null;
 			runtime_editable: boolean;
 			note: string;
+		};
+		db_backup: {
+			supported: boolean;
+			interval_days: number;
+			max_generations: number;
+			last_auto_backup_at: number;
+			backup_dir: string;
+			auto_count: number;
+			manual_count: number;
 		};
 		plugins: {
 			enabled: boolean;
@@ -337,6 +348,7 @@
 	let settingsStatus = $state<SettingsStatus | null>(null);
 	let settingsStatusError = $state<string | null>(null);
 	let settingsStatusLoading = $state(false);
+	let dbBackupStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
@@ -814,11 +826,47 @@
 			}
 			settingsStatus = await r.json();
 			settingsStatusError = null;
+			dbBackupStatus = null;
 		} catch (e) {
 			settingsStatus = null;
 			settingsStatusError = e instanceof Error ? e.message : String(e);
 		} finally {
 			settingsStatusLoading = false;
+		}
+	}
+
+	async function updateDbBackupSettings(intervalDays: number, maxGenerations: number) {
+		dbBackupStatus = null;
+		try {
+			const r = await apiFetch('/api/settings/db-backup', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ interval_days: intervalDays, max_generations: maxGenerations })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const nextBackup = await r.json() as SettingsStatus['db_backup'];
+			if (settingsStatus) settingsStatus = { ...settingsStatus, db_backup: nextBackup };
+		} catch (e) {
+			dbBackupStatus = t().settingsDbBackupSaveFailed;
+			console.warn('failed to update DB backup settings', e);
+		}
+	}
+
+	async function runDbBackupNow() {
+		dbBackupStatus = null;
+		try {
+			const r = await apiFetch('/api/settings/db-backup/run', { method: 'POST' });
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			await loadSettingsStatus();
+			dbBackupStatus = t().settingsDbBackupRunDone;
+		} catch (e) {
+			dbBackupStatus = e instanceof Error ? e.message : String(e);
 		}
 	}
 
@@ -2653,6 +2701,7 @@
 		{settingsStatus}
 		{settingsStatusError}
 		{settingsStatusLoading}
+		{dbBackupStatus}
 		{currentUser}
 		{userSettingsStatus}
 		{userSettingsLoading}
@@ -2690,6 +2739,8 @@
 		onSetStage2Provider={setStage2Provider}
 		onSetStage2Model={setStage2Model}
 		onLoadSettingsStatus={loadSettingsStatus}
+		onUpdateDbBackupSettings={updateDbBackupSettings}
+		onRunDbBackupNow={runDbBackupNow}
 		onLoadUserSettings={loadUserSettings}
 		onLogin={login}
 		onLogout={logout}

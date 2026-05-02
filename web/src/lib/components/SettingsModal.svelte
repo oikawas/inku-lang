@@ -15,8 +15,19 @@
 			url: string;
 			database: string | null;
 			is_default: boolean;
+			file_size_bytes: number | null;
+			file_path: string | null;
 			runtime_editable: boolean;
 			note: string;
+		};
+		db_backup: {
+			supported: boolean;
+			interval_days: number;
+			max_generations: number;
+			last_auto_backup_at: number;
+			backup_dir: string;
+			auto_count: number;
+			manual_count: number;
 		};
 		plugins: {
 			enabled: boolean;
@@ -56,6 +67,7 @@
 		settingsStatus: SettingsStatus | null;
 		settingsStatusError: string | null;
 		settingsStatusLoading: boolean;
+		dbBackupStatus: string | null;
 		currentUser: UserItem | null;
 		userSettingsStatus: string | null;
 		userSettingsLoading: boolean;
@@ -92,6 +104,8 @@
 		onSetStage2Provider: (provider: Provider) => void;
 		onSetStage2Model: (model: string) => void;
 		onLoadSettingsStatus: () => void;
+		onUpdateDbBackupSettings: (intervalDays: number, maxGenerations: number) => void | Promise<void>;
+		onRunDbBackupNow: () => void | Promise<void>;
 		onLoadUserSettings: () => void;
 		onLogin: () => void | Promise<void>;
 		onLogout: () => void | Promise<void>;
@@ -124,6 +138,7 @@
 		settingsStatus,
 		settingsStatusError,
 		settingsStatusLoading,
+		dbBackupStatus,
 		currentUser,
 		userSettingsStatus,
 		userSettingsLoading,
@@ -160,6 +175,8 @@
 		onSetStage2Provider,
 		onSetStage2Model,
 		onLoadSettingsStatus,
+		onUpdateDbBackupSettings,
+		onRunDbBackupNow,
 		onLoadUserSettings,
 		onLogin,
 		onLogout,
@@ -183,6 +200,24 @@
 
 	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
 	const isAdmin = $derived(currentUser?.role === 'admin');
+
+	function formatBytes(bytes: number | null | undefined): string {
+		if (bytes == null) return '-';
+		if (bytes < 1024) return `${bytes} B`;
+		const units = ['KB', 'MB', 'GB', 'TB'];
+		let value = bytes / 1024;
+		let unit = units[0];
+		for (let i = 1; i < units.length && value >= 1024; i += 1) {
+			value /= 1024;
+			unit = units[i];
+		}
+		return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
+	}
+
+	function formatTimestamp(ms: number): string {
+		if (!ms) return '-';
+		return new Date(ms).toLocaleString();
+	}
 </script>
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -254,14 +289,60 @@
 						<span>URL</span><code>{settingsStatus.database.url}</code>
 						<span>Database</span><strong>{settingsStatus.database.database ?? '-'}</strong>
 						<span>Default</span><strong>{settingsStatus.database.is_default ? t().settingsYes : t().settingsNo}</strong>
+						<span>{t().settingsDbFileSize}</span><strong>{formatBytes(settingsStatus.database.file_size_bytes)}</strong>
 					</div>
 					<div class="db-test-result">{settingsStatus.database.note}</div>
 				{:else}
 					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
 				{/if}
 			</div>
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsDbBackupTitle}</div>
+				{#if settingsStatusLoading}
+					<div class="inline-message">{t().settingsLoading}</div>
+				{:else if settingsStatus}
+					{#if !settingsStatus.db_backup.supported}
+						<div class="inline-message">{t().settingsDbBackupUnsupported}</div>
+					{/if}
+					<div class="db-backup-grid">
+						<label>
+							<span>{t().settingsDbBackupInterval}</span>
+							<input
+								type="number"
+								min="1"
+								max="365"
+								value={settingsStatus.db_backup.interval_days}
+								disabled={!settingsStatus.db_backup.supported}
+								onchange={(e) => onUpdateDbBackupSettings(Number((e.currentTarget as HTMLInputElement).value), settingsStatus?.db_backup.max_generations ?? 4)}
+							/>
+						</label>
+						<label>
+							<span>{t().settingsDbBackupMaxGenerations}</span>
+							<input
+								type="number"
+								min="1"
+								max="100"
+								value={settingsStatus.db_backup.max_generations}
+								disabled={!settingsStatus.db_backup.supported}
+								onchange={(e) => onUpdateDbBackupSettings(settingsStatus?.db_backup.interval_days ?? 7, Number((e.currentTarget as HTMLInputElement).value))}
+							/>
+						</label>
+					</div>
+					<div class="settings-readonly-grid compact">
+						<span>{t().settingsDbBackupLastAuto}</span><strong>{formatTimestamp(settingsStatus.db_backup.last_auto_backup_at)}</strong>
+						<span>Directory</span><code>{settingsStatus.db_backup.backup_dir}</code>
+						<span>Saved</span><strong>{t().settingsDbBackupStoredCounts(settingsStatus.db_backup.auto_count, settingsStatus.db_backup.manual_count)}</strong>
+					</div>
+					{#if dbBackupStatus}
+						<div class="inline-message">{dbBackupStatus}</div>
+					{/if}
+				{:else}
+					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
+				{/if}
+			</div>
 			<div class="settings-inline-actions">
 				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReload}</button>
+				<button class="ghost-btn primary-inline" onclick={onRunDbBackupNow} disabled={settingsStatusLoading || currentUser?.role !== 'admin' || !settingsStatus?.db_backup.supported}>{t().settingsDbBackupRunNow}</button>
 			</div>
 		{:else if settingsTab === 'plugins'}
 			<div class="popover-group">
@@ -637,6 +718,36 @@
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 11px;
 		word-break: break-all;
+	}
+	.settings-readonly-grid.compact {
+		margin-top: 10px;
+		margin-bottom: 0;
+	}
+	.db-backup-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+		margin-top: 10px;
+	}
+	.db-backup-grid label {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.db-backup-grid input {
+		min-width: 0;
+		padding: 5px 7px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		font-size: 12px;
+		font-family: inherit;
+		font-variant-numeric: tabular-nums;
 	}
 	.inline-message {
 		padding: 7px 9px;

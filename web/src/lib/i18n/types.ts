@@ -155,6 +155,16 @@ export interface LangPack {
 	settingsTabExport: string;
 	settingsTabMisc: string;
 	settingsCurrentDb: string;
+	settingsDbFileSize: string;
+	settingsDbBackupTitle: string;
+	settingsDbBackupUnsupported: string;
+	settingsDbBackupInterval: string;
+	settingsDbBackupMaxGenerations: string;
+	settingsDbBackupLastAuto: string;
+	settingsDbBackupStoredCounts: (autoCount: number, manualCount: number) => string;
+	settingsDbBackupRunNow: string;
+	settingsDbBackupRunDone: string;
+	settingsDbBackupSaveFailed: string;
 	settingsLoading: string;
 	settingsLoadFailed: string;
 	settingsReload: string;

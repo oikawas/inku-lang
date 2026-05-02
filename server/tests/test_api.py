@@ -979,7 +979,8 @@ def test_artifact_save_submit_releases_slot_when_executor_fails(monkeypatch, cap
     assert "failed to submit artifact save job" in caplog.text
 
 
-def test_settings_status_is_admin_only():
+def test_settings_status_is_admin_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"settings-{suffix}")
     admin = db.add_user(
@@ -1007,8 +1008,12 @@ def test_settings_status_is_admin_only():
     assert r.status_code == 200
     data = r.json()
     assert data["database"]["backend"]
+    assert "file_size_bytes" in data["database"]
     assert data["database"]["runtime_editable"] is False
     assert "INKU_DB_URL" in data["database"]["note"]
+    assert data["db_backup"]["supported"] is True
+    assert data["db_backup"]["interval_days"] == 7
+    assert data["db_backup"]["max_generations"] == 4
     assert data["plugins"]["enabled"] is True
     assert data["plugins"]["runtime_editable"] is False
     assert data["plugins"]["loaded"] == [{"name": "canvas-aspect", "version": "0.1.0", "status": "enabled"}]
@@ -1022,6 +1027,56 @@ def test_settings_status_is_admin_only():
     db.delete_user(admin["id"])
     db.delete_user(user["id"])
     db.delete_user_group(group["id"])
+
+
+def test_db_backup_settings_and_manual_run_are_admin_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"db-backup-{suffix}")
+    user = db.add_user(
+        username=f"db-backup-user-{suffix}",
+        email=f"db-backup-user-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    admin = db.add_user(
+        username=f"db-backup-admin-{suffix}",
+        email=f"db-backup-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    user_headers, user_token = _auth_headers(user)
+    admin_headers, admin_token = _auth_headers(admin)
+    try:
+        assert client.put(
+            "/api/settings/db-backup",
+            headers=user_headers,
+            json={"interval_days": 3, "max_generations": 2},
+        ).status_code == 403
+
+        settings_r = client.put(
+            "/api/settings/db-backup",
+            headers=admin_headers,
+            json={"interval_days": 3, "max_generations": 2},
+        )
+        assert settings_r.status_code == 200
+        assert settings_r.json()["interval_days"] == 3
+        assert settings_r.json()["max_generations"] == 2
+
+        run_r = client.post("/api/settings/db-backup/run", headers=admin_headers)
+        assert run_r.status_code == 200
+        data = run_r.json()
+        assert data["manual"] is True
+        assert data["size_bytes"] > 0
+        assert (tmp_path / "db-backups" / "manual").exists()
+    finally:
+        db.delete_session(admin_token)
+        db.delete_session(user_token)
+        db.delete_user(admin["id"])
+        db.delete_user(user["id"])
+        db.delete_user_group(group["id"])
 
 
 def test_user_management_crud():

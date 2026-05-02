@@ -9,7 +9,10 @@ import json
 import logging
 import os
 import secrets
+import shutil
+import sqlite3
 import uuid
+from datetime import datetime
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
@@ -87,6 +90,14 @@ class UserSessionRow(Base):
     at         = Column(BigInteger, nullable=False, index=True)
 
 
+class AppSettingRow(Base):
+    __tablename__ = "app_settings"
+
+    key   = Column(String, primary_key=True)
+    value = Column(Text, nullable=False)
+    at    = Column(BigInteger, nullable=False, index=True)
+
+
 USER_ROLES = {"admin", "group_lead", "user"}
 ROLE_LABELS = {
     "admin": "管理者",
@@ -137,6 +148,14 @@ _EXPORT_TEMPLATE_DEFAULTS = [
         "y_px": 2048,
     },
 ]
+_DEFAULT_DB_BACKUP_DIR = Path.home() / ".local" / "share" / "inku" / "db-backups"
+_DB_BACKUP_DIR = Path(os.getenv("INKU_DB_BACKUP_DIR", str(_DEFAULT_DB_BACKUP_DIR))).expanduser()
+_DB_BACKUP_SETTINGS_KEY = "db_backup_settings"
+_DB_BACKUP_DEFAULT_SETTINGS = {
+    "interval_days": 7,
+    "max_generations": 4,
+    "last_auto_backup_at": 0,
+}
 _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_user_id", "CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"),
     (
@@ -341,12 +360,168 @@ def admin_history_owner_id() -> str | None:
 
 def database_info() -> dict:
     url = engine.url
+    db_path = _sqlite_db_path()
+    file_size = db_path.stat().st_size if db_path and db_path.exists() else None
     return {
         "backend": url.get_backend_name(),
         "driver": url.get_driver_name(),
         "url": url.render_as_string(hide_password=True),
         "database": url.database,
         "is_default": _DB_URL == _DEFAULT_DB,
+        "file_size_bytes": file_size,
+        "file_path": str(db_path) if db_path else None,
+    }
+
+
+def _sqlite_db_path() -> Path | None:
+    if engine.dialect.name != "sqlite":
+        return None
+    database = engine.url.database
+    if not database or database == ":memory:":
+        return None
+    return Path(database).expanduser()
+
+
+def _read_app_setting(key: str) -> dict | None:
+    with SessionLocal() as session:
+        row = session.get(AppSettingRow, key)
+        if not row:
+            return None
+        try:
+            value = json.loads(row.value or "{}")
+        except json.JSONDecodeError:
+            return None
+        return value if isinstance(value, dict) else None
+
+
+def _write_app_setting(key: str, value: dict) -> dict:
+    with SessionLocal() as session:
+        row = session.get(AppSettingRow, key)
+        if row:
+            row.value = json.dumps(value, ensure_ascii=False)
+            row.at = _now_ms()
+        else:
+            row = AppSettingRow(key=key, value=json.dumps(value, ensure_ascii=False), at=_now_ms())
+            session.add(row)
+        session.commit()
+        return value
+
+
+def _normalize_db_backup_settings(settings: dict | None) -> dict:
+    clean = dict(_DB_BACKUP_DEFAULT_SETTINGS)
+    if not isinstance(settings, dict):
+        return clean
+    if "interval_days" in settings:
+        try:
+            interval_days = int(settings["interval_days"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("backup interval days must be an integer") from exc
+        if interval_days < 1 or interval_days > 365:
+            raise ValueError("backup interval days must be between 1 and 365")
+        clean["interval_days"] = interval_days
+    if "max_generations" in settings:
+        try:
+            max_generations = int(settings["max_generations"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("backup max generations must be an integer") from exc
+        if max_generations < 1 or max_generations > 100:
+            raise ValueError("backup max generations must be between 1 and 100")
+        clean["max_generations"] = max_generations
+    if "last_auto_backup_at" in settings:
+        try:
+            clean["last_auto_backup_at"] = max(0, int(settings["last_auto_backup_at"]))
+        except (TypeError, ValueError):
+            clean["last_auto_backup_at"] = 0
+    return clean
+
+
+def get_db_backup_settings() -> dict:
+    return _normalize_db_backup_settings(_read_app_setting(_DB_BACKUP_SETTINGS_KEY))
+
+
+def update_db_backup_settings(interval_days: int, max_generations: int) -> dict:
+    current = get_db_backup_settings()
+    current["interval_days"] = interval_days
+    current["max_generations"] = max_generations
+    clean = _normalize_db_backup_settings(current)
+    return _write_app_setting(_DB_BACKUP_SETTINGS_KEY, clean)
+
+
+def _db_backup_file(kind: str, at_ms: int) -> Path:
+    timestamp = datetime.fromtimestamp(at_ms / 1000).strftime("%Y%m%d-%H%M%S")
+    return _DB_BACKUP_DIR / kind / f"inku-{kind}-{timestamp}.db"
+
+
+def _copy_sqlite_database(destination: Path) -> None:
+    source = _sqlite_db_path()
+    if not source or not source.exists():
+        raise ValueError("SQLite DB file is not available")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with sqlite3.connect(source) as src, sqlite3.connect(destination) as dst:
+            src.backup(dst)
+    except sqlite3.Error:
+        if destination.exists():
+            destination.unlink(missing_ok=True)
+        shutil.copy2(source, destination)
+
+
+def _prune_auto_backups(max_generations: int) -> None:
+    auto_dir = _DB_BACKUP_DIR / "auto"
+    if not auto_dir.exists():
+        return
+    backups = sorted(auto_dir.glob("inku-auto-*.db"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for old in backups[max_generations:]:
+        old.unlink(missing_ok=True)
+
+
+def create_db_backup(*, manual: bool = False) -> dict:
+    if engine.dialect.name != "sqlite":
+        raise ValueError("DB backup replicas are supported only for SQLite file databases")
+    at_ms = _now_ms()
+    kind = "manual" if manual else "auto"
+    path = _db_backup_file(kind, at_ms)
+    _copy_sqlite_database(path)
+    if manual:
+        settings = get_db_backup_settings()
+    else:
+        settings = get_db_backup_settings()
+        settings["last_auto_backup_at"] = at_ms
+        _write_app_setting(_DB_BACKUP_SETTINGS_KEY, settings)
+        _prune_auto_backups(settings["max_generations"])
+    return {
+        "path": str(path),
+        "at": at_ms,
+        "manual": manual,
+        "size_bytes": path.stat().st_size if path.exists() else None,
+    }
+
+
+def ensure_scheduled_db_backup() -> dict | None:
+    settings = get_db_backup_settings()
+    last_at = int(settings.get("last_auto_backup_at") or 0)
+    interval_ms = int(settings["interval_days"]) * 24 * 60 * 60 * 1000
+    if last_at > 0 and _now_ms() - last_at < interval_ms:
+        return None
+    try:
+        return create_db_backup(manual=False)
+    except ValueError:
+        return None
+
+
+def db_backup_status() -> dict:
+    settings = get_db_backup_settings()
+    supported = engine.dialect.name == "sqlite" and _sqlite_db_path() is not None
+    auto_dir = _DB_BACKUP_DIR / "auto"
+    manual_dir = _DB_BACKUP_DIR / "manual"
+    auto_count = len(list(auto_dir.glob("inku-auto-*.db"))) if auto_dir.exists() else 0
+    manual_count = len(list(manual_dir.glob("inku-manual-*.db"))) if manual_dir.exists() else 0
+    return {
+        **settings,
+        "supported": supported,
+        "backup_dir": str(_DB_BACKUP_DIR),
+        "auto_count": auto_count,
+        "manual_count": manual_count,
     }
 
 

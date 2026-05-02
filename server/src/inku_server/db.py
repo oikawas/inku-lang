@@ -74,6 +74,7 @@ class UserAccountRow(Base):
     image_generation_count = Column(Integer, nullable=False, default=0)
     batch_prompt_history = Column(Text, nullable=False, default="[]")
     demo_settings = Column(Text, nullable=False, default="{}")
+    export_templates = Column(Text, nullable=False, default="[]")
     plugin_storage = Column(Text, nullable=False, default="{}")
     at            = Column(BigInteger, nullable=False, index=True)
 
@@ -107,11 +108,12 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     ),
     "batch_prompt_history": "ALTER TABLE user_accounts ADD COLUMN batch_prompt_history TEXT NOT NULL DEFAULT '[]'",
     "demo_settings": "ALTER TABLE user_accounts ADD COLUMN demo_settings TEXT NOT NULL DEFAULT '{}'",
+    "export_templates": "ALTER TABLE user_accounts ADD COLUMN export_templates TEXT NOT NULL DEFAULT '[]'",
     "plugin_storage": "ALTER TABLE user_accounts ADD COLUMN plugin_storage TEXT NOT NULL DEFAULT '{}'",
 }
 _BATCH_PROMPT_HISTORY_LIMIT = 20
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
-_SETTINGS_TABS = {"db", "plugins", "users", "misc"}
+_SETTINGS_TABS = {"db", "plugins", "users", "export", "misc"}
 _PLUGIN_STORAGE_MAX_BYTES = 20_000
 _DEMO_DEFAULT_SETTINGS = {
     "save_db": False,
@@ -120,6 +122,21 @@ _DEMO_DEFAULT_SETTINGS = {
     "seed_phrase": "日本の四季を感じさせる文章を40語以内で生成",
     "interval_seconds": 30,
 }
+_EXPORT_TEMPLATE_LIMIT = 20
+_EXPORT_TEMPLATE_DEFAULTS = [
+    {
+        "id": "png-1024",
+        "name": "PNG 1024px",
+        "description": "PNG / y-axis 1024px",
+        "y_px": 1024,
+    },
+    {
+        "id": "png-2048",
+        "name": "PNG 2048px",
+        "description": "PNG / y-axis 2048px",
+        "y_px": 2048,
+    },
+]
 _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_user_id", "CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"),
     (
@@ -804,6 +821,74 @@ def update_user_demo_settings(user_id: str, settings: dict) -> dict | None:
         if not row:
             return None
         row.demo_settings = json.dumps(clean, ensure_ascii=False)
+        session.commit()
+        return clean
+
+
+def _normalize_export_templates(items: list[dict]) -> list[dict]:
+    if not isinstance(items, list):
+        raise ValueError("export templates must be a list")
+    normalized: list[dict] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("export template must be an object")
+        template_id = item.get("id")
+        if not isinstance(template_id, str) or not template_id.strip():
+            raise ValueError("export template id is required")
+        template_id = template_id.strip()[:80]
+        if template_id in seen:
+            continue
+        name = item.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("export template name is required")
+        description = item.get("description", "")
+        if not isinstance(description, str):
+            raise ValueError("export template description must be a string")
+        try:
+            y_px = int(item.get("y_px"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("export template y_px must be an integer") from exc
+        if y_px < 64 or y_px > 12000:
+            raise ValueError("export template y_px must be between 64 and 12000")
+        normalized.append(
+            {
+                "id": template_id,
+                "name": name.strip()[:80],
+                "description": description.strip()[:240],
+                "y_px": y_px,
+            }
+        )
+        seen.add(template_id)
+        if len(normalized) >= _EXPORT_TEMPLATE_LIMIT:
+            break
+    return normalized or [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+
+
+def get_user_export_templates(user_id: str) -> list[dict]:
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+        try:
+            parsed = json.loads(row.export_templates or "[]")
+        except json.JSONDecodeError:
+            return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+        if not isinstance(parsed, list) or not parsed:
+            return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+        try:
+            return _normalize_export_templates(parsed)
+        except ValueError:
+            return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+
+
+def update_user_export_templates(user_id: str, items: list[dict]) -> list[dict] | None:
+    clean = _normalize_export_templates(items)
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        row.export_templates = json.dumps(clean, ensure_ascii=False)
         session.commit()
         return clean
 

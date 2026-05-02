@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import type { ExportTemplate } from '$lib/exportTemplates';
 	import { PROVIDER_GROUPS, modelsForProvider, type Provider } from '$lib/models';
 
 	type PluginItem = {
@@ -42,7 +43,7 @@
 		at: number;
 	};
 	type SettingsMode = 'model' | 'settings';
-	type SettingsTab = 'connection' | 'db' | 'plugins' | 'users' | 'misc';
+	type SettingsTab = 'connection' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
 
 	type Props = {
 		settingsMode: SettingsMode;
@@ -79,6 +80,8 @@
 		showKiwi: boolean;
 		showCrab: boolean;
 		pngAlphaWhite: boolean;
+		exportTemplates: ExportTemplate[];
+		exportTemplateStatus: string | null;
 		saveReplayAsNewVersion: boolean;
 		canvasAspectEnabled: boolean;
 		onClose: () => void;
@@ -103,6 +106,9 @@
 		onClearEditGroup: () => void;
 		onSaveGroupEdit: () => void | Promise<void>;
 		onSetCanvasAspectEnabled: (enabled: boolean) => void | Promise<void>;
+		onAddExportTemplate: () => void | Promise<void>;
+		onUpdateExportTemplate: (id: string, patch: Partial<ExportTemplate>) => void | Promise<void>;
+		onRemoveExportTemplate: (id: string) => void | Promise<void>;
 		onCancelModelSelection: () => void;
 		onConfirmModelSelection: () => void;
 	};
@@ -142,6 +148,8 @@
 		showKiwi = $bindable(),
 		showCrab = $bindable(),
 		pngAlphaWhite = $bindable(),
+		exportTemplates,
+		exportTemplateStatus,
 		saveReplayAsNewVersion = $bindable(),
 		canvasAspectEnabled,
 		onClose,
@@ -166,6 +174,9 @@
 		onClearEditGroup,
 		onSaveGroupEdit,
 		onSetCanvasAspectEnabled,
+		onAddExportTemplate,
+		onUpdateExportTemplate,
+		onRemoveExportTemplate,
 		onCancelModelSelection,
 		onConfirmModelSelection,
 	}: Props = $props();
@@ -189,6 +200,7 @@
 				<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
 				<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
 			{/if}
+			<button class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
 			<button class:active={settingsTab === 'misc'} onclick={() => onSelectSettingsTab('misc')}>{t().settingsTabMisc}</button>
 		</div>
 	{/if}
@@ -462,6 +474,56 @@
 					</div>
 				</div>
 			{/if}
+		{:else if settingsTab === 'export'}
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsExportTemplatesTitle}</div>
+				<div class="db-test-result">{t().settingsExportTemplatesDescription}</div>
+				{#if exportTemplateStatus}
+					<div class="inline-message">{exportTemplateStatus}</div>
+				{/if}
+				<div class="export-template-head">
+					<span>{t().settingsExportTemplateName}</span>
+					<span>{t().settingsExportTemplateDescription}</span>
+					<span>{t().settingsExportTemplateHeight}</span>
+					<span></span>
+				</div>
+				<div class="export-template-list">
+					{#each exportTemplates as template (template.id)}
+						<div class="export-template-row">
+							<input
+								value={template.name}
+								aria-label={t().settingsExportTemplateName}
+								onchange={(e) => onUpdateExportTemplate(template.id, { name: (e.currentTarget as HTMLInputElement).value })}
+							/>
+							<input
+								value={template.description}
+								aria-label={t().settingsExportTemplateDescription}
+								onchange={(e) => onUpdateExportTemplate(template.id, { description: (e.currentTarget as HTMLInputElement).value })}
+							/>
+							<input
+								value={template.y_px}
+								type="number"
+								min="64"
+								max="12000"
+								step="1"
+								aria-label={t().settingsExportTemplateHeight}
+								onchange={(e) => onUpdateExportTemplate(template.id, { y_px: Number((e.currentTarget as HTMLInputElement).value) })}
+							/>
+							<button class="ghost-btn" onclick={() => onRemoveExportTemplate(template.id)}>{t().settingsExportTemplateDelete}</button>
+						</div>
+					{/each}
+				</div>
+				<div class="settings-inline-actions">
+					<button class="ghost-btn primary-inline" onclick={onAddExportTemplate}>{t().settingsExportTemplateAdd}</button>
+				</div>
+			</div>
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsExportLabel}</div>
+				<label class="setting-toggle">
+					<input type="checkbox" bind:checked={pngAlphaWhite} />
+					<span>{t().settingsPngAlpha}</span>
+				</label>
+			</div>
 		{:else}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsMascotLabel}</div>
@@ -472,13 +534,6 @@
 				<label class="setting-toggle">
 					<input type="checkbox" bind:checked={showCrab} />
 					<span>{t().settingsShowCrab}</span>
-				</label>
-			</div>
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsExportLabel}</div>
-				<label class="setting-toggle">
-					<input type="checkbox" bind:checked={pngAlphaWhite} />
-					<span>{t().settingsPngAlpha}</span>
 				</label>
 			</div>
 			<div class="popover-group">
@@ -592,6 +647,47 @@
 		font-size: 12px;
 	}
 	.plugin-add { display: flex; gap: 8px; align-items: center; }
+	.export-template-head,
+	.export-template-row {
+		display: grid;
+		grid-template-columns: minmax(120px, 0.8fr) minmax(180px, 1.4fr) 96px 70px;
+		gap: 8px;
+		align-items: center;
+	}
+	.export-template-head {
+		margin-top: 10px;
+		padding: 0 4px;
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.export-template-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin: 6px 0 10px;
+	}
+	.export-template-row {
+		padding: 7px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel);
+	}
+	.export-template-row input {
+		min-width: 0;
+		padding: 5px 7px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		font-size: 12px;
+		font-family: inherit;
+	}
+	.export-template-row input[type="number"] {
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+	}
 	.system-plugin-panel {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;

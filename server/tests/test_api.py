@@ -262,7 +262,7 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
     columns = {col["name"] for col in inspect(legacy_engine).get_columns("history")}
     assert {"user_id", "catalog_id", "trashed", "starred"} <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
-    assert {"ui_theme", "batch_prompt_history", "demo_settings"} <= user_columns
+    assert {"ui_theme", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
     with legacy_engine.connect() as conn:
@@ -455,6 +455,37 @@ def test_current_user_plugin_storage_is_persisted(auth_context):
         db.delete_session(other_token)
         db.delete_user(admin["id"])
         db.delete_user(other_user["id"])
+
+
+def test_current_user_export_templates_are_persisted(auth_context):
+    headers, _, _ = auth_context
+
+    initial = client.get("/api/auth/me/export-templates", headers=headers)
+    assert initial.status_code == 200
+    assert initial.json()["templates"] == [
+        {"id": "png-1024", "name": "PNG 1024px", "description": "PNG / y-axis 1024px", "y_px": 1024},
+        {"id": "png-2048", "name": "PNG 2048px", "description": "PNG / y-axis 2048px", "y_px": 2048},
+    ]
+
+    body = {
+        "templates": [
+            {"id": "custom", "name": "Poster", "description": "Tall poster", "y_px": 3000},
+        ]
+    }
+    updated = client.put("/api/auth/me/export-templates", headers=headers, json=body)
+    assert updated.status_code == 200
+    assert updated.json() == body
+
+    persisted = client.get("/api/auth/me/export-templates", headers=headers)
+    assert persisted.status_code == 200
+    assert persisted.json() == body
+
+    invalid = client.put(
+        "/api/auth/me/export-templates",
+        headers=headers,
+        json={"templates": [{"id": "bad", "name": "Bad", "description": "", "y_px": 10}]},
+    )
+    assert invalid.status_code == 422
 
 
 def test_compose_happy_path(monkeypatch, auth_context):

@@ -415,6 +415,17 @@ class BatchPromptHistoryResponse(BaseModel):
     items: list[str] = Field(default_factory=list)
 
 
+class ExportTemplateItem(BaseModel):
+    id: str = Field(..., min_length=1, max_length=80)
+    name: str = Field(..., min_length=1, max_length=80)
+    description: str = Field(default="", max_length=240)
+    y_px: int = Field(..., ge=64, le=12000)
+
+
+class ExportTemplatesBody(BaseModel):
+    templates: list[ExportTemplateItem] = Field(default_factory=list)
+
+
 class PluginStorageBody(BaseModel):
     storage: dict = Field(default_factory=dict)
 
@@ -610,6 +621,28 @@ def api_auth_me_update_batch_prompt_history(
     if items is None:
         raise HTTPException(status_code=404, detail="user not found")
     return BatchPromptHistoryResponse(items=items)
+
+
+@app.get("/api/auth/me/export-templates", response_model=ExportTemplatesBody)
+def api_auth_me_export_templates(actor: dict = Depends(_current_user)) -> ExportTemplatesBody:
+    return ExportTemplatesBody(templates=_db.get_user_export_templates(actor["id"]))
+
+
+@app.put("/api/auth/me/export-templates", response_model=ExportTemplatesBody)
+def api_auth_me_update_export_templates(
+    body: ExportTemplatesBody,
+    actor: dict = Depends(_current_user),
+) -> ExportTemplatesBody:
+    try:
+        templates = _db.update_user_export_templates(
+            actor["id"],
+            [item.model_dump() for item in body.templates],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if templates is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    return ExportTemplatesBody(templates=templates)
 
 
 @app.get("/api/auth/me/plugin-storage", response_model=PluginStorageBody)

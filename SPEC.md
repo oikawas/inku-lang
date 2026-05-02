@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.34**  
+**Version: v1.35**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -242,7 +242,8 @@ Major UI areas:
 - Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
 - History strip: recent works, hover metadata, star markers, pagination
 - History manager: larger history view, trash, restore, permanent delete, star filter
-- Settings modal: models, color catalogs, DB status, plugin status, users, theme
+- Settings modal: models, color catalogs, DB status, plugin status, export
+  templates, users, theme
 
 The status bar displays the current render context:
 
@@ -255,6 +256,12 @@ The status bar displays the current render context:
 
 For history display, model, catalog, and canvas values come from the history
 item when available.  For active editing, they come from the current selections.
+
+PNG export options are managed as per-user templates in the settings modal's
+export tab.  Each template has a name, description, and y-axis height in pixels.
+The default templates are `PNG 1024px` and `PNG 2048px`.  The status bar PNG
+menu is generated from these templates, and export width is computed from the
+current canvas aspect ratio.
 
 ---
 
@@ -395,7 +402,7 @@ The reference implementation currently includes:
 - color catalog selection
 - dark mode
 - plugin storage, system/user plugin directories, and `canvas-aspect`
-- SVG and PNG export
+- SVG export and template-based PNG export
 - CLI client foundation
 - shared kiwi progress mascot for single drawing and DDL replay
 - renderer material effects, wobble, rotation, arrangement paths, and canvas

@@ -27,6 +27,7 @@
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { COLOR_CATALOGS, getCatalogById, getRenderColorMap, type RenderColorMap } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
+	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
 		DEFAULT_CANVAS_ASPECT_ID,
@@ -107,7 +108,7 @@
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
-	type SettingsTab = 'connection' | 'db' | 'plugins' | 'users' | 'misc';
+	type SettingsTab = 'connection' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
 	type UserGroup = {
 		id: string;
 		name: string;
@@ -224,6 +225,8 @@
 	let showKiwi = $state(true);
 	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
+	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
+	let exportTemplateStatus = $state<string | null>(null);
 	let saveReplayAsNewVersion = $state(true);
 	let miscSettingsLoaded = $state(false);
 
@@ -376,7 +379,7 @@
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
-		return tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'misc';
+		return tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc';
 	}
 
 	function canAccessSettingsTab(tab: SettingsTab) {
@@ -516,6 +519,68 @@
 		}
 	}
 
+	async function loadExportTemplates() {
+		if (!currentUser) {
+			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
+			exportTemplateStatus = null;
+			return;
+		}
+		try {
+			const r = await apiFetch('/api/auth/me/export-templates', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { templates?: unknown };
+			exportTemplates = normalizeExportTemplates(data.templates);
+			exportTemplateStatus = null;
+		} catch (e) {
+			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
+			exportTemplateStatus = t().settingsExportTemplateSaveFailed;
+			console.warn('failed to load export templates', e);
+		}
+	}
+
+	async function saveExportTemplates(nextTemplates: ExportTemplate[]) {
+		const previous = exportTemplates;
+		const next = normalizeExportTemplates(nextTemplates);
+		exportTemplates = next;
+		exportTemplateStatus = null;
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/export-templates', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ templates: next })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const data = await r.json() as { templates?: unknown };
+			exportTemplates = normalizeExportTemplates(data.templates);
+		} catch (e) {
+			exportTemplates = previous;
+			exportTemplateStatus = t().settingsExportTemplateSaveFailed;
+			console.warn('failed to save export templates', e);
+		}
+	}
+
+	function addExportTemplate() {
+		const id = `png-${Date.now().toString(36)}`;
+		void saveExportTemplates([
+			...exportTemplates,
+			{ id, name: 'PNG 3000px', description: 'PNG / y-axis 3000px', y_px: 3000 }
+		]);
+	}
+
+	function updateExportTemplate(id: string, patch: Partial<ExportTemplate>) {
+		void saveExportTemplates(exportTemplates.map((template) => (
+			template.id === id ? { ...template, ...patch } : template
+		)));
+	}
+
+	function removeExportTemplate(id: string) {
+		void saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
+	}
+
 	async function saveDemoSettings(settings: DemoSettings) {
 		const next = normalizeDemoSettings(settings);
 		demoSettings = next;
@@ -613,6 +678,7 @@
 		settingsOpen = true;
 		if (nextTab === 'db') void loadSettingsStatus();
 		if (nextTab === 'users') void loadUserSettings();
+		if (nextTab === 'export') void loadExportTemplates();
 	}
 
 	function openModelSelection() {
@@ -684,6 +750,7 @@
 		void updateUserSettingsTab(tab);
 		if (tab === 'db') void loadSettingsStatus();
 		if (tab === 'users') void loadUserSettings();
+		if (tab === 'export') void loadExportTemplates();
 	}
 
 	async function loadUserSettings() {
@@ -763,7 +830,7 @@
 			applyUserTheme(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -773,6 +840,8 @@
 			batchPromptHistory = [];
 			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 			demoSettingsLoaded = false;
+			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
+			exportTemplateStatus = null;
 			canvasAspectEnabled = true;
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			loginStatus = t().loginRequiredMessage;
@@ -810,7 +879,7 @@
 			trashTotal = 0;
 			historyManager.clear();
 			loginPassword = '';
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -832,6 +901,8 @@
 		batchPromptHistory = [];
 		demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 		demoSettingsLoaded = false;
+		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
+		exportTemplateStatus = null;
 		canvasAspectEnabled = true;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		loginStatus = null;
@@ -1936,9 +2007,8 @@
 	async function downloadPNG(size: number) {
 		if (!result) return;
 		const aspect = getCanvasAspectOption(effectiveCanvasAspectId());
-		const maxRatio = Math.max(aspect.ratioW, aspect.ratioH, 1);
-		const pngWidth = Math.round(size * aspect.ratioW / maxRatio);
-		const pngHeight = Math.round(size * aspect.ratioH / maxRatio);
+		const pngHeight = Math.max(64, Math.round(size));
+		const pngWidth = Math.max(64, Math.round(pngHeight * aspect.ratioW / aspect.ratioH));
 		let svg = result.svg.replace(/(<svg)([^>]*)/, (_: string, tag: string, attrs: string) => {
 			const a = attrs.replace(/\s+width="[^"]*"/g, '').replace(/\s+height="[^"]*"/g, '');
 			return `${tag}${a} width="${pngWidth}" height="${pngHeight}"`;
@@ -1951,7 +2021,7 @@
 				canvas.width = pngWidth; canvas.height = pngHeight;
 				const ctx = canvas.getContext('2d')!;
 				if (!pngAlphaWhite) {
-					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, pngWidth, pngHeight);
 				}
 				const img = new Image();
 				img.onload = () => {
@@ -2532,6 +2602,7 @@
 				onToggleStar={toggleHistoryStar}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
+				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->
 
@@ -2606,6 +2677,8 @@
 		bind:showKiwi
 		bind:showCrab
 		bind:pngAlphaWhite
+		{exportTemplates}
+		{exportTemplateStatus}
 		bind:saveReplayAsNewVersion
 		{canvasAspectEnabled}
 		onSetCanvasAspectEnabled={setCanvasAspectEnabled}
@@ -2632,6 +2705,9 @@
 		onSaveGroupEdit={saveGroupEdit}
 		onCancelModelSelection={cancelModelSelection}
 		onConfirmModelSelection={confirmModelSelection}
+		onAddExportTemplate={addExportTemplate}
+		onUpdateExportTemplate={updateExportTemplate}
+		onRemoveExportTemplate={removeExportTemplate}
 	/>
 {/if}
 

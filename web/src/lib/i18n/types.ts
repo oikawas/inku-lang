@@ -152,6 +152,7 @@ export interface LangPack {
 	settingsTabDb: string;
 	settingsTabPlugins: string;
 	settingsTabUsers: string;
+	settingsTabExport: string;
 	settingsTabMisc: string;
 	settingsCurrentDb: string;
 	settingsLoading: string;
@@ -176,6 +177,14 @@ export interface LangPack {
 	settingsDisplayLabel: string;
 	settingsMascotLabel: string;
 	settingsExportLabel: string;
+	settingsExportTemplatesTitle: string;
+	settingsExportTemplatesDescription: string;
+	settingsExportTemplateName: string;
+	settingsExportTemplateDescription: string;
+	settingsExportTemplateHeight: string;
+	settingsExportTemplateAdd: string;
+	settingsExportTemplateDelete: string;
+	settingsExportTemplateSaveFailed: string;
 	settingsHistoryLabel: string;
 	settingsShowBirds: string;
 	settingsShowKiwi: string;

@@ -3,6 +3,7 @@
 	import { PROVIDER_GROUPS, modelsForProvider, providerOfModel, type Provider } from '$lib/models';
 	import type { DemoSettings } from '$lib/demo';
 	import PaintButton from './PaintButton.svelte';
+	import StopButton from './StopButton.svelte';
 
 	type Props = {
 		settings: DemoSettings;
@@ -155,7 +156,7 @@
 				<span>{(liveMs / 1000).toFixed(1)}s</span>
 				{#if waitingSeconds !== null}<span>{t().demoWaiting(waitingSeconds)}</span>{/if}
 			</div>
-			<button class="stop-sm" onclick={onStop}>{t().demoStop}</button>
+			<StopButton onclick={onStop}>{t().demoStop}</StopButton>
 		{:else}
 			<PaintButton onclick={onStart} disabled={!settings.seed_phrase.trim()}>{t().demoStart}</PaintButton>
 		{/if}
@@ -291,14 +292,6 @@
 	.stats-count {
 		color: var(--fg3);
 		margin-left: auto;
-	}
-	.stop-sm {
-		border: 1px solid rgba(154, 61, 61, 0.35);
-		background: rgba(154, 61, 61, 0.08);
-		color: #9a3d3d;
-		border-radius: var(--r);
-		padding: 4px 10px;
-		cursor: pointer;
 	}
 	.ghost-btn {
 		padding: 5px 10px;

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import PaintButton from './PaintButton.svelte';
+	import StopButton from './StopButton.svelte';
 
 	type BatchFailure = {
 		line: number;
@@ -187,7 +188,7 @@
 		<span>{t().batchProgress(batchCurrent, batchTotal)}</span>
 		<span class="batch-token-total">{t().batchTokenTotal(batchTokensInTotal, batchTokensOutTotal)}</span>
 		<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
-		<button class="stop-sm" onclick={onStop}>{t().stopBtn}</button>
+		<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 	</div>
 {:else}
 	<PaintButton onclick={submitAndRemember} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
@@ -305,6 +306,9 @@
 		background: var(--panel); font-size: 12px; color: var(--fg2);
 		margin-top: 8px;
 	}
+	.batch-progress :global(.stop-btn) {
+		margin-left: auto;
+	}
 	.batch-crab {
 		width: 46px;
 		height: 28px;
@@ -405,11 +409,6 @@
 	.bubble-c { animation-delay: 0.55s; }
 	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
 	.batch-token-total { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
-	.stop-sm {
-		padding: 2px 7px; border: 1px solid var(--border2);
-		border-radius: var(--r); background: none;
-		color: var(--fg2); font-size: 11px; cursor: pointer; font-family: inherit;
-	}
 	.error-text { color: #a2342a; font-size: 12px; }
 	.batch-summary {
 		margin-top: 8px;

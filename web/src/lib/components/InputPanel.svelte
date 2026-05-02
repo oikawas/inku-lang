@@ -4,6 +4,7 @@
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
 	import PaintButton from './PaintButton.svelte';
+	import StopButton from './StopButton.svelte';
 	import type { DemoSettings } from '$lib/demo';
 	import type { CanvasAspectId } from '$lib/plugins/canvasAspect';
 
@@ -203,7 +204,7 @@
 				</div>
 				<div class="progress-right">
 					<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
-					<button class="stop-sm" onclick={onStop}>{t().stopBtn}</button>
+					<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 				</div>
 			</div>
 			<div
@@ -408,11 +409,6 @@
 	.phase-check { color: #27ae60; font-size: 10px; }
 	.progress-right { display: flex; align-items: center; gap: 7px; }
 	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
-	.stop-sm {
-		padding: 2px 7px; border: 1px solid var(--border2);
-		border-radius: var(--r); background: none;
-		color: var(--fg2); font-size: 11px; cursor: pointer; font-family: inherit;
-	}
 	.progress-bar-track {
 		position: relative;
 		height: 32px; background: transparent;

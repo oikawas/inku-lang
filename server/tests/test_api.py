@@ -404,6 +404,14 @@ def test_current_user_demo_settings_are_persisted(auth_context):
 
 def test_current_user_plugin_storage_is_persisted(auth_context):
     headers, user, group = auth_context
+    admin = db.add_user(
+        username=f"api-plugin-admin-{uuid.uuid4().hex[:8]}",
+        email=f"api-plugin-admin-{uuid.uuid4().hex[:8]}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    admin_headers, admin_token = _auth_headers(admin)
     other_user = db.add_user(
         username=f"api-plugin-storage-{uuid.uuid4().hex[:8]}",
         email=f"api-plugin-storage-{uuid.uuid4().hex[:8]}@example.test",
@@ -422,10 +430,17 @@ def test_current_user_plugin_storage_is_persisted(auth_context):
             headers=headers,
             json={"value": {"selected": "golden"}},
         )
+        assert updated.status_code == 403
+
+        updated = client.put(
+            "/api/auth/me/plugin-storage/canvas-aspect",
+            headers=admin_headers,
+            json={"value": {"selected": "golden"}},
+        )
         assert updated.status_code == 200
         assert updated.json() == {"storage": {"canvas-aspect": {"selected": "golden"}}}
 
-        persisted = client.get("/api/auth/me/plugin-storage", headers=headers)
+        persisted = client.get("/api/auth/me/plugin-storage", headers=admin_headers)
         assert persisted.status_code == 200
         assert persisted.json() == {"storage": {"canvas-aspect": {"selected": "golden"}}}
 
@@ -433,10 +448,12 @@ def test_current_user_plugin_storage_is_persisted(auth_context):
         assert isolated.status_code == 200
         assert isolated.json() == {"storage": {}}
 
-        invalid = client.put("/api/auth/me/plugin-storage/bad id", headers=headers, json={"value": {}})
+        invalid = client.put("/api/auth/me/plugin-storage/bad id", headers=admin_headers, json={"value": {}})
         assert invalid.status_code == 400
     finally:
+        db.delete_session(admin_token)
         db.delete_session(other_token)
+        db.delete_user(admin["id"])
         db.delete_user(other_user["id"])
 
 

@@ -164,6 +164,7 @@ export interface LangPack {
 	settingsCanvasPluginDescription: string;
 	settingsPluginEnabled: string;
 	settingsPluginDisabled: string;
+	settingsPluginAdminOnly: string;
 	settingsUserPlugins: string;
 	settingsUserPluginsAddTitle: string;
 	settingsUserPluginsAddDescription: string;

@@ -379,6 +379,15 @@
 		return tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'misc';
 	}
 
+	function canAccessSettingsTab(tab: SettingsTab) {
+		if (tab === 'db' || tab === 'users') return currentUser?.role === 'admin';
+		return tab !== 'connection';
+	}
+
+	function defaultSettingsTab() {
+		return currentUser?.role === 'admin' ? 'db' : 'plugins';
+	}
+
 	function normalizeBatchPromptHistory(items: string[]): string[] {
 		const normalized: string[] = [];
 		const seen = new Set<string>();
@@ -462,6 +471,7 @@
 	}
 
 	async function setCanvasAspectEnabled(value: boolean) {
+		if (currentUser?.role !== 'admin') return;
 		canvasAspectEnabled = value;
 		canvasAspectMenuOpen = false;
 		if (!value) {
@@ -476,6 +486,7 @@
 	}
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
+		if (currentUser?.role !== 'admin') return;
 		canvasAspectId = normalizeCanvasAspectId(id);
 		canvasAspectMenuOpen = false;
 		result = null;
@@ -596,10 +607,11 @@
 
 	function openSettings(tab: typeof settingsTab | null = null) {
 		settingsMode = 'settings';
-		const nextTab = tab ?? (isSettingsContentTab(currentUser?.settings_tab) ? currentUser.settings_tab : 'db');
+		const candidate = tab ?? (isSettingsContentTab(currentUser?.settings_tab) ? currentUser.settings_tab : defaultSettingsTab());
+		const nextTab = canAccessSettingsTab(candidate) ? candidate : defaultSettingsTab();
 		settingsTab = nextTab;
 		settingsOpen = true;
-		if (nextTab === 'db' || nextTab === 'plugins') void loadSettingsStatus();
+		if (nextTab === 'db') void loadSettingsStatus();
 		if (nextTab === 'users') void loadUserSettings();
 	}
 
@@ -667,9 +679,10 @@
 	}
 
 	function selectSettingsTab(tab: typeof settingsTab) {
+		if (!canAccessSettingsTab(tab)) return;
 		settingsTab = tab;
 		void updateUserSettingsTab(tab);
-		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
+		if (tab === 'db') void loadSettingsStatus();
 		if (tab === 'users') void loadUserSettings();
 	}
 
@@ -684,7 +697,7 @@
 			currentUser = actor;
 			applyUserTheme(actor);
 			authToken = 'cookie';
-			if (!['admin', 'group_lead'].includes(actor.role)) {
+			if (actor.role !== 'admin') {
 				users = [];
 				groups = [];
 				userSettingsStatus = null;

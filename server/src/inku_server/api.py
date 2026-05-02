@@ -620,7 +620,7 @@ def api_auth_me_plugin_storage(actor: dict = Depends(_current_user)) -> PluginSt
 @app.put("/api/auth/me/plugin-storage", response_model=PluginStorageBody)
 def api_auth_me_update_plugin_storage(
     body: PluginStorageBody,
-    actor: dict = Depends(_current_user),
+    actor: dict = Depends(_admin_user),
 ) -> PluginStorageBody:
     try:
         storage = _db.update_user_plugin_storage(actor["id"], body.storage)
@@ -635,7 +635,7 @@ def api_auth_me_update_plugin_storage(
 def api_auth_me_update_plugin_value(
     plugin_id: str,
     body: PluginValueBody,
-    actor: dict = Depends(_current_user),
+    actor: dict = Depends(_admin_user),
 ) -> PluginStorageBody:
     try:
         storage = _db.update_user_plugin_value(actor["id"], plugin_id, body.value)

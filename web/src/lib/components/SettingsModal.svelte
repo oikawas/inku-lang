@@ -171,6 +171,7 @@
 	}: Props = $props();
 
 	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
+	const isAdmin = $derived(currentUser?.role === 'admin');
 </script>
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -184,8 +185,10 @@
 	{#if settingsMode === 'settings'}
 		<div class="settings-tabs">
 			<button class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
-			<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
-			<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
+			{#if isAdmin}
+				<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
+				<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
+			{/if}
 			<button class:active={settingsTab === 'misc'} onclick={() => onSelectSettingsTab('misc')}>{t().settingsTabMisc}</button>
 		</div>
 	{/if}
@@ -251,31 +254,35 @@
 		{:else if settingsTab === 'plugins'}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsSystemPlugins}</div>
-				{#if settingsStatusLoading}
-					<div class="inline-message">{t().settingsLoading}</div>
-				{:else if settingsStatus}
-					<div class="system-plugin-panel">
-						<div class="system-plugin-main">
-							<div class="system-plugin-title-row">
-								<div class="system-plugin-title">{t().settingsCanvasPluginTitle}</div>
-								<span class="plugin-version-pill">v0.1.0</span>
-							</div>
-							<div class="system-plugin-desc">{t().settingsCanvasPluginDescription}</div>
+				<div class="system-plugin-panel">
+					<div class="system-plugin-main">
+						<div class="system-plugin-title-row">
+							<div class="system-plugin-title">{t().settingsCanvasPluginTitle}</div>
+							<span class="plugin-version-pill">v0.1.0</span>
 						</div>
-						<button
-							type="button"
-							class="plugin-switch"
-							class:plugin-enabled={canvasAspectEnabled}
-							role="switch"
-							aria-checked={canvasAspectEnabled}
-							onclick={() => void onSetCanvasAspectEnabled(!canvasAspectEnabled)}
-						>
-							<span class="switch-track"><span class="switch-knob"></span></span>
-							<span class="switch-label">{canvasAspectEnabled ? t().settingsPluginEnabled : t().settingsPluginDisabled}</span>
-						</button>
+						<div class="system-plugin-desc">{t().settingsCanvasPluginDescription}</div>
 					</div>
-				{:else}
-					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
+					<button
+						type="button"
+						class="plugin-switch"
+						class:plugin-enabled={canvasAspectEnabled}
+						role="switch"
+						aria-checked={canvasAspectEnabled}
+						disabled={!isAdmin}
+						title={isAdmin ? '' : t().settingsPluginAdminOnly}
+						onclick={() => { if (isAdmin) void onSetCanvasAspectEnabled(!canvasAspectEnabled); }}
+					>
+						<span class="switch-track"><span class="switch-knob"></span></span>
+						<span class="switch-label">{canvasAspectEnabled ? t().settingsPluginEnabled : t().settingsPluginDisabled}</span>
+					</button>
+				</div>
+				{#if !isAdmin}
+					<div class="db-test-result">{t().settingsPluginAdminOnly}</div>
+				{/if}
+				{#if isAdmin && settingsStatusLoading}
+					<div class="inline-message">{t().settingsLoading}</div>
+				{:else if isAdmin && settingsStatusError}
+					<div class="inline-message">{settingsStatusError}</div>
 				{/if}
 			</div>
 			<div class="popover-group">
@@ -318,14 +325,14 @@
 				{/if}
 			</div>
 			{#if currentUser}
-				{#if currentUser.role === 'admin' || currentUser.role === 'group_lead'}
+				{#if currentUser.role === 'admin'}
 					<div class="popover-group">
 						<div class="user-management-head">
 							<div>
 								<div class="popover-group-label">{t().settingsUsersLabel}</div>
 								<div class="user-management-count">{t().userCountLabel(users.length)}</div>
 							</div>
-							<button class="ghost-btn" onclick={onLoadUserSettings} disabled={userSettingsLoading || !['admin', 'group_lead'].includes(currentUser.role)}>{t().settingsReload}</button>
+							<button class="ghost-btn" onclick={onLoadUserSettings} disabled={userSettingsLoading || currentUser.role !== 'admin'}>{t().settingsReload}</button>
 						</div>
 						<div class="user-management-layout">
 							<div class="user-list-panel">
@@ -360,7 +367,7 @@
 									<input bind:value={newUserPassword} type="password" placeholder={t().userPasswordPlaceholder} />
 									<label class="user-form-field">
 										<span>{t().userRoleSelectLabel}</span>
-										<select bind:value={newUserRole} disabled={currentUser.role === 'group_lead'}>
+										<select bind:value={newUserRole}>
 											{#each USER_ROLE_OPTIONS as role (role)}
 												<option value={role}>{role}</option>
 											{/each}
@@ -368,7 +375,7 @@
 									</label>
 									<label class="user-form-field">
 										<span>{t().userGroupSelectLabel}</span>
-										<select bind:value={newUserGroupId} disabled={currentUser.role === 'group_lead'}>
+										<select bind:value={newUserGroupId}>
 											<option value="">{t().userNoGroup}</option>
 											{#each groups as group (group.id)}
 												<option value={group.id}>{group.name}</option>
@@ -389,7 +396,7 @@
 										<input bind:value={editUserPassword} type="password" placeholder={t().userNewPasswordPlaceholder} />
 										<label class="user-form-field">
 											<span>{t().userRoleSelectLabel}</span>
-											<select bind:value={editUserRole} disabled={currentUser.role === 'group_lead'}>
+											<select bind:value={editUserRole}>
 												{#each USER_ROLE_OPTIONS as role (role)}
 													<option value={role}>{role}</option>
 												{/each}
@@ -397,7 +404,7 @@
 										</label>
 										<label class="user-form-field">
 											<span>{t().userGroupSelectLabel}</span>
-											<select bind:value={editUserGroupId} disabled={currentUser.role === 'group_lead'}>
+											<select bind:value={editUserGroupId}>
 												<option value="">{t().userNoGroup}</option>
 												{#each groups as group (group.id)}
 													<option value={group.id}>{group.name}</option>
@@ -662,6 +669,10 @@
 	}
 	.plugin-switch.plugin-enabled .switch-knob {
 		transform: translateX(18px);
+	}
+	.plugin-switch:disabled {
+		opacity: 0.62;
+		cursor: default;
 	}
 	.user-plugin-skeleton {
 		display: grid;

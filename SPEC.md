@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.32**  
+**Version: v1.33**  
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -323,6 +323,11 @@ dialog can update the user's email address and password through
 `PATCH /api/auth/me/profile`.  Password changes require the current password,
 and the endpoint is separate from admin user-management APIs.
 
+Settings visibility is role-aware.  DB settings and user management are visible
+only to the `admin` role.  The plugins tab is visible to all signed-in users,
+but plugin setting changes and plugin-storage update APIs are restricted to
+`admin`.
+
 Operational details for the author's local server are intentionally not part of
 this public specification.  They belong in untracked local documents such as
 `AGENTS.md`, `LOCAL_WORK.md`, and `no-git-sync/`.
@@ -375,6 +380,7 @@ The reference implementation currently includes:
 - SvelteKit frontend
 - authenticated users and admin user management
 - signed-in user profile editing
+- role-aware settings visibility
 - DB-backed history
 - star and trash history management
 - batch rendering

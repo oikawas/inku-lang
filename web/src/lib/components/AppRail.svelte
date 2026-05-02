@@ -35,9 +35,35 @@
 	}: Props = $props();
 
 	let expanded = $state(false);
+	let openTimer: ReturnType<typeof setTimeout> | null = null;
+	let closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearTimer(timer: ReturnType<typeof setTimeout> | null) {
+		if (timer) clearTimeout(timer);
+	}
+
+	function scheduleOpen() {
+		clearTimer(closeTimer);
+		closeTimer = null;
+		if (expanded || openTimer) return;
+		openTimer = setTimeout(() => {
+			expanded = true;
+			openTimer = null;
+		}, 220);
+	}
+
+	function scheduleClose() {
+		clearTimer(openTimer);
+		openTimer = null;
+		clearTimer(closeTimer);
+		closeTimer = setTimeout(() => {
+			if (!userMenuOpen) expanded = false;
+			closeTimer = null;
+		}, 380);
+	}
 </script>
 
-<aside class="app-rail" class:expanded onmouseenter={() => (expanded = true)} onmouseleave={() => (expanded = false)}>
+<aside class="app-rail" class:expanded onmouseenter={scheduleOpen} onmouseleave={scheduleClose}>
 	<div class="rail-brand">
 		<div class="rail-logo-row">
 			<div class="rail-logo">
@@ -144,6 +170,12 @@
 	}
 	.rail-logo-suffix {
 		flex: 0 0 auto;
+		opacity: 0;
+		transition: opacity 0.12s ease;
+	}
+	.app-rail.expanded .rail-logo-suffix {
+		opacity: 1;
+		transition-delay: 0.08s;
 	}
 	.rail-sub {
 		margin-top: 4px;
@@ -151,6 +183,12 @@
 		font-size: 10px;
 		line-height: 1.3;
 		white-space: nowrap;
+		opacity: 0;
+		transition: opacity 0.12s ease;
+	}
+	.app-rail.expanded .rail-sub {
+		opacity: 1;
+		transition-delay: 0.08s;
 	}
 	.rail-actions {
 		display: flex;
@@ -267,6 +305,12 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		opacity: 0;
+		transition: opacity 0.12s ease;
+	}
+	.app-rail.expanded .rail-label {
+		opacity: 1;
+		transition-delay: 0.08s;
 	}
 	.rail-user-menu {
 		position: absolute;

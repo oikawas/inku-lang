@@ -110,7 +110,8 @@ Only physical and observational words are allowed. Emotional evaluation — "bea
 5. Output is still — the viewer moves, not the image
 6. Input is a constrained DSL, not free-form natural language
 
-For the full design rationale, see [SPEC.md](SPEC.md).
+For the public English specification, see [SPEC.md](SPEC.md).  The canonical
+Japanese source is [SPEC.ja.md](SPEC.ja.md).
 
 ---
 

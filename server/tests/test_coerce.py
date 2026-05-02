@@ -255,3 +255,35 @@ def test_coerce_score_adds_sensory_coverage_from_ddl():
     assert "scent layer" in hints
     assert "waiting buds" in hints
     assert any(ins.arrangement and ins.arrangement.path == "wave" for ins in fixed.instructions)
+
+
+def test_coerce_score_keeps_white_sensory_layers_pale_on_white_background():
+    score = Score.model_validate(
+        {
+            "background": "white",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.2],
+                    "size": [0.42, 0.12],
+                    "color": "white",
+                    "filled": True,
+                    "color_hint": "柔らかな光",
+                },
+                {
+                    "primitive": "arc",
+                    "center": [0.3, 0.7],
+                    "radius": 0.14,
+                    "angle_start": 205,
+                    "angle_end": 335,
+                    "color": "white",
+                    "color_hint": "五感の気配",
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score)
+
+    assert [ins.color for ins in fixed.instructions] == ["blue", "blue"]
+    assert all("white sensory layer made visible as pale blue" in (ins.color_hint or "") for ins in fixed.instructions)

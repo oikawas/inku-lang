@@ -174,6 +174,11 @@ def _print_json(data: Any) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
+def _write_json_file(path: Path, data: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def _display_model(model: str | None) -> str:
     return model or SERVER_DEFAULT_MODEL_LABEL
 
@@ -305,6 +310,66 @@ def _write_paint_outputs(
         cairosvg.svg2png(bytestring=str(result["svg"]).encode("utf-8"), write_to=str(png_path))
         paths["png"] = str(png_path)
     return paths
+
+
+def _review_sets(results: list[dict[str, Any]], *, slow_ms: int = 100_000) -> dict[str, list[int]]:
+    fallback: list[int] = []
+    slow: list[int] = []
+    normal: list[int] = []
+    for result in results:
+        line = int(result.get("line") or 0)
+        if not line:
+            continue
+        uses_fallback = bool(result.get("interpret_fallback_used") or result.get("compose_fallback_used"))
+        is_slow = int(result.get("elapsed_total_ms") or 0) >= slow_ms
+        if uses_fallback:
+            fallback.append(line)
+        if is_slow:
+            slow.append(line)
+        if not uses_fallback and not is_slow:
+            normal.append(line)
+    return {
+        "all_success_samples": [int(result.get("line") or 0) for result in results if result.get("line")],
+        "fallback_samples": fallback,
+        "slow_samples": slow,
+        "normal_samples": normal,
+    }
+
+
+def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thumb_size: int) -> None:
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError as exc:
+        raise CliError("contact-sheet requires Pillow") from exc
+
+    pngs = sorted(path for path in input_dir.glob("*.png") if path.name != output_path.name)
+    if not pngs:
+        raise CliError(f"no PNG files found in {input_dir}")
+
+    columns = max(1, columns)
+    thumb_size = max(64, thumb_size)
+    label_h = 24
+    gap = 12
+    rows = (len(pngs) + columns - 1) // columns
+    width = columns * thumb_size + (columns + 1) * gap
+    height = rows * (thumb_size + label_h) + (rows + 1) * gap
+    sheet = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(sheet)
+
+    for index, path in enumerate(pngs):
+        row, col = divmod(index, columns)
+        x = gap + col * (thumb_size + gap)
+        y = gap + row * (thumb_size + label_h + gap)
+        with Image.open(path) as image:
+            image = image.convert("RGB")
+            image.thumbnail((thumb_size, thumb_size))
+            px = x + (thumb_size - image.width) // 2
+            py = y + (thumb_size - image.height) // 2
+            sheet.paste(image, (px, py))
+        draw.text((x, y + thumb_size + 4), path.stem, fill=(40, 40, 40))
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(output_path)
 
 
 def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
@@ -643,7 +708,7 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_color_cycle += int(result.get("score_color_cycle_count") or 0)
         aggregate_expanded += int(result.get("score_expanded_count") or 0)
 
-    _print_json({
+    summary = {
         "success": len(results),
         "failed": len(failures),
         "total": len(lines),
@@ -665,10 +730,24 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_fade_counts": dict(sorted(aggregate_fade.items())),
         "score_primitive_counts": dict(sorted(aggregate_primitive.items())),
         "score_color_counts": dict(sorted(aggregate_color.items())),
+        "review_sets": _review_sets(results),
         "results": results,
         "failures": failures,
-    })
+    }
+    summary_path = Path(args.summary_json) if args.summary_json else (out_dir / "analysis-summary.json" if out_dir else None)
+    if summary_path is not None:
+        _write_json_file(summary_path, summary)
+        print(f"summary: {summary_path}", file=sys.stderr)
+    _print_json(summary)
     return 1 if failures else 0
+
+
+def command_contact_sheet(args: argparse.Namespace) -> int:
+    input_dir = Path(args.input_dir)
+    output_path = Path(args.output) if args.output else input_dir / "contact-sheet.png"
+    _make_contact_sheet(input_dir, output_path, columns=args.columns, thumb_size=args.thumb_size)
+    print(str(output_path))
+    return 0
 
 
 def command_demo_instruction(args: argparse.Namespace) -> int:
@@ -737,6 +816,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--no-progress", action="store_true", help="disable elapsed-time progress animation")
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")
+        parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
@@ -774,6 +854,13 @@ def build_parser() -> argparse.ArgumentParser:
     batch = subparsers.add_parser("batch", help="generate drawings from a prompt list")
     _add_paint_args(batch, batch=True)
     batch.set_defaults(func=command_batch)
+
+    contact_sheet = subparsers.add_parser("contact-sheet", help="create a contact sheet from PNG files in a directory")
+    contact_sheet.add_argument("input_dir", help="directory containing PNG outputs")
+    contact_sheet.add_argument("--output", "-o", help="output PNG path (default: INPUT_DIR/contact-sheet.png)")
+    contact_sheet.add_argument("--columns", type=int, default=5)
+    contact_sheet.add_argument("--thumb-size", type=int, default=220)
+    contact_sheet.set_defaults(func=command_contact_sheet)
 
     demo = subparsers.add_parser("demo-instruction", help="generate one demo prompt from a seed phrase")
     _add_common_server_args(demo)

@@ -1373,3 +1373,11 @@ Score 集計:
    - CLI batch summary を JSON ファイルへ保存する。
    - contact sheet 生成を CLI サブコマンド化する。
    - fallback 使用サンプル、slow sample、normal sample を自動で分けてレビュー対象にする。
+
+実装状況:
+
+- 1 は Build 249 で実装。白背景上の `柔らかな光`、`五感`、`香り`、`透明な膜` などを単純な黒線へ変換せず、淡い青/緑として `color_hint` を保持する。
+- 2 は Build 250 で実装。Stage 2 fallback score でも大数量を `density / cluster_count / fade / preserve_space` へ畳み、200個以上の DDL clause を全面均一ではなくクラスタ化する。fallback primitive は triangle / arc / square / ellipse / line に分散する。
+- 3 は Build 250 で実装。Stage 1.5 の DDL expansion と Stage 2 prompt へ、春・花・温かい光、水・夜・冷気、森・葉・香りなどの scene tone から palette を選ぶ方針を追加した。fallback でも `color_cycle` を使って春系、水夜系、多色系を保持する。
+- 4 は Build 250 で実装。既存 schema の範囲で triangle、arc、rotated square、thin ellipse をより積極的に使う DDL expansion を追加した。葉・花びら・紙片・山・屋根などは、自然 primitive plugin の前段として抽象化された形へ変換する。
+- 5 は Build 250 で実装。`inku-cli batch` は `--summary-json`、または `--out-dir` 指定時の `analysis-summary.json` に summary を保存する。summary には `review_sets` として全成功サンプル、fallback sample、slow sample、normal sample を含める。Free API の待ち時間は品質評価から除外するが、診断用メタデータとして保持する。`inku-cli contact-sheet` で PNG 出力ディレクトリから contact sheet を生成できる。

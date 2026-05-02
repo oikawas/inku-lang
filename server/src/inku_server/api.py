@@ -786,7 +786,7 @@ def api_prompts(lang: str = Query(default="ja")) -> PromptsResponse:
 
 
 def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
-    """Build a minimal visible score when Stage 2 returns empty twice."""
+    """Build a visible deterministic score when Stage 2 returns empty twice."""
     lower = ddl.lower()
 
     if ("背景を黒" in ddl) or ("fill background with black" in lower):
@@ -835,23 +835,31 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
     elif ("縄" in ddl) or ("rope" in lower):
         weight = "rope"
 
-    if ("四角" in ddl) or ("square" in lower) or ("rectangle" in lower):
+    if any(marker in ddl for marker in ("色とりどり", "多色", "赤・青", "赤、青")) or any(
+        marker in lower for marker in ("colorful", "multi-color", "multicolor", "red, blue")
+    ):
+        color_cycle = ["red", "blue", "green", "gray"]
+    elif any(marker in ddl for marker in ("春", "花", "蕾", "桜", "温", "陽光")) or any(
+        marker in lower for marker in ("spring", "flower", "bud", "warm", "sunlight")
+    ):
+        color_cycle = ["red", "green", "white"]
+        if color == "black":
+            color = "red"
+    elif any(marker in ddl for marker in ("夜", "月", "水", "雨", "霧", "冷")) or any(
+        marker in lower for marker in ("night", "moon", "water", "rain", "mist", "cold")
+    ):
+        color_cycle = ["blue", "white", "gray"]
+        if color == "black":
+            color = "blue"
+    else:
+        color_cycle = []
+
+    if ("三角" in ddl) or ("triangle" in lower) or ("山" in ddl) or ("mountain" in lower):
         instruction = {
-            "primitive": "square",
-            "position": [0.62, 0.28],
-            "size": [0.18, 0.12],
-            "rotation": -12,
-            "color": color,
-            "weight": weight,
-            "filled": "塗" in ddl or "fill" in lower,
-            "color_hint": "fallback from DDL",
-        }
-    elif ("円" in ddl) or ("circle" in lower) or ("moon" in lower) or ("月" in ddl):
-        instruction = {
-            "primitive": "ellipse",
-            "center": [0.72, 0.32],
-            "size": [0.18, 0.11],
-            "rotation": -18,
+            "primitive": "triangle",
+            "position": [0.54, 0.22],
+            "size": [0.20, 0.18],
+            "rotation": -8,
             "color": color,
             "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
@@ -868,6 +876,37 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "weight": weight,
             "color_hint": "fallback from DDL",
         }
+    elif ("四角" in ddl) or ("square" in lower) or ("rectangle" in lower) or ("紙片" in ddl) or ("patch" in lower):
+        instruction = {
+            "primitive": "square",
+            "position": [0.62, 0.28],
+            "size": [0.18, 0.12],
+            "rotation": -12,
+            "color": color,
+            "weight": weight,
+            "filled": "塗" in ddl or "fill" in lower,
+            "color_hint": "fallback from DDL",
+        }
+    elif (
+        ("円" in ddl)
+        or ("circle" in lower)
+        or ("moon" in lower)
+        or ("月" in ddl)
+        or ("蕾" in ddl)
+        or ("花びら" in ddl)
+        or ("petal" in lower)
+        or ("bud" in lower)
+    ):
+        instruction = {
+            "primitive": "ellipse",
+            "center": [0.72, 0.32],
+            "size": [0.18, 0.11],
+            "rotation": -18,
+            "color": color,
+            "weight": weight,
+            "filled": "塗" in ddl or "fill" in lower,
+            "color_hint": "fallback from DDL",
+        }
     else:
         instruction = {
             "primitive": "line",
@@ -880,10 +919,11 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         }
 
     arrangement: dict[str, object] | None = None
+    explicit_count = count_hint_from_ddl(ddl)
     if ("散らす" in ddl) or ("点々" in ddl) or ("scatter" in lower) or ("dotted" in lower):
-        arrangement = {"count": count_hint_from_ddl(ddl) or 7, "layout": "scatter", "margin": 0.18}
+        arrangement = {"count": explicit_count or 11, "layout": "scatter", "margin": 0.18}
     elif ("並べる" in ddl) or ("line up" in lower):
-        arrangement = {"count": count_hint_from_ddl(ddl) or 3, "layout": "horizontal", "margin": 0.1}
+        arrangement = {"count": explicit_count or 3, "layout": "horizontal", "margin": 0.1}
 
     if arrangement is not None:
         if ("波打つ軌跡" in ddl) or ("undulating trace" in lower):
@@ -898,7 +938,23 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         elif ("左から右" in ddl) or ("left to right" in lower):
             arrangement["layout"] = "horizontal"
             arrangement["path"] = "left_to_right"
+        count = int(arrangement.get("count") or 1)
+        if count > 120:
+            arrangement["count"] = min(count, 120)
+            arrangement["density"] = "high" if count >= 300 else "medium"
+            arrangement["cluster_count"] = 9 if count >= 300 else 5
+            arrangement["fade"] = "directional" if arrangement.get("path") not in (None, "none") else "outward"
+            arrangement["preserve_space"] = True
+        elif count >= 40:
+            arrangement["density"] = "medium"
+            arrangement["cluster_count"] = 4
+            arrangement["fade"] = "directional" if arrangement.get("path") not in (None, "none") else "outward"
+            arrangement["preserve_space"] = True
+        if color_cycle:
+            arrangement["color_cycle"] = color_cycle
         instruction["arrangement"] = arrangement
+    elif color_cycle:
+        instruction["color_hint"] = f"{instruction['color_hint']}; palette {'/'.join(color_cycle)}"
 
     return Score.model_validate({"background": background, "instructions": [instruction]})
 

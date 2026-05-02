@@ -367,11 +367,21 @@ def _dominant_ja_color(ddl: str) -> str:
     for color in _JA_COLORS:
         if color in body:
             return _JA_COLOR_WORD[color]
+    if _has_any(body, ("春", "桜", "花", "蕾", "夕", "温", "陽光", "祝", "祭")):
+        return "赤い"
+    if _has_any(body, ("森", "葉", "草", "香", "匂", "畑", "苔")):
+        return "緑の"
+    if _has_any(body, ("夜", "月", "水", "雨", "霧", "冷", "海", "空")):
+        return "青い"
     return "黒い"
 
 
 def _contrast_ja_color(ddl: str) -> str:
     if "背景を黒" in ddl or "暗い背景" in ddl:
+        return "白い"
+    if _has_any(ddl, ("春", "桜", "花", "蕾", "温", "陽光")):
+        return "緑の"
+    if _has_any(ddl, ("夜", "月", "水", "雨", "霧", "冷")):
         return "白い"
     return "黒い"
 
@@ -382,12 +392,22 @@ def _dominant_en_color(ddl: str) -> str:
     for color in _EN_COLORS:
         if color in lower:
             return color
+    if _has_any(lower, ("spring", "cherry", "flower", "bud", "sunset", "warm", "sunlight", "festival")):
+        return "red"
+    if _has_any(lower, ("forest", "leaf", "grass", "scent", "fragrance", "field", "moss")):
+        return "green"
+    if _has_any(lower, ("night", "moon", "water", "rain", "mist", "cold", "sea", "sky")):
+        return "blue"
     return "black"
 
 
 def _contrast_en_color(ddl: str) -> str:
     lower = ddl.lower()
     if "fill background with black" in lower:
+        return "white"
+    if _has_any(lower, ("spring", "cherry", "flower", "bud", "warm", "sunlight")):
+        return "green"
+    if _has_any(lower, ("night", "moon", "water", "rain", "mist", "cold")):
         return "white"
     return "black"
 
@@ -436,6 +456,12 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
 
     if any(token in ddl for token in ("弧", "円", "波", "水", "月", "中心")):
         structural.append(f"{contrast_color}細い弧を左下の焦点から三つ広げる。半径は0.11。")
+    if any(token in context for token in ("山", "屋根", "尖", "針葉樹", "頂", "鋭")):
+        structural.append(f"{main_color}細い三角を上端寄りの焦点に二つ置く。少し傾ける。")
+    if any(token in context for token in ("葉", "花びら", "羽", "紙片", "破片", "舟")):
+        structural.append(f"{main_color}細い右上がりの楕円を葉片として波打つ軌跡に沿って五個散らす。")
+    if any(token in context for token in ("扉", "窓", "箱", "街", "部屋", "格子")):
+        structural.append(f"{contrast_color}回転した細い四角を視線の切片として右半分に三つ散らす。")
     if any(token in context for token in ("膜", "透明", "霞", "霧", "靄", "気配", "余韻")):
         structural.append(f"{main_color}薄い水彩の楕円を透明な膜として右半分に三つ重ねる。境界が滲む。")
     if any(token in context for token in ("反射", "映り")):
@@ -513,6 +539,12 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
 
     if any(token in lower for token in ("arc", "circle", "wave", "water", "moon", "center")):
         structural.append(f"Line up three thin {contrast_color} arcs spreading from a lower-left focus. Radius 0.11.")
+    if any(token in context.lower() for token in ("mountain", "roof", "sharp", "pine", "peak", "needle")):
+        structural.append(f"Place two thin {main_color} triangles near the upper-edge focus. Tilt them slightly.")
+    if any(token in context.lower() for token in ("leaf", "petal", "feather", "paper", "fragment", "boat")):
+        structural.append(f"Scatter five thin {main_color} ellipses rising to the right along an undulating trace as leaf-like pieces.")
+    if any(token in context.lower() for token in ("door", "window", "box", "city", "room", "grid")):
+        structural.append(f"Scatter three thin rotated {contrast_color} squares in the right half as visual cuts.")
     if any(token in context.lower() for token in ("membrane", "transparent", "haze", "fog", "mist", "atmosphere", "presence")):
         structural.append(f"Layer three pale {main_color} watercolor ellipses in the right half as a transparent membrane. Edges blurring.")
     if any(token in context.lower() for token in ("reflection", "reflected")):

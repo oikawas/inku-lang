@@ -151,3 +151,26 @@ def test_score_metrics_reports_density_cluster_and_fade_fields():
     assert metrics["score_fade_counts"] == {"outward": 1}
     assert metrics["score_primitive_counts"] == {"line": 1, "square": 1}
     assert metrics["score_color_counts"] == {"black": 1, "white": 1}
+
+
+def test_review_sets_groups_successful_samples_without_excluding_slow():
+    sets = cli._review_sets(
+        [
+            {"line": 1, "elapsed_total_ms": 20_000},
+            {"line": 2, "elapsed_total_ms": 140_000},
+            {"line": 3, "elapsed_total_ms": 30_000, "compose_fallback_used": True},
+            {"line": 4, "elapsed_total_ms": 180_000, "interpret_fallback_used": True},
+        ]
+    )
+
+    assert sets["all_success_samples"] == [1, 2, 3, 4]
+    assert sets["normal_samples"] == [1]
+    assert sets["slow_samples"] == [2, 4]
+    assert sets["fallback_samples"] == [3, 4]
+
+
+def test_batch_accepts_summary_json_option():
+    parser = cli.build_parser()
+    args = parser.parse_args(["batch", "--file", "prompts.txt", "--summary-json", "summary.json"])
+
+    assert args.summary_json == "summary.json"

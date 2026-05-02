@@ -678,6 +678,45 @@ def test_compose_fallback_preserves_line_arrangement_path(monkeypatch, auth_cont
     assert instruction["arrangement"]["path"] == "top_to_bottom"
 
 
+def test_compose_fallback_clusters_large_counts_and_palette(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "compose",
+        lambda ddl, model=None, original_text=None, system_prompt=None, lang="ja": Score(instructions=[]),
+    )
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "春の赤い小さな楕円を波打つ軌跡に沿って三百個散らす。"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    arrangement = r.json()["score"]["instructions"][0]["arrangement"]
+    assert arrangement["count"] <= 120
+    assert arrangement["density"] == "high"
+    assert arrangement["cluster_count"] == 9
+    assert arrangement["preserve_space"] is True
+    assert arrangement["color_cycle"] == ["red", "green", "white"]
+
+
+def test_compose_fallback_uses_triangle_for_mountain(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "compose",
+        lambda ddl, model=None, original_text=None, system_prompt=None, lang="ja": Score(instructions=[]),
+    )
+
+    r = client.post("/api/compose", json={"ddl": "緑の山を二つ並べる。"}, headers=headers)
+
+    assert r.status_code == 200
+    instruction = r.json()["score"]["instructions"][0]
+    assert instruction["primitive"] == "triangle"
+    assert instruction["arrangement"]["count"] == 2
+
+
 def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setenv("INKU_STAGE2_HARD_TIMEOUT_SECONDS", "0.01")

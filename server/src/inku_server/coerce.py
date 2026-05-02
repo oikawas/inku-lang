@@ -191,9 +191,34 @@ def _with_visible_color(ins: Instruction, background: str) -> Instruction:
     if ins.color != background:
         return ins
     data = ins.model_dump(by_alias=True)
-    data["color"] = VISIBLE_ON_BACKGROUND.get(background, "black")
     hint = data.get("color_hint")
-    note = f"{background} foreground made visible"
+    norm_hint = (hint or "").lower()
+    sensory_markers = (
+        "soft light",
+        "five-sense",
+        "scent",
+        "fragrance",
+        "membrane",
+        "haze",
+        "atmosphere",
+        "透明な膜",
+        "柔らかな光",
+        "五感",
+        "香り",
+        "匂",
+        "気配",
+    )
+    is_sensory = any(marker in norm_hint or marker in (hint or "") for marker in sensory_markers)
+    if is_sensory and background == "white":
+        if any(marker in norm_hint or marker in (hint or "") for marker in ("scent", "fragrance", "香り", "匂")):
+            data["color"] = "green"
+            note = "white sensory layer made visible as pale green"
+        else:
+            data["color"] = "blue"
+            note = "white sensory layer made visible as pale blue"
+    else:
+        data["color"] = VISIBLE_ON_BACKGROUND.get(background, "black")
+        note = f"{background} foreground made visible"
     data["color_hint"] = f"{hint}; {note}" if hint else note
     return Instruction.model_validate(data)
 

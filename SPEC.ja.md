@@ -1700,6 +1700,72 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - macOS から pentala の `inku-api` へ LAN 経由で接続し、`login` / `paint` / SVG・JSON・PNG 出力の動作を確認した
 - CLI の確認で生成される `cli/out/` はローカル成果物として Git 追跡対象外にする
 
+### v1.24 (2026-05-02)
+
+**Build 250: DDL 品質チューニング 2-5 + ベンチマーク tooling**
+
+Build 248 / 249 の sensory retention 後に残った「fallback 作品の縮退」「黒・灰偏重」「形状語彙の狭さ」「ベンチ結果整理の手作業負担」に対応した。
+
+Fallback score の品質改善:
+
+- Stage 2 が timeout / empty instructions で deterministic fallback Score へ切り替わった場合でも、DDL の数量・配置・素材・場のトーンを可能な範囲で保持する
+- `散らす` / `点々` / `scatter` / `dotted` は fallback でも `arrangement` として保持する
+- 40個以上の反復は `density=medium`, `cluster_count`, `fade`, `preserve_space=true` を付与し、余白を残す
+- 120個を超える反復は最大 120 個程度へ代表化し、300個以上は `density=high`, `cluster_count=9` として群の見え方を優先する
+- `波打つ軌跡`、`斜めの帯`、`右半分`、`上から下`、`左から右` は fallback でも `arrangement.path` へ反映する
+- fallback primitive は line / square へ寄せすぎず、DDL の語に応じて `triangle` / `arc` / `square` / `ellipse` / `line` へ分散する
+
+Palette strategy:
+
+- Stage 1.5 の deterministic expansion で、明示色が少ない場合に場のトーンから代表色を選ぶ
+- 春・花・蕾・温かい光は red / green / white 系を優先する
+- 水・夜・月・雨・霧・冷気は blue / white / gray 系を優先する
+- 森・葉・草・香りは green / white / gray 系を優先する
+- fallback でも春系・水夜系・多色系では `arrangement.color_cycle` を使い、単色化を避ける
+- 抽象色に収まらないニュアンスは `color_hint` に保持し、Renderer の色カタログ解決で利用できるようにする
+
+Shape vocabulary:
+
+- 既存 schema の範囲で `triangle` / `arc` / rotated square / thin ellipse をより積極的に使う
+- 山・屋根・尖った先端は `triangle` として表現する
+- 葉・花びら・羽・紙片・破片・舟は thin ellipse または rotated square として抽象化する
+- 扉・窓・箱・街・部屋・格子は rotated square を「視線の切片」として扱えるようにする
+- 自然 primitive plugin が未導入の段階でも、自然・物質形を既存 primitive で失わずに保持する
+
+Sensory visibility:
+
+- 白背景上の `柔らかな光`、`五感`、`透明な膜`、`気配` は単純な黒化を避け、淡い blue と `color_hint` で保持する
+- 白背景上の `香り` / `匂い` / `fragrance` / `scent` は淡い green と `color_hint` で保持する
+- 見えることを優先しつつ、感覚層が硬い黒線になって作品の余韻を壊すことを避ける
+
+CLI benchmark tooling:
+
+- `inku-cli batch` は `--summary-json` を指定すると batch summary JSON を指定パスへ保存する
+- `--out-dir` 指定時は既定で `OUT_DIR/analysis-summary.json` に summary を保存する
+- summary には `review_sets` を追加し、以下を自動分類する:
+  - `all_success_samples`: 成功した全サンプル
+  - `fallback_samples`: Stage 1 / Stage 2 fallback 使用サンプル
+  - `slow_samples`: 実行時間が長いサンプル
+  - `normal_samples`: fallback なし、かつ slow ではないサンプル
+- NVIDIA Free API の待ち時間はキュー状況による偶然性が高いため、芸術評価では除外し、診断メタデータとしてのみ扱う
+- 成功した描画は、遅かった場合でも今後すべて品質評価対象に含める
+- `inku-cli contact-sheet` を追加し、PNG 出力ディレクトリから contact sheet を生成できる
+- CLI 依存関係として Pillow を明示し、contact sheet 生成を安定して利用できるようにする
+
+検証:
+
+- macOS:
+  - `server`: `76 passed, 15 skipped`
+  - `cli`: `11 passed`
+  - `ruff`: backend / CLI とも all checks passed
+- pentala:
+  - `server`: `76 passed, 15 skipped`
+  - `cli`: `11 passed`
+  - `ruff`: backend / CLI とも all checks passed
+  - `web`: `npm run check` 0 errors / 0 warnings
+  - `web`: `npm run build` success
+  - `inku-api` / `inku-server` health check: HTTP 200
+
 ### v1.23 (2026-05-01)
 
 **NVIDIA Free API 前提の LLM retry / fail 機構 + 100件ベンチ由来の Score 補正**

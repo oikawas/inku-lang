@@ -25,7 +25,7 @@ export const ja: LangPack = {
 	saijikiLabel: '歳時記:',
 	saijikiToggleBtn: '歳時記',
 	saijikiTitle: '歳時記',
-	saijikiHint: '語彙をクリックすると記述欄に挿入されます。',
+	saijikiHint: '語彙をクリックするとカーソル位置に挿入されます。',
 	currentSetting: '現在の設定',
 	saveCurrentBtn: '現在を保存',
 
@@ -88,8 +88,8 @@ export const ja: LangPack = {
 	vocabInInputLabel: '入力に含まれた語彙',
 	thinkingLabel: '思考 (qwen3 内部)',
 	ddlLabel: '解釈 (正規化DDL)',
-	ddlEditSectionLabel: 'DDL直接編集',
-	ddlEditNote: '歳時記の語彙はカーソル位置に挿入されます',
+	ddlEditSectionLabel: 'DDL編集',
+	ddlSyntaxGuide: 'DDL簡易ガイド\nDDLは、絵そのものではなく、絵を生成するための短い視覚指示です。自然文を、色・かたち・場所・動き・てざわりに分解した「演奏用の記述」として扱います。\n1行に1つの視覚指示を書くと安定します。\n基本形: 色 + 大きさ + かたち + 数 + 場所 + 動き。\n例: 背景を白で塗りつぶす。\n例: 赤い小さな円を右上に三個置く。\n例: 青い細い線を左下から右上へ引く。\n場所は「上端」「右半分」「左下から右上へ」のように具体化します。\n動きや質感は「波打つ」「細かく揺れる」「クレヨン」「鉛筆」のように短く添えます。',
 
 	tabCanvas: '描画',
 	tabPrompts: 'プロンプト',

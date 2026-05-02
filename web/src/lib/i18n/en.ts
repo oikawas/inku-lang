@@ -25,7 +25,7 @@ export const en: LangPack = {
 	saijikiLabel: 'saijiki:',
 	saijikiToggleBtn: 'saijiki',
 	saijikiTitle: 'Saijiki',
-	saijikiHint: 'Click a word to insert it into the description.',
+	saijikiHint: 'Click a word to insert it at the caret.',
 	currentSetting: 'current settings',
 	saveCurrentBtn: 'save current',
 
@@ -88,8 +88,8 @@ export const en: LangPack = {
 	vocabInInputLabel: 'vocabulary in input',
 	thinkingLabel: 'thinking (qwen3 internal)',
 	ddlLabel: 'interpretation (normalized DDL)',
-	ddlEditSectionLabel: 'direct DDL editing',
-	ddlEditNote: 'Saijiki words are inserted at the caret',
+	ddlEditSectionLabel: 'DDL editing',
+	ddlSyntaxGuide: 'DDL quick guide\nDDL is not the picture itself. It is a compact visual instruction used to generate the picture. It turns natural language into a performable description made of color, shape, place, motion, and material.\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, crayon, or pencil.',
 
 	tabCanvas: 'drawing',
 	tabPrompts: 'prompts',

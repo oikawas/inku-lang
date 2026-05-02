@@ -82,7 +82,7 @@ export interface LangPack {
 	thinkingLabel: string;
 	ddlLabel: string;
 	ddlEditSectionLabel: string;
-	ddlEditNote: string;
+	ddlSyntaxGuide: string;
 
 	// Output tabs
 	tabCanvas: string;

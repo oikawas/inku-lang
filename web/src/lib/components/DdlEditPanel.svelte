@@ -2,7 +2,6 @@
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import KiwiMascot from './KiwiMascot.svelte';
-	import PaintButton from './PaintButton.svelte';
 	import SaijikiInline from './SaijikiInline.svelte';
 	import StopButton from './StopButton.svelte';
 
@@ -76,12 +75,6 @@
 		dialogOpen = false;
 	}
 
-	async function replayFromDialog() {
-		if (reloading || !(ddl ?? '').trim() || loading) return;
-		closeEditorDialog();
-		await onReplay();
-	}
-
 	function syncEditorScroll() {
 		onSyncHighlightScroll();
 		if (ddlLineNumberEl && ddlTextareaEl) {
@@ -92,18 +85,31 @@
 
 <div class="ddl-edit-layout">
 	<div class="ddl-edit-main">
-		<button
-			type="button"
-			class="ddl-summary-box"
-			disabled={reloading || loading}
-			onclick={openEditorDialog}
-		>
-			{#if ddl?.trim()}
-				<span class="ddl-summary-highlight">{@html ddlHighlighted}</span>
-			{:else}
-				<span class="ddl-summary-placeholder">{t().ddlEditPlaceholder}</span>
-			{/if}
-		</button>
+		<div class="ddl-inline-head">
+			<button class="ddl-edit-dialog-btn" type="button" disabled={reloading || loading} onclick={openEditorDialog}>
+				{t().ddlEditSectionLabel}
+			</button>
+		</div>
+		<div class="ddl-highlight-wrap inline-editor">
+			<div class="ddl-highlight" bind:this={ddlHighlightEl} aria-hidden="true">{@html ddlHighlighted}</div>
+			<textarea
+				class="ddl-edit-ta"
+				bind:this={ddlTextareaEl}
+				bind:value={ddl}
+				rows="10"
+				spellcheck="false"
+				placeholder={t().ddlEditPlaceholder}
+				disabled={reloading || loading}
+				onclick={onRememberSelection}
+				onfocus={() => { ddlFocused = true; onRememberSelection(); }}
+				onblur={() => { onRememberSelection(); ddlFocused = false; }}
+				oninput={() => { onRememberSelection(); syncEditorScroll(); }}
+				onkeyup={onRememberSelection}
+				onmouseup={onRememberSelection}
+				onselect={onRememberSelection}
+				onscroll={syncEditorScroll}
+			></textarea>
+		</div>
 
 		{#if reloading}
 			<div class="progress-wrap">
@@ -147,7 +153,6 @@
 		<div class="ddl-dialog-head">
 			<div>
 				<div class="ddl-dialog-title">{t().ddlEditSectionLabel}</div>
-				<div class="ddl-dialog-subtitle">{t().ddlEditNote}</div>
 			</div>
 			<button class="ddl-dialog-close" onclick={closeEditorDialog} aria-label={t().closeLabel}>×</button>
 		</div>
@@ -179,9 +184,9 @@
 						></textarea>
 					</div>
 				</div>
-				<PaintButton onclick={replayFromDialog} disabled={reloading || !(ddl ?? '').trim() || loading}>
-					{t().ddlPaintButton}
-				</PaintButton>
+				<div class="ddl-editor-foot">
+					<p class="ddl-syntax-guide">{t().ddlSyntaxGuide}</p>
+				</div>
 			</div>
 			<SaijikiInline
 				bind:activePreview={activeSaijikiPreview}
@@ -205,50 +210,26 @@
 		min-width: 0;
 		gap: 8px;
 	}
-	.ddl-summary-box {
+	.ddl-inline-head {
 		display: flex;
-		align-items: flex-start;
-		justify-content: flex-start;
-		flex-direction: column;
-		width: 100%;
-		min-height: 16em;
-		padding: 10px 11px;
-		border: 1px solid var(--accent);
-		border-left: 3px solid var(--border2);
-		border-radius: 0 var(--r) var(--r) 0;
+		justify-content: flex-end;
+	}
+	.ddl-edit-dialog-btn {
+		padding: 4px 10px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
 		background: var(--panel);
-		color: var(--fg);
-		appearance: none;
+		color: var(--fg2);
+		font-size: 11px;
+		cursor: pointer;
 		font-family: inherit;
-		font-size: 13px;
-		line-height: 1.78;
-		text-align: left;
-		cursor: text;
-		white-space: pre-wrap;
-		word-break: break-word;
-		overflow: hidden;
 	}
-	.ddl-summary-box:hover:not(:disabled),
-	.ddl-summary-box:focus-visible {
-		border-color: var(--accent);
-		box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
-		outline: none;
+	.ddl-edit-dialog-btn:hover:not(:disabled) {
+		background: var(--bg2);
 	}
-	.ddl-summary-box:disabled {
+	.ddl-edit-dialog-btn:disabled {
 		cursor: not-allowed;
-		opacity: 0.72;
-	}
-	.ddl-summary-highlight {
-		display: block;
-		width: 100%;
-		max-height: 15em;
-		overflow: hidden;
-	}
-	.ddl-summary-placeholder {
-		display: block;
-		width: 100%;
-		color: var(--fg3);
-		opacity: 0.72;
+		opacity: 0.5;
 	}
 	.ddl-highlight-wrap {
 		position: relative;
@@ -265,6 +246,9 @@
 		min-height: 0;
 		height: 100%;
 	}
+	.ddl-highlight-wrap.inline-editor {
+		min-height: 16em;
+	}
 	.ddl-editor-frame {
 		display: grid;
 		grid-template-columns: 46px minmax(0, 1fr);
@@ -275,6 +259,23 @@
 		flex-direction: column;
 		gap: 10px;
 		min-height: 0;
+	}
+	.ddl-editor-foot {
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: flex-end;
+	}
+	.ddl-syntax-guide {
+		margin: 0;
+		padding: 9px 10px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg3);
+		font-size: 11px;
+		line-height: 1.55;
+		white-space: pre-line;
 	}
 	.ddl-line-numbers {
 		padding: 11px 8px 10px 6px;
@@ -328,6 +329,10 @@
 		min-height: 0;
 		resize: none;
 	}
+	.inline-editor .ddl-highlight,
+	.inline-editor .ddl-edit-ta {
+		min-height: 16em;
+	}
 	.ddl-highlight {
 		position: absolute;
 		inset: 0;
@@ -355,6 +360,10 @@
 	}
 	.ddl-edit-ta::selection {
 		background: rgba(44, 62, 145, 0.22);
+	}
+	.ddl-edit-ta:disabled {
+		cursor: not-allowed;
+		opacity: 0.72;
 	}
 	.ddl-highlight :global(.ddl-token) {
 		border-radius: 2px;
@@ -392,72 +401,47 @@
 		color: #9b7a66;
 		font-style: inherit;
 	}
-	.ddl-summary-box :global(.ddl-token) {
-		border-radius: 2px;
-	}
-	.ddl-summary-box :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
-	.ddl-summary-box :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
-	.ddl-summary-box :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
-	.ddl-summary-box :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
-	.ddl-summary-box :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
-	.ddl-summary-box :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
-	.ddl-summary-box :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
-	.ddl-summary-box :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
-	.ddl-summary-box :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
-	.ddl-summary-box :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
-	.ddl-summary-box :global(.ddl-token-emotion) { color: #9b7a66; }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-shape),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-shape) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-shape) {
 		color: #9cc4ff;
 		background: rgba(92, 143, 220, 0.26);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-touch),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-touch) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-touch) {
 		color: #e2bf82;
 		background: rgba(188, 139, 62, 0.24);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-line),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-line) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-line) {
 		color: #c4ccd5;
 		background: rgba(147, 160, 176, 0.22);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-color),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-color) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-color) {
 		color: #ff91c7;
 		background: rgba(215, 80, 149, 0.24);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-motion),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-motion) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-motion) {
 		color: #7ce1d4;
 		background: rgba(50, 157, 147, 0.24);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-place),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-place) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-place) {
 		color: #c2a9ff;
 		background: rgba(133, 99, 214, 0.26);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-action),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-action) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-action) {
 		color: #f0aa73;
 		background: rgba(197, 105, 45, 0.24);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-angle),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-angle) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-angle) {
 		color: #a7d88e;
 		background: rgba(89, 142, 65, 0.25);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-ratio),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-ratio) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-ratio) {
 		color: #f0a0a0;
 		background: rgba(196, 78, 78, 0.24);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-word),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-word) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-word) {
 		color: #b8c7ff;
 		background: rgba(92, 111, 205, 0.26);
 	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-emotion),
-	:global(html[data-theme='dark']) .ddl-summary-box :global(.ddl-token-emotion) {
+	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-emotion) {
 		color: #d8b8a6;
 	}
 	:global(html[data-theme='dark']) .ddl-line-numbers {
@@ -599,11 +583,6 @@
 		letter-spacing: 0.05em;
 		color: var(--fg);
 	}
-	.ddl-dialog-subtitle {
-		margin-top: 3px;
-		font-size: 11px;
-		color: var(--fg3);
-	}
 	.ddl-dialog-close {
 		width: 28px;
 		height: 28px;
@@ -633,9 +612,6 @@
 		.ddl-highlight-wrap {
 			min-height: 20em;
 		}
-		.ddl-summary-box {
-			min-height: 14em;
-		}
 		.ddl-dialog {
 			width: calc(100vw - 20px);
 			height: calc(100vh - 20px);
@@ -644,6 +620,9 @@
 			display: flex;
 			flex-direction: column;
 			padding: 10px;
+		}
+		.ddl-editor-foot {
+			justify-content: stretch;
 		}
 		.ddl-editor-frame {
 			min-height: 22em;

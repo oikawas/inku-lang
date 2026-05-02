@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import DdlEditPanel from './DdlEditPanel.svelte';
+	import PaintButton from './PaintButton.svelte';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -84,11 +85,7 @@
 		onReplay={onReplay}
 	/>
 	{#if !reloading && !loading}
-		<button
-			class="replay-btn"
-			onclick={onReplay}
-			disabled={!ddl}
-		>{t().ddlPaintButton}</button>
+		<PaintButton onclick={onReplay} disabled={!ddl}>{t().ddlPaintButton}</PaintButton>
 	{/if}
 </section>
 
@@ -121,34 +118,4 @@
 		font-family: inherit;
 	}
 	.ghost-btn:hover { background: var(--bg2); }
-	.replay-btn {
-		width: 100%;
-		margin-top: 6px;
-		padding: 10px;
-		font-size: 14px;
-		font-weight: 500;
-		background: #e8f1fb;
-		color: #234c78;
-		border: 1px solid #9fb9d6;
-		border-radius: var(--r);
-		letter-spacing: 0.08em;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-		font-family: inherit;
-		transition: background 0.15s, border-color 0.15s, color 0.15s;
-	}
-	.replay-btn:hover:not(:disabled) {
-		background: #d7e8f8;
-		border-color: #6f98c3;
-		color: #173f68;
-	}
-	.replay-btn:disabled {
-		background: var(--bg2);
-		border-color: var(--border2);
-		color: var(--fg3);
-		cursor: not-allowed;
-	}
 </style>

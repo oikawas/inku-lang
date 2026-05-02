@@ -33,7 +33,6 @@ export interface LangPack {
 
 	// Input
 	modeSingle: string;
-	modeDdlEdit: string;
 	modeBatch: string;
 	modeDemo: string;
 	inputPlaceholder: string;

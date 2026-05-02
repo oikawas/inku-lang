@@ -42,7 +42,6 @@ export const en: LangPack = {
 	saijikiPreviewPlaceholder: 'Hover over a word to preview how it affects the drawing.',
 
 	modeSingle: 'describe',
-	modeDdlEdit: 'DDL edit',
 	modeBatch: 'batch',
 	modeDemo: 'demo',
 	inputPlaceholder: 'A moon rises beyond the mountains',

@@ -140,7 +140,7 @@
 	};
 	// ── Input ───────────────────────────────────────────────
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
-	let inputMode   = $state<'single' | 'ddl' | 'batch' | 'demo'>('single');
+	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
 	let input       = $state(DEFAULT_INPUT);
 	let batchInput  = $state('');
 	let stage1UserPrompt = $state('');
@@ -1298,21 +1298,8 @@
 	const demoRunning = $derived(activeRunMode === 'demo' && loading);
 	const demoCanSaveCurrent = $derived(!!result && !!demoGeneratedPrompt && !!demoGeneratedDdl && !demoCurrentSaved);
 	const canSubmit     = $derived(
-		inputMode === 'single'
-			? !!input.trim()
-			: inputMode === 'ddl'
-				? !!(ddl ?? '').trim()
-				: inputMode === 'batch'
-					? batchNonEmpty > 0
-					: false
+		inputMode === 'single' ? !!input.trim() : inputMode === 'batch' ? batchNonEmpty > 0 : false
 	);
-
-	$effect(() => {
-		if (inputMode === 'ddl' && ddl === null) {
-			ddl = '';
-			ddlSelection = { start: 0, end: 0 };
-		}
-	});
 
 	// ── Timer ───────────────────────────────────────────────
 	function startTimer() {
@@ -1548,10 +1535,6 @@
 	// ── Submit ──────────────────────────────────────────────
 	async function submit() {
 		if (!canSubmit || loading) return;
-		if (inputMode === 'ddl') {
-			await replay();
-			return;
-		}
 		const submittedMode = inputMode;
 		const abortController = new AbortController();
 		submitAbortController = abortController;
@@ -1666,7 +1649,7 @@
 		reloading = true; reloadError = null;
 		displayedHistoryItem = null;
 		const lang = getLang();
-		const replayInput = inputMode === 'ddl' ? ddl : input;
+		const replayInput = input;
 		const startedAt = Date.now();
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
@@ -1871,7 +1854,6 @@
 
 	function clearInput() {
 		if (inputMode === 'single') input = '';
-		if (inputMode === 'ddl') ddl = '';
 		if (inputMode === 'batch') batchInput = '';
 		if (inputMode === 'demo') {
 			demoGeneratedPrompt = '';
@@ -1880,7 +1862,7 @@
 			demoSaveStatus = null;
 			demoCurrentSaved = false;
 		}
-		if (inputMode !== 'ddl') ddl = null;
+		ddl = null;
 		thinking = null;
 		result = null;
 		stage1UserPrompt = '';
@@ -2539,18 +2521,10 @@
 						bind:inputMode
 						bind:input
 						bind:batchInput
-						bind:ddl
-						{ddlHighlighted}
-						bind:ddlTextareaEl
-						bind:ddlHighlightEl
-						bind:ddlFocused
 						{lineNumbersText}
 						{batchNonEmpty}
 						{batchRunning}
 						{singleRunning}
-						{reloading}
-						{reloadError}
-						{loading}
 						{batchActiveLine}
 						{batchActiveDdlHighlighted}
 						{batchTotal}
@@ -2560,7 +2534,6 @@
 						{batchTokensInTotal}
 						{batchTokensOutTotal}
 						{liveMs}
-						{tokenSummary}
 						{batchFailureReport}
 						{batchPromptHistory}
 						bind:demoSettings
@@ -2586,7 +2559,6 @@
 						{stageLabel}
 						{showKiwi}
 						{showCrab}
-						bind:activeSaijikiPreview
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -2602,12 +2574,6 @@
 						onStopDemo={stopDemo}
 						onSubmit={submit}
 						onStop={stopBatch}
-						onInsertWord={insertWord}
-						previewForWord={saijikiPreview}
-						onRememberDDLSelection={rememberDDLSelection}
-						onSyncDDLHighlightScroll={syncDDLHighlightScroll}
-						onReplay={replay}
-						onStopReplay={stopReplay}
 					/>
 
 					<!-- thinking -->
@@ -2631,11 +2597,17 @@
 							{reloading}
 							{reloadError}
 							{loading}
+							{liveMs}
+							{tokenSummary}
 							{showKiwi}
+							bind:activeSaijikiPreview
 							onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
+							onInsertWord={insertWord}
+							previewForWord={saijikiPreview}
 							onRememberSelection={rememberDDLSelection}
 							onSyncHighlightScroll={syncDDLHighlightScroll}
 							onReplay={replay}
+							onStopReplay={stopReplay}
 						/>
 					{/if}
 
@@ -2687,7 +2659,7 @@
 				{panY}
 				{canvasDragging}
 				{promptsData}
-				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : inputMode === 'demo' ? demoGeneratedPrompt : '')}
+				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : demoGeneratedPrompt)}
 				{ddl}
 				{copiedPrompt}
 				{scoreJsonLines}

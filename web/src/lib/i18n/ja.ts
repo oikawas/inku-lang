@@ -42,7 +42,6 @@ export const ja: LangPack = {
 	saijikiPreviewPlaceholder: '語彙にマウスを重ねると、描画への効き方を表示します。',
 
 	modeSingle: '記述',
-	modeDdlEdit: 'DDL編集',
 	modeBatch: 'バッチ',
 	modeDemo: 'デモ',
 	inputPlaceholder: '山の向こうに月が昇る',

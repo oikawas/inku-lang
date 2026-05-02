@@ -3,7 +3,6 @@
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
-	import DdlEditPanel from './DdlEditPanel.svelte';
 	import KiwiMascot from './KiwiMascot.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
@@ -20,31 +19,14 @@
 		total: number;
 		failures: BatchFailure[];
 	};
-	type SaijikiPreview = {
-		categoryKey: string;
-		word: string;
-		canonicalWord: string;
-		effect: string;
-		example: string;
-		svg: string;
-	};
-
 	type Props = {
-		inputMode: 'single' | 'ddl' | 'batch' | 'demo';
+		inputMode: 'single' | 'batch' | 'demo';
 		input: string;
 		batchInput: string;
-		ddl: string | null;
-		ddlHighlighted: string;
-		ddlTextareaEl: HTMLTextAreaElement | null;
-		ddlHighlightEl: HTMLDivElement | null;
-		ddlFocused: boolean;
 		lineNumbersText: string;
 		batchNonEmpty: number;
 		batchRunning: boolean;
 		singleRunning: boolean;
-		reloading: boolean;
-		reloadError: string | null;
-		loading: boolean;
 		batchActiveLine: number | null;
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
@@ -54,7 +36,6 @@
 		batchTokensInTotal: number;
 		batchTokensOutTotal: number;
 		liveMs: number;
-		tokenSummary: string;
 		batchFailureReport: BatchFailureReport | null;
 		canSubmit: boolean;
 		error: string | null;
@@ -80,7 +61,6 @@
 		stageLabel: string;
 		showKiwi: boolean;
 		showCrab: boolean;
-		activeSaijikiPreview: SaijikiPreview | null;
 		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
@@ -96,30 +76,16 @@
 		onStopDemo: () => void;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
-		onInsertWord: (word: string) => void;
-		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
-		onRememberDDLSelection: () => void;
-		onSyncDDLHighlightScroll: () => void;
-		onReplay: () => void | Promise<void>;
-		onStopReplay: () => void;
 	};
 
 	let {
 		inputMode = $bindable('single'),
 		input = $bindable(''),
 		batchInput = $bindable(''),
-		ddl = $bindable(''),
-		ddlHighlighted,
-		ddlTextareaEl = $bindable(null),
-		ddlHighlightEl = $bindable(null),
-		ddlFocused = $bindable(false),
 		lineNumbersText,
 		batchNonEmpty,
 		batchRunning,
 		singleRunning,
-		reloading,
-		reloadError,
-		loading,
 		batchActiveLine,
 		batchActiveDdlHighlighted,
 		batchTotal,
@@ -129,7 +95,6 @@
 		batchTokensInTotal,
 		batchTokensOutTotal,
 		liveMs,
-		tokenSummary,
 		batchFailureReport,
 		canSubmit,
 		error,
@@ -155,7 +120,6 @@
 		stageLabel,
 		showKiwi,
 		showCrab,
-		activeSaijikiPreview = $bindable(),
 		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
@@ -171,17 +135,10 @@
 		onStopDemo,
 		onSubmit,
 		onStop,
-		onInsertWord,
-		previewForWord,
-		onRememberDDLSelection,
-		onSyncDDLHighlightScroll,
-		onReplay,
-		onStopReplay,
 	}: Props = $props();
 
 	const tabItems = $derived([
 		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning },
-		{ mode: 'ddl' as const, label: t().modeDdlEdit, running: reloading },
 		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning },
 		{ mode: 'demo' as const, label: t().modeDemo, running: demoRunning },
 	]);
@@ -208,7 +165,7 @@
 
 <section class="panel-section">
 	<div class="section-head">
-		<span class="section-label">{inputMode === 'ddl' ? t().ddlEditSectionLabel : t().inputSectionLabel}</span>
+		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
 			{#if canvasAspectEnabled}
 				<CanvasAspectPlugin
@@ -267,27 +224,6 @@
 		{/if}
 
 		{#if error}<p class="error-text">{error}</p>{/if}
-	{:else if inputMode === 'ddl'}
-		<DdlEditPanel
-			bind:ddl
-			{ddlHighlighted}
-			bind:ddlTextareaEl
-			bind:ddlHighlightEl
-			bind:ddlFocused
-			{reloading}
-			{reloadError}
-			{loading}
-			{liveMs}
-			{tokenSummary}
-			{showKiwi}
-			bind:activeSaijikiPreview
-			{onInsertWord}
-			{previewForWord}
-			onRememberSelection={onRememberDDLSelection}
-			onSyncHighlightScroll={onSyncDDLHighlightScroll}
-			onReplay={onReplay}
-			{onStopReplay}
-		/>
 	{:else if inputMode === 'batch'}
 		<BatchPanel
 			bind:batchInput

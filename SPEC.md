@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.37**
+**Version: v1.38**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -239,7 +239,8 @@ Major UI areas:
 - App rail: compact navigation, user menu, profile, settings, language and
   theme controls
 - Input panel: single drawing, batch drawing, and demo modes
-- DDL editor: editable normalized DDL with Saijiki word highlighting
+- DDL editor: editable normalized DDL embedded in the single drawing flow, with
+  Saijiki word highlighting and an expanded dialog editor
 - Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
 - History strip: recent works, hover metadata, star markers, pagination
 - History manager: larger history view, trash, restore, permanent delete, star filter
@@ -273,6 +274,19 @@ current canvas aspect ratio.
 The user writes one instruction and runs the full pipeline.  The resulting DDL
 can be edited directly.  Replaying from DDL skips Stage 1 and calls Stage 2 /
 renderer again.
+
+The normalized DDL appears as an interpretation box under the single drawing
+input.  The box supports two editing paths:
+
+- the Saijiki button opens the side drawer for vocabulary reference and word
+  insertion
+- clicking the interpretation box opens a larger DDL dialog with line numbers,
+  a two-column Saijiki vocabulary panel, and a `Draw from DDL` action
+
+The same `Draw from DDL` action is also available below the interpretation box
+for quick replay without opening the dialog.  DDL replay shows elapsed time,
+token information, a stop button, and the kiwi progress mascot.  Stopping replay
+aborts the active `/api/compose` request.
 
 During single drawing and DDL replay, the progress bar can show a kiwi mascot.
 The kiwi faces left, walks slowly, pecks with a long beak, sniffs, blinks,
@@ -416,6 +430,8 @@ The reference implementation currently includes:
 - SVG export and template-based PNG export
 - CLI client foundation
 - shared kiwi progress mascot for single drawing and DDL replay
+- integrated DDL interpretation editor with Saijiki drawer, expanded dialog,
+  token/time display, and cancellable `/api/compose` replay
 - renderer material effects, wobble, rotation, arrangement paths, and canvas
   aspect support
 

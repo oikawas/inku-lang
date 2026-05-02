@@ -27,6 +27,7 @@
 		tokenSummary: string;
 		showKiwi: boolean;
 		activeSaijikiPreview: SaijikiPreview | null;
+		onToggleSaijiki: () => void;
 		onInsertWord: (word: string) => void;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
 		onRememberSelection: () => void;
@@ -48,6 +49,7 @@
 		tokenSummary,
 		showKiwi,
 		activeSaijikiPreview = $bindable(),
+		onToggleSaijiki,
 		onInsertWord,
 		previewForWord,
 		onRememberSelection,
@@ -86,7 +88,10 @@
 <div class="ddl-edit-layout">
 	<div class="ddl-edit-main">
 		<div class="ddl-inline-head">
-			<button class="ddl-edit-dialog-btn" type="button" disabled={reloading || loading} onclick={openEditorDialog}>
+			<button class="ddl-inline-btn" type="button" onclick={onToggleSaijiki}>
+				{t().saijikiToggleBtn}
+			</button>
+			<button class="ddl-inline-btn" type="button" disabled={reloading || loading} onclick={openEditorDialog}>
 				{t().ddlEditSectionLabel}
 			</button>
 		</div>
@@ -213,8 +218,9 @@
 	.ddl-inline-head {
 		display: flex;
 		justify-content: flex-end;
+		gap: 5px;
 	}
-	.ddl-edit-dialog-btn {
+	.ddl-inline-btn {
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
@@ -224,10 +230,10 @@
 		cursor: pointer;
 		font-family: inherit;
 	}
-	.ddl-edit-dialog-btn:hover:not(:disabled) {
+	.ddl-inline-btn:hover:not(:disabled) {
 		background: var(--bg2);
 	}
-	.ddl-edit-dialog-btn:disabled {
+	.ddl-inline-btn:disabled {
 		cursor: not-allowed;
 		opacity: 0.5;
 	}

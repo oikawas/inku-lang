@@ -197,6 +197,7 @@
 
 	// ── Result ──────────────────────────────────────────────
 	let ddl      = $state<string | null>(null);
+	let ddlGeneratedBaseline = $state<string | null>(null);
 	let thinking = $state<string | null>(null);
 	let result   = $state<PaintResult | null>(null);
 
@@ -1285,7 +1286,7 @@
 		trashItems = items;
 		trashTotal = total;
 	});
-	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean } | null>(null);
+	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean } | null>(null);
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
@@ -1294,9 +1295,10 @@
 	const lineNumbersText = $derived(batchLines.map((_, i) => String(i + 1)).join('\n'));
 	const batchNonEmpty = $derived(batchLines.filter((l) => l.trim()).length);
 	const batchRunning = $derived(activeRunMode === 'batch' && loading);
-	const singleRunning = $derived(activeRunMode === 'single' && loading);
+	const singleRunning = $derived((activeRunMode === 'single' && loading) || reloading);
 	const demoRunning = $derived(activeRunMode === 'demo' && loading);
 	const demoCanSaveCurrent = $derived(!!result && !!demoGeneratedPrompt && !!demoGeneratedDdl && !demoCurrentSaved);
+	const ddlEditedAfterGeneration = $derived(inputMode === 'single' && ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline);
 	const canSubmit     = $derived(
 		inputMode === 'single' ? !!input.trim() : inputMode === 'batch' ? batchNonEmpty > 0 : false
 	);
@@ -1536,7 +1538,7 @@
 				demoGeneratedDdl = r.ddl;
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
-				ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
+				ddl = r.ddl; ddlGeneratedBaseline = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
 				fitCanvasZoom();
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
@@ -1610,6 +1612,21 @@
 	}
 
 	// ── Submit ──────────────────────────────────────────────
+	function requestSubmit() {
+		if (inputMode === 'single' && ddlEditedAfterGeneration && !loading && !reloading) {
+			confirmAction = {
+				message: t().confirmDdlOverwriteMessage,
+				runLabel: t().confirmOk,
+				hideCancel: false,
+				run: () => { void submit(); },
+				secondaryLabel: t().ddlPaintButton,
+				secondaryRun: () => { void replay(); },
+			};
+			return;
+		}
+		void submit();
+	}
+
 	async function submit() {
 		if (!canSubmit || loading) return;
 		const submittedMode = inputMode;
@@ -1618,7 +1635,7 @@
 		submitStopRequested = false;
 		loading = true; error = null;
 		activeRunMode = submittedMode;
-		ddl = null; thinking = null; ddlSelection = { start: 0, end: 0 };
+		ddl = null; ddlGeneratedBaseline = null; thinking = null; ddlSelection = { start: 0, end: 0 };
 		displayedHistoryItem = null;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
@@ -1636,6 +1653,7 @@
 				tokensInStage1 = interpreted.tokens_in;
 				tokensOutStage1 = interpreted.tokens_out;
 				ddl = interpreted.ddl;
+				ddlGeneratedBaseline = interpreted.ddl;
 				ddlSelection = { start: interpreted.ddl.length, end: interpreted.ddl.length };
 				thinking = interpreted.thinking;
 				stageLabel = t().stageImageGenerating;
@@ -1701,6 +1719,7 @@
 						if (displayedHistoryItem === null) {
 							result = r;
 							ddl = r.ddl;
+							ddlGeneratedBaseline = r.ddl;
 							ddlSelection = { start: r.ddl.length, end: r.ddl.length };
 							fitCanvasZoom();
 						}
@@ -1997,6 +2016,7 @@
 			demoCurrentSaved = false;
 		}
 		ddl = null;
+		ddlGeneratedBaseline = null;
 		thinking = null;
 		result = null;
 		stage1UserPrompt = '';
@@ -2078,7 +2098,7 @@
 		inputMode = 'single';
 		displayedHistoryItem = it;
 		const itemDDL = it.ddl ?? '';
-		input = it.input; ddl = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
+		input = it.input; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
 		stage1UserPrompt = it.input ? it.input + buildEmotionHint(it.input) : '';
 		result = { score: it.score, svg: it.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: it.elapsed_ms ?? 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
 		error = null;
@@ -2707,7 +2727,7 @@
 						onSaveCurrentDemo={saveCurrentDemoToHistory}
 						onStartDemo={startDemo}
 						onStopDemo={stopDemo}
-						onSubmit={submit}
+						onSubmit={requestSubmit}
 						onStop={stopBatch}
 					/>
 

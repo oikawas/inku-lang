@@ -270,6 +270,8 @@ export const ja: LangPack = {
 	historyActionHeader: '操作',
 	confirmCancel: 'キャンセル',
 	confirmRun: '実行',
+	confirmOk: 'OK',
+	confirmDdlOverwriteMessage: 'DDLの編集結果が失われます、よろしいですか？',
 	confirmTrashMessage: (n) => `${n}件をごみ箱に移動しますか？`,
 	confirmRestoreMessage: (n) => `${n}件を復元しますか？`,
 	confirmPermanentDeleteMessage: (n) => `${n}件を完全に削除しますか？`,

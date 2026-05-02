@@ -237,6 +237,7 @@
 			{liveMs}
 			{batchFailureReport}
 			{canSubmit}
+			actionDisabled={singleRunning}
 			{error}
 			{batchPromptHistory}
 			{showCrab}
@@ -262,6 +263,7 @@
 			generatedDdlHighlighted={demoGeneratedDdlHighlighted}
 			canSaveCurrent={demoCanSaveCurrent}
 			savingCurrent={demoSavingCurrent}
+			actionDisabled={singleRunning}
 			saveStatus={demoSaveStatus}
 			error={demoError}
 			onSettingsChange={onDemoSettingsChange}

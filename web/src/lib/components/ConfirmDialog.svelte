@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 
-	type ConfirmAction = {
-		message: string;
-		run: () => void;
-		destructive?: boolean;
-	};
+type ConfirmAction = {
+	message: string;
+	run: () => void;
+	destructive?: boolean;
+	runLabel?: string;
+	secondaryLabel?: string;
+	secondaryRun?: () => void;
+	hideCancel?: boolean;
+};
 
 	type Props = {
 		action: ConfirmAction;
@@ -21,8 +25,13 @@
 	<div class="confirm-box" role="dialog" aria-modal="true" tabindex="-1">
 		<p>{action.message}</p>
 		<div class="confirm-actions">
-			<button class="ghost-btn" onclick={onCancel}>{t().confirmCancel}</button>
-			<button class={action.destructive ? 'danger-btn' : 'confirm-btn'} onclick={onRun}>{action.destructive ? t().deleteButton : t().confirmRun}</button>
+			{#if !action.hideCancel}
+				<button class="ghost-btn" onclick={onCancel}>{t().confirmCancel}</button>
+			{/if}
+			<button class={action.destructive ? 'danger-btn' : 'confirm-btn'} onclick={onRun}>{action.runLabel ?? (action.destructive ? t().deleteButton : t().confirmRun)}</button>
+			{#if action.secondaryRun}
+				<button class="ghost-btn" onclick={() => { const run = action.secondaryRun; onCancel(); run?.(); }}>{action.secondaryLabel ?? t().confirmRun}</button>
+			{/if}
 		</div>
 	</div>
 </div>
@@ -58,5 +67,12 @@
 		color: #fff; font-size: 11px; cursor: pointer; font-family: inherit;
 	}
 	.danger-btn { background: #c0392b; }
-	.confirm-btn { background: var(--fg); }
+	.confirm-btn {
+		background: var(--accent);
+		color: var(--button-active-fg);
+		border: 1px solid color-mix(in srgb, var(--accent) 82%, #000);
+	}
+	.confirm-btn:hover {
+		filter: brightness(0.96);
+	}
 </style>

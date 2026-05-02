@@ -278,15 +278,26 @@ renderer again.
 The normalized DDL appears as an interpretation box under the single drawing
 input.  The box supports two editing paths:
 
-- the Saijiki button opens the side drawer for vocabulary reference and word
-  insertion
-- clicking the interpretation box opens a larger DDL dialog with line numbers,
-  a two-column Saijiki vocabulary panel, and a `Draw from DDL` action
+- direct inline editing in the highlighted interpretation box
+- the `Saijiki` button opens the side drawer for vocabulary reference and word
+  insertion at the current caret position
+- the `DDL editing` button opens a larger dialog with line numbers, a
+  two-column Saijiki vocabulary panel, and a short DDL syntax guide
 
 The same `Draw from DDL` action is also available below the interpretation box
-for quick replay without opening the dialog.  DDL replay shows elapsed time,
-token information, a stop button, and the kiwi progress mascot.  Stopping replay
-aborts the active `/api/compose` request.
+for quick replay without opening the dialog.  The dialog itself does not start
+drawing, so drawing actions remain concentrated in the main single-drawing
+panel.
+
+If the user edits DDL directly and then presses the normal `draw` button, inku
+warns that the DDL edit will be lost.  The choices are `cancel`, `OK`, and
+`draw from DDL`.  `OK` reruns Stage 1 from the natural-language prompt, while
+`draw from DDL` preserves the edited DDL and runs Stage 2 / rendering only.
+
+DDL replay shows elapsed time, token information, a stop button, and the kiwi
+progress mascot.  Stopping replay aborts the active `/api/compose` request.
+During single drawing and DDL replay, the single tab shows a running effect and
+the batch/demo start actions are suppressed.
 
 During single drawing and DDL replay, the progress bar can show a kiwi mascot.
 The kiwi faces left, walks slowly, pecks with a long beak, sniffs, blinks,

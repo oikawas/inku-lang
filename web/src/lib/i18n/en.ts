@@ -270,6 +270,8 @@ export const en: LangPack = {
 	historyActionHeader: 'actions',
 	confirmCancel: 'cancel',
 	confirmRun: 'run',
+	confirmOk: 'OK',
+	confirmDdlOverwriteMessage: 'Your DDL edits will be lost. Continue?',
 	confirmTrashMessage: (n) => `Move ${n} item${n === 1 ? '' : 's'} to trash?`,
 	confirmRestoreMessage: (n) => `Restore ${n} item${n === 1 ? '' : 's'}?`,
 	confirmPermanentDeleteMessage: (n) => `Permanently delete ${n} item${n === 1 ? '' : 's'}?`,

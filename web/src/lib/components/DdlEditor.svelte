@@ -60,9 +60,6 @@
 <section class="panel-section">
 	<div class="section-head">
 		<span class="section-label">{t().ddlLabel}</span>
-		<div class="section-actions">
-			<button class="ghost-btn" onclick={onToggleSaijiki}>{t().saijikiToggleBtn}</button>
-		</div>
 	</div>
 	<DdlEditPanel
 		bind:ddl
@@ -77,6 +74,7 @@
 		{tokenSummary}
 		{showKiwi}
 		bind:activeSaijikiPreview
+		{onToggleSaijiki}
 		{onInsertWord}
 		{previewForWord}
 		{onStopReplay}
@@ -103,19 +101,4 @@
 		color: var(--fg3);
 		text-transform: uppercase;
 	}
-	.section-actions {
-		display: flex;
-		gap: 5px;
-	}
-	.ghost-btn {
-		padding: 4px 10px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: 11px;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
 </style>

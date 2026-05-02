@@ -284,6 +284,8 @@ export interface LangPack {
 	historyActionHeader: string;
 	confirmCancel: string;
 	confirmRun: string;
+	confirmOk: string;
+	confirmDdlOverwriteMessage: string;
 	confirmTrashMessage: (n: number) => string;
 	confirmRestoreMessage: (n: number) => string;
 	confirmPermanentDeleteMessage: (n: number) => string;

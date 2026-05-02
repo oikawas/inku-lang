@@ -22,6 +22,7 @@
 		generatedDdlHighlighted: string;
 		canSaveCurrent: boolean;
 		savingCurrent: boolean;
+		actionDisabled: boolean;
 		saveStatus: string | null;
 		error: string | null;
 		onSettingsChange: (settings: DemoSettings) => void | Promise<void>;
@@ -47,6 +48,7 @@
 		generatedDdlHighlighted,
 		canSaveCurrent,
 		savingCurrent,
+		actionDisabled,
 		saveStatus,
 		error,
 		onSettingsChange,
@@ -158,7 +160,7 @@
 			</div>
 			<StopButton onclick={onStop}>{t().demoStop}</StopButton>
 		{:else}
-			<PaintButton onclick={onStart} disabled={!settings.seed_phrase.trim()}>{t().demoStart}</PaintButton>
+			<PaintButton onclick={onStart} disabled={!settings.seed_phrase.trim() || actionDisabled}>{t().demoStart}</PaintButton>
 		{/if}
 	</div>
 

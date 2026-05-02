@@ -30,6 +30,7 @@
 		liveMs: number;
 		batchFailureReport: BatchFailureReport | null;
 		canSubmit: boolean;
+		actionDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
 		showCrab: boolean;
@@ -54,6 +55,7 @@
 		liveMs,
 		batchFailureReport,
 		canSubmit,
+		actionDisabled,
 		error,
 		batchPromptHistory,
 		showCrab,
@@ -195,7 +197,7 @@
 		<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 	</div>
 {:else}
-	<PaintButton onclick={submitAndRemember} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
+	<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled}>{t().submitBtn}</PaintButton>
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}

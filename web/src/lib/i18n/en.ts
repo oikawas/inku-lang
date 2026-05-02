@@ -178,6 +178,8 @@ export const en: LangPack = {
 	userRoleLabel: 'role',
 	userRoleSelectLabel: 'select role',
 	userGroupSelectLabel: 'select group',
+	userGenerationCountLabel: 'renders',
+	profileGenerationCountLabel: 'total image generations',
 	loginRequiredMessage: 'Please sign in.',
 	settingsAdminOnlyMessage: 'Only admins can view DB settings and plugin status.',
 	userInfoLoadFailed: 'Could not load user information.',

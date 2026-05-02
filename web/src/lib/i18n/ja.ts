@@ -178,6 +178,8 @@ export const ja: LangPack = {
 	userRoleLabel: 'ロール',
 	userRoleSelectLabel: 'ロールを選択',
 	userGroupSelectLabel: '所属グループを選択',
+	userGenerationCountLabel: '生成数',
+	profileGenerationCountLabel: '画像生成累計数',
 	loginRequiredMessage: 'ログインしてください。',
 	settingsAdminOnlyMessage: 'DB設定とプラグイン状態は管理者のみ確認できます。',
 	userInfoLoadFailed: 'ユーザー情報を読み込めませんでした。',

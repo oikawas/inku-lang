@@ -657,6 +657,19 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert "中心" not in data["ddl"]
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
+    assert data["user_generation_count"] == 1
+
+    skipped_count = client.post(
+        "/api/paint",
+        json={"text": "一滴の墨", "count_generation": False},
+        headers=headers,
+    )
+    assert skipped_count.status_code == 200
+    assert skipped_count.json().get("user_generation_count") is None
+
+    me = client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["image_generation_count"] == 1
 
 
 def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
@@ -686,6 +699,23 @@ def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
     assert data["interpret_fallback_reasons"] == ["stage1_hard_timeout"]
     assert "斜めの線を三本" in data["ddl"]
     assert captured["ddl"] == data["ddl"]
+
+
+def test_failed_paint_does_not_increment_generation_count(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("黒い円を置く。", None))
+
+    def fail_compose(*args, **kwargs):
+        raise RuntimeError("compose failed for test")
+
+    monkeypatch.setattr(api_module, "compose", fail_compose)
+
+    r = client.post("/api/paint", json={"text": "壊れる描画"}, headers=headers)
+    assert r.status_code == 502
+
+    me = client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["image_generation_count"] == 0
 
 
 def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):

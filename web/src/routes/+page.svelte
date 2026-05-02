@@ -68,6 +68,7 @@
 		tokens_out_stage1: number | null;
 		tokens_in_stage2: number | null;
 		tokens_out_stage2: number | null;
+		user_generation_count?: number | null;
 	};
 
 	type Iteration = HistoryItem;
@@ -122,6 +123,7 @@
 		group_name: string | null;
 		ui_theme?: 'light' | 'dark';
 		settings_tab?: SettingsTab;
+		image_generation_count: number;
 		at: number;
 	};
 	// ── Input ───────────────────────────────────────────────
@@ -1229,6 +1231,7 @@
 		historyInput?: string;
 		saveHistory?: boolean;
 		saveArtifacts?: boolean;
+		countGeneration?: boolean;
 		signal?: AbortSignal;
 	};
 
@@ -1254,6 +1257,7 @@
 				canvas_aspect: effectiveCanvasAspectId(),
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
+				count_generation: options.countGeneration ?? true,
 				history_input: historyInput,
 				catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
 			})
@@ -1263,7 +1267,11 @@
 			throw new Error(d.detail ?? `HTTP ${r.status}`);
 		}
 		stageLabel = t().stageStructuring('');
-		return await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+		const data = await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+		if (currentUser && typeof data.user_generation_count === 'number') {
+			currentUser = { ...currentUser, image_generation_count: data.user_generation_count };
+		}
+		return data;
 	}
 
 	async function refreshHistoryAfterServerSave() {
@@ -1310,6 +1318,7 @@
 				const r = await paintOne(demoGeneratedPrompt, {
 					saveHistory: settings.save_db,
 					saveArtifacts: settings.save_files,
+					countGeneration: false,
 					historyInput: `[demo] ${demoGeneratedPrompt}`,
 				});
 				if (demoRunId !== runId || !loading) break;
@@ -2614,10 +2623,11 @@
 {/if}
 
 {#if profileOpen && currentUser}
-	<ProfileModal
-		username={currentUser.username}
-		email={currentUser.email}
-		status={profileStatus}
+		<ProfileModal
+			username={currentUser.username}
+			email={currentUser.email}
+			generationCount={currentUser.image_generation_count}
+			status={profileStatus}
 		saving={profileSaving}
 		bind:profileEmail
 		bind:profileCurrentPassword

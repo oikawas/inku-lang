@@ -250,6 +250,7 @@ class PaintRequest(BaseModel):
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     save_history: bool = Field(default=False, description="描画結果を履歴に保存するか")
     save_artifacts: bool | None = Field(default=None, description="SVG/JSON/PNG などの副産物ファイルを保存するか")
+    count_generation: bool = Field(default=True, description="完了した描画をユーザーの累積生成数に加算するか")
     history_input: str | None = Field(default=None, description="履歴に表示するユーザー記述")
     history_at: int | None = Field(default=None, description="履歴保存時刻")
     catalog_id: str | None = Field(default=None, description="使用した色カタログID")
@@ -275,6 +276,7 @@ class PaintResponse(BaseModel):
     compose_retry_count: int = 0
     compose_retry_reasons: list[str] = Field(default_factory=list)
     compose_fallback_used: bool = False
+    user_generation_count: int | None = None
 
 
 @dataclass
@@ -365,6 +367,7 @@ class UserAccountItem(BaseModel):
     group_name: str | None = None
     ui_theme: str = "light"
     settings_tab: str = "db"
+    image_generation_count: int = 0
     at: int
 
 
@@ -1258,6 +1261,11 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             "svg": svg,
             "at": history_at,
         })
+    user_generation_count = None
+    if req.count_generation:
+        user_generation_count = _db.increment_user_generation_count(actor["id"])
+        if user_generation_count is None:
+            raise HTTPException(status_code=404, detail="user not found")
     return PaintResponse(
         text=source_text,
         ddl=ddl,
@@ -1278,6 +1286,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         compose_retry_count=compose_detail.retry_count,
         compose_retry_reasons=compose_detail.retry_reasons,
         compose_fallback_used=compose_detail.fallback_used,
+        user_generation_count=user_generation_count,
     )
 
 

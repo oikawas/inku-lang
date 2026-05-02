@@ -4,6 +4,7 @@
 	type Props = {
 		username: string;
 		email: string;
+		generationCount: number;
 		status: string | null;
 		saving: boolean;
 		profileEmail: string;
@@ -16,6 +17,7 @@
 	let {
 		username,
 		email,
+		generationCount,
 		status,
 		saving,
 		profileEmail = $bindable(''),
@@ -45,6 +47,10 @@
 		</div>
 
 		<div class="profile-body">
+			<div class="profile-stat">
+				<span>{t().profileGenerationCountLabel}</span>
+				<strong>{generationCount.toLocaleString()}</strong>
+			</div>
 			<label class="profile-field">
 				<span>{t().profileEmailLabel}</span>
 				<input bind:value={profileEmail} type="email" autocomplete="email" />
@@ -113,6 +119,28 @@
 		flex-direction: column;
 		gap: 12px;
 		padding: 14px 16px;
+	}
+	.profile-stat {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 9px 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel);
+	}
+	.profile-stat span {
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.profile-stat strong {
+		color: var(--fg);
+		font-size: 14px;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
 	}
 	.profile-field {
 		display: flex;

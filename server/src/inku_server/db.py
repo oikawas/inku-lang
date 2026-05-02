@@ -71,6 +71,7 @@ class UserAccountRow(Base):
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
     ui_theme      = Column(String, nullable=False, default="light")
     settings_tab  = Column(String, nullable=False, default="db")
+    image_generation_count = Column(Integer, nullable=False, default=0)
     batch_prompt_history = Column(Text, nullable=False, default="[]")
     demo_settings = Column(Text, nullable=False, default="{}")
     plugin_storage = Column(Text, nullable=False, default="{}")
@@ -101,6 +102,9 @@ _HISTORY_COLUMN_MIGRATIONS = {
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
     "settings_tab": "ALTER TABLE user_accounts ADD COLUMN settings_tab VARCHAR NOT NULL DEFAULT 'db'",
+    "image_generation_count": (
+        "ALTER TABLE user_accounts ADD COLUMN image_generation_count INTEGER NOT NULL DEFAULT 0"
+    ),
     "batch_prompt_history": "ALTER TABLE user_accounts ADD COLUMN batch_prompt_history TEXT NOT NULL DEFAULT '[]'",
     "demo_settings": "ALTER TABLE user_accounts ADD COLUMN demo_settings TEXT NOT NULL DEFAULT '{}'",
     "plugin_storage": "ALTER TABLE user_accounts ADD COLUMN plugin_storage TEXT NOT NULL DEFAULT '{}'",
@@ -377,6 +381,7 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "group_name": group_name,
         "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
         "settings_tab": row.settings_tab if row.settings_tab in _SETTINGS_TABS else "db",
+        "image_generation_count": row.image_generation_count or 0,
         "at": row.at,
     }
 
@@ -647,6 +652,19 @@ def update_current_user_profile(
         session.refresh(row)
         group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
         return _user_to_dict(row, group_name)
+
+
+def increment_user_generation_count(user_id: str, amount: int = 1) -> int | None:
+    if amount <= 0:
+        raise ValueError("amount must be positive")
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        row.image_generation_count = (row.image_generation_count or 0) + amount
+        session.commit()
+        session.refresh(row)
+        return row.image_generation_count or 0
 
 
 def update_user_theme(user_id: str, ui_theme: str) -> dict | None:

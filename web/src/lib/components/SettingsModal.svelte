@@ -38,6 +38,7 @@
 		role_label: string;
 		group_id: string | null;
 		group_name: string | null;
+		image_generation_count: number;
 		at: number;
 	};
 	type SettingsMode = 'model' | 'settings';
@@ -333,6 +334,7 @@
 									<span>{t().userEmailPlaceholder}</span>
 									<span>{t().userRoleLabel}</span>
 									<span>{t().userGroupLabel}</span>
+									<span>{t().userGenerationCountLabel}</span>
 									<span></span>
 								</div>
 								<div class="user-list">
@@ -343,6 +345,7 @@
 												<span class="user-cell">{user.email}</span>
 												<span class="user-cell">{user.role}</span>
 												<span class="user-cell">{user.group_name ?? t().userNoGroup}</span>
+												<span class="user-cell user-count-cell">{user.image_generation_count.toLocaleString()}</span>
 											</button>
 											<button class="ghost-btn" onclick={() => onRemoveUser(user.id)}>{t().deleteButton}</button>
 										</div>
@@ -706,7 +709,7 @@
 	}
 	.user-list-panel {
 		min-width: 0;
-		--user-list-columns: minmax(0, 1fr) minmax(0, 1.35fr) 86px 100px 68px;
+		--user-list-columns: minmax(0, 1fr) minmax(0, 1.35fr) 72px 92px 38px 68px;
 	}
 	.user-editor-panel {
 		border: 1px solid var(--border);
@@ -776,6 +779,12 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
+	.user-list-head span {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.user-row {
 		display: grid;
 		grid-template-columns: var(--user-list-columns);
@@ -788,9 +797,9 @@
 	}
 	.user-row.selected { border-color: var(--accent); background: var(--accent-light); }
 	.user-select {
-		grid-column: 1 / 5;
+		grid-column: 1 / 6;
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) 86px 100px;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) 72px 92px 38px;
 		gap: 8px;
 		align-items: center;
 		min-width: 0;
@@ -808,6 +817,7 @@
 	}
 	.user-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg2); font-size: 12px; }
 	.user-name { color: var(--fg); font-weight: 500; }
+	.user-count-cell { text-align: right; font-variant-numeric: tabular-nums; }
 	.group-row {
 		display: flex;
 		align-items: center;

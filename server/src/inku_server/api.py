@@ -223,6 +223,7 @@ class ComposeResponse(BaseModel):
 
 class InterpretRequest(BaseModel):
     text: str = Field(..., min_length=1, description="自由な自然言語の記述")
+    original_text: str | None = Field(default=None, description="元のユーザー記述")
     model: str | None = Field(
         default=None, description="Stage 1 モデル名 (未指定時は OPENAI_MODEL_STAGE1 既定)"
     )
@@ -230,6 +231,7 @@ class InterpretRequest(BaseModel):
         default=False, description="qwen3 の <think> 内容を別フィールドで返すか"
     )
     lang: str = Field(default="ja", description="言語コード (ja / en)")
+    expand_intermediate: bool = Field(default=False, description="Stage 1.5 の中間DDL拡張を適用するか")
 
 
 class InterpretResponse(BaseModel):
@@ -317,6 +319,7 @@ class HistoryPostBody(BaseModel):
     tokens_out: int | None = None
     catalog_id: str | None = None
     save_artifacts: bool = True
+    count_generation: bool = Field(default=False, exclude=True)
     color_map: dict[str, str] | None = Field(default=None, exclude=True)
     canvas_aspect: str | None = Field(default=None, exclude=True)
 
@@ -1111,6 +1114,9 @@ def api_interpret(req: InterpretRequest, _actor: dict = Depends(_current_user)) 
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
+    if req.expand_intermediate:
+        source_text = req.original_text or req.text
+        detail.ddl = expand_intermediate_ddl(detail.ddl, lang=req.lang, context_text=source_text)
     data: dict = {"ddl": detail.ddl, "thinking": detail.thinking}
     if detail.tokens_in is not None:
         data["tokens_in"] = detail.tokens_in
@@ -1541,6 +1547,9 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         catalog_id=body.catalog_id,
         save_artifacts=body.save_artifacts,
     )
+    if body.count_generation:
+        if _db.increment_user_generation_count(actor["id"]) is None:
+            raise HTTPException(status_code=404, detail="user not found")
     return HistoryItem(**item_dict)
 
 

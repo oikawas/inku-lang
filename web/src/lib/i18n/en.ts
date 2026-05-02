@@ -79,6 +79,8 @@ export const en: LangPack = {
 
 	submitBtn: 'draw',
 	stopBtn: 'stop',
+	stageDdlGenerating: 'DDL generation',
+	stageImageGenerating: 'JSON generation / SVG rendering',
 	stageInterpreting: 'interpreting…',
 	stageStructuring: (tok) => `structuring…${tok}`,
 	batchProgress: (cur, tot) => `drawing ${cur} / ${tot}…`,

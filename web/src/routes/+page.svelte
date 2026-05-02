@@ -1408,6 +1408,83 @@
 		return data;
 	}
 
+	type InterpretResult = {
+		ddl: string;
+		thinking: string | null;
+		tokens_in: number | null;
+		tokens_out: number | null;
+	};
+
+	async function interpretOne(text: string, signal?: AbortSignal): Promise<InterpretResult> {
+		const lang = getLang();
+		const augmented = text + buildEmotionHint(text);
+		stage1UserPrompt = augmented;
+		const r = await apiFetch('/api/interpret', {
+			method: 'POST',
+			signal,
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				text: augmented,
+				original_text: text,
+				model: stage1Model,
+				include_thinking: includeThinking,
+				lang,
+				expand_intermediate: true,
+			})
+		});
+		if (!r.ok) {
+			const d = await r.json().catch(() => ({})) as { detail?: string };
+			throw new Error(d.detail ?? `HTTP ${r.status}`);
+		}
+		const data = await r.json() as {
+			ddl: string;
+			thinking: string | null;
+			tokens_in?: number | null;
+			tokens_out?: number | null;
+		};
+		return {
+			ddl: data.ddl,
+			thinking: data.thinking,
+			tokens_in: data.tokens_in ?? null,
+			tokens_out: data.tokens_out ?? null,
+		};
+	}
+
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal): Promise<{
+		score: Score;
+		svg: string;
+		elapsed_ms: number;
+		tokens_in: number | null;
+		tokens_out: number | null;
+	}> {
+		const lang = getLang();
+		const r = await apiFetch('/api/compose', {
+			method: 'POST',
+			signal,
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				ddl: currentDdl,
+				model: stage2Model,
+				original_text: originalText,
+				lang,
+				color_map: activeColorMap(),
+				canvas_aspect: effectiveCanvasAspectId(),
+			})
+		});
+		if (!r.ok) {
+			const d = await r.json().catch(() => ({})) as { detail?: string };
+			throw new Error(d.detail ?? `HTTP ${r.status}`);
+		}
+		const data = await r.json() as {
+			score: Score;
+			svg: string;
+			elapsed_ms: number;
+			tokens_in: number | null;
+			tokens_out: number | null;
+		};
+		return data;
+	}
+
 	async function refreshHistoryAfterServerSave() {
 		await fetchHistoryOffset(0);
 		historyCursor = 0;
@@ -1551,14 +1628,51 @@
 
 		try {
 			if (submittedMode === 'single') {
-				const r = await paintOne(input, { signal: abortController.signal });
+				stageLabel = t().stageDdlGenerating;
+				const stage1StartedAt = Date.now();
+				const interpreted = await interpretOne(input, abortController.signal);
 				if (submitStopRequested) return;
-				ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
+				elapsedStage1Ms = Date.now() - stage1StartedAt;
+				tokensInStage1 = interpreted.tokens_in;
+				tokensOutStage1 = interpreted.tokens_out;
+				ddl = interpreted.ddl;
+				ddlSelection = { start: interpreted.ddl.length, end: interpreted.ddl.length };
+				thinking = interpreted.thinking;
+				stageLabel = t().stageImageGenerating;
+				reloading = true;
+				const composed = await composeOne(interpreted.ddl, input, abortController.signal);
+				if (submitStopRequested) return;
+				reloading = false;
+				elapsedStage2Ms = composed.elapsed_ms;
+				elapsedTotalMs = Date.now() - _timerStart;
+				tokensInStage2 = composed.tokens_in;
+				tokensOutStage2 = composed.tokens_out;
+				const r: PaintResult = {
+					score: composed.score,
+					svg: composed.svg,
+					elapsed_stage1_ms: elapsedStage1Ms,
+					elapsed_stage2_ms: elapsedStage2Ms,
+					elapsed_total_ms: elapsedTotalMs,
+					tokens_in_stage1: tokensInStage1,
+					tokens_out_stage1: tokensOutStage1,
+					tokens_in_stage2: tokensInStage2,
+					tokens_out_stage2: tokensOutStage2,
+				};
+				result = r; outputTab = 'canvas';
 				fitCanvasZoom();
-				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
-				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
-				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
-				await refreshHistoryAfterServerSave();
+				await pushHistory({
+					input,
+					ddl: interpreted.ddl,
+					score: composed.score,
+					svg: composed.svg,
+					at: Date.now(),
+					elapsed_ms: elapsedTotalMs,
+					stage1_model: stage1Model,
+					stage2_model: stage2Model,
+					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
+					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
+					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null,
+				}, { countGeneration: true });
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
 				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
@@ -1624,7 +1738,7 @@
 		} finally {
 			if (submitAbortController === abortController) submitAbortController = null;
 			submitStopRequested = false;
-			stopTimer(); loading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
+			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
 		}
 	}
 
@@ -1638,6 +1752,14 @@
 		if (!reloading) return;
 		replayStopRequested = true;
 		replayAbortController?.abort();
+	}
+
+	function stopDdlRender() {
+		if (replayAbortController) {
+			stopReplay();
+			return;
+		}
+		stopBatch();
 	}
 
 	// ── Replay (Stage 2 のみ) ────────────────────────────────
@@ -1796,15 +1918,27 @@
 		}
 	}
 
-	async function pushHistory(it: Iteration): Promise<void> {
+	async function refreshCurrentUserOnly(): Promise<void> {
+		try {
+			const r = await apiFetch('/api/auth/me', { cache: 'no-store' });
+			if (!r.ok) return;
+			currentUser = await r.json() as UserItem;
+			applyUserTheme(currentUser);
+		} catch {
+			/* ignore */
+		}
+	}
+
+	async function pushHistory(it: Iteration, options: { countGeneration?: boolean } = {}): Promise<void> {
 		if (!authToken) return;
 		try {
 				await apiFetch('/api/history', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, save_artifacts: true, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
+					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
 				});
 		} catch { /* ignore */ }
+		if (options.countGeneration) await refreshCurrentUserOnly();
 		await fetchHistoryOffset(0);
 		historyCursor = 0;
 	}
@@ -2525,6 +2659,7 @@
 						{batchNonEmpty}
 						{batchRunning}
 						{singleRunning}
+						singleDdlReady={ddl !== null}
 						{batchActiveLine}
 						{batchActiveDdlHighlighted}
 						{batchTotal}
@@ -2607,7 +2742,7 @@
 							onRememberSelection={rememberDDLSelection}
 							onSyncHighlightScroll={syncDDLHighlightScroll}
 							onReplay={replay}
-							onStopReplay={stopReplay}
+							onStopReplay={stopDdlRender}
 						/>
 					{/if}
 

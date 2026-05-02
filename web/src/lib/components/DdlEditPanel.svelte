@@ -108,7 +108,7 @@
 		{#if reloading}
 			<div class="progress-wrap">
 				<div class="progress-phases">
-					<span class="phase-item phase-active"><span class="phase-dot"></span>{t().statsStruct}</span>
+					<span class="phase-item phase-active"><span class="phase-dot"></span>{t().stageImageGenerating}</span>
 				</div>
 				<div class="progress-right">
 					<span class="progress-token">{tokenSummary || '-→-tok'}</span>
@@ -116,7 +116,7 @@
 					<StopButton onclick={onStopReplay}>{t().stopBtn}</StopButton>
 				</div>
 			</div>
-			<div class="progress-bar-track" style="--progress-target: 55%">
+			<div class="progress-bar-track" style="--progress-target: 100%">
 				<div class="progress-bar-fill"></div>
 				{#if showKiwi}
 					<KiwiMascot />
@@ -469,7 +469,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 8px 10px 6px;
+		gap: 10px;
+		min-height: 44px;
+		padding: 9px 11px 8px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r) var(--r) 0 0;
 		background: var(--panel);
@@ -479,6 +481,7 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+		min-width: 0;
 	}
 	.phase-item {
 		font-size: 11px;
@@ -503,7 +506,10 @@
 	.progress-right {
 		display: flex;
 		align-items: center;
+		justify-content: flex-end;
 		gap: 7px;
+		min-width: 0;
+		flex: 1;
 	}
 	.progress-token {
 		font-size: 11px;
@@ -516,9 +522,16 @@
 		color: var(--fg3);
 		font-variant-numeric: tabular-nums;
 	}
+	.progress-right :global(.stop-btn) {
+		width: auto;
+		min-width: 86px;
+		flex: 0 0 auto;
+		padding: 8px 10px;
+		font-size: 13px;
+	}
 	.progress-bar-track {
 		position: relative;
-		height: 32px;
+		height: 36px;
 		background: transparent;
 		border-left: 1px solid var(--border2);
 		border-right: 1px solid var(--border2);
@@ -527,7 +540,7 @@
 	.progress-bar-track::before {
 		content: "";
 		position: absolute;
-		top: 18px;
+		top: 20px;
 		left: 0;
 		right: 0;
 		height: 3px;
@@ -535,12 +548,14 @@
 	}
 	.progress-bar-fill {
 		position: absolute;
-		top: 18px;
+		top: 20px;
 		left: 0;
 		height: 3px;
-		width: var(--progress-target, 50%);
+		width: var(--progress-target, 100%);
+		transform-origin: left center;
 		background: var(--accent);
 		transition: width 0.3s ease;
+		animation: progressFillEven 10s linear forwards;
 	}
 	.error-text {
 		color: #a2342a;
@@ -640,5 +655,9 @@
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50% { opacity: 0.4; transform: scale(0.7); }
+	}
+	@keyframes progressFillEven {
+		from { transform: scaleX(0); }
+		to { transform: scaleX(1); }
 	}
 </style>

@@ -79,6 +79,8 @@ export const ja: LangPack = {
 
 	submitBtn: '描画する',
 	stopBtn: '停止',
+	stageDdlGenerating: 'DDL生成',
+	stageImageGenerating: 'JSON生成・SVGレンダリング',
 	stageInterpreting: '解釈中…',
 	stageStructuring: (tok) => `構造化中…${tok}`,
 	batchProgress: (cur, tot) => `${cur} / ${tot} 番目を描画中…`,

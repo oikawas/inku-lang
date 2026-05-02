@@ -71,6 +71,8 @@ export interface LangPack {
 	// Submit / loading
 	submitBtn: string;
 	stopBtn: string;
+	stageDdlGenerating: string;
+	stageImageGenerating: string;
 	stageInterpreting: string;
 	stageStructuring: (tokLabel: string) => string;
 	batchProgress: (current: number, total: number) => string;

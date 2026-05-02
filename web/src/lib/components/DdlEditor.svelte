@@ -83,11 +83,13 @@
 		onSyncHighlightScroll={onSyncHighlightScroll}
 		onReplay={onReplay}
 	/>
-	<button
-		class="replay-btn"
-		onclick={onReplay}
-		disabled={reloading || !ddl || loading}
-	>{t().ddlPaintButton}</button>
+	{#if !reloading && !loading}
+		<button
+			class="replay-btn"
+			onclick={onReplay}
+			disabled={!ddl}
+		>{t().ddlPaintButton}</button>
+	{/if}
 </section>
 
 <style>

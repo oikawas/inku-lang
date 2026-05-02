@@ -27,6 +27,7 @@
 		batchNonEmpty: number;
 		batchRunning: boolean;
 		singleRunning: boolean;
+		singleDdlReady: boolean;
 		batchActiveLine: number | null;
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
@@ -86,6 +87,7 @@
 		batchNonEmpty,
 		batchRunning,
 		singleRunning,
+		singleDdlReady,
 		batchActiveLine,
 		batchActiveDdlHighlighted,
 		batchTotal,
@@ -192,26 +194,20 @@
 			class="input-ta"
 		></textarea>
 
-		{#if singleRunning}
+		{#if singleRunning && !singleDdlReady}
 			<div class="progress-wrap">
 				<div class="progress-phases">
-					{#each [{ key: '解釈', label: t().statsInterp }, { key: '構造化', label: t().statsStruct }] as ph, i (ph.key)}
-						{#if i > 0}<span class="phase-sep">›</span>{/if}
-						<span class="phase-item" class:phase-done={stageLabel.includes('構造化') && ph.key === '解釈'} class:phase-active={stageLabel.includes(ph.key) && !(stageLabel.includes('構造化') && ph.key === '解釈')}>
-							{#if stageLabel.includes('構造化') && ph.key === '解釈'}<span class="phase-check">✓</span>{/if}
-							{#if !(stageLabel.includes('構造化') && ph.key === '解釈') && stageLabel.includes(ph.key)}<span class="phase-dot"></span>{/if}
-							{ph.label}
-						</span>
-					{/each}
+					<span class="phase-item phase-active"><span class="phase-dot"></span>{t().stageDdlGenerating}</span>
 				</div>
 				<div class="progress-right">
+					<span class="progress-token">-→-tok</span>
 					<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
 					<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 				</div>
 			</div>
 			<div
 				class="progress-bar-track"
-				style="--progress-target: {stageLabel.includes('構造化') ? '65%' : '30%'}"
+				style="--progress-target: 100%"
 			>
 				<div class="progress-bar-fill"></div>
 				{#if showKiwi}
@@ -219,7 +215,7 @@
 				{/if}
 			</div>
 			<div class="progress-stage-text">{stageLabel}</div>
-		{:else}
+		{:else if !singleRunning}
 			<PaintButton onclick={onSubmit} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
 		{/if}
 
@@ -357,39 +353,48 @@
 	.input-ta:focus { border-color: var(--accent); }
 	.progress-wrap {
 		display: flex; align-items: center; justify-content: space-between;
-		padding: 8px 10px 6px;
+		gap: 10px;
+		min-height: 44px;
+		padding: 9px 11px 8px;
 		border: 1px solid var(--border2); border-radius: var(--r) var(--r) 0 0;
 		background: var(--panel);
 		margin-top: 8px;
 	}
-	.progress-phases { display: flex; align-items: center; gap: 4px; }
-	.phase-sep { color: var(--border); font-size: 9px; margin: 0 1px; }
+	.progress-phases { display: flex; align-items: center; gap: 4px; min-width: 0; }
 	.phase-item { font-size: 11px; color: var(--border2); display: flex; align-items: center; gap: 3px; }
 	.phase-item.phase-active { color: var(--fg); font-weight: 500; }
-	.phase-item.phase-done { color: var(--fg3); }
 	.phase-dot {
 		display: inline-block; width: 6px; height: 6px; border-radius: 50%;
 		background: var(--accent); flex-shrink: 0;
 		animation: inkupulse 1s ease-in-out infinite;
 	}
-	.phase-check { color: #27ae60; font-size: 10px; }
-	.progress-right { display: flex; align-items: center; gap: 7px; }
+	.progress-right { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; flex: 1; }
+	.progress-token { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+	.progress-right :global(.stop-btn) {
+		width: auto;
+		min-width: 86px;
+		flex: 0 0 auto;
+		padding: 8px 10px;
+		font-size: 13px;
+	}
 	.progress-bar-track {
 		position: relative;
-		height: 32px; background: transparent;
+		height: 36px; background: transparent;
 		border-left: 1px solid var(--border2); border-right: 1px solid var(--border2);
 		overflow: visible;
 	}
 	.progress-bar-track::before {
 		content: "";
-		position: absolute; top: 18px; left: 0; right: 0; height: 3px;
+		position: absolute; top: 20px; left: 0; right: 0; height: 3px;
 		background: var(--bg3);
 	}
 	.progress-bar-fill {
-		position: absolute; top: 18px; left: 0; height: 3px;
-		width: var(--progress-target, 50%);
+		position: absolute; top: 20px; left: 0; height: 3px;
+		width: var(--progress-target, 100%);
+		transform-origin: left center;
 		background: var(--accent); transition: width 0.3s ease;
+		animation: progressFillEven 10s linear forwards;
 	}
 	.progress-stage-text {
 		font-size: 11px; color: var(--fg3);
@@ -402,6 +407,10 @@
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50% { opacity: 0.4; transform: scale(0.7); }
+	}
+	@keyframes progressFillEven {
+		from { transform: scaleX(0); }
+		to { transform: scaleX(1); }
 	}
 	@keyframes tabrun {
 		from { background-position: 180% 0; }

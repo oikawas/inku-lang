@@ -140,7 +140,7 @@
 	};
 	// ── Input ───────────────────────────────────────────────
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
-	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
+	let inputMode   = $state<'single' | 'ddl' | 'batch' | 'demo'>('single');
 	let input       = $state(DEFAULT_INPUT);
 	let batchInput  = $state('');
 	let stage1UserPrompt = $state('');
@@ -155,6 +155,8 @@
 	let activeRunMode = $state<'single' | 'batch' | 'demo' | null>(null);
 	let submitAbortController: AbortController | null = null;
 	let submitStopRequested = false;
+	let replayAbortController: AbortController | null = null;
+	let replayStopRequested = false;
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
@@ -1296,8 +1298,21 @@
 	const demoRunning = $derived(activeRunMode === 'demo' && loading);
 	const demoCanSaveCurrent = $derived(!!result && !!demoGeneratedPrompt && !!demoGeneratedDdl && !demoCurrentSaved);
 	const canSubmit     = $derived(
-		inputMode === 'single' ? !!input.trim() : inputMode === 'batch' ? batchNonEmpty > 0 : false
+		inputMode === 'single'
+			? !!input.trim()
+			: inputMode === 'ddl'
+				? !!(ddl ?? '').trim()
+				: inputMode === 'batch'
+					? batchNonEmpty > 0
+					: false
 	);
+
+	$effect(() => {
+		if (inputMode === 'ddl' && ddl === null) {
+			ddl = '';
+			ddlSelection = { start: 0, end: 0 };
+		}
+	});
 
 	// ── Timer ───────────────────────────────────────────────
 	function startTimer() {
@@ -1533,6 +1548,10 @@
 	// ── Submit ──────────────────────────────────────────────
 	async function submit() {
 		if (!canSubmit || loading) return;
+		if (inputMode === 'ddl') {
+			await replay();
+			return;
+		}
 		const submittedMode = inputMode;
 		const abortController = new AbortController();
 		submitAbortController = abortController;
@@ -1632,18 +1651,33 @@
 		submitAbortController?.abort();
 	}
 
+	function stopReplay() {
+		if (!reloading) return;
+		replayStopRequested = true;
+		replayAbortController?.abort();
+	}
+
 	// ── Replay (Stage 2 のみ) ────────────────────────────────
 	async function replay() {
 		if (!ddl || reloading) return;
+		const abortController = new AbortController();
+		replayAbortController = abortController;
+		replayStopRequested = false;
 		reloading = true; reloadError = null;
 		displayedHistoryItem = null;
 		const lang = getLang();
+		const replayInput = inputMode === 'ddl' ? ddl : input;
 		const startedAt = Date.now();
+		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
+		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
+		stageLabel = t().stageStructuring('');
+		startTimer();
 		try {
 			const r = await apiFetch('/api/compose', {
 				method: 'POST',
+				signal: abortController.signal,
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: stage2Model, original_text: input, lang, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
+				body: JSON.stringify({ ddl, model: stage2Model, original_text: replayInput, lang, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -1657,9 +1691,11 @@
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
+			elapsedStage1Ms = 0; elapsedStage2Ms = elapsedMs; elapsedTotalMs = elapsedMs;
+			tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = d.tokens_in; tokensOutStage2 = d.tokens_out;
 			if (saveReplayAsNewVersion) {
 				await pushHistory({
-					input,
+					input: replayInput,
 					ddl,
 					score: d.score,
 					svg: d.svg,
@@ -1675,8 +1711,14 @@
 			outputTab = 'canvas';
 			fitCanvasZoom();
 		} catch (e) {
-			reloadError = e instanceof Error ? e.message : String(e);
+			if (!replayStopRequested && !abortController.signal.aborted) {
+				reloadError = e instanceof Error ? e.message : String(e);
+			}
 		} finally {
+			if (replayAbortController === abortController) replayAbortController = null;
+			replayStopRequested = false;
+			stopTimer();
+			stageLabel = '';
 			reloading = false;
 		}
 	}
@@ -1829,6 +1871,7 @@
 
 	function clearInput() {
 		if (inputMode === 'single') input = '';
+		if (inputMode === 'ddl') ddl = '';
 		if (inputMode === 'batch') batchInput = '';
 		if (inputMode === 'demo') {
 			demoGeneratedPrompt = '';
@@ -1837,7 +1880,7 @@
 			demoSaveStatus = null;
 			demoCurrentSaved = false;
 		}
-		ddl = null;
+		if (inputMode !== 'ddl') ddl = null;
 		thinking = null;
 		result = null;
 		stage1UserPrompt = '';
@@ -2496,10 +2539,18 @@
 						bind:inputMode
 						bind:input
 						bind:batchInput
+						bind:ddl
+						{ddlHighlighted}
+						bind:ddlTextareaEl
+						bind:ddlHighlightEl
+						bind:ddlFocused
 						{lineNumbersText}
 						{batchNonEmpty}
 						{batchRunning}
 						{singleRunning}
+						{reloading}
+						{reloadError}
+						{loading}
 						{batchActiveLine}
 						{batchActiveDdlHighlighted}
 						{batchTotal}
@@ -2509,6 +2560,7 @@
 						{batchTokensInTotal}
 						{batchTokensOutTotal}
 						{liveMs}
+						{tokenSummary}
 						{batchFailureReport}
 						{batchPromptHistory}
 						bind:demoSettings
@@ -2534,6 +2586,7 @@
 						{stageLabel}
 						{showKiwi}
 						{showCrab}
+						bind:activeSaijikiPreview
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -2549,6 +2602,12 @@
 						onStopDemo={stopDemo}
 						onSubmit={submit}
 						onStop={stopBatch}
+						onInsertWord={insertWord}
+						previewForWord={saijikiPreview}
+						onRememberDDLSelection={rememberDDLSelection}
+						onSyncDDLHighlightScroll={syncDDLHighlightScroll}
+						onReplay={replay}
+						onStopReplay={stopReplay}
 					/>
 
 					<!-- thinking -->
@@ -2628,7 +2687,7 @@
 				{panY}
 				{canvasDragging}
 				{promptsData}
-				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : demoGeneratedPrompt)}
+				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : inputMode === 'demo' ? demoGeneratedPrompt : '')}
 				{ddl}
 				{copiedPrompt}
 				{scoreJsonLines}

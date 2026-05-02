@@ -18,7 +18,7 @@ Weight = Literal[
     "brush_thin", "brush_thick", "rope",
 ]
 Color = Literal["white", "black", "blue", "red", "green", "gray"]
-Canvas = Literal["square", "golden", "a4", "b4", "pillar", "oban", "wide", "vertical"]
+Canvas = str
 
 Amplitude = Literal["fine", "medium", "broad"]
 Frequency = Literal["slow", "medium", "high"]
@@ -199,7 +199,14 @@ class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: str = "0.1.0"
-    canvas: Canvas = "square"
+    canvas: Canvas = Field(
+        default="square",
+        min_length=1,
+        description=(
+            "キャンバス比率ID。標準値は square。"
+            "利用可能な値は canvas-size plugin が管理するため、スキーマでは静的列挙しない"
+        ),
+    )
     background: Color = Field(
         default="white",
         description="背景色 (省略=white)。「背景を黒で塗りつぶす」→ black",

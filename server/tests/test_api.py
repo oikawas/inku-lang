@@ -526,6 +526,42 @@ def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
     assert 'viewBox="0 0 200 1000"' in data["svg"]
 
 
+def test_compose_accepts_byobu_canvas_with_multiline_ddl(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    fake_score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}
+            ]
+        }
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "背景を白で塗りつぶす。\n青い横線を一本引く。", "canvas_aspect": "byobu"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["score"]["canvas"] == "byobu"
+    assert 'viewBox="0 0 2200 1000"' in data["svg"]
+
+
+def test_score_canvas_accepts_future_plugin_id():
+    score = Score.model_validate(
+        {
+            "canvas": "future-plugin-canvas",
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}
+            ],
+        }
+    )
+
+    assert score.canvas == "future-plugin-canvas"
+
+
 def test_compose_sanitizes_random_ddl_before_stage2(monkeypatch, auth_context):
     headers, _, _ = auth_context
     captured: dict[str, str] = {}

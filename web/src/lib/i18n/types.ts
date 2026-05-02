@@ -33,9 +33,11 @@ export interface LangPack {
 
 	// Input
 	modeSingle: string;
+	modeDdlEdit: string;
 	modeBatch: string;
 	modeDemo: string;
 	inputPlaceholder: string;
+	ddlEditPlaceholder: string;
 	batchPlaceholder: string;
 	batchCount: (n: number) => string;
 	batchHistoryLabel: string;
@@ -78,6 +80,8 @@ export interface LangPack {
 	vocabInInputLabel: string;
 	thinkingLabel: string;
 	ddlLabel: string;
+	ddlEditSectionLabel: string;
+	ddlEditNote: string;
 
 	// Output tabs
 	tabCanvas: string;
@@ -94,8 +98,10 @@ export interface LangPack {
 
 	// DDL edit
 	replayFromDdlButton: string;
+	ddlPaintButton: string;
 	ddlEditBtn: string;
 	ddlDoneBtn: string;
+	saijikiPreviewPlaceholder: string;
 
 	// Canvas
 	canvasPlaceholder: string;

@@ -60,7 +60,8 @@
 		demoError: string | null;
 		lockNonDemo: boolean;
 		stageLabel: string;
-		showBirds: boolean;
+		showKiwi: boolean;
+		showCrab: boolean;
 		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
@@ -118,7 +119,8 @@
 		demoError,
 		lockNonDemo,
 		stageLabel,
-		showBirds,
+		showKiwi,
+		showCrab,
 		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
@@ -213,7 +215,7 @@
 				style="--progress-target: {stageLabel.includes('構造化') ? '65%' : '30%'}"
 			>
 				<div class="progress-bar-fill"></div>
-				{#if showBirds}
+				{#if showKiwi}
 					<KiwiMascot />
 				{/if}
 			</div>
@@ -242,6 +244,7 @@
 			{canSubmit}
 			{error}
 			{batchPromptHistory}
+			{showCrab}
 			{onRememberBatchPrompt}
 			onSubmit={onSubmit}
 			onStop={onStop}

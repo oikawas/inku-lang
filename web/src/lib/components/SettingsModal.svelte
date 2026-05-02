@@ -73,7 +73,8 @@
 		editUserRole: UserRole;
 		editUserGroupId: string;
 		newGroupName: string;
-		showBirds: boolean;
+		showKiwi: boolean;
+		showCrab: boolean;
 		pngAlphaWhite: boolean;
 		saveReplayAsNewVersion: boolean;
 		canvasAspectEnabled: boolean;
@@ -130,7 +131,8 @@
 		editUserRole = $bindable(),
 		editUserGroupId = $bindable(),
 		newGroupName = $bindable(),
-		showBirds = $bindable(),
+		showKiwi = $bindable(),
+		showCrab = $bindable(),
 		pngAlphaWhite = $bindable(),
 		saveReplayAsNewVersion = $bindable(),
 		canvasAspectEnabled,
@@ -403,10 +405,14 @@
 			{/if}
 		{:else}
 			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsDisplayLabel}</div>
+				<div class="popover-group-label">{t().settingsMascotLabel}</div>
 				<label class="setting-toggle">
-					<input type="checkbox" bind:checked={showBirds} />
-					<span>{t().settingsShowBirds}</span>
+					<input type="checkbox" bind:checked={showKiwi} />
+					<span>{t().settingsShowKiwi}</span>
+				</label>
+				<label class="setting-toggle">
+					<input type="checkbox" bind:checked={showCrab} />
+					<span>{t().settingsShowCrab}</span>
 				</label>
 			</div>
 			<div class="popover-group">

@@ -173,9 +173,12 @@ export interface LangPack {
 	settingsUnavailable: string;
 	settingsUsersLabel: string;
 	settingsDisplayLabel: string;
+	settingsMascotLabel: string;
 	settingsExportLabel: string;
 	settingsHistoryLabel: string;
 	settingsShowBirds: string;
+	settingsShowKiwi: string;
+	settingsShowCrab: string;
 	settingsPngAlpha: string;
 	settingsSaveReplay: string;
 	colorCatalogTitle: string;

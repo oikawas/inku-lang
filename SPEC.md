@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.30**  
+**Version: v1.31**  
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -259,6 +259,14 @@ The user writes one instruction and runs the full pipeline.  The resulting DDL
 can be edited directly.  Replaying from DDL skips Stage 1 and calls Stage 2 /
 renderer again.
 
+During single drawing and DDL replay, the progress bar can show a kiwi mascot.
+The kiwi faces left, walks slowly, pecks with a long beak, sniffs, blinks,
+occasionally opens its beak during a quick dash, and sometimes curls into a
+"kiwi ball".  In the curled state it keeps its head, body, and beak visible,
+stays in place for more than six seconds, closes its eye, and gently nods its
+head.  The legs are anchored at fixed body positions so the feet move without
+the leg roots drifting.
+
 ### Batch Drawing
 
 The batch panel accepts multiple instruction lines.  During execution, the
@@ -369,6 +377,7 @@ The reference implementation currently includes:
 - plugin storage and `canvas-aspect`
 - SVG and PNG export
 - CLI client foundation
+- shared kiwi progress mascot for single drawing and DDL replay
 - renderer material effects, wobble, rotation, arrangement paths, and canvas
   aspect support
 

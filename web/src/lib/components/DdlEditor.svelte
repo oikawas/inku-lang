@@ -11,7 +11,7 @@
 		reloading: boolean;
 		reloadError: string | null;
 		loading: boolean;
-		showBirds: boolean;
+		showKiwi: boolean;
 		onToggleSaijiki: () => void;
 		onRememberSelection: () => void;
 		onSyncHighlightScroll: () => void;
@@ -27,7 +27,7 @@
 		reloading,
 		reloadError,
 		loading,
-		showBirds,
+		showKiwi,
 		onToggleSaijiki,
 		onRememberSelection,
 		onSyncHighlightScroll,
@@ -72,7 +72,7 @@
 		</div>
 		<div class="progress-bar-track" style="--progress-target: 55%">
 			<div class="progress-bar-fill"></div>
-			{#if showBirds}
+			{#if showKiwi}
 				<KiwiMascot />
 			{/if}
 		</div>

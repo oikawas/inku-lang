@@ -45,6 +45,8 @@
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
 	const CATALOG_KEY         = 'inku-color-catalog';
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
+	const SHOW_KIWI_KEY       = 'inku-show-kiwi';
+	const SHOW_CRAB_KEY       = 'inku-show-crab';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
@@ -214,7 +216,8 @@
 		stage2Model: string;
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
-	let showBirds = $state(true);
+	let showKiwi = $state(true);
+	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
 	let saveReplayAsNewVersion = $state(true);
 	let miscSettingsLoaded = $state(false);
@@ -929,7 +932,8 @@
 
 	function persistMiscSettings() {
 		try {
-			localStorage.setItem(SHOW_BIRDS_KEY, showBirds ? '1' : '0');
+			localStorage.setItem(SHOW_KIWI_KEY, showKiwi ? '1' : '0');
+			localStorage.setItem(SHOW_CRAB_KEY, showCrab ? '1' : '0');
 			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
 			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
 		} catch {}
@@ -2148,7 +2152,11 @@
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
-			const birds = localStorage.getItem(SHOW_BIRDS_KEY); if (birds !== null) showBirds = birds !== '0';
+			const kiwi = localStorage.getItem(SHOW_KIWI_KEY);
+			const birds = localStorage.getItem(SHOW_BIRDS_KEY);
+			if (kiwi !== null) showKiwi = kiwi !== '0';
+			else if (birds !== null) showKiwi = birds !== '0';
+			const crab = localStorage.getItem(SHOW_CRAB_KEY); if (crab !== null) showCrab = crab !== '0';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			const savedBatchFailureReport = loadBatchFailureReport();
@@ -2167,7 +2175,7 @@
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		showBirds; pngAlphaWhite; saveReplayAsNewVersion;
+		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -2250,7 +2258,8 @@
 						{canSubmit}
 						{error}
 						{stageLabel}
-						{showBirds}
+						{showKiwi}
+						{showCrab}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -2289,7 +2298,7 @@
 							{reloading}
 							{reloadError}
 							{loading}
-							{showBirds}
+							{showKiwi}
 							onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 							onRememberSelection={rememberDDLSelection}
 							onSyncHighlightScroll={syncDDLHighlightScroll}
@@ -2436,7 +2445,8 @@
 		bind:editUserRole
 		bind:editUserGroupId
 		bind:newGroupName
-		bind:showBirds
+		bind:showKiwi
+		bind:showCrab
 		bind:pngAlphaWhite
 		bind:saveReplayAsNewVersion
 		{canvasAspectEnabled}

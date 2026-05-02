@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.35**
+**Version: v1.36**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -191,6 +191,7 @@ The built-in `canvas-aspect` plugin currently supports:
 | Classic JP | `pillar` | 1:5 | Japanese pillar-picture format |
 | Ukiyoe | `oban` | 2:3 | ukiyo-e oban proportion |
 | Cinema | `wide` | 2.35:1 | cinematic panorama |
+| Classic JP | `byobu` | 2.2:1 | Japanese folding screen format based on one half of a six-panel pair |
 | Mobile | `vertical` | 9:16 | smartphone vertical format |
 
 The selected aspect is stored per user in plugin storage and passed to

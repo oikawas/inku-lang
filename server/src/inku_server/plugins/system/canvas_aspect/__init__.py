@@ -37,6 +37,7 @@ CANVAS_ASPECTS: tuple[CanvasAspect, ...] = (
     CanvasAspect("pillar", "Classic JP", "Pillar", 1.0, 5.0, "Tall Japanese pillar-picture format"),
     CanvasAspect("oban", "Ukiyoe", "Oban", 2.0, 3.0, "Ukiyo-e oban woodblock proportion"),
     CanvasAspect("wide", "Cinema", "CinemaScope", 2.35, 1.0, "Wide cinematic panorama"),
+    CanvasAspect("byobu", "Classic JP", "Byobu", 2.2, 1.0, "Japanese folding screen panel based on one half of a six-panel pair"),
     CanvasAspect("vertical", "Mobile", "Mobile Vertical", 9.0, 16.0, "Contemporary phone-screen format"),
 )
 

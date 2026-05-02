@@ -67,6 +67,7 @@ The plugin supports these aspect identifiers:
 | Classic JP | `pillar` | 1:5 | Tall Japanese pillar-picture format |
 | Ukiyoe | `oban` | 2:3 | Ukiyo-e oban proportion |
 | Cinema | `wide` | 2.35:1 | Cinematic panorama |
+| Classic JP | `byobu` | 2.2:1 | Japanese folding screen format based on one half of a six-panel pair |
 | Mobile | `vertical` | 9:16 | Smartphone vertical format |
 
 ## User Storage

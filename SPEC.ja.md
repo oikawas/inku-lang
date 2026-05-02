@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.35**
+**Version: v1.36**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -164,7 +164,7 @@ v1.29 時点では、参照実装として `canvas-aspect` プラグインを追
 - `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を決定する
 - 正規化座標は 0.0〜1.0 のまま維持する。円・弧の半径は短辺基準とし、ワイド/縦長キャンバスで真円が不自然に引き伸ばされないようにする
 
-`canvas-aspect` が扱う比率は、`square`、`golden`、`a4`、`b4`、`pillar`、`oban`、`wide`、`vertical` とする。
+`canvas-aspect` が扱う比率は、`square`、`golden`、`a4`、`b4`、`pillar`、`oban`、`wide`、`byobu`、`vertical` とする。
 
 実装方法と将来のプラグイン作成手順は `PLUGIN.md` に記録する。
 
@@ -1384,6 +1384,18 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ## 変更履歴
 
+### v1.36 (2026-05-02)
+
+**キャンバス比率: 屏風**
+
+キャンバス比率プラグインに `byobu` を追加した。
+
+- 比率は `2.2:1`
+- 表示名は `Byobu`
+- 説明は「日本の屏風。六曲一双の一隻に準じる横長の型」
+- 表示順は `Wide` の下、`Vertical` の上
+- build number: 215
+
 ### v1.35 (2026-05-02)
 
 **エクスポートテンプレート**
@@ -1490,7 +1502,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 アプリケーションのコア要素とノンコア拡張を分離するため、最初のプラグインフックとして canvas-size hook を導入した。
 
 - `canvas-aspect` 参照プラグインを追加
-- キャンバス比率として `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `vertical` をサポート
+- キャンバス比率として `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` をサポート
 - ユーザーごとのプラグイン設定を DB の `plugin_storage` に JSON として保存
 - `/api/auth/me/plugin-storage` と `/api/auth/me/plugin-storage/{plugin_id}` を追加
 - `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を変更

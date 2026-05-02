@@ -250,6 +250,7 @@ class PaintRequest(BaseModel):
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     save_history: bool = Field(default=False, description="描画結果を履歴に保存するか")
     save_artifacts: bool | None = Field(default=None, description="SVG/JSON/PNG などの副産物ファイルを保存するか")
+    count_generation: bool = Field(default=True, description="完了した描画をユーザーの累積生成数に加算するか")
     history_input: str | None = Field(default=None, description="履歴に表示するユーザー記述")
     history_at: int | None = Field(default=None, description="履歴保存時刻")
     catalog_id: str | None = Field(default=None, description="使用した色カタログID")
@@ -275,6 +276,7 @@ class PaintResponse(BaseModel):
     compose_retry_count: int = 0
     compose_retry_reasons: list[str] = Field(default_factory=list)
     compose_fallback_used: bool = False
+    user_generation_count: int | None = None
 
 
 @dataclass
@@ -351,6 +353,10 @@ class UserGroupCreateBody(BaseModel):
     name: str = Field(..., min_length=1, description="ユーザーグループ名")
 
 
+class UserGroupUpdateBody(BaseModel):
+    name: str = Field(..., min_length=1, description="ユーザーグループ名")
+
+
 class UserAccountItem(BaseModel):
     id: str
     username: str
@@ -360,6 +366,8 @@ class UserAccountItem(BaseModel):
     group_id: str | None = None
     group_name: str | None = None
     ui_theme: str = "light"
+    settings_tab: str = "db"
+    image_generation_count: int = 0
     at: int
 
 
@@ -379,6 +387,12 @@ class UserAccountUpdateBody(BaseModel):
     group_id: str | None = None
 
 
+class UserProfileUpdateBody(BaseModel):
+    email: str | None = Field(default=None, min_length=1)
+    password: str | None = Field(default=None, min_length=8)
+    current_password: str | None = Field(default=None, min_length=1)
+
+
 class LoginBody(BaseModel):
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
@@ -389,7 +403,8 @@ class LoginResponse(BaseModel):
 
 
 class UserSettingsBody(BaseModel):
-    ui_theme: str = Field(default="light")
+    ui_theme: str | None = None
+    settings_tab: str | None = None
 
 
 class BatchPromptHistoryBody(BaseModel):
@@ -398,6 +413,17 @@ class BatchPromptHistoryBody(BaseModel):
 
 class BatchPromptHistoryResponse(BaseModel):
     items: list[str] = Field(default_factory=list)
+
+
+class ExportTemplateItem(BaseModel):
+    id: str = Field(..., min_length=1, max_length=80)
+    name: str = Field(..., min_length=1, max_length=80)
+    description: str = Field(default="", max_length=240)
+    y_px: int = Field(..., ge=64, le=12000)
+
+
+class ExportTemplatesBody(BaseModel):
+    templates: list[ExportTemplateItem] = Field(default_factory=list)
 
 
 class PluginStorageBody(BaseModel):
@@ -432,8 +458,32 @@ class DatabaseSettingsStatus(BaseModel):
     url: str
     database: str | None = None
     is_default: bool
+    file_size_bytes: int | None = None
+    file_path: str | None = None
     runtime_editable: bool = False
     note: str
+
+
+class DbBackupStatus(BaseModel):
+    supported: bool
+    interval_days: int
+    max_generations: int
+    last_auto_backup_at: int = 0
+    backup_dir: str
+    auto_count: int = 0
+    manual_count: int = 0
+
+
+class DbBackupSettingsBody(BaseModel):
+    interval_days: int = Field(default=7, ge=1, le=365)
+    max_generations: int = Field(default=4, ge=1, le=100)
+
+
+class DbBackupResult(BaseModel):
+    path: str
+    at: int
+    manual: bool
+    size_bytes: int | None = None
 
 
 class PluginSettingsStatus(BaseModel):
@@ -455,6 +505,7 @@ class OutputSaveStatus(BaseModel):
 
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus
+    db_backup: DbBackupStatus
     plugins: PluginSettingsStatus
     output_save: OutputSaveStatus
 
@@ -552,9 +603,27 @@ def api_auth_me(actor: dict = Depends(_current_user)) -> UserAccountItem:
 @app.patch("/api/auth/me/settings", response_model=UserAccountItem)
 def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_user)) -> UserAccountItem:
     try:
-        user = _db.update_user_theme(actor["id"], body.ui_theme)
+        user = _db.update_user_settings(actor["id"], ui_theme=body.ui_theme, settings_tab=body.settings_tab)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+    return UserAccountItem(**user)
+
+
+@app.patch("/api/auth/me/profile", response_model=UserAccountItem)
+def api_auth_me_profile(body: UserProfileUpdateBody, actor: dict = Depends(_current_user)) -> UserAccountItem:
+    try:
+        user = _db.update_current_user_profile(
+            actor["id"],
+            email=body.email,
+            password=body.password,
+            current_password=body.current_password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=409, detail=f"profile update failed: {e}") from e
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)
@@ -579,6 +648,28 @@ def api_auth_me_update_batch_prompt_history(
     return BatchPromptHistoryResponse(items=items)
 
 
+@app.get("/api/auth/me/export-templates", response_model=ExportTemplatesBody)
+def api_auth_me_export_templates(actor: dict = Depends(_current_user)) -> ExportTemplatesBody:
+    return ExportTemplatesBody(templates=_db.get_user_export_templates(actor["id"]))
+
+
+@app.put("/api/auth/me/export-templates", response_model=ExportTemplatesBody)
+def api_auth_me_update_export_templates(
+    body: ExportTemplatesBody,
+    actor: dict = Depends(_current_user),
+) -> ExportTemplatesBody:
+    try:
+        templates = _db.update_user_export_templates(
+            actor["id"],
+            [item.model_dump() for item in body.templates],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if templates is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    return ExportTemplatesBody(templates=templates)
+
+
 @app.get("/api/auth/me/plugin-storage", response_model=PluginStorageBody)
 def api_auth_me_plugin_storage(actor: dict = Depends(_current_user)) -> PluginStorageBody:
     return PluginStorageBody(storage=_db.get_user_plugin_storage(actor["id"]))
@@ -587,7 +678,7 @@ def api_auth_me_plugin_storage(actor: dict = Depends(_current_user)) -> PluginSt
 @app.put("/api/auth/me/plugin-storage", response_model=PluginStorageBody)
 def api_auth_me_update_plugin_storage(
     body: PluginStorageBody,
-    actor: dict = Depends(_current_user),
+    actor: dict = Depends(_admin_user),
 ) -> PluginStorageBody:
     try:
         storage = _db.update_user_plugin_storage(actor["id"], body.storage)
@@ -602,7 +693,7 @@ def api_auth_me_update_plugin_storage(
 def api_auth_me_update_plugin_value(
     plugin_id: str,
     body: PluginValueBody,
-    actor: dict = Depends(_current_user),
+    actor: dict = Depends(_admin_user),
 ) -> PluginStorageBody:
     try:
         storage = _db.update_user_plugin_value(actor["id"], plugin_id, body.value)
@@ -634,12 +725,14 @@ def api_auth_me_update_demo_settings(
 
 @app.get("/api/settings/status", response_model=SettingsStatusResponse)
 def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusResponse:
+    _db.ensure_scheduled_db_backup()
     db_info = _db.database_info()
     return SettingsStatusResponse(
         database=DatabaseSettingsStatus(
             **db_info,
             note="DB connection is selected at server startup by INKU_DB_URL. Restart the server after changing it.",
         ),
+        db_backup=DbBackupStatus(**_db.db_backup_status()),
         plugins=PluginSettingsStatus(
             enabled=True,
             loaded=plugin_status_items(),
@@ -652,6 +745,27 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
         ),
     )
+
+
+@app.put("/api/settings/db-backup", response_model=DbBackupStatus)
+def api_settings_update_db_backup(
+    body: DbBackupSettingsBody,
+    actor: dict = Depends(_admin_user),
+) -> DbBackupStatus:
+    try:
+        _db.update_db_backup_settings(body.interval_days, body.max_generations)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return DbBackupStatus(**_db.db_backup_status())
+
+
+@app.post("/api/settings/db-backup/run", response_model=DbBackupResult)
+def api_settings_run_db_backup(actor: dict = Depends(_admin_user)) -> DbBackupResult:
+    try:
+        result = _db.create_db_backup(manual=True)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return DbBackupResult(**result)
 
 
 @app.post("/api/auth/logout")
@@ -1228,6 +1342,11 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             "svg": svg,
             "at": history_at,
         })
+    user_generation_count = None
+    if req.count_generation:
+        user_generation_count = _db.increment_user_generation_count(actor["id"])
+        if user_generation_count is None:
+            raise HTTPException(status_code=404, detail="user not found")
     return PaintResponse(
         text=source_text,
         ddl=ddl,
@@ -1248,6 +1367,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         compose_retry_count=compose_detail.retry_count,
         compose_retry_reasons=compose_detail.retry_reasons,
         compose_fallback_used=compose_detail.fallback_used,
+        user_generation_count=user_generation_count,
     )
 
 
@@ -1269,6 +1389,25 @@ def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_use
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=409, detail=f"group create failed: {e}") from e
+
+
+@app.patch("/api/user-groups/{group_id}", response_model=UserGroupItem)
+def api_user_groups_update(
+    group_id: str,
+    body: UserGroupUpdateBody,
+    actor: dict = Depends(_user_manager),
+) -> UserGroupItem:
+    if actor["role"] != "admin":
+        raise HTTPException(status_code=403, detail="only administrators can update groups")
+    try:
+        group = _db.update_user_group(group_id, body.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=409, detail=f"group update failed: {e}") from e
+    if not group:
+        raise HTTPException(status_code=404, detail="group not found")
+    return UserGroupItem(**group)
 
 
 @app.delete("/api/user-groups/{group_id}")

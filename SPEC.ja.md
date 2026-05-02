@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.30**
+**Version: v1.37**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -158,11 +158,13 @@ v1.29 時点では、参照実装として `canvas-aspect` プラグインを追
 - 現在のフックは **canvas-size hook** のみ
 - ユーザーごとのプラグイン設定は DB の plugin extension storage に JSON として保存する
 - Web UI のプラグイン呼び出しボタンは、モデル選択ボタンの左側に配置する
+- プラグイン実装は system plugins と user plugins のディレクトリを分け、各プラグインを専用ディレクトリに配置する
+- 参照実装の `canvas-aspect` は、サーバー側では `server/src/inku_server/plugins/system/canvas_aspect/`、Web 側では `web/src/lib/plugins/system/canvas-aspect/` に配置する
 - キャンバス比率を変更した場合、既存の描画表示はクリアし、選択比率に合わせたプレースホルダー画像へ切り替える
 - `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を決定する
 - 正規化座標は 0.0〜1.0 のまま維持する。円・弧の半径は短辺基準とし、ワイド/縦長キャンバスで真円が不自然に引き伸ばされないようにする
 
-`canvas-aspect` が扱う比率は、`square`、`golden`、`a4`、`b4`、`pillar`、`oban`、`wide`、`vertical` とする。
+`canvas-aspect` が扱う比率は、`square`、`golden`、`a4`、`b4`、`pillar`、`oban`、`wide`、`byobu`、`vertical` とする。
 
 実装方法と将来のプラグイン作成手順は `PLUGIN.md` に記録する。
 
@@ -1281,7 +1283,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~固定の6色制約~~ → v1.6 で色カタログシステム導入（default + 10文化パレット選択可）
 - ~~キャンバスのズーム不可~~ → v1.6 でズームUI追加（0.5×〜3×）
 - ~~スクロール型レイアウトで全要素の関係が見えにくい~~ → v1.6 で固定ビューポート2ペイン構成に刷新
-- ~~ユーザー管理が prototype UI のみ~~ → v1.10 で認証、ユーザー/グループ管理 API、DB 永続化、権限制御を実装
+- ~~ユーザー管理が prototype UI のみ~~ → v1.10 で認証、ユーザー/グループ管理 API、DB 永続化、ロール制御を実装
 - ~~描画履歴が全ユーザーで共有される~~ → v1.10 で `history.user_id` を追加し、履歴取得・保存・削除をログインユーザー単位に分離。既存履歴は初回起動時に admin 所有へ移行
 - ~~DB設定 / プラグイン管理が prototype UI のみ~~ → v1.11 で管理者向け read-only API に接続し、DB は `INKU_DB_URL` 起動時設定、プラグインは未実装であることを UI に明示
 - ~~履歴保存時に Web UI から送られた SVG を DB に保存できる~~ → v1.12 で `/api/paint` が生成直後に履歴保存し、Web UI から履歴保存用 SVG を送り返さない形へ変更。互換用 `POST /api/history` でもリクエスト `svg` は無視してサーバー側で再レンダリングする
@@ -1362,7 +1364,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 `server/src/inku_server/`:
 - `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
 - `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
-- `plugins.py` — プラグインレジストリと hook 補助。v1.29 時点では `canvas-aspect` の canvas-size hook を提供
+- `plugins/` — プラグインレジストリと hook 補助。system/user ディレクトリを分け、v1.34 時点では system plugin として `canvas-aspect` の canvas-size hook を提供
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
@@ -1381,6 +1383,111 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.37 (2026-05-02)
+
+**DBバックアップ設定**
+
+DB設定タブに、DBファイルサイズ表示とバックアップ設定を追加した。
+
+- DB設定タブは引き続き `admin` ロールのみ表示する
+- SQLite ファイル DB のサイズを表示する
+- DBバックアップ設定として、保存間隔（日）と最大保存世代数を設定できる
+- 既定値は、保存間隔 7 日、最大保存世代数 4 世代
+- `/api/settings/status` 取得時に保存間隔を超えていれば自動バックアップを作成する
+- 自動バックアップは設定された最大保存世代数に従って古いものを削除する
+- `今すぐバックアップ` ボタンで手動バックアップを作成できる
+- 手動バックアップは最大保存世代数のカウント対象外とする
+- SQLite 以外の DB では、ファイルレプリカ方式のバックアップは非対応として表示する
+- API として `PUT /api/settings/db-backup` と `POST /api/settings/db-backup/run` を追加する
+- build number: 216
+
+### v1.36 (2026-05-02)
+
+**キャンバス比率: 屏風**
+
+キャンバス比率プラグインに `byobu` を追加した。
+
+- 比率は `2.2:1`
+- 表示名は `Byobu`
+- 説明は「日本の屏風。六曲一双の一隻に準じる横長の型」
+- 表示順は `Wide` の下、`Vertical` の上
+- build number: 215
+
+### v1.35 (2026-05-02)
+
+**エクスポートテンプレート**
+
+設定ダイアログに `エクスポート` タブを追加し、PNG 保存形式をユーザーごとのテンプレートとして管理できるようにした。
+
+- `エクスポート` タブは全ログインユーザーが利用できる
+- テンプレートはサーバー DB のユーザー別設定として保存する
+- テンプレート項目は、テンプレート名、説明、y軸高さ（ピクセル数）とする
+- 既定テンプレートとして `PNG 1024px` と `PNG 2048px` を用意する
+- ステータスバーの PNG ボタンから表示されるメニューは、保存済みテンプレートを参照する
+- PNG 書き出し時は y軸高さを基準にし、現在のキャンバス比率から横幅を算出する
+- API として `GET /api/auth/me/export-templates` と `PUT /api/auth/me/export-templates` を追加する
+- build number: 214
+
+### v1.34 (2026-05-02)
+
+**プラグインディレクトリ構成の整理**
+
+プラグインを system と user の配置に分け、各プラグインを専用ディレクトリに置く構成へ変更した。
+
+- サーバー側プラグイン実装を `server/src/inku_server/plugins/` パッケージへ移行
+- system plugin は `server/src/inku_server/plugins/system/<plugin_name>/` に配置する
+- user plugin 用に `server/src/inku_server/plugins/user/` 名前空間を予約する
+- Web 側プラグイン実装を `web/src/lib/plugins/system/<plugin-id>/` に配置する
+- user plugin 用に `web/src/lib/plugins/user/` を予約する
+- 既存の `canvas-aspect` は system plugin として専用ディレクトリへ移動する
+- `server/src/inku_server/plugins/__init__.py` は API / Renderer から参照する安定した hook API を再エクスポートする
+- build number: 213
+
+### v1.33 (2026-05-02)
+
+**設定ダイアログのロール別表示制御**
+
+設定ダイアログで、ロールごとの表示範囲と変更権限を整理した。
+
+- `DB設定` タブは `admin` ロールのみに表示する
+- `ユーザー管理` タブは `admin` ロールのみに表示する
+- `プラグイン` タブは全ログインユーザーに表示する
+- プラグイン設定の変更は `admin` ロールのみに許可する
+- 非 admin ユーザーが設定を開く場合、保存済みタブが `DB設定` / `ユーザー管理` であっても `プラグイン` タブへフォールバックする
+- plugin storage 更新 API は admin のみ利用可能とする
+- build number: 212
+
+### v1.32 (2026-05-02)
+
+**プロフィールダイアログ**
+
+アプリレールのユーザーアイコンメニューにプロフィールを追加し、ログインユーザーが自分のアカウント情報を直接変更できるようにした。
+
+- ユーザーアイコンメニューは、プロフィールとログアウトを選択できる
+- プロフィールを選択すると、設定ダイアログとは独立したプロフィールダイアログを表示する
+- プロフィールダイアログではメールアドレスを変更できる
+- パスワード変更時は、現在のパスワードと新しいパスワードを入力する
+- 新しいパスワードは 8 文字以上とし、現在のパスワードが一致しない場合は変更を拒否する
+- 自己プロフィール更新 API として `PATCH /api/auth/me/profile` を追加する
+- 管理者によるユーザー管理 API とは分離し、ログインユーザー自身のメールアドレス / パスワード変更に限定する
+- build number: 206
+
+### v1.31 (2026-05-02)
+
+**記述タブ進捗マスコットのキウイ化**
+
+記述タブの単発描画中、および解釈（正規化DDL）からの再描画中に表示する進捗バー上のマスコットを、小鳥からキウイへ変更した。
+
+- キウイは左向き固定で表示し、右向き反転や方向転換の中間フレームは使用しない
+- 長いくちばしで地面をつつく、鼻を鳴らす、瞬きする、くちばしを開けてダッシュするなどの仕草を行う
+- 脚は胴体下部の固定位置から生え、足先だけが動くようにして、付け根が揺れない
+- 足先の動きはややダイナミックにし、歩行時の踏み替えが分かるようにする
+- 胴体と尾側を別グループ化し、低頻度でお尻を振る仕草を行う
+- キウイボールでは頭・胴体・くちばしを残した丸まり表現とし、6秒以上その場に留まる
+- キウイボール中は目を閉じ、頭だけがゆっくり「こくり、こくり」と動く
+- 進捗マスコットは `KiwiMascot.svelte` として共通コンポーネント化し、記述パネルと DDL 再描画パネルから利用する
+- build number: 199
 
 ### v1.30 (2026-05-01)
 
@@ -1413,7 +1520,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 アプリケーションのコア要素とノンコア拡張を分離するため、最初のプラグインフックとして canvas-size hook を導入した。
 
 - `canvas-aspect` 参照プラグインを追加
-- キャンバス比率として `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `vertical` をサポート
+- キャンバス比率として `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` をサポート
 - ユーザーごとのプラグイン設定を DB の `plugin_storage` に JSON として保存
 - `/api/auth/me/plugin-storage` と `/api/auth/me/plugin-storage/{plugin_id}` を追加
 - `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を変更
@@ -2043,6 +2150,7 @@ LLM 呼び出しや描画生成を行う API をログイン済みユーザー�
 
 - `POST /api/auth/login`
 - `GET /api/auth/me`
+- `PATCH /api/auth/me/profile`
 - `PATCH /api/auth/me/settings`
 - `GET /api/auth/me/batch-prompt-history`
 - `PUT /api/auth/me/batch-prompt-history`
@@ -2055,27 +2163,26 @@ LLM 呼び出しや描画生成を行う API をログイン済みユーザー�
 - `PATCH /api/users/{user_id}`
 - `DELETE /api/users/{user_id}`
 
-権限制御:
+ロール制御:
 
-- 管理者は全ユーザー / 全グループを管理できる
-- グループリードは自グループ内の一般ユーザーのみ作成・変更・削除できる
-- グループリードは role 昇格、他グループ移動、グループ作成・削除はできない
-- 一般ユーザーはユーザー管理 API を利用できない
+- admin は全ユーザー / 全グループを管理できる
+- group_lead / user はユーザー管理 API を利用できない
+- plugin storage 更新 API は admin のみ利用できる
 
 #### ユーザー管理 UI
 
 - 未ログイン時はログイン UI を表示
-- ログイン後、現在ユーザー / 権限 / 所属グループを表示
-- 管理者 / グループリードの場合:
+- ログイン後、現在ユーザー / ロール / 所属グループを表示
+- アプリレールのユーザーアイコンメニューからプロフィールダイアログを開き、自分のメールアドレス / パスワードを変更できる
+- admin の場合:
   - ユーザー追加パネル
   - ユーザー変更パネル
   - ユーザー一覧の変更 / 削除操作
-- 管理者の場合:
   - グループ追加
   - グループ削除
-- グループリードの場合:
-  - 追加ユーザーの role は `user` に固定
-  - 所属グループは自グループに固定
+- DB設定タブは admin のみに表示
+- ユーザー管理タブは admin のみに表示
+- プラグインタブは全ユーザーに表示するが、設定変更は admin のみに許可
 
 #### ユーザー別履歴保存
 

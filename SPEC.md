@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.30**  
+**Version: v1.37**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -191,6 +191,7 @@ The built-in `canvas-aspect` plugin currently supports:
 | Classic JP | `pillar` | 1:5 | Japanese pillar-picture format |
 | Ukiyoe | `oban` | 2:3 | ukiyo-e oban proportion |
 | Cinema | `wide` | 2.35:1 | cinematic panorama |
+| Classic JP | `byobu` | 2.2:1 | Japanese folding screen format based on one half of a six-panel pair |
 | Mobile | `vertical` | 9:16 | smartphone vertical format |
 
 The selected aspect is stored per user in plugin storage and passed to
@@ -216,6 +217,12 @@ Plugin principles:
 4. Plugin code should be isolated from the main UI where possible.
 5. Plugin behavior should be documented in [PLUGIN.md](PLUGIN.md).
 
+Plugin implementation is split into system and user directories.  Each plugin
+owns its own directory.  The built-in `canvas-aspect` plugin lives under
+`server/src/inku_server/plugins/system/canvas_aspect/` on the backend and
+`web/src/lib/plugins/system/canvas-aspect/` in the frontend.  User plugin
+directories are reserved for future local or third-party plugin loading.
+
 The next likely plugin family is nature primitives or phenomena, such as
 leaves, wind, rain, or water.  Such plugins must define whether they extend
 Stage 2, JSON Score, renderer behavior, or only a deterministic vocabulary
@@ -229,13 +236,15 @@ The web app is the current reference interface.
 
 Major UI areas:
 
-- App rail: compact navigation, user menu, settings, language and theme controls
+- App rail: compact navigation, user menu, profile, settings, language and
+  theme controls
 - Input panel: single drawing, batch drawing, and demo modes
 - DDL editor: editable normalized DDL with Saijiki word highlighting
 - Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
 - History strip: recent works, hover metadata, star markers, pagination
 - History manager: larger history view, trash, restore, permanent delete, star filter
-- Settings modal: models, color catalogs, DB status, plugin status, users, theme
+- Settings modal: models, color catalogs, DB status, plugin status, export
+  templates, users, theme
 
 The status bar displays the current render context:
 
@@ -249,6 +258,12 @@ The status bar displays the current render context:
 For history display, model, catalog, and canvas values come from the history
 item when available.  For active editing, they come from the current selections.
 
+PNG export options are managed as per-user templates in the settings modal's
+export tab.  Each template has a name, description, and y-axis height in pixels.
+The default templates are `PNG 1024px` and `PNG 2048px`.  The status bar PNG
+menu is generated from these templates, and export width is computed from the
+current canvas aspect ratio.
+
 ---
 
 ## 10. Modes
@@ -258,6 +273,14 @@ item when available.  For active editing, they come from the current selections.
 The user writes one instruction and runs the full pipeline.  The resulting DDL
 can be edited directly.  Replaying from DDL skips Stage 1 and calls Stage 2 /
 renderer again.
+
+During single drawing and DDL replay, the progress bar can show a kiwi mascot.
+The kiwi faces left, walks slowly, pecks with a long beak, sniffs, blinks,
+occasionally opens its beak during a quick dash, and sometimes curls into a
+"kiwi ball".  In the curled state it keeps its head, body, and beak visible,
+stays in place for more than six seconds, closes its eye, and gently nods its
+head.  The legs are anchored at fixed body positions so the feet move without
+the leg roots drifting.
 
 ### Batch Drawing
 
@@ -306,7 +329,27 @@ client.
 ## 12. Security and Operations
 
 The web app includes authentication, user roles, sessions, per-user settings,
-and user management.  Passwords are stored as salted PBKDF2-SHA256 hashes.
+user profile editing, and user management.  Passwords are stored as salted
+PBKDF2-SHA256 hashes.
+
+The app rail user menu opens a profile dialog for the signed-in user.  The
+dialog can update the user's email address and password through
+`PATCH /api/auth/me/profile`.  Password changes require the current password,
+and the endpoint is separate from admin user-management APIs.
+
+Settings visibility is role-aware.  DB settings and user management are visible
+only to the `admin` role.  The plugins tab is visible to all signed-in users,
+but plugin setting changes and plugin-storage update APIs are restricted to
+`admin`.
+
+The DB settings tab also shows the current DB file size when the backend is a
+SQLite file database.  Admin users can configure DB replica backups with an
+interval in days and a maximum number of automatic generations.  The defaults
+are seven days and four generations.  Scheduled backups are created when the
+settings status endpoint is loaded after the interval has elapsed.  Manual
+backups can be created immediately and are stored separately from the automatic
+generation limit.  File-replica backups are reported as unavailable for
+non-SQLite DB backends.
 
 Operational details for the author's local server are intentionally not part of
 this public specification.  They belong in untracked local documents such as
@@ -359,6 +402,9 @@ The reference implementation currently includes:
 - FastAPI backend
 - SvelteKit frontend
 - authenticated users and admin user management
+- signed-in user profile editing
+- role-aware settings visibility
+- DB file size display and SQLite backup settings
 - DB-backed history
 - star and trash history management
 - batch rendering
@@ -366,9 +412,10 @@ The reference implementation currently includes:
 - model/provider selection
 - color catalog selection
 - dark mode
-- plugin storage and `canvas-aspect`
-- SVG and PNG export
+- plugin storage, system/user plugin directories, and `canvas-aspect`
+- SVG export and template-based PNG export
 - CLI client foundation
+- shared kiwi progress mascot for single drawing and DDL replay
 - renderer material effects, wobble, rotation, arrangement paths, and canvas
   aspect support
 

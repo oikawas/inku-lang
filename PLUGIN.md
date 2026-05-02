@@ -24,10 +24,37 @@ extensions to affect rendering.
 Files:
 
 ```text
-server/src/inku_server/plugins.py
-web/src/lib/plugins/canvasAspect.ts
+server/src/inku_server/plugins/__init__.py
+server/src/inku_server/plugins/system/canvas_aspect/__init__.py
+server/src/inku_server/plugins/user/__init__.py
+web/src/lib/plugins/system/canvas-aspect/index.ts
+web/src/lib/plugins/user/README.md
 web/src/lib/components/CanvasAspectPlugin.svelte
 ```
+
+System plugins and user plugins are separated by directory.  Each plugin owns a
+dedicated directory:
+
+```text
+server/src/inku_server/plugins/
+  __init__.py                    # stable registry / re-export surface
+  system/
+    canvas_aspect/
+      __init__.py                # bundled canvas-aspect hook implementation
+  user/
+    __init__.py                  # reserved namespace for future user plugins
+
+web/src/lib/plugins/
+  system/
+    canvas-aspect/
+      index.ts                   # bundled canvas-aspect UI data/helpers
+  user/
+    README.md                    # reserved location for future user plugins
+```
+
+System plugins are shipped with inku and may be used by the reference UI.
+User plugins are reserved for locally installed or third-party extensions; the
+runtime loader is not implemented yet.
 
 The plugin supports these aspect identifiers:
 
@@ -40,6 +67,7 @@ The plugin supports these aspect identifiers:
 | Classic JP | `pillar` | 1:5 | Tall Japanese pillar-picture format |
 | Ukiyoe | `oban` | 2:3 | Ukiyo-e oban proportion |
 | Cinema | `wide` | 2.35:1 | Cinematic panorama |
+| Classic JP | `byobu` | 2.2:1 | Japanese folding screen format based on one half of a six-panel pair |
 | Mobile | `vertical` | 9:16 | Smartphone vertical format |
 
 ## User Storage
@@ -109,12 +137,13 @@ display and use compact download icons for SVG / PNG actions.
 
 Future hooks should follow the same shape:
 
-1. Add a typed server-side registry entry in `server/src/inku_server/plugins.py`.
-2. Add a focused frontend plugin module under `web/src/lib/plugins/`.
-3. Add a component under `web/src/lib/components/` only for the visible plugin UI.
-4. Store user choices under `/api/auth/me/plugin-storage/{plugin_id}`.
-5. Pass only the needed hook value into the core API or renderer.
-6. Document the hook contract in this file.
+1. Add the server implementation under `server/src/inku_server/plugins/system/<plugin_name>/` or `server/src/inku_server/plugins/user/<plugin_name>/`.
+2. Re-export the stable hook surface from `server/src/inku_server/plugins/__init__.py` when core API or renderer code needs it.
+3. Add the frontend module under `web/src/lib/plugins/system/<plugin-id>/` or `web/src/lib/plugins/user/<plugin-id>/`.
+4. Add a component under `web/src/lib/components/` only for the visible plugin UI.
+5. Store user choices under `/api/auth/me/plugin-storage/{plugin_id}`.
+6. Pass only the needed hook value into the core API or renderer.
+7. Document the hook contract in this file.
 
 For example, a future natural-primitive plugin such as `leaf` should first
 define whether it extends JSON Score, Stage 2 composition, or only the SVG

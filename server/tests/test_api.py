@@ -262,7 +262,7 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
     columns = {col["name"] for col in inspect(legacy_engine).get_columns("history")}
     assert {"user_id", "catalog_id", "trashed", "starred"} <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
-    assert {"ui_theme", "batch_prompt_history", "demo_settings"} <= user_columns
+    assert {"ui_theme", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
     with legacy_engine.connect() as conn:
@@ -301,6 +301,41 @@ def test_current_user_theme_can_be_updated(auth_context):
 
     invalid = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "sepia"})
     assert invalid.status_code == 400
+
+
+def test_current_user_profile_can_be_updated(auth_context):
+    headers, user, _ = auth_context
+    next_email = f"profile-{uuid.uuid4().hex[:8]}@example.test"
+
+    email_r = client.patch("/api/auth/me/profile", headers=headers, json={"email": next_email})
+    assert email_r.status_code == 200
+    assert email_r.json()["email"] == next_email
+
+    missing_current_r = client.patch(
+        "/api/auth/me/profile",
+        headers=headers,
+        json={"password": "password-456"},
+    )
+    assert missing_current_r.status_code == 400
+
+    wrong_current_r = client.patch(
+        "/api/auth/me/profile",
+        headers=headers,
+        json={"password": "password-456", "current_password": "wrong-password"},
+    )
+    assert wrong_current_r.status_code == 400
+
+    password_r = client.patch(
+        "/api/auth/me/profile",
+        headers=headers,
+        json={"password": "password-456", "current_password": "password-123"},
+    )
+    assert password_r.status_code == 200
+
+    login_old = client.post("/api/auth/login", json={"username": user["username"], "password": "password-123"})
+    assert login_old.status_code == 401
+    login_new = client.post("/api/auth/login", json={"username": user["username"], "password": "password-456"})
+    assert login_new.status_code == 200
 
 
 def test_current_user_batch_prompt_history_is_persisted(auth_context):
@@ -369,6 +404,14 @@ def test_current_user_demo_settings_are_persisted(auth_context):
 
 def test_current_user_plugin_storage_is_persisted(auth_context):
     headers, user, group = auth_context
+    admin = db.add_user(
+        username=f"api-plugin-admin-{uuid.uuid4().hex[:8]}",
+        email=f"api-plugin-admin-{uuid.uuid4().hex[:8]}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    admin_headers, admin_token = _auth_headers(admin)
     other_user = db.add_user(
         username=f"api-plugin-storage-{uuid.uuid4().hex[:8]}",
         email=f"api-plugin-storage-{uuid.uuid4().hex[:8]}@example.test",
@@ -387,10 +430,17 @@ def test_current_user_plugin_storage_is_persisted(auth_context):
             headers=headers,
             json={"value": {"selected": "golden"}},
         )
+        assert updated.status_code == 403
+
+        updated = client.put(
+            "/api/auth/me/plugin-storage/canvas-aspect",
+            headers=admin_headers,
+            json={"value": {"selected": "golden"}},
+        )
         assert updated.status_code == 200
         assert updated.json() == {"storage": {"canvas-aspect": {"selected": "golden"}}}
 
-        persisted = client.get("/api/auth/me/plugin-storage", headers=headers)
+        persisted = client.get("/api/auth/me/plugin-storage", headers=admin_headers)
         assert persisted.status_code == 200
         assert persisted.json() == {"storage": {"canvas-aspect": {"selected": "golden"}}}
 
@@ -398,11 +448,44 @@ def test_current_user_plugin_storage_is_persisted(auth_context):
         assert isolated.status_code == 200
         assert isolated.json() == {"storage": {}}
 
-        invalid = client.put("/api/auth/me/plugin-storage/bad id", headers=headers, json={"value": {}})
+        invalid = client.put("/api/auth/me/plugin-storage/bad id", headers=admin_headers, json={"value": {}})
         assert invalid.status_code == 400
     finally:
+        db.delete_session(admin_token)
         db.delete_session(other_token)
+        db.delete_user(admin["id"])
         db.delete_user(other_user["id"])
+
+
+def test_current_user_export_templates_are_persisted(auth_context):
+    headers, _, _ = auth_context
+
+    initial = client.get("/api/auth/me/export-templates", headers=headers)
+    assert initial.status_code == 200
+    assert initial.json()["templates"] == [
+        {"id": "png-1024", "name": "PNG 1024px", "description": "PNG / y-axis 1024px", "y_px": 1024},
+        {"id": "png-2048", "name": "PNG 2048px", "description": "PNG / y-axis 2048px", "y_px": 2048},
+    ]
+
+    body = {
+        "templates": [
+            {"id": "custom", "name": "Poster", "description": "Tall poster", "y_px": 3000},
+        ]
+    }
+    updated = client.put("/api/auth/me/export-templates", headers=headers, json=body)
+    assert updated.status_code == 200
+    assert updated.json() == body
+
+    persisted = client.get("/api/auth/me/export-templates", headers=headers)
+    assert persisted.status_code == 200
+    assert persisted.json() == body
+
+    invalid = client.put(
+        "/api/auth/me/export-templates",
+        headers=headers,
+        json={"templates": [{"id": "bad", "name": "Bad", "description": "", "y_px": 10}]},
+    )
+    assert invalid.status_code == 422
 
 
 def test_compose_happy_path(monkeypatch, auth_context):
@@ -622,6 +705,19 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert "中心" not in data["ddl"]
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
+    assert data["user_generation_count"] == 1
+
+    skipped_count = client.post(
+        "/api/paint",
+        json={"text": "一滴の墨", "count_generation": False},
+        headers=headers,
+    )
+    assert skipped_count.status_code == 200
+    assert skipped_count.json().get("user_generation_count") is None
+
+    me = client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["image_generation_count"] == 1
 
 
 def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
@@ -651,6 +747,23 @@ def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
     assert data["interpret_fallback_reasons"] == ["stage1_hard_timeout"]
     assert "斜めの線を三本" in data["ddl"]
     assert captured["ddl"] == data["ddl"]
+
+
+def test_failed_paint_does_not_increment_generation_count(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("黒い円を置く。", None))
+
+    def fail_compose(*args, **kwargs):
+        raise RuntimeError("compose failed for test")
+
+    monkeypatch.setattr(api_module, "compose", fail_compose)
+
+    r = client.post("/api/paint", json={"text": "壊れる描画"}, headers=headers)
+    assert r.status_code == 502
+
+    me = client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["image_generation_count"] == 0
 
 
 def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
@@ -866,7 +979,8 @@ def test_artifact_save_submit_releases_slot_when_executor_fails(monkeypatch, cap
     assert "failed to submit artifact save job" in caplog.text
 
 
-def test_settings_status_is_admin_only():
+def test_settings_status_is_admin_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"settings-{suffix}")
     admin = db.add_user(
@@ -894,8 +1008,12 @@ def test_settings_status_is_admin_only():
     assert r.status_code == 200
     data = r.json()
     assert data["database"]["backend"]
+    assert "file_size_bytes" in data["database"]
     assert data["database"]["runtime_editable"] is False
     assert "INKU_DB_URL" in data["database"]["note"]
+    assert data["db_backup"]["supported"] is True
+    assert data["db_backup"]["interval_days"] == 7
+    assert data["db_backup"]["max_generations"] == 4
     assert data["plugins"]["enabled"] is True
     assert data["plugins"]["runtime_editable"] is False
     assert data["plugins"]["loaded"] == [{"name": "canvas-aspect", "version": "0.1.0", "status": "enabled"}]
@@ -909,6 +1027,56 @@ def test_settings_status_is_admin_only():
     db.delete_user(admin["id"])
     db.delete_user(user["id"])
     db.delete_user_group(group["id"])
+
+
+def test_db_backup_settings_and_manual_run_are_admin_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"db-backup-{suffix}")
+    user = db.add_user(
+        username=f"db-backup-user-{suffix}",
+        email=f"db-backup-user-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    admin = db.add_user(
+        username=f"db-backup-admin-{suffix}",
+        email=f"db-backup-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    user_headers, user_token = _auth_headers(user)
+    admin_headers, admin_token = _auth_headers(admin)
+    try:
+        assert client.put(
+            "/api/settings/db-backup",
+            headers=user_headers,
+            json={"interval_days": 3, "max_generations": 2},
+        ).status_code == 403
+
+        settings_r = client.put(
+            "/api/settings/db-backup",
+            headers=admin_headers,
+            json={"interval_days": 3, "max_generations": 2},
+        )
+        assert settings_r.status_code == 200
+        assert settings_r.json()["interval_days"] == 3
+        assert settings_r.json()["max_generations"] == 2
+
+        run_r = client.post("/api/settings/db-backup/run", headers=admin_headers)
+        assert run_r.status_code == 200
+        data = run_r.json()
+        assert data["manual"] is True
+        assert data["size_bytes"] > 0
+        assert (tmp_path / "db-backups" / "manual").exists()
+    finally:
+        db.delete_session(admin_token)
+        db.delete_session(user_token)
+        db.delete_user(admin["id"])
+        db.delete_user(user["id"])
+        db.delete_user_group(group["id"])
 
 
 def test_user_management_crud():
@@ -926,6 +1094,14 @@ def test_user_management_crud():
     group_r = client.post("/api/user-groups", json={"name": f"class-{suffix}"}, headers=headers)
     assert group_r.status_code == 200
     group = group_r.json()
+    rename_r = client.patch(
+        f"/api/user-groups/{group['id']}",
+        json={"name": f"renamed-class-{suffix}"},
+        headers=headers,
+    )
+    assert rename_r.status_code == 200
+    assert rename_r.json()["name"] == f"renamed-class-{suffix}"
+    group = rename_r.json()
 
     user_r = client.post(
         "/api/users",
@@ -955,10 +1131,20 @@ def test_user_management_crud():
     )
     assert patch_r.status_code == 200
     assert patch_r.json()["role"] == "group_lead"
+    settings_r = client.patch("/api/auth/me/settings", json={"settings_tab": "users"}, headers=headers)
+    assert settings_r.status_code == 200
+    assert settings_r.json()["settings_tab"] == "users"
+    bad_settings_r = client.patch("/api/auth/me/settings", json={"settings_tab": "connection"}, headers=headers)
+    assert bad_settings_r.status_code == 400
 
     lead_headers, lead_token = _auth_headers(user)
 
     assert client.post("/api/user-groups", json={"name": f"blocked-{suffix}"}, headers=lead_headers).status_code == 403
+    assert client.patch(
+        f"/api/user-groups/{group['id']}",
+        json={"name": f"blocked-rename-{suffix}"},
+        headers=lead_headers,
+    ).status_code == 403
     blocked_admin_r = client.post(
         "/api/users",
         json={

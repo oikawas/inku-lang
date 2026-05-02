@@ -9,6 +9,7 @@ export type CanvasAspectId =
 	| 'pillar'
 	| 'oban'
 	| 'wide'
+	| 'byobu'
 	| 'vertical';
 
 export type CanvasAspectOption = {
@@ -30,6 +31,7 @@ export const CANVAS_ASPECT_OPTIONS: CanvasAspectOption[] = [
 	{ id: 'pillar', category: 'Classic JP', label: 'Pillar', ratio: '1:5', ratioW: 1, ratioH: 5, intentJa: '柱絵。縦長の余白と書き下ろしの感覚。', intentEn: 'Japanese pillar-picture format with tall negative space.' },
 	{ id: 'oban', category: 'Ukiyoe', label: 'Oban', ratio: '2:3', ratioW: 2, ratioH: 3, intentJa: '浮世絵木版画の標準的な比率。', intentEn: 'Standard ukiyo-e oban woodblock proportion.' },
 	{ id: 'wide', category: 'Cinema', label: 'Wide', ratio: '2.35:1', ratioW: 2.35, ratioH: 1, intentJa: 'シネマスコープ。パノラマや情景の提示。', intentEn: 'Cinemascope panorama for scenes and landscapes.' },
+	{ id: 'byobu', category: 'Classic JP', label: 'Byobu', ratio: '2.2:1', ratioW: 2.2, ratioH: 1, intentJa: '日本の屏風。六曲一双の一隻に準じる横長の型。', intentEn: 'Japanese folding screen format, based on one half of a six-panel pair.' },
 	{ id: 'vertical', category: 'Mobile', label: 'Vertical', ratio: '9:16', ratioW: 9, ratioH: 16, intentJa: 'スマートフォン全画面の現代的な型。', intentEn: 'Contemporary full-screen mobile format.' },
 ];
 

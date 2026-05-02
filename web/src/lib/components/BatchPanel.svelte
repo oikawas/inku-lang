@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import PaintButton from './PaintButton.svelte';
+	import StopButton from './StopButton.svelte';
 
 	type BatchFailure = {
 		line: number;
@@ -31,6 +32,7 @@
 		canSubmit: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
+		showCrab: boolean;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
@@ -54,6 +56,7 @@
 		canSubmit,
 		error,
 		batchPromptHistory,
+		showCrab,
 		onRememberBatchPrompt,
 		onSubmit,
 		onStop,
@@ -131,63 +134,65 @@
 
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress">
-		<svg class="batch-crab" viewBox="0 0 74 42" aria-hidden="true">
-			<defs>
-				<clipPath id="crab-visible-clip">
-					<rect x="0" y="0" width="74" height="80">
-						<animate
-							attributeName="height"
-							dur="12.5s"
-							repeatCount="indefinite"
-							values="80;80;35;35;80;80"
-							keyTimes="0;0.56;0.62;0.76;0.84;1"
-						/>
-					</rect>
-				</clipPath>
-			</defs>
-			<g class="crab-walk">
-				<g class="crab-water crab-water-back">
-					<ellipse cx="37" cy="35" rx="21" ry="3.8" />
-					<path d="M15 35 Q21 32.5 27 35 T39 35 T51 35 T63 35" />
-				</g>
-				<g class="crab-bow">
-					<g class="crab-bury" clip-path="url(#crab-visible-clip)">
-						<path class="crab-leg leg-a" d="M23 28 L14 34 M28 29 L22 37 M46 29 L52 37 M51 28 L60 34" />
-						<ellipse class="crab-body" cx="37" cy="24" rx="18" ry="11" />
-						<path class="crab-shell" d="M23 23 Q37 9 51 23" />
-						<g class="crab-claw claw-left">
-							<path d="M21 23 C10 18 9 10 16 8" />
-							<path class="claw-pincer" d="M15 8 C9 4 10 14 16 12 C21 16 22 6 15 8 Z" />
+		{#if showCrab}
+			<svg class="batch-crab" viewBox="0 0 74 42" aria-hidden="true">
+				<defs>
+					<clipPath id="crab-visible-clip">
+						<rect x="0" y="0" width="74" height="80">
+							<animate
+								attributeName="height"
+								dur="12.5s"
+								repeatCount="indefinite"
+								values="80;80;35;35;80;80"
+								keyTimes="0;0.56;0.62;0.76;0.84;1"
+							/>
+						</rect>
+					</clipPath>
+				</defs>
+				<g class="crab-walk">
+					<g class="crab-water crab-water-back">
+						<ellipse cx="37" cy="35" rx="21" ry="3.8" />
+						<path d="M15 35 Q21 32.5 27 35 T39 35 T51 35 T63 35" />
+					</g>
+					<g class="crab-bow">
+						<g class="crab-bury" clip-path="url(#crab-visible-clip)">
+							<path class="crab-leg leg-a" d="M23 28 L14 34 M28 29 L22 37 M46 29 L52 37 M51 28 L60 34" />
+							<ellipse class="crab-body" cx="37" cy="24" rx="18" ry="11" />
+							<path class="crab-shell" d="M23 23 Q37 9 51 23" />
+							<g class="crab-claw claw-left">
+								<path d="M21 23 C10 18 9 10 16 8" />
+								<path class="claw-pincer" d="M15 8 C9 4 10 14 16 12 C21 16 22 6 15 8 Z" />
+							</g>
+							<g class="crab-claw claw-right">
+								<path d="M53 23 C64 18 65 10 58 8" />
+								<path class="claw-pincer" d="M59 8 C65 4 64 14 58 12 C53 16 52 6 59 8 Z" />
+							</g>
+							<g class="crab-eyes">
+								<path d="M31 15 L29 8 M43 15 L45 8" />
+								<circle class="eye-white" cx="29" cy="7" r="3.3" />
+								<circle class="eye-white" cx="45" cy="7" r="3.3" />
+								<circle class="eye-dot eye-left" cx="29" cy="7" r="1.2" />
+								<circle class="eye-dot eye-right" cx="45" cy="7" r="1.2" />
+							</g>
+							<path class="crab-mouth" d="M33 25 Q37 28 41 25" />
 						</g>
-						<g class="crab-claw claw-right">
-							<path d="M53 23 C64 18 65 10 58 8" />
-							<path class="claw-pincer" d="M59 8 C65 4 64 14 58 12 C53 16 52 6 59 8 Z" />
-						</g>
-						<g class="crab-eyes">
-							<path d="M31 15 L29 8 M43 15 L45 8" />
-							<circle class="eye-white" cx="29" cy="7" r="3.3" />
-							<circle class="eye-white" cx="45" cy="7" r="3.3" />
-							<circle class="eye-dot eye-left" cx="29" cy="7" r="1.2" />
-							<circle class="eye-dot eye-right" cx="45" cy="7" r="1.2" />
-						</g>
-						<path class="crab-mouth" d="M33 25 Q37 28 41 25" />
+					</g>
+					<g class="crab-bubbles">
+						<circle class="bubble bubble-a" cx="49" cy="32" r="1.7" />
+						<circle class="bubble bubble-b" cx="55" cy="31" r="1.2" />
+						<circle class="bubble bubble-c" cx="44" cy="33" r="0.9" />
+					</g>
+					<g class="crab-water crab-water-front">
+						<ellipse cx="37" cy="35" rx="23" ry="4.3" />
+						<path d="M14 35 Q20 32 26 35 T38 35 T50 35 T62 35" />
 					</g>
 				</g>
-				<g class="crab-bubbles">
-					<circle class="bubble bubble-a" cx="49" cy="32" r="1.7" />
-					<circle class="bubble bubble-b" cx="55" cy="31" r="1.2" />
-					<circle class="bubble bubble-c" cx="44" cy="33" r="0.9" />
-				</g>
-				<g class="crab-water crab-water-front">
-					<ellipse cx="37" cy="35" rx="23" ry="4.3" />
-					<path d="M14 35 Q20 32 26 35 T38 35 T50 35 T62 35" />
-				</g>
-			</g>
-		</svg>
+			</svg>
+		{/if}
 		<span>{t().batchProgress(batchCurrent, batchTotal)}</span>
 		<span class="batch-token-total">{t().batchTokenTotal(batchTokensInTotal, batchTokensOutTotal)}</span>
 		<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
-		<button class="stop-sm" onclick={onStop}>{t().stopBtn}</button>
+		<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 	</div>
 {:else}
 	<PaintButton onclick={submitAndRemember} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
@@ -305,6 +310,9 @@
 		background: var(--panel); font-size: 12px; color: var(--fg2);
 		margin-top: 8px;
 	}
+	.batch-progress :global(.stop-btn) {
+		margin-left: auto;
+	}
 	.batch-crab {
 		width: 46px;
 		height: 28px;
@@ -405,11 +413,6 @@
 	.bubble-c { animation-delay: 0.55s; }
 	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
 	.batch-token-total { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
-	.stop-sm {
-		padding: 2px 7px; border: 1px solid var(--border2);
-		border-radius: var(--r); background: none;
-		color: var(--fg2); font-size: 11px; cursor: pointer; font-family: inherit;
-	}
 	.error-text { color: #a2342a; font-size: 12px; }
 	.batch-summary {
 		margin-top: 8px;

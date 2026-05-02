@@ -9,7 +9,10 @@ import json
 import logging
 import os
 import secrets
+import shutil
+import sqlite3
 import uuid
+from datetime import datetime
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
@@ -70,8 +73,11 @@ class UserAccountRow(Base):
     role          = Column(String, nullable=False, index=True)
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
     ui_theme      = Column(String, nullable=False, default="light")
+    settings_tab  = Column(String, nullable=False, default="db")
+    image_generation_count = Column(Integer, nullable=False, default=0)
     batch_prompt_history = Column(Text, nullable=False, default="[]")
     demo_settings = Column(Text, nullable=False, default="{}")
+    export_templates = Column(Text, nullable=False, default="[]")
     plugin_storage = Column(Text, nullable=False, default="{}")
     at            = Column(BigInteger, nullable=False, index=True)
 
@@ -82,6 +88,14 @@ class UserSessionRow(Base):
     token_hash = Column(String, primary_key=True)
     user_id    = Column(String, ForeignKey("user_accounts.id"), nullable=False, index=True)
     at         = Column(BigInteger, nullable=False, index=True)
+
+
+class AppSettingRow(Base):
+    __tablename__ = "app_settings"
+
+    key   = Column(String, primary_key=True)
+    value = Column(Text, nullable=False)
+    at    = Column(BigInteger, nullable=False, index=True)
 
 
 USER_ROLES = {"admin", "group_lead", "user"}
@@ -99,12 +113,18 @@ _HISTORY_COLUMN_MIGRATIONS = {
 }
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
+    "settings_tab": "ALTER TABLE user_accounts ADD COLUMN settings_tab VARCHAR NOT NULL DEFAULT 'db'",
+    "image_generation_count": (
+        "ALTER TABLE user_accounts ADD COLUMN image_generation_count INTEGER NOT NULL DEFAULT 0"
+    ),
     "batch_prompt_history": "ALTER TABLE user_accounts ADD COLUMN batch_prompt_history TEXT NOT NULL DEFAULT '[]'",
     "demo_settings": "ALTER TABLE user_accounts ADD COLUMN demo_settings TEXT NOT NULL DEFAULT '{}'",
+    "export_templates": "ALTER TABLE user_accounts ADD COLUMN export_templates TEXT NOT NULL DEFAULT '[]'",
     "plugin_storage": "ALTER TABLE user_accounts ADD COLUMN plugin_storage TEXT NOT NULL DEFAULT '{}'",
 }
 _BATCH_PROMPT_HISTORY_LIMIT = 20
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
+_SETTINGS_TABS = {"db", "plugins", "users", "export", "misc"}
 _PLUGIN_STORAGE_MAX_BYTES = 20_000
 _DEMO_DEFAULT_SETTINGS = {
     "save_db": False,
@@ -112,6 +132,29 @@ _DEMO_DEFAULT_SETTINGS = {
     "prompt_model": "google/gemma-4-31b-it",
     "seed_phrase": "日本の四季を感じさせる文章を40語以内で生成",
     "interval_seconds": 30,
+}
+_EXPORT_TEMPLATE_LIMIT = 20
+_EXPORT_TEMPLATE_DEFAULTS = [
+    {
+        "id": "png-1024",
+        "name": "PNG 1024px",
+        "description": "PNG / y-axis 1024px",
+        "y_px": 1024,
+    },
+    {
+        "id": "png-2048",
+        "name": "PNG 2048px",
+        "description": "PNG / y-axis 2048px",
+        "y_px": 2048,
+    },
+]
+_DEFAULT_DB_BACKUP_DIR = Path.home() / ".local" / "share" / "inku" / "db-backups"
+_DB_BACKUP_DIR = Path(os.getenv("INKU_DB_BACKUP_DIR", str(_DEFAULT_DB_BACKUP_DIR))).expanduser()
+_DB_BACKUP_SETTINGS_KEY = "db_backup_settings"
+_DB_BACKUP_DEFAULT_SETTINGS = {
+    "interval_days": 7,
+    "max_generations": 4,
+    "last_auto_backup_at": 0,
 }
 _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_user_id", "CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"),
@@ -317,12 +360,168 @@ def admin_history_owner_id() -> str | None:
 
 def database_info() -> dict:
     url = engine.url
+    db_path = _sqlite_db_path()
+    file_size = db_path.stat().st_size if db_path and db_path.exists() else None
     return {
         "backend": url.get_backend_name(),
         "driver": url.get_driver_name(),
         "url": url.render_as_string(hide_password=True),
         "database": url.database,
         "is_default": _DB_URL == _DEFAULT_DB,
+        "file_size_bytes": file_size,
+        "file_path": str(db_path) if db_path else None,
+    }
+
+
+def _sqlite_db_path() -> Path | None:
+    if engine.dialect.name != "sqlite":
+        return None
+    database = engine.url.database
+    if not database or database == ":memory:":
+        return None
+    return Path(database).expanduser()
+
+
+def _read_app_setting(key: str) -> dict | None:
+    with SessionLocal() as session:
+        row = session.get(AppSettingRow, key)
+        if not row:
+            return None
+        try:
+            value = json.loads(row.value or "{}")
+        except json.JSONDecodeError:
+            return None
+        return value if isinstance(value, dict) else None
+
+
+def _write_app_setting(key: str, value: dict) -> dict:
+    with SessionLocal() as session:
+        row = session.get(AppSettingRow, key)
+        if row:
+            row.value = json.dumps(value, ensure_ascii=False)
+            row.at = _now_ms()
+        else:
+            row = AppSettingRow(key=key, value=json.dumps(value, ensure_ascii=False), at=_now_ms())
+            session.add(row)
+        session.commit()
+        return value
+
+
+def _normalize_db_backup_settings(settings: dict | None) -> dict:
+    clean = dict(_DB_BACKUP_DEFAULT_SETTINGS)
+    if not isinstance(settings, dict):
+        return clean
+    if "interval_days" in settings:
+        try:
+            interval_days = int(settings["interval_days"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("backup interval days must be an integer") from exc
+        if interval_days < 1 or interval_days > 365:
+            raise ValueError("backup interval days must be between 1 and 365")
+        clean["interval_days"] = interval_days
+    if "max_generations" in settings:
+        try:
+            max_generations = int(settings["max_generations"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("backup max generations must be an integer") from exc
+        if max_generations < 1 or max_generations > 100:
+            raise ValueError("backup max generations must be between 1 and 100")
+        clean["max_generations"] = max_generations
+    if "last_auto_backup_at" in settings:
+        try:
+            clean["last_auto_backup_at"] = max(0, int(settings["last_auto_backup_at"]))
+        except (TypeError, ValueError):
+            clean["last_auto_backup_at"] = 0
+    return clean
+
+
+def get_db_backup_settings() -> dict:
+    return _normalize_db_backup_settings(_read_app_setting(_DB_BACKUP_SETTINGS_KEY))
+
+
+def update_db_backup_settings(interval_days: int, max_generations: int) -> dict:
+    current = get_db_backup_settings()
+    current["interval_days"] = interval_days
+    current["max_generations"] = max_generations
+    clean = _normalize_db_backup_settings(current)
+    return _write_app_setting(_DB_BACKUP_SETTINGS_KEY, clean)
+
+
+def _db_backup_file(kind: str, at_ms: int) -> Path:
+    timestamp = datetime.fromtimestamp(at_ms / 1000).strftime("%Y%m%d-%H%M%S")
+    return _DB_BACKUP_DIR / kind / f"inku-{kind}-{timestamp}.db"
+
+
+def _copy_sqlite_database(destination: Path) -> None:
+    source = _sqlite_db_path()
+    if not source or not source.exists():
+        raise ValueError("SQLite DB file is not available")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with sqlite3.connect(source) as src, sqlite3.connect(destination) as dst:
+            src.backup(dst)
+    except sqlite3.Error:
+        if destination.exists():
+            destination.unlink(missing_ok=True)
+        shutil.copy2(source, destination)
+
+
+def _prune_auto_backups(max_generations: int) -> None:
+    auto_dir = _DB_BACKUP_DIR / "auto"
+    if not auto_dir.exists():
+        return
+    backups = sorted(auto_dir.glob("inku-auto-*.db"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for old in backups[max_generations:]:
+        old.unlink(missing_ok=True)
+
+
+def create_db_backup(*, manual: bool = False) -> dict:
+    if engine.dialect.name != "sqlite":
+        raise ValueError("DB backup replicas are supported only for SQLite file databases")
+    at_ms = _now_ms()
+    kind = "manual" if manual else "auto"
+    path = _db_backup_file(kind, at_ms)
+    _copy_sqlite_database(path)
+    if manual:
+        settings = get_db_backup_settings()
+    else:
+        settings = get_db_backup_settings()
+        settings["last_auto_backup_at"] = at_ms
+        _write_app_setting(_DB_BACKUP_SETTINGS_KEY, settings)
+        _prune_auto_backups(settings["max_generations"])
+    return {
+        "path": str(path),
+        "at": at_ms,
+        "manual": manual,
+        "size_bytes": path.stat().st_size if path.exists() else None,
+    }
+
+
+def ensure_scheduled_db_backup() -> dict | None:
+    settings = get_db_backup_settings()
+    last_at = int(settings.get("last_auto_backup_at") or 0)
+    interval_ms = int(settings["interval_days"]) * 24 * 60 * 60 * 1000
+    if last_at > 0 and _now_ms() - last_at < interval_ms:
+        return None
+    try:
+        return create_db_backup(manual=False)
+    except ValueError:
+        return None
+
+
+def db_backup_status() -> dict:
+    settings = get_db_backup_settings()
+    supported = engine.dialect.name == "sqlite" and _sqlite_db_path() is not None
+    auto_dir = _DB_BACKUP_DIR / "auto"
+    manual_dir = _DB_BACKUP_DIR / "manual"
+    auto_count = len(list(auto_dir.glob("inku-auto-*.db"))) if auto_dir.exists() else 0
+    manual_count = len(list(manual_dir.glob("inku-manual-*.db"))) if manual_dir.exists() else 0
+    return {
+        **settings,
+        "supported": supported,
+        "backup_dir": str(_DB_BACKUP_DIR),
+        "auto_count": auto_count,
+        "manual_count": manual_count,
     }
 
 
@@ -373,6 +572,8 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "group_id": row.group_id,
         "group_name": group_name,
         "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
+        "settings_tab": row.settings_tab if row.settings_tab in _SETTINGS_TABS else "db",
+        "image_generation_count": row.image_generation_count or 0,
         "at": row.at,
     }
 
@@ -416,6 +617,21 @@ def add_user_group(name: str) -> dict:
     row = UserGroupRow(id=str(uuid.uuid4()), name=name, at=_now_ms())
     with SessionLocal() as session:
         session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _group_to_dict(row)
+
+
+def update_user_group(group_id: str, name: str) -> dict | None:
+    name = name.strip()
+    if not name:
+        raise ValueError("group name is required")
+    with SessionLocal() as session:
+        row = session.get(UserGroupRow, group_id)
+        if not row:
+            return None
+        row.name = name
+        row.at = _now_ms()
         session.commit()
         session.refresh(row)
         return _group_to_dict(row)
@@ -604,6 +820,45 @@ def update_user(
         return _user_to_dict(row, group_name)
 
 
+def update_current_user_profile(
+    user_id: str,
+    *,
+    email: str | None = None,
+    password: str | None = None,
+    current_password: str | None = None,
+) -> dict | None:
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        if email is not None:
+            email = email.strip()
+            if not email:
+                raise ValueError("email is required")
+            row.email = email
+        if password is not None and password:
+            if not current_password or not verify_password(current_password, row.password_hash):
+                raise ValueError("current password is invalid")
+            row.password_hash = _hash_password(password)
+        session.commit()
+        session.refresh(row)
+        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+        return _user_to_dict(row, group_name)
+
+
+def increment_user_generation_count(user_id: str, amount: int = 1) -> int | None:
+    if amount <= 0:
+        raise ValueError("amount must be positive")
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        row.image_generation_count = (row.image_generation_count or 0) + amount
+        session.commit()
+        session.refresh(row)
+        return row.image_generation_count or 0
+
+
 def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
     if ui_theme not in {"light", "dark"}:
         raise ValueError("invalid ui theme")
@@ -612,6 +867,25 @@ def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
         if not row:
             return None
         row.ui_theme = ui_theme
+        session.commit()
+        session.refresh(row)
+        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+        return _user_to_dict(row, group_name)
+
+
+def update_user_settings(user_id: str, ui_theme: str | None = None, settings_tab: str | None = None) -> dict | None:
+    if ui_theme is not None and ui_theme not in {"light", "dark"}:
+        raise ValueError("invalid ui theme")
+    if settings_tab is not None and settings_tab not in _SETTINGS_TABS:
+        raise ValueError("invalid settings tab")
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        if ui_theme is not None:
+            row.ui_theme = ui_theme
+        if settings_tab is not None:
+            row.settings_tab = settings_tab
         session.commit()
         session.refresh(row)
         group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
@@ -722,6 +996,74 @@ def update_user_demo_settings(user_id: str, settings: dict) -> dict | None:
         if not row:
             return None
         row.demo_settings = json.dumps(clean, ensure_ascii=False)
+        session.commit()
+        return clean
+
+
+def _normalize_export_templates(items: list[dict]) -> list[dict]:
+    if not isinstance(items, list):
+        raise ValueError("export templates must be a list")
+    normalized: list[dict] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("export template must be an object")
+        template_id = item.get("id")
+        if not isinstance(template_id, str) or not template_id.strip():
+            raise ValueError("export template id is required")
+        template_id = template_id.strip()[:80]
+        if template_id in seen:
+            continue
+        name = item.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("export template name is required")
+        description = item.get("description", "")
+        if not isinstance(description, str):
+            raise ValueError("export template description must be a string")
+        try:
+            y_px = int(item.get("y_px"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("export template y_px must be an integer") from exc
+        if y_px < 64 or y_px > 12000:
+            raise ValueError("export template y_px must be between 64 and 12000")
+        normalized.append(
+            {
+                "id": template_id,
+                "name": name.strip()[:80],
+                "description": description.strip()[:240],
+                "y_px": y_px,
+            }
+        )
+        seen.add(template_id)
+        if len(normalized) >= _EXPORT_TEMPLATE_LIMIT:
+            break
+    return normalized or [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+
+
+def get_user_export_templates(user_id: str) -> list[dict]:
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+        try:
+            parsed = json.loads(row.export_templates or "[]")
+        except json.JSONDecodeError:
+            return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+        if not isinstance(parsed, list) or not parsed:
+            return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+        try:
+            return _normalize_export_templates(parsed)
+        except ValueError:
+            return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
+
+
+def update_user_export_templates(user_id: str, items: list[dict]) -> list[dict] | None:
+    clean = _normalize_export_templates(items)
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        row.export_templates = json.dumps(clean, ensure_ascii=False)
         session.commit()
         return clean
 

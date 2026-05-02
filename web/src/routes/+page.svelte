@@ -14,6 +14,7 @@
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
+	import ProfileModal from '$lib/components/ProfileModal.svelte';
 	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import {
@@ -26,13 +27,14 @@
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { COLOR_CATALOGS, getCatalogById, getRenderColorMap, type RenderColorMap } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
+	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
 		DEFAULT_CANVAS_ASPECT_ID,
 		getCanvasAspectOption,
 		normalizeCanvasAspectId,
 		type CanvasAspectId,
-	} from '$lib/plugins/canvasAspect';
+	} from '$lib/plugins/system/canvas-aspect';
 	import {
 		HistoryManagerState,
 		type HistoryItem,
@@ -45,6 +47,8 @@
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
 	const CATALOG_KEY         = 'inku-color-catalog';
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
+	const SHOW_KIWI_KEY       = 'inku-show-kiwi';
+	const SHOW_CRAB_KEY       = 'inku-show-crab';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
@@ -65,6 +69,7 @@
 		tokens_out_stage1: number | null;
 		tokens_in_stage2: number | null;
 		tokens_out_stage2: number | null;
+		user_generation_count?: number | null;
 	};
 
 	type Iteration = HistoryItem;
@@ -91,8 +96,19 @@
 			url: string;
 			database: string | null;
 			is_default: boolean;
+			file_size_bytes: number | null;
+			file_path: string | null;
 			runtime_editable: boolean;
 			note: string;
+		};
+		db_backup: {
+			supported: boolean;
+			interval_days: number;
+			max_generations: number;
+			last_auto_backup_at: number;
+			backup_dir: string;
+			auto_count: number;
+			manual_count: number;
 		};
 		plugins: {
 			enabled: boolean;
@@ -103,6 +119,7 @@
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
+	type SettingsTab = 'connection' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
 	type UserGroup = {
 		id: string;
 		name: string;
@@ -117,6 +134,8 @@
 		group_id: string | null;
 		group_name: string | null;
 		ui_theme?: 'light' | 'dark';
+		settings_tab?: SettingsTab;
+		image_generation_count: number;
 		at: number;
 	};
 	// ── Input ───────────────────────────────────────────────
@@ -134,6 +153,8 @@
 	// ── Loading ─────────────────────────────────────────────
 	let loading    = $state(false);
 	let activeRunMode = $state<'single' | 'batch' | 'demo' | null>(null);
+	let submitAbortController: AbortController | null = null;
+	let submitStopRequested = false;
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
@@ -183,7 +204,7 @@
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let settingsOpen = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
-	let settingsTab  = $state<'connection' | 'db' | 'plugins' | 'users' | 'misc'>('connection');
+	let settingsTab  = $state<SettingsTab>('connection');
 	let pngMenuOpen  = $state(false);
 	let userMenuOpen = $state(false);
 	let darkMode     = $state(false);
@@ -212,8 +233,11 @@
 		stage2Model: string;
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
-	let showBirds = $state(true);
+	let showKiwi = $state(true);
+	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
+	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
+	let exportTemplateStatus = $state<string | null>(null);
 	let saveReplayAsNewVersion = $state(true);
 	let miscSettingsLoaded = $state(false);
 
@@ -324,6 +348,7 @@
 	let settingsStatus = $state<SettingsStatus | null>(null);
 	let settingsStatusError = $state<string | null>(null);
 	let settingsStatusLoading = $state(false);
+	let dbBackupStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
@@ -338,6 +363,8 @@
 	let editUserRole = $state<UserRole>('user');
 	let editUserGroupId = $state('');
 	let newGroupName = $state('');
+	let editGroupId = $state<string | null>(null);
+	let editGroupName = $state('');
 	let userSettingsStatus = $state<string | null>(null);
 	let userSettingsLoading = $state(false);
 	let userSettingsRequestId = 0;
@@ -347,6 +374,12 @@
 	let loginPassword = $state('');
 	let loginPasswordVisible = $state(false);
 	let loginStatus = $state<string | null>(null);
+	let profileOpen = $state(false);
+	let profileEmail = $state('');
+	let profileCurrentPassword = $state('');
+	let profileNewPassword = $state('');
+	let profileStatus = $state<string | null>(null);
+	let profileSaving = $state(false);
 
 	function apiFetch(path: string, init: RequestInit = {}) {
 		const headers = new Headers(init.headers);
@@ -355,6 +388,19 @@
 
 	function applyUserTheme(user: UserItem | null) {
 		darkMode = user?.ui_theme === 'dark';
+	}
+
+	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
+		return tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc';
+	}
+
+	function canAccessSettingsTab(tab: SettingsTab) {
+		if (tab === 'db' || tab === 'users') return currentUser?.role === 'admin';
+		return tab !== 'connection';
+	}
+
+	function defaultSettingsTab() {
+		return currentUser?.role === 'admin' ? 'db' : 'plugins';
 	}
 
 	function normalizeBatchPromptHistory(items: string[]): string[] {
@@ -440,6 +486,7 @@
 	}
 
 	async function setCanvasAspectEnabled(value: boolean) {
+		if (currentUser?.role !== 'admin') return;
 		canvasAspectEnabled = value;
 		canvasAspectMenuOpen = false;
 		if (!value) {
@@ -454,6 +501,7 @@
 	}
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
+		if (currentUser?.role !== 'admin') return;
 		canvasAspectId = normalizeCanvasAspectId(id);
 		canvasAspectMenuOpen = false;
 		result = null;
@@ -481,6 +529,68 @@
 			demoSettingsLoaded = false;
 			console.warn('failed to load demo settings', e);
 		}
+	}
+
+	async function loadExportTemplates() {
+		if (!currentUser) {
+			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
+			exportTemplateStatus = null;
+			return;
+		}
+		try {
+			const r = await apiFetch('/api/auth/me/export-templates', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { templates?: unknown };
+			exportTemplates = normalizeExportTemplates(data.templates);
+			exportTemplateStatus = null;
+		} catch (e) {
+			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
+			exportTemplateStatus = t().settingsExportTemplateSaveFailed;
+			console.warn('failed to load export templates', e);
+		}
+	}
+
+	async function saveExportTemplates(nextTemplates: ExportTemplate[]) {
+		const previous = exportTemplates;
+		const next = normalizeExportTemplates(nextTemplates);
+		exportTemplates = next;
+		exportTemplateStatus = null;
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/export-templates', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ templates: next })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const data = await r.json() as { templates?: unknown };
+			exportTemplates = normalizeExportTemplates(data.templates);
+		} catch (e) {
+			exportTemplates = previous;
+			exportTemplateStatus = t().settingsExportTemplateSaveFailed;
+			console.warn('failed to save export templates', e);
+		}
+	}
+
+	function addExportTemplate() {
+		const id = `png-${Date.now().toString(36)}`;
+		void saveExportTemplates([
+			...exportTemplates,
+			{ id, name: 'PNG 3000px', description: 'PNG / y-axis 3000px', y_px: 3000 }
+		]);
+	}
+
+	function updateExportTemplate(id: string, patch: Partial<ExportTemplate>) {
+		void saveExportTemplates(exportTemplates.map((template) => (
+			template.id === id ? { ...template, ...patch } : template
+		)));
+	}
+
+	function removeExportTemplate(id: string) {
+		void saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
 	}
 
 	async function saveDemoSettings(settings: DemoSettings) {
@@ -552,12 +662,35 @@
 		}
 	}
 
-	function openSettings(tab: typeof settingsTab = 'db') {
+	async function updateUserSettingsTab(tab: typeof settingsTab) {
+		if (!currentUser || !isSettingsContentTab(tab)) return;
+		const previousUser = currentUser;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ settings_tab: tab })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			currentUser = previousUser;
+			console.warn('failed to update settings tab', e);
+		}
+	}
+
+	function openSettings(tab: typeof settingsTab | null = null) {
 		settingsMode = 'settings';
-		settingsTab = tab;
+		const candidate = tab ?? (isSettingsContentTab(currentUser?.settings_tab) ? currentUser.settings_tab : defaultSettingsTab());
+		const nextTab = canAccessSettingsTab(candidate) ? candidate : defaultSettingsTab();
+		settingsTab = nextTab;
 		settingsOpen = true;
-		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
-		if (tab === 'users') void loadUserSettings();
+		if (nextTab === 'db') void loadSettingsStatus();
+		if (nextTab === 'users') void loadUserSettings();
+		if (nextTab === 'export') void loadExportTemplates();
 	}
 
 	function openModelSelection() {
@@ -624,9 +757,12 @@
 	}
 
 	function selectSettingsTab(tab: typeof settingsTab) {
+		if (!canAccessSettingsTab(tab)) return;
 		settingsTab = tab;
-		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
+		void updateUserSettingsTab(tab);
+		if (tab === 'db') void loadSettingsStatus();
 		if (tab === 'users') void loadUserSettings();
+		if (tab === 'export') void loadExportTemplates();
 	}
 
 	async function loadUserSettings() {
@@ -640,7 +776,7 @@
 			currentUser = actor;
 			applyUserTheme(actor);
 			authToken = 'cookie';
-			if (!['admin', 'group_lead'].includes(actor.role)) {
+			if (actor.role !== 'admin') {
 				users = [];
 				groups = [];
 				userSettingsStatus = null;
@@ -690,11 +826,47 @@
 			}
 			settingsStatus = await r.json();
 			settingsStatusError = null;
+			dbBackupStatus = null;
 		} catch (e) {
 			settingsStatus = null;
 			settingsStatusError = e instanceof Error ? e.message : String(e);
 		} finally {
 			settingsStatusLoading = false;
+		}
+	}
+
+	async function updateDbBackupSettings(intervalDays: number, maxGenerations: number) {
+		dbBackupStatus = null;
+		try {
+			const r = await apiFetch('/api/settings/db-backup', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ interval_days: intervalDays, max_generations: maxGenerations })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const nextBackup = await r.json() as SettingsStatus['db_backup'];
+			if (settingsStatus) settingsStatus = { ...settingsStatus, db_backup: nextBackup };
+		} catch (e) {
+			dbBackupStatus = t().settingsDbBackupSaveFailed;
+			console.warn('failed to update DB backup settings', e);
+		}
+	}
+
+	async function runDbBackupNow() {
+		dbBackupStatus = null;
+		try {
+			const r = await apiFetch('/api/settings/db-backup/run', { method: 'POST' });
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			await loadSettingsStatus();
+			dbBackupStatus = t().settingsDbBackupRunDone;
+		} catch (e) {
+			dbBackupStatus = e instanceof Error ? e.message : String(e);
 		}
 	}
 
@@ -706,7 +878,7 @@
 			applyUserTheme(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -716,6 +888,8 @@
 			batchPromptHistory = [];
 			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 			demoSettingsLoaded = false;
+			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
+			exportTemplateStatus = null;
 			canvasAspectEnabled = true;
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			loginStatus = t().loginRequiredMessage;
@@ -753,7 +927,7 @@
 			trashTotal = 0;
 			historyManager.clear();
 			loginPassword = '';
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage()]);
+			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -768,12 +942,15 @@
 			try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
 		}
 		userMenuOpen = false;
+		profileOpen = false;
 		authToken = null;
 		currentUser = null;
 		applyUserTheme(null);
 		batchPromptHistory = [];
 		demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 		demoSettingsLoaded = false;
+		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
+		exportTemplateStatus = null;
 		canvasAspectEnabled = true;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		loginStatus = null;
@@ -786,6 +963,69 @@
 		trashItems = [];
 		trashTotal = 0;
 		historyManager.clear();
+	}
+
+	function openProfile() {
+		if (!currentUser) return;
+		profileEmail = currentUser.email;
+		profileCurrentPassword = '';
+		profileNewPassword = '';
+		profileStatus = null;
+		profileOpen = true;
+		userMenuOpen = false;
+	}
+
+	function closeProfile() {
+		if (profileSaving) return;
+		profileOpen = false;
+		profileCurrentPassword = '';
+		profileNewPassword = '';
+	}
+
+	async function saveProfile() {
+		if (!currentUser) return;
+		const email = profileEmail.trim();
+		if (!email) {
+			profileStatus = t().userValidationUpdate;
+			return;
+		}
+		if (profileNewPassword && profileNewPassword.length < 8) {
+			profileStatus = t().userPasswordTooShort;
+			return;
+		}
+		if (profileNewPassword && !profileCurrentPassword) {
+			profileStatus = t().profileCurrentPasswordRequired;
+			return;
+		}
+		profileSaving = true;
+		profileStatus = null;
+		try {
+			const body: { email: string; password?: string; current_password?: string } = { email };
+			if (profileNewPassword) {
+				body.password = profileNewPassword;
+				body.current_password = profileCurrentPassword;
+			}
+			const r = await apiFetch('/api/auth/me/profile', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body),
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			currentUser = await r.json() as UserItem;
+			applyUserTheme(currentUser);
+			profileEmail = currentUser.email;
+			profileCurrentPassword = '';
+			profileNewPassword = '';
+			profileStatus = t().profileSavedMessage;
+			await loadUserSettings();
+		} catch (e) {
+			profileStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			profileSaving = false;
+		}
 	}
 
 	async function addUser() {
@@ -925,9 +1165,41 @@
 		}
 	}
 
+	function setEditGroup(group: UserGroup) {
+		editGroupId = group.id;
+		editGroupName = group.name;
+	}
+
+	function clearEditGroup() {
+		editGroupId = null;
+		editGroupName = '';
+	}
+
+	async function saveGroupEdit() {
+		const id = editGroupId;
+		const name = editGroupName.trim();
+		if (!id || !name) return;
+		try {
+			const r = await apiFetch(`/api/user-groups/${id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			clearEditGroup();
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
 	function persistMiscSettings() {
 		try {
-			localStorage.setItem(SHOW_BIRDS_KEY, showBirds ? '1' : '0');
+			localStorage.setItem(SHOW_KIWI_KEY, showKiwi ? '1' : '0');
+			localStorage.setItem(SHOW_CRAB_KEY, showCrab ? '1' : '0');
 			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
 			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
 		} catch {}
@@ -1091,6 +1363,8 @@
 		historyInput?: string;
 		saveHistory?: boolean;
 		saveArtifacts?: boolean;
+		countGeneration?: boolean;
+		signal?: AbortSignal;
 	};
 
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
@@ -1102,6 +1376,7 @@
 		stage1UserPrompt = augmented;
 		const r = await apiFetch('/api/paint', {
 			method: 'POST',
+			signal: options.signal,
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				text: augmented,
@@ -1114,6 +1389,7 @@
 				canvas_aspect: effectiveCanvasAspectId(),
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
+				count_generation: options.countGeneration ?? true,
 				history_input: historyInput,
 				catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
 			})
@@ -1123,7 +1399,11 @@
 			throw new Error(d.detail ?? `HTTP ${r.status}`);
 		}
 		stageLabel = t().stageStructuring('');
-		return await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+		const data = await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+		if (currentUser && typeof data.user_generation_count === 'number') {
+			currentUser = { ...currentUser, image_generation_count: data.user_generation_count };
+		}
+		return data;
 	}
 
 	async function refreshHistoryAfterServerSave() {
@@ -1170,6 +1450,7 @@
 				const r = await paintOne(demoGeneratedPrompt, {
 					saveHistory: settings.save_db,
 					saveArtifacts: settings.save_files,
+					countGeneration: false,
 					historyInput: `[demo] ${demoGeneratedPrompt}`,
 				});
 				if (demoRunId !== runId || !loading) break;
@@ -1253,6 +1534,9 @@
 	async function submit() {
 		if (!canSubmit || loading) return;
 		const submittedMode = inputMode;
+		const abortController = new AbortController();
+		submitAbortController = abortController;
+		submitStopRequested = false;
 		loading = true; error = null;
 		activeRunMode = submittedMode;
 		ddl = null; thinking = null; ddlSelection = { start: 0, end: 0 };
@@ -1265,7 +1549,8 @@
 
 		try {
 			if (submittedMode === 'single') {
-				const r = await paintOne(input);
+				const r = await paintOne(input, { signal: abortController.signal });
+				if (submitStopRequested) return;
 				ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
 				fitCanvasZoom();
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
@@ -1280,13 +1565,17 @@
 					.filter((item) => item.input);
 				batchTotal = lines.length; outputTab = 'canvas';
 				for (let i = 0; i < lines.length; i++) {
-					if (!loading) break;
+					if (submitStopRequested) break;
 					batchCurrent = i + 1;
 					batchActiveLine = lines[i].line;
 					batchActiveTokensIn = null;
 					batchActiveTokensOut = null;
 					try {
-						const r = await paintOne(lines[i].input, { historyInput: `#${lines[i].line} ${lines[i].input}` });
+						const r = await paintOne(lines[i].input, {
+							historyInput: `#${lines[i].line} ${lines[i].input}`,
+							signal: abortController.signal,
+						});
+						if (submitStopRequested) break;
 						batchActiveDdl = r.ddl;
 						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
 						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
@@ -1305,6 +1594,7 @@
 							setBatchFailureReport({ success: batchSuccess, total: batchTotal, failures: batchFailures });
 						}
 					} catch (e) {
+						if (submitStopRequested || abortController.signal.aborted) break;
 						batchFailures = [
 							...batchFailures,
 							{
@@ -1326,13 +1616,21 @@
 				}
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e); result = null;
+			if (!(submitStopRequested || abortController.signal.aborted)) {
+				error = e instanceof Error ? e.message : String(e); result = null;
+			}
 		} finally {
+			if (submitAbortController === abortController) submitAbortController = null;
+			submitStopRequested = false;
 			stopTimer(); loading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
 		}
 	}
 
-	function stopBatch() { loading = false; }
+	function stopBatch() {
+		if (activeRunMode !== 'single' && activeRunMode !== 'batch') return;
+		submitStopRequested = true;
+		submitAbortController?.abort();
+	}
 
 	// ── Replay (Stage 2 のみ) ────────────────────────────────
 	async function replay() {
@@ -1693,6 +1991,7 @@
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
 			userMenuOpen = false;
+			if (profileOpen) closeProfile();
 			if (settingsOpen) closeSettingsModal();
 			if (catalogOpen) cancelCatalogSelection();
 			historyManager.open = false;
@@ -1702,7 +2001,7 @@
 	}
 
 	function shouldIgnoreCanvasShortcut(e: KeyboardEvent) {
-		if (!currentUser || settingsOpen || catalogOpen || historyManager.open || confirmAction) return true;
+		if (!currentUser || profileOpen || settingsOpen || catalogOpen || historyManager.open || confirmAction) return true;
 		const target = e.target;
 		if (!(target instanceof HTMLElement)) return false;
 		if (target.isContentEditable) return true;
@@ -1756,9 +2055,8 @@
 	async function downloadPNG(size: number) {
 		if (!result) return;
 		const aspect = getCanvasAspectOption(effectiveCanvasAspectId());
-		const maxRatio = Math.max(aspect.ratioW, aspect.ratioH, 1);
-		const pngWidth = Math.round(size * aspect.ratioW / maxRatio);
-		const pngHeight = Math.round(size * aspect.ratioH / maxRatio);
+		const pngHeight = Math.max(64, Math.round(size));
+		const pngWidth = Math.max(64, Math.round(pngHeight * aspect.ratioW / aspect.ratioH));
 		let svg = result.svg.replace(/(<svg)([^>]*)/, (_: string, tag: string, attrs: string) => {
 			const a = attrs.replace(/\s+width="[^"]*"/g, '').replace(/\s+height="[^"]*"/g, '');
 			return `${tag}${a} width="${pngWidth}" height="${pngHeight}"`;
@@ -1771,7 +2069,7 @@
 				canvas.width = pngWidth; canvas.height = pngHeight;
 				const ctx = canvas.getContext('2d')!;
 				if (!pngAlphaWhite) {
-					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, pngWidth, pngHeight);
 				}
 				const img = new Image();
 				img.onload = () => {
@@ -2127,7 +2425,11 @@
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
-			const birds = localStorage.getItem(SHOW_BIRDS_KEY); if (birds !== null) showBirds = birds !== '0';
+			const kiwi = localStorage.getItem(SHOW_KIWI_KEY);
+			const birds = localStorage.getItem(SHOW_BIRDS_KEY);
+			if (kiwi !== null) showKiwi = kiwi !== '0';
+			else if (birds !== null) showKiwi = birds !== '0';
+			const crab = localStorage.getItem(SHOW_CRAB_KEY); if (crab !== null) showCrab = crab !== '0';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			const savedBatchFailureReport = loadBatchFailureReport();
@@ -2146,7 +2448,7 @@
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		showBirds; pngAlphaWhite; saveReplayAsNewVersion;
+		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -2178,8 +2480,9 @@
 		{darkMode}
 		buildNumber={__BUILD_NUMBER__}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
+		onOpenProfile={openProfile}
 		onLogout={logout}
-		onOpenSettings={() => openSettings('db')}
+		onOpenSettings={() => openSettings()}
 		onToggleTheme={() => void updateUiTheme(!darkMode)}
 	/>
 
@@ -2229,7 +2532,8 @@
 						{canSubmit}
 						{error}
 						{stageLabel}
-						{showBirds}
+						{showKiwi}
+						{showCrab}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -2268,7 +2572,7 @@
 							{reloading}
 							{reloadError}
 							{loading}
-							{showBirds}
+							{showKiwi}
 							onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 							onRememberSelection={rememberDDLSelection}
 							onSyncHighlightScroll={syncDDLHighlightScroll}
@@ -2346,6 +2650,7 @@
 				onToggleStar={toggleHistoryStar}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
+				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->
 
@@ -2396,6 +2701,7 @@
 		{settingsStatus}
 		{settingsStatusError}
 		{settingsStatusLoading}
+		{dbBackupStatus}
 		{currentUser}
 		{userSettingsStatus}
 		{userSettingsLoading}
@@ -2415,8 +2721,13 @@
 		bind:editUserRole
 		bind:editUserGroupId
 		bind:newGroupName
-		bind:showBirds
+		bind:editGroupName
+		{editGroupId}
+		bind:showKiwi
+		bind:showCrab
 		bind:pngAlphaWhite
+		{exportTemplates}
+		{exportTemplateStatus}
 		bind:saveReplayAsNewVersion
 		{canvasAspectEnabled}
 		onSetCanvasAspectEnabled={setCanvasAspectEnabled}
@@ -2428,6 +2739,8 @@
 		onSetStage2Provider={setStage2Provider}
 		onSetStage2Model={setStage2Model}
 		onLoadSettingsStatus={loadSettingsStatus}
+		onUpdateDbBackupSettings={updateDbBackupSettings}
+		onRunDbBackupNow={runDbBackupNow}
 		onLoadUserSettings={loadUserSettings}
 		onLogin={login}
 		onLogout={logout}
@@ -2438,8 +2751,29 @@
 		onRemoveUser={removeUser}
 		onAddGroup={addGroup}
 		onRemoveGroup={removeGroup}
+		onSetEditGroup={setEditGroup}
+		onClearEditGroup={clearEditGroup}
+		onSaveGroupEdit={saveGroupEdit}
 		onCancelModelSelection={cancelModelSelection}
 		onConfirmModelSelection={confirmModelSelection}
+		onAddExportTemplate={addExportTemplate}
+		onUpdateExportTemplate={updateExportTemplate}
+		onRemoveExportTemplate={removeExportTemplate}
+	/>
+{/if}
+
+{#if profileOpen && currentUser}
+		<ProfileModal
+			username={currentUser.username}
+			email={currentUser.email}
+			generationCount={currentUser.image_generation_count}
+			status={profileStatus}
+		saving={profileSaving}
+		bind:profileEmail
+		bind:profileCurrentPassword
+		bind:profileNewPassword
+		onClose={closeProfile}
+		onSave={saveProfile}
 	/>
 {/if}
 

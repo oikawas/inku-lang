@@ -134,6 +134,8 @@
 	// ── Loading ─────────────────────────────────────────────
 	let loading    = $state(false);
 	let activeRunMode = $state<'single' | 'batch' | 'demo' | null>(null);
+	let submitAbortController: AbortController | null = null;
+	let submitStopRequested = false;
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
@@ -1091,6 +1093,7 @@
 		historyInput?: string;
 		saveHistory?: boolean;
 		saveArtifacts?: boolean;
+		signal?: AbortSignal;
 	};
 
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
@@ -1102,6 +1105,7 @@
 		stage1UserPrompt = augmented;
 		const r = await apiFetch('/api/paint', {
 			method: 'POST',
+			signal: options.signal,
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				text: augmented,
@@ -1253,6 +1257,9 @@
 	async function submit() {
 		if (!canSubmit || loading) return;
 		const submittedMode = inputMode;
+		const abortController = new AbortController();
+		submitAbortController = abortController;
+		submitStopRequested = false;
 		loading = true; error = null;
 		activeRunMode = submittedMode;
 		ddl = null; thinking = null; ddlSelection = { start: 0, end: 0 };
@@ -1265,7 +1272,8 @@
 
 		try {
 			if (submittedMode === 'single') {
-				const r = await paintOne(input);
+				const r = await paintOne(input, { signal: abortController.signal });
+				if (submitStopRequested) return;
 				ddl = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
 				fitCanvasZoom();
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
@@ -1280,13 +1288,17 @@
 					.filter((item) => item.input);
 				batchTotal = lines.length; outputTab = 'canvas';
 				for (let i = 0; i < lines.length; i++) {
-					if (!loading) break;
+					if (submitStopRequested) break;
 					batchCurrent = i + 1;
 					batchActiveLine = lines[i].line;
 					batchActiveTokensIn = null;
 					batchActiveTokensOut = null;
 					try {
-						const r = await paintOne(lines[i].input, { historyInput: `#${lines[i].line} ${lines[i].input}` });
+						const r = await paintOne(lines[i].input, {
+							historyInput: `#${lines[i].line} ${lines[i].input}`,
+							signal: abortController.signal,
+						});
+						if (submitStopRequested) break;
 						batchActiveDdl = r.ddl;
 						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
 						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
@@ -1305,6 +1317,7 @@
 							setBatchFailureReport({ success: batchSuccess, total: batchTotal, failures: batchFailures });
 						}
 					} catch (e) {
+						if (submitStopRequested || abortController.signal.aborted) break;
 						batchFailures = [
 							...batchFailures,
 							{
@@ -1326,13 +1339,21 @@
 				}
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e); result = null;
+			if (!(submitStopRequested || abortController.signal.aborted)) {
+				error = e instanceof Error ? e.message : String(e); result = null;
+			}
 		} finally {
+			if (submitAbortController === abortController) submitAbortController = null;
+			submitStopRequested = false;
 			stopTimer(); loading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
 		}
 	}
 
-	function stopBatch() { loading = false; }
+	function stopBatch() {
+		if (activeRunMode !== 'single' && activeRunMode !== 'batch') return;
+		submitStopRequested = true;
+		submitAbortController?.abort();
+	}
 
 	// ── Replay (Stage 2 のみ) ────────────────────────────────
 	async function replay() {

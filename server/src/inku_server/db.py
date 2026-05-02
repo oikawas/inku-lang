@@ -70,6 +70,7 @@ class UserAccountRow(Base):
     role          = Column(String, nullable=False, index=True)
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
     ui_theme      = Column(String, nullable=False, default="light")
+    settings_tab  = Column(String, nullable=False, default="db")
     batch_prompt_history = Column(Text, nullable=False, default="[]")
     demo_settings = Column(Text, nullable=False, default="{}")
     plugin_storage = Column(Text, nullable=False, default="{}")
@@ -99,12 +100,14 @@ _HISTORY_COLUMN_MIGRATIONS = {
 }
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
+    "settings_tab": "ALTER TABLE user_accounts ADD COLUMN settings_tab VARCHAR NOT NULL DEFAULT 'db'",
     "batch_prompt_history": "ALTER TABLE user_accounts ADD COLUMN batch_prompt_history TEXT NOT NULL DEFAULT '[]'",
     "demo_settings": "ALTER TABLE user_accounts ADD COLUMN demo_settings TEXT NOT NULL DEFAULT '{}'",
     "plugin_storage": "ALTER TABLE user_accounts ADD COLUMN plugin_storage TEXT NOT NULL DEFAULT '{}'",
 }
 _BATCH_PROMPT_HISTORY_LIMIT = 20
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
+_SETTINGS_TABS = {"db", "plugins", "users", "misc"}
 _PLUGIN_STORAGE_MAX_BYTES = 20_000
 _DEMO_DEFAULT_SETTINGS = {
     "save_db": False,
@@ -373,6 +376,7 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "group_id": row.group_id,
         "group_name": group_name,
         "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
+        "settings_tab": row.settings_tab if row.settings_tab in _SETTINGS_TABS else "db",
         "at": row.at,
     }
 
@@ -416,6 +420,21 @@ def add_user_group(name: str) -> dict:
     row = UserGroupRow(id=str(uuid.uuid4()), name=name, at=_now_ms())
     with SessionLocal() as session:
         session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _group_to_dict(row)
+
+
+def update_user_group(group_id: str, name: str) -> dict | None:
+    name = name.strip()
+    if not name:
+        raise ValueError("group name is required")
+    with SessionLocal() as session:
+        row = session.get(UserGroupRow, group_id)
+        if not row:
+            return None
+        row.name = name
+        row.at = _now_ms()
         session.commit()
         session.refresh(row)
         return _group_to_dict(row)
@@ -612,6 +631,25 @@ def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
         if not row:
             return None
         row.ui_theme = ui_theme
+        session.commit()
+        session.refresh(row)
+        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+        return _user_to_dict(row, group_name)
+
+
+def update_user_settings(user_id: str, ui_theme: str | None = None, settings_tab: str | None = None) -> dict | None:
+    if ui_theme is not None and ui_theme not in {"light", "dark"}:
+        raise ValueError("invalid ui theme")
+    if settings_tab is not None and settings_tab not in _SETTINGS_TABS:
+        raise ValueError("invalid settings tab")
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        if ui_theme is not None:
+            row.ui_theme = ui_theme
+        if settings_tab is not None:
+            row.settings_tab = settings_tab
         session.commit()
         session.refresh(row)
         group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None

@@ -73,6 +73,8 @@
 		editUserRole: UserRole;
 		editUserGroupId: string;
 		newGroupName: string;
+		editGroupId: string | null;
+		editGroupName: string;
 		showKiwi: boolean;
 		showCrab: boolean;
 		pngAlphaWhite: boolean;
@@ -96,6 +98,9 @@
 		onRemoveUser: (id: string) => void | Promise<void>;
 		onAddGroup: () => void | Promise<void>;
 		onRemoveGroup: (group: UserGroup) => void | Promise<void>;
+		onSetEditGroup: (group: UserGroup) => void;
+		onClearEditGroup: () => void;
+		onSaveGroupEdit: () => void | Promise<void>;
 		onSetCanvasAspectEnabled: (enabled: boolean) => void | Promise<void>;
 		onCancelModelSelection: () => void;
 		onConfirmModelSelection: () => void;
@@ -131,6 +136,8 @@
 		editUserRole = $bindable(),
 		editUserGroupId = $bindable(),
 		newGroupName = $bindable(),
+		editGroupId,
+		editGroupName = $bindable(),
 		showKiwi = $bindable(),
 		showCrab = $bindable(),
 		pngAlphaWhite = $bindable(),
@@ -154,22 +161,15 @@
 		onRemoveUser,
 		onAddGroup,
 		onRemoveGroup,
+		onSetEditGroup,
+		onClearEditGroup,
+		onSaveGroupEdit,
 		onSetCanvasAspectEnabled,
 		onCancelModelSelection,
 		onConfirmModelSelection,
 	}: Props = $props();
 
-	const USER_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
-		{ value: 'admin', label: 'admin' },
-		{ value: 'group_lead', label: 'group_lead' },
-		{ value: 'user', label: 'user' },
-	];
-
-	function userRoleLabel(role: UserRole) {
-		if (role === 'admin') return t().userRoleAdmin;
-		if (role === 'group_lead') return t().userRoleGroupLead;
-		return t().userRoleUser;
-	}
+	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
 </script>
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -294,8 +294,8 @@
 				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReload}</button>
 			</div>
 		{:else if settingsTab === 'users'}
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsUsersLabel}</div>
+			<div class="popover-group user-account-group">
+				<div class="popover-group-label">{t().settingsUserSessionLabel}</div>
 				{#if userSettingsStatus}
 					<div class="inline-message">{userSettingsStatus}</div>
 				{/if}
@@ -311,31 +311,67 @@
 						<span>{currentUser.username} / {currentUser.role}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
 						<button class="ghost-btn" onclick={onLogout}>{t().logoutButton}</button>
 					</div>
-					<div class="settings-inline-actions">
-						<button class="ghost-btn" onclick={onLoadUserSettings} disabled={userSettingsLoading || !['admin', 'group_lead'].includes(currentUser.role)}>{t().settingsReload}</button>
-					</div>
 					{#if userSettingsLoading}
 						<div class="inline-message">{t().settingsLoading}</div>
 					{/if}
-					{#if currentUser.role === 'admin' || currentUser.role === 'group_lead'}
-						<div class="user-editor-grid">
+				{/if}
+			</div>
+			{#if currentUser}
+				{#if currentUser.role === 'admin' || currentUser.role === 'group_lead'}
+					<div class="popover-group">
+						<div class="user-management-head">
+							<div>
+								<div class="popover-group-label">{t().settingsUsersLabel}</div>
+								<div class="user-management-count">{t().userCountLabel(users.length)}</div>
+							</div>
+							<button class="ghost-btn" onclick={onLoadUserSettings} disabled={userSettingsLoading || !['admin', 'group_lead'].includes(currentUser.role)}>{t().settingsReload}</button>
+						</div>
+						<div class="user-management-layout">
+							<div class="user-list-panel">
+								<div class="user-list-head">
+									<span>{t().userNamePlaceholder}</span>
+									<span>{t().userEmailPlaceholder}</span>
+									<span>{t().userRoleLabel}</span>
+									<span>{t().userGroupLabel}</span>
+									<span></span>
+								</div>
+								<div class="user-list">
+									{#each users as user (user.id)}
+										<div class="user-row" class:selected={selectedUserId === user.id}>
+											<button class="user-select" onclick={() => onSetEditUser(user)}>
+												<span class="user-cell user-name">{user.username}</span>
+												<span class="user-cell">{user.email}</span>
+												<span class="user-cell">{user.role}</span>
+												<span class="user-cell">{user.group_name ?? t().userNoGroup}</span>
+											</button>
+											<button class="ghost-btn" onclick={() => onRemoveUser(user.id)}>{t().deleteButton}</button>
+										</div>
+									{/each}
+								</div>
+							</div>
 							<div class="user-editor-panel">
 								<div class="user-editor-title">{t().userAddTitle}</div>
 								<div class="user-form-grid">
 									<input bind:value={newUserName} placeholder={t().userNamePlaceholder} />
 									<input bind:value={newUserEmail} type="email" placeholder={t().userEmailPlaceholder} />
 									<input bind:value={newUserPassword} type="password" placeholder={t().userPasswordPlaceholder} />
-									<select bind:value={newUserRole} disabled={currentUser.role === 'group_lead'}>
-										{#each USER_ROLE_OPTIONS as role (role.value)}
-											<option value={role.value}>{userRoleLabel(role.value)}</option>
-										{/each}
-									</select>
-									<select bind:value={newUserGroupId} disabled={currentUser.role === 'group_lead'}>
-										<option value="">{t().userNoGroup}</option>
-										{#each groups as group (group.id)}
-											<option value={group.id}>{group.name}</option>
-										{/each}
-									</select>
+									<label class="user-form-field">
+										<span>{t().userRoleSelectLabel}</span>
+										<select bind:value={newUserRole} disabled={currentUser.role === 'group_lead'}>
+											{#each USER_ROLE_OPTIONS as role (role)}
+												<option value={role}>{role}</option>
+											{/each}
+										</select>
+									</label>
+									<label class="user-form-field">
+										<span>{t().userGroupSelectLabel}</span>
+										<select bind:value={newUserGroupId} disabled={currentUser.role === 'group_lead'}>
+											<option value="">{t().userNoGroup}</option>
+											{#each groups as group (group.id)}
+												<option value={group.id}>{group.name}</option>
+											{/each}
+										</select>
+									</label>
 								</div>
 								<div class="user-form-actions">
 									<button class="ghost-btn" onclick={onAddUser}>{t().userAddButton}</button>
@@ -348,17 +384,23 @@
 										<input bind:value={editUserName} placeholder={t().userNamePlaceholder} />
 										<input bind:value={editUserEmail} type="email" placeholder={t().userEmailPlaceholder} />
 										<input bind:value={editUserPassword} type="password" placeholder={t().userNewPasswordPlaceholder} />
-										<select bind:value={editUserRole} disabled={currentUser.role === 'group_lead'}>
-											{#each USER_ROLE_OPTIONS as role (role.value)}
-												<option value={role.value}>{userRoleLabel(role.value)}</option>
-											{/each}
-										</select>
-										<select bind:value={editUserGroupId} disabled={currentUser.role === 'group_lead'}>
-											<option value="">{t().userNoGroup}</option>
-											{#each groups as group (group.id)}
-												<option value={group.id}>{group.name}</option>
-											{/each}
-										</select>
+										<label class="user-form-field">
+											<span>{t().userRoleSelectLabel}</span>
+											<select bind:value={editUserRole} disabled={currentUser.role === 'group_lead'}>
+												{#each USER_ROLE_OPTIONS as role (role)}
+													<option value={role}>{role}</option>
+												{/each}
+											</select>
+										</label>
+										<label class="user-form-field">
+											<span>{t().userGroupSelectLabel}</span>
+											<select bind:value={editUserGroupId} disabled={currentUser.role === 'group_lead'}>
+												<option value="">{t().userNoGroup}</option>
+												{#each groups as group (group.id)}
+													<option value={group.id}>{group.name}</option>
+												{/each}
+											</select>
+										</label>
 									</div>
 									<div class="user-form-actions">
 										<button class="ghost-btn" onclick={onClearEditUser}>{t().userClearSelection}</button>
@@ -369,23 +411,14 @@
 								{/if}
 							</div>
 						</div>
-						<div class="user-list">
-							{#each users as user (user.id)}
-								<div class="user-row" class:selected={selectedUserId === user.id}>
-									<button class="ghost-btn" onclick={() => onSetEditUser(user)}>{t().editButton}</button>
-									<span class="user-cell user-name">{user.username}</span>
-									<span class="user-cell">{user.email}</span>
-									<span class="user-cell">{user.role}</span>
-									<span class="user-cell">{user.group_name ?? t().userNoGroup}</span>
-									<button class="ghost-btn" onclick={() => onRemoveUser(user.id)}>{t().deleteButton}</button>
-								</div>
-							{/each}
-						</div>
-					{:else}
+					</div>
+				{:else}
+					<div class="popover-group">
+						<div class="popover-group-label">{t().settingsUsersLabel}</div>
 						<div class="inline-message">{t().userManageUnavailable}</div>
-					{/if}
+					</div>
 				{/if}
-			</div>
+			{/if}
 			{#if currentUser?.role === 'admin'}
 				<div class="popover-group">
 					<div class="popover-group-label">{t().userGroupLabel}</div>
@@ -396,8 +429,24 @@
 					<div class="group-list">
 						{#each groups as group (group.id)}
 							<div class="group-row">
-								<span>{group.name}</span>
-								<button class="ghost-btn" onclick={() => onRemoveGroup(group)}>{t().deleteButton}</button>
+								{#if editGroupId === group.id}
+									<input
+										class="group-edit-input"
+										bind:value={editGroupName}
+										placeholder={t().groupNamePlaceholder}
+										onkeydown={(e) => { if (e.key === 'Enter') void onSaveGroupEdit(); }}
+									/>
+									<div class="group-row-actions">
+										<button class="ghost-btn" onclick={onClearEditGroup}>{t().confirmCancel}</button>
+										<button class="ghost-btn primary-inline" onclick={onSaveGroupEdit}>{t().userSaveChanges}</button>
+									</div>
+								{:else}
+									<span>{group.name}</span>
+									<div class="group-row-actions">
+										<button class="ghost-btn" onclick={() => onSetEditGroup(group)}>{t().editButton}</button>
+										<button class="ghost-btn" onclick={() => onRemoveGroup(group)}>{t().deleteButton}</button>
+									</div>
+								{/if}
 							</div>
 						{/each}
 					</div>
@@ -496,7 +545,7 @@
 		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
 	}
 	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
-	.form-row select, .plugin-add input, .login-grid input {
+	.form-row select, .plugin-add input, .login-grid input, .group-edit-input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: var(--panel); color: var(--fg); font-size: 12px; font-family: inherit;
@@ -622,6 +671,9 @@
 		gap: 8px;
 		align-items: center;
 	}
+	.user-account-group {
+		background: var(--panel);
+	}
 	.user-session-row {
 		display: flex;
 		justify-content: space-between;
@@ -634,11 +686,27 @@
 		color: var(--fg2);
 		font-size: 12px;
 	}
-	.user-editor-grid {
+	.user-management-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 12px;
+		margin-bottom: 10px;
+	}
+	.user-management-count {
+		color: var(--fg3);
+		font-size: 11px;
+		line-height: 1.4;
+	}
+	.user-management-layout {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
 		gap: 10px;
-		margin-top: 10px;
+		align-items: start;
+	}
+	.user-list-panel {
+		min-width: 0;
+		--user-list-columns: minmax(0, 1fr) minmax(0, 1.35fr) 86px 100px 68px;
 	}
 	.user-editor-panel {
 		border: 1px solid var(--border);
@@ -663,11 +731,29 @@
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: var(--panel); color: var(--fg); font-size: 12px; font-family: inherit;
 	}
+	.user-form-field {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		min-width: 0;
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.user-form-field select {
+		width: 100%;
+		text-transform: none;
+		letter-spacing: 0;
+	}
 	.user-form-actions {
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
 		margin-top: 8px;
+	}
+	.user-management-layout .user-editor-panel {
+		grid-column: 2;
 	}
 	.primary-inline {
 		border-color: var(--accent);
@@ -680,9 +766,19 @@
 		gap: 6px;
 		margin-top: 10px;
 	}
+	.user-list-head {
+		display: grid;
+		grid-template-columns: var(--user-list-columns);
+		gap: 8px;
+		padding: 0 9px 5px;
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
 	.user-row {
 		display: grid;
-		grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.35fr) 120px 120px auto;
+		grid-template-columns: var(--user-list-columns);
 		gap: 8px;
 		align-items: center;
 		padding: 7px 9px;
@@ -691,6 +787,25 @@
 		background: var(--panel);
 	}
 	.user-row.selected { border-color: var(--accent); background: var(--accent-light); }
+	.user-select {
+		grid-column: 1 / 5;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) 86px 100px;
+		gap: 8px;
+		align-items: center;
+		min-width: 0;
+		padding: 0;
+		border: none;
+		background: none;
+		color: inherit;
+		font-family: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.user-row > .ghost-btn {
+		width: 68px;
+		justify-content: center;
+	}
 	.user-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg2); font-size: 12px; }
 	.user-name { color: var(--fg); font-weight: 500; }
 	.group-row {
@@ -704,6 +819,16 @@
 		padding: 7px 9px;
 		font-size: 12px;
 		color: var(--fg2);
+	}
+	.group-row-actions {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 6px;
+		flex-shrink: 0;
+	}
+	.group-edit-input {
+		flex: 1;
 	}
 	.setting-toggle {
 		display: flex;

@@ -105,6 +105,7 @@
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
+	type SettingsTab = 'connection' | 'db' | 'plugins' | 'users' | 'misc';
 	type UserGroup = {
 		id: string;
 		name: string;
@@ -119,6 +120,7 @@
 		group_id: string | null;
 		group_name: string | null;
 		ui_theme?: 'light' | 'dark';
+		settings_tab?: SettingsTab;
 		at: number;
 	};
 	// ── Input ───────────────────────────────────────────────
@@ -187,7 +189,7 @@
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let settingsOpen = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
-	let settingsTab  = $state<'connection' | 'db' | 'plugins' | 'users' | 'misc'>('connection');
+	let settingsTab  = $state<SettingsTab>('connection');
 	let pngMenuOpen  = $state(false);
 	let userMenuOpen = $state(false);
 	let darkMode     = $state(false);
@@ -343,6 +345,8 @@
 	let editUserRole = $state<UserRole>('user');
 	let editUserGroupId = $state('');
 	let newGroupName = $state('');
+	let editGroupId = $state<string | null>(null);
+	let editGroupName = $state('');
 	let userSettingsStatus = $state<string | null>(null);
 	let userSettingsLoading = $state(false);
 	let userSettingsRequestId = 0;
@@ -360,6 +364,10 @@
 
 	function applyUserTheme(user: UserItem | null) {
 		darkMode = user?.ui_theme === 'dark';
+	}
+
+	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
+		return tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'misc';
 	}
 
 	function normalizeBatchPromptHistory(items: string[]): string[] {
@@ -557,12 +565,33 @@
 		}
 	}
 
-	function openSettings(tab: typeof settingsTab = 'db') {
+	async function updateUserSettingsTab(tab: typeof settingsTab) {
+		if (!currentUser || !isSettingsContentTab(tab)) return;
+		const previousUser = currentUser;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ settings_tab: tab })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			currentUser = previousUser;
+			console.warn('failed to update settings tab', e);
+		}
+	}
+
+	function openSettings(tab: typeof settingsTab | null = null) {
 		settingsMode = 'settings';
-		settingsTab = tab;
+		const nextTab = tab ?? (isSettingsContentTab(currentUser?.settings_tab) ? currentUser.settings_tab : 'db');
+		settingsTab = nextTab;
 		settingsOpen = true;
-		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
-		if (tab === 'users') void loadUserSettings();
+		if (nextTab === 'db' || nextTab === 'plugins') void loadSettingsStatus();
+		if (nextTab === 'users') void loadUserSettings();
 	}
 
 	function openModelSelection() {
@@ -630,6 +659,7 @@
 
 	function selectSettingsTab(tab: typeof settingsTab) {
 		settingsTab = tab;
+		void updateUserSettingsTab(tab);
 		if (tab === 'db' || tab === 'plugins') void loadSettingsStatus();
 		if (tab === 'users') void loadUserSettings();
 	}
@@ -924,6 +954,37 @@
 				const d = await r.json().catch(() => ({})) as { detail?: string };
 				throw new Error(d.detail ?? `HTTP ${r.status}`);
 			}
+			await loadUserSettings();
+		} catch (e) {
+			userSettingsStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	function setEditGroup(group: UserGroup) {
+		editGroupId = group.id;
+		editGroupName = group.name;
+	}
+
+	function clearEditGroup() {
+		editGroupId = null;
+		editGroupName = '';
+	}
+
+	async function saveGroupEdit() {
+		const id = editGroupId;
+		const name = editGroupName.trim();
+		if (!id || !name) return;
+		try {
+			const r = await apiFetch(`/api/user-groups/${id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			clearEditGroup();
 			await loadUserSettings();
 		} catch (e) {
 			userSettingsStatus = e instanceof Error ? e.message : String(e);
@@ -2208,7 +2269,7 @@
 		buildNumber={__BUILD_NUMBER__}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
 		onLogout={logout}
-		onOpenSettings={() => openSettings('db')}
+		onOpenSettings={() => openSettings()}
 		onToggleTheme={() => void updateUiTheme(!darkMode)}
 	/>
 
@@ -2445,6 +2506,8 @@
 		bind:editUserRole
 		bind:editUserGroupId
 		bind:newGroupName
+		bind:editGroupName
+		{editGroupId}
 		bind:showKiwi
 		bind:showCrab
 		bind:pngAlphaWhite
@@ -2469,6 +2532,9 @@
 		onRemoveUser={removeUser}
 		onAddGroup={addGroup}
 		onRemoveGroup={removeGroup}
+		onSetEditGroup={setEditGroup}
+		onClearEditGroup={clearEditGroup}
+		onSaveGroupEdit={saveGroupEdit}
 		onCancelModelSelection={cancelModelSelection}
 		onConfirmModelSelection={confirmModelSelection}
 	/>

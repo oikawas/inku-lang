@@ -187,6 +187,11 @@ export interface LangPack {
 	userRoleAdmin: string;
 	userRoleGroupLead: string;
 	userRoleUser: string;
+	settingsUserSessionLabel: string;
+	userCountLabel: (n: number) => string;
+	userRoleLabel: string;
+	userRoleSelectLabel: string;
+	userGroupSelectLabel: string;
 	loginRequiredMessage: string;
 	settingsAdminOnlyMessage: string;
 	userInfoLoadFailed: string;

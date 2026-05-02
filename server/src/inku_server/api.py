@@ -351,6 +351,10 @@ class UserGroupCreateBody(BaseModel):
     name: str = Field(..., min_length=1, description="ユーザーグループ名")
 
 
+class UserGroupUpdateBody(BaseModel):
+    name: str = Field(..., min_length=1, description="ユーザーグループ名")
+
+
 class UserAccountItem(BaseModel):
     id: str
     username: str
@@ -360,6 +364,7 @@ class UserAccountItem(BaseModel):
     group_id: str | None = None
     group_name: str | None = None
     ui_theme: str = "light"
+    settings_tab: str = "db"
     at: int
 
 
@@ -389,7 +394,8 @@ class LoginResponse(BaseModel):
 
 
 class UserSettingsBody(BaseModel):
-    ui_theme: str = Field(default="light")
+    ui_theme: str | None = None
+    settings_tab: str | None = None
 
 
 class BatchPromptHistoryBody(BaseModel):
@@ -552,7 +558,7 @@ def api_auth_me(actor: dict = Depends(_current_user)) -> UserAccountItem:
 @app.patch("/api/auth/me/settings", response_model=UserAccountItem)
 def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_user)) -> UserAccountItem:
     try:
-        user = _db.update_user_theme(actor["id"], body.ui_theme)
+        user = _db.update_user_settings(actor["id"], ui_theme=body.ui_theme, settings_tab=body.settings_tab)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     if not user:
@@ -1269,6 +1275,25 @@ def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_use
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=409, detail=f"group create failed: {e}") from e
+
+
+@app.patch("/api/user-groups/{group_id}", response_model=UserGroupItem)
+def api_user_groups_update(
+    group_id: str,
+    body: UserGroupUpdateBody,
+    actor: dict = Depends(_user_manager),
+) -> UserGroupItem:
+    if actor["role"] != "admin":
+        raise HTTPException(status_code=403, detail="only administrators can update groups")
+    try:
+        group = _db.update_user_group(group_id, body.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=409, detail=f"group update failed: {e}") from e
+    if not group:
+        raise HTTPException(status_code=404, detail="group not found")
+    return UserGroupItem(**group)
 
 
 @app.delete("/api/user-groups/{group_id}")

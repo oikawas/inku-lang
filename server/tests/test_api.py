@@ -926,6 +926,14 @@ def test_user_management_crud():
     group_r = client.post("/api/user-groups", json={"name": f"class-{suffix}"}, headers=headers)
     assert group_r.status_code == 200
     group = group_r.json()
+    rename_r = client.patch(
+        f"/api/user-groups/{group['id']}",
+        json={"name": f"renamed-class-{suffix}"},
+        headers=headers,
+    )
+    assert rename_r.status_code == 200
+    assert rename_r.json()["name"] == f"renamed-class-{suffix}"
+    group = rename_r.json()
 
     user_r = client.post(
         "/api/users",
@@ -955,10 +963,20 @@ def test_user_management_crud():
     )
     assert patch_r.status_code == 200
     assert patch_r.json()["role"] == "group_lead"
+    settings_r = client.patch("/api/auth/me/settings", json={"settings_tab": "users"}, headers=headers)
+    assert settings_r.status_code == 200
+    assert settings_r.json()["settings_tab"] == "users"
+    bad_settings_r = client.patch("/api/auth/me/settings", json={"settings_tab": "connection"}, headers=headers)
+    assert bad_settings_r.status_code == 400
 
     lead_headers, lead_token = _auth_headers(user)
 
     assert client.post("/api/user-groups", json={"name": f"blocked-{suffix}"}, headers=lead_headers).status_code == 403
+    assert client.patch(
+        f"/api/user-groups/{group['id']}",
+        json={"name": f"blocked-rename-{suffix}"},
+        headers=lead_headers,
+    ).status_code == 403
     blocked_admin_r = client.post(
         "/api/users",
         json={

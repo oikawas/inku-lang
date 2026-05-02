@@ -4,7 +4,7 @@
 		CANVAS_ASPECT_OPTIONS,
 		getCanvasAspectOption,
 		type CanvasAspectId,
-	} from '$lib/plugins/canvasAspect';
+	} from '$lib/plugins/system/canvas-aspect';
 
 	type Props = {
 		selected: CanvasAspectId;

@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.33**  
+**Version: v1.34**  
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -216,6 +216,12 @@ Plugin principles:
 4. Plugin code should be isolated from the main UI where possible.
 5. Plugin behavior should be documented in [PLUGIN.md](PLUGIN.md).
 
+Plugin implementation is split into system and user directories.  Each plugin
+owns its own directory.  The built-in `canvas-aspect` plugin lives under
+`server/src/inku_server/plugins/system/canvas_aspect/` on the backend and
+`web/src/lib/plugins/system/canvas-aspect/` in the frontend.  User plugin
+directories are reserved for future local or third-party plugin loading.
+
 The next likely plugin family is nature primitives or phenomena, such as
 leaves, wind, rain, or water.  Such plugins must define whether they extend
 Stage 2, JSON Score, renderer behavior, or only a deterministic vocabulary
@@ -388,7 +394,7 @@ The reference implementation currently includes:
 - model/provider selection
 - color catalog selection
 - dark mode
-- plugin storage and `canvas-aspect`
+- plugin storage, system/user plugin directories, and `canvas-aspect`
 - SVG and PNG export
 - CLI client foundation
 - shared kiwi progress mascot for single drawing and DDL replay

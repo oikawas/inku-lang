@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.33**
+**Version: v1.34**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -158,6 +158,8 @@ v1.29 時点では、参照実装として `canvas-aspect` プラグインを追
 - 現在のフックは **canvas-size hook** のみ
 - ユーザーごとのプラグイン設定は DB の plugin extension storage に JSON として保存する
 - Web UI のプラグイン呼び出しボタンは、モデル選択ボタンの左側に配置する
+- プラグイン実装は system plugins と user plugins のディレクトリを分け、各プラグインを専用ディレクトリに配置する
+- 参照実装の `canvas-aspect` は、サーバー側では `server/src/inku_server/plugins/system/canvas_aspect/`、Web 側では `web/src/lib/plugins/system/canvas-aspect/` に配置する
 - キャンバス比率を変更した場合、既存の描画表示はクリアし、選択比率に合わせたプレースホルダー画像へ切り替える
 - `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を決定する
 - 正規化座標は 0.0〜1.0 のまま維持する。円・弧の半径は短辺基準とし、ワイド/縦長キャンバスで真円が不自然に引き伸ばされないようにする
@@ -1362,7 +1364,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 `server/src/inku_server/`:
 - `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
 - `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
-- `plugins.py` — プラグインレジストリと hook 補助。v1.29 時点では `canvas-aspect` の canvas-size hook を提供
+- `plugins/` — プラグインレジストリと hook 補助。system/user ディレクトリを分け、v1.34 時点では system plugin として `canvas-aspect` の canvas-size hook を提供
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
@@ -1381,6 +1383,21 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.34 (2026-05-02)
+
+**プラグインディレクトリ構成の整理**
+
+プラグインを system と user の配置に分け、各プラグインを専用ディレクトリに置く構成へ変更した。
+
+- サーバー側プラグイン実装を `server/src/inku_server/plugins/` パッケージへ移行
+- system plugin は `server/src/inku_server/plugins/system/<plugin_name>/` に配置する
+- user plugin 用に `server/src/inku_server/plugins/user/` 名前空間を予約する
+- Web 側プラグイン実装を `web/src/lib/plugins/system/<plugin-id>/` に配置する
+- user plugin 用に `web/src/lib/plugins/user/` を予約する
+- 既存の `canvas-aspect` は system plugin として専用ディレクトリへ移動する
+- `server/src/inku_server/plugins/__init__.py` は API / Renderer から参照する安定した hook API を再エクスポートする
+- build number: 213
 
 ### v1.33 (2026-05-02)
 

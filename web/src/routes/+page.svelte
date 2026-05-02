@@ -33,7 +33,7 @@
 		getCanvasAspectOption,
 		normalizeCanvasAspectId,
 		type CanvasAspectId,
-	} from '$lib/plugins/canvasAspect';
+	} from '$lib/plugins/system/canvas-aspect';
 	import {
 		HistoryManagerState,
 		type HistoryItem,

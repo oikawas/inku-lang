@@ -1,8 +1,4 @@
-"""Plugin registry and hook helpers.
-
-The first reference plugin is canvas-aspect.  The registry is deliberately
-small, but it establishes the contract used by API, renderer, and UI clients.
-"""
+"""Canvas aspect system plugin."""
 
 from __future__ import annotations
 
@@ -63,13 +59,3 @@ def canvas_size_for_aspect(value: str | None) -> CanvasSize:
     if ratio >= 1:
         return CanvasSize(width=round(CANVAS_BASE_PX * ratio), height=CANVAS_BASE_PX)
     return CanvasSize(width=round(CANVAS_BASE_PX * ratio), height=CANVAS_BASE_PX)
-
-
-def plugin_status_items() -> list[dict[str, str]]:
-    return [
-        {
-            "name": CANVAS_ASPECT_PLUGIN_ID,
-            "version": "0.1.0",
-            "status": "enabled",
-        }
-    ]

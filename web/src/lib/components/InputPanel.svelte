@@ -7,7 +7,7 @@
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 	import type { DemoSettings } from '$lib/demo';
-	import type { CanvasAspectId } from '$lib/plugins/canvasAspect';
+	import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 
 	type BatchFailure = {
 		line: number;

@@ -97,9 +97,11 @@ possibilities by selectively applying:
 
 - mathematical and geometric laws
 - spatial paths and non-central focus
+- scene-tone palette choices
 - music-derived structures such as counterpoint, canon, and harmonic ratios
 - painting and material techniques such as perspective, chiaroscuro, drawing,
   pointillism, watercolor, oil-paint layering, patchwork, fresco, and sumi ink
+- abstracted natural or material forms using the current primitive vocabulary
 
 The filter must be selective.  It should not pack every technique into every
 image.  It chooses a small number of relevant techniques based on the sentence's
@@ -111,6 +113,12 @@ Stage 2 converts normalized and expanded DDL into JSON Score.  Its job is
 structural, not poetic.  It must preserve DDL elements such as color, material,
 movement, arrangement path, rotation, and canvas.  If an element exists in DDL,
 Stage 2 should either encode it or fail clearly.
+
+When Stage 2 cannot return usable instructions because of timeout, empty output,
+or transient model failure, the server may produce a deterministic fallback
+Score.  This fallback is still expected to preserve the DDL's visible essentials:
+quantity, placement path, material words, palette tone, and enough shape variety
+to remain reviewable.
 
 ### Renderer: Performance
 
@@ -138,7 +146,7 @@ Current core categories include:
 
 | English | Japanese | Examples |
 | --- | --- | --- |
-| shape | かたち | circle, ellipse, square, line, arc |
+| shape | かたち | circle, ellipse, triangle, square, line, arc |
 | touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
 | line continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | motion | うごき | place, align, scatter, fill, tremble, undulate |
@@ -163,12 +171,25 @@ Important score concepts:
 
 - `canvas`: selected canvas aspect identifier, such as `square` or `golden`
 - `instructions`: ordered drawing instructions
-- primitive fields: shape, line, circle, ellipse, square, arc, and related data
+- primitive fields: line, circle, ellipse, triangle, square, arc, and related data
 - `weight`: material / tool quality
 - `variation`: visible wobble, blur, tremble, or motion behavior
-- `arrangement`: count, distribution, paths, and grouping
+- `arrangement`: count, distribution, paths, grouping, density, fade, and color cycles
 - `rotation`: shape-level or group-level orientation
 - `color_hint`: optional hint used when resolving catalog colors
+
+Large repetitions should prefer group behavior over literal overload.  Dense
+clusters use `arrangement.density`, `cluster_count`, `fade`, and
+`preserve_space` so that negative space remains part of the composition.
+
+Current scene-tone palette behavior uses abstract colors only:
+
+- spring, flowers, buds, and warm light lean toward red / green / white
+- water, night, moon, rain, mist, and cold air lean toward blue / white / gray
+- forest, leaves, grass, moss, and fragrance lean toward green / white / gray
+
+Nuance that cannot be represented by the six abstract colors is retained in
+`color_hint` for catalog-based rendering.
 
 The system treats the DB history record as the source of truth.  SVG, JSON
 files, PNG files, and other artifacts are derived outputs.
@@ -396,6 +417,16 @@ renderer behavior.
 CLI configuration is local and editable.  It stores base URL, provider/model
 selection, and timeout values outside the server DB.
 
+`inku-cli batch` can write a benchmark summary JSON file.  When an output
+directory is used, the default summary path is `analysis-summary.json` in that
+directory.  The summary includes all successful samples and review groupings for
+fallback, slow, and normal samples.  Slow samples are diagnostic only; successful
+drawings remain part of quality review even when the free inference endpoint was
+queued.
+
+`inku-cli contact-sheet` builds a PNG contact sheet from a directory of PNG
+outputs, making benchmark review less dependent on manual image assembly.
+
 ---
 
 ## 14. Testing and Evaluation
@@ -406,6 +437,7 @@ The project evaluates quality through several layers:
   deterministic fallback behavior
 - frontend Svelte check and production build
 - CLI-based benchmark generation
+- saved benchmark summaries and contact sheets
 - visual review of generated SVG/PNG output
 - stress tests using invalid, ambiguous, emotional, conversational, and
   contradictory instructions
@@ -415,8 +447,13 @@ Benchmarks focus on:
 - whether Stage 1 preserves the whole input context
 - whether Stage 1.5 expands without overpacking techniques
 - whether Stage 2 preserves all DDL elements in JSON Score
+- whether deterministic fallback keeps enough DDL content to be reviewable
 - whether the renderer makes DDL features visible
 - whether the output has enough negative space, variation, and artistic focus
+
+For NVIDIA free API testing, elapsed time is treated as operational metadata,
+not as an artistic quality signal.  Queue delays can indicate service pressure,
+but they do not exclude a successful work from aesthetic or structural review.
 
 ---
 
@@ -439,12 +476,14 @@ The reference implementation currently includes:
 - dark mode
 - plugin storage, system/user plugin directories, and `canvas-aspect`
 - SVG export and template-based PNG export
-- CLI client foundation
+- CLI client foundation, benchmark summary output, and contact sheet generation
 - shared kiwi progress mascot for single drawing and DDL replay
 - integrated DDL interpretation editor with Saijiki drawer, expanded dialog,
   token/time display, and cancellable `/api/compose` replay
-- renderer material effects, wobble, rotation, arrangement paths, and canvas
-  aspect support
+- scene-tone palette strategy, richer fallback Scores, sensory visibility
+  safeguards, and broader primitive use within the current schema
+- renderer material effects, wobble, rotation, arrangement paths, density/fade,
+  and canvas aspect support
 
 Detailed implementation history remains in the canonical Japanese spec.
 

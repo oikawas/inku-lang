@@ -303,6 +303,41 @@ def test_current_user_theme_can_be_updated(auth_context):
     assert invalid.status_code == 400
 
 
+def test_current_user_profile_can_be_updated(auth_context):
+    headers, user, _ = auth_context
+    next_email = f"profile-{uuid.uuid4().hex[:8]}@example.test"
+
+    email_r = client.patch("/api/auth/me/profile", headers=headers, json={"email": next_email})
+    assert email_r.status_code == 200
+    assert email_r.json()["email"] == next_email
+
+    missing_current_r = client.patch(
+        "/api/auth/me/profile",
+        headers=headers,
+        json={"password": "password-456"},
+    )
+    assert missing_current_r.status_code == 400
+
+    wrong_current_r = client.patch(
+        "/api/auth/me/profile",
+        headers=headers,
+        json={"password": "password-456", "current_password": "wrong-password"},
+    )
+    assert wrong_current_r.status_code == 400
+
+    password_r = client.patch(
+        "/api/auth/me/profile",
+        headers=headers,
+        json={"password": "password-456", "current_password": "password-123"},
+    )
+    assert password_r.status_code == 200
+
+    login_old = client.post("/api/auth/login", json={"username": user["username"], "password": "password-123"})
+    assert login_old.status_code == 401
+    login_new = client.post("/api/auth/login", json={"username": user["username"], "password": "password-456"})
+    assert login_new.status_code == 200
+
+
 def test_current_user_batch_prompt_history_is_persisted(auth_context):
     headers, user, group = auth_context
     other_user = db.add_user(

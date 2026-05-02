@@ -214,6 +214,15 @@ export interface LangPack {
 	userGroupLabel: string;
 	userNoGroup: string;
 	userDeleteBlockedMessage: string;
+	profileButton: string;
+	profileTitle: string;
+	profileEmailLabel: string;
+	profileCurrentPasswordLabel: string;
+	profileNewPasswordLabel: string;
+	profilePasswordHelp: string;
+	profileCurrentPasswordRequired: string;
+	profileSaveButton: string;
+	profileSavedMessage: string;
 	logoutButton: string;
 	addButton: string;
 	editButton: string;

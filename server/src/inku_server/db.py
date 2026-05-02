@@ -623,6 +623,32 @@ def update_user(
         return _user_to_dict(row, group_name)
 
 
+def update_current_user_profile(
+    user_id: str,
+    *,
+    email: str | None = None,
+    password: str | None = None,
+    current_password: str | None = None,
+) -> dict | None:
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if not row:
+            return None
+        if email is not None:
+            email = email.strip()
+            if not email:
+                raise ValueError("email is required")
+            row.email = email
+        if password is not None and password:
+            if not current_password or not verify_password(current_password, row.password_hash):
+                raise ValueError("current password is invalid")
+            row.password_hash = _hash_password(password)
+        session.commit()
+        session.refresh(row)
+        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+        return _user_to_dict(row, group_name)
+
+
 def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
     if ui_theme not in {"light", "dark"}:
         raise ValueError("invalid ui theme")

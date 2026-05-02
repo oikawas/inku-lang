@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.31**  
+**Version: v1.32**  
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -229,7 +229,8 @@ The web app is the current reference interface.
 
 Major UI areas:
 
-- App rail: compact navigation, user menu, settings, language and theme controls
+- App rail: compact navigation, user menu, profile, settings, language and
+  theme controls
 - Input panel: single drawing, batch drawing, and demo modes
 - DDL editor: editable normalized DDL with Saijiki word highlighting
 - Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
@@ -314,7 +315,13 @@ client.
 ## 12. Security and Operations
 
 The web app includes authentication, user roles, sessions, per-user settings,
-and user management.  Passwords are stored as salted PBKDF2-SHA256 hashes.
+user profile editing, and user management.  Passwords are stored as salted
+PBKDF2-SHA256 hashes.
+
+The app rail user menu opens a profile dialog for the signed-in user.  The
+dialog can update the user's email address and password through
+`PATCH /api/auth/me/profile`.  Password changes require the current password,
+and the endpoint is separate from admin user-management APIs.
 
 Operational details for the author's local server are intentionally not part of
 this public specification.  They belong in untracked local documents such as
@@ -367,6 +374,7 @@ The reference implementation currently includes:
 - FastAPI backend
 - SvelteKit frontend
 - authenticated users and admin user management
+- signed-in user profile editing
 - DB-backed history
 - star and trash history management
 - batch rendering

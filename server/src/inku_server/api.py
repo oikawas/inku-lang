@@ -384,6 +384,12 @@ class UserAccountUpdateBody(BaseModel):
     group_id: str | None = None
 
 
+class UserProfileUpdateBody(BaseModel):
+    email: str | None = Field(default=None, min_length=1)
+    password: str | None = Field(default=None, min_length=8)
+    current_password: str | None = Field(default=None, min_length=1)
+
+
 class LoginBody(BaseModel):
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
@@ -561,6 +567,24 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
         user = _db.update_user_settings(actor["id"], ui_theme=body.ui_theme, settings_tab=body.settings_tab)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+    return UserAccountItem(**user)
+
+
+@app.patch("/api/auth/me/profile", response_model=UserAccountItem)
+def api_auth_me_profile(body: UserProfileUpdateBody, actor: dict = Depends(_current_user)) -> UserAccountItem:
+    try:
+        user = _db.update_current_user_profile(
+            actor["id"],
+            email=body.email,
+            password=body.password,
+            current_password=body.current_password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=409, detail=f"profile update failed: {e}") from e
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)

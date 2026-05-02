@@ -14,6 +14,7 @@
 		darkMode: boolean;
 		buildNumber: string;
 		onToggleUserMenu: () => void;
+		onOpenProfile: () => void;
 		onLogout: () => void | Promise<void>;
 		onOpenSettings: () => void;
 		onToggleTheme: () => void;
@@ -27,6 +28,7 @@
 		darkMode,
 		buildNumber,
 		onToggleUserMenu,
+		onOpenProfile,
 		onLogout,
 		onOpenSettings,
 		onToggleTheme,
@@ -61,6 +63,7 @@
 			</button>
 			{#if userMenuOpen}
 				<div class="rail-user-menu" role="menu">
+					<button type="button" role="menuitem" onclick={onOpenProfile}>{t().profileButton}</button>
 					<button type="button" role="menuitem" onclick={onLogout}>{t().logoutButton}</button>
 				</div>
 			{/if}

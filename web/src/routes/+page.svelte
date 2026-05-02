@@ -14,6 +14,7 @@
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
+	import ProfileModal from '$lib/components/ProfileModal.svelte';
 	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import {
@@ -356,6 +357,12 @@
 	let loginPassword = $state('');
 	let loginPasswordVisible = $state(false);
 	let loginStatus = $state<string | null>(null);
+	let profileOpen = $state(false);
+	let profileEmail = $state('');
+	let profileCurrentPassword = $state('');
+	let profileNewPassword = $state('');
+	let profileStatus = $state<string | null>(null);
+	let profileSaving = $state(false);
 
 	function apiFetch(path: string, init: RequestInit = {}) {
 		const headers = new Headers(init.headers);
@@ -803,6 +810,7 @@
 			try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
 		}
 		userMenuOpen = false;
+		profileOpen = false;
 		authToken = null;
 		currentUser = null;
 		applyUserTheme(null);
@@ -821,6 +829,69 @@
 		trashItems = [];
 		trashTotal = 0;
 		historyManager.clear();
+	}
+
+	function openProfile() {
+		if (!currentUser) return;
+		profileEmail = currentUser.email;
+		profileCurrentPassword = '';
+		profileNewPassword = '';
+		profileStatus = null;
+		profileOpen = true;
+		userMenuOpen = false;
+	}
+
+	function closeProfile() {
+		if (profileSaving) return;
+		profileOpen = false;
+		profileCurrentPassword = '';
+		profileNewPassword = '';
+	}
+
+	async function saveProfile() {
+		if (!currentUser) return;
+		const email = profileEmail.trim();
+		if (!email) {
+			profileStatus = t().userValidationUpdate;
+			return;
+		}
+		if (profileNewPassword && profileNewPassword.length < 8) {
+			profileStatus = t().userPasswordTooShort;
+			return;
+		}
+		if (profileNewPassword && !profileCurrentPassword) {
+			profileStatus = t().profileCurrentPasswordRequired;
+			return;
+		}
+		profileSaving = true;
+		profileStatus = null;
+		try {
+			const body: { email: string; password?: string; current_password?: string } = { email };
+			if (profileNewPassword) {
+				body.password = profileNewPassword;
+				body.current_password = profileCurrentPassword;
+			}
+			const r = await apiFetch('/api/auth/me/profile', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body),
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			currentUser = await r.json() as UserItem;
+			applyUserTheme(currentUser);
+			profileEmail = currentUser.email;
+			profileCurrentPassword = '';
+			profileNewPassword = '';
+			profileStatus = t().profileSavedMessage;
+			await loadUserSettings();
+		} catch (e) {
+			profileStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			profileSaving = false;
+		}
 	}
 
 	async function addUser() {
@@ -1779,6 +1850,7 @@
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
 			userMenuOpen = false;
+			if (profileOpen) closeProfile();
 			if (settingsOpen) closeSettingsModal();
 			if (catalogOpen) cancelCatalogSelection();
 			historyManager.open = false;
@@ -1788,7 +1860,7 @@
 	}
 
 	function shouldIgnoreCanvasShortcut(e: KeyboardEvent) {
-		if (!currentUser || settingsOpen || catalogOpen || historyManager.open || confirmAction) return true;
+		if (!currentUser || profileOpen || settingsOpen || catalogOpen || historyManager.open || confirmAction) return true;
 		const target = e.target;
 		if (!(target instanceof HTMLElement)) return false;
 		if (target.isContentEditable) return true;
@@ -2268,6 +2340,7 @@
 		{darkMode}
 		buildNumber={__BUILD_NUMBER__}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
+		onOpenProfile={openProfile}
 		onLogout={logout}
 		onOpenSettings={() => openSettings()}
 		onToggleTheme={() => void updateUiTheme(!darkMode)}
@@ -2537,6 +2610,20 @@
 		onSaveGroupEdit={saveGroupEdit}
 		onCancelModelSelection={cancelModelSelection}
 		onConfirmModelSelection={confirmModelSelection}
+	/>
+{/if}
+
+{#if profileOpen && currentUser}
+	<ProfileModal
+		username={currentUser.username}
+		email={currentUser.email}
+		status={profileStatus}
+		saving={profileSaving}
+		bind:profileEmail
+		bind:profileCurrentPassword
+		bind:profileNewPassword
+		onClose={closeProfile}
+		onSave={saveProfile}
 	/>
 {/if}
 

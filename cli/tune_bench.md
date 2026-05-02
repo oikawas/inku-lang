@@ -1233,3 +1233,143 @@ UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
 - `ruff`: all checks passed
 - server pytest: `107 passed, 30 skipped`
 - cli pytest: `8 passed`
+
+## 18. Build 248: sensory retention 後 30件ベンチ
+
+Date: 2026-05-02
+
+目的:
+
+- Build 247 の density/cluster/fade 対応後に見えた「洗練されたが、情報量・楽しさ・豊かさが減った」問題を検証する。
+- Stage 1.5 / Stage 2 / coerce / renderer に追加した、光・香り・温度・待つ時間・五感などの感覚情報保持が実作に効いているか確認する。
+
+対象:
+
+- 入力: `cli/out/tune-bench-030-after-806e30a/prompts.txt`
+- 出力: `cli/out/tune-bench-030-sensory-248/`
+- contact sheet: `cli/out/tune-bench-030-sensory-248/contact-sheet.png`
+- 集計: `cli/out/tune-bench-030-sensory-248/analysis-summary.json`
+- Stage1/Stage2: `nvidia` / `google/gemma-4-31b-it`
+
+実行:
+
+```sh
+cd cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli batch \
+  --base-url http://192.168.0.89:8100 \
+  -f ./out/tune-bench-030-after-806e30a/prompts.txt \
+  -o ./out/tune-bench-030-sensory-248 \
+  --prefix bench030s248 \
+  --png \
+  --continue-on-error
+```
+
+結果:
+
+- 成功: 30 / 30
+- 失敗: 0 / 30
+- total elapsed: 1,661,692 ms
+- average elapsed: 55,390 ms
+- median elapsed: 31,122 ms
+- max elapsed: 194,990 ms
+- tokens in/out: 316,496 / 12,740
+- Stage 1 fallback: 1件 (`bench030s248-023`)
+- Stage 2 fallback: 5件 (`bench030s248-003`, `009`, `022`, `026`, `028`)
+- compose retry: 3件 (`bench030s248-002`, `004`, `030`)
+- 100秒超: 9件 (`002`, `003`, `004`, `009`, `022`, `023`, `026`, `028`, `030`)
+
+Score 集計:
+
+- expanded count total: 1,756
+- clustered arrangements: 10
+- preserve_space: 19
+- color_cycle: 8
+- density: `high=7`, `medium=4`, `low=6`
+- fade: `outward=15`, `directional=3`
+- primitives: `line=44`, `ellipse=30`, `square=13`, `arc=4`, `circle=2`
+- colors: `black=38`, `gray=28`, `white=14`, `red=11`, `blue=2`
+- sensory hint sample: `002`, `005`, `008`, `009`, `011`, `014`, `015`, `024`, `025`, `030`
+
+前回 Build 247 との比較:
+
+- 成功率は 30/30 のまま維持。
+- expanded count は 1,348 → 1,756 に増え、情報量は戻った。
+- ellipse は 18 → 30 に増え、線と真円だけの単調さは少し緩和。
+- preserve_space は 14 → 19、fade は 13 → 18 に増え、気配・膜・薄れの schema field 利用は増加。
+- color_cycle は 10 → 8 に減り、多色の遊びはやや後退。
+- black/gray は 54 → 66 に増え、色彩幅は依然として狭い。
+- 100秒超は 7件 → 9件。Free API の遅延影響は悪化気味で、品質レビューとは別に運用上の課題として残る。
+
+専門家レビュー:
+
+### 批評家A: 現代抽象画・構成批評
+
+- 改善: Build 247 より画面の密度差と素材感は戻っている。`008`、`014`、`024` は光や気配を補助層として残し、単なる幾何要素より詩的な読みが増えた。
+- 改善: `001`、`006`、`017`、`030` は線の反復が風・息・雨・竹林と対応し、反復が単なる装飾ではなく時間性を持ち始めている。
+- 懸念: `007`、`030` は密度が高く、情報量はあるが画面の呼吸が弱い。大数量の cluster は効いているが、作品としての焦点が濃い粒群に吸われる。
+- 懸念: `016` は赤背景と黒楕円で強いが、主題が「熟した果実」以上に記号的な赤黒に縮約される。強い背景色の使用理由を Stage 2 がもう少し構図へ反映すべき。
+- 懸念: `003`、`022`、`028` の fallback は「壊れない」ことを達成しているが、抽象画としては硬く、入力文の余韻が乏しい。
+
+結論:
+
+- 「洗練されすぎて痩せる」問題は一部改善。特に感覚語の保持は有効。
+- ただし復元された情報が、色・面・構図の選択ではなく、黒/灰の線や楕円へ落ちやすい。豊かさを増すには、感覚語を primitive 追加だけでなく palette / spatial focus / opacity / texture strategy へ渡す必要がある。
+
+### 批評家B: 多文化視覚表現・詩的普遍性
+
+- 改善: `008` 病室、`024` 夜明けの湖、`025` 古い鏡のように、感覚語が「状況の温度」として残るケースが出た。これは文化依存の具象記号に頼らず、普遍的な空気感へ近づいている。
+- 改善: `019` は茶室・炭・闇の簡素な緊張があり、日本的な余白の文脈とデジタル抽象の接続として良い。
+- 懸念: `006` 畳部屋、`011` 庭、`029` 工場跡は灰色線に寄りすぎ、文化的な場の差が薄い。畳、庭、鉄骨がすべて線密度に回収されると、場所の固有性が失われる。
+- 懸念: `026` 夏祭りは色紙・湿り・丸まりがあるため本来は楽しいサンプルになるはずだが、fallback のため矩形群が散らかり、祝祭後の湿度より UI 的な重なりに見える。
+- 懸念: 青が 2 件しかなく、水・夜明け・湖・地下鉄・港の差が黒/灰/赤に吸収されている。文化的普遍性のためにも、色の語彙を増やす必要がある。
+
+結論:
+
+- 感情や雰囲気を DDL に伝える方向は正しい。
+- 次は「場の性質」を、線種だけでなく、色温度、余白の圧力、重心、重なり方に分配するべき。
+
+### 専門家C: 実装・生成品質エンジニア
+
+- 改善: failure 0、empty instruction retry 3件、fallback 6件で、API と renderer の安定性は維持されている。
+- 改善: `density / fade / preserve_space` の利用は増え、schema field は実出力に乗っている。
+- 懸念: fallback が 6/30 と多い。うち 5件は Stage 2 hard timeout で、品質評価上は通常成功とは別に扱うべき。
+- 懸念: fallback score の `density/fade/preserve_space` 利用が弱い。`003` は200個の四角がそのまま縦配置で、Build 247 で追加した clustering の意図とずれる。
+- 懸念: 白背景上の白い感覚層は `coerce` により黒へ可視化されるため、`008`、`014` の「柔らかな光」が黒い要素として出る。見えることは重要だが、光の情緒を壊す。背景側を微調整するか、白を薄青/淡灰/低 opacity に寄せる専用ルールが必要。
+- 懸念: `line=44`, `ellipse=30` で、triangle はゼロ。形状語彙の多様性はまだ限定的。葉・しずく・破片・面の欠けなどの自然プリミティブ/プラグイン候補が有効。
+
+結論:
+
+- 今回の修正は方向として有効だが、fallback と visibility 補正が美術的意図を壊すケースが目立つ。
+- 次の実装は、通常成功ルートの拡張より、fallback/coerce/visibility の表現品質を上げる方が効く。
+
+総合評価:
+
+- Build 248 は Build 247 より情報量が戻り、感覚語の保持も確認できた。
+- 作品の「楽しさ」は一部戻ったが、色彩と形状の選択肢はまだ狭い。
+- 「薄い感覚層」が白背景上で黒へ変換される問題は、今回の一番重要な発見。
+- fallback 使用時の品質が全体評価を下げている。fallback は安全装置としては機能するが、作品品質としては別改善が必要。
+
+次の実装候補:
+
+1. Sensory visibility 専用補正
+   - `柔らかな光`, `五感`, `香り`, `透明な膜` などは、白背景でも単純な黒化を避ける。
+   - white-on-white の場合は foreground を淡青/淡灰/赤ではなく、低 opacity の blue/gray と `color_hint` に保持する。
+   - 大きい光面は background 側をわずかに darken する選択も検討する。
+
+2. Fallback score の品質改善
+   - fallback でも `density / cluster_count / fade / preserve_space` を使う。
+   - 200個以上の DDL clause は、通常 coerce と同じ cluster budget を通す。
+   - fallback の primitive は line/square へ寄せず、入力の場に応じて ellipse/arc/square/line を分散する。
+
+3. Palette strategy の追加
+   - Stage 1.5 で `temperature`, `time_of_day`, `place_tone` を簡易分類し、Stage 2 の `color_hint` と abstract color に渡す。
+   - 黒/灰偏重を抑え、青・緑・赤・白を場面に応じて使い分ける。
+
+4. Shape vocabulary の拡張
+   - 既存 schema の範囲では、triangle / arc / rotated square / thin ellipse をもっと使う。
+   - 次段では自然プリミティブ plugin の設計に接続し、葉・水滴・紙片・影片のような「抽象化された自然/物質形」を追加できる余地を作る。
+
+5. Benchmark tooling
+   - CLI batch summary を JSON ファイルへ保存する。
+   - contact sheet 生成を CLI サブコマンド化する。
+   - fallback 使用サンプル、slow sample、normal sample を自動で分けてレビュー対象にする。

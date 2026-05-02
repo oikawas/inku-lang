@@ -228,3 +228,30 @@ def test_coerce_score_adds_atmospheric_coverage_from_ddl():
     assert atmospheric[0].arrangement is not None
     assert atmospheric[0].arrangement.fade == "outward"
     assert atmospheric[0].arrangement.preserve_space is True
+
+
+def test_coerce_score_adds_sensory_coverage_from_ddl():
+    score = Score.model_validate(
+        {
+            "background": "white",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="黒い横線を一本引く。柔らかな光が上端に残る。沈丁花の香りが波打つ。桜の蕾が開花を待つ。",
+    )
+
+    hints = " ".join(ins.color_hint or "" for ins in fixed.instructions)
+    assert "soft light" in hints
+    assert "scent layer" in hints
+    assert "waiting buds" in hints
+    assert any(ins.arrangement and ins.arrangement.path == "wave" for ins in fixed.instructions)

@@ -659,6 +659,22 @@ def _stroke_attrs(ins: Instruction, cmap: dict[str, str]) -> dict:
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.26)
         if do_fill:
             attrs["fill_opacity"] = 0.12
+    elif any(token in hint for token in ("soft light", "柔らかな光", "陽光", "日差し")):
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.30)
+        if do_fill:
+            attrs["fill_opacity"] = 0.14
+    elif any(token in hint for token in ("scent", "fragrance", "香り", "匂")):
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.38)
+        if do_fill:
+            attrs["fill_opacity"] = 0.20
+    elif any(token in hint for token in ("waiting buds", "開花を待つ蕾", "蕾", "つぼみ")):
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.72)
+        if do_fill:
+            attrs["fill_opacity"] = 0.58
+    elif any(token in hint for token in ("five-sense", "五感")):
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.44)
+        if do_fill:
+            attrs["fill_opacity"] = 0.18
     elif "fade directional" in hint or "fade=directional" in hint:
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.48)
         if do_fill:

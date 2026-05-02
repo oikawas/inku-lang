@@ -392,8 +392,10 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
     markers = (
         "線", "点", "円", "楕円", "四角", "三角", "弧", "塗りつぶす", "散らす", "並べる",
         "膜", "霞", "霧", "靄", "気配", "余韻", "反射", "映り", "消え", "滲",
+        "光", "陽光", "日差し", "香", "匂", "蕾", "つぼみ", "開花", "五感", "温",
         "line", "dot", "circle", "ellipse", "square", "triangle", "arc", "scatter", "fill",
         "membrane", "haze", "fog", "mist", "trace", "reflection", "fade", "fading", "blur",
+        "light", "sunlight", "scent", "fragrance", "bud", "bloom", "sense", "warm",
     )
     return [
         clause
@@ -468,15 +470,33 @@ def _is_fading_clause(clause: str) -> bool:
     return any(marker in clause or marker in lower for marker in ("消え", "薄れ", "fade", "fading", "vanish", "dissolve"))
 
 
+def _sensory_kind(clause: str) -> str | None:
+    lower = clause.lower()
+    if any(marker in clause or marker in lower for marker in ("光", "陽光", "日差し", "柔ら", "light", "sunlight", "soft")):
+        return "light"
+    if any(marker in clause or marker in lower for marker in ("香", "匂", "沈丁花", "scent", "fragrance")):
+        return "scent"
+    if any(marker in clause or marker in lower for marker in ("蕾", "つぼみ", "開花", "bud", "bloom")):
+        return "bud"
+    if any(marker in clause or marker in lower for marker in ("五感", "気配", "訪れ", "sense", "presence", "arrival")):
+        return "sense"
+    return None
+
+
 def _fallback_instruction_from_clause(clause: str, *, index: int, background: str) -> Instruction:
     primitive = _primitive_from_clause(clause)
-    if _is_atmospheric_clause(clause):
+    sensory_kind = _sensory_kind(clause)
+    if sensory_kind == "sense":
+        primitive = "arc"
+    elif sensory_kind:
+        primitive = "ellipse"
+    elif _is_atmospheric_clause(clause):
         primitive = "ellipse"
     elif _is_reflection_clause(clause):
         primitive = "line"
     color = _color_from_clause(clause, background)
     weight = _weight_from_clause(clause)
-    if _is_atmospheric_clause(clause) and weight == "pen":
+    if (sensory_kind or _is_atmospheric_clause(clause)) and weight == "pen":
         weight = "chalk"
     common: dict[str, Any] = {
         "primitive": primitive,
@@ -501,6 +521,79 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
         common["arrangement"] = {"count": min(count, 120), "layout": "scatter", "margin": 0.18}
     elif count and (("並べる" in clause) or ("line up" in lower)):
         common["arrangement"] = {"count": min(count, 80), "layout": "horizontal", "margin": 0.1}
+    elif sensory_kind == "light":
+        common.update(
+            {
+                "filled": True,
+                "center": [0.50, 0.22 + min(index, 2) * 0.04],
+                "size": [0.42, 0.12],
+                "rotation": -6 + index * 4,
+                "color": "white" if background != "white" else "blue",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "horizontal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                },
+                "color_hint": f"{common['color_hint']}; soft light",
+            }
+        )
+    elif sensory_kind == "scent":
+        common.update(
+            {
+                "center": [0.56, 0.54],
+                "size": [0.05, 0.024],
+                "rotation": -18,
+                "color": "green" if background != "green" else "white",
+                "arrangement": {
+                    "count": 7,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "directional",
+                    "preserve_space": True,
+                },
+                "color_hint": f"{common['color_hint']}; scent layer",
+            }
+        )
+    elif sensory_kind == "bud":
+        common.update(
+            {
+                "center": [0.70, 0.62],
+                "size": [0.055, 0.026],
+                "rotation": -30,
+                "color": "red" if background != "red" else "white",
+                "arrangement": {
+                    "count": 5,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.18,
+                },
+                "color_hint": f"{common['color_hint']}; waiting buds",
+            }
+        )
+    elif sensory_kind == "sense":
+        common.update(
+            {
+                "center": [0.34, 0.70],
+                "radius": 0.14,
+                "angle_start": 205,
+                "angle_end": 335,
+                "color": "white" if background != "white" else "blue",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "radial",
+                    "margin": 0.22,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                },
+                "color_hint": f"{common['color_hint']}; five-sense presence",
+            }
+        )
     elif _is_atmospheric_clause(clause):
         common["arrangement"] = {
             "count": 5,

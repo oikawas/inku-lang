@@ -249,6 +249,35 @@ def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
     assert 'fill-opacity="0.22"' in svg
 
 
+def test_render_sensory_layers_have_distinct_opacity():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.2],
+                    "size": [0.42, 0.12],
+                    "color": "white",
+                    "filled": True,
+                    "color_hint": "柔らかな光",
+                },
+                {
+                    "primitive": "ellipse",
+                    "center": [0.55, 0.55],
+                    "size": [0.05, 0.024],
+                    "color": "green",
+                    "filled": True,
+                    "color_hint": "沈丁花の香り",
+                },
+            ]
+        }
+    )
+    svg = render(score)
+
+    assert 'fill-opacity="0.14"' in svg
+    assert 'fill-opacity="0.2"' in svg
+
+
 def test_render_brush_lines_use_layered_material_texture():
     score = Score.model_validate(
         {

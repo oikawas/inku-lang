@@ -115,6 +115,19 @@ def test_expand_intermediate_ddl_carries_atmospheric_context():
     assert "薄い反射" in expanded
 
 
+def test_expand_intermediate_ddl_carries_sensory_context_without_overloading():
+    expanded = expand_intermediate_ddl(
+        "緑の三角を三つ置く。赤い楕円を三つ置く。",
+        context_text="柔らかな陽光と沈丁花の香り、桜の蕾が開花を待つ春の五感",
+    )
+
+    markers = ("柔らかな光", "香りの層", "開花を待つ蕾", "五感の気配")
+    selected = [marker for marker in markers if marker in expanded]
+
+    assert len(selected) >= 2
+    assert expanded.count("。") <= 8
+
+
 def test_expand_intermediate_ddl_does_not_add_true_circles_for_particles():
     expanded = expand_intermediate_ddl(
         "背景を黒で塗りつぶす。白い小さな四角を画面全体に点々と六百十個散らす。",

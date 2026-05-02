@@ -171,6 +171,11 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "preserve_space" in SYSTEM_PROMPT
     assert "透明な膜" in SYSTEM_PROMPT
     assert "反射" in SYSTEM_PROMPT
+    assert "圧縮しすぎない" in SYSTEM_PROMPT
+    assert "香り" in SYSTEM_PROMPT
+    assert "五感" in SYSTEM_PROMPT
+    assert "削りすぎ" in SYSTEM_PROMPT
+    assert "柔らかな光と沈丁花の香り" in SYSTEM_PROMPT
     assert "実質的に見えない instruction" in SYSTEM_PROMPT
     assert "面積の少ない側" in SYSTEM_PROMPT
     assert "background=\"gray\"" in SYSTEM_PROMPT
@@ -218,6 +223,11 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "preserve_space" in SYSTEM_PROMPT_EN
     assert "transparent membrane" in SYSTEM_PROMPT_EN
     assert "Reflection" in SYSTEM_PROMPT_EN
+    assert "Do not over-compress" in SYSTEM_PROMPT_EN
+    assert "scent" in SYSTEM_PROMPT_EN
+    assert "bodily senses" in SYSTEM_PROMPT_EN
+    assert "loses richness or playfulness" in SYSTEM_PROMPT_EN
+    assert "Soft light and daphne fragrance" in SYSTEM_PROMPT_EN
     assert "effectively invisible instructions" in SYSTEM_PROMPT_EN
     assert "smaller visual area" in SYSTEM_PROMPT_EN
     assert 'background="gray"' in SYSTEM_PROMPT_EN

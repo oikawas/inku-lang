@@ -144,6 +144,10 @@ def test_submit_tool_schema_is_valid():
     assert "$ref" not in json.dumps(schema)
     arrangement = schema["properties"]["instructions"]["items"]["properties"]["arrangement"]["anyOf"][0]
     assert "path" in arrangement["properties"]
+    assert "density" in arrangement["properties"]
+    assert "cluster_count" in arrangement["properties"]
+    assert "fade" in arrangement["properties"]
+    assert "preserve_space" in arrangement["properties"]
     assert arrangement["properties"]["path"]["enum"] == [
         "none",
         "diagonal",
@@ -160,9 +164,13 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "40〜120" in SYSTEM_PROMPT
     assert "300〜800" in SYSTEM_PROMPT
     assert "700〜1000" in SYSTEM_PROMPT
-    assert "610" in SYSTEM_PROMPT
+    assert "六百十" in SYSTEM_PROMPT
     assert "instructions を空配列にしてはいけない" in SYSTEM_PROMPT
     assert "余白を残す" in SYSTEM_PROMPT
+    assert "cluster_count" in SYSTEM_PROMPT
+    assert "preserve_space" in SYSTEM_PROMPT
+    assert "透明な膜" in SYSTEM_PROMPT
+    assert "反射" in SYSTEM_PROMPT
     assert "実質的に見えない instruction" in SYSTEM_PROMPT
     assert "面積の少ない側" in SYSTEM_PROMPT
     assert "background=\"gray\"" in SYSTEM_PROMPT
@@ -203,9 +211,13 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "40–120" in SYSTEM_PROMPT_EN
     assert "300–800" in SYSTEM_PROMPT_EN
     assert "700–1000" in SYSTEM_PROMPT_EN
-    assert "610" in SYSTEM_PROMPT_EN
+    assert "six hundred ten" in SYSTEM_PROMPT_EN
     assert "instructions must not be empty" in SYSTEM_PROMPT_EN
     assert "Preserve negative space" in SYSTEM_PROMPT_EN
+    assert "cluster_count" in SYSTEM_PROMPT_EN
+    assert "preserve_space" in SYSTEM_PROMPT_EN
+    assert "transparent membrane" in SYSTEM_PROMPT_EN
+    assert "Reflection" in SYSTEM_PROMPT_EN
     assert "effectively invisible instructions" in SYSTEM_PROMPT_EN
     assert "smaller visual area" in SYSTEM_PROMPT_EN
     assert 'background="gray"' in SYSTEM_PROMPT_EN

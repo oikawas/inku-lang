@@ -50,6 +50,13 @@ _JA_EXPANSION_MARKERS = (
     "クレヨンの擦れ",
     "ロットリングの均一線",
     "縄の撚り",
+    "透明な膜",
+    "薄い反射",
+    "消える線",
+    "柔らかな光",
+    "香りの層",
+    "開花を待つ蕾",
+    "五感の気配",
 )
 _EN_EXPANSION_MARKERS = (
     "diagonal band in the right half",
@@ -76,6 +83,13 @@ _EN_EXPANSION_MARKERS = (
     "crayon rubbing",
     "rotring uniform lines",
     "rope twist",
+    "transparent membrane",
+    "faint reflection",
+    "fading lines",
+    "soft light",
+    "scent layer",
+    "waiting buds",
+    "five-sense presence",
 )
 
 
@@ -155,6 +169,10 @@ def _profile_ja(text: str) -> _FilterProfile:
         mode = "asymmetric_rhythm" if mode != "single_tension" else mode
     if _has_any(text, ("水", "波", "月", "霧", "滲", "淡", "雲")):
         tags.update(("water", "soft"))
+    if _has_any(text, ("膜", "透明", "霞", "霧", "靄", "気配", "余韻", "反射", "映り", "消え", "薄れ")):
+        tags.update(("soft", "atmosphere"))
+    if _has_any(text, ("香", "匂", "陽光", "光", "春", "蕾", "つぼみ", "開花", "待つ", "五感", "温", "柔ら")):
+        tags.update(("soft", "sensory"))
     if _has_any(text, ("音", "リズム", "歌", "輪唱", "響", "反復", "揺", "舞", "流")):
         tags.add("music")
     if _has_any(text, ("建物", "都市", "寺", "古刹", "部屋", "道", "遠く", "奥", "畑")):
@@ -193,6 +211,10 @@ def _profile_en(text: str) -> _FilterProfile:
         mode = "asymmetric_rhythm" if mode != "single_tension" else mode
     if _has_any(lower, ("water", "wave", "moon", "mist", "blur", "pale", "cloud")):
         tags.update(("water", "soft"))
+    if _has_any(lower, ("membrane", "transparent", "haze", "fog", "mist", "atmosphere", "presence", "reflection", "fade", "fading")):
+        tags.update(("soft", "atmosphere"))
+    if _has_any(lower, ("scent", "fragrance", "sunlight", "light", "spring", "bud", "bloom", "waiting", "sense", "warm", "soft")):
+        tags.update(("soft", "sensory"))
     if _has_any(lower, ("sound", "rhythm", "song", "canon", "echo", "repeat", "sway", "drift")):
         tags.add("music")
     if _has_any(lower, ("building", "city", "temple", "room", "road", "distant", "depth", "field")):
@@ -220,6 +242,12 @@ def _select_category(
     if count <= 0:
         return []
 
+    if profile.tags & {"atmosphere", "sensory"}:
+        preferred_tags = profile.tags & {"atmosphere", "sensory"}
+        matched = [c for c in candidates if c.tags & preferred_tags]
+        if matched:
+            return _pick([c.text for c in matched], count, text=text, salt=salt)
+
     if profile.intensity <= 1:
         matched = [c for c in candidates if c.tags & {"quiet", "soft", "water"}]
     else:
@@ -239,6 +267,10 @@ def _category_plan(profile: _FilterProfile, *, has_structural: bool) -> tuple[in
 
     if "music" in profile.tags:
         return (0, 1, 0)
+    if "sensory" in profile.tags:
+        return (2 if has_structural else 0, 0, 1)
+    if "atmosphere" in profile.tags:
+        return (2 if has_structural else 0, 0, 0)
     if profile.tags & {"geometry", "space"}:
         return (0, 0, 1)
     return (1 if has_structural else 0, 0, 0)
@@ -246,6 +278,18 @@ def _category_plan(profile: _FilterProfile, *, has_structural: bool) -> tuple[in
 
 def _mode_salt(profile: _FilterProfile, category: str) -> str:
     return f"{profile.mode}:{category}"
+
+
+def _structural_tags(text: str) -> frozenset[str]:
+    tags = {"particle", "line", "water", "space"}
+    lower = text.lower()
+    if any(token in text or token in lower for token in ("透明な膜", "薄い反射", "消える線", "transparent membrane", "faint reflection", "fading lines")):
+        tags.add("atmosphere")
+        tags.add("soft")
+    if any(token in text or token in lower for token in ("柔らかな光", "香りの層", "開花を待つ蕾", "五感の気配", "soft light", "scent layer", "waiting buds", "five-sense presence")):
+        tags.add("sensory")
+        tags.add("soft")
+    return frozenset(tags)
 
 
 def _limit_centered(items: list[str], *, centered_tokens: tuple[str, ...], max_count: int = 1) -> list[str]:
@@ -392,6 +436,20 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
 
     if any(token in ddl for token in ("弧", "円", "波", "水", "月", "中心")):
         structural.append(f"{contrast_color}細い弧を左下の焦点から三つ広げる。半径は0.11。")
+    if any(token in context for token in ("膜", "透明", "霞", "霧", "靄", "気配", "余韻")):
+        structural.append(f"{main_color}薄い水彩の楕円を透明な膜として右半分に三つ重ねる。境界が滲む。")
+    if any(token in context for token in ("反射", "映り")):
+        structural.append(f"{contrast_color}薄い反射の線を波打つ軌跡に沿って五本散らす。ゆっくり揺れる。")
+    if any(token in context for token in ("消え", "薄れ", "遠ざか")):
+        structural.append(f"{contrast_color}消える線を左下から右上へ五本散らす。細かく震える。")
+    if any(token in context for token in ("陽光", "光", "日差し", "温", "柔ら")):
+        structural.append("白い薄い水彩の横長の楕円を柔らかな光として上端寄りに三つ重ねる。境界が滲む。")
+    if any(token in context for token in ("香", "匂", "沈丁花")):
+        structural.append("緑の小さな楕円を香りの層として波打つ軌跡に沿って七個散らす。ゆっくり揺れる。")
+    if any(token in context for token in ("蕾", "つぼみ", "開花", "春")):
+        structural.append("赤い右上がりの小さな楕円を開花を待つ蕾として右半分の斜めの帯に五個散らす。")
+    if any(token in context for token in ("五感", "気配", "訪れ")):
+        structural.append("白い薄い弧を五感の気配として左下の焦点から三つ広げる。半径は0.14。")
 
     music = [
         _FilterCandidate(f"{contrast_color}細い線を対位法の反行として右下がりに二本並べる。細かく震える。", frozenset(("line", "music", "contrast"))),
@@ -412,8 +470,9 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
         _FilterCandidate("赤・青・緑・灰の回転した小さな四角をパッチワークとして格子状に六個並べる。", frozenset(("geometry", "dense"))),
         _FilterCandidate(f"{contrast_color}チョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。", frozenset(("space", "line", "soft"))),
         _FilterCandidate("黒い細筆の縦線を水墨の濃淡として左から右へ三本並べる。境界が滲む。", frozenset(("water", "contrast", "quiet"))),
+        _FilterCandidate("白い薄い水彩の楕円を五感の気配として右上に二つ重ねる。境界が滲む。", frozenset(("sensory", "soft", "quiet"))),
     ]
-    structural_candidates = [_FilterCandidate(text, frozenset(("particle", "line", "water", "space"))) for text in structural]
+    structural_candidates = [_FilterCandidate(text, _structural_tags(text)) for text in structural]
     structural_count, music_count, painting_count = _category_plan(profile, has_structural=bool(structural_candidates))
 
     selected = (
@@ -454,6 +513,20 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
 
     if any(token in lower for token in ("arc", "circle", "wave", "water", "moon", "center")):
         structural.append(f"Line up three thin {contrast_color} arcs spreading from a lower-left focus. Radius 0.11.")
+    if any(token in context.lower() for token in ("membrane", "transparent", "haze", "fog", "mist", "atmosphere", "presence")):
+        structural.append(f"Layer three pale {main_color} watercolor ellipses in the right half as a transparent membrane. Edges blurring.")
+    if any(token in context.lower() for token in ("reflection", "reflected")):
+        structural.append(f"Scatter five thin {contrast_color} faint reflection lines along an undulating trace. Swaying slowly.")
+    if any(token in context.lower() for token in ("fade", "fading", "vanish", "dissolve")):
+        structural.append(f"Scatter five thin {contrast_color} fading lines from lower left to upper right. Fine trembling.")
+    if any(token in context.lower() for token in ("sunlight", "light", "warm", "soft")):
+        structural.append("Layer three pale white watercolor ellipses near the upper edge as soft light. Edges blurring.")
+    if any(token in context.lower() for token in ("scent", "fragrance")):
+        structural.append("Scatter seven small green ellipses along an undulating trace as a scent layer. Swaying slowly.")
+    if any(token in context.lower() for token in ("spring", "bud", "bloom", "waiting")):
+        structural.append("Scatter five small red ellipses rising to the right along a diagonal band in the right half as waiting buds.")
+    if any(token in context.lower() for token in ("sense", "presence", "arrival")):
+        structural.append("Line up three pale white arcs from a lower-left focus as five-sense presence. Radius 0.14.")
 
     music = [
         _FilterCandidate(f"Line up two thin {contrast_color} lines falling to the right as contrapuntal contrary motion. Fine trembling.", frozenset(("line", "music", "contrast"))),
@@ -474,8 +547,9 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
         _FilterCandidate("Line up six small rotated squares in red, blue, green, gray as patchwork grid.", frozenset(("geometry", "dense"))),
         _FilterCandidate(f"Line up three {contrast_color} chalk horizontal lines at the bottom as fresco ground. Edges blurring.", frozenset(("space", "line", "soft"))),
         _FilterCandidate("Line up three black fine-brush vertical lines left to right as ink-wash value. Edges blurring.", frozenset(("water", "contrast", "quiet"))),
+        _FilterCandidate("Layer two pale white watercolor ellipses in the upper right as five-sense presence. Edges blurring.", frozenset(("sensory", "soft", "quiet"))),
     ]
-    structural_candidates = [_FilterCandidate(text, frozenset(("particle", "line", "water", "space"))) for text in structural]
+    structural_candidates = [_FilterCandidate(text, _structural_tags(text)) for text in structural]
     structural_count, music_count, painting_count = _category_plan(profile, has_structural=bool(structural_candidates))
 
     selected = (

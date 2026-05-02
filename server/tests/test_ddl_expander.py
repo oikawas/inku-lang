@@ -105,6 +105,16 @@ def test_expand_intermediate_ddl_uses_context_to_control_filter_amount():
     assert len(quiet_selected) < len(dense_selected)
 
 
+def test_expand_intermediate_ddl_carries_atmospheric_context():
+    expanded = expand_intermediate_ddl(
+        "白い短い線を上から下へ九本散らす。",
+        context_text="透明な膜と雨の反射が残るバス停",
+    )
+
+    assert "透明な膜" in expanded
+    assert "薄い反射" in expanded
+
+
 def test_expand_intermediate_ddl_does_not_add_true_circles_for_particles():
     expanded = expand_intermediate_ddl(
         "背景を黒で塗りつぶす。白い小さな四角を画面全体に点々と六百十個散らす。",

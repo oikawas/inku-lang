@@ -34,6 +34,8 @@ Dimension = Literal[
 ]
 Layout = Literal["horizontal", "vertical", "radial", "scatter"]
 Path = Literal["none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"]
+Density = Literal["none", "low", "medium", "high"]
+Fade = Literal["none", "outward", "directional"]
 
 
 class Variation(BaseModel):
@@ -108,6 +110,33 @@ class Arrangement(BaseModel):
     radius: Optional[float] = Field(
         default=None,
         description="radial の配置半径 (省略=0.3)",
+    )
+    density: Density = Field(
+        default="none",
+        description=(
+            "群の視覚密度。none=通常配置 / low=粗い間隔 / medium=まとまりを感じる密度"
+            " / high=粒・雨・雪などの濃い群。count が大きい時の見え方を Renderer に伝える"
+        ),
+    )
+    cluster_count: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=12,
+        description=(
+            "群を何個のまとまりに分けるか。大数量を全面均一に埋めず、"
+            "3-9 個程度のクラスタで余白を残す時に使う"
+        ),
+    )
+    fade: Fade = Field(
+        default="none",
+        description=(
+            "群の薄れ方。outward=中心から端へ薄れる / directional=軌跡方向へ薄れる"
+            " / none=薄れなし"
+        ),
+    )
+    preserve_space: bool = Field(
+        default=False,
+        description="true の場合、Renderer は margin と分布を広めに取り、余白を構図要素として残す",
     )
 
 

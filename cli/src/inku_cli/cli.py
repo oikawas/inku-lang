@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from http.cookies import SimpleCookie
@@ -306,6 +307,69 @@ def _write_paint_outputs(
     return paths
 
 
+def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(score, dict):
+        return {}
+    instructions = score.get("instructions")
+    if not isinstance(instructions, list):
+        return {}
+
+    primitive_counts: Counter[str] = Counter()
+    color_counts: Counter[str] = Counter()
+    density_counts: Counter[str] = Counter()
+    fade_counts: Counter[str] = Counter()
+    arrangement_count = 0
+    expanded_count = 0
+    clustered_arrangements = 0
+    preserve_space_count = 0
+    color_cycle_count = 0
+
+    for instruction in instructions:
+        if not isinstance(instruction, dict):
+            continue
+        primitive = instruction.get("primitive")
+        color = instruction.get("color")
+        if isinstance(primitive, str):
+            primitive_counts[primitive] += 1
+        if isinstance(color, str):
+            color_counts[color] += 1
+
+        arrangement = instruction.get("arrangement")
+        if not isinstance(arrangement, dict):
+            expanded_count += 1
+            continue
+
+        arrangement_count += 1
+        count = arrangement.get("count")
+        expanded_count += int(count) if isinstance(count, int) and count > 0 else 1
+        density = arrangement.get("density")
+        fade = arrangement.get("fade")
+        if isinstance(density, str) and density != "none":
+            density_counts[density] += 1
+        if isinstance(fade, str) and fade != "none":
+            fade_counts[fade] += 1
+        if isinstance(arrangement.get("cluster_count"), int):
+            clustered_arrangements += 1
+        if arrangement.get("preserve_space") is True:
+            preserve_space_count += 1
+        color_cycle = arrangement.get("color_cycle")
+        if isinstance(color_cycle, list) and color_cycle:
+            color_cycle_count += 1
+
+    return {
+        "score_instruction_count": len(instructions),
+        "score_arrangement_count": arrangement_count,
+        "score_expanded_count": expanded_count,
+        "score_clustered_arrangements": clustered_arrangements,
+        "score_preserve_space_count": preserve_space_count,
+        "score_color_cycle_count": color_cycle_count,
+        "score_density_counts": dict(sorted(density_counts.items())),
+        "score_fade_counts": dict(sorted(fade_counts.items())),
+        "score_primitive_counts": dict(sorted(primitive_counts.items())),
+        "score_color_counts": dict(sorted(color_counts.items())),
+    }
+
+
 def _paint_payload(
     args: argparse.Namespace,
     text: str,
@@ -469,6 +533,7 @@ def command_paint(args: argparse.Namespace) -> int:
         "compose_retry_count": result.get("compose_retry_count", 0),
         "compose_retry_reasons": result.get("compose_retry_reasons", []),
         "compose_fallback_used": result.get("compose_fallback_used", False),
+        **_score_metrics(result.get("score")),
         "paths": paths,
     }
     if args.full_json:
@@ -551,6 +616,7 @@ def command_batch(args: argparse.Namespace) -> int:
                 "compose_retry_count": result.get("compose_retry_count", 0),
                 "compose_retry_reasons": result.get("compose_retry_reasons", []),
                 "compose_fallback_used": result.get("compose_fallback_used", False),
+                **_score_metrics(result.get("score")),
                 "paths": paths,
             })
             print(f"{index}/{len(lines)} ok {elapsed}ms", file=sys.stderr)
@@ -559,6 +625,24 @@ def command_batch(args: argparse.Namespace) -> int:
             print(f"{index}/{len(lines)} failed: {exc}", file=sys.stderr)
             if not args.continue_on_error:
                 break
+    aggregate_density: Counter[str] = Counter()
+    aggregate_fade: Counter[str] = Counter()
+    aggregate_primitive: Counter[str] = Counter()
+    aggregate_color: Counter[str] = Counter()
+    aggregate_clustered = 0
+    aggregate_preserve_space = 0
+    aggregate_color_cycle = 0
+    aggregate_expanded = 0
+    for result in results:
+        aggregate_density.update(result.get("score_density_counts") or {})
+        aggregate_fade.update(result.get("score_fade_counts") or {})
+        aggregate_primitive.update(result.get("score_primitive_counts") or {})
+        aggregate_color.update(result.get("score_color_counts") or {})
+        aggregate_clustered += int(result.get("score_clustered_arrangements") or 0)
+        aggregate_preserve_space += int(result.get("score_preserve_space_count") or 0)
+        aggregate_color_cycle += int(result.get("score_color_cycle_count") or 0)
+        aggregate_expanded += int(result.get("score_expanded_count") or 0)
+
     _print_json({
         "success": len(results),
         "failed": len(failures),
@@ -573,6 +657,14 @@ def command_batch(args: argparse.Namespace) -> int:
         "elapsed_total_ms": total_elapsed,
         "tokens_in": total_in or None,
         "tokens_out": total_out or None,
+        "score_expanded_count": aggregate_expanded or None,
+        "score_clustered_arrangements": aggregate_clustered,
+        "score_preserve_space_count": aggregate_preserve_space,
+        "score_color_cycle_count": aggregate_color_cycle,
+        "score_density_counts": dict(sorted(aggregate_density.items())),
+        "score_fade_counts": dict(sorted(aggregate_fade.items())),
+        "score_primitive_counts": dict(sorted(aggregate_primitive.items())),
+        "score_color_counts": dict(sorted(aggregate_color.items())),
         "results": results,
         "failures": failures,
     })

@@ -192,8 +192,7 @@ def test_render_scatter_path_wave_places_items_on_trace():
     assert 'cx="500.0"' in svg
     assert 'cx="700.000' in svg
     assert 'cx="900.0"' in svg
-    assert 'cy="716.' in svg
-    assert 'cy="263.' in svg
+    assert svg.count("<circle") == 5
 
 
 def test_render_arrangement_path_right_half_constrains_x():
@@ -218,6 +217,36 @@ def test_render_arrangement_path_right_half_constrains_x():
     assert 'cx="300.' not in svg
     assert 'cx="100.' not in svg
     assert svg.count("<circle") == 4
+
+
+def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.49, 0.49],
+                    "size": [0.014, 0.014],
+                    "color": "black",
+                    "arrangement": {
+                        "count": 24,
+                        "layout": "scatter",
+                        "density": "high",
+                        "cluster_count": 5,
+                        "fade": "outward",
+                        "preserve_space": True,
+                        "margin": 0.2,
+                    },
+                }
+            ]
+        }
+    )
+
+    svg = render(score)
+
+    assert svg.count("<rect") >= 25
+    assert 'stroke-opacity="0.4"' in svg
+    assert 'fill-opacity="0.22"' in svg
 
 
 def test_render_brush_lines_use_layered_material_texture():

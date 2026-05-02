@@ -46,7 +46,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
 - **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
-- **余白を残す。小さな scatter が 200 個を超える場合は、全面密度ではなく斜めの帯・上から下・右半分などの配置語を尊重し、要素サイズを小さくしすぎない**
+- **余白を残す。小さな scatter が 120 個を超える場合は、全面密度ではなく arrangement.density, cluster_count, fade, preserve_space を使い、斜めの帯・上から下・右半分などの配置語を尊重する。要素サイズを小さくしすぎない**
+- **大数量は「数の忠実さ」より「群の見え方」を優先する。300 個以上は count を 80〜120 個へ代表化し、density="high", cluster_count=5〜9, fade="outward" または "directional", preserve_space=true で原意を保持する**
+- **膜・霞・霧・透明・気配・余韻 → 薄い ellipse/square/line に fade を付け、preserve_space=true。説明だけで終わらせず、透明な面・薄い反射・消える線として JSON 化する**
+- **反射・映り込み → line または arc の少数反復。fade="directional" と path="wave" または "top_to_bottom" を使う**
 - **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
@@ -91,10 +94,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.5,0.5],"size":[0.06,0.03],"color":"blue","rotation":-30,"arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
 
 入力: 白い回転した小さな四角を画面全体に点々と六百十個散らす。
-出力: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.012,0.012],"color":"white","rotation":30,"arrangement":{"count":610,"layout":"scatter"}}]}
+出力: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.014,0.014],"color":"white","rotation":30,"arrangement":{"count":110,"layout":"scatter","density":"high","cluster_count":9,"fade":"outward","preserve_space":true,"margin":0.2}}]}
 
 入力: 白い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。
-出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 入力: 赤い右上がりの小さな楕円を右半分に縦に二十個散らす。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
@@ -163,13 +166,16 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"background":"white","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"black","color_hint":"白い線を可視化"}]}
 
 入力: 背景を白で塗りつぶす。白い短い線を上から下へ百三十七本散らす。
-出力: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"白い線を小面積側で可視化","arrangement":{"count":137,"layout":"vertical"}}]}
+出力: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"白い線を小面積側で可視化","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}
 
 入力: 背景を白で塗りつぶす。白い大きな円を上端近くに置く。半径は0.15。
 出力: {"background":"blue","instructions":[{"primitive":"circle","center":[0.5,0.18],"radius":0.15,"color":"white"}]}
 
 入力: 赤・青・緑・黒の色とりどりの円を放射状に八つ並べる。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,"arrangement":{"count":8,"layout":"radial","color_cycle":["red","blue","green","black","gray","red","blue","green"]}}]}
+
+入力: 透明な膜が雨のバス停の反射を薄く包む。
+出力: {"instructions":[{"primitive":"ellipse","center":[0.58,0.46],"size":[0.46,0.18],"color":"blue","filled":true,"color_hint":"透明な膜","arrangement":{"count":5,"layout":"scatter","density":"low","cluster_count":3,"fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.35,0.22],"to":[0.72,0.78],"color":"white","color_hint":"雨の反射","arrangement":{"count":9,"layout":"vertical","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.18}}]}
 
 # わりあい (比率・描画範囲)
 
@@ -262,7 +268,10 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
 - **count is integer 1–1000. Use explicit numbers from DDL**
 - **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
-- **Preserve negative space. When tiny scatter exceeds 200 items, do not turn it into uniform full-canvas density; respect placement phrases such as diagonal band, top to bottom, or right half, and keep elements visible enough**
+- **Preserve negative space. When tiny scatter exceeds 120 items, do not turn it into uniform full-canvas density; use arrangement.density, cluster_count, fade, and preserve_space while respecting placement phrases such as diagonal band, top to bottom, or right half**
+- **For very large quantities, prioritize the visible group behavior over literal item count. For 300+ items, represent them with count around 80–120 plus density="high", cluster_count=5–9, fade="outward" or "directional", and preserve_space=true**
+- **Membrane, haze, fog, transparency, atmosphere, or lingering presence → thin ellipse/square/line with fade and preserve_space=true. Do not omit them as mere explanation; convert them into transparent planes, faint reflections, or fading lines**
+- **Reflection → sparse repeated line or arc with fade="directional" and path="wave" or "top_to_bottom"**
 - **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
@@ -307,10 +316,10 @@ Input: Scatter five small blue ellipses rising to the right near the center. Mak
 Output: {"instructions":[{"primitive":"ellipse","center":[0.5,0.5],"size":[0.06,0.03],"color":"blue","rotation":-30,"arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
 
 Input: Scatter six hundred ten small rotated white squares dotted across the whole canvas.
-Output: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.012,0.012],"color":"white","rotation":30,"arrangement":{"count":610,"layout":"scatter"}}]}
+Output: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.014,0.014],"color":"white","rotation":30,"arrangement":{"count":110,"layout":"scatter","density":"high","cluster_count":9,"fade":"outward","preserve_space":true,"margin":0.2}}]}
 
 Input: Scatter one hundred thirty-seven short white lines from top to bottom. Swaying slowly.
-Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 Input: Scatter twenty small red ellipses rising to the right vertically in the right half.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
@@ -379,13 +388,16 @@ Input: Fill background with white. Draw a white horizontal line at center.
 Output: {"background":"white","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"black","color_hint":"white line made visible"}]}
 
 Input: Fill background with white. Scatter one hundred thirty-seven short white lines from top to bottom.
-Output: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"white lines made visible on the smaller area","arrangement":{"count":137,"layout":"vertical"}}]}
+Output: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"white lines made visible on the smaller area","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}
 
 Input: Fill background with white. Place a large white circle near the top edge. Radius 0.15.
 Output: {"background":"blue","instructions":[{"primitive":"circle","center":[0.5,0.18],"radius":0.15,"color":"white"}]}
 
 Input: Arrange eight circles radially in red, blue, green, black.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,"arrangement":{"count":8,"layout":"radial","color_cycle":["red","blue","green","black","gray","red","blue","green"]}}]}
+
+Input: A transparent membrane wraps faint reflections at a rainy bus stop.
+Output: {"instructions":[{"primitive":"ellipse","center":[0.58,0.46],"size":[0.46,0.18],"color":"blue","filled":true,"color_hint":"transparent membrane","arrangement":{"count":5,"layout":"scatter","density":"low","cluster_count":3,"fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.35,0.22],"to":[0.72,0.78],"color":"white","color_hint":"rain reflection","arrangement":{"count":9,"layout":"vertical","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.18}}]}
 
 # Proportions
 

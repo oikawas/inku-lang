@@ -258,6 +258,47 @@ def _path_pos(i: int, n: int, seed: int, margin: float, path: str) -> tuple[floa
     return _scatter_pos(i, seed, margin)
 
 
+def _density_radius(density: str, preserve_space: bool) -> float:
+    base = {
+        "low": 0.035,
+        "medium": 0.060,
+        "high": 0.085,
+        "none": 0.045,
+    }.get(density, 0.045)
+    return base * (0.85 if preserve_space else 1.0)
+
+
+def _clustered_pos(
+    i: int,
+    n: int,
+    seed: int,
+    margin: float,
+    path: str,
+    *,
+    cluster_count: int,
+    density: str,
+    preserve_space: bool,
+) -> tuple[float, float]:
+    """大数量の配置を、均一散布ではなく複数のまとまりとして決定的に配置する。"""
+    cluster_count = max(1, min(cluster_count, n))
+    cluster_index = i % cluster_count
+    local_index = i // cluster_count
+    local_total = max(1, math.ceil(n / cluster_count))
+    center_margin = max(margin, 0.20 if preserve_space else margin)
+    if path == "none":
+        cx, cy = _scatter_pos(cluster_index, seed ^ 0xC1A57, center_margin)
+    else:
+        cx, cy = _path_pos(cluster_index, cluster_count, seed ^ 0xC1A57, center_margin, path)
+
+    angle = _hash01(i, seed, "cluster-angle") * math.tau
+    spiral_t = (local_index + 0.5) / local_total
+    radius = _density_radius(density, preserve_space) * math.sqrt(spiral_t)
+    jitter = 0.55 + _hash01(i, seed, "cluster-radius") * 0.75
+    x = cx + math.cos(angle) * radius * jitter
+    y = cy + math.sin(angle) * radius * jitter
+    return _clamp01(x), _clamp01(y)
+
+
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
@@ -298,7 +339,20 @@ def _anchor(ins: Instruction) -> tuple[float, float]:
 def _shift(ins: Instruction, dx: float, dy: float) -> Instruction:
     """ins を (dx, dy) だけ平行移動した新しい Instruction を返す。arrangement は除去。"""
     data = ins.model_dump(by_alias=True)
+    arr = ins.arrangement
     data.pop("arrangement", None)
+    if arr is not None:
+        notes: list[str] = []
+        if arr.density != "none":
+            notes.append(f"density={arr.density}")
+        if arr.fade != "none":
+            notes.append(f"fade={arr.fade}")
+        if arr.preserve_space:
+            notes.append("preserve_space")
+        if notes:
+            hint = data.get("color_hint")
+            effect_note = "; ".join(notes)
+            data["color_hint"] = f"{hint}; {effect_note}" if hint else effect_note
     if ins.primitive == "line" and ins.from_ and ins.to:
         data["from"] = [ins.from_[0] + dx, ins.from_[1] + dy]
         data["to"] = [ins.to[0] + dx, ins.to[1] + dy]
@@ -331,9 +385,32 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
         data.pop("arrangement", None)
         return _apply_color_cycle([Instruction.model_validate(data)], arr.color_cycle)
     n = arr.count
-    margin = arr.margin
+    margin = max(arr.margin, 0.20) if arr.preserve_space else arr.margin
     ax, ay = _anchor(ins)
     seed = _seed_for_instruction(ins)
+    cluster_count = arr.cluster_count or 0
+
+    if cluster_count > 0 and arr.layout in ("scatter", "horizontal", "vertical"):
+        path = arr.path
+        if path == "none" and arr.layout == "horizontal":
+            path = "left_to_right"
+        elif path == "none" and arr.layout == "vertical":
+            path = "top_to_bottom"
+        targets = [
+            _clustered_pos(
+                i,
+                n,
+                seed,
+                margin,
+                path,
+                cluster_count=cluster_count,
+                density=arr.density,
+                preserve_space=arr.preserve_space,
+            )
+            for i in range(n)
+        ]
+        result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
+        return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "horizontal":
         if arr.path != "none":
@@ -567,6 +644,7 @@ def _stroke_attrs(ins: Instruction, cmap: dict[str, str]) -> dict:
     do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled
     color = _resolve_color(ins.color, ins.color_hint, cmap)
     weight_style = WEIGHT_STYLE.get(ins.weight, {})
+    hint = _norm_label(ins.color_hint or "")
     attrs = {
         "stroke": color,
         "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight],
@@ -577,6 +655,20 @@ def _stroke_attrs(ins: Instruction, cmap: dict[str, str]) -> dict:
         attrs["stroke_opacity"] = weight_style["stroke_opacity"]
     if ins.weight in TEXTURE_FILTERS:
         attrs["filter"] = f"url(#texture-{ins.weight})"
+    if any(token in hint for token in ("membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄")):
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.26)
+        if do_fill:
+            attrs["fill_opacity"] = 0.12
+    elif "fade directional" in hint or "fade=directional" in hint:
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.48)
+        if do_fill:
+            attrs["fill_opacity"] = 0.30
+    elif "fade outward" in hint or "fade=outward" in hint:
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.40)
+        if do_fill:
+            attrs["fill_opacity"] = 0.22
+    if any(token in hint for token in ("reflection", "反射", "映り")):
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.52)
     dash = STYLE_TO_DASH[ins.style]
     texture_dash = weight_style.get("stroke_dasharray")
     if dash:

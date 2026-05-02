@@ -218,6 +218,54 @@ uv run inku-cli batch \
 - `circle_or_ellipse_bias`
 - `random_scatter`
 - `path_not_reflected`
+
+## 2026-05-02 Build 247: density/cluster/fade 追従後 30 件ベンチ
+
+対象:
+
+- 入力: `cli/out/tune-bench-030-after-806e30a/prompts.txt`
+- 出力: `cli/out/tune-bench-030-density-247/`
+- contact sheet: `cli/out/tune-bench-030-density-247/contact-sheet.png`
+- Stage1/Stage2: `nvidia` / `google/gemma-4-31b-it`
+
+結果:
+
+- 成功: 30 / 30
+- 失敗: 0 / 30
+- total elapsed: 1,631,379 ms
+- average elapsed: 54,379 ms
+- median elapsed: 38,257 ms
+- max elapsed: 187,518 ms
+- tokens in/out: 314,433 / 14,164
+- compose retry total: 3
+- compose fallback used: 5件
+
+Score 集計:
+
+- expanded count total: 1,348
+- clustered arrangements: 10
+- preserve_space: 14
+- color_cycle: 10
+- density: `high=3`, `medium=7`, `low=3`
+- fade: `outward=10`, `directional=3`
+- primitives: `line=46`, `ellipse=18`, `square=14`, `arc=6`, `circle=2`
+- colors: `black=32`, `gray=22`, `white=20`, `red=8`, `blue=4`
+
+観察:
+
+- `density / cluster_count / fade / preserve_space` は 30 件中の一部に反映され、特に粒・膜・気配・消失系の表現で新フィールドが使われた。
+- `circle` は 2 件まで抑制され、真円偏重は改善している。
+- `line` が依然として最多で、線主体の構成が強い。次の調整では面・弧・非線形の領域表現を増やす余地がある。
+- `black` と `gray` が多く、色彩の幅はまだ限定的。色カタログ解決以前の抽象色としても、青・緑・赤の使い分けを増やす余地がある。
+- fallback は 5 件発生。うち Stage2 hard timeout が複数あり、Free API の待ち・失敗前提としては許容範囲だが、品質評価からは fallback 作品を別枠に分ける必要がある。
+- 100 秒超の遅延が 7 件あり、ベンチ用途では timeout だけでなく「遅延サンプル」ラベルを評価表に残すのが妥当。
+
+次の改善候補:
+
+- Stage2 が `density / fade` をより直接使うよう、膜・霞・反射・消失以外の「空気感」「距離」「沈黙」でも schema field へ落とす例を追加する。
+- Stage1.5 は線の補助層を増やしすぎないよう、面・弧・余白の焦点に振る候補を増やす。
+- Renderer は `fade` の方向性を要素ごとの opacity 勾配としてより明確化する。現状は instruction 単位の薄れに近い。
+- ベンチ評価では fallback 使用作品を成功件数に含めつつ、芸術評価では別集計する。
 - `fill_mismatch`
 - `slow_stage2`
 

@@ -56,7 +56,10 @@ def test_coerce_score_keeps_tiny_particle_cloud_visible_and_bounded():
     assert ins.filled is True
     assert ins.size == (0.008, 0.008)
     assert ins.arrangement is not None
-    assert ins.arrangement.count == 240
+    assert ins.arrangement.count <= 120
+    assert ins.arrangement.density == "high"
+    assert ins.arrangement.cluster_count is not None
+    assert ins.arrangement.preserve_space is True
 
 
 def test_coerce_score_dedupes_repeated_arranged_instructions():
@@ -119,8 +122,11 @@ def test_coerce_score_caps_single_arrangement_density():
     fixed = coerce_score(score)
 
     assert fixed.instructions[0].arrangement is not None
-    assert fixed.instructions[0].arrangement.count == 240
-    assert "single arrangement density capped" in (fixed.instructions[0].color_hint or "")
+    assert fixed.instructions[0].arrangement.count <= 120
+    assert fixed.instructions[0].arrangement.density == "high"
+    assert fixed.instructions[0].arrangement.cluster_count is not None
+    assert fixed.instructions[0].arrangement.preserve_space is True
+    assert "single arrangement density clustered" in (fixed.instructions[0].color_hint or "")
 
 
 def test_coerce_score_infers_material_and_variation_from_ddl():
@@ -173,3 +179,52 @@ def test_coerce_score_adds_ddl_coverage_when_stage2_collapses_to_one_instruction
 def test_count_hint_from_ddl_extracts_japanese_numbers():
     assert count_hint_from_ddl("白い線を二百三十三本散らす。") == 233
     assert count_hint_from_ddl("赤い点を47個散らす。") == 47
+
+
+def test_coerce_score_preserves_multicolor_cycle_from_ddl_coverage():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="黒い横線を一本引く。赤・青・緑の小さな四角を三十個散らす。",
+    )
+
+    colored = [ins for ins in fixed.instructions if ins.arrangement and ins.arrangement.color_cycle]
+    assert colored
+    assert colored[0].arrangement is not None
+    assert colored[0].arrangement.color_cycle == ["blue", "red", "green"] or colored[0].arrangement.color_cycle == ["red", "blue", "green"]
+
+
+def test_coerce_score_adds_atmospheric_coverage_from_ddl():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="黒い横線を一本引く。透明な膜が反射を包む。")
+
+    assert len(fixed.instructions) >= 2
+    atmospheric = [ins for ins in fixed.instructions if "membrane haze" in (ins.color_hint or "")]
+    assert atmospheric
+    assert atmospheric[0].arrangement is not None
+    assert atmospheric[0].arrangement.fade == "outward"
+    assert atmospheric[0].arrangement.preserve_space is True

@@ -114,3 +114,40 @@ def test_write_paint_outputs(tmp_path):
     assert Path(paths["svg"]).read_text(encoding="utf-8") == result["svg"]
     saved_json = json.loads(Path(paths["json"]).read_text(encoding="utf-8"))
     assert saved_json["ddl"] == result["ddl"]
+
+
+def test_score_metrics_reports_density_cluster_and_fade_fields():
+    score = {
+        "instructions": [
+            {
+                "primitive": "square",
+                "color": "white",
+                "arrangement": {
+                    "count": 110,
+                    "layout": "scatter",
+                    "density": "high",
+                    "cluster_count": 9,
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "color_cycle": ["red", "blue"],
+                },
+            },
+            {
+                "primitive": "line",
+                "color": "black",
+            },
+        ],
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_instruction_count"] == 2
+    assert metrics["score_arrangement_count"] == 1
+    assert metrics["score_expanded_count"] == 111
+    assert metrics["score_clustered_arrangements"] == 1
+    assert metrics["score_preserve_space_count"] == 1
+    assert metrics["score_color_cycle_count"] == 1
+    assert metrics["score_density_counts"] == {"high": 1}
+    assert metrics["score_fade_counts"] == {"outward": 1}
+    assert metrics["score_primitive_counts"] == {"line": 1, "square": 1}
+    assert metrics["score_color_counts"] == {"black": 1, "white": 1}

@@ -149,6 +149,16 @@ MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
 
 MAX_EXPANDED_PRIMITIVES = 400
 MAX_EXPANDED_PER_INSTRUCTION = 240
+MAX_VISUAL_CLUSTERED_COUNT = 120
+
+COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("白", "white"), "white"),
+    (("黒", "black"), "black"),
+    (("青", "blue"), "blue"),
+    (("赤", "red"), "red"),
+    (("緑", "green"), "green"),
+    (("灰", "gray", "grey"), "gray"),
+)
 
 
 def _visible_background(background: str) -> str:
@@ -206,14 +216,7 @@ def _with_density_budget(ins: Instruction) -> Instruction:
         return ins
     if _shape_extent(ins) > 0.018:
         return ins
-    data = ins.model_dump(by_alias=True)
-    arr_data = dict(data["arrangement"])
-    arr_data["count"] = 240
-    data["arrangement"] = arr_data
-    hint = data.get("color_hint")
-    note = "scatter density capped to preserve negative space"
-    data["color_hint"] = f"{hint}; {note}" if hint else note
-    return Instruction.model_validate(data)
+    return _with_clustered_density(ins, "scatter density clustered to preserve negative space")
 
 
 def _with_material_hint(ins: Instruction, ddl: str | None) -> Instruction:
@@ -294,19 +297,59 @@ def _with_arrangement_count(ins: Instruction, count: int, note: str) -> Instruct
     return Instruction.model_validate(data)
 
 
+def _density_label(original_count: int) -> str:
+    if original_count >= 180:
+        return "high"
+    if original_count >= 80:
+        return "medium"
+    return "low"
+
+
+def _cluster_count(original_count: int) -> int:
+    if original_count >= 500:
+        return 9
+    if original_count >= 240:
+        return 7
+    if original_count >= 120:
+        return 5
+    return 3
+
+
+def _clustered_visual_count(original_count: int) -> int:
+    if original_count <= MAX_VISUAL_CLUSTERED_COUNT:
+        return original_count
+    return min(MAX_VISUAL_CLUSTERED_COUNT, max(48, int(original_count * 0.42)))
+
+
+def _with_clustered_density(ins: Instruction, note: str) -> Instruction:
+    arr = ins.arrangement
+    if arr is None:
+        return ins
+    original_count = arr.count
+    data = ins.model_dump(by_alias=True)
+    arr_data = dict(data["arrangement"])
+    arr_data["count"] = _clustered_visual_count(original_count)
+    existing_density = arr_data.get("density", "none")
+    arr_data["density"] = existing_density if existing_density != "none" else _density_label(original_count)
+    arr_data["cluster_count"] = arr_data.get("cluster_count") or _cluster_count(original_count)
+    arr_data["preserve_space"] = True
+    arr_data["margin"] = max(float(arr_data.get("margin") or 0.1), 0.18)
+    if arr_data.get("fade", "none") == "none":
+        arr_data["fade"] = "directional" if arr.path != "none" or arr.layout in ("horizontal", "vertical") else "outward"
+    data["arrangement"] = arr_data
+    hint = data.get("color_hint")
+    full_note = f"{note}; original count {original_count}"
+    data["color_hint"] = f"{hint}; {full_note}" if hint else full_note
+    return Instruction.model_validate(data)
+
+
 def _with_per_instruction_density_budget(instructions: list[Instruction]) -> list[Instruction]:
     adjusted: list[Instruction] = []
     for ins in instructions:
         if ins.arrangement is None or ins.arrangement.count <= MAX_EXPANDED_PER_INSTRUCTION:
             adjusted.append(ins)
             continue
-        adjusted.append(
-            _with_arrangement_count(
-                ins,
-                MAX_EXPANDED_PER_INSTRUCTION,
-                "single arrangement density capped to preserve negative space",
-            )
-        )
+        adjusted.append(_with_clustered_density(ins, "single arrangement density clustered to preserve negative space"))
     return adjusted
 
 
@@ -331,7 +374,12 @@ def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruct
             remaining_total = sum(_expanded_count(item) for item in remaining[index:])
             share = count / remaining_total if remaining_total > 0 else 0
             allowed = max(1, int((remaining_budget - rest_minimum) * share))
-        adjusted_ins = _with_arrangement_count(ins, allowed, "expanded density capped to preserve negative space")
+        if allowed < count and count > 80:
+            adjusted_ins = _with_clustered_density(ins, "expanded density clustered to preserve negative space")
+            if _expanded_count(adjusted_ins) > allowed:
+                adjusted_ins = _with_arrangement_count(adjusted_ins, allowed, "expanded density capped after clustering")
+        else:
+            adjusted_ins = _with_arrangement_count(ins, allowed, "expanded density capped to preserve negative space")
         adjusted.append(adjusted_ins)
         remaining_budget -= _expanded_count(adjusted_ins)
     return adjusted
@@ -343,7 +391,9 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
     clauses = [part.strip() for part in re.split(r"[。\n;；]+", ddl) if part.strip()]
     markers = (
         "線", "点", "円", "楕円", "四角", "三角", "弧", "塗りつぶす", "散らす", "並べる",
+        "膜", "霞", "霧", "靄", "気配", "余韻", "反射", "映り", "消え", "滲",
         "line", "dot", "circle", "ellipse", "square", "triangle", "arc", "scatter", "fill",
+        "membrane", "haze", "fog", "mist", "trace", "reflection", "fade", "fading", "blur",
     )
     return [
         clause
@@ -355,19 +405,28 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
 
 def _color_from_clause(clause: str, background: str) -> str:
     lower = clause.lower()
-    candidates = (
-        (("白", "white"), "white"),
-        (("黒", "black"), "black"),
-        (("青", "blue"), "blue"),
-        (("赤", "red"), "red"),
-        (("緑", "green"), "green"),
-        (("灰", "gray", "grey"), "gray"),
-    )
-    for markers, color in candidates:
+    for markers, color in COLOR_MARKERS:
         if any(marker in clause or marker in lower for marker in markers):
             if color != background:
                 return color
     return VISIBLE_ON_BACKGROUND.get(background, "black")
+
+
+def _color_cycle_from_clause(clause: str, background: str) -> list[str]:
+    lower = clause.lower()
+    colors: list[str] = []
+    for markers, color in COLOR_MARKERS:
+        if color == background:
+            continue
+        if any(marker in clause or marker in lower for marker in markers):
+            colors.append(color)
+    if ("色とりどり" in clause or "多色" in clause or "colorful" in lower or "multi-color" in lower) and len(colors) < 3:
+        colors.extend(color for color in ("red", "blue", "green", "black", "gray") if color != background)
+    deduped: list[str] = []
+    for color in colors:
+        if color not in deduped:
+            deduped.append(color)
+    return deduped
 
 
 def _weight_from_clause(clause: str) -> str:
@@ -391,10 +450,34 @@ def _primitive_from_clause(clause: str) -> str:
     return "line"
 
 
+def _is_atmospheric_clause(clause: str) -> bool:
+    lower = clause.lower()
+    return any(
+        marker in clause or marker in lower
+        for marker in ("膜", "霞", "霧", "靄", "気配", "余韻", "透明", "membrane", "haze", "fog", "mist", "atmosphere")
+    )
+
+
+def _is_reflection_clause(clause: str) -> bool:
+    lower = clause.lower()
+    return any(marker in clause or marker in lower for marker in ("反射", "映り", "reflection", "reflected"))
+
+
+def _is_fading_clause(clause: str) -> bool:
+    lower = clause.lower()
+    return any(marker in clause or marker in lower for marker in ("消え", "薄れ", "fade", "fading", "vanish", "dissolve"))
+
+
 def _fallback_instruction_from_clause(clause: str, *, index: int, background: str) -> Instruction:
     primitive = _primitive_from_clause(clause)
+    if _is_atmospheric_clause(clause):
+        primitive = "ellipse"
+    elif _is_reflection_clause(clause):
+        primitive = "line"
     color = _color_from_clause(clause, background)
     weight = _weight_from_clause(clause)
+    if _is_atmospheric_clause(clause) and weight == "pen":
+        weight = "chalk"
     common: dict[str, Any] = {
         "primitive": primitive,
         "color": color,
@@ -413,10 +496,49 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
 
     count = count_hint_from_ddl(clause)
     lower = clause.lower()
+    cycle = _color_cycle_from_clause(clause, background)
     if count and (("散らす" in clause) or ("scatter" in lower)):
         common["arrangement"] = {"count": min(count, 120), "layout": "scatter", "margin": 0.18}
     elif count and (("並べる" in clause) or ("line up" in lower)):
         common["arrangement"] = {"count": min(count, 80), "layout": "horizontal", "margin": 0.1}
+    elif _is_atmospheric_clause(clause):
+        common["arrangement"] = {
+            "count": 5,
+            "layout": "scatter",
+            "margin": 0.24,
+            "density": "low",
+            "cluster_count": 3,
+            "fade": "outward",
+            "preserve_space": True,
+        }
+        common["filled"] = True
+        common["color_hint"] = f"{common['color_hint']}; membrane haze"
+    elif _is_reflection_clause(clause):
+        common["arrangement"] = {
+            "count": 9,
+            "layout": "vertical",
+            "path": "wave",
+            "margin": 0.18,
+            "density": "low",
+            "fade": "directional",
+            "preserve_space": True,
+        }
+        common["color_hint"] = f"{common['color_hint']}; reflection"
+    elif _is_fading_clause(clause):
+        common["arrangement"] = {
+            "count": 7,
+            "layout": "scatter",
+            "path": "diagonal",
+            "margin": 0.24,
+            "density": "low",
+            "fade": "directional",
+            "preserve_space": True,
+        }
+        common["color_hint"] = f"{common['color_hint']}; fading"
+    if cycle:
+        arrangement = dict(common.get("arrangement") or {"count": max(len(cycle), 3), "layout": "scatter", "margin": 0.18})
+        arrangement["color_cycle"] = cycle
+        common["arrangement"] = arrangement
     return Instruction.model_validate(common)
 
 

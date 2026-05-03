@@ -187,9 +187,16 @@ COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("山", "屋根", "尖", "鋭", "三角", "mountain", "roof", "sharp", "peak", "triangle"), "triangle"),
+    (("山", "屋根", "尖", "鋭", "三角", "峰", "頂", "稜線", "切妻", "mountain", "roof", "sharp", "peak", "ridge", "triangle"), "triangle"),
     (("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple"), "arc"),
     (("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square"), "square"),
+)
+
+MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "leaves"), "leaf_cluster"),
+    (("紙片", "破片", "折", "手紙", "paper", "fragment", "shard", "letter"), "paper_shard"),
+    (("波紋", "渦", "螺旋", "巻", "ripple", "spiral", "coil"), "ripple_knot"),
+    (("山", "屋根", "峰", "稜線", "切妻", "mountain", "roof", "ridge", "peak"), "mountain_sign"),
 )
 
 
@@ -463,30 +470,79 @@ def _score_contains_color(instructions: list[Instruction], color: str) -> bool:
     return False
 
 
+def _color_repair_order(colors: set[str]) -> list[str]:
+    ordered = [color for color in ("red", "blue", "green", "white", "black", "gray") if color in colors]
+    return ordered or sorted(colors)
+
+
+def _green_intent_context(ddl: str | None) -> str | None:
+    if not ddl:
+        return None
+    lower = ddl.lower()
+    if "竹" in ddl or "bamboo" in lower:
+        return "bamboo green kept as primary contour"
+    if any(marker in ddl for marker in ("枯れ草", "枯草", "枯れた草", "枯葉")) or "withered grass" in lower or "dry grass" in lower:
+        return "withered grass kept as muted green-gray"
+    if ("森" in ddl or "forest" in lower) and any(marker in ddl for marker in ("落ち葉", "紅葉", "秋")):
+        return "forest green kept as quiet residue behind warm leaves"
+    return None
+
+
+def _with_color_cycle_delivery(ins: Instruction, colors: list[str], *, ddl: str | None = None) -> Instruction:
+    data = ins.model_dump(by_alias=True)
+    arr_data = dict(data.get("arrangement") or {})
+    cycle: list[str] = []
+    existing_cycle = arr_data.get("color_cycle")
+    if isinstance(existing_cycle, list):
+        cycle.extend(str(color) for color in existing_cycle)
+    base_color = data.get("color")
+    green_context = _green_intent_context(ddl) if "green" in colors else None
+    if green_context and "bamboo" in green_context:
+        data["color"] = "green"
+        base_color = "green"
+    if isinstance(base_color, str):
+        cycle.insert(0, base_color)
+    if green_context and "withered" in green_context and "gray" not in cycle:
+        cycle.insert(0, "gray")
+    for color in colors:
+        if color not in cycle:
+            cycle.append(color)
+    if not cycle:
+        return ins
+    if "count" not in arr_data:
+        arr_data["count"] = max(2, len(cycle))
+        arr_data["layout"] = arr_data.get("layout") or "scatter"
+        arr_data["margin"] = max(float(arr_data.get("margin") or 0.1), 0.16)
+    arr_data["color_cycle"] = cycle
+    data["arrangement"] = arr_data
+    hint = data.get("color_hint")
+    note = f"{'/'.join(colors)} restored in color_cycle from DDL color intent"
+    if green_context:
+        note = f"{note}; {green_context}"
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
 def _with_color_delivery_repair(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
     requested = _requested_colors_from_ddl(ddl)
     if not requested:
         return instructions
 
     repaired = list(instructions)
-    for color in sorted(requested):
-        if _score_contains_color(repaired, color):
-            continue
-        candidate_index = next(
-            (
-                index for index, ins in enumerate(repaired)
-                if ins.primitive in ("ellipse", "arc", "circle", "square", "triangle")
-            ),
-            0 if repaired else -1,
-        )
-        if candidate_index < 0:
-            continue
-        data = repaired[candidate_index].model_dump(by_alias=True)
-        hint = data.get("color_hint")
-        note = f"{color} restored from DDL color intent"
-        data["color"] = color
-        data["color_hint"] = f"{hint}; {note}" if hint else note
-        repaired[candidate_index] = Instruction.model_validate(data)
+    missing = {color for color in requested if not _score_contains_color(repaired, color)}
+    if not missing:
+        return repaired
+
+    candidate_index = next(
+        (
+            index for index, ins in enumerate(repaired)
+            if ins.primitive in ("ellipse", "arc", "circle", "square", "triangle")
+        ),
+        0 if repaired else -1,
+    )
+    if candidate_index < 0:
+        return repaired
+    repaired[candidate_index] = _with_color_cycle_delivery(repaired[candidate_index], _color_repair_order(missing), ddl=ddl)
     return repaired
 
 
@@ -551,9 +607,146 @@ def _with_shape_delivery_repair(
     for primitive in ("triangle", "arc", "square"):
         if primitive not in requested or _score_contains_primitive(repaired, primitive):
             continue
-        if len(repaired) >= 6:
+        limit = 8 if primitive == "triangle" else 6
+        if len(repaired) >= limit:
+            if primitive == "triangle":
+                replace_index = next(
+                    (
+                        index for index, ins in enumerate(repaired)
+                        if ins.primitive in ("line", "ellipse", "square") and ins.arrangement is None
+                    ),
+                    -1,
+                )
+                if replace_index >= 0:
+                    repaired[replace_index] = _shape_repair_instruction(
+                        primitive,
+                        index=replace_index,
+                        background=background,
+                    )
+                    continue
             break
         repaired.append(_shape_repair_instruction(primitive, index=len(repaired), background=background))
+    return repaired
+
+
+def _requested_motifs_from_ddl(ddl: str | None) -> list[str]:
+    if not ddl:
+        return []
+    lower = ddl.lower()
+    motifs: list[str] = []
+    for markers, motif in MOTIF_INTENT_MARKERS:
+        if any(marker.lower() in lower or marker in ddl for marker in markers):
+            motifs.append(motif)
+    return motifs
+
+
+def _score_contains_motif(instructions: list[Instruction], motif: str) -> bool:
+    return any(motif in (ins.color_hint or "") for ins in instructions)
+
+
+def _motif_repair_instructions(motif: str, *, index: int, background: str) -> list[Instruction]:
+    color = VISIBLE_ON_BACKGROUND.get(background, "black")
+    offset = min(index, 2) * 0.08
+    if motif == "leaf_cluster":
+        return [
+            Instruction.model_validate({
+                "primitive": "ellipse",
+                "center": [0.38 + offset, 0.44],
+                "size": [0.13, 0.035],
+                "rotation": -28,
+                "color": "green" if background != "green" else "white",
+                "color_hint": "leaf_cluster motif restored from DDL intent",
+            }),
+            Instruction.model_validate({
+                "primitive": "arc",
+                "center": [0.40 + offset, 0.44],
+                "radius": 0.08,
+                "angle_start": 200,
+                "angle_end": 335,
+                "rotation": -24,
+                "color": color,
+                "weight": "brush_thin",
+                "color_hint": "leaf_cluster motif restored from DDL intent",
+            }),
+        ]
+    if motif == "paper_shard":
+        return [
+            Instruction.model_validate({
+                "primitive": "square",
+                "position": [0.56 - offset, 0.36 + offset],
+                "size": [0.13, 0.09],
+                "rotation": -24,
+                "color": color,
+                "color_hint": "paper_shard motif restored from DDL intent",
+            }),
+            Instruction.model_validate({
+                "primitive": "line",
+                "from": [0.55 - offset, 0.43 + offset],
+                "to": [0.70 - offset, 0.37 + offset],
+                "color": color,
+                "weight": "hair",
+                "color_hint": "paper_shard motif restored from DDL intent",
+            }),
+        ]
+    if motif == "ripple_knot":
+        return [
+            Instruction.model_validate({
+                "primitive": "arc",
+                "center": [0.62 - offset, 0.58],
+                "radius": 0.10,
+                "angle_start": 25,
+                "angle_end": 210,
+                "color": "blue" if background != "blue" else "white",
+                "color_hint": "ripple_knot motif restored from DDL intent",
+            }),
+            Instruction.model_validate({
+                "primitive": "ellipse",
+                "center": [0.62 - offset, 0.58],
+                "size": [0.055, 0.025],
+                "rotation": 18,
+                "color": color,
+                "color_hint": "ripple_knot motif restored from DDL intent",
+            }),
+        ]
+    return [
+        Instruction.model_validate({
+            "primitive": "triangle",
+            "position": [0.50 - offset, 0.27 + offset],
+            "size": [0.18, 0.15],
+            "rotation": -12,
+            "color": color,
+            "color_hint": "mountain_sign motif restored from DDL intent",
+        }),
+        Instruction.model_validate({
+            "primitive": "line",
+            "from": [0.59 - offset, 0.25 + offset],
+            "to": [0.59 - offset, 0.45 + offset],
+            "color": color,
+            "weight": "hair",
+            "color_hint": "mountain_sign motif restored from DDL intent",
+        }),
+    ]
+
+
+def _with_complex_motif_repair(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    motifs = _requested_motifs_from_ddl(ddl)
+    if not motifs:
+        return instructions
+    repaired = list(instructions)
+    added = 0
+    for motif in motifs:
+        if added >= 2 or _score_contains_motif(repaired, motif):
+            continue
+        motif_instructions = _motif_repair_instructions(motif, index=added, background=background)
+        if len(repaired) + len(motif_instructions) > 10:
+            continue
+        repaired.extend(motif_instructions)
+        added += 1
     return repaired
 
 
@@ -962,6 +1155,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
     instructions = _with_color_delivery_repair(instructions, ddl=ddl)
     instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
+    instructions = _with_complex_motif_repair(instructions, ddl=ddl, background=background)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)

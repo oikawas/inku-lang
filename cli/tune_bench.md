@@ -1903,3 +1903,13 @@ green 到達の問題:
 - Next action 1 として、日本語 green marker から単独 `葉` を外した。
 - `落ち葉`, `若葉`, `木の葉`, `葉っぱ`, `葉脈` は green marker として維持した。
 - `言葉` で CLI `color_trace` や server `coerce_score` の green repair が誤作動しないテストを追加した。
+- Next action 2 として、複数 missing color の repair を `color` 上書きではなく `arrangement.color_cycle` 追加へ変更した。
+- これにより、red / blue / green など複数色が同時に欠けても green が後続色で上書きされず、元の抽象色も cycle 内に残る。
+- Next action 3 として、green intent の文脈別 repair を追加した。
+- `竹林` は green を主線・輪郭色として優先し、`枯れ草` は gray/green の低彩度 cycle、`秋の森 + 落ち葉` は red 主色を保ったまま green を背景残響として cycle に残す。
+- Next action 4 として、triangle delivery の優先度を上げた。
+- `屋根`, `山`, `稜線`, `切妻`, `roof`, `ridge` などの intent があり、既に instruction が多い場合でも triangle を追加または弱い instruction と置換して残す。
+- Next action 5 として、deterministic complex motif repair を追加した。
+- `leaf_cluster`, `paper_shard`, `ripple_knot`, `mountain_sign` を既存 primitive 2個の組み合わせとして補助追加し、1作品あたり最大2 motif に制限する。
+- Next action 6 として、CLI summary に `math_balance_markers` を追加した。
+- `radial` の 5/8/13/21 配置、黄金比付近の中心、三分割付近の中心、対角の counterweight 配置を `paint` / `batch` の score metrics と `analysis-summary.json` 集計で確認できるようにした。

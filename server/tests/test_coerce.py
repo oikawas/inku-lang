@@ -305,8 +305,78 @@ def test_coerce_score_repairs_missing_green_from_natural_ddl():
 
     fixed = coerce_score(score, ddl="竹林の香りを含む薄い楕円を波打つ軌跡に沿って散らす。")
 
-    assert any(ins.color == "green" for ins in fixed.instructions)
-    assert any("green restored from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any(ins.color == "green" or (ins.arrangement and "green" in ins.arrangement.color_cycle) for ins in fixed.instructions)
+    assert any("green restored in color_cycle from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_repairs_multiple_missing_colors_without_overwriting_green():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.18, 0.08],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="青い夜の森に赤い落ち葉を散らす。")
+
+    repaired = fixed.instructions[0]
+    assert repaired.color == "gray"
+    assert repaired.arrangement is not None
+    assert repaired.arrangement.color_cycle == ["gray", "red", "blue", "green"]
+    assert "red/blue/green restored in color_cycle from DDL color intent" in (repaired.color_hint or "")
+    assert "forest green kept as quiet residue behind warm leaves" in (repaired.color_hint or "")
+
+
+def test_coerce_score_keeps_bamboo_green_as_primary_contour():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.2],
+                    "to": [0.8, 0.8],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="竹林の輪郭を細い線で引く。")
+
+    repaired = fixed.instructions[0]
+    assert repaired.color == "green"
+    assert repaired.arrangement is not None
+    assert repaired.arrangement.color_cycle == ["green"]
+    assert "bamboo green kept as primary contour" in (repaired.color_hint or "")
+
+
+def test_coerce_score_keeps_withered_grass_as_muted_green_gray():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.18, 0.08],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="枯れ草の低い波を横に散らす。")
+
+    repaired = fixed.instructions[0]
+    assert repaired.color == "gray"
+    assert repaired.arrangement is not None
+    assert repaired.arrangement.color_cycle == ["gray", "green"]
+    assert "withered grass kept as muted green-gray" in (repaired.color_hint or "")
 
 
 def test_coerce_score_does_not_repair_green_from_words_false_positive():
@@ -345,7 +415,7 @@ def test_coerce_score_repairs_green_from_specific_leaf_terms():
 
     fixed = coerce_score(score, ddl="木の葉と葉脈を細い楕円で散らす。")
 
-    assert any(ins.color == "green" for ins in fixed.instructions)
+    assert any(ins.color == "green" or (ins.arrangement and "green" in ins.arrangement.color_cycle) for ins in fixed.instructions)
 
 
 def test_coerce_score_repairs_missing_shape_intents_from_ddl():
@@ -370,3 +440,72 @@ def test_coerce_score_repairs_missing_shape_intents_from_ddl():
     assert "triangle restored from DDL shape intent" in hints
     assert any(ins.primitive == "arc" and "coverage from DDL clause" in (ins.color_hint or "") for ins in fixed.instructions)
     assert "square restored from DDL shape intent" in hints
+
+
+def test_coerce_score_prioritizes_triangle_delivery_for_roof_intent_when_many_instructions():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.1, 0.1 + index * 0.08],
+                    "to": [0.9, 0.1 + index * 0.08],
+                    "color": "black",
+                }
+                for index in range(8)
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="低い雲の下に街の屋根と稜線を鋭く置く。")
+
+    assert any(ins.primitive == "triangle" for ins in fixed.instructions)
+    assert len(fixed.instructions) == 10
+    assert any("triangle restored from DDL shape intent" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("mountain_sign motif restored from DDL intent" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_adds_limited_compound_motifs_from_ddl():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="落ち葉の群れと折れた紙片を少しだけ散らす。")
+
+    hints = [ins.color_hint or "" for ins in fixed.instructions]
+    assert sum("leaf_cluster motif restored from DDL intent" in hint for hint in hints) == 2
+    assert sum("paper_shard motif restored from DDL intent" in hint for hint in hints) == 2
+    assert len([hint for hint in hints if "motif restored from DDL intent" in hint]) == 4
+
+
+def test_coerce_score_limits_compound_motifs_to_two_per_work():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="木の葉、紙片、波紋、山の印を置く。")
+
+    motif_hints = [ins.color_hint or "" for ins in fixed.instructions if "motif restored from DDL intent" in (ins.color_hint or "")]
+    assert len(motif_hints) == 4
+    assert any("leaf_cluster motif restored from DDL intent" in hint for hint in motif_hints)
+    assert any("paper_shard motif restored from DDL intent" in hint for hint in motif_hints)
+    assert not any("ripple_knot motif restored from DDL intent" in hint for hint in motif_hints)
+    assert not any("mountain_sign motif restored from DDL intent" in hint for hint in motif_hints)

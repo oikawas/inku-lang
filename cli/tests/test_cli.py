@@ -227,6 +227,47 @@ def test_score_metrics_reports_density_cluster_and_fade_fields():
     assert metrics["score_fade_counts"] == {"outward": 1}
     assert metrics["score_primitive_counts"] == {"line": 1, "square": 1}
     assert metrics["score_color_counts"] == {"black": 1, "white": 1}
+    assert metrics["math_balance_markers"] == {
+        "counterweight_like_opposite_placements": 0,
+        "golden_like_centers": 0,
+        "radial_fibonacci_counts": 0,
+        "rule_of_thirds_like_centers": 0,
+    }
+
+
+def test_score_metrics_reports_math_balance_markers():
+    score = {
+        "instructions": [
+            {
+                "primitive": "ellipse",
+                "color": "blue",
+                "center": [0.382, 0.33],
+                "size": [0.12, 0.08],
+                "arrangement": {"count": 8, "layout": "radial", "center": [0.618, 0.667]},
+            },
+            {
+                "primitive": "square",
+                "color": "red",
+                "position": [0.12, 0.12],
+                "size": [0.1, 0.1],
+            },
+            {
+                "primitive": "line",
+                "color": "black",
+                "from": [0.78, 0.78],
+                "to": [0.98, 0.98],
+            },
+        ],
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["math_balance_markers"] == {
+        "counterweight_like_opposite_placements": 3,
+        "golden_like_centers": 2,
+        "radial_fibonacci_counts": 1,
+        "rule_of_thirds_like_centers": 2,
+    }
 
 
 def test_review_sets_groups_successful_samples_without_excluding_slow():

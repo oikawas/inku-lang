@@ -494,6 +494,79 @@ def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thu
     sheet.save(output_path)
 
 
+def _coord_pair(value: Any) -> tuple[float, float] | None:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return None
+    x, y = value
+    if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+        return None
+    return float(x), float(y)
+
+
+def _instruction_center(instruction: dict[str, Any]) -> tuple[float, float] | None:
+    center = _coord_pair(instruction.get("center"))
+    if center is not None:
+        return center
+    start = _coord_pair(instruction.get("from"))
+    end = _coord_pair(instruction.get("to"))
+    if start is not None and end is not None:
+        return ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
+    position = _coord_pair(instruction.get("position"))
+    size = _coord_pair(instruction.get("size"))
+    if position is not None and size is not None:
+        return (position[0] + size[0] / 2, position[1] + size[1] / 2)
+    return None
+
+
+def _near_any(value: float, targets: tuple[float, ...], *, tolerance: float = 0.035) -> bool:
+    return any(abs(value - target) <= tolerance for target in targets)
+
+
+def _math_balance_markers(instructions: list[dict[str, Any]]) -> dict[str, int]:
+    centers: list[tuple[float, float]] = []
+    radial_fibonacci_counts = 0
+    for instruction in instructions:
+        center = _instruction_center(instruction)
+        if center is not None:
+            centers.append(center)
+        arrangement = instruction.get("arrangement")
+        if not isinstance(arrangement, dict):
+            continue
+        if arrangement.get("layout") == "radial" and arrangement.get("count") in {5, 8, 13, 21}:
+            radial_fibonacci_counts += 1
+        arrangement_center = _coord_pair(arrangement.get("center"))
+        if arrangement_center is not None:
+            centers.append(arrangement_center)
+
+    golden_like_centers = sum(
+        1
+        for x, y in centers
+        if _near_any(x, (0.382, 0.618)) or _near_any(y, (0.382, 0.618))
+    )
+    rule_of_thirds_like_centers = sum(
+        1
+        for x, y in centers
+        if _near_any(x, (1 / 3, 2 / 3)) or _near_any(y, (1 / 3, 2 / 3))
+    )
+    counterweight_like_opposite_placements = 0
+    for index, (x1, y1) in enumerate(centers):
+        for x2, y2 in centers[index + 1:]:
+            if (
+                (x1 - 0.5) * (x2 - 0.5) < 0
+                and (y1 - 0.5) * (y2 - 0.5) < 0
+                and abs(x1 - x2) >= 0.25
+                and abs(y1 - y2) >= 0.25
+            ):
+                counterweight_like_opposite_placements += 1
+
+    return {
+        "radial_fibonacci_counts": radial_fibonacci_counts,
+        "golden_like_centers": golden_like_centers,
+        "rule_of_thirds_like_centers": rule_of_thirds_like_centers,
+        "counterweight_like_opposite_placements": counterweight_like_opposite_placements,
+    }
+
+
 def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(score, dict):
         return {}
@@ -554,6 +627,9 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_fade_counts": dict(sorted(fade_counts.items())),
         "score_primitive_counts": dict(sorted(primitive_counts.items())),
         "score_color_counts": dict(sorted(color_counts.items())),
+        "math_balance_markers": _math_balance_markers([
+            instruction for instruction in instructions if isinstance(instruction, dict)
+        ]),
     }
 
 
@@ -964,12 +1040,14 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_preserve_space = 0
     aggregate_color_cycle = 0
     aggregate_expanded = 0
+    aggregate_math_balance: Counter[str] = Counter()
     color_traces: list[dict[str, Any]] = []
     for result in results:
         aggregate_density.update(result.get("score_density_counts") or {})
         aggregate_fade.update(result.get("score_fade_counts") or {})
         aggregate_primitive.update(result.get("score_primitive_counts") or {})
         aggregate_color.update(result.get("score_color_counts") or {})
+        aggregate_math_balance.update(result.get("math_balance_markers") or {})
         aggregate_clustered += int(result.get("score_clustered_arrangements") or 0)
         aggregate_preserve_space += int(result.get("score_preserve_space_count") or 0)
         aggregate_color_cycle += int(result.get("score_color_cycle_count") or 0)
@@ -1002,6 +1080,7 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_fade_counts": dict(sorted(aggregate_fade.items())),
         "score_primitive_counts": dict(sorted(aggregate_primitive.items())),
         "score_color_counts": dict(sorted(aggregate_color.items())),
+        "math_balance_markers": dict(sorted(aggregate_math_balance.items())),
         "review_sets": _review_sets(results),
         "results": results,
         "failures": failures,

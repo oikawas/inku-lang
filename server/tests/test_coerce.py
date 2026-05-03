@@ -509,3 +509,67 @@ def test_coerce_score_limits_compound_motifs_to_two_per_work():
     assert any("paper_shard motif restored from DDL intent" in hint for hint in motif_hints)
     assert not any("ripple_knot motif restored from DDL intent" in hint for hint in motif_hints)
     assert not any("mountain_sign motif restored from DDL intent" in hint for hint in motif_hints)
+
+
+def test_coerce_score_adds_generic_anchor_for_line_only_warm_scene():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夏祭りの灯りが遠くで揺れる。")
+
+    anchors = [ins for ins in fixed.instructions if "composition anchor restored for shape/color diversity" in (ins.color_hint or "")]
+    assert len(anchors) == 1
+    assert anchors[0].primitive == "ellipse"
+    assert anchors[0].color == "red"
+
+
+def test_coerce_score_does_not_add_generic_anchor_for_minimal_quiet_scene():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="静かな余白に黒い線を一つだけ置く。")
+
+    assert len(fixed.instructions) == 1
+    assert not any("composition anchor restored for shape/color diversity" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_adds_generic_accent_when_shape_exists_but_color_is_flat():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.35, 0.35],
+                    "size": [0.18, 0.18],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="水の冷たさが石の横に残る。")
+
+    accents = [ins for ins in fixed.instructions if "composition accent restored for shape/color diversity" in (ins.color_hint or "")]
+    assert len(accents) == 1
+    assert accents[0].primitive == "arc"
+    assert accents[0].color == "blue"

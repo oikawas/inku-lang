@@ -2182,3 +2182,87 @@ contact sheet 目視評価:
 - `_score_metrics` に `score_motif_hint_counts` を追加し、`leaf_cluster`, `paper_shard`, `ripple_knot`, `mountain_sign` の到達数を `color_hint` から集計できるようにした。
 - `batch` summary に `score_motif_hint_lines` と `math_balance_marker_lines` を追加し、motif / math marker がどのサンプルで出たか追跡できるようにした。
 - Build 257 の次ベンチでは、green-heavy `010` の warning が消えること、shape-heavy の motif 到達 line が summary で列挙されることを確認する。
+
+## 24. 方針確認: 個別 motif 最適化を避ける
+
+ユーザー指摘:
+
+- 「形と色の楽しさ」を改善する際、どのような指示が来るか予想できない状況で、`leaf_cluster` / `paper_shard` / `ripple_knot` など個別ケースの形を直接調整し続けるのは危険ではないか。
+
+確認結果:
+
+- 懸念は妥当。
+- Build 256 小ベンチで見えた弱点は、個別 motif の完成度だけではなく、未知入力でも形・色・サイズ・密度・配置の差が十分に出るかという、より汎用的な問題。
+- したがって次のテーマ粒度は `generic composition diversity repair` とする。
+
+3 persona review:
+
+1. 技術評価者
+   - 妥当。primitive / color / size / density / placement の偏りを検出して補う方が再利用性が高い。
+   - ただし repair が強すぎると、全作品が同じ構成へ寄る。
+   - 不足時のみ、最小補正にするべき。
+2. 美術ディレクター
+   - 妥当。課題は「葉を葉らしく」ではなく、画面内に主役・対比・背景の役割が出るか。
+   - ただし `anchor + accent + texture` を毎回強制すると退屈になる。
+   - 静かな入力や余白の入力では、補正を控えるべき。
+3. 一般鑑賞者
+   - 妥当。入力文を知らなくても、中心、色の違い、細かな動きがある方が見て楽しい。
+   - ただし派手にすればよいわけではなく、白黒だけが合う入力もある。
+
+実装方針:
+
+- 個別 motif repair は補助・診断として残す。
+- 次に入れるのは、未知入力にも効く composition role repair:
+  - `anchor`: 見える中サイズの主役形
+  - `accent`: 主色と違う小さな対比色 / 対比形
+  - `texture`: 線・粒・反復の背景層
+- 3役すべてを強制しない。
+- 以下のような不足時のみ、最大1〜2個の instruction を追加する:
+  - primitive が1種類だけ
+  - line だけ
+  - color が黒灰だけ
+  - 見える中サイズ anchor が無い
+  - expanded count が少なすぎる
+- `余白`, `静か`, `薄い`, `一つ`, `だけ`, `minimal`, `quiet` などの入力では補正を弱める。
+- 目的は「ベンチ語彙への最適化」ではなく、形・色・サイズ・密度・配置の最低限の分散を確保すること。
+
+Build 258 予定:
+
+- `coerce_score` に generic composition diversity repair を追加する。
+- テストでは、個別 motif 名ではなく以下を確認する:
+  - line only score に中サイズ anchor が1つ追加される
+  - 黒灰だけの score に、入力文脈から控えめな accent color が1つ追加される
+  - 静かな / 余白 / 一つだけ 系の入力では過剰補正しない
+
+実装メモ:
+
+- Build 258 として、`coerce_score` に `_with_composition_diversity_repair` を追加した。
+- repair は motif 固有ではなく、composition role の不足だけを見る。
+- `anchor` は、line only / primitive 1種類 / visible anchor 不足の時だけ、中サイズの ellipse を1つ追加する。
+- `accent` は、既に visible anchor があるが色が黒灰に偏り、DDL 文脈から red / blue / green などの対比色を推定できる時だけ、arc を1つ追加する。
+- `余白`, `静か`, `薄い`, `一つ`, `だけ`, `minimal`, `quiet`, `negative space` などの入力では repair を抑制する。
+- これにより、未知入力でも「形・色・サイズの最低限の差」を補うが、静かな作品や余白の作品を壊しにくくする。
+
+検証結果:
+
+- Mac:
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_coerce.py -q`: 26 passed
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_renderer.py tests/test_coerce.py -q`: 121 passed
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests`: passed
+  - `npm run check`: 0 errors / 0 warnings
+  - `npm run build`: passed
+- pentala deploy:
+  - `./no-git-sync/scripts/deploy.sh`: rsync + service restart 完了
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache ~/.local/bin/uv run pytest tests/test_api.py tests/test_renderer.py tests/test_coerce.py -q`: 121 passed
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache ~/.local/bin/uv run ruff check src tests`: passed
+  - `npm run check`: 0 errors / 0 warnings
+  - `npm run build`: passed
+  - `GET http://127.0.0.1:8100/health`: 200 `{"ok":true}`
+  - `GET http://127.0.0.1:5173/api/info`: `build_number=258`
+  - `GET http://127.0.0.1:5173/`: 200
+
+次アクション:
+
+1. Build 258 で green-heavy / shape-heavy の 10件小ベンチを再実行し、`composition anchor restored` / `composition accent restored` が必要なケースだけに出ているか確認する。
+2. contact sheet では、個別 motif の見立てではなく、主役形・対比色・余白保持の3点を評価する。
+3. 過補正が見えなければ、default / impressionism の30件比較へ戻る。

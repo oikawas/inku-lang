@@ -644,6 +644,121 @@ def _score_contains_motif(instructions: list[Instruction], motif: str) -> bool:
     return any(motif in (ins.color_hint or "") for ins in instructions)
 
 
+def _composition_repair_suppressed(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(
+        marker in ddl or marker in lower
+        for marker in (
+            "余白",
+            "静か",
+            "薄い",
+            "一つ",
+            "ひとつ",
+            "だけ",
+            "少しだけ",
+            "quiet",
+            "minimal",
+            "single",
+            "only",
+            "negative space",
+        )
+    )
+
+
+def _score_colors_with_cycles(instructions: list[Instruction]) -> set[str]:
+    colors: set[str] = set()
+    for ins in instructions:
+        colors.add(ins.color)
+        if ins.arrangement:
+            colors.update(ins.arrangement.color_cycle)
+    return colors
+
+
+def _has_visible_anchor(instructions: list[Instruction]) -> bool:
+    for ins in instructions:
+        if ins.primitive == "line":
+            continue
+        if 0.08 <= _shape_extent(ins) <= 0.42:
+            return True
+    return False
+
+
+def _composition_accent_color(ddl: str | None, instructions: list[Instruction], background: str) -> str | None:
+    existing = _score_colors_with_cycles(instructions)
+    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color not in existing and color != background]
+    if requested:
+        return requested[0]
+    if existing and not existing <= {"black", "gray"}:
+        return None
+    lower = (ddl or "").lower()
+    if any(marker in (ddl or "") or marker in lower for marker in ("祭", "火", "灯", "温", "赤", "warm", "fire", "light")):
+        return "red" if background != "red" else "white"
+    if any(marker in (ddl or "") or marker in lower for marker in ("水", "夜", "湖", "冷", "青", "water", "night", "cold")):
+        return "blue" if background != "blue" else "white"
+    if any(marker in (ddl or "") or marker in lower for marker in ("森", "草", "苔", "庭", "竹", "green", "forest", "grass")):
+        return "green" if background != "green" else "white"
+    return None
+
+
+def _composition_anchor_instruction(*, color: str, background: str) -> Instruction:
+    visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    return Instruction.model_validate({
+        "primitive": "ellipse",
+        "center": [0.64, 0.40],
+        "size": [0.18, 0.11],
+        "rotation": -18,
+        "color": visible,
+        "weight": "brush_thick",
+        "color_hint": "composition anchor restored for shape/color diversity",
+    })
+
+
+def _composition_accent_instruction(*, color: str, background: str) -> Instruction:
+    visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    return Instruction.model_validate({
+        "primitive": "arc",
+        "center": [0.36, 0.62],
+        "radius": 0.09,
+        "angle_start": 18,
+        "angle_end": 205,
+        "rotation": 8,
+        "color": visible,
+        "weight": "brush_thin",
+        "color_hint": "composition accent restored for shape/color diversity",
+    })
+
+
+def _with_composition_diversity_repair(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    if not ddl or _composition_repair_suppressed(ddl) or len(instructions) >= 10:
+        return instructions
+
+    repaired = list(instructions)
+    primitives = {ins.primitive for ins in repaired}
+    colors = _score_colors_with_cycles(repaired)
+    accent_color = _composition_accent_color(ddl, repaired, background)
+    needs_anchor = bool(repaired) and not _has_visible_anchor(repaired) and (primitives == {"line"} or len(primitives) == 1)
+    needs_accent = accent_color is not None and accent_color not in colors
+
+    if needs_anchor:
+        repaired.append(_composition_anchor_instruction(
+            color=accent_color or VISIBLE_ON_BACKGROUND.get(background, "black"),
+            background=background,
+        ))
+        colors = _score_colors_with_cycles(repaired)
+
+    if needs_accent and accent_color not in colors and len(repaired) < 10:
+        repaired.append(_composition_accent_instruction(color=accent_color, background=background))
+
+    return repaired
+
+
 def _motif_repair_instructions(motif: str, *, index: int, background: str) -> list[Instruction]:
     color = VISIBLE_ON_BACKGROUND.get(background, "black")
     offset = min(index, 2) * 0.08
@@ -1156,6 +1271,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_color_delivery_repair(instructions, ddl=ddl)
     instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
     instructions = _with_complex_motif_repair(instructions, ddl=ddl, background=background)
+    instructions = _with_composition_diversity_repair(instructions, ddl=ddl, background=background)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)

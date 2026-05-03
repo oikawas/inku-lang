@@ -175,9 +175,8 @@ export class HistoryManagerState {
 	setPageSize = (pageSize: number) => {
 		const nextPageSize = Math.max(1, Math.min(200, Math.floor(pageSize)));
 		if (nextPageSize === this.pageSize) return;
-		const firstVisibleIndex = this.page * this.pageSize;
 		this.pageSize = nextPageSize;
-		this.page = Math.max(0, Math.floor(firstVisibleIndex / nextPageSize));
+		this.page = Math.max(0, Math.min(this.page, this.totalPages - 1));
 		this.selectedIds = [];
 		void this.fetch({ page: this.page });
 	};

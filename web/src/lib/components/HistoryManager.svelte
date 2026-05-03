@@ -227,46 +227,50 @@
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
 <div class="history-modal" role="dialog" aria-modal="true" tabindex="-1">
 	<div class="modal-head">
-		<div class="catalog-modal-title">{t().historyManagerTitle}</div>
-		<div class="modal-head-actions">
+		<div class="history-head-left">
+			<div class="catalog-modal-title">{t().historyManagerTitle}</div>
+			<div class="settings-tabs history-mode-tabs">
+				<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
+				<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
+			</div>
+			<span class="history-manager-count">
+				{#if managedHistoryTotal === 0}
+					0 / 0
+				{:else}
+					{historyManagerOffset + 1}-{historyManagerShownTo} / {managedHistoryTotal}
+				{/if}
+			</span>
+		</div>
+		<div class="history-head-actions">
+			<div class="history-manager-pager">
+				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
+				<span>{historyManagerLoading ? t().historyLoading : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
+				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
+			</div>
+			<button class="catalog-close" onclick={onClose}>×</button>
+		</div>
+	</div>
+	<div class="history-tools">
+		<div class="history-tool-group">
+			<button class="ghost-btn" onclick={onSelectAll}>{t().historySelectAll}</button>
+			<button
+				class="ghost-btn"
+				class:ghost-active={historyManagerStarredOnly}
+				onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
+			>{t().historyStarredOnly}</button>
 			<button
 				class="ghost-btn"
 				class:ghost-active={historyManagerView === 'trash'}
 				onclick={() => onSetView(historyManagerView === 'trash' ? 'active' : 'trash')}
 			>{t().historyTrashButton(managerTrashTotal || trashTotal)}</button>
-			<button class="catalog-close" onclick={onClose}>×</button>
-		</div>
-	</div>
-	<div class="settings-tabs history-mode-tabs">
-		<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
-		<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
-	</div>
-	<div class="history-tools">
-		<span class="history-manager-count">
-			{#if managedHistoryTotal === 0}
-				0 / 0
+			{#if historyManagerView === 'active'}
+				<button class="ghost-btn" onclick={() => onAskTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyMoveToTrash}</button>
 			{:else}
-				{historyManagerOffset + 1}-{historyManagerShownTo} / {managedHistoryTotal}
+				<button class="ghost-btn" onclick={() => onAskRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
+				<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
 			{/if}
-		</span>
-		<button class="ghost-btn" onclick={onSelectAll}>{t().historySelectAll}</button>
-		<button
-			class="ghost-btn"
-			class:ghost-active={historyManagerStarredOnly}
-			onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
-		>{t().historyStarredOnly}</button>
-		{#if historyManagerView === 'active'}
-			<button class="ghost-btn" onclick={() => onAskTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyMoveToTrash}</button>
-		{:else}
-			<button class="ghost-btn" onclick={() => onAskRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
-			<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
-		{/if}
+		</div>
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
-	</div>
-	<div class="history-manager-pager">
-		<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
-		<span>{historyManagerLoading ? t().historyLoading : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
-		<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
 	</div>
 	{#if historyManagerTab === 'thumbs'}
 		<div class="history-thumb-grid-wrap" bind:this={thumbGridWrapEl}>
@@ -301,7 +305,15 @@
 								>★</button>
 								{#if hashLabel(it)}<button class="hash-chip" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>{hashLabel(it)}</button>{/if}
 								{#if historyManagerView === 'active'}
-									<button class="ghost-btn" onclick={() => it.id && onAskTrash([it.id])}>{t().deleteButton}</button>
+									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().deleteButton} aria-label={t().deleteButton}>
+										<svg viewBox="2 2 20 20" aria-hidden="true">
+											<path d="M3 6h18" />
+											<path d="M8 6V4h8v2" />
+											<path d="M6 6l1 15h10l1-15" />
+											<path d="M10 10v7" />
+											<path d="M14 10v7" />
+										</svg>
+									</button>
 								{:else}
 									<button class="ghost-btn" onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
 									<button class="danger-btn" onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
@@ -339,7 +351,15 @@
 							<td>{catalogName(it.catalog_id)}</td>
 							<td>
 								{#if historyManagerView === 'active'}
-									<button class="ghost-btn" onclick={() => it.id && onAskTrash([it.id])}>{t().deleteButton}</button>
+									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().deleteButton} aria-label={t().deleteButton}>
+										<svg viewBox="2 2 20 20" aria-hidden="true">
+											<path d="M3 6h18" />
+											<path d="M8 6V4h8v2" />
+											<path d="M6 6l1 15h10l1-15" />
+											<path d="M10 10v7" />
+											<path d="M14 10v7" />
+										</svg>
+									</button>
 								{:else}
 									<button class="ghost-btn" onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
 									<button class="danger-btn" onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
@@ -398,11 +418,27 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 14px 18px 10px;
+		gap: 12px;
+		padding: 9px 12px;
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 	}
-	.catalog-modal-title { font-size: 15px; font-weight: 300; letter-spacing: 0.05em; }
+	.history-head-left,
+	.history-head-actions,
+	.history-tool-group {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+	.history-head-left { flex: 1 1 auto; }
+	.history-head-actions { flex: 0 0 auto; }
+	.catalog-modal-title {
+		flex: 0 0 auto;
+		font-size: 15px;
+		font-weight: 300;
+		letter-spacing: 0.05em;
+	}
 	.catalog-close {
 		width: 24px;
 		height: 24px;
@@ -413,29 +449,31 @@
 		cursor: pointer;
 		line-height: 1;
 	}
-	.modal-head-actions { display: flex; align-items: center; gap: 8px; }
 	.settings-tabs {
 		display: flex;
 		gap: 0;
-		border-bottom: 1px solid var(--border);
 		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		overflow: hidden;
 	}
 	.settings-tabs button {
-		padding: 9px 16px;
+		padding: 4px 9px;
 		border: none;
-		border-bottom: 2px solid transparent;
 		background: none;
 		color: var(--fg2);
-		font-size: 13px;
+		font-size: 11px;
 		cursor: pointer;
 		font-family: inherit;
 	}
-	.settings-tabs button.active { color: var(--fg); border-bottom-color: var(--fg); font-weight: 500; }
+	.settings-tabs button + button { border-left: 1px solid var(--border); }
+	.settings-tabs button.active { color: var(--fg); background: var(--panel); font-weight: 500; }
 	.history-tools {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 10px 14px;
+		justify-content: space-between;
+		gap: 10px;
+		padding: 7px 12px;
 		border-bottom: 1px solid var(--border);
 		flex-wrap: wrap;
 	}
@@ -470,14 +508,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 10px;
-		padding: 8px 14px;
-		border-bottom: 1px solid var(--border);
+		gap: 6px;
 		color: var(--fg3);
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
 	}
-	.history-nav-btn { min-width: 92px; }
+	.history-nav-btn { min-width: 74px; }
 	.history-thumb-grid-wrap,
 	.history-table-wrap {
 		flex: 1;
@@ -742,6 +778,25 @@
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
+	.icon-trash-btn {
+		width: 24px;
+		height: 22px;
+		padding: 0;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--fg2);
+	}
+	.icon-trash-btn svg {
+		width: 22px;
+		height: 20px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.7;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.icon-trash-btn:hover { color: var(--fg); }
 	.danger-btn {
 		padding: 4px 10px;
 		border: none;

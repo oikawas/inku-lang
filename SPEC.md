@@ -584,6 +584,12 @@ The thumbnail action row places the star at the lower left, shows hash labels
 without `#`, and aligns hash button typography with the delete action.
 Starred thumbnails keep an explicit highlighted star state in dark mode.
 The thumbnail hover tooltip includes a larger image preview above the metadata.
+The history manager header is compressed into two rows: title/view/count/pager
+on the first row and selection/filter/search controls on the second row.
+When thumbnail page size is recalculated from measured card dimensions, the
+current page number is preserved instead of jumping back to the first page.
+Per-item delete actions in the history manager use a compact trash icon button
+instead of a text label.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

@@ -208,6 +208,42 @@ def test_write_paint_outputs(tmp_path):
     assert saved_json["ddl"] == result["ddl"]
 
 
+def test_svg_profile_arg_is_accepted_for_paint_and_batch():
+    parser = cli.build_parser()
+
+    paint_args = parser.parse_args(["paint", "線", "--svg-profile", "editable"])
+    batch_args = parser.parse_args(["batch", "--file", "prompts.txt", "--svg-profile", "compat"])
+
+    assert paint_args.svg_profile == "editable"
+    assert batch_args.svg_profile == "compat"
+
+
+def test_result_with_svg_profile_regenerates_non_display_svg():
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def request_text(self, method, path, *, data=None, query=None, auth=True):
+            self.calls.append((method, path, data, query, auth))
+            return "<svg><title>editable</title></svg>"
+
+    client = FakeClient()
+    result = {
+        "score": {"instructions": []},
+        "svg": "<svg><title>display</title></svg>",
+        "render_color_catalog_id": "vivid_material",
+    }
+
+    output = cli._result_with_svg_profile(client, result, svg_profile="editable", color_catalog="default")
+
+    assert output["svg_profile"] == "editable"
+    assert output["svg"] == "<svg><title>editable</title></svg>"
+    assert client.calls[0][0:2] == ("POST", "/api/render-svg")
+    assert client.calls[0][2]["catalog_id"] == "vivid_material"
+    assert client.calls[0][2]["svg_profile"] == "editable"
+    assert result["svg"] == "<svg><title>display</title></svg>"
+
+
 def test_score_metrics_reports_density_cluster_and_fade_fields():
     score = {
         "instructions": [

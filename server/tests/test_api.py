@@ -977,6 +977,53 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     db.delete_items(user["id"], [data["history_id"]])
 
 
+def test_render_svg_endpoint_generates_editable_profile(auth_context):
+    headers, _, _ = auth_context
+    r = client.post(
+        "/api/render-svg",
+        json={
+            "svg_profile": "editable",
+            "score": {
+                "instructions": [
+                    {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5], "weight": "pencil"}
+                ]
+            },
+        },
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/svg+xml")
+    assert 'id="layer_10_content"' in r.text
+    assert 'id="mark_000_000_line"' in r.text
+    assert "filter=" not in r.text
+
+
+def test_history_svg_endpoint_keeps_display_svg_and_regenerates_editable(auth_context):
+    headers, user, _ = auth_context
+    item = db.add_item({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "output_path": None,
+        "input": "editable svg",
+        "ddl": "線",
+        "score": {"instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}]},
+        "svg": "<svg><desc>stored display</desc></svg>",
+        "at": 1_700_000_000_001,
+    })
+
+    display = client.get(f"/api/history/{item['id']}/svg?profile=display", headers=headers)
+    editable = client.get(f"/api/history/{item['id']}/svg?profile=editable", headers=headers)
+
+    assert display.status_code == 200
+    assert display.text == "<svg><desc>stored display</desc></svg>"
+    assert editable.status_code == 200
+    assert "<title>inku render (editable SVG)</title>" in editable.text
+    assert 'id="layer_10_content"' in editable.text
+
+    db.delete_items(user["id"], [item["id"]])
+
+
 def test_paint_resolves_catalog_id_on_server(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("緑の円を置く。", None))

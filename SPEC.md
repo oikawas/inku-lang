@@ -134,6 +134,20 @@ The renderer converts JSON Score into SVG.  It owns visual realization:
 The renderer is allowed to produce controlled variation, but it must preserve
 the JSON Score's intent.
 
+SVG export has three profiles:
+
+- `display`: the default server-rendered SVG used for web display, history,
+  PNG generation, and artifact rebuilds.
+- `editable`: generated on demand from JSON Score and server-owned color catalog
+  metadata, with stable ASCII IDs and layer-like groups for Illustrator and
+  Affinity editing.
+- `compat`: generated on demand from JSON Score and server-owned color catalog
+  metadata, avoiding filters and clip paths for broader SVG compatibility.
+
+The DB stores only the `display` SVG in `history.svg`.  Editable and compatible
+SVG files are regenerated at download time rather than stored as additional DB
+payloads.
+
 ---
 
 ## 5. Core Vocabulary
@@ -398,6 +412,14 @@ The web UI does not send client-generated SVG back as trusted history content.
 `/api/paint` generates and saves server-side history directly.  Compatibility
 history endpoints re-render from JSON Score instead of trusting SVG sent by the
 client.
+
+For SVG download, the web UI exposes Display, Editable, and Compat variants.
+Display downloads the stored SVG.  Editable and Compat call server render
+endpoints so past history can benefit from the current export structure without
+duplicating SVG blobs in the DB.
+
+The CLI `paint` and `batch` commands also accept
+`--svg-profile display|editable|compat` for saved SVG files.
 
 ---
 

@@ -5,6 +5,7 @@
 	import OutputTabsContent from './OutputTabsContent.svelte';
 
 	type OutputTab = 'canvas' | 'prompts' | 'score';
+	type SvgProfile = 'display' | 'editable' | 'compat';
 	type PaintResult = { svg: string; score: { instructions: unknown[]; canvas?: string | null } };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean };
@@ -54,7 +55,7 @@
 		onFitZoomChange: (zoom: number) => void;
 		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
-		onDownloadSVG: () => void;
+		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
 		onDownloadPNG: (size: number) => void | Promise<void>;
 	};
 
@@ -108,6 +109,7 @@
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
+	let svgMenuOpen = $state(false);
 	const canvasMaxRatio = $derived(Math.max(canvasAspectWidth, canvasAspectHeight, 1));
 	const canvasBaseWidth = $derived(400 * canvasAspectWidth / canvasMaxRatio);
 	const canvasBaseHeight = $derived(400 * canvasAspectHeight / canvasMaxRatio);
@@ -266,12 +268,31 @@
 			title={statusHistoryItem?.starred ? t().starOn : t().starOff}
 			aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
 		>★</button>
-		<button class="ghost-btn export-btn" onclick={onDownloadSVG} disabled={!result}>
-			<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-				<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-			</svg>
-			<span>SVG</span>
-		</button>
+		<div class="png-wrap">
+			<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); svgMenuOpen = !svgMenuOpen; }} disabled={!result}>
+				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+				</svg>
+				<span>SVG</span>
+				<span class="menu-caret">▾</span>
+			</button>
+			{#if svgMenuOpen}
+				<div class="png-menu">
+					<button onclick={() => { onDownloadSVG('display'); svgMenuOpen = false; }}>
+						<span class="png-size">Display</span>
+						<span class="png-sub">stored</span>
+					</button>
+					<button onclick={() => { onDownloadSVG('editable'); svgMenuOpen = false; }}>
+						<span class="png-size">Editable</span>
+						<span class="png-sub">layers</span>
+					</button>
+					<button onclick={() => { onDownloadSVG('compat'); svgMenuOpen = false; }}>
+						<span class="png-size">Compat</span>
+						<span class="png-sub">portable</span>
+					</button>
+				</div>
+			{/if}
+		</div>
 		<div class="png-wrap" bind:this={pngWrapEl}>
 			<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>
 				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">

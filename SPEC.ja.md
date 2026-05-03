@@ -1384,6 +1384,24 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ## 変更履歴
 
+### v1.39 (2026-05-03)
+
+**SVG保存形式プロファイル**
+
+SVG保存形式を、表示用・編集用・互換優先に分離した。
+
+- DB の `history.svg` には従来どおり表示用 SVG を保存する
+- 履歴表示、PNG 再生成、artifact 再生成は DB に保存された表示用 SVG を正本として扱う
+- 編集用 SVG は JSON Score とサーバー側の色カタログ情報からダウンロード時に都度生成する
+- 互換優先 SVG も JSON Score とサーバー側の色カタログ情報からダウンロード時に都度生成する
+- `display` プロファイルは現行表示互換を優先し、既存の texture filter / blur / clip を維持する
+- `editable` プロファイルは Illustrator / Affinity で編集しやすいよう、`layer_00_background`、`layer_10_content`、`instruction_###_*`、`mark_###_###_*` 形式の安定 ID とグループ構造を追加する
+- `compat` プロファイルは汎用SVGビューアで壊れにくいことを優先し、filter と clip-path を使わない
+- API として `POST /api/render-svg` と `GET /api/history/{item_id}/svg?profile=...` を追加する
+- Web UI の SVG ボタンは `Display` / `Editable` / `Compat` のメニューから保存形式を選択できる
+- CLI の `paint` / `batch` は `--svg-profile display|editable|compat` で保存する SVG プロファイルを選択できる
+- build number: 267
+
 ### v1.38 (2026-05-02)
 
 **解釈 box の DDL 編集ダイアログ統合**

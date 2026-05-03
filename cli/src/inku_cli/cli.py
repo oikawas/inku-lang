@@ -28,6 +28,7 @@ SERVER_DEFAULT_PROVIDER_LABEL = "server default"
 PROVIDERS = ("nvidia", "anthropic", "local")
 COLOR_KEYS = ("white", "black", "blue", "red", "green", "gray")
 DEFAULT_COLOR_CATALOG_ID = "default"
+SVG_PROFILES = ("display", "editable", "compat")
 COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "white": ("white", "ivory", "snow", "paper", "白", "雪", "紙", "光"),
     "black": ("black", "dark", "shadow", "ink", "黒", "闇", "影", "墨"),
@@ -211,6 +212,44 @@ class ApiClient:
                 raw = response.read()
                 parsed = json.loads(raw.decode("utf-8")) if raw else {}
                 return parsed, response
+        except urllib.error.HTTPError as exc:
+            message = exc.reason
+            try:
+                parsed_error = json.loads(exc.read().decode("utf-8"))
+                message = parsed_error.get("detail") or parsed_error.get("message") or str(parsed_error)
+            except Exception:
+                pass
+            raise CliError(f"HTTP {exc.code}: {message}") from exc
+        except urllib.error.URLError as exc:
+            raise CliError(f"failed to connect to {self.base_url}: {exc.reason}") from exc
+
+    def request_text(
+        self,
+        method: str,
+        path: str,
+        *,
+        data: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
+        auth: bool = True,
+    ) -> str:
+        url = _join_url(self.base_url, path)
+        if query:
+            clean_query = {k: v for k, v in query.items() if v is not None}
+            if clean_query:
+                url += "?" + urllib.parse.urlencode(clean_query)
+        body = None
+        headers = {"Accept": "image/svg+xml,text/plain,*/*"}
+        if data is not None:
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        if auth:
+            if not self.token:
+                raise CliError("not logged in; run `inku-cli login` first")
+            headers["Authorization"] = f"Bearer {self.token}"
+        req = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+                return response.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             message = exc.reason
             try:
@@ -457,6 +496,29 @@ def _write_paint_outputs(
         cairosvg.svg2png(bytestring=str(result["svg"]).encode("utf-8"), write_to=str(png_path))
         paths["png"] = str(png_path)
     return paths
+
+
+def _result_with_svg_profile(
+    client: ApiClient,
+    result: dict[str, Any],
+    *,
+    svg_profile: str,
+    color_catalog: str,
+) -> dict[str, Any]:
+    output = dict(result)
+    output["svg_profile"] = svg_profile
+    if svg_profile == "display":
+        return output
+    output["svg"] = client.request_text(
+        "POST",
+        "/api/render-svg",
+        data={
+            "score": result.get("score") or {},
+            "catalog_id": result.get("render_color_catalog_id") or color_catalog,
+            "svg_profile": svg_profile,
+        },
+    )
+    return output
 
 
 def _review_sets(results: list[dict[str, Any]], *, slow_ms: int = 100_000) -> dict[str, list[int]]:
@@ -975,7 +1037,8 @@ def command_paint(args: argparse.Namespace) -> int:
         enabled=not args.no_progress,
     )
     prefix = args.prefix or f"inku-{started}"
-    paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
+    output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
+    paths = _write_paint_outputs(output_result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
     summary = {
         "text": result.get("text"),
         **_model_summary(
@@ -985,6 +1048,7 @@ def command_paint(args: argparse.Namespace) -> int:
             stage2_provider=stage2_provider,
         ),
         "timeout_seconds": timeout_seconds,
+        "svg_profile": args.svg_profile,
         **_color_catalog_summary(color_catalog, catalog_data),
         **_render_response_summary(result),
         "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=text),
@@ -1002,7 +1066,7 @@ def command_paint(args: argparse.Namespace) -> int:
     }
     if args.full_json:
         _print_json({
-            **result,
+            **output_result,
             **_model_summary(
                 stage1_model,
                 stage2_model,
@@ -1061,7 +1125,8 @@ def command_batch(args: argparse.Namespace) -> int:
                 enabled=not args.no_progress,
             )
             prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
-            paths = _write_paint_outputs(result, out_dir=out_dir, prefix=prefix, png=args.png)
+            output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
+            paths = _write_paint_outputs(output_result, out_dir=out_dir, prefix=prefix, png=args.png)
             tokens_in = (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0)
             tokens_out = (result.get("tokens_out_stage1") or 0) + (result.get("tokens_out_stage2") or 0)
             elapsed = int(result.get("elapsed_total_ms") or 0)
@@ -1082,6 +1147,7 @@ def command_batch(args: argparse.Namespace) -> int:
                 **_render_response_summary(result),
                 "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
                 "history_id": result.get("history_id"),
+                "svg_profile": args.svg_profile,
                 "elapsed_total_ms": elapsed,
                 "tokens_in": tokens_in or None,
                 "tokens_out": tokens_out or None,
@@ -1136,6 +1202,7 @@ def command_batch(args: argparse.Namespace) -> int:
             stage2_provider=stage2_provider,
         ),
         "timeout_seconds": timeout_seconds,
+        "svg_profile": args.svg_profile,
         **_color_catalog_summary(color_catalog, catalog_data),
         "render_build_numbers": sorted({
             str(result["render_build_number"])
@@ -1257,6 +1324,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     parser.add_argument("--prefix", help="output filename prefix")
     parser.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
+    parser.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files")
     parser.add_argument("--stage1-provider", choices=PROVIDERS)
     parser.add_argument("--stage1-model")
     parser.add_argument("--stage2-provider", choices=PROVIDERS)

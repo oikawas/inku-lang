@@ -76,6 +76,7 @@
 		tokens_out_stage2: number | null;
 		user_generation_count?: number | null;
 	};
+	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
 	type BatchFailure = {
@@ -2279,11 +2280,31 @@
 		const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
 		URL.revokeObjectURL(url);
 	}
-	function downloadSVG() {
+	async function downloadSVG(profile: SvgProfile = 'display') {
 		if (!result) return;
-		const desc = `<desc>${escapeXml(input)}</desc>`;
-		const svg  = result.svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
-		triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), exportFilename('svg'));
+		let svg = result.svg;
+		if (profile === 'display') {
+			const desc = `<desc>${escapeXml(input)}</desc>`;
+			svg = result.svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
+		} else if (displayedHistoryItem?.id) {
+			const r = await apiFetch(`/api/history/${displayedHistoryItem.id}/svg?profile=${profile}`);
+			if (!r.ok) throw new Error(await r.text());
+			svg = await r.text();
+		} else {
+			const r = await apiFetch('/api/render-svg', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					score: result.score,
+					catalog_id: result.render_color_catalog_id ?? selectedCatalog,
+					canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+					svg_profile: profile
+				})
+			});
+			if (!r.ok) throw new Error(await r.text());
+			svg = await r.text();
+		}
+		triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), exportFilename(profile === 'display' ? 'svg' : `${profile}.svg`));
 	}
 
 	async function downloadPNG(size: number) {

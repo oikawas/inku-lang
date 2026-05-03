@@ -36,7 +36,7 @@ from .plugins import (
     normalize_canvas_aspect_id,
     plugin_status_items,
 )
-from .renderer import render
+from .renderer import SVG_PROFILES, render
 from .schema import Score
 from . import db as _db
 
@@ -123,6 +123,32 @@ def _coerce_context(ddl: str, original_text: str | None = None) -> str:
     if original and original != normalized:
         return f"{original}\n{normalized}"
     return normalized
+
+
+def _validated_svg_profile(svg_profile: str | None) -> str:
+    profile = (svg_profile or "display").strip().lower()
+    if profile not in SVG_PROFILES:
+        raise HTTPException(status_code=422, detail=f"unsupported svg profile: {svg_profile}")
+    return profile
+
+
+def _render_score_svg(
+    score_payload: dict,
+    *,
+    catalog_id: str | None,
+    canvas_aspect: str | None = None,
+    svg_profile: str | None = None,
+) -> str:
+    score = coerce_score(Score.model_validate(score_payload))
+    canvas = _validated_canvas_aspect_override(canvas_aspect)
+    if canvas is not None:
+        score = _score_with_canvas(score, canvas)
+    render_metadata = _render_metadata(_resolved_catalog_id(catalog_id))
+    return render(
+        score,
+        color_map=render_metadata["render_color_map"],
+        svg_profile=_validated_svg_profile(svg_profile),
+    )
 
 
 def _history_output_prefix(item: dict) -> Path:
@@ -358,6 +384,13 @@ class PaintResponse(BaseModel):
     compose_fallback_used: bool = False
     user_generation_count: int | None = None
     catalog_id: str | None = None
+
+
+class RenderSvgRequest(BaseModel):
+    score: dict
+    catalog_id: str | None = None
+    canvas_aspect: str | None = None
+    svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
 
 
 @dataclass
@@ -1399,6 +1432,22 @@ def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_curre
     return DemoInstructionResponse(instruction=instruction)
 
 
+@app.post("/api/render-svg")
+def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user)) -> Response:
+    try:
+        svg = _render_score_svg(
+            req.score,
+            catalog_id=req.catalog_id,
+            canvas_aspect=req.canvas_aspect,
+            svg_profile=req.svg_profile,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"svg render failed: {e}") from e
+    return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
+
+
 def _add_history_item(
     *,
     actor: dict,
@@ -1690,6 +1739,33 @@ def api_history_get(
         starred=starred,
     )
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
+
+
+@app.get("/api/history/{item_id}/svg")
+def api_history_svg(
+    item_id: str,
+    profile: str = Query(default="display", description="SVG output profile: display / editable / compat"),
+    actor: dict = Depends(_current_user),
+) -> Response:
+    svg_profile = _validated_svg_profile(profile)
+    items = _db.get_items(actor["id"], [item_id])
+    if not items:
+        raise HTTPException(status_code=404, detail="history item not found")
+    item = items[0]
+    if svg_profile == "display":
+        svg = item.get("svg", "")
+    else:
+        try:
+            svg = _render_score_svg(
+                item.get("score", {}),
+                catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
+                svg_profile=svg_profile,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status_code=422, detail=f"history svg render failed: {e}") from e
+    return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
 
 
 @app.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)

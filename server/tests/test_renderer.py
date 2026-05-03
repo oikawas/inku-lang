@@ -68,6 +68,55 @@ def test_render_wraps_primitives_in_canvas_clip():
     assert "<clipPath" in svg
 
 
+def test_render_editable_svg_has_layer_groups_and_stable_ids():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "weight": "pencil",
+                }
+            ]
+        }
+    )
+
+    svg = render(score, svg_profile="editable")
+
+    assert "<title>inku render (editable SVG)</title>" in svg
+    assert 'id="inku_artboard"' in svg
+    assert 'id="layer_00_background"' in svg
+    assert 'id="layer_10_content"' in svg
+    assert 'id="instruction_000_line_black_pencil"' in svg
+    assert 'id="mark_000_000_line"' in svg
+    assert "clip-path" not in svg
+    assert "filter=" not in svg
+
+
+def test_render_compat_svg_is_portable_and_filter_free():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.12,
+                    "weight": "chalk",
+                    "variation": {"quality": "pink", "dimensions": ["position_x"], "amplitude": "fine"},
+                }
+            ]
+        }
+    )
+
+    svg = render(score, svg_profile="compat")
+
+    assert "<title>inku render (compat SVG)</title>" in svg
+    assert 'id="mark_000_000_circle"' in svg
+    assert "filter=" not in svg
+    assert "<filter" not in svg
+
+
 def test_render_dashed_line_has_dasharray():
     score = Score.model_validate(
         {

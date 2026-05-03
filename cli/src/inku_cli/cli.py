@@ -342,7 +342,9 @@ def _color_catalog_summary(catalog_id: str, catalog_data: dict[str, Any]) -> dic
 def _render_response_summary(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "render_build_number": result.get("render_build_number"),
-        "render_color_catalog": result.get("render_color_catalog"),
+        "render_color_catalog_id": result.get("render_color_catalog_id"),
+        "render_color_catalog_name": result.get("render_color_catalog_name"),
+        "render_color_catalog_sub": result.get("render_color_catalog_sub"),
         "render_color_map": result.get("render_color_map"),
     }
 
@@ -1140,7 +1142,9 @@ def command_batch(args: argparse.Namespace) -> int:
             for result in results
             if result.get("render_build_number") is not None
         }),
-        "render_color_catalog": results[0].get("render_color_catalog") if results else None,
+        "render_color_catalog_id": results[0].get("render_color_catalog_id") if results else None,
+        "render_color_catalog_name": results[0].get("render_color_catalog_name") if results else None,
+        "render_color_catalog_sub": results[0].get("render_color_catalog_sub") if results else None,
         "render_color_map": results[0].get("render_color_map") if results else None,
         "color_trace": _aggregate_color_traces(color_traces),
         "elapsed_total_ms": total_elapsed,

@@ -1711,10 +1711,10 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - Web UI と CLI は色カタログ一覧をサーバー API から取得し、クライアント側のカタログ定義を持たない
 - `/api/paint`、`/api/compose`、`/api/history` は `catalog_id` を受け取り、サーバー側でレンダリング用 `color_map` を解決する
 - `color_map` リクエストフィールドは互換用に残すが、色カタログ解決の正本としては扱わない
-- 履歴には従来どおり `catalog_id` を保存する。加えて、描画レスポンス JSON と出力 artifact JSON には、実際にレンダリングした `render_build_number`、サーバー解決済みの `render_color_catalog`、および `render_color_map`（抽象色名・`palette:<name>` から実際の `#RRGGBB` コードへの展開）を記録する
+- 履歴には従来どおり `catalog_id` を保存する。加えて、描画レスポンス JSON と出力 artifact JSON には、実際にレンダリングした `render_build_number`、サーバー解決済みの `render_color_catalog_id` / `render_color_catalog_name` / `render_color_catalog_sub`、および `render_color_map`（抽象色名・`palette:<name>` から実際の `#RRGGBB` コードへの展開）を記録する。`render_color_catalog` の完全な `map` / `swatches` / `palette` snapshot は `render_color_map` と重複するため保存しない
 - `GET /api/info` はサーバー名、バージョン、ビルド番号を返す
 - CLI に `version` コマンドを追加し、CLI 側の version / build number と、接続先サーバーの version / build number を表示する
-- Build 260
+- Build 264
 
 ### v1.26 (2026-05-03)
 

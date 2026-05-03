@@ -135,7 +135,13 @@ def _history_output_prefix(item: dict) -> Path:
 def _history_render_metadata(item: dict) -> dict | None:
     if isinstance(item.get("render_metadata"), dict):
         return item["render_metadata"]
-    keys = ("render_build_number", "render_color_catalog", "render_color_map")
+    keys = (
+        "render_build_number",
+        "render_color_catalog_id",
+        "render_color_catalog_name",
+        "render_color_catalog_sub",
+        "render_color_map",
+    )
     metadata = {key: item[key] for key in keys if item.get(key) is not None}
     return metadata or None
 
@@ -217,7 +223,9 @@ def _render_metadata(catalog_id: str | None) -> dict:
         raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
     return {
         "render_build_number": _build_number(),
-        "render_color_catalog": catalog,
+        "render_color_catalog_id": str(catalog["id"]),
+        "render_color_catalog_name": str(catalog["name"]),
+        "render_color_catalog_sub": str(catalog["sub"]),
         "render_color_map": color_map,
     }
 
@@ -274,7 +282,9 @@ class ComposeResponse(BaseModel):
     score: Score
     svg: str
     render_build_number: str | None = None
-    render_color_catalog: dict | None = None
+    render_color_catalog_id: str | None = None
+    render_color_catalog_name: str | None = None
+    render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     elapsed_ms: int = 0
     tokens_in: int | None = None
@@ -328,7 +338,9 @@ class PaintResponse(BaseModel):
     score: Score
     svg: str
     render_build_number: str | None = None
-    render_color_catalog: dict | None = None
+    render_color_catalog_id: str | None = None
+    render_color_catalog_name: str | None = None
+    render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     history_id: str | None = None
     history_at: int | None = None
@@ -397,7 +409,9 @@ class HistoryPostBody(BaseModel):
     tokens_out: int | None = None
     catalog_id: str | None = None
     render_build_number: str | None = None
-    render_color_catalog: dict | None = None
+    render_color_catalog_id: str | None = None
+    render_color_catalog_name: str | None = None
+    render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     save_artifacts: bool = True
     count_generation: bool = Field(default=False, exclude=True)

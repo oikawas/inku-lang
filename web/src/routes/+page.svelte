@@ -61,7 +61,9 @@
 		svg: string;
 		score: Score;
 		render_build_number?: string | null;
-		render_color_catalog?: Record<string, unknown> | null;
+		render_color_catalog_id?: string | null;
+		render_color_catalog_name?: string | null;
+		render_color_catalog_sub?: string | null;
 		render_color_map?: Record<string, string> | null;
 		history_id?: string | null;
 		history_at?: number | null;
@@ -1470,7 +1472,9 @@
 		score: Score;
 		svg: string;
 		render_build_number?: string | null;
-		render_color_catalog?: Record<string, unknown> | null;
+		render_color_catalog_id?: string | null;
+		render_color_catalog_name?: string | null;
+		render_color_catalog_sub?: string | null;
 		render_color_map?: Record<string, string> | null;
 		elapsed_ms: number;
 		tokens_in: number | null;
@@ -1498,7 +1502,9 @@
 			score: Score;
 			svg: string;
 			render_build_number?: string | null;
-			render_color_catalog?: Record<string, unknown> | null;
+			render_color_catalog_id?: string | null;
+			render_color_catalog_name?: string | null;
+			render_color_catalog_sub?: string | null;
 			render_color_map?: Record<string, string> | null;
 			elapsed_ms: number;
 			tokens_in: number | null;
@@ -1689,7 +1695,9 @@
 					score: composed.score,
 					svg: composed.svg,
 					render_build_number: composed.render_build_number,
-					render_color_catalog: composed.render_color_catalog,
+					render_color_catalog_id: composed.render_color_catalog_id,
+					render_color_catalog_name: composed.render_color_catalog_name,
+					render_color_catalog_sub: composed.render_color_catalog_sub,
 					render_color_map: composed.render_color_map,
 					elapsed_stage1_ms: elapsedStage1Ms,
 					elapsed_stage2_ms: elapsedStage2Ms,
@@ -1834,15 +1842,17 @@
 				score: Score;
 				svg: string;
 				render_build_number?: string | null;
-				render_color_catalog?: Record<string, unknown> | null;
+				render_color_catalog_id?: string | null;
+				render_color_catalog_name?: string | null;
+				render_color_catalog_sub?: string | null;
 				render_color_map?: Record<string, string> | null;
 				tokens_in: number | null;
 				tokens_out: number | null;
 			};
 			const elapsedMs = Date.now() - startedAt;
 			result = result
-				? { ...result, score: d.score, svg: d.svg, render_build_number: d.render_build_number, render_color_catalog: d.render_color_catalog, render_color_map: d.render_color_map }
-				: { score: d.score, svg: d.svg, render_build_number: d.render_build_number, render_color_catalog: d.render_color_catalog, render_color_map: d.render_color_map, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				? { ...result, score: d.score, svg: d.svg, render_build_number: d.render_build_number, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map }
+				: { score: d.score, svg: d.svg, render_build_number: d.render_build_number, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
@@ -2134,7 +2144,9 @@
 			score: it.score,
 			svg: it.svg,
 			render_build_number: it.render_build_number,
-			render_color_catalog: it.render_color_catalog,
+			render_color_catalog_id: it.render_color_catalog_id,
+			render_color_catalog_name: it.render_color_catalog_name,
+			render_color_catalog_sub: it.render_color_catalog_sub,
 			render_color_map: it.render_color_map,
 			elapsed_stage1_ms: 0,
 			elapsed_stage2_ms: 0,
@@ -2453,7 +2465,9 @@
 		if (!result) return null;
 		const payload: Record<string, unknown> = { score: result.score };
 		if (result.render_build_number !== undefined) payload.render_build_number = result.render_build_number;
-		if (result.render_color_catalog !== undefined) payload.render_color_catalog = result.render_color_catalog;
+		if (result.render_color_catalog_id !== undefined) payload.render_color_catalog_id = result.render_color_catalog_id;
+		if (result.render_color_catalog_name !== undefined) payload.render_color_catalog_name = result.render_color_catalog_name;
+		if (result.render_color_catalog_sub !== undefined) payload.render_color_catalog_sub = result.render_color_catalog_sub;
 		if (result.render_color_map !== undefined) payload.render_color_map = result.render_color_map;
 		return payload;
 	});

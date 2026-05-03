@@ -163,10 +163,13 @@ instructions include color nuance, the system may preserve `color_hint` so
 Stage 2 and rendering can resolve the best catalog color without losing intent.
 
 Render JSON produced by the server records the concrete render context.  Paint,
-compose, and saved artifact JSON include `render_build_number`, the resolved
-`render_color_catalog`, and `render_color_map`, where abstract colors and
+compose, and saved artifact JSON include `render_build_number`,
+`render_color_catalog_id`, `render_color_catalog_name`,
+`render_color_catalog_sub`, and `render_color_map`, where abstract colors and
 `palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
-rendering.
+rendering.  The full catalog `map` / `swatches` / `palette` snapshot is not
+duplicated in render JSON because `render_color_map` is the concrete color
+record needed for replay and audit.
 
 ---
 

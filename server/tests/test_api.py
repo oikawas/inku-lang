@@ -284,6 +284,9 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
         "user_id",
         "catalog_id",
         "render_build_number",
+        "render_color_catalog_id",
+        "render_color_catalog_name",
+        "render_color_catalog_sub",
         "render_color_catalog",
         "render_color_map",
         "trashed",
@@ -816,7 +819,9 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
     assert len(instructions) == 1
     assert instructions[0]["primitive"] == "line"
     assert r.json()["render_build_number"]
-    assert r.json()["render_color_catalog"]["id"] == "default"
+    assert r.json()["render_color_catalog_id"] == "default"
+    assert r.json()["render_color_catalog_name"] == "inku Default"
+    assert "render_color_catalog" not in r.json()
     assert r.json()["render_color_map"]["black"] == "#111111"
 
 
@@ -837,7 +842,9 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
     assert data["render_build_number"]
-    assert data["render_color_catalog"]["id"] == "default"
+    assert data["render_color_catalog_id"] == "default"
+    assert data["render_color_catalog_name"] == "inku Default"
+    assert "render_color_catalog" not in data
     assert data["render_color_map"]["black"] == "#111111"
     assert data["user_generation_count"] == 1
 
@@ -947,7 +954,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     data = r.json()
     assert data["history_id"]
     assert data["history_at"] == 1_700_000_000_000
-    assert data["render_color_catalog"]["id"] == "mexican"
+    assert data["render_color_catalog_id"] == "mexican"
+    assert data["render_color_catalog_name"] == "Mexican Vibrant"
     assert data["render_color_map"]["green"] == "#008f39"
 
     history = client.get("/api/history", headers=headers).json()
@@ -957,7 +965,9 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["input"] == "一滴の墨"
     assert item["catalog_id"] == "mexican"
     assert item["render_build_number"] == data["render_build_number"]
-    assert item["render_color_catalog"]["id"] == "mexican"
+    assert item["render_color_catalog_id"] == "mexican"
+    assert item["render_color_catalog_name"] == "Mexican Vibrant"
+    assert "render_color_catalog" not in item
     assert item["render_color_map"]["green"] == "#008f39"
     assert item["svg"] == data["svg"]
 
@@ -981,7 +991,7 @@ def test_paint_resolves_catalog_id_on_server(monkeypatch, auth_context):
     assert r.status_code == 200
     data = r.json()
     assert data["catalog_id"] == "mexican"
-    assert data["render_color_catalog"]["id"] == "mexican"
+    assert data["render_color_catalog_id"] == "mexican"
     assert data["render_color_map"]["green"] == "#008f39"
     assert data["render_color_map"]["palette:Cactus"] == "#008f39"
     assert "#008f39" in data["svg"]
@@ -1030,7 +1040,9 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
         "<svg></svg>",
         {
             "render_build_number": "260",
-            "render_color_catalog": {"id": "default"},
+            "render_color_catalog_id": "default",
+            "render_color_catalog_name": "inku Default",
+            "render_color_catalog_sub": "規定値",
             "render_color_map": {"black": "#111111"},
         },
     )
@@ -1039,7 +1051,9 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert (tmp_path / "out" / "sample_normalized.ddl").read_text(encoding="utf-8") == "normalized ddl"
     saved_score = json.loads((tmp_path / "out" / "sample_score.json").read_text(encoding="utf-8"))
     assert saved_score["render_build_number"] == "260"
-    assert saved_score["render_color_catalog"]["id"] == "default"
+    assert saved_score["render_color_catalog_id"] == "default"
+    assert saved_score["render_color_catalog_name"] == "inku Default"
+    assert "render_color_catalog" not in saved_score
     assert saved_score["render_color_map"]["black"] == "#111111"
     assert saved_score["score"] == {"instructions": []}
     assert (tmp_path / "out" / "sample_output.svg").read_text(encoding="utf-8") == "<svg></svg>"

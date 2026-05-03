@@ -7,6 +7,7 @@ Stage 2 composer を monkeypatch でバイパスし、FastAPI のスキーマ/�
 from __future__ import annotations
 
 import builtins
+import json
 import logging
 import sys
 import time
@@ -279,7 +280,15 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
     db._migrate_columns()
 
     columns = {col["name"] for col in inspect(legacy_engine).get_columns("history")}
-    assert {"user_id", "catalog_id", "trashed", "starred"} <= columns
+    assert {
+        "user_id",
+        "catalog_id",
+        "render_build_number",
+        "render_color_catalog",
+        "render_color_map",
+        "trashed",
+        "starred",
+    } <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
     assert {"ui_theme", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
@@ -806,6 +815,9 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
     instructions = r.json()["score"]["instructions"]
     assert len(instructions) == 1
     assert instructions[0]["primitive"] == "line"
+    assert r.json()["render_build_number"]
+    assert r.json()["render_color_catalog"]["id"] == "default"
+    assert r.json()["render_color_map"]["black"] == "#111111"
 
 
 def test_paint_pipeline(monkeypatch, auth_context):
@@ -824,6 +836,9 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert "中心" not in data["ddl"]
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
+    assert data["render_build_number"]
+    assert data["render_color_catalog"]["id"] == "default"
+    assert data["render_color_map"]["black"] == "#111111"
     assert data["user_generation_count"] == 1
 
     skipped_count = client.post(
@@ -932,6 +947,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     data = r.json()
     assert data["history_id"]
     assert data["history_at"] == 1_700_000_000_000
+    assert data["render_color_catalog"]["id"] == "mexican"
+    assert data["render_color_map"]["green"] == "#008f39"
 
     history = client.get("/api/history", headers=headers).json()
     assert history["total"] == 1
@@ -939,6 +956,9 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["id"] == data["history_id"]
     assert item["input"] == "一滴の墨"
     assert item["catalog_id"] == "mexican"
+    assert item["render_build_number"] == data["render_build_number"]
+    assert item["render_color_catalog"]["id"] == "mexican"
+    assert item["render_color_map"]["green"] == "#008f39"
     assert item["svg"] == data["svg"]
 
     db.delete_items(user["id"], [data["history_id"]])
@@ -961,6 +981,9 @@ def test_paint_resolves_catalog_id_on_server(monkeypatch, auth_context):
     assert r.status_code == 200
     data = r.json()
     assert data["catalog_id"] == "mexican"
+    assert data["render_color_catalog"]["id"] == "mexican"
+    assert data["render_color_map"]["green"] == "#008f39"
+    assert data["render_color_map"]["palette:Cactus"] == "#008f39"
     assert "#008f39" in data["svg"]
 
 
@@ -1005,11 +1028,20 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
         "normalized ddl",
         {"instructions": []},
         "<svg></svg>",
+        {
+            "render_build_number": "260",
+            "render_color_catalog": {"id": "default"},
+            "render_color_map": {"black": "#111111"},
+        },
     )
 
     assert (tmp_path / "out" / "sample_instruction.txt").read_text(encoding="utf-8") == "input text"
     assert (tmp_path / "out" / "sample_normalized.ddl").read_text(encoding="utf-8") == "normalized ddl"
-    assert (tmp_path / "out" / "sample_score.json").exists()
+    saved_score = json.loads((tmp_path / "out" / "sample_score.json").read_text(encoding="utf-8"))
+    assert saved_score["render_build_number"] == "260"
+    assert saved_score["render_color_catalog"]["id"] == "default"
+    assert saved_score["render_color_map"]["black"] == "#111111"
+    assert saved_score["score"] == {"instructions": []}
     assert (tmp_path / "out" / "sample_output.svg").read_text(encoding="utf-8") == "<svg></svg>"
     assert not (tmp_path / "out" / "sample_output.png").exists()
     assert "skipped PNG output" in caplog.text

@@ -339,6 +339,14 @@ def _color_catalog_summary(catalog_id: str, catalog_data: dict[str, Any]) -> dic
     }
 
 
+def _render_response_summary(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "render_build_number": result.get("render_build_number"),
+        "render_color_catalog": result.get("render_color_catalog"),
+        "render_color_map": result.get("render_color_map"),
+    }
+
+
 def _model_summary(
     stage1_model: str | None,
     stage2_model: str | None,
@@ -976,6 +984,7 @@ def command_paint(args: argparse.Namespace) -> int:
         ),
         "timeout_seconds": timeout_seconds,
         **_color_catalog_summary(color_catalog, catalog_data),
+        **_render_response_summary(result),
         "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=text),
         "history_id": result.get("history_id"),
         "elapsed_total_ms": result.get("elapsed_total_ms"),
@@ -1000,6 +1009,7 @@ def command_paint(args: argparse.Namespace) -> int:
             ),
             "timeout_seconds": timeout_seconds,
             **_color_catalog_summary(color_catalog, catalog_data),
+            **_render_response_summary(result),
             "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=text),
             "paths": paths,
         })
@@ -1067,6 +1077,7 @@ def command_batch(args: argparse.Namespace) -> int:
                 ),
                 "timeout_seconds": timeout_seconds,
                 **_color_catalog_summary(color_catalog, catalog_data),
+                **_render_response_summary(result),
                 "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
                 "history_id": result.get("history_id"),
                 "elapsed_total_ms": elapsed,
@@ -1124,6 +1135,13 @@ def command_batch(args: argparse.Namespace) -> int:
         ),
         "timeout_seconds": timeout_seconds,
         **_color_catalog_summary(color_catalog, catalog_data),
+        "render_build_numbers": sorted({
+            str(result["render_build_number"])
+            for result in results
+            if result.get("render_build_number") is not None
+        }),
+        "render_color_catalog": results[0].get("render_color_catalog") if results else None,
+        "render_color_map": results[0].get("render_color_map") if results else None,
         "color_trace": _aggregate_color_traces(color_traces),
         "elapsed_total_ms": total_elapsed,
         "tokens_in": total_in or None,

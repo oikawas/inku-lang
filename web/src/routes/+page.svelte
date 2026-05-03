@@ -60,6 +60,9 @@
 	type PaintResult = {
 		svg: string;
 		score: Score;
+		render_build_number?: string | null;
+		render_color_catalog?: Record<string, unknown> | null;
+		render_color_map?: Record<string, string> | null;
 		history_id?: string | null;
 		history_at?: number | null;
 		elapsed_stage1_ms: number;
@@ -148,7 +151,8 @@
 	let ddlHighlightEl = $state<HTMLDivElement | null>(null);
 	let ddlSelection = $state({ start: 0, end: 0 });
 	let ddlFocused = $state(false);
-	let copiedPrompt = $state<'stage1' | 'stage2' | null>(null);
+	type CopyKind = 'stage1' | 'stage2' | 'score';
+	let copiedPrompt = $state<CopyKind | null>(null);
 
 	// ── Loading ─────────────────────────────────────────────
 	let loading    = $state(false);
@@ -1465,6 +1469,9 @@
 	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal): Promise<{
 		score: Score;
 		svg: string;
+		render_build_number?: string | null;
+		render_color_catalog?: Record<string, unknown> | null;
+		render_color_map?: Record<string, string> | null;
 		elapsed_ms: number;
 		tokens_in: number | null;
 		tokens_out: number | null;
@@ -1490,6 +1497,9 @@
 		const data = await r.json() as {
 			score: Score;
 			svg: string;
+			render_build_number?: string | null;
+			render_color_catalog?: Record<string, unknown> | null;
+			render_color_map?: Record<string, string> | null;
 			elapsed_ms: number;
 			tokens_in: number | null;
 			tokens_out: number | null;
@@ -1678,6 +1688,9 @@
 				const r: PaintResult = {
 					score: composed.score,
 					svg: composed.svg,
+					render_build_number: composed.render_build_number,
+					render_color_catalog: composed.render_color_catalog,
+					render_color_map: composed.render_color_map,
 					elapsed_stage1_ms: elapsedStage1Ms,
 					elapsed_stage2_ms: elapsedStage2Ms,
 					elapsed_total_ms: elapsedTotalMs,
@@ -1817,11 +1830,19 @@
 				const d = await r.json().catch(() => ({})) as { detail?: string };
 				throw new Error(d.detail ?? `HTTP ${r.status}`);
 			}
-			const d = await r.json() as { score: Score; svg: string; tokens_in: number | null; tokens_out: number | null };
+			const d = await r.json() as {
+				score: Score;
+				svg: string;
+				render_build_number?: string | null;
+				render_color_catalog?: Record<string, unknown> | null;
+				render_color_map?: Record<string, string> | null;
+				tokens_in: number | null;
+				tokens_out: number | null;
+			};
 			const elapsedMs = Date.now() - startedAt;
 			result = result
-				? { ...result, score: d.score, svg: d.svg }
-				: { score: d.score, svg: d.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				? { ...result, score: d.score, svg: d.svg, render_build_number: d.render_build_number, render_color_catalog: d.render_color_catalog, render_color_map: d.render_color_map }
+				: { score: d.score, svg: d.svg, render_build_number: d.render_build_number, render_color_catalog: d.render_color_catalog, render_color_map: d.render_color_map, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
@@ -2109,7 +2130,20 @@
 		const itemDDL = it.ddl ?? '';
 		input = it.input; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
 		stage1UserPrompt = it.input ? it.input + buildEmotionHint(it.input) : '';
-		result = { score: it.score, svg: it.svg, elapsed_stage1_ms: 0, elapsed_stage2_ms: 0, elapsed_total_ms: it.elapsed_ms ?? 0, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
+		result = {
+			score: it.score,
+			svg: it.svg,
+			render_build_number: it.render_build_number,
+			render_color_catalog: it.render_color_catalog,
+			render_color_map: it.render_color_map,
+			elapsed_stage1_ms: 0,
+			elapsed_stage2_ms: 0,
+			elapsed_total_ms: it.elapsed_ms ?? 0,
+			tokens_in_stage1: null,
+			tokens_out_stage1: null,
+			tokens_in_stage2: null,
+			tokens_out_stage2: null,
+		};
 		error = null;
 		outputTab = 'canvas';
 		fitCanvasZoom();
@@ -2278,7 +2312,7 @@
 		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
 	}
 
-	async function copyPromptText(kind: 'stage1' | 'stage2', text: string | null | undefined): Promise<void> {
+	async function copyPromptText(kind: CopyKind, text: string | null | undefined): Promise<void> {
 		const value = text ?? '';
 		try {
 			if (navigator.clipboard?.writeText) {
@@ -2415,11 +2449,22 @@
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
 	);
-	const scoreJsonLines = $derived(
-		result ? JSON.stringify(result.score, null, 2).split('\n') : []
-	);
+	const scoreJsonPayload = $derived.by(() => {
+		if (!result) return null;
+		const payload: Record<string, unknown> = { score: result.score };
+		if (result.render_build_number !== undefined) payload.render_build_number = result.render_build_number;
+		if (result.render_color_catalog !== undefined) payload.render_color_catalog = result.render_color_catalog;
+		if (result.render_color_map !== undefined) payload.render_color_map = result.render_color_map;
+		return payload;
+	});
+	const scoreJsonText = $derived(scoreJsonPayload ? JSON.stringify(scoreJsonPayload, null, 2) : '');
+	const scoreJsonLines = $derived(scoreJsonText ? scoreJsonText.split('\n') : []);
 	const scoreJsonHighlightedLines = $derived(scoreJsonLines.map(highlightJsonLine));
 	const scoreJsonHighlighted = $derived(scoreJsonHighlightedLines.join('\n'));
+	const scoreJsonSeparatorLine = $derived.by(() => {
+		const index = scoreJsonLines.findIndex((line) => line.startsWith('  "render_'));
+		return index >= 0 ? index : null;
+	});
 	const ddlHighlighted = $derived(ddl !== null
 		? highlightDDL(ddl, ddlFocused && ddlSelection.start === ddlSelection.end ? ddlSelection.start : null)
 		: '');
@@ -2826,8 +2871,10 @@
 				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : demoGeneratedPrompt)}
 				{ddl}
 				{copiedPrompt}
+				{scoreJsonText}
 				{scoreJsonLines}
 				{scoreJsonHighlighted}
+				{scoreJsonSeparatorLine}
 				{statusStage1Model}
 				{statusStage2Model}
 				{statusCatalogName}

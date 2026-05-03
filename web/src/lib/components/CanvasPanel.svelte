@@ -31,9 +31,11 @@
 		ddl: string | null;
 		promptStage1Expanded: boolean;
 		promptStage2Expanded: boolean;
-		copiedPrompt: 'stage1' | 'stage2' | null;
+		copiedPrompt: 'stage1' | 'stage2' | 'score' | null;
+		scoreJsonText: string;
 		scoreJsonLines: string[];
 		scoreJsonHighlighted: string;
+		scoreJsonSeparatorLine: number | null;
 		statusStage1Model: string;
 		statusStage2Model: string;
 		statusCatalogName: string;
@@ -50,7 +52,7 @@
 		onSetZoom: (zoom: number) => void;
 		onResetZoom: () => void;
 		onFitZoomChange: (zoom: number) => void;
-		onCopyPromptText: (kind: 'stage1' | 'stage2', text: string | null | undefined) => void | Promise<void>;
+		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onDownloadSVG: () => void;
 		onDownloadPNG: (size: number) => void | Promise<void>;
@@ -79,8 +81,10 @@
 		promptStage1Expanded = $bindable(false),
 		promptStage2Expanded = $bindable(false),
 		copiedPrompt,
+		scoreJsonText,
 		scoreJsonLines,
 		scoreJsonHighlighted,
+		scoreJsonSeparatorLine,
 		statusStage1Model,
 		statusStage2Model,
 		statusCatalogName,
@@ -195,8 +199,10 @@
 					bind:promptStage1Expanded
 					bind:promptStage2Expanded
 					{copiedPrompt}
+					{scoreJsonText}
 					{scoreJsonLines}
 					{scoreJsonHighlighted}
+					{scoreJsonSeparatorLine}
 					{onCopyPromptText}
 				/>
 			{:else if outputTab === 'score'}
@@ -208,8 +214,10 @@
 					bind:promptStage1Expanded
 					bind:promptStage2Expanded
 					{copiedPrompt}
+					{scoreJsonText}
 					{scoreJsonLines}
 					{scoreJsonHighlighted}
+					{scoreJsonSeparatorLine}
 					{onCopyPromptText}
 				/>
 			{/if}

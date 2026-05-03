@@ -82,16 +82,22 @@ def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
     return date_dir / (dt.strftime("%Y%m%d_%H%M%S") + "_" + item_id[:8])
 
 
-def _save_output_files(prefix: Path, input_text: str, ddl: str | None, score: dict, svg: str) -> None:
+def _save_output_files(
+    prefix: Path,
+    input_text: str,
+    ddl: str | None,
+    score: dict,
+    svg: str,
+    render_metadata: dict | None = None,
+) -> None:
     try:
         prefix.parent.mkdir(parents=True, exist_ok=True)
         if input_text:
             Path(f"{prefix}_instruction.txt").write_text(input_text, encoding="utf-8")
         if ddl:
             Path(f"{prefix}_normalized.ddl").write_text(ddl, encoding="utf-8")
-        Path(f"{prefix}_score.json").write_text(
-            json.dumps(score, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        score_payload = {"score": score, **(render_metadata or {})}
+        Path(f"{prefix}_score.json").write_text(json.dumps(score_payload, ensure_ascii=False, indent=2), encoding="utf-8")
         svg_bytes = svg.encode("utf-8")
         Path(f"{prefix}_output.svg").write_bytes(svg_bytes)
     except Exception:
@@ -126,6 +132,14 @@ def _history_output_prefix(item: dict) -> Path:
     return _output_prefix(item["user_id"], item["id"], item["at"])
 
 
+def _history_render_metadata(item: dict) -> dict | None:
+    if isinstance(item.get("render_metadata"), dict):
+        return item["render_metadata"]
+    keys = ("render_build_number", "render_color_catalog", "render_color_map")
+    metadata = {key: item[key] for key in keys if item.get(key) is not None}
+    return metadata or None
+
+
 def _save_history_artifacts(item: dict) -> None:
     _save_output_files(
         _history_output_prefix(item),
@@ -133,6 +147,7 @@ def _save_history_artifacts(item: dict) -> None:
         item.get("ddl"),
         item.get("score", {}),
         item.get("svg", ""),
+        _history_render_metadata(item),
     )
 
 
@@ -195,6 +210,18 @@ def _catalog_render_color_map(catalog_id: str | None) -> dict[str, str]:
     return color_map
 
 
+def _render_metadata(catalog_id: str | None) -> dict:
+    catalog = get_color_catalog(catalog_id)
+    color_map = render_color_map_for_catalog(catalog_id)
+    if catalog is None or color_map is None:
+        raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
+    return {
+        "render_build_number": _build_number(),
+        "render_color_catalog": catalog,
+        "render_color_map": color_map,
+    }
+
+
 def _resolved_catalog_id(catalog_id: str | None) -> str:
     catalog = get_color_catalog(catalog_id)
     if catalog is None:
@@ -246,6 +273,9 @@ class ComposeRequest(BaseModel):
 class ComposeResponse(BaseModel):
     score: Score
     svg: str
+    render_build_number: str | None = None
+    render_color_catalog: dict | None = None
+    render_color_map: dict[str, str] | None = None
     elapsed_ms: int = 0
     tokens_in: int | None = None
     tokens_out: int | None = None
@@ -297,6 +327,9 @@ class PaintResponse(BaseModel):
     thinking: str | None = None
     score: Score
     svg: str
+    render_build_number: str | None = None
+    render_color_catalog: dict | None = None
+    render_color_map: dict[str, str] | None = None
     history_id: str | None = None
     history_at: int | None = None
     elapsed_stage1_ms: int = 0
@@ -363,6 +396,9 @@ class HistoryPostBody(BaseModel):
     tokens_in: int | None = None
     tokens_out: int | None = None
     catalog_id: str | None = None
+    render_build_number: str | None = None
+    render_color_catalog: dict | None = None
+    render_color_map: dict[str, str] | None = None
     save_artifacts: bool = True
     count_generation: bool = Field(default=False, exclude=True)
     color_map: dict[str, str] | None = Field(default=None, exclude=True, description="Deprecated: ignored; catalog_id is resolved server-side")
@@ -1195,8 +1231,9 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
+    render_metadata = _render_metadata(req.catalog_id)
     try:
-        svg = render(score, color_map=_catalog_render_color_map(req.catalog_id))
+        svg = render(score, color_map=render_metadata["render_color_map"])
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
 
@@ -1204,6 +1241,7 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
     return ComposeResponse(
         score=score,
         svg=svg,
+        **render_metadata,
         elapsed_ms=elapsed_ms,
         tokens_in=compose_detail.tokens_in,
         tokens_out=compose_detail.tokens_out,
@@ -1362,6 +1400,7 @@ def _add_history_item(
     tokens_out: int | None = None,
     catalog_id: str | None = None,
     save_artifacts: bool = True,
+    render_metadata: dict | None = None,
 ) -> dict:
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
@@ -1381,9 +1420,14 @@ def _add_history_item(
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
         "catalog_id": catalog_id,
+        **(render_metadata or {}),
     })
     if save_artifacts:
+        item_dict.update(render_metadata or {})
+        item_dict["render_metadata"] = render_metadata or {}
         _submit_history_artifact_save(item_dict)
+    else:
+        item_dict.update(render_metadata or {})
     return item_dict
 
 
@@ -1417,9 +1461,10 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
+    render_metadata = _render_metadata(catalog_id)
     t2 = time.perf_counter()
     try:
-        svg = render(score, color_map=_catalog_render_color_map(catalog_id))
+        svg = render(score, color_map=render_metadata["render_color_map"])
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
     elapsed_stage1_ms = int((t1 - t0) * 1000)
@@ -1444,6 +1489,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             tokens_out=(interpret_detail_result.tokens_out or 0) + (compose_detail.tokens_out or 0) or None,
             catalog_id=None if catalog_id == "default" else catalog_id,
             save_artifacts=save_artifacts,
+            render_metadata=render_metadata,
         )
         history_id = item["id"]
     elif save_artifacts:
@@ -1459,6 +1505,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             "score": score_dict,
             "svg": svg,
             "at": history_at,
+            "render_metadata": render_metadata,
         })
     user_generation_count = None
     if req.count_generation:
@@ -1471,6 +1518,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         thinking=interpret_detail_result.thinking,
         score=score,
         svg=svg,
+        **render_metadata,
         history_id=history_id,
         history_at=history_at,
         elapsed_stage1_ms=elapsed_stage1_ms,
@@ -1610,7 +1658,7 @@ def api_users_delete(user_id: str, actor: dict = Depends(_user_manager)) -> dict
     return {"ok": True}
 
 
-@app.get("/api/history", response_model=HistoryListResponse)
+@app.get("/api/history", response_model=HistoryListResponse, response_model_exclude_none=True)
 def api_history_get(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
@@ -1630,17 +1678,18 @@ def api_history_get(
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
-@app.post("/api/history", response_model=HistoryItem)
+@app.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
     try:
         score = coerce_score(Score.model_validate(body.score))
         catalog_id = _resolved_catalog_id(body.catalog_id)
+        render_metadata = _render_metadata(catalog_id)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
         if canvas_aspect is not None:
             score = _score_with_canvas(score, canvas_aspect)
         svg = render(
             score,
-            color_map=_catalog_render_color_map(catalog_id),
+            color_map=render_metadata["render_color_map"],
         )
     except HTTPException:
         raise
@@ -1660,6 +1709,7 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         tokens_out=body.tokens_out,
         catalog_id=None if catalog_id == "default" else catalog_id,
         save_artifacts=body.save_artifacts,
+        render_metadata=render_metadata,
     )
     if body.count_generation:
         if _db.increment_user_generation_count(actor["id"]) is None:
@@ -1685,7 +1735,7 @@ def api_history_restore(body: HistoryIdsBody, actor: dict = Depends(_current_use
     return {"ok": True, "count": count}
 
 
-@app.patch("/api/history/{item_id}/star", response_model=HistoryItem)
+@app.patch("/api/history/{item_id}/star", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_star(item_id: str, body: HistoryStarBody, actor: dict = Depends(_current_user)) -> HistoryItem:
     item = _db.set_item_starred(actor["id"], item_id, body.starred)
     if not item:

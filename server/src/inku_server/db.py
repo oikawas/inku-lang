@@ -51,6 +51,9 @@ class HistoryRow(Base):
     tokens_in    = Column(Integer,    nullable=True)
     tokens_out   = Column(Integer,    nullable=True)
     catalog_id   = Column(String,     nullable=True)
+    render_build_number = Column(String, nullable=True)
+    render_color_catalog = Column(Text, nullable=True)
+    render_color_map = Column(Text, nullable=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
 
@@ -108,6 +111,9 @@ _UNSET = object()
 _HISTORY_COLUMN_MIGRATIONS = {
     "user_id": "ALTER TABLE history ADD COLUMN user_id VARCHAR",
     "catalog_id": "ALTER TABLE history ADD COLUMN catalog_id VARCHAR",
+    "render_build_number": "ALTER TABLE history ADD COLUMN render_build_number VARCHAR",
+    "render_color_catalog": "ALTER TABLE history ADD COLUMN render_color_catalog TEXT",
+    "render_color_map": "ALTER TABLE history ADD COLUMN render_color_map TEXT",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
 }
@@ -538,7 +544,7 @@ def _assign_unowned_history_to_admin() -> None:
 
 
 def _row_to_dict(row: HistoryRow) -> dict:
-    return {
+    item = {
         "id":           row.id,
         "user_id":      row.user_id,
         "at":           row.at,
@@ -556,6 +562,19 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "trashed":      bool(row.trashed),
         "starred":      bool(row.starred),
     }
+    if row.render_build_number is not None:
+        item["render_build_number"] = row.render_build_number
+    if row.render_color_catalog is not None:
+        try:
+            item["render_color_catalog"] = json.loads(row.render_color_catalog)
+        except json.JSONDecodeError:
+            item["render_color_catalog"] = None
+    if row.render_color_map is not None:
+        try:
+            item["render_color_map"] = json.loads(row.render_color_map)
+        except json.JSONDecodeError:
+            item["render_color_map"] = None
+    return item
 
 
 def _group_to_dict(row: UserGroupRow) -> dict:
@@ -594,6 +613,9 @@ def add_item(item: dict) -> dict:
         tokens_in=item.get("tokens_in"),
         tokens_out=item.get("tokens_out"),
         catalog_id=item.get("catalog_id"),
+        render_build_number=item.get("render_build_number"),
+        render_color_catalog=json.dumps(item.get("render_color_catalog"), ensure_ascii=False) if item.get("render_color_catalog") is not None else None,
+        render_color_map=json.dumps(item.get("render_color_map"), ensure_ascii=False) if item.get("render_color_map") is not None else None,
         trashed=0,
         starred=0,
     )

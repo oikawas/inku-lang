@@ -10,10 +10,12 @@
 		ddl: string | null;
 		promptStage1Expanded: boolean;
 		promptStage2Expanded: boolean;
-		copiedPrompt: 'stage1' | 'stage2' | null;
+		copiedPrompt: 'stage1' | 'stage2' | 'score' | null;
+		scoreJsonText: string;
 		scoreJsonLines: string[];
 		scoreJsonHighlighted: string;
-		onCopyPromptText: (kind: 'stage1' | 'stage2', text: string | null | undefined) => void | Promise<void>;
+		scoreJsonSeparatorLine: number | null;
+		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 	};
 
 	let {
@@ -24,10 +26,14 @@
 		promptStage1Expanded = $bindable(false),
 		promptStage2Expanded = $bindable(false),
 		copiedPrompt,
+		scoreJsonText,
 		scoreJsonLines,
 		scoreJsonHighlighted,
+		scoreJsonSeparatorLine,
 		onCopyPromptText,
 	}: Props = $props();
+
+	const scoreJsonHighlightedLines = $derived(scoreJsonHighlighted ? scoreJsonHighlighted.split('\n') : []);
 </script>
 
 {#if outputTab === 'prompts' && promptsData}
@@ -90,13 +96,34 @@
 {/if}
 
 {#if outputTab === 'score'}
-	<div class="score-view">
-		<div class="score-line-nums" aria-hidden="true">
-			{#each scoreJsonLines as _, i (i)}
-				<div>{i + 1}</div>
-			{/each}
+	<div class="score-shell">
+		<div class="score-toolbar">
+			<button
+				class="prompt-copy-btn score-copy-btn"
+				class:copied={copiedPrompt === 'score'}
+				type="button"
+				title={copiedPrompt === 'score' ? t().promptCopied : t().promptCopy}
+				aria-label={copiedPrompt === 'score' ? t().promptCopied : t().promptCopy}
+				onclick={() => onCopyPromptText('score', scoreJsonText)}
+			>
+				<svg viewBox="0 0 24 24" aria-hidden="true">
+					<rect x="9" y="9" width="10" height="10" rx="2"></rect>
+					<path d="M5 15V7a2 2 0 0 1 2-2h8"></path>
+				</svg>
+			</button>
 		</div>
-		<pre class="score-pre">{@html scoreJsonHighlighted}</pre>
+		<div class="score-view">
+			<div class="score-line-nums" aria-hidden="true">
+				{#each scoreJsonLines as _, i (i)}
+					<div class="score-line-num" class:section-start={scoreJsonSeparatorLine === i}>{i + 1}</div>
+				{/each}
+			</div>
+			<div class="score-pre">
+				{#each scoreJsonHighlightedLines as line, i (i)}
+					<span class="score-code-line" class:section-start={scoreJsonSeparatorLine === i}>{@html line || '&nbsp;'}</span>
+				{/each}
+			</div>
+		</div>
 	</div>
 {/if}
 
@@ -199,15 +226,42 @@
 		background: linear-gradient(transparent, var(--bg));
 		pointer-events: none;
 	}
-	.score-view {
-		display: flex;
+	.score-shell {
+		position: relative;
 		width: 100%;
 		height: 100%;
 		min-height: 0;
 		align-self: stretch;
+		display: flex;
+		flex-direction: column;
 		background: var(--panel);
 		border: 1px solid var(--border);
 		border-radius: var(--r);
+		overflow: hidden;
+	}
+	.score-toolbar {
+		display: flex;
+		justify-content: flex-end;
+		padding: 6px 8px;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg2);
+	}
+	.score-copy-btn {
+		color: var(--fg2);
+		background: var(--panel);
+		border-color: var(--border);
+	}
+	.score-copy-btn.copied {
+		color: #2f6f45;
+		background: rgba(47, 111, 69, 0.10);
+	}
+	.score-view {
+		display: flex;
+		width: 100%;
+		flex: 1;
+		min-height: 0;
+		align-self: stretch;
+		background: var(--panel);
 		overflow: auto;
 		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 		font-size: 12px;
@@ -226,13 +280,23 @@
 		user-select: none;
 		font-variant-numeric: tabular-nums;
 	}
+	.score-line-num,
+	.score-code-line {
+		min-height: 18px;
+	}
+	.score-line-num.section-start,
+	.score-code-line.section-start {
+		border-top: 1px solid var(--border2);
+		margin-top: 6px;
+		padding-top: 6px;
+	}
 	.score-pre {
 		background: var(--panel);
 		padding: 12px;
 		overflow: visible;
 		font-size: inherit;
 		line-height: inherit;
-		white-space: pre;
+		white-space: nowrap;
 		word-break: normal;
 		width: 100%;
 		min-height: 100%;
@@ -240,12 +304,26 @@
 		margin: 0;
 		font-family: inherit;
 		align-self: flex-start;
+		color: var(--fg);
 	}
-	.score-pre :global(.json-key) { color: #6f4bb8; font-weight: 600; }
-	.score-pre :global(.json-string) { color: #116329; }
-	.score-pre :global(.json-number) { color: #0b63ce; }
-	.score-pre :global(.json-bool) { color: #b54708; font-weight: 600; }
-	.score-pre :global(.json-null) { color: #6b7280; font-style: italic; }
+	.score-code-line {
+		display: block;
+		white-space: pre;
+	}
+	.score-pre :global(.json-key) { color: #5b3f99; font-weight: 600; }
+	.score-pre :global(.json-string) { color: #0f6b2f; }
+	.score-pre :global(.json-number) { color: #075ca8; }
+	.score-pre :global(.json-bool) { color: #9a3f05; font-weight: 600; }
+	.score-pre :global(.json-null) { color: #5e6672; font-style: italic; }
+	:global(html[data-theme='dark']) .score-pre :global(.json-key) { color: #d6c5ff; }
+	:global(html[data-theme='dark']) .score-pre :global(.json-string) { color: #8ce99a; }
+	:global(html[data-theme='dark']) .score-pre :global(.json-number) { color: #91caff; }
+	:global(html[data-theme='dark']) .score-pre :global(.json-bool) { color: #ffc078; }
+	:global(html[data-theme='dark']) .score-pre :global(.json-null) { color: #b8c0cc; }
+	:global(html[data-theme='dark']) .score-copy-btn.copied {
+		color: #8ce99a;
+		background: rgba(140, 233, 154, 0.12);
+	}
 	.muted-center { color: var(--fg3); font-size: 13px; padding: 16px; }
 	.ghost-btn {
 		padding: 4px 10px;

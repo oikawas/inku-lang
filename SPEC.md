@@ -162,6 +162,12 @@ select a `catalog_id` rather than owning their own catalog tables.  When user
 instructions include color nuance, the system may preserve `color_hint` so
 Stage 2 and rendering can resolve the best catalog color without losing intent.
 
+Render JSON produced by the server records the concrete render context.  Paint,
+compose, and saved artifact JSON include `render_build_number`, the resolved
+`render_color_catalog`, and `render_color_map`, where abstract colors and
+`palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
+rendering.
+
 ---
 
 ## 6. JSON Score

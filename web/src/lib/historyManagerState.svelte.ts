@@ -19,6 +19,9 @@ export type HistoryItem = {
 	tokens_in?: number | null;
 	tokens_out?: number | null;
 	catalog_id?: string | null;
+	render_build_number?: string | null;
+	render_color_catalog?: Record<string, unknown> | null;
+	render_color_map?: Record<string, string> | null;
 	trashed?: boolean;
 	starred?: boolean;
 };

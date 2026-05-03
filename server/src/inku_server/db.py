@@ -140,7 +140,7 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
 }
 _BATCH_PROMPT_HISTORY_LIMIT = 20
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
-_SETTINGS_TABS = {"db", "plugins", "users", "export", "misc"}
+_SETTINGS_TABS = {"models", "db", "plugins", "users", "export", "misc"}
 _PLUGIN_STORAGE_MAX_BYTES = 20_000
 _DEMO_DEFAULT_SETTINGS = {
     "save_db": False,
@@ -168,6 +168,7 @@ _EXPORT_TEMPLATE_DEFAULTS = [
 _DEFAULT_DB_BACKUP_DIR = Path.home() / ".local" / "share" / "inku" / "db-backups"
 _DB_BACKUP_DIR = Path(os.getenv("INKU_DB_BACKUP_DIR", str(_DEFAULT_DB_BACKUP_DIR))).expanduser()
 _DB_BACKUP_SETTINGS_KEY = "db_backup_settings"
+_MODEL_SETTINGS_KEY = "model_connection_settings"
 _DB_BACKUP_DEFAULT_SETTINGS = {
     "interval_days": 7,
     "max_generations": 4,
@@ -542,6 +543,19 @@ def update_db_backup_settings(interval_days: int, max_generations: int) -> dict:
     current["max_generations"] = max_generations
     clean = _normalize_db_backup_settings(current)
     return _write_app_setting(_DB_BACKUP_SETTINGS_KEY, clean)
+
+
+def get_model_settings() -> dict:
+    from .model_settings import normalize_model_settings
+
+    return normalize_model_settings(_read_app_setting(_MODEL_SETTINGS_KEY))
+
+
+def update_model_settings(settings: dict) -> dict:
+    from .model_settings import normalize_model_settings
+
+    clean = normalize_model_settings(settings)
+    return _write_app_setting(_MODEL_SETTINGS_KEY, clean)
 
 
 def _db_backup_file(kind: str, at_ms: int) -> Path:

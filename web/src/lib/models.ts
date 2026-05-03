@@ -1,4 +1,4 @@
-export type Provider = 'nvidia' | 'anthropic' | 'local';
+export type Provider = 'openai' | 'anthropic' | 'gemini' | 'nvidia' | 'ollama' | 'ovms';
 
 export type ModelOption = {
 	id: string;
@@ -14,6 +14,16 @@ export type ProviderGroup = {
 
 export const PROVIDER_GROUPS: ProviderGroup[] = [
 	{
+		id: 'openai',
+		label: 'OpenAI',
+		models: [
+			{ id: 'openai:gpt-5.1', label: 'GPT-5.1' },
+			{ id: 'openai:gpt-5.1-mini', label: 'GPT-5.1 mini' },
+			{ id: 'openai:gpt-4.1', label: 'GPT-4.1' },
+			{ id: 'openai:gpt-4.1-mini', label: 'GPT-4.1 mini' }
+		]
+	},
+	{
 		id: 'nvidia',
 		label: 'NVIDIA NIM',
 		models: [
@@ -24,7 +34,7 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 	},
 	{
 		id: 'anthropic',
-		label: 'Anthropic',
+		label: 'Claude',
 		models: [
 			{ id: 'anthropic:claude-opus-4-7', label: 'Anthropic Claude Opus 4.7' },
 			{ id: 'anthropic:claude-sonnet-4-6', label: 'Anthropic Claude Sonnet 4.6' },
@@ -32,8 +42,26 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 		]
 	},
 	{
-		id: 'local',
-		label: 'ローカル (OVMS)',
+		id: 'gemini',
+		label: 'Gemini',
+		models: [
+			{ id: 'gemini:gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+			{ id: 'gemini:gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+			{ id: 'gemini:gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' }
+		]
+	},
+	{
+		id: 'ollama',
+		label: 'Ollama',
+		models: [
+			{ id: 'ollama:llama3.2', label: 'Llama 3.2' },
+			{ id: 'ollama:gpt-oss:20b', label: 'gpt-oss 20B' },
+			{ id: 'ollama:qwen3:8b', label: 'Qwen3 8B' }
+		]
+	},
+	{
+		id: 'ovms',
+		label: 'Intel OVMS',
 		models: [
 			{ id: 'qwen3-api', label: 'Qwen3 8B Instruct', notes: 'thinking有効' },
 			{ id: 'qwen-api', label: 'Qwen2.5 7B Instruct' },
@@ -51,6 +79,12 @@ export function modelsForProvider(provider: Provider): ModelOption[] {
 }
 
 export function providerOfModel(modelId: string): Provider {
+	if (modelId.startsWith('openai:')) return 'openai';
+	if (modelId.startsWith('anthropic:')) return 'anthropic';
+	if (modelId.startsWith('gemini:')) return 'gemini';
+	if (modelId.startsWith('nvidia:')) return 'nvidia';
+	if (modelId.startsWith('ollama:')) return 'ollama';
+	if (modelId.startsWith('ovms:')) return 'ovms';
 	for (const g of PROVIDER_GROUPS) {
 		if (g.models.some((m) => m.id === modelId)) return g.id;
 	}

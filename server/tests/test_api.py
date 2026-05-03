@@ -21,6 +21,7 @@ from sqlalchemy import create_engine, inspect, text
 from inku_server import db
 from inku_server import api as api_module
 from inku_server.api import app
+from inku_server.model_settings import default_model_settings
 from inku_server.schema import Score
 
 client = TestClient(app)
@@ -839,8 +840,6 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
 
 def test_paint_pipeline(monkeypatch, auth_context):
     headers, _, _ = auth_context
-    monkeypatch.setenv("OPENAI_MODEL_STAGE1", "stage1-default-test")
-    monkeypatch.setenv("OPENAI_MODEL", "stage2-default-test")
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
@@ -855,8 +854,8 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert "中心" not in data["ddl"]
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
-    assert data["stage1_model"] == "stage1-default-test"
-    assert data["stage2_model"] == "stage2-default-test"
+    assert data["stage1_model"] == "nvidia:google/gemma-4-31b-it"
+    assert data["stage2_model"] == "nvidia:google/gemma-4-31b-it"
     assert data["render_build_number"]
     assert data["render_color_profile"] == {
         "id": "srgb",
@@ -1545,4 +1544,58 @@ def test_history_is_scoped_to_authenticated_user():
     db.delete_session(token_b)
     db.delete_user(user_a["id"])
     db.delete_user(user_b["id"])
+    db.delete_user_group(group["id"])
+
+
+def test_model_settings_store_keys_server_side():
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"model-settings-admins-{suffix}")
+    admin = db.add_user(
+        username=f"model-settings-admin-{suffix}",
+        email=f"model-settings-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    headers, token = _auth_headers(admin)
+    r = client.get("/api/settings/models", headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert any(provider["id"] == "openai" for provider in data["catalog"])
+
+    r = client.put(
+        "/api/settings/models",
+        headers=headers,
+        json={
+            "stage1_provider": "openai",
+            "stage1_model": "gpt-5.1-mini",
+            "stage2_provider": "gemini",
+            "stage2_model": "gemini-2.5-flash",
+            "providers": {
+                "openai": {"base_url": "https://api.openai.com/v1", "api_key": "sk-test-secret"},
+                "gemini": {"base_url": "https://generativelanguage.googleapis.com", "api_key": "gemini-secret"},
+            },
+        },
+    )
+    assert r.status_code == 200
+    settings = r.json()["settings"]
+    assert settings["stage1_provider"] == "openai"
+    assert settings["stage2_provider"] == "gemini"
+    assert settings["providers"]["openai"]["api_key_set"] is True
+    assert settings["providers"]["openai"]["api_key_hint"] == "sk-t...cret"
+    assert "sk-test-secret" not in json.dumps(settings)
+
+    saved = db.get_model_settings()
+    assert saved["providers"]["openai"]["api_key"] == "sk-test-secret"
+
+    r = client.put(
+        "/api/settings/models",
+        headers=headers,
+        json={"providers": {"openai": {"base_url": "https://api.openai.com/v1", "clear_api_key": True}}},
+    )
+    assert r.status_code == 200
+    assert r.json()["settings"]["providers"]["openai"]["api_key_set"] is False
+    db.update_model_settings(default_model_settings())
+    db.delete_session(token)
+    db.delete_user(admin["id"])
     db.delete_user_group(group["id"])

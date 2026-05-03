@@ -15,10 +15,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.request
 from copy import deepcopy
 from typing import Any
 
 from .llm_retry import call_with_llm_retry
+from .model_settings import connection_for, provider_for_model
 from .schema import Score
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
@@ -498,17 +500,31 @@ def _submit_tool() -> dict[str, Any]:
 
 
 def _get_provider(model: str) -> str:
+    if ":" in model:
+        prefix, _ = model.split(":", 1)
+        if prefix in {"openai", "anthropic", "gemini", "nvidia", "ollama", "ovms"}:
+            return prefix
     if model.startswith("anthropic:"):
         return "anthropic"
+    if model.startswith("gemini-"):
+        return "gemini"
     if "/" in model:
         return "nvidia"
     return "ovms"
 
 
 def _strip_prefix(model: str) -> str:
-    if model.startswith("anthropic:"):
-        return model[len("anthropic:"):]
+    if ":" in model:
+        prefix, value = model.split(":", 1)
+        if prefix in {"openai", "anthropic", "gemini", "nvidia", "ollama", "ovms"}:
+            return value
     return model
+
+
+def _current_model_settings() -> dict:
+    from . import db as _db
+
+    return _db.get_model_settings()
 
 
 def _build_user_message(ddl: str, original_text: str | None, lang: str = "ja") -> str:
@@ -535,21 +551,28 @@ def compose(
         effective_prompt = SYSTEM_PROMPT_EN
     else:
         effective_prompt = SYSTEM_PROMPT
+    settings = _current_model_settings()
     if model:
-        provider = _get_provider(model)
+        provider, model_id = provider_for_model(model, stage="stage2", settings=settings)
         if provider == "anthropic":
-            return _compose_anthropic(user_msg, model=_strip_prefix(model), system_prompt=effective_prompt)
-        return _compose_openai(user_msg, model=model, system_prompt=effective_prompt)
+            return _compose_anthropic(user_msg, model=model_id, system_prompt=effective_prompt, settings=settings)
+        if provider == "gemini":
+            return _compose_gemini(user_msg, model=model_id, system_prompt=effective_prompt, settings=settings)
+        return _compose_openai(user_msg, model=model_id, provider=provider, system_prompt=effective_prompt)
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
         return _compose_openai(user_msg, model=None, system_prompt=effective_prompt)
     return _compose_anthropic(user_msg, system_prompt=effective_prompt)
 
 
-def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> tuple[Score, int | None, int | None]:
+def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT, settings: dict | None = None) -> tuple[Score, int | None, int | None]:
     from anthropic import Anthropic
 
-    client = Anthropic()
+    connection = connection_for("anthropic", settings or _current_model_settings())
+    kwargs = {"api_key": connection["api_key"]} if connection.get("api_key") else {}
+    if connection.get("base_url"):
+        kwargs["base_url"] = connection["base_url"]
+    client = Anthropic(**kwargs)
     resp = client.messages.create(
         model=model or DEFAULT_ANTHROPIC_MODEL,
         max_tokens=MAX_TOKENS,
@@ -566,17 +589,42 @@ def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt
     raise RuntimeError("Anthropic did not return submit_score tool call")
 
 
-def _compose_openai(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> tuple[Score, int | None, int | None]:
+def _compose_gemini(user_msg: str, *, model: str, system_prompt: str = SYSTEM_PROMPT, settings: dict | None = None) -> tuple[Score, int | None, int | None]:
+    connection = connection_for("gemini", settings or _current_model_settings())
+    api_key = connection.get("api_key") or ""
+    if not api_key:
+        raise RuntimeError("Gemini API key is not configured")
+    base_url = str(connection.get("base_url") or "https://generativelanguage.googleapis.com").rstrip("/")
+    url = f"{base_url}/v1beta/models/{model}:generateContent?key={api_key}"
+    body = {
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
+        "contents": [{"role": "user", "parts": [{"text": user_msg}]}],
+        "generationConfig": {"temperature": 0.0, "maxOutputTokens": MAX_TOKENS, "responseMimeType": "application/json"},
+    }
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    text_out = "\n".join(str(part.get("text", "")) for part in parts).strip()
+    usage = payload.get("usageMetadata", {})
+    return Score.model_validate(_extract_json(text_out)), usage.get("promptTokenCount"), usage.get("candidatesTokenCount")
+
+
+def _compose_openai(user_msg: str, *, model: str | None = None, provider: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> tuple[Score, int | None, int | None]:
     from openai import OpenAI
 
-    model = model or os.getenv("OPENAI_MODEL", "qwen-api")
-
-    if "/" in model:
-        base_url = "https://integrate.api.nvidia.com/v1"
-        api_key = os.getenv("NVIDIA_API_KEY", "")
-    else:
-        base_url = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:18000/v3")
-        api_key = os.getenv("OPENAI_API_KEY") or "none"
+    settings = _current_model_settings()
+    if model is None:
+        provider, model = provider_for_model(None, stage="stage2", settings=settings)
+    provider = provider or provider_for_model(model, stage="stage2", settings=settings)[0]
+    connection = connection_for(provider, settings)
+    base_url = connection["base_url"]
+    api_key = connection.get("api_key") or "none"
 
     timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
     client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=0)

@@ -1410,10 +1410,15 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - 現時点のカラーマネジメントは sRGB のみを対象とし、JSONタブ、描画レスポンス、履歴、artifact JSONには `render_color_profile: { id: "srgb", name: "sRGB IEC61966-2.1", standard: "IEC 61966-2-1:1999" }` を記録する。Adobe RGB 等の広色域プロファイルは将来拡張候補とし、現時点では実装しない
 - JSONタブは、モデル/ビルド/カラープロファイル/色カタログなどの属性メタ情報を先頭に表示し、その後に `score` を表示する
 - 履歴から画像を開き直した場合も、JSONタブに履歴保存済みの `stage1_model` / `stage2_model` を表示する
+- 設定ダイアログに管理者向け `モデル設定` タブを追加する。Stage 1 / Stage 2 の既定 provider / model と、provider 別の base URL / API key をサーバー DB の app settings に保存する
+- 商用 LLM provider は OpenAI / Claude / Gemini、非商用 API provider は NVIDIA NIM、ローカル provider は Ollama (OpenAI互換) / Intel OVMS (OpenAI互換) を対象とする
+- API key はサーバー側にのみ保存し、`GET /api/settings/models` の応答では `api_key_set` とマスク済み `api_key_hint` のみを返す。ブラウザへ生の API key は返さない
+- `PUT /api/settings/models` は管理者のみ利用でき、API key の新規設定、保持、明示削除を区別する
+- LLM 呼び出しは model ID の provider prefix (`openai:` / `anthropic:` / `gemini:` / `nvidia:` / `ollama:` / `ovms:`) と、設定タブの既定値から接続先を解決する。旧来の NVIDIA slash ID とローカル OVMS ID も互換扱いとして受け付ける
 - CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
 - CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
 - 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める
-- build number: 288
+- build number: 289
 
 ### v1.40 (2026-05-03)
 

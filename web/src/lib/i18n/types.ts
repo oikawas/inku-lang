@@ -175,6 +175,7 @@ export interface LangPack {
 
 	// Settings / catalog
 	settingsTitle: string;
+	settingsTabModels: string;
 	settingsTabDb: string;
 	settingsTabPlugins: string;
 	settingsTabUsers: string;
@@ -194,6 +195,17 @@ export interface LangPack {
 	settingsLoading: string;
 	settingsLoadFailed: string;
 	settingsReload: string;
+	settingsModelDefaultsTitle: string;
+	settingsModelConnectionsTitle: string;
+	settingsModelBaseUrl: string;
+	settingsModelApiKey: string;
+	settingsModelApiKeyPlaceholder: string;
+	settingsModelKeepApiKey: string;
+	settingsModelClearApiKey: string;
+	settingsModelApiKeySet: (hint: string) => string;
+	settingsModelApiKeyUnset: string;
+	settingsModelSecurityNote: string;
+	settingsModelSaved: string;
 	settingsPluginsStatus: string;
 	settingsPluginsEmpty: string;
 	settingsSystemPlugins: string;

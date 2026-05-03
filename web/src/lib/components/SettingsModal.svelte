@@ -54,7 +54,15 @@
 		at: number;
 	};
 	type SettingsMode = 'model' | 'settings';
-	type SettingsTab = 'connection' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
+	type ModelProviderSetting = { base_url: string; api_key_set: boolean; api_key_hint: string | null; api_key?: string; clear_api_key?: boolean };
+	type ModelSettings = {
+		stage1_provider: Provider;
+		stage1_model: string;
+		stage2_provider: Provider;
+		stage2_model: string;
+		providers: Record<string, ModelProviderSetting>;
+	};
 
 	type Props = {
 		settingsMode: SettingsMode;
@@ -67,6 +75,9 @@
 		settingsStatus: SettingsStatus | null;
 		settingsStatusError: string | null;
 		settingsStatusLoading: boolean;
+		modelSettings: ModelSettings | null;
+		modelSettingsStatus: string | null;
+		modelSettingsLoading: boolean;
 		dbBackupStatus: string | null;
 		currentUser: UserItem | null;
 		userSettingsStatus: string | null;
@@ -103,6 +114,9 @@
 		onSetStage1Model: (model: string) => void;
 		onSetStage2Provider: (provider: Provider) => void;
 		onSetStage2Model: (model: string) => void;
+		onUpdateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
+		onSaveModelSettings: () => void | Promise<void>;
+		onLoadModelSettings: () => void | Promise<void>;
 		onLoadSettingsStatus: () => void;
 		onUpdateDbBackupSettings: (intervalDays: number, maxGenerations: number) => void | Promise<void>;
 		onRunDbBackupNow: () => void | Promise<void>;
@@ -138,6 +152,9 @@
 		settingsStatus,
 		settingsStatusError,
 		settingsStatusLoading,
+		modelSettings = $bindable(),
+		modelSettingsStatus,
+		modelSettingsLoading,
 		dbBackupStatus,
 		currentUser,
 		userSettingsStatus,
@@ -174,6 +191,9 @@
 		onSetStage1Model,
 		onSetStage2Provider,
 		onSetStage2Model,
+		onUpdateModelProvider,
+		onSaveModelSettings,
+		onLoadModelSettings,
 		onLoadSettingsStatus,
 		onUpdateDbBackupSettings,
 		onRunDbBackupNow,
@@ -200,6 +220,27 @@
 
 	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
 	const isAdmin = $derived(currentUser?.role === 'admin');
+
+	function updateModelSettings(patch: Partial<ModelSettings>) {
+		if (!modelSettings) return;
+		modelSettings = { ...modelSettings, ...patch };
+	}
+
+	function selectStage1Provider(provider: Provider) {
+		if (!modelSettings) return;
+		updateModelSettings({
+			stage1_provider: provider,
+			stage1_model: modelsForProvider(provider)[0]?.id ?? modelSettings.stage1_model,
+		});
+	}
+
+	function selectStage2Provider(provider: Provider) {
+		if (!modelSettings) return;
+		updateModelSettings({
+			stage2_provider: provider,
+			stage2_model: modelsForProvider(provider)[0]?.id ?? modelSettings.stage2_model,
+		});
+	}
 
 	function formatBytes(bytes: number | null | undefined): string {
 		if (bytes == null) return '-';
@@ -230,6 +271,9 @@
 	</div>
 	{#if settingsMode === 'settings'}
 		<div class="settings-tabs">
+			{#if isAdmin}
+				<button class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
+			{/if}
 			<button class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
 			{#if isAdmin}
 				<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
@@ -277,6 +321,111 @@
 					</select>
 				</div>
 			</div>
+		{:else if settingsTab === 'models'}
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsModelDefaultsTitle}</div>
+				{#if modelSettingsLoading}
+					<div class="inline-message">{t().settingsLoading}</div>
+				{:else if modelSettings}
+					<div class="model-default-grid">
+						<label>
+							<span>{t().stage1Label} {t().providerLabel}</span>
+							<select
+								value={modelSettings.stage1_provider}
+								onchange={(e) => {
+									const provider = (e.currentTarget as HTMLSelectElement).value as Provider;
+									selectStage1Provider(provider);
+								}}
+							>
+								{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+							</select>
+						</label>
+						<label>
+							<span>{t().stage1Label} {t().modelLabel}</span>
+							<select
+								value={modelSettings.stage1_model}
+								onchange={(e) => { updateModelSettings({ stage1_model: (e.currentTarget as HTMLSelectElement).value }); }}
+							>
+								{#each modelsForProvider(modelSettings.stage1_provider) as model (model.id)}
+									<option value={model.id}>{model.label}{model.notes ? ` - ${model.notes}` : ''}</option>
+								{/each}
+							</select>
+						</label>
+						<label>
+							<span>{t().stage2Label} {t().providerLabel}</span>
+							<select
+								value={modelSettings.stage2_provider}
+								onchange={(e) => {
+									const provider = (e.currentTarget as HTMLSelectElement).value as Provider;
+									selectStage2Provider(provider);
+								}}
+							>
+								{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+							</select>
+						</label>
+						<label>
+							<span>{t().stage2Label} {t().modelLabel}</span>
+							<select
+								value={modelSettings.stage2_model}
+								onchange={(e) => { updateModelSettings({ stage2_model: (e.currentTarget as HTMLSelectElement).value }); }}
+							>
+								{#each modelsForProvider(modelSettings.stage2_provider) as model (model.id)}
+									<option value={model.id}>{model.label}{model.notes ? ` - ${model.notes}` : ''}</option>
+								{/each}
+							</select>
+						</label>
+					</div>
+					<div class="db-test-result">{t().settingsModelSecurityNote}</div>
+				{:else}
+					<div class="inline-message">{modelSettingsStatus ?? t().settingsLoadFailed}</div>
+				{/if}
+			</div>
+			{#if modelSettings}
+				<div class="popover-group">
+					<div class="popover-group-label">{t().settingsModelConnectionsTitle}</div>
+					<div class="model-provider-list">
+						{#each PROVIDER_GROUPS as provider (provider.id)}
+							{@const setting = modelSettings.providers[provider.id] ?? { base_url: '', api_key_set: false, api_key_hint: null }}
+							<div class="model-provider-row">
+								<div class="model-provider-head">
+									<strong>{provider.label}</strong>
+									<span>{setting.api_key_set ? t().settingsModelApiKeySet(setting.api_key_hint ?? '') : t().settingsModelApiKeyUnset}</span>
+								</div>
+								<label>
+									<span>{t().settingsModelBaseUrl}</span>
+									<input
+										value={setting.base_url}
+										onchange={(e) => onUpdateModelProvider(provider.id, { base_url: (e.currentTarget as HTMLInputElement).value })}
+									/>
+								</label>
+								<label>
+									<span>{t().settingsModelApiKey}</span>
+									<input
+										type="password"
+										placeholder={setting.api_key_set ? t().settingsModelKeepApiKey : t().settingsModelApiKeyPlaceholder}
+										onchange={(e) => onUpdateModelProvider(provider.id, { api_key: (e.currentTarget as HTMLInputElement).value, clear_api_key: false })}
+									/>
+								</label>
+								<label class="check-row">
+									<input
+										type="checkbox"
+										checked={!!setting.clear_api_key}
+										onchange={(e) => onUpdateModelProvider(provider.id, { clear_api_key: (e.currentTarget as HTMLInputElement).checked, api_key: '' })}
+									/>
+									<span>{t().settingsModelClearApiKey}</span>
+								</label>
+							</div>
+						{/each}
+					</div>
+					{#if modelSettingsStatus}
+						<div class="inline-message">{modelSettingsStatus}</div>
+					{/if}
+				</div>
+				<div class="settings-inline-actions">
+					<button class="ghost-btn" onclick={onLoadModelSettings} disabled={modelSettingsLoading}>{t().settingsReload}</button>
+					<button class="ghost-btn primary-inline" onclick={onSaveModelSettings} disabled={modelSettingsLoading}>{t().userSaveChanges}</button>
+				</div>
+			{/if}
 		{:else if settingsTab === 'db'}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsCurrentDb}</div>
@@ -749,6 +898,54 @@
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
 	}
+	.model-default-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+	}
+	.model-default-grid label,
+	.model-provider-row label {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.model-default-grid select,
+	.model-provider-row input {
+		min-width: 0;
+		padding: 5px 7px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		font-size: 12px;
+		font-family: inherit;
+	}
+	.model-provider-list {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+	}
+	.model-provider-row {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--bg);
+	}
+	.model-provider-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.model-provider-head strong { font-size: 12px; font-weight: 500; }
+	.model-provider-head span { color: var(--fg3); font-size: 11px; }
 	.inline-message {
 		padding: 7px 9px;
 		border: 1px solid var(--border);

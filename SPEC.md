@@ -602,6 +602,17 @@ The JSON tab displays render metadata first, including model, build, color
 profile, and color catalog fields, followed by the `score` payload.
 When a history item is reopened, the JSON tab displays the saved `stage1_model`
 and `stage2_model` from that history record.
+The settings dialog includes an admin-only Model Settings tab.  It stores the
+default Stage 1 / Stage 2 provider and model plus per-provider base URL and API
+key settings in server app settings.  The supported connection targets are
+OpenAI, Claude, Gemini, NVIDIA NIM, Ollama's OpenAI-compatible API, and Intel
+OVMS's OpenAI-compatible API.  Raw API keys are kept server-side only:
+`GET /api/settings/models` returns only `api_key_set` and a masked hint, while
+`PUT /api/settings/models` distinguishes preserving, replacing, and clearing a
+provider key.  LLM calls resolve provider-prefixed model IDs such as
+`openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`, and
+`ovms:...`, while keeping compatibility for older NVIDIA slash IDs and local
+OVMS model IDs.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

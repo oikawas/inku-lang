@@ -130,7 +130,15 @@
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
-	type SettingsTab = 'connection' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
+	type ModelProviderSetting = { base_url: string; api_key_set: boolean; api_key_hint: string | null; api_key?: string; clear_api_key?: boolean };
+	type ModelSettings = {
+		stage1_provider: Provider;
+		stage1_model: string;
+		stage2_provider: Provider;
+		stage2_model: string;
+		providers: Record<string, ModelProviderSetting>;
+	};
 	type UserGroup = {
 		id: string;
 		name: string;
@@ -361,6 +369,9 @@
 	let settingsStatus = $state<SettingsStatus | null>(null);
 	let settingsStatusError = $state<string | null>(null);
 	let settingsStatusLoading = $state(false);
+	let modelSettings = $state<ModelSettings | null>(null);
+	let modelSettingsStatus = $state<string | null>(null);
+	let modelSettingsLoading = $state(false);
 	let dbBackupStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
@@ -404,16 +415,16 @@
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
-		return tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc';
+		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc';
 	}
 
 	function canAccessSettingsTab(tab: SettingsTab) {
-		if (tab === 'db' || tab === 'users') return currentUser?.role === 'admin';
+		if (tab === 'models' || tab === 'db' || tab === 'users') return currentUser?.role === 'admin';
 		return tab !== 'connection';
 	}
 
 	function defaultSettingsTab() {
-		return currentUser?.role === 'admin' ? 'db' : 'plugins';
+		return currentUser?.role === 'admin' ? 'models' : 'plugins';
 	}
 
 	function normalizeBatchPromptHistory(items: string[]): string[] {
@@ -702,6 +713,7 @@
 		const nextTab = canAccessSettingsTab(candidate) ? candidate : defaultSettingsTab();
 		settingsTab = nextTab;
 		settingsOpen = true;
+		if (nextTab === 'models') void loadModelSettings();
 		if (nextTab === 'db') void loadSettingsStatus();
 		if (nextTab === 'users') void loadUserSettings();
 		if (nextTab === 'export') void loadExportTemplates();
@@ -788,9 +800,81 @@
 		if (!canAccessSettingsTab(tab)) return;
 		settingsTab = tab;
 		void updateUserSettingsTab(tab);
+		if (tab === 'models') void loadModelSettings();
 		if (tab === 'db') void loadSettingsStatus();
 		if (tab === 'users') void loadUserSettings();
 		if (tab === 'export') void loadExportTemplates();
+	}
+
+	async function loadModelSettings() {
+		if (currentUser?.role !== 'admin') {
+			modelSettings = null;
+			modelSettingsStatus = t().settingsAdminOnlyMessage;
+			return;
+		}
+		modelSettingsLoading = true;
+		try {
+			const r = await apiFetch('/api/settings/models', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { settings: ModelSettings };
+			modelSettings = data.settings;
+			modelSettingsStatus = null;
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			modelSettingsLoading = false;
+		}
+	}
+
+	function updateModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
+		if (!modelSettings) return;
+		const current = modelSettings.providers[provider] ?? { base_url: '', api_key_set: false, api_key_hint: null };
+		modelSettings = {
+			...modelSettings,
+			providers: {
+				...modelSettings.providers,
+				[provider]: { ...current, ...patch },
+			},
+		};
+	}
+
+	async function saveModelSettings() {
+		if (!modelSettings || currentUser?.role !== 'admin') return;
+		modelSettingsLoading = true;
+		try {
+			const providers = Object.fromEntries(Object.entries(modelSettings.providers).map(([id, provider]) => [
+				id,
+				{
+					base_url: provider.base_url,
+					api_key: provider.api_key || undefined,
+					clear_api_key: !!provider.clear_api_key,
+				}
+			]));
+			const r = await apiFetch('/api/settings/models', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					stage1_provider: modelSettings.stage1_provider,
+					stage1_model: modelSettings.stage1_model,
+					stage2_provider: modelSettings.stage2_provider,
+					stage2_model: modelSettings.stage2_model,
+					providers,
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { settings: ModelSettings };
+			modelSettings = data.settings;
+			stage1Provider = data.settings.stage1_provider;
+			stage1Model = data.settings.stage1_model;
+			stage2Provider = data.settings.stage2_provider;
+			stage2Model = data.settings.stage2_model;
+			persistModelSelection();
+			modelSettingsStatus = t().settingsModelSaved;
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			modelSettingsLoading = false;
+		}
 	}
 
 	async function loadUserSettings() {
@@ -2413,7 +2497,8 @@
 
 	function statusModelName(m: string | null | undefined): string {
 		if (!m) return '';
-		const model = modelsForProvider(providerOfModel(m)).find((option) => option.id === m);
+		const bareModel = m.includes(':') ? m.split(':').slice(1).join(':') : m;
+		const model = modelsForProvider(providerOfModel(m)).find((option) => option.id === m || option.id === bareModel);
 		return model?.label ?? m;
 	}
 
@@ -3013,6 +3098,9 @@
 		{settingsStatus}
 		{settingsStatusError}
 		{settingsStatusLoading}
+		bind:modelSettings
+		{modelSettingsStatus}
+		{modelSettingsLoading}
 		{dbBackupStatus}
 		{currentUser}
 		{userSettingsStatus}
@@ -3050,6 +3138,9 @@
 		onSetStage1Model={setStage1Model}
 		onSetStage2Provider={setStage2Provider}
 		onSetStage2Model={setStage2Model}
+		onUpdateModelProvider={updateModelProvider}
+		onSaveModelSettings={saveModelSettings}
+		onLoadModelSettings={loadModelSettings}
 		onLoadSettingsStatus={loadSettingsStatus}
 		onUpdateDbBackupSettings={updateDbBackupSettings}
 		onRunDbBackupNow={runDbBackupNow}

@@ -38,6 +38,7 @@ from .plugins import (
 )
 from .renderer import SVG_PROFILES, render
 from .schema import Score
+from .model_settings import model_provider_catalog, public_model_settings, update_model_settings
 from . import db as _db
 
 _APP_VERSION = "0.1.0"
@@ -82,11 +83,17 @@ def _build_number() -> str | None:
 
 
 def _resolved_stage1_model(model: str | None) -> str:
-    return model or os.getenv("OPENAI_MODEL_STAGE1", "qwen3-api")
+    settings = _db.get_model_settings()
+    if model:
+        return model
+    return f"{settings['stage1_provider']}:{settings['stage1_model']}"
 
 
 def _resolved_stage2_model(model: str | None) -> str:
-    return model or os.getenv("OPENAI_MODEL", "qwen-api")
+    settings = _db.get_model_settings()
+    if model:
+        return model
+    return f"{settings['stage2_provider']}:{settings['stage2_model']}"
 
 
 def _model_metadata(*, stage1_model: str | None = None, stage2_model: str | None = None) -> dict[str, str]:
@@ -679,6 +686,25 @@ class OutputSaveStatus(BaseModel):
     note: str
 
 
+class ModelSettingsResponse(BaseModel):
+    catalog: list[dict] = Field(default_factory=list)
+    settings: dict = Field(default_factory=dict)
+
+
+class ModelProviderPatch(BaseModel):
+    base_url: str | None = None
+    api_key: str | None = None
+    clear_api_key: bool = False
+
+
+class ModelSettingsPatch(BaseModel):
+    stage1_provider: str | None = None
+    stage1_model: str | None = None
+    stage2_provider: str | None = None
+    stage2_model: str | None = None
+    providers: dict[str, ModelProviderPatch] = Field(default_factory=dict)
+
+
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus
     db_backup: DbBackupStatus
@@ -930,6 +956,36 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             **_artifact_save_stats(),
             note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
         ),
+    )
+
+
+@app.get("/api/settings/models", response_model=ModelSettingsResponse)
+def api_settings_models(actor: dict = Depends(_admin_user)) -> ModelSettingsResponse:
+    settings = _db.get_model_settings()
+    return ModelSettingsResponse(
+        catalog=model_provider_catalog(),
+        settings=public_model_settings(settings),
+    )
+
+
+@app.put("/api/settings/models", response_model=ModelSettingsResponse)
+def api_settings_update_models(
+    body: ModelSettingsPatch,
+    actor: dict = Depends(_admin_user),
+) -> ModelSettingsResponse:
+    current = _db.get_model_settings()
+    provider_patch = {
+        key: value.model_dump(exclude_unset=True)
+        for key, value in body.providers.items()
+    }
+    next_settings = update_model_settings(current, {
+        **body.model_dump(exclude={"providers"}, exclude_unset=True),
+        "providers": provider_patch,
+    })
+    saved = _db.update_model_settings(next_settings)
+    return ModelSettingsResponse(
+        catalog=model_provider_catalog(),
+        settings=public_model_settings(saved),
     )
 
 

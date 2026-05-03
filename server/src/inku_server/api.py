@@ -22,6 +22,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Resp
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import compose
 from .composer import SYSTEM_PROMPT as STAGE2_PROMPT
@@ -39,7 +40,8 @@ from .renderer import render
 from .schema import Score
 from . import db as _db
 
-app = FastAPI(title="inku-server", version="0.1.0")
+_APP_VERSION = "0.1.0"
+app = FastAPI(title="inku-server", version=_APP_VERSION)
 
 _db.init_db()
 
@@ -64,6 +66,14 @@ _HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 _SESSION_COOKIE_NAME = "inku_session"
 _SESSION_COOKIE_MAX_AGE = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
 _SESSION_COOKIE_SECURE = os.getenv("INKU_SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
+
+
+def _build_number() -> str | None:
+    path = Path(__file__).resolve().parents[3] / "web" / "BUILD_NUMBER"
+    try:
+        return path.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
 
 
 def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
@@ -170,6 +180,20 @@ def _validated_color_map(color_map: dict[str, str] | None) -> dict[str, str] | N
     return clean
 
 
+def _catalog_render_color_map(catalog_id: str | None) -> dict[str, str]:
+    color_map = render_color_map_for_catalog(catalog_id)
+    if color_map is None:
+        raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
+    return color_map
+
+
+def _resolved_catalog_id(catalog_id: str | None) -> str:
+    catalog = get_color_catalog(catalog_id)
+    if catalog is None:
+        raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
+    return str(catalog["id"])
+
+
 def _validated_canvas_aspect(value: str | None) -> str:
     if value is None:
         return normalize_canvas_aspect_id(None)
@@ -206,7 +230,8 @@ class ComposeRequest(BaseModel):
     )
     original_text: str | None = Field(default=None, description="元のユーザー記述 (省略可)")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
-    color_map: dict[str, str] | None = Field(default=None, description="色カタログ (white/black/blue/red/green/gray → hex)")
+    color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
+    catalog_id: str | None = Field(default=None, description="使用するサーバー側色カタログID")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
 
 
@@ -248,7 +273,7 @@ class PaintRequest(BaseModel):
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
     lang: str = Field(default="ja", description="言語コード (ja / en)")
-    color_map: dict[str, str] | None = Field(default=None, description="色カタログ")
+    color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     save_history: bool = Field(default=False, description="描画結果を履歴に保存するか")
     save_artifacts: bool | None = Field(default=None, description="SVG/JSON/PNG などの副産物ファイルを保存するか")
@@ -279,6 +304,7 @@ class PaintResponse(BaseModel):
     compose_retry_reasons: list[str] = Field(default_factory=list)
     compose_fallback_used: bool = False
     user_generation_count: int | None = None
+    catalog_id: str | None = None
 
 
 @dataclass
@@ -306,6 +332,17 @@ class PromptsResponse(BaseModel):
     stage2_system: str
 
 
+class AppInfoResponse(BaseModel):
+    name: str
+    version: str
+    build_number: str | None = None
+
+
+class ColorCatalogsResponse(BaseModel):
+    default_catalog_id: str
+    catalogs: list[dict]
+
+
 class HistoryPostBody(BaseModel):
     input: str
     ddl: str | None = None
@@ -320,7 +357,7 @@ class HistoryPostBody(BaseModel):
     catalog_id: str | None = None
     save_artifacts: bool = True
     count_generation: bool = Field(default=False, exclude=True)
-    color_map: dict[str, str] | None = Field(default=None, exclude=True)
+    color_map: dict[str, str] | None = Field(default=None, exclude=True, description="Deprecated: ignored; catalog_id is resolved server-side")
     canvas_aspect: str | None = Field(default=None, exclude=True)
 
 
@@ -586,6 +623,16 @@ def _can_manage_user(actor: dict, target: dict) -> bool:
 @app.get("/health")
 def health() -> dict[str, bool]:
     return {"ok": True}
+
+
+@app.get("/api/info", response_model=AppInfoResponse)
+def api_info() -> AppInfoResponse:
+    return AppInfoResponse(name="inku-server", version=_APP_VERSION, build_number=_build_number())
+
+
+@app.get("/api/color-catalogs", response_model=ColorCatalogsResponse)
+def api_color_catalogs() -> ColorCatalogsResponse:
+    return ColorCatalogsResponse(default_catalog_id="default", catalogs=color_catalogs())
 
 
 @app.post("/api/auth/login", response_model=LoginResponse)
@@ -1141,7 +1188,7 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
     try:
-        svg = render(score, color_map=req.color_map)
+        svg = render(score, color_map=_catalog_render_color_map(req.catalog_id))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
 
@@ -1336,6 +1383,7 @@ def _add_history_item(
 def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintResponse:
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
+    catalog_id = _resolved_catalog_id(req.catalog_id)
     try:
         interpret_detail_result = _call_interpret_detail(
             req.text, model=req.stage1_model, include_thinking=req.include_thinking, lang=req.lang
@@ -1363,7 +1411,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     score = _score_with_canvas(score, canvas_aspect)
     t2 = time.perf_counter()
     try:
-        svg = render(score, color_map=req.color_map)
+        svg = render(score, color_map=_catalog_render_color_map(catalog_id))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
     elapsed_stage1_ms = int((t1 - t0) * 1000)
@@ -1386,7 +1434,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             stage2_model=req.stage2_model,
             tokens_in=(interpret_detail_result.tokens_in or 0) + (compose_detail.tokens_in or 0) or None,
             tokens_out=(interpret_detail_result.tokens_out or 0) + (compose_detail.tokens_out or 0) or None,
-            catalog_id=req.catalog_id,
+            catalog_id=None if catalog_id == "default" else catalog_id,
             save_artifacts=save_artifacts,
         )
         history_id = item["id"]
@@ -1430,6 +1478,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         compose_retry_reasons=compose_detail.retry_reasons,
         compose_fallback_used=compose_detail.fallback_used,
         user_generation_count=user_generation_count,
+        catalog_id=catalog_id,
     )
 
 
@@ -1577,12 +1626,13 @@ def api_history_get(
 def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
     try:
         score = coerce_score(Score.model_validate(body.score))
+        catalog_id = _resolved_catalog_id(body.catalog_id)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
         if canvas_aspect is not None:
             score = _score_with_canvas(score, canvas_aspect)
         svg = render(
             score,
-            color_map=_validated_color_map(body.color_map),
+            color_map=_catalog_render_color_map(catalog_id),
         )
     except HTTPException:
         raise
@@ -1600,7 +1650,7 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         stage2_model=body.stage2_model,
         tokens_in=body.tokens_in,
         tokens_out=body.tokens_out,
-        catalog_id=body.catalog_id,
+        catalog_id=None if catalog_id == "default" else catalog_id,
         save_artifacts=body.save_artifacts,
     )
     if body.count_generation:

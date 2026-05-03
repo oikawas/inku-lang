@@ -6,6 +6,25 @@ from pathlib import Path
 from inku_cli import cli
 
 
+CATALOG_DATA = {
+    "default_catalog_id": "default",
+    "catalogs": {
+        "default": {
+            "id": "default",
+            "name": "inku Default",
+            "map": {"white": "#ffffff", "black": "#111111", "blue": "#2c3e91", "red": "#a2342a", "green": "#2f6b3a", "gray": "#888888"},
+            "palette": [],
+        },
+        "mexican": {
+            "id": "mexican",
+            "name": "Mexican Vibrant",
+            "map": {"white": "#f4f4f4", "black": "#1c1c1c", "blue": "#73c2fb", "red": "#f50087", "green": "#008f39", "gray": "#b04a33"},
+            "palette": [{"name": "Cactus", "code": "#008f39"}],
+        },
+    },
+}
+
+
 def test_extract_session_token_from_login_cookie():
     token = cli._extract_session_token("inku_session=abc123; HttpOnly; Path=/; SameSite=lax")
     assert token == "abc123"
@@ -43,8 +62,8 @@ def test_paint_payload_drops_none_values():
     assert payload["stage1_model"] == "gemma"
     assert payload["save_history"] is True
     assert payload["include_thinking"] is False
-    assert payload["color_map"]["green"] == "#2f6b3a"
-    assert "catalog_id" not in payload
+    assert payload["catalog_id"] == "default"
+    assert "color_map" not in payload
     assert "stage2_model" not in payload
     assert "history_input" not in payload
 
@@ -102,7 +121,16 @@ def test_color_catalog_payload_sets_catalog_and_map():
     payload = cli._paint_payload(args, "緑の葉")
 
     assert payload["catalog_id"] == "mexican"
-    assert payload["color_map"]["green"] == "#008f39"
+    assert "color_map" not in payload
+
+
+def test_color_catalog_summary_uses_server_catalog_data():
+    summary = cli._color_catalog_summary("mexican", CATALOG_DATA)
+
+    assert summary["resolved_color_catalog"] == "mexican"
+    assert summary["color_catalog_name"] == "Mexican Vibrant"
+    assert summary["color_map"]["green"] == "#008f39"
+    assert summary["color_map"]["palette:Cactus"] == "#008f39"
 
 
 def test_color_trace_reports_missing_green():
@@ -117,6 +145,24 @@ def test_color_trace_reports_missing_green():
     assert trace["green_requested"] is True
     assert trace["green_in_score"] is False
     assert "green_requested_but_missing_in_score" in trace["warnings"]
+
+
+def test_color_trace_does_not_treat_words_as_green_leaf_marker():
+    result = {
+        "text": "言えなかった言葉を白い余白に置く",
+        "ddl": "言えなかった言葉のために白い余白を残す。",
+        "score": {"instructions": [{"primitive": "ellipse", "color": "white"}]},
+    }
+
+    trace = cli._color_trace(result, catalog_id="default")
+
+    assert trace["green_requested"] is False
+    assert "green" not in trace["requested_colors"]
+    assert "green_requested_but_missing_in_score" not in trace["warnings"]
+
+
+def test_color_trace_detects_specific_leaf_terms_as_green():
+    assert cli._marker_colors("落ち葉と若葉、木の葉、葉っぱ、葉脈") == ["green"]
 
 
 def test_timeout_prefers_args_then_config_then_default():

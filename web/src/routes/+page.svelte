@@ -25,7 +25,7 @@
 		type Provider
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
-	import { COLOR_CATALOGS, getCatalogById, getRenderColorMap, type RenderColorMap } from '$lib/colors';
+	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	import {
@@ -340,12 +340,9 @@
 
 	// ── Color catalog ────────────────────────────────────────
 	let selectedCatalog = $state('default');
-	const currentCatalog = $derived(getCatalogById(selectedCatalog) ?? COLOR_CATALOGS[0]);
-
-	function activeColorMap(): RenderColorMap | null {
-		if (selectedCatalog === 'default') return null;
-		return getRenderColorMap(selectedCatalog);
-	}
+	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
+	let defaultCatalogId = $state('default');
+	const currentCatalog = $derived(catalogById(colorCatalogs, selectedCatalog) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 
 	// ── Settings tabs ────────────────────────────────────────
 	let settingsStatus = $state<SettingsStatus | null>(null);
@@ -757,6 +754,20 @@
 		}
 		catalogSelectionSnapshot = null;
 		catalogOpen = false;
+	}
+
+	async function loadColorCatalogs() {
+		try {
+			const r = await apiFetch('/api/color-catalogs', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as ColorCatalogsResponse;
+			if (!Array.isArray(data.catalogs) || data.catalogs.length === 0) throw new Error('empty color catalog list');
+			colorCatalogs = data.catalogs;
+			defaultCatalogId = data.default_catalog_id || 'default';
+			if (!catalogById(colorCatalogs, selectedCatalog)) selectedCatalog = defaultCatalogId;
+		} catch (e) {
+			console.warn('failed to load color catalogs', e);
+		}
 	}
 
 	function selectSettingsTab(tab: typeof settingsTab) {
@@ -1389,13 +1400,12 @@
 				stage2_model: stage2Model,
 				include_thinking: includeThinking,
 				lang,
-				color_map: activeColorMap(),
 				canvas_aspect: effectiveCanvasAspectId(),
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
 				count_generation: options.countGeneration ?? true,
 				history_input: historyInput,
-				catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
+				catalog_id: selectedCatalog
 			})
 		});
 		if (!r.ok) {
@@ -1469,7 +1479,7 @@
 				model: stage2Model,
 				original_text: originalText,
 				lang,
-				color_map: activeColorMap(),
+				catalog_id: selectedCatalog,
 				canvas_aspect: effectiveCanvasAspectId(),
 			})
 		});
@@ -1689,7 +1699,7 @@
 					stage2_model: stage2Model,
 					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
-					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null,
+					catalog_id: selectedCatalog,
 				}, { countGeneration: true });
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
@@ -1801,7 +1811,7 @@
 				method: 'POST',
 				signal: abortController.signal,
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: stage2Model, original_text: replayInput, lang, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
+				body: JSON.stringify({ ddl, model: stage2Model, original_text: replayInput, lang, catalog_id: selectedCatalog, canvas_aspect: effectiveCanvasAspectId() })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -1954,7 +1964,7 @@
 				await apiFetch('/api/history', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, color_map: activeColorMap(), canvas_aspect: effectiveCanvasAspectId() })
+					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: effectiveCanvasAspectId() })
 				});
 		} catch { /* ignore */ }
 		if (options.countGeneration) await refreshCurrentUserOnly();
@@ -1982,7 +1992,6 @@
 					tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null,
 					save_artifacts: demoSettings.save_files,
-					color_map: activeColorMap(),
 					canvas_aspect: effectiveCanvasAspectId(),
 				})
 			});
@@ -2312,7 +2321,7 @@
 	}
 
 	function catalogName(id: string | null | undefined): string {
-		return getCatalogById(id ?? 'default')?.name ?? 'inku Default';
+		return catalogById(colorCatalogs, id ?? defaultCatalogId)?.name ?? 'inku Default';
 	}
 
 	function svgAspect(svg: string | null | undefined): { ratioW: number; ratioH: number } | null {
@@ -2616,7 +2625,7 @@
 			miscSettingsLoaded = true;
 		} catch {}
 		void (async () => {
-			await Promise.all([loadCurrentUser(), fetchPrompts()]);
+			await Promise.all([loadColorCatalogs(), loadCurrentUser(), fetchPrompts()]);
 		})();
 
 		return () => {
@@ -2966,6 +2975,7 @@
 <!-- ══ CATALOG MODAL ══ -->
 {#if catalogOpen}
 	<ColorCatalogModal
+		catalogs={colorCatalogs}
 		{selectedCatalog}
 		{currentCatalog}
 		onSelectCatalog={setSelectedCatalog}

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import { COLOR_CATALOGS, type ColorCatalog } from '$lib/colors';
+	import type { ColorCatalog } from '$lib/colors';
 
 	type Props = {
+		catalogs: ColorCatalog[];
 		selectedCatalog: string;
 		currentCatalog: ColorCatalog;
 		onSelectCatalog: (id: string) => void;
@@ -13,6 +14,7 @@
 	let {
 		selectedCatalog,
 		currentCatalog,
+		catalogs,
 		onSelectCatalog,
 		onCancel,
 		onConfirm,
@@ -34,7 +36,7 @@
 	</div>
 	<div class="catalog-body">
 		<div class="catalog-scroll">
-			{#each COLOR_CATALOGS as cat (cat.id)}
+			{#each catalogs as cat (cat.id)}
 				{@const active = selectedCatalog === cat.id}
 				<button
 					class="catalog-item"

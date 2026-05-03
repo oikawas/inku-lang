@@ -1897,3 +1897,9 @@ green 到達の問題:
    - まず green marker / green repair を修正する。
    - その後、green-heavy 10件小ベンチと shape-heavy 10件小ベンチを実行する。
    - 小ベンチで到達率を確認してから、再度 default / impressionism の30件比較へ進む。
+
+実装メモ:
+
+- Next action 1 として、日本語 green marker から単独 `葉` を外した。
+- `落ち葉`, `若葉`, `木の葉`, `葉っぱ`, `葉脈` は green marker として維持した。
+- `言葉` で CLI `color_trace` や server `coerce_score` の green repair が誤作動しないテストを追加した。

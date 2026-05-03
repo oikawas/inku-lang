@@ -77,6 +77,25 @@ def test_health():
     assert r.json() == {"ok": True}
 
 
+def test_info_reports_version_and_build_number():
+    r = client.get("/api/info")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["name"] == "inku-server"
+    assert data["version"] == "0.1.0"
+    assert data["build_number"]
+
+
+def test_color_catalogs_are_served_by_api():
+    r = client.get("/api/color-catalogs")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["default_catalog_id"] == "default"
+    catalogs = {catalog["id"]: catalog for catalog in data["catalogs"]}
+    assert catalogs["mexican"]["map"]["green"] == "#008f39"
+    assert any(color["name"] == "Cactus" for color in catalogs["mexican"]["palette"])
+
+
 def test_generation_apis_require_auth():
     assert client.post("/api/compose", json={"ddl": "中心に円"}).status_code == 401
     assert client.post("/api/interpret", json={"text": "一滴の墨"}).status_code == 401
@@ -880,7 +899,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
             "save_history": True,
             "history_input": "一滴の墨",
             "history_at": 1_700_000_000_000,
-            "catalog_id": "sample",
+            "catalog_id": "mexican",
         },
         headers=headers,
     )
@@ -894,10 +913,37 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     item = history["items"][0]
     assert item["id"] == data["history_id"]
     assert item["input"] == "一滴の墨"
-    assert item["catalog_id"] == "sample"
+    assert item["catalog_id"] == "mexican"
     assert item["svg"] == data["svg"]
 
     db.delete_items(user["id"], [data["history_id"]])
+
+
+def test_paint_resolves_catalog_id_on_server(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("緑の円を置く。", None))
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1, "color": "green"}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post(
+        "/api/paint",
+        json={"text": "緑の円", "catalog_id": "mexican"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["catalog_id"] == "mexican"
+    assert "#008f39" in data["svg"]
+
+
+def test_paint_rejects_unknown_catalog_id(auth_context):
+    headers, _, _ = auth_context
+    r = client.post("/api/paint", json={"text": "緑の円", "catalog_id": "missing"}, headers=headers)
+    assert r.status_code == 422
+    assert "unsupported color catalog" in r.json()["detail"]
 
 
 def test_cors_allows_localhost(monkeypatch, auth_context):

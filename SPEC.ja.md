@@ -1700,6 +1700,22 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - macOS から pentala の `inku-api` へ LAN 経由で接続し、`login` / `paint` / SVG・JSON・PNG 出力の動作を確認した
 - CLI の確認で生成される `cli/out/` はローカル成果物として Git 追跡対象外にする
 
+### v1.25 (2026-05-03)
+
+**サーバー正本の色カタログ API + CLI version/build 表示**
+
+色カタログの正本をクライアント側静的定義からサーバー側へ移した。
+
+- 色カタログ定義は `server/src/inku_server/color_catalogs.py` を正本とする
+- `GET /api/color-catalogs` は default catalog ID と全カタログの `map` / `swatches` / `palette` を返す
+- Web UI と CLI は色カタログ一覧をサーバー API から取得し、クライアント側のカタログ定義を持たない
+- `/api/paint`、`/api/compose`、`/api/history` は `catalog_id` を受け取り、サーバー側でレンダリング用 `color_map` を解決する
+- `color_map` リクエストフィールドは互換用に残すが、色カタログ解決の正本としては扱わない
+- 履歴には従来どおり `catalog_id` を保存し、`color_map` 自体は保存しない
+- `GET /api/info` はサーバー名、バージョン、ビルド番号を返す
+- CLI に `version` コマンドを追加し、CLI 側の version / build number と、接続先サーバーの version / build number を表示する
+- Build 252
+
 ### v1.24 (2026-05-02)
 
 **Build 250: DDL 品質チューニング 2-5 + ベンチマーク tooling**
@@ -2176,7 +2192,7 @@ LLM 呼び出しや描画生成を行う API をログイン済みユーザー�
 - Web UI の単発描画 / バッチ描画は、描画結果を表示しつつ、履歴保存は `/api/paint` のサーバー側処理に任せる
 - Web UI は履歴保存用に SVG を `/api/history` へ送り返さない
 - 互換用の `POST /api/history` は残すが、リクエストの `svg` は信用せず、受け取った JSON Score からサーバー側で SVG を再レンダリングして保存する
-- 色カタログは `color_map` としてサーバーに渡し、`#RRGGBB` 形式のみ検証してレンダリングに使う。`color_map` 自体は履歴メタデータとして保存しない
+- 色カタログは初期実装では `color_map` としてサーバーに渡した。v1.25 以降は `catalog_id` をサーバーに渡し、サーバー側の色カタログ正本から `color_map` を解決する。`color_map` 自体は履歴メタデータとして保存しない
 - Build 71
 
 ### v1.11 (2026-04-29)
@@ -2507,7 +2523,7 @@ Stage 1 / Stage 2 モデル選択を「⚙ 接続設定」ボタン → ポッ�
 
 #### 色カタログシステム
 
-**フロントエンド**: `web/src/lib/colors.ts` 新設。
+**フロントエンド**: 初期実装では `web/src/lib/colors.ts` にカタログ定義を持った。v1.25 以降はサーバー側 `GET /api/color-catalogs` を正本とし、フロントエンドは取得した一覧を表示・選択に使う。
 
 ```typescript
 type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
@@ -2519,7 +2535,7 @@ type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
 
 「カタログ設定」モーダル（ヘッダー右端）から選択。選択は `localStorage` に永続化。
 
-**バックエンド**: `renderer.render()` に `color_map: dict[str, str] | None = None` パラメータ追加。`ComposeRequest` / `PaintRequest` に `color_map` フィールド追加。演奏ごとに選択中のカタログ色マップがサーバーに送信され、SVG 出力に反映される。
+**バックエンド**: `renderer.render()` に `color_map: dict[str, str] | None = None` パラメータ追加。初期実装では `ComposeRequest` / `PaintRequest` の `color_map` フィールドで演奏ごとに選択中のカタログ色マップを受け取った。v1.25 以降は `catalog_id` を受け取り、サーバー側の色カタログ定義からレンダリング用 `color_map` を解決する。
 
 #### 色ニュアンス `color_hint`
 

@@ -156,9 +156,11 @@ Current core categories include:
 | color | いろ | white, black, blue, red, green, gray |
 
 Colors in JSON Score are abstract color names.  Rendering resolves them through
-the selected color catalog.  When user instructions include color nuance, the
-system may preserve `color_hint` so Stage 2 and rendering can resolve the best
-catalog color without losing intent.
+the selected color catalog.  The server is the source of truth for color
+catalog definitions and exposes them through `/api/color-catalogs`; clients
+select a `catalog_id` rather than owning their own catalog tables.  When user
+instructions include color nuance, the system may preserve `color_hint` so
+Stage 2 and rendering can resolve the best catalog color without losing intent.
 
 ---
 
@@ -477,6 +479,7 @@ The reference implementation currently includes:
 - plugin storage, system/user plugin directories, and `canvas-aspect`
 - SVG export and template-based PNG export
 - CLI client foundation, benchmark summary output, and contact sheet generation
+- CLI version/build reporting and server-owned color catalog lookup
 - shared kiwi progress mascot for single drawing and DDL replay
 - integrated DDL interpretation editor with Saijiki drawer, expanded dialog,
   token/time display, and cancellable `/api/compose` replay

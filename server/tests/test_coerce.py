@@ -309,6 +309,45 @@ def test_coerce_score_repairs_missing_green_from_natural_ddl():
     assert any("green restored from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_does_not_repair_green_from_words_false_positive():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.18, 0.08],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="言えなかった言葉のために白い余白を残す。")
+
+    assert not any(ins.color == "green" for ins in fixed.instructions)
+    assert not any("green restored from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_repairs_green_from_specific_leaf_terms():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.18, 0.08],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="木の葉と葉脈を細い楕円で散らす。")
+
+    assert any(ins.color == "green" for ins in fixed.instructions)
+
+
 def test_coerce_score_repairs_missing_shape_intents_from_ddl():
     score = Score.model_validate(
         {

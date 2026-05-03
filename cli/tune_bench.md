@@ -2390,3 +2390,81 @@ Build 258 の green-heavy 再実行中に、`010`「白い余白」「黒い線�
 - composition diversity repair は小ベンチ20件中1件だけ発火し、過補正ではない。
 - green delivery は green-heavy / shape-heavy とも 1.0。
 - 次は default / impressionism の30件比較に戻し、同じ制約が広い入力でも保たれるか確認する。
+
+## Build 264 current: 色カタログ全バリエーション 10件ベンチ
+
+目的:
+
+- サーバー側の色カタログを正として、全カタログで同一プロンプト10件をレンダリングする。
+- カタログ名・特徴にそぐう配色か、描画時に美術的に意味のある配色になっているかを、3名の異なるペルソナで評価する。
+- パレット構成の改善案があれば、個別ケース最適化ではなくカタログ全体の性格調整として記録する。
+
+実行:
+
+- 日時: 2026-05-03
+- 実行環境: Mac CLI から pentala LAN API `http://192.168.0.89:8100` を呼び出し
+- build: `264`
+- 入力: `cli/out/tune-bench-build264-color-catalog-10/prompts.txt`
+- 出力: `cli/out/tune-bench-build264-color-catalog-10/`
+- 対象カタログ: `default`, `japanese`, `renaissance`, `impressionism`, `chinese`, `nordic`, `indian`, `egyptian`, `mexican`, `british`, `greek`
+- 各カタログ10件、合計110件を `inku-cli batch --png --continue-on-error --color-catalog <id>` でノンストップ実行し、各ディレクトリに `contact-sheet.png` を生成した。
+
+結果:
+
+| catalog | success | failed | fallback | green delivery | 備考 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| default | 10 | 0 | 0 | 1.0 | 基準として安定。黒・赤・緑のコントラストが明快。 |
+| japanese | 10 | 0 | 4 | 1.0 | 既定色に近く、和の伝統色としての差分が弱い。 |
+| renaissance | 10 | 0 | 4 | 1.0 | 土色、赤、緑、白の組み合わせは絵画的。gray が茶に寄る。 |
+| impressionism | 10 | 0 | 0 | 1.0 | 淡色と青地が強く、光の印象は出る。黒が青として強く出る。 |
+| chinese | 10 | 0 | 1 | 1.0 | 朱、黒、金、翡翠系の方向は明快。gray の紫が強い。 |
+| nordic | 10 | 0 | 0 | 1.0 | 最も統一感が高い。低彩度で、余白との相性がよい。 |
+| indian | 10 | 0 | 2 | 1.0 | 華やかだが、blue が magenta に置換されるため意味が揺れる。 |
+| egyptian | 10 | 0 | 0 | 1.0 | パピルス地、赤、金茶、ターコイズがテーマに合う。 |
+| mexican | 10 | 0 | 1 | 1.0 | 祝祭的で楽しい。quiet prompt では彩度が勝ちやすい。 |
+| british | 10 | 0 | 0 | 1.0 | クリーム地、navy、crimson、racing green が安定。 |
+| greek | 10 | 0 | 1 | 1.0 | 白・青・テラコッタ・オリーブで地中海性が出る。 |
+
+3名ペルソナ評価:
+
+1. 色彩史・文化カタログ監修者
+
+   - 適合度が高い: `nordic`, `egyptian`, `british`, `greek`, `chinese`
+   - 条件付きで良い: `renaissance`, `mexican`, `impressionism`
+   - 改善優先: `japanese`, `indian`
+   - `japanese` は名称が「Japanese Tradition / 和の伝統色」だが、core map が `default` とほぼ同じで、藤紫・山吹が extras に留まる。結果として、出力全体が「和」よりも通常の inku default に見える。
+   - `indian` は彩度と祝祭性は合うが、抽象色 `blue` が `#fc0fc0` の magenta になるため、プロンプト上の青い線・青い円という意味が崩れやすい。
+
+2. 画家・構図評価者
+
+   - 絵として意味が出やすい: `nordic`, `renaissance`, `egyptian`, `greek`
+   - 形と色の楽しさが強い: `mexican`, `indian`, `chinese`, `impressionism`
+   - `nordic` は低彩度の面と線が余白を保ち、10枚全体の鑑賞密度が安定している。
+   - `renaissance` は暖色の地と赤・緑の関係が絵画的だが、灰色要求が茶色の面として出るため、影や石畳のニュアンスが土壁に寄る。
+   - `impressionism` は光と淡色の方向性は良いが、暗部が青地に置換されると、夜景や黒い余白のプロンプトで画面支配が強くなりすぎる。
+   - `mexican` は最も楽しいが、Rosa Mexicano と terracotta が強いため、静かな入力でも祝祭方向へ引っ張る。
+
+3. レンダラー・プロダクト設計者
+
+   - 実装仕様としては、抽象色名キーのままサーバー側カタログを展開している現在方針でよい。クライアント側の独自色モデルへ戻す必要はない。
+   - 評価上の問題は API 連携ではなく、カタログごとの abstract color map の意味付けにある。
+   - `gray`, `black`, `blue` のような構造色をテーマ色へ寄せすぎると、プロンプトの構造意図が変質する。テーマ性は保ちつつ、core map では意味が大きく崩れない範囲に置き、強い文化色は palette extras として使うのがメンテナンスしやすい。
+
+パレット改善案:
+
+- `default`: 変更不要。比較基準として、ニュートラルで意味が明確。
+- `japanese`: core map を default からもう一段だけ和色へ寄せる。例: `red` を朱寄り、`blue` を藍、`green` を常磐、`gray` を消墨として明確化する。藤紫・山吹は extras のままでよいが、現状よりカタログ差が出る必要がある。
+- `renaissance`: `gray` を Siena ではなく warm neutral gray / stone gray へ寄せ、Sienna は palette extra に残す。茶地の絵画性は保ちつつ、灰色要求の意味を守る。
+- `impressionism`: `black` は cobalt blue ではなく dark violet / deep ultramarine 系の暗色にする。Cobalt blue は blue または extra に残す。淡色の魅力は維持する。
+- `chinese`: `gray` を purple から inkstone gray へ寄せ、purple は extra に残す。`blue` は electric blue より porcelain/cobalt blue に寄せると伝統性が増す。
+- `nordic`: 変更不要に近い。必要なら `blue` を少し低彩度へ寄せる程度。
+- `indian`: `blue` を magenta から indigo / peacock blue に戻す。Magenta は `Gulabi` などの extra に残す。現在のままだと青指定の意味が最も崩れやすい。
+- `egyptian`: 大きな変更不要。`green` を turquoise とする方針はテーマとして成立するが、より緑の意味を守るなら malachite green を core にし、turquoise を extra にする。
+- `mexican`: `gray` を terracotta から neutral stone gray へ寄せ、terracotta は extra に残す。Rosa Mexicano は catalog identity として維持してよい。
+- `british`: 大きな変更不要。必要なら `black` を navy から charcoal へ寄せ、navy は extra に残すと、黒指定の構造線がより安定する。
+- `greek`: 大きな変更不要。青・白・テラコッタ・オリーブの関係が名前と出力の両方に合っている。
+
+次アクション:
+
+- 改善優先度は `indian` の `blue`、`japanese` の core map 差分、`impressionism` の `black`、`chinese` / `renaissance` / `mexican` の `gray`。
+- いずれも個別プロンプト対策ではなく、抽象色の意味を守りながら各カタログの性格を強める調整として実装する。

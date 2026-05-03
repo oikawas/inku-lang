@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { t } from '$lib/i18n/index.svelte';
+	import { getLang, t } from '$lib/i18n/index.svelte';
 	import type { ColorCatalog } from '$lib/colors';
 
 	type Props = {
@@ -27,6 +27,15 @@
 		const b = parseInt(value.slice(4, 6), 16);
 		return (r * 299 + g * 587 + b * 114) / 1000 > 224;
 	}
+
+	function catalogSub(catalog: ColorCatalog): string {
+		return getLang() === 'ja' ? (catalog.sub_ja ?? catalog.sub) : catalog.sub;
+	}
+
+	function paletteName(color: { name: string; name_ja?: string }): string {
+		if (getLang() !== 'ja' || !color.name_ja) return color.name;
+		return `${color.name}（${color.name_ja}）`;
+	}
 </script>
 
 <div class="modal-backdrop" onclick={onCancel} aria-hidden="true"></div>
@@ -50,7 +59,7 @@
 					</div>
 					<div class="catalog-info">
 						<div class="catalog-name">{cat.name}</div>
-						<div class="catalog-sub">{cat.sub}</div>
+						<div class="catalog-sub">{catalogSub(cat)}</div>
 					</div>
 					{#if active}<span class="catalog-check">✓</span>{/if}
 				</button>
@@ -62,7 +71,7 @@
 				{#each currentCatalog.palette as color (color.code)}
 					<div class="catalog-color-row">
 						<div class="catalog-color-box" class:light={isLightColor(color.code)} style="background:{color.code}"></div>
-						<span class="catalog-color-name">{color.name}</span>
+						<span class="catalog-color-name">{paletteName(color)}</span>
 						<span class="catalog-color-code">{color.code}</span>
 					</div>
 				{/each}

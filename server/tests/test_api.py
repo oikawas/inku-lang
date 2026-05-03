@@ -93,8 +93,11 @@ def test_color_catalogs_are_served_by_api():
     data = r.json()
     assert data["default_catalog_id"] == "default"
     catalogs = {catalog["id"]: catalog for catalog in data["catalogs"]}
+    assert catalogs["default"]["sub"] == "neutral baseline"
+    assert catalogs["default"]["sub_ja"] == "ニュートラルな基準値"
     assert catalogs["vivid_material"]["map"]["green"] == "#008f39"
     assert any(color["name"] == "Fresh Green" for color in catalogs["vivid_material"]["palette"])
+    assert any(color["name_ja"] == "新鮮な緑" for color in catalogs["vivid_material"]["palette"])
 
 
 def test_generation_apis_require_auth():
@@ -1042,7 +1045,7 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
             "render_build_number": "260",
             "render_color_catalog_id": "default",
             "render_color_catalog_name": "inku Default",
-            "render_color_catalog_sub": "規定値",
+            "render_color_catalog_sub": "neutral baseline",
             "render_color_map": {"black": "#111111"},
         },
     )

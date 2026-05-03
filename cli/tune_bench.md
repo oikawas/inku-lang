@@ -2626,3 +2626,20 @@ Build 258 の green-heavy 再実行中に、`010`「白い余白」「黒い線�
 - Build 264 の指摘のうち、文化的摩擦と抽象色の意味崩れは Build 265 で大半を修正できた。
 - 残件は個別ケース最適化ではなく、`open_air_light`, `dye_earth`, `desert_mineral` の core color が背景・暗色として作品全体を支配しすぎる問題として扱う。
 - 次の調整では、国・地域名へ戻さず、素材・光・技法・描画上の振る舞いによる命名方針を維持する。
+
+### Build 266 current: 色カタログの残課題対応と日本語UI
+
+対応:
+
+- `open_air_light`: core `black` を `#2f2d66` から `#4b4a78` へ軽くし、pink / sky / green / gray も少し落ち着かせた。狙いは、暗い入力で夜青の面が画面を支配する問題を抑えること。
+- `dye_earth`: core `black` を `#1f1b2e` から `#2b2736` へ軽くし、core `red` と palette の bright pink を少し抑えた。`blue=#006c8f` は維持し、Build 264 の blue→magenta 退行は戻さない。
+- `desert_mineral`: core `black`, `white`, `blue`, `green`, `gray` を少し構造色寄りに調整した。paper/sand が背景全体を支配する問題を弱め、linen / shadow / river-blue 的な幅を持たせる。
+- 色カタログ API の `default.sub` を `規定値` から `neutral baseline` へ変更した。英語UIで日本語説明が出る問題を修正。
+- 各カタログに `sub_ja` を追加し、日本語UIでは説明を日本語表示する。
+- palette 色に対応する日本語名があるものは `name_ja` を追加し、日本語UIでは `English（日本語）` の形で表示する。
+
+確認観点:
+
+- この変更は個別プロンプト分岐ではなく、Build 265 の残課題として記録した core color の支配度調整である。
+- `map` は抽象色の意味を守る方針を維持し、特徴色は `palette` に置く。
+- 次のベンチでは Build 265 と同じ10件 prompts を Build 266 で再実行し、`open_air_light`, `dye_earth`, `desert_mineral` の fallback / slow / contact sheet の支配色を重点比較する。

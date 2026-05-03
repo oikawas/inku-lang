@@ -1280,7 +1280,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~学習モードの複雑さ~~ → v1.2 で廃止 (実験的機能として trainer.py は残置)
 - ~~解釈DDL 編集後に再レンダリングできない~~ → v1.6 で「再演奏」(Stage 2 のみ呼出し) 実装
 - ~~接続設定が常時表示で占有面積過大~~ → v1.6 でポップオーバーに集約
-- ~~固定の6色制約~~ → v1.6 で色カタログシステム導入（default + 10文化パレット選択可）
+- ~~固定の6色制約~~ → v1.6 で色カタログシステム導入（default + 10素材・光・技法ベースのカタログ選択可）
 - ~~キャンバスのズーム不可~~ → v1.6 でズームUI追加（0.5×〜3×）
 - ~~スクロール型レイアウトで全要素の関係が見えにくい~~ → v1.6 で固定ビューポート2ペイン構成に刷新
 - ~~ユーザー管理が prototype UI のみ~~ → v1.10 で認証、ユーザー/グループ管理 API、DB 永続化、ロール制御を実装
@@ -2564,6 +2564,8 @@ type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
 - 追加10種: Ink & Season / Fresco Study / Open-Air Light / Ink & Porcelain / Cool Material / Dye & Earth / Desert Mineral / Vivid Material / Weathered Heritage / Sea & Stone
 - 各カタログは `map`（6色 ColorMap）+ `swatches`（表示用8色）+ `palette`（名称付き8色）を持つ
 - `default` は文化的な標準ではなく neutral baseline として扱う。追加カタログの `id` / 表示名 / 説明は、国名・民族名・食・祭り・帝国・観光記号で文化全体を代表しないよう、素材・光・技法・描画上の振る舞いを基準に命名する。
+- カタログの `map` は `white / black / blue / red / green / gray` の抽象色としての意味を壊さないことを優先する。特徴色は `palette` に逃がし、`blue` が pink へ、`gray` が terracotta へ、`black` が navy へ変わるような意味崩れを避ける。
+- Build 265 時点の残課題として、`open_air_light`, `dye_earth`, `desert_mineral` は背景・暗色・高彩度差し色が作品全体を支配しやすい。今後の調整は個別プロンプト最適化ではなく、core color の明度・彩度・背景化しやすさを抑える方向で行う。
 
 「カタログ設定」モーダル（ヘッダー右端）から選択。選択は `localStorage` に永続化。
 

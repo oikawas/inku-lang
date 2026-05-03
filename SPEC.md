@@ -167,6 +167,13 @@ a country, ethnicity, food, festival, empire, or tourism marker as a complete
 palette identity: `ink_season`, `fresco_study`, `open_air_light`,
 `ink_porcelain`, `cool_material`, `dye_earth`, `desert_mineral`,
 `vivid_material`, `weathered_heritage`, and `sea_stone`.
+Catalog `map` values must preserve the meaning of the abstract colors
+`white / black / blue / red / green / gray`; stronger identity colors belong in
+`palette` rather than replacing structural colors.  The Build 265 review leaves
+`open_air_light`, `dye_earth`, and `desert_mineral` as known tuning targets:
+their dark backgrounds, high-chroma accents, or paper/sand tones can dominate
+quiet prompts, so future tuning should adjust core brightness and saturation
+instead of branching into prompt-specific exceptions.
 
 Render JSON produced by the server records the concrete render context.  Paint,
 compose, and saved artifact JSON include `render_build_number`,

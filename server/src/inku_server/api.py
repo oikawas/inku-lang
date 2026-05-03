@@ -111,6 +111,14 @@ def _save_output_files(prefix: Path, input_text: str, ddl: str | None, score: di
         _logger.exception("failed to save PNG output: prefix=%s", prefix)
 
 
+def _coerce_context(ddl: str, original_text: str | None = None) -> str:
+    original = (original_text or "").strip()
+    normalized = ddl.strip()
+    if original and original != normalized:
+        return f"{original}\n{normalized}"
+    return normalized
+
+
 def _history_output_prefix(item: dict) -> Path:
     output_path = item.get("output_path")
     if output_path:
@@ -1181,7 +1189,7 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
     try:
         score = compose_detail.score
         ensure_renderable_score(score)
-        score = coerce_score(score, ddl=req.ddl)
+        score = coerce_score(score, ddl=_coerce_context(req.ddl, req.original_text))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -1403,7 +1411,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     try:
         score = compose_detail.score
         ensure_renderable_score(score)
-        score = coerce_score(score, ddl=ddl)
+        score = coerce_score(score, ddl=_coerce_context(ddl, source_text))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 

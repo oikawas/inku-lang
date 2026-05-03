@@ -399,6 +399,27 @@ def test_coerce_score_does_not_repair_green_from_words_false_positive():
     assert not any("green restored from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_keeps_negated_green_out_of_color_cycles_and_composition_repair():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.5, 0.5],
+                    "to": [0.72, 0.28],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="言えなかった言葉を白い余白に置き、緑には寄せず黒い線だけを残す。")
+
+    assert all(ins.color != "green" for ins in fixed.instructions)
+    assert all("green" not in (ins.arrangement.color_cycle if ins.arrangement else []) for ins in fixed.instructions)
+    assert not any("composition anchor restored" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_repairs_green_from_specific_leaf_terms():
     score = Score.model_validate(
         {

@@ -783,6 +783,31 @@ def test_interpret_empty_rejected(auth_context):
     assert r.status_code == 422
 
 
+def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+
+    def fake_compose(ddl: str, model=None, original_text=None, system_prompt=None, lang="ja"):
+        return Score.model_validate(
+            {"instructions": [{"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5], "color": "black"}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    r = client.post(
+        "/api/compose",
+        json={
+            "ddl": "黒い線を置く。",
+            "original_text": "白い余白に、黒い線だけを残す。",
+        },
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    instructions = r.json()["score"]["instructions"]
+    assert len(instructions) == 1
+    assert instructions[0]["primitive"] == "line"
+
+
 def test_paint_pipeline(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))

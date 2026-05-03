@@ -2266,3 +2266,127 @@ Build 258 予定:
 1. Build 258 で green-heavy / shape-heavy の 10件小ベンチを再実行し、`composition anchor restored` / `composition accent restored` が必要なケースだけに出ているか確認する。
 2. contact sheet では、個別 motif の見立てではなく、主役形・対比色・余白保持の3点を評価する。
 3. 過補正が見えなければ、default / impressionism の30件比較へ戻る。
+
+## 25. Build 259: composition repair 小ベンチ再評価
+
+Build 258 の green-heavy 再実行中に、`010`「白い余白」「黒い線だけ」「緑には寄せず」で `composition anchor` が追加され、さらに negated green が `color_cycle` に復活する問題を確認した。
+
+原因:
+
+- `/api/paint` / `/api/compose` は Stage 2 へ原文を渡していたが、`coerce_score` には正規化 DDL のみを渡していた。
+- そのため、原文にある `余白`, `だけ`, `緑には寄せず` が repair 抑制・否定色判定に使われなかった。
+- server 側 `coerce.py` の color repair / DDL coverage も negated color を直接除外していなかった。
+
+実装:
+
+- Build 259 として、API 側で coerce 用コンテキストに `original_text + normalized DDL` を渡すようにした。
+- server 側 `coerce.py` に `NEGATED_COLOR_MARKERS` を追加し、`緑には寄せず`, `緑ではなく`, `avoid green`, `not green` などを requested color / color_cycle / green intent context から除外するようにした。
+- API テストで、`original_text` の `余白` / `だけ` が composition repair 抑制に効くことを確認した。
+- coerce テストで、negated green が instruction color / color_cycle に復活しないこと、composition anchor も追加されないことを確認した。
+- `web/BUILD_NUMBER`: 259
+
+検証:
+
+- Mac:
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_coerce.py tests/test_api.py -q`: 83 passed
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests`: passed
+  - `npm run check`: 0 errors / 0 warnings
+  - `npm run build`: passed
+- pentala deploy:
+  - `./no-git-sync/scripts/deploy.sh`: rsync + service restart 完了
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache ~/.local/bin/uv run pytest tests/test_api.py tests/test_coerce.py -q`: 83 passed
+  - `UV_CACHE_DIR=/tmp/inku-uv-cache ~/.local/bin/uv run ruff check src tests`: passed
+  - `GET http://127.0.0.1:5173/api/info`: `build_number=259`
+
+### green-heavy 10
+
+入力:
+
+- `cli/out/tune-bench-build256-green-heavy/prompts.txt`
+
+出力:
+
+- `cli/out/tune-bench-build259-green-heavy-default/`
+- `cli/out/tune-bench-build259-green-heavy-default/analysis-summary.json`
+- `cli/out/tune-bench-build259-green-heavy-default/contact-sheet.png`
+
+結果:
+
+- 成功: 10 / 10
+- 失敗: 0 / 10
+- fallback: 1件 (`010`)
+- slow sample: 4件 (`002`, `003`, `004`, `010`)
+- tokens in/out: 130,098 / 8,881
+- total elapsed: 607,325 ms
+- primitives: `line=24`, `ellipse=15`, `arc=5`, `circle=2`, `square=1`
+- colors: `green=16`, `black=14`, `blue=6`, `gray=5`, `red=4`, `white=2`
+- color trace:
+  - requested: `green=9`, `white=6`, `black=5`, `blue=5`, `gray=4`, `red=2`
+  - score presence: `green=13`, `black=9`, `blue=6`, `white=6`, `gray=5`, `red=4`
+  - missing requested: `blue=1`, `white=1`
+  - warnings: `requested_color_missing_in_score=1`
+  - negated: `green=1`
+  - green delivery rate: 9 / 9 = 1.0
+- motif hints: `leaf_cluster=8`
+- math balance: `golden_like_centers=10`, `rule_of_thirds_like_centers=4`, `counterweight_like_opposite_placements=2`
+- composition repair:
+  - `composition accent restored`: 1件 (`007`)
+  - `composition anchor restored`: 0件
+
+確認:
+
+- `010` は fallback だが、`green_requested=false`, `green_rendered=false` になり、否定文脈は守られた。
+- `010` では `composition anchor` も追加されず、白い余白と黒い線だけの意図を壊していない。
+- green-heavy では一律の anchor 追加は起きず、repair は過補正になっていない。
+- `007` の accent 1件は、灰霧と竹葉脈の黒灰寄り構成へ小さな対比形を追加する用途で、今回の方針に合う。
+
+### shape-heavy 10
+
+入力:
+
+- `cli/out/tune-bench-build256-shape-heavy/prompts.txt`
+
+出力:
+
+- `cli/out/tune-bench-build259-shape-heavy-default/`
+- `cli/out/tune-bench-build259-shape-heavy-default/analysis-summary.json`
+- `cli/out/tune-bench-build259-shape-heavy-default/contact-sheet.png`
+
+結果:
+
+- 成功: 10 / 10
+- 失敗: 0 / 10
+- fallback: 1件 (`006`)
+- slow sample: 1件 (`006`)
+- tokens in/out: 114,085 / 4,873
+- total elapsed: 363,918 ms
+- primitives: `line=18`, `arc=11`, `ellipse=11`, `square=10`, `triangle=10`, `circle=1`
+- colors: `black=37`, `green=10`, `blue=7`, `white=4`, `gray=3`
+- color trace:
+  - requested: `black=7`, `white=6`, `green=4`, `blue=3`, `gray=2`, `red=1`
+  - score presence: `black=16`, `green=6`, `white=6`, `blue=3`, `gray=3`, `red=1`
+  - missing requested: `blue=1`, `white=1`
+  - warnings: `requested_color_missing_in_score=2`
+  - green delivery rate: 4 / 4 = 1.0
+- motif hints:
+  - `mountain_sign=8` (`001`, `002`, `006`, `008`)
+  - `paper_shard=8` (`003`, `007`, `009`, `010`)
+  - `leaf_cluster=6` (`005`, `007`, `010`)
+  - `ripple_knot=4` (`004`, `009`)
+- math balance: `golden_like_centers=23`, `rule_of_thirds_like_centers=16`, `counterweight_like_opposite_placements=6`, `radial_fibonacci_counts=2`
+- composition repair:
+  - `composition anchor restored`: 0件
+  - `composition accent restored`: 0件
+
+確認:
+
+- shape-heavy は `triangle=10`, `square=10`, `arc=11` まで出ており、Build 250 の `triangle=0` 問題は小ベンチでは解消している。
+- motif hints は4種類すべて到達しているが、今回の主目的である composition repair は発火していない。これは既に形の多様性が十分あるためで、個別ケース最適化へ分岐していない。
+- `006` は fallback だが、三角・灰色線・庭の green context は残っている。
+
+総合判断:
+
+- Build 259 の修正で、原文の否定・余白・限定表現が coerce に届くようになった。
+- composition diversity repair は小ベンチ20件中1件だけ発火し、過補正ではない。
+- green delivery は green-heavy / shape-heavy とも 1.0。
+- 次は default / impressionism の30件比較に戻し、同じ制約が広い入力でも保たれるか確認する。

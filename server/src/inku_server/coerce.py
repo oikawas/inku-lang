@@ -186,6 +186,21 @@ COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("灰", "gray", "grey"), "gray"),
 )
 
+NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
+    "green": (
+        "not green",
+        "avoid green",
+        "without green",
+        "no green",
+        "緑には寄せず",
+        "緑に寄せず",
+        "緑ではなく",
+        "緑を避け",
+        "緑を使わず",
+        "緑なし",
+    ),
+}
+
 SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("山", "屋根", "尖", "鋭", "三角", "峰", "頂", "稜線", "切妻", "mountain", "roof", "sharp", "peak", "ridge", "triangle"), "triangle"),
     (("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple"), "arc"),
@@ -457,7 +472,18 @@ def _requested_colors_from_ddl(ddl: str | None) -> set[str]:
     for markers, color in COLOR_MARKERS:
         if any(marker.lower() in lower or marker in ddl for marker in markers):
             colors.add(color)
-    return colors
+    return colors - _negated_colors_from_text(ddl)
+
+
+def _negated_colors_from_text(text: str | None) -> set[str]:
+    if not text:
+        return set()
+    lower = text.lower()
+    return {
+        color
+        for color, markers in NEGATED_COLOR_MARKERS.items()
+        if any(marker.lower() in lower or marker in text for marker in markers)
+    }
 
 
 def _score_contains_color(instructions: list[Instruction], color: str) -> bool:
@@ -477,6 +503,8 @@ def _color_repair_order(colors: set[str]) -> list[str]:
 
 def _green_intent_context(ddl: str | None) -> str | None:
     if not ddl:
+        return None
+    if "green" in _negated_colors_from_text(ddl):
         return None
     lower = ddl.lower()
     if "竹" in ddl or "bamboo" in lower:
@@ -887,7 +915,10 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
 
 def _color_from_clause(clause: str, background: str) -> str:
     lower = clause.lower()
+    negated = _negated_colors_from_text(clause)
     for markers, color in COLOR_MARKERS:
+        if color in negated:
+            continue
         if any(marker in clause or marker in lower for marker in markers):
             if color != background:
                 return color
@@ -896,9 +927,10 @@ def _color_from_clause(clause: str, background: str) -> str:
 
 def _color_cycle_from_clause(clause: str, background: str) -> list[str]:
     lower = clause.lower()
+    negated = _negated_colors_from_text(clause)
     colors: list[str] = []
     for markers, color in COLOR_MARKERS:
-        if color == background:
+        if color == background or color in negated:
             continue
         if any(marker in clause or marker in lower for marker in markers):
             colors.append(color)

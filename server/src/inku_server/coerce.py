@@ -156,8 +156,14 @@ COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("黒", "black"), "black"),
     (("青", "blue"), "blue"),
     (("赤", "red"), "red"),
-    (("緑", "green"), "green"),
+    (("緑", "green", "森", "forest", "葉", "leaf", "草", "grass", "苔", "moss", "竹", "bamboo", "庭", "garden", "香り", "scent", "fragrance", "芽"), "green"),
     (("灰", "gray", "grey"), "gray"),
+)
+
+SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("山", "屋根", "尖", "鋭", "三角", "mountain", "roof", "sharp", "peak", "triangle"), "triangle"),
+    (("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple"), "arc"),
+    (("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square"), "square"),
 )
 
 
@@ -408,6 +414,121 @@ def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruct
         adjusted.append(adjusted_ins)
         remaining_budget -= _expanded_count(adjusted_ins)
     return adjusted
+
+
+def _requested_colors_from_ddl(ddl: str | None) -> set[str]:
+    if not ddl:
+        return set()
+    lower = ddl.lower()
+    colors: set[str] = set()
+    for markers, color in COLOR_MARKERS:
+        if any(marker.lower() in lower or marker in ddl for marker in markers):
+            colors.add(color)
+    return colors
+
+
+def _score_contains_color(instructions: list[Instruction], color: str) -> bool:
+    for ins in instructions:
+        if ins.color == color:
+            return True
+        arr = ins.arrangement
+        if arr and color in arr.color_cycle:
+            return True
+    return False
+
+
+def _with_color_delivery_repair(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    requested = _requested_colors_from_ddl(ddl)
+    if not requested:
+        return instructions
+
+    repaired = list(instructions)
+    for color in sorted(requested):
+        if _score_contains_color(repaired, color):
+            continue
+        candidate_index = next(
+            (
+                index for index, ins in enumerate(repaired)
+                if ins.primitive in ("ellipse", "arc", "circle", "square", "triangle")
+            ),
+            0 if repaired else -1,
+        )
+        if candidate_index < 0:
+            continue
+        data = repaired[candidate_index].model_dump(by_alias=True)
+        hint = data.get("color_hint")
+        note = f"{color} restored from DDL color intent"
+        data["color"] = color
+        data["color_hint"] = f"{hint}; {note}" if hint else note
+        repaired[candidate_index] = Instruction.model_validate(data)
+    return repaired
+
+
+def _requested_shapes_from_ddl(ddl: str | None) -> set[str]:
+    if not ddl:
+        return set()
+    lower = ddl.lower()
+    shapes: set[str] = set()
+    for markers, primitive in SHAPE_INTENT_MARKERS:
+        if any(marker.lower() in lower or marker in ddl for marker in markers):
+            shapes.add(primitive)
+    return shapes
+
+
+def _score_contains_primitive(instructions: list[Instruction], primitive: str) -> bool:
+    return any(ins.primitive == primitive for ins in instructions)
+
+
+def _shape_repair_instruction(primitive: str, *, index: int, background: str) -> Instruction:
+    color = VISIBLE_ON_BACKGROUND.get(background, "black")
+    offset = min(index, 3) * 0.08
+    common: dict[str, Any] = {
+        "primitive": primitive,
+        "color": color,
+        "weight": "brush_thin",
+        "color_hint": f"{primitive} restored from DDL shape intent",
+    }
+    if primitive == "triangle":
+        common.update({
+            "position": [0.58 - offset, 0.22 + offset],
+            "size": [0.18, 0.16],
+            "rotation": -18 + index * 11,
+        })
+    elif primitive == "arc":
+        common.update({
+            "center": [0.66 - offset, 0.34 + offset],
+            "radius": 0.13,
+            "angle_start": 205,
+            "angle_end": 25,
+            "rotation": -10 + index * 9,
+        })
+    else:
+        common.update({
+            "position": [0.56 - offset, 0.30 + offset],
+            "size": [0.16, 0.11],
+            "rotation": -25 + index * 13,
+        })
+    return Instruction.model_validate(common)
+
+
+def _with_shape_delivery_repair(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    requested = _requested_shapes_from_ddl(ddl)
+    if not requested:
+        return instructions
+
+    repaired = list(instructions)
+    for primitive in ("triangle", "arc", "square"):
+        if primitive not in requested or _score_contains_primitive(repaired, primitive):
+            continue
+        if len(repaired) >= 6:
+            break
+        repaired.append(_shape_repair_instruction(primitive, index=len(repaired), background=background))
+    return repaired
 
 
 def _ddl_clauses(ddl: str | None) -> list[str]:
@@ -813,6 +934,8 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     ]
     instructions = _dedupe_instructions(instructions)
     instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
+    instructions = _with_color_delivery_repair(instructions, ddl=ddl)
+    instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)

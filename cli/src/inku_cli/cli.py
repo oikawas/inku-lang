@@ -25,6 +25,107 @@ DEFAULT_REQUEST_TIMEOUT_SECONDS = 600
 SERVER_DEFAULT_MODEL_LABEL = "server default"
 SERVER_DEFAULT_PROVIDER_LABEL = "server default"
 PROVIDERS = ("nvidia", "anthropic", "local")
+COLOR_KEYS = ("white", "black", "blue", "red", "green", "gray")
+DEFAULT_COLOR_CATALOG_ID = "default"
+COLOR_CATALOGS: dict[str, dict[str, str]] = {
+    "default": {
+        "white": "#ffffff",
+        "black": "#111111",
+        "blue": "#2c3e91",
+        "red": "#a2342a",
+        "green": "#2f6b3a",
+        "gray": "#888888",
+    },
+    "japanese": {
+        "white": "#fffffb",
+        "black": "#111111",
+        "blue": "#2c3e91",
+        "red": "#a2342a",
+        "green": "#2f6b3a",
+        "gray": "#888888",
+    },
+    "renaissance": {
+        "white": "#f5f5f5",
+        "black": "#5d4037",
+        "blue": "#003399",
+        "red": "#e34234",
+        "green": "#4f7942",
+        "gray": "#a0522d",
+    },
+    "impressionism": {
+        "white": "#ffffff",
+        "black": "#2a52be",
+        "blue": "#87ceeb",
+        "red": "#ffc1cc",
+        "green": "#40826d",
+        "gray": "#c8a2c8",
+    },
+    "chinese": {
+        "white": "#fffdfa",
+        "black": "#1a1a1b",
+        "blue": "#0040ff",
+        "red": "#ee1c25",
+        "green": "#00a86b",
+        "gray": "#800080",
+    },
+    "nordic": {
+        "white": "#fcfcfc",
+        "black": "#2c3e50",
+        "blue": "#5dade2",
+        "red": "#a98467",
+        "green": "#4b5d43",
+        "gray": "#95a5a6",
+    },
+    "indian": {
+        "white": "#ffffff",
+        "black": "#000080",
+        "blue": "#fc0fc0",
+        "red": "#e30b5c",
+        "green": "#666600",
+        "gray": "#c19a6b",
+    },
+    "egyptian": {
+        "white": "#f5deb3",
+        "black": "#0a0a0a",
+        "blue": "#123499",
+        "red": "#b31b1b",
+        "green": "#40e0d0",
+        "gray": "#cc7722",
+    },
+    "mexican": {
+        "white": "#f4f4f4",
+        "black": "#1c1c1c",
+        "blue": "#73c2fb",
+        "red": "#f50087",
+        "green": "#008f39",
+        "gray": "#b04a33",
+    },
+    "british": {
+        "white": "#fffdd0",
+        "black": "#000080",
+        "blue": "#4169e1",
+        "red": "#dc143c",
+        "green": "#004225",
+        "gray": "#708090",
+    },
+    "greek": {
+        "white": "#ffffff",
+        "black": "#191970",
+        "blue": "#005bae",
+        "red": "#e2725b",
+        "green": "#808000",
+        "gray": "#b2beb5",
+    },
+}
+COLOR_CATALOG_IDS = tuple(COLOR_CATALOGS.keys())
+COLOR_MARKERS: dict[str, tuple[str, ...]] = {
+    "white": ("white", "ivory", "snow", "paper", "白", "雪", "紙", "光"),
+    "black": ("black", "dark", "shadow", "ink", "黒", "闇", "影", "墨"),
+    "blue": ("blue", "water", "night", "cold", "sky", "青", "水", "夜", "冷", "空", "湖"),
+    "red": ("red", "pink", "warm", "fire", "fruit", "赤", "紅", "桜", "桃", "温", "火", "果実"),
+    "green": ("green", "forest", "leaf", "grass", "moss", "bamboo", "garden", "scent", "緑", "森", "葉", "草", "苔", "竹", "庭", "香り", "芽"),
+    "gray": ("gray", "grey", "silver", "ash", "stone", "灰", "銀", "石", "埃"),
+}
 T = TypeVar("T")
 
 
@@ -42,6 +143,7 @@ class CliConfig:
     stage2_provider: str | None = None
     stage2_model: str | None = None
     timeout_seconds: int | None = None
+    color_catalog: str | None = None
 
 
 def _config_path() -> Path:
@@ -56,9 +158,11 @@ def load_config(path: Path | None = None) -> CliConfig:
     path = path or _config_path()
     if not path.exists():
         timeout_env = os.getenv("INKU_CLI_TIMEOUT_SECONDS")
+        catalog_env = os.getenv("INKU_COLOR_CATALOG")
         return CliConfig(
             base_url=os.getenv("INKU_BASE_URL", DEFAULT_BASE_URL),
             timeout_seconds=int(timeout_env) if timeout_env else None,
+            color_catalog=catalog_env if catalog_env in COLOR_CATALOGS else None,
         )
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -73,6 +177,7 @@ def load_config(path: Path | None = None) -> CliConfig:
         stage2_provider=raw.get("stage2_provider") or None,
         stage2_model=raw.get("stage2_model") or None,
         timeout_seconds=int(raw["timeout_seconds"]) if raw.get("timeout_seconds") is not None else None,
+        color_catalog=raw.get("color_catalog") or None,
     )
 
 
@@ -88,6 +193,7 @@ def save_config(config: CliConfig, path: Path | None = None) -> None:
         "stage2_provider": config.stage2_provider,
         "stage2_model": config.stage2_model,
         "timeout_seconds": config.timeout_seconds,
+        "color_catalog": config.color_catalog,
     }
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     try:
@@ -207,6 +313,23 @@ def _resolved_timeout_seconds(args: argparse.Namespace, config: CliConfig) -> in
     return args.timeout_seconds or config.timeout_seconds or DEFAULT_REQUEST_TIMEOUT_SECONDS
 
 
+def _resolved_color_catalog(args: argparse.Namespace, config: CliConfig) -> str:
+    requested = getattr(args, "color_catalog", None) or getattr(args, "catalog_id", None) or config.color_catalog
+    catalog = requested or DEFAULT_COLOR_CATALOG_ID
+    if catalog not in COLOR_CATALOGS:
+        raise CliError(f"unknown color catalog: {catalog}. choices: {', '.join(COLOR_CATALOG_IDS)}")
+    return catalog
+
+
+def _color_catalog_summary(catalog_id: str) -> dict[str, Any]:
+    color_map = COLOR_CATALOGS[catalog_id]
+    return {
+        "requested_color_catalog": catalog_id,
+        "resolved_color_catalog": catalog_id,
+        "color_map": dict(color_map),
+    }
+
+
 def _model_summary(
     stage1_model: str | None,
     stage2_model: str | None,
@@ -237,6 +360,10 @@ def _print_model_summary(
     print(f"Stage1 model: {_display_model(stage1_model)}", file=sys.stderr)
     print(f"Stage2 provider: {_display_provider(stage2_provider)}", file=sys.stderr)
     print(f"Stage2 model: {_display_model(stage2_model)}", file=sys.stderr)
+
+
+def _print_color_catalog_summary(catalog_id: str) -> None:
+    print(f"Color catalog: {catalog_id}", file=sys.stderr)
 
 
 def _run_with_progress(
@@ -435,13 +562,133 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def _marker_colors(text: str | None) -> list[str]:
+    if not text:
+        return []
+    lower = text.lower()
+    found = [
+        color
+        for color, markers in COLOR_MARKERS.items()
+        if any(marker.lower() in lower or marker in text for marker in markers)
+    ]
+    return sorted(found)
+
+
+def _score_color_details(score: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(score, dict):
+        return {"score_colors": [], "score_color_cycle_colors": [], "score_color_hints": []}
+    instructions = score.get("instructions")
+    if not isinstance(instructions, list):
+        return {"score_colors": [], "score_color_cycle_colors": [], "score_color_hints": []}
+
+    colors: Counter[str] = Counter()
+    cycle_colors: Counter[str] = Counter()
+    hints: list[str] = []
+    for instruction in instructions:
+        if not isinstance(instruction, dict):
+            continue
+        color = instruction.get("color")
+        if isinstance(color, str):
+            colors[color] += 1
+        hint = instruction.get("color_hint")
+        if isinstance(hint, str) and hint:
+            hints.append(hint)
+        arrangement = instruction.get("arrangement")
+        if isinstance(arrangement, dict):
+            color_cycle = arrangement.get("color_cycle")
+            if isinstance(color_cycle, list):
+                for item in color_cycle:
+                    if isinstance(item, str):
+                        cycle_colors[item] += 1
+    return {
+        "score_colors": dict(sorted(colors.items())),
+        "score_color_cycle_colors": dict(sorted(cycle_colors.items())),
+        "score_color_hints": hints[:20],
+    }
+
+
+def _color_trace(
+    result: dict[str, Any],
+    *,
+    catalog_id: str,
+    requested_text: str | None = None,
+) -> dict[str, Any]:
+    text = requested_text or result.get("text")
+    ddl = result.get("ddl")
+    score = result.get("score")
+    details = _score_color_details(score)
+    score_colors = set(details["score_colors"])
+    cycle_colors = set(details["score_color_cycle_colors"])
+    score_or_cycle = score_colors | cycle_colors
+    requested_colors = sorted(set(_marker_colors(text)) | set(_marker_colors(ddl)))
+    missing = [color for color in requested_colors if color in COLOR_KEYS and color not in score_or_cycle]
+    green_requested = "green" in requested_colors
+    green_in_score = "green" in score_or_cycle
+    warnings: list[str] = []
+    if missing:
+        warnings.append("requested_color_missing_in_score")
+    if green_requested and not green_in_score:
+        warnings.append("green_requested_but_missing_in_score")
+    return {
+        "requested_color_catalog": catalog_id,
+        "resolved_color_catalog": catalog_id,
+        "resolved_palette": dict(COLOR_CATALOGS[catalog_id]),
+        "text_color_markers": _marker_colors(text),
+        "ddl_color_markers": _marker_colors(ddl),
+        "requested_colors": requested_colors,
+        **details,
+        "missing_requested_colors": missing,
+        "green_requested": green_requested,
+        "green_in_score": green_in_score,
+        "green_rendered": green_in_score,
+        "warnings": warnings,
+    }
+
+
+def _aggregate_color_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
+    requested: Counter[str] = Counter()
+    in_score: Counter[str] = Counter()
+    missing: Counter[str] = Counter()
+    warnings: Counter[str] = Counter()
+    green_requested = 0
+    green_in_score = 0
+    for trace in traces:
+        requested.update(trace.get("requested_colors") or [])
+        in_score.update((trace.get("score_colors") or {}).keys())
+        in_score.update((trace.get("score_color_cycle_colors") or {}).keys())
+        missing.update(trace.get("missing_requested_colors") or [])
+        warnings.update(trace.get("warnings") or [])
+        if trace.get("green_requested"):
+            green_requested += 1
+        if trace.get("green_in_score"):
+            green_in_score += 1
+    return {
+        "requested_color_counts": dict(sorted(requested.items())),
+        "score_color_presence_counts": dict(sorted(in_score.items())),
+        "missing_requested_color_counts": dict(sorted(missing.items())),
+        "warning_counts": dict(sorted(warnings.items())),
+        "green_requested_samples": green_requested,
+        "green_in_score_samples": green_in_score,
+        "green_delivery_rate": (green_in_score / green_requested) if green_requested else None,
+    }
+
+
 def _paint_payload(
     args: argparse.Namespace,
     text: str,
     *,
     stage1_model: str | None = None,
     stage2_model: str | None = None,
+    color_catalog: str | None = None,
 ) -> dict[str, Any]:
+    color_catalog = (
+        color_catalog
+        or getattr(args, "color_catalog", None)
+        or getattr(args, "catalog_id", None)
+        or DEFAULT_COLOR_CATALOG_ID
+    )
+    if color_catalog not in COLOR_CATALOGS:
+        raise CliError(f"unknown color catalog: {color_catalog}. choices: {', '.join(COLOR_CATALOG_IDS)}")
     payload: dict[str, Any] = {
         "text": text,
         "original_text": args.original_text,
@@ -452,7 +699,8 @@ def _paint_payload(
         "save_history": args.save_history,
         "save_artifacts": args.save_artifacts,
         "history_input": args.history_input,
-        "catalog_id": args.catalog_id,
+        "catalog_id": color_catalog if color_catalog != DEFAULT_COLOR_CATALOG_ID else None,
+        "color_map": dict(COLOR_CATALOGS[color_catalog]),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -482,6 +730,7 @@ def command_login(args: argparse.Namespace) -> int:
         stage2_provider=existing.stage2_provider,
         stage2_model=existing.stage2_model,
         timeout_seconds=timeout_seconds,
+        color_catalog=existing.color_catalog,
     ))
     print(f"logged in as {username}")
     return 0
@@ -525,7 +774,11 @@ def command_models(args: argparse.Namespace) -> int:
         or args.stage2_provider is not None
         or args.stage2_model is not None
         or args.timeout_seconds is not None
+        or args.color_catalog is not None
     ):
+        color_catalog = args.color_catalog if args.color_catalog is not None else config.color_catalog
+        if color_catalog is not None and color_catalog not in COLOR_CATALOGS:
+            raise CliError(f"unknown color catalog: {color_catalog}. choices: {', '.join(COLOR_CATALOG_IDS)}")
         config = CliConfig(
             base_url=args.base_url or config.base_url,
             token=config.token,
@@ -535,12 +788,15 @@ def command_models(args: argparse.Namespace) -> int:
             stage2_provider=args.stage2_provider if args.stage2_provider is not None else config.stage2_provider,
             stage2_model=args.stage2_model if args.stage2_model is not None else config.stage2_model,
             timeout_seconds=timeout_seconds,
+            color_catalog=color_catalog,
         )
         save_config(config)
     data = {
         "base_url": args.base_url or config.base_url,
         "username": config.username,
         "timeout_seconds": config.timeout_seconds or DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        "color_catalog": config.color_catalog or DEFAULT_COLOR_CATALOG_ID,
+        "available_color_catalogs": list(COLOR_CATALOG_IDS),
         **_model_summary(
             config.stage1_model,
             config.stage2_model,
@@ -562,12 +818,14 @@ def command_paint(args: argparse.Namespace) -> int:
     stage1_model = _resolved_stage1_model(args, config)
     stage2_provider = _resolved_stage2_provider(args, config)
     stage2_model = _resolved_stage2_model(args, config)
+    color_catalog = _resolved_color_catalog(args, config)
     _print_model_summary(
         stage1_model,
         stage2_model,
         stage1_provider=stage1_provider,
         stage2_provider=stage2_provider,
     )
+    _print_color_catalog_summary(color_catalog)
     result, _ = _run_with_progress(
         "drawing",
         lambda: client.request("POST", "/api/paint", data=_paint_payload(
@@ -575,6 +833,7 @@ def command_paint(args: argparse.Namespace) -> int:
             text,
             stage1_model=stage1_model,
             stage2_model=stage2_model,
+            color_catalog=color_catalog,
         )),
         enabled=not args.no_progress,
     )
@@ -589,6 +848,8 @@ def command_paint(args: argparse.Namespace) -> int:
             stage2_provider=stage2_provider,
         ),
         "timeout_seconds": timeout_seconds,
+        **_color_catalog_summary(color_catalog),
+        "color_trace": _color_trace(result, catalog_id=color_catalog, requested_text=text),
         "history_id": result.get("history_id"),
         "elapsed_total_ms": result.get("elapsed_total_ms"),
         "tokens_in": (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0) or None,
@@ -611,6 +872,8 @@ def command_paint(args: argparse.Namespace) -> int:
                 stage2_provider=stage2_provider,
             ),
             "timeout_seconds": timeout_seconds,
+            **_color_catalog_summary(color_catalog),
+            "color_trace": _color_trace(result, catalog_id=color_catalog, requested_text=text),
             "paths": paths,
         })
     else:
@@ -636,12 +899,14 @@ def command_batch(args: argparse.Namespace) -> int:
     stage1_model = _resolved_stage1_model(args, config)
     stage2_provider = _resolved_stage2_provider(args, config)
     stage2_model = _resolved_stage2_model(args, config)
+    color_catalog = _resolved_color_catalog(args, config)
     _print_model_summary(
         stage1_model,
         stage2_model,
         stage1_provider=stage1_provider,
         stage2_provider=stage2_provider,
     )
+    _print_color_catalog_summary(color_catalog)
     for index, line in enumerate(lines, start=1):
         try:
             result, _ = _run_with_progress(
@@ -651,6 +916,7 @@ def command_batch(args: argparse.Namespace) -> int:
                     line,
                     stage1_model=stage1_model,
                     stage2_model=stage2_model,
+                    color_catalog=color_catalog,
                 )),
                 enabled=not args.no_progress,
             )
@@ -672,6 +938,8 @@ def command_batch(args: argparse.Namespace) -> int:
                     stage2_provider=stage2_provider,
                 ),
                 "timeout_seconds": timeout_seconds,
+                **_color_catalog_summary(color_catalog),
+                "color_trace": _color_trace(result, catalog_id=color_catalog, requested_text=line),
                 "history_id": result.get("history_id"),
                 "elapsed_total_ms": elapsed,
                 "tokens_in": tokens_in or None,
@@ -698,6 +966,7 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_preserve_space = 0
     aggregate_color_cycle = 0
     aggregate_expanded = 0
+    color_traces: list[dict[str, Any]] = []
     for result in results:
         aggregate_density.update(result.get("score_density_counts") or {})
         aggregate_fade.update(result.get("score_fade_counts") or {})
@@ -707,6 +976,9 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_preserve_space += int(result.get("score_preserve_space_count") or 0)
         aggregate_color_cycle += int(result.get("score_color_cycle_count") or 0)
         aggregate_expanded += int(result.get("score_expanded_count") or 0)
+        trace = result.get("color_trace")
+        if isinstance(trace, dict):
+            color_traces.append(trace)
 
     summary = {
         "success": len(results),
@@ -719,6 +991,8 @@ def command_batch(args: argparse.Namespace) -> int:
             stage2_provider=stage2_provider,
         ),
         "timeout_seconds": timeout_seconds,
+        **_color_catalog_summary(color_catalog),
+        "color_trace": _aggregate_color_traces(color_traces),
         "elapsed_total_ms": total_elapsed,
         "tokens_in": total_in or None,
         "tokens_out": total_out or None,
@@ -808,7 +1082,8 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--stage2-model")
     parser.add_argument("--original-text")
     parser.add_argument("--history-input")
-    parser.add_argument("--catalog-id")
+    parser.add_argument("--catalog-id", choices=COLOR_CATALOG_IDS, help="color catalog id (legacy alias)")
+    parser.add_argument("--color-catalog", choices=COLOR_CATALOG_IDS, help="color catalog for renderer and benchmark tracing")
     parser.add_argument("--lang", default="ja", choices=["ja", "en"])
     parser.add_argument("--include-thinking", action="store_true")
     parser.add_argument("--save-history", action="store_true")
@@ -845,6 +1120,7 @@ def build_parser() -> argparse.ArgumentParser:
     models.add_argument("--stage1-model", help="save the default Stage 1 model for paint and batch")
     models.add_argument("--stage2-provider", choices=PROVIDERS, help="save the default Stage 2 provider")
     models.add_argument("--stage2-model", help="save the default Stage 2 model for paint and batch")
+    models.add_argument("--color-catalog", choices=COLOR_CATALOG_IDS, help="save the default color catalog for paint and batch")
     models.set_defaults(func=command_models)
 
     paint = subparsers.add_parser("paint", help="generate one drawing")

@@ -22,6 +22,7 @@ def test_config_roundtrip(tmp_path):
         stage2_provider="local",
         stage2_model="stage2",
         timeout_seconds=900,
+        color_catalog="impressionism",
     )
     cli.save_config(config, path)
 
@@ -42,6 +43,8 @@ def test_paint_payload_drops_none_values():
     assert payload["stage1_model"] == "gemma"
     assert payload["save_history"] is True
     assert payload["include_thinking"] is False
+    assert payload["color_map"]["green"] == "#2f6b3a"
+    assert "catalog_id" not in payload
     assert "stage2_model" not in payload
     assert "history_input" not in payload
 
@@ -81,12 +84,39 @@ def test_models_command_accepts_providers():
         "local",
         "--stage2-model",
         "qwen-api",
+        "--color-catalog",
+        "japanese",
     ])
 
     assert args.stage1_provider == "nvidia"
     assert args.stage1_model == "google/gemma-4-31b-it"
     assert args.stage2_provider == "local"
     assert args.stage2_model == "qwen-api"
+    assert args.color_catalog == "japanese"
+
+
+def test_color_catalog_payload_sets_catalog_and_map():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "緑の葉", "--color-catalog", "mexican"])
+
+    payload = cli._paint_payload(args, "緑の葉")
+
+    assert payload["catalog_id"] == "mexican"
+    assert payload["color_map"]["green"] == "#008f39"
+
+
+def test_color_trace_reports_missing_green():
+    result = {
+        "text": "緑の葉が揺れる",
+        "ddl": "緑の小さな楕円を散らす。",
+        "score": {"instructions": [{"primitive": "ellipse", "color": "gray"}]},
+    }
+
+    trace = cli._color_trace(result, catalog_id="default")
+
+    assert trace["green_requested"] is True
+    assert trace["green_in_score"] is False
+    assert "green_requested_but_missing_in_score" in trace["warnings"]
 
 
 def test_timeout_prefers_args_then_config_then_default():

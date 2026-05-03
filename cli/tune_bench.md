@@ -1381,3 +1381,519 @@ Score 集計:
 - 3 は Build 250 で実装。Stage 1.5 の DDL expansion と Stage 2 prompt へ、春・花・温かい光、水・夜・冷気、森・葉・香りなどの scene tone から palette を選ぶ方針を追加した。fallback でも `color_cycle` を使って春系、水夜系、多色系を保持する。
 - 4 は Build 250 で実装。既存 schema の範囲で triangle、arc、rotated square、thin ellipse をより積極的に使う DDL expansion を追加した。葉・花びら・紙片・山・屋根などは、自然 primitive plugin の前段として抽象化された形へ変換する。
 - 5 は Build 250 で実装。`inku-cli batch` は `--summary-json`、または `--out-dir` 指定時の `analysis-summary.json` に summary を保存する。summary には `review_sets` として全成功サンプル、fallback sample、slow sample、normal sample を含める。Free API の待ち時間は品質評価から除外するが、診断用メタデータとして保持する。`inku-cli contact-sheet` で PNG 出力ディレクトリから contact sheet を生成できる。
+
+## 20. Build 250 現行構成 30件ベンチ
+
+実施日: 2026-05-02
+
+目的:
+
+- Build 250 の現行 Stage 1 / 1.5 / 2 / renderer 構成で、30件の定点プロンプトを再実行する。
+- Free API の待ち時間は品質評価から除外し、描画に成功した30件すべてを評価対象とする。
+- 成功率、fallback 発生、DDL の情報保持、JSON/SVG への反映、芸術的完成度を確認する。
+
+入力:
+
+- `cli/out/tune-bench-030-after-806e30a/prompts.txt`
+
+出力:
+
+- `cli/out/tune-bench-030-build250/`
+- `cli/out/tune-bench-030-build250/analysis-summary.json`
+- `cli/out/tune-bench-030-build250/contact-sheet.png`
+
+実行コマンド:
+
+```sh
+cd /Users/oikawas/projects/ddl-server/cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli batch \
+  --base-url http://192.168.0.89:8100 \
+  -f ./out/tune-bench-030-after-806e30a/prompts.txt \
+  -o ./out/tune-bench-030-build250 \
+  --summary-json ./out/tune-bench-030-build250/analysis-summary.json \
+  --prefix bench030b250 \
+  --png \
+  --continue-on-error
+
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli contact-sheet \
+  ./out/tune-bench-030-build250 \
+  --output ./out/tune-bench-030-build250/contact-sheet.png
+```
+
+結果:
+
+- 成功: 30 / 30
+- 失敗: 0 / 30
+- total elapsed: 1,869,662 ms
+- tokens in/out: 343,339 / 21,253
+- Stage 1 fallback: 1件 (`008`)
+- Stage 2 fallback: 6件 (`004`, `009`, `010`, `016`, `020`, `023`)
+- fallback 合計: 7件 (`004`, `008`, `009`, `010`, `016`, `020`, `023`)
+- slow sample: 9件 (`003`, `004`, `008`, `009`, `010`, `016`, `019`, `020`, `023`)
+
+Score 集計:
+
+- expanded count total: 1,816
+- clustered arrangements: 11
+- preserve_space: 22
+- color_cycle: 11
+- density: `high=7`, `medium=10`, `low=4`
+- fade: `outward=16`, `directional=4`
+- primitives: `line=50`, `ellipse=27`, `square=13`, `arc=3`, `circle=2`
+- colors: `gray=34`, `black=29`, `white=16`, `blue=9`, `red=6`, `green=1`
+
+Build 248 との比較:
+
+- 成功率は 30/30 のまま維持。
+- expanded count は 1,756 → 1,816 に微増し、情報量は保たれている。
+- preserve_space は 19 → 22、color_cycle は 8 → 11 に増え、余白保持と色循環の field はより使われている。
+- blue は 2 → 9 に増え、水・夜・冷気の色相は改善した。
+- black は 38 → 29 に減ったが、gray は 28 → 34 に増え、黒/灰の合計は 66 → 63 と依然として高い。
+- fallback は 6件 → 7件でやや増加。安全装置としては機能しているが、作品品質では通常成功サンプルとの差が残る。
+- triangle は依然として出ていない。既存 schema 内の形状語彙拡張が JSON まで十分に到達していない。
+
+専門家レビュー:
+
+### 批評家A: 現代抽象画・構成批評
+
+- 改善: `004`、`008`、`014`、`024` のように、気配・光・水面を薄い層として扱う方向は見える。Build 247 の痩せた構成より、画面に時間性が戻った。
+- 改善: `006`、`021`、`027`、`030` は線の揺れや方向性が詩的な運動を持ち、単なる幾何パターンから少し離れている。
+- 懸念: `001`、`005`、`017`、`029` は線の反復が主役化しすぎる。技法としては整っているが、入力文ごとの差が線幅・線数・方向に縮約される。
+- 懸念: `003`、`028` は強い矩形面に回収され、テーマの細部より画面処理が前に出る。面を使う場合も、余白・欠け・境界の表情を増やす必要がある。
+- 懸念: `010`、`016`、`020`、`023` の fallback 群は成立しているが、通常成功群と比べて詩的な飛躍が弱い。壊れないが、作品としての意外性が薄い。
+
+評価:
+
+- 情報量と安定性は改善済み。
+- 次は「抽象画としての構図判断」を強める段階。線・楕円・灰に逃げず、入力ごとに面、余白、重心、非対称性を選ぶ必要がある。
+
+### 批評家B: 多文化視覚表現・詩的普遍性
+
+- 改善: `008` 病室、`014` 窓辺、`019` 茶室、`024` 湖のような静かな主題では、文化固有の具象を避けつつ、場の温度を抽象化できている。
+- 改善: `004` 川辺、`015` 港、`030` 竹林は、色や反復により、自然の流れや湿度が以前より伝わる。
+- 懸念: `006` 畳、`011` 庭、`026` 夏祭りなど、文化的な場の違いが線・小矩形・粒群に均されやすい。多文化的な普遍性は、固有性を消すことではなく、固有性を抽象化して残すことで成立する。
+- 懸念: green が 1 件しかなく、森林・葉・香り・春の生命感が色として立ち上がりにくい。
+- 懸念: 赤・青・白の使い分けは改善したが、黄・金・紫・茶のような入力語が6色抽象色へ落ちる際のニュアンス保持がまだ弱い。
+
+評価:
+
+- 感情・雰囲気を DDL に残す方向は正しい。
+- 次は `color_hint` と場面分類を強め、文化的な場所性を色温度、余白、密度、配置の型として保持する。
+
+### 専門家C: 実装・生成品質エンジニア
+
+- 改善: 30/30 成功。Stage 2 hard timeout や empty instructions があっても、fallback により API エラーとしては失敗しない。
+- 改善: `density / fade / preserve_space / color_cycle` の集計値は伸びており、schema field は実出力に乗っている。
+- 懸念: fallback 7/30 はまだ高い。Free API の遅延は評価対象外だが、fallback 経由の作品品質は通常生成と同じ水準ではない。
+- 懸念: primitive は `line=50`, `ellipse=27` に偏り、`triangle=0`。DDL expansion で追加した語彙が Stage 2 JSON に安定して残っていない。
+- 懸念: `gray=34`, `black=29` で全体の約 66% が黒/灰。visibility coerce と palette strategy が安全側に寄りすぎている。
+- 懸念: `score_expanded_count=1,816` は情報量としては良いが、大量展開が構図の豊かさではなく線数・粒数へ変換されるケースがある。
+
+評価:
+
+- システムの安全性は上がった。
+- 品質向上には、Stage 2 の JSON 化時点で DDL の構図・色・形状意図を落とさない検証層が必要。
+
+総合評価:
+
+- Build 250 は「成功する」「壊れない」「一定以上の情報量を持つ」段階には到達している。
+- Build 247 で失われた豊かさは一部戻ったが、表現の軸が線・楕円・黒灰へ集中しやすい。
+- 現行の最大課題は、DDL が持つ色温度、場の固有性、形状語彙、構図意図が JSON 変換時に薄まること。
+- fallback は運用上必要だが、fallback 作品がレビュー全体の印象を下げている。fallback を単なる安全装置ではなく、短い詩的再構成として扱う必要がある。
+
+次の改善点:
+
+1. Stage 2 JSON coverage checker
+   - Stage 1.5 の DDL に含まれる `primitive`, `color_hint`, `density`, `fade`, `preserve_space`, `trajectory`, `rotation`, `texture` が JSON Score に反映されているかを post-check する。
+   - triangle / arc / rotated square / thin ellipse などが DDL に出た場合、JSON 側でゼロになったら repair prompt または deterministic repair を走らせる。
+
+2. Palette balance repair
+   - 黒/灰が前景色の過半を占める場合、入力の scene tone に応じて blue / green / red / white へ一部を再配分する。
+   - 春・葉・森・香りは green を候補に戻す。
+   - 光・朝・湖・雪は white/blue を中心に、単純な gray 化を避ける。
+   - 赤は果実・布・祭り・夕焼け・火に限定せず、温度や生命感のアクセントとして使う。
+
+3. Shape diversity repair
+   - 30件単位で triangle がゼロになる状態は避ける。
+   - 山・屋根・紙片・鋭さ・折れ・傾きの語彙がある場合、triangle または rotated square を優先候補にする。
+   - 線の群れで代替されている自然物や場所性を、面と輪郭へ分散する。
+
+4. Fallback quality upgrade
+   - fallback は1つの代表 instruction に縮約せず、DDL clause を 2-4 個の score instruction に分ける。
+   - fallback でも `color_cycle`, `fade`, `preserve_space`, `density`, `cluster_count` を必ず候補化する。
+   - hard timeout 後の fallback では、入力文の名詞だけでなく、感情語・時間帯・空気感を短く保持する。
+
+5. Line dominance reduction
+   - `line` が全 primitive の半数を超える場合、同じ意味を ellipse / square / arc に置換する repair を入れる。
+   - 揺れ・気配・香り・光をすべて線で表すのではなく、薄い面、粒、弧、余白の圧力へ分散する。
+
+6. Composition intent field
+   - Stage 1.5 から Stage 2 へ、`focus_area`, `negative_space_role`, `asymmetry`, `visual_weight` のような構図意図を渡す。
+   - 中央配置・均一散布を避け、入力文の主題に応じて重心を決める。
+   - fallback と repair でもこの構図意図を保持する。
+
+7. Benchmark review automation
+   - `analysis-summary.json` から、黒/灰偏重、line 偏重、triangle 欠落、fallback 使用、expanded 過多を自動で抽出する。
+   - contact sheet と summary を組み合わせ、次回から専門家レビューの前段に機械的な警告一覧を出す。
+
+## 21. 追加フィードバックを踏まえた Next action 詳細
+
+記録日: 2026-05-03
+
+ユーザーフィードバック:
+
+- 楽しい形がない。もっと複雑な形を作れないか。
+- 数学的な均衡が感じられる画が少ない。
+- 線の揺れ、表情はとても良くなっている。
+- 緑色の primitive 指示が通っていない。色指示が通っているかを特に確認する。
+- CLI サポートとして、色カタログを変更したテストを実施できるようにする。
+
+専門家レビューから接続する主課題:
+
+- Stage 1.5 の DDL に含めた形状・色・構図の意図が、Stage 2 JSON に落ちる過程で薄まっている。
+- `line` と `ellipse` への偏りが強く、triangle / arc / rotated square / 複合形が十分に使われていない。
+- 黒/灰への安全側補正が強く、green を含む scene tone が JSON と SVG まで届いていない。
+- 余白や線の表情は改善しているため、次はそれを壊さずに、形・数学的秩序・色の到達率を上げる。
+
+### 1. Color instruction trace と color catalog benchmark 対応
+
+目的:
+
+- 色指示が Stage 1 / 1.5 / 2 / renderer のどこで失われるかを追跡可能にする。
+- 色カタログを変更した比較ベンチを CLI から実行できるようにする。
+
+実装内容:
+
+- `inku-cli paint` / `inku-cli batch` に `--color-catalog` を追加する。
+- CLI の local config に既定 color catalog を保存できるようにする。
+- 描画時の stdout と `analysis-summary.json` に以下を記録する。
+  - requested color catalog
+  - resolved color catalog
+  - DDL 内の色語彙一覧
+  - JSON Score の abstract color count
+  - renderer で実際に解決された palette 色
+  - color mismatch warning
+- `analysis-summary.json` に `color_trace` セクションを追加する。
+
+検証:
+
+- 同一30件を `inku Default` と別カタログで実行し、色分布差を比較する。
+- 緑系プロンプトを 10件追加し、DDL に green が出た場合の JSON 到達率を測る。
+- `green_requested`, `green_in_score`, `green_rendered` を個別に集計する。
+
+完了条件:
+
+- CLI から色カタログ指定ベンチが実行できる。
+- 緑指示が失われた場合、Stage 1.5 / Stage 2 / renderer のどこで落ちたか分かる。
+
+### 2. Shape vocabulary coverage checker
+
+目的:
+
+- 楽しい形、複雑な形が出ない問題を、まず「DDL にあるのに JSON にない」問題として検出する。
+
+実装内容:
+
+- Stage 1.5 の expanded DDL から shape intent を抽出する。
+  - `sharp`, `folded`, `leaf`, `petal`, `mountain`, `roof`, `paper`, `fragment`, `spiral`, `wave`, `nested`, `cluster` など。
+- Stage 2 JSON Score の primitive 分布と比較する。
+- DDL に shape intent があるのに JSON が `line` / `ellipse` に偏った場合、repair を実行する。
+- repair は最初は deterministic にする。
+  - mountain / roof / sharp -> triangle または rotated square
+  - paper / folded / fragment -> rotated square
+  - leaf / petal -> thin ellipse + arc
+  - spiral / coil / curl -> arc group
+  - nested / layered -> square / ellipse の入れ子
+
+検証:
+
+- 30件ベンチの `triangle=0` が解消されるか確認する。
+- line が全 primitive の半数を超えるサンプル数を減らす。
+- repair 前後の DDL / JSON 差分を summary に保存する。
+
+完了条件:
+
+- triangle / arc / rotated square が実ベンチで安定して出る。
+- 「線で代替された形」を機械的に検出できる。
+
+### 3. Complex shape composition layer
+
+目的:
+
+- primitive 単体ではなく、複数 primitive を組み合わせた「楽しい形」を作る。
+- renderer の既存 primitive を活かしつつ、複合的な形の単位を導入する。
+
+実装内容:
+
+- Stage 1.5 に `motif` または `compound_shape` の概念を追加する。
+- Stage 2 prompt に「単一 primitive ではなく、2-5個の primitive を1つの形として組む」指示を追加する。
+- 初期 motif 候補:
+  - leaf cluster: thin ellipse + arc + small line
+  - paper shard: rotated square + thin line + fade
+  - seed pod: ellipse + small circle group + arc
+  - folded light: rotated square + translucent line group
+  - mountain sign: triangle + vertical line + preserve_space
+  - ripple knot: arc group + small ellipse
+- JSON Score では motif を直接 schema に入れず、複数 instruction へ展開する。後方互換性は現段階では重視しないが、renderer 側の変更量を抑える。
+
+検証:
+
+- contact sheet 上で「単体図形の羅列」ではなく、局所的に読める形の塊が増えるか見る。
+- expanded count を過剰に増やさず、motif 数と primitive 数を summary に記録する。
+
+完了条件:
+
+- 30件ベンチのうち少なくとも 10件で compound motif が使われる。
+- 画面が騒がしくならず、局所的な楽しさが増える。
+
+### 4. Mathematical balance strategy
+
+目的:
+
+- 数学的な均衡が感じられる画を増やす。
+- ただし機械的な線対称・点対称へ戻らないようにする。
+
+実装内容:
+
+- Stage 1.5 に `balance_strategy` を追加する。
+- 候補:
+  - golden offset: 黄金比付近に重心を置く
+  - root rectangle rhythm: √2 / √3 的な間隔
+  - prime spacing: 2,3,5,7,11 の間隔を使う
+  - fibonacci count: 3,5,8,13,21 の数量感
+  - counterweight: 大きな面と小さな群れの釣り合い
+  - orbit / field: 中心ではなく局所重心を持つ周回
+  - near symmetry break: 対称に見えそうで崩す
+- Stage 2 に「中央対称ではなく、局所重心と反対側の小要素で均衡を作る」ことを明示する。
+- JSON Score に `focus_area`, `visual_weight`, `counterweight_area` などの構図意図を反映する。
+
+検証:
+
+- 30件ベンチで、中央固定や均一散布のサンプルを数える。
+- contact sheet で、重心が画面中央に偏っていないか確認する。
+- 数学的 strategy の使用回数を summary に記録する。
+
+完了条件:
+
+- 明示的な数学 strategy が 30件中 15件以上で使われる。
+- 中央配置・単純対称の比率が下がる。
+
+### 5. Line expression を維持した形への転用
+
+目的:
+
+- 改善済みの線の揺れ・表情を失わず、形の輪郭や面の境界へ応用する。
+
+実装内容:
+
+- line texture を、単なる線 instruction だけでなく、circle / ellipse / square / arc の輪郭処理にも使う。
+- shape outline に以下の variation を追加する。
+  - trembling edge
+  - brushed contour
+  - broken contour
+  - layered contour
+  - water-warped edge
+- Stage 2 prompt に「線の表情を、独立した線だけでなく形の縁にも使う」ことを追加する。
+
+検証:
+
+- line primitive count が下がっても、線の表情が失われないかを見る。
+- shape primitive の輪郭差が SVG 上で確認できるかを見る。
+
+完了条件:
+
+- line 偏重を減らしつつ、線表現の良さを保持する。
+- 形が増えても硬い図形に戻らない。
+
+### 6. Green / palette repair の優先実装
+
+目的:
+
+- 緑指示が通らない問題を優先して解消する。
+- 色指示の到達率を定量的に扱う。
+
+実装内容:
+
+- Stage 1.5 の scene tone 判定で、以下を green candidate に明示的に入れる。
+  - 森、葉、草、苔、竹、庭、香り、春、芽吹き、湿った自然
+- Stage 2 の palette instruction に「green を gray/black に置換しない」制約を追加する。
+- renderer の visibility coerce で green が背景に埋もれる場合、green を別色へ逃がすのではなく、明度・透明度・輪郭で可視化する。
+- color catalog 解決後の実色が十分に見えるかを contrast check する。
+
+検証:
+
+- 緑系プロンプトを含む小ベンチを作る。
+- `green_requested -> green_in_ddl -> green_in_score -> green_rendered` の到達率を記録する。
+- 緑が0または1件に留まる場合は fail とする。
+
+完了条件:
+
+- 緑系プロンプトで green が JSON と SVG に到達する。
+- 30件定点ベンチでも green が複数回出る。
+
+### 7. Review automation の拡張
+
+目的:
+
+- 人間のレビュー前に、今回の問題を自動的に検出する。
+
+実装内容:
+
+- `analysis-summary.json` に以下の警告を追加する。
+  - `line_dominance_warning`
+  - `shape_diversity_warning`
+  - `triangle_missing_warning`
+  - `green_missing_warning`
+  - `monochrome_bias_warning`
+  - `fallback_quality_warning`
+  - `math_balance_missing_warning`
+- CLI に `inku-cli analyze-benchmark` を追加し、既存 summary から警告と改善候補を出す。
+- contact sheet の生成時に、fallback sample や warning sample を別 contact sheet として出せるようにする。
+
+検証:
+
+- Build 250 の summary に対して警告が期待通り出ること。
+- 次回ベンチで警告が減ったか比較できること。
+
+完了条件:
+
+- 次の30件ベンチで、人間レビューの前に機械的な問題一覧が得られる。
+
+実装順:
+
+1. CLI の color catalog 指定と color trace 保存。
+2. Green / palette repair。
+3. Shape vocabulary coverage checker。
+4. Mathematical balance strategy。
+5. Complex shape composition layer。
+6. Line expression の shape outline への転用。
+7. Benchmark review automation 拡張。
+
+優先理由:
+
+- 色指示、特に green の欠落は現在のベンチで明確に観測されているため、最初に trace 可能にする。
+- 複雑な形と数学的均衡は、Stage 2 JSON で意図が落ちる問題を解決しないと安定しない。
+- 線の表情は良くなっているため、削るのではなく形の輪郭・面の境界に移植する。
+
+着手状況:
+
+- 1 の CLI color catalog 指定を実装した。`inku-cli paint` / `inku-cli batch` は `--color-catalog` を受け取り、対応する renderer 用 `color_map` を `/api/paint` に送る。既存の `--catalog-id` は互換用 alias として残す。
+- CLI local config に `color_catalog` を保存できるようにした。`inku-cli models --color-catalog mexican` のように既定カタログを変更できる。
+- `paint` / `batch` の summary に `requested_color_catalog`, `resolved_color_catalog`, `color_map`, `color_trace` を追加した。
+- `color_trace` には、入力/DDL から検出した色 marker、Score の color / color_cycle、missing requested colors、green delivery 状況、warning を含める。
+- 2 の前段として、サーバーの `coerce_score` に green delivery repair を追加した。DDL に緑・森・葉・草・苔・竹・庭・香り・芽などの green intent があり、Score に green が無い場合、既存 instruction の一つを green に補修して `color_hint` に理由を残す。
+- 3 の前段として、サーバーの `coerce_score` に shape delivery repair を追加した。DDL に山・屋根・鋭さ・波紋・渦・紙片・破片・折れなどの shape intent があり、Score に triangle / arc / square が欠ける場合、過密にならない範囲で補助 instruction を追加する。
+- Stage 2 prompt に、複雑な形を 2〜5 primitive の局所 motif として構成する指示を追加した。葉、紙片、種、山、波紋を既存 primitive の組み合わせとして扱う。
+- Stage 2 prompt に、数学的均衡は中央対称ではなく、golden offset / 三分割 / 白銀比 / prime spacing / fibonacci count / counterweight で作るという指示を追加した。
+- 検証: `cli/tests/test_cli.py`, `server/tests/test_coerce.py`, `server/tests/test_composer.py`, `ruff check src tests` を CLI / server で実行済み。
+
+## 22. Build 250 current: 色カタログ比較 30件ベンチ
+
+実施日: 2026-05-03
+
+目的:
+
+- CLI の `--color-catalog` と `color_trace` が機能するか確認する。
+- default / impressionism の2カタログで同一30件を実行し、色カタログ差、green 到達率、shape repair、数学的均衡の改善具合を確認する。
+- Free API の待ち時間は品質評価から除外し、成功した描画をすべて評価対象にする。
+
+入力:
+
+- `cli/out/tune-bench-030-after-806e30a/prompts.txt`
+
+出力:
+
+- `cli/out/tune-bench-030-build250-current-default/`
+- `cli/out/tune-bench-030-build250-current-default/analysis-summary.json`
+- `cli/out/tune-bench-030-build250-current-default/contact-sheet.png`
+- `cli/out/tune-bench-030-build250-current-impressionism/`
+- `cli/out/tune-bench-030-build250-current-impressionism/analysis-summary.json`
+- `cli/out/tune-bench-030-build250-current-impressionism/contact-sheet.png`
+
+default 結果:
+
+- 成功: 30 / 30
+- 失敗: 0 / 30
+- fallback: 2件 (`017`, `028`)
+- slow sample: 5件 (`004`, `009`, `011`, `017`, `028`)
+- tokens in/out: 366,235 / 18,612
+- primitives: `line=44`, `ellipse=30`, `square=12`, `arc=3`, `circle=2`
+- colors: `black=28`, `white=28`, `gray=19`, `blue=8`, `red=7`, `green=1`
+- color trace:
+  - requested: `white=22`, `black=20`, `blue=17`, `gray=14`, `red=9`, `green=6`
+  - score presence: `white=23`, `black=22`, `gray=15`, `blue=10`, `red=9`, `green=3`
+  - missing requested: `blue=8`, `green=4`, `black=3`, `white=3`, `red=2`, `gray=1`
+  - warnings: `requested_color_missing_in_score=17`, `green_requested_but_missing_in_score=4`
+  - green delivery rate: 3 / 6 = 0.5
+
+impressionism 結果:
+
+- 成功: 30 / 30
+- 失敗: 0 / 30
+- fallback: 4件 (`010`, `015`, `018`, `025`)
+- slow sample: 5件 (`010`, `015`, `018`, `022`, `025`)
+- tokens in/out: 326,781 / 11,706
+- primitives: `line=44`, `ellipse=25`, `square=14`, `arc=3`, `circle=3`
+- colors: `black=30`, `white=23`, `gray=19`, `red=10`, `blue=6`, `green=1`
+- color trace:
+  - requested: `white=20`, `black=20`, `blue=19`, `gray=17`, `red=9`, `green=7`
+  - score presence: `black=25`, `white=21`, `gray=16`, `blue=8`, `red=8`, `green=2`
+  - missing requested: `blue=11`, `green=6`, `gray=4`, `black=3`, `red=2`, `white=2`
+  - warnings: `requested_color_missing_in_score=20`, `green_requested_but_missing_in_score=6`
+  - green delivery rate: 2 / 7 = 0.2857
+
+評価:
+
+- CLI の色カタログ切り替えは動作している。contact sheet 上でも default と impressionism の色味差は明確に出た。
+- `color_trace` により、green がどのサンプルで要求され、Score に落ちたかが追跡できるようになった。
+- fallback は Build 250 直前の 7件から default 2件、impressionism 4件へ減った。安定性は改善している。
+- line count は両方 `44` で、Build 250 の `50` より減ったが、依然として最大 primitive。
+- square は default `12`, impressionism `14` で一定数出ている。arc は両方 `3`。triangle は依然として aggregate に出ていない。
+- contact sheet 上では、`026` や `025` に局所的な複合形が見えるが、全体として「楽しい複雑形」はまだ少ない。
+- 数学的均衡は、`029` のグリッドや `012` の斜め反復など一部に見えるが、golden offset / counterweight / prime spacing のような明確な構図判断にはまだ弱い。
+- 緑の到達率は default で 50%、impressionism で 28.6%。green repair は不十分。
+
+green 到達の問題:
+
+- `007` 秋の森では、入力に森があり green marker が立つが、DDL と Score は赤・黒に寄り、green が落ちた。
+- `011` 庭・枯れ草では、green marker が立つが、Score は black / blue / gray / white になり green が落ちた。
+- `017` 竹林では、fallback 経由で gray / white に寄り、green が落ちた。
+- `022` 手紙の余白では、`言えなかった言葉` の「葉」が marker に誤検出され、green requested になっている。日本語 substring ベースの green marker が過剰検出している。
+- `012`, `026` は color_cycle に green が入り、green delivery は成立した。
+
+次の改善点:
+
+1. 日本語 color marker の精度改善
+   - `葉` 単独で green marker にすると、`言葉` が誤検出される。
+   - `葉` は `落ち葉`, `若葉`, `木の葉`, `葉っぱ`, `葉脈` などの語として検出する。
+   - `草`, `苔`, `竹`, `森`, `庭`, `香り`, `芽` は維持するが、文脈に応じた過剰検出を避ける。
+
+2. Green repair の複数色対応
+   - 現状は既存 instruction の1つを順番に上書きするため、複数 missing colors がある場合、後続色で green が上書きされる可能性がある。
+   - requested color が複数ある場合は、既存 arrangement の `color_cycle` に追加するか、補助 instruction を追加する。
+   - green requested かつ green absent の場合は、他色より green を優先し、最後に必ず残るようにする。
+
+3. Green intent の意味分解
+   - `秋の森で落ち葉が深い赤` は主色 red が正しいが、green は背景・残響・森の低彩度層として薄く残すべき。
+   - `枯れた草` は鮮やかな green ではなく、green/gray の中間として `color_hint` に枯草を残す。
+   - `竹林` は green を主線または輪郭色として残す。
+
+4. Triangle delivery の追加確認
+   - shape repair は square / arc には効いているが、30件では triangle が aggregate に出ていない。
+   - 定点30件に triangle を誘発する明確な山・屋根・鋭角 prompt が少ない可能性があるため、shape 小ベンチを別途作る。
+   - ただし `遠雷の前、低い雲が街の屋根...` は roof intent があるため、triangle または rotated square が出るべき。現在は square 止まり。
+
+5. Complex motif の強化
+   - 現在は prompt 指示のみで、Score schema には motif 概念がないため、LLM が単体 instruction に戻りやすい。
+   - deterministic repair で、leaf cluster / paper shard / ripple knot / mountain sign を追加できるようにする。
+   - motif 数は 1作品あたり 1〜2 に制限し、過密化を避ける。
+
+6. Mathematical balance trace
+   - 現状の summary では、数学的均衡が実際に使われたか機械的に分からない。
+   - `analysis-summary.json` に `math_balance_markers` を追加する。
+   - radial count 5/8/13/21、golden-like center、rule-of-thirds-like center、counterweight-like opposite placement を検出する。
+
+7. 次回ベンチ方針
+   - まず green marker / green repair を修正する。
+   - その後、green-heavy 10件小ベンチと shape-heavy 10件小ベンチを実行する。
+   - 小ベンチで到達率を確認してから、再度 default / impressionism の30件比較へ進む。

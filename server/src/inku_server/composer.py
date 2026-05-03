@@ -54,6 +54,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **柔らかな光・日差し → 白または黄色寄りの薄い ellipse を重ね、filled=true, color_hint に原文の光を保持する。香り・匂い → 緑/白/灰の小さな ellipse または arc を wave path で少数散らす。蕾・開花待ち → 赤/白の小さな ellipse を斜めの帯で残す。五感・気配 → 薄い arc/ellipse と fade で残す**
 - **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
 - **山・屋根・鋭い先端 → triangle を使える。葉・花びら・羽・紙片 → thin ellipse / rotated square として扱い、自然プリミティブ plugin が無い現在も抽象化された自然/物質形として残す**
+- **楽しい形・複雑な形は、単体 primitive ではなく 2〜5 個の primitive の局所 motif として作る。例: 葉=細い ellipse + arc、紙片=rotated square + 細線、種=ellipse + 小粒、山=triangle + 余白を切る line、波紋=arc + 小 ellipse**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
 - **背景色と描画色が同じで、実質的に見えない instruction を作ってはいけない。background と同色なら面積の少ない側を変更する。通常は線・小図形・点の color を黒・白・青・赤・緑などの文脈に合う可視色へ寄せる。大きな主題図形が同色の場合だけ background 側を変更してよい**
@@ -74,6 +75,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「上端寄りの焦点」→ center=[0.5,0.18]。「右半分の焦点」→ center=[0.72,0.5]**
 - **「正五角形の頂点に五個」→ arrangement count=5 layout=radial。五芒星的な均衡の点列として扱う**
 - **「フィボナッチ」「十三」「二十一」などの数量はそのまま使い、意外性のある規則的な層として扱う**
+- **数学的均衡は中央対称ではない。golden offset、三分割、白銀比、prime spacing、fibonacci count、counterweight を使い、主焦点と反対側の小要素で釣り合いを作る**
 - **「対位法の反行」→ 既存方向と反対の斜線層。右下がり=rotation=30、右上がり=rotation=-30**
 - **「倍音列」→ 整数比の放射層。弧または円を count=4 layout=radial として扱う**
 - **「輪唱のずれ」→ 同形を少しずつ横方向に並べる反復。layout=horizontal、count は DDL の数を使う**
@@ -283,6 +285,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Soft light / sunlight → layered pale white or yellow-leaning ellipse, filled=true, preserving the original phrase in color_hint. Scent / fragrance → small green/white/gray ellipse or arc along path="wave". Buds / waiting to bloom → small red/white ellipses along a diagonal band. Five-sense presence / atmosphere → faint arc/ellipse with fade**
 - **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**
 - **Mountain / roof / sharp peak → triangle is allowed. Leaf / petal / feather / paper fragment → use thin ellipse or rotated square so abstract natural/material forms survive until natural primitive plugins exist**
+- **Playful or complex shapes should be local motifs made from 2-5 primitives, not a single primitive. Examples: leaf=thin ellipse + arc, paper shard=rotated square + thin line, seed pod=ellipse + small particles, mountain=triangle + a line cutting negative space, ripple=arc + small ellipse**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
 - **Do not create effectively invisible instructions whose drawing color matches the background. If they match, change the smaller visual area. Usually change line/small-shape/dot color to a context-fitting visible color such as black, white, blue, red, or green. Change the background only when the matching subject is large and dominant**
@@ -303,6 +306,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"upper-edge focus" → center=[0.5,0.18]. "right-half focus" → center=[0.72,0.5]**
 - **"regular pentagon vertices" → arrangement count=5 layout=radial. Treat it as a pentagonal balance layer**
 - **Fibonacci-like counts such as thirteen and twenty-one are intentional; keep them as explicit counts**
+- **Mathematical balance is not central symmetry. Use golden offset, rule-of-thirds, silver ratio, prime spacing, fibonacci count, and counterweight; balance the main focus with smaller elements on the opposite side**
 - **"contrapuntal contrary motion" → a line layer moving against the main direction. Falling to the right uses rotation=30; rising to the right uses rotation=-30**
 - **"harmonic overtone series" → an integer-ratio radial arc/circle layer. Keep the explicit count**
 - **"canon offset" → repeated same shape with slight horizontal delay. Use layout=horizontal and the explicit count**

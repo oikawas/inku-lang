@@ -287,3 +287,47 @@ def test_coerce_score_keeps_white_sensory_layers_pale_on_white_background():
 
     assert [ins.color for ins in fixed.instructions] == ["blue", "blue"]
     assert all("white sensory layer made visible as pale blue" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_repairs_missing_green_from_natural_ddl():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.18, 0.08],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="竹林の香りを含む薄い楕円を波打つ軌跡に沿って散らす。")
+
+    assert any(ins.color == "green" for ins in fixed.instructions)
+    assert any("green restored from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_repairs_missing_shape_intents_from_ddl():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="鋭い山のかたちを置く。波紋の弧を添える。折れた紙片を散らす。")
+
+    primitives = {ins.primitive for ins in fixed.instructions}
+    assert {"triangle", "arc", "square"} <= primitives
+    hints = " ".join(ins.color_hint or "" for ins in fixed.instructions)
+    assert "triangle restored from DDL shape intent" in hints
+    assert any(ins.primitive == "arc" and "coverage from DDL clause" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert "square restored from DDL shape intent" in hints

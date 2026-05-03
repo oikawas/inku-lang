@@ -581,6 +581,176 @@ def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thu
     sheet.save(output_path)
 
 
+def _history_hash_label(item: dict[str, Any]) -> str:
+    value = item.get("render_hash_short") or str(item.get("render_hash") or "")[-4:]
+    return str(value).upper()
+
+
+def _history_hash_matches(item: dict[str, Any], ref: str) -> bool:
+    needle = ref.strip().lower().removeprefix("#")
+    render_hash = str(item.get("render_hash") or "").lower()
+    short_hash = str(item.get("render_hash_short") or "").lower()
+    return bool(needle) and (render_hash.endswith(needle) or short_hash == needle)
+
+
+def _resolve_history_hash(items: list[dict[str, Any]], ref: str) -> dict[str, Any]:
+    matches = [item for item in items if _history_hash_matches(item, ref)]
+    if not matches:
+        raise CliError(f"history hash not found: {ref}")
+    if len(matches) > 1:
+        candidates = ", ".join(
+            f"#{_history_hash_label(item)} {item.get('at')} {str(item.get('input') or '')[:28]}"
+            for item in matches[:8]
+        )
+        raise CliError(f"history hash is ambiguous: {ref}. candidates: {candidates}. Use more digits.")
+    return matches[0]
+
+
+def _select_history_items(
+    items: list[dict[str, Any]],
+    *,
+    hashes: list[str],
+    from_hash: str | None,
+    to_hash: str | None,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    if from_hash or to_hash:
+        if not from_hash or not to_hash:
+            raise CliError("--from and --to must be used together")
+        start = _resolve_history_hash(items, from_hash)
+        end = _resolve_history_hash(items, to_hash)
+        start_index = items.index(start)
+        end_index = items.index(end)
+        lo, hi = sorted((start_index, end_index))
+        for item in items[lo:hi + 1]:
+            item_id = str(item.get("id") or "")
+            if item_id and item_id not in seen:
+                selected.append(item)
+                seen.add(item_id)
+    for ref in hashes:
+        item = _resolve_history_hash(items, ref)
+        item_id = str(item.get("id") or "")
+        if item_id and item_id not in seen:
+            selected.append(item)
+            seen.add(item_id)
+    if not selected:
+        raise CliError("no history hashes were specified")
+    return selected
+
+
+def _fetch_all_history(client: ApiClient, *, starred: bool = False, query: str | None = None) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    offset = 0
+    limit = 100
+    total = None
+    while total is None or offset < total:
+        data, _ = client.request(
+            "GET",
+            "/api/history",
+            query={"offset": offset, "limit": limit, "q": query, "starred": starred},
+        )
+        page = data.get("items")
+        if not isinstance(page, list):
+            raise CliError("server returned invalid history list")
+        items.extend(item for item in page if isinstance(item, dict))
+        total = int(data.get("total") or len(items))
+        if not page:
+            break
+        offset += len(page)
+    return items
+
+
+def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) -> dict[str, Any]:
+    results: list[dict[str, Any]] = []
+    total_elapsed = 0
+    total_in = 0
+    total_out = 0
+    for index, item in enumerate(items, start=1):
+        tokens_in = int(item.get("tokens_in") or 0)
+        tokens_out = int(item.get("tokens_out") or 0)
+        elapsed = int(item.get("elapsed_ms") or 0)
+        total_in += tokens_in
+        total_out += tokens_out
+        total_elapsed += elapsed
+        results.append({
+            "index": index,
+            "id": item.get("id"),
+            "hash": item.get("render_hash"),
+            "hash_short": _history_hash_label(item),
+            "at": item.get("at"),
+            "text": item.get("input"),
+            "ddl": item.get("ddl"),
+            "elapsed_ms": elapsed,
+            "tokens_in": tokens_in or None,
+            "tokens_out": tokens_out or None,
+            "stage1_model": item.get("stage1_model"),
+            "stage2_model": item.get("stage2_model"),
+            "render_build_number": item.get("render_build_number"),
+            "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
+            "render_color_catalog_name": item.get("render_color_catalog_name"),
+            **_score_metrics(item.get("score")),
+        })
+    aggregate_primitive: Counter[str] = Counter()
+    aggregate_color: Counter[str] = Counter()
+    aggregate_density: Counter[str] = Counter()
+    aggregate_fade: Counter[str] = Counter()
+    for result in results:
+        aggregate_primitive.update(result.get("score_primitive_counts") or {})
+        aggregate_color.update(result.get("score_color_counts") or {})
+        aggregate_density.update(result.get("score_density_counts") or {})
+        aggregate_fade.update(result.get("score_fade_counts") or {})
+    return {
+        "total": len(items),
+        "elapsed_total_ms": total_elapsed,
+        "tokens_in": total_in or None,
+        "tokens_out": total_out or None,
+        "render_build_numbers": sorted({str(item.get("render_build_number")) for item in items if item.get("render_build_number") is not None}),
+        "score_primitive_counts": dict(sorted(aggregate_primitive.items())),
+        "score_color_counts": dict(sorted(aggregate_color.items())),
+        "score_density_counts": dict(sorted(aggregate_density.items())),
+        "score_fade_counts": dict(sorted(aggregate_fade.items())),
+        "paths": paths,
+        "results": results,
+    }
+
+
+def _write_history_export(
+    items: list[dict[str, Any]],
+    *,
+    out_dir: Path,
+    columns: int,
+    thumb_size: int,
+) -> dict[str, Any]:
+    try:
+        import cairosvg
+    except ImportError as exc:
+        raise CliError("history-export requires cairosvg for contact-sheet PNGs") from exc
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    item_dir = out_dir / "items"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    for index, item in enumerate(items, start=1):
+        label = _history_hash_label(item) or str(index).zfill(4)
+        prefix = item_dir / f"{index:03d}-{label}"
+        _write_json_file(prefix.with_suffix(".json"), item)
+        svg = str(item.get("svg") or "")
+        prefix.with_suffix(".svg").write_text(svg, encoding="utf-8")
+        cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=str(prefix.with_suffix(".png")))
+    sheet_path = out_dir / "contact-sheet.png"
+    _make_contact_sheet(item_dir, sheet_path, columns=columns, thumb_size=thumb_size)
+    summary_path = out_dir / "summary.json"
+    paths = {
+        "out_dir": str(out_dir),
+        "items_dir": str(item_dir),
+        "contact_sheet": str(sheet_path),
+        "summary_json": str(summary_path),
+    }
+    summary = _history_export_summary(items, paths)
+    _write_json_file(summary_path, summary)
+    return summary
+
+
 def _coord_pair(value: Any) -> tuple[float, float] | None:
     if not isinstance(value, (list, tuple)) or len(value) != 2:
         return None
@@ -1281,6 +1451,30 @@ def command_history(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_history_export(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    items = _fetch_all_history(client, starred=args.starred, query=args.query)
+    selected = _select_history_items(
+        items,
+        hashes=args.hashes or [],
+        from_hash=args.from_hash,
+        to_hash=args.to_hash,
+    )
+    summary = _write_history_export(
+        selected,
+        out_dir=Path(args.out_dir),
+        columns=args.columns,
+        thumb_size=args.thumb_size,
+    )
+    _print_json(summary)
+    return 0
+
+
 def command_version(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -1401,6 +1595,18 @@ def build_parser() -> argparse.ArgumentParser:
     history.add_argument("--query", "-q")
     history.add_argument("--starred", action="store_true")
     history.set_defaults(func=command_history)
+
+    history_export = subparsers.add_parser("history-export", help="export history items by hash for benchmark review")
+    _add_common_server_args(history_export)
+    history_export.add_argument("hashes", nargs="*", help="individual 4+ digit history hash suffixes")
+    history_export.add_argument("--from", dest="from_hash", help="start hash suffix for an inclusive history-order range")
+    history_export.add_argument("--to", dest="to_hash", help="end hash suffix for an inclusive history-order range")
+    history_export.add_argument("--out-dir", "-o", required=True, help="output directory for contact sheet and JSON files")
+    history_export.add_argument("--columns", type=int, default=5)
+    history_export.add_argument("--thumb-size", type=int, default=220)
+    history_export.add_argument("--query", "-q", help="filter history before resolving hashes")
+    history_export.add_argument("--starred", action="store_true", help="filter history to starred items before resolving hashes")
+    history_export.set_defaults(func=command_history_export)
 
     version_cmd = subparsers.add_parser("version", help="show CLI and server version/build information")
     _add_common_server_args(version_cmd)

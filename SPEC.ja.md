@@ -1368,12 +1368,12 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
 - `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
-- `db.py` — SQLAlchemy DB 層。履歴、スター状態、ユーザーグループ、ユーザーアカウント、セッション、ユーザー別 UI 設定、バッチ指示履歴、プラグイン拡張記憶域を管理。パスワードは PBKDF2-SHA256 + salt で保存
+- `db.py` — SQLAlchemy DB 層。履歴、描画内容ハッシュ、スター状態、ユーザーグループ、ユーザーアカウント、セッション、ユーザー別 UI 設定、バッチ指示履歴、プラグイン拡張記憶域を管理。パスワードは PBKDF2-SHA256 + salt で保存
 - `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/history/{id}/star`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
 - `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
 
 `cli/src/inku_cli/`:
-- `cli.py` — `inku-api` を操作する API クライアント CLI。`login` / `logout` / `me` / `paint` / `batch` / `demo-instruction` / `history` を提供する。サーバー内部モジュールを import せず、HTTP API のみを利用する
+- `cli.py` — `inku-api` を操作する API クライアント CLI。`login` / `logout` / `me` / `paint` / `batch` / `demo-instruction` / `history` / `history-export` を提供する。サーバー内部モジュールを import せず、HTTP API のみを利用する
 
 
 **別リポジトリ / 別 PoC**:
@@ -1383,6 +1383,29 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.41 (2026-05-03)
+
+**履歴描画ハッシュとCLI履歴エクスポート**
+
+履歴DBの各描画に、描画内容に基づく `render_hash` を付与する。
+
+- `render_hash` は canonical JSON 化した `input` / `ddl` / `score` / `svg` / render metadata から SHA-256 で生成し、DB上には64桁hexを正規値として保存する
+- API の履歴レスポンスと `/api/paint` の履歴保存レスポンスには `render_hash` と、末尾4桁を大文字化した `render_hash_short` を含める
+- 既存履歴はDBマイグレーション時に `render_hash` をバックフィルする
+- 履歴管理ダイアログでは、サムネイルとリスト表示に `#ABCD` 形式の4桁短縮ハッシュをレイアウトを壊さないチップとして表示し、クリックで正規ハッシュをコピーできる
+- 履歴管理ダイアログは現在のウインドウサイズに対して上下左右10%の余白を基準に大きく開き、サムネイル下には指示文の先頭、その下にスター、短縮ハッシュ、削除/復元操作を並べる
+- サムネイル下の指示文は、先頭に `#123` のような番号がある場合はその番号を省略して表示する
+- サムネイル操作部の未スター状態は小さくても視認できるコントラストにし、左上の選択チェックボックスも小型化して枠線を細くする
+- 履歴管理ダイアログのページ切り替えでは、複数の再取得が重なっても最後の完了時に読み込み中表示を必ず解除する
+- 履歴管理ダイアログのサムネイル表示は、ダイアログ内の実表示領域から列数と行数を測定し、スクロールバーを出さずに収まる件数をページサイズとして動的に再計算する
+- サムネイル操作行のスターはクリックイベントをカード選択から分離し、カード実寸を使ってページサイズを再計算することで下端余白を詰める
+- サムネイル操作行は左下にスターを置き、ハッシュは `#` を付けず削除ボタンと同じボタン寸法感に揃える
+- ダークモードでもスター済み状態の色が通常状態に上書きされないよう、スター済み表示を明示する
+- CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
+- CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
+- 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める
+- build number: 280
 
 ### v1.40 (2026-05-03)
 

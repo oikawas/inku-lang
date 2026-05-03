@@ -296,6 +296,8 @@ export interface LangPack {
 	historyLoading: string;
 	historyRestore: string;
 	historyImageHeader: string;
+	historyHashHeader: string;
+	historyHashCopyTitle: string;
 	historyCreatedAtHeader: string;
 	historyModelHeader: string;
 	historySecondsHeader: string;

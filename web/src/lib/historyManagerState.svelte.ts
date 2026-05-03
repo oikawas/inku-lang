@@ -1,4 +1,4 @@
-export const HISTORY_MANAGER_PAGE_SIZE = 100;
+export const HISTORY_MANAGER_DEFAULT_PAGE_SIZE = 24;
 
 export type HistoryManagerView = 'active' | 'trash';
 export type HistoryManagerTab = 'thumbs' | 'list';
@@ -24,6 +24,8 @@ export type HistoryItem = {
 	render_color_catalog_name?: string | null;
 	render_color_catalog_sub?: string | null;
 	render_color_map?: Record<string, string> | null;
+	render_hash?: string | null;
+	render_hash_short?: string | null;
 	trashed?: boolean;
 	starred?: boolean;
 };
@@ -43,6 +45,7 @@ export class HistoryManagerState {
 	view = $state<HistoryManagerView>('active');
 	tab = $state<HistoryManagerTab>('thumbs');
 	page = $state(0);
+	pageSize = $state(HISTORY_MANAGER_DEFAULT_PAGE_SIZE);
 	loading = $state(false);
 	starredOnly = $state(false);
 	activeItems = $state<HistoryItem[]>([]);
@@ -52,11 +55,12 @@ export class HistoryManagerState {
 	search = $state('');
 	selectedIds = $state<string[]>([]);
 	private requestId = 0;
+	private pendingRequests = 0;
 
 	items = $derived(this.view === 'trash' ? this.trashItems : this.activeItems);
 	total = $derived(this.view === 'trash' ? this.trashTotal : this.activeTotal);
-	totalPages = $derived(Math.max(1, Math.ceil(this.total / HISTORY_MANAGER_PAGE_SIZE)));
-	offset = $derived(this.page * HISTORY_MANAGER_PAGE_SIZE);
+	totalPages = $derived(Math.max(1, Math.ceil(this.total / this.pageSize)));
+	offset = $derived(this.page * this.pageSize);
 	shownTo = $derived(Math.min(this.offset + this.items.length, this.total));
 
 	constructor(
@@ -69,6 +73,7 @@ export class HistoryManagerState {
 		this.view = 'active';
 		this.tab = 'thumbs';
 		this.page = 0;
+		this.pageSize = HISTORY_MANAGER_DEFAULT_PAGE_SIZE;
 		this.loading = false;
 		this.starredOnly = false;
 		this.activeItems = [];
@@ -78,6 +83,7 @@ export class HistoryManagerState {
 		this.search = '';
 		this.selectedIds = [];
 		this.requestId += 1;
+		this.pendingRequests = 0;
 	}
 
 	openWith(activeItems: HistoryItem[], activeTotal: number, trashTotal: number) {
@@ -100,13 +106,15 @@ export class HistoryManagerState {
 		const page = options.page ?? this.page;
 		const search = options.search ?? this.search.trim();
 		const starredOnly = options.starredOnly ?? this.starredOnly;
+		this.pendingRequests += 1;
 		this.loading = true;
 		try {
 			const trashed = view === 'trash';
-			const offset = page * HISTORY_MANAGER_PAGE_SIZE;
+			const pageSize = this.pageSize;
+			const offset = page * pageSize;
 			const params = new URLSearchParams({
 				offset: String(offset),
-				limit: String(HISTORY_MANAGER_PAGE_SIZE),
+				limit: String(pageSize),
 				q: search,
 			});
 			if (trashed) params.set('trashed', 'true');
@@ -137,7 +145,8 @@ export class HistoryManagerState {
 			}
 		} catch { /* ignore */ }
 		finally {
-			if (requestId === this.requestId) this.loading = false;
+			this.pendingRequests = Math.max(0, this.pendingRequests - 1);
+			if (requestId === this.requestId || this.pendingRequests === 0) this.loading = false;
 		}
 	};
 
@@ -161,6 +170,16 @@ export class HistoryManagerState {
 		this.page = nextPage;
 		this.selectedIds = [];
 		void this.fetch({ page: nextPage });
+	};
+
+	setPageSize = (pageSize: number) => {
+		const nextPageSize = Math.max(1, Math.min(200, Math.floor(pageSize)));
+		if (nextPageSize === this.pageSize) return;
+		const firstVisibleIndex = this.page * this.pageSize;
+		this.pageSize = nextPageSize;
+		this.page = Math.max(0, Math.floor(firstVisibleIndex / nextPageSize));
+		this.selectedIds = [];
+		void this.fetch({ page: this.page });
 	};
 
 	searchChanged = (search: string) => {

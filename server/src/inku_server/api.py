@@ -368,6 +368,8 @@ class PaintResponse(BaseModel):
     render_color_catalog_name: str | None = None
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
+    render_hash: str | None = None
+    render_hash_short: str | None = None
     history_id: str | None = None
     history_at: int | None = None
     elapsed_stage1_ms: int = 0
@@ -455,6 +457,8 @@ class HistoryPostBody(BaseModel):
 class HistoryItem(HistoryPostBody):
     id: str
     output_path: str | None = None
+    render_hash: str | None = None
+    render_hash_short: str | None = None
     trashed: bool = False
     starred: bool = False
 
@@ -1536,6 +1540,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
     history_id = None
     history_at = None
+    render_hash = None
+    render_hash_short = None
     save_artifacts = req.save_artifacts if req.save_artifacts is not None else req.save_history
     if req.save_history:
         history_at = req.history_at or int(time.time() * 1000)
@@ -1556,6 +1562,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             render_metadata=render_metadata,
         )
         history_id = item["id"]
+        render_hash = item.get("render_hash")
+        render_hash_short = item.get("render_hash_short")
     elif save_artifacts:
         history_at = req.history_at or int(time.time() * 1000)
         item_id = str(uuid.uuid4())
@@ -1585,6 +1593,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         **render_metadata,
         history_id=history_id,
         history_at=history_at,
+        render_hash=render_hash,
+        render_hash_short=render_hash_short,
         elapsed_stage1_ms=elapsed_stage1_ms,
         elapsed_stage2_ms=elapsed_stage2_ms,
         elapsed_total_ms=elapsed_total_ms,

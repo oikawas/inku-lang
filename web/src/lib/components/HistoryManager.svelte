@@ -16,6 +16,8 @@
 		tokens_in?: number | null;
 		tokens_out?: number | null;
 		catalog_id?: string | null;
+		render_hash?: string | null;
+		render_hash_short?: string | null;
 		trashed?: boolean;
 		starred?: boolean;
 	};
@@ -38,6 +40,7 @@
 		onClose: () => void;
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
+		onSetPageSize: (pageSize: number) => void;
 		onSetStarredOnly: (value: boolean) => void;
 		onSelectAll: () => void;
 		onAskTrash: (ids: string[]) => void;
@@ -73,6 +76,7 @@
 		onClose,
 		onSetView,
 		onSetPage,
+		onSetPageSize,
 		onSetStarredOnly,
 		onSelectAll,
 		onAskTrash,
@@ -100,6 +104,7 @@
 
 	let tooltipState = $state<TooltipState | null>(null);
 	let tooltipTimer: ReturnType<typeof setTimeout> | null = null;
+	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
 
 	function handleThumbKeydown(event: KeyboardEvent, item: HistoryItem) {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -137,6 +142,86 @@
 			};
 		}, 700);
 	}
+
+	function hashLabel(item: HistoryItem): string {
+		return (item.render_hash_short || item.render_hash?.slice(-4) || '').toUpperCase();
+	}
+
+	function copyHash(item: HistoryItem, event: MouseEvent) {
+		event.stopPropagation();
+		event.preventDefault();
+		const hash = item.render_hash || hashLabel(item);
+		if (!hash) return;
+		if (navigator.clipboard?.writeText) {
+			void navigator.clipboard.writeText(hash).catch(() => fallbackCopy(hash));
+			return;
+		}
+		fallbackCopy(hash);
+	}
+
+	function fallbackCopy(text: string) {
+		const textarea = document.createElement('textarea');
+		textarea.value = text;
+		textarea.setAttribute('readonly', '');
+		textarea.style.position = 'fixed';
+		textarea.style.left = '-9999px';
+		textarea.style.top = '0';
+		document.body.appendChild(textarea);
+		textarea.select();
+		try {
+			document.execCommand('copy');
+		} finally {
+			document.body.removeChild(textarea);
+		}
+	}
+
+	function thumbnailPromptText(text: string): string {
+		return historyPreviewText(text.replace(/^\s*#\d+\s*/, ''));
+	}
+
+	function toggleStarFromThumb(item: HistoryItem, event: MouseEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		void onToggleStar(item, event);
+	}
+
+	function calculatePageSize(element: HTMLElement): number {
+		const width = element.clientWidth;
+		const height = element.clientHeight;
+		if (width <= 0 || height <= 0) return 1;
+		const grid = element.querySelector('.history-thumb-grid');
+		const computed = grid ? getComputedStyle(grid) : null;
+		const gap = computed ? Number.parseFloat(computed.rowGap || computed.gap || '8') || 8 : 8;
+		const minCardWidth = 104;
+		const columns = Math.max(1, Math.floor((width + gap) / (minCardWidth + gap)));
+		const firstCard = element.querySelector('.manager-thumb-wrap');
+		let cardHeight = firstCard instanceof HTMLElement ? firstCard.getBoundingClientRect().height : 0;
+		if (cardHeight <= 0) {
+			const cardWidth = Math.max(minCardWidth, (width - gap * (columns - 1)) / columns);
+			const imageHeight = cardWidth * 58 / 82;
+			cardHeight = imageHeight + 48;
+		}
+		const rows = Math.max(1, Math.floor((height + gap) / (cardHeight + gap)));
+		return Math.max(1, columns * rows);
+	}
+
+	$effect(() => {
+		const element = thumbGridWrapEl;
+		managedHistoryItems.length;
+		if (!element || historyManagerTab !== 'thumbs') return;
+		let frame = 0;
+		const update = () => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => onSetPageSize(calculatePageSize(element)));
+		};
+		update();
+		const observer = new ResizeObserver(update);
+		observer.observe(element);
+		return () => {
+			cancelAnimationFrame(frame);
+			observer.disconnect();
+		};
+	});
 </script>
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -184,7 +269,7 @@
 		<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
 	</div>
 	{#if historyManagerTab === 'thumbs'}
-		<div class="history-thumb-grid-wrap">
+		<div class="history-thumb-grid-wrap" bind:this={thumbGridWrapEl}>
 			<div class="history-thumb-grid">
 				{#each managedHistoryItems as it, i (it.id ?? it.at)}
 					<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
@@ -203,25 +288,25 @@
 							tabindex={historyManagerView === 'active' ? 0 : -1}
 						>
 							<HistoryThumbnail item={it} scope="manager" size="manager" />
-							<button
-								class="thumb-star"
-								class:starred={!!it.starred}
-								onclick={(event) => onToggleStar(it, event)}
-								title={it.starred ? t().starOn : t().starOff}
-								aria-label={it.starred ? t().starOn : t().starOff}
-							>★</button>
-							<div class="thumb-meta">
-								<span class="thumb-time">{formatElapsed(it.elapsed_ms)}</span>
-								{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
-							</div>
 						</div>
 						<div class="manager-thumb-actions">
-							{#if historyManagerView === 'active'}
-								<button class="ghost-btn" onclick={() => it.id && onAskTrash([it.id])}>{t().deleteButton}</button>
-							{:else}
-								<button class="ghost-btn" onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
-								<button class="danger-btn" onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
-							{/if}
+							<div class="thumb-catalog" title={it.input}>{thumbnailPromptText(it.input)}</div>
+							<div class="thumb-action-row">
+								<button
+									class="hash-row-star"
+									class:starred={!!it.starred}
+									onclick={(event) => toggleStarFromThumb(it, event)}
+									title={it.starred ? t().starOn : t().starOff}
+									aria-label={it.starred ? t().starOn : t().starOff}
+								>★</button>
+								{#if hashLabel(it)}<button class="hash-chip" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>{hashLabel(it)}</button>{/if}
+								{#if historyManagerView === 'active'}
+									<button class="ghost-btn" onclick={() => it.id && onAskTrash([it.id])}>{t().deleteButton}</button>
+								{:else}
+									<button class="ghost-btn" onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
+									<button class="danger-btn" onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
+								{/if}
+							</div>
 						</div>
 					</div>
 				{/each}
@@ -231,7 +316,7 @@
 		<div class="history-table-wrap">
 			<table class="history-table">
 				<thead>
-					<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyModelHeader}</th><th>{t().historySecondsHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historyActionHeader}</th></tr>
+					<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyHashHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyModelHeader}</th><th>{t().historySecondsHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historyActionHeader}</th></tr>
 				</thead>
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
@@ -247,6 +332,7 @@
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
 							</td>
+							<td>{#if hashLabel(it)}<button class="hash-chip table-hash" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>#{hashLabel(it)}</button>{/if}</td>
 							<td>{formatHistoryDate(it.at)}</td>
 							<td>{historyModelSummary(it)}</td>
 							<td>{formatElapsed(it.elapsed_ms)}</td>
@@ -277,6 +363,7 @@
 		<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(tooltipState.item.at)}</strong></div>
 		<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(tooltipState.item.elapsed_ms)}</strong></div>
 		<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(tooltipState.item.catalog_id)}</strong></div>
+		{#if hashLabel(tooltipState.item)}<div class="tooltip-row"><span>{t().historyHashHeader}</span><strong>#{hashLabel(tooltipState.item)}</strong></div>{/if}
 		<div class="tooltip-row"><span>{t().historyTooltipTokens}</span><strong>{historyTokenSummary(tooltipState.item)}</strong></div>
 		<div class="tooltip-date">{historyPreviewText(tooltipState.item.input)}</div>
 	</div>
@@ -292,9 +379,8 @@
 	}
 	.history-modal {
 		position: fixed;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
+		top: 10vh;
+		left: 10vw;
 		z-index: 401;
 		background: var(--panel2);
 		border-radius: var(--r-lg);
@@ -302,9 +388,8 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		width: min(1240px, calc(100vw - 24px));
-		height: min(720px, calc(100vh - 32px));
-		max-height: 88vh;
+		width: 80vw;
+		height: 80vh;
 	}
 	.modal-head {
 		display: flex;
@@ -393,14 +478,15 @@
 	.history-thumb-grid-wrap,
 	.history-table-wrap {
 		flex: 1;
-		overflow: auto;
-		padding: 12px 14px 14px;
+		padding: 8px 10px 6px;
 		min-height: 0;
 	}
+	.history-thumb-grid-wrap { overflow: hidden; }
+	.history-table-wrap { overflow: auto; }
 	.history-thumb-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-		gap: 12px;
+		gap: 8px;
 		align-items: start;
 	}
 	.manager-thumb-wrap {
@@ -408,7 +494,7 @@
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		background: var(--panel);
-		padding: 7px;
+		padding: 5px;
 		transition: border-color 0.12s, box-shadow 0.12s;
 		content-visibility: auto;
 		contain-intrinsic-size: 150px 164px;
@@ -423,9 +509,17 @@
 		left: 6px;
 		z-index: 30;
 		background: rgba(255,255,255,0.86);
-		border-radius: 3px;
+		border-radius: 2px;
 		line-height: 1;
-		padding: 2px;
+		padding: 1px;
+	}
+	.manager-check input {
+		width: 12px;
+		height: 12px;
+		margin: 0;
+		accent-color: var(--accent);
+		outline: 0.5px solid rgba(40,36,30,0.32);
+		outline-offset: -1px;
 	}
 	.thumb-star {
 		position: absolute;
@@ -514,26 +608,94 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.thumb-meta {
-		padding: 3px 5px;
-		border-top: 1px solid var(--border);
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
+	.thumb-catalog {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--fg2);
+		font-size: 11px;
+		line-height: 1.25;
 	}
-	.thumb-time { font-size: 11px; font-weight: 500; color: var(--fg2); }
-	.thumb-model { font-size: 10px; color: var(--fg3); }
+	.thumb-action-row {
+		display: flex;
+		align-items: flex-end;
+		gap: 4px;
+		justify-content: flex-start;
+		min-width: 0;
+		position: relative;
+		z-index: 40;
+	}
+	.hash-row-star {
+		flex: 0 0 auto;
+		position: relative;
+		z-index: 41;
+		width: 18px;
+		height: 18px;
+		border: 1px solid var(--border2);
+		border-radius: 50%;
+		background: var(--panel);
+		color: var(--fg3);
+		font-size: 10px;
+		line-height: 1;
+		cursor: pointer;
+		pointer-events: auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+	}
+	.hash-row-star.starred {
+		color: #d59b21;
+		background: #fff6ce;
+		border-color: rgba(213,155,33,0.45);
+	}
+	:global(html[data-theme='dark']) .hash-row-star {
+		color: #b8c0cc;
+		border-color: rgba(255,255,255,0.22);
+		background: rgba(255,255,255,0.06);
+	}
+	:global(html[data-theme='dark']) .hash-row-star.starred {
+		color: #ffd166;
+		background: rgba(213,155,33,0.18);
+		border-color: rgba(255,209,102,0.55);
+	}
+	.hash-chip {
+		align-self: flex-end;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg2);
+		font-family: inherit;
+		font-size: 10px;
+		line-height: 1;
+		padding: 3px 7px;
+		cursor: copy;
+	}
+	.hash-chip:hover {
+		border-color: var(--accent);
+		color: var(--fg);
+	}
+	.table-hash {
+		font-size: 11px;
+		white-space: nowrap;
+	}
 	.manager-thumb {
 		width: 100%;
 	}
 	.manager-thumb-actions {
 		display: flex;
-		gap: 5px;
-		margin-top: 7px;
-		flex-wrap: wrap;
+		flex-direction: column;
+		gap: 4px;
+		margin-top: 5px;
+		min-width: 0;
+		position: relative;
+		z-index: 40;
 	}
 	.manager-thumb-actions .ghost-btn,
 	.manager-thumb-actions .danger-btn {
+		flex: 0 0 auto;
+		margin-left: auto;
 		font-size: 10px;
 		padding: 3px 7px;
 	}

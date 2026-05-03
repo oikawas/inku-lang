@@ -292,6 +292,7 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
         "render_color_catalog_sub",
         "render_color_catalog",
         "render_color_map",
+        "render_hash",
         "trashed",
         "starred",
     } <= columns
@@ -959,6 +960,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     data = r.json()
     assert data["history_id"]
     assert data["history_at"] == 1_700_000_000_000
+    assert len(data["render_hash"]) == 64
+    assert data["render_hash_short"] == data["render_hash"][-4:].upper()
     assert data["render_color_catalog_id"] == "vivid_material"
     assert data["render_color_catalog_name"] == "Vivid Material"
     assert data["render_color_map"]["green"] == "#008f39"
@@ -967,6 +970,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert history["total"] == 1
     item = history["items"][0]
     assert item["id"] == data["history_id"]
+    assert item["render_hash"] == data["render_hash"]
+    assert item["render_hash_short"] == data["render_hash_short"]
     assert item["input"] == "一滴の墨"
     assert item["catalog_id"] == "vivid_material"
     assert item["render_build_number"] == data["render_build_number"]

@@ -550,6 +550,8 @@ The reference implementation currently includes:
 - plugin storage, system/user plugin directories, and `canvas-aspect`
 - SVG export and template-based PNG export
 - CLI client foundation, benchmark summary output, and contact sheet generation
+- CLI history export by render hash for benchmark review contact sheets,
+  per-item JSON, and summary JSON
 - CLI version/build reporting and server-owned color catalog lookup
 - CLI benchmark diagnostics for color delivery, negated colors, motif hint
   arrival, and mathematical balance marker sample lines
@@ -560,6 +562,27 @@ The reference implementation currently includes:
   safeguards, and broader primitive use within the current schema
 - renderer material effects, wobble, rotation, arrangement paths, density/fade,
   and canvas aspect support
+
+History records carry a server-side `render_hash`: a 64-character SHA-256 hex
+hash of the rendered content and render metadata.  History APIs also expose a
+four-character uppercase short hash for human reference.  The history manager
+shows the short hash without changing the thumbnail layout; clicking it copies
+the full hash.  The CLI can resolve hash suffixes, reject ambiguous short
+matches, and export selected or ranged history items for benchmark review.
+The history manager opens at 80% of the current viewport, leaving 10% margins
+on each side, and thumbnail cards show the prompt preview above a compact
+star/hash/action row.
+Prompt previews omit a leading numeric marker such as `#12`, and the compact
+thumbnail controls keep visible contrast in both light and dark modes.
+History manager pagination tracks overlapping fetches so the loading indicator
+is cleared when the final request completes.
+Thumbnail pagination measures the actual dialog thumbnail area and dynamically
+uses only the number of items that fit without a thumbnail scrollbar.
+The thumbnail star action is isolated from card selection, and page sizing uses
+measured card height to reduce unused space at the bottom of the dialog.
+The thumbnail action row places the star at the lower left, shows hash labels
+without `#`, and aligns hash button typography with the delete action.
+Starred thumbnails keep an explicit highlighted star state in dark mode.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

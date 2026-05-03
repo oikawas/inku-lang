@@ -375,3 +375,49 @@ def test_batch_accepts_summary_json_option():
     args = parser.parse_args(["batch", "--file", "prompts.txt", "--summary-json", "summary.json"])
 
     assert args.summary_json == "summary.json"
+
+
+def test_history_export_parser_accepts_hash_range_and_individuals():
+    parser = cli.build_parser()
+    args = parser.parse_args([
+        "history-export",
+        "ABCD",
+        "1234",
+        "--from",
+        "F3DE",
+        "--to",
+        "0A9C",
+        "--out-dir",
+        "out",
+    ])
+
+    assert args.hashes == ["ABCD", "1234"]
+    assert args.from_hash == "F3DE"
+    assert args.to_hash == "0A9C"
+    assert args.out_dir == "out"
+
+
+def test_select_history_items_resolves_short_hashes_and_ranges():
+    items = [
+        {"id": "1", "render_hash": "a" * 60 + "1111", "render_hash_short": "1111"},
+        {"id": "2", "render_hash": "b" * 60 + "2222", "render_hash_short": "2222"},
+        {"id": "3", "render_hash": "c" * 60 + "3333", "render_hash_short": "3333"},
+    ]
+
+    selected = cli._select_history_items(items, hashes=["3333"], from_hash="1111", to_hash="2222")
+
+    assert [item["id"] for item in selected] == ["1", "2", "3"]
+
+
+def test_resolve_history_hash_rejects_ambiguous_short_hash():
+    items = [
+        {"id": "1", "render_hash": "a" * 60 + "1111", "render_hash_short": "1111", "input": "one"},
+        {"id": "2", "render_hash": "b" * 60 + "1111", "render_hash_short": "1111", "input": "two"},
+    ]
+
+    try:
+        cli._resolve_history_hash(items, "1111")
+    except cli.CliError as exc:
+        assert "ambiguous" in str(exc)
+    else:
+        raise AssertionError("expected ambiguous hash error")

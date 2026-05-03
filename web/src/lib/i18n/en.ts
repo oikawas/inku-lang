@@ -282,6 +282,8 @@ export const en: LangPack = {
 	historyLoading: 'loading',
 	historyRestore: 'restore',
 	historyImageHeader: 'image',
+	historyHashHeader: 'hash',
+	historyHashCopyTitle: 'copy hash',
 	historyCreatedAtHeader: 'created',
 	historyModelHeader: 'model',
 	historySecondsHeader: 'seconds',

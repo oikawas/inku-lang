@@ -57,6 +57,7 @@ class HistoryRow(Base):
     render_color_catalog_sub = Column(String, nullable=True)
     render_color_catalog = Column(Text, nullable=True)
     render_color_map = Column(Text, nullable=True)
+    render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
 
@@ -120,6 +121,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "render_color_catalog_sub": "ALTER TABLE history ADD COLUMN render_color_catalog_sub VARCHAR",
     "render_color_catalog": "ALTER TABLE history ADD COLUMN render_color_catalog TEXT",
     "render_color_map": "ALTER TABLE history ADD COLUMN render_color_map TEXT",
+    "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
 }
@@ -179,6 +181,7 @@ _HISTORY_INDEX_MIGRATIONS = (
         "ix_history_user_starred_trashed_at",
         "CREATE INDEX IF NOT EXISTS ix_history_user_starred_trashed_at ON history (user_id, starred, trashed, at)",
     ),
+    ("ix_history_render_hash", "CREATE INDEX IF NOT EXISTS ix_history_render_hash ON history (render_hash)"),
 )
 
 
@@ -227,6 +230,7 @@ def _migrate_columns() -> None:
                 conn.execute(text(ddl))
             except Exception as exc:  # noqa: BLE001
                 raise RuntimeError(f"failed to create migration index {index_name}") from exc
+        _backfill_render_hashes(conn)
         _migrate_history_search(conn)
 
 
@@ -285,6 +289,84 @@ def _now_ms() -> int:
     import time
 
     return int(time.time() * 1000)
+
+
+def _canonical_json(value) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def render_hash_for_item(item: dict) -> str:
+    payload = {
+        "input": item.get("input", ""),
+        "ddl": item.get("ddl"),
+        "score": item.get("score") or {},
+        "svg": item.get("svg", ""),
+        "render_build_number": item.get("render_build_number"),
+        "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
+        "render_color_catalog_name": item.get("render_color_catalog_name"),
+        "render_color_catalog_sub": item.get("render_color_catalog_sub"),
+        "render_color_map": item.get("render_color_map"),
+    }
+    return sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+def render_hash_short(render_hash: str | None) -> str | None:
+    return render_hash[-4:].upper() if render_hash else None
+
+
+def _row_hash_payload(row: HistoryRow) -> dict:
+    item = {
+        "input": row.input,
+        "ddl": row.ddl,
+        "score": json.loads(row.score) if row.score else {},
+        "svg": row.svg,
+        "catalog_id": row.catalog_id,
+        "render_build_number": row.render_build_number,
+        "render_color_catalog_id": row.render_color_catalog_id,
+        "render_color_catalog_name": row.render_color_catalog_name,
+        "render_color_catalog_sub": row.render_color_catalog_sub,
+    }
+    if row.render_color_map is not None:
+        try:
+            item["render_color_map"] = json.loads(row.render_color_map)
+        except json.JSONDecodeError:
+            item["render_color_map"] = None
+    return item
+
+
+def _backfill_render_hashes(conn) -> None:
+    if engine.dialect.name != "sqlite":
+        return
+    rows = conn.execute(text(
+        """
+        SELECT id, input, ddl, score, svg, catalog_id, render_build_number,
+               render_color_catalog_id, render_color_catalog_name,
+               render_color_catalog_sub, render_color_map
+        FROM history
+        WHERE render_hash IS NULL OR render_hash = ''
+        """
+    ))
+    for row in rows.mappings():
+        item = {
+            "input": row["input"],
+            "ddl": row["ddl"],
+            "score": json.loads(row["score"]) if row["score"] else {},
+            "svg": row["svg"],
+            "catalog_id": row["catalog_id"],
+            "render_build_number": row["render_build_number"],
+            "render_color_catalog_id": row["render_color_catalog_id"],
+            "render_color_catalog_name": row["render_color_catalog_name"],
+            "render_color_catalog_sub": row["render_color_catalog_sub"],
+        }
+        if row["render_color_map"] is not None:
+            try:
+                item["render_color_map"] = json.loads(row["render_color_map"])
+            except json.JSONDecodeError:
+                item["render_color_map"] = None
+        conn.execute(
+            text("UPDATE history SET render_hash = :render_hash WHERE id = :id"),
+            {"id": row["id"], "render_hash": render_hash_for_item(item)},
+        )
 
 
 def _hash_password(password: str) -> str:
@@ -566,6 +648,8 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "tokens_in":    row.tokens_in,
         "tokens_out":   row.tokens_out,
         "catalog_id":   row.catalog_id,
+        "render_hash":  row.render_hash,
+        "render_hash_short": render_hash_short(row.render_hash),
         "trashed":      bool(row.trashed),
         "starred":      bool(row.starred),
     }
@@ -615,6 +699,7 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
 
 
 def add_item(item: dict) -> dict:
+    render_hash = item.get("render_hash") or render_hash_for_item(item)
     row = HistoryRow(
         id=item["id"],
         user_id=item["user_id"],
@@ -635,6 +720,7 @@ def add_item(item: dict) -> dict:
         render_color_catalog_name=item.get("render_color_catalog_name"),
         render_color_catalog_sub=item.get("render_color_catalog_sub"),
         render_color_map=json.dumps(item.get("render_color_map"), ensure_ascii=False) if item.get("render_color_map") is not None else None,
+        render_hash=render_hash,
         trashed=0,
         starred=0,
     )

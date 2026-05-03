@@ -65,6 +65,8 @@
 		render_color_catalog_name?: string | null;
 		render_color_catalog_sub?: string | null;
 		render_color_map?: Record<string, string> | null;
+		render_hash?: string | null;
+		render_hash_short?: string | null;
 		history_id?: string | null;
 		history_at?: number | null;
 		elapsed_stage1_ms: number;
@@ -2044,7 +2046,7 @@
 			}
 			const saved = await r.json() as Iteration;
 			if (result) {
-				result = { ...result, history_id: saved.id, history_at: saved.at };
+				result = { ...result, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short };
 			}
 			demoCurrentSaved = true;
 			demoSaveStatus = t().demoSavedCurrent;
@@ -2160,6 +2162,8 @@
 			render_color_catalog_name: it.render_color_catalog_name,
 			render_color_catalog_sub: it.render_color_catalog_sub,
 			render_color_map: it.render_color_map,
+			render_hash: it.render_hash,
+			render_hash_short: it.render_hash_short,
 			elapsed_stage1_ms: 0,
 			elapsed_stage2_ms: 0,
 			elapsed_total_ms: it.elapsed_ms ?? 0,
@@ -3098,6 +3102,7 @@
 		onClose={() => (historyManager.open = false)}
 		onSetView={historyManager.setView}
 		onSetPage={historyManager.setPage}
+		onSetPageSize={historyManager.setPageSize}
 		onSetStarredOnly={historyManager.setStarredOnly}
 		onSelectAll={selectAllManagedHistory}
 		onAskTrash={askTrash}

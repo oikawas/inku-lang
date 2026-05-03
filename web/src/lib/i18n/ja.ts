@@ -282,6 +282,8 @@ export const ja: LangPack = {
 	historyLoading: '読み込み中',
 	historyRestore: '復元',
 	historyImageHeader: '画像',
+	historyHashHeader: 'ハッシュ',
+	historyHashCopyTitle: 'ハッシュをコピー',
 	historyCreatedAtHeader: '作成日時',
 	historyModelHeader: 'モデル',
 	historySecondsHeader: '秒数',

@@ -110,6 +110,7 @@
 
 	let canvasContentEl: HTMLDivElement | null = null;
 	let svgMenuOpen = $state(false);
+	let svgHelpOpen = $state(false);
 	const canvasMaxRatio = $derived(Math.max(canvasAspectWidth, canvasAspectHeight, 1));
 	const canvasBaseWidth = $derived(400 * canvasAspectWidth / canvasMaxRatio);
 	const canvasBaseHeight = $derived(400 * canvasAspectHeight / canvasMaxRatio);
@@ -278,17 +279,40 @@
 			</button>
 			{#if svgMenuOpen}
 				<div class="png-menu">
+					<div class="svg-menu-head">
+						<span>SVG保存形式の違い</span>
+						<button
+							type="button"
+							class="svg-help-btn"
+							aria-label="SVG保存形式の違い"
+							onclick={(e) => { e.stopPropagation(); svgHelpOpen = !svgHelpOpen; }}
+						>?</button>
+					</div>
+					{#if svgHelpOpen}
+						<div class="svg-help-popover">
+							<table>
+								<thead>
+									<tr><th>形式</th><th>用途</th><th>特徴</th></tr>
+								</thead>
+								<tbody>
+									<tr><td>表示用</td><td>Web表示・PNG生成</td><td>保存済みSVG。見た目の再現を優先し、filter / clip-path を使う。</td></tr>
+									<tr><td>編集用</td><td>Illustrator / Affinity</td><td>Scoreから再生成。レイヤー構造と安定IDを付け、filter / clip-path を避ける。</td></tr>
+									<tr><td>互換優先</td><td>汎用SVG受け渡し</td><td>Scoreから再生成。編集用に近いが、壊れにくさを優先する。</td></tr>
+								</tbody>
+							</table>
+						</div>
+					{/if}
 					<button onclick={() => { onDownloadSVG('display'); svgMenuOpen = false; }}>
-						<span class="png-size">Display</span>
-						<span class="png-sub">stored</span>
+						<span class="png-size">表示用</span>
+						<span class="png-sub">描画用・PNG用マスター</span>
 					</button>
 					<button onclick={() => { onDownloadSVG('editable'); svgMenuOpen = false; }}>
-						<span class="png-size">Editable</span>
-						<span class="png-sub">layers</span>
+						<span class="png-size">編集用</span>
+						<span class="png-sub">レイヤー構造</span>
 					</button>
 					<button onclick={() => { onDownloadSVG('compat'); svgMenuOpen = false; }}>
-						<span class="png-size">Compat</span>
-						<span class="png-sub">portable</span>
+						<span class="png-size">互換優先</span>
+						<span class="png-sub">汎用SVG</span>
 					</button>
 				</div>
 			{/if}
@@ -587,7 +611,7 @@
 		box-shadow: 0 4px 18px rgba(0,0,0,0.12);
 		min-width: 220px;
 	}
-	.png-menu button {
+	.png-menu > button {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -603,10 +627,68 @@
 		font-size: 13px;
 		white-space: nowrap;
 	}
-	.png-menu button:last-child { border-bottom: none; }
-	.png-menu button:hover { background: var(--bg); }
+	.png-menu > button:last-child { border-bottom: none; }
+	.png-menu > button:hover { background: var(--bg); }
 	.png-size { font-weight: 500; }
 	.png-sub { color: var(--fg3); font-size: 11px; white-space: nowrap; }
+	.svg-menu-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 8px 12px;
+		border-bottom: 1px solid var(--border);
+		color: var(--fg2);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.svg-help-btn {
+		width: 18px;
+		height: 18px;
+		border: 1px solid var(--border2);
+		border-radius: 50%;
+		background: var(--bg);
+		color: var(--fg2);
+		font: inherit;
+		font-size: 11px;
+		line-height: 1;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex: 0 0 auto;
+		padding: 0;
+	}
+	.svg-help-popover {
+		width: min(480px, calc(100vw - 48px));
+		padding: 12px;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg2);
+		color: var(--fg);
+	}
+	.svg-help-popover table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 11px;
+		line-height: 1.45;
+	}
+	.svg-help-popover th,
+	.svg-help-popover td {
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		text-align: left;
+		vertical-align: top;
+	}
+	.svg-help-popover th {
+		background: var(--bg);
+		color: var(--fg2);
+		font-weight: 700;
+		white-space: nowrap;
+	}
+	.svg-help-popover td:first-child {
+		white-space: nowrap;
+		font-weight: 600;
+	}
 	.ghost-btn {
 		padding: 4px 10px;
 		border: 1px solid var(--border2);

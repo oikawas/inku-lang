@@ -66,6 +66,11 @@ _HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 _SESSION_COOKIE_NAME = "inku_session"
 _SESSION_COOKIE_MAX_AGE = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
 _SESSION_COOKIE_SECURE = os.getenv("INKU_SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
+_SRGB_COLOR_PROFILE = {
+    "id": "srgb",
+    "name": "sRGB IEC61966-2.1",
+    "standard": "IEC 61966-2-1:1999",
+}
 
 
 def _build_number() -> str | None:
@@ -181,6 +186,7 @@ def _history_render_metadata(item: dict) -> dict | None:
         return item["render_metadata"]
     keys = (
         "render_build_number",
+        "render_color_profile",
         "render_color_catalog_id",
         "render_color_catalog_name",
         "render_color_catalog_sub",
@@ -276,6 +282,7 @@ def _render_metadata(catalog_id: str | None) -> dict:
         raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
     return {
         "render_build_number": _build_number(),
+        "render_color_profile": dict(_SRGB_COLOR_PROFILE),
         "render_color_catalog_id": str(catalog["id"]),
         "render_color_catalog_name": str(catalog["name"]),
         "render_color_catalog_sub": str(catalog["sub"]),
@@ -336,6 +343,7 @@ class ComposeResponse(BaseModel):
     svg: str
     stage2_model: str | None = None
     render_build_number: str | None = None
+    render_color_profile: dict[str, str] | None = None
     render_color_catalog_id: str | None = None
     render_color_catalog_name: str | None = None
     render_color_catalog_sub: str | None = None
@@ -394,6 +402,7 @@ class PaintResponse(BaseModel):
     stage1_model: str | None = None
     stage2_model: str | None = None
     render_build_number: str | None = None
+    render_color_profile: dict[str, str] | None = None
     render_color_catalog_id: str | None = None
     render_color_catalog_name: str | None = None
     render_color_catalog_sub: str | None = None
@@ -474,6 +483,7 @@ class HistoryPostBody(BaseModel):
     tokens_out: int | None = None
     catalog_id: str | None = None
     render_build_number: str | None = None
+    render_color_profile: dict[str, str] | None = None
     render_color_catalog_id: str | None = None
     render_color_catalog_name: str | None = None
     render_color_catalog_sub: str | None = None

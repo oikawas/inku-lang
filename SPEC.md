@@ -197,7 +197,7 @@ those entries as `English（日本語）`, while the English UI displays `name` 
 Render JSON produced by the server records the concrete render context.  Paint,
 compose, and saved artifact JSON include the resolved `stage1_model` /
 `stage2_model` that were actually used, plus `render_build_number`,
-`render_color_catalog_id`, `render_color_catalog_name`,
+`render_color_profile`, `render_color_catalog_id`, `render_color_catalog_name`,
 `render_color_catalog_sub`, and `render_color_map`, where abstract colors and
 `palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
 rendering.  The full catalog `map` / `swatches` / `palette` snapshot is not
@@ -593,6 +593,15 @@ Per-item delete actions in the history manager use a compact trash icon button
 instead of a text label.
 The JSON tab, paint responses, history records, and saved artifact JSON include
 the resolved `stage1_model` / `stage2_model` used by the server.
+Current color management is intentionally limited to sRGB. The JSON tab,
+paint/compose responses, history records, and saved artifact JSON include
+`render_color_profile: { id: "srgb", name: "sRGB IEC61966-2.1", standard:
+"IEC 61966-2-1:1999" }`. Adobe RGB and other wide-gamut profiles remain future
+extension candidates and are not implemented in the current renderer.
+The JSON tab displays render metadata first, including model, build, color
+profile, and color catalog fields, followed by the `score` payload.
+When a history item is reopened, the JSON tab displays the saved `stage1_model`
+and `stage2_model` from that history record.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

@@ -20,6 +20,7 @@ export type HistoryItem = {
 	tokens_out?: number | null;
 	catalog_id?: string | null;
 	render_build_number?: string | null;
+	render_color_profile?: Record<string, string> | null;
 	render_color_catalog_id?: string | null;
 	render_color_catalog_name?: string | null;
 	render_color_catalog_sub?: string | null;

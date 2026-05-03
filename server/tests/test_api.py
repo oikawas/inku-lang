@@ -287,6 +287,7 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
         "user_id",
         "catalog_id",
         "render_build_number",
+        "render_color_profile",
         "render_color_catalog_id",
         "render_color_catalog_name",
         "render_color_catalog_sub",
@@ -825,6 +826,11 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
     assert len(instructions) == 1
     assert instructions[0]["primitive"] == "line"
     assert r.json()["render_build_number"]
+    assert r.json()["render_color_profile"] == {
+        "id": "srgb",
+        "name": "sRGB IEC61966-2.1",
+        "standard": "IEC 61966-2-1:1999",
+    }
     assert r.json()["render_color_catalog_id"] == "default"
     assert r.json()["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in r.json()
@@ -852,6 +858,11 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert data["stage1_model"] == "stage1-default-test"
     assert data["stage2_model"] == "stage2-default-test"
     assert data["render_build_number"]
+    assert data["render_color_profile"] == {
+        "id": "srgb",
+        "name": "sRGB IEC61966-2.1",
+        "standard": "IEC 61966-2-1:1999",
+    }
     assert data["render_color_catalog_id"] == "default"
     assert data["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in data
@@ -979,6 +990,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["input"] == "一滴の墨"
     assert item["catalog_id"] == "vivid_material"
     assert item["render_build_number"] == data["render_build_number"]
+    assert item["render_color_profile"]["id"] == "srgb"
     assert item["render_color_catalog_id"] == "vivid_material"
     assert item["render_color_catalog_name"] == "Vivid Material"
     assert "render_color_catalog" not in item
@@ -1101,6 +1113,11 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
         "<svg></svg>",
         {
             "render_build_number": "260",
+            "render_color_profile": {
+                "id": "srgb",
+                "name": "sRGB IEC61966-2.1",
+                "standard": "IEC 61966-2-1:1999",
+            },
             "render_color_catalog_id": "default",
             "render_color_catalog_name": "inku Default",
             "render_color_catalog_sub": "neutral baseline",
@@ -1118,6 +1135,7 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert saved_score["stage1_model"] == "stage1"
     assert saved_score["stage2_model"] == "stage2"
     assert saved_score["render_build_number"] == "260"
+    assert saved_score["render_color_profile"]["id"] == "srgb"
     assert saved_score["render_color_catalog_id"] == "default"
     assert saved_score["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in saved_score

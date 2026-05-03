@@ -52,6 +52,7 @@ class HistoryRow(Base):
     tokens_out   = Column(Integer,    nullable=True)
     catalog_id   = Column(String,     nullable=True)
     render_build_number = Column(String, nullable=True)
+    render_color_profile = Column(Text, nullable=True)
     render_color_catalog_id = Column(String, nullable=True)
     render_color_catalog_name = Column(String, nullable=True)
     render_color_catalog_sub = Column(String, nullable=True)
@@ -116,6 +117,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "user_id": "ALTER TABLE history ADD COLUMN user_id VARCHAR",
     "catalog_id": "ALTER TABLE history ADD COLUMN catalog_id VARCHAR",
     "render_build_number": "ALTER TABLE history ADD COLUMN render_build_number VARCHAR",
+    "render_color_profile": "ALTER TABLE history ADD COLUMN render_color_profile TEXT",
     "render_color_catalog_id": "ALTER TABLE history ADD COLUMN render_color_catalog_id VARCHAR",
     "render_color_catalog_name": "ALTER TABLE history ADD COLUMN render_color_catalog_name VARCHAR",
     "render_color_catalog_sub": "ALTER TABLE history ADD COLUMN render_color_catalog_sub VARCHAR",
@@ -655,6 +657,11 @@ def _row_to_dict(row: HistoryRow) -> dict:
     }
     if row.render_build_number is not None:
         item["render_build_number"] = row.render_build_number
+    if row.render_color_profile is not None:
+        try:
+            item["render_color_profile"] = json.loads(row.render_color_profile)
+        except json.JSONDecodeError:
+            item["render_color_profile"] = None
     if row.render_color_catalog_id is not None:
         item["render_color_catalog_id"] = row.render_color_catalog_id
     if row.render_color_catalog_name is not None:
@@ -716,6 +723,7 @@ def add_item(item: dict) -> dict:
         tokens_out=item.get("tokens_out"),
         catalog_id=item.get("catalog_id"),
         render_build_number=item.get("render_build_number"),
+        render_color_profile=json.dumps(item.get("render_color_profile"), ensure_ascii=False) if item.get("render_color_profile") is not None else None,
         render_color_catalog_id=item.get("render_color_catalog_id"),
         render_color_catalog_name=item.get("render_color_catalog_name"),
         render_color_catalog_sub=item.get("render_color_catalog_sub"),

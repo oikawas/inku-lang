@@ -1407,10 +1407,13 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - サムネイル実寸によるページサイズ再計算時は、ページ番号を維持し、次ページ操作後に先頭ページへ戻らないようにする
 - 履歴管理ダイアログの各画像に表示する個別削除操作は、文字ラベルではなく小さなごみ箱アイコンボタンで表示する
 - JSONタブ、描画レスポンス、履歴保存時のartifact JSONには、サーバーが実際に使用した解決済み `stage1_model` / `stage2_model` を記録する
+- 現時点のカラーマネジメントは sRGB のみを対象とし、JSONタブ、描画レスポンス、履歴、artifact JSONには `render_color_profile: { id: "srgb", name: "sRGB IEC61966-2.1", standard: "IEC 61966-2-1:1999" }` を記録する。Adobe RGB 等の広色域プロファイルは将来拡張候補とし、現時点では実装しない
+- JSONタブは、モデル/ビルド/カラープロファイル/色カタログなどの属性メタ情報を先頭に表示し、その後に `score` を表示する
+- 履歴から画像を開き直した場合も、JSONタブに履歴保存済みの `stage1_model` / `stage2_model` を表示する
 - CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
 - CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
 - 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める
-- build number: 285
+- build number: 288
 
 ### v1.40 (2026-05-03)
 
@@ -1770,7 +1773,7 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - Web UI と CLI は色カタログ一覧をサーバー API から取得し、クライアント側のカタログ定義を持たない
 - `/api/paint`、`/api/compose`、`/api/history` は `catalog_id` を受け取り、サーバー側でレンダリング用 `color_map` を解決する
 - `color_map` リクエストフィールドは互換用に残すが、色カタログ解決の正本としては扱わない
-- 履歴には従来どおり `catalog_id` を保存する。加えて、描画レスポンス JSON と出力 artifact JSON には、実際に使用した解決済みの `stage1_model` / `stage2_model`、実際にレンダリングした `render_build_number`、サーバー解決済みの `render_color_catalog_id` / `render_color_catalog_name` / `render_color_catalog_sub`、および `render_color_map`（抽象色名・`palette:<name>` から実際の `#RRGGBB` コードへの展開）を記録する。`render_color_catalog` の完全な `map` / `swatches` / `palette` snapshot は `render_color_map` と重複するため保存しない
+- 履歴には従来どおり `catalog_id` を保存する。加えて、描画レスポンス JSON と出力 artifact JSON には、実際に使用した解決済みの `stage1_model` / `stage2_model`、実際にレンダリングした `render_build_number`、sRGB基準であることを示す `render_color_profile`、サーバー解決済みの `render_color_catalog_id` / `render_color_catalog_name` / `render_color_catalog_sub`、および `render_color_map`（抽象色名・`palette:<name>` から実際の `#RRGGBB` コードへの展開）を記録する。`render_color_catalog` の完全な `map` / `swatches` / `palette` snapshot は `render_color_map` と重複するため保存しない
 - `GET /api/info` はサーバー名、バージョン、ビルド番号を返す
 - CLI に `version` コマンドを追加し、CLI 側の version / build number と、接続先サーバーの version / build number を表示する
 - Build 264

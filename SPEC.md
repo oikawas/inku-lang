@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.38**
+**Version: v1.39**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -426,6 +426,19 @@ fallback, slow, and normal samples.  Slow samples are diagnostic only; successfu
 drawings remain part of quality review even when the free inference endpoint was
 queued.
 
+Benchmark summaries also include diagnostic traces used for tuning:
+
+- `color_trace`, including requested colors, colors present in the Score,
+  missing requested colors, warnings, and negated color markers.
+- `negated_color_markers`, so phrases such as "not green" or Japanese
+  equivalents such as `緑には寄せず` do not incorrectly count as missing green.
+- `score_motif_hint_counts` and `score_motif_hint_lines` for compound motif
+  repairs such as `leaf_cluster`, `paper_shard`, `ripple_knot`, and
+  `mountain_sign`.
+- `math_balance_markers` and `math_balance_marker_lines` for detected
+  compositional markers such as radial Fibonacci counts, golden-like centers,
+  rule-of-thirds-like centers, and counterweight-like opposite placements.
+
 `inku-cli contact-sheet` builds a PNG contact sheet from a directory of PNG
 outputs, making benchmark review less dependent on manual image assembly.
 
@@ -480,6 +493,8 @@ The reference implementation currently includes:
 - SVG export and template-based PNG export
 - CLI client foundation, benchmark summary output, and contact sheet generation
 - CLI version/build reporting and server-owned color catalog lookup
+- CLI benchmark diagnostics for color delivery, negated colors, motif hint
+  arrival, and mathematical balance marker sample lines
 - shared kiwi progress mascot for single drawing and DDL replay
 - integrated DDL interpretation editor with Saijiki drawer, expanded dialog,
   token/time display, and cancellable `/api/compose` replay

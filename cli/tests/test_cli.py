@@ -165,6 +165,22 @@ def test_color_trace_detects_specific_leaf_terms_as_green():
     assert cli._marker_colors("落ち葉と若葉、木の葉、葉っぱ、葉脈") == ["green"]
 
 
+def test_color_trace_suppresses_negated_green_warning():
+    result = {
+        "text": "言えなかった言葉を白い余白に置き、緑には寄せず黒い線だけを残す。",
+        "ddl": "白い余白に黒い線だけを置く。",
+        "score": {"instructions": [{"primitive": "line", "color": "black"}]},
+    }
+
+    trace = cli._color_trace(result, catalog_id="default")
+
+    assert "green" in trace["text_color_markers"]
+    assert trace["negated_color_markers"] == ["green"]
+    assert "green" not in trace["requested_colors"]
+    assert trace["green_requested"] is False
+    assert "green_requested_but_missing_in_score" not in trace["warnings"]
+
+
 def test_timeout_prefers_args_then_config_then_default():
     parser = cli.build_parser()
     config = cli.CliConfig(timeout_seconds=900)
@@ -227,6 +243,7 @@ def test_score_metrics_reports_density_cluster_and_fade_fields():
     assert metrics["score_fade_counts"] == {"outward": 1}
     assert metrics["score_primitive_counts"] == {"line": 1, "square": 1}
     assert metrics["score_color_counts"] == {"black": 1, "white": 1}
+    assert metrics["score_motif_hint_counts"] == {}
     assert metrics["math_balance_markers"] == {
         "counterweight_like_opposite_placements": 0,
         "golden_like_centers": 0,
@@ -267,6 +284,37 @@ def test_score_metrics_reports_math_balance_markers():
         "golden_like_centers": 2,
         "radial_fibonacci_counts": 1,
         "rule_of_thirds_like_centers": 2,
+    }
+
+
+def test_score_metrics_reports_motif_hint_counts():
+    score = {
+        "instructions": [
+            {"primitive": "ellipse", "color": "green", "color_hint": "leaf_cluster motif restored from DDL intent"},
+            {"primitive": "arc", "color": "black", "color_hint": "leaf_cluster motif restored from DDL intent"},
+            {"primitive": "square", "color": "black", "color_hint": "paper_shard motif restored from DDL intent"},
+        ],
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_motif_hint_counts"] == {"leaf_cluster": 2, "paper_shard": 1}
+
+
+def test_aggregate_marker_lines_reports_sample_lines():
+    results = [
+        {"line": 1, "math_balance_markers": {"golden_like_centers": 1}, "score_motif_hint_counts": {"leaf_cluster": 2}},
+        {"line": 2, "math_balance_markers": {"golden_like_centers": 0}, "score_motif_hint_counts": {"paper_shard": 1}},
+        {"line": 3, "math_balance_markers": {"radial_fibonacci_counts": 1}, "score_motif_hint_counts": {}},
+    ]
+
+    assert cli._aggregate_marker_lines(results, "math_balance_markers") == {
+        "golden_like_centers": [1],
+        "radial_fibonacci_counts": [3],
+    }
+    assert cli._aggregate_marker_lines(results, "score_motif_hint_counts") == {
+        "leaf_cluster": [1],
+        "paper_shard": [2],
     }
 
 

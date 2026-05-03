@@ -1913,3 +1913,272 @@ green 到達の問題:
 - `leaf_cluster`, `paper_shard`, `ripple_knot`, `mountain_sign` を既存 primitive 2個の組み合わせとして補助追加し、1作品あたり最大2 motif に制限する。
 - Next action 6 として、CLI summary に `math_balance_markers` を追加した。
 - `radial` の 5/8/13/21 配置、黄金比付近の中心、三分割付近の中心、対角の counterweight 配置を `paint` / `batch` の score metrics と `analysis-summary.json` 集計で確認できるようにした。
+
+## 23. Build 256 focused small benches
+
+実施日: 2026-05-03
+
+目的:
+
+- Build 256 の green repair / triangle delivery / complex motif repair / math balance trace を小ベンチで確認する。
+- 以前のベンチと同じ Mac CLI コンテキストで実行する。
+- Free API の待ち時間は品質評価から除外し、summary の slow / fallback 診断として扱う。
+
+実行コンテキスト:
+
+- 実行場所: `/Users/oikawas/projects/ddl-server/cli`
+- API: `http://192.168.0.89:8100`
+- Stage 1: `nvidia` / `google/gemma-4-31b-it`
+- Stage 2: `nvidia` / `google/gemma-4-31b-it`
+- Color catalog: `default`
+- Build: CLI / server ともに `256`
+
+### green-heavy 10
+
+入力:
+
+- `cli/out/tune-bench-build256-green-heavy/prompts.txt`
+
+出力:
+
+- `cli/out/tune-bench-build256-green-heavy-default/`
+- `cli/out/tune-bench-build256-green-heavy-default/analysis-summary.json`
+- `cli/out/tune-bench-build256-green-heavy-default/contact-sheet.png`
+
+実行:
+
+```sh
+cd /Users/oikawas/projects/ddl-server/cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli batch \
+  --base-url http://192.168.0.89:8100 \
+  -f ./out/tune-bench-build256-green-heavy/prompts.txt \
+  -o ./out/tune-bench-build256-green-heavy-default \
+  --summary-json ./out/tune-bench-build256-green-heavy-default/analysis-summary.json \
+  --prefix green256 \
+  --png \
+  --continue-on-error
+
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli contact-sheet \
+  ./out/tune-bench-build256-green-heavy-default \
+  --output ./out/tune-bench-build256-green-heavy-default/contact-sheet.png
+```
+
+結果:
+
+- 成功: 10 / 10
+- 失敗: 0 / 10
+- fallback: 1件 (`009`)
+- slow sample: 1件 (`009`)
+- tokens in/out: 129,830 / 8,521
+- total elapsed: 586,923 ms
+- primitives: `line=20`, `ellipse=9`, `circle=1`
+- colors: `green=12`, `black=6`, `gray=6`, `blue=4`, `red=2`
+- color trace:
+  - requested: `green=10`, `white=5`, `black=4`, `gray=4`, `blue=3`, `red=2`
+  - score presence: `green=12`, `black=6`, `gray=5`, `white=4`, `blue=3`, `red=4`
+  - missing requested: `blue=1`, `green=1`, `white=1`
+  - warnings: `requested_color_missing_in_score=2`, `green_requested_but_missing_in_score=1`
+  - green delivery rate: 9 / 10 = 0.9
+- math balance markers: `rule_of_thirds_like_centers=6`, `golden_like_centers=4`
+
+評価:
+
+- Build 250 current default の green delivery 3 / 6 = 0.5 から、green-heavy では 9 / 10 = 0.9 まで改善した。
+- `竹林`, `枯れ草`, `秋の森 + 落ち葉`, `苔`, `若葉`, `葉脈` は green または color_cycle に残った。
+- `009` は Stage 2 retry / fallback 経由だが、blue / green の color_cycle を保持した。
+- `010` は入力に明示的な `緑には寄せず` があるため green を出さないのは意図に近いが、color_trace は `green_requested_but_missing_in_score` と警告する。否定文脈を `color_trace` がまだ扱えていない。
+
+contact sheet 目視評価:
+
+- `001` 竹林は緑の太い主幹と細い縦線が立ち、竹林の輪郭として読める。白い余白も残っている。
+- `002` 枯れ草は薄い赤灰の線群として見え、green-heavy の意図に対して緑は弱い。ただし枯草の低彩度表現としては破綻していない。
+- `003` 秋の森 + 落ち葉は緑背景に赤い葉が乗り、green 背景残響と赤い主役の関係は明確。
+- `004` 苔・石・青い水は大きな赤茶の塊が主役化し、苔や水の読みが弱い。color delivery は成立しているがモチーフ解像度は低い。
+- `005` 庭・若葉は右端に小さくまとまりすぎ、画面の大半が空きすぎている。緑は届いているが構図の主題性が弱い。
+- `006` 夜の森 + 赤い実は黒背景に緑線と赤点があり、夜の森の静かな層としては成立している。
+- `007` 竹の葉脈は赤系の有機線が多く、green intent と視覚結果がずれる。葉脈の線としては面白いが色の主張が不安定。
+- `008` 乾いた草・埃は薄く散りすぎ、見える情報量が少ない。くすんだ緑の匂いという抽象性は出るが、作品として弱い。
+- `009` 水面 + 木の葉は fallback 経由ながら青緑の塊として強く、色到達は良い。ただし密度が高く、葉や水面の差は読みにくい。
+- `010` 否定文脈は黒い線だけが残り、`緑には寄せず` の意図に合う。警告だけが過剰。
+
+まとめ:
+
+- green repair は数値上も目視上も改善している。
+- ただし green を入れるだけでは主題解像度は上がらず、`004`, `005`, `008`, `009` のように、モチーフの位置・密度・大きさの制御が次の課題。
+- `green_requested_but_missing_in_score` は否定文脈を見ないため、`010` のような正しい非 green を誤警告する。
+
+### shape-heavy 10
+
+入力:
+
+- `cli/out/tune-bench-build256-shape-heavy/prompts.txt`
+
+出力:
+
+- `cli/out/tune-bench-build256-shape-heavy-default/`
+- `cli/out/tune-bench-build256-shape-heavy-default/analysis-summary.json`
+- `cli/out/tune-bench-build256-shape-heavy-default/contact-sheet.png`
+
+実行:
+
+```sh
+cd /Users/oikawas/projects/ddl-server/cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli batch \
+  --base-url http://192.168.0.89:8100 \
+  -f ./out/tune-bench-build256-shape-heavy/prompts.txt \
+  -o ./out/tune-bench-build256-shape-heavy-default \
+  --summary-json ./out/tune-bench-build256-shape-heavy-default/analysis-summary.json \
+  --prefix shape256 \
+  --png \
+  --continue-on-error
+
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli contact-sheet \
+  ./out/tune-bench-build256-shape-heavy-default \
+  --output ./out/tune-bench-build256-shape-heavy-default/contact-sheet.png
+```
+
+結果:
+
+- 成功: 10 / 10
+- 失敗: 0 / 10
+- fallback: 0件
+- slow sample: 0件
+- tokens in/out: 121,911 / 4,955
+- total elapsed: 382,048 ms
+- primitives: `line=9`, `ellipse=6`, `square=5`, `arc=4`, `triangle=4`, `circle=3`
+- colors: `black=17`, `blue=6`, `gray=6`, `green=2`
+- color trace:
+  - requested: `black=6`, `white=6`, `gray=4`, `green=4`, `blue=3`, `red=1`
+  - score presence: `black=13`, `gray=4`, `white=4`, `blue=2`, `green=2`, `red=1`
+  - missing requested: `green=2`, `white=2`, `black=1`, `blue=1`
+  - warnings: `requested_color_missing_in_score=4`, `green_requested_but_missing_in_score=2`
+  - green delivery rate: 2 / 4 = 0.5
+- math balance markers: `rule_of_thirds_like_centers=6`, `radial_fibonacci_counts=2`, `golden_like_centers=2`, `counterweight_like_opposite_placements=1`
+
+評価:
+
+- Build 250 current default では aggregate に `triangle=0` だったが、shape-heavy では `triangle=4` になり、roof / mountain / ridge 系 intent の triangle delivery は改善した。
+- `arc=4`, `square=5`, `circle=3` も出ており、line 偏重は小ベンチでは緩和した。
+- `math_balance_markers` は radial fibonacci と counterweight を検出でき、trace の追加は機能している。
+- green は shape-heavy では主目的ではないが、`落ち葉`, `若葉`, `庭`, `屋根 + 落ち葉` などで missing が残った。否定・優先 motif・色 intent の競合を次の改善候補にする。
+
+contact sheet 目視評価:
+
+- `001` 屋根・稜線は triangle が出ているが、黒い樹形のようにも見える。屋根として読むには上部の灰色矩形が強く、関係がやや曖昧。
+- `002` 山の峰は赤背景に黒い三角が2つ立ち、峰として明確。線も対角に流れており、shape delivery は良い。
+- `003` 紙片は小さな黒い square 群と斜線で読める。紙片としては成立するが、やや細かく遠い。
+- `004` 波紋・渦は arc と円群が明確で、この小ベンチでは最も motif として読める。複合形の方向性は良い。
+- `005` 落ち葉群は小楕円がまとまっており、葉群として読める。緑ではなく赤系に寄るが、落ち葉としては自然。
+- `006` 切妻屋根は大きな三角と斜線で強い。ただし灰色線や対角釣り合いより三角が支配的で、構図は単純。
+- `007` 手紙片 + 若葉は小さな要素群として分かれるが、紙片と葉の差はまだ弱い。complex motif は出ているが識別性が不足。
+- `008` 山の頂 + 霧は黒い三角と弧で読める。霧の白は薄く、背景との関係は控えめ。
+- `009` 螺旋の波 + 紙片は弧が連続しており波紋として成立する一方、紙片は見えにくい。
+- `010` 屋根・落ち葉・波紋・紙片を二つに絞る意図は、一部の丸と矩形に整理されている。ただし「二つのモチーフだけを強く」はまだ視覚的に明確ではない。
+
+まとめ:
+
+- triangle / arc / square は aggregate と目視の両方で改善した。
+- `004` の ripple、`002` / `006` / `008` の triangle は有効。
+- paper_shard と leaf_cluster は「小さな要素群」としては出るが、互いの識別性が弱い。次は motif ごとの空間分離、サイズ差、色差、hint の renderer 反映を検討する。
+- `math_balance_markers` は値として出るが、目視で明確に構図戦略として読める例はまだ限定的。counterweight は検出値 `1` だが、作品全体の重心設計としては弱い。
+
+次の確認:
+
+- contact sheet を目視し、triangle / paper_shard / leaf_cluster / ripple_knot / mountain_sign が「読める複合形」として成立しているか確認する。
+- `color_trace` に否定文脈 (`緑には寄せず`, `not green`) を扱う警告抑制を追加するか検討する。
+- 小ベンチでは改善が見えたため、default / impressionism の30件比較を Build 256 で再実行する。
+
+### 3 persona review
+
+対象:
+
+- `cli/out/tune-bench-build256-green-heavy-default/contact-sheet.png`
+- `cli/out/tune-bench-build256-shape-heavy-default/contact-sheet.png`
+- 各 `analysis-summary.json`
+
+#### Persona A: 技術評価者 / renderer・Score 診断担当
+
+評価観点:
+
+- DDL intent が Score primitive / color / arrangement に落ちているか。
+- fallback / retry / trace が診断可能か。
+- 修正対象が機械的に特定できるか。
+
+評価結果:
+
+1. green-heavy は green delivery 9 / 10 まで改善しており、Build 250 current default の 3 / 6 から明確に前進している。
+2. color_cycle repair は機能している。`003` 秋の森 + 落ち葉、`009` 水面 + 木の葉では、主色と補助色の保持が summary 上で追える。
+3. `010` の `緑には寄せず` は正しく green を出していないが、`color_trace` は green missing と警告する。否定文脈を marker 抽出が扱っていない。
+4. shape-heavy は `triangle=4`, `arc=4`, `square=5` で、Build 250 current default の `triangle=0` 問題は小ベンチでは解消している。
+5. `math_balance_markers` は summary に出ており、radial fibonacci / rule-of-thirds / counterweight の検出は動作している。ただし「検出された」ことと「構図として強い」ことは別で、評価補助指標として扱うべき。
+
+技術的な次アクション:
+
+1. `color_trace` に否定文脈を追加する。例: `緑には寄せず`, `緑ではなく`, `not green`, `avoid green`。
+2. motif repair の `color_hint` を summary で aggregate できるようにし、leaf_cluster / paper_shard / ripple_knot / mountain_sign の到達率を数値化する。
+3. math marker は count だけでなく、該当 line 番号も summary に残す。
+
+#### Persona B: 美術ディレクター / 抽象作品品質担当
+
+評価観点:
+
+- 作品として視線が止まるか。
+- 抽象化が単なる図形配置でなく、主題の気配を持つか。
+- 密度、余白、色、重心が気持ちよく制御されているか。
+
+評価結果:
+
+1. green-heavy `003` は最も意図が伝わる。緑背景と赤い落ち葉の関係が明確で、色の役割が分かれている。
+2. green-heavy `006` は黒背景に緑線と赤点が少量入り、夜の森として静かに成立している。情報量は少ないが余白の使い方は良い。
+3. green-heavy `004`, `005`, `008` は主題の読みが弱い。色は入っているが、苔・庭・匂いといったモチーフの輪郭が画面上で立っていない。
+4. green-heavy `009` は迫力はあるが、葉と水面が一体化しすぎている。fallback としては良いが、作品としては密度が強すぎる。
+5. shape-heavy `004` は波紋・渦として最も完成度が高い。弧と円群の関係が自然で、複合形として読める。
+6. shape-heavy `002`, `006`, `008` は triangle の到達が目視でも分かる。ただし `006` は三角が支配的で、対角の釣り合いより記号性が勝つ。
+7. paper_shard / leaf_cluster は小要素として出ているが、作品の主役になるほどの形態差がまだない。紙片と葉の違いが弱い。
+
+美術面の次アクション:
+
+1. motif ごとに画面内の役割を分ける。例: paper_shard は角張った中サイズ、leaf_cluster は柔らかい小反復、ripple_knot は弧の層。
+2. density repair は「数を減らす」だけでなく、主役 motif と背景 motif のサイズ差を作る。
+3. 30件比較前に、shape-heavy の上位例 `002`, `004`, `006`, `008` を基準作品として残し、同じ方向に寄せる。
+
+#### Persona C: 一般鑑賞者 / 非技術ユーザー
+
+評価観点:
+
+- 入力文を知らなくても、何かの気配や印象を受け取れるか。
+- 見て楽しいか、もう一度見たいか。
+- 文字説明なしで違いが分かるか。
+
+評価結果:
+
+1. green-heavy は全体として「緑が出るようになった」ことは分かるが、似た細線・小粒に見える作品もある。
+2. green-heavy `001`, `003`, `006`, `009` は印象に残る。特に `003` は色の対比が強く、入力を知らなくても秋や森の気配がある。
+3. green-heavy `008`, `010` は薄すぎて、単体作品としては見落としやすい。意図は正しくても鑑賞体験が弱い。
+4. shape-heavy は green-heavy より形の違いが分かりやすい。三角、弧、四角が見えるため、一覧での変化がある。
+5. shape-heavy `004` は最も見て楽しい。波紋や渦として直感的に読める。
+6. shape-heavy `001`, `006` は強い形があるが、屋根か山か木かは人によって読みが割れそう。
+7. shape-heavy `007`, `010` は複数モチーフの差が分かりにくい。説明を読まないと、紙片・葉・屋根・波紋の区別は難しい。
+
+一般鑑賞者向けの次アクション:
+
+1. 1作品内の主役を1つ強くし、残りを背景に回す。
+2. contact sheet で見た時に小さく潰れる作品を減らす。小要素だけの作品は、最低1つ中サイズの anchor を置く。
+3. 色と形の差を同時に使い、説明なしでも motif の違いが見えるようにする。
+
+総合結論:
+
+- Build 256 の小ベンチは、green 到達と triangle / arc / square 到達の改善を確認できた。
+- 技術的には trace と repair が機能し始めている。
+- 美術的には、到達した色や primitive を「作品の主役」として成立させる段階が次。
+- 一般鑑賞では、shape-heavy の方が変化が分かりやすく、green-heavy は色到達後の構図・密度制御が課題。
+- 次の実装優先度は、否定文脈の color_trace 修正、motif 到達率の数値化、motif ごとのサイズ・空間分離の強化。
+
+実装メモ:
+
+- Build 257 として、CLI summary 診断を拡張した。
+- `color_trace` は `緑には寄せず`, `緑ではなく`, `not green`, `avoid green` などの否定文脈を `negated_color_markers` として記録し、requested color から除外する。
+- これにより、green-heavy `010` のような「緑を出さないことが正しい」サンプルを `green_requested_but_missing_in_score` と誤警告しない。
+- `_score_metrics` に `score_motif_hint_counts` を追加し、`leaf_cluster`, `paper_shard`, `ripple_knot`, `mountain_sign` の到達数を `color_hint` から集計できるようにした。
+- `batch` summary に `score_motif_hint_lines` と `math_balance_marker_lines` を追加し、motif / math marker がどのサンプルで出たか追跡できるようにした。
+- Build 257 の次ベンチでは、green-heavy `010` の warning が消えること、shape-heavy の motif 到達 line が summary で列挙されることを確認する。

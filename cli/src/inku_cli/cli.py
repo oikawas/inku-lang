@@ -58,6 +58,21 @@ COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     ),
     "gray": ("gray", "grey", "silver", "ash", "stone", "灰", "銀", "石", "埃"),
 }
+NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
+    "green": (
+        "not green",
+        "avoid green",
+        "without green",
+        "no green",
+        "緑には寄せず",
+        "緑に寄せず",
+        "緑ではなく",
+        "緑を避け",
+        "緑を使わず",
+        "緑なし",
+    ),
+}
+MOTIF_HINT_KEYS = ("leaf_cluster", "paper_shard", "ripple_knot", "mountain_sign")
 T = TypeVar("T")
 
 
@@ -576,6 +591,7 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
 
     primitive_counts: Counter[str] = Counter()
     color_counts: Counter[str] = Counter()
+    motif_hint_counts: Counter[str] = Counter()
     density_counts: Counter[str] = Counter()
     fade_counts: Counter[str] = Counter()
     arrangement_count = 0
@@ -593,6 +609,11 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
             primitive_counts[primitive] += 1
         if isinstance(color, str):
             color_counts[color] += 1
+        hint = instruction.get("color_hint")
+        if isinstance(hint, str):
+            for motif in MOTIF_HINT_KEYS:
+                if motif in hint:
+                    motif_hint_counts[motif] += 1
 
         arrangement = instruction.get("arrangement")
         if not isinstance(arrangement, dict):
@@ -627,6 +648,7 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_fade_counts": dict(sorted(fade_counts.items())),
         "score_primitive_counts": dict(sorted(primitive_counts.items())),
         "score_color_counts": dict(sorted(color_counts.items())),
+        "score_motif_hint_counts": dict(sorted(motif_hint_counts.items())),
         "math_balance_markers": _math_balance_markers([
             instruction for instruction in instructions if isinstance(instruction, dict)
         ]),
@@ -640,6 +662,18 @@ def _marker_colors(text: str | None) -> list[str]:
     found = [
         color
         for color, markers in COLOR_MARKERS.items()
+        if any(marker.lower() in lower or marker in text for marker in markers)
+    ]
+    return sorted(found)
+
+
+def _negated_marker_colors(text: str | None) -> list[str]:
+    if not text:
+        return []
+    lower = text.lower()
+    found = [
+        color
+        for color, markers in NEGATED_COLOR_MARKERS.items()
         if any(marker.lower() in lower or marker in text for marker in markers)
     ]
     return sorted(found)
@@ -692,7 +726,8 @@ def _color_trace(
     score_colors = set(details["score_colors"])
     cycle_colors = set(details["score_color_cycle_colors"])
     score_or_cycle = score_colors | cycle_colors
-    requested_colors = sorted(set(_marker_colors(text)) | set(_marker_colors(ddl)))
+    negated_colors = sorted(set(_negated_marker_colors(text)) | set(_negated_marker_colors(ddl)))
+    requested_colors = sorted((set(_marker_colors(text)) | set(_marker_colors(ddl))) - set(negated_colors))
     missing = [color for color in requested_colors if color in COLOR_KEYS and color not in score_or_cycle]
     green_requested = "green" in requested_colors
     green_in_score = "green" in score_or_cycle
@@ -708,6 +743,7 @@ def _color_trace(
         "resolved_palette": _render_color_map(catalog) if catalog else {},
         "text_color_markers": _marker_colors(text),
         "ddl_color_markers": _marker_colors(ddl),
+        "negated_color_markers": negated_colors,
         "requested_colors": requested_colors,
         **details,
         "missing_requested_colors": missing,
@@ -723,6 +759,7 @@ def _aggregate_color_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
     in_score: Counter[str] = Counter()
     missing: Counter[str] = Counter()
     warnings: Counter[str] = Counter()
+    negated: Counter[str] = Counter()
     green_requested = 0
     green_in_score = 0
     for trace in traces:
@@ -731,6 +768,7 @@ def _aggregate_color_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
         in_score.update((trace.get("score_color_cycle_colors") or {}).keys())
         missing.update(trace.get("missing_requested_colors") or [])
         warnings.update(trace.get("warnings") or [])
+        negated.update(trace.get("negated_color_markers") or [])
         if trace.get("green_requested"):
             green_requested += 1
         if trace.get("green_in_score"):
@@ -740,10 +778,26 @@ def _aggregate_color_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
         "score_color_presence_counts": dict(sorted(in_score.items())),
         "missing_requested_color_counts": dict(sorted(missing.items())),
         "warning_counts": dict(sorted(warnings.items())),
+        "negated_color_counts": dict(sorted(negated.items())),
         "green_requested_samples": green_requested,
         "green_in_score_samples": green_in_score,
         "green_delivery_rate": (green_in_score / green_requested) if green_requested else None,
     }
+
+
+def _aggregate_marker_lines(results: list[dict[str, Any]], key: str) -> dict[str, list[int]]:
+    lines: dict[str, list[int]] = {}
+    for result in results:
+        line = int(result.get("line") or 0)
+        if not line:
+            continue
+        markers = result.get(key)
+        if not isinstance(markers, dict):
+            continue
+        for marker, count in markers.items():
+            if isinstance(marker, str) and int(count or 0) > 0:
+                lines.setdefault(marker, []).append(line)
+    return dict(sorted(lines.items()))
 
 
 def _paint_payload(
@@ -1036,6 +1090,7 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_fade: Counter[str] = Counter()
     aggregate_primitive: Counter[str] = Counter()
     aggregate_color: Counter[str] = Counter()
+    aggregate_motif_hints: Counter[str] = Counter()
     aggregate_clustered = 0
     aggregate_preserve_space = 0
     aggregate_color_cycle = 0
@@ -1047,6 +1102,7 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_fade.update(result.get("score_fade_counts") or {})
         aggregate_primitive.update(result.get("score_primitive_counts") or {})
         aggregate_color.update(result.get("score_color_counts") or {})
+        aggregate_motif_hints.update(result.get("score_motif_hint_counts") or {})
         aggregate_math_balance.update(result.get("math_balance_markers") or {})
         aggregate_clustered += int(result.get("score_clustered_arrangements") or 0)
         aggregate_preserve_space += int(result.get("score_preserve_space_count") or 0)
@@ -1080,7 +1136,10 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_fade_counts": dict(sorted(aggregate_fade.items())),
         "score_primitive_counts": dict(sorted(aggregate_primitive.items())),
         "score_color_counts": dict(sorted(aggregate_color.items())),
+        "score_motif_hint_counts": dict(sorted(aggregate_motif_hints.items())),
+        "score_motif_hint_lines": _aggregate_marker_lines(results, "score_motif_hint_counts"),
         "math_balance_markers": dict(sorted(aggregate_math_balance.items())),
+        "math_balance_marker_lines": _aggregate_marker_lines(results, "math_balance_markers"),
         "review_sets": _review_sets(results),
         "results": results,
         "failures": failures,

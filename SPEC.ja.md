@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.38**
+**Version: v1.39**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -1716,6 +1716,30 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - CLI に `version` コマンドを追加し、CLI 側の version / build number と、接続先サーバーの version / build number を表示する
 - Build 252
 
+### v1.26 (2026-05-03)
+
+**Build 257: CLI benchmark 診断 summary 拡張**
+
+Build 256 の focused small bench と 3 persona review で、green / shape / motif / math balance の到達状況をより機械的に追える必要が明確になった。
+
+CLI benchmark summary は、作品品質の評価そのものではなく、後続の人間評価と実装修正を支える診断データとして扱う。
+
+- `color_trace` は、色 marker だけでなく否定文脈も記録する
+  - 例: `緑には寄せず`, `緑ではなく`, `not green`, `avoid green`
+  - 否定された色は `negated_color_markers` に入り、`requested_colors` から除外する
+  - これにより「緑を出さないことが正しい」サンプルを `green_requested_but_missing_in_score` と誤警告しない
+- `_score_metrics` は `score_motif_hint_counts` を返す
+  - `leaf_cluster`
+  - `paper_shard`
+  - `ripple_knot`
+  - `mountain_sign`
+- `inku-cli batch` summary は、motif / math marker のサンプル番号を列挙する
+  - `score_motif_hint_lines`
+  - `math_balance_marker_lines`
+- `math_balance_markers` は count だけでなく、どの sample で出たかを追跡できる
+- summary は既存キーを維持しつつ追加キーとして拡張する。既存の benchmark JSON consumer を壊さない
+- Build 257
+
 ### v1.24 (2026-05-02)
 
 **Build 250: DDL 品質チューニング 2-5 + ベンチマーク tooling**
@@ -1763,6 +1787,13 @@ CLI benchmark tooling:
   - `fallback_samples`: Stage 1 / Stage 2 fallback 使用サンプル
   - `slow_samples`: 実行時間が長いサンプル
   - `normal_samples`: fallback なし、かつ slow ではないサンプル
+- summary には色到達、否定色、motif 到達、数学的構図 marker の診断情報を含める:
+  - `color_trace`
+  - `negated_color_markers`
+  - `score_motif_hint_counts`
+  - `score_motif_hint_lines`
+  - `math_balance_markers`
+  - `math_balance_marker_lines`
 - NVIDIA Free API の待ち時間はキュー状況による偶然性が高いため、芸術評価では除外し、診断メタデータとしてのみ扱う
 - 成功した描画は、遅かった場合でも今後すべて品質評価対象に含める
 - `inku-cli contact-sheet` を追加し、PNG 出力ディレクトリから contact sheet を生成できる

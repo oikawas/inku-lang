@@ -280,11 +280,11 @@
 			{#if svgMenuOpen}
 				<div class="png-menu">
 					<div class="svg-menu-head">
-						<span>SVG保存形式の違い</span>
+						<span>{t().svgExportHelpTitle}</span>
 						<button
 							type="button"
 							class="svg-help-btn"
-							aria-label="SVG保存形式の違い"
+							aria-label={t().svgExportHelpAria}
 							onclick={(e) => { e.stopPropagation(); svgHelpOpen = !svgHelpOpen; }}
 						>?</button>
 					</div>
@@ -292,27 +292,27 @@
 						<div class="svg-help-popover">
 							<table>
 								<thead>
-									<tr><th>形式</th><th>用途</th><th>特徴</th></tr>
+									<tr><th>{t().svgExportTableFormat}</th><th>{t().svgExportTableUse}</th><th>{t().svgExportTableFeature}</th></tr>
 								</thead>
 								<tbody>
-									<tr><td>表示用</td><td>Web表示・PNG生成</td><td>保存済みSVG。見た目の再現を優先し、filter / clip-path を使う。</td></tr>
-									<tr><td>編集用</td><td>Illustrator / Affinity</td><td>Scoreから再生成。レイヤー構造と安定IDを付け、filter / clip-path を避ける。</td></tr>
-									<tr><td>互換優先</td><td>汎用SVG受け渡し</td><td>Scoreから再生成。編集用に近いが、壊れにくさを優先する。</td></tr>
+									<tr><td>{t().svgExportDisplayName}</td><td>{t().svgExportDisplayUse}</td><td>{t().svgExportDisplayFeature}</td></tr>
+									<tr><td>{t().svgExportEditableName}</td><td>{t().svgExportEditableUse}</td><td>{t().svgExportEditableFeature}</td></tr>
+									<tr><td>{t().svgExportCompatName}</td><td>{t().svgExportCompatUse}</td><td>{t().svgExportCompatFeature}</td></tr>
 								</tbody>
 							</table>
 						</div>
 					{/if}
 					<button onclick={() => { onDownloadSVG('display'); svgMenuOpen = false; }}>
-						<span class="png-size">表示用</span>
-						<span class="png-sub">描画用・PNG用マスター</span>
+						<span class="png-size">{t().svgExportDisplayName}</span>
+						<span class="png-sub">{t().svgExportDisplaySub}</span>
 					</button>
 					<button onclick={() => { onDownloadSVG('editable'); svgMenuOpen = false; }}>
-						<span class="png-size">編集用</span>
-						<span class="png-sub">レイヤー構造</span>
+						<span class="png-size">{t().svgExportEditableName}</span>
+						<span class="png-sub">{t().svgExportEditableSub}</span>
 					</button>
 					<button onclick={() => { onDownloadSVG('compat'); svgMenuOpen = false; }}>
-						<span class="png-size">互換優先</span>
-						<span class="png-sub">汎用SVG</span>
+						<span class="png-size">{t().svgExportCompatName}</span>
+						<span class="png-sub">{t().svgExportCompatSub}</span>
 					</button>
 				</div>
 			{/if}

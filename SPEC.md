@@ -378,6 +378,10 @@ active line is highlighted and the current DDL interpretation is displayed
 read-only.  Batch execution keeps failure reports until the next batch run, and
 stores batch prompt history per user.
 
+Batch mode can optionally choose a random server color catalog for each render.
+The selected catalog is sent as `catalog_id` to `/api/paint`, and history records
+store the catalog that was actually used.
+
 The batch mascot is a small crab that walks slowly during progress, moves its
 claws, watches the process, and occasionally dives under a water surface while
 bubbles rise.
@@ -388,6 +392,11 @@ Demo mode repeatedly generates an instruction from a seed phrase, renders it,
 waits for the configured interval, and repeats.  Demo settings are stored per
 user.  Demo results are not saved by default; the user can explicitly save a
 current render to history.
+
+Demo mode can also choose a random server color catalog for each render.  This
+option is part of the per-user demo settings.  The status bar reflects the
+catalog reported by the render result, not only the current global catalog
+selection.
 
 While demo is running, history interaction is restricted where it could confuse
 context.

@@ -144,6 +144,7 @@ _DEMO_DEFAULT_SETTINGS = {
     "prompt_model": "google/gemma-4-31b-it",
     "seed_phrase": "日本の四季を感じさせる文章を40語以内で生成",
     "interval_seconds": 30,
+    "random_color_catalog": False,
 }
 _EXPORT_TEMPLATE_LIMIT = 20
 _EXPORT_TEMPLATE_DEFAULTS = [
@@ -986,6 +987,8 @@ def _normalize_demo_settings(settings: dict) -> dict:
         clean["save_db"] = bool(settings["save_db"])
     if "save_files" in settings:
         clean["save_files"] = bool(settings["save_files"])
+    if "random_color_catalog" in settings:
+        clean["random_color_catalog"] = bool(settings["random_color_catalog"])
     if "prompt_model" in settings:
         model = settings["prompt_model"]
         if not isinstance(model, str) or not model.strip():

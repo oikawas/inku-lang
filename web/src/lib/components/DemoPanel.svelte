@@ -107,6 +107,15 @@
 			/>
 			<span>{t().demoSaveFiles}</span>
 		</label>
+		<label class="check-row wide">
+			<input
+				type="checkbox"
+				checked={settings.random_color_catalog}
+				disabled={running}
+				onchange={(event) => updateSettings({ random_color_catalog: (event.currentTarget as HTMLInputElement).checked })}
+			/>
+			<span>{t().demoRandomColorCatalog}</span>
+		</label>
 		<label>
 			<span>{t().providerLabel}</span>
 			<select value={promptProvider} disabled={running} onchange={(event) => setPromptProvider((event.currentTarget as HTMLSelectElement).value as Provider)}>

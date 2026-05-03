@@ -415,6 +415,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
     assert initial.status_code == 200
     assert initial.json()["save_db"] is False
     assert initial.json()["save_files"] is False
+    assert initial.json()["random_color_catalog"] is False
     assert initial.json()["interval_seconds"] == 30
 
     body = {
@@ -423,6 +424,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
         "prompt_model": "meta/llama-3.3-70b-instruct",
         "seed_phrase": "短い冬の情景を生成",
         "interval_seconds": 45,
+        "random_color_catalog": True,
     }
     updated = client.put("/api/auth/me/demo-settings", headers=headers, json=body)
     assert updated.status_code == 200

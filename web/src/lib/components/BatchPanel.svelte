@@ -33,6 +33,7 @@
 		actionDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
+		randomColorCatalog: boolean;
 		showCrab: boolean;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
 		onSubmit: () => void | Promise<void>;
@@ -58,6 +59,7 @@
 		actionDisabled,
 		error,
 		batchPromptHistory,
+		randomColorCatalog = $bindable(false),
 		showCrab,
 		onRememberBatchPrompt,
 		onSubmit,
@@ -68,6 +70,7 @@
 	let batchScrollTop = $state(0);
 	let selectedHistoryPrompt = $state('');
 	const displayLineNumbersText = $derived(batchInput.trim() ? lineNumbersText : t().batchPlaceholder.split('\n').map((_, i) => String(i + 1)).join('\n'));
+	const batchTextareaHeight = $derived(`${Math.max(240, displayLineNumbersText.split('\n').length * 21.45 + 18)}px`);
 	const batchActiveLineStyle = $derived(
 		batchActiveLine === null
 			? ''
@@ -110,6 +113,7 @@
 			wrap="off"
 			placeholder={t().batchPlaceholder}
 			readonly={batchRunning}
+			style={`height: ${batchTextareaHeight}`}
 			onscroll={() => (batchScrollTop = batchTextareaEl?.scrollTop ?? 0)}
 		></textarea>
 	</div>
@@ -117,6 +121,10 @@
 {#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 {#if !batchRunning}
 	<div class="batch-tools">
+		<label class="batch-option">
+			<input type="checkbox" bind:checked={randomColorCatalog} />
+			<span>{t().batchRandomColorCatalog}</span>
+		</label>
 		{#if batchPromptHistory.length > 0}
 			<div class="batch-history">
 				<select
@@ -245,6 +253,7 @@
 	}
 	.batch-ta {
 		width: 100%; padding: 9px 10px;
+		box-sizing: border-box;
 		border: none;
 		border-radius: 0;
 		background: transparent; color: var(--fg);
@@ -256,6 +265,7 @@
 		position: relative;
 		z-index: 1;
 		min-height: 240px;
+		height: 100%;
 	}
 	.batch-ta:focus { border-color: var(--accent); }
 	.batch-ta:read-only {
@@ -264,6 +274,7 @@
 	}
 	.batch-ta-wrap {
 		position: relative;
+		display: flex;
 		flex: 1;
 		min-width: 0;
 		background: var(--panel);
@@ -276,6 +287,14 @@
 		gap: 6px;
 		margin-top: 2px;
 	}
+	.batch-option {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--fg2);
+		font-size: 11px;
+	}
+	.batch-option input { margin: 0; }
 	.batch-history {
 		display: flex;
 		align-items: center;

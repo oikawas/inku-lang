@@ -41,6 +41,7 @@
 		canSubmit: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
+		batchRandomColorCatalog: boolean;
 		demoSettings: DemoSettings;
 		demoRunning: boolean;
 		demoWaitingSeconds: number | null;
@@ -101,6 +102,7 @@
 		canSubmit,
 		error,
 		batchPromptHistory,
+		batchRandomColorCatalog = $bindable(false),
 		demoSettings = $bindable(),
 		demoRunning,
 		demoWaitingSeconds,
@@ -240,6 +242,7 @@
 			actionDisabled={singleRunning}
 			{error}
 			{batchPromptHistory}
+			bind:randomColorCatalog={batchRandomColorCatalog}
 			{showCrab}
 			{onRememberBatchPrompt}
 			onSubmit={onSubmit}

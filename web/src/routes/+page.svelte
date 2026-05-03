@@ -171,6 +171,7 @@
 	let batchFailures = $state<BatchFailure[]>([]);
 	let batchFailureReport = $state<BatchFailureReport | null>(null);
 	let batchPromptHistory = $state<string[]>([]);
+	let batchRandomColorCatalog = $state(false);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
 	let batchActiveTokensIn = $state<number | null>(null);
@@ -448,6 +449,7 @@
 			prompt_model: settings.prompt_model || DEFAULT_MODEL,
 			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
 			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
+			random_color_catalog: !!settings.random_color_catalog,
 		};
 	}
 
@@ -1386,6 +1388,7 @@
 		saveHistory?: boolean;
 		saveArtifacts?: boolean;
 		countGeneration?: boolean;
+		catalogId?: string;
 		signal?: AbortSignal;
 	};
 
@@ -1412,7 +1415,7 @@
 				save_artifacts: options.saveArtifacts ?? true,
 				count_generation: options.countGeneration ?? true,
 				history_input: historyInput,
-				catalog_id: selectedCatalog
+				catalog_id: options.catalogId ?? selectedCatalog
 			})
 		});
 		if (!r.ok) {
@@ -1523,6 +1526,12 @@
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
+	function randomColorCatalogId(): string {
+		const ids = colorCatalogs.map((catalog) => catalog.id).filter((id): id is string => !!id);
+		if (ids.length === 0) return selectedCatalog;
+		return ids[Math.floor(Math.random() * ids.length)] ?? selectedCatalog;
+	}
+
 	async function generateDemoInstruction(settings: DemoSettings): Promise<string> {
 		const r = await apiFetch('/api/demo/instruction', {
 			method: 'POST',
@@ -1560,6 +1569,7 @@
 					saveArtifacts: settings.save_files,
 					countGeneration: false,
 					historyInput: `[demo] ${demoGeneratedPrompt}`,
+					catalogId: settings.random_color_catalog ? randomColorCatalogId() : selectedCatalog,
 				});
 				if (demoRunId !== runId || !loading) break;
 				demoGeneratedDdl = r.ddl;
@@ -1739,6 +1749,7 @@
 					try {
 						const r = await paintOne(lines[i].input, {
 							historyInput: `#${lines[i].line} ${lines[i].input}`,
+							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : selectedCatalog,
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) break;
@@ -2022,7 +2033,7 @@
 					stage2_model: stage2Model,
 					tokens_in: (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
-					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null,
+					catalog_id: result.render_color_catalog_id ?? (selectedCatalog !== 'default' ? selectedCatalog : null),
 					save_artifacts: demoSettings.save_files,
 					canvas_aspect: effectiveCanvasAspectId(),
 				})
@@ -2412,7 +2423,7 @@
 	const statusStage2Model = $derived(displayedHistoryItem
 		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
 		: statusModelName(stage2Model));
-	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : currentCatalog.name);
+	const statusCatalogName = $derived(displayedHistoryItem ? catalogName(displayedHistoryItem.catalog_id) : catalogName(result?.render_color_catalog_id ?? selectedCatalog));
 	const currentCanvasAspect = $derived(getCanvasAspectOption(effectiveCanvasAspectId()));
 	const displayCanvasAspect = $derived(svgAspect(result?.svg) ?? currentCanvasAspect);
 	const statusCanvasName = $derived(getCanvasAspectOption(
@@ -2780,6 +2791,7 @@
 						{liveMs}
 						{batchFailureReport}
 						{batchPromptHistory}
+						bind:batchRandomColorCatalog
 						bind:demoSettings
 						{demoRunning}
 						{demoWaitingSeconds}

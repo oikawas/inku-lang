@@ -473,6 +473,15 @@ def _inject_blur_filters(
         svg = svg.replace("<defs>", f"<defs>{filter_xml}", 1)
 
     for eid, amp in blur_elems:
+        id_start = svg.find(f'id="{eid}"')
+        if id_start < 0:
+            continue
+        tag_start = svg.rfind("<", 0, id_start)
+        tag_end = svg.find(">", id_start)
+        if tag_start < 0 or tag_end < 0:
+            continue
+        if ' filter="' in svg[tag_start:tag_end]:
+            continue
         svg = svg.replace(f'id="{eid}"', f'id="{eid}" filter="url(#blur-{amp})"', 1)
     return svg
 

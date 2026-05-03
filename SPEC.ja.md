@@ -2561,8 +2561,9 @@ type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
 ```
 
 - `default`（規定値）= 既存 `renderer.py` COLOR_MAP と完全一致
-- 追加10種: Japanese Tradition / Italian Renaissance / French Impressionism / Chinese Imperial / Scandinavian Minimalism / Indian Spice / Egyptian Sands / Mexican Vibrant / British Heritage / Greek Aegean
+- 追加10種: Ink & Season / Fresco Study / Open-Air Light / Ink & Porcelain / Cool Material / Dye & Earth / Desert Mineral / Vivid Material / Weathered Heritage / Sea & Stone
 - 各カタログは `map`（6色 ColorMap）+ `swatches`（表示用8色）+ `palette`（名称付き8色）を持つ
+- `default` は文化的な標準ではなく neutral baseline として扱う。追加カタログの `id` / 表示名 / 説明は、国名・民族名・食・祭り・帝国・観光記号で文化全体を代表しないよう、素材・光・技法・描画上の振る舞いを基準に命名する。
 
 「カタログ設定」モーダル（ヘッダー右端）から選択。選択は `localStorage` に永続化。
 

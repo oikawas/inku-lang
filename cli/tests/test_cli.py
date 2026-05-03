@@ -15,11 +15,11 @@ CATALOG_DATA = {
             "map": {"white": "#ffffff", "black": "#111111", "blue": "#2c3e91", "red": "#a2342a", "green": "#2f6b3a", "gray": "#888888"},
             "palette": [],
         },
-        "mexican": {
-            "id": "mexican",
-            "name": "Mexican Vibrant",
-            "map": {"white": "#f4f4f4", "black": "#1c1c1c", "blue": "#73c2fb", "red": "#f50087", "green": "#008f39", "gray": "#b04a33"},
-            "palette": [{"name": "Cactus", "code": "#008f39"}],
+        "vivid_material": {
+            "id": "vivid_material",
+            "name": "Vivid Material",
+            "map": {"white": "#f4f4f4", "black": "#1c1c1c", "blue": "#73c2fb", "red": "#f50087", "green": "#008f39", "gray": "#7d6f66"},
+            "palette": [{"name": "Fresh Green", "code": "#008f39"}],
         },
     },
 }
@@ -41,7 +41,7 @@ def test_config_roundtrip(tmp_path):
         stage2_provider="local",
         stage2_model="stage2",
         timeout_seconds=900,
-        color_catalog="impressionism",
+        color_catalog="open_air_light",
     )
     cli.save_config(config, path)
 
@@ -104,33 +104,33 @@ def test_models_command_accepts_providers():
         "--stage2-model",
         "qwen-api",
         "--color-catalog",
-        "japanese",
+        "ink_season",
     ])
 
     assert args.stage1_provider == "nvidia"
     assert args.stage1_model == "google/gemma-4-31b-it"
     assert args.stage2_provider == "local"
     assert args.stage2_model == "qwen-api"
-    assert args.color_catalog == "japanese"
+    assert args.color_catalog == "ink_season"
 
 
 def test_color_catalog_payload_sets_catalog_and_map():
     parser = cli.build_parser()
-    args = parser.parse_args(["paint", "緑の葉", "--color-catalog", "mexican"])
+    args = parser.parse_args(["paint", "緑の葉", "--color-catalog", "vivid_material"])
 
     payload = cli._paint_payload(args, "緑の葉")
 
-    assert payload["catalog_id"] == "mexican"
+    assert payload["catalog_id"] == "vivid_material"
     assert "color_map" not in payload
 
 
 def test_color_catalog_summary_uses_server_catalog_data():
-    summary = cli._color_catalog_summary("mexican", CATALOG_DATA)
+    summary = cli._color_catalog_summary("vivid_material", CATALOG_DATA)
 
-    assert summary["resolved_color_catalog"] == "mexican"
-    assert summary["color_catalog_name"] == "Mexican Vibrant"
+    assert summary["resolved_color_catalog"] == "vivid_material"
+    assert summary["color_catalog_name"] == "Vivid Material"
     assert summary["color_map"]["green"] == "#008f39"
-    assert summary["color_map"]["palette:Cactus"] == "#008f39"
+    assert summary["color_map"]["palette:Fresh Green"] == "#008f39"
 
 
 def test_color_trace_reports_missing_green():

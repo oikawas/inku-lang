@@ -93,8 +93,8 @@ def test_color_catalogs_are_served_by_api():
     data = r.json()
     assert data["default_catalog_id"] == "default"
     catalogs = {catalog["id"]: catalog for catalog in data["catalogs"]}
-    assert catalogs["mexican"]["map"]["green"] == "#008f39"
-    assert any(color["name"] == "Cactus" for color in catalogs["mexican"]["palette"])
+    assert catalogs["vivid_material"]["map"]["green"] == "#008f39"
+    assert any(color["name"] == "Fresh Green" for color in catalogs["vivid_material"]["palette"])
 
 
 def test_generation_apis_require_auth():
@@ -946,7 +946,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
             "save_history": True,
             "history_input": "一滴の墨",
             "history_at": 1_700_000_000_000,
-            "catalog_id": "mexican",
+            "catalog_id": "vivid_material",
         },
         headers=headers,
     )
@@ -954,8 +954,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     data = r.json()
     assert data["history_id"]
     assert data["history_at"] == 1_700_000_000_000
-    assert data["render_color_catalog_id"] == "mexican"
-    assert data["render_color_catalog_name"] == "Mexican Vibrant"
+    assert data["render_color_catalog_id"] == "vivid_material"
+    assert data["render_color_catalog_name"] == "Vivid Material"
     assert data["render_color_map"]["green"] == "#008f39"
 
     history = client.get("/api/history", headers=headers).json()
@@ -963,10 +963,10 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     item = history["items"][0]
     assert item["id"] == data["history_id"]
     assert item["input"] == "一滴の墨"
-    assert item["catalog_id"] == "mexican"
+    assert item["catalog_id"] == "vivid_material"
     assert item["render_build_number"] == data["render_build_number"]
-    assert item["render_color_catalog_id"] == "mexican"
-    assert item["render_color_catalog_name"] == "Mexican Vibrant"
+    assert item["render_color_catalog_id"] == "vivid_material"
+    assert item["render_color_catalog_name"] == "Vivid Material"
     assert "render_color_catalog" not in item
     assert item["render_color_map"]["green"] == "#008f39"
     assert item["svg"] == data["svg"]
@@ -984,16 +984,16 @@ def test_paint_resolves_catalog_id_on_server(monkeypatch, auth_context):
 
     r = client.post(
         "/api/paint",
-        json={"text": "緑の円", "catalog_id": "mexican"},
+        json={"text": "緑の円", "catalog_id": "vivid_material"},
         headers=headers,
     )
 
     assert r.status_code == 200
     data = r.json()
-    assert data["catalog_id"] == "mexican"
-    assert data["render_color_catalog_id"] == "mexican"
+    assert data["catalog_id"] == "vivid_material"
+    assert data["render_color_catalog_id"] == "vivid_material"
     assert data["render_color_map"]["green"] == "#008f39"
-    assert data["render_color_map"]["palette:Cactus"] == "#008f39"
+    assert data["render_color_map"]["palette:Fresh Green"] == "#008f39"
     assert "#008f39" in data["svg"]
 
 

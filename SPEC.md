@@ -161,6 +161,12 @@ catalog definitions and exposes them through `/api/color-catalogs`; clients
 select a `catalog_id` rather than owning their own catalog tables.  When user
 instructions include color nuance, the system may preserve `color_hint` so
 Stage 2 and rendering can resolve the best catalog color without losing intent.
+The default catalog is a neutral baseline, not a cultural default.  Additional
+catalog ids use material-, light-, and technique-based names to avoid presenting
+a country, ethnicity, food, festival, empire, or tourism marker as a complete
+palette identity: `ink_season`, `fresco_study`, `open_air_light`,
+`ink_porcelain`, `cool_material`, `dye_earth`, `desert_mineral`,
+`vivid_material`, `weathered_heritage`, and `sea_stone`.
 
 Render JSON produced by the server records the concrete render context.  Paint,
 compose, and saved artifact JSON include `render_build_number`,

@@ -2481,19 +2481,148 @@ Build 258 の green-heavy 再実行中に、`010`「白い余白」「黒い線�
 
 パレット改善案:
 
-- `default`: 変更不要。比較基準として、ニュートラルで意味が明確。
-- `japanese`: core map を default からもう一段だけ和色へ寄せる。例: `red` を朱寄り、`blue` を藍、`green` を常磐、`gray` を消墨として明確化する。藤紫・山吹は extras のままでよいが、現状よりカタログ差が出る必要がある。
-- `renaissance`: `gray` を Siena ではなく warm neutral gray / stone gray へ寄せ、Sienna は palette extra に残す。茶地の絵画性は保ちつつ、灰色要求の意味を守る。
-- `impressionism`: `black` は cobalt blue ではなく dark violet / deep ultramarine 系の暗色にする。Cobalt blue は blue または extra に残す。淡色の魅力は維持する。
-- `chinese`: `gray` を purple から inkstone gray へ寄せ、purple は extra に残す。`blue` は electric blue より porcelain/cobalt blue に寄せると伝統性が増す。
-- `nordic`: 変更不要に近い。必要なら `blue` を少し低彩度へ寄せる程度。
-- `indian`: `blue` を magenta から indigo / peacock blue に戻す。Magenta は `Gulabi` などの extra に残す。現在のままだと青指定の意味が最も崩れやすい。
-- `egyptian`: 大きな変更不要。`green` を turquoise とする方針はテーマとして成立するが、より緑の意味を守るなら malachite green を core にし、turquoise を extra にする。
-- `mexican`: `gray` を terracotta から neutral stone gray へ寄せ、terracotta は extra に残す。Rosa Mexicano は catalog identity として維持してよい。
-- `british`: 大きな変更不要。必要なら `black` を navy から charcoal へ寄せ、navy は extra に残すと、黒指定の構造線がより安定する。
-- `greek`: 大きな変更不要。青・白・テラコッタ・オリーブの関係が名前と出力の両方に合っている。
+- 方針: core map は `black`, `white`, `red`, `blue`, `green`, `gray` の抽象色としての意味を壊さない範囲で調整する。文化的・時代的な特徴色は、過度な代表化を避けるため palette extras に分散させる。国名系カタログでは、観光記号や祝祭色だけに寄せず、日常色・素材色・影色を含める。
+- `default`: 変更不要。比較基準として、ニュートラルで意味が明確。仕様上は「標準文化」ではなく neutral baseline と明記する。
+- `japanese`: core map は和色へ寄せるが、渋さだけに固定しない。`red` は朱、`blue` は藍、`green` は常磐、`gray` は消墨のように意味が明確な色へ寄せる。extras は藤紫・山吹に加え、季節色や現代的な明色を入れられる余地を残す。狙いは default との差分を出すことであり、「和=侘び寂び」へ閉じることではない。
+- `renaissance`: `gray` は Siena ではなく warm neutral gray / stone gray に戻し、Sienna や gold は extras に残す。時代様式カタログとして、土色・鉛白・石・深緑・赤の絵画性を保ちつつ、すべてを museum-like な茶金へ寄せない。
+- `impressionism`: `black` は cobalt blue ではなく dark violet / deep ultramarine 系の暗色へ変更する。Cobalt blue、sky blue、rose、lilac は palette extras または `blue` 周辺で残す。淡いパステルだけでなく、暗部・補色・屋外光の揺れを表現できる幅を持たせる。
+- `chinese`: `gray` は purple から inkstone gray へ寄せ、purple と gold は extras に残す。`blue` は electric blue より porcelain/cobalt blue へ寄せる。朱金翡翠だけに固定せず、水墨、陶磁、紙、石の静かな色を core / extras の両方に含める。
+- `nordic`: 大きな変更不要。必要なら `blue` を少し muted にし、extra に winter dark, summer light, wood, moss などを足せる構成にする。低彩度ミニマル一辺倒ではなく、季節差と素材感の幅を残す。
+- `indian`: `blue` を magenta から indigo / peacock blue / Krishna blue 系へ戻す。Magenta は `Gulabi` などの festive extra として残す。高彩度の祝祭色だけでなく、earth, textile dye, monsoon, stone, paper の落ち着いた色域を extras に含め、ステレオタイプ化リスクを下げる。
+- `egyptian`: カタログ名が広いので、古代意匠を意図するなら将来的に `ancient_egyptian` への名称変更も検討する。現行名のままなら、papyrus, gold, turquoise だけに寄せず、desert stone, Nile blue, linen, shadow を含める。`green` は malachite green を core にし、turquoise は extra に置くと抽象色との対応が明確になる。
+- `mexican`: `gray` を terracotta から neutral stone gray へ戻し、terracotta は extra に残す。Rosa Mexicano は identity として維持してよいが、祝祭色だけに偏らないよう muted earth, urban stone, shadow, paper を extras に含める。静かな入力でも描画意図を保てる構成にする。
+- `british`: 大きな変更不要。`black` は navy から charcoal へ寄せ、navy は extra に残すと黒線の構造性が安定する。heritage / institutional に偏りすぎないよう、fog gray, brick, rain blue, wool brown など日常的な素材色を extras に含める。
+- `greek`: 大きな変更不要。white, Aegean blue, terracotta, olive, stone gray の関係は良い。白壁と青い海だけに固定しないよう、darker sea, marble shadow, dry grass, clay などを extras に足せる余地を持たせる。
 
 次アクション:
 
 - 改善優先度は `indian` の `blue`、`japanese` の core map 差分、`impressionism` の `black`、`chinese` / `renaissance` / `mexican` の `gray`。
-- いずれも個別プロンプト対策ではなく、抽象色の意味を守りながら各カタログの性格を強める調整として実装する。
+- 追加で、`egyptian` はカタログ名の範囲を見直す余地がある。名称変更をしない場合は、ancient-symbol palette だけに閉じない extras を追加する。
+- いずれも個別プロンプト対策ではなく、抽象色の意味を守り、カタログの文化的・時代的な幅を確保する調整として実装する。
+
+### Build 265 方針: 文化的摩擦リスクを下げるカタログ rename
+
+調査・スクリーニング:
+
+- 国名、民族名、食、祭り、帝国、観光記号をカタログ identity として直接使うと、色カタログが文化全体を代表しているように見えやすい。
+- 色名・商品名の過去事例では、肌色表現の不足や、暗い色に否定的な名前を付けることが批判されている。色名は「面白い名前」よりも、誰に何を代表させているかを確認する必要がある。
+- 今回は国・地域名を外し、素材・光・技法・描画上の振る舞いを名前にする。
+
+変更:
+
+- 旧 id との比較表は Git 管理外の `no-git-sync/color_catalog_rename_map.md` に保存した。
+- product code には互換 alias を残さず、新 id を正として扱う。
+- 旧 `japanese` は `ink_season`、旧 `renaissance` は `fresco_study`、旧 `impressionism` は `open_air_light`、旧 `chinese` は `ink_porcelain`、旧 `nordic` は `cool_material`、旧 `indian` は `dye_earth`、旧 `egyptian` は `desert_mineral`、旧 `mexican` は `vivid_material`、旧 `british` は `weathered_heritage`、旧 `greek` は `sea_stone` に変更する。
+- `map` は抽象色の意味を守る方向へ調整し、強い特徴色は `palette` に残す。とくに `blue`, `gray`, `black` は構造色としての意味を優先する。
+
+次アクション:
+
+- Build 265 を pentala に反映後、Build 264 と同じ10件プロンプトを新 id 全種で再実行する。
+- 出力 root は `cli/out/tune-bench-build265-color-catalog-10/` とし、`no-git-sync/color_catalog_rename_map.md` を使って旧 id の contact sheet と比較する。
+
+### Build 265 current: rename 後カタログ 10枚ベンチ
+
+実行:
+
+- 日時: 2026-05-03
+- 実行環境: Mac CLI から pentala LAN API `http://192.168.0.89:8100` を呼び出し
+- build: `265`
+- 入力: `cli/out/tune-bench-build264-color-catalog-10/prompts.txt`
+- 出力: `cli/out/tune-bench-build265-color-catalog-10/`
+- 旧名→新名比較表: `no-git-sync/color_catalog_rename_map.md` (Git 管理外)
+- 対象カタログ: `default`, `ink_season`, `fresco_study`, `open_air_light`, `ink_porcelain`, `cool_material`, `dye_earth`, `desert_mineral`, `vivid_material`, `weathered_heritage`, `sea_stone`
+- 各カタログ10件、合計110件を `inku-cli batch --png --continue-on-error --color-catalog <id>` で実行し、各ディレクトリに `contact-sheet.png` を生成した。
+
+補足:
+
+- 初回 `sea_stone` 実行の5件目で、texture filter と blur filter が同じ SVG 要素に重複属性として出力され、PNG変換が停止した。
+- レンダラーを修正し、既に texture filter を持つ要素には blur filter を追加しないようにした。途中出力は `cli/out/tune-bench-build265-color-catalog-10/sea_stone_svg_filter_failure/` に残し、修正後に `sea_stone` を再実行した。
+
+結果:
+
+| new catalog | old catalog | success | failed | fallback | slow | green delivery | elapsed ms | 比較メモ |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| default | default | 10 | 0 | 1 | 2 | 1.0 | 406901 | 基準。今回は fallback が1件あり、Build 264 よりやや重い。 |
+| ink_season | japanese | 10 | 0 | 0 | 0 | 1.0 | 239825 | fallback 4→0。旧名の文化摩擦を下げつつ、朱・藍・墨の差分が見える。 |
+| fresco_study | renaissance | 10 | 0 | 2 | 2 | 1.0 | 418179 | fallback 4→2。茶に偏りすぎた gray を石色へ戻し、絵画的な地と赤緑は維持。 |
+| open_air_light | impressionism | 10 | 0 | 2 | 2 | 1.0 | 562096 | fallback 0→2。淡色と青紫の光は強いが、黒面が夜青として支配的になる傾向は残る。 |
+| ink_porcelain | chinese | 10 | 0 | 1 | 1 | 1.0 | 354580 | fallback 1→1。紫 gray 問題は解消し、朱・緑・青磁系の整理が良い。 |
+| cool_material | nordic | 10 | 0 | 0 | 0 | 1.0 | 213136 | fallback 0→0。旧版同様に安定し、素材名へ寄せたことで代表性リスクが下がった。 |
+| dye_earth | indian | 10 | 0 | 3 | 3 | 1.0 | 706952 | fallback 2→3。blue が magenta へ崩れる問題は解消したが、実行時間と fallback は悪化。 |
+| desert_mineral | egyptian | 10 | 0 | 2 | 2 | 1.0 | 434146 | fallback 0→2。観光記号的な名前は避けられたが、砂地背景が強く、静かな入力でもテーマ色が勝つ。 |
+| vivid_material | mexican | 10 | 0 | 0 | 0 | 1.0 | 266006 | fallback 1→0。gray を stone gray に戻した効果が大きく、祝祭記号名も外せた。 |
+| weathered_heritage | british | 10 | 0 | 0 | 0 | 1.0 | 245854 | fallback 0→0。black を charcoal に戻し、navy 一辺倒が弱まった。 |
+| sea_stone | greek | 10 | 0 | 0 | 0 | 1.0 | 242161 | fallback 1→0。白青観光記号だけでなく石・乾いた緑・土色が見える。 |
+
+3名ペルソナ評価:
+
+1. 文化的摩擦レビュー担当
+
+   - 改善大: `ink_season`, `dye_earth`, `vivid_material`, `desert_mineral`, `sea_stone`
+   - 国名・民族名・食・祭り・帝国を id/name/sub から外したため、「文化全体を代表する色」という見え方はかなり下がった。
+   - ただし `weathered_heritage` は heritage という語が階級的・制度的な連想を持つため、リスクは低くない。現状は国名を外し、fog/brick/wool/rain の素材説明にしたことで許容範囲。
+   - `desert_mineral` は安全側だが、砂漠・鉱物へ寄りすぎると地域文化の多様性ではなく地理イメージに固定される。今後は linen / shadow / river blue の比率も見たい。
+
+2. 画家・構図評価者
+
+   - 絵として最も安定: `cool_material`, `weathered_heritage`, `sea_stone`, `vivid_material`
+   - 形と色の楽しさが増えた: `vivid_material`, `dye_earth`, `ink_porcelain`, `open_air_light`
+   - `ink_season` は旧 `japanese` よりカタログ差分が出たが、赤線が強く、青・緑の出番は少なめ。余白と黒の骨格はよい。
+   - `open_air_light` は淡いピンクと青紫が気持ちよい一方、暗い入力で画面全体が夜青に寄る。光のカタログとしては、暗部を少し軽くした方が屋外光らしい。
+   - `dye_earth` は美術的には楽しい。深い地と染料色がよく出るが、静かな線の入力でも濃色背景が支配しやすい。
+
+3. レンダラー・プロダクト設計者
+
+   - API / JSON 連携はサーバー側カタログを正として記録できている。全 summary で `render_build_numbers: ["265"]` と `render_color_catalog_id` が確認できた。
+   - 抽象色名キーの方針は維持でよい。今回の改善は、`blue`, `gray`, `black` をテーマ色に置換しすぎず、意味を守った点が効いている。
+   - ベンチ中に見つかった SVG filter 重複は、カタログとは別のレンダラ品質問題。修正後の `sea_stone` は10/10で PNG 生成まで通った。
+   - 性能比較は LLM 実行の揺れが大きいので、elapsed は参考値。品質判断は contact-sheet と fallback/欠落警告を優先する。
+
+改善度合い:
+
+- 文化的摩擦: 大きく改善。product code のカタログ id/name/sub から、国・地域・食・祭り・帝国・観光ラベルを外した。
+- 色意味の保持: 改善。旧 `indian` の blue→magenta、旧 `mexican` の gray→terracotta、旧 `british` の black→navy、旧 `chinese` の gray→purple は解消した。
+- 描画品質: 多くは改善または維持。`cool_material`, `vivid_material`, `weathered_heritage`, `sea_stone` は安定。`ink_season` も旧版より明確に良い。
+- 残リスク: `open_air_light`, `dye_earth`, `desert_mineral` は背景・暗色が強く、入力によってはカタログの気分が形の意図を上書きする。次に触るなら個別ケース対策ではなく、背景化しやすい core color の明度・彩度を少し抑える。
+
+次アクション:
+
+- `open_air_light`: core `black` をもう少し軽い deep violet gray に寄せるか、暗背景化を抑える。
+- `dye_earth`: identity は良いので、core `black` の濃さと high-chroma pink の支配を下げる。blue は現状維持。
+- `desert_mineral`: paper/sand の背景支配を少し弱め、gray/green の素材色をもう少し構造色として使いやすくする。
+- 変更する場合も、国・地域名へ戻さず、素材・光・技法の名前を維持する。
+
+### Build 264 指摘点に対する Build 265 修正確認
+
+確認観点:
+
+- Build 264 の「3名ペルソナ評価」
+- Build 264 の「国・地域出身者ペルソナによる補助レビュー」
+- Build 264 の「ステレオタイプ化リスク評価」
+- Build 265 の rename 後10枚ベンチ結果、contact sheet、summary JSON
+
+修正済み:
+
+- 名称リスク: 修正済み。Build 264 の `japanese`, `indian`, `egyptian`, `mexican`, `british`, `greek` など国・地域名を直接背負う id/name/sub は、Build 265 で `ink_season`, `dye_earth`, `desert_mineral`, `vivid_material`, `weathered_heritage`, `sea_stone` へ変更した。根拠は Build 265 方針の「国名、民族名、食、祭り、帝国、観光記号をカタログ identity として直接使うと、色カタログが文化全体を代表しているように見えやすい」という判断と、`server/src/inku_server/color_catalogs.py` の新 catalog 定義。
+- `japanese` の default との差分不足: 修正済み。Build 264 では core map が default に近く、藤紫・山吹が extras に留まるため「和」より通常 default に見えると評価した。Build 265 の `ink_season` は `red=#d3381c`, `blue=#165e83`, `green=#007b43`, `gray=#595857` に変更し、fallback も `4 -> 0`。contact sheet でも朱・藍・墨の差分が見える。
+- `indian` の `blue` が magenta へ崩れる問題: 修正済み。Build 264 では `blue` が `#fc0fc0` になり、青い線・青い円の意味が崩れると指摘した。Build 265 の `dye_earth` は core `blue=#006c8f` とし、magenta は `palette:Bright Pink` に移した。色意味の保持としては改善。
+- `renaissance` の `gray` が茶へ寄りすぎる問題: 修正済み。Build 264 では gray が Sienna 的な茶に寄り、石・陰影・銀灰の意図が失われやすいと評価した。Build 265 の `fresco_study` は core `gray=#8a8178` の warm stone に戻し、Burnt Earth は palette extra に置いた。fallback も `4 -> 2`。
+- `chinese` の `gray` が紫へ寄りすぎる問題: 修正済み。Build 264 では `gray` の purple が現代的・装飾的に出すぎると評価した。Build 265 の `ink_porcelain` は core `gray=#4b4b4f` とし、Mineral Violet は palette extra に残した。
+- `mexican` の `gray` が terracotta になる問題と祝祭記号名: 修正済み。Build 264 では quiet prompt でも祝祭方向へ引っ張る、`gray` が stone/shadow でなく土壁や陶器へ変わると評価した。Build 265 の `vivid_material` は core `gray=#7d6f66`、名前も素材・顔料寄りに変更し、fallback は `1 -> 0`。
+- `british` の `black` が navy になる問題: 修正済み。Build 264 では黒線の構造性を重視するなら charcoal がよいと評価した。Build 265 の `weathered_heritage` は core `black=#1f2933` とし、navy 系は `blue` / palette 側に残した。fallback は `0 -> 0`。
+- `greek` の白青観光記号化: 概ね修正済み。Build 264 では white and Aegean blue への固定化リスクを挙げた。Build 265 の `sea_stone` は `stone gray`, `dry olive`, `clay red`, `night sea` を含み、白青だけに閉じない。fallback も `1 -> 0`。
+- サーバー正本・JSON記録: 修正済み。Build 265 の全 summary で `render_build_numbers: ["265"]` と `render_color_catalog_id` が確認できた。API / JSON 連携は、クライアント側独自カタログではなくサーバー側カタログを正として扱えている。
+
+要改善:
+
+- `open_air_light`: 旧 `impressionism` の暗部支配が残る。名称は国・流派名から離れて安全側になったが、暗い入力で夜青の面が支配的になりやすい。Build 265 では fallback が `0 -> 2`、slow も2件。core `black=#2f2d66` をもう少し軽い deep violet gray に寄せるか、暗背景化を抑える必要がある。
+- `dye_earth`: 色意味は改善したが、描画支配と実行指標は悪化。Build 264 の blue 問題は直った一方で、Build 265 は fallback `2 -> 3`、slow 3件、elapsed `706952ms`。深い地と high-chroma pink が静かな入力でも強く出るため、core `black` の濃さと pink の支配を下げる。
+- `desert_mineral`: 旧 `egyptian` の観光・古代記号名は外せたが、砂漠・鉱物へ寄りすぎる別の固定化リスクが残る。Build 265 は fallback `0 -> 2`、slow 2件。paper/sand の背景支配を弱め、linen / shadow / river blue 的な幅を増やす。
+- `weathered_heritage`: 出力は安定しているが、`heritage` 語の階級的・制度的な連想は残る。現状は fog/brick/wool/rain の素材説明で許容範囲だが、将来的により中立な素材名へ寄せる余地がある。
+- `default`: カタログ rename の本題ではないが、Build 264 は fallback 0、Build 265 は fallback 1 / slow 2。比較基準としては再計測時に揺れを確認する。
+
+結論:
+
+- Build 264 の指摘のうち、文化的摩擦と抽象色の意味崩れは Build 265 で大半を修正できた。
+- 残件は個別ケース最適化ではなく、`open_air_light`, `dye_earth`, `desert_mineral` の core color が背景・暗色として作品全体を支配しすぎる問題として扱う。
+- 次の調整では、国・地域名へ戻さず、素材・光・技法・描画上の振る舞いによる命名方針を維持する。

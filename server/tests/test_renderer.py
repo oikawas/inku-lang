@@ -1,3 +1,5 @@
+from xml.etree import ElementTree
+
 from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 
@@ -736,6 +738,26 @@ def test_render_circle_with_pink_variation_emits_blur_filter():
     assert 'filter="url(#blur-medium)"' in svg
     assert "<circle" in svg
     assert "<polyline" not in svg
+
+
+def test_render_textured_pink_variation_keeps_valid_svg_filter_attribute():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "triangle",
+                    "position": [0.4, 0.4],
+                    "size": [0.2, 0.2],
+                    "weight": "chalk",
+                    "variation": {"quality": "pink", "amplitude": "medium"},
+                }
+            ]
+        }
+    )
+    svg = render(score)
+    ElementTree.fromstring(svg)
+    assert svg.count('filter="url(#texture-chalk)"') == 1
+    assert svg.count('filter="url(#blur-medium)"') == 0
 
 
 def test_render_line_with_pink_variation_emits_blur_not_polyline():

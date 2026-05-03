@@ -45,5 +45,6 @@ LOCAL_WORK.md
 data/history.json
 
 # CLI generated outputs
+cli/tune_bench.md
 cli/out/
 server/out/

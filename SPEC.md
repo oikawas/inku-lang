@@ -174,6 +174,11 @@ Catalog `map` values must preserve the meaning of the abstract colors
 their dark backgrounds, high-chroma accents, or paper/sand tones can dominate
 quiet prompts, so future tuning should adjust core brightness and saturation
 instead of branching into prompt-specific exceptions.
+Build 266 lightens those three catalogs' core colors to reduce background and
+dark-color dominance.  Catalog `sub` remains the English UI description, while
+`sub_ja` carries the Japanese UI description.  Palette color names use `name` as
+the English canonical label and may include `name_ja`; the Japanese UI displays
+those entries as `English（日本語）`, while the English UI displays `name` only.
 
 Render JSON produced by the server records the concrete render context.  Paint,
 compose, and saved artifact JSON include `render_build_number`,

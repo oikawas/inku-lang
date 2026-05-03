@@ -2566,6 +2566,8 @@ type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
 - `default` は文化的な標準ではなく neutral baseline として扱う。追加カタログの `id` / 表示名 / 説明は、国名・民族名・食・祭り・帝国・観光記号で文化全体を代表しないよう、素材・光・技法・描画上の振る舞いを基準に命名する。
 - カタログの `map` は `white / black / blue / red / green / gray` の抽象色としての意味を壊さないことを優先する。特徴色は `palette` に逃がし、`blue` が pink へ、`gray` が terracotta へ、`black` が navy へ変わるような意味崩れを避ける。
 - Build 265 時点の残課題として、`open_air_light`, `dye_earth`, `desert_mineral` は背景・暗色・高彩度差し色が作品全体を支配しやすい。今後の調整は個別プロンプト最適化ではなく、core color の明度・彩度・背景化しやすさを抑える方向で行う。
+- Build 266 では上記3カタログの core color を少し軽くし、背景・暗色・高彩度差し色の支配を抑えた。`default.sub` は英語UI向けに `neutral baseline` とし、日本語UI向け説明は `sub_ja` に分離する。
+- カタログ詳細色は `palette[].name` を英語の正本表示名とし、対応する日本語名がある場合は `palette[].name_ja` を併記できる。日本語UIでは `English（日本語）` と表示し、英語UIでは `name` のみ表示する。
 
 「カタログ設定」モーダル（ヘッダー右端）から選択。選択は `localStorage` に永続化。
 

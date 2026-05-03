@@ -583,6 +583,7 @@ measured card height to reduce unused space at the bottom of the dialog.
 The thumbnail action row places the star at the lower left, shows hash labels
 without `#`, and aligns hash button typography with the delete action.
 Starred thumbnails keep an explicit highlighted star state in dark mode.
+The thumbnail hover tooltip includes a larger image preview above the metadata.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

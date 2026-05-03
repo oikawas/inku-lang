@@ -124,8 +124,8 @@
 		hideTooltip();
 		tooltipTimer = setTimeout(() => {
 			const rect = target.getBoundingClientRect();
-			const tooltipWidth = 340;
-			const tooltipHeight = 150;
+			const tooltipWidth = Math.min(440, window.innerWidth - 28);
+			const tooltipHeight = 430;
 			const margin = 14;
 			const x = Math.max(
 				margin + tooltipWidth / 2,
@@ -358,6 +358,9 @@
 		class:above={tooltipState.placement === 'above'}
 		style="left: {tooltipState.x}px; top: {tooltipState.y}px;"
 	>
+		<div class="tooltip-preview">
+			<HistoryThumbnail item={tooltipState.item} scope="tooltip" size="manager" />
+		</div>
 		<div class="tooltip-title">#{historyManagerOffset + tooltipState.index + 1}</div>
 		<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(tooltipState.item)}</strong></div>
 		<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(tooltipState.item.at)}</strong></div>
@@ -577,7 +580,7 @@
 		border: 1px solid var(--border2);
 		padding: 9px 11px;
 		text-align: left;
-		width: min(340px, calc(100vw - 28px));
+		width: min(440px, calc(100vw - 28px));
 		z-index: 5000;
 		line-height: 1.7;
 		box-shadow: 0 12px 36px rgba(0,0,0,0.22);
@@ -586,6 +589,19 @@
 		transform: translateX(-50%) translateY(-100%);
 	}
 	.tooltip-title { font-weight: 500; margin-bottom: 3px; }
+	.tooltip-preview {
+		width: 100%;
+		max-height: min(300px, 48vh);
+		margin-bottom: 8px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		overflow: hidden;
+		background: var(--panel);
+	}
+	.tooltip-preview :global(.history-thumbnail.manager) {
+		width: 100%;
+		height: auto;
+	}
 	.tooltip-row {
 		display: grid;
 		grid-template-columns: 70px minmax(0, 1fr);

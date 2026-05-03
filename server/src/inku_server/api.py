@@ -76,6 +76,23 @@ def _build_number() -> str | None:
         return None
 
 
+def _resolved_stage1_model(model: str | None) -> str:
+    return model or os.getenv("OPENAI_MODEL_STAGE1", "qwen3-api")
+
+
+def _resolved_stage2_model(model: str | None) -> str:
+    return model or os.getenv("OPENAI_MODEL", "qwen-api")
+
+
+def _model_metadata(*, stage1_model: str | None = None, stage2_model: str | None = None) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    if stage1_model:
+        metadata["stage1_model"] = stage1_model
+    if stage2_model:
+        metadata["stage2_model"] = stage2_model
+    return metadata
+
+
 def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
     dt = datetime.fromtimestamp(at_ms / 1000, tz=timezone.utc).astimezone()
     date_dir = _OUTPUT_DIR / user_id / dt.strftime("%Y-%m-%d")
@@ -89,6 +106,7 @@ def _save_output_files(
     score: dict,
     svg: str,
     render_metadata: dict | None = None,
+    model_metadata: dict | None = None,
 ) -> None:
     try:
         prefix.parent.mkdir(parents=True, exist_ok=True)
@@ -96,7 +114,7 @@ def _save_output_files(
             Path(f"{prefix}_instruction.txt").write_text(input_text, encoding="utf-8")
         if ddl:
             Path(f"{prefix}_normalized.ddl").write_text(ddl, encoding="utf-8")
-        score_payload = {"score": score, **(render_metadata or {})}
+        score_payload = {"score": score, **(model_metadata or {}), **(render_metadata or {})}
         Path(f"{prefix}_score.json").write_text(json.dumps(score_payload, ensure_ascii=False, indent=2), encoding="utf-8")
         svg_bytes = svg.encode("utf-8")
         Path(f"{prefix}_output.svg").write_bytes(svg_bytes)
@@ -172,6 +190,14 @@ def _history_render_metadata(item: dict) -> dict | None:
     return metadata or None
 
 
+def _history_model_metadata(item: dict) -> dict | None:
+    metadata = _model_metadata(
+        stage1_model=item.get("stage1_model"),
+        stage2_model=item.get("stage2_model"),
+    )
+    return metadata or None
+
+
 def _save_history_artifacts(item: dict) -> None:
     _save_output_files(
         _history_output_prefix(item),
@@ -180,6 +206,7 @@ def _save_history_artifacts(item: dict) -> None:
         item.get("score", {}),
         item.get("svg", ""),
         _history_render_metadata(item),
+        _history_model_metadata(item),
     )
 
 
@@ -307,6 +334,7 @@ class ComposeRequest(BaseModel):
 class ComposeResponse(BaseModel):
     score: Score
     svg: str
+    stage2_model: str | None = None
     render_build_number: str | None = None
     render_color_catalog_id: str | None = None
     render_color_catalog_name: str | None = None
@@ -363,6 +391,8 @@ class PaintResponse(BaseModel):
     thinking: str | None = None
     score: Score
     svg: str
+    stage1_model: str | None = None
+    stage2_model: str | None = None
     render_build_number: str | None = None
     render_color_catalog_id: str | None = None
     render_color_catalog_name: str | None = None
@@ -1263,10 +1293,11 @@ def _call_interpret_detail(
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
 def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> ComposeResponse:
     t0 = time.perf_counter()
+    resolved_stage2_model = _resolved_stage2_model(req.model)
     try:
         compose_detail = _call_compose_detail(
             req.ddl,
-            model=req.model,
+            model=resolved_stage2_model,
             original_text=req.original_text,
             system_prompt=None,
             lang=req.lang,
@@ -1293,6 +1324,7 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
     return ComposeResponse(
         score=score,
         svg=svg,
+        stage2_model=resolved_stage2_model,
         **render_metadata,
         elapsed_ms=elapsed_ms,
         tokens_in=compose_detail.tokens_in,
@@ -1504,9 +1536,11 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
     catalog_id = _resolved_catalog_id(req.catalog_id)
+    resolved_stage1_model = _resolved_stage1_model(req.stage1_model)
+    resolved_stage2_model = _resolved_stage2_model(req.stage2_model)
     try:
         interpret_detail_result = _call_interpret_detail(
-            req.text, model=req.stage1_model, include_thinking=req.include_thinking, lang=req.lang
+            req.text, model=resolved_stage1_model, include_thinking=req.include_thinking, lang=req.lang
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
@@ -1515,7 +1549,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     t1 = time.perf_counter()
     try:
         compose_detail = _call_compose_detail(
-            ddl, model=req.stage2_model, original_text=source_text, lang=req.lang
+            ddl, model=resolved_stage2_model, original_text=source_text, lang=req.lang
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
@@ -1553,8 +1587,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             svg=svg,
             at=history_at,
             elapsed_ms=elapsed_total_ms,
-            stage1_model=req.stage1_model,
-            stage2_model=req.stage2_model,
+            stage1_model=resolved_stage1_model,
+            stage2_model=resolved_stage2_model,
             tokens_in=(interpret_detail_result.tokens_in or 0) + (compose_detail.tokens_in or 0) or None,
             tokens_out=(interpret_detail_result.tokens_out or 0) + (compose_detail.tokens_out or 0) or None,
             catalog_id=None if catalog_id == "default" else catalog_id,
@@ -1577,6 +1611,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             "score": score_dict,
             "svg": svg,
             "at": history_at,
+            "stage1_model": resolved_stage1_model,
+            "stage2_model": resolved_stage2_model,
             "render_metadata": render_metadata,
         })
     user_generation_count = None
@@ -1590,6 +1626,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         thinking=interpret_detail_result.thinking,
         score=score,
         svg=svg,
+        stage1_model=resolved_stage1_model,
+        stage2_model=resolved_stage2_model,
         **render_metadata,
         history_id=history_id,
         history_at=history_at,

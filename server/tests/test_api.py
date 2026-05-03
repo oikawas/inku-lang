@@ -833,6 +833,8 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
 
 def test_paint_pipeline(monkeypatch, auth_context):
     headers, _, _ = auth_context
+    monkeypatch.setenv("OPENAI_MODEL_STAGE1", "stage1-default-test")
+    monkeypatch.setenv("OPENAI_MODEL", "stage2-default-test")
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
@@ -847,6 +849,8 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert "中心" not in data["ddl"]
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
+    assert data["stage1_model"] == "stage1-default-test"
+    assert data["stage2_model"] == "stage2-default-test"
     assert data["render_build_number"]
     assert data["render_color_catalog_id"] == "default"
     assert data["render_color_catalog_name"] == "inku Default"
@@ -1102,11 +1106,17 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
             "render_color_catalog_sub": "neutral baseline",
             "render_color_map": {"black": "#111111"},
         },
+        {
+            "stage1_model": "stage1",
+            "stage2_model": "stage2",
+        },
     )
 
     assert (tmp_path / "out" / "sample_instruction.txt").read_text(encoding="utf-8") == "input text"
     assert (tmp_path / "out" / "sample_normalized.ddl").read_text(encoding="utf-8") == "normalized ddl"
     saved_score = json.loads((tmp_path / "out" / "sample_score.json").read_text(encoding="utf-8"))
+    assert saved_score["stage1_model"] == "stage1"
+    assert saved_score["stage2_model"] == "stage2"
     assert saved_score["render_build_number"] == "260"
     assert saved_score["render_color_catalog_id"] == "default"
     assert saved_score["render_color_catalog_name"] == "inku Default"

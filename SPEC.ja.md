@@ -1406,10 +1406,11 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - 履歴管理ダイアログ上部は、タイトル/表示切替/件数/ページ移動を1段に集約し、選択/絞り込み/検索を2段目にまとめることでサムネイル表示領域を広げる
 - サムネイル実寸によるページサイズ再計算時は、ページ番号を維持し、次ページ操作後に先頭ページへ戻らないようにする
 - 履歴管理ダイアログの各画像に表示する個別削除操作は、文字ラベルではなく小さなごみ箱アイコンボタンで表示する
+- JSONタブ、描画レスポンス、履歴保存時のartifact JSONには、サーバーが実際に使用した解決済み `stage1_model` / `stage2_model` を記録する
 - CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
 - CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
 - 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める
-- build number: 284
+- build number: 285
 
 ### v1.40 (2026-05-03)
 
@@ -1769,7 +1770,7 @@ macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI �
 - Web UI と CLI は色カタログ一覧をサーバー API から取得し、クライアント側のカタログ定義を持たない
 - `/api/paint`、`/api/compose`、`/api/history` は `catalog_id` を受け取り、サーバー側でレンダリング用 `color_map` を解決する
 - `color_map` リクエストフィールドは互換用に残すが、色カタログ解決の正本としては扱わない
-- 履歴には従来どおり `catalog_id` を保存する。加えて、描画レスポンス JSON と出力 artifact JSON には、実際にレンダリングした `render_build_number`、サーバー解決済みの `render_color_catalog_id` / `render_color_catalog_name` / `render_color_catalog_sub`、および `render_color_map`（抽象色名・`palette:<name>` から実際の `#RRGGBB` コードへの展開）を記録する。`render_color_catalog` の完全な `map` / `swatches` / `palette` snapshot は `render_color_map` と重複するため保存しない
+- 履歴には従来どおり `catalog_id` を保存する。加えて、描画レスポンス JSON と出力 artifact JSON には、実際に使用した解決済みの `stage1_model` / `stage2_model`、実際にレンダリングした `render_build_number`、サーバー解決済みの `render_color_catalog_id` / `render_color_catalog_name` / `render_color_catalog_sub`、および `render_color_map`（抽象色名・`palette:<name>` から実際の `#RRGGBB` コードへの展開）を記録する。`render_color_catalog` の完全な `map` / `swatches` / `palette` snapshot は `render_color_map` と重複するため保存しない
 - `GET /api/info` はサーバー名、バージョン、ビルド番号を返す
 - CLI に `version` コマンドを追加し、CLI 側の version / build number と、接続先サーバーの version / build number を表示する
 - Build 264

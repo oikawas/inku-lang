@@ -195,7 +195,8 @@ the English canonical label and may include `name_ja`; the Japanese UI displays
 those entries as `English（日本語）`, while the English UI displays `name` only.
 
 Render JSON produced by the server records the concrete render context.  Paint,
-compose, and saved artifact JSON include `render_build_number`,
+compose, and saved artifact JSON include the resolved `stage1_model` /
+`stage2_model` that were actually used, plus `render_build_number`,
 `render_color_catalog_id`, `render_color_catalog_name`,
 `render_color_catalog_sub`, and `render_color_map`, where abstract colors and
 `palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
@@ -590,6 +591,8 @@ When thumbnail page size is recalculated from measured card dimensions, the
 current page number is preserved instead of jumping back to the first page.
 Per-item delete actions in the history manager use a compact trash icon button
 instead of a text label.
+The JSON tab, paint responses, history records, and saved artifact JSON include
+the resolved `stage1_model` / `stage2_model` used by the server.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

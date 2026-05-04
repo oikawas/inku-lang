@@ -18,6 +18,7 @@
 		onLogout: () => void | Promise<void>;
 		onOpenSettings: () => void;
 		onToggleTheme: () => void;
+		onOpenAppInfo: () => void;
 	};
 
 	let {
@@ -32,6 +33,7 @@
 		onLogout,
 		onOpenSettings,
 		onToggleTheme,
+		onOpenAppInfo,
 	}: Props = $props();
 
 	let expanded = $state(false);
@@ -66,9 +68,9 @@
 <aside class="app-rail" class:expanded onmouseenter={scheduleOpen} onmouseleave={scheduleClose}>
 	<div class="rail-brand">
 		<div class="rail-logo-row">
-			<div class="rail-logo">
+			<button class="rail-logo" type="button" onclick={onOpenAppInfo} aria-label={t().appInfoOpenLabel}>
 				<span class="rail-logo-core">inku</span>{#if expanded}<span class="rail-logo-suffix">-lang</span>{/if}
-			</div>
+			</button>
 		</div>
 		{#if expanded}<div class="rail-sub">{t().subtitle}</div>{/if}
 	</div>
@@ -155,6 +157,9 @@
 		width: auto;
 		display: flex;
 		align-items: center;
+		border: 0;
+		padding: 0;
+		background: transparent;
 		font-size: 15px;
 		font-weight: 300;
 		letter-spacing: 0;
@@ -162,6 +167,8 @@
 		color: var(--fg);
 		white-space: nowrap;
 		transform-origin: left center;
+		font-family: inherit;
+		cursor: default;
 	}
 	.rail-logo-core {
 		width: 30px;

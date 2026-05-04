@@ -4,6 +4,17 @@ export interface LangPack {
 
 	// Header
 	subtitle: string;
+	appInfoOpenLabel: string;
+	appInfoTitle: string;
+	appInfoConceptTitle: string;
+	appInfoConceptBody: string;
+	appInfoCreatorTitle: string;
+	appInfoCreatorName: string;
+	appInfoCreatorBody: string;
+	appInfoVersionLabel: string;
+	appInfoBuildLabel: string;
+	appInfoRepositoryLabel: string;
+	appInfoClose: string;
 	settingsButton: string;
 	themeLight: string;
 	themeDark: string;

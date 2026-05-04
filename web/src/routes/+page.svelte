@@ -55,6 +55,8 @@
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
+	const APP_VERSION = '0.1.0';
+	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 	const BATCH_PROMPT_HISTORY_LIMIT = 20;
@@ -247,6 +249,7 @@
 	let saijikiOpen  = $state(false);
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let settingsOpen = $state(false);
+	let appInfoOpen = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<SettingsTab>('connection');
 	let pngMenuOpen  = $state(false);
@@ -3221,6 +3224,7 @@
 		onLogout={logout}
 		onOpenSettings={() => openSettings()}
 		onToggleTheme={() => void updateUiTheme(!darkMode)}
+		onOpenAppInfo={() => (appInfoOpen = true)}
 	/>
 
 	<!-- ══ BODY ══ -->
@@ -3526,6 +3530,41 @@
 	/>
 {/if}
 
+{#if appInfoOpen}
+	<div class="modal-backdrop app-info-backdrop" onclick={() => (appInfoOpen = false)} aria-hidden="true"></div>
+	<div class="app-info-modal" role="dialog" aria-modal="true" aria-labelledby="app-info-title">
+		<div class="app-info-head">
+			<div id="app-info-title" class="app-info-title">{t().appInfoTitle}</div>
+			<button class="app-info-close" onclick={() => (appInfoOpen = false)} aria-label={t().appInfoClose}>×</button>
+		</div>
+		<div class="app-info-body">
+			<section>
+				<h2>{t().appInfoConceptTitle}</h2>
+				<p>{t().appInfoConceptBody}</p>
+			</section>
+			<section>
+				<h2>{t().appInfoCreatorTitle}</h2>
+				<div class="app-info-creator">{t().appInfoCreatorName}</div>
+				<p>{t().appInfoCreatorBody}</p>
+			</section>
+			<dl class="app-info-meta">
+				<div>
+					<dt>{t().appInfoVersionLabel}</dt>
+					<dd>{APP_VERSION}</dd>
+				</div>
+				<div>
+					<dt>{t().appInfoBuildLabel}</dt>
+					<dd>{__BUILD_NUMBER__}</dd>
+				</div>
+				<div>
+					<dt>{t().appInfoRepositoryLabel}</dt>
+					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>
+				</div>
+			</dl>
+		</div>
+	</div>
+{/if}
+
 {#if profileOpen && currentUser}
 		<ProfileModal
 			username={currentUser.username}
@@ -3752,6 +3791,106 @@
 	.stats-grid { display: grid; grid-template-columns: auto 1fr; gap: 0 12px; }
 	.stats-key { color: var(--fg3); }
 	.stats-total { font-weight: 500; }
+
+	/* App info */
+	.app-info-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 700;
+		background: rgba(0,0,0,0.25);
+		backdrop-filter: blur(2px);
+	}
+	.app-info-modal {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		z-index: 701;
+		width: min(520px, calc(100vw - 32px));
+		max-height: min(720px, calc(100vh - 32px));
+		transform: translate(-50%, -50%);
+		background: var(--panel2);
+		border: 1px solid var(--border);
+		border-radius: var(--r-lg);
+		box-shadow: 0 18px 56px rgba(0,0,0,0.24);
+		overflow: hidden;
+	}
+	.app-info-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 14px 16px;
+		border-bottom: 1px solid var(--border);
+	}
+	.app-info-title {
+		font-size: 18px;
+		font-weight: 300;
+		letter-spacing: 0;
+	}
+	.app-info-close {
+		width: 26px;
+		height: 26px;
+		border: 0;
+		background: transparent;
+		color: var(--fg3);
+		font-size: 18px;
+		line-height: 1;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.app-info-body {
+		display: flex;
+		flex-direction: column;
+		gap: 18px;
+		padding: 18px 18px 20px;
+		color: var(--fg2);
+		font-size: 13px;
+		line-height: 1.8;
+	}
+	.app-info-body h2 {
+		margin: 0 0 6px;
+		color: var(--fg);
+		font-size: 12px;
+		font-weight: 500;
+		letter-spacing: 0.04em;
+	}
+	.app-info-body p {
+		margin: 0;
+	}
+	.app-info-creator {
+		margin-bottom: 4px;
+		color: var(--fg);
+		font-size: 14px;
+		font-weight: 500;
+	}
+	.app-info-meta {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		gap: 6px 14px;
+		margin: 0;
+		padding-top: 2px;
+		font-size: 12px;
+		line-height: 1.6;
+	}
+	.app-info-meta div {
+		display: contents;
+	}
+	.app-info-meta dt {
+		color: var(--fg3);
+	}
+	.app-info-meta dd {
+		min-width: 0;
+		margin: 0;
+		color: var(--fg);
+		word-break: break-word;
+	}
+	.app-info-meta a {
+		color: var(--accent);
+		text-decoration: none;
+	}
+	.app-info-meta a:hover {
+		text-decoration: underline;
+	}
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {

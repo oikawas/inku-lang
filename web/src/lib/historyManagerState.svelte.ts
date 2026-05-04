@@ -98,7 +98,6 @@ export class HistoryManagerState {
 		this.activeTotal = activeTotal;
 		this.trashItems = [];
 		this.trashTotal = trashTotal;
-		void this.fetch();
 	}
 
 	fetch = async (options: FetchOptions = {}): Promise<void> => {
@@ -175,7 +174,11 @@ export class HistoryManagerState {
 
 	setPageSize = (pageSize: number) => {
 		const nextPageSize = Math.max(1, Math.min(200, Math.floor(pageSize)));
-		if (nextPageSize === this.pageSize) return;
+		if (nextPageSize === this.pageSize) {
+			const expectedItems = Math.min(nextPageSize, this.total);
+			if (this.items.length < expectedItems) void this.fetch({ page: this.page });
+			return;
+		}
 		this.pageSize = nextPageSize;
 		this.page = Math.max(0, Math.min(this.page, this.totalPages - 1));
 		this.selectedIds = [];

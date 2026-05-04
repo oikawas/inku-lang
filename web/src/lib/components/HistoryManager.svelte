@@ -106,10 +106,17 @@
 	let tooltipTimer: ReturnType<typeof setTimeout> | null = null;
 	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
 
+	function loadItemAndClose(item: HistoryItem) {
+		if (historyManagerView !== 'active') return;
+		hideTooltip();
+		onLoadItem(item);
+		onClose();
+	}
+
 	function handleThumbKeydown(event: KeyboardEvent, item: HistoryItem) {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
-		if (historyManagerView === 'active') onLoadItem(item);
+		loadItemAndClose(item);
 	}
 
 	function hideTooltip() {
@@ -282,7 +289,7 @@
 						</label>
 						<div
 							class="thumb manager-thumb"
-							onclick={() => historyManagerView === 'active' && onLoadItem(it)}
+							onclick={() => loadItemAndClose(it)}
 							onkeydown={(event) => handleThumbKeydown(event, it)}
 							onmouseenter={(event) => scheduleTooltip(event.currentTarget as HTMLElement, it, i)}
 							onmouseleave={hideTooltip}
@@ -335,7 +342,15 @@
 						<tr>
 							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && onToggleSelection(it.id)} /></td>
 							<td class="table-thumb-cell">
-								<HistoryThumbnail item={it} scope="table" size="mini" />
+								<button
+									class="table-thumb-select"
+									onclick={() => loadItemAndClose(it)}
+									disabled={historyManagerView !== 'active'}
+									title={t().historyImageHeader}
+									aria-label={t().historyImageHeader}
+								>
+									<HistoryThumbnail item={it} scope="table" size="mini" />
+								</button>
 								<button
 									class="thumb-star mini-star"
 									class:starred={!!it.starred}
@@ -580,6 +595,16 @@
 	}
 	.thumb-star.starred { color: #d59b21; background: #fff6ce; border-color: rgba(213,155,33,0.45); }
 	.table-thumb-cell { position: relative; width: 66px; }
+	.table-thumb-select {
+		display: block;
+		width: 48px;
+		height: 48px;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		cursor: pointer;
+	}
+	.table-thumb-select:disabled { cursor: default; }
 	.table-thumb-cell :global(svg) {
 		content-visibility: auto;
 		contain-intrinsic-size: 48px 48px;

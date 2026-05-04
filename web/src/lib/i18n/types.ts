@@ -208,6 +208,10 @@ export interface LangPack {
 	settingsModelServiceModels: string;
 	settingsModelDeleteServiceConfirm: (provider: string) => string;
 	settingsModelDeleteService: string;
+	settingsModelServiceMemoButton: string;
+	settingsModelServiceMemoTitle: (provider: string) => string;
+	settingsModelServiceMemoLabel: string;
+	settingsModelServiceMemoPlaceholder: string;
 	settingsModelFetchModels: string;
 	settingsModelFetchModelsSaved: string;
 	settingsModelBaseUrl: string;

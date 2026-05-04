@@ -1616,6 +1616,7 @@ def test_model_settings_store_keys_server_side():
                 "openai": {
                     "base_url": "https://api.openai.com/v1",
                     "api_key": "sk-test-secret",
+                    "memo": "Team contract renews in April.",
                     "enabled_models": {"gpt-5.1": False},
                 },
                 "gemini": {"base_url": "https://generativelanguage.googleapis.com", "api_key": "gemini-secret"},
@@ -1628,9 +1629,11 @@ def test_model_settings_store_keys_server_side():
     assert settings["providers"]["openai"]["api_key_hint"] == "sk-t...cret"
     assert settings["providers"]["openai"]["enabled_models"]["gpt-5.1"] is False
     assert "sk-test-secret" not in json.dumps(settings)
+    assert next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")["memo"] == "Team contract renews in April."
 
     saved = db.get_model_settings()
     assert saved["providers"]["openai"]["api_key"] == "sk-test-secret"
+    assert saved["providers"]["openai"]["memo"] == "Team contract renews in April."
     assert saved["providers"]["openai"]["enabled_models"]["gpt-5.1"] is False
 
     r = client.put(
@@ -1644,6 +1647,7 @@ def test_model_settings_store_keys_server_side():
     public_models = client.get("/api/models", headers=headers)
     assert public_models.status_code == 200
     openai_catalog = next(provider for provider in public_models.json()["catalog"] if provider["id"] == "openai")
+    assert "memo" not in openai_catalog
     assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
 
     r = client.put(

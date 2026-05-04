@@ -13,6 +13,7 @@ export type ProviderGroup = {
 	kind?: string;
 	builtin?: boolean;
 	requires_api_key?: boolean;
+	memo?: string;
 	models: ModelOption[];
 };
 

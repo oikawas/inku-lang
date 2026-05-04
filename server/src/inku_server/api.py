@@ -728,6 +728,7 @@ class ModelProviderPatch(BaseModel):
     base_url_env: str | None = None
     default_base_url: str | None = None
     requires_api_key: bool | None = None
+    memo: str | None = None
     models: list[dict] = Field(default_factory=list)
     active: bool | None = None
     delete: bool = False

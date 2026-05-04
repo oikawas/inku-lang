@@ -60,6 +60,7 @@
 		kind?: string;
 		default_base_url?: string;
 		requires_api_key?: boolean;
+		memo?: string;
 		models?: { id: string; label: string; notes?: string }[];
 		delete?: boolean;
 		base_url: string;
@@ -135,6 +136,7 @@
 		onAskClearModelApiKey: (provider: Provider) => void;
 		onFetchModelList: (provider: Provider) => void | Promise<void>;
 		onSaveModelProviderName: (provider: Provider, label: string) => void | Promise<void>;
+		onSaveModelProviderMemo: (provider: Provider, memo: string) => void | Promise<void>;
 		onSaveModelProvider: (provider: Provider) => void | Promise<void>;
 		onSaveModelSettings: () => void | Promise<void>;
 		onLoadModelSettings: () => void | Promise<void>;
@@ -220,6 +222,7 @@
 		onAskClearModelApiKey,
 		onFetchModelList,
 		onSaveModelProviderName,
+		onSaveModelProviderMemo,
 		onSaveModelProvider,
 		onSaveModelSettings,
 		onLoadModelSettings,
@@ -258,6 +261,9 @@
 	let modelPickerProviderId = $state<Provider | null>(null);
 	let editProviderId = $state<Provider | null>(null);
 	let editProviderLabel = $state('');
+	let memoProviderId = $state<Provider | null>(null);
+	let memoProviderLabel = $state('');
+	let memoProviderText = $state('');
 	let baseUrlDrafts = $state<Record<string, string>>({});
 
 	function modelsFor(provider: Provider) {
@@ -296,6 +302,20 @@
 		await onSaveModelProviderName(editProviderId, editProviderLabel.trim());
 		editProviderId = null;
 		editProviderLabel = '';
+	}
+
+	function openMemoProvider(provider: ProviderGroup) {
+		memoProviderId = provider.id;
+		memoProviderLabel = provider.label;
+		memoProviderText = provider.memo ?? '';
+	}
+
+	async function saveMemoProvider() {
+		if (!memoProviderId) return;
+		await onSaveModelProviderMemo(memoProviderId, memoProviderText);
+		memoProviderId = null;
+		memoProviderLabel = '';
+		memoProviderText = '';
 	}
 
 	function baseUrlValue(provider: Provider, setting: ModelProviderSetting): string {
@@ -516,6 +536,7 @@
 								</div>
 								<div class="model-provider-actions">
 									<button class="ghost-btn model-service-delete" onclick={() => onAskDeleteModelProvider(provider.id)} disabled={modelSettingsLoading}>{t().settingsModelDeleteService}</button>
+									<button class="ghost-btn model-service-memo" onclick={() => openMemoProvider(provider)} disabled={modelSettingsLoading}>{t().settingsModelServiceMemoButton}</button>
 									<button class="ghost-btn primary-inline model-service-save" onclick={() => saveBaseUrl(provider.id, setting)} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
 								</div>
 							</div>
@@ -960,6 +981,31 @@
 	</div>
 {/if}
 
+{#if memoProviderId}
+	<div class="modal-backdrop add-service-backdrop" onclick={() => (memoProviderId = null)} aria-hidden="true"></div>
+	<div class="service-memo-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">{t().settingsModelServiceMemoTitle(memoProviderLabel)}</div>
+			<button class="catalog-close" onclick={() => (memoProviderId = null)}>×</button>
+		</div>
+		<div class="add-service-body">
+			<label class="model-service-memo-field">
+				<span>{t().settingsModelServiceMemoLabel}</span>
+				<textarea
+					bind:value={memoProviderText}
+					rows="8"
+					spellcheck="false"
+					placeholder={t().settingsModelServiceMemoPlaceholder}
+				></textarea>
+			</label>
+		</div>
+		<div class="add-service-actions">
+			<button class="ghost-btn" onclick={() => (memoProviderId = null)}>{t().confirmCancel}</button>
+			<button class="ghost-btn primary-inline" onclick={saveMemoProvider} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
+		</div>
+	</div>
+{/if}
+
 {#if modelPickerProvider && modelPickerSetting}
 	<div class="modal-backdrop model-picker-backdrop" onclick={() => (modelPickerProviderId = null)} aria-hidden="true"></div>
 	<div class="model-picker-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
@@ -1356,6 +1402,7 @@
 	.add-service-backdrop { z-index: 650; }
 	.add-service-dialog,
 	.service-edit-dialog,
+	.service-memo-dialog,
 	.model-picker-dialog {
 		position: fixed;
 		z-index: 660;
@@ -1379,6 +1426,31 @@
 	.add-service-body {
 		padding: 14px;
 		overflow: auto;
+	}
+	.model-service-memo-field {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.model-service-memo-field textarea {
+		min-width: 0;
+		width: 100%;
+		box-sizing: border-box;
+		resize: vertical;
+		padding: 7px 9px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		font-size: 12px;
+		line-height: 1.45;
+		font-family: inherit;
+		text-transform: none;
+		letter-spacing: 0;
 	}
 	.model-picker-body {
 		padding: 14px;

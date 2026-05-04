@@ -145,6 +145,7 @@
 		kind?: string;
 		default_base_url?: string;
 		requires_api_key?: boolean;
+		memo?: string;
 		models?: { id: string; label: string; notes?: string }[];
 		base_url: string;
 		api_key_set: boolean;
@@ -921,6 +922,7 @@
 				label: patch.label ?? provider,
 				kind: patch.kind,
 				requires_api_key: patch.requires_api_key,
+				memo: patch.memo,
 				models: patch.models ?? [],
 			},
 		];
@@ -1034,12 +1036,13 @@
 		}
 	}
 
-	function modelProviderPayload(id: string, provider: ModelProviderSetting, labelOverride?: string) {
+	function modelProviderPayload(id: string, provider: ModelProviderSetting, labelOverride?: string, memoOverride?: string) {
 		const catalogProvider = modelCatalog.find((item) => item.id === id);
 		return {
 			label: labelOverride ?? catalogProvider?.label,
 			kind: catalogProvider?.kind,
 			requires_api_key: catalogProvider?.requires_api_key,
+			memo: memoOverride ?? catalogProvider?.memo,
 			models: catalogProvider?.models ?? [],
 			base_url: provider.base_url,
 			api_key: provider.api_key || undefined,
@@ -1062,6 +1065,34 @@
 				body: JSON.stringify({
 					providers: {
 						[provider]: modelProviderPayload(provider, providerSettings, nextLabel),
+					},
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
+			modelSettings = data.settings;
+			modelSettingsStatus = t().settingsModelSaved;
+			await loadAvailableModels();
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			modelSettingsLoading = false;
+		}
+	}
+
+	async function saveModelProviderMemo(provider: Provider, memo: string) {
+		if (!modelSettings || currentUser?.role !== 'admin') return;
+		const providerSettings = modelSettings.providers[provider];
+		if (!providerSettings) return;
+		modelSettingsLoading = true;
+		try {
+			const r = await apiFetch('/api/settings/models', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					providers: {
+						[provider]: modelProviderPayload(provider, providerSettings, undefined, memo),
 					},
 				}),
 			});
@@ -3415,6 +3446,7 @@
 		onAskClearModelApiKey={askClearModelApiKey}
 		onFetchModelList={fetchProviderModels}
 		onSaveModelProviderName={saveModelProviderName}
+		onSaveModelProviderMemo={saveModelProviderMemo}
 		onSaveModelProvider={saveModelProvider}
 		onSaveModelSettings={saveModelSettings}
 		onLoadModelSettings={loadModelSettings}

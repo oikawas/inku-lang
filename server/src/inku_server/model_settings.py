@@ -153,6 +153,7 @@ def default_model_settings() -> dict[str, Any]:
                 "base_url_env": provider["base_url_env"],
                 "default_base_url": provider["default_base_url"],
                 "requires_api_key": provider["requires_api_key"],
+                "memo": "",
                 "models": deepcopy(provider["models"]),
                 "builtin": True,
                 "active": True,
@@ -197,6 +198,7 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 "base_url_env": "",
                 "default_base_url": "",
                 "requires_api_key": False,
+                "memo": "",
                 "models": [],
                 "builtin": False,
                 "active": True,
@@ -229,6 +231,8 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 provider["default_base_url"] = _normalize_provider_base_url(provider_id, incoming["default_base_url"])
             if incoming.get("requires_api_key") is not None:
                 provider["requires_api_key"] = bool(incoming["requires_api_key"])
+            if isinstance(incoming.get("memo"), str):
+                provider["memo"] = incoming["memo"].strip()
             models = _normalize_models(incoming.get("models"))
             if models:
                 provider["models"] = models
@@ -301,6 +305,8 @@ def model_provider_catalog(settings: dict[str, Any] | None = None, *, include_di
             "active": provider.get("active", True),
             "models": models,
         })
+        if include_disabled:
+            catalog[-1]["memo"] = str(provider.get("memo") or "")
     return catalog
 
 
@@ -353,6 +359,7 @@ def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dic
                     "base_url_env": incoming.get("base_url_env") or "",
                     "default_base_url": incoming.get("default_base_url") or incoming.get("base_url") or "",
                     "requires_api_key": bool(incoming.get("requires_api_key")),
+                    "memo": incoming.get("memo") or "",
                     "models": _normalize_models(incoming.get("models")),
                     "builtin": False,
                     "active": True,
@@ -362,7 +369,7 @@ def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dic
                 }
             else:
                 clean["providers"][provider_id].update({k: v for k, v in incoming.items() if k in {
-                    "label", "kind", "api_key_env", "base_url_env", "default_base_url", "requires_api_key", "models", "active"
+                    "label", "kind", "api_key_env", "base_url_env", "default_base_url", "requires_api_key", "memo", "models", "active"
                 }})
             if isinstance(incoming.get("base_url"), str) and incoming["base_url"].strip():
                 clean["providers"][provider_id]["base_url"] = _normalize_provider_base_url(provider_id, incoming["base_url"])

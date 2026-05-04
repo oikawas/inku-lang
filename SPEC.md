@@ -609,15 +609,25 @@ OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama's
 OpenAI-compatible API, and Intel OVMS's OpenAI-compatible API. Admin users can
 add and remove connection services from the model settings tab. Added services
 carry a service ID, display name, connection kind (`openai_compatible`,
-`anthropic`, or `gemini`), base URL, API-key requirement, and model list.
+`anthropic`, or `gemini`), base URL, and optional initial API key. Model lists
+are fetched later through each service's model-list fetch action instead of
+being typed manually when the service is created.
+The service ID is the stable internal key used for DB connection settings,
+Stage 1 / Stage 2 provider references, API provider dispatch, and duplicate
+protection, so it is not editable after creation. The user-facing service name
+can be edited later.
 Each service panel can fetch its model list through the server. The server uses
 the saved base URL and API key to call the provider-specific models API and
 saves the returned model list back into that service definition without sending
-raw API keys to the browser.
-Raw API keys are kept server-side only:
-`GET /api/settings/models` returns only `api_key_set` and a masked hint, while
-`PUT /api/settings/models` distinguishes preserving, replacing, and clearing a
-provider key.  LLM calls resolve provider-prefixed model IDs such as
+raw API keys to the browser. Fetch success or error messages are shown at the
+bottom of the published-model picker dialog.
+Raw API keys are kept server-side only. The UI uses
+`GET /api/settings/models` only to know whether a key is configured. Raw keys
+are never returned to the browser; when a key is already configured, the input
+shows "keep saved key" and is read-only. Entering a new key for an unset
+service changes that service action to save the key. `PUT /api/settings/models`
+distinguishes preserving, replacing, and clearing a provider key. LLM calls
+resolve provider-prefixed model IDs such as
 `openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`, and
 `ovms:...`, while keeping compatibility for older NVIDIA slash IDs and local
 OVMS model IDs.
@@ -625,9 +635,11 @@ LLM server connection settings are global admin-managed settings.  Each user's
 Stage 1 / Stage 2 provider and model selection is stored separately in
 `user_accounts.model_settings`, saved from the model selection dialog through
 `/api/auth/me/settings`, and restored on login.  Admin users can also toggle
-which models are visible to users for each provider.  `GET /api/models` returns
-only published models for signed-in users, and the model selection dialog uses
-that filtered catalog.
+which models are visible to users for each provider. Published-model selection
+is handled in a separate dialog that also contains model-list fetch, select-all,
+and clear-all controls. The main settings tab summarizes only the currently
+published models. `GET /api/models` returns only published models for signed-in
+users, and the model selection dialog uses that filtered catalog.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

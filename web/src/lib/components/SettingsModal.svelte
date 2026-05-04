@@ -72,6 +72,10 @@
 	type ModelSettings = {
 		providers: Record<string, ModelProviderSetting>;
 	};
+	type ModelFetchResult = {
+		type: 'success' | 'error';
+		message: string;
+	};
 
 	type Props = {
 		settingsMode: SettingsMode;
@@ -87,7 +91,7 @@
 		settingsStatusLoading: boolean;
 		modelSettings: ModelSettings | null;
 		modelSettingsStatus: string | null;
-		modelFetchErrors: Record<string, string>;
+		modelFetchResults: Record<string, ModelFetchResult>;
 		modelSettingsLoading: boolean;
 		dbBackupStatus: string | null;
 		currentUser: UserItem | null;
@@ -130,6 +134,7 @@
 		onAskDeleteModelProvider: (provider: Provider) => void;
 		onAskClearModelApiKey: (provider: Provider) => void;
 		onFetchModelList: (provider: Provider) => void | Promise<void>;
+		onSaveModelProviderName: (provider: Provider, label: string) => void | Promise<void>;
 		onSaveModelProvider: (provider: Provider) => void | Promise<void>;
 		onSaveModelSettings: () => void | Promise<void>;
 		onLoadModelSettings: () => void | Promise<void>;
@@ -171,7 +176,7 @@
 		settingsStatusLoading,
 		modelSettings = $bindable(),
 		modelSettingsStatus,
-		modelFetchErrors,
+		modelFetchResults,
 		modelSettingsLoading,
 		dbBackupStatus,
 		currentUser,
@@ -214,6 +219,7 @@
 		onAskDeleteModelProvider,
 		onAskClearModelApiKey,
 		onFetchModelList,
+		onSaveModelProviderName,
 		onSaveModelProvider,
 		onSaveModelSettings,
 		onLoadModelSettings,
@@ -250,6 +256,8 @@
 	let newProviderApiKey = $state('');
 	let showAddServiceDialog = $state(false);
 	let modelPickerProviderId = $state<Provider | null>(null);
+	let editProviderId = $state<Provider | null>(null);
+	let editProviderLabel = $state('');
 	let baseUrlDrafts = $state<Record<string, string>>({});
 
 	function modelsFor(provider: Provider) {
@@ -276,6 +284,18 @@
 		newProviderBaseUrl = '';
 		newProviderApiKey = '';
 		showAddServiceDialog = false;
+	}
+
+	function openEditProvider(provider: ProviderGroup) {
+		editProviderId = provider.id;
+		editProviderLabel = provider.label;
+	}
+
+	async function saveEditProvider() {
+		if (!editProviderId || !editProviderLabel.trim()) return;
+		await onSaveModelProviderName(editProviderId, editProviderLabel.trim());
+		editProviderId = null;
+		editProviderLabel = '';
 	}
 
 	function baseUrlValue(provider: Provider, setting: ModelProviderSetting): string {
@@ -307,6 +327,14 @@
 
 	function modelEnabled(setting: ModelProviderSetting, modelId: string): boolean {
 		return setting.enabled_models?.[modelId] !== false;
+	}
+
+	function hasPendingApiKey(setting: ModelProviderSetting): boolean {
+		return !setting.api_key_set && !!setting.api_key?.trim();
+	}
+
+	function apiKeyInputValue(setting: ModelProviderSetting): string {
+		return setting.api_key_set ? t().settingsModelKeepApiKey : (setting.api_key ?? '');
 	}
 
 	function selectedModels(provider: ProviderGroup, setting: ModelProviderSetting) {
@@ -413,10 +441,13 @@
 							{@const setting = modelSettings.providers[provider.id] ?? { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} }}
 							<div class="model-provider-row">
 								<div class="model-provider-head">
-									<strong>{provider.label}</strong>
+									<div class="model-provider-title-row">
+										<strong>{provider.label}</strong>
+										<button class="ghost-btn model-provider-edit" onclick={() => openEditProvider(provider)} disabled={modelSettingsLoading}>{t().editButton}</button>
+									</div>
 									<div class="model-provider-head-actions">
 										<span class="model-key-state">
-											{setting.api_key_set ? t().settingsModelApiKeySet(setting.api_key_hint ?? '') : t().settingsModelApiKeyUnset}
+											{setting.api_key_set ? t().settingsModelApiKeySet : t().settingsModelApiKeyUnset}
 											{#if !setting.api_key_set}
 												<button type="button" class="model-key-info" aria-label={t().settingsModelApiKeyOptionalHint}>
 													i
@@ -444,15 +475,28 @@
 									<span>{t().settingsModelApiKey}</span>
 									<div class="model-api-key-row">
 										<input
-											type="password"
+											type="text"
+											autocomplete="off"
+											autocapitalize="off"
+											spellcheck="false"
+											value={apiKeyInputValue(setting)}
 											placeholder={setting.api_key_set ? t().settingsModelKeepApiKey : t().settingsModelApiKeyPlaceholder}
-											onchange={(e) => onUpdateModelProvider(provider.id, { api_key: (e.currentTarget as HTMLInputElement).value, clear_api_key: false })}
+											disabled={setting.api_key_set}
+											oninput={(e) => onUpdateModelProvider(provider.id, { api_key: (e.currentTarget as HTMLInputElement).value, clear_api_key: false })}
 										/>
-										<button
-											class="ghost-btn model-key-delete"
-											onclick={() => onAskClearModelApiKey(provider.id)}
-											disabled={!setting.api_key_set || modelSettingsLoading}
-										>{t().deleteButton}</button>
+										{#if hasPendingApiKey(setting)}
+											<button
+												class="ghost-btn primary-inline model-key-delete"
+												onclick={() => onSaveModelProvider(provider.id)}
+												disabled={modelSettingsLoading}
+											>{t().profileSaveButton}</button>
+										{:else}
+											<button
+												class="ghost-btn model-key-delete"
+												onclick={() => onAskClearModelApiKey(provider.id)}
+												disabled={!setting.api_key_set || modelSettingsLoading}
+											>{t().deleteButton}</button>
+										{/if}
 									</div>
 								</label>
 								<div class="model-publish-summary" aria-label={t().settingsModelPublishedModels}>
@@ -481,9 +525,7 @@
 						<div class="inline-message">{modelSettingsStatus}</div>
 					{/if}
 				</div>
-				<div class="settings-inline-actions">
-					<button class="ghost-btn" onclick={onLoadModelSettings} disabled={modelSettingsLoading}>{t().settingsReload}</button>
-					<button class="ghost-btn primary-inline" onclick={onSaveModelSettings} disabled={modelSettingsLoading}>{t().userSaveChanges}</button>
+				<div class="settings-inline-actions model-settings-footer-actions">
 					<button class="ghost-btn" onclick={() => (showAddServiceDialog = true)} disabled={modelSettingsLoading}>{t().settingsModelAddServiceButton}</button>
 				</div>
 			{/if}
@@ -892,6 +934,32 @@
 	</div>
 {/if}
 
+{#if editProviderId}
+	<div class="modal-backdrop add-service-backdrop" onclick={() => (editProviderId = null)} aria-hidden="true"></div>
+	<div class="service-edit-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">{t().settingsModelEditServiceTitle}</div>
+			<button class="catalog-close" onclick={() => (editProviderId = null)}>×</button>
+		</div>
+		<div class="add-service-body">
+			<div class="model-add-grid">
+				<div class="model-add-readonly-field">
+					<span>{t().settingsModelServiceId}</span>
+					<div class="readonly-service-id">{editProviderId}</div>
+				</div>
+				<label>
+					<span>{t().settingsModelServiceName}</span>
+					<input bind:value={editProviderLabel} />
+				</label>
+			</div>
+		</div>
+		<div class="add-service-actions">
+			<button class="ghost-btn" onclick={() => (editProviderId = null)}>{t().confirmCancel}</button>
+			<button class="ghost-btn primary-inline" onclick={saveEditProvider} disabled={modelSettingsLoading || !editProviderLabel.trim()}>{t().profileSaveButton}</button>
+		</div>
+	</div>
+{/if}
+
 {#if modelPickerProvider && modelPickerSetting}
 	<div class="modal-backdrop model-picker-backdrop" onclick={() => (modelPickerProviderId = null)} aria-hidden="true"></div>
 	<div class="model-picker-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
@@ -924,8 +992,8 @@
 			</div>
 		</div>
 		<div class="model-picker-footer">
-			{#if modelFetchErrors[modelPickerProvider.id]}
-				<div class="model-picker-error">{modelFetchErrors[modelPickerProvider.id]}</div>
+			{#if modelFetchResults[modelPickerProvider.id]}
+				<div class:error={modelFetchResults[modelPickerProvider.id].type === 'error'} class="model-picker-result">{modelFetchResults[modelPickerProvider.id].message}</div>
 			{/if}
 			<button class="ghost-btn" onclick={() => (modelPickerProviderId = null)}>{t().confirmCancel}</button>
 			<button class="ghost-btn primary-inline" onclick={() => { void saveBaseUrl(modelPickerProvider.id, modelPickerSetting); modelPickerProviderId = null; }} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
@@ -997,6 +1065,7 @@
 	}
 	.check-row { display: flex; align-items: center; gap: 7px; color: var(--fg2); font-size: 12px; }
 	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
+	.model-settings-footer-actions { justify-content: flex-end; }
 	.db-test-result { color: var(--fg2); font-size: 12px; }
 	.settings-readonly-grid {
 		display: grid;
@@ -1077,7 +1146,8 @@
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 10px;
 	}
-	.model-add-grid label {
+	.model-add-grid label,
+	.model-add-readonly-field {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
@@ -1087,8 +1157,11 @@
 		letter-spacing: 0.06em;
 	}
 	.model-add-grid input,
-	.model-add-grid select {
+	.model-add-grid select,
+	.readonly-service-id {
 		min-width: 0;
+		box-sizing: border-box;
+		height: 28px;
 		padding: 5px 7px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
@@ -1096,6 +1169,15 @@
 		color: var(--fg);
 		font-size: 12px;
 		font-family: inherit;
+	}
+	.readonly-service-id {
+		border: 1px solid var(--border);
+		display: flex;
+		align-items: center;
+		background: var(--bg);
+		color: var(--fg3);
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		user-select: text;
 	}
 	.model-add-label-with-help {
 		display: inline-flex;
@@ -1132,6 +1214,16 @@
 	}
 	.model-provider-head strong { font-size: 12px; font-weight: 500; }
 	.model-provider-head span { color: var(--fg3); font-size: 11px; }
+	.model-provider-title-row {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+	}
+	.model-provider-edit {
+		padding: 2px 6px;
+		font-size: 10px;
+	}
 	.model-provider-head-actions {
 		display: inline-flex;
 		align-items: center;
@@ -1204,6 +1296,11 @@
 		padding-inline: 8px;
 	}
 	.model-api-key-row input { width: 100%; }
+	.model-api-key-row input:disabled {
+		color: var(--fg3);
+		-webkit-text-fill-color: var(--fg3);
+		opacity: 1;
+	}
 	.model-key-delete {
 		white-space: nowrap;
 		padding-inline: 8px;
@@ -1258,6 +1355,7 @@
 	}
 	.add-service-backdrop { z-index: 650; }
 	.add-service-dialog,
+	.service-edit-dialog,
 	.model-picker-dialog {
 		position: fixed;
 		z-index: 660;
@@ -1327,13 +1425,16 @@
 		border-top: 1px solid var(--border);
 		background: var(--panel2);
 	}
-	.model-picker-error {
+	.model-picker-result {
 		margin-right: auto;
 		min-width: 0;
-		color: var(--danger, #b42318);
+		color: var(--fg2);
 		font-size: 12px;
 		line-height: 1.35;
 		overflow-wrap: anywhere;
+	}
+	.model-picker-result.error {
+		color: var(--danger, #b42318);
 	}
 	.inline-message {
 		padding: 7px 9px;

@@ -388,9 +388,10 @@
 	let settingsStatusLoading = $state(false);
 	let modelSettings = $state<ModelSettings | null>(null);
 	let modelSettingsStatus = $state<string | null>(null);
-	let modelFetchErrors = $state<Record<string, string>>({});
+	let modelFetchResults = $state<Record<string, { type: 'success' | 'error'; message: string }>>({});
 	let modelSettingsLoading = $state(false);
 	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
+	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let dbBackupStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
@@ -434,7 +435,7 @@
 	}
 
 	function modelsFor(provider: Provider) {
-		return modelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
+		return availableModelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
 	}
 
 	function applyUserModelSettings(user: UserItem | null) {
@@ -756,6 +757,7 @@
 		settingsMode = 'model';
 		settingsTab = 'connection';
 		settingsOpen = true;
+		void loadAvailableModels();
 	}
 
 	async function persistModelSelection() {
@@ -882,7 +884,7 @@
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const data = await r.json() as { catalog: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
-			modelCatalog = data.catalog.length ? data.catalog : PROVIDER_GROUPS;
+			availableModelCatalog = data.catalog.length ? data.catalog : PROVIDER_GROUPS;
 			if (data.settings.model_settings) {
 				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
 			}
@@ -965,7 +967,9 @@
 	async function fetchProviderModels(provider: Provider) {
 		if (currentUser?.role !== 'admin') return;
 		modelSettingsLoading = true;
-		modelFetchErrors = { ...modelFetchErrors, [provider]: '' };
+		const nextResults = { ...modelFetchResults };
+		delete nextResults[provider];
+		modelFetchResults = nextResults;
 		try {
 			const r = await apiFetch(`/api/settings/models/${encodeURIComponent(provider)}/fetch-models`, {
 				method: 'POST',
@@ -978,10 +982,11 @@
 			modelCatalog = data.catalog;
 			modelSettings = data.settings;
 			modelSettingsStatus = t().settingsModelFetchModelsSaved;
+			modelFetchResults = { ...modelFetchResults, [provider]: { type: 'success', message: t().settingsModelFetchModelsSaved } };
 			await loadAvailableModels();
 		} catch (e) {
 			const message = e instanceof Error ? e.message : String(e);
-			modelFetchErrors = { ...modelFetchErrors, [provider]: message };
+			modelFetchResults = { ...modelFetchResults, [provider]: { type: 'error', message } };
 			modelSettingsStatus = message;
 		} finally {
 			modelSettingsLoading = false;
@@ -1028,10 +1033,10 @@
 		}
 	}
 
-	function modelProviderPayload(id: string, provider: ModelProviderSetting) {
+	function modelProviderPayload(id: string, provider: ModelProviderSetting, labelOverride?: string) {
 		const catalogProvider = modelCatalog.find((item) => item.id === id);
 		return {
-			label: catalogProvider?.label,
+			label: labelOverride ?? catalogProvider?.label,
 			kind: catalogProvider?.kind,
 			requires_api_key: catalogProvider?.requires_api_key,
 			models: catalogProvider?.models ?? [],
@@ -1040,6 +1045,36 @@
 			clear_api_key: !!provider.clear_api_key,
 			enabled_models: provider.enabled_models ?? {},
 		};
+	}
+
+	async function saveModelProviderName(provider: Provider, label: string) {
+		if (!modelSettings || currentUser?.role !== 'admin') return;
+		const providerSettings = modelSettings.providers[provider];
+		if (!providerSettings) return;
+		const nextLabel = label.trim();
+		if (!nextLabel) return;
+		modelSettingsLoading = true;
+		try {
+			const r = await apiFetch('/api/settings/models', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					providers: {
+						[provider]: modelProviderPayload(provider, providerSettings, nextLabel),
+					},
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
+			modelSettings = data.settings;
+			modelSettingsStatus = t().settingsModelSaved;
+			await loadAvailableModels();
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			modelSettingsLoading = false;
+		}
 	}
 
 	async function saveModelProvider(provider: Provider) {
@@ -3317,14 +3352,14 @@
 		{stage1Model}
 		{stage2Provider}
 		{stage2Model}
-		providerGroups={modelCatalog}
+		providerGroups={settingsMode === 'model' ? availableModelCatalog : modelCatalog}
 		bind:includeThinking
 		{settingsStatus}
 		{settingsStatusError}
 		{settingsStatusLoading}
 		bind:modelSettings
 		{modelSettingsStatus}
-		{modelFetchErrors}
+		{modelFetchResults}
 		{modelSettingsLoading}
 		{dbBackupStatus}
 		{currentUser}
@@ -3368,6 +3403,7 @@
 		onAskDeleteModelProvider={askDeleteModelProvider}
 		onAskClearModelApiKey={askClearModelApiKey}
 		onFetchModelList={fetchProviderModels}
+		onSaveModelProviderName={saveModelProviderName}
 		onSaveModelProvider={saveModelProvider}
 		onSaveModelSettings={saveModelSettings}
 		onLoadModelSettings={loadModelSettings}

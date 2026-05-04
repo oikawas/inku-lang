@@ -199,6 +199,7 @@ export interface LangPack {
 	settingsModelConnectionsTitle: string;
 	settingsModelAddServiceTitle: string;
 	settingsModelAddServiceButton: string;
+	settingsModelEditServiceTitle: string;
 	settingsModelServiceId: string;
 	settingsModelServiceIdHelp: string;
 	settingsModelServiceName: string;
@@ -216,7 +217,7 @@ export interface LangPack {
 	settingsModelClearApiKey: string;
 	settingsModelClearApiKeyConfirm: (provider: string) => string;
 	settingsModelApiKeyCleared: string;
-	settingsModelApiKeySet: (hint: string) => string;
+	settingsModelApiKeySet: string;
 	settingsModelApiKeyUnset: string;
 	settingsModelApiKeyOptionalHint: string;
 	settingsModelSecurityNote: string;

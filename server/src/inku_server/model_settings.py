@@ -10,6 +10,8 @@ import os
 from copy import deepcopy
 from typing import Any
 
+from .secrets import decrypt_secret, encrypt_secret
+
 PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
     {
         "id": "openai",
@@ -318,6 +320,14 @@ def mask_secret(value: str | None) -> str | None:
     return f"{value[:4]}...{value[-4:]}"
 
 
+def storage_model_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    clean = normalize_model_settings(settings)
+    stored = deepcopy(clean)
+    for provider in stored.get("providers", {}).values():
+        provider["api_key"] = encrypt_secret(str(provider.get("api_key") or ""))
+    return stored
+
+
 def public_model_settings(settings: dict[str, Any]) -> dict[str, Any]:
     clean = normalize_model_settings(settings)
     providers: dict[str, dict[str, Any]] = {}
@@ -325,7 +335,7 @@ def public_model_settings(settings: dict[str, Any]) -> dict[str, Any]:
         if not provider.get("active", True):
             continue
         stored = clean["providers"][provider_id]
-        api_key = str(stored.get("api_key") or "")
+        api_key = decrypt_secret(str(stored.get("api_key") or ""))
         providers[provider_id] = {
             "base_url": stored.get("base_url") or provider["default_base_url"],
             "api_key_set": bool(api_key),
@@ -415,6 +425,6 @@ def connection_for(provider_id: str, settings: dict[str, Any]) -> dict[str, Any]
         "id": provider_id,
         "kind": provider["kind"],
         "base_url": stored.get("base_url") or provider["default_base_url"],
-        "api_key": stored.get("api_key") or os.getenv(str(provider["api_key_env"]), ""),
+        "api_key": decrypt_secret(str(stored.get("api_key") or "")) or os.getenv(str(provider["api_key_env"]), ""),
         "requires_api_key": provider["requires_api_key"],
     }

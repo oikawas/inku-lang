@@ -626,7 +626,12 @@ Raw API keys are kept server-side only. The UI uses
 are never returned to the browser; when a key is already configured, the input
 shows "keep saved key" and is read-only. Entering a new key for an unset
 service changes that service action to save the key. `PUT /api/settings/models`
-distinguishes preserving, replacing, and clearing a provider key. LLM calls
+distinguishes preserving, replacing, and clearing a provider key. Provider API
+keys are stored in the DB in encrypted `enc:v1:` form. The server uses
+`INKU_SECRET_KEY` when set, otherwise `INKU_SECRET_KEY_FILE` or
+`~/.local/share/inku/secret.key` as a local key file. Existing plaintext keys
+remain readable for compatibility and are migrated to encrypted storage on the
+next save. LLM calls
 resolve provider-prefixed model IDs such as
 `openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`, and
 `ovms:...`, while keeping compatibility for older NVIDIA slash IDs and local

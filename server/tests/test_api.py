@@ -22,7 +22,7 @@ from sqlalchemy import create_engine, inspect, text
 from inku_server import db
 from inku_server import api as api_module
 from inku_server.api import app
-from inku_server.model_settings import default_model_settings, update_model_settings
+from inku_server.model_settings import connection_for, default_model_settings, update_model_settings
 from inku_server.schema import Score
 
 client = TestClient(app)
@@ -1589,7 +1589,8 @@ def test_history_is_scoped_to_authenticated_user():
     db.delete_user_group(group["id"])
 
 
-def test_model_settings_store_keys_server_side():
+def test_model_settings_store_keys_server_side(monkeypatch):
+    monkeypatch.setenv("INKU_SECRET_KEY", "test-secret-for-model-settings")
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"model-settings-admins-{suffix}")
     admin = db.add_user(
@@ -1632,7 +1633,9 @@ def test_model_settings_store_keys_server_side():
     assert next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")["memo"] == "Team contract renews in April."
 
     saved = db.get_model_settings()
-    assert saved["providers"]["openai"]["api_key"] == "sk-test-secret"
+    assert saved["providers"]["openai"]["api_key"].startswith("enc:v1:")
+    assert "sk-test-secret" not in json.dumps(saved)
+    assert connection_for("openai", saved)["api_key"] == "sk-test-secret"
     assert saved["providers"]["openai"]["memo"] == "Team contract renews in April."
     assert saved["providers"]["openai"]["enabled_models"]["gpt-5.1"] is False
 

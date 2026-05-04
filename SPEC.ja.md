@@ -1416,6 +1416,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - service ID は DB 内の接続設定キー、Stage 1 / Stage 2 の provider 参照、API 呼び出し時の provider 判定、重複防止に使う内部IDであり、作成後は編集不可とする。画面に表示するサービス名は後から編集できる
 - 接続サービスごとに `モデルリスト取得` を実行できる。サーバーは保存済み Base URL / API key を使って provider 種別ごとの models API を呼び、取得したモデル一覧を当該サービス定義へ保存する。取得結果の成功/エラーは公開モデル選択ダイアログ下部に表示する。API key はブラウザへ送らない
 - API key はサーバー側にのみ保存し、`GET /api/settings/models` の応答では設定済みかどうかのみを UI 表示に使う。ブラウザへ生の API key は返さず、設定済みの場合の入力欄は `保存済みキーを維持` と表示して編集不可にする。未設定の状態で新しい key を入力した場合は、そのサービスの保存ボタンで保存する
+- DB 内の provider API key は `enc:v1:` 形式で暗号化して保存する。暗号鍵は `INKU_SECRET_KEY` を優先し、未設定の場合は `INKU_SECRET_KEY_FILE` または `~/.local/share/inku/secret.key` のローカル鍵を使う。既存の平文キーは読み込み互換を維持し、次回保存時に暗号化形式へ移行する
 - `PUT /api/settings/models` は管理者のみ利用でき、API key の新規設定、保持、明示削除を区別する
 - LLM 呼び出しは model ID の provider prefix (`openai:` / `anthropic:` / `gemini:` / `nvidia:` / `ollama:` / `ovms:`) と、設定タブの既定値から接続先を解決する。旧来の NVIDIA slash ID とローカル OVMS ID も互換扱いとして受け付ける
 - Web UI から `/api/paint` / `/api/interpret` / `/api/compose` へ送るモデルIDは、接続先 provider と結合して `openai:gpt-5.2` のような provider 付き ID に正規化する。API が provider prefix の無い model ID を受け取った場合でも、その ID がユーザー設定中の Stage 1 / Stage 2 model と一致する場合は、同じユーザー設定の provider で補完してから dispatch する

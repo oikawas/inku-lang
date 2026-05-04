@@ -554,10 +554,11 @@ def get_model_settings() -> dict:
 
 
 def update_model_settings(settings: dict) -> dict:
-    from .model_settings import normalize_model_settings
+    from .model_settings import normalize_model_settings, storage_model_settings
 
-    clean = normalize_model_settings(settings)
-    return _write_app_setting(_MODEL_SETTINGS_KEY, clean)
+    stored = storage_model_settings(settings)
+    _write_app_setting(_MODEL_SETTINGS_KEY, stored)
+    return normalize_model_settings(stored)
 
 
 def _db_backup_file(kind: str, at_ms: int) -> Path:

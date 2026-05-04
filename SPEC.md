@@ -458,6 +458,22 @@ backups can be created immediately and are stored separately from the automatic
 generation limit.  File-replica backups are reported as unavailable for
 non-SQLite DB backends.
 
+Concurrent drawing requests are bounded at the application layer. Stage 1 and
+Stage 2 LLM calls share a bounded executor controlled by `INKU_STAGE_WORKERS`
+and `INKU_STAGE_QUEUE_LIMIT`. If capacity cannot be acquired, or if a stage
+exceeds its hard timeout, the request follows the same deterministic fallback
+path used for stage hard timeouts. Timed-out LLM calls may continue in their
+underlying Python thread until the provider call returns, so their capacity slot
+is retained until that worker actually finishes. This prevents timed-out
+provider calls from creating an unbounded backlog.
+
+Per-user drawing counters are updated with a single database-side atomic
+increment so simultaneous `/api/paint` requests for the same user do not lose
+generation counts. History listing, retrieval, starring, trashing, restoring,
+and deletion remain scoped by `user_id` so drawing history does not mix across
+users. Admin status responses include `stage_execution` with Stage worker count,
+queue limit, and submitted/completed/failed/timed_out/rejected counters.
+
 Operational details for the author's local server are intentionally not part of
 this public specification.  They belong in untracked local documents such as
 `AGENTS.md`, `LOCAL_WORK.md`, and `no-git-sync/`.

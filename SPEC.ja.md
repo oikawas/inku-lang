@@ -1651,6 +1651,25 @@ DB設定タブに、DBファイルサイズ表示とバックアップ設定を�
   - Stage 2 hard timeout 時に `/api/compose` が fallback Score を返す
   - Stage 1 hard timeout 時に `/api/paint` が fallback DDL で継続する
 
+**複数ユーザー同時描画時の安全性**
+
+複数ユーザー、または同一ユーザーが同時に `/api/paint` を実行した場合に、共有資源が無制限に増えたり、ユーザー別の生成回数が欠落したりしないようにする。
+
+- `user_accounts.image_generation_count` は、DB 側の単一 `UPDATE` で `image_generation_count = image_generation_count + amount` として原子的に加算する
+- Stage 1 / Stage 2 の LLM 呼び出しは共有 bounded executor で実行する
+- Stage executor の worker 数は `INKU_STAGE_WORKERS`、待機を含む上限は `INKU_STAGE_QUEUE_LIMIT` で設定する
+- Stage 呼び出しが hard timeout しても、下層の LLM 呼び出しスレッドは Python から強制停止できない。そのため timeout 済みの処理も実際に完了するまで Stage capacity を保持し、後続リクエストが無制限に積み上がらないようにする
+- Stage capacity を取得できない場合は Stage hard timeout と同じ fallback 経路へ進む
+- `/api/settings/status` は `stage_execution` に worker 数、queue 上限、`submitted` / `completed` / `failed` / `timed_out` / `rejected` を返す
+- 履歴保存、履歴一覧、スター、削除、復元は引き続き `user_id` で絞り込み、ユーザー間で履歴が混在しないようにする
+
+追加テスト:
+
+- `test_api.py`
+  - 同一ユーザーの生成回数を並列更新しても最終カウントが欠落しない
+  - Stage hard timeout 後も underlying worker 完了まで capacity が保持され、次の Stage 実行が上限で拒否される
+  - `/api/settings/status` が `stage_execution` の状態を返す
+
 検証:
 
 ```sh

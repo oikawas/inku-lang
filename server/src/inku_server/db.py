@@ -1009,12 +1009,23 @@ def increment_user_generation_count(user_id: str, amount: int = 1) -> int | None
     if amount <= 0:
         raise ValueError("amount must be positive")
     with SessionLocal() as session:
+        result = session.execute(
+            text(
+                """
+                UPDATE user_accounts
+                SET image_generation_count = COALESCE(image_generation_count, 0) + :amount
+                WHERE id = :user_id
+                """
+            ),
+            {"amount": amount, "user_id": user_id},
+        )
+        if result.rowcount == 0:
+            session.rollback()
+            return None
+        session.commit()
         row = session.get(UserAccountRow, user_id)
         if not row:
             return None
-        row.image_generation_count = (row.image_generation_count or 0) + amount
-        session.commit()
-        session.refresh(row)
         return row.image_generation_count or 0
 
 

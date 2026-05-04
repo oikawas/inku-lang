@@ -14,6 +14,7 @@ import time
 import types
 import urllib.request
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
 from fastapi.testclient import TestClient
@@ -819,6 +820,34 @@ def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
 
 
+def test_stage_timeout_keeps_capacity_bound_until_worker_finishes(monkeypatch):
+    executor = ThreadPoolExecutor(max_workers=1)
+    monkeypatch.setattr(api_module, "_stage_executor", executor)
+    monkeypatch.setattr(api_module, "_stage_slots", api_module.BoundedSemaphore(1))
+    monkeypatch.setattr(
+        api_module,
+        "_stage_stats",
+        {"submitted": 0, "completed": 0, "failed": 0, "timed_out": 0, "rejected": 0},
+    )
+
+    def slow_operation():
+        time.sleep(0.12)
+        return "late"
+
+    try:
+        with pytest.raises(api_module.StageHardTimeoutError):
+            api_module._run_with_hard_timeout("stage-test", 0.01, slow_operation)
+        with pytest.raises(api_module.StageHardTimeoutError):
+            api_module._run_with_hard_timeout("stage-test", 0.01, lambda: "blocked")
+
+        time.sleep(0.14)
+        assert api_module._run_with_hard_timeout("stage-test", 0.05, lambda: "ok") == "ok"
+        assert api_module._stage_stats["timed_out"] == 1
+        assert api_module._stage_stats["rejected"] == 1
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
+
+
 def test_interpret_happy_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
@@ -921,6 +950,31 @@ def test_paint_pipeline(monkeypatch, auth_context):
     me = client.get("/api/auth/me", headers=headers)
     assert me.status_code == 200
     assert me.json()["image_generation_count"] == 1
+
+
+def test_generation_count_increment_is_atomic_under_concurrency():
+    suffix = uuid.uuid4().hex[:8]
+    user = db.add_user(
+        username=f"counter-{suffix}",
+        email=f"counter-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=None,
+    )
+    try:
+        count = 40
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            results = [
+                future.result()
+                for future in as_completed(
+                    [executor.submit(db.increment_user_generation_count, user["id"]) for _ in range(count)]
+                )
+            ]
+
+        assert all(isinstance(result, int) for result in results)
+        assert db.get_user(user["id"])["image_generation_count"] == count
+    finally:
+        db.delete_user(user["id"])
 
 
 def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
@@ -1339,6 +1393,10 @@ def test_settings_status_is_admin_only(tmp_path, monkeypatch):
     assert data["output_save"]["queue_limit"] >= data["output_save"]["workers"]
     assert {"submitted", "completed", "failed", "skipped"} <= set(data["output_save"])
     assert "source of truth" in data["output_save"]["note"]
+    assert data["stage_execution"]["workers"] >= 1
+    assert data["stage_execution"]["queue_limit"] >= data["stage_execution"]["workers"]
+    assert {"submitted", "completed", "failed", "timed_out", "rejected"} <= set(data["stage_execution"])
+    assert "bounded executor" in data["stage_execution"]["note"]
 
     db.delete_session(admin_token)
     db.delete_session(user_token)

@@ -72,6 +72,18 @@ _save_stats = {
     "failed": 0,
     "skipped": 0,
 }
+_STAGE_WORKERS = max(1, int(os.getenv("INKU_STAGE_WORKERS", "4")))
+_STAGE_QUEUE_LIMIT = max(_STAGE_WORKERS, int(os.getenv("INKU_STAGE_QUEUE_LIMIT", str(_STAGE_WORKERS * 2))))
+_stage_executor = ThreadPoolExecutor(max_workers=_STAGE_WORKERS, thread_name_prefix="inku-stage")
+_stage_slots = BoundedSemaphore(_STAGE_QUEUE_LIMIT)
+_stage_stats_lock = Lock()
+_stage_stats = {
+    "submitted": 0,
+    "completed": 0,
+    "failed": 0,
+    "timed_out": 0,
+    "rejected": 0,
+}
 _logger = logging.getLogger(__name__)
 _HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 _SESSION_COOKIE_NAME = "inku_session"
@@ -259,6 +271,16 @@ def _increment_save_stat(name: str) -> None:
 def _artifact_save_stats() -> dict[str, int]:
     with _save_stats_lock:
         return dict(_save_stats)
+
+
+def _increment_stage_stat(name: str) -> None:
+    with _stage_stats_lock:
+        _stage_stats[name] = _stage_stats.get(name, 0) + 1
+
+
+def _stage_execution_stats() -> dict[str, int]:
+    with _stage_stats_lock:
+        return dict(_stage_stats)
 
 
 def _run_history_artifact_save(item: dict) -> None:
@@ -716,6 +738,17 @@ class OutputSaveStatus(BaseModel):
     note: str
 
 
+class StageExecutionStatus(BaseModel):
+    workers: int
+    queue_limit: int
+    submitted: int
+    completed: int
+    failed: int
+    timed_out: int
+    rejected: int
+    note: str
+
+
 class ModelSettingsResponse(BaseModel):
     catalog: list[dict] = Field(default_factory=list)
     settings: dict = Field(default_factory=dict)
@@ -751,6 +784,7 @@ class SettingsStatusResponse(BaseModel):
     db_backup: DbBackupStatus
     plugins: PluginSettingsStatus
     output_save: OutputSaveStatus
+    stage_execution: StageExecutionStatus
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -1010,6 +1044,12 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             queue_limit=_SAVE_QUEUE_LIMIT,
             **_artifact_save_stats(),
             note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
+        ),
+        stage_execution=StageExecutionStatus(
+            workers=_STAGE_WORKERS,
+            queue_limit=_STAGE_QUEUE_LIMIT,
+            **_stage_execution_stats(),
+            note="Stage 1/2 LLM calls share a bounded executor. Timed-out calls keep capacity until the underlying call finishes.",
         ),
     )
 
@@ -1575,15 +1615,28 @@ def _hard_timeout_seconds(env_name: str, default: str = "120") -> float:
 
 
 def _run_with_hard_timeout(label: str, timeout_seconds: float, operation):
-    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"inku-{label}-timeout")
-    future = executor.submit(operation)
+    stage_slots = _stage_slots
+    if not stage_slots.acquire(timeout=timeout_seconds):
+        _increment_stage_stat("rejected")
+        raise StageHardTimeoutError(f"{label} could not start within {timeout_seconds:g}s stage capacity timeout")
     try:
-        return future.result(timeout=timeout_seconds)
+        future = _stage_executor.submit(operation)
+    except Exception:
+        stage_slots.release()
+        raise
+    _increment_stage_stat("submitted")
+    future.add_done_callback(lambda _future, slots=stage_slots: slots.release())
+    try:
+        result = future.result(timeout=timeout_seconds)
     except FutureTimeoutError as exc:
+        _increment_stage_stat("timed_out")
         future.cancel()
         raise StageHardTimeoutError(f"{label} exceeded {timeout_seconds:g}s hard timeout") from exc
-    finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+    except Exception:
+        _increment_stage_stat("failed")
+        raise
+    _increment_stage_stat("completed")
+    return result
 
 
 def _fallback_ddl_from_text(text: str, *, lang: str) -> str:

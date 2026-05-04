@@ -1418,12 +1418,14 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - API key はサーバー側にのみ保存し、`GET /api/settings/models` の応答では設定済みかどうかのみを UI 表示に使う。ブラウザへ生の API key は返さず、設定済みの場合の入力欄は `保存済みキーを維持` と表示して編集不可にする。未設定の状態で新しい key を入力した場合は、そのサービスの保存ボタンで保存する
 - `PUT /api/settings/models` は管理者のみ利用でき、API key の新規設定、保持、明示削除を区別する
 - LLM 呼び出しは model ID の provider prefix (`openai:` / `anthropic:` / `gemini:` / `nvidia:` / `ollama:` / `ovms:`) と、設定タブの既定値から接続先を解決する。旧来の NVIDIA slash ID とローカル OVMS ID も互換扱いとして受け付ける
+- Web UI から `/api/paint` / `/api/interpret` / `/api/compose` へ送るモデルIDは、接続先 provider と結合して `openai:gpt-5.2` のような provider 付き ID に正規化する。API が provider prefix の無い model ID を受け取った場合でも、その ID がユーザー設定中の Stage 1 / Stage 2 model と一致する場合は、同じユーザー設定の provider で補完してから dispatch する
+- デモ指示文生成も同じ provider 解決を使い、OpenAI API Platform / Claude API / Gemini API / NVIDIA NIM / Ollama / Intel OVMS の各接続設定を経由する
 - LLMサーバー接続設定はグローバルな管理者設定とし、Stage 1 / Stage 2 の接続先・モデル選択はユーザーごとの `user_accounts.model_settings` に保存する。モデル選択ダイアログの確定時に `/api/auth/me/settings` へ保存し、ログイン時に復元する
 - 管理者は設定ダイアログのモデル設定タブで、provider ごとに一般ユーザーへ公開するモデルを個別に On/Off できる。公開モデル選択はサービスパネル内ではなく個別ダイアログで行い、`モデルリスト取得` / `全て選択` / `全て解除` も同ダイアログに置く。モデル設定タブ本体には公開中モデルのみを要約表示する。`GET /api/models` はログイン済みユーザー向けに公開モデルのみを返し、モデル選択ダイアログはこの一覧を使う
 - CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
 - CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
 - 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める
-- build number: 312
+- build number: 313
 
 ### v1.40 (2026-05-03)
 

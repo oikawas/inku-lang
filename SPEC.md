@@ -631,6 +631,13 @@ resolve provider-prefixed model IDs such as
 `openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`, and
 `ovms:...`, while keeping compatibility for older NVIDIA slash IDs and local
 OVMS model IDs.
+The web UI normalizes model IDs sent to `/api/paint`, `/api/interpret`, and
+`/api/compose` by combining the selected provider with the selected model, for
+example `openai:gpt-5.2`. If an API request still sends a bare model ID and it
+matches the current user's configured Stage 1 or Stage 2 model, the server
+qualifies it with that user's configured provider before dispatching. Demo
+prompt generation uses the same provider resolution path for OpenAI API
+Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, and Intel OVMS.
 LLM server connection settings are global admin-managed settings.  Each user's
 Stage 1 / Stage 2 provider and model selection is stored separately in
 `user_accounts.model_settings`, saved from the model selection dialog through

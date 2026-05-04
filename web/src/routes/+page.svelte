@@ -23,6 +23,7 @@
 		DEFAULT_MODEL,
 		modelsForProvider,
 		providerOfModel,
+		qualifiedModelId,
 		type Provider,
 		type ProviderGroup
 	} from '$lib/models';
@@ -1743,6 +1744,8 @@
 		const lang = getLang();
 		stageLabel = t().stageInterpreting;
 		const historyInput = options.historyInput ?? text;
+		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
+		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
 
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
@@ -1753,8 +1756,8 @@
 			body: JSON.stringify({
 				text: augmented,
 				original_text: text,
-				stage1_model: stage1Model,
-				stage2_model: stage2Model,
+				stage1_model: resolvedStage1Model,
+				stage2_model: resolvedStage2Model,
 				include_thinking: includeThinking,
 				lang,
 				canvas_aspect: effectiveCanvasAspectId(),
@@ -1788,6 +1791,7 @@
 		const lang = getLang();
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
+		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
 		const r = await apiFetch('/api/interpret', {
 			method: 'POST',
 			signal,
@@ -1795,7 +1799,7 @@
 			body: JSON.stringify({
 				text: augmented,
 				original_text: text,
-				model: stage1Model,
+				model: resolvedStage1Model,
 				include_thinking: includeThinking,
 				lang,
 				expand_intermediate: true,
@@ -1834,13 +1838,14 @@
 		tokens_out: number | null;
 	}> {
 		const lang = getLang();
+		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
 		const r = await apiFetch('/api/compose', {
 			method: 'POST',
 			signal,
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				ddl: currentDdl,
-				model: stage2Model,
+				model: resolvedStage2Model,
 				original_text: originalText,
 				lang,
 				catalog_id: selectedCatalog,
@@ -1884,12 +1889,13 @@
 	}
 
 	async function generateDemoInstruction(settings: DemoSettings): Promise<string> {
+		const model = qualifiedModelId(providerOfModel(settings.prompt_model), settings.prompt_model);
 		const r = await apiFetch('/api/demo/instruction', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				seed_phrase: settings.seed_phrase,
-				model: settings.prompt_model,
+				model,
 				lang: getLang(),
 			})
 		});
@@ -2053,11 +2059,13 @@
 				elapsedTotalMs = Date.now() - _timerStart;
 				tokensInStage2 = composed.tokens_in;
 				tokensOutStage2 = composed.tokens_out;
+				const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
+				const resolvedStage2Model = composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model);
 				const r: PaintResult = {
 					score: composed.score,
 					svg: composed.svg,
-					stage1_model: stage1Model,
-					stage2_model: composed.stage2_model ?? stage2Model,
+					stage1_model: resolvedStage1Model,
+					stage2_model: resolvedStage2Model,
 					render_build_number: composed.render_build_number,
 					render_color_profile: composed.render_color_profile,
 					render_color_catalog_id: composed.render_color_catalog_id,
@@ -2081,8 +2089,8 @@
 					svg: composed.svg,
 					at: Date.now(),
 					elapsed_ms: elapsedTotalMs,
-					stage1_model: stage1Model,
-					stage2_model: composed.stage2_model ?? stage2Model,
+					stage1_model: resolvedStage1Model,
+					stage2_model: resolvedStage2Model,
 					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
 					catalog_id: selectedCatalog,
@@ -2194,11 +2202,12 @@
 		stageLabel = t().stageStructuring('');
 		startTimer();
 		try {
+			const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
 			const r = await apiFetch('/api/compose', {
 				method: 'POST',
 				signal: abortController.signal,
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: stage2Model, original_text: replayInput, lang, catalog_id: selectedCatalog, canvas_aspect: effectiveCanvasAspectId() })
+				body: JSON.stringify({ ddl, model: resolvedStage2Model, original_text: replayInput, lang, catalog_id: selectedCatalog, canvas_aspect: effectiveCanvasAspectId() })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -2218,9 +2227,11 @@
 				tokens_out: number | null;
 			};
 			const elapsedMs = Date.now() - startedAt;
+			const resolvedStage1Model = result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
+			const savedStage2Model = d.stage2_model ?? resolvedStage2Model;
 			result = result
-				? { ...result, score: d.score, svg: d.svg, stage2_model: d.stage2_model ?? stage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map }
-				: { score: d.score, svg: d.svg, stage1_model: stage1Model, stage2_model: d.stage2_model ?? stage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map }
+				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
@@ -2234,8 +2245,8 @@
 					svg: d.svg,
 					at: Date.now(),
 					elapsed_ms: elapsedMs,
-					stage1_model: stage1Model,
-					stage2_model: d.stage2_model ?? stage2Model,
+					stage1_model: resolvedStage1Model,
+					stage2_model: savedStage2Model,
 					tokens_in: d.tokens_in,
 					tokens_out: d.tokens_out,
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
@@ -2385,8 +2396,8 @@
 					score: result.score,
 					at: Date.now(),
 					elapsed_ms: result.elapsed_total_ms ?? 0,
-					stage1_model: result.stage1_model ?? stage1Model,
-					stage2_model: result.stage2_model ?? stage2Model,
+					stage1_model: result.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model),
+					stage2_model: result.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
 					tokens_in: (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
 					catalog_id: result.render_color_catalog_id ?? (selectedCatalog !== 'default' ? selectedCatalog : null),

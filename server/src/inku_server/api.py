@@ -45,6 +45,7 @@ from .model_settings import (
     connection_for,
     model_provider_catalog,
     normalize_model_settings,
+    provider_for_model,
     public_model_settings,
     update_model_settings,
 )
@@ -91,22 +92,36 @@ def _build_number() -> str | None:
         return None
 
 
-def _resolved_stage1_model(model: str | None, actor: dict | None = None) -> str:
-    if model:
-        return model
+def _is_qualified_model_id(model: str) -> bool:
+    if ":" not in model:
+        return False
+    prefix = model.split(":", 1)[0]
+    return prefix in normalize_model_settings(_db.get_model_settings())["providers"]
+
+
+def _resolved_stage_model(model: str | None, actor: dict | None, *, stage: str) -> str:
     settings = (actor or {}).get("model_settings") or {}
-    provider = settings.get("stage1_provider", "nvidia")
-    model_id = settings.get("stage1_model", "google/gemma-4-31b-it")
-    return model_id if ":" in str(model_id) else f"{provider}:{model_id}"
+    provider_key = "stage1_provider" if stage == "stage1" else "stage2_provider"
+    model_key = "stage1_model" if stage == "stage1" else "stage2_model"
+    default_model = "google/gemma-4-31b-it"
+    provider = str(settings.get(provider_key, "nvidia") or "nvidia")
+    model_id = str(settings.get(model_key, default_model) or default_model)
+    if model:
+        requested = str(model).strip()
+        if _is_qualified_model_id(requested):
+            return requested
+        if requested == model_id:
+            return f"{provider}:{requested}"
+        return requested
+    return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
+
+
+def _resolved_stage1_model(model: str | None, actor: dict | None = None) -> str:
+    return _resolved_stage_model(model, actor, stage="stage1")
 
 
 def _resolved_stage2_model(model: str | None, actor: dict | None = None) -> str:
-    if model:
-        return model
-    settings = (actor or {}).get("model_settings") or {}
-    provider = settings.get("stage2_provider", "nvidia")
-    model_id = settings.get("stage2_model", "google/gemma-4-31b-it")
-    return model_id if ":" in str(model_id) else f"{provider}:{model_id}"
+    return _resolved_stage_model(model, actor, stage="stage2")
 
 
 def _model_metadata(*, stage1_model: str | None = None, stage2_model: str | None = None) -> dict[str, str]:
@@ -1606,12 +1621,18 @@ def _demo_instruction_system(lang: str) -> str:
 
 def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str) -> str:
     model_name = model or os.getenv("OPENAI_MODEL_STAGE1") or os.getenv("OPENAI_MODEL") or "qwen-api"
-    if model_name.startswith("anthropic:"):
+    settings = _db.get_model_settings()
+    provider, model_id = provider_for_model(model_name, stage="stage1", settings=settings)
+    if provider == "anthropic":
         import anthropic
 
-        client = anthropic.Anthropic()
+        connection = connection_for("anthropic", settings)
+        kwargs = {"api_key": connection["api_key"]} if connection.get("api_key") else {}
+        if connection.get("base_url"):
+            kwargs["base_url"] = connection["base_url"]
+        client = anthropic.Anthropic(**kwargs)
         resp = client.messages.create(
-            model=_strip_anthropic_prefix(model_name),
+            model=model_id,
             max_tokens=180,
             temperature=0.9,
             system=_demo_instruction_system(lang),
@@ -1619,18 +1640,35 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
         )
         parts = [getattr(block, "text", "") for block in resp.content if getattr(block, "type", "") == "text"]
         text = "\n".join(parts).strip()
+    elif provider == "gemini":
+        connection = connection_for("gemini", settings)
+        api_key = connection.get("api_key") or ""
+        if not api_key:
+            raise RuntimeError("Gemini API key is not configured")
+        base_url = str(connection.get("base_url") or "https://generativelanguage.googleapis.com").rstrip("/")
+        url = f"{base_url}/v1beta/models/{model_id}:generateContent?key={api_key}"
+        body = {
+            "systemInstruction": {"parts": [{"text": _demo_instruction_system(lang)}]},
+            "contents": [{"role": "user", "parts": [{"text": seed_phrase}]}],
+            "generationConfig": {"temperature": 0.9, "maxOutputTokens": 180},
+        }
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        text = "\n".join(str(part.get("text", "")) for part in parts).strip()
     else:
         from openai import OpenAI
 
-        if "/" in model_name:
-            base_url = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
-            api_key = os.getenv("NVIDIA_API_KEY", "")
-        else:
-            base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-            api_key = os.getenv("OPENAI_API_KEY", "dummy")
-        client = OpenAI(base_url=base_url, api_key=api_key)
+        connection = connection_for(provider, settings)
+        client = OpenAI(base_url=connection["base_url"], api_key=connection.get("api_key") or "none")
         resp = client.chat.completions.create(
-            model=model_name,
+            model=model_id,
             messages=[
                 {"role": "system", "content": _demo_instruction_system(lang)},
                 {"role": "user", "content": seed_phrase},

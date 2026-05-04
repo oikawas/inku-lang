@@ -82,6 +82,13 @@ export function modelsForProvider(provider: Provider): ModelOption[] {
 	return PROVIDER_GROUPS.find((g) => g.id === provider)?.models ?? [];
 }
 
+export function qualifiedModelId(provider: Provider, modelId: string): string {
+	const cleanProvider = String(provider || '').trim();
+	const cleanModel = String(modelId || '').trim();
+	if (!cleanProvider || !cleanModel) return cleanModel;
+	return cleanModel.startsWith(`${cleanProvider}:`) ? cleanModel : `${cleanProvider}:${cleanModel}`;
+}
+
 export function providerOfModel(modelId: string): Provider {
 	if (modelId.startsWith('openai:')) return 'openai';
 	if (modelId.startsWith('anthropic:')) return 'anthropic';

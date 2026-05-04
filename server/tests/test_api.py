@@ -51,6 +51,24 @@ EXPANSION_MARKERS = (
 )
 
 
+def test_resolved_stage_models_qualify_current_user_provider():
+    actor = {
+        "model_settings": {
+            "stage1_provider": "openai",
+            "stage1_model": "gpt-5.2",
+            "stage2_provider": "anthropic",
+            "stage2_model": "claude-sonnet-4-6",
+        }
+    }
+
+    assert api_module._resolved_stage1_model(None, actor) == "openai:gpt-5.2"
+    assert api_module._resolved_stage1_model("gpt-5.2", actor) == "openai:gpt-5.2"
+    assert api_module._resolved_stage2_model(None, actor) == "anthropic:claude-sonnet-4-6"
+    assert api_module._resolved_stage2_model("claude-sonnet-4-6", actor) == "anthropic:claude-sonnet-4-6"
+    assert api_module._resolved_stage1_model("ovms:qwen-api", actor) == "ovms:qwen-api"
+    assert api_module._resolved_stage1_model("qwen-api", actor) == "qwen-api"
+
+
 def _auth_headers(user: dict) -> tuple[dict[str, str], str]:
     token = db.create_session(user["id"])
     return {"Authorization": f"Bearer {token}"}, token

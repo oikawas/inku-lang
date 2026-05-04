@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.42**
+**Version: v1.43**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -186,13 +186,34 @@ Nature.雨  →  短い線を上から下に多数散らす
 - 他言語への移植時、コアだけ移植すれば動く
 - プラグイン同士が衝突しない
 
-### 4.5 盆栽との対応
+### 4.6 Render Engine Pack との分離
+
+語彙プラグインはコア語彙のマクロであり、描画コアそのものを差し替える仕組みではない。
+描画コアの差し替えは、より重い責務を持つ **Render Engine Pack** として別扱いにする。
+
+Render Engine は、`JSON Score + render options + server-owned color metadata` を受け取り、
+`SVG + render metadata` を返す境界である。現行の `renderer.py` は `default`
+エンジンとして扱う。
+
+この境界を設ける目的は、将来、モデルや表現目標に応じて以下のような描画戦略を分岐できるようにするためである。
+
+- 表示用の安定した SVG を優先するエンジン
+- Illustrator / Affinity での編集容易性を優先するエンジン
+- 幾何構成、色面構成、素材感など特定の表現を強めたエンジン
+- 特定の Stage 2 モデルや prompt pack に合わせて調整したエンジン
+
+ただし、Render Engine は DB 正本の互換性を壊してはならない。
+履歴、JSONタブ、CLI、ベンチマークが読む正規メタデータ形式は安定させる。
+外部任意コードをロードする仕組みは現時点では実装しない。まず内部境界とメタデータ記録を作り、
+2つ目以降の実エンジンが必要になった段階で、配布形式・安全性・依存関係を設計する。
+
+### 4.7 盆栽との対応
 
 この設計は盆栽の比喩と一致する。盆栽は新しい植物を発明しない。既存の植物の組み合わせと配置で世界を作る。プラグインも同じ性質を持つべきである。
 
 新機能を足すのではなく、既存の組み合わせに名前を与える。それがプラグインの役割。
 
-### 4.6 公式 Reference Plugins
+### 4.8 公式 Reference Plugins
 
 「公式」と「非公式」のプラグインを分ける問題への DDL の姿勢：
 
@@ -206,7 +227,7 @@ Nature、Bamboo など、数個の公式プラグインを「プラグインの�
 - ユーザーは参考実装を読んで自分のプラグインを書ける
 - コアチームはコアに集中できる
 
-### 4.7 名前空間の規約
+### 4.9 名前空間の規約
 
 プラグインは必ず名前空間を持つ。例:
 
@@ -1333,6 +1354,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 │   │   ├── __init__.py
 │   │   ├── schema.py              # JSON Score Pydantic モデル
 │   │   ├── renderer.py            # Score → SVG (svgwrite)
+│   │   ├── render_engines/         # RenderEngine 契約と default engine
 │   │   ├── composer.py            # 正規化DDL → Score (Haiku 4.5)
 │   │   ├── db.py                  # 履歴 / ユーザー / セッション DB 層
 │   │   ├── migrate_history.py     # history.json → DB 移行
@@ -1364,6 +1386,7 @@ inku-lang/                         # github.com/oikawas/inku-lang
 `server/src/inku_server/`:
 - `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
 - `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
+- `render_engines/` — 将来の描画コア差し替えに備えた RenderEngine 契約と静的レジストリ。現行レンダラーは `default` engine としてラップする
 - `plugins/` — プラグインレジストリと hook 補助。system/user ディレクトリを分け、v1.34 時点では system plugin として `canvas-aspect` の canvas-size hook を提供
 - `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
 - `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
@@ -1383,6 +1406,22 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.43 (2026-05-05)
+
+**Render Engine 境界とエンジンメタデータ**
+
+将来の複数描画エンジン受け入れに備え、描画コアを `RenderEngine` 契約越しに呼び出す内部境界を追加した。
+
+- `server/src/inku_server/render_engines/` を追加し、`base.py` に `RenderEngine` Protocol と `RenderEngineResult` を定義する
+- 現行の `renderer.py` は `default` engine として `render_engines/default.py` から呼び出す
+- 現時点では外部任意コードのロードや管理UIは実装しない。`current_render_engine()` は静的に `default` engine を返す
+- `/api/compose`、`/api/paint`、互換用 `/api/history` は RenderEngine 経由で SVG を生成する
+- 描画レスポンス、履歴レコード、JSONタブ、artifact JSON に `render_engine_id` と `render_engine_version` を記録する
+- `history` テーブルに `render_engine_id` / `render_engine_version` カラムを追加し、既存DBは起動時マイグレーションで追従する
+- `render_hash` の canonical payload に engine metadata を含め、同じ Score / SVG でも描画エンジンが異なる場合は別内容として追跡できるようにする
+- 現行値は `render_engine_id: "default"`、`render_engine_version: "1"` とする
+- build number: 326
 
 ### v1.42 (2026-05-04)
 

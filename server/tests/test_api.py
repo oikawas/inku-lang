@@ -310,6 +310,8 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
         "catalog_id",
         "render_build_number",
         "render_color_profile",
+        "render_engine_id",
+        "render_engine_version",
         "render_color_catalog_id",
         "render_color_catalog_name",
         "render_color_catalog_sub",
@@ -904,6 +906,8 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
         "name": "sRGB IEC61966-2.1",
         "standard": "IEC 61966-2-1:1999",
     }
+    assert r.json()["render_engine_id"] == "default"
+    assert r.json()["render_engine_version"] == "1"
     assert r.json()["render_color_catalog_id"] == "default"
     assert r.json()["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in r.json()
@@ -934,6 +938,8 @@ def test_paint_pipeline(monkeypatch, auth_context):
         "name": "sRGB IEC61966-2.1",
         "standard": "IEC 61966-2-1:1999",
     }
+    assert data["render_engine_id"] == "default"
+    assert data["render_engine_version"] == "1"
     assert data["render_color_catalog_id"] == "default"
     assert data["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in data
@@ -1087,6 +1093,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["catalog_id"] == "vivid_material"
     assert item["render_build_number"] == data["render_build_number"]
     assert item["render_color_profile"]["id"] == "srgb"
+    assert item["render_engine_id"] == "default"
+    assert item["render_engine_version"] == "1"
     assert item["render_color_catalog_id"] == "vivid_material"
     assert item["render_color_catalog_name"] == "Vivid Material"
     assert "render_color_catalog" not in item
@@ -1214,6 +1222,8 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
                 "name": "sRGB IEC61966-2.1",
                 "standard": "IEC 61966-2-1:1999",
             },
+            "render_engine_id": "default",
+            "render_engine_version": "1",
             "render_color_catalog_id": "default",
             "render_color_catalog_name": "inku Default",
             "render_color_catalog_sub": "neutral baseline",
@@ -1232,6 +1242,8 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert saved_score["stage2_model"] == "stage2"
     assert saved_score["render_build_number"] == "260"
     assert saved_score["render_color_profile"]["id"] == "srgb"
+    assert saved_score["render_engine_id"] == "default"
+    assert saved_score["render_engine_version"] == "1"
     assert saved_score["render_color_catalog_id"] == "default"
     assert saved_score["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in saved_score

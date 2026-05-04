@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.42**
+**Version: v1.43**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -134,6 +134,14 @@ The renderer converts JSON Score into SVG.  It owns visual realization:
 The renderer is allowed to produce controlled variation, but it must preserve
 the JSON Score's intent.
 
+The rendering core is exposed internally through a RenderEngine contract.  A
+render engine receives JSON Score, render options, and server-owned color
+metadata, then returns SVG plus render metadata.  The current `renderer.py`
+implementation is wrapped as the static `default` engine.  inku does not load
+arbitrary external engine code yet; this boundary exists so future engine packs
+can be introduced without changing the API, history, JSON tab, CLI, or
+benchmark metadata contracts.
+
 SVG export has three profiles:
 
 - `display`: the default server-rendered SVG used for web display, history,
@@ -197,12 +205,14 @@ those entries as `English（日本語）`, while the English UI displays `name` 
 Render JSON produced by the server records the concrete render context.  Paint,
 compose, and saved artifact JSON include the resolved `stage1_model` /
 `stage2_model` that were actually used, plus `render_build_number`,
-`render_color_profile`, `render_color_catalog_id`, `render_color_catalog_name`,
+`render_color_profile`, `render_engine_id`, `render_engine_version`,
+`render_color_catalog_id`, `render_color_catalog_name`,
 `render_color_catalog_sub`, and `render_color_map`, where abstract colors and
 `palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
-rendering.  The full catalog `map` / `swatches` / `palette` snapshot is not
-duplicated in render JSON because `render_color_map` is the concrete color
-record needed for replay and audit.
+rendering.  The current engine metadata is `render_engine_id: "default"` and
+`render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
+snapshot is not duplicated in render JSON because `render_color_map` is the
+concrete color record needed for replay and audit.
 
 ---
 
@@ -643,6 +653,12 @@ The JSON tab displays render metadata first, including model, build, color
 profile, and color catalog fields, followed by the `score` payload.
 When a history item is reopened, the JSON tab displays the saved `stage1_model`
 and `stage2_model` from that history record.
+Paint, compose, history records, the JSON tab, and saved artifact JSON also
+include render engine metadata.  `render_engine_id` identifies the rendering
+core that performed the JSON Score, and `render_engine_version` identifies that
+engine's contract version.  These fields are included in the canonical
+`render_hash` payload so two works rendered with different engines remain
+traceable even when their input Score is otherwise similar.
 The settings dialog includes an admin-only Model Settings tab.  It stores the
 default Stage 1 / Stage 2 provider and model plus per-provider base URL and API
 key settings in server app settings.  The supported connection targets are

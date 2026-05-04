@@ -69,6 +69,8 @@
 		stage2_model?: string | null;
 		render_build_number?: string | null;
 		render_color_profile?: Record<string, string> | null;
+		render_engine_id?: string | null;
+		render_engine_version?: string | null;
 		render_color_catalog_id?: string | null;
 		render_color_catalog_name?: string | null;
 		render_color_catalog_sub?: string | null;
@@ -1899,6 +1901,8 @@
 		stage2_model?: string | null;
 		render_build_number?: string | null;
 		render_color_profile?: Record<string, string> | null;
+		render_engine_id?: string | null;
+		render_engine_version?: string | null;
 		render_color_catalog_id?: string | null;
 		render_color_catalog_name?: string | null;
 		render_color_catalog_sub?: string | null;
@@ -1932,6 +1936,8 @@
 			stage2_model?: string | null;
 			render_build_number?: string | null;
 			render_color_profile?: Record<string, string> | null;
+			render_engine_id?: string | null;
+			render_engine_version?: string | null;
 			render_color_catalog_id?: string | null;
 			render_color_catalog_name?: string | null;
 			render_color_catalog_sub?: string | null;
@@ -2138,6 +2144,8 @@
 					stage2_model: resolvedStage2Model,
 					render_build_number: composed.render_build_number,
 					render_color_profile: composed.render_color_profile,
+					render_engine_id: composed.render_engine_id,
+					render_engine_version: composed.render_engine_version,
 					render_color_catalog_id: composed.render_color_catalog_id,
 					render_color_catalog_name: composed.render_color_catalog_name,
 					render_color_catalog_sub: composed.render_color_catalog_sub,
@@ -2289,6 +2297,8 @@
 				stage2_model?: string | null;
 				render_build_number?: string | null;
 				render_color_profile?: Record<string, string> | null;
+				render_engine_id?: string | null;
+				render_engine_version?: string | null;
 				render_color_catalog_id?: string | null;
 				render_color_catalog_name?: string | null;
 				render_color_catalog_sub?: string | null;
@@ -2300,8 +2310,8 @@
 			const resolvedStage1Model = result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
 			const savedStage2Model = d.stage2_model ?? resolvedStage2Model;
 			result = result
-				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map }
-				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map }
+				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
@@ -2636,6 +2646,8 @@
 			stage2_model: it.stage2_model,
 			render_build_number: it.render_build_number,
 			render_color_profile: it.render_color_profile,
+			render_engine_id: it.render_engine_id,
+			render_engine_version: it.render_engine_version,
 			render_color_catalog_id: it.render_color_catalog_id,
 			render_color_catalog_name: it.render_color_catalog_name,
 			render_color_catalog_sub: it.render_color_catalog_sub,
@@ -3003,6 +3015,8 @@
 		if (result.stage2_model !== undefined) payload.stage2_model = result.stage2_model;
 		if (result.render_build_number !== undefined) payload.render_build_number = result.render_build_number;
 		if (result.render_color_profile !== undefined) payload.render_color_profile = result.render_color_profile;
+		if (result.render_engine_id !== undefined) payload.render_engine_id = result.render_engine_id;
+		if (result.render_engine_version !== undefined) payload.render_engine_version = result.render_engine_version;
 		if (result.render_color_catalog_id !== undefined) payload.render_color_catalog_id = result.render_color_catalog_id;
 		if (result.render_color_catalog_name !== undefined) payload.render_color_catalog_name = result.render_color_catalog_name;
 		if (result.render_color_catalog_sub !== undefined) payload.render_color_catalog_sub = result.render_color_catalog_sub;

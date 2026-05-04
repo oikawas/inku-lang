@@ -243,6 +243,7 @@
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
+	let windowHeight = $state(800);
 	let saijikiOpen  = $state(false);
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let settingsOpen = $state(false);
@@ -2299,6 +2300,30 @@
 	}
 
 	// ── History ─────────────────────────────────────────────
+	function estimatedHistoryManagerPageSize(): number {
+		const modalWidth = Math.max(320, windowWidth * 0.8);
+		const modalHeight = Math.max(280, windowHeight * 0.8);
+		const gridWidth = Math.max(1, modalWidth - 20);
+		const gridHeight = Math.max(1, modalHeight - 94);
+		const gap = 8;
+		const minCardWidth = 104;
+		const columns = Math.max(1, Math.floor((gridWidth + gap) / (minCardWidth + gap)));
+		const cardWidth = Math.max(minCardWidth, (gridWidth - gap * (columns - 1)) / columns);
+		const cardHeight = cardWidth * 58 / 82 + 48;
+		const rows = Math.max(1, Math.floor((gridHeight + gap) / (cardHeight + gap)));
+		return Math.max(historyWindowSize, Math.min(100, columns * rows));
+	}
+
+	function preloadHistoryManagerFirstPage() {
+		if (!authToken || historyManager.open || historyStarredOnly || historyOffset !== 0) return;
+		historyManager.preloadFirstPage(
+			historyItems,
+			historyTotal,
+			trashTotal,
+			estimatedHistoryManagerPageSize()
+		);
+	}
+
 	async function fetchHistoryOffset(offset: number): Promise<void> {
 		if (!authToken) {
 			historyItems = [];
@@ -2308,9 +2333,12 @@
 		}
 		const safeOffset = Math.max(0, offset);
 		try {
+			const listLimit = safeOffset === 0 && !historyStarredOnly
+				? estimatedHistoryManagerPageSize()
+				: historyWindowSize;
 			const params = new URLSearchParams({
 				offset: String(safeOffset),
-				limit: String(historyWindowSize),
+				limit: String(listLimit),
 			});
 			if (historyStarredOnly) params.set('starred', 'true');
 			const r = await apiFetch(`/api/history?${params.toString()}`);
@@ -2321,9 +2349,17 @@
 				await fetchHistoryOffset(lastOffset);
 				return;
 			}
-			historyItems = data.items; historyTotal = data.total; historyOffset = safeOffset;
-			if (historyCursor >= data.items.length) historyCursor = data.items.length > 0 ? 0 : -1;
-			if (historyCursor < 0 && data.items.length > 0) historyCursor = 0;
+			const stripItems = safeOffset === 0 && !historyStarredOnly
+				? data.items.slice(0, historyWindowSize)
+				: data.items;
+			historyItems = stripItems; historyTotal = data.total; historyOffset = safeOffset;
+			if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
+			if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
+			if (safeOffset === 0 && !historyStarredOnly) {
+				historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
+			} else {
+				preloadHistoryManagerFirstPage();
+			}
 		} catch { /* ignore */ }
 	}
 
@@ -3111,7 +3147,11 @@
 	// ── Mount ───────────────────────────────────────────────
 	onMount(() => {
 		windowWidth = window.innerWidth;
-		function onResize() { windowWidth = window.innerWidth; }
+		windowHeight = window.innerHeight;
+		function onResize() {
+			windowWidth = window.innerWidth;
+			windowHeight = window.innerHeight;
+		}
 		window.addEventListener('resize', onResize);
 		document.addEventListener('keydown', handleKeydown, true);
 

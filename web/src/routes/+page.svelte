@@ -658,7 +658,7 @@
 		const id = `png-${Date.now().toString(36)}`;
 		void saveExportTemplates([
 			...exportTemplates,
-			{ id, name: 'PNG 3000px', description: 'PNG / y-axis 3000px', y_px: 3000 }
+			{ id, name: 'PNG 3000px', description: 'PNG / Y軸 3000px', y_px: 3000 }
 		]);
 	}
 

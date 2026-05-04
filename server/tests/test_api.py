@@ -548,8 +548,9 @@ def test_current_user_export_templates_are_persisted(auth_context):
     initial = client.get("/api/auth/me/export-templates", headers=headers)
     assert initial.status_code == 200
     assert initial.json()["templates"] == [
-        {"id": "png-1024", "name": "PNG 1024px", "description": "PNG / y-axis 1024px", "y_px": 1024},
-        {"id": "png-2048", "name": "PNG 2048px", "description": "PNG / y-axis 2048px", "y_px": 2048},
+        {"id": "png-1080", "name": "PNG 1080px", "description": "PNG / Y軸 1080px", "y_px": 1080},
+        {"id": "png-2160", "name": "PNG 2160px", "description": "PNG / Y軸 2160px", "y_px": 2160},
+        {"id": "png-4320", "name": "PNG 4320px", "description": "PNG / Y軸 4320px", "y_px": 4320},
     ]
 
     body = {

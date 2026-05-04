@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.43**
+**Version: v1.44**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -688,7 +688,10 @@ keys are stored in the DB in encrypted `enc:v1:` form. The server uses
 `INKU_SECRET_KEY` when set, otherwise `INKU_SECRET_KEY_FILE` or
 `~/.local/share/inku/secret.key` as a local key file. Existing plaintext keys
 remain readable for compatibility and are migrated to encrypted storage on the
-next save. LLM calls
+next save. The Model Settings tab shows this rule next to the AI service
+connections heading: API keys are encrypted and stored only in the server-side
+DB, are never displayed again, and keys configured through environment
+variables are treated as initial values. LLM calls
 resolve provider-prefixed model IDs such as
 `openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`, and
 `ovms:...`, while keeping compatibility for older NVIDIA slash IDs and local
@@ -709,6 +712,10 @@ is handled in a separate dialog that also contains model-list fetch, select-all,
 and clear-all controls. The main settings tab summarizes only the currently
 published models. `GET /api/models` returns only published models for signed-in
 users, and the model selection dialog uses that filtered catalog.
+The status-bar PNG export templates default to Y-axis heights of `1080px`,
+`2160px`, and `4320px`. Older saved defaults of `1024px` and `2048px` are
+automatically replaced by the new defaults, while user-customized templates are
+preserved. The Japanese UI labels this dimension as `Y軸` / `Y軸の高さ`.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

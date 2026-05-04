@@ -165,16 +165,22 @@ _DEMO_DEFAULT_SETTINGS = {
 _EXPORT_TEMPLATE_LIMIT = 20
 _EXPORT_TEMPLATE_DEFAULTS = [
     {
-        "id": "png-1024",
-        "name": "PNG 1024px",
-        "description": "PNG / y-axis 1024px",
-        "y_px": 1024,
+        "id": "png-1080",
+        "name": "PNG 1080px",
+        "description": "PNG / Y軸 1080px",
+        "y_px": 1080,
     },
     {
-        "id": "png-2048",
-        "name": "PNG 2048px",
-        "description": "PNG / y-axis 2048px",
-        "y_px": 2048,
+        "id": "png-2160",
+        "name": "PNG 2160px",
+        "description": "PNG / Y軸 2160px",
+        "y_px": 2160,
+    },
+    {
+        "id": "png-4320",
+        "name": "PNG 4320px",
+        "description": "PNG / Y軸 4320px",
+        "y_px": 4320,
     },
 ]
 _DEFAULT_DB_BACKUP_DIR = Path.home() / ".local" / "share" / "inku" / "db-backups"
@@ -1248,6 +1254,14 @@ def update_user_demo_settings(user_id: str, settings: dict) -> dict | None:
 def _normalize_export_templates(items: list[dict]) -> list[dict]:
     if not isinstance(items, list):
         raise ValueError("export templates must be a list")
+    if (
+        len(items) == 2
+        and items[0].get("id") == "png-1024"
+        and items[0].get("y_px") == 1024
+        and items[1].get("id") == "png-2048"
+        and items[1].get("y_px") == 2048
+    ):
+        return [dict(item) for item in _EXPORT_TEMPLATE_DEFAULTS]
     normalized: list[dict] = []
     seen: set[str] = set()
     for item in items:

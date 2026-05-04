@@ -239,7 +239,7 @@ export const en: LangPack = {
 	settingsModelApiKeySet: 'API key set',
 	settingsModelApiKeyUnset: 'API key not set',
 	settingsModelApiKeyOptionalHint: 'Local LLM services may be usable without an API key.',
-	settingsModelSecurityNote: 'API keys are stored only in the server-side DB and are never displayed again. Keys already configured by environment variables are used as initial values.',
+	settingsModelSecurityNote: 'API keys are encrypted and stored only in the server-side DB, and are never displayed again. Keys already configured by environment variables are used as initial values.',
 	settingsModelPublishedModels: 'Models visible to users',
 	settingsModelSelectModels: 'Select models',
 	settingsModelSelectModelsTitle: (provider) => `Visible models for ${provider}`,

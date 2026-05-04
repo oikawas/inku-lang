@@ -472,7 +472,10 @@
 			{/if}
 			{#if modelSettings}
 				<div class="popover-group">
-					<div class="popover-group-label">{t().settingsModelConnectionsTitle}</div>
+					<div class="model-connections-heading">
+						<div class="popover-group-label">{t().settingsModelConnectionsTitle}</div>
+						<div class="model-security-note">{t().settingsModelSecurityNote}</div>
+					</div>
 					<div class="model-provider-list">
 						{#each providerGroups as provider (provider.id)}
 							{@const setting = modelSettings.providers[provider.id] ?? { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} }}
@@ -1172,6 +1175,26 @@
 	.popover-group-label {
 		font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;
 		font-weight: 500; margin-bottom: 7px;
+	}
+	.model-connections-heading {
+		display: flex;
+		align-items: baseline;
+		gap: 10px;
+		margin-bottom: 7px;
+		min-width: 0;
+	}
+	.model-connections-heading .popover-group-label {
+		margin-bottom: 0;
+		flex: 0 0 auto;
+	}
+	.model-security-note {
+		min-width: 0;
+		color: var(--fg3);
+		font-size: 10px;
+		line-height: 1.45;
+		text-transform: none;
+		letter-spacing: 0;
+		overflow-wrap: anywhere;
 	}
 	.form-row {
 		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;

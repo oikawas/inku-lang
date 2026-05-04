@@ -6,12 +6,22 @@ export type ExportTemplate = {
 };
 
 export const DEFAULT_EXPORT_TEMPLATES: ExportTemplate[] = [
-	{ id: 'png-1024', name: 'PNG 1024px', description: 'PNG / y-axis 1024px', y_px: 1024 },
-	{ id: 'png-2048', name: 'PNG 2048px', description: 'PNG / y-axis 2048px', y_px: 2048 },
+	{ id: 'png-1080', name: 'PNG 1080px', description: 'PNG / Y軸 1080px', y_px: 1080 },
+	{ id: 'png-2160', name: 'PNG 2160px', description: 'PNG / Y軸 2160px', y_px: 2160 },
+	{ id: 'png-4320', name: 'PNG 4320px', description: 'PNG / Y軸 4320px', y_px: 4320 },
 ];
 
+function isLegacyDefaultTemplates(value: unknown): boolean {
+	if (!Array.isArray(value) || value.length !== 2) return false;
+	const [first, second] = value as Array<Partial<ExportTemplate>>;
+	return first?.id === 'png-1024'
+		&& first?.y_px === 1024
+		&& second?.id === 'png-2048'
+		&& second?.y_px === 2048;
+}
+
 export function normalizeExportTemplates(value: unknown): ExportTemplate[] {
-	const source = Array.isArray(value) ? value : DEFAULT_EXPORT_TEMPLATES;
+	const source = Array.isArray(value) && !isLegacyDefaultTemplates(value) ? value : DEFAULT_EXPORT_TEMPLATES;
 	const normalized: ExportTemplate[] = [];
 	const seen = new Set<string>();
 	for (const item of source) {

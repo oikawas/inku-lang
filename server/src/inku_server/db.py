@@ -82,6 +82,7 @@ class UserAccountRow(Base):
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
     ui_theme      = Column(String, nullable=False, default="light")
     settings_tab  = Column(String, nullable=False, default="db")
+    model_settings = Column(Text, nullable=False, default="{}")
     image_generation_count = Column(Integer, nullable=False, default=0)
     batch_prompt_history = Column(Text, nullable=False, default="[]")
     demo_settings = Column(Text, nullable=False, default="{}")
@@ -130,6 +131,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
     "settings_tab": "ALTER TABLE user_accounts ADD COLUMN settings_tab VARCHAR NOT NULL DEFAULT 'db'",
+    "model_settings": "ALTER TABLE user_accounts ADD COLUMN model_settings TEXT NOT NULL DEFAULT '{}'",
     "image_generation_count": (
         "ALTER TABLE user_accounts ADD COLUMN image_generation_count INTEGER NOT NULL DEFAULT 0"
     ),
@@ -704,6 +706,12 @@ def _group_to_dict(row: UserGroupRow) -> dict:
 
 
 def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
+    from .model_settings import normalize_user_model_settings
+
+    try:
+        model_settings = json.loads(row.model_settings or "{}")
+    except json.JSONDecodeError:
+        model_settings = {}
     return {
         "id": row.id,
         "username": row.username,
@@ -714,6 +722,7 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "group_name": group_name,
         "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
         "settings_tab": row.settings_tab if row.settings_tab in _SETTINGS_TABS else "db",
+        "model_settings": normalize_user_model_settings(model_settings),
         "image_generation_count": row.image_generation_count or 0,
         "at": row.at,
     }
@@ -1022,7 +1031,14 @@ def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
         return _user_to_dict(row, group_name)
 
 
-def update_user_settings(user_id: str, ui_theme: str | None = None, settings_tab: str | None = None) -> dict | None:
+def update_user_settings(
+    user_id: str,
+    ui_theme: str | None = None,
+    settings_tab: str | None = None,
+    model_settings: dict | None = None,
+) -> dict | None:
+    from .model_settings import update_user_model_settings
+
     if ui_theme is not None and ui_theme not in {"light", "dark"}:
         raise ValueError("invalid ui theme")
     if settings_tab is not None and settings_tab not in _SETTINGS_TABS:
@@ -1035,6 +1051,15 @@ def update_user_settings(user_id: str, ui_theme: str | None = None, settings_tab
             row.ui_theme = ui_theme
         if settings_tab is not None:
             row.settings_tab = settings_tab
+        if model_settings is not None:
+            try:
+                current_model_settings = json.loads(row.model_settings or "{}")
+            except json.JSONDecodeError:
+                current_model_settings = {}
+            row.model_settings = json.dumps(
+                update_user_model_settings(current_model_settings, model_settings),
+                ensure_ascii=False,
+            )
         session.commit()
         session.refresh(row)
         group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None

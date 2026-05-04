@@ -11,6 +11,9 @@ import logging
 import os
 import re
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
@@ -38,7 +41,13 @@ from .plugins import (
 )
 from .renderer import SVG_PROFILES, render
 from .schema import Score
-from .model_settings import model_provider_catalog, public_model_settings, update_model_settings
+from .model_settings import (
+    connection_for,
+    model_provider_catalog,
+    normalize_model_settings,
+    public_model_settings,
+    update_model_settings,
+)
 from . import db as _db
 
 _APP_VERSION = "0.1.0"
@@ -82,18 +91,22 @@ def _build_number() -> str | None:
         return None
 
 
-def _resolved_stage1_model(model: str | None) -> str:
-    settings = _db.get_model_settings()
+def _resolved_stage1_model(model: str | None, actor: dict | None = None) -> str:
     if model:
         return model
-    return f"{settings['stage1_provider']}:{settings['stage1_model']}"
+    settings = (actor or {}).get("model_settings") or {}
+    provider = settings.get("stage1_provider", "nvidia")
+    model_id = settings.get("stage1_model", "google/gemma-4-31b-it")
+    return model_id if ":" in str(model_id) else f"{provider}:{model_id}"
 
 
-def _resolved_stage2_model(model: str | None) -> str:
-    settings = _db.get_model_settings()
+def _resolved_stage2_model(model: str | None, actor: dict | None = None) -> str:
     if model:
         return model
-    return f"{settings['stage2_provider']}:{settings['stage2_model']}"
+    settings = (actor or {}).get("model_settings") or {}
+    provider = settings.get("stage2_provider", "nvidia")
+    model_id = settings.get("stage2_model", "google/gemma-4-31b-it")
+    return model_id if ":" in str(model_id) else f"{provider}:{model_id}"
 
 
 def _model_metadata(*, stage1_model: str | None = None, stage2_model: str | None = None) -> dict[str, str]:
@@ -549,6 +562,7 @@ class UserAccountItem(BaseModel):
     group_name: str | None = None
     ui_theme: str = "light"
     settings_tab: str = "db"
+    model_settings: dict = Field(default_factory=dict)
     image_generation_count: int = 0
     at: int
 
@@ -587,6 +601,7 @@ class LoginResponse(BaseModel):
 class UserSettingsBody(BaseModel):
     ui_theme: str | None = None
     settings_tab: str | None = None
+    model_settings: dict | None = None
 
 
 class BatchPromptHistoryBody(BaseModel):
@@ -692,9 +707,19 @@ class ModelSettingsResponse(BaseModel):
 
 
 class ModelProviderPatch(BaseModel):
+    label: str | None = None
+    kind: str | None = None
+    api_key_env: str | None = None
+    base_url_env: str | None = None
+    default_base_url: str | None = None
+    requires_api_key: bool | None = None
+    models: list[dict] = Field(default_factory=list)
+    active: bool | None = None
+    delete: bool = False
     base_url: str | None = None
     api_key: str | None = None
     clear_api_key: bool = False
+    enabled_models: dict[str, bool] = Field(default_factory=dict)
 
 
 class ModelSettingsPatch(BaseModel):
@@ -815,12 +840,26 @@ def api_auth_me(actor: dict = Depends(_current_user)) -> UserAccountItem:
 @app.patch("/api/auth/me/settings", response_model=UserAccountItem)
 def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_user)) -> UserAccountItem:
     try:
-        user = _db.update_user_settings(actor["id"], ui_theme=body.ui_theme, settings_tab=body.settings_tab)
+        user = _db.update_user_settings(
+            actor["id"],
+            ui_theme=body.ui_theme,
+            settings_tab=body.settings_tab,
+            model_settings=body.model_settings,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)
+
+
+@app.get("/api/models", response_model=ModelSettingsResponse)
+def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
+    settings = _db.get_model_settings()
+    return ModelSettingsResponse(
+        catalog=model_provider_catalog(settings, include_disabled=False),
+        settings={"model_settings": actor.get("model_settings") or {}},
+    )
 
 
 @app.patch("/api/auth/me/profile", response_model=UserAccountItem)
@@ -963,7 +1002,7 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
 def api_settings_models(actor: dict = Depends(_admin_user)) -> ModelSettingsResponse:
     settings = _db.get_model_settings()
     return ModelSettingsResponse(
-        catalog=model_provider_catalog(),
+        catalog=model_provider_catalog(settings, include_disabled=True),
         settings=public_model_settings(settings),
     )
 
@@ -984,7 +1023,87 @@ def api_settings_update_models(
     })
     saved = _db.update_model_settings(next_settings)
     return ModelSettingsResponse(
-        catalog=model_provider_catalog(),
+        catalog=model_provider_catalog(saved, include_disabled=True),
+        settings=public_model_settings(saved),
+    )
+
+
+def _fetch_provider_model_list(provider_id: str, settings: dict) -> list[dict[str, str]]:
+    catalog = {str(provider["id"]): provider for provider in model_provider_catalog(settings, include_disabled=True)}
+    provider = catalog.get(provider_id)
+    if not provider:
+        raise ValueError("unknown provider")
+    conn = connection_for(provider_id, settings)
+    base_url = str(conn["base_url"]).rstrip("/")
+    headers: dict[str, str] = {"Accept": "application/json"}
+    if conn.get("kind") == "anthropic":
+        url = f"{base_url}/v1/models"
+        if conn.get("api_key"):
+            headers["x-api-key"] = str(conn["api_key"])
+        headers["anthropic-version"] = "2023-06-01"
+    elif conn.get("kind") == "gemini":
+        query = f"?key={urllib.parse.quote(str(conn.get('api_key') or ''))}" if conn.get("api_key") else ""
+        url = f"{base_url}/v1beta/models{query}"
+    else:
+        url = f"{base_url}/models"
+        if conn.get("api_key"):
+            headers["Authorization"] = f"Bearer {conn['api_key']}"
+    try:
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise ValueError(f"model list fetch failed: {exc}") from exc
+
+    raw_models = payload.get("data") if isinstance(payload, dict) else None
+    if raw_models is None and isinstance(payload, dict):
+        raw_models = payload.get("models")
+    if not isinstance(raw_models, list):
+        raise ValueError("model list response did not contain models")
+    models: list[dict[str, str]] = []
+    for item in raw_models:
+        if not isinstance(item, dict):
+            continue
+        model_id = str(item.get("id") or item.get("name") or "").strip()
+        if model_id.startswith("models/"):
+            model_id = model_id.removeprefix("models/")
+        if not model_id:
+            continue
+        label = str(item.get("display_name") or item.get("displayName") or model_id).strip()
+        models.append({"id": model_id, "label": label or model_id})
+    if not models:
+        raise ValueError("model list response was empty")
+    return models
+
+
+@app.post("/api/settings/models/{provider_id}/fetch-models", response_model=ModelSettingsResponse)
+def api_settings_fetch_provider_models(
+    provider_id: str,
+    actor: dict = Depends(_admin_user),
+) -> ModelSettingsResponse:
+    current = _db.get_model_settings()
+    try:
+        models = _fetch_provider_model_list(provider_id, current)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    clean = normalize_model_settings(current)
+    previous_provider = clean.get("providers", {}).get(provider_id, {})
+    previous_model_ids = {str(model.get("id")) for model in previous_provider.get("models", [])}
+    previous_enabled_models = previous_provider.get("enabled_models") or {}
+    enabled_models = {
+        model["id"]: model["id"] in previous_model_ids and bool(previous_enabled_models.get(model["id"], False))
+        for model in models
+    }
+    saved = _db.update_model_settings(update_model_settings(current, {
+        "providers": {
+            provider_id: {
+                "models": models,
+                "enabled_models": enabled_models,
+            }
+        }
+    }))
+    return ModelSettingsResponse(
+        catalog=model_provider_catalog(saved, include_disabled=True),
         settings=public_model_settings(saved),
     )
 
@@ -1357,9 +1476,9 @@ def _call_interpret_detail(
 
 
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
-def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> ComposeResponse:
+def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> ComposeResponse:
     t0 = time.perf_counter()
-    resolved_stage2_model = _resolved_stage2_model(req.model)
+    resolved_stage2_model = _resolved_stage2_model(req.model, actor)
     try:
         compose_detail = _call_compose_detail(
             req.ddl,
@@ -1402,11 +1521,11 @@ def api_compose(req: ComposeRequest, _actor: dict = Depends(_current_user)) -> C
 
 
 @app.post("/api/interpret")
-def api_interpret(req: InterpretRequest, _actor: dict = Depends(_current_user)) -> dict:
+def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
     try:
         detail = _call_interpret_detail(
             req.text,
-            model=req.model,
+            model=_resolved_stage1_model(req.model, actor),
             include_thinking=req.include_thinking,
             system_prompt_prefix=None,
             lang=req.lang,
@@ -1507,7 +1626,7 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
             base_url = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
             api_key = os.getenv("NVIDIA_API_KEY", "")
         else:
-            base_url = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v3")
+            base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
             api_key = os.getenv("OPENAI_API_KEY", "dummy")
         client = OpenAI(base_url=base_url, api_key=api_key)
         resp = client.chat.completions.create(
@@ -1602,8 +1721,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
     catalog_id = _resolved_catalog_id(req.catalog_id)
-    resolved_stage1_model = _resolved_stage1_model(req.stage1_model)
-    resolved_stage2_model = _resolved_stage2_model(req.stage2_model)
+    resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
+    resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     try:
         interpret_detail_result = _call_interpret_detail(
             req.text, model=resolved_stage1_model, include_thinking=req.include_thinking, lang=req.lang

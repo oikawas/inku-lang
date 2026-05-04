@@ -18,11 +18,13 @@
 	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import {
+		PROVIDER_GROUPS,
 		DEFAULT_PROVIDER,
 		DEFAULT_MODEL,
 		modelsForProvider,
 		providerOfModel,
-		type Provider
+		type Provider,
+		type ProviderGroup
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
@@ -131,12 +133,26 @@
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
 	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
-	type ModelProviderSetting = { base_url: string; api_key_set: boolean; api_key_hint: string | null; api_key?: string; clear_api_key?: boolean };
-	type ModelSettings = {
+	type UserModelSettings = {
 		stage1_provider: Provider;
 		stage1_model: string;
 		stage2_provider: Provider;
 		stage2_model: string;
+	};
+	type ModelProviderSetting = {
+		label?: string;
+		kind?: string;
+		default_base_url?: string;
+		requires_api_key?: boolean;
+		models?: { id: string; label: string; notes?: string }[];
+		base_url: string;
+		api_key_set: boolean;
+		api_key_hint: string | null;
+		api_key?: string;
+		clear_api_key?: boolean;
+		enabled_models?: Record<string, boolean>;
+	};
+	type ModelSettings = {
 		providers: Record<string, ModelProviderSetting>;
 	};
 	type UserGroup = {
@@ -154,6 +170,7 @@
 		group_name: string | null;
 		ui_theme?: 'light' | 'dark';
 		settings_tab?: SettingsTab;
+		model_settings?: UserModelSettings;
 		image_generation_count: number;
 		at: number;
 	};
@@ -371,7 +388,9 @@
 	let settingsStatusLoading = $state(false);
 	let modelSettings = $state<ModelSettings | null>(null);
 	let modelSettingsStatus = $state<string | null>(null);
+	let modelFetchErrors = $state<Record<string, string>>({});
 	let modelSettingsLoading = $state(false);
+	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let dbBackupStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
@@ -412,6 +431,19 @@
 
 	function applyUserTheme(user: UserItem | null) {
 		darkMode = user?.ui_theme === 'dark';
+	}
+
+	function modelsFor(provider: Provider) {
+		return modelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
+	}
+
+	function applyUserModelSettings(user: UserItem | null) {
+		const settings = user?.model_settings;
+		if (!settings) return;
+		stage1Provider = settings.stage1_provider;
+		stage1Model = settings.stage1_model;
+		stage2Provider = settings.stage2_provider;
+		stage2Model = settings.stage2_model;
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
@@ -726,18 +758,36 @@
 		settingsOpen = true;
 	}
 
-	function persistModelSelection() {
+	async function persistModelSelection() {
+		if (!currentUser) return;
+		const previousUser = currentUser;
+		const model_settings: UserModelSettings = {
+			stage1_provider: stage1Provider,
+			stage1_model: stage1Model,
+			stage2_provider: stage2Provider,
+			stage2_model: stage2Model,
+		};
 		try {
-			localStorage.setItem(PROVIDER_STAGE1_KEY, stage1Provider);
-			localStorage.setItem(MODEL_STAGE1_KEY, stage1Model);
-			localStorage.setItem(PROVIDER_STAGE2_KEY, stage2Provider);
-			localStorage.setItem(MODEL_STAGE2_KEY, stage2Model);
-		} catch {}
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ model_settings })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			currentUser = await r.json() as UserItem;
+			applyUserModelSettings(currentUser);
+		} catch (e) {
+			currentUser = previousUser;
+			console.warn('failed to update model selection', e);
+		}
 	}
 
-	function confirmModelSelection() {
+	async function confirmModelSelection() {
 		modelSelectionSnapshot = null;
-		persistModelSelection();
+		await persistModelSelection();
 		settingsOpen = false;
 	}
 
@@ -747,7 +797,6 @@
 			stage1Model = modelSelectionSnapshot.stage1Model;
 			stage2Provider = modelSelectionSnapshot.stage2Provider;
 			stage2Model = modelSelectionSnapshot.stage2Model;
-			persistModelSelection();
 		}
 		modelSelectionSnapshot = null;
 		settingsOpen = false;
@@ -816,13 +865,35 @@
 		try {
 			const r = await apiFetch('/api/settings/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { settings: ModelSettings };
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
 			modelSettings = data.settings;
 			modelSettingsStatus = null;
 		} catch (e) {
 			modelSettingsStatus = e instanceof Error ? e.message : String(e);
 		} finally {
 			modelSettingsLoading = false;
+		}
+	}
+
+	async function loadAvailableModels() {
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/models', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
+			modelCatalog = data.catalog.length ? data.catalog : PROVIDER_GROUPS;
+			if (data.settings.model_settings) {
+				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
+			}
+			if (!modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
+				stage1Model = modelsFor(stage1Provider)[0]?.id ?? stage1Model;
+			}
+			if (!modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
+				stage2Model = modelsFor(stage2Provider)[0]?.id ?? stage2Model;
+			}
+		} catch (e) {
+			console.warn('failed to load model catalog', e);
 		}
 	}
 
@@ -838,38 +909,187 @@
 		};
 	}
 
-	async function saveModelSettings() {
-		if (!modelSettings || currentUser?.role !== 'admin') return;
+	function addModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
+		if (!modelSettings || !provider) return;
+		modelCatalog = [
+			...modelCatalog.filter((item) => item.id !== provider),
+			{
+				id: provider,
+				label: patch.label ?? provider,
+				kind: patch.kind,
+				requires_api_key: patch.requires_api_key,
+				models: patch.models ?? [],
+			},
+		];
+		updateModelProvider(provider, {
+			base_url: patch.base_url ?? patch.default_base_url ?? '',
+			api_key_set: false,
+			api_key_hint: null,
+			api_key: patch.api_key,
+			enabled_models: patch.enabled_models ?? {},
+		});
+		modelSettingsStatus = t().settingsModelSaved;
+	}
+
+	function askDeleteModelProvider(provider: Provider) {
+		const providerLabel = modelCatalog.find((item) => item.id === provider)?.label ?? provider;
+		confirmAction = {
+			message: t().settingsModelDeleteServiceConfirm(providerLabel),
+			destructive: true,
+			run: () => { void deleteModelProvider(provider); },
+		};
+	}
+
+	async function deleteModelProvider(provider: Provider) {
+		if (currentUser?.role !== 'admin') return;
 		modelSettingsLoading = true;
 		try {
-			const providers = Object.fromEntries(Object.entries(modelSettings.providers).map(([id, provider]) => [
-				id,
-				{
-					base_url: provider.base_url,
-					api_key: provider.api_key || undefined,
-					clear_api_key: !!provider.clear_api_key,
-				}
-			]));
+			const r = await apiFetch('/api/settings/models', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ providers: { [provider]: { delete: true } } }),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
+			modelSettings = data.settings;
+			modelSettingsStatus = t().settingsModelSaved;
+			await loadAvailableModels();
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			modelSettingsLoading = false;
+		}
+	}
+
+	async function fetchProviderModels(provider: Provider) {
+		if (currentUser?.role !== 'admin') return;
+		modelSettingsLoading = true;
+		modelFetchErrors = { ...modelFetchErrors, [provider]: '' };
+		try {
+			const r = await apiFetch(`/api/settings/models/${encodeURIComponent(provider)}/fetch-models`, {
+				method: 'POST',
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
+			modelSettings = data.settings;
+			modelSettingsStatus = t().settingsModelFetchModelsSaved;
+			await loadAvailableModels();
+		} catch (e) {
+			const message = e instanceof Error ? e.message : String(e);
+			modelFetchErrors = { ...modelFetchErrors, [provider]: message };
+			modelSettingsStatus = message;
+		} finally {
+			modelSettingsLoading = false;
+		}
+	}
+
+	function askClearModelApiKey(provider: Provider) {
+		const providerLabel = modelCatalog.find((item) => item.id === provider)?.label ?? provider;
+		confirmAction = {
+			message: t().settingsModelClearApiKeyConfirm(providerLabel),
+			destructive: true,
+			runLabel: t().settingsModelClearApiKey,
+			run: () => { void clearModelApiKey(provider); },
+		};
+	}
+
+	async function clearModelApiKey(provider: Provider) {
+		if (currentUser?.role !== 'admin') return;
+		modelSettingsLoading = true;
+		try {
+			const current = modelSettings?.providers[provider];
 			const r = await apiFetch('/api/settings/models', {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					stage1_provider: modelSettings.stage1_provider,
-					stage1_model: modelSettings.stage1_model,
-					stage2_provider: modelSettings.stage2_provider,
-					stage2_model: modelSettings.stage2_model,
+					providers: {
+						[provider]: {
+							base_url: current?.base_url,
+							clear_api_key: true,
+							enabled_models: current?.enabled_models ?? {},
+						},
+					},
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
+			modelSettings = data.settings;
+			modelSettingsStatus = t().settingsModelApiKeyCleared;
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			modelSettingsLoading = false;
+		}
+	}
+
+	function modelProviderPayload(id: string, provider: ModelProviderSetting) {
+		const catalogProvider = modelCatalog.find((item) => item.id === id);
+		return {
+			label: catalogProvider?.label,
+			kind: catalogProvider?.kind,
+			requires_api_key: catalogProvider?.requires_api_key,
+			models: catalogProvider?.models ?? [],
+			base_url: provider.base_url,
+			api_key: provider.api_key || undefined,
+			clear_api_key: !!provider.clear_api_key,
+			enabled_models: provider.enabled_models ?? {},
+		};
+	}
+
+	async function saveModelProvider(provider: Provider) {
+		if (!modelSettings || currentUser?.role !== 'admin') return;
+		const providerSettings = modelSettings.providers[provider];
+		if (!providerSettings) return;
+		modelSettingsLoading = true;
+		try {
+			const r = await apiFetch('/api/settings/models', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					providers: {
+						[provider]: modelProviderPayload(provider, providerSettings),
+					},
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
+			modelSettings = data.settings;
+			modelSettingsStatus = t().settingsModelSaved;
+			await loadAvailableModels();
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			modelSettingsLoading = false;
+		}
+	}
+
+	async function saveModelSettings() {
+		if (!modelSettings || currentUser?.role !== 'admin') return;
+		modelSettingsLoading = true;
+		try {
+			const providers = Object.fromEntries(Object.entries(modelSettings.providers).map(([id, provider]) => {
+				return [id, modelProviderPayload(id, provider)];
+			}));
+			const r = await apiFetch('/api/settings/models', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
 					providers,
 				}),
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { settings: ModelSettings };
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
 			modelSettings = data.settings;
-			stage1Provider = data.settings.stage1_provider;
-			stage1Model = data.settings.stage1_model;
-			stage2Provider = data.settings.stage2_provider;
-			stage2Model = data.settings.stage2_model;
-			persistModelSelection();
 			modelSettingsStatus = t().settingsModelSaved;
+			await loadAvailableModels();
 		} catch (e) {
 			modelSettingsStatus = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -887,6 +1107,7 @@
 			if (requestId !== userSettingsRequestId) return;
 			currentUser = actor;
 			applyUserTheme(actor);
+			applyUserModelSettings(actor);
 			authToken = 'cookie';
 			if (actor.role !== 'admin') {
 				users = [];
@@ -988,9 +1209,10 @@
 			if (!r.ok) throw new Error('session expired');
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
+			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -1032,6 +1254,7 @@
 			authToken = 'cookie';
 			currentUser = data.user;
 			applyUserTheme(data.user);
+			applyUserModelSettings(data.user);
 			loginStatus = null;
 			historyItems = [];
 			historyTotal = 0;
@@ -1039,7 +1262,7 @@
 			trashTotal = 0;
 			historyManager.clear();
 			loginPassword = '';
-			await Promise.all([loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
+			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -2366,7 +2589,7 @@
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
 		displayedHistoryItem = null;
-		stage1Provider = v; stage1Model = modelsForProvider(v)[0]?.id ?? stage1Model;
+		stage1Provider = v; stage1Model = modelsFor(v)[0]?.id ?? stage1Model;
 	}
 	function setStage1Model(v: string) {
 		displayedHistoryItem = null;
@@ -2374,7 +2597,7 @@
 	}
 	function setStage2Provider(v: Provider) {
 		displayedHistoryItem = null;
-		stage2Provider = v; stage2Model = modelsForProvider(v)[0]?.id ?? stage2Model;
+		stage2Provider = v; stage2Model = modelsFor(v)[0]?.id ?? stage2Model;
 	}
 	function setStage2Model(v: string) {
 		displayedHistoryItem = null;
@@ -2498,7 +2721,7 @@
 	function statusModelName(m: string | null | undefined): string {
 		if (!m) return '';
 		const bareModel = m.includes(':') ? m.split(':').slice(1).join(':') : m;
-		const model = modelsForProvider(providerOfModel(m)).find((option) => option.id === m || option.id === bareModel);
+		const model = modelsFor(providerOfModel(m)).find((option) => option.id === m || option.id === bareModel);
 		return model?.label ?? m;
 	}
 
@@ -3094,12 +3317,14 @@
 		{stage1Model}
 		{stage2Provider}
 		{stage2Model}
+		providerGroups={modelCatalog}
 		bind:includeThinking
 		{settingsStatus}
 		{settingsStatusError}
 		{settingsStatusLoading}
 		bind:modelSettings
 		{modelSettingsStatus}
+		{modelFetchErrors}
 		{modelSettingsLoading}
 		{dbBackupStatus}
 		{currentUser}
@@ -3139,6 +3364,11 @@
 		onSetStage2Provider={setStage2Provider}
 		onSetStage2Model={setStage2Model}
 		onUpdateModelProvider={updateModelProvider}
+		onAddModelProvider={addModelProvider}
+		onAskDeleteModelProvider={askDeleteModelProvider}
+		onAskClearModelApiKey={askClearModelApiKey}
+		onFetchModelList={fetchProviderModels}
+		onSaveModelProvider={saveModelProvider}
 		onSaveModelSettings={saveModelSettings}
 		onLoadModelSettings={loadModelSettings}
 		onLoadSettingsStatus={loadSettingsStatus}

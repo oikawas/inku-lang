@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
-	import { PROVIDER_GROUPS, modelsForProvider, type Provider } from '$lib/models';
+	import type { Provider, ProviderGroup } from '$lib/models';
 
 	type PluginItem = {
 		name: string;
@@ -55,12 +55,21 @@
 	};
 	type SettingsMode = 'model' | 'settings';
 	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
-	type ModelProviderSetting = { base_url: string; api_key_set: boolean; api_key_hint: string | null; api_key?: string; clear_api_key?: boolean };
+	type ModelProviderSetting = {
+		label?: string;
+		kind?: string;
+		default_base_url?: string;
+		requires_api_key?: boolean;
+		models?: { id: string; label: string; notes?: string }[];
+		delete?: boolean;
+		base_url: string;
+		api_key_set: boolean;
+		api_key_hint: string | null;
+		api_key?: string;
+		clear_api_key?: boolean;
+		enabled_models?: Record<string, boolean>;
+	};
 	type ModelSettings = {
-		stage1_provider: Provider;
-		stage1_model: string;
-		stage2_provider: Provider;
-		stage2_model: string;
 		providers: Record<string, ModelProviderSetting>;
 	};
 
@@ -71,12 +80,14 @@
 		stage1Model: string;
 		stage2Provider: Provider;
 		stage2Model: string;
+		providerGroups: ProviderGroup[];
 		includeThinking: boolean;
 		settingsStatus: SettingsStatus | null;
 		settingsStatusError: string | null;
 		settingsStatusLoading: boolean;
 		modelSettings: ModelSettings | null;
 		modelSettingsStatus: string | null;
+		modelFetchErrors: Record<string, string>;
 		modelSettingsLoading: boolean;
 		dbBackupStatus: string | null;
 		currentUser: UserItem | null;
@@ -115,6 +126,11 @@
 		onSetStage2Provider: (provider: Provider) => void;
 		onSetStage2Model: (model: string) => void;
 		onUpdateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
+		onAddModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
+		onAskDeleteModelProvider: (provider: Provider) => void;
+		onAskClearModelApiKey: (provider: Provider) => void;
+		onFetchModelList: (provider: Provider) => void | Promise<void>;
+		onSaveModelProvider: (provider: Provider) => void | Promise<void>;
 		onSaveModelSettings: () => void | Promise<void>;
 		onLoadModelSettings: () => void | Promise<void>;
 		onLoadSettingsStatus: () => void;
@@ -148,12 +164,14 @@
 		stage1Model,
 		stage2Provider,
 		stage2Model,
+		providerGroups,
 		includeThinking = $bindable(),
 		settingsStatus,
 		settingsStatusError,
 		settingsStatusLoading,
 		modelSettings = $bindable(),
 		modelSettingsStatus,
+		modelFetchErrors,
 		modelSettingsLoading,
 		dbBackupStatus,
 		currentUser,
@@ -192,6 +210,11 @@
 		onSetStage2Provider,
 		onSetStage2Model,
 		onUpdateModelProvider,
+		onAddModelProvider,
+		onAskDeleteModelProvider,
+		onAskClearModelApiKey,
+		onFetchModelList,
+		onSaveModelProvider,
 		onSaveModelSettings,
 		onLoadModelSettings,
 		onLoadSettingsStatus,
@@ -220,27 +243,82 @@
 
 	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
 	const isAdmin = $derived(currentUser?.role === 'admin');
+	let newProviderId = $state('');
+	let newProviderLabel = $state('');
+	let newProviderKind = $state('openai_compatible');
+	let newProviderBaseUrl = $state('');
+	let newProviderApiKey = $state('');
+	let showAddServiceDialog = $state(false);
+	let modelPickerProviderId = $state<Provider | null>(null);
+	let baseUrlDrafts = $state<Record<string, string>>({});
 
-	function updateModelSettings(patch: Partial<ModelSettings>) {
-		if (!modelSettings) return;
-		modelSettings = { ...modelSettings, ...patch };
+	function modelsFor(provider: Provider) {
+		return providerGroups.find((group) => group.id === provider)?.models ?? [];
 	}
 
-	function selectStage1Provider(provider: Provider) {
-		if (!modelSettings) return;
-		updateModelSettings({
-			stage1_provider: provider,
-			stage1_model: modelsForProvider(provider)[0]?.id ?? modelSettings.stage1_model,
+	function addModelProvider() {
+		const id = newProviderId.trim().toLowerCase();
+		const label = newProviderLabel.trim() || id;
+		if (!id || !label || !newProviderBaseUrl.trim()) return;
+		onAddModelProvider(id, {
+			label,
+			kind: newProviderKind,
+			base_url: newProviderBaseUrl.trim(),
+			default_base_url: newProviderBaseUrl.trim(),
+			requires_api_key: !!newProviderApiKey.trim(),
+			api_key: newProviderApiKey.trim() || undefined,
+			models: [],
+			enabled_models: {},
+		});
+		newProviderId = '';
+		newProviderLabel = '';
+		newProviderKind = 'openai_compatible';
+		newProviderBaseUrl = '';
+		newProviderApiKey = '';
+		showAddServiceDialog = false;
+	}
+
+	function baseUrlValue(provider: Provider, setting: ModelProviderSetting): string {
+		return baseUrlDrafts[provider] ?? setting.base_url ?? '';
+	}
+
+	function baseUrlChanged(provider: Provider, setting: ModelProviderSetting): boolean {
+		return baseUrlDrafts[provider] != null && baseUrlDrafts[provider] !== (setting.base_url ?? '');
+	}
+
+	function setBaseUrlDraft(provider: Provider, value: string) {
+		baseUrlDrafts = { ...baseUrlDrafts, [provider]: value };
+	}
+
+	async function saveBaseUrl(provider: Provider, setting: ModelProviderSetting) {
+		const value = baseUrlValue(provider, setting).trim();
+		onUpdateModelProvider(provider, { base_url: value });
+		await onSaveModelProvider(provider);
+		const nextDrafts = { ...baseUrlDrafts };
+		delete nextDrafts[provider];
+		baseUrlDrafts = nextDrafts;
+	}
+
+	function setAllPublishedModels(provider: Provider, models: { id: string }[], enabled: boolean) {
+		onUpdateModelProvider(provider, {
+			enabled_models: Object.fromEntries(models.map((model) => [model.id, enabled])),
 		});
 	}
 
-	function selectStage2Provider(provider: Provider) {
-		if (!modelSettings) return;
-		updateModelSettings({
-			stage2_provider: provider,
-			stage2_model: modelsForProvider(provider)[0]?.id ?? modelSettings.stage2_model,
-		});
+	function modelEnabled(setting: ModelProviderSetting, modelId: string): boolean {
+		return setting.enabled_models?.[modelId] !== false;
 	}
+
+	function selectedModels(provider: ProviderGroup, setting: ModelProviderSetting) {
+		return provider.models.filter((model) => modelEnabled(setting, model.id));
+	}
+
+	const modelPickerProvider = $derived(providerGroups.find((provider) => provider.id === modelPickerProviderId) ?? null);
+	const modelPickerSetting = $derived(
+		modelPickerProviderId && modelSettings
+			? (modelSettings.providers[modelPickerProviderId] ?? { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} })
+			: null
+	);
 
 	function formatBytes(bytes: number | null | undefined): string {
 		if (bytes == null) return '-';
@@ -290,13 +368,13 @@
 				<div class="form-row">
 					<label for="settings-stage1-provider">{t().providerLabel}</label>
 					<select id="settings-stage1-provider" value={stage1Provider} onchange={(e) => onSetStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-						{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+						{#each providerGroups as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
 					</select>
 				</div>
 				<div class="form-row">
 					<label for="settings-stage1-model">{t().modelLabel}</label>
 					<select id="settings-stage1-model" value={stage1Model} onchange={(e) => onSetStage1Model((e.currentTarget as HTMLSelectElement).value)}>
-						{#each modelsForProvider(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` - ${m.notes}` : ''}</option>{/each}
+						{#each modelsFor(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` - ${m.notes}` : ''}</option>{/each}
 					</select>
 				</div>
 				{#if stage1Model.includes('qwen3')}
@@ -311,109 +389,91 @@
 				<div class="form-row">
 					<label for="settings-stage2-provider">{t().providerLabel}</label>
 					<select id="settings-stage2-provider" value={stage2Provider} onchange={(e) => onSetStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-						{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
+						{#each providerGroups as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
 					</select>
 				</div>
 				<div class="form-row">
 					<label for="settings-stage2-model">{t().modelLabel}</label>
 					<select id="settings-stage2-model" value={stage2Model} onchange={(e) => onSetStage2Model((e.currentTarget as HTMLSelectElement).value)}>
-						{#each modelsForProvider(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` - ${m.notes}` : ''}</option>{/each}
+						{#each modelsFor(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` - ${m.notes}` : ''}</option>{/each}
 					</select>
 				</div>
 			</div>
 		{:else if settingsTab === 'models'}
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsModelDefaultsTitle}</div>
-				{#if modelSettingsLoading}
-					<div class="inline-message">{t().settingsLoading}</div>
-				{:else if modelSettings}
-					<div class="model-default-grid">
-						<label>
-							<span>{t().stage1Label} {t().providerLabel}</span>
-							<select
-								value={modelSettings.stage1_provider}
-								onchange={(e) => {
-									const provider = (e.currentTarget as HTMLSelectElement).value as Provider;
-									selectStage1Provider(provider);
-								}}
-							>
-								{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-							</select>
-						</label>
-						<label>
-							<span>{t().stage1Label} {t().modelLabel}</span>
-							<select
-								value={modelSettings.stage1_model}
-								onchange={(e) => { updateModelSettings({ stage1_model: (e.currentTarget as HTMLSelectElement).value }); }}
-							>
-								{#each modelsForProvider(modelSettings.stage1_provider) as model (model.id)}
-									<option value={model.id}>{model.label}{model.notes ? ` - ${model.notes}` : ''}</option>
-								{/each}
-							</select>
-						</label>
-						<label>
-							<span>{t().stage2Label} {t().providerLabel}</span>
-							<select
-								value={modelSettings.stage2_provider}
-								onchange={(e) => {
-									const provider = (e.currentTarget as HTMLSelectElement).value as Provider;
-									selectStage2Provider(provider);
-								}}
-							>
-								{#each PROVIDER_GROUPS as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-							</select>
-						</label>
-						<label>
-							<span>{t().stage2Label} {t().modelLabel}</span>
-							<select
-								value={modelSettings.stage2_model}
-								onchange={(e) => { updateModelSettings({ stage2_model: (e.currentTarget as HTMLSelectElement).value }); }}
-							>
-								{#each modelsForProvider(modelSettings.stage2_provider) as model (model.id)}
-									<option value={model.id}>{model.label}{model.notes ? ` - ${model.notes}` : ''}</option>
-								{/each}
-							</select>
-						</label>
-					</div>
-					<div class="db-test-result">{t().settingsModelSecurityNote}</div>
-				{:else}
-					<div class="inline-message">{modelSettingsStatus ?? t().settingsLoadFailed}</div>
-				{/if}
-			</div>
+			{#if modelSettingsLoading}
+				<div class="popover-group"><div class="inline-message">{t().settingsLoading}</div></div>
+			{:else if !modelSettings}
+				<div class="popover-group"><div class="inline-message">{modelSettingsStatus ?? t().settingsLoadFailed}</div></div>
+			{/if}
 			{#if modelSettings}
 				<div class="popover-group">
 					<div class="popover-group-label">{t().settingsModelConnectionsTitle}</div>
 					<div class="model-provider-list">
-						{#each PROVIDER_GROUPS as provider (provider.id)}
-							{@const setting = modelSettings.providers[provider.id] ?? { base_url: '', api_key_set: false, api_key_hint: null }}
+						{#each providerGroups as provider (provider.id)}
+							{@const setting = modelSettings.providers[provider.id] ?? { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} }}
 							<div class="model-provider-row">
 								<div class="model-provider-head">
 									<strong>{provider.label}</strong>
-									<span>{setting.api_key_set ? t().settingsModelApiKeySet(setting.api_key_hint ?? '') : t().settingsModelApiKeyUnset}</span>
+									<div class="model-provider-head-actions">
+										<span class="model-key-state">
+											{setting.api_key_set ? t().settingsModelApiKeySet(setting.api_key_hint ?? '') : t().settingsModelApiKeyUnset}
+											{#if !setting.api_key_set}
+												<button type="button" class="model-key-info" aria-label={t().settingsModelApiKeyOptionalHint}>
+													i
+													<span class="model-key-tooltip">{t().settingsModelApiKeyOptionalHint}</span>
+												</button>
+											{/if}
+										</span>
+									</div>
 								</div>
 								<label>
 									<span>{t().settingsModelBaseUrl}</span>
-									<input
-										value={setting.base_url}
-										onchange={(e) => onUpdateModelProvider(provider.id, { base_url: (e.currentTarget as HTMLInputElement).value })}
-									/>
+									<div class="model-base-url-row">
+										<input
+											value={baseUrlValue(provider.id, setting)}
+											oninput={(e) => setBaseUrlDraft(provider.id, (e.currentTarget as HTMLInputElement).value)}
+										/>
+										<button
+											class="ghost-btn model-base-url-save"
+											onclick={() => saveBaseUrl(provider.id, setting)}
+											disabled={modelSettingsLoading || !baseUrlChanged(provider.id, setting)}
+										>{t().profileSaveButton}</button>
+									</div>
 								</label>
 								<label>
 									<span>{t().settingsModelApiKey}</span>
-									<input
-										type="password"
-										placeholder={setting.api_key_set ? t().settingsModelKeepApiKey : t().settingsModelApiKeyPlaceholder}
-										onchange={(e) => onUpdateModelProvider(provider.id, { api_key: (e.currentTarget as HTMLInputElement).value, clear_api_key: false })}
-									/>
+									<div class="model-api-key-row">
+										<input
+											type="password"
+											placeholder={setting.api_key_set ? t().settingsModelKeepApiKey : t().settingsModelApiKeyPlaceholder}
+											onchange={(e) => onUpdateModelProvider(provider.id, { api_key: (e.currentTarget as HTMLInputElement).value, clear_api_key: false })}
+										/>
+										<button
+											class="ghost-btn model-key-delete"
+											onclick={() => onAskClearModelApiKey(provider.id)}
+											disabled={!setting.api_key_set || modelSettingsLoading}
+										>{t().deleteButton}</button>
+									</div>
 								</label>
-								<label class="check-row">
-									<input
-										type="checkbox"
-										checked={!!setting.clear_api_key}
-										onchange={(e) => onUpdateModelProvider(provider.id, { clear_api_key: (e.currentTarget as HTMLInputElement).checked, api_key: '' })}
-									/>
-									<span>{t().settingsModelClearApiKey}</span>
-								</label>
+								<div class="model-publish-summary" aria-label={t().settingsModelPublishedModels}>
+									<div class="model-publish-head">
+										<div class="model-publish-title">{t().settingsModelPublishedModels}</div>
+										<button class="ghost-btn model-fetch-btn" onclick={() => (modelPickerProviderId = provider.id)} disabled={modelSettingsLoading}>{t().settingsModelSelectModels}</button>
+									</div>
+									{#if selectedModels(provider, setting).length}
+										<div class="model-publish-selected">
+											{#each selectedModels(provider, setting) as model, modelIndex (`${model.id}:${modelIndex}`)}
+												<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
+											{/each}
+										</div>
+									{:else}
+										<div class="model-publish-empty">{t().settingsModelNoPublishedModels}</div>
+									{/if}
+								</div>
+								<div class="model-provider-actions">
+									<button class="ghost-btn model-service-delete" onclick={() => onAskDeleteModelProvider(provider.id)} disabled={modelSettingsLoading}>{t().settingsModelDeleteService}</button>
+									<button class="ghost-btn primary-inline model-service-save" onclick={() => saveBaseUrl(provider.id, setting)} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
+								</div>
 							</div>
 						{/each}
 					</div>
@@ -424,6 +484,7 @@
 				<div class="settings-inline-actions">
 					<button class="ghost-btn" onclick={onLoadModelSettings} disabled={modelSettingsLoading}>{t().settingsReload}</button>
 					<button class="ghost-btn primary-inline" onclick={onSaveModelSettings} disabled={modelSettingsLoading}>{t().userSaveChanges}</button>
+					<button class="ghost-btn" onclick={() => (showAddServiceDialog = true)} disabled={modelSettingsLoading}>{t().settingsModelAddServiceButton}</button>
 				</div>
 			{/if}
 		{:else if settingsTab === 'db'}
@@ -783,6 +844,95 @@
 	{/if}
 </div>
 
+{#if showAddServiceDialog}
+	<div class="modal-backdrop add-service-backdrop" onclick={() => (showAddServiceDialog = false)} aria-hidden="true"></div>
+	<div class="add-service-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">{t().settingsModelAddServiceTitle}</div>
+			<button class="catalog-close" onclick={() => (showAddServiceDialog = false)}>×</button>
+		</div>
+		<div class="add-service-body">
+			<div class="model-add-grid">
+				<label>
+					<span class="model-add-label-with-help">
+						{t().settingsModelServiceId}
+						<button type="button" class="model-key-info model-service-id-info" aria-label={t().settingsModelServiceIdHelp}>
+							i
+							<span class="model-key-tooltip model-service-id-tooltip">{t().settingsModelServiceIdHelp}</span>
+						</button>
+					</span>
+					<input bind:value={newProviderId} placeholder="my-openai" />
+				</label>
+				<label>
+					<span>{t().settingsModelServiceName}</span>
+					<input bind:value={newProviderLabel} placeholder="My OpenAI-compatible server" />
+				</label>
+				<label>
+					<span>{t().settingsModelServiceKind}</span>
+					<select bind:value={newProviderKind}>
+						<option value="openai_compatible">OpenAI compatible</option>
+						<option value="anthropic">Claude API</option>
+						<option value="gemini">Gemini API</option>
+					</select>
+				</label>
+				<label>
+					<span>{t().settingsModelBaseUrl}</span>
+					<input bind:value={newProviderBaseUrl} placeholder="http://127.0.0.1:11434/v1" />
+				</label>
+				<label>
+					<span>{t().settingsModelApiKey}</span>
+					<input bind:value={newProviderApiKey} type="password" placeholder={t().settingsModelApiKeyPlaceholder} />
+				</label>
+			</div>
+		</div>
+		<div class="add-service-actions">
+			<button class="ghost-btn" onclick={() => (showAddServiceDialog = false)}>{t().confirmCancel}</button>
+			<button class="ghost-btn primary-inline" onclick={addModelProvider} disabled={modelSettingsLoading}>{t().addButton}</button>
+		</div>
+	</div>
+{/if}
+
+{#if modelPickerProvider && modelPickerSetting}
+	<div class="modal-backdrop model-picker-backdrop" onclick={() => (modelPickerProviderId = null)} aria-hidden="true"></div>
+	<div class="model-picker-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">{t().settingsModelSelectModelsTitle(modelPickerProvider.label)}</div>
+			<button class="catalog-close" onclick={() => (modelPickerProviderId = null)}>×</button>
+		</div>
+		<div class="model-picker-body">
+			<div class="model-picker-actions">
+				<button class="ghost-btn" onclick={() => onFetchModelList(modelPickerProvider.id)} disabled={modelSettingsLoading}>{t().settingsModelFetchModels}</button>
+				<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerProvider.id, modelPickerProvider.models, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectAll}</button>
+				<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerProvider.id, modelPickerProvider.models, false)} disabled={modelSettingsLoading}>{t().settingsModelClearAll}</button>
+			</div>
+			<div class="model-picker-list" aria-label={t().settingsModelPublishedModels}>
+				{#each modelPickerProvider.models as model, modelIndex (`${model.id}:${modelIndex}`)}
+					<label class="check-row model-picker-row">
+						<input
+							type="checkbox"
+							checked={modelEnabled(modelPickerSetting, model.id)}
+							onchange={(e) => onUpdateModelProvider(modelPickerProvider.id, {
+								enabled_models: {
+									...(modelPickerSetting.enabled_models ?? {}),
+									[model.id]: (e.currentTarget as HTMLInputElement).checked,
+								},
+							})}
+						/>
+						<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
+					</label>
+				{/each}
+			</div>
+		</div>
+		<div class="model-picker-footer">
+			{#if modelFetchErrors[modelPickerProvider.id]}
+				<div class="model-picker-error">{modelFetchErrors[modelPickerProvider.id]}</div>
+			{/if}
+			<button class="ghost-btn" onclick={() => (modelPickerProviderId = null)}>{t().confirmCancel}</button>
+			<button class="ghost-btn primary-inline" onclick={() => { void saveBaseUrl(modelPickerProvider.id, modelPickerSetting); modelPickerProviderId = null; }} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
+		</div>
+	</div>
+{/if}
+
 <style>
 	.modal-backdrop {
 		position: fixed; inset: 0; z-index: 400;
@@ -898,12 +1048,6 @@
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
 	}
-	.model-default-grid {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 10px;
-	}
-	.model-default-grid label,
 	.model-provider-row label {
 		display: flex;
 		flex-direction: column;
@@ -913,7 +1057,6 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
-	.model-default-grid select,
 	.model-provider-row input {
 		min-width: 0;
 		padding: 5px 7px;
@@ -928,6 +1071,49 @@
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 10px;
+	}
+	.model-add-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+	}
+	.model-add-grid label {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.model-add-grid input,
+	.model-add-grid select {
+		min-width: 0;
+		padding: 5px 7px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		font-size: 12px;
+		font-family: inherit;
+	}
+	.model-add-label-with-help {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.model-service-id-info {
+		width: 14px;
+		height: 14px;
+		font-size: 9px;
+	}
+	.model-service-id-tooltip {
+		left: 0;
+		right: auto;
+		width: min(320px, 60vw);
+		white-space: pre-line;
+		text-transform: none;
+		letter-spacing: 0;
 	}
 	.model-provider-row {
 		display: flex;
@@ -946,6 +1132,209 @@
 	}
 	.model-provider-head strong { font-size: 12px; font-weight: 500; }
 	.model-provider-head span { color: var(--fg3); font-size: 11px; }
+	.model-provider-head-actions {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.model-service-delete {
+		padding: 2px 6px;
+		font-size: 10px;
+	}
+	.model-key-state {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		position: relative;
+	}
+	.model-key-info {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		border: 1px solid var(--border2);
+		border-radius: 999px;
+		color: var(--fg2);
+		background: var(--panel);
+		padding: 0;
+		font-size: 10px;
+		font-weight: 600;
+		line-height: 1;
+		cursor: help;
+		text-transform: none;
+	}
+	.model-key-tooltip {
+		position: absolute;
+		right: 0;
+		top: calc(100% + 7px);
+		z-index: 20;
+		display: none;
+		width: min(260px, 42vw);
+		padding: 7px 9px;
+		border-radius: var(--r);
+		background: var(--tooltip-bg);
+		color: #fff;
+		box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+		font-size: 11px;
+		line-height: 1.45;
+		font-weight: 400;
+		text-align: left;
+	}
+	.model-key-info:hover .model-key-tooltip,
+	.model-key-info:focus .model-key-tooltip {
+		display: block;
+	}
+	.model-api-key-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 6px;
+		align-items: center;
+	}
+	.model-base-url-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 6px;
+		align-items: center;
+	}
+	.model-base-url-row input { width: 100%; }
+	.model-base-url-save {
+		white-space: nowrap;
+		padding-inline: 8px;
+	}
+	.model-api-key-row input { width: 100%; }
+	.model-key-delete {
+		white-space: nowrap;
+		padding-inline: 8px;
+	}
+	.model-publish-summary {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+		padding-top: 2px;
+	}
+	.model-publish-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.model-publish-title {
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.model-fetch-btn {
+		padding: 2px 6px;
+		font-size: 10px;
+	}
+	.model-publish-selected {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		max-height: 72px;
+		overflow: auto;
+	}
+	.model-publish-selected span {
+		padding: 2px 6px;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		background: var(--panel);
+		color: var(--fg2);
+		font-size: 10px;
+		line-height: 1.35;
+	}
+	.model-publish-empty {
+		color: var(--fg3);
+		font-size: 11px;
+	}
+	.model-provider-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 6px;
+		margin-top: 2px;
+	}
+	.add-service-backdrop { z-index: 650; }
+	.add-service-dialog,
+	.model-picker-dialog {
+		position: fixed;
+		z-index: 660;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		width: min(720px, 86vw);
+		max-height: 86vh;
+		display: flex;
+		flex-direction: column;
+		border: 1px solid var(--border2);
+		border-radius: var(--r-lg);
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		overflow: hidden;
+	}
+	.model-picker-dialog {
+		width: min(760px, 88vw);
+		max-height: 82vh;
+	}
+	.add-service-body {
+		padding: 14px;
+		overflow: auto;
+	}
+	.model-picker-body {
+		padding: 14px;
+		overflow: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.model-picker-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.model-picker-list {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 6px 10px;
+	}
+	.model-picker-row {
+		min-width: 0;
+		padding: 5px 7px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--bg);
+	}
+	.model-picker-row span {
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+	.add-service-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		padding: 10px 14px;
+		border-top: 1px solid var(--border);
+		background: var(--panel2);
+	}
+	.model-picker-footer {
+		display: flex;
+		justify-content: flex-end;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		border-top: 1px solid var(--border);
+		background: var(--panel2);
+	}
+	.model-picker-error {
+		margin-right: auto;
+		min-width: 0;
+		color: var(--danger, #b42318);
+		font-size: 12px;
+		line-height: 1.35;
+		overflow-wrap: anywhere;
+	}
 	.inline-message {
 		padding: 7px 9px;
 		border: 1px solid var(--border);

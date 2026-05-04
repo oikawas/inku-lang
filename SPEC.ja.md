@@ -1411,14 +1411,18 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - JSONタブは、モデル/ビルド/カラープロファイル/色カタログなどの属性メタ情報を先頭に表示し、その後に `score` を表示する
 - 履歴から画像を開き直した場合も、JSONタブに履歴保存済みの `stage1_model` / `stage2_model` を表示する
 - 設定ダイアログに管理者向け `モデル設定` タブを追加する。Stage 1 / Stage 2 の既定 provider / model と、provider 別の base URL / API key をサーバー DB の app settings に保存する
-- 商用 LLM provider は OpenAI / Claude / Gemini、非商用 API provider は NVIDIA NIM、ローカル provider は Ollama (OpenAI互換) / Intel OVMS (OpenAI互換) を対象とする
+- 組み込みの商用 LLM provider は公式名称に合わせて OpenAI API Platform / Claude API / Gemini API とし、非商用 API provider は NVIDIA NIM、ローカル provider は Ollama (OpenAI互換) / Intel OVMS (OpenAI互換) を対象とする
+- 管理者は設定ダイアログのモデル設定タブで、接続サービスを追加・削除できる。追加サービスは service ID、表示名、接続形式 (`openai_compatible` / `anthropic` / `gemini`)、Base URL、APIキー要否、モデル一覧を持つ
+- 接続サービスごとに `モデルリスト取得` を実行できる。サーバーは保存済み Base URL / API key を使って provider 種別ごとの models API を呼び、取得したモデル一覧を当該サービス定義へ保存する。API key はブラウザへ送らない
 - API key はサーバー側にのみ保存し、`GET /api/settings/models` の応答では `api_key_set` とマスク済み `api_key_hint` のみを返す。ブラウザへ生の API key は返さない
 - `PUT /api/settings/models` は管理者のみ利用でき、API key の新規設定、保持、明示削除を区別する
 - LLM 呼び出しは model ID の provider prefix (`openai:` / `anthropic:` / `gemini:` / `nvidia:` / `ollama:` / `ovms:`) と、設定タブの既定値から接続先を解決する。旧来の NVIDIA slash ID とローカル OVMS ID も互換扱いとして受け付ける
+- LLMサーバー接続設定はグローバルな管理者設定とし、Stage 1 / Stage 2 の接続先・モデル選択はユーザーごとの `user_accounts.model_settings` に保存する。モデル選択ダイアログの確定時に `/api/auth/me/settings` へ保存し、ログイン時に復元する
+- 管理者は設定ダイアログのモデル設定タブで、provider ごとに一般ユーザーへ公開するモデルを個別に On/Off できる。`GET /api/models` はログイン済みユーザー向けに公開モデルのみを返し、モデル選択ダイアログはこの一覧を使う
 - CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
 - CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
 - 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める
-- build number: 289
+- build number: 294
 
 ### v1.40 (2026-05-03)
 

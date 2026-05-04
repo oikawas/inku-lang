@@ -12,6 +12,7 @@ import logging
 import sys
 import time
 import types
+import urllib.request
 import uuid
 
 import pytest
@@ -21,7 +22,7 @@ from sqlalchemy import create_engine, inspect, text
 from inku_server import db
 from inku_server import api as api_module
 from inku_server.api import app
-from inku_server.model_settings import default_model_settings
+from inku_server.model_settings import default_model_settings, update_model_settings
 from inku_server.schema import Score
 
 client = TestClient(app)
@@ -299,7 +300,7 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
         "starred",
     } <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
-    assert {"ui_theme", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
+    assert {"ui_theme", "model_settings", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
     with legacy_engine.connect() as conn:
@@ -338,6 +339,29 @@ def test_current_user_theme_can_be_updated(auth_context):
 
     invalid = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "sepia"})
     assert invalid.status_code == 400
+
+
+def test_current_user_model_selection_is_persisted(auth_context):
+    headers, _, _ = auth_context
+    updated = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={
+            "model_settings": {
+                "stage1_provider": "openai",
+                "stage1_model": "openai:gpt-5.1-mini",
+                "stage2_provider": "gemini",
+                "stage2_model": "gemini:gemini-2.5-flash",
+            }
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["model_settings"]["stage1_provider"] == "openai"
+    assert updated.json()["model_settings"]["stage2_model"] == "gemini:gemini-2.5-flash"
+
+    me = client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["model_settings"]["stage1_model"] == "openai:gpt-5.1-mini"
 
 
 def test_current_user_profile_can_be_updated(auth_context):
@@ -1562,31 +1586,75 @@ def test_model_settings_store_keys_server_side():
     assert r.status_code == 200
     data = r.json()
     assert any(provider["id"] == "openai" for provider in data["catalog"])
+    assert next(provider for provider in data["catalog"] if provider["id"] == "openai")["label"] == "OpenAI API Platform"
+    assert next(provider for provider in data["catalog"] if provider["id"] == "anthropic")["label"] == "Claude API"
+    assert next(provider for provider in data["catalog"] if provider["id"] == "gemini")["label"] == "Gemini API"
 
     r = client.put(
         "/api/settings/models",
         headers=headers,
         json={
-            "stage1_provider": "openai",
-            "stage1_model": "gpt-5.1-mini",
-            "stage2_provider": "gemini",
-            "stage2_model": "gemini-2.5-flash",
             "providers": {
-                "openai": {"base_url": "https://api.openai.com/v1", "api_key": "sk-test-secret"},
+                "openai": {
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key": "sk-test-secret",
+                    "enabled_models": {"gpt-5.1": False},
+                },
                 "gemini": {"base_url": "https://generativelanguage.googleapis.com", "api_key": "gemini-secret"},
             },
         },
     )
     assert r.status_code == 200
     settings = r.json()["settings"]
-    assert settings["stage1_provider"] == "openai"
-    assert settings["stage2_provider"] == "gemini"
     assert settings["providers"]["openai"]["api_key_set"] is True
     assert settings["providers"]["openai"]["api_key_hint"] == "sk-t...cret"
+    assert settings["providers"]["openai"]["enabled_models"]["gpt-5.1"] is False
     assert "sk-test-secret" not in json.dumps(settings)
 
     saved = db.get_model_settings()
     assert saved["providers"]["openai"]["api_key"] == "sk-test-secret"
+    assert saved["providers"]["openai"]["enabled_models"]["gpt-5.1"] is False
+
+    r = client.put(
+        "/api/settings/models",
+        headers=headers,
+        json={"providers": {"openai": {"base_url": "http://127.0.0.1:18000/v3"}}},
+    )
+    assert r.status_code == 200
+    assert r.json()["settings"]["providers"]["openai"]["base_url"] == "https://api.openai.com/v1"
+
+    public_models = client.get("/api/models", headers=headers)
+    assert public_models.status_code == 200
+    openai_catalog = next(provider for provider in public_models.json()["catalog"] if provider["id"] == "openai")
+    assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
+
+    r = client.put(
+        "/api/settings/models",
+        headers=headers,
+        json={
+            "providers": {
+                "custom-openai": {
+                    "label": "Custom OpenAI Compatible",
+                    "kind": "openai_compatible",
+                    "base_url": "http://127.0.0.1:9999/v1",
+                    "default_base_url": "http://127.0.0.1:9999/v1",
+                    "requires_api_key": False,
+                    "models": [{"id": "local-model", "label": "Local Model"}],
+                    "enabled_models": {"local-model": True},
+                }
+            }
+        },
+    )
+    assert r.status_code == 200
+    assert any(provider["id"] == "custom-openai" for provider in r.json()["catalog"])
+
+    r = client.put(
+        "/api/settings/models",
+        headers=headers,
+        json={"providers": {"custom-openai": {"delete": True}}},
+    )
+    assert r.status_code == 200
+    assert all(provider["id"] != "custom-openai" for provider in r.json()["catalog"])
 
     r = client.put(
         "/api/settings/models",
@@ -1595,6 +1663,81 @@ def test_model_settings_store_keys_server_side():
     )
     assert r.status_code == 200
     assert r.json()["settings"]["providers"]["openai"]["api_key_set"] is False
+    db.update_model_settings(default_model_settings())
+    db.delete_session(token)
+    db.delete_user(admin["id"])
+    db.delete_user_group(group["id"])
+
+
+def test_model_settings_fetch_models_from_provider(monkeypatch):
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"model-fetch-admins-{suffix}")
+    admin = db.add_user(
+        username=f"model-fetch-admin-{suffix}",
+        email=f"model-fetch-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    headers, token = _auth_headers(admin)
+    db.update_model_settings(update_model_settings(default_model_settings(), {
+        "providers": {
+            "openai": {
+                "models": [
+                    {"id": "fetched-model", "label": "Previous Fetched Model"},
+                    {"id": "removed-model", "label": "Removed Model"},
+                ],
+                "enabled_models": {"fetched-model": True, "removed-model": True},
+            }
+        }
+    }))
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "data": [
+                    {"id": "fetched-model", "display_name": "Fetched Model"},
+                    {"id": "new-fetched-model", "display_name": "New Fetched Model"},
+                    {"id": "fetched-model", "display_name": "Fetched Model Duplicate"},
+                ]
+            }).encode()
+
+    seen = {}
+
+    def fake_urlopen(req, timeout=0):
+        seen["url"] = req.full_url
+        seen["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    r = client.post("/api/settings/models/openai/fetch-models", headers=headers)
+    assert r.status_code == 200
+    assert seen["url"] == "https://api.openai.com/v1/models"
+    openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
+    assert openai_catalog["models"] == [
+        {"id": "fetched-model", "label": "Fetched Model", "enabled": True},
+        {"id": "new-fetched-model", "label": "New Fetched Model", "enabled": False},
+    ]
+
+    class NewFakeResponse(FakeResponse):
+        def read(self):
+            return json.dumps({"data": [{"id": "new-model", "display_name": "New Model"}]}).encode()
+
+    def new_fake_urlopen(req, timeout=0):
+        return NewFakeResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", new_fake_urlopen)
+    r = client.post("/api/settings/models/openai/fetch-models", headers=headers)
+    assert r.status_code == 200
+    openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
+    assert openai_catalog["models"] == [{"id": "new-model", "label": "New Model", "enabled": False}]
+
     db.update_model_settings(default_model_settings())
     db.delete_session(token)
     db.delete_user(admin["id"])

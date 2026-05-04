@@ -128,7 +128,7 @@ def _generate_openai(style: str, model: str) -> str:
         base_url = "https://integrate.api.nvidia.com/v1"
         api_key = os.getenv("NVIDIA_API_KEY", "")
     else:
-        base_url = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:18000/v3")
+        base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
         api_key = os.getenv("OPENAI_API_KEY") or "none"
 
     client = OpenAI(base_url=base_url, api_key=api_key)

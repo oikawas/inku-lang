@@ -1,21 +1,25 @@
-export type Provider = 'openai' | 'anthropic' | 'gemini' | 'nvidia' | 'ollama' | 'ovms';
+export type Provider = string;
 
 export type ModelOption = {
 	id: string;
 	label: string;
 	notes?: string;
+	enabled?: boolean;
 };
 
 export type ProviderGroup = {
 	id: Provider;
 	label: string;
+	kind?: string;
+	builtin?: boolean;
+	requires_api_key?: boolean;
 	models: ModelOption[];
 };
 
 export const PROVIDER_GROUPS: ProviderGroup[] = [
 	{
 		id: 'openai',
-		label: 'OpenAI',
+		label: 'OpenAI API Platform',
 		models: [
 			{ id: 'openai:gpt-5.1', label: 'GPT-5.1' },
 			{ id: 'openai:gpt-5.1-mini', label: 'GPT-5.1 mini' },
@@ -34,7 +38,7 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 	},
 	{
 		id: 'anthropic',
-		label: 'Claude',
+		label: 'Claude API',
 		models: [
 			{ id: 'anthropic:claude-opus-4-7', label: 'Anthropic Claude Opus 4.7' },
 			{ id: 'anthropic:claude-sonnet-4-6', label: 'Anthropic Claude Sonnet 4.6' },
@@ -43,7 +47,7 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 	},
 	{
 		id: 'gemini',
-		label: 'Gemini',
+		label: 'Gemini API',
 		models: [
 			{ id: 'gemini:gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
 			{ id: 'gemini:gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
@@ -85,6 +89,7 @@ export function providerOfModel(modelId: string): Provider {
 	if (modelId.startsWith('nvidia:')) return 'nvidia';
 	if (modelId.startsWith('ollama:')) return 'ollama';
 	if (modelId.startsWith('ovms:')) return 'ovms';
+	if (modelId.includes(':') && !modelId.startsWith('gpt-oss:')) return modelId.split(':', 1)[0];
 	for (const g of PROVIDER_GROUPS) {
 		if (g.models.some((m) => m.id === modelId)) return g.id;
 	}

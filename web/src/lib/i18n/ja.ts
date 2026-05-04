@@ -155,6 +155,7 @@ export const ja: LangPack = {
 	historyLockedDuringDemo: 'デモ実行中は履歴操作をロックしています',
 	historyNewerPage: (n) => `← 新しい${n}件`,
 	historyOlderPage: (n) => `古い${n}件 →`,
+	historyLatest: '最新',
 	historyClearBtn: '全て消す',
 	navOlderBtn: '◀',
 	navNewerBtn: '▶',

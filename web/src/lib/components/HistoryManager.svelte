@@ -40,6 +40,7 @@
 		onClose: () => void;
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
+		onSetLatestPage: () => void | Promise<void>;
 		onSetPageSize: (pageSize: number) => void;
 		onSetStarredOnly: (value: boolean) => void;
 		onSelectAll: () => void;
@@ -76,6 +77,7 @@
 		onClose,
 		onSetView,
 		onSetPage,
+		onSetLatestPage,
 		onSetPageSize,
 		onSetStarredOnly,
 		onSelectAll,
@@ -250,6 +252,7 @@
 		</div>
 		<div class="history-head-actions">
 			<div class="history-manager-pager">
+				<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyLatest}</button>
 				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
 				<span>{historyManagerLoading ? t().historyLoading : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
 				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
@@ -529,6 +532,7 @@
 		font-variant-numeric: tabular-nums;
 	}
 	.history-nav-btn { min-width: 74px; }
+	.history-latest-btn { min-width: 54px; }
 	.history-thumb-grid-wrap,
 	.history-table-wrap {
 		flex: 1;

@@ -47,6 +47,7 @@
 		pngTemplates: ExportTemplate[];
 		onGotoNext: () => void | Promise<void>;
 		onGotoPrev: () => void | Promise<void>;
+		onGotoLatest: () => void | Promise<void>;
 		onPointerDown: (event: PointerEvent) => void;
 		onPointerMove: (event: PointerEvent) => void;
 		onPointerUp: (event: PointerEvent) => void;
@@ -96,6 +97,7 @@
 		pngTemplates,
 		onGotoNext,
 		onGotoPrev,
+		onGotoLatest,
 		onPointerDown,
 		onPointerMove,
 		onPointerUp,
@@ -236,6 +238,7 @@
 		{/if}
 
 		<div class="nav-right">
+			<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
 			<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
 			{#if historyTotal > 0}
 				<span class="nav-counter">{navPos} / {historyTotal}</span>
@@ -408,7 +411,28 @@
 		transition: background 0.1s;
 	}
 	.nav-circle:hover:not(:disabled) { background: var(--floating-control-hover); }
+	.nav-latest {
+		min-width: 42px;
+		height: 24px;
+		border-radius: 999px;
+		background: var(--floating-control-bg);
+		border: 1px solid var(--border2);
+		box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+		color: var(--floating-control-fg);
+		cursor: pointer;
+		font-size: 11px;
+		font-family: inherit;
+		line-height: 1;
+		padding: 0 8px;
+	}
+	.nav-latest:hover:not(:disabled) { background: var(--floating-control-hover); }
 	.nav-circle:disabled {
+		background: var(--floating-control-disabled-bg);
+		color: var(--floating-control-muted);
+		opacity: 1;
+		cursor: not-allowed;
+	}
+	.nav-latest:disabled {
 		background: var(--floating-control-disabled-bg);
 		color: var(--floating-control-muted);
 		opacity: 1;

@@ -2336,6 +2336,11 @@
 		loadIteration(0);
 	}
 
+	async function gotoHistoryLatestPage(): Promise<void> {
+		await fetchHistoryPage(0);
+		loadIteration(0);
+	}
+
 	async function gotoHistoryOlderPage(): Promise<void> {
 		await fetchHistoryPage(historyPage + 1);
 		loadIteration(0);
@@ -2589,6 +2594,11 @@
 	async function gotoNext() {
 		if (historyCursor > 0) { loadIteration(historyCursor - 1); }
 		else if (historyOffset > 0) { await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize)); loadIteration(historyItems.length - 1); }
+	}
+	async function gotoLatest() {
+		if (historyTotal <= 0) return;
+		await fetchHistoryOffset(0);
+		loadIteration(0);
 	}
 
 	const prevDisabled = $derived(historyCursor < 0 || historyOffset + historyCursor >= historyTotal - 1);
@@ -3337,6 +3347,7 @@
 				{statusHistoryItem}
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}
+				onGotoLatest={gotoLatest}
 				onPointerDown={startCanvasDrag}
 				onPointerMove={moveCanvasDrag}
 				onPointerUp={endCanvasDrag}
@@ -3361,6 +3372,7 @@
 			onOpenManager={openHistoryManager}
 			onNewerPage={gotoHistoryNewerPage}
 			onOlderPage={gotoHistoryOlderPage}
+			onLatestPage={gotoHistoryLatestPage}
 			onLoadIteration={loadIteration}
 			onToggleStar={toggleHistoryStar}
 			interactionLocked={demoRunning}
@@ -3521,6 +3533,7 @@
 		onClose={() => (historyManager.open = false)}
 		onSetView={historyManager.setView}
 		onSetPage={historyManager.setPage}
+		onSetLatestPage={() => historyManager.setPage(0)}
 		onSetPageSize={historyManager.setPageSize}
 		onSetStarredOnly={historyManager.setStarredOnly}
 		onSelectAll={selectAllManagedHistory}

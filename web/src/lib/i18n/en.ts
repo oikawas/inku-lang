@@ -155,6 +155,7 @@ export const en: LangPack = {
 	historyLockedDuringDemo: 'History controls are locked during demo',
 	historyNewerPage: (n) => `← newer ${n}`,
 	historyOlderPage: (n) => `older ${n} →`,
+	historyLatest: 'latest',
 	historyClearBtn: 'clear all',
 	navOlderBtn: '◀',
 	navNewerBtn: '▶',

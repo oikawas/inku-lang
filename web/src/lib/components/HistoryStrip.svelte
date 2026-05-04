@@ -30,6 +30,7 @@
 		onOpenManager: () => void;
 		onNewerPage: () => void | Promise<void>;
 		onOlderPage: () => void | Promise<void>;
+		onLatestPage: () => void | Promise<void>;
 		onLoadIteration: (index: number) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		interactionLocked: boolean;
@@ -53,6 +54,7 @@
 		onOpenManager,
 		onNewerPage,
 		onOlderPage,
+		onLatestPage,
 		onLoadIteration,
 		onToggleStar,
 		interactionLocked,
@@ -96,6 +98,7 @@
 							class:ghost-active={historyStarredOnly}
 							onclick={() => onSetStarredOnly(!historyStarredOnly)}
 						>{t().historyStarredOnly}</button>
+						<button class="ghost-btn history-latest-btn" onclick={onLatestPage} disabled={interactionLocked || historyPage <= 0}>{t().historyLatest}</button>
 						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || historyPage <= 0}>{t().historyNewerPage(historyNavSpan)}</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
 						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={interactionLocked || historyPage >= historyTotalPages - 1}>{t().historyOlderPage(historyNavSpan)}</button>
@@ -224,6 +227,7 @@
 		text-align: center;
 	}
 	.history-nav-btn { min-width: 92px; }
+	.history-latest-btn { min-width: 54px; }
 	.history-filter-btn { min-width: 76px; }
 	.ghost-btn.ghost-active { background: var(--fg); color: var(--panel); border-color: var(--fg); }
 	.history-collapse-btn {
@@ -275,13 +279,13 @@
 		top: 3px;
 		right: 3px;
 		z-index: 20;
-		width: 20px;
-		height: 20px;
+		width: 18px;
+		height: 18px;
 		border: 1px solid rgba(0,0,0,0.12);
 		border-radius: 50%;
 		background: rgba(255,255,255,0.86);
 		color: rgba(40,36,30,0.42);
-		font-size: 13px;
+		font-size: 10px;
 		line-height: 1;
 		cursor: pointer;
 		display: flex;

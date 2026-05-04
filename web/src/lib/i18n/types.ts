@@ -168,6 +168,7 @@ export interface LangPack {
 	historyLockedDuringDemo: string;
 	historyNewerPage: (n: number) => string;
 	historyOlderPage: (n: number) => string;
+	historyLatest: string;
 	historyClearBtn: string;
 	navOlderBtn: string;
 	navNewerBtn: string;

@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.39**
+**Version: v1.42**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -1383,6 +1383,24 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.42 (2026-05-04)
+
+**サーバーワイド自動保存設定**
+
+出力 artifact ファイルの自動保存を、ユーザー個別設定ではなくサーバーワイドな管理者設定として扱う。
+
+- 設定ダイアログに admin 向け `その他（サーバー）` タブを追加する
+- `その他（サーバー）` タブでは、描画ファイル自動保存の On/Off、保存先フォルダの絶対パス、PNG 自動保存サイズを設定できる
+- PNG 自動保存サイズは `1080px` / `2160px` から選択する
+- サーバーは `app_settings.output_save_settings` に `enabled` / `output_dir` / `png_size` を保存する
+- 初期保存先は `INKU_OUTPUT_DIR`、初期 PNG サイズは `INKU_OUTPUT_PNG_SIZE` を使い、未指定時は `~/.local/share/inku/outputs` と `2160px` を使う
+- `PUT /api/settings/output-save` は admin のみ利用でき、保存先は絶対パスのみ許可し、PNG サイズは `1080` / `2160` のみ受け付ける
+- 自動保存 Off の場合も履歴 DB は正本として保存し、SVG / JSON / 入力 / DDL / PNG などの artifact ファイル保存だけをスキップする
+- 保存先フォルダ配下は従来どおり `user_id/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history_id>` 形式の日別ディレクトリ構成とする
+- `その他（サーバー）` タブには保存 worker / queue、保存統計、PNG サイズを表示する。保存 worker は同時保存ジョブ数、queue は保存待ちジョブ上限であり、上限超過時は DB 履歴保存を優先して artifact 保存をスキップする
+- 画面上の注記は「履歴DBが正本です。出力ファイルはバックグラウンドで保存される副産物で、DBから再生成できます。」と表示する
+- build number: 324
 
 ### v1.41 (2026-05-03)
 

@@ -145,9 +145,17 @@ def _model_metadata(*, stage1_model: str | None = None, stage2_model: str | None
     return metadata
 
 
+def _output_save_settings() -> dict:
+    return _db.get_output_save_settings()
+
+
+def _current_output_dir() -> Path:
+    return Path(_output_save_settings()["output_dir"])
+
+
 def _output_prefix(user_id: str, item_id: str, at_ms: int) -> Path:
     dt = datetime.fromtimestamp(at_ms / 1000, tz=timezone.utc).astimezone()
-    date_dir = _OUTPUT_DIR / user_id / dt.strftime("%Y-%m-%d")
+    date_dir = _current_output_dir() / user_id / dt.strftime("%Y-%m-%d")
     return date_dir / (dt.strftime("%Y%m%d_%H%M%S") + "_" + item_id[:8])
 
 
@@ -181,7 +189,7 @@ def _save_output_files(
         return
 
     try:
-        png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=_OUTPUT_PNG_SIZE)
+        png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=int(_output_save_settings()["png_size"]))
         Path(f"{prefix}_output.png").write_bytes(png_bytes)
     except Exception:
         _logger.exception("failed to save PNG output: prefix=%s", prefix)
@@ -295,6 +303,9 @@ def _run_history_artifact_save(item: dict) -> None:
 
 
 def _submit_history_artifact_save(item: dict) -> bool:
+    if not _output_save_settings()["enabled"]:
+        _increment_save_stat("skipped")
+        return False
     if not _save_slots.acquire(blocking=False):
         _increment_save_stat("skipped")
         _logger.warning(
@@ -714,6 +725,12 @@ class DbBackupSettingsBody(BaseModel):
     max_generations: int = Field(default=4, ge=1, le=100)
 
 
+class OutputSaveSettingsBody(BaseModel):
+    enabled: bool = True
+    output_dir: str
+    png_size: int = Field(default=2160)
+
+
 class DbBackupResult(BaseModel):
     path: str
     at: int
@@ -729,6 +746,9 @@ class PluginSettingsStatus(BaseModel):
 
 
 class OutputSaveStatus(BaseModel):
+    enabled: bool
+    output_dir: str
+    png_size: int
     workers: int
     queue_limit: int
     submitted: int
@@ -1028,6 +1048,7 @@ def api_auth_me_update_demo_settings(
 def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusResponse:
     _db.ensure_scheduled_db_backup()
     db_info = _db.database_info()
+    output_settings = _output_save_settings()
     return SettingsStatusResponse(
         database=DatabaseSettingsStatus(
             **db_info,
@@ -1040,6 +1061,9 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             note="Reference plugin hook is enabled for canvas aspect selection. Third-party plugin loading is not implemented yet.",
         ),
         output_save=OutputSaveStatus(
+            enabled=bool(output_settings["enabled"]),
+            output_dir=str(output_settings["output_dir"]),
+            png_size=int(output_settings["png_size"]),
             workers=_SAVE_WORKERS,
             queue_limit=_SAVE_QUEUE_LIMIT,
             **_artifact_save_stats(),
@@ -1174,6 +1198,26 @@ def api_settings_update_db_backup(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return DbBackupStatus(**_db.db_backup_status())
+
+
+@app.put("/api/settings/output-save", response_model=OutputSaveStatus)
+def api_settings_update_output_save(
+    body: OutputSaveSettingsBody,
+    actor: dict = Depends(_admin_user),
+) -> OutputSaveStatus:
+    try:
+        output_settings = _db.update_output_save_settings(body.enabled, body.output_dir, body.png_size)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return OutputSaveStatus(
+        enabled=bool(output_settings["enabled"]),
+        output_dir=str(output_settings["output_dir"]),
+        png_size=int(output_settings["png_size"]),
+        workers=_SAVE_WORKERS,
+        queue_limit=_SAVE_QUEUE_LIMIT,
+        **_artifact_save_stats(),
+        note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
+    )
 
 
 @app.post("/api/settings/db-backup/run", response_model=DbBackupResult)

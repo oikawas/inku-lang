@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.39**
+**Version: v1.42**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -430,6 +430,31 @@ duplicating SVG blobs in the DB.
 
 The CLI `paint` and `batch` commands also accept
 `--svg-profile display|editable|compat` for saved SVG files.
+
+Server-side output artifact saving is an admin-managed, server-wide setting.
+The settings dialog includes an admin-only "other (server)" tab for:
+
+- enabling or disabling automatic drawing file artifact saving
+- setting the output folder as an absolute server path
+- selecting the automatic PNG artifact size, either 1080px or 2160px
+
+The server stores these values in `app_settings.output_save_settings` as
+`enabled`, `output_dir`, and `png_size`.  `INKU_OUTPUT_DIR` and
+`INKU_OUTPUT_PNG_SIZE` provide initial values; if unset, the defaults are
+`~/.local/share/inku/outputs` and 2160px.  The API endpoint
+`PUT /api/settings/output-save` is admin-only, accepts only absolute output
+paths, and restricts PNG size to 1080 or 2160.
+
+Disabling automatic artifact saving does not disable DB history saving.  The
+history DB remains the source of truth, and only derived files such as SVG,
+JSON, input text, normalized DDL, and PNG artifacts are skipped.  When enabled,
+artifact files remain grouped by user and date under
+`<output_dir>/<user_id>/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history-id>...`.
+
+The "other (server)" tab shows save worker and queue settings, save statistics,
+and the PNG artifact size.  Save workers are concurrent file-save jobs; the
+queue is the maximum number of pending artifact save jobs.  If the queue is
+full, the server preserves DB history and skips only artifact file saving.
 
 ---
 

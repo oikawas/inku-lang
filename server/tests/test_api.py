@@ -15,6 +15,7 @@ import types
 import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -1391,6 +1392,9 @@ def test_settings_status_is_admin_only(tmp_path, monkeypatch):
     assert data["plugins"]["loaded"] == [{"name": "canvas-aspect", "version": "0.1.0", "status": "enabled"}]
     assert data["output_save"]["workers"] >= 1
     assert data["output_save"]["queue_limit"] >= data["output_save"]["workers"]
+    assert data["output_save"]["enabled"] is True
+    assert data["output_save"]["output_dir"]
+    assert data["output_save"]["png_size"] > 0
     assert {"submitted", "completed", "failed", "skipped"} <= set(data["output_save"])
     assert "source of truth" in data["output_save"]["note"]
     assert data["stage_execution"]["workers"] >= 1
@@ -1645,6 +1649,70 @@ def test_history_is_scoped_to_authenticated_user():
     db.delete_user(user_a["id"])
     db.delete_user(user_b["id"])
     db.delete_user_group(group["id"])
+
+
+def test_output_save_settings_are_admin_only(tmp_path):
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"output-save-{suffix}")
+    user = db.add_user(
+        username=f"output-save-user-{suffix}",
+        email=f"output-save-user-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    admin = db.add_user(
+        username=f"output-save-admin-{suffix}",
+        email=f"output-save-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    user_headers, user_token = _auth_headers(user)
+    admin_headers, admin_token = _auth_headers(admin)
+    try:
+        output_dir = tmp_path / "outputs"
+        assert client.put(
+            "/api/settings/output-save",
+            headers=user_headers,
+            json={"enabled": False, "output_dir": str(output_dir), "png_size": 1080},
+        ).status_code == 403
+
+        settings_r = client.put(
+            "/api/settings/output-save",
+            headers=admin_headers,
+            json={"enabled": False, "output_dir": str(output_dir), "png_size": 1080},
+        )
+        assert settings_r.status_code == 200
+        data = settings_r.json()
+        assert data["enabled"] is False
+        assert data["output_dir"] == str(output_dir)
+        assert data["png_size"] == 1080
+
+        status_r = client.get("/api/settings/status", headers=admin_headers)
+        assert status_r.status_code == 200
+        assert status_r.json()["output_save"]["enabled"] is False
+
+        bad_r = client.put(
+            "/api/settings/output-save",
+            headers=admin_headers,
+            json={"enabled": True, "output_dir": "relative/out", "png_size": 2160},
+        )
+        assert bad_r.status_code == 400
+
+        bad_size_r = client.put(
+            "/api/settings/output-save",
+            headers=admin_headers,
+            json={"enabled": True, "output_dir": str(output_dir), "png_size": 1440},
+        )
+        assert bad_size_r.status_code == 400
+    finally:
+        db.update_output_save_settings(True, str(Path.home() / ".local" / "share" / "inku" / "outputs"), 2160)
+        db.delete_session(admin_token)
+        db.delete_session(user_token)
+        db.delete_user(admin["id"])
+        db.delete_user(user["id"])
+        db.delete_user_group(group["id"])
 
 
 def test_model_settings_store_keys_server_side(monkeypatch):

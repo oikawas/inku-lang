@@ -193,6 +193,7 @@ export interface LangPack {
 	settingsTabUsers: string;
 	settingsTabExport: string;
 	settingsTabMisc: string;
+	settingsTabServerMisc: string;
 	settingsCurrentDb: string;
 	settingsDbFileSize: string;
 	settingsDbBackupTitle: string;
@@ -204,6 +205,18 @@ export interface LangPack {
 	settingsDbBackupRunNow: string;
 	settingsDbBackupRunDone: string;
 	settingsDbBackupSaveFailed: string;
+	settingsOutputSaveTitle: string;
+	settingsOutputSaveEnabled: string;
+	settingsOutputSaveDir: string;
+	settingsOutputSaveDirPlaceholder: string;
+	settingsOutputSavePngSize: string;
+	settingsOutputSaveWorkers: string;
+	settingsOutputSaveWorkersHelp: string;
+	settingsOutputSaveStats: string;
+	settingsOutputSaveNoteLabel: string;
+	settingsOutputSaveNote: string;
+	settingsOutputSaveSaved: string;
+	settingsReloadSettings: string;
 	settingsLoading: string;
 	settingsLoadFailed: string;
 	settingsReload: string;

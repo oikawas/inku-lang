@@ -142,8 +142,14 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
 }
 _BATCH_PROMPT_HISTORY_LIMIT = 20
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
-_SETTINGS_TABS = {"models", "db", "plugins", "users", "export", "misc"}
+_SETTINGS_TABS = {"models", "db", "plugins", "users", "export", "misc", "server_misc"}
 _PLUGIN_STORAGE_MAX_BYTES = 20_000
+_OUTPUT_SAVE_SETTINGS_KEY = "output_save_settings"
+_OUTPUT_SAVE_DEFAULT_SETTINGS = {
+    "enabled": True,
+    "output_dir": str(Path(os.getenv("INKU_OUTPUT_DIR", str(Path.home() / ".local" / "share" / "inku" / "outputs")))),
+    "png_size": int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160")),
+}
 _DEMO_DEFAULT_SETTINGS = {
     "save_db": False,
     "save_files": False,
@@ -545,6 +551,40 @@ def update_db_backup_settings(interval_days: int, max_generations: int) -> dict:
     current["max_generations"] = max_generations
     clean = _normalize_db_backup_settings(current)
     return _write_app_setting(_DB_BACKUP_SETTINGS_KEY, clean)
+
+
+def _normalize_output_save_settings(settings: dict | None) -> dict:
+    clean = dict(_OUTPUT_SAVE_DEFAULT_SETTINGS)
+    if not isinstance(settings, dict):
+        return clean
+    if "enabled" in settings:
+        clean["enabled"] = bool(settings["enabled"])
+    if "output_dir" in settings:
+        raw_path = str(settings["output_dir"] or "").strip()
+        if not raw_path:
+            raise ValueError("output directory must not be empty")
+        path = Path(raw_path).expanduser()
+        if not path.is_absolute():
+            raise ValueError("output directory must be an absolute path")
+        clean["output_dir"] = str(path)
+    if "png_size" in settings:
+        try:
+            png_size = int(settings["png_size"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("PNG size must be 1080 or 2160") from exc
+        if png_size not in {1080, 2160}:
+            raise ValueError("PNG size must be 1080 or 2160")
+        clean["png_size"] = png_size
+    return clean
+
+
+def get_output_save_settings() -> dict:
+    return _normalize_output_save_settings(_read_app_setting(_OUTPUT_SAVE_SETTINGS_KEY))
+
+
+def update_output_save_settings(enabled: bool, output_dir: str, png_size: int) -> dict:
+    clean = _normalize_output_save_settings({"enabled": enabled, "output_dir": output_dir, "png_size": png_size})
+    return _write_app_setting(_OUTPUT_SAVE_SETTINGS_KEY, clean)
 
 
 def get_model_settings() -> dict:

@@ -132,10 +132,22 @@
 			runtime_editable: boolean;
 			note: string;
 		};
+		output_save: {
+			enabled: boolean;
+			output_dir: string;
+			png_size: number;
+			workers: number;
+			queue_limit: number;
+			submitted: number;
+			completed: number;
+			failed: number;
+			skipped: number;
+			note: string;
+		};
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc' | 'server_misc';
 	type UserModelSettings = {
 		stage1_provider: Provider;
 		stage1_model: string;
@@ -399,6 +411,7 @@
 	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let dbBackupStatus = $state<string | null>(null);
+	let outputSaveStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
@@ -454,11 +467,11 @@
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
-		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc';
+		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc' || tab === 'server_misc';
 	}
 
 	function canAccessSettingsTab(tab: SettingsTab) {
-		if (tab === 'models' || tab === 'db' || tab === 'users') return currentUser?.role === 'admin';
+		if (tab === 'models' || tab === 'db' || tab === 'users' || tab === 'server_misc') return currentUser?.role === 'admin';
 		return tab !== 'connection';
 	}
 
@@ -858,7 +871,7 @@
 		settingsTab = tab;
 		void updateUserSettingsTab(tab);
 		if (tab === 'models') void loadModelSettings();
-		if (tab === 'db') void loadSettingsStatus();
+		if (tab === 'db' || tab === 'server_misc') void loadSettingsStatus();
 		if (tab === 'users') void loadUserSettings();
 		if (tab === 'export') void loadExportTemplates();
 	}
@@ -1231,6 +1244,7 @@
 			settingsStatus = await r.json();
 			settingsStatusError = null;
 			dbBackupStatus = null;
+			outputSaveStatus = null;
 		} catch (e) {
 			settingsStatus = null;
 			settingsStatusError = e instanceof Error ? e.message : String(e);
@@ -1271,6 +1285,27 @@
 			dbBackupStatus = t().settingsDbBackupRunDone;
 		} catch (e) {
 			dbBackupStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function updateOutputSaveSettings(enabled: boolean, outputDir: string, pngSize: number) {
+		outputSaveStatus = null;
+		try {
+			const r = await apiFetch('/api/settings/output-save', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ enabled, output_dir: outputDir, png_size: pngSize })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const nextOutputSave = await r.json() as SettingsStatus['output_save'];
+			if (settingsStatus) settingsStatus = { ...settingsStatus, output_save: nextOutputSave };
+			outputSaveStatus = t().settingsOutputSaveSaved;
+		} catch (e) {
+			outputSaveStatus = e instanceof Error ? e.message : String(e);
+			console.warn('failed to update output save settings', e);
 		}
 	}
 
@@ -3460,6 +3495,7 @@
 		{modelFetchResults}
 		{modelSettingsLoading}
 		{dbBackupStatus}
+		{outputSaveStatus}
 		{currentUser}
 		{userSettingsStatus}
 		{userSettingsLoading}
@@ -3509,6 +3545,7 @@
 		onLoadSettingsStatus={loadSettingsStatus}
 		onUpdateDbBackupSettings={updateDbBackupSettings}
 		onRunDbBackupNow={runDbBackupNow}
+		onUpdateOutputSaveSettings={updateOutputSaveSettings}
 		onLoadUserSettings={loadUserSettings}
 		onLogin={login}
 		onLogout={logout}

@@ -96,6 +96,10 @@
 		rememberCurrentPrompt();
 		void onSubmit();
 	}
+
+	function tokenPair(input: number | null, output: number | null): string {
+		return `${input ?? '-'}→${output ?? '-'}tok`;
+	}
 </script>
 
 <div class="batch-wrap">
@@ -199,9 +203,19 @@
 				</g>
 			</svg>
 		{/if}
-		<span>{t().batchProgress(batchCurrent, batchTotal)}</span>
-		<span class="batch-token-total">{t().batchTokenTotal(batchTokensInTotal, batchTokensOutTotal)}</span>
-		<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
+		<div class="batch-progress-table">
+			<div class="batch-progress-row">
+				<span class="batch-progress-key">{t().statsProgress}</span>
+				<span class="batch-progress-value">{t().batchProgress(batchCurrent, batchTotal)}</span>
+			</div>
+			<div class="batch-progress-row">
+				<span class="batch-progress-key">{t().statsTotal}</span>
+				<span class="batch-progress-value">
+					<span><span class="batch-metric-label">{t().statsElapsed}</span>{(liveMs / 1000).toFixed(1)}s</span>
+					<span><span class="batch-metric-label">{t().statsTokens}</span>{tokenPair(batchTokensInTotal, batchTokensOutTotal)}</span>
+				</span>
+			</div>
+		</div>
 		<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 	</div>
 {:else}
@@ -215,7 +229,7 @@
 			<span>{t().batchActiveDdlLabel}</span>
 			<div class="batch-observe-meta">
 				{#if batchActiveLine !== null}<span>{t().batchActiveLine(batchActiveLine)}</span>{/if}
-				<span>{t().batchTokenLine(batchActiveTokensIn, batchActiveTokensOut)}</span>
+				<span><span class="batch-metric-label">{t().statsTokens}</span>{tokenPair(batchActiveTokensIn, batchActiveTokensOut)}</span>
 			</div>
 		</div>
 		<div class="batch-observe-body">{@html batchActiveDdlHighlighted}</div>
@@ -325,14 +339,16 @@
 		z-index: 0;
 	}
 	.batch-progress {
-		display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+		display: flex; align-items: center; gap: 8px;
 		padding: 8px 10px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: var(--panel); font-size: 12px; color: var(--fg2);
 		margin-top: 8px;
+		min-width: 0;
 	}
 	.batch-progress :global(.stop-btn) {
 		margin-left: auto;
+		flex: 0 0 auto;
 	}
 	.batch-crab {
 		width: 46px;
@@ -432,8 +448,44 @@
 	}
 	.bubble-b { animation-delay: 0.28s; }
 	.bubble-c { animation-delay: 0.55s; }
-	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
-	.batch-token-total { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+	.batch-progress-table {
+		display: grid;
+		gap: 4px;
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	.batch-progress-row {
+		display: grid;
+		grid-template-columns: minmax(48px, 0.45fr) minmax(0, 1.55fr);
+		gap: 8px;
+		align-items: center;
+		min-width: 0;
+	}
+	.batch-progress-key {
+		color: var(--fg3);
+		min-width: 0;
+	}
+	.batch-progress-value {
+		display: grid;
+		grid-template-columns: minmax(86px, 1fr) minmax(100px, 1.1fr);
+		gap: 6px 10px;
+		min-width: 0;
+		font-variant-numeric: tabular-nums;
+	}
+	.batch-progress-row:first-child .batch-progress-value {
+		display: block;
+	}
+	.batch-progress-value > span {
+		min-width: 0;
+		white-space: nowrap;
+	}
+	.batch-metric-label {
+		display: inline-block;
+		min-width: 3.9em;
+		margin-right: 5px;
+		color: var(--fg3);
+		font-variant-numeric: normal;
+	}
 	.error-text { color: #a2342a; font-size: 12px; }
 	.batch-summary {
 		margin-top: 8px;
@@ -485,9 +537,8 @@
 		overflow: hidden;
 	}
 	.batch-observe-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		display: grid;
+		grid-template-columns: minmax(72px, 0.65fr) minmax(0, 1.35fr);
 		gap: 8px;
 		padding: 6px 9px;
 		border-bottom: 1px solid #d9dfd1;
@@ -496,17 +547,21 @@
 		font-weight: 600;
 	}
 	.batch-observe-meta {
-		display: flex;
-		align-items: center;
-		gap: 8px;
+		display: grid;
+		grid-template-columns: minmax(54px, auto) minmax(0, 1fr);
+		gap: 6px 8px;
 		color: var(--fg3);
 		font-weight: 400;
 		font-variant-numeric: tabular-nums;
+		min-width: 0;
+		justify-self: stretch;
 	}
 	.batch-observe-meta span {
 		color: var(--fg3);
 		font-weight: 400;
 		font-variant-numeric: tabular-nums;
+		min-width: 0;
+		white-space: nowrap;
 	}
 	.batch-observe-body {
 		margin: 0;

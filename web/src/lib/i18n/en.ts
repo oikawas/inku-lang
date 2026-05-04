@@ -150,9 +150,13 @@ export const en: LangPack = {
 
 	elapsedDetailed: (s1, s2, total) =>
 		`interp ${s1.toFixed(1)}s + struct ${s2.toFixed(1)}s = ${total.toFixed(1)}s`,
-	statsInterp: 'interpret',
-	statsStruct: 'structure',
+	resultLogLabel: 'result log',
+	statsInterp: 'DDL generation',
+	statsStruct: 'JSON generation / SVG rendering',
 	statsTotal: 'total',
+	statsProgress: 'progress',
+	statsElapsed: 'elapsed',
+	statsTokens: 'tokens',
 	tokenSummary: (s1in, s1out, s2in, s2out) => {
 		const parts: string[] = [];
 		if (s1in != null) parts.push(`interp ${s1in}→${s1out ?? '?'}`);

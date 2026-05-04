@@ -2981,6 +2981,21 @@
 	const tokenSummary = $derived.by(() =>
 		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
 	);
+	function tokenPair(input: number | null, output: number | null): string {
+		return `${input ?? '-'}→${output ?? '-'}tok`;
+	}
+	function totalTokenPair(
+		firstIn: number | null,
+		firstOut: number | null,
+		secondIn: number | null,
+		secondOut: number | null,
+	): string {
+		const hasInput = firstIn !== null || secondIn !== null;
+		const hasOutput = firstOut !== null || secondOut !== null;
+		const input = hasInput ? (firstIn ?? 0) + (secondIn ?? 0) : null;
+		const output = hasOutput ? (firstOut ?? 0) + (secondOut ?? 0) : null;
+		return tokenPair(input, output);
+	}
 	const scoreJsonPayload = $derived.by(() => {
 		if (!result) return null;
 		const payload: Record<string, unknown> = {};
@@ -3156,16 +3171,6 @@
 		else return;
 		event.preventDefault();
 	}
-
-	// ── Stats string ─────────────────────────────────────────
-	const statsLine = $derived.by(() => {
-		if (!result) return '';
-		const s1 = (result.elapsed_stage1_ms / 1000).toFixed(1);
-		const s2 = (result.elapsed_stage2_ms / 1000).toFixed(1);
-		const total = (result.elapsed_total_ms / 1000).toFixed(1);
-		if (result.elapsed_stage1_ms > 0) return `${t().statsInterp} ${s1}s + ${t().statsStruct} ${s2}s = ${total}s`;
-		return `${total}s`;
-	});
 
 	const historyNavSpan = $derived(historyWindowSize);
 	let lastHistoryWindowSize = 0;
@@ -3369,19 +3374,35 @@
 						<section class="panel-section stats-section">
 							<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
 								<span class="stats-arrow" class:open={statsOpen}>▶</span>
-								{statsLine}
+								<span>{t().resultLogLabel}</span>
 							</button>
 							{#if statsOpen}
 								<div class="stats-detail">
-									{#if elapsedStage1Ms > 0}
-										<div class="stats-grid">
-											<span class="stats-key">{t().statsInterp}</span><span>{(elapsedStage1Ms / 1000).toFixed(1)}s{tokensInStage1 != null ? ` — ${tokensInStage1}→${tokensOutStage1}tok` : ''}</span>
-											<span class="stats-key">{t().statsStruct}</span><span>{(elapsedStage2Ms / 1000).toFixed(1)}s{tokensInStage2 != null ? ` — ${tokensInStage2}→${tokensOutStage2}tok` : ''}</span>
-											<span class="stats-key">{t().statsTotal}</span><span class="stats-total">{(elapsedTotalMs / 1000).toFixed(1)}s</span>
+									<div class="stats-grid">
+										{#if elapsedStage1Ms > 0}
+											<div class="stats-row">
+												<span class="stats-key">{t().statsInterp}</span>
+												<span class="stats-value">
+													<span><span class="stats-metric-label">{t().statsElapsed}</span>{(elapsedStage1Ms / 1000).toFixed(1)}s</span>
+													<span><span class="stats-metric-label">{t().statsTokens}</span>{tokenPair(tokensInStage1, tokensOutStage1)}</span>
+												</span>
+											</div>
+										{/if}
+										<div class="stats-row">
+											<span class="stats-key">{t().statsStruct}</span>
+											<span class="stats-value">
+												<span><span class="stats-metric-label">{t().statsElapsed}</span>{(elapsedStage2Ms / 1000).toFixed(1)}s</span>
+												<span><span class="stats-metric-label">{t().statsTokens}</span>{tokenPair(tokensInStage2, tokensOutStage2)}</span>
+											</span>
 										</div>
-									{:else}
-										<span>{(elapsedTotalMs / 1000).toFixed(1)}s</span>
-									{/if}
+										<div class="stats-row stats-total">
+											<span class="stats-key">{t().statsTotal}</span>
+											<span class="stats-value">
+												<span><span class="stats-metric-label">{t().statsElapsed}</span>{(elapsedTotalMs / 1000).toFixed(1)}s</span>
+												<span><span class="stats-metric-label">{t().statsTokens}</span>{totalTokenPair(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)}</span>
+											</span>
+										</div>
+									</div>
 								</div>
 							{/if}
 						</section>
@@ -3823,11 +3844,44 @@
 	.stats-arrow.open { transform: rotate(90deg); }
 	.stats-detail {
 		background: var(--bg2); border-radius: var(--r); border-left: 2px solid var(--border2);
-		padding: 8px 12px; font-size: 11px; color: var(--fg2); line-height: 1.9;
+		padding: 8px 10px; font-size: 11px; color: var(--fg2); line-height: 1.5;
+		overflow: hidden;
 	}
-	.stats-grid { display: grid; grid-template-columns: auto 1fr; gap: 0 12px; }
-	.stats-key { color: var(--fg3); }
+	.stats-grid {
+		display: grid;
+		gap: 5px;
+	}
+	.stats-row {
+		display: grid;
+		grid-template-columns: minmax(108px, 0.75fr) minmax(0, 1.25fr);
+		gap: 8px;
+		align-items: start;
+		min-width: 0;
+	}
+	.stats-key { color: var(--fg3); min-width: 0; overflow-wrap: anywhere; }
+	.stats-value {
+		display: grid;
+		grid-template-columns: minmax(86px, 1fr) minmax(100px, 1.1fr);
+		gap: 6px 10px;
+		min-width: 0;
+		font-variant-numeric: tabular-nums;
+	}
+	.stats-value > span {
+		min-width: 0;
+		white-space: nowrap;
+	}
+	.stats-metric-label {
+		display: inline-block;
+		min-width: 3.9em;
+		margin-right: 5px;
+		color: var(--fg3);
+		font-variant-numeric: normal;
+	}
 	.stats-total { font-weight: 500; }
+	@media (max-width: 520px) {
+		.stats-row { grid-template-columns: minmax(0, 1fr); }
+		.stats-value { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+	}
 
 	/* App info */
 	.app-info-backdrop {

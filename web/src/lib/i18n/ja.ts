@@ -150,9 +150,13 @@ export const ja: LangPack = {
 
 	elapsedDetailed: (s1, s2, total) =>
 		`解釈 ${s1.toFixed(1)}s + 構造化 ${s2.toFixed(1)}s = ${total.toFixed(1)}s`,
-	statsInterp: '解釈',
-	statsStruct: '構造化',
+	resultLogLabel: '結果ログ',
+	statsInterp: 'DDL生成',
+	statsStruct: 'JSON生成・SVGレンダリング',
 	statsTotal: '合計',
+	statsProgress: '進捗',
+	statsElapsed: '経過時間',
+	statsTokens: 'Token',
 	tokenSummary: (s1in, s1out, s2in, s2out) => {
 		const parts: string[] = [];
 		if (s1in != null) parts.push(`解釈 ${s1in}→${s1out ?? '?'}`);

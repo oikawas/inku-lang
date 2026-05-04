@@ -162,9 +162,13 @@ export interface LangPack {
 
 	// Elapsed / tokens
 	elapsedDetailed: (s1: number, s2: number, total: number) => string;
+	resultLogLabel: string;
 	statsInterp: string;
 	statsStruct: string;
 	statsTotal: string;
+	statsProgress: string;
+	statsElapsed: string;
+	statsTokens: string;
 	tokenSummary: (
 		s1in: number | null,
 		s1out: number | null,

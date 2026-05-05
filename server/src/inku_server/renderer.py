@@ -333,7 +333,7 @@ def _anchor(ins: Instruction) -> tuple[float, float]:
     """図形の論理的な中心座標を返す。"""
     if ins.primitive == "line" and ins.from_ and ins.to:
         return ((ins.from_[0] + ins.to[0]) / 2, (ins.from_[1] + ins.to[1]) / 2)
-    if ins.primitive in ("circle", "ellipse", "arc") and ins.center:
+    if ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center:
         return ins.center
     if ins.primitive in ("square", "triangle") and ins.position and ins.size:
         return (ins.position[0] + ins.size[0] / 2, ins.position[1] + ins.size[1] / 2)
@@ -360,7 +360,7 @@ def _shift(ins: Instruction, dx: float, dy: float) -> Instruction:
     if ins.primitive == "line" and ins.from_ and ins.to:
         data["from"] = [ins.from_[0] + dx, ins.from_[1] + dy]
         data["to"] = [ins.to[0] + dx, ins.to[1] + dy]
-    elif ins.primitive in ("circle", "ellipse", "arc") and ins.center:
+    elif ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center:
         data["center"] = [ins.center[0] + dx, ins.center[1] + dy]
     elif ins.primitive in ("square", "triangle") and ins.position:
         data["position"] = [ins.position[0] + dx, ins.position[1] + dy]
@@ -634,7 +634,7 @@ def render(
     return svg
 
 
-_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})
+_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle", "polygon"})
 
 
 def _texture_filter_weights(score: Score) -> set[str]:
@@ -1050,6 +1050,18 @@ def _arc_points(cx: float, cy: float, r: float, start_deg: float, end_deg: float
     ]
 
 
+def _polygon_points(cx: float, cy: float, r: float, sides: int, rotation_deg: float = 0.0) -> list[tuple[float, float]]:
+    sides = min(max(int(sides), 5), 8)
+    start = math.radians(rotation_deg - 90)
+    return [
+        (
+            cx + math.cos(start + math.tau * i / sides) * r,
+            cy + math.sin(start + math.tau * i / sides) * r,
+        )
+        for i in range(sides)
+    ]
+
+
 def _outline_attrs(attrs: dict, *, stroke_width: float, opacity: float, dash: str | None = None) -> dict:
     result = _copy_attrs(attrs)
     result["fill"] = "none"
@@ -1430,6 +1442,14 @@ def _render_instruction(
             (x, y + h),
             (x + w, y + h),
         ]
+        return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
+
+    if ins.primitive == "polygon":
+        if ins.center is None or ins.radius is None:
+            raise ValueError("polygon requires 'center' and 'radius'")
+        cx, cy = _px(ins.center, canvas)
+        r = ins.radius * canvas.unit
+        points = _polygon_points(cx, cy, r, ins.sides or 5)
         return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
 
     if ins.primitive == "arc":

@@ -117,6 +117,28 @@ def test_render_compat_svg_is_portable_and_filter_free():
     assert "<filter" not in svg
 
 
+def test_render_polygon_outputs_svg_polygon():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "polygon",
+                    "center": [0.5, 0.5],
+                    "radius": 0.1,
+                    "sides": 6,
+                    "rotation": 15,
+                }
+            ]
+        }
+    )
+
+    svg = render(score, svg_profile="editable")
+
+    assert 'id="instruction_000_polygon_black_pen"' in svg
+    assert 'id="mark_000_000_polygon"' in svg
+    assert "<polygon" in svg
+
+
 def test_render_dashed_line_has_dasharray():
     score = Score.model_validate(
         {

@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Coord = tuple[float, float]
 
-Primitive = Literal["line", "circle", "ellipse", "triangle", "square", "arc"]
+Primitive = Literal["line", "circle", "ellipse", "triangle", "square", "polygon", "arc"]
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 Weight = Literal[
     "hair", "pencil", "pen", "rotring", "crayon", "chalk",
@@ -167,7 +167,13 @@ class Instruction(BaseModel):
     )
     radius: Optional[float] = Field(
         default=None,
-        description="circle/arc の半径 (省略=0.1)",
+        description="circle/arc/polygon の半径 (省略=0.1)",
+    )
+    sides: Optional[int] = Field(
+        default=None,
+        ge=5,
+        le=8,
+        description="polygon の頂点数。5-8 の正多角形のみ。個別 primitive は増やさず、多角形語彙はここに集約する",
     )
     position: Optional[Coord] = Field(
         default=None,
@@ -227,6 +233,16 @@ class Instruction(BaseModel):
         default=None,
         description="N個配置。2以上の同一図形は必ずこれを使う。複数 instruction 生成は絶対禁止",
     )
+
+    @field_validator("sides", mode="before")
+    @classmethod
+    def _clamp_sides(cls, v: object) -> object:
+        if v is None:
+            return v
+        try:
+            return min(max(int(v), 5), 8)
+        except (TypeError, ValueError):
+            return 5
 
 
 class Presence(BaseModel):

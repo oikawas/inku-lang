@@ -825,3 +825,58 @@ def test_coerce_score_tempers_quiet_symbolic_fallback_shapes():
     assert arr.density == "low"
     assert arr.preserve_space is True
     assert "quiet symbolic shape tempered" in (ins.color_hint or "")
+
+
+def test_coerce_score_repairs_polygon_fields_and_tempers_quiet_polygon():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "polygon",
+                    "center": [0.55, 0.4],
+                    "radius": 0.18,
+                    "sides": 12,
+                    "color_hint": "coverage from DDL clause: 鉱物のような多角形を置く",
+                    "arrangement": {"count": 20, "layout": "scatter"},
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="静かな部屋に鉱物のような多角形の気配が沈んでいる。")
+
+    ins = fixed.instructions[0]
+    arr = ins.arrangement
+    assert ins.primitive == "polygon"
+    assert ins.sides == 8
+    assert ins.radius is not None and ins.radius <= 0.06
+    assert arr is not None
+    assert arr.count == 8
+    assert "quiet symbolic shape tempered" in (ins.color_hint or "")
+
+
+def test_coerce_score_restores_motion_energy_without_increasing_count():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.08, 0.04],
+                    "color": "red",
+                    "arrangement": {"count": 5, "layout": "scatter"},
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夏祭りの後、路面に残った色紙が湿って丸まっている。")
+
+    ins = fixed.instructions[0]
+    assert ins.arrangement is not None
+    assert ins.arrangement.count == 5
+    assert ins.arrangement.path == "wave"
+    assert ins.rotation is not None
+    assert ins.variation is not None
+    assert ins.variation.quality == "wave"
+    assert "motion energy restored" in (ins.color_hint or "")

@@ -171,6 +171,8 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "preserve_space" in SYSTEM_PROMPT
     assert "透明な膜" in SYSTEM_PROMPT
     assert "Score.presence" in SYSTEM_PROMPT
+    assert "多角形語彙は polygon だけ" in SYSTEM_PROMPT
+    assert '"primitive":"polygon"' in SYSTEM_PROMPT
     assert "目鼻口・頭身・四肢・耳・尻尾" in SYSTEM_PROMPT
     assert "待つ人の気配" in SYSTEM_PROMPT
     assert "反射" in SYSTEM_PROMPT
@@ -226,6 +228,7 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "preserve_space" in SYSTEM_PROMPT_EN
     assert "transparent membrane" in SYSTEM_PROMPT_EN
     assert "Score.presence" in SYSTEM_PROMPT_EN
+    assert "Use only polygon for polygonal vocabulary" in SYSTEM_PROMPT_EN
     assert "eyes, mouth, body proportions, limbs, ears, or tails" in SYSTEM_PROMPT_EN
     assert "waiting person" in SYSTEM_PROMPT_EN
     assert "Reflection" in SYSTEM_PROMPT_EN

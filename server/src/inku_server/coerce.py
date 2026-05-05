@@ -63,6 +63,14 @@ def _as_float(v: Any) -> float | None:
         return None
 
 
+def _as_polygon_sides(v: Any) -> int | None:
+    """polygon の頂点数を 5-8 に正規化。"""
+    try:
+        return min(max(int(v), 5), 8)
+    except (TypeError, ValueError):
+        return None
+
+
 # ── フィールド補修仕様 ──────────────────────────────────────────────────────────
 
 @dataclass
@@ -101,6 +109,11 @@ PRIMITIVE_SPECS: dict[str, list[FieldSpec]] = {
         FieldSpec("radius",      0.15,                               coerce=_as_positive_float),
         FieldSpec("angle_start", 0.0,                                coerce=_as_float),
         FieldSpec("angle_end",   270.0,                              coerce=_as_float),
+    ],
+    "polygon": [
+        FieldSpec("center", [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
+        FieldSpec("radius", 0.12,                              coerce=_as_positive_float),
+        FieldSpec("sides",  5,                                 coerce=_as_polygon_sides),
     ],
     "square": [
         FieldSpec("position", [0.35, 0.35], fallbacks=["center"], coerce=_as_coord),
@@ -403,7 +416,7 @@ VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
     "雨", "雪", "降", "縦", "上から下", "rain", "snow", "falling", "vertical", "top to bottom",
 )
 MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "帰って", "風", "波", "ためらう",
+    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "風", "波", "ためらう",
     "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
 )
 COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
@@ -441,7 +454,7 @@ def _context_has_colorful_accent(ddl: str | None) -> bool:
 
 
 def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
-    if ins.primitive not in ("circle", "ellipse", "square", "triangle"):
+    if ins.primitive not in ("circle", "ellipse", "square", "triangle", "polygon"):
         return None
     if ins.primitive == "circle" and ins.center is not None:
         return ("circle", round(ins.center[0], 2), round(ins.center[1], 2), round(ins.radius or 0.1, 2))
@@ -461,6 +474,14 @@ def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
             round(ins.size[0], 2),
             round(ins.size[1], 2),
         )
+    if ins.primitive == "polygon" and ins.center is not None:
+        return (
+            "polygon",
+            round(ins.center[0], 2),
+            round(ins.center[1], 2),
+            round(ins.radius or 0.1, 2),
+            int(ins.sides or 5),
+        )
     return None
 
 
@@ -472,6 +493,9 @@ def _closed_shape_area(ins: Instruction) -> float:
         return ins.size[0] * ins.size[1]
     if ins.primitive in ("square", "triangle") and ins.size is not None:
         return ins.size[0] * ins.size[1]
+    if ins.primitive == "polygon":
+        radius = ins.radius if ins.radius is not None else 0.1
+        return radius * radius
     return 0.0
 
 
@@ -565,24 +589,33 @@ def _cap_size(size: tuple[float, float] | list[float], max_width: float, max_hei
 
 
 def _with_quiet_symbolic_shape_tempering(ins: Instruction, *, ddl: str | None) -> Instruction:
-    if not _context_has_density_governor(ddl) or ins.primitive not in ("square", "triangle"):
+    if not _context_has_density_governor(ddl) or ins.primitive not in ("square", "triangle", "polygon"):
         return ins
-    if ins.size is None:
+    if ins.primitive != "polygon" and ins.size is None:
+        return ins
+    if ins.primitive == "polygon" and ins.radius is None:
         return ins
     hint = ins.color_hint or ""
     if not any(marker in hint for marker in ("coverage from DDL clause", "motif restored", "shape intent", "fallback from DDL")):
         return ins
 
-    size = list(ins.size)
     arr = ins.arrangement
-    needs_size_cap = size[0] > MAX_QUIET_SYMBOLIC_SHAPE_WIDTH or size[1] > MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT
+    if ins.primitive == "polygon":
+        needs_size_cap = float(ins.radius or 0.0) > MAX_QUIET_SYMBOLIC_SHAPE_WIDTH / 2
+    else:
+        assert ins.size is not None
+        size = list(ins.size)
+        needs_size_cap = size[0] > MAX_QUIET_SYMBOLIC_SHAPE_WIDTH or size[1] > MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT
     needs_count_cap = arr is not None and arr.count > MAX_QUIET_SYMBOLIC_SHAPE_COUNT
     if not needs_size_cap and not needs_count_cap:
         return ins
 
     data = ins.model_dump(by_alias=True)
     if needs_size_cap:
-        data["size"] = _cap_size(size, MAX_QUIET_SYMBOLIC_SHAPE_WIDTH, MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT)
+        if ins.primitive == "polygon":
+            data["radius"] = min(float(ins.radius or 0.1), MAX_QUIET_SYMBOLIC_SHAPE_WIDTH / 2)
+        else:
+            data["size"] = _cap_size(size, MAX_QUIET_SYMBOLIC_SHAPE_WIDTH, MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT)
     if arr is not None:
         arr_data = dict(data["arrangement"])
         if needs_count_cap:
@@ -597,6 +630,45 @@ def _with_quiet_symbolic_shape_tempering(ins: Instruction, *, ddl: str | None) -
     note = "quiet symbolic shape tempered to avoid fallback dominance"
     data["color_hint"] = f"{hint}; {note}" if hint else note
     return Instruction.model_validate(data)
+
+
+def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """動きのある入力では count を増やさず、軌跡・回転・揺らぎで発散を保つ。"""
+    if not _context_has_motion(ddl):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for index, ins in enumerate(instructions):
+        data = ins.model_dump(by_alias=True)
+        changed = False
+        if ins.arrangement is not None:
+            arr_data = dict(data["arrangement"])
+            if arr_data.get("path", "none") == "none":
+                arr_data["path"] = "wave" if index % 2 == 0 else "diagonal"
+                changed = True
+            if ins.primitive in ("ellipse", "square", "triangle", "polygon") and data.get("rotation") is None:
+                data["rotation"] = -24 if index % 2 == 0 else 18
+                changed = True
+            data["arrangement"] = arr_data
+        elif ins.primitive in ("line", "ellipse", "arc", "square", "triangle", "polygon") and data.get("rotation") is None:
+            data["rotation"] = -18 if index % 2 == 0 else 22
+            changed = True
+
+        if ins.variation is None and ins.primitive in ("line", "ellipse", "arc", "polygon"):
+            data["variation"] = {
+                "amplitude": "medium",
+                "frequency": "slow",
+                "quality": "wave",
+                "dimensions": ["position_x", "position_y"],
+            }
+            changed = True
+
+        if changed:
+            hint = data.get("color_hint")
+            note = "motion energy restored through trajectory and rotation"
+            data["color_hint"] = f"{hint}; {note}" if hint else note
+        adjusted.append(Instruction.model_validate(data))
+    return adjusted
 
 
 def _has_compensating_accent(instructions: list[Instruction]) -> bool:
@@ -1326,10 +1398,10 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
         return []
     clauses = [part.strip() for part in re.split(r"[。\n;；]+", ddl) if part.strip()]
     markers = (
-        "線", "点", "円", "楕円", "四角", "三角", "弧", "塗りつぶす", "散らす", "並べる",
+        "線", "点", "円", "楕円", "四角", "三角", "多角形", "五角", "六角", "弧", "塗りつぶす", "散らす", "並べる",
         "膜", "霞", "霧", "靄", "気配", "余韻", "反射", "映り", "消え", "滲",
         "光", "陽光", "日差し", "香", "匂", "蕾", "つぼみ", "開花", "五感", "温",
-        "line", "dot", "circle", "ellipse", "square", "triangle", "arc", "scatter", "fill",
+        "line", "dot", "circle", "ellipse", "square", "triangle", "polygon", "arc", "scatter", "fill",
         "membrane", "haze", "fog", "mist", "trace", "reflection", "fade", "fading", "blur",
         "light", "sunlight", "scent", "fragrance", "bud", "bloom", "sense", "warm",
     )
@@ -1381,6 +1453,8 @@ def _weight_from_clause(clause: str) -> str:
 
 def _primitive_from_clause(clause: str) -> str:
     lower = clause.lower()
+    if ("多角形" in clause) or ("五角" in clause) or ("六角" in clause) or ("polygon" in lower):
+        return "polygon"
     if ("四角" in clause) or ("square" in lower) or ("rectangle" in lower):
         return "square"
     if ("三角" in clause) or ("triangle" in lower):
@@ -1424,6 +1498,7 @@ def _sensory_kind(clause: str) -> str | None:
 
 
 def _fallback_instruction_from_clause(clause: str, *, index: int, background: str) -> Instruction:
+    lower = clause.lower()
     primitive = _primitive_from_clause(clause)
     sensory_kind = _sensory_kind(clause)
     if sensory_kind == "sense":
@@ -1449,13 +1524,15 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
         common.update({"from": [0.16 + offset, 0.76 - offset], "to": [0.78, 0.30 + offset], "rotation": -8 + index * 7})
     elif primitive == "arc":
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.11, "angle_start": 210, "angle_end": 330})
+    elif primitive == "polygon":
+        sides = 6 if ("六角" in clause or "hex" in lower or "mineral" in lower or "鉱物" in clause) else 5
+        common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.055, "sides": sides, "rotation": -18 + index * 9})
     elif primitive == "ellipse":
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "size": [0.16, 0.09], "rotation": -18 + index * 9})
     else:
         common.update({"position": [0.58 - offset / 2, 0.24 + offset], "size": [0.14, 0.10], "rotation": -12 + index * 8})
 
     count = count_hint_from_ddl(clause)
-    lower = clause.lower()
     cycle = _color_cycle_from_clause(clause, background)
     if count and (("散らす" in clause) or ("scatter" in lower)):
         common["arrangement"] = {"count": min(count, 120), "layout": "scatter", "margin": 0.18}
@@ -1736,6 +1813,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     effective_presence = score.presence or _presence_from_ddl(ddl)
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
     instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)
+    instructions = _with_motion_energy(instructions, ddl=ddl)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)

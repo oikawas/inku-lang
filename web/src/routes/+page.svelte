@@ -54,6 +54,8 @@
 	const SHOW_CRAB_KEY       = 'inku-show-crab';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
+	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
+	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 	const APP_VERSION = '0.1.0';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
@@ -61,6 +63,7 @@
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 	const BATCH_PROMPT_HISTORY_LIMIT = 20;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
+	type HistorySelectionBehavior = 'history' | 'current';
 
 	type PaintResult = {
 		svg: string;
@@ -413,6 +416,8 @@
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
 	let defaultCatalogId = $state('default');
 	const currentCatalog = $derived(catalogById(colorCatalogs, selectedCatalog) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
+	let historySelectionCanvas = $state<HistorySelectionBehavior>('current');
+	let historySelectionCatalog = $state<HistorySelectionBehavior>('current');
 
 	// ── Settings tabs ────────────────────────────────────────
 	let settingsStatus = $state<SettingsStatus | null>(null);
@@ -1680,7 +1685,13 @@
 			localStorage.setItem(SHOW_CRAB_KEY, showCrab ? '1' : '0');
 			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
 			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
+			localStorage.setItem(HISTORY_SELECTION_CANVAS_KEY, historySelectionCanvas);
+			localStorage.setItem(HISTORY_SELECTION_CATALOG_KEY, historySelectionCatalog);
 		} catch {}
+	}
+
+	function normalizeHistorySelectionBehavior(value: string | null): HistorySelectionBehavior {
+		return value === 'history' ? 'history' : 'current';
 	}
 
 	// ── 感情語 → DDL ヒント ──────────────────────────────────
@@ -2675,6 +2686,20 @@
 		if (demoRunning) return;
 		inputMode = 'single';
 		displayedHistoryItem = it;
+		if (historySelectionCatalog === 'history') {
+			const catalogId = it.render_color_catalog_id ?? it.catalog_id;
+			if (catalogId && catalogById(colorCatalogs, catalogId)) {
+				selectedCatalog = catalogId;
+				persistSelectedCatalog();
+			}
+		}
+		if (historySelectionCanvas === 'history') {
+			const canvasId = it.render_canvas_aspect ?? it.score?.canvas;
+			if (canvasId) {
+				canvasAspectId = normalizeCanvasAspectId(canvasId);
+				void saveCanvasAspectPluginValue();
+			}
+		}
 		const itemDDL = it.ddl ?? '';
 		input = it.input; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
 		stage1UserPrompt = it.input ? it.input + buildEmotionHint(it.input) : '';
@@ -3269,6 +3294,8 @@
 			const crab = localStorage.getItem(SHOW_CRAB_KEY); if (crab !== null) showCrab = crab !== '0';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
+			historySelectionCanvas = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CANVAS_KEY));
+			historySelectionCatalog = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CATALOG_KEY));
 			const savedBatchFailureReport = loadBatchFailureReport();
 			setBatchFailureReport(savedBatchFailureReport);
 			miscSettingsLoaded = true;
@@ -3285,7 +3312,7 @@
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion;
+		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -3603,6 +3630,8 @@
 		{exportTemplates}
 		{exportTemplateStatus}
 		bind:saveReplayAsNewVersion
+		bind:historySelectionCanvas
+		bind:historySelectionCatalog
 		{canvasAspectEnabled}
 		onSetCanvasAspectEnabled={setCanvasAspectEnabled}
 		onClose={closeSettingsModal}

@@ -310,6 +310,11 @@ export interface LangPack {
 	settingsShowCrab: string;
 	settingsPngAlpha: string;
 	settingsSaveReplay: string;
+	settingsHistorySelectionTitle: string;
+	settingsHistorySelectionCanvasHistory: string;
+	settingsHistorySelectionCanvasCurrent: string;
+	settingsHistorySelectionCatalogHistory: string;
+	settingsHistorySelectionCatalogCurrent: string;
 	colorCatalogTitle: string;
 	colorCatalogDetail: string;
 	colorCatalogConfirm: string;

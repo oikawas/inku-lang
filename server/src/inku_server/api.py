@@ -105,6 +105,39 @@ def _build_number() -> str | None:
         return None
 
 
+def _build_date() -> str | None:
+    path = Path(__file__).resolve().parents[3] / "web" / "BUILD_NUMBER"
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).astimezone().isoformat(timespec="seconds")
+    except OSError:
+        return None
+
+
+def _startup_banner(*, service_name: str, service_kind: str, emoji: str) -> str:
+    build_number = _build_number() or "unknown"
+    build_date = _build_date() or "unknown"
+    border = "=============================="
+    return "\n".join(
+        [
+            border,
+            f"{emoji} {service_name} starting",
+            f"service: {service_kind}",
+            f"version: {_APP_VERSION}",
+            f"build: {build_number} ({build_date})",
+            border,
+        ]
+    )
+
+
+def _log_startup_banner() -> None:
+    banner = _startup_banner(service_name="inku-api", service_kind="FastAPI rendering API", emoji="🧠")
+    print(banner, flush=True)
+    _logger.info(banner)
+
+
+_log_startup_banner()
+
+
 def _is_qualified_model_id(model: str) -> bool:
     if ":" not in model:
         return False
@@ -169,8 +202,8 @@ def _log_systemd_dropins(settings: dict) -> dict[str, str]:
             [
                 "[Service]",
                 "LogsDirectory=inku",
-                f"StandardOutput=append:{path}",
-                f"StandardError=append:{path}",
+                f"StandardOutput=journal+append:{path}",
+                f"StandardError=journal+append:{path}",
                 "",
             ]
         )

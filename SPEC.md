@@ -481,6 +481,14 @@ previews for `inku-server` and `inku-api`; `PUT /api/settings/log-retention` is
 admin-only and updates the stored policy.  Applying those generated files to the
 host OS remains an operational task that requires server privileges.
 
+The generated systemd preview uses
+`StandardOutput=journal+append:/var/log/inku/<service>.log` and the matching
+`StandardError` value so operators can follow logs through both
+`journalctl -fu <service>` and retained file logs.  `inku-api` and `inku-server`
+also print startup banners wrapped in `==============================`; the
+banners include the service role, application version, build number, and build
+date.  The API banner uses `🧠`, and the web UI banner uses `🎨`.
+
 ---
 
 ## 12. Security and Operations

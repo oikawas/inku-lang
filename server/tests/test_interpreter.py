@@ -107,6 +107,8 @@ def test_quantity_prompt_uses_dynamic_range():
     assert "画面全体に点々と六百十個" in prompt
     assert "画面全体に細かく八百九十個" in prompt
     assert "背景色と主描画色を同じにしてはいけない" in prompt
+    assert "人・顔・動物を具象化しない" in prompt
+    assert "縦線+小楕円" in prompt
     assert "ランダムに六百十個" not in prompt
     assert "ランダムに八百九十個" not in prompt
 

@@ -638,8 +638,8 @@ def test_coerce_score_restores_human_presence_as_abstract_score_field():
 
     assert fixed.presence is not None
     assert fixed.presence.kind == "figure_like"
-    assert fixed.presence.symmetry == "bilateral"
-    assert fixed.presence.gaze_pressure == "low"
+    assert fixed.presence.symmetry == "none"
+    assert fixed.presence.gaze_pressure == "none"
 
 
 def test_coerce_score_restores_animal_group_presence_without_extra_primitives():

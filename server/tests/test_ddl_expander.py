@@ -139,6 +139,17 @@ def test_expand_intermediate_ddl_does_not_add_true_circles_for_particles():
     assert any(word in expanded for word in ("右上がり", "右下がり", "回転した"))
 
 
+def test_expand_intermediate_ddl_abstracts_presence_without_body_symbols():
+    expanded = expand_intermediate_ddl(
+        "青い横線を下端に三十本並べる。",
+        context_text="川岸で人と熊が並んで待っている",
+    )
+
+    assert any(marker in expanded for marker in ("存在の重心", "輪郭の密度"))
+    assert "縦線" not in expanded
+    assert "小さな楕円" not in expanded
+
+
 def test_expand_intermediate_ddl_en_selects_focused_layers():
     ddl = "Scatter five small red circles randomly. Draw three thin white horizontal lines."
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from inku_cli import cli
@@ -421,3 +422,54 @@ def test_resolve_history_hash_rejects_ambiguous_short_hash():
         assert "ambiguous" in str(exc)
     else:
         raise AssertionError("expected ambiguous hash error")
+
+
+def test_history_export_writes_contact_sheet_and_evaluation_json(tmp_path, monkeypatch):
+    class FakeCairoSvg:
+        @staticmethod
+        def svg2png(*, bytestring, write_to):
+            Path(write_to).write_bytes(b"png")
+
+    monkeypatch.setitem(sys.modules, "cairosvg", FakeCairoSvg)
+    monkeypatch.setattr(cli, "_make_contact_sheet", lambda input_dir, output_path, *, columns, thumb_size: Path(output_path).write_bytes(b"sheet"))
+
+    item_dir = tmp_path / "items"
+    item_dir.mkdir()
+    (item_dir / "stale.png").write_bytes(b"old")
+    (item_dir / "stale.json").write_text("{}", encoding="utf-8")
+    items = [
+        {
+            "id": "h1",
+            "render_hash": "a" * 60 + "ABCD",
+            "render_hash_short": "ABCD",
+            "at": 123,
+            "input": "丸が跳ねる",
+            "ddl": "赤い丸を置く。",
+            "score": {"instructions": [{"primitive": "ellipse", "color": "red"}]},
+            "svg": "<svg></svg>",
+            "elapsed_ms": 1200,
+            "tokens_in": 10,
+            "tokens_out": 20,
+            "stage1_model": "s1",
+            "stage2_model": "s2",
+            "render_build_number": "352",
+            "render_engine_id": "default",
+            "render_engine_version": "1",
+            "render_canvas_aspect": "1:1",
+            "render_color_catalog_id": "default",
+            "render_color_catalog_name": "inku Default",
+        }
+    ]
+
+    summary = cli._write_history_export(items, out_dir=tmp_path, columns=4, thumb_size=180)
+
+    assert not (item_dir / "stale.png").exists()
+    assert not (item_dir / "stale.json").exists()
+    assert (tmp_path / "contact-sheet.png").read_bytes() == b"sheet"
+    assert (tmp_path / "summary.json").exists()
+    exported_item = json.loads((item_dir / "001-ABCD.json").read_text(encoding="utf-8"))
+    assert exported_item["export_paths"]["png"].endswith("001-ABCD.png")
+    assert summary["ai_evaluation"]["contact_sheet"].endswith("contact-sheet.png")
+    assert summary["ai_evaluation"]["items"][0]["prompt"] == "丸が跳ねる"
+    assert summary["ai_evaluation"]["items"][0]["paths"]["json"].endswith("001-ABCD.json")
+    assert summary["results"][0]["score_primitive_counts"] == {"ellipse": 1}

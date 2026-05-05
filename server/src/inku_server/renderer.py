@@ -663,6 +663,16 @@ def _presence_center_px(score: Score, canvas: CanvasSize) -> tuple[float, float]
     return _clamp01(x) * canvas.width, _clamp01(y) * canvas.height
 
 
+def _presence_seed(score: Score) -> int:
+    presence_json = score.presence.model_dump_json() if score.presence is not None else ""
+    instruction_key = "|".join(
+        f"{ins.primitive}:{ins.color}:{ins.weight}:{ins.arrangement.count if ins.arrangement else 1}"
+        for ins in score.instructions
+    )
+    digest = hashlib.sha256(f"{presence_json}|{instruction_key}".encode("utf-8")).digest()
+    return struct.unpack("<Q", digest[:8])[0]
+
+
 def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, str], canvas: CanvasSize):
     """抽象化された存在感を描く。自然文キーワードや具象部品はここでは扱わない。"""
     presence = score.presence
@@ -682,29 +692,26 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
     radius_y = unit * {"low": 0.24, "medium": 0.32, "high": 0.40}[presence.intensity]
     stroke = max(1.2, unit * 0.003)
     layer = dwg.g(id="presence_layer")
+    seed = _presence_seed(score)
+    phase = math.tau * _hash01(0, seed, "presence-phase")
+    tilt = (_hash01(1, seed, "presence-tilt") - 0.5) * 1.2
 
     if presence.symmetry == "bilateral":
-        for offset_scale in (0.22, 0.46):
-            dx = radius_x * offset_scale
+        for i, side in enumerate((-1, 1, -1, 1)):
+            y_shift = (-0.36 + i * 0.24) * radius_y
+            x_outer = side * radius_x * (0.34 + 0.10 * _hash01(i, seed, "sym-x"))
+            x_inner = side * radius_x * (0.10 + 0.08 * _hash01(i, seed, "sym-inner"))
             layer.add(dwg.line(
-                start=(cx - dx, cy - radius_y * 0.72),
-                end=(cx - dx * 0.54, cy + radius_y * 0.72),
+                start=(cx + x_outer, cy + y_shift - radius_y * 0.06),
+                end=(cx + x_inner, cy + y_shift + radius_y * (0.10 + tilt * 0.06)),
                 stroke=color,
                 stroke_width=stroke,
-                stroke_opacity=intensity_opacity,
-                stroke_linecap="round",
-            ))
-            layer.add(dwg.line(
-                start=(cx + dx, cy - radius_y * 0.72),
-                end=(cx + dx * 0.54, cy + radius_y * 0.72),
-                stroke=color,
-                stroke_width=stroke,
-                stroke_opacity=intensity_opacity,
+                stroke_opacity=intensity_opacity * 0.58,
                 stroke_linecap="round",
             ))
     elif presence.symmetry == "radial":
         for i in range(6):
-            angle = math.tau * i / 6.0
+            angle = phase + math.tau * i / 6.0
             inner = radius_x * 0.28
             outer = radius_x * 0.86
             layer.add(dwg.line(
@@ -719,10 +726,11 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
     if presence.gaze_pressure != "none":
         for i, side in enumerate((-1, 1, -1, 1, -1, 1)):
             t = (i + 1) / 7
-            start_x = cx + side * (radius_x * (1.25 + 0.28 * (i % 2)))
-            start_y = cy - radius_y * 0.62 + t * radius_y * 1.24
-            end_x = cx + side * radius_x * 0.18
-            end_y = cy + (t - 0.5) * radius_y * 0.20
+            angle = phase + side * (0.34 + 0.08 * i)
+            start_x = cx + math.cos(angle) * radius_x * (1.05 + 0.18 * (i % 2))
+            start_y = cy + math.sin(angle) * radius_y * (0.72 + 0.08 * i)
+            end_x = cx + math.cos(angle + math.pi) * radius_x * 0.12
+            end_y = cy + (t - 0.5) * radius_y * 0.16
             layer.add(dwg.line(
                 start=(start_x, start_y),
                 end=(end_x, end_y),
@@ -733,7 +741,7 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
             ))
 
     for i in range(contour_count):
-        angle = math.tau * i / contour_count
+        angle = phase + math.tau * i / contour_count
         span = 0.18 + 0.05 * (i % 3)
         start = angle - span
         end = angle + span

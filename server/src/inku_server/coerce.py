@@ -1533,8 +1533,8 @@ def _presence_from_ddl(ddl: str | None) -> dict | None:
         marker in ddl.lower() for marker in ("strong", "pressure", "dense")
     ) else "medium" if has_gaze or has_group else "low"
     contour_density = "high" if has_group else "medium" if has_creature or has_gaze else "low"
-    symmetry = "bilateral" if _context_has_any(ddl, SYMMETRY_PRESENCE_MARKERS) or kind == "figure_like" else "none"
-    gaze_pressure = "medium" if has_gaze else "low" if has_human else "none"
+    symmetry = "bilateral" if _context_has_any(ddl, SYMMETRY_PRESENCE_MARKERS) else "none"
+    gaze_pressure = "medium" if has_gaze else "none"
     presence: dict[str, object] = {
         "kind": kind,
         "intensity": intensity,

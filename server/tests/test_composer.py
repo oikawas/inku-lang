@@ -174,6 +174,8 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "多角形語彙は polygon だけ" in SYSTEM_PROMPT
     assert '"primitive":"polygon"' in SYSTEM_PROMPT
     assert "目鼻口・頭身・四肢・耳・尻尾" in SYSTEM_PROMPT
+    assert 'symmetry="bilateral" は' in SYSTEM_PROMPT
+    assert "縦線+小楕円" in SYSTEM_PROMPT
     assert "待つ人の気配" in SYSTEM_PROMPT
     assert "反射" in SYSTEM_PROMPT
     assert "圧縮しすぎない" in SYSTEM_PROMPT
@@ -230,6 +232,8 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "Score.presence" in SYSTEM_PROMPT_EN
     assert "Use only polygon for polygonal vocabulary" in SYSTEM_PROMPT_EN
     assert "eyes, mouth, body proportions, limbs, ears, or tails" in SYSTEM_PROMPT_EN
+    assert 'symmetry="bilateral" only' in SYSTEM_PROMPT_EN
+    assert "vertical-line + small-ellipse" in SYSTEM_PROMPT_EN
     assert "waiting person" in SYSTEM_PROMPT_EN
     assert "Reflection" in SYSTEM_PROMPT_EN
     assert "Do not over-compress" in SYSTEM_PROMPT_EN

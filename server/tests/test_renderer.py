@@ -928,8 +928,8 @@ def test_render_presence_layer_gets_subtler_when_scene_is_dense():
     sparse_svg = render(sparse)
     dense_svg = render(dense)
 
-    assert 'stroke-opacity="0.21"' in sparse_svg
-    assert 'stroke-opacity="0.1092"' in dense_svg
+    assert 'stroke-opacity="0.1722"' in sparse_svg
+    assert 'stroke-opacity="0.089544"' in dense_svg
 
 
 def test_render_color_cycle_preserves_effect_hint_opacity():

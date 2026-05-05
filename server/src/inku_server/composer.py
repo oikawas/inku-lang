@@ -53,6 +53,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **大数量は「数の忠実さ」より「群の見え方」を優先する。300 個以上は count を 80〜120 個へ代表化し、density="high", cluster_count=5〜9, fade="outward" または "directional", preserve_space=true で原意を保持する**
 - **膜・霞・霧・透明・気配・余韻 → 薄い ellipse/square/line に fade を付け、preserve_space=true。説明だけで終わらせず、透明な面・薄い反射・消える線として JSON 化する**
 - **人・顔・動物を対象物として描かない。目鼻口・頭身・四肢・耳・尻尾を instruction にしない。存在感、重心、左右対称性、視線の圧力、群れ、輪郭密度として Score.presence に変換する**
+- **Score.presence は固定の人型記号ではない。symmetry="bilateral" は「正面・対称・顔」など明示がある時だけ使い、通常は symmetry="none" を選ぶ。gaze_pressure も視線・顔・見つめる等が明示された時だけ none 以外にする**
+- **人・動物の補助 instruction を作る場合も、縦線+小楕円、棒人間、頭、胴体、翼、尾のような共通シルエットにしない。余白線、端寄りの焦点、薄い弧、群れの間隔として抽象化する**
 - **反射・映り込み → line または arc の少数反復。fade="directional" と path="wave" または "top_to_bottom" を使う**
 - **柔らかな光・日差し → 白または黄色寄りの薄い ellipse を重ね、filled=true, color_hint に原文の光を保持する。香り・匂い → 緑/白/灰の小さな ellipse または arc を wave path で少数散らす。蕾・開花待ち → 赤/白の小さな ellipse を斜めの帯で残す。五感・気配 → 薄い arc/ellipse と fade で残す**
 - **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
@@ -292,6 +294,8 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **For very large quantities, prioritize the visible group behavior over literal item count. For 300+ items, represent them with count around 80–120 plus density="high", cluster_count=5–9, fade="outward" or "directional", and preserve_space=true**
 - **Membrane, haze, fog, transparency, atmosphere, or lingering presence → thin ellipse/square/line with fade and preserve_space=true. Do not omit them as mere explanation; convert them into transparent planes, faint reflections, or fading lines**
 - **Do not draw humans, faces, or animals as objects. Do not make eyes, mouth, body proportions, limbs, ears, or tails into instructions. Convert them into Score.presence as presence, weight, bilateral symmetry, gaze pressure, group behavior, and contour density**
+- **Score.presence is not a fixed human-symbol overlay. Use symmetry="bilateral" only when frontality, symmetry, or a face is explicit; otherwise prefer symmetry="none". Use gaze_pressure other than none only when gaze, face, looking, or staring is explicit**
+- **If supporting instructions are needed for human/animal context, do not make a vertical-line + small-ellipse silhouette, stick figure, head/body, wing, or tail. Abstract it as negative-space lines, edge-biased focus, pale arcs, or group spacing**
 - **Reflection → sparse repeated line or arc with fade="directional" and path="wave" or "top_to_bottom"**
 - **Soft light / sunlight → layered pale white or yellow-leaning ellipse, filled=true, preserving the original phrase in color_hint. Scent / fragrance → small green/white/gray ellipse or arc along path="wave". Buds / waiting to bloom → small red/white ellipses along a diagonal band. Five-sense presence / atmosphere → faint arc/ellipse with fade**
 - **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**

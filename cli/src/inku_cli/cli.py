@@ -665,6 +665,7 @@ def _fetch_all_history(client: ApiClient, *, starred: bool = False, query: str |
 
 def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
+    evaluation_items: list[dict[str, Any]] = []
     total_elapsed = 0
     total_in = 0
     total_out = 0
@@ -689,9 +690,33 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
             "stage1_model": item.get("stage1_model"),
             "stage2_model": item.get("stage2_model"),
             "render_build_number": item.get("render_build_number"),
+            "render_engine_id": item.get("render_engine_id"),
+            "render_engine_version": item.get("render_engine_version"),
+            "render_canvas_aspect": item.get("render_canvas_aspect"),
             "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
             "render_color_catalog_name": item.get("render_color_catalog_name"),
             **_score_metrics(item.get("score")),
+        })
+        artifact_paths = (item.get("_export_paths") or {}) if isinstance(item.get("_export_paths"), dict) else {}
+        evaluation_items.append({
+            "index": index,
+            "label": artifact_paths.get("label") or f"{index:03d}-{_history_hash_label(item)}",
+            "id": item.get("id"),
+            "hash": item.get("render_hash"),
+            "hash_short": _history_hash_label(item),
+            "at": item.get("at"),
+            "prompt": item.get("input"),
+            "ddl": item.get("ddl"),
+            "score": item.get("score"),
+            "stage1_model": item.get("stage1_model"),
+            "stage2_model": item.get("stage2_model"),
+            "render_build_number": item.get("render_build_number"),
+            "render_engine_id": item.get("render_engine_id"),
+            "render_engine_version": item.get("render_engine_version"),
+            "render_canvas_aspect": item.get("render_canvas_aspect"),
+            "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
+            "render_color_catalog_name": item.get("render_color_catalog_name"),
+            "paths": {key: artifact_paths.get(key) for key in ("json", "svg", "png") if artifact_paths.get(key)},
         })
     aggregate_primitive: Counter[str] = Counter()
     aggregate_color: Counter[str] = Counter()
@@ -713,8 +738,26 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
         "score_density_counts": dict(sorted(aggregate_density.items())),
         "score_fade_counts": dict(sorted(aggregate_fade.items())),
         "paths": paths,
+        "ai_evaluation": {
+            "contact_sheet": paths.get("contact_sheet"),
+            "summary_json": paths.get("summary_json"),
+            "item_json_dir": paths.get("items_dir"),
+            "review_focus": [
+                "Compare each contact-sheet image with its prompt, DDL, score, models, build, canvas, and color catalog metadata.",
+                "Assess expression, clarity, fun, motion, color use, diversity, and regressions against the intended benchmark focus.",
+            ],
+            "items": evaluation_items,
+        },
         "results": results,
     }
+
+
+def _clear_history_export_items_dir(item_dir: Path) -> None:
+    if not item_dir.exists():
+        return
+    for path in item_dir.iterdir():
+        if path.is_file() and path.suffix.lower() in {".json", ".svg", ".png"}:
+            path.unlink()
 
 
 def _write_history_export(
@@ -732,13 +775,26 @@ def _write_history_export(
     out_dir.mkdir(parents=True, exist_ok=True)
     item_dir = out_dir / "items"
     item_dir.mkdir(parents=True, exist_ok=True)
+    _clear_history_export_items_dir(item_dir)
     for index, item in enumerate(items, start=1):
         label = _history_hash_label(item) or str(index).zfill(4)
         prefix = item_dir / f"{index:03d}-{label}"
-        _write_json_file(prefix.with_suffix(".json"), item)
+        export_item = dict(item)
+        json_path = prefix.with_suffix(".json")
+        svg_path = prefix.with_suffix(".svg")
+        png_path = prefix.with_suffix(".png")
+        export_paths = {
+            "label": prefix.name,
+            "json": str(json_path),
+            "svg": str(svg_path),
+            "png": str(png_path),
+        }
+        export_item["export_paths"] = export_paths
+        _write_json_file(json_path, export_item)
         svg = str(item.get("svg") or "")
-        prefix.with_suffix(".svg").write_text(svg, encoding="utf-8")
-        cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=str(prefix.with_suffix(".png")))
+        svg_path.write_text(svg, encoding="utf-8")
+        cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=str(png_path))
+        item["_export_paths"] = export_paths
     sheet_path = out_dir / "contact-sheet.png"
     _make_contact_sheet(item_dir, sheet_path, columns=columns, thumb_size=thumb_size)
     summary_path = out_dir / "summary.json"
@@ -1620,7 +1676,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     history_export = subparsers.add_parser("history-export", help="export history items by hash for benchmark review")
     _add_common_server_args(history_export)
-    history_export.add_argument("hashes", nargs="*", help="individual 4+ digit history hash suffixes")
+    history_export.add_argument("hashes", nargs="*", help="individual 4+ character history hash suffixes")
     history_export.add_argument("--from", dest="from_hash", help="start hash suffix for an inclusive history-order range")
     history_export.add_argument("--to", dest="to_hash", help="end hash suffix for an inclusive history-order range")
     history_export.add_argument("--out-dir", "-o", required=True, help="output directory for contact sheet and JSON files")

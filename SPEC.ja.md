@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.44**
+**Version: v1.45**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -1422,6 +1422,19 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - 英語UIでも同じ意味の注記を表示する
 - build number: 328
 
+### v1.45 (2026-05-05)
+
+**JSONメタデータへの描画ハッシュ記録**
+
+各描画のサーバー側 `render_hash` を、履歴だけでなく JSON メタデータ領域にも記録する。
+
+- `render_hash` は、描画内容とサーバー所有の render metadata から算出する64文字の SHA-256 hex とする
+- `render_hash_short` は UI / CLI で参照しやすい4文字の大文字サフィックスとする
+- `/api/paint`、`/api/compose`、JSONタブ、CLI出力JSON、保存 artifact JSON に `render_hash` / `render_hash_short` を含める
+- 履歴DBから artifact JSON を再生成する場合も、DB上の `render_hash` / `render_hash_short` をメタデータ領域へ展開する
+- 履歴DBは引き続き正本であり、出力ファイルは副産物として扱う
+- build number: 352
+
 ### v1.43 (2026-05-05)
 
 **Render Engine 境界とエンジンメタデータ**
@@ -2282,6 +2295,64 @@ Svelte の既存 accessibility warning を整理し、`npm run check` が 0 erro
 履歴サムネイルの SVG クリップ加工は `HistoryThumbnail` に集約した。`+page.svelte` のテンプレート経由で `clippedHistorySvg()` を呼び続ける形を廃止し、サムネイル単位の `$derived` で加工済み SVG を管理する。
 
 - Build 124
+
+### v1.20 (2026-05-05)
+
+**レンダリングエンジン改訂 + 履歴ハッシュ UI + DDL 自動補正制御**
+
+レンダリングエンジンの改訂では、個別キーワードへの分岐ではなく、入力の意味を汎用的な描画パラメータへ変換する方針を採った。
+
+- 人・顔・動物を対象物として描かず、`Score.presence` の `kind` / `intensity` / `center` / `symmetry` / `gaze_pressure` / `contour_density` として扱う
+- `presence` は目鼻口・頭身・四肢・耳・尻尾を instruction にしない。存在感、重心、左右対称性、視線の圧力、群れ、輪郭密度として renderer に渡す
+- renderer は `presence` を薄い弧、線片、端寄りの焦点、非対称な輪郭密度として演奏する。縦線＋小楕円、棒人間、頭/胴体、翼/尾、円周上の同型楕円列のような固定シルエットは避ける
+- `polygon` primitive を追加し、多角形語彙は個別の五角形・六角形 primitive へ分けず、`sides=5-8` の `polygon` に集約する
+- `motion_energy` は count / density を増やすのではなく、`trajectory` / `rotation` / `diagonal` / `wave` / `asymmetry` を強めて動勢を戻す
+- quiet / presence / membrane / fog / memory / shadow 系入力では、高密度、大きな塗り閉図形、縦雨線、fallback 由来の大きな square / triangle が主題を上書きしないよう密度と記号形状を抑制する
+- `leaf_grain` / `silence_layer` / `hard_edge` / `playful_motion` などの context energy は、行番号ではなく文脈語に基づく小さな補助層として扱う
+
+Stage 2 の契約も強化した。
+
+- 形容語・動作語・質感語は、DDL で指定された主図形へ適用する
+- `震える` / `揺れる` / `滲む` / `太い` / `細い` などを理由に、DDL にない補助線・補助図形・別色 instruction を追加してはいけない
+- プロンプト制約だけではモデル依存で再発するため、composer に deterministic な contract guard を追加した
+- contract guard は、DDL が単一の明示 primitive family と motion / texture modifier を含む場合だけ適用する
+- 明示色がある場合は、その色・primitive に合う instruction だけを残し、未指定の補助線・補助図形・別色 instruction を落とす
+- 線に対して「震える」などがあり、Stage 2 が variation を落としている場合は、主 line instruction に `quality=perlin`, `dimensions=["position_x","position_y"]` を補う
+- 複数モチーフの DDL にはこの guard を適用せず、豊かな多層出力を壊さない
+
+解釈 box と DDL 再描画の操作を整理した。
+
+- `ComposeRequest` / `PaintRequest` に `auto_repair` を追加した。既定は `true`
+- Web UI の解釈 box に「自動補正」チェックを追加し、OFF の場合は `coerce_score()` による自動補正を適用しない
+- `新規作成` は、記述タブでは空の解釈 box を表示し、歳時記、DDL 編集、自動補正、DDL から描画の操作をそのまま利用できる状態にする
+- `DDLから描画` ボタンは解釈 box の下に配置し、解釈 box 上部のボタンは削除した
+- `DDLから描画` は Stage 1 を呼ばず、解釈 box の DDL を Stage 2 / renderer に渡す。自然言語の指示欄の内容は再解釈しない
+
+履歴とステータスバーのハッシュ表示を整理した。
+
+- ステータスバーのスター右隣に、表示中画像の `render_hash_short` を表示し、クリックでフル `render_hash` をコピーするボタンを追加した
+- 未描画時、またはハッシュがない場合はハッシュボタンを押下不可にする
+- 通常描画後に `/api/history` へ保存した場合、保存 API の戻り値で `result.render_hash` / `render_hash_short` / `history_id` / `history_at` を更新する
+- これにより、描画完了直後のステータスバーと、別履歴を表示して戻った後のステータスバーが同じ DB 正本のハッシュを表示する
+- 履歴ダイアログの画像領域クリックは、その履歴を選択してメイン画面へ戻る
+- 履歴ストリップと履歴管理ダイアログに「最新」ボタンを追加した
+- バッチ描画中に他タブや履歴を見ても、バッチタブへ戻った後は次の描画完了時に最新描画を自動表示する
+
+色カタログ UI の確定動作を変更した。
+
+- 色カタログダイアログで選択変更後、ダイアログ外をクリックした場合は「保存」と同じ動作として扱う
+- キャンセルボタンは従来どおり、ダイアログを開いた時点の選択へ戻す
+- 色カタログボタンは現在選択中のカタログ名を表示し、長い名前は省略表示する
+
+ベンチマークで確認した主な修正点:
+
+- Build 342 -> 345: presence 抽象化により、人・動物の対象物化を抑えつつ、気配・重心・輪郭密度を保持した
+- Build 346 -> 347: quiet density governor と symbolic shape tempering により、過密な縦線や fallback 由来の大きな四角/三角の支配を抑えた
+- Build 348: `polygon` と `motion_energy` を導入し、count を増やさずに動勢を戻した
+- Build 349-351: polygon 5件ベンチで `polygon` 出力を確認し、落ち葉・廊下・鉄骨・自転車の影などで context energy を調整した
+- Build 351-355: 共通図形再発調査に基づき、presence 補助層が固定シルエットや ring-like mark へ収束しないよう調整した
+- Build 356-357: 自動補正OFF時の未指定横線3本混入を調査し、Stage 2 contract guard で未指定補助 instruction を除去する方針を追加した
+- Build 359
 
 ### v1.19 (2026-04-30)
 

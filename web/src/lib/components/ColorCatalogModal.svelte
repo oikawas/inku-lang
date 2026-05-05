@@ -38,7 +38,7 @@
 	}
 </script>
 
-<div class="modal-backdrop" onclick={onCancel} aria-hidden="true"></div>
+<div class="modal-backdrop" onclick={onConfirm} aria-hidden="true"></div>
 <div class="catalog-modal" role="dialog" aria-modal="true" tabindex="-1">
 	<div class="catalog-modal-head">
 		<div class="catalog-modal-title">{t().colorCatalogTitle}</div>

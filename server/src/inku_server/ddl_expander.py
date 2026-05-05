@@ -182,6 +182,9 @@ def _profile_ja(text: str) -> _FilterProfile:
         tags.add("contrast")
     if _has_any(text, ("四角", "格子", "幾何", "均衡", "法則", "対称")):
         tags.add("geometry")
+    if _has_any(text, ("人", "人物", "村人", "老人", "顔", "視線", "動物", "鳥", "魚", "熊", "群れ")):
+        tags.update(("presence", "space"))
+        mode = "field_and_interruption" if mode != "single_tension" else mode
 
     if _has_any(text, ("影", "痕跡", "埃", "足跡", "残", "冷え", "錆")) and mode != "single_tension":
         mode = "field_and_interruption"
@@ -224,6 +227,9 @@ def _profile_en(text: str) -> _FilterProfile:
         tags.add("contrast")
     if _has_any(lower, ("square", "grid", "geometric", "balance", "law", "symmetry")):
         tags.add("geometry")
+    if _has_any(lower, ("human", "person", "people", "figure", "face", "gaze", "animal", "bird", "fish", "bear", "flock", "herd")):
+        tags.update(("presence", "space"))
+        mode = "field_and_interruption" if mode != "single_tension" else mode
 
     if _has_any(lower, ("shadow", "trace", "dust", "footprint", "remains", "cold", "rust")) and mode != "single_tension":
         mode = "field_and_interruption"
@@ -242,8 +248,8 @@ def _select_category(
     if count <= 0:
         return []
 
-    if profile.tags & {"atmosphere", "sensory"}:
-        preferred_tags = profile.tags & {"atmosphere", "sensory"}
+    if profile.tags & {"atmosphere", "sensory", "presence"}:
+        preferred_tags = profile.tags & {"atmosphere", "sensory", "presence"}
         matched = [c for c in candidates if c.tags & preferred_tags]
         if matched:
             return _pick([c.text for c in matched], count, text=text, salt=salt)
@@ -271,6 +277,8 @@ def _category_plan(profile: _FilterProfile, *, has_structural: bool) -> tuple[in
         return (2 if has_structural else 0, 0, 1)
     if "atmosphere" in profile.tags:
         return (2 if has_structural else 0, 0, 0)
+    if "presence" in profile.tags:
+        return (1 if has_structural else 0, 0, 1)
     if profile.tags & {"geometry", "space"}:
         return (0, 0, 1)
     return (1 if has_structural else 0, 0, 0)
@@ -289,6 +297,9 @@ def _structural_tags(text: str) -> frozenset[str]:
     if any(token in text or token in lower for token in ("柔らかな光", "香りの層", "開花を待つ蕾", "五感の気配", "soft light", "scent layer", "waiting buds", "five-sense presence")):
         tags.add("sensory")
         tags.add("soft")
+    if any(token in text or token in lower for token in ("存在の重心", "輪郭の密度", "presence weight", "contour density")):
+        tags.add("presence")
+        tags.add("space")
     return frozenset(tags)
 
 
@@ -476,6 +487,9 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
         structural.append("赤い右上がりの小さな楕円を開花を待つ蕾として右半分の斜めの帯に五個散らす。")
     if any(token in context for token in ("五感", "気配", "訪れ")):
         structural.append("白い薄い弧を五感の気配として左下の焦点から三つ広げる。半径は0.14。")
+    if any(token in context for token in ("人", "人物", "村人", "老人", "顔", "視線", "動物", "鳥", "魚", "熊", "群れ")):
+        structural.append(f"{contrast_color}細い余白線を存在の重心として右上の焦点へ二本引く。細かく震える。")
+        structural.append(f"{main_color}薄い弧を輪郭の密度として左下の焦点から二つ置く。半径は0.09。")
 
     music = [
         _FilterCandidate(f"{contrast_color}細い線を対位法の反行として右下がりに二本並べる。細かく震える。", frozenset(("line", "music", "contrast"))),
@@ -559,6 +573,9 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
         structural.append("Scatter five small red ellipses rising to the right along a diagonal band in the right half as waiting buds.")
     if any(token in context.lower() for token in ("sense", "presence", "arrival")):
         structural.append("Line up three pale white arcs from a lower-left focus as five-sense presence. Radius 0.14.")
+    if any(token in context.lower() for token in ("human", "person", "people", "figure", "face", "gaze", "animal", "bird", "fish", "bear", "flock", "herd")):
+        structural.append(f"Draw two thin {contrast_color} negative-space lines toward an upper-right focus as presence weight. Fine trembling.")
+        structural.append(f"Place two pale {main_color} arcs from a lower-left focus as contour density. Radius 0.09.")
 
     music = [
         _FilterCandidate(f"Line up two thin {contrast_color} lines falling to the right as contrapuntal contrary motion. Fine trembling.", frozenset(("line", "music", "contrast"))),

@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Coord = tuple[float, float]
 
-Primitive = Literal["line", "circle", "ellipse", "triangle", "square", "arc"]
+Primitive = Literal["line", "circle", "ellipse", "triangle", "square", "polygon", "arc"]
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 Weight = Literal[
     "hair", "pencil", "pen", "rotring", "crayon", "chalk",
@@ -36,6 +36,11 @@ Layout = Literal["horizontal", "vertical", "radial", "scatter"]
 Path = Literal["none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"]
 Density = Literal["none", "low", "medium", "high"]
 Fade = Literal["none", "outward", "directional"]
+PresenceKind = Literal["none", "figure_like", "creature_like", "group_like"]
+PresenceIntensity = Literal["low", "medium", "high"]
+PresenceSymmetry = Literal["none", "bilateral", "radial"]
+GazePressure = Literal["none", "low", "medium", "high"]
+ContourDensity = Literal["low", "medium", "high"]
 
 
 class Variation(BaseModel):
@@ -162,7 +167,13 @@ class Instruction(BaseModel):
     )
     radius: Optional[float] = Field(
         default=None,
-        description="circle/arc の半径 (省略=0.1)",
+        description="circle/arc/polygon の半径 (省略=0.1)",
+    )
+    sides: Optional[int] = Field(
+        default=None,
+        ge=5,
+        le=8,
+        description="polygon の頂点数。5-8 の正多角形のみ。個別 primitive は増やさず、多角形語彙はここに集約する",
     )
     position: Optional[Coord] = Field(
         default=None,
@@ -223,6 +234,48 @@ class Instruction(BaseModel):
         description="N個配置。2以上の同一図形は必ずこれを使う。複数 instruction 生成は絶対禁止",
     )
 
+    @field_validator("sides", mode="before")
+    @classmethod
+    def _clamp_sides(cls, v: object) -> object:
+        if v is None:
+            return v
+        try:
+            return min(max(int(v), 5), 8)
+        except (TypeError, ValueError):
+            return 5
+
+
+class Presence(BaseModel):
+    """人・顔・動物などの具象モチーフを、抽象的な構図圧として保持する。"""
+
+    kind: PresenceKind = Field(
+        default="none",
+        description=(
+            "存在の種類。none=なし / figure_like=人型の気配 / creature_like=動物的な気配"
+            " / group_like=群れや複数の気配。具象的な顔・身体・動物として描かない"
+        ),
+    )
+    intensity: PresenceIntensity = Field(
+        default="medium",
+        description="存在感の強さ: low=弱い / medium=中程度 / high=強い",
+    )
+    center: Optional[Coord] = Field(
+        default=None,
+        description="存在感の重心。省略時は画面中央付近",
+    )
+    symmetry: PresenceSymmetry = Field(
+        default="none",
+        description="対称性: none=なし / bilateral=左右対称の圧 / radial=放射的な圧",
+    )
+    gaze_pressure: GazePressure = Field(
+        default="none",
+        description="視線の圧力。顔や目は描かず、細い線の収束や余白の圧として描く",
+    )
+    contour_density: ContourDensity = Field(
+        default="low",
+        description="輪郭密度。具象輪郭ではなく、短い弧や線片の密度として扱う",
+    )
+
 
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -239,5 +292,12 @@ class Score(BaseModel):
     background: Color = Field(
         default="white",
         description="背景色 (省略=white)。「背景を黒で塗りつぶす」→ black",
+    )
+    presence: Optional[Presence] = Field(
+        default=None,
+        description=(
+            "人・顔・動物・群れなどの対象物を直接描かず、存在感、重心、対称性、視線の圧力、"
+            "群れ、輪郭密度へ抽象化した描画パラメータ。目鼻口・四肢・耳・尻尾などの具象部品は禁止"
+        ),
     )
     instructions: list[Instruction]

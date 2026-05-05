@@ -592,6 +592,8 @@ def test_compose_happy_path(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
     assert "<circle" in data["svg"]
+    assert len(data["render_hash"]) == 64
+    assert data["render_hash_short"] == data["render_hash"][-4:].upper()
 
 
 def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
@@ -721,6 +723,28 @@ def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch,
     assert data["score"]["instructions"]
     assert data["score"]["instructions"][0]["primitive"] == "line"
     assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
+
+
+def test_compose_can_skip_auto_repair(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+
+    def fake_compose(ddl: str, model=None, original_text=None, system_prompt=None, lang="ja"):
+        return Score.model_validate(
+            {"instructions": [{"primitive": "line", "from": [0.5, 0.0], "to": [0.5, 1.0], "color": "green"}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "震えるペンの緑の直線を300本、上から下に引く。", "auto_repair": False},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    instructions = r.json()["score"]["instructions"]
+    assert [ins["primitive"] for ins in instructions] == ["line"]
+    assert not any("composition anchor restored" in (ins.get("color_hint") or "") for ins in instructions)
 
 
 def test_compose_fallback_preserves_arrangement_path(monkeypatch, auth_context):
@@ -909,7 +933,7 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
         "standard": "IEC 61966-2-1:1999",
     }
     assert r.json()["render_engine_id"] == "default"
-    assert r.json()["render_engine_version"] == "1"
+    assert r.json()["render_engine_version"] == "2"
     assert r.json()["render_canvas_aspect"] == "square"
     assert r.json()["render_color_catalog_id"] == "default"
     assert r.json()["render_color_catalog_name"] == "inku Default"
@@ -942,7 +966,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
         "standard": "IEC 61966-2-1:1999",
     }
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "1"
+    assert data["render_engine_version"] == "2"
     assert data["render_canvas_aspect"] == "square"
     assert data["render_color_catalog_id"] == "default"
     assert data["render_color_catalog_name"] == "inku Default"
@@ -1100,7 +1124,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_build_number"] == data["render_build_number"]
     assert item["render_color_profile"]["id"] == "srgb"
     assert item["render_engine_id"] == "default"
-    assert item["render_engine_version"] == "1"
+    assert item["render_engine_version"] == "2"
     assert item["render_canvas_aspect"] == "wide"
     assert item["render_color_catalog_id"] == "vivid_material"
     assert item["render_color_catalog_name"] == "Vivid Material"
@@ -1230,12 +1254,14 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
                 "standard": "IEC 61966-2-1:1999",
             },
             "render_engine_id": "default",
-            "render_engine_version": "1",
+            "render_engine_version": "2",
             "render_color_catalog_id": "default",
             "render_color_catalog_name": "inku Default",
             "render_color_catalog_sub": "neutral baseline",
             "render_color_map": {"black": "#111111"},
             "render_canvas_aspect": "square",
+            "render_hash": "a" * 64,
+            "render_hash_short": "AAAA",
         },
         {
             "stage1_model": "stage1",
@@ -1251,12 +1277,14 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert saved_score["render_build_number"] == "260"
     assert saved_score["render_color_profile"]["id"] == "srgb"
     assert saved_score["render_engine_id"] == "default"
-    assert saved_score["render_engine_version"] == "1"
+    assert saved_score["render_engine_version"] == "2"
     assert saved_score["render_color_catalog_id"] == "default"
     assert saved_score["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in saved_score
     assert saved_score["render_color_map"]["black"] == "#111111"
     assert saved_score["render_canvas_aspect"] == "square"
+    assert saved_score["render_hash"] == "a" * 64
+    assert saved_score["render_hash_short"] == "AAAA"
     assert saved_score["score"] == {"instructions": []}
     assert (tmp_path / "out" / "sample_output.svg").read_text(encoding="utf-8") == "<svg></svg>"
     assert not (tmp_path / "out" / "sample_output.png").exists()
@@ -1293,7 +1321,9 @@ def test_history_output_files_are_rebuildable_from_db(tmp_path):
     assert r.json()["count"] == 1
     assert (tmp_path / "outputs" / "sample_instruction.txt").read_text(encoding="utf-8") == "artifact source"
     assert (tmp_path / "outputs" / "sample_normalized.ddl").read_text(encoding="utf-8") == "中心に円"
-    assert (tmp_path / "outputs" / "sample_score.json").exists()
+    saved_score = json.loads((tmp_path / "outputs" / "sample_score.json").read_text(encoding="utf-8"))
+    assert saved_score["render_hash"] == item["render_hash"]
+    assert saved_score["render_hash_short"] == item["render_hash_short"]
     assert (tmp_path / "outputs" / "sample_output.svg").read_text(encoding="utf-8") == "<svg><desc>from db</desc></svg>"
 
     db.delete_items(user["id"], [item["id"]])

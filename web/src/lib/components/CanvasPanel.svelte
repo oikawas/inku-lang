@@ -6,7 +6,7 @@
 
 	type OutputTab = 'canvas' | 'prompts' | 'score';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: { instructions: unknown[]; canvas?: string | null } };
+	type PaintResult = { svg: string; score: { instructions: unknown[]; canvas?: string | null }; render_hash?: string | null; render_hash_short?: string | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean };
 
@@ -42,6 +42,9 @@
 		statusCatalogName: string;
 		statusCanvasName: string;
 		statusHistoryItem: HistoryItem | null;
+		statusHashLabel: string;
+		statusHashCopyTitle: string;
+		statusHashCopied: boolean;
 		pngMenuOpen: boolean;
 		pngWrapEl: HTMLDivElement | null;
 		pngTemplates: ExportTemplate[];
@@ -55,6 +58,7 @@
 		onResetZoom: () => void;
 		onFitZoomChange: (zoom: number) => void;
 		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
+		onCopyStatusHash: () => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
 		onDownloadPNG: (size: number) => void | Promise<void>;
@@ -92,6 +96,9 @@
 		statusCatalogName,
 		statusCanvasName,
 		statusHistoryItem,
+		statusHashLabel,
+		statusHashCopyTitle,
+		statusHashCopied,
 		pngMenuOpen = $bindable(false),
 		pngWrapEl = $bindable(null),
 		pngTemplates,
@@ -105,6 +112,7 @@
 		onResetZoom,
 		onFitZoomChange,
 		onCopyPromptText,
+		onCopyStatusHash,
 		onToggleStar,
 		onDownloadSVG,
 		onDownloadPNG
@@ -294,6 +302,14 @@
 			title={statusHistoryItem?.starred ? t().starOn : t().starOff}
 			aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
 		>★</button>
+		<button
+			class="hash-copy-btn"
+			class:copied={statusHashCopied}
+			disabled={!result || !statusHashLabel}
+			onclick={onCopyStatusHash}
+			title={statusHashCopyTitle}
+			aria-label={statusHashCopyTitle}
+		>{statusHashCopied ? t().promptCopied : statusHashLabel || '----'}</button>
 		<div class="png-wrap">
 			<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); svgMenuOpen = !svgMenuOpen; }} disabled={!result}>
 				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -674,6 +690,37 @@
 	.star-btn.starred { color: #d59b21; border-color: rgba(213,155,33,0.55); background: #fff7dc; }
 	.star-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 	.status-star { flex-shrink: 0; }
+	.hash-copy-btn {
+		height: 24px;
+		min-width: 48px;
+		padding: 0 8px;
+		border: 1px solid var(--border2);
+		border-radius: 999px;
+		background: var(--panel);
+		color: var(--fg2);
+		font-size: 11px;
+		line-height: 1;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-weight: 600;
+		letter-spacing: 0;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+	.hash-copy-btn:hover:not(:disabled) {
+		border-color: rgba(77,95,134,0.45);
+		background: var(--bg2);
+	}
+	.hash-copy-btn.copied {
+		border-color: rgba(70,130,90,0.45);
+		color: #2f6b3a;
+		background: rgba(47,107,58,0.10);
+		font-family: inherit;
+		font-weight: 600;
+	}
+	.hash-copy-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 	.png-wrap { position: relative; }
 	.png-menu {
 		position: absolute;

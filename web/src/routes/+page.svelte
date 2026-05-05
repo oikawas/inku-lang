@@ -74,13 +74,13 @@
 		render_color_profile?: Record<string, string> | null;
 		render_engine_id?: string | null;
 		render_engine_version?: string | null;
+		render_hash?: string | null;
+		render_hash_short?: string | null;
 		render_color_catalog_id?: string | null;
 		render_color_catalog_name?: string | null;
 		render_color_catalog_sub?: string | null;
 		render_color_map?: Record<string, string> | null;
 		render_canvas_aspect?: string | null;
-		render_hash?: string | null;
-		render_hash_short?: string | null;
 		history_id?: string | null;
 		history_at?: number | null;
 		elapsed_stage1_ms: number;
@@ -219,6 +219,7 @@
 	let ddlFocused = $state(false);
 	type CopyKind = 'stage1' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
+	let statusHashCopied = $state(false);
 
 	// ── Loading ─────────────────────────────────────────────
 	let loading    = $state(false);
@@ -241,6 +242,11 @@
 	let batchActiveTokensOut = $state<number | null>(null);
 	let batchTokensInTotal = $state(0);
 	let batchTokensOutTotal = $state(0);
+	let batchLatestResult = $state<PaintResult | null>(null);
+	let batchLatestDdl = $state<string | null>(null);
+	let batchLatestThinking = $state<string | null>(null);
+	let batchAutoFollowLatest = $state(false);
+	let previousInputMode = $state<'single' | 'batch' | 'demo'>('single');
 	let error        = $state<string | null>(null);
 	let demoSettings = $state<DemoSettings>({ ...DEFAULT_DEMO_SETTINGS });
 	let demoGeneratedPrompt = $state('');
@@ -269,6 +275,7 @@
 	// ── Result ──────────────────────────────────────────────
 	let ddl      = $state<string | null>(null);
 	let ddlGeneratedBaseline = $state<string | null>(null);
+	let ddlAutoRepairEnabled = $state(true);
 	let thinking = $state<string | null>(null);
 	let result   = $state<PaintResult | null>(null);
 
@@ -1879,6 +1886,7 @@
 				include_thinking: includeThinking,
 				lang,
 				canvas_aspect: effectiveCanvasAspectId(),
+				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
 				count_generation: options.countGeneration ?? true,
@@ -1949,6 +1957,8 @@
 		render_color_profile?: Record<string, string> | null;
 		render_engine_id?: string | null;
 		render_engine_version?: string | null;
+		render_hash?: string | null;
+		render_hash_short?: string | null;
 		render_color_catalog_id?: string | null;
 		render_color_catalog_name?: string | null;
 		render_color_catalog_sub?: string | null;
@@ -1971,6 +1981,7 @@
 				lang,
 				catalog_id: selectedCatalog,
 				canvas_aspect: effectiveCanvasAspectId(),
+				auto_repair: ddlAutoRepairEnabled,
 			})
 		});
 		if (!r.ok) {
@@ -1985,6 +1996,8 @@
 			render_color_profile?: Record<string, string> | null;
 			render_engine_id?: string | null;
 			render_engine_version?: string | null;
+			render_hash?: string | null;
+			render_hash_short?: string | null;
 			render_color_catalog_id?: string | null;
 			render_color_catalog_name?: string | null;
 			render_color_catalog_sub?: string | null;
@@ -2159,6 +2172,12 @@
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
 		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
+		if (submittedMode === 'batch') {
+			batchLatestResult = null;
+			batchLatestDdl = null;
+			batchLatestThinking = null;
+			batchAutoFollowLatest = true;
+		}
 		startTimer();
 
 		try {
@@ -2199,6 +2218,8 @@
 					render_color_catalog_sub: composed.render_color_catalog_sub,
 					render_color_map: composed.render_color_map,
 					render_canvas_aspect: composed.render_canvas_aspect,
+					render_hash: composed.render_hash,
+					render_hash_short: composed.render_hash_short,
 					elapsed_stage1_ms: elapsedStage1Ms,
 					elapsed_stage2_ms: elapsedStage2Ms,
 					elapsed_total_ms: elapsedTotalMs,
@@ -2209,7 +2230,7 @@
 				};
 				result = r; outputTab = 'canvas';
 				fitCanvasZoom();
-				await pushHistory({
+				const savedHistory = await pushHistory({
 					input,
 					ddl: interpreted.ddl,
 					score: composed.score,
@@ -2222,6 +2243,15 @@
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
 					catalog_id: selectedCatalog,
 				}, { countGeneration: true });
+				if (savedHistory && result === r) {
+					result = {
+						...r,
+						history_id: savedHistory.id,
+						history_at: savedHistory.at,
+						render_hash: savedHistory.render_hash,
+						render_hash_short: savedHistory.render_hash_short,
+					};
+				}
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
 				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
@@ -2248,12 +2278,11 @@
 						batchTokensInTotal += batchActiveTokensIn ?? 0;
 						batchTokensOutTotal += batchActiveTokensOut ?? 0;
 						thinking = r.thinking;
-						if (displayedHistoryItem === null) {
-							result = r;
-							ddl = r.ddl;
-							ddlGeneratedBaseline = r.ddl;
-							ddlSelection = { start: r.ddl.length, end: r.ddl.length };
-							fitCanvasZoom();
+						batchLatestResult = r;
+						batchLatestDdl = r.ddl;
+						batchLatestThinking = r.thinking;
+						if (inputMode === 'batch' && batchAutoFollowLatest) {
+							displayLatestBatchRender();
 						}
 						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
@@ -2334,7 +2363,7 @@
 				method: 'POST',
 				signal: abortController.signal,
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: resolvedStage2Model, original_text: replayInput, lang, catalog_id: selectedCatalog, canvas_aspect: effectiveCanvasAspectId() })
+				body: JSON.stringify({ ddl, model: resolvedStage2Model, original_text: replayInput, lang, catalog_id: selectedCatalog, canvas_aspect: effectiveCanvasAspectId(), auto_repair: ddlAutoRepairEnabled })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -2353,6 +2382,8 @@
 				render_color_catalog_sub?: string | null;
 				render_color_map?: Record<string, string> | null;
 				render_canvas_aspect?: string | null;
+				render_hash?: string | null;
+				render_hash_short?: string | null;
 				tokens_in: number | null;
 				tokens_out: number | null;
 			};
@@ -2360,15 +2391,15 @@
 			const resolvedStage1Model = result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
 			const savedStage2Model = d.stage2_model ?? resolvedStage2Model;
 			result = result
-				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect }
-				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_hash: d.render_hash, render_hash_short: d.render_hash_short }
+				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_hash: d.render_hash, render_hash_short: d.render_hash_short, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
 			elapsedStage1Ms = 0; elapsedStage2Ms = elapsedMs; elapsedTotalMs = elapsedMs;
 			tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = d.tokens_in; tokensOutStage2 = d.tokens_out;
 			if (saveReplayAsNewVersion) {
-				await pushHistory({
+				const savedHistory = await pushHistory({
 					input: replayInput,
 					ddl,
 					score: d.score,
@@ -2381,6 +2412,15 @@
 					tokens_out: d.tokens_out,
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
 				});
+				if (savedHistory && result) {
+					result = {
+						...result,
+						history_id: savedHistory.id,
+						history_at: savedHistory.at,
+						render_hash: savedHistory.render_hash,
+						render_hash_short: savedHistory.render_hash_short,
+					};
+				}
 			}
 			outputTab = 'canvas';
 			fitCanvasZoom();
@@ -2538,18 +2578,21 @@
 		}
 	}
 
-	async function pushHistory(it: Iteration, options: { countGeneration?: boolean } = {}): Promise<void> {
-		if (!authToken) return;
+	async function pushHistory(it: Iteration, options: { countGeneration?: boolean } = {}): Promise<Iteration | null> {
+		if (!authToken) return null;
+		let saved: Iteration | null = null;
 		try {
-				await apiFetch('/api/history', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: effectiveCanvasAspectId() })
-				});
+			const r = await apiFetch('/api/history', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: effectiveCanvasAspectId() })
+			});
+			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
 		if (options.countGeneration) await refreshCurrentUserOnly();
 		await fetchHistoryOffset(0);
 		historyCursor = 0;
+		return saved;
 	}
 
 	async function saveCurrentDemoToHistory(): Promise<void> {
@@ -2604,8 +2647,8 @@
 			demoSaveStatus = null;
 			demoCurrentSaved = false;
 		}
-		ddl = null;
-		ddlGeneratedBaseline = null;
+		ddl = inputMode === 'single' ? '' : null;
+		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
 		thinking = null;
 		result = null;
 		stage1UserPrompt = '';
@@ -2920,22 +2963,25 @@
 		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
 	}
 
+	async function copyTextToClipboard(value: string): Promise<void> {
+		if (navigator.clipboard?.writeText) {
+			await navigator.clipboard.writeText(value);
+			return;
+		}
+		const textarea = document.createElement('textarea');
+		textarea.value = value;
+		textarea.setAttribute('readonly', 'true');
+		textarea.style.position = 'fixed';
+		textarea.style.left = '-9999px';
+		document.body.appendChild(textarea);
+		textarea.select();
+		document.execCommand('copy');
+		document.body.removeChild(textarea);
+	}
+
 	async function copyPromptText(kind: CopyKind, text: string | null | undefined): Promise<void> {
-		const value = text ?? '';
 		try {
-			if (navigator.clipboard?.writeText) {
-				await navigator.clipboard.writeText(value);
-			} else {
-				const textarea = document.createElement('textarea');
-				textarea.value = value;
-				textarea.setAttribute('readonly', 'true');
-				textarea.style.position = 'fixed';
-				textarea.style.left = '-9999px';
-				document.body.appendChild(textarea);
-				textarea.select();
-				document.execCommand('copy');
-				document.body.removeChild(textarea);
-			}
+			await copyTextToClipboard(text ?? '');
 			copiedPrompt = kind;
 			window.setTimeout(() => {
 				if (copiedPrompt === kind) copiedPrompt = null;
@@ -2943,6 +2989,38 @@
 		} catch {
 			copiedPrompt = null;
 		}
+	}
+
+	async function copyStatusHash(): Promise<void> {
+		const value = statusHashFull;
+		if (!value) return;
+		try {
+			await copyTextToClipboard(value);
+			statusHashCopied = true;
+			window.setTimeout(() => {
+				statusHashCopied = false;
+			}, 1200);
+		} catch {
+			statusHashCopied = false;
+		}
+	}
+
+	function displayLatestBatchRender(): void {
+		if (!batchLatestResult) return;
+		result = batchLatestResult;
+		ddl = batchLatestDdl;
+		ddlGeneratedBaseline = batchLatestDdl;
+		ddlSelection = { start: batchLatestDdl?.length ?? 0, end: batchLatestDdl?.length ?? 0 };
+		thinking = batchLatestThinking;
+		outputTab = 'canvas';
+		fitCanvasZoom();
+	}
+
+	function resumeBatchLatestFollow(): void {
+		batchAutoFollowLatest = true;
+		displayedHistoryItem = null;
+		historyCursor = -1;
+		displayLatestBatchRender();
 	}
 
 	function shortModel(m: string | null | undefined): string {
@@ -2996,6 +3074,21 @@
 	const statusCanvasName = $derived(getCanvasAspectOption(
 		displayedHistoryItem?.score?.canvas ?? result?.score?.canvas ?? effectiveCanvasAspectId()
 	).label);
+	const statusHashFull = $derived(
+		displayedHistoryItem?.render_hash
+			?? result?.render_hash
+			?? ''
+	);
+	const statusHashLabel = $derived((
+		displayedHistoryItem?.render_hash_short
+			?? displayedHistoryItem?.render_hash?.slice(-4)
+			?? result?.render_hash_short
+			?? result?.render_hash?.slice(-4)
+			?? ''
+	).toUpperCase());
+	const statusHashCopyTitle = $derived(statusHashLabel
+		? `${t().historyHashCopyTitle}: ${statusHashLabel}`
+		: t().historyHashCopyTitle);
 	const statusHistoryItem = $derived.by(() => {
 		if (displayedHistoryItem) return displayedHistoryItem;
 		if (result?.history_id) {
@@ -3085,6 +3178,8 @@
 		if (result.render_engine_id !== undefined) payload.render_engine_id = result.render_engine_id;
 		if (result.render_engine_version !== undefined) payload.render_engine_version = result.render_engine_version;
 		if (result.render_canvas_aspect !== undefined) payload.render_canvas_aspect = result.render_canvas_aspect;
+		if (result.render_hash !== undefined) payload.render_hash = result.render_hash;
+		if (result.render_hash_short !== undefined) payload.render_hash_short = result.render_hash_short;
 		if (result.render_color_catalog_id !== undefined) payload.render_color_catalog_id = result.render_color_catalog_id;
 		if (result.render_color_catalog_name !== undefined) payload.render_color_catalog_name = result.render_color_catalog_name;
 		if (result.render_color_catalog_sub !== undefined) payload.render_color_catalog_sub = result.render_color_catalog_sub;
@@ -3319,6 +3414,17 @@
 		if (typeof document === 'undefined') return;
 		document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
 	});
+	$effect(() => {
+		const mode = inputMode;
+		const wasMode = previousInputMode;
+		if (mode === wasMode) return;
+		previousInputMode = mode;
+		if (mode === 'batch' && (activeRunMode === 'batch' || batchLatestResult)) {
+			untrack(resumeBatchLatestFollow);
+		} else if (wasMode === 'batch') {
+			batchAutoFollowLatest = false;
+		}
+	});
 </script>
 
 <svelte:window onclick={handleDocClick} />
@@ -3443,6 +3549,7 @@
 							{liveMs}
 							{tokenSummary}
 							{showKiwi}
+							bind:autoRepairEnabled={ddlAutoRepairEnabled}
 							bind:activeSaijikiPreview
 							onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 							onInsertWord={insertWord}
@@ -3530,6 +3637,9 @@
 				{statusCatalogName}
 				{statusCanvasName}
 				{statusHistoryItem}
+				{statusHashLabel}
+				{statusHashCopyTitle}
+				{statusHashCopied}
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}
 				onGotoLatest={gotoLatest}
@@ -3540,6 +3650,7 @@
 				onResetZoom={resetZoom}
 				onFitZoomChange={updateCanvasFitZoom}
 				onCopyPromptText={copyPromptText}
+				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}

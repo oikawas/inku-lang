@@ -1,6 +1,7 @@
+import math
 from xml.etree import ElementTree
 
-from inku_server.renderer import render
+from inku_server.renderer import _clustered_pos, render
 from inku_server.schema import Instruction, Score
 
 
@@ -115,6 +116,28 @@ def test_render_compat_svg_is_portable_and_filter_free():
     assert 'id="mark_000_000_circle"' in svg
     assert "filter=" not in svg
     assert "<filter" not in svg
+
+
+def test_render_polygon_outputs_svg_polygon():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "polygon",
+                    "center": [0.5, 0.5],
+                    "radius": 0.1,
+                    "sides": 6,
+                    "rotation": 15,
+                }
+            ]
+        }
+    )
+
+    svg = render(score, svg_profile="editable")
+
+    assert 'id="instruction_000_polygon_black_pen"' in svg
+    assert 'id="mark_000_000_polygon"' in svg
+    assert "<polygon" in svg
 
 
 def test_render_dashed_line_has_dasharray():
@@ -298,6 +321,27 @@ def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
     assert svg.count("<rect") >= 25
     assert 'stroke-opacity="0.4"' in svg
     assert 'fill-opacity="0.22"' in svg
+
+
+def test_clustered_positions_do_not_form_constant_radius_ring():
+    points = [
+        _clustered_pos(
+            i,
+            48,
+            12345,
+            0.2,
+            "none",
+            cluster_count=1,
+            density="high",
+            preserve_space=True,
+        )
+        for i in range(48)
+    ]
+    cx = sum(x for x, _ in points) / len(points)
+    cy = sum(y for _, y in points) / len(points)
+    distances = sorted(math.hypot(x - cx, y - cy) for x, y in points)
+
+    assert distances[-1] > distances[0] * 2.5
 
 
 def test_render_sensory_layers_have_distinct_opacity():
@@ -846,3 +890,92 @@ def test_render_pink_variation_deterministic():
         }
     )
     assert render(score) == render(score)
+
+
+def test_render_presence_layer_is_abstract_and_filter_free():
+    score = Score.model_validate(
+        {
+            "presence": {
+                "kind": "figure_like",
+                "intensity": "medium",
+                "center": [0.56, 0.52],
+                "symmetry": "bilateral",
+                "gaze_pressure": "medium",
+                "contour_density": "medium",
+            },
+            "instructions": [
+                {"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.3, 0.12], "color": "blue"}
+            ],
+        }
+    )
+
+    svg = render(score, svg_profile="editable")
+
+    ElementTree.fromstring(svg)
+    assert 'id="layer_20_presence"' in svg
+    assert 'id="presence_layer"' in svg
+    assert "filter=" not in svg
+    assert "eye" not in svg.lower()
+    assert "face" not in svg.lower()
+    assert "animal" not in svg.lower()
+
+
+def test_render_omits_presence_layer_when_absent():
+    svg = render(Score.model_validate({"instructions": []}), svg_profile="editable")
+
+    assert 'id="presence_layer"' not in svg
+
+
+def test_render_presence_layer_gets_subtler_when_scene_is_dense():
+    sparse = Score.model_validate(
+        {
+            "presence": {"kind": "figure_like", "intensity": "medium", "symmetry": "bilateral"},
+            "instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}],
+        }
+    )
+    dense = Score.model_validate(
+        {
+            "presence": {"kind": "figure_like", "intensity": "medium", "symmetry": "bilateral"},
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.5],
+                    "to": [1.0, 0.5],
+                    "arrangement": {"count": 160, "layout": "vertical"},
+                }
+            ],
+        }
+    )
+
+    sparse_svg = render(sparse)
+    dense_svg = render(dense)
+
+    assert 'stroke-opacity="0.1722"' in sparse_svg
+    assert 'stroke-opacity="0.089544"' in dense_svg
+
+
+def test_render_color_cycle_preserves_effect_hint_opacity():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.3, 0.1],
+                    "color": "black",
+                    "color_hint": "透明な膜; white restored in color_cycle from DDL color intent",
+                    "arrangement": {
+                        "count": 2,
+                        "layout": "horizontal",
+                        "color_cycle": ["black", "white"],
+                    },
+                }
+            ],
+        }
+    )
+
+    svg = render(score)
+
+    assert svg.count('fill-opacity="0.12"') == 2
+    assert 'fill="#111111"' in svg
+    assert 'fill="#ffffff"' in svg

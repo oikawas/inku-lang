@@ -24,6 +24,7 @@
 		liveMs: number;
 		tokenSummary: string;
 		showKiwi: boolean;
+		autoRepairEnabled: boolean;
 		activeSaijikiPreview: SaijikiPreview | null;
 		onToggleSaijiki: () => void;
 		onInsertWord: (word: string) => void;
@@ -46,6 +47,7 @@
 		liveMs,
 		tokenSummary,
 		showKiwi,
+		autoRepairEnabled = $bindable(true),
 		activeSaijikiPreview = $bindable(),
 		onToggleSaijiki,
 		onInsertWord,
@@ -73,6 +75,7 @@
 		{liveMs}
 		{tokenSummary}
 		{showKiwi}
+		bind:autoRepairEnabled
 		bind:activeSaijikiPreview
 		{onToggleSaijiki}
 		{onInsertWord}
@@ -83,7 +86,7 @@
 		onReplay={onReplay}
 	/>
 	{#if !reloading && !loading}
-		<PaintButton onclick={onReplay} disabled={!ddl}>{t().ddlPaintButton}</PaintButton>
+		<PaintButton onclick={onReplay} disabled={!ddl.trim()}>{t().ddlPaintButton}</PaintButton>
 	{/if}
 </section>
 

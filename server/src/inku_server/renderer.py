@@ -283,7 +283,11 @@ def _clustered_pos(
     density: str,
     preserve_space: bool,
 ) -> tuple[float, float]:
-    """大数量の配置を、均一散布ではなく複数のまとまりとして決定的に配置する。"""
+    """大数量の配置を、均一散布ではなく複数のまとまりとして決定的に配置する。
+
+    クラスタ内部を円周状に並べると、異なる絵に同じ輪状の記号が現れやすい。
+    そのため、内部配置はパス方向を持つ短い帯として広げる。
+    """
     cluster_count = max(1, min(cluster_count, n))
     cluster_index = i % cluster_count
     local_index = i // cluster_count
@@ -294,12 +298,26 @@ def _clustered_pos(
     else:
         cx, cy = _path_pos(cluster_index, cluster_count, seed ^ 0xC1A57, center_margin, path)
 
-    angle = _hash01(i, seed, "cluster-angle") * math.tau
-    spiral_t = (local_index + 0.5) / local_total
-    radius = _density_radius(density, preserve_space) * math.sqrt(spiral_t)
-    jitter = 0.55 + _hash01(i, seed, "cluster-radius") * 0.75
-    x = cx + math.cos(angle) * radius * jitter
-    y = cy + math.sin(angle) * radius * jitter
+    if path == "diagonal":
+        axis_angle = -math.pi / 4
+    elif path in ("top_to_bottom",):
+        axis_angle = math.pi / 2
+    elif path in ("left_to_right", "right_half", "wave"):
+        axis_angle = 0.0
+    else:
+        axis_angle = _hash01(cluster_index, seed, "cluster-axis") * math.tau
+    tx, ty = math.cos(axis_angle), math.sin(axis_angle)
+    nx, ny = -ty, tx
+    local_t = (local_index + 0.5) / local_total
+    centered = (local_t - 0.5) * 2.0
+    radius = _density_radius(density, preserve_space)
+    long_span = radius * (1.45 + _hash01(cluster_index, seed, "cluster-long") * 0.95)
+    cross_span = radius * (0.28 + _hash01(cluster_index, seed, "cluster-cross") * 0.32)
+    along = centered * long_span + (_hash01(i, seed, "cluster-along") - 0.5) * radius * 0.20
+    cross = (_hash01(i, seed, "cluster-cross-jitter") - 0.5) * cross_span * (1.25 - 0.45 * abs(centered))
+    bend = math.sin(local_t * math.pi) * (_hash01(cluster_index, seed, "cluster-bend") - 0.5) * radius * 0.55
+    x = cx + tx * along + nx * (cross + bend)
+    y = cy + ty * along + ny * (cross + bend)
     return _clamp01(x), _clamp01(y)
 
 
@@ -333,7 +351,7 @@ def _anchor(ins: Instruction) -> tuple[float, float]:
     """図形の論理的な中心座標を返す。"""
     if ins.primitive == "line" and ins.from_ and ins.to:
         return ((ins.from_[0] + ins.to[0]) / 2, (ins.from_[1] + ins.to[1]) / 2)
-    if ins.primitive in ("circle", "ellipse", "arc") and ins.center:
+    if ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center:
         return ins.center
     if ins.primitive in ("square", "triangle") and ins.position and ins.size:
         return (ins.position[0] + ins.size[0] / 2, ins.position[1] + ins.size[1] / 2)
@@ -360,7 +378,7 @@ def _shift(ins: Instruction, dx: float, dy: float) -> Instruction:
     if ins.primitive == "line" and ins.from_ and ins.to:
         data["from"] = [ins.from_[0] + dx, ins.from_[1] + dy]
         data["to"] = [ins.to[0] + dx, ins.to[1] + dy]
-    elif ins.primitive in ("circle", "ellipse", "arc") and ins.center:
+    elif ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center:
         data["center"] = [ins.center[0] + dx, ins.center[1] + dy]
     elif ins.primitive in ("square", "triangle") and ins.position:
         data["position"] = [ins.position[0] + dx, ins.position[1] + dy]
@@ -374,9 +392,27 @@ def _apply_color_cycle(items: list[Instruction], cycle: list) -> list[Instructio
     for i, single in enumerate(items):
         data = single.model_dump(by_alias=True)
         data["color"] = cycle[i % len(cycle)]
-        data["color_hint"] = None
+        data["color_hint"] = _render_effect_hint(single.color_hint)
         result.append(Instruction.model_validate(data))
     return result
+
+
+def _render_effect_hint(color_hint: str | None) -> str | None:
+    """color_cycle 時も、色選択ではなく描画効果に関わるヒントだけは残す。"""
+    if not color_hint:
+        return None
+    hint = _norm_label(color_hint)
+    effect_tokens = (
+        "membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄",
+        "soft light", "柔らかな光", "陽光", "日差し",
+        "scent", "fragrance", "香り", "匂",
+        "waiting buds", "開花を待つ蕾", "蕾", "つぼみ",
+        "five-sense", "五感",
+        "fade directional", "fade=directional", "fade outward", "fade=outward",
+        "reflection", "反射", "映り",
+    )
+    kept = [token for token in effect_tokens if token in hint]
+    return "; ".join(kept) if kept else None
 
 
 def _expand_arrangement(ins: Instruction) -> list[Instruction]:
@@ -562,14 +598,17 @@ def render(
         background = dwg.g(id="layer_00_background")
         background.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=bg, id="background"))
         content = dwg.g(id="layer_10_content")
+        presence_content = dwg.g(id="layer_20_presence")
         artboard.add(background)
         artboard.add(content)
+        artboard.add(presence_content)
     else:
         dwg.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=bg))
         clip_id = "canvas-clip"
         clip = dwg.defs.add(dwg.clipPath(id=clip_id))
         clip.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height)))
         content = dwg.g(clip_path=f"url(#{clip_id})")
+        presence_content = content
 
     blur_needed: dict[str, float] = {}
     texture_filters = _texture_filter_weights(score) if use_filters else set()
@@ -596,6 +635,10 @@ def render(
         if structured:
             content.add(instruction_group)
 
+    presence_layer = _render_presence_layer(dwg, score, cmap, canvas)
+    if presence_layer is not None:
+        presence_content.add(presence_layer)
+
     if structured:
         dwg.add(artboard)
     else:
@@ -609,7 +652,7 @@ def render(
     return svg
 
 
-_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})
+_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle", "polygon"})
 
 
 def _texture_filter_weights(score: Score) -> set[str]:
@@ -618,6 +661,156 @@ def _texture_filter_weights(score: Score) -> set[str]:
         if ins.weight in TEXTURE_FILTERS:
             weights.add(ins.weight)
     return weights
+
+
+def _score_visual_load(score: Score) -> int:
+    load = 0
+    for ins in score.instructions:
+        if ins.arrangement is not None:
+            load += max(1, int(ins.arrangement.count))
+        else:
+            load += 1
+    return load
+
+
+def _presence_center_px(score: Score, canvas: CanvasSize) -> tuple[float, float]:
+    presence = score.presence
+    if presence is None or presence.center is None:
+        return canvas.width * 0.52, canvas.height * 0.50
+    x, y = presence.center
+    return _clamp01(x) * canvas.width, _clamp01(y) * canvas.height
+
+
+def _presence_seed(score: Score) -> int:
+    presence_json = score.presence.model_dump_json() if score.presence is not None else ""
+    instruction_key = "|".join(
+        f"{ins.primitive}:{ins.color}:{ins.weight}:{ins.arrangement.count if ins.arrangement else 1}"
+        for ins in score.instructions
+    )
+    digest = hashlib.sha256(f"{presence_json}|{instruction_key}".encode("utf-8")).digest()
+    return struct.unpack("<Q", digest[:8])[0]
+
+
+def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, str], canvas: CanvasSize):
+    """抽象化された存在感を描く。自然文キーワードや具象部品はここでは扱わない。"""
+    presence = score.presence
+    if presence is None or presence.kind == "none":
+        return None
+
+    cx, cy = _presence_center_px(score, canvas)
+    unit = canvas.unit
+    color = cmap.get("gray", COLOR_MAP["gray"])
+    dark = cmap.get("black", COLOR_MAP["black"])
+    visual_load = _score_visual_load(score)
+    load_opacity = 0.52 if visual_load >= 120 else 0.70 if visual_load >= 60 else 1.0
+    intensity_opacity = {"low": 0.13, "medium": 0.21, "high": 0.30}[presence.intensity] * load_opacity
+    gaze_opacity = {"none": 0.0, "low": 0.11, "medium": 0.18, "high": 0.26}[presence.gaze_pressure] * load_opacity
+    contour_count = {"low": 4, "medium": 7, "high": 11}[presence.contour_density]
+    radius_x = unit * {"low": 0.18, "medium": 0.24, "high": 0.30}[presence.intensity]
+    radius_y = unit * {"low": 0.24, "medium": 0.32, "high": 0.40}[presence.intensity]
+    stroke = max(1.2, unit * 0.003)
+    layer = dwg.g(id="presence_layer")
+    seed = _presence_seed(score)
+    phase = math.tau * _hash01(0, seed, "presence-phase")
+    tilt = (_hash01(1, seed, "presence-tilt") - 0.5) * 1.2
+
+    if presence.symmetry == "bilateral":
+        for i, side in enumerate((-1, 1, -1, 1)):
+            y_shift = (-0.36 + i * 0.24) * radius_y
+            x_outer = side * radius_x * (0.34 + 0.10 * _hash01(i, seed, "sym-x"))
+            x_inner = side * radius_x * (0.10 + 0.08 * _hash01(i, seed, "sym-inner"))
+            layer.add(dwg.line(
+                start=(cx + x_outer, cy + y_shift - radius_y * 0.06),
+                end=(cx + x_inner, cy + y_shift + radius_y * (0.10 + tilt * 0.06)),
+                stroke=color,
+                stroke_width=stroke,
+                stroke_opacity=intensity_opacity * 0.58,
+                stroke_linecap="round",
+            ))
+    elif presence.symmetry == "radial":
+        for i in range(6):
+            angle = phase + math.tau * i / 6.0
+            inner = radius_x * 0.28
+            outer = radius_x * 0.86
+            layer.add(dwg.line(
+                start=(cx + math.cos(angle) * inner, cy + math.sin(angle) * inner),
+                end=(cx + math.cos(angle) * outer, cy + math.sin(angle) * outer),
+                stroke=color,
+                stroke_width=stroke,
+                stroke_opacity=intensity_opacity * 0.72,
+                stroke_linecap="round",
+            ))
+
+    if presence.gaze_pressure != "none":
+        for i, side in enumerate((-1, 1, -1, 1, -1, 1)):
+            t = (i + 1) / 7
+            angle = phase + side * (0.34 + 0.08 * i)
+            start_x = cx + math.cos(angle) * radius_x * (1.05 + 0.18 * (i % 2))
+            start_y = cy + math.sin(angle) * radius_y * (0.72 + 0.08 * i)
+            end_x = cx + math.cos(angle + math.pi) * radius_x * 0.12
+            end_y = cy + (t - 0.5) * radius_y * 0.16
+            layer.add(dwg.line(
+                start=(start_x, start_y),
+                end=(end_x, end_y),
+                stroke=dark,
+                stroke_width=stroke * 0.8,
+                stroke_opacity=gaze_opacity,
+                stroke_linecap="round",
+            ))
+
+    flow_angle = phase * 0.35 + tilt
+    tx, ty = math.cos(flow_angle), math.sin(flow_angle)
+    nx, ny = -ty, tx
+    for i in range(contour_count):
+        t = (i + 0.5) / contour_count
+        along = (t - 0.5) * radius_x * (1.18 + 0.18 * _hash01(i, seed, "presence-flow-span"))
+        cross = math.sin(t * math.pi * 1.7 + phase) * radius_y * 0.32
+        cross += (_hash01(i, seed, "presence-flow-cross") - 0.5) * radius_y * 0.28
+        px = cx + tx * along + nx * cross
+        py = cy + ty * along + ny * cross
+        half = radius_x * (0.09 + 0.04 * _hash01(i, seed, "presence-flow-half"))
+        lift = radius_y * (0.05 + 0.04 * _hash01(i, seed, "presence-flow-lift"))
+        side = -1.0 if i % 2 else 1.0
+        x1 = px - tx * half - nx * lift * side
+        y1 = py - ty * half - ny * lift * side
+        x2 = px + tx * half + nx * lift * side
+        y2 = py + ty * half + ny * lift * side
+        xm = px + nx * lift * side * 1.4
+        ym = py + ny * lift * side * 1.4
+        path = dwg.path(
+            d=f"M {x1:.2f},{y1:.2f} Q {xm:.2f},{ym:.2f} {x2:.2f},{y2:.2f}",
+            fill="none",
+            stroke=color,
+            stroke_width=stroke,
+            stroke_opacity=intensity_opacity * 0.82,
+            stroke_linecap="round",
+        )
+        layer.add(path)
+
+    if presence.kind == "group_like":
+        for i in range(7):
+            t = (i - 3) / 3.5
+            px = cx + tx * t * radius_x * 0.78 + nx * (_hash01(i, seed, "group-x") - 0.5) * radius_x * 0.20
+            py = cy + ty * t * radius_x * 0.78 + ny * (_hash01(i, seed, "group-y") - 0.5) * radius_y * 0.58
+            layer.add(dwg.circle(
+                center=(px, py),
+                r=max(2.0, unit * 0.006),
+                fill=color,
+                fill_opacity=intensity_opacity * 0.72,
+            ))
+    elif presence.kind == "creature_like":
+        for i in range(3):
+            t = (i - 1) * 0.34
+            layer.add(dwg.line(
+                start=(cx - radius_x * 0.30 + t * radius_x, cy + radius_y * 0.32),
+                end=(cx - radius_x * 0.05 + t * radius_x, cy + radius_y * 0.44),
+                stroke=color,
+                stroke_width=stroke,
+                stroke_opacity=intensity_opacity * 0.76,
+                stroke_linecap="round",
+            ))
+
+    return layer
 
 
 def _norm_label(value: str) -> str:
@@ -888,6 +1081,18 @@ def _arc_points(cx: float, cy: float, r: float, start_deg: float, end_deg: float
             cy - math.sin(start + (end - start) * i / (count - 1)) * r,
         )
         for i in range(count)
+    ]
+
+
+def _polygon_points(cx: float, cy: float, r: float, sides: int, rotation_deg: float = 0.0) -> list[tuple[float, float]]:
+    sides = min(max(int(sides), 5), 8)
+    start = math.radians(rotation_deg - 90)
+    return [
+        (
+            cx + math.cos(start + math.tau * i / sides) * r,
+            cy + math.sin(start + math.tau * i / sides) * r,
+        )
+        for i in range(sides)
     ]
 
 
@@ -1271,6 +1476,14 @@ def _render_instruction(
             (x, y + h),
             (x + w, y + h),
         ]
+        return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
+
+    if ins.primitive == "polygon":
+        if ins.center is None or ins.radius is None:
+            raise ValueError("polygon requires 'center' and 'radius'")
+        cx, cy = _px(ins.center, canvas)
+        r = ins.radius * canvas.unit
+        points = _polygon_points(cx, cy, r, ins.sides or 5)
         return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
 
     if ins.primitive == "arc":

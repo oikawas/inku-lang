@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.44**
+**Version: v1.45**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -114,6 +114,16 @@ structural, not poetic.  It must preserve DDL elements such as color, material,
 movement, arrangement path, rotation, and canvas.  If an element exists in DDL,
 Stage 2 should either encode it or fail clearly.
 
+Adjectives, motion words, and texture words modify the primitive that the DDL
+already names.  Stage 2 must not add unrequested support lines, support shapes,
+or differently colored instructions merely because the DDL says "trembling",
+"swaying", "blurring", "thick", "thin", or a similar modifier.  The server also
+applies a narrow deterministic contract guard for single-primitive DDL with
+motion or texture modifiers: it keeps only instructions matching the requested
+primitive and explicit color, drops unrequested auxiliary marks, and applies
+the missing motion as variation on the requested primitive when possible.  The
+guard is intentionally not applied to multi-motif DDL.
+
 When Stage 2 cannot return usable instructions because of timeout, empty output,
 or transient model failure, the server may produce a deterministic fallback
 Score.  This fallback is still expected to preserve the DDL's visible essentials:
@@ -133,6 +143,20 @@ The renderer converts JSON Score into SVG.  It owns visual realization:
 
 The renderer is allowed to produce controlled variation, but it must preserve
 the JSON Score's intent.
+
+Human, face, animal, and group motifs are not drawn as literal objects.  Stage 2
+and the coercion layer convert them into `Score.presence`: presence kind,
+intensity, center of gravity, symmetry, gaze pressure, group behavior, and
+contour density.  The renderer realizes presence as faint arcs, edge-biased
+focus, asymmetric spacing, and contour-density pressure.  It avoids fixed
+silhouettes such as stick figures, head/body pairs, wing/tail marks, or rings
+of identical ellipses.
+
+The primitive vocabulary includes `polygon` for polygonal language.  Individual
+pentagon or hexagon primitives are not added; polygonal intent is represented
+with `polygon` and `sides=5-8`.  Motion energy is handled by trajectory,
+rotation, diagonal placement, wave paths, and asymmetry rather than simply
+increasing count or density.
 
 The rendering core is exposed internally through a RenderEngine contract.  A
 render engine receives JSON Score, render options, and server-owned color
@@ -203,17 +227,20 @@ the English canonical label and may include `name_ja`; the Japanese UI displays
 those entries as `English（日本語）`, while the English UI displays `name` only.
 
 Render JSON produced by the server records the concrete render context.  Paint,
-compose, and saved artifact JSON include the resolved `stage1_model` /
-`stage2_model` that were actually used, plus `render_build_number`,
-`render_color_profile`, `render_engine_id`, `render_engine_version`,
-`render_canvas_aspect`, `render_color_catalog_id`,
-`render_color_catalog_name`, `render_color_catalog_sub`, and
-`render_color_map`, where abstract colors and
+compose, the JSON tab, and saved artifact JSON include the resolved
+`stage1_model` / `stage2_model` that were actually used, plus
+`render_build_number`, `render_color_profile`, `render_engine_id`,
+`render_engine_version`, `render_canvas_aspect`, `render_hash`,
+`render_hash_short`, `render_color_catalog_id`, `render_color_catalog_name`,
+`render_color_catalog_sub`, and `render_color_map`, where abstract colors and
 `palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
 rendering.  The current engine metadata is `render_engine_id: "default"` and
 `render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
+`render_hash` is a 64-character SHA-256 hex hash of the rendered content and
+server-owned render metadata.  `render_hash_short` is the four-character
+uppercase suffix used for UI and CLI references.
 `score.canvas` remains the score-level canvas instruction, while
 `render_canvas_aspect` records the canvas aspect actually used for this rendered
 artifact.  In normal server-generated output they match, but both are retained
@@ -373,6 +400,11 @@ input.  The box supports two editing paths:
   insertion at the current caret position
 - the `DDL editing` button opens a larger dialog with line numbers, a
   two-column Saijiki vocabulary panel, and a short DDL syntax guide
+- the `auto repair` checkbox controls whether the server applies deterministic
+  JSON Score repair after Stage 2. It is enabled by default. When disabled,
+  Stage 2 output is rendered without the broader `coerce_score()` repair pass,
+  while hard contract guards may still remove instructions that violate the
+  requested primitive/color contract.
 
 The same `Draw from DDL` action is also available below the interpretation box
 for quick replay without opening the dialog.  The dialog itself does not start
@@ -383,6 +415,7 @@ If the user edits DDL directly and then presses the normal `draw` button, inku
 warns that the DDL edit will be lost.  The choices are `cancel`, `OK`, and
 `draw from DDL`.  `OK` reruns Stage 1 from the natural-language prompt, while
 `draw from DDL` preserves the edited DDL and runs Stage 2 / rendering only.
+The natural-language prompt is not reinterpreted by `Draw from DDL`.
 
 DDL replay shows elapsed time, token information, a stop button, and the kiwi
 progress mascot.  Stopping replay aborts the active `/api/compose` request.
@@ -407,6 +440,10 @@ stores batch prompt history per user.
 Batch mode can optionally choose a random server color catalog for each render.
 The selected catalog is sent as `catalog_id` to `/api/paint`, and history records
 store the catalog that was actually used.
+
+In the color catalog dialog, clicking outside the dialog confirms the current
+selection exactly like the save/confirm action. The cancel button still restores
+the selection snapshot from when the dialog was opened.
 
 The batch mascot is a small crab that walks slowly during progress, moves its
 claws, watches the process, and occasionally dives under a water surface while
@@ -656,11 +693,17 @@ The reference implementation currently includes:
   and canvas aspect support
 
 History records carry a server-side `render_hash`: a 64-character SHA-256 hex
-hash of the rendered content and render metadata.  History APIs also expose a
-four-character uppercase short hash for human reference.  The history manager
-shows the short hash without changing the thumbnail layout; clicking it copies
-the full hash.  The CLI can resolve hash suffixes, reject ambiguous short
-matches, and export selected or ranged history items for benchmark review.
+hash of the rendered content and render metadata.  History APIs, paint/compose
+responses, the JSON tab, and saved artifact JSON expose both `render_hash` and
+the four-character uppercase `render_hash_short` for human reference.  The
+history manager shows the short hash without changing the thumbnail layout;
+clicking it copies the full hash.  The status bar also shows the current
+render's short hash beside the star action and copies the full hash when
+clicked.  After the web UI saves a render through the history API, it replaces
+the active result hash with the DB history record's hash so the value shown
+immediately after rendering matches the value shown when the same work is later
+selected from history.  The CLI can resolve hash suffixes, reject ambiguous
+short matches, and export selected or ranged history items for benchmark review.
 The history manager opens at 80% of the current viewport, leaving 10% margins
 on each side, and thumbnail cards show the prompt preview above a compact
 star/hash/action row.

@@ -48,6 +48,7 @@ export const en: LangPack = {
 	colorCatalogButton: 'color catalog',
 	replayFromDdlButton: '↺ draw from interpretation',
 	ddlPaintButton: 'draw from DDL',
+	ddlAutoRepairLabel: 'auto repair',
 	ddlEditBtn: 'edit',
 	ddlDoneBtn: 'done',
 	saijikiPreviewPlaceholder: 'Hover over a word to preview how it affects the drawing.',

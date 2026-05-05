@@ -21,7 +21,7 @@ from typing import Any
 
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
-from .schema import Score
+from .schema import Score, Variation
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 2048
@@ -36,7 +36,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 # 変換ルール (厳守)
 
 - 座標: 0.0-1.0 比率 (左上=(0,0) 右下=(1,1))
-- circle/ellipse/arc → center フィールド。square/triangle → position フィールド (bbox 左上)
+- circle/ellipse/arc/polygon → center フィールド。square/triangle → position フィールド (bbox 左上)
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
 - **正規化DDL に図形・線・弧の指示がある場合、instructions を空配列にしてはいけない。変換不能なら最も近い線・楕円・四角へ落とし込む**
@@ -45,6 +45,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **圧縮しすぎない。光・香り・温度・音・待つ時間・五感などの感覚語が DDL にある場合、主題を壊さない範囲で 1〜2 個の薄い補助層として残す。削りすぎて作品の情報量や楽しさを失わせない**
 - **余白は構図要素。小さな焦点、端寄りの線、反復の欠落、画面外へ続く方向で余白に圧力を作る。余白を全面散布で埋めない**
 - variation は明示された揺らぎがある場合のみ付ける
+- **形容語・動作語・質感語は、DDL で指定された主図形へ適用する。震える・揺れる・滲む・太い・細い等を理由に、DDL にない補助線・補助図形・別色の instruction を追加してはいけない**
 - **「ゆっくり揺れる」→ variation quality="wave", frequency="slow" を優先する。perlin は「震える」「細かく揺れる」に使う**
 - **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
@@ -52,10 +53,14 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **余白を残す。小さな scatter が 120 個を超える場合は、全面密度ではなく arrangement.density, cluster_count, fade, preserve_space を使い、斜めの帯・上から下・右半分などの配置語を尊重する。要素サイズを小さくしすぎない**
 - **大数量は「数の忠実さ」より「群の見え方」を優先する。300 個以上は count を 80〜120 個へ代表化し、density="high", cluster_count=5〜9, fade="outward" または "directional", preserve_space=true で原意を保持する**
 - **膜・霞・霧・透明・気配・余韻 → 薄い ellipse/square/line に fade を付け、preserve_space=true。説明だけで終わらせず、透明な面・薄い反射・消える線として JSON 化する**
+- **人・顔・動物を対象物として描かない。目鼻口・頭身・四肢・耳・尻尾を instruction にしない。存在感、重心、左右対称性、視線の圧力、群れ、輪郭密度として Score.presence に変換する**
+- **Score.presence は固定の人型記号ではない。symmetry="bilateral" は「正面・対称・顔」など明示がある時だけ使い、通常は symmetry="none" を選ぶ。gaze_pressure も視線・顔・見つめる等が明示された時だけ none 以外にする**
+- **人・動物の補助 instruction を作る場合も、縦線+小楕円、棒人間、頭、胴体、翼、尾のような共通シルエットにしない。余白線、端寄りの焦点、薄い弧、群れの間隔として抽象化する**
 - **反射・映り込み → line または arc の少数反復。fade="directional" と path="wave" または "top_to_bottom" を使う**
 - **柔らかな光・日差し → 白または黄色寄りの薄い ellipse を重ね、filled=true, color_hint に原文の光を保持する。香り・匂い → 緑/白/灰の小さな ellipse または arc を wave path で少数散らす。蕾・開花待ち → 赤/白の小さな ellipse を斜めの帯で残す。五感・気配 → 薄い arc/ellipse と fade で残す**
 - **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
-- **山・屋根・鋭い先端 → triangle を使える。葉・花びら・羽・紙片 → thin ellipse / rotated square として扱い、自然プリミティブ plugin が無い現在も抽象化された自然/物質形として残す**
+- **多角形語彙は polygon だけを使い、sides=5-8 に限る。結晶、鉱物、硬い欠片、人工物の硬さ、都市的構造にだけ使う。五角形/六角形などを個別 primitive にしない**
+- **山・屋根・鋭い先端 → triangle を使える。葉・花びら・羽・紙片 → thin ellipse / rotated square / small polygon として扱い、自然プリミティブ plugin が無い現在も抽象化された自然/物質形として残す**
 - **楽しい形・複雑な形は、単体 primitive ではなく 2〜5 個の primitive の局所 motif として作る。例: 葉=細い ellipse + arc、紙片=rotated square + 細線、種=ellipse + 小粒、山=triangle + 余白を切る line、波紋=arc + 小 ellipse**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
@@ -106,6 +111,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 白い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。
 出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+入力: 震えるペンの緑の直線を三百本、上から下に引く。
+出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"green","arrangement":{"count":110,"layout":"vertical","path":"top_to_bottom","density":"high","cluster_count":7,"fade":"directional","preserve_space":true},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x","position_y"]}}]}
 
 入力: 赤い右上がりの小さな楕円を右半分に縦に二十個散らす。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
@@ -185,6 +193,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 透明な膜が雨のバス停の反射を薄く包む。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.58,0.46],"size":[0.46,0.18],"color":"blue","filled":true,"color_hint":"透明な膜","arrangement":{"count":5,"layout":"scatter","density":"low","cluster_count":3,"fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.35,0.22],"to":[0.72,0.78],"color":"white","color_hint":"雨の反射","arrangement":{"count":9,"layout":"vertical","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.18}}]}
 
+入力: 雨のバス停で、待つ人の気配が透明な膜になっている。
+出力: {"presence":{"kind":"figure_like","intensity":"low","center":[0.56,0.52],"symmetry":"bilateral","gaze_pressure":"low","contour_density":"low"},"instructions":[{"primitive":"ellipse","center":[0.56,0.52],"size":[0.42,0.16],"color":"blue","filled":true,"color_hint":"透明な膜","arrangement":{"count":4,"layout":"scatter","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
+
 入力: 柔らかな光と沈丁花の香りの中で、桜の蕾が開花を待つ。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.48,0.20],"size":[0.42,0.12],"color":"white","filled":true,"color_hint":"柔らかな光","arrangement":{"count":3,"layout":"horizontal","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"ellipse","center":[0.56,0.55],"size":[0.045,0.022],"color":"green","rotation":-18,"color_hint":"沈丁花の香り","arrangement":{"count":7,"layout":"scatter","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.24}},{"primitive":"ellipse","center":[0.70,0.62],"size":[0.055,0.026],"color":"red","rotation":-30,"color_hint":"開花を待つ蕾","arrangement":{"count":5,"layout":"scatter","path":"diagonal","margin":0.18}}]}
 
@@ -225,6 +236,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 右上がりの横長の四角を中央に置く。
 出力: {"instructions":[{"primitive":"square","position":[0.325,0.425],"size":[0.35,0.15],"rotation":-30}]}
+
+入力: 鉱物のような硬い欠片を中央より右上に置く。
+出力: {"instructions":[{"primitive":"polygon","center":[0.62,0.38],"radius":0.06,"sides":6,"rotation":18}]}
 
 入力: 斜めの線を中央に引く。
 出力: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"rotation":45}]}
@@ -267,7 +281,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 # Conversion Rules (strict)
 
 - Coordinates: 0.0-1.0 ratio (top-left=(0,0) bottom-right=(1,1))
-- circle/ellipse/arc → center field. square/triangle → position field (bbox top-left)
+- circle/ellipse/arc/polygon → center field. square/triangle → position field (bbox top-left)
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
 - **If normalized DDL contains shapes, lines, or arcs, instructions must not be empty. If exact conversion is difficult, map it to the nearest line, ellipse, or square**
@@ -276,6 +290,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Do not over-compress. If the DDL contains sensory words such as light, scent, temperature, sound, waiting time, or bodily senses, keep 1–2 of them as faint supporting layers when they do not break the subject. Do not remove so much information that the work loses richness or playfulness**
 - **Negative space is compositional pressure. Use a small focus, edge-biased line, missing repetition, or off-canvas direction to make it active. Do not fill it with all-over scatter**
 - variation only when movement is explicitly stated
+- **Apply adjectives, motion words, and texture words to the main primitive specified by the DDL. Do not add supporting lines, supporting shapes, or differently colored instructions that were not requested merely because the DDL says trembling, swaying, blurring, thick, thin, or similar modifiers**
 - **"swaying slowly" / "slowly swaying" → prefer variation quality="wave", frequency="slow". Use perlin for trembling or fine swaying**
 - **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
 - **count is integer 1–1000. Use explicit numbers from DDL**
@@ -283,10 +298,14 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Preserve negative space. When tiny scatter exceeds 120 items, do not turn it into uniform full-canvas density; use arrangement.density, cluster_count, fade, and preserve_space while respecting placement phrases such as diagonal band, top to bottom, or right half**
 - **For very large quantities, prioritize the visible group behavior over literal item count. For 300+ items, represent them with count around 80–120 plus density="high", cluster_count=5–9, fade="outward" or "directional", and preserve_space=true**
 - **Membrane, haze, fog, transparency, atmosphere, or lingering presence → thin ellipse/square/line with fade and preserve_space=true. Do not omit them as mere explanation; convert them into transparent planes, faint reflections, or fading lines**
+- **Do not draw humans, faces, or animals as objects. Do not make eyes, mouth, body proportions, limbs, ears, or tails into instructions. Convert them into Score.presence as presence, weight, bilateral symmetry, gaze pressure, group behavior, and contour density**
+- **Score.presence is not a fixed human-symbol overlay. Use symmetry="bilateral" only when frontality, symmetry, or a face is explicit; otherwise prefer symmetry="none". Use gaze_pressure other than none only when gaze, face, looking, or staring is explicit**
+- **If supporting instructions are needed for human/animal context, do not make a vertical-line + small-ellipse silhouette, stick figure, head/body, wing, or tail. Abstract it as negative-space lines, edge-biased focus, pale arcs, or group spacing**
 - **Reflection → sparse repeated line or arc with fade="directional" and path="wave" or "top_to_bottom"**
 - **Soft light / sunlight → layered pale white or yellow-leaning ellipse, filled=true, preserving the original phrase in color_hint. Scent / fragrance → small green/white/gray ellipse or arc along path="wave". Buds / waiting to bloom → small red/white ellipses along a diagonal band. Five-sense presence / atmosphere → faint arc/ellipse with fade**
 - **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**
-- **Mountain / roof / sharp peak → triangle is allowed. Leaf / petal / feather / paper fragment → use thin ellipse or rotated square so abstract natural/material forms survive until natural primitive plugins exist**
+- **Use only polygon for polygonal vocabulary, with sides=5-8. Use it only for crystals, minerals, hard shards, artificial hardness, or urban structure. Do not add separate pentagon/hexagon primitives**
+- **Mountain / roof / sharp peak → triangle is allowed. Leaf / petal / feather / paper fragment → use thin ellipse, rotated square, or small polygon so abstract natural/material forms survive until natural primitive plugins exist**
 - **Playful or complex shapes should be local motifs made from 2-5 primitives, not a single primitive. Examples: leaf=thin ellipse + arc, paper shard=rotated square + thin line, seed pod=ellipse + small particles, mountain=triangle + a line cutting negative space, ripple=arc + small ellipse**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
@@ -337,6 +356,9 @@ Output: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.
 
 Input: Scatter one hundred thirty-seven short white lines from top to bottom. Swaying slowly.
 Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+Input: Draw three hundred trembling green pen lines from top to bottom.
+Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"green","arrangement":{"count":110,"layout":"vertical","path":"top_to_bottom","density":"high","cluster_count":7,"fade":"directional","preserve_space":true},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x","position_y"]}}]}
 
 Input: Scatter twenty small red ellipses rising to the right vertically in the right half.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
@@ -415,6 +437,9 @@ Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.05,
 
 Input: A transparent membrane wraps faint reflections at a rainy bus stop.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.58,0.46],"size":[0.46,0.18],"color":"blue","filled":true,"color_hint":"transparent membrane","arrangement":{"count":5,"layout":"scatter","density":"low","cluster_count":3,"fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.35,0.22],"to":[0.72,0.78],"color":"white","color_hint":"rain reflection","arrangement":{"count":9,"layout":"vertical","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.18}}]}
+
+Input: At a rainy bus stop, the presence of a waiting person becomes a transparent membrane.
+Output: {"presence":{"kind":"figure_like","intensity":"low","center":[0.56,0.52],"symmetry":"bilateral","gaze_pressure":"low","contour_density":"low"},"instructions":[{"primitive":"ellipse","center":[0.56,0.52],"size":[0.42,0.16],"color":"blue","filled":true,"color_hint":"transparent membrane","arrangement":{"count":4,"layout":"scatter","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
 
 Input: Soft light and daphne fragrance surround cherry buds waiting to bloom.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.48,0.20],"size":[0.42,0.12],"color":"white","filled":true,"color_hint":"soft light","arrangement":{"count":3,"layout":"horizontal","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"ellipse","center":[0.56,0.55],"size":[0.045,0.022],"color":"green","rotation":-18,"color_hint":"daphne fragrance","arrangement":{"count":7,"layout":"scatter","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.24}},{"primitive":"ellipse","center":[0.70,0.62],"size":[0.055,0.026],"color":"red","rotation":-30,"color_hint":"waiting buds","arrangement":{"count":5,"layout":"scatter","path":"diagonal","margin":0.18}}]}
@@ -535,6 +560,109 @@ def _build_user_message(ddl: str, original_text: str | None, lang: str = "ja") -
     return ddl
 
 
+_MOTION_OR_TEXTURE_TERMS = (
+    "震える",
+    "震え",
+    "揺れる",
+    "揺らぐ",
+    "揺れ",
+    "小刻み",
+    "滲む",
+    "にじむ",
+    "太い",
+    "細い",
+    "trembling",
+    "tremble",
+    "swaying",
+    "sway",
+    "wobble",
+    "wobbly",
+    "blurring",
+    "blurred",
+    "thick",
+    "thin",
+)
+
+_PRIMITIVE_TERMS = {
+    "line": ("直線", "線", "縦線", "横線", "line", "lines"),
+    "circle": ("円", "丸", "circle", "circles"),
+    "ellipse": ("楕円", "ellipse", "ellipses", "oval", "ovals"),
+    "triangle": ("三角", "triangle", "triangles"),
+    "square": ("四角", "square", "squares"),
+    "polygon": ("多角形", "polygon", "polygons"),
+    "arc": ("弧", "arc", "arcs"),
+}
+
+_COLOR_TERMS = {
+    "white": ("白", "white"),
+    "black": ("黒", "black"),
+    "blue": ("青", "blue"),
+    "red": ("赤", "red"),
+    "green": ("緑", "green"),
+    "gray": ("灰", "グレー", "gray", "grey"),
+}
+
+
+def _mentioned_values(text: str, terms_by_value: dict[str, tuple[str, ...]]) -> set[str]:
+    haystack = text.lower()
+    return {
+        value
+        for value, terms in terms_by_value.items()
+        if any(term.lower() in haystack for term in terms)
+    }
+
+
+def _enforce_modifier_targeting(score: Score, ddl: str) -> Score:
+    """Keep motion/texture modifiers on the explicitly requested single motif.
+
+    This is a Stage 2 contract guard, not the broader visual auto-repair pass.
+    It only applies when the DDL names exactly one primitive family and includes
+    a motion/texture modifier, because those modifiers should decorate the named
+    primitive instead of creating unrequested support marks.
+    """
+
+    if not any(term.lower() in ddl.lower() for term in _MOTION_OR_TEXTURE_TERMS):
+        return score
+    target_primitives = _mentioned_values(ddl, _PRIMITIVE_TERMS)
+    if len(target_primitives) != 1:
+        return score
+    target_colors = _mentioned_values(ddl, _COLOR_TERMS)
+    target_primitive = next(iter(target_primitives))
+
+    def matches_target(ins) -> bool:
+        if ins.primitive != target_primitive:
+            return False
+        return not target_colors or ins.color in target_colors
+
+    targeted = [ins for ins in score.instructions if matches_target(ins)]
+    if not targeted:
+        return score
+    if len(targeted) == len(score.instructions) and all(ins.variation is not None for ins in targeted):
+        return score
+
+    repaired = []
+    for ins in targeted:
+        if ins.variation is not None or target_primitive != "line":
+            repaired.append(ins)
+            continue
+        repaired.append(
+            ins.model_copy(
+                update={
+                    "variation": Variation(
+                        amplitude="fine",
+                        frequency="medium",
+                        quality="perlin",
+                        dimensions=["position_x", "position_y"],
+                    )
+                }
+            )
+        )
+
+    data = score.model_dump()
+    data["instructions"] = [ins.model_dump(by_alias=True) for ins in repaired]
+    return Score.model_validate(data)
+
+
 def compose(
     ddl: str,
     *,
@@ -555,14 +683,34 @@ def compose(
     if model:
         provider, model_id = provider_for_model(model, stage="stage2", settings=settings)
         if provider == "anthropic":
-            return _compose_anthropic(user_msg, model=model_id, system_prompt=effective_prompt, settings=settings)
+            score, tokens_in, tokens_out = _compose_anthropic(
+                user_msg,
+                model=model_id,
+                system_prompt=effective_prompt,
+                settings=settings,
+            )
+            return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
         if provider == "gemini":
-            return _compose_gemini(user_msg, model=model_id, system_prompt=effective_prompt, settings=settings)
-        return _compose_openai(user_msg, model=model_id, provider=provider, system_prompt=effective_prompt)
+            score, tokens_in, tokens_out = _compose_gemini(
+                user_msg,
+                model=model_id,
+                system_prompt=effective_prompt,
+                settings=settings,
+            )
+            return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+        score, tokens_in, tokens_out = _compose_openai(
+            user_msg,
+            model=model_id,
+            provider=provider,
+            system_prompt=effective_prompt,
+        )
+        return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        return _compose_openai(user_msg, model=None, system_prompt=effective_prompt)
-    return _compose_anthropic(user_msg, system_prompt=effective_prompt)
+        score, tokens_in, tokens_out = _compose_openai(user_msg, model=None, system_prompt=effective_prompt)
+        return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+    score, tokens_in, tokens_out = _compose_anthropic(user_msg, system_prompt=effective_prompt)
+    return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
 
 
 def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT, settings: dict | None = None) -> tuple[Score, int | None, int | None]:

@@ -113,6 +113,7 @@ export interface LangPack {
 	// DDL edit
 	replayFromDdlButton: string;
 	ddlPaintButton: string;
+	ddlAutoRepairLabel: string;
 	ddlEditBtn: string;
 	ddlDoneBtn: string;
 	saijikiPreviewPlaceholder: string;

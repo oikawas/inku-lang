@@ -158,6 +158,66 @@ def test_submit_tool_schema_is_valid():
     ]
 
 
+def test_modifier_targeting_drops_unrequested_support_lines():
+    from inku_server.composer import _enforce_modifier_targeting
+
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.5, 0.0],
+                    "to": [0.5, 1.0],
+                    "color": "green",
+                    "arrangement": {
+                        "count": 111,
+                        "layout": "vertical",
+                        "path": "top_to_bottom",
+                        "density": "high",
+                        "cluster_count": 7,
+                        "fade": "directional",
+                        "preserve_space": True,
+                    },
+                },
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.5],
+                    "to": [0.75, 0.5],
+                    "color": "black",
+                    "arrangement": {"count": 3, "layout": "vertical"},
+                },
+            ]
+        }
+    )
+
+    repaired = _enforce_modifier_targeting(score, "震えるペンの緑の直線を300本、上から下に引く。")
+
+    assert len(repaired.instructions) == 1
+    instruction = repaired.instructions[0]
+    assert instruction.primitive == "line"
+    assert instruction.color == "green"
+    assert instruction.variation is not None
+    assert instruction.variation.quality == "perlin"
+    assert set(instruction.variation.dimensions) == {"position_x", "position_y"}
+
+
+def test_modifier_targeting_leaves_multi_motif_scores_alone():
+    from inku_server.composer import _enforce_modifier_targeting
+
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5], "color": "green"},
+                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1, "color": "red"},
+            ]
+        }
+    )
+
+    repaired = _enforce_modifier_targeting(score, "震える緑の線と赤い円を描く。")
+
+    assert len(repaired.instructions) == 2
+
+
 def test_composer_prompt_keeps_dynamic_quantity_guidance():
     from inku_server.composer import SYSTEM_PROMPT, SYSTEM_PROMPT_EN
 
@@ -170,6 +230,13 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "cluster_count" in SYSTEM_PROMPT
     assert "preserve_space" in SYSTEM_PROMPT
     assert "透明な膜" in SYSTEM_PROMPT
+    assert "Score.presence" in SYSTEM_PROMPT
+    assert "多角形語彙は polygon だけ" in SYSTEM_PROMPT
+    assert '"primitive":"polygon"' in SYSTEM_PROMPT
+    assert "目鼻口・頭身・四肢・耳・尻尾" in SYSTEM_PROMPT
+    assert 'symmetry="bilateral" は' in SYSTEM_PROMPT
+    assert "縦線+小楕円" in SYSTEM_PROMPT
+    assert "待つ人の気配" in SYSTEM_PROMPT
     assert "反射" in SYSTEM_PROMPT
     assert "圧縮しすぎない" in SYSTEM_PROMPT
     assert "香り" in SYSTEM_PROMPT
@@ -185,6 +252,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "白い線を可視化" in SYSTEM_PROMPT
     assert "白い短い線を上から下へ百三十七本" in SYSTEM_PROMPT
     assert "ゆっくり揺れる" in SYSTEM_PROMPT
+    assert "形容語・動作語・質感語" in SYSTEM_PROMPT
+    assert "DDL にない補助線・補助図形・別色の instruction を追加してはいけない" in SYSTEM_PROMPT
+    assert "震えるペンの緑の直線" in SYSTEM_PROMPT
     assert 'quality":"wave"' in SYSTEM_PROMPT
     assert '"dimensions":["position_x","position_y"]' in SYSTEM_PROMPT
     assert "color\":\"blue" in SYSTEM_PROMPT
@@ -222,6 +292,12 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "cluster_count" in SYSTEM_PROMPT_EN
     assert "preserve_space" in SYSTEM_PROMPT_EN
     assert "transparent membrane" in SYSTEM_PROMPT_EN
+    assert "Score.presence" in SYSTEM_PROMPT_EN
+    assert "Use only polygon for polygonal vocabulary" in SYSTEM_PROMPT_EN
+    assert "eyes, mouth, body proportions, limbs, ears, or tails" in SYSTEM_PROMPT_EN
+    assert 'symmetry="bilateral" only' in SYSTEM_PROMPT_EN
+    assert "vertical-line + small-ellipse" in SYSTEM_PROMPT_EN
+    assert "waiting person" in SYSTEM_PROMPT_EN
     assert "Reflection" in SYSTEM_PROMPT_EN
     assert "Do not over-compress" in SYSTEM_PROMPT_EN
     assert "scent" in SYSTEM_PROMPT_EN
@@ -236,6 +312,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "white line made visible" in SYSTEM_PROMPT_EN
     assert "short white lines from top to bottom" in SYSTEM_PROMPT_EN
     assert "Swaying slowly" in SYSTEM_PROMPT_EN
+    assert "Apply adjectives, motion words, and texture words" in SYSTEM_PROMPT_EN
+    assert "Do not add supporting lines, supporting shapes, or differently colored instructions" in SYSTEM_PROMPT_EN
+    assert "three hundred trembling green pen lines" in SYSTEM_PROMPT_EN
     assert 'quality":"wave"' in SYSTEM_PROMPT_EN
     assert '"dimensions":["position_x","position_y"]' in SYSTEM_PROMPT_EN
     assert "color\":\"blue" in SYSTEM_PROMPT_EN

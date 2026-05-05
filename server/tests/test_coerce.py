@@ -82,6 +82,7 @@ def test_coerce_score_dedupes_repeated_arranged_instructions():
 def test_coerce_score_caps_total_expanded_density():
     score = Score.model_validate(
         {
+            "background": "blue",
             "instructions": [
                 {
                     "primitive": "line",
@@ -108,6 +109,7 @@ def test_coerce_score_caps_total_expanded_density():
 def test_coerce_score_caps_single_arrangement_density():
     score = Score.model_validate(
         {
+            "background": "blue",
             "instructions": [
                 {
                     "primitive": "line",
@@ -463,6 +465,28 @@ def test_coerce_score_repairs_missing_shape_intents_from_ddl():
     assert "square restored from DDL shape intent" in hints
 
 
+def test_coerce_score_repairs_polygon_shape_intent_from_ddl():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="鉱物のような六角の結晶を右上に置く。")
+
+    polygons = [ins for ins in fixed.instructions if ins.primitive == "polygon"]
+    assert polygons
+    assert polygons[0].sides == 6
+    assert "polygon restored from DDL shape intent" in (polygons[0].color_hint or "")
+
+
 def test_coerce_score_prioritizes_triangle_delivery_for_roof_intent_when_many_instructions():
     score = Score.model_validate(
         {
@@ -594,3 +618,339 @@ def test_coerce_score_adds_generic_accent_when_shape_exists_but_color_is_flat():
     assert len(accents) == 1
     assert accents[0].primitive == "arc"
     assert accents[0].color == "blue"
+
+
+def test_coerce_score_restores_human_presence_as_abstract_score_field():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.56, 0.52],
+                    "size": [0.42, 0.16],
+                    "color": "blue",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+
+    assert fixed.presence is not None
+    assert fixed.presence.kind == "figure_like"
+    assert fixed.presence.symmetry == "none"
+    assert fixed.presence.gaze_pressure == "none"
+
+
+def test_coerce_score_restores_animal_group_presence_without_extra_primitives():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="遠くの動物の群れの気配が横へ流れる。")
+
+    assert fixed.presence is not None
+    assert fixed.presence.kind == "group_like"
+    assert fixed.presence.contour_density == "high"
+    assert all("animal" not in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_dedupes_structurally_identical_auxiliary_layers():
+    score = Score.model_validate(
+        {
+            "background": "blue",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.75, 0.5],
+                    "size": [0.3, 0.15],
+                    "color": "white",
+                    "color_hint": "透明な膜",
+                    "arrangement": {"count": 3, "layout": "scatter", "path": "right_half", "margin": 0.45},
+                },
+                {
+                    "primitive": "ellipse",
+                    "center": [0.75, 0.5],
+                    "size": [0.3, 0.15],
+                    "color": "white",
+                    "color_hint": "material inferred from DDL",
+                    "arrangement": {"count": 3, "layout": "scatter", "path": "right_half", "margin": 0.45},
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score)
+
+    assert len(fixed.instructions) == 1
+    assert fixed.instructions[0].color_hint == "透明な膜"
+
+
+def test_coerce_score_suppresses_plain_large_shape_duplicate_when_presence_is_active():
+    score = Score.model_validate(
+        {
+            "presence": {"kind": "creature_like", "intensity": "low", "contour_density": "medium"},
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.7, 0.5],
+                    "size": [0.3, 0.1],
+                    "color": "black",
+                    "color_hint": "透明な膜; material inferred from DDL: pencil",
+                },
+                {
+                    "primitive": "ellipse",
+                    "center": [0.7, 0.5],
+                    "size": [0.3, 0.1],
+                    "color": "black",
+                    "color_hint": "material inferred from DDL: pencil",
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score)
+
+    assert len(fixed.instructions) == 1
+    assert fixed.instructions[0].color_hint is not None
+    assert "透明な膜" in fixed.instructions[0].color_hint
+
+
+def test_coerce_score_governs_quiet_high_density_scatter():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.02, 0.05],
+                    "color": "white",
+                    "color_hint": "ネオンの滲み",
+                    "arrangement": {
+                        "count": 180,
+                        "layout": "scatter",
+                        "density": "high",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夜のガラス越しに、街のネオンが涙のように滲んでいる。")
+
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.count == 64
+    assert arr.preserve_space is True
+    assert arr.fade == "outward"
+    assert "quiet density governed" in (fixed.instructions[0].color_hint or "")
+    assert any("quiet expression accent restored" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_governs_quiet_vertical_rain_density():
+    score = Score.model_validate(
+        {
+            "background": "blue",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.5, 0.0],
+                    "to": [0.5, 1.0],
+                    "color": "gray",
+                    "color_hint": "雨",
+                    "arrangement": {
+                        "count": 110,
+                        "layout": "vertical",
+                        "path": "top_to_bottom",
+                        "density": "high",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.count == 48
+    assert arr.density == "low"
+    assert arr.fade == "directional"
+
+
+def test_coerce_score_governs_quiet_large_shape_repetition():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.35, 0.1],
+                    "size": [0.3, 0.15],
+                    "color": "black",
+                    "color_hint": "低い雲",
+                    "arrangement": {
+                        "count": 30,
+                        "layout": "vertical",
+                        "path": "top_to_bottom",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="遠雷の前、低い雲が街の屋根を押し沈めている。")
+
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.count == 16
+    assert arr.density == "low"
+    assert arr.preserve_space is True
+
+
+def test_coerce_score_tempers_quiet_symbolic_fallback_shapes():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.4, 0.5],
+                    "size": [0.24, 0.2],
+                    "color": "white",
+                    "color_hint": "coverage from DDL clause: 右端に白いクレヨンの縦長の四角を置く",
+                    "arrangement": {
+                        "count": 20,
+                        "layout": "scatter",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+
+    ins = fixed.instructions[0]
+    arr = ins.arrangement
+    assert ins.size is not None
+    assert ins.size[0] <= 0.12
+    assert ins.size[1] <= 0.09
+    assert arr is not None
+    assert arr.count == 8
+    assert arr.density == "low"
+    assert arr.preserve_space is True
+    assert "quiet symbolic shape tempered" in (ins.color_hint or "")
+
+
+def test_coerce_score_repairs_polygon_fields_and_tempers_quiet_polygon():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "polygon",
+                    "center": [0.55, 0.4],
+                    "radius": 0.18,
+                    "sides": 12,
+                    "color_hint": "coverage from DDL clause: 鉱物のような多角形を置く",
+                    "arrangement": {"count": 20, "layout": "scatter"},
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="静かな部屋に鉱物のような多角形の気配が沈んでいる。")
+
+    ins = fixed.instructions[0]
+    arr = ins.arrangement
+    assert ins.primitive == "polygon"
+    assert ins.sides == 8
+    assert ins.radius is not None and ins.radius <= 0.06
+    assert arr is not None
+    assert arr.count == 8
+    assert "quiet symbolic shape tempered" in (ins.color_hint or "")
+
+
+def test_coerce_score_restores_motion_energy_without_increasing_count():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.08, 0.04],
+                    "color": "red",
+                    "arrangement": {"count": 5, "layout": "scatter"},
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夏祭りの後、路面に残った色紙が湿って丸まっている。")
+
+    ins = fixed.instructions[0]
+    assert ins.arrangement is not None
+    assert ins.arrangement.count == 5
+    assert ins.arrangement.path == "wave"
+    assert ins.rotation is not None
+    assert ins.variation is not None
+    assert ins.variation.quality == "wave"
+    assert "motion energy restored" in (ins.color_hint or "")
+
+
+def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touching_good_presence_scene():
+    base = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    leaf = coerce_score(base, ddl="秋の森で、落ち葉が湿った土に深い赤を沈めている。")
+    assert any("leaf/grain energy restored" in (ins.color_hint or "") for ins in leaf.instructions)
+
+    corridor = coerce_score(base, ddl="廃校の廊下に、夕方の光が長い沈黙を置いていく。")
+    assert any("silence/layer energy restored" in (ins.color_hint or "") for ins in corridor.instructions)
+
+    factory = coerce_score(base, ddl="静かな工場跡で、錆びた鉄骨が空を細かく分けている。")
+    assert any(ins.primitive == "polygon" and "hard edge energy restored" in (ins.color_hint or "") for ins in factory.instructions)
+
+    bicycle = coerce_score(base, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
+    assert any("playful motion energy restored as a small moving color cluster" in (ins.color_hint or "") for ins in bicycle.instructions)
+
+    red_scene = Score.model_validate(
+        {
+            "background": "red",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.05, 0.02],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+    red_bicycle = coerce_score(red_scene, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
+    playful = [ins for ins in red_bicycle.instructions if "playful motion energy restored as a small moving color cluster" in (ins.color_hint or "")]
+    assert playful
+    assert playful[0].primitive == "ellipse"
+    assert playful[0].color == "white"
+    assert playful[0].arrangement is not None
+    assert playful[0].arrangement.count == 5
+    assert playful[0].arrangement.color_cycle == ["white", "blue", "black"]
+
+    bus_stop = coerce_score(base, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+    assert not any("energy restored" in (ins.color_hint or "") for ins in bus_stop.instructions)

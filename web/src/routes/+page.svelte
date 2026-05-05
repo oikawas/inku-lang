@@ -219,6 +219,7 @@
 	let ddlFocused = $state(false);
 	type CopyKind = 'stage1' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
+	let statusHashCopied = $state(false);
 
 	// ── Loading ─────────────────────────────────────────────
 	let loading    = $state(false);
@@ -2928,28 +2929,45 @@
 		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
 	}
 
+	async function copyTextToClipboard(value: string): Promise<void> {
+		if (navigator.clipboard?.writeText) {
+			await navigator.clipboard.writeText(value);
+			return;
+		}
+		const textarea = document.createElement('textarea');
+		textarea.value = value;
+		textarea.setAttribute('readonly', 'true');
+		textarea.style.position = 'fixed';
+		textarea.style.left = '-9999px';
+		document.body.appendChild(textarea);
+		textarea.select();
+		document.execCommand('copy');
+		document.body.removeChild(textarea);
+	}
+
 	async function copyPromptText(kind: CopyKind, text: string | null | undefined): Promise<void> {
-		const value = text ?? '';
 		try {
-			if (navigator.clipboard?.writeText) {
-				await navigator.clipboard.writeText(value);
-			} else {
-				const textarea = document.createElement('textarea');
-				textarea.value = value;
-				textarea.setAttribute('readonly', 'true');
-				textarea.style.position = 'fixed';
-				textarea.style.left = '-9999px';
-				document.body.appendChild(textarea);
-				textarea.select();
-				document.execCommand('copy');
-				document.body.removeChild(textarea);
-			}
+			await copyTextToClipboard(text ?? '');
 			copiedPrompt = kind;
 			window.setTimeout(() => {
 				if (copiedPrompt === kind) copiedPrompt = null;
 			}, 1200);
 		} catch {
 			copiedPrompt = null;
+		}
+	}
+
+	async function copyStatusHash(): Promise<void> {
+		const value = statusHashFull;
+		if (!value) return;
+		try {
+			await copyTextToClipboard(value);
+			statusHashCopied = true;
+			window.setTimeout(() => {
+				statusHashCopied = false;
+			}, 1200);
+		} catch {
+			statusHashCopied = false;
 		}
 	}
 
@@ -3004,6 +3022,21 @@
 	const statusCanvasName = $derived(getCanvasAspectOption(
 		displayedHistoryItem?.score?.canvas ?? result?.score?.canvas ?? effectiveCanvasAspectId()
 	).label);
+	const statusHashFull = $derived(
+		displayedHistoryItem?.render_hash
+			?? result?.render_hash
+			?? ''
+	);
+	const statusHashLabel = $derived((
+		displayedHistoryItem?.render_hash_short
+			?? displayedHistoryItem?.render_hash?.slice(-4)
+			?? result?.render_hash_short
+			?? result?.render_hash?.slice(-4)
+			?? ''
+	).toUpperCase());
+	const statusHashCopyTitle = $derived(statusHashLabel
+		? `${t().historyHashCopyTitle}: ${statusHashLabel}`
+		: t().historyHashCopyTitle);
 	const statusHistoryItem = $derived.by(() => {
 		if (displayedHistoryItem) return displayedHistoryItem;
 		if (result?.history_id) {
@@ -3540,6 +3573,9 @@
 				{statusCatalogName}
 				{statusCanvasName}
 				{statusHistoryItem}
+				{statusHashLabel}
+				{statusHashCopyTitle}
+				{statusHashCopied}
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}
 				onGotoLatest={gotoLatest}
@@ -3550,6 +3586,7 @@
 				onResetZoom={resetZoom}
 				onFitZoomChange={updateCanvasFitZoom}
 				onCopyPromptText={copyPromptText}
+				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}

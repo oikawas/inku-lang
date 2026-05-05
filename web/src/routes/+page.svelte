@@ -2230,7 +2230,7 @@
 				};
 				result = r; outputTab = 'canvas';
 				fitCanvasZoom();
-				await pushHistory({
+				const savedHistory = await pushHistory({
 					input,
 					ddl: interpreted.ddl,
 					score: composed.score,
@@ -2243,6 +2243,15 @@
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
 					catalog_id: selectedCatalog,
 				}, { countGeneration: true });
+				if (savedHistory && result === r) {
+					result = {
+						...r,
+						history_id: savedHistory.id,
+						history_at: savedHistory.at,
+						render_hash: savedHistory.render_hash,
+						render_hash_short: savedHistory.render_hash_short,
+					};
+				}
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
 				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
@@ -2390,7 +2399,7 @@
 			elapsedStage1Ms = 0; elapsedStage2Ms = elapsedMs; elapsedTotalMs = elapsedMs;
 			tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = d.tokens_in; tokensOutStage2 = d.tokens_out;
 			if (saveReplayAsNewVersion) {
-				await pushHistory({
+				const savedHistory = await pushHistory({
 					input: replayInput,
 					ddl,
 					score: d.score,
@@ -2403,6 +2412,15 @@
 					tokens_out: d.tokens_out,
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
 				});
+				if (savedHistory && result) {
+					result = {
+						...result,
+						history_id: savedHistory.id,
+						history_at: savedHistory.at,
+						render_hash: savedHistory.render_hash,
+						render_hash_short: savedHistory.render_hash_short,
+					};
+				}
 			}
 			outputTab = 'canvas';
 			fitCanvasZoom();
@@ -2560,18 +2578,21 @@
 		}
 	}
 
-	async function pushHistory(it: Iteration, options: { countGeneration?: boolean } = {}): Promise<void> {
-		if (!authToken) return;
+	async function pushHistory(it: Iteration, options: { countGeneration?: boolean } = {}): Promise<Iteration | null> {
+		if (!authToken) return null;
+		let saved: Iteration | null = null;
 		try {
-				await apiFetch('/api/history', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: effectiveCanvasAspectId() })
-				});
+			const r = await apiFetch('/api/history', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: effectiveCanvasAspectId() })
+			});
+			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
 		if (options.countGeneration) await refreshCurrentUserOnly();
 		await fetchHistoryOffset(0);
 		historyCursor = 0;
+		return saved;
 	}
 
 	async function saveCurrentDemoToHistory(): Promise<void> {

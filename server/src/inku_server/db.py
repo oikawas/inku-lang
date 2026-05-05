@@ -60,6 +60,7 @@ class HistoryRow(Base):
     render_color_catalog_sub = Column(String, nullable=True)
     render_color_catalog = Column(Text, nullable=True)
     render_color_map = Column(Text, nullable=True)
+    render_canvas_aspect = Column(String, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -128,6 +129,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "render_color_catalog_sub": "ALTER TABLE history ADD COLUMN render_color_catalog_sub VARCHAR",
     "render_color_catalog": "ALTER TABLE history ADD COLUMN render_color_catalog TEXT",
     "render_color_map": "ALTER TABLE history ADD COLUMN render_color_map TEXT",
+    "render_canvas_aspect": "ALTER TABLE history ADD COLUMN render_canvas_aspect VARCHAR",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
@@ -332,6 +334,7 @@ def render_hash_for_item(item: dict) -> str:
         "render_build_number": item.get("render_build_number"),
         "render_engine_id": item.get("render_engine_id"),
         "render_engine_version": item.get("render_engine_version"),
+        "render_canvas_aspect": item.get("render_canvas_aspect"),
         "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
         "render_color_catalog_name": item.get("render_color_catalog_name"),
         "render_color_catalog_sub": item.get("render_color_catalog_sub"),
@@ -354,6 +357,7 @@ def _row_hash_payload(row: HistoryRow) -> dict:
         "render_build_number": row.render_build_number,
         "render_engine_id": row.render_engine_id,
         "render_engine_version": row.render_engine_version,
+        "render_canvas_aspect": row.render_canvas_aspect,
         "render_color_catalog_id": row.render_color_catalog_id,
         "render_color_catalog_name": row.render_color_catalog_name,
         "render_color_catalog_sub": row.render_color_catalog_sub,
@@ -374,7 +378,7 @@ def _backfill_render_hashes(conn) -> None:
         SELECT id, input, ddl, score, svg, catalog_id, render_build_number,
                render_engine_id, render_engine_version,
                render_color_catalog_id, render_color_catalog_name,
-               render_color_catalog_sub, render_color_map
+               render_color_catalog_sub, render_color_map, render_canvas_aspect
         FROM history
         WHERE render_hash IS NULL OR render_hash = ''
         """
@@ -389,6 +393,7 @@ def _backfill_render_hashes(conn) -> None:
             "render_build_number": row["render_build_number"],
             "render_engine_id": row["render_engine_id"],
             "render_engine_version": row["render_engine_version"],
+            "render_canvas_aspect": row["render_canvas_aspect"],
             "render_color_catalog_id": row["render_color_catalog_id"],
             "render_color_catalog_name": row["render_color_catalog_name"],
             "render_color_catalog_sub": row["render_color_catalog_sub"],
@@ -806,6 +811,8 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["render_color_map"] = json.loads(row.render_color_map)
         except json.JSONDecodeError:
             item["render_color_map"] = None
+    if row.render_canvas_aspect is not None:
+        item["render_canvas_aspect"] = row.render_canvas_aspect
     return item
 
 
@@ -861,6 +868,7 @@ def add_item(item: dict) -> dict:
         render_color_catalog_name=item.get("render_color_catalog_name"),
         render_color_catalog_sub=item.get("render_color_catalog_sub"),
         render_color_map=json.dumps(item.get("render_color_map"), ensure_ascii=False) if item.get("render_color_map") is not None else None,
+        render_canvas_aspect=item.get("render_canvas_aspect"),
         render_hash=render_hash,
         trashed=0,
         starred=0,

@@ -63,6 +63,7 @@
 		stageLabel: string;
 		showKiwi: boolean;
 		showCrab: boolean;
+		selectedCatalogName: string;
 		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
@@ -124,6 +125,7 @@
 		stageLabel,
 		showKiwi,
 		showCrab,
+		selectedCatalogName,
 		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
@@ -179,8 +181,8 @@
 					onSelect={onSelectCanvasAspect}
 				/>
 			{/if}
+			<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal} title={`${t().colorCatalogButton}: ${selectedCatalogName}`}>{selectedCatalogName}</button>
 			<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
-			<button class="ghost-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			{#if inputMode !== 'demo'}
 				<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
 			{/if}
@@ -324,7 +326,7 @@
 		font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
 		color: var(--fg3); text-transform: uppercase;
 	}
-	.section-actions { display: flex; gap: 5px; }
+	.section-actions { display: flex; gap: 5px; min-width: 0; }
 	.ghost-btn {
 		padding: 4px 10px;
 		border: 1px solid var(--border2);
@@ -334,8 +336,16 @@
 		font-size: 11px;
 		cursor: pointer;
 		font-family: inherit;
+		white-space: nowrap;
 	}
 	.ghost-btn:hover { background: var(--bg2); }
+	.catalog-btn {
+		display: inline-block;
+		max-width: 128px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		vertical-align: bottom;
+	}
 	.create-btn {
 		background: #fff7e8;
 		border-color: #d8b36a;

@@ -382,6 +382,7 @@ export interface LangPack {
 	historyHashHeader: string;
 	historyHashCopyTitle: string;
 	historyCreatedAtHeader: string;
+	historyCanvasHeader: string;
 	historyModelHeader: string;
 	historySecondsHeader: string;
 	historyCatalogHeader: string;

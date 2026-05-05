@@ -159,7 +159,20 @@
 		<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
 		<div class="rtab-spacer"></div>
 		{#if currentRenderedAt}
-			<span class="rendered-at">{currentRenderedAt}</span>
+			<div class="render-meta-strip">
+				<span class="render-meta-item render-meta-catalog">
+					<span class="render-meta-label">{t().historyCatalogHeader}</span>
+					<strong>{statusCatalogName}</strong>
+				</span>
+				<span class="render-meta-item render-meta-canvas">
+					<span class="render-meta-label">{t().historyCanvasHeader}</span>
+					<strong>{statusCanvasName}</strong>
+				</span>
+				<span class="render-meta-item render-meta-created">
+					<span class="render-meta-label">{t().historyCreatedAtHeader}</span>
+					<strong>{currentRenderedAt}</strong>
+				</span>
+			</div>
 		{/if}
 	</div>
 
@@ -381,8 +394,38 @@
 	.rtab.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 500; }
 	.rtab:hover:not(.active):not(:disabled) { color: var(--fg); }
 	.rtab:disabled { opacity: 0.35; cursor: not-allowed; }
-	.rtab-spacer { flex: 1; }
-	.rendered-at { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+	.rtab-spacer { flex: 1; min-width: 12px; }
+	.render-meta-strip {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 10px;
+		min-width: 0;
+		max-width: min(68vw, 760px);
+		overflow: hidden;
+		font-size: 11px;
+		color: var(--fg3);
+	}
+	.render-meta-item {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 4px;
+		min-width: 0;
+		white-space: nowrap;
+	}
+	.render-meta-label { color: var(--fg3); }
+	.render-meta-item strong {
+		min-width: 0;
+		max-width: 160px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		color: var(--fg2);
+		font-weight: 400;
+	}
+	.render-meta-created strong {
+		max-width: none;
+		font-variant-numeric: tabular-nums;
+	}
 	.canvas-area {
 		flex: 1;
 		display: flex;

@@ -368,6 +368,7 @@ export const en: LangPack = {
 	historyHashHeader: 'hash',
 	historyHashCopyTitle: 'copy hash',
 	historyCreatedAtHeader: 'created',
+	historyCanvasHeader: 'canvas',
 	historyModelHeader: 'model',
 	historySecondsHeader: 'seconds',
 	historyCatalogHeader: 'color catalog',

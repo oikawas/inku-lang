@@ -368,6 +368,7 @@ export const ja: LangPack = {
 	historyHashHeader: 'ハッシュ',
 	historyHashCopyTitle: 'ハッシュをコピー',
 	historyCreatedAtHeader: '作成日時',
+	historyCanvasHeader: 'キャンバス',
 	historyModelHeader: 'モデル',
 	historySecondsHeader: '秒数',
 	historyCatalogHeader: '色カタログ',

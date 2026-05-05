@@ -27,6 +27,7 @@ export type HistoryItem = {
 	render_color_catalog_name?: string | null;
 	render_color_catalog_sub?: string | null;
 	render_color_map?: Record<string, string> | null;
+	render_canvas_aspect?: string | null;
 	render_hash?: string | null;
 	render_hash_short?: string | null;
 	trashed?: boolean;

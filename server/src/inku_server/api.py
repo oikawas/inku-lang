@@ -341,6 +341,7 @@ def _history_render_metadata(item: dict) -> dict | None:
         "render_color_profile",
         "render_engine_id",
         "render_engine_version",
+        "render_canvas_aspect",
         "render_color_catalog_id",
         "render_color_catalog_name",
         "render_color_catalog_sub",
@@ -442,19 +443,24 @@ def _catalog_render_color_map(catalog_id: str | None) -> dict[str, str]:
     return color_map
 
 
-def _render_metadata(catalog_id: str | None) -> dict:
+def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None) -> dict:
     catalog = get_color_catalog(catalog_id)
     color_map = render_color_map_for_catalog(catalog_id)
     if catalog is None or color_map is None:
         raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
-    return {
+    metadata = {
         "render_build_number": _build_number(),
         "render_color_profile": dict(_SRGB_COLOR_PROFILE),
+    }
+    if canvas_aspect is not None:
+        metadata["render_canvas_aspect"] = canvas_aspect
+    metadata.update({
         "render_color_catalog_id": str(catalog["id"]),
         "render_color_catalog_name": str(catalog["name"]),
         "render_color_catalog_sub": str(catalog["sub"]),
-        "render_color_map": color_map,
-    }
+    })
+    metadata["render_color_map"] = color_map
+    return metadata
 
 
 def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: str | None = None) -> tuple[str, dict]:
@@ -526,6 +532,7 @@ class ComposeResponse(BaseModel):
     render_color_catalog_name: str | None = None
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
+    render_canvas_aspect: str | None = None
     elapsed_ms: int = 0
     tokens_in: int | None = None
     tokens_out: int | None = None
@@ -587,6 +594,7 @@ class PaintResponse(BaseModel):
     render_color_catalog_name: str | None = None
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
+    render_canvas_aspect: str | None = None
     render_hash: str | None = None
     render_hash_short: str | None = None
     history_id: str | None = None
@@ -670,6 +678,7 @@ class HistoryPostBody(BaseModel):
     render_color_catalog_name: str | None = None
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
+    render_canvas_aspect: str | None = None
     save_artifacts: bool = True
     count_generation: bool = Field(default=False, exclude=True)
     color_map: dict[str, str] | None = Field(default=None, exclude=True, description="Deprecated: ignored; catalog_id is resolved server-side")
@@ -1772,7 +1781,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
-    render_metadata = _render_metadata(req.catalog_id)
+    render_metadata = _render_metadata(req.catalog_id, canvas_aspect=score.canvas)
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except Exception as e:  # noqa: BLE001
@@ -2057,7 +2066,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
-    render_metadata = _render_metadata(catalog_id)
+    render_metadata = _render_metadata(catalog_id, canvas_aspect=score.canvas)
     t2 = time.perf_counter()
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
@@ -2316,10 +2325,10 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
     try:
         score = coerce_score(Score.model_validate(body.score))
         catalog_id = _resolved_catalog_id(body.catalog_id)
-        render_metadata = _render_metadata(catalog_id)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
         if canvas_aspect is not None:
             score = _score_with_canvas(score, canvas_aspect)
+        render_metadata = _render_metadata(catalog_id, canvas_aspect=score.canvas)
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except HTTPException:
         raise

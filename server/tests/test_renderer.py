@@ -1,6 +1,7 @@
+import math
 from xml.etree import ElementTree
 
-from inku_server.renderer import render
+from inku_server.renderer import _clustered_pos, render
 from inku_server.schema import Instruction, Score
 
 
@@ -320,6 +321,27 @@ def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
     assert svg.count("<rect") >= 25
     assert 'stroke-opacity="0.4"' in svg
     assert 'fill-opacity="0.22"' in svg
+
+
+def test_clustered_positions_do_not_form_constant_radius_ring():
+    points = [
+        _clustered_pos(
+            i,
+            48,
+            12345,
+            0.2,
+            "none",
+            cluster_count=1,
+            density="high",
+            preserve_space=True,
+        )
+        for i in range(48)
+    ]
+    cx = sum(x for x, _ in points) / len(points)
+    cy = sum(y for _, y in points) / len(points)
+    distances = sorted(math.hypot(x - cx, y - cy) for x, y in points)
+
+    assert distances[-1] > distances[0] * 2.5
 
 
 def test_render_sensory_layers_have_distinct_opacity():

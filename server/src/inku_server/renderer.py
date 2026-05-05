@@ -283,7 +283,11 @@ def _clustered_pos(
     density: str,
     preserve_space: bool,
 ) -> tuple[float, float]:
-    """大数量の配置を、均一散布ではなく複数のまとまりとして決定的に配置する。"""
+    """大数量の配置を、均一散布ではなく複数のまとまりとして決定的に配置する。
+
+    クラスタ内部を円周状に並べると、異なる絵に同じ輪状の記号が現れやすい。
+    そのため、内部配置はパス方向を持つ短い帯として広げる。
+    """
     cluster_count = max(1, min(cluster_count, n))
     cluster_index = i % cluster_count
     local_index = i // cluster_count
@@ -294,12 +298,26 @@ def _clustered_pos(
     else:
         cx, cy = _path_pos(cluster_index, cluster_count, seed ^ 0xC1A57, center_margin, path)
 
-    angle = _hash01(i, seed, "cluster-angle") * math.tau
-    spiral_t = (local_index + 0.5) / local_total
-    radius = _density_radius(density, preserve_space) * math.sqrt(spiral_t)
-    jitter = 0.55 + _hash01(i, seed, "cluster-radius") * 0.75
-    x = cx + math.cos(angle) * radius * jitter
-    y = cy + math.sin(angle) * radius * jitter
+    if path == "diagonal":
+        axis_angle = -math.pi / 4
+    elif path in ("top_to_bottom",):
+        axis_angle = math.pi / 2
+    elif path in ("left_to_right", "right_half", "wave"):
+        axis_angle = 0.0
+    else:
+        axis_angle = _hash01(cluster_index, seed, "cluster-axis") * math.tau
+    tx, ty = math.cos(axis_angle), math.sin(axis_angle)
+    nx, ny = -ty, tx
+    local_t = (local_index + 0.5) / local_total
+    centered = (local_t - 0.5) * 2.0
+    radius = _density_radius(density, preserve_space)
+    long_span = radius * (1.45 + _hash01(cluster_index, seed, "cluster-long") * 0.95)
+    cross_span = radius * (0.28 + _hash01(cluster_index, seed, "cluster-cross") * 0.32)
+    along = centered * long_span + (_hash01(i, seed, "cluster-along") - 0.5) * radius * 0.20
+    cross = (_hash01(i, seed, "cluster-cross-jitter") - 0.5) * cross_span * (1.25 - 0.45 * abs(centered))
+    bend = math.sin(local_t * math.pi) * (_hash01(cluster_index, seed, "cluster-bend") - 0.5) * radius * 0.55
+    x = cx + tx * along + nx * (cross + bend)
+    y = cy + ty * along + ny * (cross + bend)
     return _clamp01(x), _clamp01(y)
 
 
@@ -740,17 +758,25 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
                 stroke_linecap="round",
             ))
 
+    flow_angle = phase * 0.35 + tilt
+    tx, ty = math.cos(flow_angle), math.sin(flow_angle)
+    nx, ny = -ty, tx
     for i in range(contour_count):
-        angle = phase + math.tau * i / contour_count
-        span = 0.18 + 0.05 * (i % 3)
-        start = angle - span
-        end = angle + span
-        x1 = cx + math.cos(start) * radius_x
-        y1 = cy + math.sin(start) * radius_y
-        x2 = cx + math.cos(end) * radius_x
-        y2 = cy + math.sin(end) * radius_y
-        xm = cx + math.cos(angle) * radius_x * 1.08
-        ym = cy + math.sin(angle) * radius_y * 1.08
+        t = (i + 0.5) / contour_count
+        along = (t - 0.5) * radius_x * (1.18 + 0.18 * _hash01(i, seed, "presence-flow-span"))
+        cross = math.sin(t * math.pi * 1.7 + phase) * radius_y * 0.32
+        cross += (_hash01(i, seed, "presence-flow-cross") - 0.5) * radius_y * 0.28
+        px = cx + tx * along + nx * cross
+        py = cy + ty * along + ny * cross
+        half = radius_x * (0.09 + 0.04 * _hash01(i, seed, "presence-flow-half"))
+        lift = radius_y * (0.05 + 0.04 * _hash01(i, seed, "presence-flow-lift"))
+        side = -1.0 if i % 2 else 1.0
+        x1 = px - tx * half - nx * lift * side
+        y1 = py - ty * half - ny * lift * side
+        x2 = px + tx * half + nx * lift * side
+        y2 = py + ty * half + ny * lift * side
+        xm = px + nx * lift * side * 1.4
+        ym = py + ny * lift * side * 1.4
         path = dwg.path(
             d=f"M {x1:.2f},{y1:.2f} Q {xm:.2f},{ym:.2f} {x2:.2f},{y2:.2f}",
             fill="none",
@@ -764,8 +790,8 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
     if presence.kind == "group_like":
         for i in range(7):
             t = (i - 3) / 3.5
-            px = cx + t * radius_x * 0.82
-            py = cy + math.sin(i * 1.7) * radius_y * 0.24
+            px = cx + tx * t * radius_x * 0.78 + nx * (_hash01(i, seed, "group-x") - 0.5) * radius_x * 0.20
+            py = cy + ty * t * radius_x * 0.78 + ny * (_hash01(i, seed, "group-y") - 0.5) * radius_y * 0.58
             layer.add(dwg.circle(
                 center=(px, py),
                 r=max(2.0, unit * 0.006),

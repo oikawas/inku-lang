@@ -242,6 +242,11 @@
 	let batchActiveTokensOut = $state<number | null>(null);
 	let batchTokensInTotal = $state(0);
 	let batchTokensOutTotal = $state(0);
+	let batchLatestResult = $state<PaintResult | null>(null);
+	let batchLatestDdl = $state<string | null>(null);
+	let batchLatestThinking = $state<string | null>(null);
+	let batchAutoFollowLatest = $state(false);
+	let previousInputMode = $state<'single' | 'batch' | 'demo'>('single');
 	let error        = $state<string | null>(null);
 	let demoSettings = $state<DemoSettings>({ ...DEFAULT_DEMO_SETTINGS });
 	let demoGeneratedPrompt = $state('');
@@ -2164,6 +2169,12 @@
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
 		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
+		if (submittedMode === 'batch') {
+			batchLatestResult = null;
+			batchLatestDdl = null;
+			batchLatestThinking = null;
+			batchAutoFollowLatest = true;
+		}
 		startTimer();
 
 		try {
@@ -2255,12 +2266,11 @@
 						batchTokensInTotal += batchActiveTokensIn ?? 0;
 						batchTokensOutTotal += batchActiveTokensOut ?? 0;
 						thinking = r.thinking;
-						if (displayedHistoryItem === null) {
-							result = r;
-							ddl = r.ddl;
-							ddlGeneratedBaseline = r.ddl;
-							ddlSelection = { start: r.ddl.length, end: r.ddl.length };
-							fitCanvasZoom();
+						batchLatestResult = r;
+						batchLatestDdl = r.ddl;
+						batchLatestThinking = r.thinking;
+						if (inputMode === 'batch' && batchAutoFollowLatest) {
+							displayLatestBatchRender();
 						}
 						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
@@ -2971,6 +2981,24 @@
 		}
 	}
 
+	function displayLatestBatchRender(): void {
+		if (!batchLatestResult) return;
+		result = batchLatestResult;
+		ddl = batchLatestDdl;
+		ddlGeneratedBaseline = batchLatestDdl;
+		ddlSelection = { start: batchLatestDdl?.length ?? 0, end: batchLatestDdl?.length ?? 0 };
+		thinking = batchLatestThinking;
+		outputTab = 'canvas';
+		fitCanvasZoom();
+	}
+
+	function resumeBatchLatestFollow(): void {
+		batchAutoFollowLatest = true;
+		displayedHistoryItem = null;
+		historyCursor = -1;
+		displayLatestBatchRender();
+	}
+
 	function shortModel(m: string | null | undefined): string {
 		if (!m) return '';
 		if (m.includes('opus')) return 'opus';
@@ -3361,6 +3389,17 @@
 	$effect(() => {
 		if (typeof document === 'undefined') return;
 		document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+	});
+	$effect(() => {
+		const mode = inputMode;
+		const wasMode = previousInputMode;
+		if (mode === wasMode) return;
+		previousInputMode = mode;
+		if (mode === 'batch' && (activeRunMode === 'batch' || batchLatestResult)) {
+			untrack(resumeBatchLatestFollow);
+		} else if (wasMode === 'batch') {
+			batchAutoFollowLatest = false;
+		}
 	});
 </script>
 

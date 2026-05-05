@@ -358,6 +358,112 @@ def _dedupe_instructions(instructions: list[Instruction]) -> list[Instruction]:
     return deduped
 
 
+def _dedupe_instruction_key(ins: Instruction) -> str:
+    data = ins.model_dump(by_alias=True, exclude_none=True)
+    data.pop("color_hint", None)
+    return json.dumps(data, sort_keys=True, ensure_ascii=False)
+
+
+def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[Instruction]:
+    """color_hint だけが違う同一補助層を統合する。"""
+    repaired: list[Instruction] = []
+    seen: set[str] = set()
+    for ins in instructions:
+        key = _dedupe_instruction_key(ins)
+        if key in seen:
+            continue
+        seen.add(key)
+        repaired.append(ins)
+    return repaired
+
+
+ATMOSPHERIC_EFFECT_MARKERS: tuple[str, ...] = (
+    "membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄",
+    "soft light", "柔らかな光", "陽光", "日差し",
+    "scent", "fragrance", "香り", "匂",
+    "five-sense", "五感",
+    "reflection", "反射", "映り",
+)
+
+
+def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
+    if ins.primitive not in ("circle", "ellipse", "square", "triangle"):
+        return None
+    if ins.primitive == "circle" and ins.center is not None:
+        return ("circle", round(ins.center[0], 2), round(ins.center[1], 2), round(ins.radius or 0.1, 2))
+    if ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
+        return (
+            "ellipse",
+            round(ins.center[0], 2),
+            round(ins.center[1], 2),
+            round(ins.size[0], 2),
+            round(ins.size[1], 2),
+        )
+    if ins.primitive in ("square", "triangle") and ins.position is not None and ins.size is not None:
+        return (
+            ins.primitive,
+            round(ins.position[0], 2),
+            round(ins.position[1], 2),
+            round(ins.size[0], 2),
+            round(ins.size[1], 2),
+        )
+    return None
+
+
+def _closed_shape_area(ins: Instruction) -> float:
+    if ins.primitive == "circle":
+        radius = ins.radius if ins.radius is not None else 0.1
+        return radius * radius
+    if ins.primitive == "ellipse" and ins.size is not None:
+        return ins.size[0] * ins.size[1]
+    if ins.primitive in ("square", "triangle") and ins.size is not None:
+        return ins.size[0] * ins.size[1]
+    return 0.0
+
+
+def _is_atmospheric_effect_hint(hint: str | None) -> bool:
+    if not hint:
+        return False
+    lower = hint.lower()
+    return any(marker in hint or marker.lower() in lower for marker in ATMOSPHERIC_EFFECT_MARKERS)
+
+
+def _is_plain_material_hint(hint: str | None) -> bool:
+    if not hint:
+        return True
+    lower = hint.lower()
+    return "material inferred from ddl" in lower and not _is_atmospheric_effect_hint(hint)
+
+
+def _with_presence_auxiliary_shape_repair(instructions: list[Instruction], presence: Any) -> list[Instruction]:
+    """presence 有効時に、補助的な大きい閉図形のプレーン重複を抑える。"""
+    kind = presence.get("kind") if isinstance(presence, dict) else getattr(presence, "kind", None)
+    if presence is None or kind == "none":
+        return instructions
+
+    atmospheric_keys = {
+        key
+        for ins in instructions
+        if (key := _closed_shape_geometry_key(ins)) is not None
+        and _closed_shape_area(ins) >= 0.025
+        and _is_atmospheric_effect_hint(ins.color_hint)
+    }
+    if not atmospheric_keys:
+        return instructions
+
+    repaired: list[Instruction] = []
+    for ins in instructions:
+        key = _closed_shape_geometry_key(ins)
+        if (
+            key in atmospheric_keys
+            and _closed_shape_area(ins) >= 0.025
+            and _is_plain_material_hint(ins.color_hint)
+        ):
+            continue
+        repaired.append(ins)
+    return repaired
+
+
 def _expanded_count(ins: Instruction) -> int:
     if ins.arrangement is None:
         return 1
@@ -893,6 +999,76 @@ def _with_complex_motif_repair(
     return repaired
 
 
+HUMAN_PRESENCE_MARKERS: tuple[str, ...] = (
+    "人", "人物", "人影", "人型", "顔", "表情", "視線", "まなざし", "眼差し", "目線", "誰か", "群衆",
+    "human", "person", "people", "figure", "face", "gaze", "look", "crowd",
+)
+CREATURE_PRESENCE_MARKERS: tuple[str, ...] = (
+    "動物", "獣", "鳥", "魚", "犬", "猫", "馬", "鹿", "群れ", "羽", "翼", "尾", "尻尾",
+    "animal", "creature", "bird", "fish", "dog", "cat", "horse", "deer", "flock", "herd", "tail", "wing",
+)
+GROUP_PRESENCE_MARKERS: tuple[str, ...] = (
+    "群れ", "群衆", "複数", "集ま", "並ぶ", "crowd", "group", "flock", "herd", "many figures",
+)
+GAZE_PRESENCE_MARKERS: tuple[str, ...] = (
+    "顔", "視線", "まなざし", "眼差し", "目線", "見つめ", "face", "gaze", "look", "stare",
+)
+SYMMETRY_PRESENCE_MARKERS: tuple[str, ...] = (
+    "人型", "顔", "正面", "対称", "figure", "face", "frontal", "symmetry",
+)
+
+
+def _context_has_any(context: str, markers: tuple[str, ...]) -> bool:
+    lower = context.lower()
+    return any(marker in context or marker.lower() in lower for marker in markers)
+
+
+def _presence_center_from_context(context: str) -> list[float] | None:
+    lower = context.lower()
+    if any(marker in context or marker in lower for marker in ("右上", "upper right")):
+        return [0.68, 0.34]
+    if any(marker in context or marker in lower for marker in ("左上", "upper left")):
+        return [0.32, 0.34]
+    if any(marker in context or marker in lower for marker in ("右下", "lower right")):
+        return [0.68, 0.66]
+    if any(marker in context or marker in lower for marker in ("左下", "lower left")):
+        return [0.32, 0.66]
+    if any(marker in context or marker in lower for marker in ("右半分", "right half")):
+        return [0.68, 0.50]
+    if any(marker in context or marker in lower for marker in ("左半分", "left half")):
+        return [0.32, 0.50]
+    return None
+
+
+def _presence_from_ddl(ddl: str | None) -> dict | None:
+    if not ddl:
+        return None
+    has_human = _context_has_any(ddl, HUMAN_PRESENCE_MARKERS)
+    has_creature = _context_has_any(ddl, CREATURE_PRESENCE_MARKERS)
+    if not has_human and not has_creature:
+        return None
+
+    has_group = _context_has_any(ddl, GROUP_PRESENCE_MARKERS)
+    has_gaze = _context_has_any(ddl, GAZE_PRESENCE_MARKERS)
+    kind = "group_like" if has_group else "creature_like" if has_creature and not has_human else "figure_like"
+    intensity = "high" if any(marker in ddl for marker in ("強い", "圧力", "濃い")) or any(
+        marker in ddl.lower() for marker in ("strong", "pressure", "dense")
+    ) else "medium" if has_gaze or has_group else "low"
+    contour_density = "high" if has_group else "medium" if has_creature or has_gaze else "low"
+    symmetry = "bilateral" if _context_has_any(ddl, SYMMETRY_PRESENCE_MARKERS) or kind == "figure_like" else "none"
+    gaze_pressure = "medium" if has_gaze else "low" if has_human else "none"
+    presence: dict[str, object] = {
+        "kind": kind,
+        "intensity": intensity,
+        "symmetry": symmetry,
+        "gaze_pressure": gaze_pressure,
+        "contour_density": contour_density,
+    }
+    if center := _presence_center_from_context(ddl):
+        presence["center"] = center
+    return presence
+
+
 def _ddl_clauses(ddl: str | None) -> list[str]:
     if not ddl:
         return []
@@ -1304,9 +1480,14 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
     instructions = _with_complex_motif_repair(instructions, ddl=ddl, background=background)
     instructions = _with_composition_diversity_repair(instructions, ddl=ddl, background=background)
+    instructions = _with_structural_duplicate_repair(instructions)
+    effective_presence = score.presence or _presence_from_ddl(ddl)
+    instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)
     data["background"] = background
+    if score.presence is None and effective_presence is not None:
+        data["presence"] = effective_presence
     data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
     return Score.model_validate(data)

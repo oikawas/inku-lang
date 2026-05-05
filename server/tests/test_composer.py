@@ -170,6 +170,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "cluster_count" in SYSTEM_PROMPT
     assert "preserve_space" in SYSTEM_PROMPT
     assert "透明な膜" in SYSTEM_PROMPT
+    assert "Score.presence" in SYSTEM_PROMPT
+    assert "目鼻口・頭身・四肢・耳・尻尾" in SYSTEM_PROMPT
+    assert "待つ人の気配" in SYSTEM_PROMPT
     assert "反射" in SYSTEM_PROMPT
     assert "圧縮しすぎない" in SYSTEM_PROMPT
     assert "香り" in SYSTEM_PROMPT
@@ -222,6 +225,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "cluster_count" in SYSTEM_PROMPT_EN
     assert "preserve_space" in SYSTEM_PROMPT_EN
     assert "transparent membrane" in SYSTEM_PROMPT_EN
+    assert "Score.presence" in SYSTEM_PROMPT_EN
+    assert "eyes, mouth, body proportions, limbs, ears, or tails" in SYSTEM_PROMPT_EN
+    assert "waiting person" in SYSTEM_PROMPT_EN
     assert "Reflection" in SYSTEM_PROMPT_EN
     assert "Do not over-compress" in SYSTEM_PROMPT_EN
     assert "scent" in SYSTEM_PROMPT_EN

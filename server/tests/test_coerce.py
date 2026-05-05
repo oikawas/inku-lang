@@ -82,6 +82,7 @@ def test_coerce_score_dedupes_repeated_arranged_instructions():
 def test_coerce_score_caps_total_expanded_density():
     score = Score.model_validate(
         {
+            "background": "blue",
             "instructions": [
                 {
                     "primitive": "line",
@@ -108,6 +109,7 @@ def test_coerce_score_caps_total_expanded_density():
 def test_coerce_score_caps_single_arrangement_density():
     score = Score.model_validate(
         {
+            "background": "blue",
             "instructions": [
                 {
                     "primitive": "line",
@@ -594,3 +596,107 @@ def test_coerce_score_adds_generic_accent_when_shape_exists_but_color_is_flat():
     assert len(accents) == 1
     assert accents[0].primitive == "arc"
     assert accents[0].color == "blue"
+
+
+def test_coerce_score_restores_human_presence_as_abstract_score_field():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.56, 0.52],
+                    "size": [0.42, 0.16],
+                    "color": "blue",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+
+    assert fixed.presence is not None
+    assert fixed.presence.kind == "figure_like"
+    assert fixed.presence.symmetry == "bilateral"
+    assert fixed.presence.gaze_pressure == "low"
+
+
+def test_coerce_score_restores_animal_group_presence_without_extra_primitives():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="遠くの動物の群れの気配が横へ流れる。")
+
+    assert fixed.presence is not None
+    assert fixed.presence.kind == "group_like"
+    assert fixed.presence.contour_density == "high"
+    assert all("animal" not in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_dedupes_structurally_identical_auxiliary_layers():
+    score = Score.model_validate(
+        {
+            "background": "blue",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.75, 0.5],
+                    "size": [0.3, 0.15],
+                    "color": "white",
+                    "color_hint": "透明な膜",
+                    "arrangement": {"count": 3, "layout": "scatter", "path": "right_half", "margin": 0.45},
+                },
+                {
+                    "primitive": "ellipse",
+                    "center": [0.75, 0.5],
+                    "size": [0.3, 0.15],
+                    "color": "white",
+                    "color_hint": "material inferred from DDL",
+                    "arrangement": {"count": 3, "layout": "scatter", "path": "right_half", "margin": 0.45},
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score)
+
+    assert len(fixed.instructions) == 1
+    assert fixed.instructions[0].color_hint == "透明な膜"
+
+
+def test_coerce_score_suppresses_plain_large_shape_duplicate_when_presence_is_active():
+    score = Score.model_validate(
+        {
+            "presence": {"kind": "creature_like", "intensity": "low", "contour_density": "medium"},
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.7, 0.5],
+                    "size": [0.3, 0.1],
+                    "color": "black",
+                    "color_hint": "透明な膜; material inferred from DDL: pencil",
+                },
+                {
+                    "primitive": "ellipse",
+                    "center": [0.7, 0.5],
+                    "size": [0.3, 0.1],
+                    "color": "black",
+                    "color_hint": "material inferred from DDL: pencil",
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score)
+
+    assert len(fixed.instructions) == 1
+    assert fixed.instructions[0].color_hint is not None
+    assert "透明な膜" in fixed.instructions[0].color_hint

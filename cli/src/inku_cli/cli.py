@@ -841,6 +841,17 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     clustered_arrangements = 0
     preserve_space_count = 0
     color_cycle_count = 0
+    presence_counts: Counter[str] = Counter()
+    presence_gaze_counts: Counter[str] = Counter()
+
+    presence = score.get("presence")
+    if isinstance(presence, dict):
+        kind = presence.get("kind")
+        if isinstance(kind, str) and kind != "none":
+            presence_counts[kind] += 1
+        gaze = presence.get("gaze_pressure")
+        if isinstance(gaze, str) and gaze != "none":
+            presence_gaze_counts[gaze] += 1
 
     for instruction in instructions:
         if not isinstance(instruction, dict):
@@ -891,6 +902,8 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_primitive_counts": dict(sorted(primitive_counts.items())),
         "score_color_counts": dict(sorted(color_counts.items())),
         "score_motif_hint_counts": dict(sorted(motif_hint_counts.items())),
+        "score_presence_counts": dict(sorted(presence_counts.items())),
+        "score_presence_gaze_counts": dict(sorted(presence_gaze_counts.items())),
         "math_balance_markers": _math_balance_markers([
             instruction for instruction in instructions if isinstance(instruction, dict)
         ]),
@@ -1340,6 +1353,8 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_primitive: Counter[str] = Counter()
     aggregate_color: Counter[str] = Counter()
     aggregate_motif_hints: Counter[str] = Counter()
+    aggregate_presence: Counter[str] = Counter()
+    aggregate_presence_gaze: Counter[str] = Counter()
     aggregate_clustered = 0
     aggregate_preserve_space = 0
     aggregate_color_cycle = 0
@@ -1352,6 +1367,8 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_primitive.update(result.get("score_primitive_counts") or {})
         aggregate_color.update(result.get("score_color_counts") or {})
         aggregate_motif_hints.update(result.get("score_motif_hint_counts") or {})
+        aggregate_presence.update(result.get("score_presence_counts") or {})
+        aggregate_presence_gaze.update(result.get("score_presence_gaze_counts") or {})
         aggregate_math_balance.update(result.get("math_balance_markers") or {})
         aggregate_clustered += int(result.get("score_clustered_arrangements") or 0)
         aggregate_preserve_space += int(result.get("score_preserve_space_count") or 0)
@@ -1397,6 +1414,9 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_color_counts": dict(sorted(aggregate_color.items())),
         "score_motif_hint_counts": dict(sorted(aggregate_motif_hints.items())),
         "score_motif_hint_lines": _aggregate_marker_lines(results, "score_motif_hint_counts"),
+        "score_presence_counts": dict(sorted(aggregate_presence.items())),
+        "score_presence_gaze_counts": dict(sorted(aggregate_presence_gaze.items())),
+        "score_presence_lines": _aggregate_marker_lines(results, "score_presence_counts"),
         "math_balance_markers": dict(sorted(aggregate_math_balance.items())),
         "math_balance_marker_lines": _aggregate_marker_lines(results, "math_balance_markers"),
         "review_sets": _review_sets(results),

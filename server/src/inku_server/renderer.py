@@ -374,9 +374,27 @@ def _apply_color_cycle(items: list[Instruction], cycle: list) -> list[Instructio
     for i, single in enumerate(items):
         data = single.model_dump(by_alias=True)
         data["color"] = cycle[i % len(cycle)]
-        data["color_hint"] = None
+        data["color_hint"] = _render_effect_hint(single.color_hint)
         result.append(Instruction.model_validate(data))
     return result
+
+
+def _render_effect_hint(color_hint: str | None) -> str | None:
+    """color_cycle 時も、色選択ではなく描画効果に関わるヒントだけは残す。"""
+    if not color_hint:
+        return None
+    hint = _norm_label(color_hint)
+    effect_tokens = (
+        "membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄",
+        "soft light", "柔らかな光", "陽光", "日差し",
+        "scent", "fragrance", "香り", "匂",
+        "waiting buds", "開花を待つ蕾", "蕾", "つぼみ",
+        "five-sense", "五感",
+        "fade directional", "fade=directional", "fade outward", "fade=outward",
+        "reflection", "反射", "映り",
+    )
+    kept = [token for token in effect_tokens if token in hint]
+    return "; ".join(kept) if kept else None
 
 
 def _expand_arrangement(ins: Instruction) -> list[Instruction]:
@@ -562,14 +580,17 @@ def render(
         background = dwg.g(id="layer_00_background")
         background.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=bg, id="background"))
         content = dwg.g(id="layer_10_content")
+        presence_content = dwg.g(id="layer_20_presence")
         artboard.add(background)
         artboard.add(content)
+        artboard.add(presence_content)
     else:
         dwg.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=bg))
         clip_id = "canvas-clip"
         clip = dwg.defs.add(dwg.clipPath(id=clip_id))
         clip.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height)))
         content = dwg.g(clip_path=f"url(#{clip_id})")
+        presence_content = content
 
     blur_needed: dict[str, float] = {}
     texture_filters = _texture_filter_weights(score) if use_filters else set()
@@ -596,6 +617,10 @@ def render(
         if structured:
             content.add(instruction_group)
 
+    presence_layer = _render_presence_layer(dwg, score, cmap, canvas)
+    if presence_layer is not None:
+        presence_content.add(presence_layer)
+
     if structured:
         dwg.add(artboard)
     else:
@@ -618,6 +643,140 @@ def _texture_filter_weights(score: Score) -> set[str]:
         if ins.weight in TEXTURE_FILTERS:
             weights.add(ins.weight)
     return weights
+
+
+def _score_visual_load(score: Score) -> int:
+    load = 0
+    for ins in score.instructions:
+        if ins.arrangement is not None:
+            load += max(1, int(ins.arrangement.count))
+        else:
+            load += 1
+    return load
+
+
+def _presence_center_px(score: Score, canvas: CanvasSize) -> tuple[float, float]:
+    presence = score.presence
+    if presence is None or presence.center is None:
+        return canvas.width * 0.52, canvas.height * 0.50
+    x, y = presence.center
+    return _clamp01(x) * canvas.width, _clamp01(y) * canvas.height
+
+
+def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, str], canvas: CanvasSize):
+    """抽象化された存在感を描く。自然文キーワードや具象部品はここでは扱わない。"""
+    presence = score.presence
+    if presence is None or presence.kind == "none":
+        return None
+
+    cx, cy = _presence_center_px(score, canvas)
+    unit = canvas.unit
+    color = cmap.get("gray", COLOR_MAP["gray"])
+    dark = cmap.get("black", COLOR_MAP["black"])
+    visual_load = _score_visual_load(score)
+    load_opacity = 0.52 if visual_load >= 120 else 0.70 if visual_load >= 60 else 1.0
+    intensity_opacity = {"low": 0.13, "medium": 0.21, "high": 0.30}[presence.intensity] * load_opacity
+    gaze_opacity = {"none": 0.0, "low": 0.11, "medium": 0.18, "high": 0.26}[presence.gaze_pressure] * load_opacity
+    contour_count = {"low": 4, "medium": 7, "high": 11}[presence.contour_density]
+    radius_x = unit * {"low": 0.18, "medium": 0.24, "high": 0.30}[presence.intensity]
+    radius_y = unit * {"low": 0.24, "medium": 0.32, "high": 0.40}[presence.intensity]
+    stroke = max(1.2, unit * 0.003)
+    layer = dwg.g(id="presence_layer")
+
+    if presence.symmetry == "bilateral":
+        for offset_scale in (0.22, 0.46):
+            dx = radius_x * offset_scale
+            layer.add(dwg.line(
+                start=(cx - dx, cy - radius_y * 0.72),
+                end=(cx - dx * 0.54, cy + radius_y * 0.72),
+                stroke=color,
+                stroke_width=stroke,
+                stroke_opacity=intensity_opacity,
+                stroke_linecap="round",
+            ))
+            layer.add(dwg.line(
+                start=(cx + dx, cy - radius_y * 0.72),
+                end=(cx + dx * 0.54, cy + radius_y * 0.72),
+                stroke=color,
+                stroke_width=stroke,
+                stroke_opacity=intensity_opacity,
+                stroke_linecap="round",
+            ))
+    elif presence.symmetry == "radial":
+        for i in range(6):
+            angle = math.tau * i / 6.0
+            inner = radius_x * 0.28
+            outer = radius_x * 0.86
+            layer.add(dwg.line(
+                start=(cx + math.cos(angle) * inner, cy + math.sin(angle) * inner),
+                end=(cx + math.cos(angle) * outer, cy + math.sin(angle) * outer),
+                stroke=color,
+                stroke_width=stroke,
+                stroke_opacity=intensity_opacity * 0.72,
+                stroke_linecap="round",
+            ))
+
+    if presence.gaze_pressure != "none":
+        for i, side in enumerate((-1, 1, -1, 1, -1, 1)):
+            t = (i + 1) / 7
+            start_x = cx + side * (radius_x * (1.25 + 0.28 * (i % 2)))
+            start_y = cy - radius_y * 0.62 + t * radius_y * 1.24
+            end_x = cx + side * radius_x * 0.18
+            end_y = cy + (t - 0.5) * radius_y * 0.20
+            layer.add(dwg.line(
+                start=(start_x, start_y),
+                end=(end_x, end_y),
+                stroke=dark,
+                stroke_width=stroke * 0.8,
+                stroke_opacity=gaze_opacity,
+                stroke_linecap="round",
+            ))
+
+    for i in range(contour_count):
+        angle = math.tau * i / contour_count
+        span = 0.18 + 0.05 * (i % 3)
+        start = angle - span
+        end = angle + span
+        x1 = cx + math.cos(start) * radius_x
+        y1 = cy + math.sin(start) * radius_y
+        x2 = cx + math.cos(end) * radius_x
+        y2 = cy + math.sin(end) * radius_y
+        xm = cx + math.cos(angle) * radius_x * 1.08
+        ym = cy + math.sin(angle) * radius_y * 1.08
+        path = dwg.path(
+            d=f"M {x1:.2f},{y1:.2f} Q {xm:.2f},{ym:.2f} {x2:.2f},{y2:.2f}",
+            fill="none",
+            stroke=color,
+            stroke_width=stroke,
+            stroke_opacity=intensity_opacity * 0.82,
+            stroke_linecap="round",
+        )
+        layer.add(path)
+
+    if presence.kind == "group_like":
+        for i in range(7):
+            t = (i - 3) / 3.5
+            px = cx + t * radius_x * 0.82
+            py = cy + math.sin(i * 1.7) * radius_y * 0.24
+            layer.add(dwg.circle(
+                center=(px, py),
+                r=max(2.0, unit * 0.006),
+                fill=color,
+                fill_opacity=intensity_opacity * 0.72,
+            ))
+    elif presence.kind == "creature_like":
+        for i in range(3):
+            t = (i - 1) * 0.34
+            layer.add(dwg.line(
+                start=(cx - radius_x * 0.30 + t * radius_x, cy + radius_y * 0.32),
+                end=(cx - radius_x * 0.05 + t * radius_x, cy + radius_y * 0.44),
+                stroke=color,
+                stroke_width=stroke,
+                stroke_opacity=intensity_opacity * 0.76,
+                stroke_linecap="round",
+            ))
+
+    return layer
 
 
 def _norm_label(value: str) -> str:

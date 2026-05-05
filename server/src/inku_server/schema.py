@@ -36,6 +36,11 @@ Layout = Literal["horizontal", "vertical", "radial", "scatter"]
 Path = Literal["none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"]
 Density = Literal["none", "low", "medium", "high"]
 Fade = Literal["none", "outward", "directional"]
+PresenceKind = Literal["none", "figure_like", "creature_like", "group_like"]
+PresenceIntensity = Literal["low", "medium", "high"]
+PresenceSymmetry = Literal["none", "bilateral", "radial"]
+GazePressure = Literal["none", "low", "medium", "high"]
+ContourDensity = Literal["low", "medium", "high"]
 
 
 class Variation(BaseModel):
@@ -224,6 +229,38 @@ class Instruction(BaseModel):
     )
 
 
+class Presence(BaseModel):
+    """人・顔・動物などの具象モチーフを、抽象的な構図圧として保持する。"""
+
+    kind: PresenceKind = Field(
+        default="none",
+        description=(
+            "存在の種類。none=なし / figure_like=人型の気配 / creature_like=動物的な気配"
+            " / group_like=群れや複数の気配。具象的な顔・身体・動物として描かない"
+        ),
+    )
+    intensity: PresenceIntensity = Field(
+        default="medium",
+        description="存在感の強さ: low=弱い / medium=中程度 / high=強い",
+    )
+    center: Optional[Coord] = Field(
+        default=None,
+        description="存在感の重心。省略時は画面中央付近",
+    )
+    symmetry: PresenceSymmetry = Field(
+        default="none",
+        description="対称性: none=なし / bilateral=左右対称の圧 / radial=放射的な圧",
+    )
+    gaze_pressure: GazePressure = Field(
+        default="none",
+        description="視線の圧力。顔や目は描かず、細い線の収束や余白の圧として描く",
+    )
+    contour_density: ContourDensity = Field(
+        default="low",
+        description="輪郭密度。具象輪郭ではなく、短い弧や線片の密度として扱う",
+    )
+
+
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -239,5 +276,12 @@ class Score(BaseModel):
     background: Color = Field(
         default="white",
         description="背景色 (省略=white)。「背景を黒で塗りつぶす」→ black",
+    )
+    presence: Optional[Presence] = Field(
+        default=None,
+        description=(
+            "人・顔・動物・群れなどの対象物を直接描かず、存在感、重心、対称性、視線の圧力、"
+            "群れ、輪郭密度へ抽象化した描画パラメータ。目鼻口・四肢・耳・尻尾などの具象部品は禁止"
+        ),
     )
     instructions: list[Instruction]

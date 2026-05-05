@@ -700,3 +700,94 @@ def test_coerce_score_suppresses_plain_large_shape_duplicate_when_presence_is_ac
     assert len(fixed.instructions) == 1
     assert fixed.instructions[0].color_hint is not None
     assert "透明な膜" in fixed.instructions[0].color_hint
+
+
+def test_coerce_score_governs_quiet_high_density_scatter():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.02, 0.05],
+                    "color": "white",
+                    "color_hint": "ネオンの滲み",
+                    "arrangement": {
+                        "count": 180,
+                        "layout": "scatter",
+                        "density": "high",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夜のガラス越しに、街のネオンが涙のように滲んでいる。")
+
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.count == 64
+    assert arr.preserve_space is True
+    assert arr.fade == "outward"
+    assert "quiet density governed" in (fixed.instructions[0].color_hint or "")
+
+
+def test_coerce_score_governs_quiet_vertical_rain_density():
+    score = Score.model_validate(
+        {
+            "background": "blue",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.5, 0.0],
+                    "to": [0.5, 1.0],
+                    "color": "gray",
+                    "color_hint": "雨",
+                    "arrangement": {
+                        "count": 110,
+                        "layout": "vertical",
+                        "path": "top_to_bottom",
+                        "density": "high",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.count == 48
+    assert arr.density == "low"
+    assert arr.fade == "directional"
+
+
+def test_coerce_score_governs_quiet_large_shape_repetition():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.35, 0.1],
+                    "size": [0.3, 0.15],
+                    "color": "black",
+                    "color_hint": "低い雲",
+                    "arrangement": {
+                        "count": 30,
+                        "layout": "vertical",
+                        "path": "top_to_bottom",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="遠雷の前、低い雲が街の屋根を押し沈めている。")
+
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.count == 16
+    assert arr.density == "low"
+    assert arr.preserve_space is True

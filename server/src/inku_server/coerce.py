@@ -150,6 +150,9 @@ MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
 MAX_EXPANDED_PRIMITIVES = 400
 MAX_EXPANDED_PER_INSTRUCTION = 240
 MAX_VISUAL_CLUSTERED_COUNT = 120
+MAX_QUIET_VISUAL_COUNT = 64
+MAX_QUIET_VERTICAL_COUNT = 48
+MAX_QUIET_LARGE_SHAPE_COUNT = 16
 
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("白", "white"), "white"),
@@ -385,6 +388,32 @@ ATMOSPHERIC_EFFECT_MARKERS: tuple[str, ...] = (
     "reflection", "反射", "映り",
 )
 
+QUIET_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
+    "静か", "静けさ", "沈黙", "余白", "薄い", "薄く", "細い", "少しだけ", "一つ", "一滴",
+    "気配", "余韻", "記憶", "忘れ", "影", "冷たい", "透明", "膜", "霞", "霧", "靄", "滲",
+    "低い雲", "押し沈",
+    "quiet", "silence", "negative space", "thin", "pale", "slight", "single", "one ",
+    "presence", "trace", "memory", "forgotten", "shadow", "cold", "transparent", "membrane",
+    "haze", "fog", "mist", "blur", "low cloud", "pressing down",
+)
+VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
+    "雨", "雪", "降", "縦", "上から下", "rain", "snow", "falling", "vertical", "top to bottom",
+)
+
+
+def _context_has_density_governor(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(marker in ddl or marker in lower for marker in QUIET_DENSITY_CONTEXT_MARKERS)
+
+
+def _context_has_vertical_density(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(marker in ddl or marker in lower for marker in VERTICAL_DENSITY_CONTEXT_MARKERS)
+
 
 def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
     if ins.primitive not in ("circle", "ellipse", "square", "triangle"):
@@ -480,6 +509,85 @@ def _with_arrangement_count(ins: Instruction, count: int, note: str) -> Instruct
     hint = data.get("color_hint")
     data["color_hint"] = f"{hint}; {note}" if hint else note
     return Instruction.model_validate(data)
+
+
+def _with_arrangement_density_governor(ins: Instruction, *, count: int, density: str, fade: str, note: str) -> Instruction:
+    if ins.arrangement is None:
+        return ins
+    data = ins.model_dump(by_alias=True)
+    arr_data = dict(data["arrangement"])
+    original_count = int(arr_data.get("count") or 1)
+    arr_data["count"] = min(original_count, max(1, int(count)))
+    arr_data["density"] = density
+    arr_data["preserve_space"] = True
+    arr_data["margin"] = max(float(arr_data.get("margin") or 0.1), 0.22)
+    if arr_data.get("fade", "none") == "none":
+        arr_data["fade"] = fade
+    if arr_data.get("cluster_count") is None and arr_data["count"] >= 32:
+        arr_data["cluster_count"] = min(5, _cluster_count(original_count))
+    data["arrangement"] = arr_data
+    hint = data.get("color_hint")
+    full_note = f"{note}; original count {original_count}"
+    data["color_hint"] = f"{hint}; {full_note}" if hint else full_note
+    return Instruction.model_validate(data)
+
+
+def _with_context_density_governor(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """静けさ・膜・記憶系の入力で、密度や大きな反復面が主題を上書きするのを抑える。"""
+    if not _context_has_density_governor(ddl):
+        return instructions
+
+    has_vertical_context = _context_has_vertical_density(ddl)
+    adjusted: list[Instruction] = []
+    for ins in instructions:
+        arr = ins.arrangement
+        if arr is None:
+            adjusted.append(ins)
+            continue
+
+        is_vertical_load = has_vertical_context and (
+            ins.primitive == "line"
+            or arr.layout == "vertical"
+            or arr.path == "top_to_bottom"
+        )
+        if is_vertical_load and arr.count > MAX_QUIET_VERTICAL_COUNT:
+            adjusted.append(
+                _with_arrangement_density_governor(
+                    ins,
+                    count=MAX_QUIET_VERTICAL_COUNT,
+                    density="low",
+                    fade="directional",
+                    note="quiet vertical density governed to keep membrane/space legible",
+                )
+            )
+            continue
+
+        if _closed_shape_area(ins) >= 0.04 and arr.count > MAX_QUIET_LARGE_SHAPE_COUNT:
+            adjusted.append(
+                _with_arrangement_density_governor(
+                    ins,
+                    count=MAX_QUIET_LARGE_SHAPE_COUNT,
+                    density="low",
+                    fade="outward",
+                    note="quiet large-shape repetition governed to preserve negative space",
+                )
+            )
+            continue
+
+        if arr.count > MAX_QUIET_VISUAL_COUNT:
+            adjusted.append(
+                _with_arrangement_density_governor(
+                    ins,
+                    count=MAX_QUIET_VISUAL_COUNT,
+                    density="medium" if arr.count >= 120 else "low",
+                    fade="outward" if arr.layout == "scatter" else "directional",
+                    note="quiet density governed to preserve lightness",
+                )
+            )
+            continue
+
+        adjusted.append(ins)
+    return adjusted
 
 
 def _density_label(original_count: int) -> str:
@@ -1483,6 +1591,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_structural_duplicate_repair(instructions)
     effective_presence = score.presence or _presence_from_ddl(ddl)
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
+    instructions = _with_context_density_governor(instructions, ddl=ddl)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)

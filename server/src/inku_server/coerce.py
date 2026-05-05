@@ -153,6 +153,9 @@ MAX_VISUAL_CLUSTERED_COUNT = 120
 MAX_QUIET_VISUAL_COUNT = 64
 MAX_QUIET_VERTICAL_COUNT = 48
 MAX_QUIET_LARGE_SHAPE_COUNT = 16
+MAX_QUIET_SYMBOLIC_SHAPE_COUNT = 8
+MAX_QUIET_SYMBOLIC_SHAPE_WIDTH = 0.12
+MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT = 0.09
 
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("白", "white"), "white"),
@@ -399,6 +402,14 @@ QUIET_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
 VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
     "雨", "雪", "降", "縦", "上から下", "rain", "snow", "falling", "vertical", "top to bottom",
 )
+MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
+    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "帰って", "風", "波", "ためらう",
+    "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
+)
+COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
+    "祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色",
+    "festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color",
+)
 
 
 def _context_has_density_governor(ddl: str | None) -> bool:
@@ -413,6 +424,20 @@ def _context_has_vertical_density(ddl: str | None) -> bool:
         return False
     lower = ddl.lower()
     return any(marker in ddl or marker in lower for marker in VERTICAL_DENSITY_CONTEXT_MARKERS)
+
+
+def _context_has_motion(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(marker in ddl or marker in lower for marker in MOTION_CONTEXT_MARKERS)
+
+
+def _context_has_colorful_accent(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(marker in ddl or marker in lower for marker in COLORFUL_CONTEXT_MARKERS)
 
 
 def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
@@ -532,14 +557,125 @@ def _with_arrangement_density_governor(ins: Instruction, *, count: int, density:
     return Instruction.model_validate(data)
 
 
-def _with_context_density_governor(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+def _cap_size(size: tuple[float, float] | list[float], max_width: float, max_height: float) -> list[float]:
+    width = float(size[0])
+    height = float(size[1])
+    scale = min(1.0, max_width / width if width > 0 else 1.0, max_height / height if height > 0 else 1.0)
+    return [max(0.01, width * scale), max(0.01, height * scale)]
+
+
+def _with_quiet_symbolic_shape_tempering(ins: Instruction, *, ddl: str | None) -> Instruction:
+    if not _context_has_density_governor(ddl) or ins.primitive not in ("square", "triangle"):
+        return ins
+    if ins.size is None:
+        return ins
+    hint = ins.color_hint or ""
+    if not any(marker in hint for marker in ("coverage from DDL clause", "motif restored", "shape intent", "fallback from DDL")):
+        return ins
+
+    size = list(ins.size)
+    arr = ins.arrangement
+    needs_size_cap = size[0] > MAX_QUIET_SYMBOLIC_SHAPE_WIDTH or size[1] > MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT
+    needs_count_cap = arr is not None and arr.count > MAX_QUIET_SYMBOLIC_SHAPE_COUNT
+    if not needs_size_cap and not needs_count_cap:
+        return ins
+
+    data = ins.model_dump(by_alias=True)
+    if needs_size_cap:
+        data["size"] = _cap_size(size, MAX_QUIET_SYMBOLIC_SHAPE_WIDTH, MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT)
+    if arr is not None:
+        arr_data = dict(data["arrangement"])
+        if needs_count_cap:
+            arr_data["count"] = MAX_QUIET_SYMBOLIC_SHAPE_COUNT
+        arr_data["preserve_space"] = True
+        arr_data["margin"] = max(float(arr_data.get("margin") or 0.1), 0.24)
+        if arr_data.get("fade", "none") == "none":
+            arr_data["fade"] = "outward"
+        if arr_data.get("density", "none") == "none":
+            arr_data["density"] = "low"
+        data["arrangement"] = arr_data
+    note = "quiet symbolic shape tempered to avoid fallback dominance"
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
+def _has_compensating_accent(instructions: list[Instruction]) -> bool:
+    for ins in instructions:
+        if "quiet expression accent restored" in (ins.color_hint or ""):
+            return True
+    return any(
+        (ins.color in {"red", "green", "blue"} and _expanded_count(ins) <= 12 and _closed_shape_area(ins) <= 0.03)
+        or (ins.primitive == "arc" and _expanded_count(ins) <= 9)
+        for ins in instructions
+    )
+
+
+def _quiet_expression_accent(*, ddl: str | None, background: str) -> Instruction:
+    color = "red" if _context_has_colorful_accent(ddl) and background != "red" else "green" if background != "green" else "blue"
+    if _context_has_motion(ddl):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.68, 0.34],
+                "radius": 0.12,
+                "angle_start": 205,
+                "angle_end": 325,
+                "color": color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black"),
+                "weight": "hair",
+                "color_hint": "quiet expression accent restored after density governance",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "radial",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                },
+            }
+        )
+    return Instruction.model_validate(
+        {
+            "primitive": "ellipse",
+            "center": [0.67, 0.35],
+            "size": [0.055, 0.026],
+            "rotation": -18,
+            "color": color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black"),
+            "weight": "pencil",
+            "filled": True,
+            "color_hint": "quiet expression accent restored after density governance",
+        }
+    )
+
+
+def _with_quiet_expression_compensation(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+    governed_count: int,
+) -> list[Instruction]:
+    if governed_count == 0 or not _context_has_density_governor(ddl) or _has_compensating_accent(instructions):
+        return instructions
+    if len(instructions) >= 8:
+        return instructions
+    return [*instructions, _quiet_expression_accent(ddl=ddl, background=background)]
+
+
+def _with_context_density_governor(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
     """静けさ・膜・記憶系の入力で、密度や大きな反復面が主題を上書きするのを抑える。"""
     if not _context_has_density_governor(ddl):
         return instructions
 
     has_vertical_context = _context_has_vertical_density(ddl)
     adjusted: list[Instruction] = []
+    governed_count = 0
     for ins in instructions:
+        ins = _with_quiet_symbolic_shape_tempering(ins, ddl=ddl)
         arr = ins.arrangement
         if arr is None:
             adjusted.append(ins)
@@ -551,6 +687,7 @@ def _with_context_density_governor(instructions: list[Instruction], *, ddl: str 
             or arr.path == "top_to_bottom"
         )
         if is_vertical_load and arr.count > MAX_QUIET_VERTICAL_COUNT:
+            governed_count += 1
             adjusted.append(
                 _with_arrangement_density_governor(
                     ins,
@@ -563,6 +700,7 @@ def _with_context_density_governor(instructions: list[Instruction], *, ddl: str 
             continue
 
         if _closed_shape_area(ins) >= 0.04 and arr.count > MAX_QUIET_LARGE_SHAPE_COUNT:
+            governed_count += 1
             adjusted.append(
                 _with_arrangement_density_governor(
                     ins,
@@ -575,6 +713,7 @@ def _with_context_density_governor(instructions: list[Instruction], *, ddl: str 
             continue
 
         if arr.count > MAX_QUIET_VISUAL_COUNT:
+            governed_count += 1
             adjusted.append(
                 _with_arrangement_density_governor(
                     ins,
@@ -587,7 +726,12 @@ def _with_context_density_governor(instructions: list[Instruction], *, ddl: str 
             continue
 
         adjusted.append(ins)
-    return adjusted
+    return _with_quiet_expression_compensation(
+        adjusted,
+        ddl=ddl,
+        background=background,
+        governed_count=governed_count,
+    )
 
 
 def _density_label(original_count: int) -> str:
@@ -1591,7 +1735,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_structural_duplicate_repair(instructions)
     effective_presence = score.presence or _presence_from_ddl(ddl)
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
-    instructions = _with_context_density_governor(instructions, ddl=ddl)
+    instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     data = score.model_dump(by_alias=True)

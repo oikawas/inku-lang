@@ -731,6 +731,7 @@ def test_coerce_score_governs_quiet_high_density_scatter():
     assert arr.preserve_space is True
     assert arr.fade == "outward"
     assert "quiet density governed" in (fixed.instructions[0].color_hint or "")
+    assert any("quiet expression accent restored" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_governs_quiet_vertical_rain_density():
@@ -791,3 +792,36 @@ def test_coerce_score_governs_quiet_large_shape_repetition():
     assert arr.count == 16
     assert arr.density == "low"
     assert arr.preserve_space is True
+
+
+def test_coerce_score_tempers_quiet_symbolic_fallback_shapes():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.4, 0.5],
+                    "size": [0.24, 0.2],
+                    "color": "white",
+                    "color_hint": "coverage from DDL clause: 右端に白いクレヨンの縦長の四角を置く",
+                    "arrangement": {
+                        "count": 20,
+                        "layout": "scatter",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+
+    ins = fixed.instructions[0]
+    arr = ins.arrangement
+    assert ins.size is not None
+    assert ins.size[0] <= 0.12
+    assert ins.size[1] <= 0.09
+    assert arr is not None
+    assert arr.count == 8
+    assert arr.density == "low"
+    assert arr.preserve_space is True
+    assert "quiet symbolic shape tempered" in (ins.color_hint or "")

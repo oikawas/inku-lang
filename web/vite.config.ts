@@ -28,13 +28,20 @@ function startupBannerPlugin() {
 	return {
 		name: 'inku-startup-banner',
 		configureServer() {
+			const border = '='.repeat(60);
+			const host = '0.0.0.0';
+			const port = 5173;
 			console.info([
-				'==============================',
-				'🎨 inku-server starting',
+				border,
+				'🎨 🖼️ 🌈 🪄 ✨ inku-server starting 🚀',
 				'service: SvelteKit web UI',
+				'mode: development',
+				`listen: ${host}:${port}`,
+				`runtime: ${process.version} / ${process.platform} ${process.arch}`,
+				'log: journal + /var/log/inku/inku-server.log',
 				`version: ${appVersion}`,
 				`build: ${buildNumber} (${buildDate})`,
-				'=============================='
+				border
 			].join('\n'));
 		}
 	};

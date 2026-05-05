@@ -485,9 +485,11 @@ The generated systemd preview uses
 `StandardOutput=journal+append:/var/log/inku/<service>.log` and the matching
 `StandardError` value so operators can follow logs through both
 `journalctl -fu <service>` and retained file logs.  `inku-api` and `inku-server`
-also print startup banners wrapped in `==============================`; the
-banners include the service role, application version, build number, and build
-date.  The API banner uses `🧠`, and the web UI banner uses `🎨`.
+also print startup banners wrapped in 60-character `=` borders; the banners
+include the service role, application version, build number, build date, mode,
+listen host/port, runtime / platform, and log destination.  The API banner
+includes the active render engine ID and version.  The API and web UI use
+different emoji sets that match their roles.
 
 ---
 

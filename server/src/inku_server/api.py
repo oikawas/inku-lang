@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import platform
 import re
 import time
 import urllib.error
@@ -116,12 +117,20 @@ def _build_date() -> str | None:
 def _startup_banner(*, service_name: str, service_kind: str, emoji: str) -> str:
     build_number = _build_number() or "unknown"
     build_date = _build_date() or "unknown"
-    border = "=============================="
+    host = os.getenv("INKU_LISTEN_HOST", "0.0.0.0")
+    port = os.getenv("INKU_LISTEN_PORT", os.getenv("INKU_SERVER_PORT", "8100"))
+    engine = current_render_engine()
+    border = "=" * 60
     return "\n".join(
         [
             border,
             f"{emoji} {service_name} starting",
             f"service: {service_kind}",
+            f"mode: {os.getenv('INKU_ENV', os.getenv('ENVIRONMENT', 'development'))}",
+            f"listen: {host}:{port}",
+            f"runtime: Python {platform.python_version()} / {platform.system()} {platform.machine()}",
+            f"render engine: {engine.id} v{engine.version}",
+            "log: journal + /var/log/inku/inku-api.log",
             f"version: {_APP_VERSION}",
             f"build: {build_number} ({build_date})",
             border,
@@ -130,7 +139,7 @@ def _startup_banner(*, service_name: str, service_kind: str, emoji: str) -> str:
 
 
 def _log_startup_banner() -> None:
-    banner = _startup_banner(service_name="inku-api", service_kind="FastAPI rendering API", emoji="🧠")
+    banner = _startup_banner(service_name="inku-api", service_kind="FastAPI rendering API", emoji="🧠 ⚙️ 🔌 🖌️ 🚀")
     print(banner, flush=True)
     _logger.info(banner)
 

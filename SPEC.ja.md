@@ -1453,9 +1453,11 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - `PUT /api/settings/log-retention` は admin のみ利用でき、保存期間は `1` から `3650` 日、ローテーション周期は `daily` / `weekly` / `monthly` のみ受け付ける
 - 画面上の注記は、ログ保存ポリシーはアプリ DB に保存されるが、`systemd` / `logrotate` への実適用にはサーバー OS の権限が必要であることを明示する
 - systemd drop-in プレビューは `StandardOutput=journal+append:/var/log/inku/<service>.log` / `StandardError=journal+append:/var/log/inku/<service>.log` を使い、`journalctl -fu <service>` とファイルログの両方で追跡できる形を推奨する
-- `inku-api` / `inku-server` の起動時には、`==============================` で囲んだ起動バナーを出力する。バナーにはサービス種別、アプリケーションバージョン、build 番号、build 日付を含め、API は `🧠`、Web UI は `🎨` を使う
+- `inku-api` / `inku-server` の起動時には、60文字の `=` 罫線で囲んだ起動バナーを出力する。バナーにはサービス種別、アプリケーションバージョン、build 番号、build 日付を含める
+- 起動バナーには、運用確認に必要な最小情報として mode、listen host/port、runtime / platform、ログ出力先も含める。API 側は描画エンジン ID / version も表示する
+- 起動バナーの絵文字はサービスの性質に合わせて変える。API は `🧠 ⚙️ 🔌 🖌️ 🚀`、Web UI は `🎨 🖼️ 🌈 🪄 ✨ ... 🚀` を使う
 - 運用検証では `inku-server` / `inku-api` の systemd drop-in と `/etc/logrotate.d/inku` を手動設定し、`NeedDaemonReload=no`、journal 出力、`daily` / `rotate 90` / `maxage 90` / `compress` の反映を確認した
-- build number: 333
+- build number: 336
 
 ### v1.42 (2026-05-04)
 

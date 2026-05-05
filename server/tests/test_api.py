@@ -1410,6 +1410,13 @@ def test_settings_status_is_admin_only(tmp_path, monkeypatch):
     assert data["output_save"]["png_size"] > 0
     assert {"submitted", "completed", "failed", "skipped"} <= set(data["output_save"])
     assert "source of truth" in data["output_save"]["note"]
+    assert data["log_retention"]["enabled"] is True
+    assert data["log_retention"]["retention_days"] == 90
+    assert data["log_retention"]["rotate"] == "daily"
+    assert data["log_retention"]["compress"] is True
+    assert data["log_retention"]["services"] == ["inku-server", "inku-api"]
+    assert "/var/log/inku/inku-api.log" in data["log_retention"]["logrotate_config"]
+    assert "OS privileges" in data["log_retention"]["note"]
     assert data["stage_execution"]["workers"] >= 1
     assert data["stage_execution"]["queue_limit"] >= data["stage_execution"]["workers"]
     assert {"submitted", "completed", "failed", "timed_out", "rejected"} <= set(data["stage_execution"])
@@ -1721,6 +1728,65 @@ def test_output_save_settings_are_admin_only(tmp_path):
         assert bad_size_r.status_code == 400
     finally:
         db.update_output_save_settings(True, str(Path.home() / ".local" / "share" / "inku" / "outputs"), 2160)
+        db.delete_session(admin_token)
+        db.delete_session(user_token)
+        db.delete_user(admin["id"])
+        db.delete_user(user["id"])
+        db.delete_user_group(group["id"])
+
+
+def test_log_retention_settings_are_admin_only():
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"log-retention-{suffix}")
+    user = db.add_user(
+        username=f"log-retention-user-{suffix}",
+        email=f"log-retention-user-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    admin = db.add_user(
+        username=f"log-retention-admin-{suffix}",
+        email=f"log-retention-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    user_headers, user_token = _auth_headers(user)
+    admin_headers, admin_token = _auth_headers(admin)
+    try:
+        payload = {"enabled": True, "retention_days": 30, "rotate": "weekly", "compress": False}
+        assert client.put("/api/settings/log-retention", headers=user_headers, json=payload).status_code == 403
+
+        settings_r = client.put("/api/settings/log-retention", headers=admin_headers, json=payload)
+        assert settings_r.status_code == 200
+        data = settings_r.json()
+        assert data["enabled"] is True
+        assert data["retention_days"] == 30
+        assert data["rotate"] == "weekly"
+        assert data["compress"] is False
+        assert "rotate 30" in data["logrotate_config"]
+        assert "compress" not in data["logrotate_config"]
+
+        status_r = client.get("/api/settings/status", headers=admin_headers)
+        assert status_r.status_code == 200
+        assert status_r.json()["log_retention"]["retention_days"] == 30
+
+        bad_r = client.put(
+            "/api/settings/log-retention",
+            headers=admin_headers,
+            json={"enabled": True, "retention_days": 0, "rotate": "daily", "compress": True},
+        )
+        assert bad_r.status_code == 422
+
+        bad_rotate_r = client.put(
+            "/api/settings/log-retention",
+            headers=admin_headers,
+            json={"enabled": True, "retention_days": 90, "rotate": "hourly", "compress": True},
+        )
+        assert bad_rotate_r.status_code == 422
+    finally:
+        db.update_log_retention_settings(True, 90, "daily", True)
         db.delete_session(admin_token)
         db.delete_session(user_token)
         db.delete_user(admin["id"])

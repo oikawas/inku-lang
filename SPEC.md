@@ -466,6 +466,21 @@ and the PNG artifact size.  Save workers are concurrent file-save jobs; the
 queue is the maximum number of pending artifact save jobs.  If the queue is
 full, the server preserves DB history and skips only artifact file saving.
 
+Server log retention is also an admin-managed, server-wide setting.  The
+settings dialog includes an admin-only "log retention" tab for enabling or
+disabling application log retention, setting the retention period in days,
+choosing a daily / weekly / monthly rotation interval, and enabling compression
+for rotated logs.  The default policy is enabled, rotates daily, keeps 90 days,
+and compresses rotated logs.
+
+The server stores this policy in `app_settings.log_retention_settings` as
+`enabled`, `retention_days`, `rotate`, and `compress`.  `INKU_LOG_RETENTION_DAYS`
+and `INKU_LOG_ROTATE` provide initial values.  `GET /api/settings/status`
+returns the current policy with generated `logrotate` and `systemd` drop-in
+previews for `inku-server` and `inku-api`; `PUT /api/settings/log-retention` is
+admin-only and updates the stored policy.  Applying those generated files to the
+host OS remains an operational task that requires server privileges.
+
 ---
 
 ## 12. Security and Operations

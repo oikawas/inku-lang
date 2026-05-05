@@ -47,6 +47,17 @@
 			skipped: number;
 			note: string;
 		};
+		log_retention: {
+			enabled: boolean;
+			retention_days: number;
+			rotate: 'daily' | 'weekly' | 'monthly';
+			compress: boolean;
+			log_dir: string;
+			services: string[];
+			systemd_dropins: Record<string, string>;
+			logrotate_config: string;
+			note: string;
+		};
 	};
 	type UserRole = 'admin' | 'group_lead' | 'user';
 	type UserGroup = {
@@ -66,7 +77,7 @@
 		at: number;
 	};
 	type SettingsMode = 'model' | 'settings';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc' | 'server_misc';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc' | 'server_misc' | 'logs';
 	type ModelProviderSetting = {
 		label?: string;
 		kind?: string;
@@ -108,6 +119,7 @@
 		modelSettingsLoading: boolean;
 		dbBackupStatus: string | null;
 		outputSaveStatus: string | null;
+		logRetentionStatus: string | null;
 		currentUser: UserItem | null;
 		userSettingsStatus: string | null;
 		userSettingsLoading: boolean;
@@ -157,6 +169,7 @@
 		onUpdateDbBackupSettings: (intervalDays: number, maxGenerations: number) => void | Promise<void>;
 		onRunDbBackupNow: () => void | Promise<void>;
 		onUpdateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => void | Promise<void>;
+		onUpdateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => void | Promise<void>;
 		onLoadUserSettings: () => void;
 		onLogin: () => void | Promise<void>;
 		onLogout: () => void | Promise<void>;
@@ -196,6 +209,7 @@
 		modelSettingsLoading,
 		dbBackupStatus,
 		outputSaveStatus,
+		logRetentionStatus,
 		currentUser,
 		userSettingsStatus,
 		userSettingsLoading,
@@ -245,6 +259,7 @@
 		onUpdateDbBackupSettings,
 		onRunDbBackupNow,
 		onUpdateOutputSaveSettings,
+		onUpdateLogRetentionSettings,
 		onLoadUserSettings,
 		onLogin,
 		onLogout,
@@ -421,6 +436,7 @@
 				<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
 				<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
 				<button class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
+				<button class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
 			{/if}
 			<button class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
 			<button class:active={settingsTab === 'misc'} onclick={() => onSelectSettingsTab('misc')}>{t().settingsTabMisc}</button>
@@ -685,6 +701,77 @@
 					<div class="db-test-result">{t().settingsOutputSaveNoteLabel}: {t().settingsOutputSaveNote}</div>
 					{#if outputSaveStatus}
 						<div class="inline-message">{outputSaveStatus}</div>
+					{/if}
+				{:else}
+					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
+				{/if}
+			</div>
+			<div class="settings-inline-actions">
+				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReloadSettings}</button>
+			</div>
+		{:else if settingsTab === 'logs'}
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsLogRetentionTitle}</div>
+				{#if settingsStatusLoading}
+					<div class="inline-message">{t().settingsLoading}</div>
+				{:else if settingsStatus}
+					<label class="setting-toggle">
+						<input
+							type="checkbox"
+							checked={settingsStatus.log_retention.enabled}
+							onchange={(e) => onUpdateLogRetentionSettings((e.currentTarget as HTMLInputElement).checked, settingsStatus?.log_retention.retention_days ?? 90, settingsStatus?.log_retention.rotate ?? 'daily', settingsStatus?.log_retention.compress ?? true)}
+						/>
+						<span>{t().settingsLogRetentionEnabled}</span>
+					</label>
+					<div class="db-backup-grid">
+						<label>
+							<span>{t().settingsLogRetentionDays}</span>
+							<input
+								type="number"
+								min="1"
+								max="3650"
+								value={settingsStatus.log_retention.retention_days}
+								onchange={(e) => onUpdateLogRetentionSettings(settingsStatus?.log_retention.enabled ?? true, Number((e.currentTarget as HTMLInputElement).value), settingsStatus?.log_retention.rotate ?? 'daily', settingsStatus?.log_retention.compress ?? true)}
+							/>
+						</label>
+						<label>
+							<span>{t().settingsLogRetentionRotate}</span>
+							<select
+								value={settingsStatus.log_retention.rotate}
+								onchange={(e) => onUpdateLogRetentionSettings(settingsStatus?.log_retention.enabled ?? true, settingsStatus?.log_retention.retention_days ?? 90, (e.currentTarget as HTMLSelectElement).value, settingsStatus?.log_retention.compress ?? true)}
+							>
+								<option value="daily">{t().settingsLogRetentionDaily}</option>
+								<option value="weekly">{t().settingsLogRetentionWeekly}</option>
+								<option value="monthly">{t().settingsLogRetentionMonthly}</option>
+							</select>
+						</label>
+					</div>
+					<label class="setting-toggle">
+						<input
+							type="checkbox"
+							checked={settingsStatus.log_retention.compress}
+							onchange={(e) => onUpdateLogRetentionSettings(settingsStatus?.log_retention.enabled ?? true, settingsStatus?.log_retention.retention_days ?? 90, settingsStatus?.log_retention.rotate ?? 'daily', (e.currentTarget as HTMLInputElement).checked)}
+						/>
+						<span>{t().settingsLogRetentionCompress}</span>
+					</label>
+					<div class="settings-readonly-grid compact">
+						<span>{t().settingsLogRetentionLogDir}</span><code>{settingsStatus.log_retention.log_dir}</code>
+						<span>{t().settingsLogRetentionServices}</span><strong>{settingsStatus.log_retention.services.join(', ')}</strong>
+					</div>
+					<div class="db-test-result">{t().settingsOutputSaveNoteLabel}: {t().settingsLogRetentionNote}</div>
+					<div class="settings-config-preview">
+						<div class="settings-config-preview-title">{t().settingsLogRetentionLogrotatePreview}</div>
+						<pre>{settingsStatus.log_retention.logrotate_config}</pre>
+					</div>
+					<div class="settings-config-preview">
+						<div class="settings-config-preview-title">{t().settingsLogRetentionSystemdPreview}</div>
+						{#each Object.entries(settingsStatus.log_retention.systemd_dropins) as [service, config]}
+							<div class="settings-config-service">{service}</div>
+							<pre>{config}</pre>
+						{/each}
+					</div>
+					{#if logRetentionStatus}
+						<div class="inline-message">{logRetentionStatus}</div>
 					{/if}
 				{:else}
 					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
@@ -1249,7 +1336,8 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
-	.db-backup-grid input {
+	.db-backup-grid input,
+	.db-backup-grid select {
 		min-width: 0;
 		padding: 5px 7px;
 		border: 1px solid var(--border2);
@@ -1259,6 +1347,38 @@
 		font-size: 12px;
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
+	}
+	.settings-config-preview {
+		margin-top: 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+	.settings-config-preview-title,
+	.settings-config-service {
+		color: var(--fg3);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.settings-config-service {
+		margin-top: 5px;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	.settings-config-preview pre {
+		max-height: 160px;
+		overflow: auto;
+		margin: 0;
+		padding: 8px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--bg);
+		color: var(--fg2);
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-size: 11px;
+		line-height: 1.45;
+		white-space: pre-wrap;
 	}
 	.server-path-row {
 		display: flex;

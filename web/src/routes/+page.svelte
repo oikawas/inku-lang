@@ -146,10 +146,21 @@
 			skipped: number;
 			note: string;
 		};
+		log_retention: {
+			enabled: boolean;
+			retention_days: number;
+			rotate: 'daily' | 'weekly' | 'monthly';
+			compress: boolean;
+			log_dir: string;
+			services: string[];
+			systemd_dropins: Record<string, string>;
+			logrotate_config: string;
+			note: string;
+		};
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc' | 'server_misc';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc' | 'server_misc' | 'logs';
 	type UserModelSettings = {
 		stage1_provider: Provider;
 		stage1_model: string;
@@ -414,6 +425,7 @@
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let dbBackupStatus = $state<string | null>(null);
 	let outputSaveStatus = $state<string | null>(null);
+	let logRetentionStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
@@ -469,11 +481,11 @@
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
-		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc' || tab === 'server_misc';
+		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
 	}
 
 	function canAccessSettingsTab(tab: SettingsTab) {
-		if (tab === 'models' || tab === 'db' || tab === 'users' || tab === 'server_misc') return currentUser?.role === 'admin';
+		if (tab === 'models' || tab === 'db' || tab === 'users' || tab === 'server_misc' || tab === 'logs') return currentUser?.role === 'admin';
 		return tab !== 'connection';
 	}
 
@@ -768,7 +780,7 @@
 		settingsTab = nextTab;
 		settingsOpen = true;
 		if (nextTab === 'models') void loadModelSettings();
-		if (nextTab === 'db') void loadSettingsStatus();
+		if (nextTab === 'db' || nextTab === 'server_misc' || nextTab === 'logs') void loadSettingsStatus();
 		if (nextTab === 'users') void loadUserSettings();
 		if (nextTab === 'export') void loadExportTemplates();
 	}
@@ -873,7 +885,7 @@
 		settingsTab = tab;
 		void updateUserSettingsTab(tab);
 		if (tab === 'models') void loadModelSettings();
-		if (tab === 'db' || tab === 'server_misc') void loadSettingsStatus();
+		if (tab === 'db' || tab === 'server_misc' || tab === 'logs') void loadSettingsStatus();
 		if (tab === 'users') void loadUserSettings();
 		if (tab === 'export') void loadExportTemplates();
 	}
@@ -1247,6 +1259,7 @@
 			settingsStatusError = null;
 			dbBackupStatus = null;
 			outputSaveStatus = null;
+			logRetentionStatus = null;
 		} catch (e) {
 			settingsStatus = null;
 			settingsStatusError = e instanceof Error ? e.message : String(e);
@@ -1308,6 +1321,27 @@
 		} catch (e) {
 			outputSaveStatus = e instanceof Error ? e.message : String(e);
 			console.warn('failed to update output save settings', e);
+		}
+	}
+
+	async function updateLogRetentionSettings(enabled: boolean, retentionDays: number, rotate: string, compress: boolean) {
+		logRetentionStatus = null;
+		try {
+			const r = await apiFetch('/api/settings/log-retention', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ enabled, retention_days: retentionDays, rotate, compress })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: string };
+				throw new Error(d.detail ?? `HTTP ${r.status}`);
+			}
+			const nextLogRetention = await r.json() as SettingsStatus['log_retention'];
+			if (settingsStatus) settingsStatus = { ...settingsStatus, log_retention: nextLogRetention };
+			logRetentionStatus = t().settingsLogRetentionSaved;
+		} catch (e) {
+			logRetentionStatus = e instanceof Error ? e.message : String(e);
+			console.warn('failed to update log retention settings', e);
 		}
 	}
 
@@ -3531,6 +3565,7 @@
 		{modelSettingsLoading}
 		{dbBackupStatus}
 		{outputSaveStatus}
+		{logRetentionStatus}
 		{currentUser}
 		{userSettingsStatus}
 		{userSettingsLoading}
@@ -3581,6 +3616,7 @@
 		onUpdateDbBackupSettings={updateDbBackupSettings}
 		onRunDbBackupNow={runDbBackupNow}
 		onUpdateOutputSaveSettings={updateOutputSaveSettings}
+		onUpdateLogRetentionSettings={updateLogRetentionSettings}
 		onLoadUserSettings={loadUserSettings}
 		onLogin={login}
 		onLogout={logout}

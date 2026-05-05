@@ -1438,6 +1438,23 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - 現行値は `render_engine_id: "default"`、`render_engine_version: "1"` とする
 - build number: 326
 
+### v1.43 (2026-05-05)
+
+**サーバーログ保存ポリシー設定**
+
+`inku-server` / `inku-api` のアプリケーションログ保存ポリシーを、管理者向けのサーバーワイド設定として扱う。
+
+- 設定ダイアログに admin 向け `ログ保存` タブを追加する
+- `ログ保存` タブでは、ログ保存とローテーションの On/Off、保存期間（日）、ローテーション周期、ローテーション済みログの圧縮 On/Off を設定できる
+- 既定ポリシーは On、保存期間 `90` 日、ローテーション周期 `daily`、圧縮 On とする
+- サーバーは `app_settings.log_retention_settings` に `enabled` / `retention_days` / `rotate` / `compress` を保存する
+- 初期保存期間は `INKU_LOG_RETENTION_DAYS`、初期ローテーション周期は `INKU_LOG_ROTATE` を使い、未指定時は `90` 日と `daily` を使う
+- `GET /api/settings/status` は現在のログ保存ポリシーに加え、`logrotate` 設定プレビューと `systemd` drop-in 設定プレビューを返す
+- `PUT /api/settings/log-retention` は admin のみ利用でき、保存期間は `1` から `3650` 日、ローテーション周期は `daily` / `weekly` / `monthly` のみ受け付ける
+- 画面上の注記は、ログ保存ポリシーはアプリ DB に保存されるが、`systemd` / `logrotate` への実適用にはサーバー OS の権限が必要であることを明示する
+- 運用検証では `inku-server` / `inku-api` の systemd drop-in と `/etc/logrotate.d/inku` を手動設定し、`NeedDaemonReload=no`、`StandardOutput=append`、`StandardError=append`、`LogsDirectory=inku`、`daily` / `rotate 90` / `maxage 90` / `compress` の反映を確認した
+- build number: 330
+
 ### v1.42 (2026-05-04)
 
 **サーバーワイド自動保存設定**

@@ -199,6 +199,7 @@ export interface LangPack {
 	settingsTabExport: string;
 	settingsTabMisc: string;
 	settingsTabServerMisc: string;
+	settingsTabLogs: string;
 	settingsCurrentDb: string;
 	settingsDbFileSize: string;
 	settingsDbBackupTitle: string;
@@ -221,6 +222,20 @@ export interface LangPack {
 	settingsOutputSaveNoteLabel: string;
 	settingsOutputSaveNote: string;
 	settingsOutputSaveSaved: string;
+	settingsLogRetentionTitle: string;
+	settingsLogRetentionEnabled: string;
+	settingsLogRetentionDays: string;
+	settingsLogRetentionRotate: string;
+	settingsLogRetentionDaily: string;
+	settingsLogRetentionWeekly: string;
+	settingsLogRetentionMonthly: string;
+	settingsLogRetentionCompress: string;
+	settingsLogRetentionLogDir: string;
+	settingsLogRetentionServices: string;
+	settingsLogRetentionLogrotatePreview: string;
+	settingsLogRetentionSystemdPreview: string;
+	settingsLogRetentionNote: string;
+	settingsLogRetentionSaved: string;
 	settingsReloadSettings: string;
 	settingsLoading: string;
 	settingsLoadFailed: string;

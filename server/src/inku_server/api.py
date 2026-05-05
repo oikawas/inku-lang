@@ -150,6 +150,60 @@ def _output_save_settings() -> dict:
     return _db.get_output_save_settings()
 
 
+_LOG_SERVICE_FILES = {
+    "inku-server": "/var/log/inku/inku-server.log",
+    "inku-api": "/var/log/inku/inku-api.log",
+}
+_LOG_DIR = "/var/log/inku"
+
+
+def _log_retention_settings() -> dict:
+    return _db.get_log_retention_settings()
+
+
+def _log_systemd_dropins(settings: dict) -> dict[str, str]:
+    if not settings["enabled"]:
+        return {}
+    return {
+        service: "\n".join(
+            [
+                "[Service]",
+                "LogsDirectory=inku",
+                f"StandardOutput=append:{path}",
+                f"StandardError=append:{path}",
+                "",
+            ]
+        )
+        for service, path in _LOG_SERVICE_FILES.items()
+    }
+
+
+def _logrotate_config(settings: dict) -> str:
+    if not settings["enabled"]:
+        return "# Log retention is disabled.\n"
+    paths = " ".join(_LOG_SERVICE_FILES.values())
+    lines = [
+        f"{paths} {{",
+        f"    {settings['rotate']}",
+        f"    rotate {settings['retention_days']}",
+        f"    maxage {settings['retention_days']}",
+        "    missingok",
+        "    notifempty",
+    ]
+    if settings["compress"]:
+        lines.extend(["    compress", "    delaycompress"])
+    lines.extend(
+        [
+            "    copytruncate",
+            "    dateext",
+            "    dateformat -%Y%m%d",
+            "}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _current_output_dir() -> Path:
     return Path(_output_save_settings()["output_dir"])
 
@@ -749,6 +803,13 @@ class OutputSaveSettingsBody(BaseModel):
     png_size: int = Field(default=2160)
 
 
+class LogRetentionSettingsBody(BaseModel):
+    enabled: bool = True
+    retention_days: int = Field(default=90, ge=1, le=3650)
+    rotate: str = Field(default="daily", pattern="^(daily|weekly|monthly)$")
+    compress: bool = True
+
+
 class DbBackupResult(BaseModel):
     path: str
     at: int
@@ -773,6 +834,18 @@ class OutputSaveStatus(BaseModel):
     completed: int
     failed: int
     skipped: int
+    note: str
+
+
+class LogRetentionStatus(BaseModel):
+    enabled: bool
+    retention_days: int
+    rotate: str
+    compress: bool
+    log_dir: str
+    services: list[str]
+    systemd_dropins: dict[str, str]
+    logrotate_config: str
     note: str
 
 
@@ -822,6 +895,7 @@ class SettingsStatusResponse(BaseModel):
     db_backup: DbBackupStatus
     plugins: PluginSettingsStatus
     output_save: OutputSaveStatus
+    log_retention: LogRetentionStatus
     stage_execution: StageExecutionStatus
 
 
@@ -1067,6 +1141,7 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
     _db.ensure_scheduled_db_backup()
     db_info = _db.database_info()
     output_settings = _output_save_settings()
+    log_settings = _log_retention_settings()
     return SettingsStatusResponse(
         database=DatabaseSettingsStatus(
             **db_info,
@@ -1086,6 +1161,17 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             queue_limit=_SAVE_QUEUE_LIMIT,
             **_artifact_save_stats(),
             note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
+        ),
+        log_retention=LogRetentionStatus(
+            enabled=bool(log_settings["enabled"]),
+            retention_days=int(log_settings["retention_days"]),
+            rotate=str(log_settings["rotate"]),
+            compress=bool(log_settings["compress"]),
+            log_dir=_LOG_DIR,
+            services=list(_LOG_SERVICE_FILES),
+            systemd_dropins=_log_systemd_dropins(log_settings),
+            logrotate_config=_logrotate_config(log_settings),
+            note="Log retention policy is stored in the application DB. Applying systemd and logrotate files requires server OS privileges.",
         ),
         stage_execution=StageExecutionStatus(
             workers=_STAGE_WORKERS,
@@ -1235,6 +1321,33 @@ def api_settings_update_output_save(
         queue_limit=_SAVE_QUEUE_LIMIT,
         **_artifact_save_stats(),
         note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
+    )
+
+
+@app.put("/api/settings/log-retention", response_model=LogRetentionStatus)
+def api_settings_update_log_retention(
+    body: LogRetentionSettingsBody,
+    actor: dict = Depends(_admin_user),
+) -> LogRetentionStatus:
+    try:
+        log_settings = _db.update_log_retention_settings(
+            body.enabled,
+            body.retention_days,
+            body.rotate,
+            body.compress,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return LogRetentionStatus(
+        enabled=bool(log_settings["enabled"]),
+        retention_days=int(log_settings["retention_days"]),
+        rotate=str(log_settings["rotate"]),
+        compress=bool(log_settings["compress"]),
+        log_dir=_LOG_DIR,
+        services=list(_LOG_SERVICE_FILES),
+        systemd_dropins=_log_systemd_dropins(log_settings),
+        logrotate_config=_logrotate_config(log_settings),
+        note="Log retention policy is stored in the application DB. Applying systemd and logrotate files requires server OS privileges.",
     )
 
 

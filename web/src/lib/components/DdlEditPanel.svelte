@@ -26,6 +26,7 @@
 		liveMs: number;
 		tokenSummary: string;
 		showKiwi: boolean;
+		autoRepairEnabled: boolean;
 		activeSaijikiPreview: SaijikiPreview | null;
 		onToggleSaijiki: () => void;
 		onInsertWord: (word: string) => void;
@@ -48,6 +49,7 @@
 		liveMs,
 		tokenSummary,
 		showKiwi,
+		autoRepairEnabled = $bindable(true),
 		activeSaijikiPreview = $bindable(),
 		onToggleSaijiki,
 		onInsertWord,
@@ -94,6 +96,10 @@
 			<button class="ddl-inline-btn" type="button" disabled={reloading || loading} onclick={openEditorDialog}>
 				{t().ddlEditSectionLabel}
 			</button>
+			<label class="ddl-inline-check">
+				<input type="checkbox" bind:checked={autoRepairEnabled} disabled={reloading || loading} />
+				<span>{t().ddlAutoRepairLabel}</span>
+			</label>
 		</div>
 		<div class="ddl-highlight-wrap inline-editor">
 			<div class="ddl-highlight" bind:this={ddlHighlightEl} aria-hidden="true">{@html ddlHighlighted}</div>
@@ -218,6 +224,7 @@
 	.ddl-inline-head {
 		display: flex;
 		justify-content: flex-end;
+		align-items: center;
 		gap: 5px;
 	}
 	.ddl-inline-btn {
@@ -236,6 +243,26 @@
 	.ddl-inline-btn:disabled {
 		cursor: not-allowed;
 		opacity: 0.5;
+	}
+	.ddl-inline-check {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding-left: 4px;
+		color: var(--fg2);
+		font-size: 11px;
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.ddl-inline-check input {
+		width: 12px;
+		height: 12px;
+		margin: 0;
+		accent-color: var(--accent);
+	}
+	.ddl-inline-check:has(input:disabled) {
+		opacity: 0.55;
+		cursor: not-allowed;
 	}
 	.ddl-highlight-wrap {
 		position: relative;

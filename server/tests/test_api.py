@@ -725,6 +725,28 @@ def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch,
     assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
 
 
+def test_compose_can_skip_auto_repair(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+
+    def fake_compose(ddl: str, model=None, original_text=None, system_prompt=None, lang="ja"):
+        return Score.model_validate(
+            {"instructions": [{"primitive": "line", "from": [0.5, 0.0], "to": [0.5, 1.0], "color": "green"}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "震えるペンの緑の直線を300本、上から下に引く。", "auto_repair": False},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    instructions = r.json()["score"]["instructions"]
+    assert [ins["primitive"] for ins in instructions] == ["line"]
+    assert not any("composition anchor restored" in (ins.get("color_hint") or "") for ins in instructions)
+
+
 def test_compose_fallback_preserves_arrangement_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(

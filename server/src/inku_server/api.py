@@ -549,6 +549,7 @@ class ComposeRequest(BaseModel):
     color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
     catalog_id: str | None = Field(default=None, description="使用するサーバー側色カタログID")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
+    auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
 
 
 class ComposeResponse(BaseModel):
@@ -609,6 +610,7 @@ class PaintRequest(BaseModel):
     history_input: str | None = Field(default=None, description="履歴に表示するユーザー記述")
     history_at: int | None = Field(default=None, description="履歴保存時刻")
     catalog_id: str | None = Field(default=None, description="使用した色カタログID")
+    auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
 
 
 class PaintResponse(BaseModel):
@@ -1808,7 +1810,8 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     try:
         score = compose_detail.score
         ensure_renderable_score(score)
-        score = coerce_score(score, ddl=_coerce_context(req.ddl, req.original_text))
+        if req.auto_repair:
+            score = coerce_score(score, ddl=_coerce_context(req.ddl, req.original_text))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -2116,7 +2119,8 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     try:
         score = compose_detail.score
         ensure_renderable_score(score)
-        score = coerce_score(score, ddl=_coerce_context(ddl, source_text))
+        if req.auto_repair:
+            score = coerce_score(score, ddl=_coerce_context(ddl, source_text))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 

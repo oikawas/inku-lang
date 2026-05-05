@@ -275,6 +275,7 @@
 	// ── Result ──────────────────────────────────────────────
 	let ddl      = $state<string | null>(null);
 	let ddlGeneratedBaseline = $state<string | null>(null);
+	let ddlAutoRepairEnabled = $state(true);
 	let thinking = $state<string | null>(null);
 	let result   = $state<PaintResult | null>(null);
 
@@ -1885,6 +1886,7 @@
 				include_thinking: includeThinking,
 				lang,
 				canvas_aspect: effectiveCanvasAspectId(),
+				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
 				count_generation: options.countGeneration ?? true,
@@ -1979,6 +1981,7 @@
 				lang,
 				catalog_id: selectedCatalog,
 				canvas_aspect: effectiveCanvasAspectId(),
+				auto_repair: ddlAutoRepairEnabled,
 			})
 		});
 		if (!r.ok) {
@@ -2351,7 +2354,7 @@
 				method: 'POST',
 				signal: abortController.signal,
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: resolvedStage2Model, original_text: replayInput, lang, catalog_id: selectedCatalog, canvas_aspect: effectiveCanvasAspectId() })
+				body: JSON.stringify({ ddl, model: resolvedStage2Model, original_text: replayInput, lang, catalog_id: selectedCatalog, canvas_aspect: effectiveCanvasAspectId(), auto_repair: ddlAutoRepairEnabled })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -2623,8 +2626,8 @@
 			demoSaveStatus = null;
 			demoCurrentSaved = false;
 		}
-		ddl = null;
-		ddlGeneratedBaseline = null;
+		ddl = inputMode === 'single' ? '' : null;
+		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
 		thinking = null;
 		result = null;
 		stage1UserPrompt = '';
@@ -3525,6 +3528,7 @@
 							{liveMs}
 							{tokenSummary}
 							{showKiwi}
+							bind:autoRepairEnabled={ddlAutoRepairEnabled}
 							bind:activeSaijikiPreview
 							onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 							onInsertWord={insertWord}

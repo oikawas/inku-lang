@@ -48,6 +48,7 @@ export const ja: LangPack = {
 	colorCatalogButton: '色カタログ',
 	replayFromDdlButton: '↺ 解釈から描画',
 	ddlPaintButton: 'DDLから描画',
+	ddlAutoRepairLabel: '自動補正',
 	ddlEditBtn: '編集',
 	ddlDoneBtn: '完了',
 	saijikiPreviewPlaceholder: '語彙にマウスを重ねると、描画への効き方を表示します。',

@@ -292,6 +292,31 @@ def _save_output_files(
         _logger.exception("failed to save PNG output: prefix=%s", prefix)
 
 
+def _render_hash_metadata(
+    *,
+    input_text: str,
+    ddl: str | None,
+    score: Score | dict,
+    svg: str,
+    catalog_id: str | None,
+    render_metadata: dict | None,
+) -> dict[str, str]:
+    score_payload = score.model_dump(by_alias=True) if isinstance(score, Score) else score
+    item = {
+        "input": input_text,
+        "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
+        "score": score_payload,
+        "svg": svg,
+        "catalog_id": catalog_id,
+        **(render_metadata or {}),
+    }
+    render_hash = _db.render_hash_for_item(item)
+    return {
+        "render_hash": render_hash,
+        "render_hash_short": _db.render_hash_short(render_hash) or "",
+    }
+
+
 def _coerce_context(ddl: str, original_text: str | None = None) -> str:
     original = (original_text or "").strip()
     normalized = ddl.strip()
@@ -335,13 +360,19 @@ def _history_output_prefix(item: dict) -> Path:
 
 def _history_render_metadata(item: dict) -> dict | None:
     if isinstance(item.get("render_metadata"), dict):
-        return item["render_metadata"]
+        metadata = dict(item["render_metadata"])
+        if item.get("render_hash") is not None:
+            metadata["render_hash"] = item["render_hash"]
+            metadata["render_hash_short"] = item.get("render_hash_short") or _db.render_hash_short(item.get("render_hash"))
+        return metadata
     keys = (
         "render_build_number",
         "render_color_profile",
         "render_engine_id",
         "render_engine_version",
         "render_canvas_aspect",
+        "render_hash",
+        "render_hash_short",
         "render_color_catalog_id",
         "render_color_catalog_name",
         "render_color_catalog_sub",
@@ -528,6 +559,8 @@ class ComposeResponse(BaseModel):
     render_color_profile: dict[str, str] | None = None
     render_engine_id: str | None = None
     render_engine_version: str | None = None
+    render_hash: str | None = None
+    render_hash_short: str | None = None
     render_color_catalog_id: str | None = None
     render_color_catalog_name: str | None = None
     render_color_catalog_sub: str | None = None
@@ -1786,6 +1819,17 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
+    render_metadata = {
+        **render_metadata,
+        **_render_hash_metadata(
+            input_text=req.original_text or req.ddl,
+            ddl=req.ddl,
+            score=score,
+            svg=svg,
+            catalog_id=req.catalog_id,
+            render_metadata=render_metadata,
+        ),
+    }
 
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
     return ComposeResponse(
@@ -2008,6 +2052,18 @@ def _add_history_item(
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
     prefix = _output_prefix(actor["id"], item_id, at)
+    metadata = dict(render_metadata or {})
+    if not metadata.get("render_hash"):
+        metadata.update(
+            _render_hash_metadata(
+                input_text=input_text,
+                ddl=ddl,
+                score=score_dict,
+                svg=svg,
+                catalog_id=catalog_id,
+                render_metadata=metadata,
+            )
+        )
     item_dict = _db.add_item({
         "id": item_id,
         "user_id": actor["id"],
@@ -2023,14 +2079,14 @@ def _add_history_item(
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
         "catalog_id": catalog_id,
-        **(render_metadata or {}),
+        **metadata,
     })
     if save_artifacts:
-        item_dict.update(render_metadata or {})
-        item_dict["render_metadata"] = render_metadata or {}
+        item_dict.update(metadata)
+        item_dict["render_metadata"] = metadata
         _submit_history_artifact_save(item_dict)
     else:
-        item_dict.update(render_metadata or {})
+        item_dict.update(metadata)
     return item_dict
 
 
@@ -2072,13 +2128,24 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
+    artifact_input = req.history_input or source_text
+    artifact_catalog_id = None if catalog_id == "default" else catalog_id
+    render_metadata = {
+        **render_metadata,
+        **_render_hash_metadata(
+            input_text=artifact_input,
+            ddl=ddl,
+            score=score,
+            svg=svg,
+            catalog_id=artifact_catalog_id,
+            render_metadata=render_metadata,
+        ),
+    }
     elapsed_stage1_ms = int((t1 - t0) * 1000)
     elapsed_stage2_ms = int((t2 - t1) * 1000)
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
     history_id = None
     history_at = None
-    render_hash = None
-    render_hash_short = None
     save_artifacts = req.save_artifacts if req.save_artifacts is not None else req.save_history
     if req.save_history:
         history_at = req.history_at or int(time.time() * 1000)
@@ -2094,13 +2161,11 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             stage2_model=resolved_stage2_model,
             tokens_in=(interpret_detail_result.tokens_in or 0) + (compose_detail.tokens_in or 0) or None,
             tokens_out=(interpret_detail_result.tokens_out or 0) + (compose_detail.tokens_out or 0) or None,
-            catalog_id=None if catalog_id == "default" else catalog_id,
+            catalog_id=artifact_catalog_id,
             save_artifacts=save_artifacts,
             render_metadata=render_metadata,
         )
         history_id = item["id"]
-        render_hash = item.get("render_hash")
-        render_hash_short = item.get("render_hash_short")
     elif save_artifacts:
         history_at = req.history_at or int(time.time() * 1000)
         item_id = str(uuid.uuid4())
@@ -2134,8 +2199,6 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         **render_metadata,
         history_id=history_id,
         history_at=history_at,
-        render_hash=render_hash,
-        render_hash_short=render_hash_short,
         elapsed_stage1_ms=elapsed_stage1_ms,
         elapsed_stage2_ms=elapsed_stage2_ms,
         elapsed_total_ms=elapsed_total_ms,

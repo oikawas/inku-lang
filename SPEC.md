@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.44**
+**Version: v1.45**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -203,17 +203,20 @@ the English canonical label and may include `name_ja`; the Japanese UI displays
 those entries as `English（日本語）`, while the English UI displays `name` only.
 
 Render JSON produced by the server records the concrete render context.  Paint,
-compose, and saved artifact JSON include the resolved `stage1_model` /
-`stage2_model` that were actually used, plus `render_build_number`,
-`render_color_profile`, `render_engine_id`, `render_engine_version`,
-`render_canvas_aspect`, `render_color_catalog_id`,
-`render_color_catalog_name`, `render_color_catalog_sub`, and
-`render_color_map`, where abstract colors and
+compose, the JSON tab, and saved artifact JSON include the resolved
+`stage1_model` / `stage2_model` that were actually used, plus
+`render_build_number`, `render_color_profile`, `render_engine_id`,
+`render_engine_version`, `render_canvas_aspect`, `render_hash`,
+`render_hash_short`, `render_color_catalog_id`, `render_color_catalog_name`,
+`render_color_catalog_sub`, and `render_color_map`, where abstract colors and
 `palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
 rendering.  The current engine metadata is `render_engine_id: "default"` and
 `render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
+`render_hash` is a 64-character SHA-256 hex hash of the rendered content and
+server-owned render metadata.  `render_hash_short` is the four-character
+uppercase suffix used for UI and CLI references.
 `score.canvas` remains the score-level canvas instruction, while
 `render_canvas_aspect` records the canvas aspect actually used for this rendered
 artifact.  In normal server-generated output they match, but both are retained
@@ -656,11 +659,13 @@ The reference implementation currently includes:
   and canvas aspect support
 
 History records carry a server-side `render_hash`: a 64-character SHA-256 hex
-hash of the rendered content and render metadata.  History APIs also expose a
-four-character uppercase short hash for human reference.  The history manager
-shows the short hash without changing the thumbnail layout; clicking it copies
-the full hash.  The CLI can resolve hash suffixes, reject ambiguous short
-matches, and export selected or ranged history items for benchmark review.
+hash of the rendered content and render metadata.  History APIs, paint/compose
+responses, the JSON tab, and saved artifact JSON expose both `render_hash` and
+the four-character uppercase `render_hash_short` for human reference.  The
+history manager shows the short hash without changing the thumbnail layout;
+clicking it copies the full hash.  The CLI can resolve hash suffixes, reject
+ambiguous short matches, and export selected or ranged history items for
+benchmark review.
 The history manager opens at 80% of the current viewport, leaving 10% margins
 on each side, and thumbnail cards show the prompt preview above a compact
 star/hash/action row.

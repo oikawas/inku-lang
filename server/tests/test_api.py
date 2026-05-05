@@ -592,6 +592,8 @@ def test_compose_happy_path(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
     assert "<circle" in data["svg"]
+    assert len(data["render_hash"]) == 64
+    assert data["render_hash_short"] == data["render_hash"][-4:].upper()
 
 
 def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
@@ -1236,6 +1238,8 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
             "render_color_catalog_sub": "neutral baseline",
             "render_color_map": {"black": "#111111"},
             "render_canvas_aspect": "square",
+            "render_hash": "a" * 64,
+            "render_hash_short": "AAAA",
         },
         {
             "stage1_model": "stage1",
@@ -1257,6 +1261,8 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert "render_color_catalog" not in saved_score
     assert saved_score["render_color_map"]["black"] == "#111111"
     assert saved_score["render_canvas_aspect"] == "square"
+    assert saved_score["render_hash"] == "a" * 64
+    assert saved_score["render_hash_short"] == "AAAA"
     assert saved_score["score"] == {"instructions": []}
     assert (tmp_path / "out" / "sample_output.svg").read_text(encoding="utf-8") == "<svg></svg>"
     assert not (tmp_path / "out" / "sample_output.png").exists()
@@ -1293,7 +1299,9 @@ def test_history_output_files_are_rebuildable_from_db(tmp_path):
     assert r.json()["count"] == 1
     assert (tmp_path / "outputs" / "sample_instruction.txt").read_text(encoding="utf-8") == "artifact source"
     assert (tmp_path / "outputs" / "sample_normalized.ddl").read_text(encoding="utf-8") == "中心に円"
-    assert (tmp_path / "outputs" / "sample_score.json").exists()
+    saved_score = json.loads((tmp_path / "outputs" / "sample_score.json").read_text(encoding="utf-8"))
+    assert saved_score["render_hash"] == item["render_hash"]
+    assert saved_score["render_hash_short"] == item["render_hash_short"]
     assert (tmp_path / "outputs" / "sample_output.svg").read_text(encoding="utf-8") == "<svg><desc>from db</desc></svg>"
 
     db.delete_items(user["id"], [item["id"]])

@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.44**
+**Version: v1.45**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -1421,6 +1421,19 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - 表示文は「APIキーはDBに暗号化して保存され、画面には再表示されません。環境変数で設定済みのキーも初期値として扱われます。」とする
 - 英語UIでも同じ意味の注記を表示する
 - build number: 328
+
+### v1.45 (2026-05-05)
+
+**JSONメタデータへの描画ハッシュ記録**
+
+各描画のサーバー側 `render_hash` を、履歴だけでなく JSON メタデータ領域にも記録する。
+
+- `render_hash` は、描画内容とサーバー所有の render metadata から算出する64文字の SHA-256 hex とする
+- `render_hash_short` は UI / CLI で参照しやすい4文字の大文字サフィックスとする
+- `/api/paint`、`/api/compose`、JSONタブ、CLI出力JSON、保存 artifact JSON に `render_hash` / `render_hash_short` を含める
+- 履歴DBから artifact JSON を再生成する場合も、DB上の `render_hash` / `render_hash_short` をメタデータ領域へ展開する
+- 履歴DBは引き続き正本であり、出力ファイルは副産物として扱う
+- build number: 352
 
 ### v1.43 (2026-05-05)
 

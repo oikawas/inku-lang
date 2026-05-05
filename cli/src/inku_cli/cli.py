@@ -381,6 +381,8 @@ def _color_catalog_summary(catalog_id: str, catalog_data: dict[str, Any]) -> dic
 def _render_response_summary(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "render_build_number": result.get("render_build_number"),
+        "render_hash": result.get("render_hash"),
+        "render_hash_short": result.get("render_hash_short"),
         "render_color_catalog_id": result.get("render_color_catalog_id"),
         "render_color_catalog_name": result.get("render_color_catalog_name"),
         "render_color_catalog_sub": result.get("render_color_catalog_sub"),

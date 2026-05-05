@@ -465,6 +465,28 @@ def test_coerce_score_repairs_missing_shape_intents_from_ddl():
     assert "square restored from DDL shape intent" in hints
 
 
+def test_coerce_score_repairs_polygon_shape_intent_from_ddl():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="鉱物のような六角の結晶を右上に置く。")
+
+    polygons = [ins for ins in fixed.instructions if ins.primitive == "polygon"]
+    assert polygons
+    assert polygons[0].sides == 6
+    assert "polygon restored from DDL shape intent" in (polygons[0].color_hint or "")
+
+
 def test_coerce_score_prioritizes_triangle_delivery_for_roof_intent_when_many_instructions():
     score = Score.model_validate(
         {
@@ -880,3 +902,55 @@ def test_coerce_score_restores_motion_energy_without_increasing_count():
     assert ins.variation is not None
     assert ins.variation.quality == "wave"
     assert "motion energy restored" in (ins.color_hint or "")
+
+
+def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touching_good_presence_scene():
+    base = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    leaf = coerce_score(base, ddl="秋の森で、落ち葉が湿った土に深い赤を沈めている。")
+    assert any("leaf/grain energy restored" in (ins.color_hint or "") for ins in leaf.instructions)
+
+    corridor = coerce_score(base, ddl="廃校の廊下に、夕方の光が長い沈黙を置いていく。")
+    assert any("silence/layer energy restored" in (ins.color_hint or "") for ins in corridor.instructions)
+
+    factory = coerce_score(base, ddl="静かな工場跡で、錆びた鉄骨が空を細かく分けている。")
+    assert any(ins.primitive == "polygon" and "hard edge energy restored" in (ins.color_hint or "") for ins in factory.instructions)
+
+    bicycle = coerce_score(base, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
+    assert any("playful motion energy restored as a small moving color cluster" in (ins.color_hint or "") for ins in bicycle.instructions)
+
+    red_scene = Score.model_validate(
+        {
+            "background": "red",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.05, 0.02],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+    red_bicycle = coerce_score(red_scene, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
+    playful = [ins for ins in red_bicycle.instructions if "playful motion energy restored as a small moving color cluster" in (ins.color_hint or "")]
+    assert playful
+    assert playful[0].primitive == "ellipse"
+    assert playful[0].color == "white"
+    assert playful[0].arrangement is not None
+    assert playful[0].arrangement.count == 5
+    assert playful[0].arrangement.color_cycle == ["white", "blue", "black"]
+
+    bus_stop = coerce_score(base, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+    assert not any("energy restored" in (ins.color_hint or "") for ins in bus_stop.instructions)

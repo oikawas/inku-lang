@@ -221,6 +221,7 @@ NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
 }
 
 SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("多角形", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片", "polygon", "crystal", "mineral", "hard shard"), "polygon"),
     (("山", "屋根", "尖", "鋭", "三角", "峰", "頂", "稜線", "切妻", "mountain", "roof", "sharp", "peak", "ridge", "triangle"), "triangle"),
     (("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple"), "arc"),
     (("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square"), "square"),
@@ -241,7 +242,7 @@ def _visible_background(background: str) -> str:
 
 
 def _shape_extent(ins: Instruction) -> float:
-    if ins.primitive in ("circle", "arc"):
+    if ins.primitive in ("circle", "arc", "polygon"):
         return float(ins.radius or 0.0) * 2
     if ins.size:
         return max(float(ins.size[0]), float(ins.size[1]))
@@ -423,6 +424,18 @@ COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
     "祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色",
     "festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color",
 )
+LEAF_GRAIN_CONTEXT_MARKERS: tuple[str, ...] = (
+    "落ち葉", "紅葉", "湿った土", "森", "leaf", "leaves", "autumn forest", "fallen leaves",
+)
+SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = (
+    "廃校", "廊下", "長い沈黙", "夕方の光", "abandoned school", "corridor", "long silence",
+)
+HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = (
+    "工場", "鉄骨", "錆", "錆び", "空を細かく分け", "factory", "steel frame", "rust", "girder",
+)
+PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
+    "自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime",
+)
 
 
 def _context_has_density_governor(ddl: str | None) -> bool:
@@ -451,6 +464,13 @@ def _context_has_colorful_accent(ddl: str | None) -> bool:
         return False
     lower = ddl.lower()
     return any(marker in ddl or marker in lower for marker in COLORFUL_CONTEXT_MARKERS)
+
+
+def _context_has_marker(ddl: str | None, markers: tuple[str, ...]) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(marker in ddl or marker.lower() in lower for marker in markers)
 
 
 def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
@@ -669,6 +689,133 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
             data["color_hint"] = f"{hint}; {note}" if hint else note
         adjusted.append(Instruction.model_validate(data))
     return adjusted
+
+
+def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
+    visible = VISIBLE_ON_BACKGROUND.get(background, "black")
+    if kind == "leaf_grain":
+        return Instruction.model_validate(
+            {
+                "primitive": "ellipse",
+                "center": [0.42, 0.62],
+                "size": [0.045, 0.018],
+                "rotation": -28,
+                "color": "red" if background != "red" else visible,
+                "filled": True,
+                "color_hint": "leaf/grain energy restored without density growth",
+                "arrangement": {
+                    "count": 6,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.22,
+                    "density": "low",
+                    "fade": "directional",
+                    "preserve_space": True,
+                    "color_cycle": ["red", "gray", "green"] if background not in {"red", "gray", "green"} else [visible],
+                },
+            }
+        )
+    if kind == "silence_layer":
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.18, 0.70],
+                "to": [0.82, 0.38],
+                "rotation": -7,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "silence/layer energy restored as a long optical trace",
+                "arrangement": {
+                    "count": 4,
+                    "layout": "horizontal",
+                    "path": "diagonal",
+                    "margin": 0.20,
+                    "density": "low",
+                    "fade": "directional",
+                    "preserve_space": True,
+                },
+            }
+        )
+    if kind == "hard_edge":
+        return Instruction.model_validate(
+            {
+                "primitive": "polygon",
+                "center": [0.66, 0.35],
+                "radius": 0.045,
+                "sides": 6,
+                "rotation": 18,
+                "color": "gray" if background != "gray" else visible,
+                "weight": "brush_thin",
+                "color_hint": "hard edge energy restored with polygonal rust/steel fragments",
+                "arrangement": {
+                    "count": 5,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.18,
+                    "density": "low",
+                    "fade": "directional",
+                    "preserve_space": True,
+                    "color_cycle": ["gray", "black"] if background not in {"gray", "black"} else [visible],
+                },
+            }
+        )
+    playful_color = "white" if background == "red" else "red" if background != "red" else visible
+    return Instruction.model_validate(
+        {
+            "primitive": "ellipse",
+            "center": [0.62, 0.40],
+            "size": [0.055, 0.024],
+            "rotation": -24,
+            "color": playful_color,
+            "filled": True,
+            "weight": "brush_thick",
+            "color_hint": "playful motion energy restored as a small moving color cluster",
+            "arrangement": {
+                "count": 5,
+                "layout": "scatter",
+                "path": "wave",
+                "margin": 0.20,
+                "density": "low",
+                "fade": "outward",
+                "preserve_space": True,
+                "color_cycle": (
+                    ["white", "blue", "black"] if background == "red"
+                    else ["red", "blue", "white"] if background not in {"red", "blue", "white"}
+                    else [playful_color]
+                ),
+            },
+        }
+    )
+
+
+def _has_context_energy(instructions: list[Instruction], kind: str) -> bool:
+    return any(kind in (ins.color_hint or "") for ins in instructions)
+
+
+def _with_context_energy_repair(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    """退行しやすい文脈に、密度ではなく局所的な層・粒度・硬さ・喜びを足す。"""
+    if not ddl or len(instructions) >= 10:
+        return instructions
+
+    repaired = list(instructions)
+    candidates: list[tuple[str, tuple[str, ...]]] = [
+        ("leaf_grain", LEAF_GRAIN_CONTEXT_MARKERS),
+        ("silence_layer", SILENCE_LAYER_CONTEXT_MARKERS),
+        ("hard_edge", HARD_EDGE_CONTEXT_MARKERS),
+        ("playful_motion", PLAYFUL_MOTION_CONTEXT_MARKERS),
+    ]
+    for kind, markers in candidates:
+        if len(repaired) >= 10:
+            break
+        if not _context_has_marker(ddl, markers) or _has_context_energy(repaired, kind):
+            continue
+        repaired.append(_context_energy_instruction(kind, background=background))
+    return repaired
 
 
 def _has_compensating_accent(instructions: list[Instruction]) -> bool:
@@ -1034,6 +1181,13 @@ def _shape_repair_instruction(primitive: str, *, index: int, background: str) ->
             "size": [0.18, 0.16],
             "rotation": -18 + index * 11,
         })
+    elif primitive == "polygon":
+        common.update({
+            "center": [0.62 - offset, 0.34 + offset],
+            "radius": 0.06,
+            "sides": 6,
+            "rotation": -18 + index * 13,
+        })
     elif primitive == "arc":
         common.update({
             "center": [0.66 - offset, 0.34 + offset],
@@ -1062,12 +1216,12 @@ def _with_shape_delivery_repair(
         return instructions
 
     repaired = list(instructions)
-    for primitive in ("triangle", "arc", "square"):
+    for primitive in ("polygon", "triangle", "arc", "square"):
         if primitive not in requested or _score_contains_primitive(repaired, primitive):
             continue
-        limit = 8 if primitive == "triangle" else 6
+        limit = 8 if primitive in ("triangle", "polygon") else 6
         if len(repaired) >= limit:
-            if primitive == "triangle":
+            if primitive in ("triangle", "polygon"):
                 replace_index = next(
                     (
                         index for index, ins in enumerate(repaired)
@@ -1810,6 +1964,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_complex_motif_repair(instructions, ddl=ddl, background=background)
     instructions = _with_composition_diversity_repair(instructions, ddl=ddl, background=background)
     instructions = _with_structural_duplicate_repair(instructions)
+    instructions = _with_context_energy_repair(instructions, ddl=ddl, background=background)
     effective_presence = score.presence or _presence_from_ddl(ddl)
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
     instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)

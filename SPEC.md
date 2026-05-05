@@ -689,8 +689,8 @@ keys are stored in the DB in encrypted `enc:v1:` form. The server uses
 `~/.local/share/inku/secret.key` as a local key file. Existing plaintext keys
 remain readable for compatibility and are migrated to encrypted storage on the
 next save. The Model Settings tab shows this rule next to the AI service
-connections heading: API keys are encrypted and stored only in the server-side
-DB, are never displayed again, and keys configured through environment
+connections heading: API keys are encrypted in the DB, are never displayed
+again, and keys configured through environment
 variables are treated as initial values. LLM calls
 resolve provider-prefixed model IDs such as
 `openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`, and

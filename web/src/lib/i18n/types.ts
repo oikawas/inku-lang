@@ -159,6 +159,7 @@ export interface LangPack {
 	pngHighRes: string;
 	pngSquare: string;
 	pngSquareHighRes: string;
+	pngYAxisDescription: (px: number) => string;
 
 	// Elapsed / tokens
 	elapsedDetailed: (s1: number, s2: number, total: number) => string;

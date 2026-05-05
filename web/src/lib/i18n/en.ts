@@ -147,6 +147,7 @@ export const en: LangPack = {
 	pngHighRes: 'high resolution (2x)',
 	pngSquare: 'square',
 	pngSquareHighRes: 'square high resolution',
+	pngYAxisDescription: (px) => `PNG / Y-axis ${px}px`,
 
 	elapsedDetailed: (s1, s2, total) =>
 		`interp ${s1.toFixed(1)}s + struct ${s2.toFixed(1)}s = ${total.toFixed(1)}s`,
@@ -239,7 +240,7 @@ export const en: LangPack = {
 	settingsModelApiKeySet: 'API key set',
 	settingsModelApiKeyUnset: 'API key not set',
 	settingsModelApiKeyOptionalHint: 'Local LLM services may be usable without an API key.',
-	settingsModelSecurityNote: 'API keys are encrypted and stored only in the server-side DB, and are never displayed again. Keys already configured by environment variables are used as initial values.',
+	settingsModelSecurityNote: 'API keys are encrypted in the DB and are never displayed again. Keys already configured by environment variables are used as initial values.',
 	settingsModelPublishedModels: 'Models visible to users',
 	settingsModelSelectModels: 'Select models',
 	settingsModelSelectModelsTitle: (provider) => `Visible models for ${provider}`,

@@ -147,6 +147,7 @@ export const ja: LangPack = {
 	pngHighRes: '高解像度 (2×)',
 	pngSquare: '正方形',
 	pngSquareHighRes: '正方形 高解像度',
+	pngYAxisDescription: (px) => `PNG / Y軸 ${px}px`,
 
 	elapsedDetailed: (s1, s2, total) =>
 		`解釈 ${s1.toFixed(1)}s + 構造化 ${s2.toFixed(1)}s = ${total.toFixed(1)}s`,
@@ -239,7 +240,7 @@ export const ja: LangPack = {
 	settingsModelApiKeySet: 'APIキー設定済み',
 	settingsModelApiKeyUnset: 'APIキー未設定',
 	settingsModelApiKeyOptionalHint: 'ローカルLLMの場合、APIキー無しで利用可能な場合があります。',
-	settingsModelSecurityNote: 'APIキーはサーバー側DBにのみ暗号化して保存され、画面には再表示されません。環境変数で設定済みのキーも初期値として扱われます。',
+	settingsModelSecurityNote: 'APIキーはDBに暗号化して保存され、画面には再表示されません。環境変数で設定済みのキーも初期値として扱われます。',
 	settingsModelPublishedModels: 'ユーザーに公開するモデル',
 	settingsModelSelectModels: 'モデル選択',
 	settingsModelSelectModelsTitle: (provider) => `${provider} の公開モデル選択`,

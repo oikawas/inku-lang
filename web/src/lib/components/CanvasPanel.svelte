@@ -141,6 +141,15 @@
 		canvasAspectHeight;
 		updateFitZoom();
 	});
+
+	function isDefaultPngTemplate(template: ExportTemplate): boolean {
+		return template.id === `png-${template.y_px}` && [1080, 2160, 4320].includes(template.y_px);
+	}
+
+	function pngTemplateDescription(template: ExportTemplate): string {
+		if (isDefaultPngTemplate(template)) return t().pngYAxisDescription(template.y_px);
+		return template.description || t().pngYAxisDescription(template.y_px);
+	}
 </script>
 
 <div class="right-panel">
@@ -333,7 +342,7 @@
 					{#each pngTemplates as template (template.id)}
 						<button onclick={() => { onDownloadPNG(template.y_px); pngMenuOpen = false; }}>
 							<span class="png-size">{template.name}</span>
-							<span class="png-sub">{template.description || `y ${template.y_px}px`}</span>
+							<span class="png-sub">{pngTemplateDescription(template)}</span>
 						</button>
 					{/each}
 				</div>

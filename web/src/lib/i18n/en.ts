@@ -260,6 +260,7 @@ export const en: LangPack = {
 	settingsModelPublishedModels: 'Models visible to users',
 	settingsModelSelectModels: 'Select models',
 	settingsModelSelectModelsTitle: (provider) => `Visible models for ${provider}`,
+	settingsModelSearchPlaceholder: 'Search models',
 	settingsModelNoPublishedModels: 'No models are selected.',
 	settingsModelSelectAll: 'Select all',
 	settingsModelClearAll: 'Clear all',

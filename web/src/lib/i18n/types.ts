@@ -274,6 +274,7 @@ export interface LangPack {
 	settingsModelPublishedModels: string;
 	settingsModelSelectModels: string;
 	settingsModelSelectModelsTitle: (provider: string) => string;
+	settingsModelSearchPlaceholder: string;
 	settingsModelNoPublishedModels: string;
 	settingsModelSelectAll: string;
 	settingsModelClearAll: string;

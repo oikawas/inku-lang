@@ -295,6 +295,7 @@
 	let newProviderApiKey = $state('');
 	let showAddServiceDialog = $state(false);
 	let modelPickerProviderId = $state<Provider | null>(null);
+	let modelPickerSearch = $state('');
 	let editProviderId = $state<Provider | null>(null);
 	let editProviderLabel = $state('');
 	let memoProviderId = $state<Provider | null>(null);
@@ -381,6 +382,16 @@
 		});
 	}
 
+	function openModelPicker(provider: Provider) {
+		modelPickerSearch = '';
+		modelPickerProviderId = provider;
+	}
+
+	function closeModelPicker() {
+		modelPickerProviderId = null;
+		modelPickerSearch = '';
+	}
+
 	function modelEnabled(setting: ModelProviderSetting, modelId: string): boolean {
 		return setting.enabled_models?.[modelId] !== false;
 	}
@@ -403,6 +414,16 @@
 			? (modelSettings.providers[modelPickerProviderId] ?? { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} })
 			: null
 	);
+	const filteredModelPickerModels = $derived.by(() => {
+		const provider = modelPickerProvider;
+		if (!provider) return [];
+		const query = modelPickerSearch.trim().toLowerCase();
+		if (!query) return provider.models;
+		return provider.models.filter((model) => {
+			const text = `${model.id} ${model.label ?? ''} ${model.notes ?? ''}`.toLowerCase();
+			return text.includes(query);
+		});
+	});
 
 	function formatBytes(bytes: number | null | undefined): string {
 		if (bytes == null) return '-';
@@ -563,7 +584,7 @@
 								<div class="model-publish-summary" aria-label={t().settingsModelPublishedModels}>
 									<div class="model-publish-head">
 										<div class="model-publish-title">{t().settingsModelPublishedModels}</div>
-										<button class="ghost-btn model-fetch-btn" onclick={() => (modelPickerProviderId = provider.id)} disabled={modelSettingsLoading}>{t().settingsModelSelectModels}</button>
+										<button class="ghost-btn model-fetch-btn" onclick={() => openModelPicker(provider.id)} disabled={modelSettingsLoading}>{t().settingsModelSelectModels}</button>
 									</div>
 									{#if selectedModels(provider, setting).length}
 										<div class="model-publish-selected">
@@ -1196,20 +1217,29 @@
 {/if}
 
 {#if modelPickerProvider && modelPickerSetting}
-	<div class="modal-backdrop model-picker-backdrop" onclick={() => (modelPickerProviderId = null)} aria-hidden="true"></div>
+	<div class="modal-backdrop model-picker-backdrop" onclick={closeModelPicker} aria-hidden="true"></div>
 	<div class="model-picker-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 		<div class="modal-head">
 			<div class="catalog-modal-title">{t().settingsModelSelectModelsTitle(modelPickerProvider.label)}</div>
-			<button class="catalog-close" onclick={() => (modelPickerProviderId = null)}>×</button>
+			<button class="catalog-close" onclick={closeModelPicker}>×</button>
 		</div>
 		<div class="model-picker-body">
 			<div class="model-picker-actions">
 				<button class="ghost-btn" onclick={() => onFetchModelList(modelPickerProvider.id)} disabled={modelSettingsLoading}>{t().settingsModelFetchModels}</button>
-				<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerProvider.id, modelPickerProvider.models, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectAll}</button>
-				<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerProvider.id, modelPickerProvider.models, false)} disabled={modelSettingsLoading}>{t().settingsModelClearAll}</button>
+				<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerProvider.id, filteredModelPickerModels, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectAll}</button>
+				<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerProvider.id, filteredModelPickerModels, false)} disabled={modelSettingsLoading}>{t().settingsModelClearAll}</button>
 			</div>
+			<input
+				class="model-picker-search"
+				type="search"
+				bind:value={modelPickerSearch}
+				placeholder={t().settingsModelSearchPlaceholder}
+				aria-label={t().settingsModelSearchPlaceholder}
+				autocomplete="off"
+				spellcheck="false"
+			/>
 			<div class="model-picker-list" aria-label={t().settingsModelPublishedModels}>
-				{#each modelPickerProvider.models as model, modelIndex (`${model.id}:${modelIndex}`)}
+				{#each filteredModelPickerModels as model, modelIndex (`${model.id}:${modelIndex}`)}
 					<label class="check-row model-picker-row">
 						<input
 							type="checkbox"
@@ -1230,8 +1260,8 @@
 			{#if modelFetchResults[modelPickerProvider.id]}
 				<div class:error={modelFetchResults[modelPickerProvider.id].type === 'error'} class="model-picker-result">{modelFetchResults[modelPickerProvider.id].message}</div>
 			{/if}
-			<button class="ghost-btn" onclick={() => (modelPickerProviderId = null)}>{t().confirmCancel}</button>
-			<button class="ghost-btn primary-inline" onclick={() => { void saveBaseUrl(modelPickerProvider.id, modelPickerSetting); modelPickerProviderId = null; }} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
+			<button class="ghost-btn" onclick={closeModelPicker}>{t().confirmCancel}</button>
+			<button class="ghost-btn primary-inline" onclick={() => { void saveBaseUrl(modelPickerProvider.id, modelPickerSetting); closeModelPicker(); }} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
 		</div>
 	</div>
 {/if}
@@ -1785,6 +1815,17 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
+	}
+	.model-picker-search {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 7px 9px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		font: inherit;
+		font-size: 12px;
 	}
 	.model-picker-list {
 		display: grid;

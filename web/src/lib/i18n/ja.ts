@@ -260,6 +260,7 @@ export const ja: LangPack = {
 	settingsModelPublishedModels: 'ユーザーに公開するモデル',
 	settingsModelSelectModels: 'モデル選択',
 	settingsModelSelectModelsTitle: (provider) => `${provider} の公開モデル選択`,
+	settingsModelSearchPlaceholder: 'モデルを検索',
 	settingsModelNoPublishedModels: '公開モデルは未選択です。',
 	settingsModelSelectAll: '全て選択',
 	settingsModelClearAll: '全て解除',

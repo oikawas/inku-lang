@@ -192,6 +192,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "白い線を可視化" in SYSTEM_PROMPT
     assert "白い短い線を上から下へ百三十七本" in SYSTEM_PROMPT
     assert "ゆっくり揺れる" in SYSTEM_PROMPT
+    assert "形容語・動作語・質感語" in SYSTEM_PROMPT
+    assert "DDL にない補助線・補助図形・別色の instruction を追加してはいけない" in SYSTEM_PROMPT
+    assert "震えるペンの緑の直線" in SYSTEM_PROMPT
     assert 'quality":"wave"' in SYSTEM_PROMPT
     assert '"dimensions":["position_x","position_y"]' in SYSTEM_PROMPT
     assert "color\":\"blue" in SYSTEM_PROMPT
@@ -249,6 +252,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "white line made visible" in SYSTEM_PROMPT_EN
     assert "short white lines from top to bottom" in SYSTEM_PROMPT_EN
     assert "Swaying slowly" in SYSTEM_PROMPT_EN
+    assert "Apply adjectives, motion words, and texture words" in SYSTEM_PROMPT_EN
+    assert "Do not add supporting lines, supporting shapes, or differently colored instructions" in SYSTEM_PROMPT_EN
+    assert "three hundred trembling green pen lines" in SYSTEM_PROMPT_EN
     assert 'quality":"wave"' in SYSTEM_PROMPT_EN
     assert '"dimensions":["position_x","position_y"]' in SYSTEM_PROMPT_EN
     assert "color\":\"blue" in SYSTEM_PROMPT_EN

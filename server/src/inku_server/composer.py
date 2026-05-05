@@ -45,6 +45,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **圧縮しすぎない。光・香り・温度・音・待つ時間・五感などの感覚語が DDL にある場合、主題を壊さない範囲で 1〜2 個の薄い補助層として残す。削りすぎて作品の情報量や楽しさを失わせない**
 - **余白は構図要素。小さな焦点、端寄りの線、反復の欠落、画面外へ続く方向で余白に圧力を作る。余白を全面散布で埋めない**
 - variation は明示された揺らぎがある場合のみ付ける
+- **形容語・動作語・質感語は、DDL で指定された主図形へ適用する。震える・揺れる・滲む・太い・細い等を理由に、DDL にない補助線・補助図形・別色の instruction を追加してはいけない**
 - **「ゆっくり揺れる」→ variation quality="wave", frequency="slow" を優先する。perlin は「震える」「細かく揺れる」に使う**
 - **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
@@ -110,6 +111,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 白い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。
 出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+入力: 震えるペンの緑の直線を三百本、上から下に引く。
+出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"green","arrangement":{"count":110,"layout":"vertical","path":"top_to_bottom","density":"high","cluster_count":7,"fade":"directional","preserve_space":true},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x","position_y"]}}]}
 
 入力: 赤い右上がりの小さな楕円を右半分に縦に二十個散らす。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
@@ -286,6 +290,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Do not over-compress. If the DDL contains sensory words such as light, scent, temperature, sound, waiting time, or bodily senses, keep 1–2 of them as faint supporting layers when they do not break the subject. Do not remove so much information that the work loses richness or playfulness**
 - **Negative space is compositional pressure. Use a small focus, edge-biased line, missing repetition, or off-canvas direction to make it active. Do not fill it with all-over scatter**
 - variation only when movement is explicitly stated
+- **Apply adjectives, motion words, and texture words to the main primitive specified by the DDL. Do not add supporting lines, supporting shapes, or differently colored instructions that were not requested merely because the DDL says trembling, swaying, blurring, thick, thin, or similar modifiers**
 - **"swaying slowly" / "slowly swaying" → prefer variation quality="wave", frequency="slow". Use perlin for trembling or fine swaying**
 - **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
 - **count is integer 1–1000. Use explicit numbers from DDL**
@@ -351,6 +356,9 @@ Output: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.
 
 Input: Scatter one hundred thirty-seven short white lines from top to bottom. Swaying slowly.
 Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+Input: Draw three hundred trembling green pen lines from top to bottom.
+Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"green","arrangement":{"count":110,"layout":"vertical","path":"top_to_bottom","density":"high","cluster_count":7,"fade":"directional","preserve_space":true},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x","position_y"]}}]}
 
 Input: Scatter twenty small red ellipses rising to the right vertically in the right half.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}

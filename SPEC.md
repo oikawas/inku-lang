@@ -206,13 +206,19 @@ Render JSON produced by the server records the concrete render context.  Paint,
 compose, and saved artifact JSON include the resolved `stage1_model` /
 `stage2_model` that were actually used, plus `render_build_number`,
 `render_color_profile`, `render_engine_id`, `render_engine_version`,
-`render_color_catalog_id`, `render_color_catalog_name`,
-`render_color_catalog_sub`, and `render_color_map`, where abstract colors and
+`render_canvas_aspect`, `render_color_catalog_id`,
+`render_color_catalog_name`, `render_color_catalog_sub`, and
+`render_color_map`, where abstract colors and
 `palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
 rendering.  The current engine metadata is `render_engine_id: "default"` and
 `render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
+`score.canvas` remains the score-level canvas instruction, while
+`render_canvas_aspect` records the canvas aspect actually used for this rendered
+artifact.  In normal server-generated output they match, but both are retained
+so render metadata remains visible even when old records or imported Scores are
+inspected.
 
 ---
 
@@ -333,6 +339,15 @@ The status bar displays the current render context:
 
 For history display, model, catalog, and canvas values come from the history
 item when available.  For active editing, they come from the current selections.
+The canvas panel header also shows the selected work's color catalog, canvas,
+and creation time.  The color catalog button in the input panel displays the
+currently selected catalog name and truncates long names with an ellipsis.
+
+The settings modal's "other" tab includes history-selection behavior controls.
+Users can choose independently whether selecting a history item updates the UI's
+current canvas aspect and color catalog to the history item's values, or keeps
+the current UI selections.  This setting affects only the UI selection state;
+the saved history SVG is displayed as stored and is not re-rendered.
 
 PNG export options are managed as per-user templates in the settings modal's
 export tab.  Each template has a name, description, and y-axis height in pixels.
@@ -675,7 +690,8 @@ paint/compose responses, history records, and saved artifact JSON include
 "IEC 61966-2-1:1999" }`. Adobe RGB and other wide-gamut profiles remain future
 extension candidates and are not implemented in the current renderer.
 The JSON tab displays render metadata first, including model, build, color
-profile, and color catalog fields, followed by the `score` payload.
+profile, render engine, canvas aspect, and color catalog fields, followed by the
+`score` payload.
 When a history item is reopened, the JSON tab displays the saved `stage1_model`
 and `stage2_model` from that history record.
 Paint, compose, history records, the JSON tab, and saved artifact JSON also

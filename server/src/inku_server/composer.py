@@ -21,7 +21,7 @@ from typing import Any
 
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
-from .schema import Score
+from .schema import Score, Variation
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 2048
@@ -560,6 +560,109 @@ def _build_user_message(ddl: str, original_text: str | None, lang: str = "ja") -
     return ddl
 
 
+_MOTION_OR_TEXTURE_TERMS = (
+    "震える",
+    "震え",
+    "揺れる",
+    "揺らぐ",
+    "揺れ",
+    "小刻み",
+    "滲む",
+    "にじむ",
+    "太い",
+    "細い",
+    "trembling",
+    "tremble",
+    "swaying",
+    "sway",
+    "wobble",
+    "wobbly",
+    "blurring",
+    "blurred",
+    "thick",
+    "thin",
+)
+
+_PRIMITIVE_TERMS = {
+    "line": ("直線", "線", "縦線", "横線", "line", "lines"),
+    "circle": ("円", "丸", "circle", "circles"),
+    "ellipse": ("楕円", "ellipse", "ellipses", "oval", "ovals"),
+    "triangle": ("三角", "triangle", "triangles"),
+    "square": ("四角", "square", "squares"),
+    "polygon": ("多角形", "polygon", "polygons"),
+    "arc": ("弧", "arc", "arcs"),
+}
+
+_COLOR_TERMS = {
+    "white": ("白", "white"),
+    "black": ("黒", "black"),
+    "blue": ("青", "blue"),
+    "red": ("赤", "red"),
+    "green": ("緑", "green"),
+    "gray": ("灰", "グレー", "gray", "grey"),
+}
+
+
+def _mentioned_values(text: str, terms_by_value: dict[str, tuple[str, ...]]) -> set[str]:
+    haystack = text.lower()
+    return {
+        value
+        for value, terms in terms_by_value.items()
+        if any(term.lower() in haystack for term in terms)
+    }
+
+
+def _enforce_modifier_targeting(score: Score, ddl: str) -> Score:
+    """Keep motion/texture modifiers on the explicitly requested single motif.
+
+    This is a Stage 2 contract guard, not the broader visual auto-repair pass.
+    It only applies when the DDL names exactly one primitive family and includes
+    a motion/texture modifier, because those modifiers should decorate the named
+    primitive instead of creating unrequested support marks.
+    """
+
+    if not any(term.lower() in ddl.lower() for term in _MOTION_OR_TEXTURE_TERMS):
+        return score
+    target_primitives = _mentioned_values(ddl, _PRIMITIVE_TERMS)
+    if len(target_primitives) != 1:
+        return score
+    target_colors = _mentioned_values(ddl, _COLOR_TERMS)
+    target_primitive = next(iter(target_primitives))
+
+    def matches_target(ins) -> bool:
+        if ins.primitive != target_primitive:
+            return False
+        return not target_colors or ins.color in target_colors
+
+    targeted = [ins for ins in score.instructions if matches_target(ins)]
+    if not targeted:
+        return score
+    if len(targeted) == len(score.instructions) and all(ins.variation is not None for ins in targeted):
+        return score
+
+    repaired = []
+    for ins in targeted:
+        if ins.variation is not None or target_primitive != "line":
+            repaired.append(ins)
+            continue
+        repaired.append(
+            ins.model_copy(
+                update={
+                    "variation": Variation(
+                        amplitude="fine",
+                        frequency="medium",
+                        quality="perlin",
+                        dimensions=["position_x", "position_y"],
+                    )
+                }
+            )
+        )
+
+    data = score.model_dump()
+    data["instructions"] = [ins.model_dump(by_alias=True) for ins in repaired]
+    return Score.model_validate(data)
+
+
 def compose(
     ddl: str,
     *,
@@ -580,14 +683,34 @@ def compose(
     if model:
         provider, model_id = provider_for_model(model, stage="stage2", settings=settings)
         if provider == "anthropic":
-            return _compose_anthropic(user_msg, model=model_id, system_prompt=effective_prompt, settings=settings)
+            score, tokens_in, tokens_out = _compose_anthropic(
+                user_msg,
+                model=model_id,
+                system_prompt=effective_prompt,
+                settings=settings,
+            )
+            return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
         if provider == "gemini":
-            return _compose_gemini(user_msg, model=model_id, system_prompt=effective_prompt, settings=settings)
-        return _compose_openai(user_msg, model=model_id, provider=provider, system_prompt=effective_prompt)
+            score, tokens_in, tokens_out = _compose_gemini(
+                user_msg,
+                model=model_id,
+                system_prompt=effective_prompt,
+                settings=settings,
+            )
+            return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+        score, tokens_in, tokens_out = _compose_openai(
+            user_msg,
+            model=model_id,
+            provider=provider,
+            system_prompt=effective_prompt,
+        )
+        return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        return _compose_openai(user_msg, model=None, system_prompt=effective_prompt)
-    return _compose_anthropic(user_msg, system_prompt=effective_prompt)
+        score, tokens_in, tokens_out = _compose_openai(user_msg, model=None, system_prompt=effective_prompt)
+        return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+    score, tokens_in, tokens_out = _compose_anthropic(user_msg, system_prompt=effective_prompt)
+    return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
 
 
 def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT, settings: dict | None = None) -> tuple[Score, int | None, int | None]:

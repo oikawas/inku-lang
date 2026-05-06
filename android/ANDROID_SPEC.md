@@ -6,6 +6,19 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-05-06.
 
+## Specification Update Workflow
+
+`ANDROID_SPEC.ja.md` is the canonical Android specification note.
+`ANDROID_SPEC.md` is the maintained English version of the same intent.
+
+When updating Android specifications:
+
+1. Update `ANDROID_SPEC.ja.md` first.
+2. Refresh `ANDROID_SPEC.md` as an English translation or public-facing
+   adaptation of the Japanese source.
+3. Do not introduce English-only Android requirements that are absent from
+   `ANDROID_SPEC.ja.md`.
+
 ## Fixed Decisions
 
 - Native Android implementation in Kotlin and Jetpack Compose.
@@ -278,6 +291,24 @@ Remaining next order:
    metadata fixtures.
 6. Complete destructive confirmations for every non-history settings operation
    and add automated parity coverage for the Android UI state transitions.
+
+## Local Commit Record
+
+- `f34852b feat: add android headless render comparison`
+  - Added the Android headless render entry point and adb-driven comparison
+    script.
+  - Added OpenAI-compatible provider routing, encrypted local provider API key
+    storage, and web-compatible Stage 1 / Stage 1.5 / Stage 2 prompt and tool
+    support.
+  - Added Android-side tests for the web DDL expander port.
+  - Updated the Pixel 9 UI, model/provider selection, batch/history/settings
+    flows, and renderer support as part of the same Android parity checkpoint.
+  - Verified with `gradle :app:compileDebugKotlin` and
+    `bash -n android/scripts/headless_render_compare.sh`.
+
+The commit intentionally excludes local-only artifacts, concrete device IDs,
+local server addresses, downloaded models, and API keys. Unrelated `manual/`
+files were left untracked.
 
 ## Build And Deployment Notes
 

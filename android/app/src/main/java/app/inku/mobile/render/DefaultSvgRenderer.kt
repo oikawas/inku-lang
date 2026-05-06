@@ -7,6 +7,7 @@ import java.security.MessageDigest
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 import kotlin.math.sin
 import org.json.JSONArray
 import org.json.JSONObject
@@ -20,21 +21,26 @@ class DefaultSvgRenderer : SvgRenderer {
         val background = colors[score.optString("background", "white")] ?: "#ffffff"
         val instructions = score.optJSONArray("instructions") ?: JSONArray()
         val body = StringBuilder()
+        val textureWeights = textureWeights(instructions)
 
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
         body.append("""<g clip-path="url(#canvas-clip)">""")
         for (i in 0 until instructions.length()) {
             val instruction = instructions.optJSONObject(i) ?: continue
             val expanded = expandArrangement(instruction)
-            for (mark in expanded) {
-                body.append(renderInstruction(mark, colors, canvas.width.toDouble(), canvas.height.toDouble()))
+            for ((index, mark) in expanded.withIndex()) {
+                body.append(renderInstruction(mark, colors, canvas.width.toDouble(), canvas.height.toDouble(), index))
             }
         }
+        body.append(renderPresenceLayer(score, colors, canvas.width.toDouble(), canvas.height.toDouble()))
         body.append("</g>")
 
         val svg = buildString {
             append("""<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}">""")
-            append("""<defs><clipPath id="canvas-clip"><rect x="0" y="0" width="${canvas.width}" height="${canvas.height}"/></clipPath></defs>""")
+            append("""<defs><clipPath id="canvas-clip"><rect x="0" y="0" width="${canvas.width}" height="${canvas.height}"/></clipPath>""")
+            append(textureFilterDefs(textureWeights))
+            append(blurFilterDefs())
+            append("</defs>")
             append(body)
             append("</svg>")
         }
@@ -51,14 +57,15 @@ class DefaultSvgRenderer : SvgRenderer {
         return RenderResult(svg = svg, metadataJson = metadata.put("render_hash", hash).toString(), renderHash = hash)
     }
 
-    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double): String {
+    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, index: Int = 0): String {
         val primitive = ins.optString("primitive", "line")
         val color = colors[ins.optString("color", "black")] ?: "#111111"
-        val strokeWidth = strokeWidth(ins.optString("weight", "pen"))
+        val weight = ins.optString("weight", "pen")
+        val strokeWidth = strokeWidth(weight)
         val style = dashStyle(ins.optString("style", "solid"))
-        val common = """stroke="$color" stroke-width="$strokeWidth" stroke-linecap="round" stroke-linejoin="round"$style"""
+        val common = """stroke="$color" stroke-width="$strokeWidth" stroke-linecap="${lineCap(weight)}" stroke-linejoin="round" stroke-opacity="${strokeOpacity(weight)}"$style${filterAttr(weight, ins.optJSONObject("variation"))}"""
         val fill = if (ins.optBoolean("filled", false) && primitive != "line") color else "none"
-        return when (primitive) {
+        val raw = when (primitive) {
             "line" -> {
                 val from = ins.optJSONArray("from")
                 val to = ins.optJSONArray("to")
@@ -66,7 +73,14 @@ class DefaultSvgRenderer : SvgRenderer {
                 val y1 = px(from?.optDouble(1, 0.5) ?: 0.5, height)
                 val x2 = px(to?.optDouble(0, 0.9) ?: 0.9, width)
                 val y2 = px(to?.optDouble(1, 0.5) ?: 0.5, height)
-                """<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" $common/>"""
+                val variation = ins.optJSONObject("variation")
+                if (needsPathVariation(variation)) {
+                    val points = variedLinePoints(x1, y1, x2, y2, variation, ins.toString())
+                        .joinToString(" ") { "${it.first},${it.second}" }
+                    """<polyline points="$points" fill="none" $common/>"""
+                } else {
+                    """<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" $common/>"""
+                }
             }
             "circle" -> {
                 val center = ins.optJSONArray("center")
@@ -111,38 +125,65 @@ class DefaultSvgRenderer : SvgRenderer {
             }
             else -> ""
         }
+        return applyRotation(raw, ins, width, height, primitive)
     }
 
     private fun expandArrangement(ins: JSONObject): List<JSONObject> {
         val arr = ins.optJSONObject("arrangement") ?: return listOf(ins)
         val count = arr.optInt("count", 1).coerceIn(1, 1000)
-        if (count == 1) return listOf(copyWithoutArrangement(ins))
         val layout = arr.optString("layout", "horizontal")
+        val prepared = ensureLineCoords(ins, layout)
+        if (count == 1) return listOf(copyWithoutArrangement(prepared))
+        val path = arr.optString("path", "none")
         val margin = arr.optDouble("margin", 0.1).coerceIn(0.0, 0.45)
-        val base = copyWithoutArrangement(ins)
+        val clusterCount = arr.optInt("cluster_count", 0)
+        val base = copyWithoutArrangement(prepared)
         return (0 until count).map { i ->
             val t = if (count <= 1) 0.5 else i.toDouble() / (count - 1).toDouble()
-            val target = when (layout) {
-                "vertical" -> margin to (margin + t * (1.0 - margin * 2.0))
-                "scatter" -> hash01(i, ins.toString()) to hash01(i + 1000, ins.toString())
-                "radial" -> {
-                    val a = Math.toRadians(i * 360.0 / count)
-                    (0.5 + cos(a) * arr.optDouble("radius", 0.3)) to (0.5 - sin(a) * arr.optDouble("radius", 0.3))
+            val target = if (clusterCount > 0 && layout in setOf("scatter", "horizontal", "vertical")) {
+                clusteredPosition(i, count, clusterCount, pathFor(layout, path), margin, ins.toString())
+            } else if (path != "none") {
+                pathPosition(i, count, margin, path, ins.toString())
+            } else {
+                when (layout) {
+                    "vertical" -> margin to (margin + t * (1.0 - margin * 2.0))
+                    "scatter" -> scatterPosition(i, margin, ins.toString())
+                    "radial" -> {
+                        val center = arr.optJSONArray("center")
+                        val cx = center?.optDouble(0, 0.5) ?: 0.5
+                        val cy = center?.optDouble(1, 0.5) ?: 0.5
+                        val a = Math.toRadians(i * 360.0 / count)
+                        (cx + cos(a) * arr.optDouble("radius", 0.3)) to (cy - sin(a) * arr.optDouble("radius", 0.3))
+                    }
+                    else -> (margin + t * (1.0 - margin * 2.0)) to 0.5
                 }
-                else -> (margin + t * (1.0 - margin * 2.0)) to 0.5
             }
-            shiftTo(base, target.first, target.second)
+            val shifted = shiftTo(base, target.first, target.second)
+            applyColorCycle(shifted, arr.optJSONArray("color_cycle"), i)
         }
     }
 
     private fun copyWithoutArrangement(ins: JSONObject): JSONObject = JSONObject(ins.toString()).also { it.remove("arrangement") }
 
+    private fun ensureLineCoords(ins: JSONObject, layout: String): JSONObject {
+        if (ins.optString("primitive", "line") != "line" || ins.has("from") || ins.has("to")) return ins
+        val copy = JSONObject(ins.toString())
+        if (layout == "vertical") {
+            copy.put("from", JSONArray(listOf(0.0, 0.5)))
+            copy.put("to", JSONArray(listOf(1.0, 0.5)))
+        } else {
+            copy.put("from", JSONArray(listOf(0.5, 0.0)))
+            copy.put("to", JSONArray(listOf(0.5, 1.0)))
+        }
+        return copy
+    }
+
     private fun shiftTo(ins: JSONObject, targetX: Double, targetY: Double): JSONObject {
         val copy = JSONObject(ins.toString())
         when (copy.optString("primitive", "line")) {
             "line" -> {
-                val from = copy.optJSONArray("from") ?: JSONArray(listOf(0.45, 0.25))
-                val to = copy.optJSONArray("to") ?: JSONArray(listOf(0.55, 0.75))
+                val from = copy.optJSONArray("from") ?: JSONArray(listOf(0.5, 0.0))
+                val to = copy.optJSONArray("to") ?: JSONArray(listOf(0.5, 1.0))
                 val ax = (from.optDouble(0) + to.optDouble(0)) / 2.0
                 val ay = (from.optDouble(1) + to.optDouble(1)) / 2.0
                 copy.put("from", JSONArray(listOf(from.optDouble(0) + targetX - ax, from.optDouble(1) + targetY - ay)))
@@ -155,6 +196,61 @@ class DefaultSvgRenderer : SvgRenderer {
             else -> copy.put("center", JSONArray(listOf(targetX, targetY)))
         }
         return copy
+    }
+
+    private fun applyColorCycle(ins: JSONObject, cycle: JSONArray?, index: Int): JSONObject {
+        if (cycle == null || cycle.length() == 0) return ins
+        val copy = JSONObject(ins.toString())
+        copy.put("color", cycle.optString(index % cycle.length(), copy.optString("color", "black")))
+        return copy
+    }
+
+    private fun pathFor(layout: String, path: String): String = when {
+        path != "none" -> path
+        layout == "horizontal" -> "left_to_right"
+        layout == "vertical" -> "top_to_bottom"
+        else -> "none"
+    }
+
+    private fun scatterPosition(i: Int, margin: Double, seed: String): Pair<Double, Double> {
+        return (margin + hash01(i, seed) * (1.0 - margin * 2.0)) to
+            (margin + hash01(i + 1000, seed) * (1.0 - margin * 2.0))
+    }
+
+    private fun pathPosition(i: Int, count: Int, margin: Double, path: String, seed: String): Pair<Double, Double> {
+        val t = if (count <= 1) 0.5 else i.toDouble() / (count - 1).toDouble()
+        val jitter = (hash01(i + 2000, seed) - 0.5) * 0.14
+        return when (path) {
+            "diagonal" -> {
+                val x = margin + t * (1.0 - margin * 2.0)
+                val y = (1.0 - margin) - t * (1.0 - margin * 2.0) + jitter
+                x to y.coerceIn(margin, 1.0 - margin)
+            }
+            "wave" -> {
+                val x = margin + t * (1.0 - margin * 2.0)
+                val y = 0.5 + sin(t * Math.PI * 2.0) * 0.22 + jitter
+                x to y.coerceIn(margin, 1.0 - margin)
+            }
+            "top_to_bottom" -> (0.5 + jitter).coerceIn(margin, 1.0 - margin) to (margin + t * (1.0 - margin * 2.0))
+            "left_to_right" -> (margin + t * (1.0 - margin * 2.0)) to (0.5 + jitter).coerceIn(margin, 1.0 - margin)
+            "right_half" -> (0.55 + hash01(i, seed) * (0.45 - margin)) to (margin + hash01(i + 1000, seed) * (1.0 - margin * 2.0))
+            else -> scatterPosition(i, margin, seed)
+        }
+    }
+
+    private fun clusteredPosition(i: Int, count: Int, clusterCount: Int, path: String, margin: Double, seed: String): Pair<Double, Double> {
+        val cluster = i % clusterCount.coerceAtLeast(1)
+        val localIndex = i / clusterCount.coerceAtLeast(1)
+        val localTotal = max(1, kotlin.math.ceil(count / clusterCount.coerceAtLeast(1).toDouble()).toInt())
+        val center = if (path == "none") scatterPosition(cluster, margin + 0.08, seed) else pathPosition(cluster, clusterCount, margin + 0.08, path, seed)
+        val t = if (localTotal <= 1) 0.5 else localIndex.toDouble() / (localTotal - 1).toDouble()
+        val angle = hash01(cluster + 3000, seed) * Math.PI * 2.0
+        val span = 0.14 + hash01(cluster + 4000, seed) * 0.12
+        val along = (t - 0.5) * span
+        val cross = (hash01(i + 5000, seed) - 0.5) * span * 0.35
+        val x = center.first + cos(angle) * along - sin(angle) * cross
+        val y = center.second + sin(angle) * along + cos(angle) * cross
+        return x.coerceIn(margin, 1.0 - margin) to y.coerceIn(margin, 1.0 - margin)
     }
 
     private fun pointsForRegular(ins: JSONObject, sides: Int, width: Double, height: Double): List<Pair<Double, Double>> {
@@ -177,6 +273,158 @@ class DefaultSvgRenderer : SvgRenderer {
         return """<polygon points="$data" fill="$fill" $common/>"""
     }
 
+    private fun applyRotation(element: String, ins: JSONObject, width: Double, height: Double, primitive: String): String {
+        val rotation = ins.optDouble("rotation", 0.0)
+        if (kotlin.math.abs(rotation) < 1e-9 || element.isBlank()) return element
+        val center = rotationCenter(ins, width, height, primitive)
+        return """<g transform="rotate($rotation ${center.first} ${center.second})">$element</g>"""
+    }
+
+    private fun renderPresenceLayer(score: JSONObject, colors: Map<String, String>, width: Double, height: Double): String {
+        val presence = score.optJSONObject("presence") ?: return ""
+        val kind = presence.optString("kind", "none")
+        if (kind == "none") return ""
+        val center = presence.optJSONArray("center")
+        val cx = px(center?.optDouble(0, 0.52) ?: 0.52, width)
+        val cy = px(center?.optDouble(1, 0.50) ?: 0.50, height)
+        val unit = min(width, height)
+        val color = colors["gray"] ?: "#888888"
+        val dark = colors["black"] ?: "#111111"
+        val visualLoad = score.optJSONArray("instructions")?.let { instructions ->
+            (0 until instructions.length()).sumOf { i ->
+                instructions.optJSONObject(i)?.optJSONObject("arrangement")?.optInt("count", 1) ?: 1
+            }
+        } ?: 1
+        val loadOpacity = when {
+            visualLoad >= 120 -> 0.52
+            visualLoad >= 60 -> 0.70
+            else -> 1.0
+        }
+        val intensity = presence.optString("intensity", "medium")
+        val intensityOpacity = when (intensity) {
+            "low" -> 0.13
+            "high" -> 0.30
+            else -> 0.21
+        } * loadOpacity
+        val gazeOpacity = when (presence.optString("gaze_pressure", "none")) {
+            "low" -> 0.11
+            "medium" -> 0.18
+            "high" -> 0.26
+            else -> 0.0
+        } * loadOpacity
+        val contourCount = when (presence.optString("contour_density", "low")) {
+            "medium" -> 7
+            "high" -> 11
+            else -> 4
+        }
+        val radiusX = unit * when (intensity) {
+            "low" -> 0.18
+            "high" -> 0.30
+            else -> 0.24
+        }
+        val radiusY = unit * when (intensity) {
+            "low" -> 0.24
+            "high" -> 0.40
+            else -> 0.32
+        }
+        val stroke = max(1.2, unit * 0.003)
+        val seed = score.toString()
+        val phase = Math.PI * 2.0 * hash01(0, "$seed:presence-phase")
+        val tilt = (hash01(1, "$seed:presence-tilt") - 0.5) * 1.2
+        val out = StringBuilder()
+        out.append("""<g id="presence_layer">""")
+        when (presence.optString("symmetry", "none")) {
+            "bilateral" -> {
+                listOf(-1, 1, -1, 1).forEachIndexed { i, side ->
+                    val yShift = (-0.36 + i * 0.24) * radiusY
+                    val xOuter = side * radiusX * (0.34 + 0.10 * hash01(i, "$seed:sym-x"))
+                    val xInner = side * radiusX * (0.10 + 0.08 * hash01(i, "$seed:sym-inner"))
+                    out.append("""<line x1="${cx + xOuter}" y1="${cy + yShift - radiusY * 0.06}" x2="${cx + xInner}" y2="${cy + yShift + radiusY * (0.10 + tilt * 0.06)}" stroke="$color" stroke-width="$stroke" stroke-opacity="${intensityOpacity * 0.58}" stroke-linecap="round"/>""")
+                }
+            }
+            "radial" -> {
+                for (i in 0 until 6) {
+                    val angle = phase + Math.PI * 2.0 * i / 6.0
+                    val inner = radiusX * 0.28
+                    val outer = radiusX * 0.86
+                    out.append("""<line x1="${cx + cos(angle) * inner}" y1="${cy + sin(angle) * inner}" x2="${cx + cos(angle) * outer}" y2="${cy + sin(angle) * outer}" stroke="$color" stroke-width="$stroke" stroke-opacity="${intensityOpacity * 0.72}" stroke-linecap="round"/>""")
+                }
+            }
+        }
+        if (gazeOpacity > 0.0) {
+            listOf(-1, 1, -1, 1, -1, 1).forEachIndexed { i, side ->
+                val t = (i + 1).toDouble() / 7.0
+                val angle = phase + side * (0.34 + 0.08 * i)
+                val x1 = cx + cos(angle) * radiusX * (1.05 + 0.18 * (i % 2))
+                val y1 = cy + sin(angle) * radiusY * (0.72 + 0.08 * i)
+                val x2 = cx + cos(angle + Math.PI) * radiusX * 0.12
+                val y2 = cy + (t - 0.5) * radiusY * 0.16
+                out.append("""<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" stroke="$dark" stroke-width="${stroke * 0.8}" stroke-opacity="$gazeOpacity" stroke-linecap="round"/>""")
+            }
+        }
+        val flowAngle = phase * 0.35 + tilt
+        val tx = cos(flowAngle)
+        val ty = sin(flowAngle)
+        val nx = -ty
+        val ny = tx
+        for (i in 0 until contourCount) {
+            val t = (i + 0.5) / contourCount
+            val along = (t - 0.5) * radiusX * (1.18 + 0.18 * hash01(i, "$seed:presence-flow-span"))
+            var cross = sin(t * Math.PI * 1.7 + phase) * radiusY * 0.32
+            cross += (hash01(i, "$seed:presence-flow-cross") - 0.5) * radiusY * 0.28
+            val px = cx + tx * along + nx * cross
+            val py = cy + ty * along + ny * cross
+            val half = radiusX * (0.09 + 0.04 * hash01(i, "$seed:presence-flow-half"))
+            val lift = radiusY * (0.05 + 0.04 * hash01(i, "$seed:presence-flow-lift"))
+            val side = if (i % 2 == 0) 1.0 else -1.0
+            val x1 = px - tx * half - nx * lift * side
+            val y1 = py - ty * half - ny * lift * side
+            val x2 = px + tx * half + nx * lift * side
+            val y2 = py + ty * half + ny * lift * side
+            val xm = px + nx * lift * side * 1.4
+            val ym = py + ny * lift * side * 1.4
+            out.append("""<path d="M $x1,$y1 Q $xm,$ym $x2,$y2" fill="none" stroke="$color" stroke-width="$stroke" stroke-opacity="${intensityOpacity * 0.82}" stroke-linecap="round"/>""")
+        }
+        if (kind == "group_like") {
+            for (i in 0 until 7) {
+                val t = (i - 3).toDouble() / 3.5
+                val px = cx + tx * t * radiusX * 0.78 + nx * (hash01(i, "$seed:group-x") - 0.5) * radiusX * 0.20
+                val py = cy + ty * t * radiusX * 0.78 + ny * (hash01(i, "$seed:group-y") - 0.5) * radiusY * 0.58
+                out.append("""<circle cx="$px" cy="$py" r="${max(2.0, unit * 0.006)}" fill="$color" fill-opacity="${intensityOpacity * 0.72}"/>""")
+            }
+        } else if (kind == "creature_like") {
+            for (i in 0 until 3) {
+                val t = (i - 1) * 0.34
+                out.append("""<line x1="${cx - radiusX * 0.30 + t * radiusX}" y1="${cy + radiusY * 0.32}" x2="${cx - radiusX * 0.05 + t * radiusX}" y2="${cy + radiusY * 0.44}" stroke="$color" stroke-width="$stroke" stroke-opacity="${intensityOpacity * 0.76}" stroke-linecap="round"/>""")
+            }
+        }
+        out.append("</g>")
+        return out.toString()
+    }
+
+    private fun rotationCenter(ins: JSONObject, width: Double, height: Double, primitive: String): Pair<Double, Double> {
+        return when (primitive) {
+            "line" -> {
+                val from = ins.optJSONArray("from")
+                val to = ins.optJSONArray("to")
+                val x = ((from?.optDouble(0, 0.1) ?: 0.1) + (to?.optDouble(0, 0.9) ?: 0.9)) / 2.0
+                val y = ((from?.optDouble(1, 0.5) ?: 0.5) + (to?.optDouble(1, 0.5) ?: 0.5)) / 2.0
+                px(x, width) to px(y, height)
+            }
+            "square", "triangle" -> {
+                val pos = ins.optJSONArray("position")
+                val size = ins.optJSONArray("size")
+                val x = (pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.3) ?: 0.3) / 2.0
+                val y = (pos?.optDouble(1, 0.35) ?: 0.35) + (size?.optDouble(1, 0.3) ?: 0.3) / 2.0
+                px(x, width) to px(y, height)
+            }
+            else -> {
+                val center = ins.optJSONArray("center")
+                px(center?.optDouble(0, 0.5) ?: 0.5, width) to px(center?.optDouble(1, 0.5) ?: 0.5, height)
+            }
+        }
+    }
+
     private fun strokeWidth(weight: String): Double = when (weight) {
         "hair" -> 0.5
         "pencil" -> 1.5
@@ -189,11 +437,136 @@ class DefaultSvgRenderer : SvgRenderer {
         else -> 2.0
     }
 
+    private fun strokeOpacity(weight: String): Double = when (weight) {
+        "hair" -> 0.72
+        "pencil" -> 0.66
+        "rotring" -> 0.95
+        "crayon" -> 0.78
+        "chalk" -> 0.70
+        "brush_thin" -> 0.90
+        "brush_thick" -> 0.86
+        "rope" -> 0.88
+        else -> 1.0
+    }
+
+    private fun lineCap(weight: String): String = when (weight) {
+        "hair" -> "butt"
+        "rotring" -> "square"
+        else -> "round"
+    }
+
     private fun dashStyle(style: String): String = when (style) {
         "dashed" -> " stroke-dasharray=\"12,8\""
         "dotted" -> " stroke-dasharray=\"2,6\""
         "dash_dot" -> " stroke-dasharray=\"12,6,2,6\""
         else -> ""
+    }
+
+    private fun textureWeights(instructions: JSONArray): Set<String> {
+        val result = mutableSetOf<String>()
+        for (i in 0 until instructions.length()) {
+            val weight = instructions.optJSONObject(i)?.optString("weight") ?: continue
+            if (weight in setOf("pencil", "crayon", "chalk", "brush_thick")) result.add(weight)
+        }
+        return result
+    }
+
+    private fun filterAttr(weight: String, variation: JSONObject?): String {
+        val blur = blurFilterId(variation)
+        if (blur != null) return " filter=\"url(#$blur)\""
+        return if (weight in setOf("pencil", "crayon", "chalk", "brush_thick")) " filter=\"url(#texture-$weight)\"" else ""
+    }
+
+    private fun textureFilterDefs(weights: Set<String>): String = buildString {
+        if ("pencil" in weights) append("""<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/></filter>""")
+        if ("crayon" in weights) append("""<filter id="texture-crayon" x="-18%" y="-18%" width="136%" height="136%"><feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="17" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8"/></filter>""")
+        if ("chalk" in weights) append("""<filter id="texture-chalk" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="23" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2"/><feGaussianBlur stdDeviation="0.9"/></filter>""")
+        if ("brush_thick" in weights) append("""<filter id="texture-brush_thick" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="2" seed="31" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4"/><feGaussianBlur stdDeviation="0.6"/></filter>""")
+    }
+
+    private fun blurFilterDefs(): String {
+        return """<filter id="blur-fine" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="2.0"/></filter><filter id="blur-medium" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="6.0"/></filter><filter id="blur-broad" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="15.0"/></filter>"""
+    }
+
+    private fun blurFilterId(variation: JSONObject?): String? {
+        if (variation?.optString("quality") != "pink") return null
+        val amp = when (variation.optString("amplitude", "medium")) {
+            "fine" -> "fine"
+            "broad" -> "broad"
+            else -> "medium"
+        }
+        return "blur-$amp"
+    }
+
+    private fun needsPathVariation(variation: JSONObject?): Boolean {
+        if (variation == null) return false
+        val quality = variation.optString("quality", "none")
+        if (quality == "none" || quality == "pink") return false
+        val dimensions = variation.optJSONArray("dimensions") ?: return false
+        for (i in 0 until dimensions.length()) {
+            if (dimensions.optString(i) in setOf("position_x", "position_y")) return true
+        }
+        return false
+    }
+
+    private fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String): List<Pair<Double, Double>> {
+        if (variation == null) return listOf(x1 to y1, x2 to y2)
+        val dx = x2 - x1
+        val dy = y2 - y1
+        val length = sqrt(dx * dx + dy * dy)
+        if (length < 1e-6) return listOf(x1 to y1, x2 to y2)
+        val perpX = -dy / length
+        val perpY = dx / length
+        val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
+        val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
+        val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
+        val result = mutableListOf(x1 to y1)
+        val segments = 80
+        for (i in 1 until segments) {
+            val t = i.toDouble() / segments.toDouble()
+            val offset = variationOffset(t, i, variation, seed)
+            var x = x1 + dx * t
+            var y = y1 + dy * t
+            if (axisX && !axisY) {
+                x += offset
+            } else if (axisY && !axisX) {
+                y += offset
+            } else {
+                x += offset * perpX
+                y += offset * perpY
+            }
+            result.add(x to y)
+        }
+        result.add(x2 to y2)
+        return result
+    }
+
+    private fun variationOffset(t: Double, segment: Int, variation: JSONObject, seed: String): Double {
+        val amp = when (variation.optString("amplitude", "medium")) {
+            "fine" -> 7.0
+            "broad" -> 30.0
+            else -> 12.0
+        }
+        val freq = when (variation.optString("frequency", "medium")) {
+            "slow" -> 2.0
+            "high" -> 14.0
+            else -> 6.0
+        }
+        return when (variation.optString("quality", "none")) {
+            "wave" -> sin(t * Math.PI * 2.0 * freq) * amp
+            "perlin" -> smoothNoise(t * freq, seed) * amp
+            "white" -> (hash01(segment, seed) * 2.0 - 1.0) * amp
+            else -> 0.0
+        }
+    }
+
+    private fun smoothNoise(x: Double, seed: String): Double {
+        val xi = kotlin.math.floor(x).toInt()
+        val xf = x - xi
+        val v1 = hash01(xi, seed) * 2.0 - 1.0
+        val v2 = hash01(xi + 1, seed) * 2.0 - 1.0
+        val t = xf * xf * (3.0 - 2.0 * xf)
+        return v1 * (1.0 - t) + v2 * t
     }
 
     private fun px(value: Double, scale: Double): Double = min(max(value, 0.0), 1.0) * scale

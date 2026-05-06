@@ -61,6 +61,7 @@ class InkuPipeline(
 
 data class PaintRequest(
     val description: String,
+    val originalText: String = description,
     val stage1Model: String,
     val stage2Model: String,
     val colorCatalogId: String,
@@ -77,6 +78,17 @@ data class PaintResult(
     val renderMetadataJson: String,
     val renderHash: String,
     val renderHashShort: String,
+)
+
+data class InterpretResult(
+    val originalInput: String,
+    val normalizedDdl: String,
+    val expandedDdl: String,
+    val ddlForDisplay: String,
+    val tokensIn: Int? = null,
+    val tokensOut: Int? = null,
+    val fallbackUsed: Boolean = false,
+    val fallbackReasons: List<String> = emptyList(),
 )
 
 data class RenderRequest(

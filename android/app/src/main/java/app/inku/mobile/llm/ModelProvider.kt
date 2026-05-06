@@ -1,0 +1,23 @@
+package app.inku.mobile.llm
+
+interface ModelProvider {
+    val providerId: String
+
+    suspend fun generate(request: ModelRequest): ModelResponse
+}
+
+data class ModelRequest(
+    val modelId: String,
+    val prompt: String,
+    val temperature: Double,
+    val maxTokens: Int,
+    val stopSequences: List<String> = emptyList(),
+)
+
+data class ModelResponse(
+    val text: String,
+    val modelId: String,
+    val promptTokens: Int? = null,
+    val completionTokens: Int? = null,
+    val elapsedMs: Long? = null,
+)

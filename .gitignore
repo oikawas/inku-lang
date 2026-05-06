@@ -40,6 +40,14 @@ CLAUDE.md
 # ローカル運用メモ
 LOCAL_WORK.md
 
+# Android generated files
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+
 # 履歴データ
 **/inku-history.json
 data/history.json

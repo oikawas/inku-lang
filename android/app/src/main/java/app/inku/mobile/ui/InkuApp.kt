@@ -28,9 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -130,7 +128,6 @@ fun InkuApp() {
 
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
-            topBar = { AppHeader(state, viewModel) },
             bottomBar = { BottomNavigationBar(state.tab, viewModel) },
             containerColor = MaterialTheme.colorScheme.background,
         ) { padding ->
@@ -521,56 +518,44 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
 }
 
 @Composable
-private fun AppHeader(state: InkuUiState, viewModel: InkuViewModel) {
-    Surface(modifier = Modifier.statusBarsPadding(), color = Color(0xFF151412), tonalElevation = 2.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            MiniPill("☰", onClick = { viewModel.setTab(AppTab.History) })
-            Text("inku", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.weight(1f))
-            MiniPill("□ ${canvasLabel(state).take(8)}", onClick = viewModel::openCanvasSelection)
-            MiniPill("◐ ${ColorCatalogs.get(state.selectedCatalogId).name.take(8)}", onClick = viewModel::openCatalogSelection)
-            MiniPill("…", onClick = viewModel::openModelSelection)
-        }
-    }
-}
-
-@Composable
 private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
-    Surface(modifier = Modifier.navigationBarsPadding(), color = Color(0xFF151412), tonalElevation = 2.dp) {
+    Surface(
+        modifier = Modifier
+            .navigationBarsPadding()
+            .border(1.dp, Color(0xFF26221E)),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        AppTab.entries.forEach { tab ->
-            val active = selected == tab
-            val label = when (tab) {
-                AppTab.Compose -> "描画"
-                AppTab.History -> "履歴"
-                AppTab.Demo -> "デモ"
-                AppTab.Settings -> "設定"
-            }
-            val mark = when (tab) {
-                AppTab.Compose -> "描"
-                AppTab.History -> "歴"
-                AppTab.Demo -> "試"
-                AppTab.Settings -> "設"
-            }
-            if (active) {
-                NavButton(mark = mark, label = label, selected = true, onClick = { viewModel.setTab(tab) }, modifier = Modifier.weight(1f))
-            } else {
-                NavButton(mark = mark, label = label, selected = false, onClick = { viewModel.setTab(tab) }, modifier = Modifier.weight(1f))
+                .height(80.dp)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            AppTab.entries.forEach { tab ->
+                val label = when (tab) {
+                    AppTab.Compose -> "記述"
+                    AppTab.History -> "履歴"
+                    AppTab.Demo -> "デモ"
+                    AppTab.Settings -> "設定"
+                }
+                val mark = when (tab) {
+                    AppTab.Compose -> "✎"
+                    AppTab.History -> "◫"
+                    AppTab.Demo -> "◉"
+                    AppTab.Settings -> "⚙"
+                }
+                NavButton(
+                    mark = mark,
+                    label = label,
+                    selected = selected == tab,
+                    onClick = { viewModel.setTab(tab) },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
-}
 }
 
 @Composable
@@ -620,8 +605,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .safeDrawingPadding()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ComposeModeTabs(state.composeMode, viewModel)
@@ -670,12 +654,12 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(previewHeight)
-                    .border(1.dp, Color(0x1A000000), RoundedCornerShape(20.dp)),
+                    .border(1.dp, Color(0x1A000000)),
                 color = Color(0xFFFAFAF6),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(0.dp),
                 tonalElevation = 1.dp,
             ) {
-                Box(modifier = Modifier.fillMaxSize().padding(10.dp)) {
+                Box(modifier = Modifier.fillMaxSize()) {
                     if (item == null) {
                         Text("No render yet", color = Color(0xFF7D766E), modifier = Modifier.align(Alignment.Center))
                     } else {
@@ -777,7 +761,6 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
 @Composable
 private fun ConditionChips(state: InkuUiState, viewModel: InkuViewModel) {
     WrapRow {
-        ChipButton("□ ${canvasLabel(state)}", onClick = viewModel::openCanvasSelection)
         ChipButton("◐ ${ColorCatalogs.get(state.selectedCatalogId).name}", onClick = viewModel::openCatalogSelection)
         ChipButton("◇ モデル", onClick = viewModel::openModelSelection)
     }
@@ -840,10 +823,6 @@ private fun InputSectionHeader(state: InkuUiState, viewModel: InkuViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CompactLabel("指示")
         WrapRow {
-            SecondarySmallButton(
-                text = CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect,
-                onClick = viewModel::openCanvasSelection,
-            )
             SecondarySmallButton(
                 text = ColorCatalogs.get(state.selectedCatalogId).name,
                 onClick = viewModel::openCatalogSelection,
@@ -1106,12 +1085,12 @@ private fun HistoryScreen(
 @Composable
 private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     when (state.settingsPane) {
+        SettingsPane.Home -> SettingsHomePanel(state, viewModel, modifier)
         SettingsPane.ModelSelection -> ModelSelectionPanel(state, viewModel, modifier)
         SettingsPane.Models -> ModelSettingsPanel(state, viewModel, modifier)
-        SettingsPane.Plugins -> PluginsSettingsPanel(state, viewModel, modifier)
-        SettingsPane.Db -> DbSettingsPanel(state, viewModel, modifier)
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
         SettingsPane.Misc -> MiscSettingsPanel(state, viewModel, modifier)
+        SettingsPane.OutputFiles -> OutputFilesSettingsPanel(state, viewModel, modifier)
         SettingsPane.ColorCatalog -> ColorCatalogSelectionPanel(state, viewModel, modifier)
         SettingsPane.Canvas -> CanvasSelectionPanel(state, viewModel, modifier)
     }
@@ -1131,60 +1110,41 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text("設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.weight(1f))
-            MiniPill("ADMIN", selected = true)
         }
-        SettingsListItem(
-            mark = "◇",
-            title = "モデル設定",
-            sub = "Stage 1 / Stage 2、LiteRT-LM、取得状態、公開モデル",
-            onClick = { viewModel.setSettingsPane(SettingsPane.Models) },
-            active = true,
-        )
+        SettingsListItem(mark = "◐", title = "表示設定", sub = "言語・テーマ・密度", onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
+        SettingsListItem(mark = "◇", title = "モデル設定", sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
         SettingsListItem(
             mark = "◓",
             title = "色カタログ",
             sub = "${ColorCatalogs.get(state.selectedCatalogId).name}（選択中）",
             onClick = viewModel::openCatalogSelection,
         )
+        SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
+        SettingsListItem(mark = "◭", title = "出力ファイル", sub = "共有シート · PNG/SVG/JSON", onClick = { viewModel.setSettingsPane(SettingsPane.OutputFiles) })
         SettingsListItem(
-            mark = "⬚",
+            mark = "□",
             title = "キャンバス",
             sub = CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect,
             onClick = viewModel::openCanvasSelection,
         )
-        SettingsListItem(mark = "⊞", title = "プラグイン", sub = "キャンバス比率 v0.1.0", onClick = { viewModel.setSettingsPane(SettingsPane.Plugins) })
-        SettingsListItem(mark = "◙", title = "ログ保存", sub = "ローカル Room / 端末内保存", onClick = { viewModel.setSettingsPane(SettingsPane.Db) })
+        Text("BUILD debug · v0.1.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
     }
 }
 
 @Composable
 private fun SettingsHeader(selectedPane: SettingsPane, viewModel: InkuViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text("設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            MiniPill("ADMIN", selected = true)
+    val title = settingsPaneTitle(selectedPane)
+    val subtitle = settingsPaneSubtitle(selectedPane)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        MiniPill("‹", onClick = { viewModel.setSettingsPane(SettingsPane.Home) })
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        WrapRow {
-            SettingsTabButton("モデル", selectedPane == SettingsPane.Models) { viewModel.setSettingsPane(SettingsPane.Models) }
-            SettingsTabButton("プラグイン", selectedPane == SettingsPane.Plugins) { viewModel.setSettingsPane(SettingsPane.Plugins) }
-            SettingsTabButton("DB", selectedPane == SettingsPane.Db) { viewModel.setSettingsPane(SettingsPane.Db) }
-            SettingsTabButton("エクスポート", selectedPane == SettingsPane.Export) { viewModel.setSettingsPane(SettingsPane.Export) }
-            SettingsTabButton("その他", selectedPane == SettingsPane.Misc) { viewModel.setSettingsPane(SettingsPane.Misc) }
-        }
-    }
-}
-
-@Composable
-private fun SettingsTabButton(text: String, selected: Boolean, onClick: () -> Unit) {
-    if (selected) {
-        PrimarySmallButton(text = text, onClick = onClick)
-    } else {
-        SecondarySmallButton(text = text, onClick = onClick)
     }
 }
 
@@ -1284,46 +1244,6 @@ private fun CanvasSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, m
 }
 
 @Composable
-private fun PluginsSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        SettingsHeader(state.settingsPane, viewModel)
-        SettingsCard("システムプラグイン", "Canvas Aspect v0.1.0", if (state.canvasAspectPluginEnabled) "有効" else "無効") {
-            SettingCheckRow(
-                checked = state.canvasAspectPluginEnabled,
-                text = "キャンバス比率選択を有効化",
-                onCheckedChange = viewModel::setCanvasAspectPluginEnabled,
-            )
-        }
-        SettingsCard("ユーザープラグイン", "Web版の追加導線に対応", "未読込") {
-            Text(
-                "Web版と同じくユーザープラグイン領域を表示します。Android単体版では外部コードの動的読込は行わず、Room上の設定対象として扱います。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun DbSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        SettingsHeader(state.settingsPane, viewModel)
-        SettingsCard("現在のDB", "Room / SQLite", "アプリ内") {
-            Text("SQLiteファイルはアプリのサンドボックス内に保持します。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        SettingsCard("DBバックアップ", "Web版のバックアップ設定", "端末内") {
-            Text("Android単体版ではアプリ内 SQLite を標準DBとし、外部サーバーDB切替は行いません。履歴/設定/モデル状態は Room に保存されます。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
 private fun ExportSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
@@ -1369,6 +1289,35 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 onSelect = viewModel::setHistorySelectionCatalog,
             )
             SettingCheckRow(state.saveReplayAsNewVersion, "DDL再描画を新しい履歴として保存", viewModel::setSaveReplayAsNewVersion)
+        }
+    }
+}
+
+@Composable
+private fun OutputFilesSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SettingsHeader(state.settingsPane, viewModel)
+        SettingsCard("共有形式", "Android share sheet", "有効") {
+            Text("描画結果はSVG、PNG、JSONとして共有できます。PNG生成はバックグラウンドで実行し、生成完了後に共有シートを開きます。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            WrapRow {
+                MiniPill("SVG display")
+                MiniPill("SVG editable")
+                MiniPill("SVG compat")
+                MiniPill("PNG 1080")
+                MiniPill("PNG 2160")
+                MiniPill("PNG 4320")
+                MiniPill("JSON")
+            }
+        }
+        SettingsCard("PNG背景", "Web版のPNG出力設定", if (state.pngAlphaWhite) "白背景" else "透明") {
+            SettingCheckRow(
+                checked = state.pngAlphaWhite,
+                text = "PNG透過時の白背景",
+                onCheckedChange = viewModel::setPngAlphaWhite,
+            )
         }
     }
 }
@@ -1463,7 +1412,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
             AddProviderCard(onAdd = viewModel::saveProviderSetting)
         }
 
-        SettingsSectionHeader("MODEL ASSETS", "ユーザーに公開するモデル")
+        SettingsSectionHeader("MODEL ASSETS", "使用可能モデル")
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             state.modelAssets.forEach { asset ->
                 ModelAssetControls(
@@ -1546,7 +1495,7 @@ private fun ProviderConnectionCard(
             ImeAwareOutlinedTextField(
                 value = publishedModels,
                 onValueChange = { publishedModels = it },
-                label = "ユーザーに公開するモデル（1行に1 model-id）",
+                label = "使用可能モデル（1行に1 model-id）",
                 modifier = Modifier.fillMaxWidth().height(120.dp),
             )
             ProviderModelActionRow(
@@ -1805,6 +1754,28 @@ private fun SettingsListItem(mark: String, title: String, sub: String, onClick: 
     }
 }
 
+private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
+    SettingsPane.Home -> "設定"
+    SettingsPane.ModelSelection -> "モデル選択"
+    SettingsPane.Models -> "モデル設定"
+    SettingsPane.Export -> "エクスポート"
+    SettingsPane.Misc -> "表示設定"
+    SettingsPane.OutputFiles -> "出力ファイル"
+    SettingsPane.ColorCatalog -> "色カタログ"
+    SettingsPane.Canvas -> "キャンバス"
+}
+
+private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
+    SettingsPane.Home -> "List + Detail"
+    SettingsPane.ModelSelection -> "Stage 1 / Stage 2"
+    SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
+    SettingsPane.Export -> "PNG / SVG templates"
+    SettingsPane.Misc -> "言語・テーマ・密度"
+    SettingsPane.OutputFiles -> "共有シート · PNG/SVG/JSON"
+    SettingsPane.ColorCatalog -> "render color catalog"
+    SettingsPane.Canvas -> "canvas aspect"
+}
+
 @Composable
 private fun SettingCheckRow(checked: Boolean, text: String, onCheckedChange: (Boolean) -> Unit) {
     Row(
@@ -1894,9 +1865,9 @@ private fun PublishedModelsSummary(
             ?: assets.map { it.modelId }
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        CompactLabel("ユーザーに公開するモデル")
+        CompactLabel("使用可能モデル")
         if (ids.isEmpty()) {
-            Text("公開モデルは未選択です。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("使用可能モデルは未選択です。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             WrapRow(horizontal = 6.dp, vertical = 6.dp) {
                 ids.forEach { id ->
@@ -2738,28 +2709,42 @@ private fun ChipButton(text: String, selected: Boolean = false, onClick: () -> U
 
 @Composable
 private fun NavButton(mark: String, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val content: @Composable () -> Unit = {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(mark, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+    Surface(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(onClick = onClick),
+        color = Color.Transparent,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(64.dp)
+                    .height(32.dp)
+                    .background(
+                        if (selected) Color(0x337FA6D8) else Color.Transparent,
+                        RoundedCornerShape(16.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    mark,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
-    }
-    if (selected) {
-        Button(
-            onClick = onClick,
-            modifier = modifier.height(58.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color(0xFF101010)),
-            content = { content() },
-        )
-    } else {
-        OutlinedButton(
-            onClick = onClick,
-            modifier = modifier.height(58.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-            content = { content() },
-        )
     }
 }
 

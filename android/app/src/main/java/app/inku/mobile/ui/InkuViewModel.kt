@@ -80,7 +80,7 @@ data class InkuUiState(
     val isDrawing: Boolean = false,
     val message: String? = null,
     val tab: AppTab = AppTab.Compose,
-    val settingsPane: SettingsPane = SettingsPane.Models,
+    val settingsPane: SettingsPane = SettingsPane.Home,
     val composeMode: ComposeMode = ComposeMode.Write,
     val renderTab: RenderTab = RenderTab.Artwork,
     val canvasZoom: Float = 1.0f,
@@ -102,12 +102,12 @@ enum class AppTab {
 }
 
 enum class SettingsPane {
+    Home,
     ModelSelection,
     Models,
-    Plugins,
-    Db,
     Export,
     Misc,
+    OutputFiles,
     ColorCatalog,
     Canvas,
 }
@@ -276,8 +276,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             selectedModelId = restoredModelSelection?.first ?: current.selectedModelId,
             selectedStage2ModelId = restoredModelSelection?.second ?: current.selectedStage2ModelId,
             selectedCatalogId = restoredCatalog ?: current.selectedCatalogId,
-            settingsPane = if (tab == AppTab.Settings && current.settingsPane in setOf(SettingsPane.ModelSelection, SettingsPane.ColorCatalog, SettingsPane.Canvas)) {
-                SettingsPane.Models
+            settingsPane = if (tab == AppTab.Settings && current.tab != AppTab.Settings) {
+                SettingsPane.Home
+            } else if (tab == AppTab.Settings && current.settingsPane in setOf(SettingsPane.ModelSelection, SettingsPane.ColorCatalog, SettingsPane.Canvas)) {
+                SettingsPane.Home
             } else {
                 current.settingsPane
             },

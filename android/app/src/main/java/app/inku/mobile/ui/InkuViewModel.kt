@@ -189,12 +189,23 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         localState.value = localState.value.copy(prompt = value, message = null)
     }
 
+    fun clearPrompt() {
+        if (state.value.isDrawing) return
+        promptEditedByUser = true
+        localState.value = localState.value.copy(prompt = "", message = null)
+    }
+
     fun setDdl(value: String) {
         localState.value = localState.value.copy(ddl = value, ddlEditedAfterGeneration = true, message = null)
     }
 
     fun setBatchText(value: String) {
         localState.value = localState.value.copy(batchText = value, message = null)
+    }
+
+    fun clearBatchText() {
+        if (state.value.isDrawing) return
+        localState.value = localState.value.copy(batchText = "", message = null)
     }
 
     fun setBatchRandomColorCatalog(enabled: Boolean) {

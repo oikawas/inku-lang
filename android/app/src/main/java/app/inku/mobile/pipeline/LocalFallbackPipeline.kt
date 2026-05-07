@@ -111,9 +111,9 @@ class LocalFallbackPipeline(
                 ),
             ).text.cleanModelText()
             val score = runCatching {
-                extractJsonObject(response)
+                WebScoreJson.extractJsonObject(response)
             }.getOrNull()
-                ?.takeIf { it.hasRenderableInstructions() }
+                ?.takeIf { WebScoreJson.hasRenderableInstructions(it) }
                 ?: retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
             coerceScore(score, "${request.originalText}\n$expandedDdl", request.canvasAspect).toString()
         }.onFailure {
@@ -146,9 +146,9 @@ class LocalFallbackPipeline(
                     tool = WebScoreTool.submitScore,
                 ),
             ).text.cleanModelText()
-            extractJsonObject(retryResponse)
+            WebScoreJson.extractJsonObject(retryResponse)
         }.getOrNull()
-        if (retryScore != null && retryScore.hasRenderableInstructions()) return retryScore
+        if (retryScore != null && WebScoreJson.hasRenderableInstructions(retryScore)) return retryScore
         Log.w(TAG, "Stage 2 returned no drawable instructions after retry; rebuilding renderable score from DDL.")
         return scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect)
     }
@@ -175,42 +175,6 @@ class LocalFallbackPipeline(
 
     private fun fallbackDdlFromText(text: String): String {
         return ServerFallbackComposer.fallbackDdlFromText(text)
-    }
-
-    private fun extractJsonObject(text: String): JSONObject {
-        val trimmed = text.trim()
-        runCatching { return unwrapScoreJson(JSONObject(trimmed)) }
-        val start = trimmed.indexOf('{')
-        val end = trimmed.lastIndexOf('}')
-        if (start >= 0 && end > start) {
-            return unwrapScoreJson(JSONObject(trimmed.substring(start, end + 1)))
-        }
-        error("Stage2 did not return a JSON object.")
-    }
-
-    private fun unwrapScoreJson(json: JSONObject): JSONObject {
-        json.optJSONArray("tool_calls")?.let { calls ->
-            for (i in 0 until calls.length()) {
-                val call = calls.optJSONObject(i) ?: continue
-                val arguments = call.optJSONObject("arguments")
-                    ?: call.optJSONObject("parameters")
-                    ?: call.optJSONObject("function")?.let { function ->
-                        function.optJSONObject("arguments")
-                            ?: function.optString("arguments").takeIf { it.isNotBlank() }?.let(::JSONObject)
-                    }
-                if (arguments != null) return arguments
-            }
-        }
-        json.optJSONObject("arguments")?.let { return it }
-        return json
-    }
-
-    private fun JSONObject.hasRenderableInstructions(): Boolean {
-        val instructions = optJSONArray("instructions") ?: return false
-        for (i in 0 until instructions.length()) {
-            if (instructions.optJSONObject(i) != null) return true
-        }
-        return false
     }
 
     private fun scoreFromWebRules(ddl: String, originalText: String, canvasAspect: String): JSONObject {

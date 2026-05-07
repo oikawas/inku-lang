@@ -6,8 +6,10 @@ import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.net.Uri
+import android.util.LruCache
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,6 +64,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -71,10 +74,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -112,6 +118,57 @@ private val InkuColors = darkColorScheme(
 private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
+
+private object HistoryThumbnailCache {
+    private const val THUMBNAIL_PX = 384
+    private val cache = LruCache<String, ImageBitmap>(64)
+
+    suspend fun get(item: HistoryItemEntity): ImageBitmap? {
+        val key = "${item.id}:${item.renderHash}:${item.displaySvg.length}:$THUMBNAIL_PX"
+        synchronized(cache) {
+            cache.get(key)?.let { return it }
+        }
+        return withContext(Dispatchers.Default) {
+            val rendered = renderSvgThumbnail(item.displaySvg, THUMBNAIL_PX)
+            if (rendered != null) {
+                synchronized(cache) {
+                    cache.put(key, rendered)
+                }
+            }
+            rendered
+        }
+    }
+
+    private fun renderSvgThumbnail(svgText: String, sizePx: Int): ImageBitmap? {
+        return runCatching {
+            val parsed = SVG.getFromString(svgText)
+            val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
+            val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
+            val documentAspect = documentWidth / documentHeight
+            val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+            val canvas = AndroidCanvas(bitmap)
+            canvas.drawColor(android.graphics.Color.WHITE)
+            val drawWidth: Float
+            val drawHeight: Float
+            if (documentAspect >= 1f) {
+                drawWidth = sizePx.toFloat()
+                drawHeight = sizePx.toFloat() / documentAspect
+            } else {
+                drawHeight = sizePx.toFloat()
+                drawWidth = sizePx.toFloat() * documentAspect
+            }
+            val left = (sizePx - drawWidth) / 2f
+            val top = (sizePx - drawHeight) / 2f
+            canvas.save()
+            canvas.translate(left, top)
+            parsed.setDocumentWidth(drawWidth)
+            parsed.setDocumentHeight(drawHeight)
+            parsed.renderToCanvas(canvas)
+            canvas.restore()
+            bitmap.asImageBitmap()
+        }.getOrNull()
+    }
+}
 
 private val saijikiGroups = listOf(
     SaijikiGroup("かたち", "forms", listOf("円", "楕円", "三角", "四角", "線", "弧")),
@@ -2798,43 +2855,21 @@ private fun ArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifie
 
 @Composable
 private fun HistoryArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifier) {
-    val score = remember(item.id, item.scoreJson) {
-        runCatching { JSONObject(item.scoreJson) }.getOrNull()
+    val thumbnail by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, item.displaySvg) {
+        value = HistoryThumbnailCache.get(item)
     }
-    val catalog = remember(item.colorCatalogId) { ColorCatalogs.get(item.colorCatalogId) }
     Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val scoreJson = score ?: run {
+        val image = thumbnail
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+            )
+        } else {
+            Canvas(modifier = Modifier.fillMaxSize()) {
                 drawRect(Color.White)
-                return@Canvas
-            }
-            val colors = catalog.renderMap
-            val backgroundName = scoreJson.optString("background", "white")
-            val background = resolvePreviewColor(backgroundName, colors, Color.White)
-            drawRect(background)
-
-            val side = minOf(size.width, size.height)
-            val offsetX = (size.width - side) / 2f
-            val offsetY = (size.height - side) / 2f
-            val instructions = scoreJson.optJSONArray("instructions") ?: JSONArray()
-            var drawn = 0
-            for (index in 0 until instructions.length()) {
-                val instruction = instructions.optJSONObject(index) ?: continue
-                val color = resolvePreviewColor(instruction.optString("color", "black"), colors, Color.Black)
-                val strokeWidth = strokeWidthPx(instruction.optString("weight", "pen"))
-                val stroke = Stroke(width = strokeWidth)
-                val marks = expandPreview(instruction)
-                for (mark in marks) {
-                    when (mark.optString("primitive", instruction.optString("primitive", "line"))) {
-                        "line" -> drawPreviewLine(mark, color, strokeWidth, offsetX, offsetY, side)
-                        "circle", "ellipse", "arc" -> drawPreviewCircle(mark, color, stroke, offsetX, offsetY, side)
-                        "square", "triangle", "polygon" -> drawPreviewSquare(mark, color, stroke, offsetX, offsetY, side)
-                        else -> drawPreviewLine(mark, color, strokeWidth, offsetX, offsetY, side)
-                    }
-                    drawn += 1
-                    if (drawn >= 96) break
-                }
-                if (drawn >= 96) break
             }
         }
     }

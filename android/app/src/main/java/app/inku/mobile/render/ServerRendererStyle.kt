@@ -21,7 +21,6 @@ internal data class SvgAttrs(
     val stroke: String,
     val strokeWidth: Double,
     val strokeLinecap: String,
-    val strokeLinejoin: String = "round",
     val strokeOpacity: Double,
     val fill: String,
     val fillOpacity: Double? = null,
@@ -29,7 +28,7 @@ internal data class SvgAttrs(
     val filter: String? = null,
 ) {
     fun toSvgAttributes(includeFill: Boolean = true): String = buildString {
-        append("""stroke="$stroke" stroke-width="$strokeWidth" stroke-linecap="$strokeLinecap" stroke-linejoin="$strokeLinejoin" stroke-opacity="$strokeOpacity"""")
+        append("""stroke="$stroke" stroke-width="$strokeWidth" stroke-linecap="$strokeLinecap" stroke-opacity="$strokeOpacity"""")
         if (includeFill) append(""" fill="$fill"""")
         if (fillOpacity != null) append(""" fill-opacity="$fillOpacity"""")
         if (!dash.isNullOrBlank()) append(""" stroke-dasharray="$dash"""")

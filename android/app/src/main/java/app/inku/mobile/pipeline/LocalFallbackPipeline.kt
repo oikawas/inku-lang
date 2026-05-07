@@ -6,7 +6,9 @@ import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.render.DefaultSvgRenderer
 import java.security.MessageDigest
 import java.util.UUID
+import kotlin.math.PI
 import kotlin.math.min
+import kotlin.math.round
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -342,13 +344,18 @@ class LocalFallbackPipeline(
         if (repairedItems.isEmpty()) {
             repairedItems += fallbackInstruction(ddl, visibleForeground("black", background), "pen")
         }
+        val presence = score.optJSONObject("presence") ?: presenceFromDdl(ddl)
         val repaired = repairedItems
             .dedupeInstructions()
             .withDdlCoverage(ddl, background)
             .withColorDelivery(ddl, background)
+            .withShapeDelivery(ddl, background)
+            .withComplexMotifRepair(ddl, background)
             .withCompositionDiversity(ddl, background)
             .withContextEnergy(ddl, background)
             .withMotionEnergy(ddl)
+            .withPresenceAuxiliaryShapeRepair(presence)
+            .withContextDensityGovernor(ddl, background)
             .withStructuralDuplicateRepair()
             .withDensityBudget()
             .fold(JSONArray()) { array, item -> array.put(item); array }
@@ -357,7 +364,6 @@ class LocalFallbackPipeline(
             .put("canvas", canvasAspect)
             .put("background", background)
             .put("instructions", repaired)
-        val presence = score.optJSONObject("presence") ?: presenceFromDdl(ddl)
         if (presence != null && presence.optString("kind", "none") != "none") result.put("presence", presence)
         return result
     }
@@ -458,8 +464,47 @@ class LocalFallbackPipeline(
         }
     }
 
+    private fun List<JSONObject>.withShapeDelivery(ddl: String, background: String): List<JSONObject> {
+        val requested = requestedShapes(ddl)
+        if (requested.isEmpty()) return this
+        val repaired = toMutableList()
+        for (primitive in listOf("polygon", "triangle", "arc", "square")) {
+            if (primitive !in requested || repaired.any { it.optString("primitive") == primitive }) continue
+            val limit = if (primitive in setOf("triangle", "polygon")) 8 else 6
+            if (repaired.size >= limit) {
+                if (primitive in setOf("triangle", "polygon")) {
+                    val replaceIndex = repaired.indexOfFirst {
+                        it.optString("primitive") in setOf("line", "ellipse", "square") && it.optJSONObject("arrangement") == null
+                    }
+                    if (replaceIndex >= 0) {
+                        repaired[replaceIndex] = shapeRepairInstruction(primitive, replaceIndex, background)
+                        continue
+                    }
+                }
+                break
+            }
+            repaired += shapeRepairInstruction(primitive, repaired.size, background)
+        }
+        return repaired
+    }
+
+    private fun List<JSONObject>.withComplexMotifRepair(ddl: String, background: String): List<JSONObject> {
+        val motifs = requestedMotifs(ddl)
+        if (motifs.isEmpty()) return this
+        val repaired = toMutableList()
+        var added = 0
+        for (motif in motifs) {
+            if (added >= 2 || repaired.any { motif in it.optString("color_hint") }) continue
+            val motifInstructions = motifRepairInstructions(motif, added, background)
+            if (repaired.size + motifInstructions.size > 10) continue
+            repaired += motifInstructions
+            added += 1
+        }
+        return repaired
+    }
+
     private fun List<JSONObject>.withCompositionDiversity(ddl: String, background: String): List<JSONObject> {
-        if (size >= 10) return this
+        if (size >= 10 || compositionRepairSuppressed(ddl)) return this
         val colors = scoreColorsWithCycles()
         val primitives = map { it.optString("primitive", "line") }.toSet()
         val result = toMutableList()
@@ -494,6 +539,17 @@ class LocalFallbackPipeline(
     private fun List<JSONObject>.withContextEnergy(ddl: String, background: String): List<JSONObject> {
         if (size >= 10) return this
         val result = toMutableList()
+        val contextCandidates = listOf(
+            "leaf_grain" to listOf("落ち葉", "紅葉", "湿った土", "森", "leaf", "leaves", "autumn forest", "fallen leaves"),
+            "silence_layer" to listOf("廃校", "廊下", "長い沈黙", "夕方の光", "abandoned school", "corridor", "long silence"),
+            "hard_edge" to listOf("工場", "鉄骨", "錆", "錆び", "空を細かく分け", "factory", "steel frame", "rust", "girder"),
+            "playful_motion" to listOf("自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime"),
+        )
+        for ((kind, markers) in contextCandidates) {
+            if (result.size >= 10) break
+            if (!contextHasMarker(ddl, markers) || result.any { kind in it.optString("color_hint") }) continue
+            result += contextEnergyInstruction(kind, background)
+        }
         val hasSoft = any { (it.optString("color_hint") + it.optString("weight")).containsAny("soft", "膜", "香", "light", "水彩") }
         if (!hasSoft && ddl.containsAny("膜", "透明", "霞", "霧", "気配", "余韻")) {
             result += JSONObject()
@@ -514,7 +570,7 @@ class LocalFallbackPipeline(
     }
 
     private fun List<JSONObject>.withMotionEnergy(ddl: String): List<JSONObject> {
-        if (!ddl.containsAny("揺れる", "震える", "波打つ", "流", "舞", "風", "浮か", "motion", "sway", "wave", "floating")) return this
+        if (!contextHasMotion(ddl) && !ddl.containsAny("震える", "波打つ", "舞", "浮か", "floating")) return this
         return mapIndexed { index, item ->
             val copy = JSONObject(item.toString())
             var changed = false
@@ -549,6 +605,71 @@ class LocalFallbackPipeline(
                 copy.put("color_hint", appendHint(copy.optString("color_hint").takeIf { it.isNotBlank() }, "motion energy restored through trajectory and rotation"))
             }
             copy
+        }
+    }
+
+    private fun List<JSONObject>.withContextDensityGovernor(ddl: String, background: String): List<JSONObject> {
+        if (!contextHasDensityGovernor(ddl)) return this
+        val adjusted = mutableListOf<JSONObject>()
+        var governedCount = 0
+        val hasVerticalContext = contextHasVerticalDensity(ddl)
+        for (item in this) {
+            val copy = temperQuietSymbolicShape(JSONObject(item.toString()), ddl)
+            val arrangement = copy.optJSONObject("arrangement")
+            if (arrangement == null) {
+                adjusted += copy
+                continue
+            }
+            val count = arrangement.optInt("count", 1)
+            val isVerticalLoad = hasVerticalContext &&
+                (copy.optString("primitive") == "line" || arrangement.optString("layout") == "vertical" || arrangement.optString("path") == "top_to_bottom")
+            when {
+                isVerticalLoad && count > 48 -> {
+                    governedCount += 1
+                    adjusted += copy.withArrangementGovernor(
+                        count = 48,
+                        density = "low",
+                        fade = "directional",
+                        note = "quiet vertical density governed to keep membrane/space legible",
+                    )
+                }
+                closedShapeArea(copy) >= 0.04 && count > 16 -> {
+                    governedCount += 1
+                    adjusted += copy.withArrangementGovernor(
+                        count = 16,
+                        density = "low",
+                        fade = "outward",
+                        note = "quiet large-shape repetition governed to preserve negative space",
+                    )
+                }
+                count > 64 -> {
+                    governedCount += 1
+                    adjusted += copy.withArrangementGovernor(
+                        count = 64,
+                        density = if (count >= 120) "medium" else "low",
+                        fade = if (arrangement.optString("layout") == "scatter") "outward" else "directional",
+                        note = "quiet density governed to preserve lightness",
+                    )
+                }
+                else -> adjusted += copy
+            }
+        }
+        if (governedCount > 0 && adjusted.size < 8 && !adjusted.hasCompensatingAccent() && contextHasDensityGovernor(ddl)) {
+            adjusted += quietExpressionAccent(ddl, background)
+        }
+        return adjusted
+    }
+
+    private fun List<JSONObject>.withPresenceAuxiliaryShapeRepair(presence: JSONObject?): List<JSONObject> {
+        if (presence == null || presence.optString("kind", "none") == "none") return this
+        val atmosphericKeys = mapNotNull { item ->
+            val key = closedShapeGeometryKey(item)
+            if (key != null && closedShapeArea(item) >= 0.025 && isAtmosphericEffectHint(item.optString("color_hint"))) key else null
+        }.toSet()
+        if (atmosphericKeys.isEmpty()) return this
+        return filterNot { item ->
+            val key = closedShapeGeometryKey(item)
+            key in atmosphericKeys && closedShapeArea(item) >= 0.025 && isPlainMaterialHint(item.optString("color_hint"))
         }
     }
 
@@ -650,12 +771,12 @@ class LocalFallbackPipeline(
     }
 
     private fun primitiveFromClause(clause: String): String? = when {
-        clause.containsAny("弧", "三日月", "半円", "上弦", "下弦", "波紋") -> "arc"
+        clause.containsAny("弧", "三日月", "半円", "上弦", "下弦", "波紋", "渦", "螺旋", "巻") -> "arc"
         clause.containsAny("楕円", "花びら", "蕾", "香り", "膜", "光") -> "ellipse"
         clause.containsAny("円", "丸", "月") -> "circle"
-        clause.containsAny("三角", "山", "峰") -> "triangle"
-        clause.containsAny("四角", "紙片", "格子", "街", "建物") -> "square"
-        clause.containsAny("多角", "五角", "六角", "結晶") -> "polygon"
+        clause.containsAny("三角", "山", "屋根", "尖", "鋭", "峰", "頂", "稜線", "切妻") -> "triangle"
+        clause.containsAny("四角", "紙片", "破片", "折", "畳", "手紙", "格子", "街", "建物") -> "square"
+        clause.containsAny("多角", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片") -> "polygon"
         clause.containsAny("線", "雨", "雪", "砂", "点", "粒", "星") -> "line"
         else -> null
     }
@@ -687,6 +808,11 @@ class LocalFallbackPipeline(
         val lower = text.lowercase()
         listOf("red" to listOf("赤", "red"), "blue" to listOf("青", "blue"), "green" to listOf("緑", "green"), "white" to listOf("白", "white"), "black" to listOf("黒", "black"), "gray" to listOf("灰", "gray", "grey")).forEach { (color, markers) ->
             if (markers.any { it in text || it in lower }) result += color
+        }
+        if (listOf("森", "forest", "leaf", "草", "grass", "苔", "moss", "竹", "bamboo", "庭", "garden", "香り", "scent", "fragrance", "芽", "落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈")
+                .any { it in text || it in lower }
+        ) {
+            result += "green"
         }
         if ((text.contains("色とりどり") || text.contains("多色") || lower.contains("colorful")) && result.size < 3) {
             result += listOf("red", "blue", "green", "black", "gray")
@@ -749,6 +875,437 @@ class LocalFallbackPipeline(
             return if (background != "green") "green" else "white"
         }
         return null
+    }
+
+    private fun requestedShapes(ddl: String): Set<String> {
+        val lower = ddl.lowercase()
+        val shapes = linkedSetOf<String>()
+        val markers = listOf(
+            listOf("多角形", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片", "polygon", "crystal", "mineral", "hard shard") to "polygon",
+            listOf("山", "屋根", "尖", "鋭", "三角", "峰", "頂", "稜線", "切妻", "mountain", "roof", "sharp", "peak", "ridge", "triangle") to "triangle",
+            listOf("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple") to "arc",
+            listOf("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square") to "square",
+        )
+        for ((terms, primitive) in markers) {
+            if (terms.any { it in ddl || it.lowercase() in lower }) shapes += primitive
+        }
+        return shapes
+    }
+
+    private fun shapeRepairInstruction(primitive: String, index: Int, background: String): JSONObject {
+        val offset = minOf(index, 3) * 0.08
+        val item = JSONObject()
+            .put("primitive", primitive)
+            .put("color", visibleForeground("black", background))
+            .put("weight", "brush_thin")
+            .put("color_hint", "$primitive restored from DDL shape intent")
+        when (primitive) {
+            "triangle" -> item
+                .put("position", JSONArray(listOf(0.58 - offset, 0.22 + offset)))
+                .put("size", JSONArray(listOf(0.18, 0.16)))
+                .put("rotation", -18 + index * 11)
+            "polygon" -> item
+                .put("center", JSONArray(listOf(0.62 - offset, 0.34 + offset)))
+                .put("radius", 0.06)
+                .put("sides", 6)
+                .put("rotation", -18 + index * 13)
+            "arc" -> item
+                .put("center", JSONArray(listOf(0.66 - offset, 0.34 + offset)))
+                .put("radius", 0.13)
+                .put("angle_start", 205)
+                .put("angle_end", 25)
+                .put("rotation", -10 + index * 9)
+            else -> item
+                .put("position", JSONArray(listOf(0.56 - offset, 0.30 + offset)))
+                .put("size", JSONArray(listOf(0.16, 0.11)))
+                .put("rotation", -25 + index * 13)
+        }
+        return item
+    }
+
+    private fun requestedMotifs(ddl: String): List<String> {
+        val lower = ddl.lowercase()
+        val motifs = mutableListOf<String>()
+        val markers = listOf(
+            listOf("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "leaves") to "leaf_cluster",
+            listOf("紙片", "破片", "折", "手紙", "paper", "fragment", "shard", "letter") to "paper_shard",
+            listOf("波紋", "渦", "螺旋", "巻", "ripple", "spiral", "coil") to "ripple_knot",
+            listOf("山", "屋根", "峰", "稜線", "切妻", "mountain", "roof", "ridge", "peak") to "mountain_sign",
+        )
+        for ((terms, motif) in markers) {
+            if (terms.any { it in ddl || it.lowercase() in lower }) motifs += motif
+        }
+        return motifs
+    }
+
+    private fun motifRepairInstructions(motif: String, index: Int, background: String): List<JSONObject> {
+        val color = visibleForeground("black", background)
+        val offset = minOf(index, 2) * 0.08
+        return when (motif) {
+            "leaf_cluster" -> listOf(
+                JSONObject()
+                    .put("primitive", "ellipse")
+                    .put("center", JSONArray(listOf(0.38 + offset, 0.44)))
+                    .put("size", JSONArray(listOf(0.13, 0.035)))
+                    .put("rotation", -28)
+                    .put("color", if (background != "green") "green" else "white")
+                    .put("color_hint", "leaf_cluster motif restored from DDL intent"),
+                JSONObject()
+                    .put("primitive", "arc")
+                    .put("center", JSONArray(listOf(0.40 + offset, 0.44)))
+                    .put("radius", 0.08)
+                    .put("angle_start", 200)
+                    .put("angle_end", 335)
+                    .put("rotation", -24)
+                    .put("color", color)
+                    .put("weight", "brush_thin")
+                    .put("color_hint", "leaf_cluster motif restored from DDL intent"),
+            )
+            "paper_shard" -> listOf(
+                JSONObject()
+                    .put("primitive", "square")
+                    .put("position", JSONArray(listOf(0.56 - offset, 0.36 + offset)))
+                    .put("size", JSONArray(listOf(0.13, 0.09)))
+                    .put("rotation", -24)
+                    .put("color", color)
+                    .put("color_hint", "paper_shard motif restored from DDL intent"),
+                JSONObject()
+                    .put("primitive", "line")
+                    .put("from", JSONArray(listOf(0.55 - offset, 0.43 + offset)))
+                    .put("to", JSONArray(listOf(0.70 - offset, 0.37 + offset)))
+                    .put("color", color)
+                    .put("weight", "hair")
+                    .put("color_hint", "paper_shard motif restored from DDL intent"),
+            )
+            "ripple_knot" -> listOf(
+                JSONObject()
+                    .put("primitive", "arc")
+                    .put("center", JSONArray(listOf(0.62 - offset, 0.58)))
+                    .put("radius", 0.10)
+                    .put("angle_start", 25)
+                    .put("angle_end", 210)
+                    .put("color", if (background != "blue") "blue" else "white")
+                    .put("color_hint", "ripple_knot motif restored from DDL intent"),
+                JSONObject()
+                    .put("primitive", "ellipse")
+                    .put("center", JSONArray(listOf(0.62 - offset, 0.58)))
+                    .put("size", JSONArray(listOf(0.055, 0.025)))
+                    .put("rotation", 18)
+                    .put("color", color)
+                    .put("color_hint", "ripple_knot motif restored from DDL intent"),
+            )
+            else -> listOf(
+                JSONObject()
+                    .put("primitive", "triangle")
+                    .put("position", JSONArray(listOf(0.50 - offset, 0.27 + offset)))
+                    .put("size", JSONArray(listOf(0.18, 0.15)))
+                    .put("rotation", -12)
+                    .put("color", color)
+                    .put("color_hint", "mountain_sign motif restored from DDL intent"),
+                JSONObject()
+                    .put("primitive", "line")
+                    .put("from", JSONArray(listOf(0.59 - offset, 0.25 + offset)))
+                    .put("to", JSONArray(listOf(0.59 - offset, 0.45 + offset)))
+                    .put("color", color)
+                    .put("weight", "hair")
+                    .put("color_hint", "mountain_sign motif restored from DDL intent"),
+            )
+        }
+    }
+
+    private fun compositionRepairSuppressed(ddl: String): Boolean {
+        val lower = ddl.lowercase()
+        return listOf("余白", "静か", "薄い", "一つ", "ひとつ", "だけ", "少しだけ", "quiet", "minimal", "single", "only", "negative space")
+            .any { it in ddl || it in lower }
+    }
+
+    private fun contextEnergyInstruction(kind: String, background: String): JSONObject {
+        val visible = visibleForeground("black", background)
+        return when (kind) {
+            "leaf_grain" -> JSONObject()
+                .put("primitive", "ellipse")
+                .put("center", JSONArray(listOf(0.42, 0.62)))
+                .put("size", JSONArray(listOf(0.045, 0.018)))
+                .put("rotation", -28)
+                .put("color", if (background != "red") "red" else visible)
+                .put("filled", true)
+                .put("color_hint", "leaf_grain energy restored without density growth")
+                .put(
+                    "arrangement",
+                    JSONObject()
+                        .put("count", 6)
+                        .put("layout", "scatter")
+                        .put("path", "diagonal")
+                        .put("margin", 0.22)
+                        .put("density", "low")
+                        .put("fade", "directional")
+                        .put("preserve_space", true)
+                        .put("color_cycle", JSONArray(if (background !in setOf("red", "gray", "green")) listOf("red", "gray", "green") else listOf(visible))),
+                )
+            "silence_layer" -> JSONObject()
+                .put("primitive", "line")
+                .put("from", JSONArray(listOf(0.18, 0.70)))
+                .put("to", JSONArray(listOf(0.82, 0.38)))
+                .put("rotation", -7)
+                .put("color", visible)
+                .put("weight", "hair")
+                .put("color_hint", "silence_layer energy restored as a long optical trace")
+                .put(
+                    "arrangement",
+                    JSONObject()
+                        .put("count", 4)
+                        .put("layout", "horizontal")
+                        .put("path", "diagonal")
+                        .put("margin", 0.20)
+                        .put("density", "low")
+                        .put("fade", "directional")
+                        .put("preserve_space", true),
+                )
+            "hard_edge" -> JSONObject()
+                .put("primitive", "polygon")
+                .put("center", JSONArray(listOf(0.66, 0.35)))
+                .put("radius", 0.045)
+                .put("sides", 6)
+                .put("rotation", 18)
+                .put("color", if (background != "gray") "gray" else visible)
+                .put("weight", "brush_thin")
+                .put("color_hint", "hard_edge energy restored with polygonal rust/steel fragments")
+                .put(
+                    "arrangement",
+                    JSONObject()
+                        .put("count", 5)
+                        .put("layout", "scatter")
+                        .put("path", "diagonal")
+                        .put("margin", 0.18)
+                        .put("density", "low")
+                        .put("fade", "directional")
+                        .put("preserve_space", true)
+                        .put("color_cycle", JSONArray(if (background !in setOf("gray", "black")) listOf("gray", "black") else listOf(visible))),
+                )
+            else -> {
+                val playfulColor = if (background == "red") "white" else if (background != "red") "red" else visible
+                JSONObject()
+                    .put("primitive", "ellipse")
+                    .put("center", JSONArray(listOf(0.62, 0.40)))
+                    .put("size", JSONArray(listOf(0.055, 0.024)))
+                    .put("rotation", -24)
+                    .put("color", playfulColor)
+                    .put("filled", true)
+                    .put("weight", "brush_thick")
+                    .put("color_hint", "playful_motion energy restored as a small moving color cluster")
+                    .put(
+                        "arrangement",
+                        JSONObject()
+                            .put("count", 5)
+                            .put("layout", "scatter")
+                            .put("path", "wave")
+                            .put("margin", 0.20)
+                            .put("density", "low")
+                            .put("fade", "outward")
+                            .put("preserve_space", true)
+                            .put(
+                                "color_cycle",
+                                JSONArray(
+                                    when {
+                                        background == "red" -> listOf("white", "blue", "black")
+                                        background !in setOf("red", "blue", "white") -> listOf("red", "blue", "white")
+                                        else -> listOf(playfulColor)
+                                    },
+                                ),
+                            ),
+                    )
+            }
+        }
+    }
+
+    private fun contextHasMarker(ddl: String, markers: List<String>): Boolean {
+        val lower = ddl.lowercase()
+        return markers.any { it in ddl || it.lowercase() in lower }
+    }
+
+    private fun contextHasDensityGovernor(ddl: String): Boolean {
+        return contextHasMarker(
+            ddl,
+            listOf(
+                "静か", "静けさ", "沈黙", "余白", "薄い", "薄く", "細い", "少しだけ", "一つ", "一滴",
+                "気配", "余韻", "記憶", "忘れ", "影", "冷たい", "透明", "膜", "霞", "霧", "靄", "滲",
+                "低い雲", "押し沈", "quiet", "silence", "negative space", "thin", "pale", "slight", "single",
+                "one ", "presence", "trace", "memory", "forgotten", "shadow", "cold", "transparent", "membrane",
+                "haze", "fog", "mist", "blur", "low cloud", "pressing down",
+            ),
+        )
+    }
+
+    private fun contextHasVerticalDensity(ddl: String): Boolean {
+        return contextHasMarker(ddl, listOf("雨", "雪", "降", "縦", "上から下", "rain", "snow", "falling", "vertical", "top to bottom"))
+    }
+
+    private fun contextHasMotion(ddl: String): Boolean {
+        return contextHasMarker(
+            ddl,
+            listOf(
+                "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "風", "波", "ためらう",
+                "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
+            ),
+        )
+    }
+
+    private fun contextHasColorfulAccent(ddl: String): Boolean {
+        return contextHasMarker(
+            ddl,
+            listOf("祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色", "festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color"),
+        )
+    }
+
+    private fun JSONObject.withArrangementGovernor(count: Int, density: String, fade: String, note: String): JSONObject {
+        val copy = JSONObject(toString())
+        val arrangement = copy.optJSONObject("arrangement") ?: return copy
+        val originalCount = arrangement.optInt("count", 1)
+        arrangement.put("count", count)
+        arrangement.put("density", density)
+        arrangement.put("fade", fade)
+        arrangement.put("preserve_space", true)
+        arrangement.put("margin", maxOf(arrangement.optDouble("margin", 0.10), 0.18))
+        copy.put("arrangement", arrangement)
+        copy.put("color_hint", appendHint(copy.optString("color_hint"), "$note; original count $originalCount"))
+        return copy
+    }
+
+    private fun temperQuietSymbolicShape(item: JSONObject, ddl: String): JSONObject {
+        val arrangement = item.optJSONObject("arrangement") ?: return item
+        if (!contextHasDensityGovernor(ddl)) return item
+        val primitive = item.optString("primitive")
+        if (primitive !in setOf("circle", "ellipse", "square", "triangle", "polygon", "arc")) return item
+        val count = arrangement.optInt("count", 1)
+        if (count <= 8 || shapeExtent(item) <= 0.12) return item
+        val copy = JSONObject(item.toString())
+        val adjusted = copy.optJSONObject("arrangement") ?: return copy
+        adjusted.put("count", minOf(count, 8))
+        adjusted.put("density", "low")
+        adjusted.put("fade", "outward")
+        adjusted.put("preserve_space", true)
+        copy.put("arrangement", adjusted)
+        copy.put("color_hint", appendHint(copy.optString("color_hint"), "quiet symbolic shape tempered to preserve negative space; original count $count"))
+        return copy
+    }
+
+    private fun closedShapeArea(item: JSONObject): Double {
+        return when (item.optString("primitive")) {
+            "circle", "polygon" -> {
+                val radius = item.optDouble("radius", 0.0)
+                PI * radius * radius
+            }
+            "arc" -> {
+                val radius = item.optDouble("radius", 0.0)
+                PI * radius * radius * 0.35
+            }
+            "ellipse" -> {
+                val size = item.optJSONArray("size")
+                val width = size?.optDouble(0, 0.0) ?: 0.0
+                val height = size?.optDouble(1, 0.0) ?: 0.0
+                PI * (width / 2.0) * (height / 2.0)
+            }
+            "square" -> {
+                val size = item.optJSONArray("size")
+                (size?.optDouble(0, 0.0) ?: 0.0) * (size?.optDouble(1, 0.0) ?: 0.0)
+            }
+            "triangle" -> {
+                val size = item.optJSONArray("size")
+                (size?.optDouble(0, 0.0) ?: 0.0) * (size?.optDouble(1, 0.0) ?: 0.0) * 0.5
+            }
+            else -> 0.0
+        }
+    }
+
+    private fun closedShapeGeometryKey(item: JSONObject): String? {
+        fun roundedArray(value: JSONArray?): List<Double>? {
+            if (value == null || value.length() < 2) return null
+            return listOf(round2(value.optDouble(0, 0.0)), round2(value.optDouble(1, 0.0)))
+        }
+        return when (item.optString("primitive")) {
+            "circle", "arc" -> {
+                val center = roundedArray(item.optJSONArray("center")) ?: return null
+                listOf(item.optString("primitive"), center[0], center[1], round2(item.optDouble("radius", 0.10))).joinToString("|")
+            }
+            "ellipse", "square", "triangle" -> {
+                val center = roundedArray(item.optJSONArray("center") ?: item.optJSONArray("position")) ?: return null
+                val size = roundedArray(item.optJSONArray("size")) ?: return null
+                listOf(item.optString("primitive"), center[0], center[1], size[0], size[1], round2(item.optDouble("rotation", 0.0))).joinToString("|")
+            }
+            "polygon" -> {
+                val center = roundedArray(item.optJSONArray("center")) ?: return null
+                listOf("polygon", center[0], center[1], round2(item.optDouble("radius", 0.10)), item.optInt("sides", 5)).joinToString("|")
+            }
+            else -> null
+        }
+    }
+
+    private fun isAtmosphericEffectHint(hint: String): Boolean {
+        if (hint.isBlank()) return false
+        val lower = hint.lowercase()
+        return listOf(
+            "membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄",
+            "soft light", "柔らかな光", "陽光", "日差し", "scent", "fragrance", "香り", "匂",
+            "five-sense", "五感", "reflection", "反射", "映り",
+        ).any { it in hint || it.lowercase() in lower }
+    }
+
+    private fun isPlainMaterialHint(hint: String): Boolean {
+        if (hint.isBlank()) return true
+        val lower = hint.lowercase()
+        return "material inferred from ddl" in lower && !isAtmosphericEffectHint(hint)
+    }
+
+    private fun round2(value: Double): Double = kotlin.math.round(value * 100.0) / 100.0
+
+    private fun List<JSONObject>.hasCompensatingAccent(): Boolean {
+        return any { item ->
+            "quiet expression accent restored" in item.optString("color_hint") ||
+                (item.optString("color") in setOf("red", "green", "blue") &&
+                    (item.optJSONObject("arrangement")?.optInt("count", 1) ?: 1) <= 12 &&
+                    closedShapeArea(item) <= 0.03) ||
+                (item.optString("primitive") == "arc" && (item.optJSONObject("arrangement")?.optInt("count", 1) ?: 1) <= 9)
+        }
+    }
+
+    private fun quietExpressionAccent(ddl: String, background: String): JSONObject {
+        val requested = when {
+            contextHasColorfulAccent(ddl) && background != "red" -> "red"
+            background != "green" -> "green"
+            else -> "blue"
+        }
+        val color = visibleForeground(requested, background)
+        return if (contextHasMotion(ddl)) {
+            JSONObject()
+                .put("primitive", "arc")
+                .put("center", JSONArray(listOf(0.68, 0.34)))
+                .put("radius", 0.12)
+                .put("angle_start", 205)
+                .put("angle_end", 325)
+                .put("color", color)
+                .put("weight", "hair")
+                .put("color_hint", "quiet expression accent restored after density governance")
+                .put(
+                    "arrangement",
+                    JSONObject()
+                        .put("count", 3)
+                        .put("layout", "radial")
+                        .put("margin", 0.24)
+                        .put("density", "low")
+                        .put("fade", "outward")
+                        .put("preserve_space", true),
+                )
+        } else {
+            JSONObject()
+                .put("primitive", "ellipse")
+                .put("center", JSONArray(listOf(0.67, 0.35)))
+                .put("size", JSONArray(listOf(0.055, 0.026)))
+                .put("rotation", -18)
+                .put("color", color)
+                .put("weight", "pencil")
+                .put("filled", true)
+                .put("color_hint", "quiet expression accent restored after density governance")
+        }
     }
 
     private fun appendHint(existing: String?, note: String): String {
@@ -820,6 +1377,8 @@ class LocalFallbackPipeline(
             (text.contains("青") || lower.contains("blue")) && background != "blue" -> "blue"
             (text.contains("赤") || lower.contains("red")) && background != "red" -> "red"
             (text.contains("緑") || lower.contains("green")) && background != "green" -> "green"
+            listOf("森", "forest", "leaf", "草", "grass", "苔", "moss", "竹", "bamboo", "庭", "garden", "香り", "scent", "fragrance", "芽", "落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈")
+                .any { it in text || it in lower } && background != "green" -> "green"
             text.contains("灰") || lower.contains("gray") || lower.contains("grey") -> "gray"
             else -> if (background in setOf("black", "blue")) "white" else "black"
         }

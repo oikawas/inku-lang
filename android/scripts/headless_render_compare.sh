@@ -8,6 +8,8 @@ OUT_DIR="${OUT_DIR:-/tmp/inku-headless}"
 RUN_ID="${RUN_ID:-run-$(date +%Y%m%d-%H%M%S)}"
 TEXT="${TEXT:-}"
 TEXT_FILE="${TEXT_FILE:-}"
+INPUT_MODE="${INPUT_MODE:-paint}"
+ORIGINAL_TEXT="${ORIGINAL_TEXT:-}"
 STAGE1_MODEL="${STAGE1_MODEL:-}"
 STAGE2_MODEL="${STAGE2_MODEL:-}"
 CATALOG_ID="${CATALOG_ID:-}"
@@ -39,9 +41,11 @@ start_args=(
   -n "$APP_ID/.HeadlessRenderActivity"
   --es run_id "$RUN_ID"
   --es text "$TEXT"
+  --es input_mode "$INPUT_MODE"
   --ez auto_repair "$AUTO_REPAIR"
   --ez save_history "$SAVE_HISTORY"
 )
+if [[ -n "$ORIGINAL_TEXT" ]]; then start_args+=(--es original_text "$ORIGINAL_TEXT"); fi
 if [[ -n "$STAGE1_MODEL" ]]; then start_args+=(--es stage1_model "$STAGE1_MODEL"); fi
 if [[ -n "$STAGE2_MODEL" ]]; then start_args+=(--es stage2_model "$STAGE2_MODEL"); fi
 if [[ -n "$CATALOG_ID" ]]; then start_args+=(--es catalog_id "$CATALOG_ID"); fi
@@ -115,8 +119,10 @@ if [[ "$COMPARE_WEB" == "1" ]]; then
     --out-dir "$OUT_DIR/$RUN_ID/web"
     --prefix web
     --color-catalog "$web_catalog"
+    --input-mode "$INPUT_MODE"
     --full-json
   )
+  if [[ -n "$ORIGINAL_TEXT" ]]; then cli_args+=(--original-text "$ORIGINAL_TEXT"); fi
   if [[ "$CLI_SAVE_HISTORY" == "true" || "$CLI_SAVE_HISTORY" == "1" ]]; then
     cli_args+=(--save-history)
   fi
@@ -154,6 +160,7 @@ jq -n \
       hash: $android[0].render_hash,
       short: $android[0].render_hash_short,
       history_id: $android[0].history_id,
+      input_mode: $android[0].input_mode,
       render_color_catalog_id: $android[0].render_color_catalog_id,
       render_color_catalog_name: $android[0].render_color_catalog_name,
       render_color_map: $android[0].render_color_map,

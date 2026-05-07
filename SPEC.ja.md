@@ -1433,6 +1433,23 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - `/api/paint`、`/api/compose`、JSONタブ、CLI出力JSON、保存 artifact JSON に `render_hash` / `render_hash_short` を含める
 - 履歴DBから artifact JSON を再生成する場合も、DB上の `render_hash` / `render_hash_short` をメタデータ領域へ展開する
 - 履歴DBは引き続き正本であり、出力ファイルは副産物として扱う
+
+### v1.46 (2026-05-07)
+
+**inku-cli の DDL 入力描画モード**
+
+server / Android の CLI 比較で、Stage 1 の LLM 出力揺れを切り離し、
+正規化DDL以降の差分を検証できるようにする。
+
+- `inku-cli paint` / `inku-cli batch` に `--input-mode paint|ddl` を追加する
+- 既定の `paint` は従来どおり自然言語入力を `/api/paint` に渡し、Stage 1 → Stage 1.5 → Stage 2 → render を実行する
+- `--input-mode ddl` は入力テキストを正規化DDLとして扱い、Stage 1 を呼ばずに `/api/compose` へ渡す
+- `--input-mode ddl --save-history` の場合、CLI は `/api/compose` の描画結果を `POST /api/history` で通常履歴DBへ保存する
+- `/api/compose` は Stage 1.5 適用後の実効DDLを `ddl` としてレスポンスに含める
+- CLI の DDL モードでは、出力JSONと履歴保存に `/api/compose` が返した実効DDLを使う
+- Android の headless 比較スクリプト `android/scripts/headless_render_compare.sh` は `INPUT_MODE=ddl` を server 側 `inku-cli paint --input-mode ddl` にも伝搬する
+- `ORIGINAL_TEXT` を指定した場合、Android / server の両方で履歴表示用の元入力および Stage 2 補助文脈として扱う
+- このモードは benchmark / parity 検証用であり、自然言語からの通常描画フローの既定動作は変更しない
 - build number: 352
 
 ### v1.43 (2026-05-05)

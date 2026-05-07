@@ -72,6 +72,10 @@ Android ワークスペースには、namespace `app.inku.mobile` の build 可�
   - adb から起動可能な run ID と prompt/model/catalog/canvas extras
   - app sandbox artifacts under `files/headless/<run_id>/`
   - `result.json`、`normalized.ddl`、`score.json`、`output.svg` の抽出
+  - `INPUT_MODE=ddl` で Stage 1 を通さず、入力済み正規化DDLを Stage 2 以降へ直接流せる。
+    LLM 出力の揺れを切り離し、DDL -> Score -> SVG の server 差分確認に使う。
+  - server CLI も `inku-cli paint --input-mode ddl` を持ち、`/api/compose` 経由で
+    DDL -> Score -> SVG を実行する。`--save-history` 指定時は `/api/history` へ保存する。
   - `inku-cli` 相当の local comparison runner として `android/scripts/headless_render_compare.sh`
   - 複数 prompt を連続比較し、retry と aggregate summary を作る
     `android/scripts/headless_batch_compare.sh`
@@ -273,6 +277,39 @@ web/server との parity を優先する。
 | `server/src/inku_server/coerce.py` / DDL coverage、shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | drawable clause extraction、clause primitive/color mapping、coverage instruction、shape/motif repair instruction factories |
 | `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration、dedupe、DDL coverage、color/shape/motif/composition/context/motion/presence/density repair order、fallback Score construction、Stage 1/2 provider fallback control |
 | `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 submit_score schema、Stage 2 JSON extraction、tool_calls / arguments unwrap、renderable instructions guard |
+
+指示から描画までの function-level parity table:
+
+| Flow step | server master | Android port | Parity rule / current work item |
+| --- | --- | --- | --- |
+| UI prompt input | `web/src/lib/components/InputPanel.svelte` / `DdlEditor.svelte` | `ui/InkuApp.kt` / `ui/InkuViewModel.kt` | mobile-native UI でよいが、prompt、DDL、auto-repair、model/catalog/canvas state は同一 flow に保存する。 |
+| Paint API orchestration | `api.py::api_paint` | `data/InkuRepository.kt::paint` / `pipeline/LocalFallbackPipeline.kt::paint` | Stage 1、Stage 1.5、Stage 2、coerce、render、hash、history save の順序を一致させる。 |
+| Stage 1 model call | `interpreter.py::interpret_detail` / `_build_system_prompt` | `LocalFallbackPipeline.kt` + `WebDdlSpec.kt` | system prompt、example selection、model output cleanup、fallback control を server に合わせる。 |
+| Stage 1 text cleanup | `interpreter.py` cleanup / usable DDL checks | `ServerDdlText.kt` | DDL guard、number-noise repair、clause dedupe、drawable vocabulary guard を関数単位で比較する。 |
+| Stage 1.5 expansion | `ddl_expander.py::expand_intermediate_ddl` | `WebDdlExpander.kt` | sensory / structural markers、filter candidates、density and placement insertion を server 更新単位で追従する。 |
+| Stage 2 model call | `composer.py::compose` / `_compose_*` | `LocalFallbackPipeline.kt` / provider clients | prompt、tool schema、retry / fallback criteria、timeout policy を server と比較する。 |
+| Stage 2 tool schema | `schema.py::Score` / `Instruction` / `composer.py` tool schema | `WebScoreTool.kt` | JSON schema、tool_calls unwrap、arguments unwrap、renderable instruction guard を一致させる。 |
+| Score primitive field coerce | `coerce.py::PRIMITIVE_SPECS` / `POST_COERCE` | `ServerScoreCoercer.kt` | primitive required fields、fallback fields、default values、arc angle repair を一致させる。 |
+| Score semantic coerce | `coerce.py` marker helpers | `ServerScoreSemantics.kt` | material、color、variation、presence、density、motion marker を server の marker set と戻り値へ合わせる。 |
+| DDL coverage repair | `coerce.py::_ddl_clauses` / `_primitive_from_clause` / `_fallback_instruction_from_clause` | `ServerScoreRepairFactory.kt` | clause extraction、primitive selection、coverage instruction defaults を一致させる。`円` / `circle` は server と同じく coverage repair では `ellipse` へ寄せる。 |
+| Fallback Score synthesis | `api.py` fallback helpers / `coerce.py::_fallback_instruction_from_clause` | `ServerFallbackComposer.kt` | provider failure / unusable Stage 2 output 時の primitive、geometry、arrangement defaults を server に合わせる。 |
+| Repair order | `coerce.py::coerce_score` | `LocalFallbackPipeline.kt` | visible color、dedupe、coverage、shape/color/motif/composition/context/motion/presence/density の順序を比較し、Android 固有順序を残さない。 |
+| SVG render engine | `render_engines/default.py` / `renderer.py::render` / `_render_instruction` | `DefaultSvgRenderer.kt` / `ServerRenderer*.kt` | instruction expansion、arrangement placement、material outline、filters、metadata を renderer table と合わせる。 |
+| Render hash / metadata | `api.py::_render_hash` / render metadata assembly | `LocalFallbackPipeline.kt::renderHash` / renderer metadata | hash input fields、build number handling、engine id/version、catalog/canvas metadata を一致させる。 |
+| History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | saved input、DDL、Score、SVG、metadata、model IDs、catalog/canvas、hash、timestamps を同じ user-visible data として保持する。 |
+| Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | server/android とも履歴保存可能にし、summary に history_id、DDL、hash、catalog を残す。 |
+
+Saijiki parity は category-by-category で確認する。Android UI の word groups は
+`web/src/lib/saijiki.ts` / `web/src/lib/i18n/ja.ts` と一致させる。server Stage 1 は
+`interpreter.py` の saijiki list と allowed action verbs を参照する。Web UI が exposed していない
+`描く` は Android UI でも独立 word としては出さず、DDL / model output に現れた場合のみ pipeline で扱う。
+Score coercion / fallback / repair では、`katachi` を primitive、`tezawari` を weight、
+`tsuranari` を style、`iro` を visible color、`yuragi` を variation、`basho` を center / position、
+`ugoki` を arrangement、`katamuki` を rotation / line endpoints、`wariai` を size / arc angle /
+line span へ反映する。LLM output が欠落または揺れた場合も、Stage 1.5 後の DDL に含まれる
+Saijiki words を `ServerScoreCoercer.kt`、`ServerScoreSemantics.kt`、
+`ServerFallbackComposer.kt`、`ServerScoreRepairFactory.kt` で補完し、server `composer.py` /
+`coerce.py` の visible behavior へ寄せる。
 
 ## Web Component Porting Matrix
 

@@ -19,14 +19,7 @@ internal object ServerFallbackComposer {
             .put("color", color)
             .put("weight", weight)
             .put("filled", filled)
-            .put(
-                "style",
-                when {
-                    text.contains("破線") || lower.contains("dashed") -> "dashed"
-                    text.contains("点線") || lower.contains("dotted") -> "dotted"
-                    else -> "solid"
-                },
-            )
+            .put("style", ServerScoreSemantics.styleKey(text))
             .put("color_hint", "fallback from DDL")
         return when {
             text.containsAny("多角形", "五角", "六角", "結晶", "鉱物", "硬い欠片") || lower.contains("polygon") || lower.contains("crystal") -> base
@@ -40,31 +33,62 @@ internal object ServerFallbackComposer {
                 .put("position", JSONArray(listOf(0.54, 0.22)))
                 .put("size", JSONArray(listOf(0.20, 0.18)))
                 .put("rotation", -8)
-            text.containsAny("弧", "円弧", "三日月", "波紋", "渦") || lower.contains("arc") || lower.contains("crescent") -> base
+            text.containsAny("弧", "円弧", "半円", "上弦", "下弦", "三日月", "波紋", "渦") || lower.contains("arc") || lower.contains("crescent") -> base
                 .put("primitive", "arc")
                 .put("center", JSONArray(listOf(0.72, 0.32)))
                 .put("radius", 0.16)
-                .put("angle_start", if (text.contains("半円")) 0 else 210)
-                .put("angle_end", if (text.contains("半円")) 180 else 330)
+                .put(
+                    "angle_start",
+                    when {
+                        text.contains("半円") -> 0
+                        text.contains("上弦") -> 270
+                        text.contains("下弦") -> 90
+                        else -> 210
+                    },
+                )
+                .put(
+                    "angle_end",
+                    when {
+                        text.contains("半円") -> 180
+                        text.contains("上弦") -> 90
+                        text.contains("下弦") -> 270
+                        else -> 330
+                    },
+                )
             text.containsAny("四角", "紙片", "パッチワーク") || lower.contains("square") || lower.contains("rectangle") || lower.contains("patch") -> base
                 .put("primitive", "square")
                 .put("position", JSONArray(listOf(0.62, 0.28)))
                 .put("size", JSONArray(listOf(if (text.contains("横長")) 0.28 else 0.18, if (text.contains("縦長")) 0.28 else 0.12)))
                 .put("rotation", if (text.containsAny("回転", "斜め", "右上がり")) -18 else 0)
             text.containsAny("円", "丸", "月", "蕾", "花びら", "香り", "光") || lower.contains("circle") || lower.contains("moon") || lower.contains("petal") || lower.contains("bud") -> base
-                .put("primitive", if (text.containsAny("楕円", "花びら", "蕾", "香り", "光")) "ellipse" else "circle")
+                .put("primitive", "ellipse")
                 .put("center", ServerScoreSemantics.focusPoint(text))
-                .also {
-                    if (it.optString("primitive") == "circle") {
-                        it.put("radius", ServerScoreSemantics.detectRadius(text) ?: 0.10)
-                    } else {
-                        it.put("size", JSONArray(listOf(0.18, 0.11))).put("rotation", -18)
-                    }
-                }
+                .put("size", JSONArray(listOf(0.18, 0.11)))
+                .put("rotation", -18)
             else -> base
                 .put("primitive", "line")
-                .put("from", JSONArray(listOf(0.16, 0.78)))
-                .put("to", JSONArray(listOf(0.84, 0.28)))
+                .put(
+                    "from",
+                    JSONArray(
+                        when {
+                            text.contains("垂直") -> listOf(0.5, 0.0)
+                            text.contains("全幅") || text.contains("水平") -> listOf(0.0, 0.5)
+                            text.contains("半幅") -> listOf(0.25, 0.5)
+                            else -> listOf(0.16, 0.78)
+                        },
+                    ),
+                )
+                .put(
+                    "to",
+                    JSONArray(
+                        when {
+                            text.contains("垂直") -> listOf(0.5, 1.0)
+                            text.contains("全幅") || text.contains("水平") -> listOf(1.0, 0.5)
+                            text.contains("半幅") -> listOf(0.75, 0.5)
+                            else -> listOf(0.84, 0.28)
+                        },
+                    ),
+                )
                 .put("rotation", if (text.contains("右下がり")) 30 else -8)
         }
     }

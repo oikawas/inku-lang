@@ -226,11 +226,11 @@ class LocalFallbackPipeline(
             .withShapeDelivery(ddl, background)
             .withComplexMotifRepair(ddl, background)
             .withCompositionDiversity(ddl, background)
+            .withStructuralDuplicateRepair()
             .withContextEnergy(ddl, background)
-            .withMotionEnergy(ddl)
             .withPresenceAuxiliaryShapeRepair(presence)
             .withContextDensityGovernor(ddl, background)
-            .withStructuralDuplicateRepair()
+            .withMotionEnergy(ddl)
             .withDensityBudget()
             .fold(JSONArray()) { array, item -> array.put(item); array }
         val result = JSONObject()
@@ -269,7 +269,7 @@ class LocalFallbackPipeline(
         for (clause in clauses) {
             val primitive = primitiveFromClause(clause) ?: continue
             if (repaired.size >= 5) break
-            val fallback = coverageInstruction(clause, primitive, background)
+            val fallback = coverageInstruction(clause, primitive, background, repaired.size)
             val key = Triple(fallback.optString("primitive"), fallback.optString("color"), fallback.optString("weight", "pen"))
             if (key in existing) continue
             repaired += fallback
@@ -279,7 +279,7 @@ class LocalFallbackPipeline(
     }
 
     private fun List<JSONObject>.withColorDelivery(ddl: String, background: String): List<JSONObject> {
-        val requested = requestedColors(ddl).filter { it != background }
+        val requested = requestedColors(ddl)
         if (requested.isEmpty()) return this
         val delivered = flatMap { item ->
             val colors = mutableListOf(item.optString("color", "black"))
@@ -288,21 +288,42 @@ class LocalFallbackPipeline(
             }
             colors
         }.toSet()
-        val missing = requested.filterNot { it in delivered }
+        val missing = listOf("red", "blue", "green", "white", "black", "gray").filter { it in requested && it !in delivered }
         if (missing.isEmpty()) return this
-        val targetIndex = indexOfFirst { it.optJSONObject("arrangement") != null }.takeIf { it >= 0 } ?: 0
+        val targetIndex = indexOfFirst { it.optString("primitive") in setOf("ellipse", "arc", "circle", "square", "triangle") }.takeIf { it >= 0 } ?: 0
         return mapIndexed { index, item ->
             if (index != targetIndex) return@mapIndexed item
             val copy = JSONObject(item.toString())
             val arrangement = copy.optJSONObject("arrangement") ?: JSONObject().put("count", maxOf(2, missing.size + 1)).put("layout", "scatter").put("margin", 0.16)
             val cycle = JSONArray()
+            arrangement.optJSONArray("color_cycle")?.let { existing ->
+                for (i in 0 until existing.length()) cycle.put(existing.optString(i))
+            }
+            val greenContext = greenIntentContext(ddl).takeIf { "green" in missing }
+            if (greenContext?.contains("bamboo") == true) copy.put("color", "green")
             val base = copy.optString("color", visibleForeground("black", background))
+            if (greenContext?.contains("withered") == true) cycle.put("gray")
             if (base != background) cycle.put(base)
-            missing.forEach { cycle.put(it) }
+            missing.forEach { color ->
+                if ((0 until cycle.length()).none { cycle.optString(it) == color }) cycle.put(color)
+            }
             arrangement.put("color_cycle", cycle)
             copy.put("arrangement", arrangement)
-            copy.put("color_hint", appendHint(copy.optString("color_hint"), "${missing.joinToString("/")} restored in color_cycle from DDL color intent"))
+            val note = "${missing.joinToString("/")} restored in color_cycle from DDL color intent" +
+                (greenContext?.let { "; $it" } ?: "")
+            copy.put("color_hint", appendHint(copy.optString("color_hint"), note))
             copy
+        }
+    }
+
+    private fun greenIntentContext(ddl: String): String? {
+        val lower = ddl.lowercase()
+        if ("green" in ServerScoreRepairFactory.negatedColors(ddl)) return null
+        return when {
+            "竹" in ddl || "bamboo" in lower -> "bamboo green kept as primary contour"
+            listOf("枯れ草", "枯草", "枯れた草").any { it in ddl } || "withered grass" in lower || "dry grass" in lower -> "withered grass kept as muted green-gray"
+            ("森" in ddl || "forest" in lower) && listOf("落ち葉", "紅葉", "秋").any { it in ddl } -> "forest green kept as quiet residue behind warm leaves"
+            else -> null
         }
     }
 
@@ -564,32 +585,57 @@ class LocalFallbackPipeline(
     }
 
     private fun List<JSONObject>.withDensityBudget(): List<JSONObject> {
-        val total = sumOf { it.optJSONObject("arrangement")?.optInt("count", 1) ?: 1 }
-        if (total <= 180) return this
-        var remaining = 180
-        return mapIndexed { index, item ->
-            val copy = JSONObject(item.toString())
-            val arrangement = copy.optJSONObject("arrangement") ?: run {
-                remaining -= 1
-                return@mapIndexed copy
+        return withPerInstructionDensityBudget().withTotalDensityBudget()
+    }
+
+    private fun List<JSONObject>.withPerInstructionDensityBudget(): List<JSONObject> {
+        return map { item ->
+            val count = expandedCount(item)
+            if (item.optJSONObject("arrangement") == null || count <= MAX_EXPANDED_PER_INSTRUCTION) {
+                item
+            } else {
+                item.withClusteredDensity("single arrangement density clustered to preserve negative space")
             }
-            val rest = size - index - 1
-            val count = arrangement.optInt("count", 1)
-            val allowed = maxOf(1, minOf(count, remaining - rest))
-            if (allowed < count) {
-                arrangement.put("count", allowed)
-                if (!arrangement.has("density") || arrangement.optString("density") == "none") {
-                    arrangement.put("density", if (count >= 180) "high" else "medium")
-                }
-                if (!arrangement.has("cluster_count")) arrangement.put("cluster_count", if (count >= 300) 9 else 5)
-                arrangement.put("preserve_space", true)
-                if (!arrangement.has("fade") || arrangement.optString("fade") == "none") arrangement.put("fade", "directional")
-                copy.put("arrangement", arrangement)
-                copy.put("color_hint", appendHint(copy.optString("color_hint"), "expanded density capped to preserve negative space; original count $count"))
-            }
-            remaining -= allowed
-            copy
         }
+    }
+
+    private fun List<JSONObject>.withTotalDensityBudget(): List<JSONObject> {
+        val total = sumOf { expandedCount(it) }
+        if (total <= MAX_EXPANDED_PRIMITIVES) return this
+
+        var remainingBudget = MAX_EXPANDED_PRIMITIVES
+        val adjusted = mutableListOf<JSONObject>()
+        forEachIndexed { index, item ->
+            val count = expandedCount(item)
+            val restMinimum = size - index - 1
+            if (item.optJSONObject("arrangement") == null) {
+                adjusted += item
+                remainingBudget -= 1
+                return@forEachIndexed
+            }
+
+            val allowed = if (remainingBudget <= restMinimum + 1) {
+                1
+            } else {
+                val remainingTotal = subList(index, size).sumOf { expandedCount(it) }
+                val share = if (remainingTotal > 0) count.toDouble() / remainingTotal.toDouble() else 0.0
+                maxOf(1, ((remainingBudget - restMinimum) * share).toInt())
+            }
+
+            val adjustedItem = if (allowed < count && count > 80) {
+                val clustered = item.withClusteredDensity("expanded density clustered to preserve negative space")
+                if (expandedCount(clustered) > allowed) {
+                    clustered.withArrangementCount(allowed, "expanded density capped after clustering")
+                } else {
+                    clustered
+                }
+            } else {
+                item.withArrangementCount(allowed, "expanded density capped to preserve negative space")
+            }
+            adjusted += adjustedItem
+            remainingBudget -= expandedCount(adjustedItem)
+        }
+        return adjusted
     }
 
     private fun splitDrawableClauses(text: String): List<String> {
@@ -600,8 +646,8 @@ class LocalFallbackPipeline(
         return ServerScoreRepairFactory.primitiveFromClause(clause)
     }
 
-    private fun coverageInstruction(clause: String, primitive: String, background: String): JSONObject {
-        return ServerScoreRepairFactory.coverageInstruction(clause, primitive, background, ::coerceInstruction)
+    private fun coverageInstruction(clause: String, primitive: String, background: String, index: Int): JSONObject {
+        return ServerScoreRepairFactory.coverageInstruction(clause, primitive, background, index, ::coerceInstruction)
     }
 
     private fun requestedColors(text: String): List<String> {
@@ -786,6 +832,65 @@ class LocalFallbackPipeline(
         return copy
     }
 
+    private fun JSONObject.withClusteredDensity(note: String): JSONObject {
+        val copy = JSONObject(toString())
+        val arrangement = copy.optJSONObject("arrangement") ?: return copy
+        val originalCount = arrangement.optInt("count", 1)
+        arrangement.put("count", clusteredVisualCount(originalCount))
+        val existingDensity = arrangement.optString("density", "none")
+        if (existingDensity == "none") arrangement.put("density", densityLabel(originalCount))
+        if (!arrangement.has("cluster_count")) arrangement.put("cluster_count", clusterCount(originalCount))
+        arrangement.put("preserve_space", true)
+        arrangement.put("margin", maxOf(arrangement.optDouble("margin", 0.10), 0.18))
+        if (arrangement.optString("fade", "none") == "none") {
+            val layout = arrangement.optString("layout", "none")
+            val hasPath = arrangement.optString("path", "none") != "none"
+            arrangement.put("fade", if (hasPath || layout == "horizontal" || layout == "vertical") "directional" else "outward")
+        }
+        copy.put("arrangement", arrangement)
+        copy.put("color_hint", appendHint(copy.optString("color_hint"), "$note; original count $originalCount"))
+        return copy
+    }
+
+    private fun JSONObject.withArrangementCount(count: Int, note: String): JSONObject {
+        val arrangement = optJSONObject("arrangement") ?: return this
+        val targetCount = maxOf(1, count)
+        if (arrangement.optInt("count", 1) == targetCount) return this
+        val copy = JSONObject(toString())
+        copy.optJSONObject("arrangement")?.put("count", targetCount)
+        copy.put("color_hint", appendHint(copy.optString("color_hint"), note))
+        return copy
+    }
+
+    private fun expandedCount(item: JSONObject): Int {
+        return maxOf(1, item.optJSONObject("arrangement")?.optInt("count", 1) ?: 1)
+    }
+
+    private fun densityLabel(originalCount: Int): String {
+        return when {
+            originalCount >= 180 -> "high"
+            originalCount >= 80 -> "medium"
+            else -> "low"
+        }
+    }
+
+    private fun clusterCount(originalCount: Int): Int {
+        return when {
+            originalCount >= 500 -> 9
+            originalCount >= 240 -> 7
+            originalCount >= 120 -> 5
+            else -> 3
+        }
+    }
+
+    private fun clusteredVisualCount(originalCount: Int): Int {
+        return if (originalCount <= MAX_VISUAL_CLUSTERED_COUNT) {
+            originalCount
+        } else {
+            minOf(MAX_VISUAL_CLUSTERED_COUNT, maxOf(48, (originalCount * 0.42).toInt()))
+        }
+    }
+
     private fun temperQuietSymbolicShape(item: JSONObject, ddl: String): JSONObject {
         val arrangement = item.optJSONObject("arrangement") ?: return item
         if (!contextHasDensityGovernor(ddl)) return item
@@ -951,5 +1056,8 @@ class LocalFallbackPipeline(
 
     companion object {
         private const val TAG = "InkuPipeline"
+        private const val MAX_EXPANDED_PRIMITIVES = 400
+        private const val MAX_EXPANDED_PER_INSTRUCTION = 240
+        private const val MAX_VISUAL_CLUSTERED_COUNT = 120
     }
 }

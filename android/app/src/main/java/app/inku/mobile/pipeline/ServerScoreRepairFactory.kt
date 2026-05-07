@@ -20,57 +20,103 @@ internal object ServerScoreRepairFactory {
         }
     }
 
-    fun primitiveFromClause(clause: String): String? = when {
-        clause.containsAny("弧", "三日月", "半円", "上弦", "下弦", "波紋", "渦", "螺旋", "巻") -> "arc"
-        clause.containsAny("楕円", "花びら", "蕾", "香り", "膜", "光") -> "ellipse"
-        clause.containsAny("円", "丸", "月") -> "circle"
-        clause.containsAny("三角", "山", "屋根", "尖", "鋭", "峰", "頂", "稜線", "切妻") -> "triangle"
-        clause.containsAny("四角", "紙片", "破片", "折", "畳", "手紙", "格子", "街", "建物") -> "square"
-        clause.containsAny("多角", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片") -> "polygon"
-        clause.containsAny("線", "雨", "雪", "砂", "点", "粒", "星") -> "line"
-        else -> null
+    fun primitiveFromClause(clause: String): String? {
+        val lower = clause.lowercase()
+        return when {
+            "多角形" in clause || "五角" in clause || "六角" in clause || "polygon" in lower -> "polygon"
+            "四角" in clause || "square" in lower || "rectangle" in lower -> "square"
+            "三角" in clause || "triangle" in lower -> "triangle"
+            "弧" in clause || "arc" in lower -> "arc"
+            "円" in clause || "楕円" in clause || "circle" in lower || "ellipse" in lower -> "ellipse"
+            else -> "line"
+        }
     }
 
     fun coverageInstruction(
         clause: String,
         primitive: String,
         background: String,
+        index: Int,
         coerceInstruction: (JSONObject, String, String) -> JSONObject,
     ): JSONObject {
+        val lower = clause.lowercase()
+        val sensoryKind = sensoryKind(clause)
+        val effectivePrimitive = when {
+            sensoryKind == "sense" -> "arc"
+            sensoryKind != null -> "ellipse"
+            isAtmosphericClause(clause) -> "ellipse"
+            isReflectionClause(clause) -> "line"
+            else -> primitive
+        }
         val color = colorFromClause(clause, background)
-        val weight = ServerScoreSemantics.detectWeightKey(clause)
+        val baseWeight = ServerScoreSemantics.detectWeightKey(clause)
+        val weight = if ((sensoryKind != null || isAtmosphericClause(clause)) && baseWeight == "pen") "chalk" else baseWeight
         val base = JSONObject()
-            .put("primitive", primitive)
+            .put("primitive", effectivePrimitive)
             .put("color", color)
             .put("weight", weight)
-            .put("style", if (clause.contains("破線")) "dashed" else if (clause.contains("点線")) "dotted" else "solid")
-            .put("filled", clause.contains("塗") && primitive != "line")
+            .put("style", ServerScoreSemantics.styleKey(clause))
             .put("color_hint", "coverage from DDL clause: ${clause.take(48)}")
-        when (primitive) {
-            "line" -> base.put("from", JSONArray(listOf(0.18, 0.72))).put("to", JSONArray(listOf(0.82, 0.28)))
-            "circle" -> base.put("center", ServerScoreSemantics.focusPoint(clause)).put("radius", ServerScoreSemantics.detectRadius(clause) ?: 0.10)
-            "ellipse" -> base.put("center", ServerScoreSemantics.focusPoint(clause)).put("size", JSONArray(listOf(0.18, 0.10))).put("rotation", -18)
-            "arc" -> base.put("center", ServerScoreSemantics.focusPoint(clause)).put("radius", ServerScoreSemantics.detectRadius(clause) ?: 0.13).put("angle_start", 210).put("angle_end", 330)
-            "polygon" -> base.put("center", ServerScoreSemantics.focusPoint(clause)).put("radius", 0.10).put("sides", 6).put("rotation", 18)
-            "square", "triangle" -> base.put("position", JSONArray(listOf(0.62, 0.30))).put("size", JSONArray(listOf(0.16, 0.12))).put("rotation", -12)
+        val offset = minOf(index, 4) * 0.09
+        when (effectivePrimitive) {
+            "line" -> base.put("from", JSONArray(listOf(0.16 + offset, 0.76 - offset))).put("to", JSONArray(listOf(0.78, 0.30 + offset))).put("rotation", -8 + index * 7)
+            "arc" -> base.put("center", JSONArray(listOf(0.68 - offset / 2.0, 0.30 + offset))).put("radius", 0.11).put("angle_start", 210).put("angle_end", 330)
+            "polygon" -> base.put("center", JSONArray(listOf(0.68 - offset / 2.0, 0.30 + offset))).put("radius", 0.055).put("sides", if ("六角" in clause || "hex" in lower || "mineral" in lower || "鉱物" in clause) 6 else 5).put("rotation", -18 + index * 9)
+            "ellipse" -> base.put("center", JSONArray(listOf(0.68 - offset / 2.0, 0.30 + offset))).put("size", JSONArray(listOf(0.16, 0.09))).put("rotation", -18 + index * 9)
+            else -> base.put("position", JSONArray(listOf(0.58 - offset / 2.0, 0.24 + offset))).put("size", JSONArray(listOf(0.14, 0.10))).put("rotation", -12 + index * 8)
         }
-        ServerFallbackComposer.arrangementFrom(clause)?.let { base.put("arrangement", it) }
+        val count = ServerScoreSemantics.countHintFromDdl(clause)
+        val colorCycle = colorCycleFromClause(clause, background)
+        when {
+            count != null && ("散らす" in clause || "scatter" in lower) -> base.put("arrangement", JSONObject().put("count", minOf(count, 120)).put("layout", "scatter").put("margin", 0.18))
+            count != null && ("並べる" in clause || "line up" in lower) -> base.put("arrangement", JSONObject().put("count", minOf(count, 80)).put("layout", "horizontal").put("margin", 0.1))
+            sensoryKind == "light" -> base.put("filled", true).put("center", JSONArray(listOf(0.50, 0.22 + minOf(index, 2) * 0.04))).put("size", JSONArray(listOf(0.42, 0.12))).put("rotation", -6 + index * 4).put("color", if (background != "white") "white" else "blue").put("arrangement", lowArrangement("horizontal", "outward", 3, 0.24)).put("color_hint", "${base.optString("color_hint")}; soft light")
+            sensoryKind == "scent" -> base.put("center", JSONArray(listOf(0.56, 0.54))).put("size", JSONArray(listOf(0.05, 0.024))).put("rotation", -18).put("color", if (background != "green") "green" else "white").put("arrangement", lowArrangement("scatter", "directional", 7, 0.24).put("path", "wave")).put("color_hint", "${base.optString("color_hint")}; scent layer")
+            sensoryKind == "bud" -> base.put("center", JSONArray(listOf(0.70, 0.62))).put("size", JSONArray(listOf(0.055, 0.026))).put("rotation", -30).put("color", if (background != "red") "red" else "white").put("arrangement", JSONObject().put("count", 5).put("layout", "scatter").put("path", "diagonal").put("margin", 0.18)).put("color_hint", "${base.optString("color_hint")}; waiting buds")
+            sensoryKind == "sense" -> base.put("center", JSONArray(listOf(0.34, 0.70))).put("radius", 0.14).put("angle_start", 205).put("angle_end", 335).put("color", if (background != "white") "white" else "blue").put("arrangement", lowArrangement("radial", "outward", 3, 0.22)).put("color_hint", "${base.optString("color_hint")}; five-sense presence")
+            isAtmosphericClause(clause) -> base.put("arrangement", lowArrangement("scatter", "outward", 5, 0.24).put("cluster_count", 3)).put("filled", true).put("color_hint", "${base.optString("color_hint")}; membrane haze")
+            isReflectionClause(clause) -> base.put("arrangement", lowArrangement("vertical", "directional", 9, 0.18).put("path", "wave")).put("color_hint", "${base.optString("color_hint")}; reflection")
+            isFadingClause(clause) -> base.put("arrangement", lowArrangement("scatter", "directional", 7, 0.24).put("path", "diagonal")).put("color_hint", "${base.optString("color_hint")}; fading")
+        }
+        if (clause.contains("塗") && effectivePrimitive != "line" && !base.has("filled")) base.put("filled", true)
+        if (colorCycle.isNotEmpty()) {
+            val arrangement = base.optJSONObject("arrangement") ?: JSONObject().put("count", maxOf(colorCycle.size, 3)).put("layout", "scatter").put("margin", 0.18)
+            arrangement.put("color_cycle", JSONArray(colorCycle))
+            base.put("arrangement", arrangement)
+        }
         return coerceInstruction(base, clause, background)
+    }
+
+    private fun lowArrangement(layout: String, fade: String, count: Int, margin: Double): JSONObject {
+        return JSONObject()
+            .put("count", count)
+            .put("layout", layout)
+            .put("margin", margin)
+            .put("density", "low")
+            .put("fade", fade)
+            .put("preserve_space", true)
     }
 
     fun requestedColors(text: String): List<String> {
         val result = mutableListOf<String>()
         val lower = text.lowercase()
-        listOf("red" to listOf("赤", "red"), "blue" to listOf("青", "blue"), "green" to listOf("緑", "green"), "white" to listOf("白", "white"), "black" to listOf("黒", "black"), "gray" to listOf("灰", "gray", "grey")).forEach { (color, markers) ->
+        val negated = negatedColors(text)
+        listOf(
+            "white" to listOf("白", "white"),
+            "black" to listOf("黒", "black"),
+            "blue" to listOf("青", "blue"),
+            "red" to listOf("赤", "red"),
+            "green" to listOf(
+                "緑", "green", "森", "forest", "leaf", "草", "grass", "苔", "moss", "竹", "bamboo", "庭", "garden", "香り", "scent", "fragrance",
+                "芽", "落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈",
+            ),
+            "gray" to listOf("灰", "gray", "grey"),
+        ).forEach { (color, markers) ->
+            if (color in negated) return@forEach
             if (markers.any { it in text || it in lower }) result += color
         }
-        if (listOf("森", "forest", "leaf", "草", "grass", "苔", "moss", "竹", "bamboo", "庭", "garden", "香り", "scent", "fragrance", "芽", "落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈")
-                .any { it in text || it in lower }
-        ) {
-            result += "green"
-        }
         if ((text.contains("色とりどり") || text.contains("多色") || lower.contains("colorful")) && result.size < 3) {
-            result += listOf("red", "blue", "green", "black", "gray")
+            result += listOf("red", "blue", "green", "black", "gray").filterNot { it in negated }
         }
         return result.distinct()
     }
@@ -78,6 +124,53 @@ internal object ServerScoreRepairFactory {
     fun colorFromClause(clause: String, background: String): String {
         return requestedColors(clause).firstOrNull { it != background }
             ?: ServerScoreSemantics.visibleForeground(ServerScoreSemantics.detectColorKey(clause, background), background)
+    }
+
+    fun colorCycleFromClause(clause: String, background: String): List<String> {
+        val colors = requestedColors(clause).filter { it != background }.toMutableList()
+        val lower = clause.lowercase()
+        if (("色とりどり" in clause || "多色" in clause || "colorful" in lower || "multi-color" in lower) && colors.size < 3) {
+            colors += listOf("red", "blue", "green", "black", "gray").filter { it != background && it !in negatedColors(clause) }
+        }
+        return colors.distinct()
+    }
+
+    fun negatedColors(text: String): Set<String> {
+        val lower = text.lowercase()
+        val greenMarkers = listOf(
+            "not green", "avoid green", "without green", "no green",
+            "緑には寄せず", "緑に寄せず", "緑ではなく", "緑を避け", "緑を使わず", "緑なし",
+        )
+        return buildSet {
+            if (greenMarkers.any { it in text || it in lower }) add("green")
+        }
+    }
+
+    fun isAtmosphericClause(clause: String): Boolean {
+        val lower = clause.lowercase()
+        return listOf("膜", "霞", "霧", "靄", "気配", "余韻", "透明", "membrane", "haze", "fog", "mist", "atmosphere")
+            .any { it in clause || it in lower }
+    }
+
+    fun isReflectionClause(clause: String): Boolean {
+        val lower = clause.lowercase()
+        return listOf("反射", "映り", "reflection", "reflected").any { it in clause || it in lower }
+    }
+
+    fun isFadingClause(clause: String): Boolean {
+        val lower = clause.lowercase()
+        return listOf("消え", "薄れ", "fade", "fading", "vanish", "dissolve").any { it in clause || it in lower }
+    }
+
+    fun sensoryKind(clause: String): String? {
+        val lower = clause.lowercase()
+        return when {
+            listOf("光", "陽光", "日差し", "柔ら", "light", "sunlight", "soft").any { it in clause || it in lower } -> "light"
+            listOf("香", "匂", "沈丁花", "scent", "fragrance").any { it in clause || it in lower } -> "scent"
+            listOf("蕾", "つぼみ", "開花", "bud", "bloom").any { it in clause || it in lower } -> "bud"
+            listOf("五感", "気配", "訪れ", "sense", "presence", "arrival").any { it in clause || it in lower } -> "sense"
+            else -> null
+        }
     }
 
     fun colorMatchesClause(item: JSONObject, clause: String, background: String): Boolean {

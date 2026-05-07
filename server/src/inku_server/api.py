@@ -553,6 +553,7 @@ class ComposeRequest(BaseModel):
 
 
 class ComposeResponse(BaseModel):
+    ddl: str
     score: Score
     svg: str
     stage2_model: str | None = None
@@ -670,6 +671,7 @@ class InterpretDetail:
 @dataclass
 class ComposeDetail:
     score: Score
+    ddl: str
     tokens_in: int | None = None
     tokens_out: int | None = None
     retry_count: int = 0
@@ -1695,11 +1697,12 @@ def _call_compose_detail(
     except StageHardTimeoutError:
         return ComposeDetail(
             score=_fallback_score_from_ddl(ddl, lang=lang),
+            ddl=ddl,
             retry_reasons=["stage2_hard_timeout"],
             fallback_used=True,
         )
     if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
-        return ComposeDetail(score=score, tokens_in=tokens_in, tokens_out=tokens_out)
+        return ComposeDetail(score=score, ddl=ddl, tokens_in=tokens_in, tokens_out=tokens_out)
 
     base_prompt = system_prompt or (STAGE2_PROMPT_EN if lang == "en" else STAGE2_PROMPT)
     reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
@@ -1738,6 +1741,7 @@ def _call_compose_detail(
         retry_score = _fallback_score_from_ddl(ddl, lang=lang)
     return ComposeDetail(
         score=retry_score,
+        ddl=ddl,
         tokens_in=tokens_in,
         tokens_out=tokens_out,
         retry_count=retry_count,
@@ -1811,7 +1815,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         score = compose_detail.score
         ensure_renderable_score(score)
         if req.auto_repair:
-            score = coerce_score(score, ddl=_coerce_context(req.ddl, req.original_text))
+            score = coerce_score(score, ddl=_coerce_context(compose_detail.ddl, req.original_text))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -1826,7 +1830,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         **render_metadata,
         **_render_hash_metadata(
             input_text=req.original_text or req.ddl,
-            ddl=req.ddl,
+            ddl=compose_detail.ddl,
             score=score,
             svg=svg,
             catalog_id=req.catalog_id,
@@ -1836,6 +1840,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
     return ComposeResponse(
+        ddl=compose_detail.ddl,
         score=score,
         svg=svg,
         stage2_model=resolved_stage2_model,

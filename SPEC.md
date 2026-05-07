@@ -606,6 +606,16 @@ renderer behavior.
 CLI configuration is local and editable.  It stores base URL, provider/model
 selection, and timeout values outside the server DB.
 
+`inku-cli paint` and `inku-cli batch` support `--input-mode paint|ddl`.
+The default `paint` mode sends natural-language input to `/api/paint` and runs
+the full Stage 1 -> Stage 1.5 -> Stage 2 -> render pipeline.  `--input-mode ddl`
+treats the input text as already-normalized DDL, skips Stage 1, and sends it to
+`/api/compose`.  When `--input-mode ddl --save-history` is used, the CLI saves
+the compose result through `POST /api/history` so the output appears in normal
+server history.  `/api/compose` returns the effective DDL after Stage 1.5
+expansion, and CLI output/history use that effective DDL for DDL-to-render
+benchmark parity.
+
 `inku-cli batch` can write a benchmark summary JSON file.  When an output
 directory is used, the default summary path is `analysis-summary.json` in that
 directory.  The summary includes all successful samples and review groupings for
@@ -681,6 +691,9 @@ The reference implementation currently includes:
 - CLI client foundation, benchmark summary output, and contact sheet generation
 - CLI history export by render hash for benchmark review contact sheets,
   per-item JSON, and summary JSON
+- CLI DDL input mode for DDL-to-render parity: `inku-cli paint --input-mode ddl`
+  and `batch --input-mode ddl` call `/api/compose` directly and save through
+  `/api/history` when `--save-history` is set
 - CLI version/build reporting and server-owned color catalog lookup
 - CLI benchmark diagnostics for color delivery, negated colors, motif hint
   arrival, and mathematical balance marker sample lines

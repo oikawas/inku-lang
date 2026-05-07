@@ -70,16 +70,30 @@ class HeadlessRenderActivity : Activity() {
             ?: CompatibilityConstants.defaultCanvasAspect
         val autoRepair = intent.getBooleanExtra("auto_repair", true)
         val saveHistory = intent.getBooleanExtra("save_history", false)
+        val inputMode = intent.getStringExtra("input_mode")?.takeIf { it.isNotBlank() } ?: "paint"
+        val originalText = intent.getStringExtra("original_text")?.takeIf { it.isNotBlank() } ?: text
 
-        val item = repository.paint(
-            description = text,
-            catalogId = catalogId,
-            canvasAspect = canvasAspect,
-            stage1ModelId = stage1Model,
-            stage2ModelId = stage2Model,
-            autoRepair = autoRepair,
-            historyInput = text,
-        )
+        val item = if (inputMode == "ddl") {
+            repository.composeFromDdl(
+                description = originalText,
+                ddl = text,
+                catalogId = catalogId,
+                canvasAspect = canvasAspect,
+                stage1ModelId = stage1Model,
+                stage2ModelId = stage2Model,
+                autoRepair = autoRepair,
+            )
+        } else {
+            repository.paint(
+                description = text,
+                catalogId = catalogId,
+                canvasAspect = canvasAspect,
+                stage1ModelId = stage1Model,
+                stage2ModelId = stage2Model,
+                autoRepair = autoRepair,
+                historyInput = text,
+            )
+        }
         if (!saveHistory) {
             repository.deleteHistoryPermanently(item.id)
         }
@@ -109,6 +123,7 @@ class HeadlessRenderActivity : Activity() {
                 .put("stage2_model", item.stage2Model)
                 .put("catalog_id", item.colorCatalogId)
                 .put("canvas_aspect", item.canvasAspect)
+                .put("input_mode", inputMode)
                 .put("elapsed_ms", item.elapsedMs)
                 .put("normalized_ddl", item.normalizedDdl)
                 .put("score_path", "files/headless/$runId/score.json")

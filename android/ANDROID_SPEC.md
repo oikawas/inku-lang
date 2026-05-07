@@ -84,6 +84,12 @@ Implemented:
   - adb-startable run IDs and prompt/model/catalog/canvas extras
   - app-sandbox artifacts under `files/headless/<run_id>/`
   - extracted `result.json`, `normalized.ddl`, `score.json`, and `output.svg`
+  - `INPUT_MODE=ddl` bypasses Stage 1 and sends an already-normalized DDL input
+    directly through Stage 2 and later stages. This isolates LLM variance when
+    comparing DDL -> Score -> SVG behavior against the server.
+  - The server CLI also supports `inku-cli paint --input-mode ddl`, which calls
+    `/api/compose` for DDL -> Score -> SVG and saves through `/api/history`
+    when `--save-history` is set.
   - `android/scripts/headless_render_compare.sh` as an `inku-cli`-equivalent
     local comparison runner
   - `android/scripts/headless_batch_compare.sh` for multi-prompt comparison,
@@ -318,6 +324,42 @@ Current pipeline compatibility layout:
 | `server/src/inku_server/coerce.py` / DDL coverage, shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | Drawable clause extraction, clause primitive/color mapping, coverage instruction, shape/motif repair instruction factories |
 | `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration, dedupe, DDL coverage, color/shape/motif/composition/context/motion/presence/density repair order, fallback Score construction, Stage 1/2 provider fallback control |
 | `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 `submit_score` schema, Stage 2 JSON extraction, tool_calls/arguments unwrap, renderable instructions guard |
+
+Function-level parity table from prompt to rendering:
+
+| Flow step | server master | Android port | Parity rule / current work item |
+| --- | --- | --- | --- |
+| UI prompt input | `web/src/lib/components/InputPanel.svelte` / `DdlEditor.svelte` | `ui/InkuApp.kt` / `ui/InkuViewModel.kt` | Mobile-native UI is acceptable, but prompt, DDL, auto-repair, model/catalog/canvas state must stay in the same saved flow. |
+| Paint API orchestration | `api.py::api_paint` | `data/InkuRepository.kt::paint` / `pipeline/LocalFallbackPipeline.kt::paint` | Keep the order: Stage 1, Stage 1.5, Stage 2, coerce, render, hash, history save. |
+| Stage 1 model call | `interpreter.py::interpret_detail` / `_build_system_prompt` | `LocalFallbackPipeline.kt` + `WebDdlSpec.kt` | Match the system prompt, example selection, model output cleanup, and fallback control. |
+| Stage 1 text cleanup | `interpreter.py` cleanup / usable DDL checks | `ServerDdlText.kt` | Compare DDL guard, number-noise repair, clause dedupe, and drawable vocabulary guard function by function. |
+| Stage 1.5 expansion | `ddl_expander.py::expand_intermediate_ddl` | `WebDdlExpander.kt` | Track sensory/structural markers, filter candidates, density, and placement insertion with server updates. |
+| Stage 2 model call | `composer.py::compose` / `_compose_*` | `LocalFallbackPipeline.kt` / provider clients | Compare prompt, tool schema, retry/fallback criteria, and timeout policy. |
+| Stage 2 tool schema | `schema.py::Score` / `Instruction` / `composer.py` tool schema | `WebScoreTool.kt` | Match JSON schema, tool_calls unwrap, arguments unwrap, and renderable instruction guard. |
+| Score primitive field coerce | `coerce.py::PRIMITIVE_SPECS` / `POST_COERCE` | `ServerScoreCoercer.kt` | Match primitive required fields, fallback fields, default values, and arc angle repair. |
+| Score semantic coerce | `coerce.py` marker helpers | `ServerScoreSemantics.kt` | Align material, color, variation, presence, density, and motion marker sets and return values. |
+| DDL coverage repair | `coerce.py::_ddl_clauses` / `_primitive_from_clause` / `_fallback_instruction_from_clause` | `ServerScoreRepairFactory.kt` | Match clause extraction, primitive selection, and coverage instruction defaults. `円` / `circle` follows server behavior and becomes `ellipse` in coverage repair. |
+| Fallback Score synthesis | `api.py` fallback helpers / `coerce.py::_fallback_instruction_from_clause` | `ServerFallbackComposer.kt` | Match primitive, geometry, and arrangement defaults after provider failure or unusable Stage 2 output. |
+| Repair order | `coerce.py::coerce_score` | `LocalFallbackPipeline.kt` | Compare visible color, dedupe, coverage, shape/color/motif/composition/context/motion/presence/density order and remove Android-only ordering. |
+| SVG render engine | `render_engines/default.py` / `renderer.py::render` / `_render_instruction` | `DefaultSvgRenderer.kt` / `ServerRenderer*.kt` | Match instruction expansion, arrangement placement, material outlines, filters, and metadata. |
+| Render hash / metadata | `api.py::_render_hash` / render metadata assembly | `LocalFallbackPipeline.kt::renderHash` / renderer metadata | Match hash input fields, build number handling, engine id/version, catalog/canvas metadata. |
+| History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | Store the same user-visible data: input, DDL, Score, SVG, metadata, model IDs, catalog/canvas, hash, and timestamps. |
+| Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | Let both server and Android save history, and keep history_id, DDL, hash, and catalog in summaries. |
+
+Saijiki parity is checked category by category. Android UI word groups must
+match `web/src/lib/saijiki.ts` and `web/src/lib/i18n/ja.ts`. Server Stage 1 is
+checked against the saijiki list and allowed action verbs in `interpreter.py`.
+The verb `draw` / `描く`, which is not exposed by the web UI, is not exposed as
+an independent Android word either; it is handled only when it appears in DDL or
+model output. Score coercion, fallback, and repair map `katachi` to primitives,
+`tezawari` to weights, `tsuranari` to styles, `iro` to visible colors,
+`yuragi` to variation, `basho` to center/position, `ugoki` to arrangement,
+`katamuki` to rotation/line endpoints, and `wariai` to size, arc angle, and line
+span. Even when LLM output is incomplete or variable, saijiki words in the
+post-Stage-1.5 DDL are repaired through `ServerScoreCoercer.kt`,
+`ServerScoreSemantics.kt`, `ServerFallbackComposer.kt`, and
+`ServerScoreRepairFactory.kt` so Android behavior tracks server `composer.py`
+and `coerce.py`.
 
 ## Web Component Porting Matrix
 

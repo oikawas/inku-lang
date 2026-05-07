@@ -65,6 +65,7 @@ internal object ServerScoreCoercer {
             data.put(spec.name, toJsonValue(value ?: spec.defaultValue))
         }
         postCoerce(primitive, data)
+        applyVariation(primitive, data, ddl)
         return data
     }
 
@@ -84,6 +85,28 @@ internal object ServerScoreCoercer {
         if (primitive == "arc" && kotlin.math.abs(data.optDouble("angle_start") - data.optDouble("angle_end")) < 1e-6) {
             data.put("angle_end", (data.optDouble("angle_start") + 270.0) % 360.0)
         }
+    }
+
+    private fun applyVariation(primitive: String, data: JSONObject, ddl: String) {
+        if (data.has("variation")) return
+        val variation = when {
+            ddl.contains("滲む") || ddl.contains("にじむ") ->
+                JSONObject().put("amplitude", "medium").put("frequency", "medium").put("quality", "pink").put("dimensions", JSONArray(listOf("position_x", "position_y")))
+            ddl.contains("波打つ") || ddl.contains("揺れる") ->
+                JSONObject().put("amplitude", if (ddl.contains("大きく")) "broad" else "medium").put("frequency", if (ddl.contains("ゆっくり")) "slow" else "medium").put("quality", "wave").put("dimensions", JSONArray(listOf("position_x", "position_y")))
+            ddl.contains("震える") || ddl.contains("細かく") ->
+                JSONObject()
+                    .put("amplitude", "fine")
+                    .put("frequency", "medium")
+                    .put("quality", "perlin")
+                    .put("dimensions", JSONArray(if (primitive == "line") listOf("position_y") else listOf("position_x", "position_y")))
+            ddl.contains("大きく") ->
+                JSONObject().put("amplitude", "broad").put("frequency", "medium").put("quality", "wave").put("dimensions", JSONArray(listOf("position_x", "position_y")))
+            ddl.contains("ゆっくり") || ddl.contains("速く") ->
+                JSONObject().put("amplitude", "medium").put("frequency", if (ddl.contains("速く")) "high" else "slow").put("quality", "wave").put("dimensions", JSONArray(listOf("position_x", "position_y")))
+            else -> null
+        }
+        if (variation != null) data.put("variation", variation)
     }
 
     private fun asCoord(value: Any?): List<Double>? {

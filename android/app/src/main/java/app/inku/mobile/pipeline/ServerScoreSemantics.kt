@@ -215,27 +215,45 @@ internal object ServerScoreSemantics {
 
     fun detectColorKey(text: String, background: String): String {
         val lower = text.lowercase()
+        val negatedGreen = listOf(
+            "not green", "avoid green", "without green", "no green",
+            "緑には寄せず", "緑に寄せず", "緑ではなく", "緑を避け", "緑を使わず", "緑なし",
+        ).any { it in text || it in lower }
         return when {
             (text.contains("白") || lower.contains("white")) && background != "white" -> "white"
             (text.contains("青") || lower.contains("blue")) && background != "blue" -> "blue"
             (text.contains("赤") || lower.contains("red")) && background != "red" -> "red"
-            (text.contains("緑") || lower.contains("green")) && background != "green" -> "green"
+            !negatedGreen && (text.contains("緑") || lower.contains("green")) && background != "green" -> "green"
             listOf("森", "forest", "leaf", "草", "grass", "苔", "moss", "竹", "bamboo", "庭", "garden", "香り", "scent", "fragrance", "芽", "落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈")
-                .any { it in text || it in lower } && background != "green" -> "green"
+                .any { it in text || it in lower } && !negatedGreen && background != "green" -> "green"
             text.contains("灰") || lower.contains("gray") || lower.contains("grey") -> "gray"
             else -> if (background in setOf("black", "blue")) "white" else "black"
         }
     }
 
     fun detectWeightKey(text: String): String = when {
+        text.contains("髪") || text.contains("ヘア") || text.contains("hair", ignoreCase = true) -> "hair"
         text.contains("ロットリング") || text.contains("rotring", ignoreCase = true) -> "rotring"
         text.contains("鉛筆") || text.contains("pencil", ignoreCase = true) -> "pencil"
+        text.contains("ペン") || text.contains("pen", ignoreCase = true) -> "pen"
         text.contains("クレヨン") || text.contains("crayon", ignoreCase = true) -> "crayon"
         text.contains("チョーク") || text.contains("chalk", ignoreCase = true) -> "chalk"
-        text.contains("太筆") || text.contains("厚塗り") || text.contains("thick brush", ignoreCase = true) -> "brush_thick"
-        text.contains("細筆") || text.contains("水墨") || text.contains("墨") || text.contains("fine brush", ignoreCase = true) -> "brush_thin"
-        text.contains("縄") || text.contains("rope", ignoreCase = true) -> "rope"
+        text.contains("太筆") || text.contains("厚塗り") || text.contains("油絵") || text.contains("thick-brush", ignoreCase = true) || text.contains("thick brush", ignoreCase = true) || text.contains("oil impasto", ignoreCase = true) -> "brush_thick"
+        text.contains("細筆") || text.contains("水墨") || text.contains("墨") || text.contains("fine-brush", ignoreCase = true) || text.contains("fine brush", ignoreCase = true) || text.contains("ink-wash", ignoreCase = true) || text.contains("ink wash", ignoreCase = true) -> "brush_thin"
+        text.contains("縄") || text.contains("ロープ") || text.contains("rope", ignoreCase = true) -> "rope"
         else -> "pen"
+    }
+
+    fun styleKey(text: String): String = when {
+        text.contains("一点鎖線") || text.contains("dash_dot", ignoreCase = true) || text.contains("dash dot", ignoreCase = true) -> "dash_dot"
+        text.contains("破線") || text.contains("dashed", ignoreCase = true) -> "dashed"
+        text.contains("点線") || text.contains("dotted", ignoreCase = true) -> "dotted"
+        else -> "solid"
+    }
+
+    fun hasStrokeStyleWord(text: String): Boolean {
+        return listOf("実線", "破線", "点線", "一点鎖線").any { text.contains(it) } ||
+            listOf("solid", "dashed", "dotted", "dash_dot", "dash dot").any { text.contains(it, ignoreCase = true) }
     }
 
     fun detectLayoutKey(text: String): String = when {

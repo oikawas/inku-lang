@@ -570,3 +570,34 @@ Verification:
 - PNG 1080px export opened the Android share sheet.
 - logcat after PNG export did not show `FATAL EXCEPTION`, `ANR in`, or
   `Input dispatching timed out`.
+
+## 2026-05-07 Explicit Android History Differences From Server/Web
+
+The Android app remains a native single-user Pixel 9+ application whose
+development master is the server/web implementation. However, management flows
+that are unnecessary or too heavy for the mobile UI are intentionally removed
+when specified here.
+
+For the History screen, the following are explicit Android differences from the
+server/web implementation:
+
+- The trash feature is not exposed in the Android UI.
+  - The History screen does not provide a Trash view switch.
+  - It does not provide a button to move history entries to Trash.
+  - It does not provide a restore-from-Trash button.
+  - It does not provide a permanent-delete button.
+  - It does not show confirmation dialogs for trash operations.
+- The list layout is not exposed in the Android UI.
+  - History uses the S4 History-style three-column thumbnail grid as the
+    default and only layout.
+  - The thumbnail/list layout toggle is not shown.
+- Multi-select actions whose purpose was trash management are not exposed in
+  the Android UI.
+  - The select-all button is not shown.
+  - History cards do not show checkboxes.
+- The remaining History screen actions are limited to search, starred-only
+  filtering, selecting a history item, Star / unstar for the selected item, and
+  JSON sharing.
+
+These removals are intentional Android-specific product differences, not
+unfinished implementation gaps.

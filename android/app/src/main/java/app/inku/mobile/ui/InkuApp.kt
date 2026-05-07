@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -34,6 +35,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -124,7 +129,6 @@ fun InkuApp() {
     val viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by viewModel.state.collectAsState()
     val history by viewModel.historyItems.collectAsState()
-    val trashedHistory by viewModel.trashedHistoryItems.collectAsState()
 
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
@@ -140,7 +144,7 @@ fun InkuApp() {
             ) {
                 when (state.tab) {
                     AppTab.Compose -> ComposeScreen(state, viewModel)
-                    AppTab.History -> HistoryScreen(state, history, trashedHistory, viewModel)
+                    AppTab.History -> HistoryScreen(state, history, viewModel)
                     AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
                     AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
                 }
@@ -158,9 +162,6 @@ fun InkuApp() {
                 }
                 if (state.canvasSelectionOpen) {
                     CanvasAspectSelectionDialog(state, viewModel)
-                }
-                state.pendingConfirm?.let { pending ->
-                    PendingConfirmDialog(pending, state.selectedHistoryIds.size, viewModel)
                 }
             }
         }
@@ -186,35 +187,6 @@ private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
                 TextButton(onClick = viewModel::confirmDdlOverwriteRenderEdited) {
                     Text("DDLから描画")
                 }
-            }
-        },
-    )
-}
-
-@Composable
-private fun PendingConfirmDialog(action: PendingConfirm, count: Int, viewModel: InkuViewModel) {
-    val title = when (action) {
-        PendingConfirm.TrashSelected -> "履歴をTrashへ移動"
-        PendingConfirm.RestoreSelected -> "履歴を復元"
-        PendingConfirm.PermanentDeleteSelected -> "履歴を完全削除"
-    }
-    val body = when (action) {
-        PendingConfirm.TrashSelected -> "${count}件をTrashへ移動します。"
-        PendingConfirm.RestoreSelected -> "${count}件を履歴へ戻します。"
-        PendingConfirm.PermanentDeleteSelected -> "${count}件を完全に削除します。この操作は戻せません。"
-    }
-    AlertDialog(
-        onDismissRequest = viewModel::cancelConfirm,
-        title = { Text(title) },
-        text = { Text(body) },
-        confirmButton = {
-            TextButton(onClick = viewModel::runPendingConfirm) {
-                Text("実行")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = viewModel::cancelConfirm) {
-                Text("キャンセル")
             }
         },
     )
@@ -980,31 +952,70 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
 private fun HistoryScreen(
     state: InkuUiState,
     history: List<HistoryItemEntity>,
-    trashedHistory: List<HistoryItemEntity>,
     viewModel: InkuViewModel,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var exportMessage by remember { mutableStateOf<String?>(null) }
-    val sourceHistory = if (state.historyView == HistoryView.Trash) trashedHistory else history
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("履歴", style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.weight(1f))
-            Text("${sourceHistory.size}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val filteredHistory = remember(history, state.historySearchQuery, state.historyStarredOnly) {
+        filterHistoryItems(history, state)
+    }
+    val header: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            HistoryHeader(
+                state = state,
+                sourceCount = history.size,
+                filteredCount = filteredHistory.size,
+                viewModel = viewModel,
+            )
+            state.selectedHistory?.let { item ->
+                HistorySelectionActions(
+                    item = item,
+                    exportMessage = exportMessage,
+                    onStar = { viewModel.toggleStar(item) },
+                    onShareJson = {
+                        exportMessage = "Export preparing..."
+                        scope.launch {
+                            exportMessage = runCatching {
+                                shareHistoryJson(context, item)
+                                "Exported F${item.renderHashShort}"
+                            }.getOrElse { error -> error.message ?: "Export failed." }
+                        }
+                    },
+                )
+            }
         }
-        WrapRow {
-            ChipButton("サムネイル", selected = state.historyLayout == HistoryLayout.Thumbs, onClick = { viewModel.setHistoryLayout(HistoryLayout.Thumbs) })
-            ChipButton("リスト", selected = state.historyLayout == HistoryLayout.List, onClick = { viewModel.setHistoryLayout(HistoryLayout.List) })
-            ChipButton("ゴミ箱 ${trashedHistory.size}", selected = state.historyView == HistoryView.Trash, onClick = {
-                viewModel.setHistoryView(if (state.historyView == HistoryView.Trash) HistoryView.Active else HistoryView.Trash)
-            })
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
+        gridItems(filteredHistory, key = { it.id }) { item ->
+            HistoryGridTile(
+                item = item,
+                selected = state.selectedHistory?.id == item.id,
+                onSelect = { viewModel.selectHistory(item) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryHeader(
+    state: InkuUiState,
+    sourceCount: Int,
+    filteredCount: Int,
+    viewModel: InkuViewModel,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("履歴", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.weight(1f))
+            Text("${sourceCount}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         ImeAwareOutlinedTextField(
             value = state.historySearchQuery,
@@ -1013,72 +1024,26 @@ private fun HistoryScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        val filteredHistory = remember(sourceHistory, state.historySearchQuery, state.historyStarredOnly) {
-            filterHistoryItems(sourceHistory, state)
-        }
         WrapRow {
             ChipButton("★ 星のみ", selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
-            ChipButton("全選択", selected = state.selectedHistoryIds.isNotEmpty() && state.selectedHistoryIds.size == filteredHistory.size, onClick = { viewModel.selectAllHistory(filteredHistory) })
-            if (state.historyView == HistoryView.Active) {
-                ChipButton("Trashへ移動", selected = false, onClick = viewModel::askTrashSelected)
-            } else {
-                ChipButton("復元", selected = false, onClick = viewModel::askRestoreSelected)
-                ChipButton("完全削除", selected = false, onClick = viewModel::askPermanentDeleteSelected)
-            }
         }
-        state.selectedHistory?.takeIf { state.historyView == HistoryView.Active }?.let { item ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondarySmallButton(text = if (item.starred) "Star解除" else "Star", onClick = { viewModel.toggleStar(item) }, modifier = Modifier.weight(1f))
-                SecondarySmallButton(text = "Trash", onClick = { viewModel.trash(item) }, modifier = Modifier.weight(1f))
-                PrimarySmallButton(
-                    text = "JSON共有",
-                    onClick = {
-                        exportMessage = "Export preparing..."
-                        scope.launch {
-                            exportMessage = runCatching {
-                                shareHistoryJson(context, item)
-                                "Exported F${item.renderHashShort}"
-                            }.getOrElse { error ->
-                                error.message ?: "Export failed."
-                            }
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+        Text("${filteredCount}/${sourceCount}件を表示", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun HistorySelectionActions(
+    item: HistoryItemEntity,
+    exportMessage: String?,
+    onStar: () -> Unit,
+    onShareJson: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        WrapRow(horizontal = 8.dp, vertical = 6.dp) {
+            MiniPill(text = if (item.starred) "★ Star解除" else "☆ Star", selected = item.starred, onClick = onStar)
+            MiniPill(text = "JSON共有", selected = true, onClick = onShareJson)
         }
         exportMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
-        Text("${filteredHistory.size}/${sourceHistory.size}件を表示", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (state.historyLayout == HistoryLayout.List) {
-            filteredHistory.forEach { item ->
-                HistoryListRow(
-                    item = item,
-                    checked = item.id in state.selectedHistoryIds,
-                    onCheck = { viewModel.toggleHistorySelection(item.id) },
-                    onSelect = { if (state.historyView == HistoryView.Active) viewModel.selectHistory(item) },
-                    onStar = { viewModel.toggleStar(item) },
-                    onTrash = { viewModel.trash(item) },
-                )
-            }
-        } else {
-            filteredHistory.chunked(2).forEach { rowItems ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    rowItems.forEach { item ->
-                        HistoryGridTile(
-                            item = item,
-                            selected = state.selectedHistory?.id == item.id,
-                            checked = item.id in state.selectedHistoryIds,
-                            onCheck = { viewModel.toggleHistorySelection(item.id) },
-                            onSelect = { if (state.historyView == HistoryView.Active) viewModel.selectHistory(item) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    if (rowItems.size == 1) {
-                        Spacer(Modifier.weight(1f))
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -2503,9 +2468,9 @@ private fun HistoryTile(item: HistoryItemEntity, selected: Boolean, onSelect: ()
         colors = CardDefaults.cardColors(containerColor = Color(0xFF24211E)),
     ) {
         Column(modifier = Modifier.padding(5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            ArtworkPreview(item, modifier = Modifier.fillMaxWidth().height(52.dp))
+            HistoryArtworkPreview(item, modifier = Modifier.fillMaxWidth().height(52.dp))
             Text(item.elapsedMs?.let { "${it / 1000.0}s" } ?: item.renderHashShort, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-            Text(item.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -2514,8 +2479,6 @@ private fun HistoryTile(item: HistoryItemEntity, selected: Boolean, onSelect: ()
 private fun HistoryGridTile(
     item: HistoryItemEntity,
     selected: Boolean,
-    checked: Boolean,
-    onCheck: () -> Unit,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -2529,27 +2492,21 @@ private fun HistoryGridTile(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Box {
-                ArtworkPreview(item, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
+                HistoryArtworkPreview(item, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
                 if (selected) {
                     Box(
                         modifier = Modifier
-                            .width(26.dp)
-                            .height(34.dp)
+                            .width(22.dp)
+                            .height(22.dp)
                             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(bottomEnd = 16.dp)),
                     )
                 }
-                MiniPill(
-                    text = if (checked) "✓" else "□",
-                    selected = checked,
-                    onClick = onCheck,
-                    modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
-                )
                 if (item.starred) {
-                    MiniPill(text = "★", modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
+                    HistoryBadge(text = "★", selected = true, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
                 }
             }
             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(item.originalInput, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Text(item.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
             }
         }
@@ -2557,41 +2514,36 @@ private fun HistoryGridTile(
 }
 
 @Composable
-private fun HistoryListRow(
-    item: HistoryItemEntity,
-    checked: Boolean,
-    onCheck: () -> Unit,
-    onSelect: () -> Unit,
-    onStar: () -> Unit,
-    onTrash: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+private fun HistoryBadge(text: String, selected: Boolean = false, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+    val base = modifier
+        .size(26.dp)
+        .background(
+            if (selected) MaterialTheme.colorScheme.secondary else Color(0xCC24211E),
+            RoundedCornerShape(13.dp),
+        )
+    Box(
+        modifier = onClick?.let { base.clickable(onClick = it) } ?: base,
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            modifier = Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            MiniPill(if (checked) "✓" else "□", selected = checked, onClick = onCheck)
-            ArtworkPreview(item, modifier = Modifier.size(56.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(item.originalInput, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    "F${item.renderHashShort} · ${(item.stage1Model ?: "-").substringAfterLast(":")} / ${(item.stage2Model ?: "-").substringAfterLast(":")} · ${ColorCatalogs.get(item.colorCatalogId).name}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            MiniPill(if (item.starred) "★" else "☆", selected = item.starred, onClick = onStar)
-            MiniPill("開く", onClick = onSelect)
-            MiniPill("Trash", onClick = onTrash)
-        }
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) Color(0xFF101010) else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
     }
+}
+
+private fun historyTitle(item: HistoryItemEntity): String {
+    val original = item.originalInput.trim()
+    if (original.isNotBlank() && !original.startsWith("{") && !original.startsWith("[")) {
+        return original
+    }
+    val normalized = item.normalizedDdl.trim()
+    if (normalized.isNotBlank() && !normalized.startsWith("{") && !normalized.startsWith("[")) {
+        return normalized
+    }
+    return "DDLから描画"
 }
 
 @Composable
@@ -2878,6 +2830,55 @@ private fun ArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifie
             }
         }
     }
+}
+
+@Composable
+private fun HistoryArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifier) {
+    val score = remember(item.id, item.scoreJson) {
+        runCatching { JSONObject(item.scoreJson) }.getOrNull()
+    }
+    val catalog = remember(item.colorCatalogId) { ColorCatalogs.get(item.colorCatalogId) }
+    Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val scoreJson = score ?: run {
+                drawRect(Color.White)
+                return@Canvas
+            }
+            val colors = catalog.renderMap
+            val backgroundName = scoreJson.optString("background", "white")
+            val background = resolvePreviewColor(backgroundName, colors, Color.White)
+            drawRect(background)
+
+            val side = minOf(size.width, size.height)
+            val offsetX = (size.width - side) / 2f
+            val offsetY = (size.height - side) / 2f
+            val instructions = scoreJson.optJSONArray("instructions") ?: JSONArray()
+            var drawn = 0
+            for (index in 0 until instructions.length()) {
+                val instruction = instructions.optJSONObject(index) ?: continue
+                val color = resolvePreviewColor(instruction.optString("color", "black"), colors, Color.Black)
+                val strokeWidth = strokeWidthPx(instruction.optString("weight", "pen"))
+                val stroke = Stroke(width = strokeWidth)
+                val marks = expandPreview(instruction)
+                for (mark in marks) {
+                    when (mark.optString("primitive", instruction.optString("primitive", "line"))) {
+                        "line" -> drawPreviewLine(mark, color, strokeWidth, offsetX, offsetY, side)
+                        "circle", "ellipse", "arc" -> drawPreviewCircle(mark, color, stroke, offsetX, offsetY, side)
+                        "square", "triangle", "polygon" -> drawPreviewSquare(mark, color, stroke, offsetX, offsetY, side)
+                        else -> drawPreviewLine(mark, color, strokeWidth, offsetX, offsetY, side)
+                    }
+                    drawn += 1
+                    if (drawn >= 96) break
+                }
+                if (drawn >= 96) break
+            }
+        }
+    }
+}
+
+private fun resolvePreviewColor(name: String, colors: Map<String, String>, fallback: Color): Color {
+    val value = colors[name] ?: name.takeIf { it.startsWith("#") } ?: return fallback
+    return runCatching { parseColor(value) }.getOrDefault(fallback)
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPreviewLine(mark: JSONObject, color: Color, strokeWidth: Float, offsetX: Float, offsetY: Float, side: Float) {

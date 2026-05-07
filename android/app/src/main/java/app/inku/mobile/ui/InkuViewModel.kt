@@ -63,10 +63,6 @@ data class InkuUiState(
     val selectedHistory: HistoryItemEntity? = null,
     val historySearchQuery: String = "",
     val historyStarredOnly: Boolean = false,
-    val historyView: HistoryView = HistoryView.Active,
-    val historyLayout: HistoryLayout = HistoryLayout.Thumbs,
-    val selectedHistoryIds: Set<String> = emptySet(),
-    val pendingConfirm: PendingConfirm? = null,
     val canvasAspectPluginEnabled: Boolean = true,
     val pngAlphaWhite: Boolean = false,
     val showKiwi: Boolean = true,
@@ -123,32 +119,15 @@ enum class RenderTab {
     Json,
 }
 
-enum class HistoryView {
-    Active,
-    Trash,
-}
-
-enum class HistoryLayout {
-    Thumbs,
-    List,
-}
-
 enum class HistorySelectionBehavior {
     History,
     Current,
-}
-
-enum class PendingConfirm {
-    TrashSelected,
-    RestoreSelected,
-    PermanentDeleteSelected,
 }
 
 class InkuViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = InkuRepository(application.applicationContext, (application as InkuApplication).database)
     private val localState = MutableStateFlow(InkuUiState())
     private val history = repository.history()
-    private val trashedHistory = repository.trashedHistory()
     private val modelAssets = repository.modelAssets()
     private val providerSettings = repository.providerSettings()
     private val exportTemplates = repository.exportTemplates()
@@ -176,12 +155,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), InkuUiState())
 
     val historyItems: StateFlow<List<HistoryItemEntity>> = history.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        emptyList(),
-    )
-
-    val trashedHistoryItems: StateFlow<List<HistoryItemEntity>> = trashedHistory.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         emptyList(),
@@ -444,65 +417,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleHistoryStarredFilter() {
         val current = localState.value
-        localState.value = current.copy(historyStarredOnly = !current.historyStarredOnly, selectedHistoryIds = emptySet())
-    }
-
-    fun setHistoryView(view: HistoryView) {
-        localState.value = localState.value.copy(historyView = view, selectedHistoryIds = emptySet())
-    }
-
-    fun setHistoryLayout(layout: HistoryLayout) {
-        localState.value = localState.value.copy(historyLayout = layout)
-    }
-
-    fun toggleHistorySelection(id: String) {
-        val current = localState.value
-        val next = if (id in current.selectedHistoryIds) current.selectedHistoryIds - id else current.selectedHistoryIds + id
-        localState.value = current.copy(selectedHistoryIds = next)
-    }
-
-    fun selectAllHistory(items: List<HistoryItemEntity>) {
-        val current = localState.value
-        val ids = items.map { it.id }.toSet()
-        localState.value = current.copy(selectedHistoryIds = if (current.selectedHistoryIds.containsAll(ids)) emptySet() else ids)
-    }
-
-    fun askTrashSelected() {
-        if (localState.value.selectedHistoryIds.isEmpty()) {
-            localState.value = localState.value.copy(message = "履歴を選択してください。")
-            return
-        }
-        localState.value = localState.value.copy(pendingConfirm = PendingConfirm.TrashSelected)
-    }
-
-    fun askRestoreSelected() {
-        if (localState.value.selectedHistoryIds.isEmpty()) {
-            localState.value = localState.value.copy(message = "履歴を選択してください。")
-            return
-        }
-        localState.value = localState.value.copy(pendingConfirm = PendingConfirm.RestoreSelected)
-    }
-
-    fun askPermanentDeleteSelected() {
-        if (localState.value.selectedHistoryIds.isEmpty()) {
-            localState.value = localState.value.copy(message = "履歴を選択してください。")
-            return
-        }
-        localState.value = localState.value.copy(pendingConfirm = PendingConfirm.PermanentDeleteSelected)
-    }
-
-    fun cancelConfirm() {
-        localState.value = localState.value.copy(pendingConfirm = null)
-    }
-
-    fun runPendingConfirm() {
-        when (localState.value.pendingConfirm) {
-            PendingConfirm.TrashSelected -> trashSelected()
-            PendingConfirm.RestoreSelected -> restoreSelected()
-            PendingConfirm.PermanentDeleteSelected -> permanentlyDeleteSelected()
-            null -> Unit
-        }
-        localState.value = localState.value.copy(pendingConfirm = null)
+        localState.value = current.copy(historyStarredOnly = !current.historyStarredOnly)
     }
 
     fun toggleDdlAutoRepair() {
@@ -949,37 +864,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleStar(item: HistoryItemEntity) {
         viewModelScope.launch {
             repository.setStarred(item.id, !item.starred)
-        }
-    }
-
-    fun trash(item: HistoryItemEntity) {
-        viewModelScope.launch {
-            repository.trash(item.id)
-            localState.value = localState.value.copy(selectedHistory = null, selectedHistoryIds = localState.value.selectedHistoryIds - item.id)
-        }
-    }
-
-    fun trashSelected() {
-        val ids = localState.value.selectedHistoryIds
-        viewModelScope.launch {
-            ids.forEach { repository.trash(it) }
-            localState.value = localState.value.copy(selectedHistoryIds = emptySet(), selectedHistory = null)
-        }
-    }
-
-    fun restoreSelected() {
-        val ids = localState.value.selectedHistoryIds
-        viewModelScope.launch {
-            ids.forEach { repository.restore(it) }
-            localState.value = localState.value.copy(selectedHistoryIds = emptySet(), historyView = HistoryView.Active)
-        }
-    }
-
-    fun permanentlyDeleteSelected() {
-        val ids = localState.value.selectedHistoryIds
-        viewModelScope.launch {
-            ids.forEach { repository.deleteHistoryPermanently(it) }
-            localState.value = localState.value.copy(selectedHistoryIds = emptySet(), selectedHistory = null)
         }
     }
 

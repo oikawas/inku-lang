@@ -549,3 +549,36 @@ Android 版は Pixel 9 以上を想定したシングルユーザー用ネイテ
 - 履歴画面に残す操作は、検索、星付きフィルタ、履歴選択、選択中履歴の Star / Star 解除、JSON 共有に限定する。
 
 この削除は未実装ではなく、Android 版のモバイル UI とシングルユーザー前提に基づく意図的な仕様差分である。
+
+## 2026-05-07 LiteRT-LM MTP と Gemma 4 再取得導線
+
+Android 版の LiteRT-LM は GPU backend を必須とし、CPU fallback は行わない。
+Gemma 4 E2B / E4B のローカル実行では、LiteRT-LM の speculative decoding / Multi-Token Prediction (MTP) を有効化する。
+
+実装要件:
+
+- LiteRT-LM Engine 初期化前に `ExperimentalFlags.enableSpeculativeDecoding = true` を設定する。
+- backend は `Backend.GPU()` のままとする。
+- GPU 初期化に失敗した場合は描画を継続せず、ユーザーへエラーを返す。
+- CPU fallback を入れてはいけない。
+- Engine 初期化 log には GPU backend と speculative decoding 有効状態を確認できる情報を出す。
+
+Gemma 4 モデル取得 UI:
+
+- モデル設定の LiteRT-LM / Gemma E2B / E4B パネルに、既存のライセンス同意 / ダウンロード導線とは別に `再取得` ボタンを用意する。
+- `再取得` は、端末内の完成済み `.litertlm` と中断中の `.part` を削除し、同じ Hugging Face URL から最初から取得し直す。
+- ライセンス未同意のモデルでは `再取得` を実行できない。
+- 取得中、接続中、検証中など busy 状態では `再取得` を実行できない。
+- 再取得中の進捗は通常ダウンロードと同じ Room の `model_assets` 状態で管理する。
+
+モデルファイルに関する扱い:
+
+- 2026-05-05 より前に取得した Gemma 4 LiteRT-LM ファイルは MTP 対応前の可能性があるため、ユーザーは `再取得` で最新ファイルに更新できる必要がある。
+- 2026-05-07 時点で、E2B / E4B の Hugging Face `x-linked-etag` は Android 実装に保持している SHA-256 と一致している。
+- そのため、現時点では download URL と SHA-256 を変更せず、端末内の古いファイルを破棄して同じ URL から取り直す方針とする。
+
+確認:
+
+- `gradle :app:compileDebugKotlin` 成功。
+- `gradle :app:assembleDebug` 成功。
+- Pixel 9 へ debug APK を install し、起動を確認。

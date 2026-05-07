@@ -601,3 +601,49 @@ server/web implementation:
 
 These removals are intentional Android-specific product differences, not
 unfinished implementation gaps.
+
+## 2026-05-07 LiteRT-LM MTP And Gemma 4 Re-Download Flow
+
+The Android LiteRT-LM integration requires the GPU backend. It must not fall
+back to CPU. For local Gemma 4 E2B / E4B execution, LiteRT-LM speculative
+decoding / Multi-Token Prediction (MTP) is enabled.
+
+Implementation requirements:
+
+- Set `ExperimentalFlags.enableSpeculativeDecoding = true` before initializing
+  the LiteRT-LM Engine.
+- Keep the backend as `Backend.GPU()`.
+- If GPU initialization fails, stop drawing and surface the error to the user.
+- Do not add CPU fallback.
+- Engine initialization logs should make it possible to confirm the GPU backend
+  and speculative decoding state.
+
+Gemma 4 model download UI:
+
+- The LiteRT-LM / Gemma E2B / E4B panel in Model Settings provides a
+  `Re-download` action in addition to the existing license acceptance and
+  download flow.
+- `Re-download` deletes the finished `.litertlm` file and any interrupted
+  `.part` file from the device, then downloads from the same Hugging Face URL
+  from the beginning.
+- Models whose license has not been accepted cannot be re-downloaded.
+- Re-download is disabled while the model is queued, connecting, downloading,
+  or verifying.
+- Re-download progress uses the same Room `model_assets` state as normal
+  downloads.
+
+Model file handling:
+
+- Gemma 4 LiteRT-LM files downloaded before 2026-05-05 may predate MTP support,
+  so users must be able to refresh them with the `Re-download` action.
+- As of 2026-05-07, the Hugging Face `x-linked-etag` values for E2B and E4B
+  match the SHA-256 values stored by the Android implementation.
+- Therefore the current policy keeps the same download URLs and SHA-256 values,
+  and refreshes old on-device files by deleting and downloading them again from
+  the same URLs.
+
+Verification:
+
+- `gradle :app:compileDebugKotlin` succeeded.
+- `gradle :app:assembleDebug` succeeded.
+- The debug APK was installed and launched on Pixel 9.

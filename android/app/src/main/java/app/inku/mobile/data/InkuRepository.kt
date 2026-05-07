@@ -19,6 +19,7 @@ import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
+import org.json.JSONObject
 
 class InkuRepository(
     private val context: Context,
@@ -272,6 +273,10 @@ class InkuRepository(
 
     private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null): HistoryItemEntity {
         val now = System.currentTimeMillis()
+        val renderMetadataJson = JSONObject(result.renderMetadataJson)
+            .put("render_hash", result.renderHash)
+            .put("render_hash_short", result.renderHashShort)
+            .toString()
         val item = HistoryItemEntity(
             id = pipeline.newHistoryId(),
             createdAt = now,
@@ -283,7 +288,7 @@ class InkuRepository(
             displaySvg = result.displaySvg,
             stage1Model = stage1ModelId,
             stage2Model = stage2ModelId,
-            renderMetadataJson = result.renderMetadataJson,
+            renderMetadataJson = renderMetadataJson,
             renderHash = result.renderHash,
             renderHashShort = result.renderHashShort,
             colorCatalogId = catalogId,

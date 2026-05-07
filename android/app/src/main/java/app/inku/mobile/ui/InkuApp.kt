@@ -2299,12 +2299,34 @@ private fun renderPromptText(item: HistoryItemEntity): String {
 }
 
 private fun renderJsonText(item: HistoryItemEntity): String {
-    return buildString {
-        appendLine("JSON Score:")
-        appendLine(JSONObject(item.scoreJson).toString(2))
-        appendLine()
-        appendLine("render metadata:")
-        appendLine(JSONObject(item.renderMetadataJson).toString(2))
+    val metadata = runCatching { JSONObject(item.renderMetadataJson) }.getOrElse { JSONObject() }
+    val payload = JSONObject()
+    payload.putIfNotBlank("stage1_model", item.stage1Model)
+    payload.putIfNotBlank("stage2_model", item.stage2Model)
+    payload.putFrom(metadata, "render_build_number")
+    payload.putFrom(metadata, "render_color_profile")
+    payload.putFrom(metadata, "render_engine_id")
+    payload.putFrom(metadata, "render_engine_version")
+    payload.putFrom(metadata, "render_canvas_aspect", item.canvasAspect)
+    payload.put("render_hash", item.renderHash)
+    payload.put("render_hash_short", item.renderHashShort)
+    payload.putFrom(metadata, "render_color_catalog_id", item.colorCatalogId)
+    payload.putFrom(metadata, "render_color_catalog_name")
+    payload.putFrom(metadata, "render_color_catalog_sub")
+    payload.putFrom(metadata, "render_color_map")
+    payload.put("score", runCatching { JSONObject(item.scoreJson) }.getOrElse { JSONObject().put("raw", item.scoreJson) })
+    return payload.toString(2)
+}
+
+private fun JSONObject.putIfNotBlank(key: String, value: String?) {
+    if (!value.isNullOrBlank()) put(key, value)
+}
+
+private fun JSONObject.putFrom(source: JSONObject, key: String, fallback: String? = null) {
+    if (source.has(key) && !source.isNull(key)) {
+        put(key, source.get(key))
+    } else if (!fallback.isNullOrBlank()) {
+        put(key, fallback)
     }
 }
 

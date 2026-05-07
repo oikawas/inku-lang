@@ -77,6 +77,9 @@ Android ワークスペースには、namespace `app.inku.mobile` の build 可�
     `android/scripts/headless_batch_compare.sh`
   - `COMPARE_WEB=1` のとき、server-side generation は `inku-cli paint` で実行する。
     比較経路で `/api/paint` を直接叩いてはならない。
+  - `android/scripts/headless_render_compare.sh` は server-side CLI 描画結果を後から通常履歴で参照できるよう、
+    `CLI_SAVE_HISTORY=true` をデフォルトとし、`inku-cli paint --save-history` を付与する。
+    `summary.json` と batch aggregate summary には server-side `history_id` を含める。
 - LiteRT-LM は Stage 1 / Stage 2 のデフォルト local model provider として接続済み。
   provider は Room から選択済み Gemma 4 E2B/E4B `.litertlm` path を読み、
   model state が `ready` であることを確認し、cached LiteRT-LM `Engine` を初期化し、

@@ -91,6 +91,11 @@ Implemented:
   - when `COMPARE_WEB=1`, server-side generation is executed through
     `inku-cli paint`; the script must not call `/api/paint` directly for the
     comparison path
+  - `android/scripts/headless_render_compare.sh` defaults
+    `CLI_SAVE_HISTORY=true` so server-side CLI drawings are run with
+    `inku-cli paint --save-history` and can be reviewed later in normal server
+    history. `summary.json` and the batch aggregate summary include the
+    server-side `history_id`.
 - LiteRT-LM is wired as the default local model provider for Stage 1 and Stage
   2. The provider reads the selected Gemma 4 E2B/E4B `.litertlm` file path from
   Room, verifies that the model is in the `ready` state, initializes a cached

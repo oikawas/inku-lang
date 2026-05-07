@@ -15,6 +15,7 @@ CANVAS_ASPECT="${CANVAS_ASPECT:-}"
 AUTO_REPAIR="${AUTO_REPAIR:-true}"
 SAVE_HISTORY="${SAVE_HISTORY:-false}"
 COMPARE_WEB="${COMPARE_WEB:-1}"
+CLI_SAVE_HISTORY="${CLI_SAVE_HISTORY:-true}"
 CLI_DIR="${CLI_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/cli}"
 INKU_CLI_TIMEOUT_SECONDS="${INKU_CLI_TIMEOUT_SECONDS:-600}"
 
@@ -70,6 +71,7 @@ printf '%s\n' "$android_result" > "$OUT_DIR/$RUN_ID/android/result.json"
 "${adb_cmd[@]}" exec-out run-as "$APP_ID" cat "files/headless/$RUN_ID/score.json" > "$OUT_DIR/$RUN_ID/android/score.json" 2>/dev/null || true
 "${adb_cmd[@]}" exec-out run-as "$APP_ID" cat "files/headless/$RUN_ID/output.svg" > "$OUT_DIR/$RUN_ID/android/output.svg" 2>/dev/null || true
 "${adb_cmd[@]}" exec-out run-as "$APP_ID" cat "files/headless/$RUN_ID/normalized.ddl" > "$OUT_DIR/$RUN_ID/android/normalized.ddl" 2>/dev/null || true
+"${adb_cmd[@]}" exec-out run-as "$APP_ID" cat "files/headless/$RUN_ID/metadata.json" > "$OUT_DIR/$RUN_ID/android/metadata.json" 2>/dev/null || true
 
 android_status="$(jq -r '.status' "$OUT_DIR/$RUN_ID/android/result.json")"
 if [[ "$android_status" != "ok" ]]; then
@@ -115,6 +117,9 @@ if [[ "$COMPARE_WEB" == "1" ]]; then
     --color-catalog "$web_catalog"
     --full-json
   )
+  if [[ "$CLI_SAVE_HISTORY" == "true" || "$CLI_SAVE_HISTORY" == "1" ]]; then
+    cli_args+=(--save-history)
+  fi
   if [[ -n "$web_stage1_provider" ]]; then cli_args+=(--stage1-provider "$web_stage1_provider"); fi
   if [[ -n "$web_stage1" && "$web_stage1" != "null" ]]; then cli_args+=(--stage1-model "$web_stage1"); fi
   if [[ -n "$web_stage2_provider" ]]; then cli_args+=(--stage2-provider "$web_stage2_provider"); fi
@@ -148,6 +153,10 @@ jq -n \
       status: $android[0].status,
       hash: $android[0].render_hash,
       short: $android[0].render_hash_short,
+      history_id: $android[0].history_id,
+      render_color_catalog_id: $android[0].render_color_catalog_id,
+      render_color_catalog_name: $android[0].render_color_catalog_name,
+      render_color_map: $android[0].render_color_map,
       stage1_model: $android[0].stage1_model,
       stage2_model: $android[0].stage2_model,
       ddl: $android[0].normalized_ddl
@@ -155,6 +164,7 @@ jq -n \
     web: (if ($web|length) > 0 then {
       hash: $web[0].render_hash,
       short: $web[0].render_hash_short,
+      history_id: $web[0].history_id,
       stage1_model: $web[0].stage1_model,
       stage2_model: $web[0].stage2_model,
       ddl: $web[0].ddl

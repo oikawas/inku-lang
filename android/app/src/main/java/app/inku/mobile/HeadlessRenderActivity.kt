@@ -73,8 +73,8 @@ class HeadlessRenderActivity : Activity() {
         val inputMode = intent.getStringExtra("input_mode")?.takeIf { it.isNotBlank() } ?: "paint"
         val originalText = intent.getStringExtra("original_text")?.takeIf { it.isNotBlank() } ?: text
 
-        val item = if (inputMode == "ddl") {
-            repository.composeFromDdl(
+        val item = when (inputMode) {
+            "ddl" -> repository.composeFromDdl(
                 description = originalText,
                 ddl = text,
                 catalogId = catalogId,
@@ -83,8 +83,15 @@ class HeadlessRenderActivity : Activity() {
                 stage2ModelId = stage2Model,
                 autoRepair = autoRepair,
             )
-        } else {
-            repository.paint(
+            "score" -> repository.renderFromScore(
+                description = originalText,
+                scoreJson = text,
+                catalogId = catalogId,
+                canvasAspect = canvasAspect,
+                stage1ModelId = stage1Model,
+                stage2ModelId = stage2Model,
+            )
+            else -> repository.paint(
                 description = text,
                 catalogId = catalogId,
                 canvasAspect = canvasAspect,
@@ -138,6 +145,9 @@ class HeadlessRenderActivity : Activity() {
     private suspend fun resolveInputText(): String = withContext(Dispatchers.IO) {
         intent.getStringExtra("text")?.takeIf { it.isNotBlank() } ?: run {
             val path = intent.getStringExtra("text_file")?.takeIf { it.isNotBlank() } ?: return@withContext ""
+            if (path.startsWith("app:")) {
+                return@withContext File(filesDir, path.removePrefix("app:").trimStart('/')).readText()
+            }
             File(path).readText()
         }
     }

@@ -42,11 +42,19 @@ start_args=(
   shell am start -W
   -n "$APP_ID/.HeadlessRenderActivity"
   --es run_id "$RUN_ID"
-  --es text "$TEXT"
   --es input_mode "$INPUT_MODE"
   --ez auto_repair "$AUTO_REPAIR"
   --ez save_history "$SAVE_HISTORY"
 )
+if [[ "$INPUT_MODE" == "score" ]]; then
+  host_input_file="$OUT_DIR/$RUN_ID/score-input.json"
+  printf '%s\n' "$TEXT" > "$host_input_file"
+  "${adb_cmd[@]}" shell run-as "$APP_ID" mkdir -p "files/headless-input" >/dev/null
+  "${adb_cmd[@]}" exec-in run-as "$APP_ID" sh -c "cat > files/headless-input/$RUN_ID.txt" < "$host_input_file"
+  start_args+=(--es text_file "app:headless-input/$RUN_ID.txt")
+else
+  start_args+=(--es text "$TEXT")
+fi
 if [[ -n "$ORIGINAL_TEXT" ]]; then start_args+=(--es original_text "$ORIGINAL_TEXT"); fi
 if [[ -n "$STAGE1_MODEL" ]]; then start_args+=(--es stage1_model "$STAGE1_MODEL"); fi
 if [[ -n "$STAGE2_MODEL" ]]; then start_args+=(--es stage2_model "$STAGE2_MODEL"); fi
@@ -113,28 +121,46 @@ if [[ "$COMPARE_WEB" == "1" ]]; then
         --username "$WEB_USERNAME" --password "$WEB_PASSWORD" >/dev/null
     )
   fi
-  cli_args=(
-    paint "$TEXT"
-    --base-url "$WEB_BASE_URL"
-    --timeout-seconds "$INKU_CLI_TIMEOUT_SECONDS"
-    --no-progress
-    --out-dir "$OUT_DIR/$RUN_ID/web"
-    --prefix web
-    --color-catalog "$web_catalog"
-    --input-mode "$INPUT_MODE"
-    --full-json
-  )
+  if [[ "$INPUT_MODE" == "score" ]]; then
+    score_input="$OUT_DIR/$RUN_ID/score-input.json"
+    printf '%s\n' "$TEXT" > "$score_input"
+    cli_args=(
+      render-score
+      --file "$score_input"
+      --base-url "$WEB_BASE_URL"
+      --timeout-seconds "$INKU_CLI_TIMEOUT_SECONDS"
+      --out-dir "$OUT_DIR/$RUN_ID/web"
+      --prefix web
+      --color-catalog "$web_catalog"
+      --canvas-aspect "$web_canvas"
+      --full-json
+    )
+  else
+    cli_args=(
+      paint "$TEXT"
+      --base-url "$WEB_BASE_URL"
+      --timeout-seconds "$INKU_CLI_TIMEOUT_SECONDS"
+      --no-progress
+      --out-dir "$OUT_DIR/$RUN_ID/web"
+      --prefix web
+      --color-catalog "$web_catalog"
+      --input-mode "$INPUT_MODE"
+      --full-json
+    )
+  fi
   if [[ "$PNG_REVIEW" == "true" || "$PNG_REVIEW" == "1" ]]; then
     cli_args+=(--png)
   fi
-  if [[ -n "$ORIGINAL_TEXT" ]]; then cli_args+=(--original-text "$ORIGINAL_TEXT"); fi
-  if [[ "$CLI_SAVE_HISTORY" == "true" || "$CLI_SAVE_HISTORY" == "1" ]]; then
+  if [[ -n "$ORIGINAL_TEXT" && "$INPUT_MODE" != "score" ]]; then cli_args+=(--original-text "$ORIGINAL_TEXT"); fi
+  if [[ "$INPUT_MODE" != "score" && ( "$CLI_SAVE_HISTORY" == "true" || "$CLI_SAVE_HISTORY" == "1" ) ]]; then
     cli_args+=(--save-history)
   fi
-  if [[ -n "$web_stage1_provider" ]]; then cli_args+=(--stage1-provider "$web_stage1_provider"); fi
-  if [[ -n "$web_stage1" && "$web_stage1" != "null" ]]; then cli_args+=(--stage1-model "$web_stage1"); fi
-  if [[ -n "$web_stage2_provider" ]]; then cli_args+=(--stage2-provider "$web_stage2_provider"); fi
-  if [[ -n "$web_stage2" && "$web_stage2" != "null" ]]; then cli_args+=(--stage2-model "$web_stage2"); fi
+  if [[ "$INPUT_MODE" != "score" ]]; then
+    if [[ -n "$web_stage1_provider" ]]; then cli_args+=(--stage1-provider "$web_stage1_provider"); fi
+    if [[ -n "$web_stage1" && "$web_stage1" != "null" ]]; then cli_args+=(--stage1-model "$web_stage1"); fi
+    if [[ -n "$web_stage2_provider" ]]; then cli_args+=(--stage2-provider "$web_stage2_provider"); fi
+    if [[ -n "$web_stage2" && "$web_stage2" != "null" ]]; then cli_args+=(--stage2-model "$web_stage2"); fi
+  fi
   (
     cd "$CLI_DIR"
     UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/inku-uv-cache}" \

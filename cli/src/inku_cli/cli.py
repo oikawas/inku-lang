@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import hashlib
 import json
 import os
 import sys
@@ -1711,6 +1712,49 @@ def command_contact_sheet(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_render_score(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    raw = _read_text_argument(args.score, args.file)
+    try:
+        score = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise CliError("score must be valid JSON") from exc
+    if not isinstance(score, dict):
+        raise CliError("score JSON must be an object")
+    catalog_data = _fetch_color_catalogs(client)
+    color_catalog = _resolved_color_catalog(args, config, catalog_data)
+    svg = client.request_text(
+        "POST",
+        "/api/render-svg",
+        data={
+            "score": score,
+            "catalog_id": color_catalog,
+            "canvas_aspect": args.canvas_aspect,
+            "svg_profile": args.svg_profile,
+        },
+    )
+    render_hash = hashlib.sha256(svg.encode("utf-8")).hexdigest()
+    result = {
+        "status": "ok",
+        "score": score,
+        "svg": svg,
+        "render_hash": render_hash,
+        "render_hash_short": render_hash[-4:].upper(),
+        "render_color_catalog_id": color_catalog,
+        "render_canvas_aspect": args.canvas_aspect,
+        "svg_profile": args.svg_profile,
+    }
+    paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=args.prefix or "score", png=args.png)
+    result["paths"] = paths
+    _print_json(result if args.full_json else {key: value for key, value in result.items() if key not in {"svg", "score"}})
+    return 0
+
+
 def command_demo_instruction(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -1878,6 +1922,20 @@ def build_parser() -> argparse.ArgumentParser:
     contact_sheet.add_argument("--columns", type=int, default=5)
     contact_sheet.add_argument("--thumb-size", type=int, default=220)
     contact_sheet.set_defaults(func=command_contact_sheet)
+
+    render_score = subparsers.add_parser("render-score", help="render a Score JSON object without Stage 1 or Stage 2")
+    _add_common_server_args(render_score)
+    render_score.add_argument("score", nargs="?", help="Score JSON text")
+    render_score.add_argument("--file", "-f", help="read Score JSON from a file, or '-'")
+    render_score.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
+    render_score.add_argument("--prefix", help="output filename prefix")
+    render_score.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
+    render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display")
+    render_score.add_argument("--canvas-aspect", default="square")
+    render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
+    render_score.add_argument("--color-catalog", help="server color catalog id")
+    render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")
+    render_score.set_defaults(func=command_render_score)
 
     demo = subparsers.add_parser("demo-instruction", help="generate one demo prompt from a seed phrase")
     _add_common_server_args(demo)

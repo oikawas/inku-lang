@@ -271,6 +271,23 @@ class InkuRepository(
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started)
     }
 
+    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String): HistoryItemEntity {
+        val started = System.currentTimeMillis()
+        val result = pipeline.renderFromScore(
+            scoreJson,
+            PaintRequest(
+                description = description,
+                originalText = description,
+                stage1Model = stage1ModelId,
+                stage2Model = stage2ModelId,
+                colorCatalogId = catalogId,
+                canvasAspect = canvasAspect,
+                autoRepair = false,
+            ),
+        )
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started)
+    }
+
     private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null): HistoryItemEntity {
         val now = System.currentTimeMillis()
         val renderMetadataJson = JSONObject(result.renderMetadataJson)

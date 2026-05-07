@@ -20,7 +20,12 @@ class LocalFallbackPipeline(
     }
 
     suspend fun interpret(request: PaintRequest): InterpretResult {
-        val normalizedDdl = generateStage1(request) ?: interpretText(request.description)
+        val generatedDdl = generateStage1(request)
+        val normalizedDdl = generatedDdl ?: if (request.stage1Model.isExplicitProviderModelId()) {
+            error("Stage 1 explicit provider returned no usable DDL.")
+        } else {
+            interpretText(request.description)
+        }
         val expandedDdl = expandIntermediateDdl(normalizedDdl, request.originalText)
         return InterpretResult(
             originalInput = request.originalText,
@@ -32,7 +37,12 @@ class LocalFallbackPipeline(
 
     suspend fun composeFromDdl(ddl: String, request: PaintRequest): PaintResult {
         val expandedDdl = expandIntermediateDdl(ddl, request.originalText)
-        val scoreJson = generateStage2(request, expandedDdl) ?: scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect).toString()
+        val generatedScore = generateStage2(request, expandedDdl)
+        val scoreJson = generatedScore ?: if (request.stage2Model.isExplicitProviderModelId()) {
+            error("Stage 2 explicit provider returned no usable Score.")
+        } else {
+            scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect).toString()
+        }
         val render = renderer.render(
             RenderRequest(
                 scoreJson = scoreJson,
@@ -89,29 +99,58 @@ class LocalFallbackPipeline(
     private suspend fun generateStage2(request: PaintRequest, expandedDdl: String): String? {
         val provider = modelProvider ?: return null
         return runCatching {
+            val userPrompt = "原文:\n${request.originalText}\n\n正規化DDL:\n$expandedDdl"
             val response = provider.generate(
                 ModelRequest(
                     modelId = request.stage2Model,
-                    prompt = "原文:\n${request.originalText}\n\n正規化DDL:\n$expandedDdl",
+                    prompt = userPrompt,
                     temperature = 0.0,
-                    maxTokens = 1024,
+                    maxTokens = 2048,
                     systemInstruction = WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA,
                     tool = WebScoreTool.submitScore,
                 ),
             ).text.cleanModelText()
             val score = runCatching {
                 extractJsonObject(response)
-            }.getOrElse { error ->
-                if (request.stage2Model.isExplicitProviderModelId()) throw error
-                if (!request.autoRepair) throw error
-                Log.w(TAG, "Stage 2 returned invalid JSON; rebuilding renderable score from DDL.", error)
-                scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect)
-            }
+            }.getOrNull()
+                ?.takeIf { it.hasRenderableInstructions() }
+                ?: retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
             coerceScore(score, "${request.originalText}\n$expandedDdl", request.canvasAspect).toString()
         }.onFailure {
             if (request.stage2Model.isExplicitProviderModelId()) throw it
             Log.w(TAG, "Stage 2 provider failed; using deterministic fallback.", it)
         }.getOrNull()
+    }
+
+    private suspend fun retryStage2OrFallback(
+        provider: ModelProvider,
+        request: PaintRequest,
+        expandedDdl: String,
+        userPrompt: String,
+    ): JSONObject {
+        if (!request.autoRepair && request.stage2Model.isExplicitProviderModelId()) {
+            error("Stage 2 model did not return drawable instructions.")
+        }
+        val rescuePrompt = WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA + "\n\n# 空描画リトライ / コンパクト描画リトライ\n" +
+            "直前の Stage 2 出力は無効または非効率。2〜5個の簡潔な描画命令を返す。" +
+            "instructions を空配列にしてはいけない。繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。" +
+            "DDLを説明し直さず、JSONを短く保つ。"
+        val retryScore = runCatching {
+            val retryResponse = provider.generate(
+                ModelRequest(
+                    modelId = request.stage2Model,
+                    prompt = userPrompt,
+                    temperature = 0.0,
+                    maxTokens = 2048,
+                    systemInstruction = rescuePrompt,
+                    tool = WebScoreTool.submitScore,
+                ),
+            ).text.cleanModelText()
+            extractJsonObject(retryResponse)
+        }.getOrNull()
+        if (retryScore != null && retryScore.hasRenderableInstructions()) return retryScore
+        Log.w(TAG, "Stage 2 returned no drawable instructions after retry; rebuilding renderable score from DDL.")
+        return scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect)
     }
 
     private fun String.isExplicitProviderModelId(): Boolean {
@@ -143,13 +182,38 @@ class LocalFallbackPipeline(
 
     private fun extractJsonObject(text: String): JSONObject {
         val trimmed = text.trim()
-        runCatching { return JSONObject(trimmed) }
+        runCatching { return unwrapScoreJson(JSONObject(trimmed)) }
         val start = trimmed.indexOf('{')
         val end = trimmed.lastIndexOf('}')
         if (start >= 0 && end > start) {
-            return JSONObject(trimmed.substring(start, end + 1))
+            return unwrapScoreJson(JSONObject(trimmed.substring(start, end + 1)))
         }
         error("Stage2 did not return a JSON object.")
+    }
+
+    private fun unwrapScoreJson(json: JSONObject): JSONObject {
+        json.optJSONArray("tool_calls")?.let { calls ->
+            for (i in 0 until calls.length()) {
+                val call = calls.optJSONObject(i) ?: continue
+                val arguments = call.optJSONObject("arguments")
+                    ?: call.optJSONObject("parameters")
+                    ?: call.optJSONObject("function")?.let { function ->
+                        function.optJSONObject("arguments")
+                            ?: function.optString("arguments").takeIf { it.isNotBlank() }?.let(::JSONObject)
+                    }
+                if (arguments != null) return arguments
+            }
+        }
+        json.optJSONObject("arguments")?.let { return it }
+        return json
+    }
+
+    private fun JSONObject.hasRenderableInstructions(): Boolean {
+        val instructions = optJSONArray("instructions") ?: return false
+        for (i in 0 until instructions.length()) {
+            if (instructions.optJSONObject(i) != null) return true
+        }
+        return false
     }
 
     private fun scoreFromWebRules(ddl: String, originalText: String, canvasAspect: String): JSONObject {
@@ -284,6 +348,8 @@ class LocalFallbackPipeline(
             .withColorDelivery(ddl, background)
             .withCompositionDiversity(ddl, background)
             .withContextEnergy(ddl, background)
+            .withMotionEnergy(ddl)
+            .withStructuralDuplicateRepair()
             .withDensityBudget()
             .fold(JSONArray()) { array, item -> array.put(item); array }
         val result = JSONObject()
@@ -348,13 +414,18 @@ class LocalFallbackPipeline(
     }
 
     private fun List<JSONObject>.withDdlCoverage(ddl: String, background: String): List<JSONObject> {
+        val clauses = splitDrawableClauses(ddl)
+        if (size != 1 || clauses.size <= 1) return this
         val repaired = toMutableList()
-        for (clause in splitClauses(ddl)) {
-            if (!hasDrawableVocabulary(clause)) continue
+        val existing = repaired.map { Triple(it.optString("primitive"), it.optString("color"), it.optString("weight", "pen")) }.toMutableSet()
+        for (clause in clauses) {
             val primitive = primitiveFromClause(clause) ?: continue
-            if (repaired.any { it.optString("primitive") == primitive && colorMatchesClause(it, clause, background) }) continue
-            if (repaired.size >= 10) break
-            repaired += coverageInstruction(clause, primitive, background)
+            if (repaired.size >= 5) break
+            val fallback = coverageInstruction(clause, primitive, background)
+            val key = Triple(fallback.optString("primitive"), fallback.optString("color"), fallback.optString("weight", "pen"))
+            if (key in existing) continue
+            repaired += fallback
+            existing += key
         }
         return repaired
     }
@@ -388,32 +459,34 @@ class LocalFallbackPipeline(
     }
 
     private fun List<JSONObject>.withCompositionDiversity(ddl: String, background: String): List<JSONObject> {
-        if (size >= 3) return this
-        val colors = map { it.optString("color", "black") }.toSet()
+        if (size >= 10) return this
+        val colors = scoreColorsWithCycles()
         val primitives = map { it.optString("primitive", "line") }.toSet()
         val result = toMutableList()
-        val accent = requestedColors(ddl).firstOrNull { it != background && it !in colors }
-        if (accent != null && result.size < 10) {
+        val accent = compositionAccentColor(ddl, background, colors)
+        val needsAnchor = result.isNotEmpty() && !hasVisibleAnchor() && (primitives == setOf("line") || primitives.size == 1)
+        if (needsAnchor) {
             result += JSONObject()
                 .put("primitive", "ellipse")
-                .put("center", JSONArray(listOf(0.72, 0.28)))
-                .put("size", JSONArray(listOf(0.09, 0.045)))
+                .put("center", JSONArray(listOf(0.64, 0.40)))
+                .put("size", JSONArray(listOf(0.18, 0.11)))
                 .put("rotation", -18)
-                .put("color", accent)
-                .put("weight", "pen")
-                .put("color_hint", "composition accent restored for shape/color diversity")
+                .put("color", if (accent != null && accent != background) accent else visibleForeground("black", background))
+                .put("weight", "brush_thick")
+                .put("color_hint", "composition anchor restored for shape/color diversity")
         }
-        if (primitives.size == 1 && result.size < 10 && (ddl.containsAny("光", "香", "気配", "余韻", "反射", "影") || result.size == 1)) {
+        val updatedColors = result.scoreColorsWithCycles()
+        if (accent != null && accent !in colors && accent !in updatedColors && result.size < 10) {
             result += JSONObject()
                 .put("primitive", "arc")
-                .put("center", JSONArray(listOf(0.34, 0.66)))
-                .put("radius", 0.12)
-                .put("angle_start", 210)
-                .put("angle_end", 330)
-                .put("color", visibleForeground("gray", background))
-                .put("weight", "pencil")
-                .put("variation", JSONObject().put("amplitude", "fine").put("frequency", "medium").put("quality", "perlin").put("dimensions", JSONArray(listOf("position_x", "position_y"))))
-                .put("color_hint", "composition anchor restored for shape diversity")
+                .put("center", JSONArray(listOf(0.36, 0.62)))
+                .put("radius", 0.09)
+                .put("angle_start", 18)
+                .put("angle_end", 205)
+                .put("rotation", 8)
+                .put("color", if (accent != background) accent else visibleForeground("black", background))
+                .put("weight", "brush_thin")
+                .put("color_hint", "composition accent restored for shape/color diversity")
         }
         return result
     }
@@ -438,6 +511,93 @@ class LocalFallbackPipeline(
             result[0] = first
         }
         return result
+    }
+
+    private fun List<JSONObject>.withMotionEnergy(ddl: String): List<JSONObject> {
+        if (!ddl.containsAny("揺れる", "震える", "波打つ", "流", "舞", "風", "浮か", "motion", "sway", "wave", "floating")) return this
+        return mapIndexed { index, item ->
+            val copy = JSONObject(item.toString())
+            var changed = false
+            val primitive = copy.optString("primitive", "line")
+            val arrangement = copy.optJSONObject("arrangement")
+            if (arrangement != null) {
+                if (arrangement.optString("path", "none") == "none") {
+                    arrangement.put("path", if (index % 2 == 0) "wave" else "diagonal")
+                    changed = true
+                }
+                if (primitive in setOf("ellipse", "square", "triangle", "polygon") && !copy.has("rotation")) {
+                    copy.put("rotation", if (index % 2 == 0) -24 else 18)
+                    changed = true
+                }
+                copy.put("arrangement", arrangement)
+            } else if (primitive in setOf("line", "ellipse", "arc", "square", "triangle", "polygon") && !copy.has("rotation")) {
+                copy.put("rotation", if (index % 2 == 0) -18 else 22)
+                changed = true
+            }
+            if (copy.optJSONObject("variation") == null && primitive in setOf("line", "ellipse", "arc", "polygon")) {
+                copy.put(
+                    "variation",
+                    JSONObject()
+                        .put("amplitude", "medium")
+                        .put("frequency", "slow")
+                        .put("quality", "wave")
+                        .put("dimensions", JSONArray(listOf("position_x", "position_y"))),
+                )
+                changed = true
+            }
+            if (changed) {
+                copy.put("color_hint", appendHint(copy.optString("color_hint").takeIf { it.isNotBlank() }, "motion energy restored through trajectory and rotation"))
+            }
+            copy
+        }
+    }
+
+    private fun List<JSONObject>.withStructuralDuplicateRepair(): List<JSONObject> {
+        val kept = linkedMapOf<String, JSONObject>()
+        for (item in this) {
+            val key = structuralDuplicateKey(item)
+            val existing = kept[key]
+            if (existing == null) {
+                kept[key] = item
+                continue
+            }
+            if (item.structuralSpecificityScore() > existing.structuralSpecificityScore()) {
+                kept[key] = item
+            }
+        }
+        return kept.values.toList()
+    }
+
+    private fun structuralDuplicateKey(item: JSONObject): String {
+        val arrangement = item.optJSONObject("arrangement")
+        return listOf(
+            item.optString("primitive", "line"),
+            item.optString("color", "black"),
+            item.optString("weight", "pen"),
+            item.optJSONArray("center")?.toString().orEmpty(),
+            item.optJSONArray("position")?.toString().orEmpty(),
+            item.optJSONArray("from")?.toString().orEmpty(),
+            item.optJSONArray("to")?.toString().orEmpty(),
+            item.optJSONArray("size")?.toString().orEmpty(),
+            item.optDouble("radius", -1.0).toString(),
+            arrangement?.optInt("count", 1)?.toString().orEmpty(),
+            arrangement?.optString("layout", "none").orEmpty(),
+            arrangement?.optString("path", "none").orEmpty(),
+        ).joinToString("|")
+    }
+
+    private fun JSONObject.structuralSpecificityScore(): Int {
+        var score = 0
+        val arrangement = optJSONObject("arrangement")
+        if (arrangement != null) {
+            score += 2
+            if (arrangement.has("density")) score += 1
+            if (arrangement.has("fade")) score += 1
+            if (arrangement.optBoolean("preserve_space", false)) score += 1
+        }
+        if (optJSONObject("variation") != null) score += 1
+        if (optString("color_hint").isNotBlank()) score += 1
+        return score
     }
 
     private fun List<JSONObject>.withDensityBudget(): List<JSONObject> {
@@ -471,6 +631,22 @@ class LocalFallbackPipeline(
 
     private fun splitClauses(text: String): List<String> {
         return Regex("""(?<=[。.!?])""").split(text).map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    private fun splitDrawableClauses(text: String): List<String> {
+        val markers = listOf(
+            "線", "点", "円", "楕円", "四角", "三角", "多角形", "五角", "六角", "弧", "塗りつぶす", "散らす", "並べる",
+            "膜", "霞", "霧", "靄", "気配", "余韻", "反射", "映り", "消え", "滲",
+            "光", "陽光", "日差し", "香", "匂", "蕾", "つぼみ", "開花", "五感", "温",
+            "line", "dot", "circle", "ellipse", "square", "triangle", "polygon", "arc", "scatter", "fill",
+            "membrane", "haze", "fog", "mist", "trace", "reflection", "fade", "fading", "blur",
+            "light", "sunlight", "scent", "fragrance", "bud", "bloom", "sense", "warm",
+        )
+        return splitClauses(text).filter { clause ->
+            !clause.startsWith("背景") &&
+                !clause.lowercase().startsWith("background") &&
+                markers.any { it in clause }
+        }
     }
 
     private fun primitiveFromClause(clause: String): String? = when {
@@ -528,6 +704,51 @@ class LocalFallbackPipeline(
         val itemColor = item.optString("color", "black")
         val cycle = item.optJSONObject("arrangement")?.optJSONArray("color_cycle")
         return itemColor in colors || (cycle != null && (0 until cycle.length()).any { cycle.optString(it) in colors })
+    }
+
+    private fun List<JSONObject>.scoreColorsWithCycles(): Set<String> {
+        val colors = mutableSetOf<String>()
+        forEach { item ->
+            colors += item.optString("color", "black")
+            item.optJSONObject("arrangement")?.optJSONArray("color_cycle")?.let { cycle ->
+                for (i in 0 until cycle.length()) colors += cycle.optString(i)
+            }
+        }
+        return colors
+    }
+
+    private fun List<JSONObject>.hasVisibleAnchor(): Boolean {
+        return any { item ->
+            item.optString("primitive", "line") != "line" && shapeExtent(item) in 0.08..0.42
+        }
+    }
+
+    private fun shapeExtent(item: JSONObject): Double {
+        val primitive = item.optString("primitive", "line")
+        return when (primitive) {
+            "circle", "arc", "polygon" -> item.optDouble("radius", 0.0) * 2.0
+            "ellipse", "square", "triangle" -> {
+                val size = item.optJSONArray("size")
+                maxOf(size?.optDouble(0, 0.0) ?: 0.0, size?.optDouble(1, 0.0) ?: 0.0)
+            }
+            else -> 0.0
+        }
+    }
+
+    private fun compositionAccentColor(ddl: String, background: String, existing: Set<String>): String? {
+        requestedColors(ddl).firstOrNull { it !in existing && it != background }?.let { return it }
+        if (existing.isNotEmpty() && existing.any { it !in setOf("black", "gray") }) return null
+        val lower = ddl.lowercase()
+        if (ddl.containsAny("祭", "火", "灯", "温", "赤") || listOf("warm", "fire", "light").any { it in lower }) {
+            return if (background != "red") "red" else "white"
+        }
+        if (ddl.containsAny("水", "夜", "湖", "冷", "青") || listOf("water", "night", "cold").any { it in lower }) {
+            return if (background != "blue") "blue" else "white"
+        }
+        if (ddl.containsAny("森", "草", "苔", "庭", "竹") || listOf("green", "forest", "grass").any { it in lower }) {
+            return if (background != "green") "green" else "white"
+        }
+        return null
     }
 
     private fun appendHint(existing: String?, note: String): String {
@@ -723,7 +944,25 @@ class LocalFallbackPipeline(
             .replace(Regex("""[ \t]{2,}"""), " ")
             .replace(Regex("""。{2,}"""), "。")
             .replace(Regex("""、{2,}"""), "、")
+            .normalizeDdlNumberNoise()
+            .dedupeDdlClauses()
             .trim()
+    }
+
+    private fun String.normalizeDdlNumberNoise(): String {
+        return replace(Regex("""([一二三四五六七八九十百]+本)数を\1並べる"""), "$1並べる")
+            .replace(Regex("""([一二三四五六七八九十百]+個)数を\1並べる"""), "$1並べる")
+            .replace(Regex("""([一二三四五六七八九十百]+点)数を\1散らす"""), "$1散らす")
+    }
+
+    private fun String.dedupeDdlClauses(): String {
+        val clauses = splitClauses(this)
+        if (clauses.isEmpty()) return this
+        val seen = mutableSetOf<String>()
+        return clauses.filter { clause ->
+            val key = clause.trim().trimEnd('。')
+            seen.add(key)
+        }.joinToString("") { if (it.endsWith("。")) it else "$it。" }
     }
 
     private fun String.isUsableStage1Ddl(): Boolean {

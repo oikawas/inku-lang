@@ -46,7 +46,7 @@ class DefaultSvgRenderer : SvgRenderer {
         }
         val metadata = JSONObject()
             .put("render_engine_id", "default")
-            .put("render_engine_version", "1")
+            .put("render_engine_version", "2")
             .put("render_canvas_aspect", CanvasAspects.normalize(request.canvasAspect))
             .put("render_color_catalog_id", catalog.id)
             .put("render_color_catalog_name", catalog.name)

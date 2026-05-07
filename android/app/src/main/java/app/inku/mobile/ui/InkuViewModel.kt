@@ -1,6 +1,7 @@
 package app.inku.mobile.ui
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.inku.mobile.InkuApplication
@@ -137,6 +138,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     private var promptEditedByUser = false
     private var modelSelectionSnapshot: Pair<String, String>? = null
     private var catalogSelectionSnapshot: String? = null
+    private var lastHistorySwipeAt = 0L
 
     val state: StateFlow<InkuUiState> = combine(localState, history, modelAssets, providerSettings, exportTemplates) { state, items, assets, providers, templates ->
         val selected = state.selectedHistory?.let { current ->
@@ -471,6 +473,30 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             tab = AppTab.Compose,
             composeMode = ComposeMode.Write,
         )
+    }
+
+    fun selectPreviousHistory() {
+        selectAdjacentHistory(-1)
+    }
+
+    fun selectNextHistory() {
+        selectAdjacentHistory(1)
+    }
+
+    private fun selectAdjacentHistory(offset: Int) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastHistorySwipeAt < 450L) return
+        val items = historyItems.value
+        if (items.isEmpty()) return
+        val current = localState.value.selectedHistory
+        val currentIndex = current
+            ?.let { selected -> items.indexOfFirst { it.id == selected.id } }
+            ?.takeIf { it >= 0 }
+            ?: 0
+        val nextIndex = (currentIndex + offset).coerceIn(0, items.lastIndex)
+        if (nextIndex == currentIndex) return
+        lastHistorySwipeAt = now
+        selectHistory(items[nextIndex])
     }
 
     fun draw() {

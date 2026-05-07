@@ -647,3 +647,27 @@ Verification:
 - `gradle :app:compileDebugKotlin` succeeded.
 - `gradle :app:assembleDebug` succeeded.
 - The debug APK was installed and launched on Pixel 9.
+
+## 2026-05-08 Android-Specific Swipe History In Compose Preview
+
+As an explicit Android difference from the server/web implementation, the
+Compose screen lets users switch the currently displayed history item by
+swiping directly on the rendered image.
+
+- Swiping right on the rendered image moves one history item backward.
+- Swiping left on the rendered image moves one history item forward.
+- Tapping the image remains a no-op.
+- Pinch-in / pinch-out zoom and panning while zoomed remain supported.
+- While zoomed, image manipulation takes priority over history swiping.
+- Short-term repeated history switching is throttled so one horizontal swipe
+  does not jump across multiple history items.
+
+This gesture is an Android-specific mobile usability addition and is not a
+server/web parity requirement.
+
+Verification:
+
+- `gradle :app:compileDebugKotlin` succeeded.
+- `gradle :app:assembleDebug` succeeded.
+- The debug APK was installed on Pixel 9, and left / right swipes on the
+  Compose preview image were verified to switch history items.

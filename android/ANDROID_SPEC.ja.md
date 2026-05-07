@@ -582,3 +582,22 @@ Gemma 4 モデル取得 UI:
 - `gradle :app:compileDebugKotlin` 成功。
 - `gradle :app:assembleDebug` 成功。
 - Pixel 9 へ debug APK を install し、起動を確認。
+
+## 2026-05-08 記述パネル描画表示の Android 固有履歴スワイプ
+
+Android 版の記述パネルでは、モバイル操作に合わせた server/web 版との明示的な差分として、描画画像そのものへの左右スワイプで表示中の履歴を切り替えられる。
+
+- 描画画像上の右スワイプは、履歴を 1 件前へ戻す。
+- 描画画像上の左スワイプは、履歴を 1 件後へ進める。
+- 画像タップには操作を割り当てない。
+- ピンチイン / ピンチアウトによるズームと、ズーム時のパン操作は維持する。
+- ズーム中は履歴スワイプより画像操作を優先する。
+- 1 回の横スワイプで複数履歴へ連続移動しないよう、短時間の連続履歴送りを抑制する。
+
+この操作は Android 版の片手操作性とモバイル履歴確認のための追加仕様であり、server/web 版との parity 対象ではない。
+
+確認:
+
+- `gradle :app:compileDebugKotlin` 成功。
+- `gradle :app:assembleDebug` 成功。
+- Pixel 9 へ debug APK を install し、記述パネルの描画画像上で左スワイプ / 右スワイプによる履歴切替を確認。

@@ -74,12 +74,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
@@ -102,6 +107,7 @@ import app.inku.mobile.data.model.ColorCatalogs
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
+import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -121,6 +127,10 @@ private val InkuColors = darkColorScheme(
     onSurface = Color(0xFFEDE7DE),
     onSurfaceVariant = Color(0xFFCFC6BA),
 )
+
+private val ServerCanvasAreaColor = Color(0xFF20201F)
+private val ServerCanvasBoxColor = Color(0xFF242321)
+private val ServerCanvasPaperColor = Color(0xFFF5F1E9)
 
 private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
@@ -692,18 +702,50 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
                     .fillMaxWidth()
                     .height(previewHeight)
                     .border(1.dp, Color(0x1A000000)),
-                color = Color(0xFFFAFAF6),
+                color = ServerCanvasAreaColor,
                 shape = RoundedCornerShape(0.dp),
                 tonalElevation = 1.dp,
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (item == null) {
-                        Text("No render yet", color = Color(0xFF7D766E), modifier = Modifier.align(Alignment.Center))
+                        CanvasPlaceholderPreview(modifier = Modifier.fillMaxSize())
                     } else {
                         ArtworkPreview(
                             item,
                             modifier = Modifier
                                 .fillMaxSize()
+                                .pointerInput(item.id, state.canvasZoom) {
+                                    awaitPointerEventScope {
+                                        var total = Offset.Zero
+                                        var switched = false
+                                        while (true) {
+                                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                                            val pressed = event.changes.filter { it.pressed }
+                                            if (pressed.isEmpty()) {
+                                                total = Offset.Zero
+                                                switched = false
+                                                continue
+                                            }
+                                            if (pressed.size != 1 || state.canvasZoom > 1.05f) {
+                                                total = Offset.Zero
+                                                continue
+                                            }
+                                            if (!switched) {
+                                                val change = pressed.first()
+                                                total += change.position - change.previousPosition
+                                                val horizontal = abs(total.x) > 96f && abs(total.x) > abs(total.y) * 1.6f
+                                                if (horizontal) {
+                                                    if (total.x > 0f) {
+                                                        viewModel.selectPreviousHistory()
+                                                    } else {
+                                                        viewModel.selectNextHistory()
+                                                    }
+                                                    switched = true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 .pointerInput(Unit) {
                                     detectTransformGestures { _, pan, zoom, _ ->
                                         if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
@@ -2751,9 +2793,9 @@ private fun ArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifie
     val svg = remember(item.id, item.displaySvg) {
         runCatching { SVG.getFromString(item.displaySvg) }.getOrNull()
     }
-    Surface(color = Color.White, shape = RoundedCornerShape(2.dp), modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize().padding(2.dp)) {
-            drawRect(Color.White)
+    Surface(color = ServerCanvasBoxColor, shape = RoundedCornerShape(0.dp), modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(ServerCanvasBoxColor)
             val parsed = svg ?: return@Canvas
             val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
             val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
@@ -2780,6 +2822,65 @@ private fun ArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifie
                 native.restore()
             }
         }
+    }
+}
+
+@Composable
+private fun CanvasPlaceholderPreview(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.background(ServerCanvasBoxColor)) {
+        drawRect(ServerCanvasPaperColor)
+        val w = size.width
+        val h = size.height
+        val unit = minOf(w, h)
+        val lineA = Path().apply {
+            moveTo(w * 0.16f, h * 0.67f)
+            cubicTo(w * 0.26f, h * 0.52f, w * 0.35f, h * 0.78f, w * 0.46f, h * 0.61f)
+            cubicTo(w * 0.57f, h * 0.44f, w * 0.65f, h * 0.40f, w * 0.83f, h * 0.58f)
+        }
+        drawPath(
+            path = lineA,
+            color = Color(0xFFCFC6B6).copy(alpha = 0.72f),
+            style = Stroke(width = unit * 0.007f, cap = StrokeCap.Round),
+        )
+        val lineB = Path().apply {
+            moveTo(w * 0.17f, h * 0.38f)
+            cubicTo(w * 0.26f, h * 0.32f, w * 0.33f, h * 0.42f, w * 0.41f, h * 0.37f)
+            cubicTo(w * 0.49f, h * 0.32f, w * 0.56f, h * 0.22f, w * 0.66f, h * 0.28f)
+            cubicTo(w * 0.73f, h * 0.32f, w * 0.78f, h * 0.39f, w * 0.85f, h * 0.36f)
+        }
+        drawPath(
+            path = lineB,
+            color = Color(0xFFDED6C9).copy(alpha = 0.72f),
+            style = Stroke(
+                width = unit * 0.004f,
+                cap = StrokeCap.Round,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(unit * 0.018f, unit * 0.018f)),
+            ),
+        )
+        val shapeStroke = Stroke(width = unit * 0.006f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        drawCircle(
+            color = Color(0xFFD8CFC0).copy(alpha = 0.72f),
+            radius = unit * 0.055f,
+            center = Offset(w * 0.33f, h * 0.53f),
+            style = shapeStroke,
+        )
+        drawRect(
+            color = Color(0xFFD8CFC0).copy(alpha = 0.72f),
+            topLeft = Offset(w * 0.63f, h * 0.48f),
+            size = Size(w * 0.09f, h * 0.11f),
+            style = shapeStroke,
+        )
+        val triangle = Path().apply {
+            moveTo(w * 0.49f, h * 0.40f)
+            lineTo(w * 0.54f, h * 0.57f)
+            lineTo(w * 0.44f, h * 0.57f)
+            close()
+        }
+        drawPath(
+            path = triangle,
+            color = Color(0xFFD8CFC0).copy(alpha = 0.72f),
+            style = shapeStroke,
+        )
     }
 }
 

@@ -86,6 +86,8 @@ Implemented:
   - extracted `result.json`, `normalized.ddl`, `score.json`, and `output.svg`
   - `android/scripts/headless_render_compare.sh` as an `inku-cli`-equivalent
     local comparison runner
+  - `android/scripts/headless_batch_compare.sh` for multi-prompt comparison,
+    retry, and aggregate summary generation
   - when `COMPARE_WEB=1`, server-side generation is executed through
     `inku-cli paint`; the script must not call `/api/paint` directly for the
     comparison path
@@ -209,6 +211,37 @@ Verified on device:
     and a white ellipse composition anchor.
   - Android render metadata reported `render_engine_version: 1`; the server
     reported `render_engine_version: 2`.
+- A five-prompt comparison was run using generated 32-character Japanese
+  seasonal instructions, Android headless CLI-equivalent rendering, and server
+  `inku-cli paint`.
+  - batch id: `season32-compare-003`
+  - artifacts: `/tmp/inku-headless/season32-compare-003/`
+  - prompt count: `5`
+  - success count: `5`
+  - error count: `0`
+  - same render hash count: `0`
+  - same DDL count: `1`
+  - all input prompts were verified as 32 characters:
+    - `春の雨に濡れた桜の影を白い余白へ淡く静かに散らす細い銀の線たちよ`
+    - `夏の夜に光る海風を青い円と赤い点で遠く揺らす透明な波音として置く`
+    - `秋の夕暮れに舞う落葉を金の線と黒い余白で斜めに重ねる細い影二本を`
+    - `冬の朝に凍る池の息を白い弧と灰の点で静かに結ぶ細い影青く遠く残す`
+    - `梅雨明けの雲間に虹の欠片を緑の弧と青い粒で軽く浮かべるそっと置く`
+  - hash short comparison:
+    - `season32-001`: Android `18E1`, server `FDCE`, DDL mismatch
+    - `season32-002`: Android `5BF6`, server `CAA0`, DDL mismatch
+    - `season32-003`: Android `588C`, server `E2BC`, DDL mismatch
+    - `season32-004`: Android `2033`, server `2357`, DDL mismatch
+    - `season32-005`: Android `E590`, server `5D2D`, DDL match
+  - `season32-001` showed large Android/server divergence in numeric
+    extraction from natural language.
+  - `season32-002` was semantically close, but Android added material details
+    such as `細筆` and `鉛筆`.
+  - `season32-003` produced the unnatural Android phrase `二本数を二本並べる`.
+  - `season32-004` diverged in background color, placement, count, and whether
+    an additional line was added, showing a large Stage 1/1.5 parity gap.
+  - `season32-005` matched DDL but still produced a different render hash,
+    leaving renderer / metadata / SVG generation parity unresolved.
 
 The latest local verification screenshot was written to:
 

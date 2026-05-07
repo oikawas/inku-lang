@@ -73,6 +73,8 @@ Android ワークスペースには、namespace `app.inku.mobile` の build 可�
   - app sandbox artifacts under `files/headless/<run_id>/`
   - `result.json`、`normalized.ddl`、`score.json`、`output.svg` の抽出
   - `inku-cli` 相当の local comparison runner として `android/scripts/headless_render_compare.sh`
+  - 複数 prompt を連続比較し、retry と aggregate summary を作る
+    `android/scripts/headless_batch_compare.sh`
   - `COMPARE_WEB=1` のとき、server-side generation は `inku-cli paint` で実行する。
     比較経路で `/api/paint` を直接叩いてはならない。
 - LiteRT-LM は Stage 1 / Stage 2 のデフォルト local model provider として接続済み。
@@ -175,6 +177,32 @@ Android ワークスペースには、namespace `app.inku.mobile` の build 可�
   - Android Score は 3 instructions。
   - server/inku-cli Score は 4 instructions。`color_cycle` repair と white ellipse composition anchor を含む。
   - Android render metadata は `render_engine_version: 1`、server は `render_engine_version: 2`。
+- 32文字の日本の四季テーマ指示を5件生成し、Android headless CLI 相当経路と
+  server `inku-cli paint` の描画結果を比較した。
+  - batch id: `season32-compare-003`
+  - artifacts: `/tmp/inku-headless/season32-compare-003/`
+  - prompt count: `5`
+  - success count: `5`
+  - error count: `0`
+  - same render hash count: `0`
+  - same DDL count: `1`
+  - 入力は全て32文字で確認済み:
+    - `春の雨に濡れた桜の影を白い余白へ淡く静かに散らす細い銀の線たちよ`
+    - `夏の夜に光る海風を青い円と赤い点で遠く揺らす透明な波音として置く`
+    - `秋の夕暮れに舞う落葉を金の線と黒い余白で斜めに重ねる細い影二本を`
+    - `冬の朝に凍る池の息を白い弧と灰の点で静かに結ぶ細い影青く遠く残す`
+    - `梅雨明けの雲間に虹の欠片を緑の弧と青い粒で軽く浮かべるそっと置く`
+  - hash short comparison:
+    - `season32-001`: Android `18E1`, server `FDCE`, DDL mismatch
+    - `season32-002`: Android `5BF6`, server `CAA0`, DDL mismatch
+    - `season32-003`: Android `588C`, server `E2BC`, DDL mismatch
+    - `season32-004`: Android `2033`, server `2357`, DDL mismatch
+    - `season32-005`: Android `E590`, server `5D2D`, DDL match
+  - `season32-001` は自然言語からの数値抽出が Android と server で大きく異なった。
+  - `season32-002` は DDL の意味は近いが、Android 側に `細筆` / `鉛筆` の material detail が追加された。
+  - `season32-003` は Android 側で `二本数を二本並べる` という不自然な重複表現が出た。
+  - `season32-004` は背景色、配置、個数、追加線の有無まで異なり、Stage 1/1.5 parity gap が大きい。
+  - `season32-005` は DDL が一致したが render hash は不一致であり、renderer / metadata / SVG generation parity が未達である。
 
 最新の local verification screenshot:
 

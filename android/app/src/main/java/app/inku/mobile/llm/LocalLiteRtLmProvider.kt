@@ -83,23 +83,34 @@ class LocalLiteRtLmProvider(
             }
             current?.close()
             Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
-            Log.i(TAG, "LiteRT-LM engine initializing model=$modelId maxTokens=$maxNumTokens")
-            val newEngine = Engine(
-                EngineConfig(
-                    modelPath = modelPath,
-                    backend = Backend.CPU(),
-                    maxNumTokens = maxNumTokens,
-                    cacheDir = File(context.cacheDir, "litert-lm").also { it.mkdirs() }.absolutePath,
-                ),
-            )
-            newEngine.initialize()
-            Log.i(TAG, "LiteRT-LM engine initialized model=$modelId")
+            val cacheDir = File(context.cacheDir, "litert-lm").also { it.mkdirs() }.absolutePath
+            val newEngine = createInitializedEngine(modelPath, Backend.GPU(), maxNumTokens, cacheDir)
+            Log.i(TAG, "LiteRT-LM engine initialized model=$modelId backend=${Backend.GPU().name}")
             loadedModelId = modelId
             loadedModelPath = modelPath
             loadedMaxNumTokens = maxNumTokens
             engine = newEngine
             newEngine
         }
+    }
+
+    private fun createInitializedEngine(
+        modelPath: String,
+        backend: Backend,
+        maxNumTokens: Int,
+        cacheDir: String,
+    ): Engine {
+        Log.i(TAG, "LiteRT-LM engine initializing backend=${backend.name} maxTokens=$maxNumTokens")
+        val newEngine = Engine(
+            EngineConfig(
+                modelPath = modelPath,
+                backend = backend,
+                maxNumTokens = maxNumTokens,
+                cacheDir = cacheDir,
+            ),
+        )
+        newEngine.initialize()
+        return newEngine
     }
 
     private fun conversationConfig(request: ModelRequest): ConversationConfig {
@@ -132,6 +143,6 @@ class LocalLiteRtLmProvider(
     private companion object {
         private const val TAG = "InkuLiteRtLm"
         private const val REQUEST_TIMEOUT_MS = 600_000L
-        private const val ENGINE_MAX_NUM_TOKENS = 8192
+        private const val ENGINE_MAX_NUM_TOKENS = 4096
     }
 }

@@ -67,7 +67,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -2778,27 +2780,36 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
 
 @Composable
 private fun ArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifier) {
+    val svg = remember(item.id, item.displaySvg) {
+        runCatching { SVG.getFromString(item.displaySvg) }.getOrNull()
+    }
     Surface(color = Color.White, shape = RoundedCornerShape(2.dp), modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize().padding(2.dp)) {
-            val score = JSONObject(item.scoreJson)
-            val catalog = ColorCatalogs.get(item.colorCatalogId)
-            val background = parseColor(catalog.map[score.optString("background", "white")] ?: "#ffffff")
-            drawRect(background)
-            val instructions = score.optJSONArray("instructions") ?: return@Canvas
-            val side = minOf(size.width, size.height)
-            val offsetX = (size.width - side) / 2f
-            val offsetY = (size.height - side) / 2f
-            for (i in 0 until instructions.length()) {
-                val instruction = instructions.optJSONObject(i) ?: continue
-                expandPreview(instruction).forEach { mark ->
-                    val color = parseColor(catalog.map[mark.optString("color", "black")] ?: "#111111")
-                    val stroke = Stroke(width = strokeWidthPx(mark.optString("weight", "pen")))
-                    when (mark.optString("primitive", "line")) {
-                        "line" -> drawPreviewLine(mark, color, stroke.width, offsetX, offsetY, side)
-                        "square" -> drawPreviewSquare(mark, color, stroke, offsetX, offsetY, side)
-                        else -> drawPreviewCircle(mark, color, stroke, offsetX, offsetY, side)
-                    }
-                }
+            drawRect(Color.White)
+            val parsed = svg ?: return@Canvas
+            val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
+            val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
+            val documentAspect = documentWidth / documentHeight
+            val boxAspect = size.width / size.height
+            val drawWidth: Float
+            val drawHeight: Float
+            if (documentAspect >= boxAspect) {
+                drawWidth = size.width
+                drawHeight = size.width / documentAspect
+            } else {
+                drawHeight = size.height
+                drawWidth = size.height * documentAspect
+            }
+            val left = (size.width - drawWidth) / 2f
+            val top = (size.height - drawHeight) / 2f
+            drawIntoCanvas { canvas ->
+                val native = canvas.nativeCanvas
+                native.save()
+                native.translate(left, top)
+                parsed.setDocumentWidth(drawWidth)
+                parsed.setDocumentHeight(drawHeight)
+                parsed.renderToCanvas(native)
+                native.restore()
             }
         }
     }

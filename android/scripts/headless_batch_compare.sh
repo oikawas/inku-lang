@@ -7,6 +7,8 @@ OUT_DIR="${OUT_DIR:-/tmp/inku-headless}"
 BATCH_ID="${BATCH_ID:-batch-$(date +%Y%m%d-%H%M%S)}"
 RUN_PREFIX="${RUN_PREFIX:-compare}"
 BATCH_RETRIES="${BATCH_RETRIES:-1}"
+PNG_REVIEW="${PNG_REVIEW:-true}"
+PNG_SIZE="${PNG_SIZE:-1024}"
 
 if [[ -z "$PROMPTS_FILE" ]]; then
   echo "PROMPTS_FILE is required." >&2
@@ -87,6 +89,7 @@ jq -s \
       android_history_id: .android.history_id,
       server_history_id: .web.history_id,
       android_catalog_id: .android.render_color_catalog_id,
+      png_review: .png_review,
       same_render_hash,
       same_ddl,
       android_ddl: .android.ddl,
@@ -96,3 +99,13 @@ jq -s \
   }' "$batch_dir"/*/summary.json > "$batch_dir/batch-summary.json"
 
 cat "$batch_dir/batch-summary.json"
+
+if [[ "$PNG_REVIEW" == "true" || "$PNG_REVIEW" == "1" ]]; then
+  CLI_DIR="${CLI_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)/cli}"
+  (
+    cd "$CLI_DIR"
+    UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/inku-uv-cache}" \
+    UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$HOME/.local/share/uv/python}" \
+    uv run python ../android/scripts/render_png_review.py "$batch_dir" --batch --size "$PNG_SIZE"
+  ) > "$batch_dir/png-review-output.json"
+fi

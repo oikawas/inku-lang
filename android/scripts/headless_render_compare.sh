@@ -20,6 +20,8 @@ COMPARE_WEB="${COMPARE_WEB:-1}"
 CLI_SAVE_HISTORY="${CLI_SAVE_HISTORY:-true}"
 CLI_DIR="${CLI_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/cli}"
 INKU_CLI_TIMEOUT_SECONDS="${INKU_CLI_TIMEOUT_SECONDS:-600}"
+PNG_REVIEW="${PNG_REVIEW:-true}"
+PNG_SIZE="${PNG_SIZE:-1024}"
 
 adb_cmd=(adb)
 if [[ -n "$DEVICE" ]]; then
@@ -122,6 +124,9 @@ if [[ "$COMPARE_WEB" == "1" ]]; then
     --input-mode "$INPUT_MODE"
     --full-json
   )
+  if [[ "$PNG_REVIEW" == "true" || "$PNG_REVIEW" == "1" ]]; then
+    cli_args+=(--png)
+  fi
   if [[ -n "$ORIGINAL_TEXT" ]]; then cli_args+=(--original-text "$ORIGINAL_TEXT"); fi
   if [[ "$CLI_SAVE_HISTORY" == "true" || "$CLI_SAVE_HISTORY" == "1" ]]; then
     cli_args+=(--save-history)
@@ -142,6 +147,17 @@ if [[ "$COMPARE_WEB" == "1" ]]; then
   jq -r '.ddl' "$OUT_DIR/$RUN_ID/web/result.json" > "$OUT_DIR/$RUN_ID/web/normalized.ddl"
 fi
 
+png_metrics_file="/dev/null"
+if [[ "$PNG_REVIEW" == "true" || "$PNG_REVIEW" == "1" ]]; then
+  (
+    cd "$CLI_DIR"
+    UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/inku-uv-cache}" \
+    UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$HOME/.local/share/uv/python}" \
+    uv run python ../android/scripts/render_png_review.py "$OUT_DIR/$RUN_ID" --size "$PNG_SIZE"
+  ) > "$OUT_DIR/$RUN_ID/png-review-output.json"
+  png_metrics_file="$OUT_DIR/$RUN_ID/png-review/metrics.json"
+fi
+
 summary="$OUT_DIR/$RUN_ID/summary.json"
 web_result_file="$OUT_DIR/$RUN_ID/web/result.json"
 if [[ ! -s "$web_result_file" ]]; then
@@ -152,6 +168,7 @@ jq -n \
   --arg out_dir "$OUT_DIR/$RUN_ID" \
   --slurpfile android "$OUT_DIR/$RUN_ID/android/result.json" \
   --slurpfile web "$web_result_file" \
+  --slurpfile png "$png_metrics_file" \
   '{
     run_id: $run_id,
     out_dir: $out_dir,
@@ -177,7 +194,8 @@ jq -n \
       ddl: $web[0].ddl
     } else null end),
     same_render_hash: (if ($web|length) > 0 then $android[0].render_hash == $web[0].render_hash else null end),
-    same_ddl: (if ($web|length) > 0 then $android[0].normalized_ddl == $web[0].ddl else null end)
+    same_ddl: (if ($web|length) > 0 then $android[0].normalized_ddl == $web[0].ddl else null end),
+    png_review: (if ($png|length) > 0 then $png[0] else null end)
   }' > "$summary"
 
 cat "$summary"

@@ -239,6 +239,7 @@ class LocalFallbackPipeline(
             .withPresenceAuxiliaryShapeRepair(presence)
             .withContextDensityGovernor(ddl, background)
             .withMotionEnergy(ddl)
+            .withServerPromptArrangementRules(ddl)
             .withDensityBudget()
             .fold(JSONArray()) { array, item -> array.put(item); array }
         val result = JSONObject()
@@ -504,6 +505,42 @@ class LocalFallbackPipeline(
                 copy.put("color_hint", appendHint(copy.optString("color_hint").takeIf { it.isNotBlank() }, "motion energy restored through trajectory and rotation"))
             }
             copy
+        }
+    }
+
+    private fun List<JSONObject>.withServerPromptArrangementRules(ddl: String): List<JSONObject> {
+        val lower = ddl.lowercase()
+        return map { item ->
+            val arrangement = item.optJSONObject("arrangement") ?: return@map item
+            val copy = JSONObject(item.toString())
+            val arr = JSONObject(arrangement.toString())
+            val count = arr.optInt("count", 1)
+            val path = arr.optString("path", "none")
+            val hasWholeCanvas = ddl.containsAny("画面全体", "全面", "点々") || lower.contains("whole canvas") || lower.contains("dotted")
+            val effectivePath = arr.optString("path", path)
+            val needsDirectionalFade = effectivePath != "none" ||
+                arr.optString("layout") in setOf("horizontal", "vertical")
+            when {
+                count > 120 -> {
+                    arr.put("count", minOf(count, 120))
+                    arr.put("density", if (count >= 300) "high" else "medium")
+                    if (!arr.has("cluster_count")) arr.put("cluster_count", if (count >= 300) 9 else 5)
+                    arr.put("fade", if (needsDirectionalFade) "directional" else "outward")
+                    arr.put("preserve_space", true)
+                }
+                count >= 40 -> {
+                    if (arr.optString("density", "none") == "none") arr.put("density", "medium")
+                    if (!arr.has("cluster_count") && hasWholeCanvas) arr.put("cluster_count", 4)
+                    if (arr.optString("fade", "none") == "none") arr.put("fade", if (needsDirectionalFade) "directional" else "outward")
+                    arr.put("preserve_space", true)
+                }
+                count >= 20 && effectivePath == "top_to_bottom" -> {
+                    if (arr.optString("density", "none") == "none") arr.put("density", if (count >= 29) "medium" else "low")
+                    if (arr.optString("fade", "none") == "none") arr.put("fade", if (needsDirectionalFade) "directional" else "outward")
+                    arr.put("preserve_space", true)
+                }
+            }
+            copy.put("arrangement", arr)
         }
     }
 

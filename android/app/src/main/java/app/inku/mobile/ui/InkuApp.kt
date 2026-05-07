@@ -11,6 +11,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Arrangement
@@ -954,37 +955,16 @@ private fun HistoryScreen(
     history: List<HistoryItemEntity>,
     viewModel: InkuViewModel,
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var exportMessage by remember { mutableStateOf<String?>(null) }
     val filteredHistory = remember(history, state.historySearchQuery, state.historyStarredOnly) {
         filterHistoryItems(history, state)
     }
     val header: @Composable () -> Unit = {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            HistoryHeader(
-                state = state,
-                sourceCount = history.size,
-                filteredCount = filteredHistory.size,
-                viewModel = viewModel,
-            )
-            state.selectedHistory?.let { item ->
-                HistorySelectionActions(
-                    item = item,
-                    exportMessage = exportMessage,
-                    onStar = { viewModel.toggleStar(item) },
-                    onShareJson = {
-                        exportMessage = "Export preparing..."
-                        scope.launch {
-                            exportMessage = runCatching {
-                                shareHistoryJson(context, item)
-                                "Exported F${item.renderHashShort}"
-                            }.getOrElse { error -> error.message ?: "Export failed." }
-                        }
-                    },
-                )
-            }
-        }
+        HistoryHeader(
+            state = state,
+            sourceCount = history.size,
+            filteredCount = filteredHistory.size,
+            viewModel = viewModel,
+        )
     }
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
@@ -999,6 +979,7 @@ private fun HistoryScreen(
                 item = item,
                 selected = state.selectedHistory?.id == item.id,
                 onSelect = { viewModel.selectHistory(item) },
+                onToggleStar = { viewModel.toggleStar(item) },
             )
         }
     }
@@ -1012,11 +993,6 @@ private fun HistoryHeader(
     viewModel: InkuViewModel,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("履歴", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.weight(1f))
-            Text("${sourceCount}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
         ImeAwareOutlinedTextField(
             value = state.historySearchQuery,
             onValueChange = viewModel::setHistorySearchQuery,
@@ -1024,26 +1000,10 @@ private fun HistoryHeader(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        WrapRow {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             ChipButton("★ 星のみ", selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
+            Text("${filteredCount}/${sourceCount}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text("${filteredCount}/${sourceCount}件を表示", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun HistorySelectionActions(
-    item: HistoryItemEntity,
-    exportMessage: String?,
-    onStar: () -> Unit,
-    onShareJson: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        WrapRow(horizontal = 8.dp, vertical = 6.dp) {
-            MiniPill(text = if (item.starred) "★ Star解除" else "☆ Star", selected = item.starred, onClick = onStar)
-            MiniPill(text = "JSON共有", selected = true, onClick = onShareJson)
-        }
-        exportMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -2480,11 +2440,15 @@ private fun HistoryGridTile(
     item: HistoryItemEntity,
     selected: Boolean,
     onSelect: () -> Unit,
+    onToggleStar: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier
-            .clickable(onClick = onSelect)
+            .combinedClickable(
+                onClick = onSelect,
+                onLongClick = onToggleStar,
+            )
             .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(14.dp))
             .border(4.dp, if (selected) Color(0x337FA6D8) else Color.Transparent, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(14.dp),

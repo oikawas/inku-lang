@@ -951,9 +951,8 @@ private fun NumberedBatchTextField(
     enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val lines = remember(value) { value.lines() }
+    val lines = remember(value) { splitBatchEditorLines(value) }
     val lineCount = maxOf(lines.size, 1)
-    val lineNumbers = remember(lineCount) { (1..lineCount).joinToString("\n") }
     val scrollState = rememberScrollState()
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
@@ -970,41 +969,67 @@ private fun NumberedBatchTextField(
         color = Color.Transparent,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .clipToBounds()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 12.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                lineNumbers,
-                style = textStyle,
-                textAlign = TextAlign.End,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(36.dp),
-            )
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                enabled = enabled,
-                textStyle = textStyle,
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 32.dp * maxOf(lineCount, 6))
-                    .onFocusChanged { focusState ->
-                        if (focusState.isFocused) {
-                            scope.launch {
-                                delay(260)
-                                bringIntoViewRequester.bringIntoView()
-                            }
-                        }
-                    },
-            )
+            lines.forEachIndexed { index, line ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        (index + 1).toString(),
+                        style = textStyle,
+                        textAlign = TextAlign.End,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(36.dp),
+                    )
+                    BasicTextField(
+                        value = line,
+                        onValueChange = { edited ->
+                            onValueChange(replaceBatchEditorLine(lines, index, edited))
+                        },
+                        enabled = enabled,
+                        textStyle = textStyle,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 32.dp)
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused) {
+                                    scope.launch {
+                                        delay(260)
+                                        bringIntoViewRequester.bringIntoView()
+                                    }
+                                }
+                            },
+                    )
+                }
+            }
+            if (lineCount < 6) {
+                Spacer(Modifier.height(32.dp * (6 - lineCount)))
+            }
         }
     }
+}
+
+private fun splitBatchEditorLines(value: String): List<String> {
+    if (value.isEmpty()) return listOf("")
+    return value.split('\n')
+}
+
+private fun replaceBatchEditorLine(lines: List<String>, index: Int, edited: String): String {
+    val replacement = edited.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+    val next = lines.toMutableList()
+    next.removeAt(index)
+    next.addAll(index, replacement)
+    return next.joinToString("\n")
 }
 
 @Composable
@@ -1399,10 +1424,6 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
             state.modelAssets.forEach { asset ->
                 ModelAssetControls(
                     asset = asset,
-                    stage1Active = asset.modelId == state.selectedModelId,
-                    stage2Active = asset.modelId == state.selectedStage2ModelId,
-                    onSelectStage1 = { viewModel.setStage1Model(asset.modelId) },
-                    onSelectStage2 = { viewModel.setStage2Model(asset.modelId) },
                     onOpenLicenseDownload = { modelAssetDialog = asset },
                 )
             }
@@ -1412,20 +1433,15 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
             }
         }
 
-        SettingsSectionHeader("AI SERVICE CONNECTIONS", "Web版と同じ接続先")
+        SettingsSectionHeader("AI SERVICE CONNECTIONS", "接続先")
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             state.providerSettings.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
-                    assets = state.modelAssets,
                     onSave = viewModel::saveProviderSetting,
-                    onFetchModels = { viewModel.fetchProviderModels(provider.providerId) },
                     onClearApiKey = { viewModel.clearProviderApiKey(provider.providerId) },
                     onDelete = { viewModel.deleteProvider(provider.providerId) },
                 )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondarySmallButton(text = "モデルリスト取得", onClick = viewModel::refreshModelCatalog, modifier = Modifier.weight(1f))
             }
             AddProviderCard(onAdd = viewModel::saveProviderSetting)
         }
@@ -1444,9 +1460,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
 @Composable
 private fun ProviderConnectionCard(
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
-    assets: List<app.inku.mobile.data.db.ModelAssetEntity>,
     onSave: (String, String, String, String, String, String) -> Unit,
-    onFetchModels: () -> Unit,
     onClearApiKey: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -1458,14 +1472,12 @@ private fun ProviderConnectionCard(
     var apiKey by remember(provider.providerId, provider.encryptedApiKey) { mutableStateOf("") }
     var confirmClearKey by remember(provider.providerId) { mutableStateOf(false) }
     var confirmDeleteService by remember(provider.providerId) { mutableStateOf(false) }
-    var publishedModels by remember(provider.providerId, provider.publishedModelsJson) {
-        mutableStateOf(parsePublishedModelIds(provider.publishedModelsJson).joinToString("\n"))
+    val publishedModels = remember(provider.providerId, provider.publishedModelsJson) {
+        parsePublishedModelIds(provider.publishedModelsJson).joinToString("\n")
     }
-    val apiKeyLabel = if (provider.providerId == "local-litert-lm") {
-        if (keySet) "新しいHuggingFace APIキー（空なら維持）" else "HuggingFace APIキー"
-    } else {
-        if (keySet) "新しいAPIキー（空なら維持）" else "APIキー"
-    }
+    val apiKeyLabel = if (provider.providerId == "local-litert-lm") "HuggingFace APIキー" else "APIキー"
+    val baseUrlChanged = baseUrl.trim() != provider.baseUrl.orEmpty()
+    val pendingApiKey = !keySet && apiKey.isNotBlank()
     SettingsCard(
         provider.displayName,
         "接続形式: ${provider.kind}${if (requiresKey) " / APIキー必須" else " / APIキー任意"}",
@@ -1498,35 +1510,42 @@ private fun ProviderConnectionCard(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            ImeAwareOutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = apiKeyLabel,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            ImeAwareOutlinedTextField(
-                value = publishedModels,
-                onValueChange = { publishedModels = it },
-                label = "使用可能モデル（1行に1 model-id）",
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-            )
-            ProviderModelActionRow(
-                provider = provider,
-                publishedModels = publishedModels,
-                onPublishedModelsChange = { publishedModels = it },
-                onFetchModels = onFetchModels,
-                onSave = { onSave(provider.providerId, displayName, kind, baseUrl, apiKey, publishedModels) },
-            )
-            PublishedModelsSummary(publishedModelsJsonFromText(publishedModels), assets)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondarySmallButton(text = "APIキー削除", onClick = { confirmClearKey = true }, enabled = keySet, modifier = Modifier.weight(1f))
-                SecondarySmallButton(text = "サービス削除", onClick = { confirmDeleteService = true }, enabled = !provider.isDefaultLocal, modifier = Modifier.weight(1f))
-                PrimarySmallButton(
-                    text = "保存",
-                    onClick = { onSave(provider.providerId, displayName, kind, baseUrl, apiKey, publishedModels) },
+                SecondarySmallButton(
+                    text = "Base URL保存",
+                    onClick = { onSave(provider.providerId, displayName, kind, baseUrl, "", publishedModels) },
+                    enabled = baseUrlChanged,
                     modifier = Modifier.weight(1f),
                 )
+                PrimarySmallButton(
+                    text = "基本設定保存",
+                    onClick = { onSave(provider.providerId, displayName, kind, baseUrl, "", publishedModels) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                ImeAwareOutlinedTextField(
+                    value = if (keySet) "設定済みのAPIキーを維持" else apiKey,
+                    onValueChange = { if (!keySet) apiKey = it },
+                    label = apiKeyLabel,
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    enabled = !keySet,
+                )
+                if (pendingApiKey) {
+                    PrimarySmallButton(
+                        text = "保存",
+                        onClick = {
+                            onSave(provider.providerId, displayName, kind, baseUrl, apiKey, publishedModels)
+                            apiKey = ""
+                        },
+                    )
+                } else {
+                    SecondarySmallButton(text = "削除", onClick = { confirmClearKey = true }, enabled = keySet)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SecondarySmallButton(text = "サービス削除", onClick = { confirmDeleteService = true }, enabled = !provider.isDefaultLocal, modifier = Modifier.weight(1f))
             }
         }
     }
@@ -1561,136 +1580,6 @@ private fun ProviderConnectionCard(
 }
 
 @Composable
-private fun ProviderModelActionRow(
-    provider: app.inku.mobile.data.db.ProviderSettingEntity,
-    publishedModels: String,
-    onPublishedModelsChange: (String) -> Unit,
-    onFetchModels: () -> Unit,
-    onSave: () -> Unit,
-) {
-    var pickerOpen by remember(provider.providerId) { mutableStateOf(false) }
-    val currentModels = parsePublishedModelIds(provider.publishedModelsJson).ifEmpty { defaultProviderModelIds(provider.providerId) }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SecondarySmallButton(
-            text = "全て選択",
-            onClick = { onPublishedModelsChange(currentModels.joinToString("\n")) },
-            modifier = Modifier.weight(1f),
-        )
-        SecondarySmallButton(
-            text = "全て解除",
-            onClick = { onPublishedModelsChange("") },
-            modifier = Modifier.weight(1f),
-        )
-        SecondarySmallButton(
-            text = "最新取得",
-            onClick = onFetchModels,
-            modifier = Modifier.weight(1f),
-        )
-        SecondarySmallButton(
-            text = "モデル選択",
-            onClick = {
-                pickerOpen = true
-            },
-            modifier = Modifier.weight(1f),
-        )
-    }
-    if (pickerOpen) {
-        ProviderModelPickerDialog(
-            providerName = provider.displayName,
-            models = currentModels,
-            publishedModels = publishedModels,
-            onPublishedModelsChange = onPublishedModelsChange,
-            onFetchModels = onFetchModels,
-            onSave = onSave,
-            onClose = { pickerOpen = false },
-        )
-    }
-}
-
-@Composable
-private fun ProviderModelPickerDialog(
-    providerName: String,
-    models: List<String>,
-    publishedModels: String,
-    onPublishedModelsChange: (String) -> Unit,
-    onFetchModels: () -> Unit,
-    onSave: () -> Unit,
-    onClose: () -> Unit,
-) {
-    var search by remember(providerName) { mutableStateOf("") }
-    var selected by remember(providerName, publishedModels) {
-        mutableStateOf(publishedModels.lines().map { it.trim() }.filter { it.isNotBlank() }.toSet())
-    }
-    val filtered = remember(models, search) {
-        val query = search.trim().lowercase()
-        if (query.isBlank()) models else models.filter { it.lowercase().contains(query) }
-    }
-
-    fun save(next: Set<String>) {
-        selected = next
-        onPublishedModelsChange(next.joinToString("\n"))
-    }
-
-    AlertDialog(
-        onDismissRequest = onClose,
-        title = { Text("$providerName モデル選択") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SecondarySmallButton(text = "最新取得", onClick = onFetchModels, modifier = Modifier.weight(1f))
-                    SecondarySmallButton(text = "全て選択", onClick = { save(filtered.toSet()) }, modifier = Modifier.weight(1f))
-                    SecondarySmallButton(text = "全て解除", onClick = { save(selected - filtered.toSet()) }, modifier = Modifier.weight(1f))
-                }
-                ImeAwareOutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    label = "モデル検索",
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(280.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    filtered.forEach { modelId ->
-                        val active = modelId in selected
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                save(if (active) selected - modelId else selected + modelId)
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (active) Color(0x1AEAD7A3) else MaterialTheme.colorScheme.surface,
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(if (active) "✓" else "", modifier = Modifier.width(18.dp), color = MaterialTheme.colorScheme.secondary)
-                                Text(modelId, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onPublishedModelsChange(selected.joinToString("\n"))
-                onSave()
-                onClose()
-            }) { Text("保存") }
-        },
-        dismissButton = {
-            TextButton(onClick = onClose) { Text("キャンセル") }
-        },
-    )
-}
-
-@Composable
 private fun AddProviderCard(
     onAdd: (String, String, String, String, String, String) -> Unit,
 ) {
@@ -1700,7 +1589,6 @@ private fun AddProviderCard(
     var kind by remember { mutableStateOf("openai-compatible") }
     var baseUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
-    var publishedModels by remember { mutableStateOf("") }
     SecondaryActionButton(text = "AIサービスを追加", onClick = { open = true })
     if (open) {
         AlertDialog(
@@ -1721,13 +1609,12 @@ private fun AddProviderCard(
                     }
                     ImeAwareOutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, label = "Base URL", modifier = Modifier.fillMaxWidth(), singleLine = true)
                     ImeAwareOutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = "APIキー", modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    ImeAwareOutlinedTextField(value = publishedModels, onValueChange = { publishedModels = it }, label = "モデル一覧（1行に1 model-id）", modifier = Modifier.fillMaxWidth().height(110.dp))
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onAdd(providerId, displayName, kind, baseUrl, apiKey, publishedModels)
+                        onAdd(providerId, displayName, kind, baseUrl, apiKey, "")
                         open = false
                     },
                     enabled = providerId.isNotBlank(),
@@ -1868,30 +1755,6 @@ private fun ModelChoiceRow(
     }
 }
 
-@Composable
-private fun PublishedModelsSummary(
-    publishedModelsJson: String?,
-    assets: List<app.inku.mobile.data.db.ModelAssetEntity>,
-) {
-    val ids = remember(publishedModelsJson, assets) {
-        publishedModelsJson?.takeIf { it.isNotBlank() }?.let(::parsePublishedModelIds)
-            ?: assets.map { it.modelId }
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        CompactLabel("使用可能モデル")
-        if (ids.isEmpty()) {
-            Text("使用可能モデルは未選択です。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            WrapRow(horizontal = 6.dp, vertical = 6.dp) {
-                ids.forEach { id ->
-                    val label = assets.firstOrNull { it.modelId == id }?.displayName ?: id.substringAfterLast(":")
-                    MiniPill(label.take(22))
-                }
-            }
-        }
-    }
-}
-
 private fun parsePublishedModelIds(value: String): List<String> {
     return runCatching {
         val array = JSONArray(value)
@@ -1899,21 +1762,6 @@ private fun parsePublishedModelIds(value: String): List<String> {
     }.getOrElse {
         value.lines().map { it.trim() }.filter { it.isNotBlank() }
     }
-}
-
-private fun publishedModelsJsonFromText(value: String): String {
-    return JSONArray(value.lines().map { it.trim() }.filter { it.isNotBlank() }).toString()
-}
-
-private fun defaultProviderModelIds(providerId: String): List<String> = when (providerId) {
-    "openai" -> listOf("openai:gpt-5.1", "openai:gpt-5.1-mini", "openai:gpt-4.1", "openai:gpt-4.1-mini")
-    "nvidia" -> listOf("google/gemma-4-31b-it", "meta/llama-3.3-70b-instruct", "mistralai/mistral-large-2-instruct")
-    "anthropic" -> listOf("anthropic:claude-opus-4-7", "anthropic:claude-sonnet-4-6", "anthropic:claude-haiku-4-5-20251001")
-    "gemini" -> listOf("gemini:gemini-2.5-pro", "gemini:gemini-2.5-flash", "gemini:gemini-2.5-flash-lite")
-    "ollama" -> listOf("ollama:llama3.2", "ollama:gpt-oss:20b", "ollama:qwen3:8b")
-    "ovms" -> listOf("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api")
-    "local-litert-lm" -> listOf("local-litert-lm:gemma-4-e2b", "local-litert-lm:gemma-4-e4b")
-    else -> emptyList()
 }
 
 private fun modelChoicesFor(state: InkuUiState): List<ModelChoice> {
@@ -2018,15 +1866,10 @@ private fun SettingsCard(title: String, sub: String, status: String, actions: @C
 @Composable
 private fun ModelAssetControls(
     asset: app.inku.mobile.data.db.ModelAssetEntity,
-    stage1Active: Boolean,
-    stage2Active: Boolean,
-    onSelectStage1: () -> Unit,
-    onSelectStage2: () -> Unit,
     onOpenLicenseDownload: () -> Unit,
 ) {
     val isReady = asset.downloadState == "ready"
     val isBusy = asset.downloadState in setOf("queued", "connecting", "downloading", "verifying")
-    val active = stage1Active || stage2Active
     val progressValue = if (asset.bytesTotal != null && asset.bytesTotal > 0L) {
         (asset.bytesDownloaded.toFloat() / asset.bytesTotal.toFloat()).coerceIn(0f, 1f)
     } else {
@@ -2040,16 +1883,14 @@ private fun ModelAssetControls(
     }
     val path = asset.localPath?.substringAfterLast("/") ?: "not stored"
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onSelectStage1),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = if (active) Color(0x1AEAD7A3) else MaterialTheme.colorScheme.surface,
-        tonalElevation = if (active) 2.dp else 0.dp,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier
-                .border(1.dp, if (active) MaterialTheme.colorScheme.secondary else Color(0xFF34302B), RoundedCornerShape(14.dp))
+                .border(1.dp, Color(0xFF34302B), RoundedCornerShape(14.dp))
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
@@ -2061,11 +1902,7 @@ private fun ModelAssetControls(
                     Text(if (asset.qualityTier.contains("high", ignoreCase = true)) "E4" else "E2", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(asset.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (stage1Active) StatusPill("S1", MaterialTheme.colorScheme.secondary)
-                        if (stage2Active) StatusPill("S2", MaterialTheme.colorScheme.primary)
-                    }
+                    Text(asset.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(asset.qualityTier, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
                 StatusPill(modelStatusLabel(asset.downloadState), modelStatusColor(asset.downloadState))
@@ -2086,10 +1923,6 @@ private fun ModelAssetControls(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondarySmallButton(text = if (stage1Active) "Stage1中" else "Stage1", onClick = onSelectStage1, modifier = Modifier.weight(1f))
-                SecondarySmallButton(text = if (stage2Active) "Stage2中" else "Stage2", onClick = onSelectStage2, modifier = Modifier.weight(1f))
-            }
             PrimarySmallButton(
                 text = when {
                     isReady -> "ライセンス/取得済み"

@@ -419,6 +419,59 @@ Remaining next order:
 6. Complete destructive confirmations for every non-history settings operation
    and add automated parity coverage for the Android UI state transitions.
 
+## 2026-05-07 Server Parity Fix Record
+
+Server CLI and Android CLI comparisons from the same DDL showed that DDL
+normalization was broadly aligned, while JSON Score and SVG output still
+diverged. The main causes were Android-side differences in the Stage 2 user
+message, Score tool schema, coerce chain, renderer seed/hash behavior, and
+Android-only support layers.
+
+This update treats the server implementation as the master for Android logic
+that is not hardware-dependent:
+
+- Stage 2 user messages now match `server/src/inku_server/composer.py`
+  `_build_user_message()`. DDL input mode sends only the DDL when the original
+  text and normalized DDL are identical.
+- Stage 2 tool schema no longer uses the Android-only simplified schema.
+  Android now uses `ServerScoreSchemaJson`, generated from the server
+  `_score_tool_schema()`.
+- Stage 2 Score repair reconnects the server `coerce_score()` stage order:
+  material hint, variation hint, DDL coverage, color delivery, shape delivery,
+  complex motif, composition diversity, structural duplicate repair, context
+  energy, presence auxiliary repair, density governor, motion energy, and
+  density budgets.
+- Material and variation hints now use the same markers and defaults as the
+  server `_with_material_hint()` and `_with_variation_hint()`.
+- Android-only repairs that were not present in the server were removed,
+  including treating `震える` as an extra motion-context trigger and adding an
+  automatic membrane-haze support layer.
+- Arrangement expansion, scatter/path/clustered placement, `preserve_space`
+  margins, density radius, cluster axis/bend/jitter, and renderer seeding were
+  aligned with `server/src/inku_server/renderer.py`.
+- Renderer seeds are derived from an `Instruction.model_dump_json()` equivalent
+  field order and default/null representation. Line variation uses the same
+  seed source.
+- Variation and material jitter signed hashes now follow the server SHA-256
+  plus little-endian signed 64-bit behavior.
+
+Verification:
+
+- `gradle :app:compileDebugKotlin` succeeded.
+- `gradle :app:assembleDebug` succeeded.
+- The debug APK was reinstalled on Pixel 9 and headless DDL render comparison
+  was rerun.
+- Final check run:
+  `/tmp/inku-headless/history-ddl5-after-final-parity-fix-20260507/history-ddl5-final-002`
+  - `same_ddl: true`
+  - `same_render_hash: false`
+  - Remaining differences were identified mainly as LLM Stage 2 output
+    variation in `variation.dimensions` and `arrangement.density`.
+
+Future comparisons should classify same-Score drawing differences as renderer
+porting issues. If the Score differs, compare Stage 2 model response, tool
+schema, and the coerce chain against the server source in that order.
+
 ## Local Commit Record
 
 - `f34852b feat: add android headless render comparison`

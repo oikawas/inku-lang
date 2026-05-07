@@ -14,7 +14,14 @@ internal object ServerRendererGeometry {
 
     fun fmt(value: Double): String = "%.3f".format(java.util.Locale.US, value)
 
-    fun signedHash(i: Int, seed: String): Double = hash01(i, seed) * 2.0 - 1.0
+    fun signedHash(i: Int, seed: String): Double {
+        val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$i".toByteArray())
+        var raw = 0L
+        for (offset in 0 until 8) {
+            raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
+        }
+        return raw.toDouble() / Long.MIN_VALUE.toDouble().let { -it }
+    }
 
     fun hash01(i: Int, seed: String): Double {
         val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$i".toByteArray())

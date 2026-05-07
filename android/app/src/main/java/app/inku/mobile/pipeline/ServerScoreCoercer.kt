@@ -57,15 +57,20 @@ internal object ServerScoreCoercer {
     ): JSONObject {
         val primitive = source.optString("primitive", "line").takeIf { it in supportedPrimitives } ?: "line"
         val data = JSONObject(source.toString()).put("primitive", primitive)
-        data.put("color", visibleForeground(data.optString("color", detectColorKey(ddl, background)), background))
-        data.put("weight", data.optString("weight", detectWeightKey(ddl)).ifBlank { "pen" })
+        data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray") } ?: "black")
+        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("hair", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "rope") } ?: "pen")
+        data.put("style", data.optString("style", "solid").ifBlank { "solid" })
+        if (!data.has("filled")) data.put("filled", false)
+        data.optJSONObject("arrangement")?.let { data.put("arrangement", normalizeArrangement(it)) }
+        data.optJSONObject("variation")?.let { data.put("variation", normalizeVariation(it)) }
 
         primitiveSpecs.getValue(primitive).forEach { spec ->
             val value = coercedField(data, spec)
             data.put(spec.name, toJsonValue(value ?: spec.defaultValue))
         }
         postCoerce(primitive, data)
-        applyVariation(primitive, data, ddl)
+        applyMaterialHint(data, ddl)
+        applyVariationHint(primitive, data, ddl)
         return data
     }
 
@@ -87,23 +92,61 @@ internal object ServerScoreCoercer {
         }
     }
 
-    private fun applyVariation(primitive: String, data: JSONObject, ddl: String) {
-        if (data.has("variation")) return
+    private fun normalizeArrangement(source: JSONObject): JSONObject {
+        val result = JSONObject(source.toString())
+        result.put("count", result.optInt("count", 1).coerceIn(1, 1000))
+        result.put("layout", result.optString("layout", "horizontal").takeIf { it in setOf("horizontal", "vertical", "radial", "scatter") } ?: "horizontal")
+        result.put("path", result.optString("path", "none").takeIf { it in setOf("none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half") } ?: "none")
+        if (!result.has("color_cycle")) result.put("color_cycle", JSONArray())
+        result.put("margin", result.optDouble("margin", 0.1).coerceIn(0.0, 0.45))
+        result.put("density", result.optString("density", "none").takeIf { it in setOf("none", "low", "medium", "high") } ?: "none")
+        if (result.has("cluster_count")) result.put("cluster_count", result.optInt("cluster_count", 1).coerceIn(1, 12))
+        result.put("fade", result.optString("fade", "none").takeIf { it in setOf("none", "outward", "directional") } ?: "none")
+        result.put("preserve_space", result.optBoolean("preserve_space", false))
+        return result
+    }
+
+    private fun normalizeVariation(source: JSONObject): JSONObject {
+        val result = JSONObject(source.toString())
+        result.put("amplitude", result.optString("amplitude", "medium").takeIf { it in setOf("fine", "medium", "broad") } ?: "medium")
+        result.put("frequency", result.optString("frequency", "medium").takeIf { it in setOf("slow", "medium", "high") } ?: "medium")
+        result.put("quality", result.optString("quality", "none").takeIf { it in setOf("none", "white", "perlin", "pink", "wave") } ?: "none")
+        if (!result.has("dimensions")) result.put("dimensions", JSONArray())
+        return result
+    }
+
+    private fun applyMaterialHint(data: JSONObject, ddl: String) {
+        if (ddl.isBlank() || data.optString("weight", "pen") != "pen") return
+        val lower = ddl.lowercase()
+        val weight = materialWeightHints.firstOrNull { (markers, _) -> markers.any { it.lowercase() in lower } }?.second ?: return
+        data.put("weight", weight)
+        val note = "material inferred from DDL: $weight"
+        val hint = data.optString("color_hint", "").takeIf { it.isNotBlank() }
+        data.put("color_hint", if (hint == null) note else "$hint; $note")
+    }
+
+    private fun applyVariationHint(primitive: String, data: JSONObject, ddl: String) {
+        if (ddl.isBlank() || data.optJSONObject("variation") != null) return
+        val lower = ddl.lowercase()
         val variation = when {
-            ddl.contains("滲む") || ddl.contains("にじむ") ->
-                JSONObject().put("amplitude", "medium").put("frequency", "medium").put("quality", "pink").put("dimensions", JSONArray(listOf("position_x", "position_y")))
-            ddl.contains("波打つ") || ddl.contains("揺れる") ->
-                JSONObject().put("amplitude", if (ddl.contains("大きく")) "broad" else "medium").put("frequency", if (ddl.contains("ゆっくり")) "slow" else "medium").put("quality", "wave").put("dimensions", JSONArray(listOf("position_x", "position_y")))
-            ddl.contains("震える") || ddl.contains("細かく") ->
+            listOf("ゆっくり揺れる", "ゆっくり波打つ").any { it in ddl } || "slow" in lower ->
+                JSONObject()
+                    .put("amplitude", "medium")
+                    .put("frequency", "slow")
+                    .put("quality", "wave")
+                    .put("dimensions", JSONArray(listOf("position_x", "position_y")))
+            listOf("細かく揺れる", "細かく震える", "震える").any { it in ddl } || "trembling" in lower ->
                 JSONObject()
                     .put("amplitude", "fine")
                     .put("frequency", "medium")
                     .put("quality", "perlin")
                     .put("dimensions", JSONArray(if (primitive == "line") listOf("position_y") else listOf("position_x", "position_y")))
-            ddl.contains("大きく") ->
-                JSONObject().put("amplitude", "broad").put("frequency", "medium").put("quality", "wave").put("dimensions", JSONArray(listOf("position_x", "position_y")))
-            ddl.contains("ゆっくり") || ddl.contains("速く") ->
-                JSONObject().put("amplitude", "medium").put("frequency", if (ddl.contains("速く")) "high" else "slow").put("quality", "wave").put("dimensions", JSONArray(listOf("position_x", "position_y")))
+            listOf("滲む", "にじむ", "境界が滲む").any { it in ddl } || "blurring" in lower ->
+                JSONObject()
+                    .put("amplitude", "medium")
+                    .put("frequency", "medium")
+                    .put("quality", "pink")
+                    .put("dimensions", JSONArray(listOf("position_x", "position_y")))
             else -> null
         }
         if (variation != null) data.put("variation", variation)
@@ -163,4 +206,15 @@ internal object ServerScoreCoercer {
             else -> null
         }
     }
+
+    private val materialWeightHints = listOf(
+        listOf("ロットリング", "rotring") to "rotring",
+        listOf("鉛筆", "pencil") to "pencil",
+        listOf("クレヨン", "crayon") to "crayon",
+        listOf("チョーク", "chalk") to "chalk",
+        listOf("細筆", "fine-brush", "fine brush") to "brush_thin",
+        listOf("太筆", "thick-brush", "thick brush", "厚塗り", "油絵") to "brush_thick",
+        listOf("水墨", "墨", "ink-wash", "ink wash") to "brush_thin",
+        listOf("縄", "ロープ", "rope") to "rope",
+    )
 }

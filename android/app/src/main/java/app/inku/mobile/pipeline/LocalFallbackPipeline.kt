@@ -99,7 +99,7 @@ class LocalFallbackPipeline(
     private suspend fun generateStage2(request: PaintRequest, expandedDdl: String): String? {
         val provider = modelProvider ?: return null
         return runCatching {
-            val userPrompt = "原文:\n${request.originalText}\n\n正規化DDL:\n$expandedDdl"
+            val userPrompt = buildStage2UserMessage(expandedDdl, request.originalText)
             val response = provider.generate(
                 ModelRequest(
                     modelId = request.stage2Model,
@@ -115,7 +115,7 @@ class LocalFallbackPipeline(
             }.getOrNull()
                 ?.takeIf { WebScoreTool.hasRenderableInstructions(it) }
                 ?: retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
-            coerceScore(score, "${request.originalText}\n$expandedDdl", request.canvasAspect).toString()
+            normalizeServerScore(score, expandedDdl, request.canvasAspect).toString()
         }.onFailure {
             if (request.stage2Model.isExplicitProviderModelId()) throw it
             Log.w(TAG, "Stage 2 provider failed; using deterministic fallback.", it)
@@ -196,7 +196,7 @@ class LocalFallbackPipeline(
             .put("canvas", canvasAspect)
             .put("background", background)
             .put("instructions", JSONArray().put(coerceInstruction(instruction, "$ddl\n$originalText", background)))
-        return coerceScore(score, "$ddl\n$originalText", canvasAspect)
+        return normalizeServerScore(score, "$ddl\n$originalText", canvasAspect)
     }
 
     private fun fallbackInstruction(text: String, color: String, weight: String): JSONObject {
@@ -207,7 +207,15 @@ class LocalFallbackPipeline(
         return ServerFallbackComposer.arrangementFrom(text)
     }
 
-    private fun coerceScore(score: JSONObject, ddl: String, canvasAspect: String): JSONObject {
+    private fun buildStage2UserMessage(ddl: String, originalText: String): String {
+        return if (originalText.isNotBlank() && originalText.trim() != ddl.trim()) {
+            "[原文]\n$originalText\n\n[正規化DDL]\n$ddl"
+        } else {
+            ddl
+        }
+    }
+
+    private fun normalizeServerScore(score: JSONObject, ddl: String, canvasAspect: String): JSONObject {
         val background = visibleBackground(score.optString("background", "white"))
         val source = score.optJSONArray("instructions") ?: JSONArray()
         val repairedItems = mutableListOf<JSONObject>()
@@ -239,7 +247,51 @@ class LocalFallbackPipeline(
             .put("background", background)
             .put("instructions", repaired)
         if (presence != null && presence.optString("kind", "none") != "none") result.put("presence", presence)
-        return result
+        return enforceModifierTargeting(result, ddl)
+    }
+
+    private fun enforceModifierTargeting(score: JSONObject, ddl: String): JSONObject {
+        if (!containsMotionOrTextureTerm(ddl)) return score
+        val targetPrimitives = mentionedValues(ddl, primitiveTerms)
+        if (targetPrimitives.size != 1) return score
+        val targetColors = mentionedValues(ddl, colorTerms)
+        val targetPrimitive = targetPrimitives.first()
+        val instructions = score.optJSONArray("instructions") ?: return score
+        val targeted = mutableListOf<JSONObject>()
+        for (i in 0 until instructions.length()) {
+            val item = instructions.optJSONObject(i) ?: continue
+            if (item.optString("primitive") == targetPrimitive && (targetColors.isEmpty() || item.optString("color") in targetColors)) {
+                targeted += item
+            }
+        }
+        if (targeted.isEmpty()) return score
+        if (targeted.size == instructions.length() && targeted.all { it.optJSONObject("variation") != null }) return score
+        val repaired = JSONArray()
+        for (item in targeted) {
+            val copy = JSONObject(item.toString())
+            if (copy.optJSONObject("variation") == null && targetPrimitive == "line") {
+                copy.put(
+                    "variation",
+                    JSONObject()
+                        .put("amplitude", "fine")
+                        .put("frequency", "medium")
+                        .put("quality", "perlin")
+                        .put("dimensions", JSONArray(listOf("position_x", "position_y"))),
+                )
+            }
+            repaired.put(copy)
+        }
+        return JSONObject(score.toString()).put("instructions", repaired)
+    }
+
+    private fun containsMotionOrTextureTerm(text: String): Boolean {
+        val lower = text.lowercase()
+        return motionOrTextureTerms.any { it.lowercase() in lower }
+    }
+
+    private fun mentionedValues(text: String, termsByValue: Map<String, List<String>>): Set<String> {
+        val lower = text.lowercase()
+        return termsByValue.filterValues { terms -> terms.any { it.lowercase() in lower } }.keys
     }
 
     private fun coerceInstruction(source: JSONObject, ddl: String, background: String): JSONObject {
@@ -413,27 +465,11 @@ class LocalFallbackPipeline(
             if (!contextHasMarker(ddl, markers) || result.any { kind in it.optString("color_hint") }) continue
             result += contextEnergyInstruction(kind, background)
         }
-        val hasSoft = any { (it.optString("color_hint") + it.optString("weight")).containsAny("soft", "膜", "香", "light", "水彩") }
-        if (!hasSoft && ddl.containsAny("膜", "透明", "霞", "霧", "気配", "余韻")) {
-            result += JSONObject()
-                .put("primitive", "ellipse")
-                .put("center", JSONArray(listOf(0.62, 0.38)))
-                .put("size", JSONArray(listOf(0.28, 0.16)))
-                .put("color", visibleForeground("gray", background))
-                .put("weight", "brush_thin")
-                .put("variation", JSONObject().put("amplitude", "medium").put("frequency", "medium").put("quality", "pink").put("dimensions", JSONArray(listOf("position_x", "position_y"))))
-                .put("color_hint", "membrane haze restored from DDL context")
-        }
-        if (result.size < 10 && ddl.containsAny("揺れる", "震える", "波打つ", "流", "舞", "風") && result.none { it.optJSONObject("variation") != null }) {
-            val first = JSONObject(result.first().toString())
-            first.put("variation", JSONObject().put("amplitude", "fine").put("frequency", "medium").put("quality", "perlin").put("dimensions", JSONArray(listOf("position_x", "position_y"))))
-            result[0] = first
-        }
         return result
     }
 
     private fun List<JSONObject>.withMotionEnergy(ddl: String): List<JSONObject> {
-        if (!contextHasMotion(ddl) && !ddl.containsAny("震える", "波打つ", "舞", "浮か", "floating")) return this
+        if (!contextHasMotion(ddl)) return this
         return mapIndexed { index, item ->
             val copy = JSONObject(item.toString())
             var changed = false
@@ -1059,5 +1095,26 @@ class LocalFallbackPipeline(
         private const val MAX_EXPANDED_PRIMITIVES = 400
         private const val MAX_EXPANDED_PER_INSTRUCTION = 240
         private const val MAX_VISUAL_CLUSTERED_COUNT = 120
+        private val motionOrTextureTerms = listOf(
+            "震える", "震え", "揺れる", "揺らぐ", "揺れ", "小刻み", "滲む", "にじむ", "太い", "細い",
+            "trembling", "tremble", "swaying", "sway", "wobble", "wobbly", "blurring", "blurred", "thick", "thin",
+        )
+        private val primitiveTerms = mapOf(
+            "line" to listOf("直線", "線", "縦線", "横線", "line", "lines"),
+            "circle" to listOf("円", "丸", "circle", "circles"),
+            "ellipse" to listOf("楕円", "ellipse", "ellipses", "oval", "ovals"),
+            "triangle" to listOf("三角", "triangle", "triangles"),
+            "square" to listOf("四角", "square", "squares"),
+            "polygon" to listOf("多角形", "polygon", "polygons"),
+            "arc" to listOf("弧", "arc", "arcs"),
+        )
+        private val colorTerms = mapOf(
+            "white" to listOf("白", "white"),
+            "black" to listOf("黒", "black"),
+            "blue" to listOf("青", "blue"),
+            "red" to listOf("赤", "red"),
+            "green" to listOf("緑", "green"),
+            "gray" to listOf("灰", "グレー", "gray", "grey"),
+        )
     }
 }

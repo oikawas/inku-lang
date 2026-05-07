@@ -74,7 +74,7 @@ class DefaultSvgRenderer : SvgRenderer {
                 val y2 = px(to?.optDouble(1, 1.0) ?: 1.0, height)
                 val variation = ins.optJSONObject("variation")
                 if (needsPathVariation(variation)) {
-                    val points = variedLinePoints(x1, y1, x2, y2, variation, ins.toString())
+                    val points = variedLinePoints(x1, y1, x2, y2, variation, seedForInstruction(ins))
                         .joinToString(" ") { "${it.first},${it.second}" }
                     """<polyline points="$points" fill="none" $common/>"""
                 } else {
@@ -145,19 +145,34 @@ class DefaultSvgRenderer : SvgRenderer {
         val prepared = ensureLineCoords(ins, layout)
         if (count == 1) return listOf(copyWithoutArrangement(prepared))
         val path = arr.optString("path", "none")
-        val margin = arr.optDouble("margin", 0.1).coerceIn(0.0, 0.45)
+        val preserveSpace = arr.optBoolean("preserve_space", false)
+        val margin = if (preserveSpace) {
+            max(arr.optDouble("margin", 0.1), 0.20)
+        } else {
+            arr.optDouble("margin", 0.1).coerceIn(0.0, 0.45)
+        }
         val clusterCount = arr.optInt("cluster_count", 0)
         val base = copyWithoutArrangement(prepared)
+        val seed = seedForInstruction(ins)
         return (0 until count).map { i ->
             val t = if (count <= 1) 0.5 else i.toDouble() / (count - 1).toDouble()
             val target = if (clusterCount > 0 && layout in setOf("scatter", "horizontal", "vertical")) {
-                clusteredPosition(i, count, clusterCount, pathFor(layout, path), margin, ins.toString())
+                clusteredPosition(
+                    i = i,
+                    count = count,
+                    clusterCount = clusterCount,
+                    path = pathFor(layout, path),
+                    margin = margin,
+                    density = arr.optString("density", "none"),
+                    preserveSpace = preserveSpace,
+                    seed = seed,
+                )
             } else if (path != "none") {
-                pathPosition(i, count, margin, path, ins.toString())
+                pathPosition(i, count, margin, path, seed)
             } else {
                 when (layout) {
                     "vertical" -> margin to (margin + t * (1.0 - margin * 2.0))
-                    "scatter" -> scatterPosition(i, margin, ins.toString())
+                    "scatter" -> scatterPosition(i, margin, seed)
                     "radial" -> {
                         val center = arr.optJSONArray("center")
                         val cx = center?.optDouble(0, 0.5) ?: 0.5
@@ -223,45 +238,81 @@ class DefaultSvgRenderer : SvgRenderer {
     }
 
     private fun scatterPosition(i: Int, margin: Double, seed: String): Pair<Double, Double> {
-        return (margin + hash01(i, seed) * (1.0 - margin * 2.0)) to
-            (margin + hash01(i + 1000, seed) * (1.0 - margin * 2.0))
+        val span = 1.0 - 2.0 * margin
+        val digest = sha256Bytes("$seed:s:$i")
+        val xv = uint32Le(digest, 0).toDouble() / 0xffffffffL.toDouble()
+        val yv = uint32Le(digest, 4).toDouble() / 0xffffffffL.toDouble()
+        return (margin + xv * span) to (margin + yv * span)
     }
 
     private fun pathPosition(i: Int, count: Int, margin: Double, path: String, seed: String): Pair<Double, Double> {
+        val span = 1.0 - 2.0 * margin
         val t = if (count <= 1) 0.5 else i.toDouble() / (count - 1).toDouble()
-        val jitter = (hash01(i + 2000, seed) - 0.5) * 0.14
+        val jitterA = hash01(i, seed, "a") - 0.5
+        val jitterB = hash01(i, seed, "b") - 0.5
         return when (path) {
             "diagonal" -> {
-                val x = margin + t * (1.0 - margin * 2.0)
-                val y = (1.0 - margin) - t * (1.0 - margin * 2.0) + jitter
-                x to y.coerceIn(margin, 1.0 - margin)
+                val x = margin + t * span
+                val y = 1.0 - margin - t * span
+                clamp01(x + jitterA * 0.08) to clamp01(y + jitterB * 0.08)
             }
             "wave" -> {
-                val x = margin + t * (1.0 - margin * 2.0)
-                val y = 0.5 + sin(t * Math.PI * 2.0) * 0.22 + jitter
-                x to y.coerceIn(margin, 1.0 - margin)
+                val x = margin + t * span
+                val y = 0.5 + sin(t * Math.PI * 2.0) * 0.22 + jitterB * 0.08
+                clamp01(x) to clamp01(y)
             }
-            "top_to_bottom" -> (0.5 + jitter).coerceIn(margin, 1.0 - margin) to (margin + t * (1.0 - margin * 2.0))
-            "left_to_right" -> (margin + t * (1.0 - margin * 2.0)) to (0.5 + jitter).coerceIn(margin, 1.0 - margin)
-            "right_half" -> (0.55 + hash01(i, seed) * (0.45 - margin)) to (margin + hash01(i + 1000, seed) * (1.0 - margin * 2.0))
+            "top_to_bottom" -> clamp01(0.5 + jitterA * 0.30) to clamp01(margin + t * span)
+            "left_to_right" -> clamp01(margin + t * span) to clamp01(0.5 + jitterB * 0.30)
+            "right_half" -> clamp01(0.56 + hash01(i, seed, "x") * (0.44 - margin)) to clamp01(margin + hash01(i, seed, "y") * span)
             else -> scatterPosition(i, margin, seed)
         }
     }
 
-    private fun clusteredPosition(i: Int, count: Int, clusterCount: Int, path: String, margin: Double, seed: String): Pair<Double, Double> {
-        val cluster = i % clusterCount.coerceAtLeast(1)
-        val localIndex = i / clusterCount.coerceAtLeast(1)
-        val localTotal = max(1, kotlin.math.ceil(count / clusterCount.coerceAtLeast(1).toDouble()).toInt())
-        val center = if (path == "none") scatterPosition(cluster, margin + 0.08, seed) else pathPosition(cluster, clusterCount, margin + 0.08, path, seed)
-        val t = if (localTotal <= 1) 0.5 else localIndex.toDouble() / (localTotal - 1).toDouble()
-        val angle = hash01(cluster + 3000, seed) * Math.PI * 2.0
-        val span = 0.14 + hash01(cluster + 4000, seed) * 0.12
-        val along = (t - 0.5) * span
-        val cross = (hash01(i + 5000, seed) - 0.5) * span * 0.35
-        val x = center.first + cos(angle) * along - sin(angle) * cross
-        val y = center.second + sin(angle) * along + cos(angle) * cross
-        return x.coerceIn(margin, 1.0 - margin) to y.coerceIn(margin, 1.0 - margin)
+    private fun clusteredPosition(i: Int, count: Int, clusterCount: Int, path: String, margin: Double, density: String, preserveSpace: Boolean, seed: String): Pair<Double, Double> {
+        val nClusters = clusterCount.coerceIn(1, count)
+        val clusterIndex = i % nClusters
+        val localIndex = i / nClusters
+        val localTotal = max(1, kotlin.math.ceil(count / nClusters.toDouble()).toInt())
+        val centerMargin = max(margin, if (preserveSpace) 0.20 else margin)
+        val center = if (path == "none") {
+            scatterPosition(clusterIndex, centerMargin, seedForCluster(seed))
+        } else {
+            pathPosition(clusterIndex, nClusters, centerMargin, path, seedForCluster(seed))
+        }
+        val axisAngle = when (path) {
+            "diagonal" -> -Math.PI / 4.0
+            "top_to_bottom" -> Math.PI / 2.0
+            "left_to_right", "right_half", "wave" -> 0.0
+            else -> hash01(clusterIndex, seed, "cluster-axis") * Math.PI * 2.0
+        }
+        val tx = cos(axisAngle)
+        val ty = sin(axisAngle)
+        val nx = -ty
+        val ny = tx
+        val localT = (localIndex + 0.5) / localTotal
+        val centered = (localT - 0.5) * 2.0
+        val radius = densityRadius(density, preserveSpace)
+        val longSpan = radius * (1.45 + hash01(clusterIndex, seed, "cluster-long") * 0.95)
+        val crossSpan = radius * (0.28 + hash01(clusterIndex, seed, "cluster-cross") * 0.32)
+        val along = centered * longSpan + (hash01(i, seed, "cluster-along") - 0.5) * radius * 0.20
+        val cross = (hash01(i, seed, "cluster-cross-jitter") - 0.5) * crossSpan * (1.25 - 0.45 * kotlin.math.abs(centered))
+        val bend = sin(localT * Math.PI) * (hash01(clusterIndex, seed, "cluster-bend") - 0.5) * radius * 0.55
+        val x = center.first + tx * along + nx * (cross + bend)
+        val y = center.second + ty * along + ny * (cross + bend)
+        return clamp01(x) to clamp01(y)
     }
+
+    private fun densityRadius(density: String, preserveSpace: Boolean): Double {
+        val base = when (density) {
+            "low" -> 0.035
+            "medium" -> 0.060
+            "high" -> 0.085
+            else -> 0.045
+        }
+        return base * if (preserveSpace) 0.85 else 1.0
+    }
+
+    private fun clamp01(value: Double): Double = value.coerceIn(0.0, 1.0)
 
     private fun pointsForRegular(ins: JSONObject, sides: Int, width: Double, height: Double): List<Pair<Double, Double>> {
         return ServerRendererGeometry.pointsForRegular(ins, sides, width, height)
@@ -545,6 +596,112 @@ class DefaultSvgRenderer : SvgRenderer {
     private fun hash01(i: Int, seed: String): Double {
         return ServerRendererGeometry.hash01(i, seed)
     }
+
+    private fun hash01(i: Int, seed: String, salt: String): Double {
+        val digest = sha256Bytes("$seed:$salt:$i")
+        return uint32Le(digest, 0).toDouble() / 0xffffffffL.toDouble()
+    }
+
+    private fun seedForInstruction(ins: JSONObject): String = uint64Le(sha256Bytes(serverInstructionJson(ins)), 0).toString()
+
+    private fun seedForCluster(seed: String): String = ((seed.toULongOrNull() ?: 0UL) xor 0xC1A57UL).toString()
+
+    private fun sha256Bytes(value: String): ByteArray = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
+
+    private fun uint32Le(bytes: ByteArray, offset: Int): Long {
+        return ((bytes[offset].toLong() and 0xffL)) or
+            ((bytes[offset + 1].toLong() and 0xffL) shl 8) or
+            ((bytes[offset + 2].toLong() and 0xffL) shl 16) or
+            ((bytes[offset + 3].toLong() and 0xffL) shl 24)
+    }
+
+    private fun uint64Le(bytes: ByteArray, offset: Int): ULong {
+        var value = 0UL
+        for (i in 0 until 8) {
+            value = value or ((bytes[offset + i].toULong() and 0xffUL) shl (8 * i))
+        }
+        return value
+    }
+
+    private fun serverInstructionJson(ins: JSONObject): String {
+        return buildString {
+            append("{")
+            append("\"primitive\":"); append(jsonString(ins.optString("primitive", "line")))
+            append(",\"from_\":"); append(coordJson(ins.optJSONArray("from")))
+            append(",\"to\":"); append(coordJson(ins.optJSONArray("to")))
+            append(",\"center\":"); append(coordJson(ins.optJSONArray("center")))
+            append(",\"radius\":"); append(numberOrNull(ins, "radius"))
+            append(",\"sides\":"); append(intOrNull(ins, "sides"))
+            append(",\"position\":"); append(coordJson(ins.optJSONArray("position")))
+            append(",\"size\":"); append(coordJson(ins.optJSONArray("size")))
+            append(",\"angle_start\":"); append(numberOrNull(ins, "angle_start"))
+            append(",\"angle_end\":"); append(numberOrNull(ins, "angle_end"))
+            append(",\"rotation\":"); append(numberOrNull(ins, "rotation"))
+            append(",\"filled\":"); append(ins.optBoolean("filled", false))
+            append(",\"style\":"); append(jsonString(ins.optString("style", "solid")))
+            append(",\"weight\":"); append(jsonString(ins.optString("weight", "pen")))
+            append(",\"color\":"); append(jsonString(ins.optString("color", "black")))
+            append(",\"color_hint\":"); append(stringOrNull(ins, "color_hint"))
+            append(",\"variation\":"); append(variationJson(ins.optJSONObject("variation")))
+            append(",\"arrangement\":"); append(arrangementJson(ins.optJSONObject("arrangement")))
+            append("}")
+        }
+    }
+
+    private fun arrangementJson(arr: JSONObject?): String {
+        if (arr == null) return "null"
+        return buildString {
+            append("{")
+            append("\"count\":"); append(arr.optInt("count", 1).coerceIn(1, 1000))
+            append(",\"layout\":"); append(jsonString(arr.optString("layout", "horizontal")))
+            append(",\"path\":"); append(jsonString(arr.optString("path", "none")))
+            append(",\"color_cycle\":"); append(stringArrayJson(arr.optJSONArray("color_cycle")))
+            append(",\"margin\":"); append(doubleJson(arr.optDouble("margin", 0.1)))
+            append(",\"center\":"); append(coordJson(arr.optJSONArray("center")))
+            append(",\"radius\":"); append(numberOrNull(arr, "radius"))
+            append(",\"density\":"); append(jsonString(arr.optString("density", "none")))
+            append(",\"cluster_count\":"); append(intOrNull(arr, "cluster_count"))
+            append(",\"fade\":"); append(jsonString(arr.optString("fade", "none")))
+            append(",\"preserve_space\":"); append(arr.optBoolean("preserve_space", false))
+            append("}")
+        }
+    }
+
+    private fun variationJson(variation: JSONObject?): String {
+        if (variation == null) return "null"
+        return buildString {
+            append("{")
+            append("\"amplitude\":"); append(jsonString(variation.optString("amplitude", "medium")))
+            append(",\"frequency\":"); append(jsonString(variation.optString("frequency", "medium")))
+            append(",\"quality\":"); append(jsonString(variation.optString("quality", "none")))
+            append(",\"dimensions\":"); append(stringArrayJson(variation.optJSONArray("dimensions")))
+            append("}")
+        }
+    }
+
+    private fun coordJson(array: JSONArray?): String {
+        if (array == null) return "null"
+        return "[${doubleJson(array.optDouble(0, 0.0))},${doubleJson(array.optDouble(1, 0.0))}]"
+    }
+
+    private fun stringArrayJson(array: JSONArray?): String {
+        if (array == null || array.length() == 0) return "[]"
+        return (0 until array.length()).joinToString(prefix = "[", postfix = "]", separator = ",") { jsonString(array.optString(it)) }
+    }
+
+    private fun stringOrNull(obj: JSONObject, key: String): String = if (obj.has(key) && !obj.isNull(key)) jsonString(obj.optString(key)) else "null"
+
+    private fun numberOrNull(obj: JSONObject, key: String): String = if (obj.has(key) && !obj.isNull(key)) doubleJson(obj.optDouble(key)) else "null"
+
+    private fun intOrNull(obj: JSONObject, key: String): String = if (obj.has(key) && !obj.isNull(key)) obj.optInt(key).toString() else "null"
+
+    private fun doubleJson(value: Double): String {
+        if (!value.isFinite()) return "0.0"
+        val text = java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
+        return if ("." in text) text else "$text.0"
+    }
+
+    private fun jsonString(value: String): String = JSONObject.quote(value)
 
     private fun sha256(value: String): String {
         return MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }

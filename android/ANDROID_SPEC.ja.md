@@ -361,6 +361,37 @@ local single-user equivalent と明記されたものを除き、Web component �
 5. reference web JSON / SVG / render metadata fixture に対する automated compatibility tests を追加する。
 6. Non-history settings operation の destructive confirmation を完了し、Android UI state transition の automated parity coverage を追加する。
 
+## 2026-05-07 Server Parity 修正記録
+
+同一 DDL から描画した server CLI / Android CLI の比較で、DDL 正規化までは概ね一致していた一方、JSON Score と SVG 描画結果に差が残っていた。
+調査の結果、主因は Android 側に残っていた server と異なる Stage 2 入力、Score tool schema、coerce chain、renderer seed/hash、独自補助レイヤーだった。
+
+今回の修正で、Android のハードウェア非依存ロジックは原則として server 実装を master とし、以下を server source に合わせた。
+
+- Stage 2 user message は `server/src/inku_server/composer.py` の `_build_user_message()` と同じ形式にする。
+  `originalText` と DDL が同一の DDL 入力では、余計な `[原文]` block を付けず DDL のみを送る。
+- Stage 2 tool schema は Android 独自の簡略 schema を廃止し、server の `_score_tool_schema()` から生成した `ServerScoreSchemaJson` を使用する。
+- Stage 2 後の Score 補正は `server/src/inku_server/coerce.py` の `coerce_score()` の段階構成に合わせる。
+  `material_hint`、`variation_hint`、DDL coverage、color delivery、shape delivery、complex motif、composition diversity、structural duplicate、context energy、presence auxiliary、density governor、motion energy、density budget を通常フローへ接続する。
+- `material_hint` / `variation_hint` は server の `_with_material_hint()` / `_with_variation_hint()` と同じ marker と default variation を使う。
+- server にない Android 独自補修として入っていた、`震える` を motion context として扱う追加条件と、membrane haze 補助レイヤー自動追加は削除する。
+- renderer の arrangement 展開、scatter / path / clustered 配置、`preserve_space` margin、density radius、cluster axis / bend / jitter は `server/src/inku_server/renderer.py` に合わせる。
+- renderer seed は `Instruction.model_dump_json()` 相当の field order と default/null 表現から作り、line variation の seed も同じ seed source を使う。
+- variation / material jitter の signed hash は server の `_hash_to_unit()` と同じ SHA-256 + little-endian signed 64-bit 由来にする。
+
+検証:
+
+- `gradle :app:compileDebugKotlin` 成功。
+- `gradle :app:assembleDebug` 成功。
+- Pixel 9 へ debug APK を再インストールして headless DDL render comparison を実行。
+- 最終確認 run: `/tmp/inku-headless/history-ddl5-after-final-parity-fix-20260507/history-ddl5-final-002`
+  - `same_ddl: true`
+  - `same_render_hash: false`
+  - 残差は主に LLM Stage 2 出力揺れによる `variation.dimensions` と `arrangement.density` の差として確認した。
+
+今後の比較で同一 Score からの描画差が出た場合は、renderer の Kotlin 実装差分として扱う。
+Score 自体が異なる場合は、Stage 2 model response、tool schema、coerce chain の順に server source と照合する。
+
 ## Local Commit Record
 
 - `f34852b feat: add android headless render comparison`

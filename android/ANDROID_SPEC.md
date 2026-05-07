@@ -312,7 +312,12 @@ Current pipeline compatibility layout:
 | --- | --- | --- |
 | `server/src/inku_server/interpreter.py` / Stage 1 model text cleanup and usable DDL guard | `android/app/src/main/java/app/inku/mobile/pipeline/ServerDdlText.kt` | Model output cleanup, Stage 1 DDL normalization, number-noise repair, clause dedupe, drawable vocabulary guard |
 | `server/src/inku_server/ddl_expander.py` | `android/app/src/main/java/app/inku/mobile/pipeline/WebDdlExpander.kt` | Stage 1.5 DDL expansion and sensory/structural marker insertion |
-| `server/src/inku_server/coerce.py` | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion/repair, fallback Score construction, presence inference; future split target for `ServerScoreCoercer.kt` |
+| `server/src/inku_server/coerce.py` / `PRIMITIVE_SPECS`, field coercion, post-coerce | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreCoercer.kt` | Stage 2 instruction primitive field repair, fallback field selection, arc angle repair |
+| `server/src/inku_server/coerce.py` / semantic marker helpers, presence inference, color/layout/material/radius detection | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSemantics.kt` | Context marker detection, quiet-density/motion/colorful context checks, presence inference, visible color/background, DDL hint helpers |
+| `server/src/inku_server/composer.py` and `coerce.py` / fallback score synthesis | `android/app/src/main/java/app/inku/mobile/pipeline/ServerFallbackComposer.kt` | Fallback DDL, fallback instruction, and arrangement synthesis after provider failure or unusable Stage 2 output |
+| `server/src/inku_server/coerce.py` / DDL coverage, shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | Drawable clause extraction, clause primitive/color mapping, coverage instruction, shape/motif repair instruction factories |
+| `server/src/inku_server/coerce.py` / semantic repair order | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairPipeline.kt` | Application order for dedupe, DDL coverage, color/shape/motif/composition/context/motion/presence/density repair |
+| `server/src/inku_server/coerce.py` / Android-local repair hook implementation | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration, repair hook bodies, fallback Score construction, Stage 1/2 provider fallback control |
 | `server/src/inku_server/schema.py` / Stage 2 tool contract | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 `submit_score` schema exposed to local/provider LLMs |
 
 ## Web Component Porting Matrix

@@ -5,19 +5,21 @@ import android.content.Intent
 import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
+import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,8 +32,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -85,8 +85,10 @@ import app.inku.mobile.data.model.ColorCatalogs
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.caverock.androidsvg.SVG
 import org.json.JSONArray
 import org.json.JSONObject
@@ -128,7 +130,7 @@ fun InkuApp() {
 
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
-            topBar = { AppHeader(state) },
+            topBar = { AppHeader(state, viewModel) },
             bottomBar = { BottomNavigationBar(state.tab, viewModel) },
             containerColor = MaterialTheme.colorScheme.background,
         ) { padding ->
@@ -507,7 +509,7 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
             saijikiGroups.forEach { group ->
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${group.label} / ${group.en}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
                         group.words.forEach { word ->
                             MiniPill(word, onClick = { viewModel.insertDdlWord(word) })
                         }
@@ -519,7 +521,7 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
 }
 
 @Composable
-private fun AppHeader(state: InkuUiState) {
+private fun AppHeader(state: InkuUiState, viewModel: InkuViewModel) {
     Surface(modifier = Modifier.statusBarsPadding(), color = Color(0xFF151412), tonalElevation = 2.dp) {
         Row(
             modifier = Modifier
@@ -528,15 +530,12 @@ private fun AppHeader(state: InkuUiState) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            MiniPill("☰", onClick = { viewModel.setTab(AppTab.History) })
             Text("inku", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
             Spacer(Modifier.weight(1f))
-            Text(
-                "S1 ${selectedModelLabel(state)}   S2 ${selectedStage2ModelLabel(state)}   ${ColorCatalogs.get(state.selectedCatalogId).name}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            MiniPill("□ ${canvasLabel(state).take(8)}", onClick = viewModel::openCanvasSelection)
+            MiniPill("◐ ${ColorCatalogs.get(state.selectedCatalogId).name.take(8)}", onClick = viewModel::openCatalogSelection)
+            MiniPill("…", onClick = viewModel::openModelSelection)
         }
     }
 }
@@ -579,9 +578,9 @@ private fun ComposeModeTabs(selected: ComposeMode, viewModel: InkuViewModel) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(100))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         ComposeMode.entries.forEach { tab ->
             val active = selected == tab
@@ -589,26 +588,30 @@ private fun ComposeModeTabs(selected: ComposeMode, viewModel: InkuViewModel) {
                 ComposeMode.Write -> "記述"
                 ComposeMode.Batch -> "バッチ"
             }
-            val colors = if (active) {
-                ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = Color(0xFF19150F))
-            } else {
-                ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (active) {
-                Button(
-                    onClick = { viewModel.setComposeMode(tab) },
-                    shape = RoundedCornerShape(4.dp),
-                    colors = colors,
-                ) { Text(label) }
-            } else {
-                OutlinedButton(
-                    onClick = { viewModel.setComposeMode(tab) },
-                    shape = RoundedCornerShape(4.dp),
-                    colors = colors,
-                ) { Text(label) }
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clickable { viewModel.setComposeMode(tab) },
+                shape = RoundedCornerShape(100),
+                color = if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
+                tonalElevation = if (active) 2.dp else 0.dp,
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
+}
+
+private fun canvasLabel(state: InkuUiState): String {
+    return CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect
 }
 
 @Composable
@@ -618,17 +621,19 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .safeDrawingPadding()
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ComposeModeTabs(state.composeMode, viewModel)
-        ConditionChips(state, viewModel)
         if (state.composeMode == ComposeMode.Batch) {
+            ConditionChips(state, viewModel)
             BatchPanel(state, viewModel)
+            CanvasHeroCard(state, viewModel)
         } else {
+            CanvasHeroCard(state, viewModel)
+            ConditionChips(state, viewModel)
             DrawPanel(state, viewModel)
         }
-        CanvasHeroCard(state, viewModel)
         Spacer(Modifier.height(96.dp))
     }
 }
@@ -638,94 +643,122 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
     val item = state.selectedHistory
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
     var canvasMessage by remember { mutableStateOf<String?>(null) }
+    var svgMenuOpen by remember { mutableStateOf(false) }
+    var pngMenuOpen by remember { mutableStateOf(false) }
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val ratio = canvasAspectRatio(state.selectedCanvasAspect)
         val previewHeight = (maxWidth / ratio).coerceAtMost(330.dp)
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(previewHeight)
-                .border(1.dp, Color(0xFF3A3631), RoundedCornerShape(20.dp)),
-            color = Color(0xFF20201E),
-            shape = RoundedCornerShape(20.dp),
-            tonalElevation = 1.dp,
-        ) {
-            Box(modifier = Modifier.fillMaxSize().padding(10.dp)) {
-                if (item == null) {
-                    Text("No render yet", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Center))
-                } else {
-                    ArtworkPreview(
-                        item,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(state.canvasZoom) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    viewModel.panCanvas(dragAmount.x, dragAmount.y)
-                                }
-                            }
-                            .graphicsLayer(
-                                scaleX = state.canvasZoom,
-                                scaleY = state.canvasZoom,
-                                translationX = state.canvasPanX,
-                                translationY = state.canvasPanY,
-                            ),
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item?.let {
+                WrapRow {
+                    MiniPill(text = if (it.starred) "★" else "☆", selected = it.starred, onClick = { viewModel.toggleStar(it) })
+                    MiniPill(
+                        text = "F${it.renderHashShort}",
+                        onClick = {
+                            clipboard.setText(AnnotatedString(it.renderHashShort))
+                            canvasMessage = "Hash copied."
+                        },
                     )
-                    Row(
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        MiniPill(text = if (item.starred) "★" else "☆", selected = item.starred, onClick = { viewModel.toggleStar(item) })
-                        MiniPill(
-                            text = "F${item.renderHashShort}",
-                            onClick = {
-                                clipboard.setText(AnnotatedString(item.renderHashShort))
-                                canvasMessage = "Hash copied."
-                            },
+                    MiniPill("-", onClick = { viewModel.setCanvasZoom(state.canvasZoom - 0.25f) })
+                    MiniPill("${(state.canvasZoom * 100).toInt()}%", onClick = viewModel::resetCanvasZoom)
+                    MiniPill("+", onClick = { viewModel.setCanvasZoom(state.canvasZoom + 0.25f) })
+                }
+            }
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(previewHeight)
+                    .border(1.dp, Color(0x1A000000), RoundedCornerShape(20.dp)),
+                color = Color(0xFFFAFAF6),
+                shape = RoundedCornerShape(20.dp),
+                tonalElevation = 1.dp,
+            ) {
+                Box(modifier = Modifier.fillMaxSize().padding(10.dp)) {
+                    if (item == null) {
+                        Text("No render yet", color = Color(0xFF7D766E), modifier = Modifier.align(Alignment.Center))
+                    } else {
+                        ArtworkPreview(
+                            item,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTransformGestures { _, pan, zoom, _ ->
+                                        if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
+                                        if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
+                                    }
+                                }
+                                .graphicsLayer(
+                                    scaleX = state.canvasZoom,
+                                    scaleY = state.canvasZoom,
+                                    translationX = state.canvasPanX,
+                                    translationY = state.canvasPanY,
+                                ),
                         )
                     }
-                    Row(
-                        modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        RenderTab.entries.forEach { tab ->
+                }
+            }
+            item?.let {
+                WrapRow {
+                    RenderTab.entries.forEach { tab ->
+                        MiniPill(
+                            text = when (tab) {
+                                RenderTab.Artwork -> "描画"
+                                RenderTab.Prompt -> "Prompt"
+                                RenderTab.Json -> "JSON"
+                            },
+                            selected = state.renderTab == tab,
+                            onClick = { viewModel.setRenderTab(tab) },
+                        )
+                    }
+                    Box {
+                        MiniPill(text = "SVG ▾", onClick = { svgMenuOpen = true })
+                    }
+                    Box {
+                        MiniPill(text = "PNG ▾", onClick = { pngMenuOpen = true })
+                    }
+                }
+                if (svgMenuOpen) {
+                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                        listOf(
+                            "display" to "表示用SVG",
+                            "editable" to "編集用SVG",
+                            "compat" to "汎用SVG",
+                        ).forEach { (profile, label) ->
                             MiniPill(
-                                text = when (tab) {
-                                    RenderTab.Artwork -> "描画"
-                                    RenderTab.Prompt -> "Prompt"
-                                    RenderTab.Json -> "JSON"
+                                text = label,
+                                onClick = {
+                                    svgMenuOpen = false
+                                    canvasMessage = "SVG export preparing..."
+                                    scope.launch {
+                                        canvasMessage = runCatching {
+                                            shareHistorySvg(context, it, profile)
+                                            "SVG exported F${it.renderHashShort}"
+                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
+                                    }
                                 },
-                                selected = state.renderTab == tab,
-                                onClick = { viewModel.setRenderTab(tab) },
                             )
                         }
                     }
-                    Row(
-                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        MiniPill("-", onClick = { viewModel.setCanvasZoom(state.canvasZoom - 0.25f) })
-                        MiniPill("${(state.canvasZoom * 100).toInt()}%", onClick = viewModel::resetCanvasZoom)
-                        MiniPill("+", onClick = { viewModel.setCanvasZoom(state.canvasZoom + 0.25f) })
-                        MiniPill(
-                            text = "SVG",
-                            onClick = {
-                                canvasMessage = runCatching {
-                                    shareHistorySvg(context, item)
-                                    "SVG exported F${item.renderHashShort}"
-                                }.getOrElse { error -> error.message ?: "SVG export failed." }
-                            },
-                        )
-                        MiniPill(
-                            text = "PNG",
-                            onClick = {
-                                canvasMessage = runCatching {
-                                    shareHistoryPng(context, item, 2160)
-                                    "PNG exported F${item.renderHashShort}"
-                                }.getOrElse { error -> error.message ?: "PNG export failed." }
-                            },
-                        )
+                }
+                if (pngMenuOpen) {
+                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                        listOf(1080, 2160, 4320).forEach { size ->
+                            MiniPill(
+                                text = "PNG ${size}px",
+                                onClick = {
+                                    pngMenuOpen = false
+                                    canvasMessage = "PNG export preparing..."
+                                    scope.launch {
+                                        canvasMessage = runCatching {
+                                            shareHistoryPng(context, it, size)
+                                            "PNG exported F${it.renderHashShort}"
+                                        }.getOrElse { error -> error.message ?: "PNG export failed." }
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -743,17 +776,17 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
 
 @Composable
 private fun ConditionChips(state: InkuUiState, viewModel: InkuViewModel) {
-    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ChipButton("□ ${CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect}", onClick = viewModel::openCanvasSelection)
+    WrapRow {
+        ChipButton("□ ${canvasLabel(state)}", onClick = viewModel::openCanvasSelection)
         ChipButton("◐ ${ColorCatalogs.get(state.selectedCatalogId).name}", onClick = viewModel::openCatalogSelection)
-        ChipButton("◇ ${selectedModelLabel(state)} / ${selectedStage2ModelLabel(state)}", onClick = viewModel::openModelSelection)
+        ChipButton("◇ モデル", onClick = viewModel::openModelSelection)
     }
 }
 
 @Composable
 private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        InputSectionHeader(state, viewModel)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        CompactLabel("指示")
         ImeAwareOutlinedTextField(
             value = state.prompt,
             onValueChange = viewModel::setPrompt,
@@ -771,8 +804,15 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
         state.message?.takeIf { it.isNotBlank() }?.let { message ->
             Text(message, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
-        CompactLabel("解釈（正規化DDL）")
-        DdlActionRow(state, viewModel)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CompactLabel("解釈（正規化DDL）")
+            Spacer(Modifier.weight(1f))
+            DdlActionRow(state, viewModel)
+        }
         if (state.saijikiOpen) {
             SaijikiPanel(viewModel)
         }
@@ -799,10 +839,7 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
 private fun InputSectionHeader(state: InkuUiState, viewModel: InkuViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CompactLabel("指示")
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        WrapRow {
             SecondarySmallButton(
                 text = CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect,
                 onClick = viewModel::openCanvasSelection,
@@ -856,7 +893,7 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
             )
             if (state.batchPromptHistory.isNotEmpty()) {
                 CompactLabel("バッチ指示履歴")
-                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                WrapRow(horizontal = 6.dp, vertical = 6.dp) {
                     state.batchPromptHistory.forEach { prompt ->
                         MiniPill(
                             text = prompt.lineSequence().firstOrNull()?.take(22) ?: "履歴",
@@ -968,6 +1005,7 @@ private fun HistoryScreen(
     viewModel: InkuViewModel,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var exportMessage by remember { mutableStateOf<String?>(null) }
     val sourceHistory = if (state.historyView == HistoryView.Trash) trashedHistory else history
     Column(
@@ -982,7 +1020,7 @@ private fun HistoryScreen(
             Spacer(Modifier.weight(1f))
             Text("${sourceHistory.size}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             ChipButton("サムネイル", selected = state.historyLayout == HistoryLayout.Thumbs, onClick = { viewModel.setHistoryLayout(HistoryLayout.Thumbs) })
             ChipButton("リスト", selected = state.historyLayout == HistoryLayout.List, onClick = { viewModel.setHistoryLayout(HistoryLayout.List) })
             ChipButton("ゴミ箱 ${trashedHistory.size}", selected = state.historyView == HistoryView.Trash, onClick = {
@@ -999,7 +1037,7 @@ private fun HistoryScreen(
         val filteredHistory = remember(sourceHistory, state.historySearchQuery, state.historyStarredOnly) {
             filterHistoryItems(sourceHistory, state)
         }
-        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow {
             ChipButton("★ 星のみ", selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
             ChipButton("全選択", selected = state.selectedHistoryIds.isNotEmpty() && state.selectedHistoryIds.size == filteredHistory.size, onClick = { viewModel.selectAllHistory(filteredHistory) })
             if (state.historyView == HistoryView.Active) {
@@ -1016,11 +1054,14 @@ private fun HistoryScreen(
                 PrimarySmallButton(
                     text = "JSON共有",
                     onClick = {
-                        exportMessage = runCatching {
-                            shareHistoryJson(context, item)
-                            "Exported F${item.renderHashShort}"
-                        }.getOrElse { error ->
-                            error.message ?: "Export failed."
+                        exportMessage = "Export preparing..."
+                        scope.launch {
+                            exportMessage = runCatching {
+                                shareHistoryJson(context, item)
+                                "Exported F${item.renderHashShort}"
+                            }.getOrElse { error ->
+                                error.message ?: "Export failed."
+                            }
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -1128,10 +1169,7 @@ private fun SettingsHeader(selectedPane: SettingsPane, viewModel: InkuViewModel)
             Text("設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             MiniPill("ADMIN", selected = true)
         }
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        WrapRow {
             SettingsTabButton("モデル", selectedPane == SettingsPane.Models) { viewModel.setSettingsPane(SettingsPane.Models) }
             SettingsTabButton("プラグイン", selectedPane == SettingsPane.Plugins) { viewModel.setSettingsPane(SettingsPane.Plugins) }
             SettingsTabButton("DB", selectedPane == SettingsPane.Db) { viewModel.setSettingsPane(SettingsPane.Db) }
@@ -1714,7 +1752,7 @@ private fun AddProviderCard(
                     ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = "サービスID", modifier = Modifier.fillMaxWidth(), singleLine = true)
                     ImeAwareOutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = "サービス名", modifier = Modifier.fillMaxWidth(), singleLine = true)
                     CompactLabel("接続形式")
-                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
                         listOf("openai-compatible" to "OpenAI compatible", "anthropic" to "Claude API", "gemini" to "Gemini API").forEach { (value, label) ->
                             MiniPill(label, selected = kind == value, onClick = { kind = value })
                         }
@@ -1835,13 +1873,10 @@ private fun ModelChoiceRow(
     selectedValue: String,
     onSelect: (String) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    WrapRow {
         choices.forEach { choice ->
             MiniPill(
-                text = "${choice.providerName} / ${choice.label}",
+                text = "${choice.providerName.take(10)} / ${choice.label.take(18)}",
                 selected = choice.id == selectedValue,
                 onClick = { onSelect(choice.id) },
             )
@@ -1863,13 +1898,10 @@ private fun PublishedModelsSummary(
         if (ids.isEmpty()) {
             Text("公開モデルは未選択です。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
+            WrapRow(horizontal = 6.dp, vertical = 6.dp) {
                 ids.forEach { id ->
                     val label = assets.firstOrNull { it.modelId == id }?.displayName ?: id.substringAfterLast(":")
-                    MiniPill(label)
+                    MiniPill(label.take(22))
                 }
             }
         }
@@ -2145,12 +2177,7 @@ private fun HorizontalChoiceRow(
     selectedValue: String,
     onSelect: (String) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    WrapRow {
         values.forEach { (value, label) ->
             if (value == selectedValue) {
                 PrimarySmallButton(text = label, onClick = { onSelect(value) })
@@ -2163,17 +2190,12 @@ private fun HorizontalChoiceRow(
 
 @Composable
 private fun ColorCatalogButtonRow(selectedValue: String, onSelect: (String) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    WrapRow {
         ColorCatalogs.all.forEach { catalog ->
             val selected = catalog.id == selectedValue
             OutlinedButton(
                 onClick = { onSelect(catalog.id) },
-                modifier = Modifier.height(54.dp),
+                modifier = Modifier.height(54.dp).fillMaxWidth(),
                 shape = RoundedCornerShape(4.dp),
                 colors = if (selected) {
                     ButtonDefaults.outlinedButtonColors(
@@ -2332,39 +2354,50 @@ private fun JSONObject.putFrom(source: JSONObject, key: String, fallback: String
     }
 }
 
-private fun shareHistoryJson(context: Context, item: HistoryItemEntity) {
+private data class SharePayload(
+    val uri: Uri,
+    val mimeType: String,
+    val subject: String,
+    val clipLabel: String,
+    val chooserTitle: String,
+)
+
+private suspend fun shareHistoryJson(context: Context, item: HistoryItemEntity) {
+    val payload = withContext(Dispatchers.IO) { buildHistoryJsonPayload(context, item) }
+    launchShareIntent(context, payload)
+}
+
+private suspend fun shareHistorySvg(context: Context, item: HistoryItemEntity, profile: String = "display") {
+    val payload = withContext(Dispatchers.IO) { buildHistorySvgPayload(context, item, profile) }
+    launchShareIntent(context, payload)
+}
+
+private suspend fun shareHistoryPng(context: Context, item: HistoryItemEntity, targetHeight: Int) {
+    val payload = withContext(Dispatchers.IO) { buildHistoryPngPayload(context, item, targetHeight) }
+    launchShareIntent(context, payload)
+}
+
+private fun buildHistoryJsonPayload(context: Context, item: HistoryItemEntity): SharePayload {
     val exportDir = File(context.cacheDir, "exports")
     exportDir.mkdirs()
     val file = File(exportDir, "inku-${item.renderHashShort}.json")
     file.writeText(historyExportJson(item).toString(2), Charsets.UTF_8)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "application/json"
-        putExtra(Intent.EXTRA_SUBJECT, "inku ${item.renderHashShort}")
-        putExtra(Intent.EXTRA_STREAM, uri)
-        clipData = ClipData.newUri(context.contentResolver, "inku-${item.renderHashShort}.json", uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(intent, "Export inku JSON"))
+    return SharePayload(uri, "application/json", "inku ${item.renderHashShort}", file.name, "Export inku JSON")
 }
 
-private fun shareHistorySvg(context: Context, item: HistoryItemEntity) {
+private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, profile: String): SharePayload {
+    val normalizedProfile = profile.takeIf { it in setOf("display", "editable", "compat") } ?: "display"
     val exportDir = File(context.cacheDir, "exports")
     exportDir.mkdirs()
-    val file = File(exportDir, "inku-${item.renderHashShort}.svg")
-    file.writeText(item.displaySvg, Charsets.UTF_8)
+    val ext = if (normalizedProfile == "display") "svg" else "$normalizedProfile.svg"
+    val file = File(exportDir, "inku-${item.renderHashShort}.$ext")
+    file.writeText(svgForExport(item, normalizedProfile), Charsets.UTF_8)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/svg+xml"
-        putExtra(Intent.EXTRA_SUBJECT, "inku ${item.renderHashShort}")
-        putExtra(Intent.EXTRA_STREAM, uri)
-        clipData = ClipData.newUri(context.contentResolver, "inku-${item.renderHashShort}.svg", uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(intent, "Export inku SVG"))
+    return SharePayload(uri, "image/svg+xml", "inku ${item.renderHashShort}", file.name, "Export inku SVG")
 }
 
-private fun shareHistoryPng(context: Context, item: HistoryItemEntity, targetHeight: Int) {
+private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, targetHeight: Int): SharePayload {
     val svg = SVG.getFromString(item.displaySvg)
     val documentWidth = svg.documentWidth.takeIf { it > 0f } ?: 1000f
     val documentHeight = svg.documentHeight.takeIf { it > 0f } ?: 1000f
@@ -2383,14 +2416,43 @@ private fun shareHistoryPng(context: Context, item: HistoryItemEntity, targetHei
     }
     bitmap.recycle()
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
+}
+
+private fun launchShareIntent(context: Context, payload: SharePayload) {
     val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/png"
-        putExtra(Intent.EXTRA_SUBJECT, "inku ${item.renderHashShort}")
-        putExtra(Intent.EXTRA_STREAM, uri)
-        clipData = ClipData.newUri(context.contentResolver, file.name, uri)
+        type = payload.mimeType
+        putExtra(Intent.EXTRA_SUBJECT, payload.subject)
+        putExtra(Intent.EXTRA_STREAM, payload.uri)
+        clipData = ClipData.newUri(context.contentResolver, payload.clipLabel, payload.uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(intent, "Export inku PNG"))
+    context.startActivity(Intent.createChooser(intent, payload.chooserTitle))
+}
+
+private fun svgForExport(item: HistoryItemEntity, profile: String): String {
+    val metadata = JSONObject()
+        .put("generator", "inku")
+        .put("svg_profile", profile)
+        .put("source", "android")
+    val title = "inku render ($profile SVG)"
+    val desc = when (profile) {
+        "editable" -> "Generated by inku. Groups and IDs are included for vector editing."
+        else -> item.originalInput.ifBlank { "Generated by inku. Portable SVG output." }
+    }
+    val documentMetadata = "<title>${escapeXml(title)}</title>" +
+        "<desc>${escapeXml(desc)}</desc>" +
+        "<metadata id=\"inku_metadata\">${escapeXml(metadata.toString())}</metadata>"
+    val match = Regex("(<svg\\b[^>]*>)").find(item.displaySvg) ?: return item.displaySvg
+    return item.displaySvg.replaceRange(match.range.last + 1, match.range.last + 1, documentMetadata)
+}
+
+private fun escapeXml(value: String): String {
+    return value
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
 }
 
 private fun historyExportJson(item: HistoryItemEntity): JSONObject {
@@ -2449,8 +2511,8 @@ private fun HistoryStrip(history: List<HistoryItemEntity>, selected: HistoryItem
                 Spacer(Modifier.weight(1f))
                 selected?.let { Text(it.renderHashShort, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary) }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(history.take(20), key = { it.id }) { item ->
+            WrapRow {
+                history.take(8).forEach { item ->
                     HistoryTile(item = item, selected = selected?.id == item.id, onSelect = { viewModel.selectHistory(item) })
                 }
             }
@@ -2568,10 +2630,27 @@ private fun CompactLabel(text: String) {
 
 @Composable
 private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
         MiniPill("歳時記", selected = state.saijikiOpen, onClick = viewModel::toggleSaijiki)
         MiniPill("DDL編集", onClick = viewModel::openDdlEditor)
         MiniPill("自動補正", selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WrapRow(
+    modifier: Modifier = Modifier,
+    horizontal: androidx.compose.ui.unit.Dp = 8.dp,
+    vertical: androidx.compose.ui.unit.Dp = 8.dp,
+    content: @Composable () -> Unit,
+) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(horizontal),
+        verticalArrangement = Arrangement.spacedBy(vertical),
+    ) {
+        content()
     }
 }
 
@@ -2607,6 +2686,7 @@ private fun ImeAwareOutlinedTextField(
         maxLines = maxLines,
         singleLine = singleLine,
         enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
     )
 }
 
@@ -2742,7 +2822,7 @@ private fun PrimaryActionButton(text: String, onClick: () -> Unit, enabled: Bool
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.fillMaxWidth().height(56.dp),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(28.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color(0xFF101010)),
     ) { Text(text, maxLines = 1) }
 }
@@ -2753,7 +2833,7 @@ private fun SecondaryActionButton(text: String, onClick: () -> Unit, enabled: Bo
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.fillMaxWidth().height(56.dp),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(28.dp),
     ) { Text(text, maxLines = 1) }
 }
 

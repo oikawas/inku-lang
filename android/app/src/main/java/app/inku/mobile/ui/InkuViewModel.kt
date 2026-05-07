@@ -357,6 +357,11 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         localState.value = localState.value.copy(canvasZoom = value.coerceIn(0.5f, 3.0f))
     }
 
+    fun scaleCanvasZoom(multiplier: Float) {
+        val current = localState.value
+        localState.value = current.copy(canvasZoom = (current.canvasZoom * multiplier).coerceIn(0.5f, 3.0f))
+    }
+
     fun resetCanvasZoom() {
         localState.value = localState.value.copy(canvasZoom = 1.0f, canvasPanX = 0f, canvasPanY = 0f)
     }

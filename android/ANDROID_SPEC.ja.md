@@ -487,3 +487,43 @@ adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqli
 adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqlite-wal > /tmp/inku-android.sqlite-wal
 adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqlite-shm > /tmp/inku-android.sqlite-shm
 ```
+
+## 2026-05-07 Pixel 9 UI / Canvas 操作更新
+
+Claude Design DDL4 の S1 Compose（記述）案を参考に、Android 版の描画タブ UI を更新した。
+ただし、モバイル UI 方針として横スクロールは使用禁止とし、すべての選択肢・チップ・メニューは折り返し表示または縦方向の配置で構成する。
+
+今回の更新での UI 要件:
+
+- 描画タブの主表示は S1 Compose（記述）を優先し、キャンバス、条件チップ、指示入力、正規化 DDL の順に自然に確認できる構成にする。
+- 画像プレビュー上にボタンやメニューを重ねない。
+  - star / render hash / zoom 操作は画像の上側へ配置する。
+  - 描画 / Prompt / JSON / SVG / PNG の操作は画像の下側へ配置する。
+  - SVG / PNG の展開メニューも画像上へ被せず、画像下のインライン選択肢として表示する。
+- 画像本体のタップは no action とする。
+- 画像本体のジェスチャは、ピンチイン / ピンチアウトによる zoom と、zoom 時の pan のみに使う。
+- 既存のタブ、設定、履歴、歳時記、モデル選択、色カタログ選択などのボタンは、見た目だけでなく必ず遷移先または実処理へ接続する。
+- 日本語 IME 表示時に入力欄が隠れないよう、入力欄は bring-into-view / IME padding 前提の実装を維持する。
+
+SVG / PNG 共有の挙動:
+
+- SVG / PNG / JSON の共有は、重いファイル生成処理を main thread で実行しない。
+- PNG 生成は SVG rasterize と PNG encode を background dispatcher で実行し、完了後に Android share sheet を開く。
+- SVG は server / web 版と同じ利用意図を持つ profile 選択を提供する。
+  - 表示用 SVG
+  - 編集用 SVG
+  - 汎用 SVG
+- PNG は server / web 版の保存テンプレートに合わせ、少なくとも以下の Y 軸サイズを提供する。
+  - 1080px
+  - 2160px
+  - 4320px
+- Android 版ではブラウザ download ではなく Android の share sheet を使うが、ユーザー操作上は Web 版の SVG / PNG メニューと同じ役割を持つ。
+
+実機確認:
+
+- `gradle :app:compileDebugKotlin` 成功。
+- `gradle :app:assembleDebug` 成功。
+- Pixel 9 へ debug APK を install し、起動を確認。
+- スクリーンショットで、画像上に操作ボタンやメニューが重なっていないことを確認。
+- PNG 1080px export を実行し、Android share sheet が表示されることを確認。
+- PNG export 実行後の logcat で `FATAL EXCEPTION`、`ANR in`、`Input dispatching timed out` が出ていないことを確認。

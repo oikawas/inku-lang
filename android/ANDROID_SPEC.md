@@ -516,3 +516,57 @@ adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqli
 adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqlite-wal > /tmp/inku-android.sqlite-wal
 adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqlite-shm > /tmp/inku-android.sqlite-shm
 ```
+
+## 2026-05-07 Pixel 9 UI / Canvas Interaction Update
+
+The Android draw tab UI was updated based on the Claude Design DDL4 S1 Compose
+reference. As a mobile UI rule, horizontal scrolling is prohibited; choices,
+chips, and menus must use wrapping rows or vertical layout instead.
+
+UI requirements from this update:
+
+- The draw tab prioritizes the S1 Compose writing flow: canvas, condition
+  chips, prompt input, and normalized DDL should be easy to inspect in order.
+- Controls and menus must not be overlaid on top of the artwork preview.
+  - Star, render hash, and zoom controls are placed above the image.
+  - Artwork / Prompt / JSON / SVG / PNG controls are placed below the image.
+  - SVG / PNG expanded choices are shown inline below the image, not as
+    popups covering the artwork.
+- Tapping the image itself has no action.
+- The image gesture surface is used only for pinch zoom and panning while
+  zoomed.
+- Existing buttons for tabs, settings, history, saijiki, model selection,
+  color catalog selection, and related flows must always be wired to a
+  transition or real action. Visual-only buttons are not acceptable.
+- Japanese IME behavior must remain supported: input fields should keep the
+  bring-into-view and IME padding behavior so focused fields are not hidden by
+  the keyboard.
+
+SVG / PNG sharing behavior:
+
+- SVG / PNG / JSON sharing must not run heavy file generation on the main
+  thread.
+- PNG generation rasterizes SVG and encodes PNG on a background dispatcher,
+  then opens the Android share sheet after completion.
+- SVG export exposes profile choices with the same intent as the server/web
+  implementation:
+  - display SVG
+  - editable SVG
+  - compatible SVG
+- PNG export exposes at least the server/web template Y-axis sizes:
+  - 1080px
+  - 2160px
+  - 4320px
+- Android uses the system share sheet instead of a browser download, but the
+  user-facing SVG / PNG menu role should match the web version.
+
+Verification:
+
+- `gradle :app:compileDebugKotlin` succeeded.
+- `gradle :app:assembleDebug` succeeded.
+- The debug APK was installed and launched on Pixel 9.
+- Screenshots confirmed that controls and menus are not overlaid on top of the
+  artwork.
+- PNG 1080px export opened the Android share sheet.
+- logcat after PNG export did not show `FATAL EXCEPTION`, `ANR in`, or
+  `Input dispatching timed out`.

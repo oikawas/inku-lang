@@ -17,7 +17,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val score = JSONObject(request.scoreJson)
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
         val catalog = ColorCatalogs.get(request.colorCatalogId)
-        val colors = catalog.map
+        val colors = catalog.renderMap
         val background = colors[score.optString("background", "white")] ?: "#ffffff"
         val instructions = score.optJSONArray("instructions") ?: JSONArray()
         val body = StringBuilder()
@@ -59,9 +59,9 @@ class DefaultSvgRenderer : SvgRenderer {
 
     private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, index: Int = 0): String {
         val primitive = ins.optString("primitive", "line")
-        val color = colors[ins.optString("color", "black")] ?: "#111111"
+        val colorKey = ins.optString("color", "black")
         val weight = ins.optString("weight", "pen")
-        val attrs = strokeAttrs(primitive, weight, color, ins)
+        val attrs = strokeAttrs(primitive, weight, colorKey, colors, ins)
         val common = attrs.toSvgAttributes(includeFill = false)
         val fill = attrs.fill
         val raw = when (primitive) {
@@ -127,11 +127,13 @@ class DefaultSvgRenderer : SvgRenderer {
             }
             else -> ""
         }
-        return applyRotation(raw, ins, width, height, primitive)
+        val rendered = applyRotation(raw, ins, width, height, primitive)
+        val blur = blurFilterId(ins.optJSONObject("variation"))
+        return if (blur != null) """<g filter="url(#$blur)">$rendered</g>""" else rendered
     }
 
-    private fun strokeAttrs(primitive: String, weight: String, color: String, ins: JSONObject): SvgAttrs {
-        return ServerRendererStyle.strokeAttrs(primitive, weight, color, ins)
+    private fun strokeAttrs(primitive: String, weight: String, colorKey: String, colors: Map<String, String>, ins: JSONObject): SvgAttrs {
+        return ServerRendererStyle.strokeAttrs(primitive, weight, colorKey, colors, ins)
     }
 
     private fun outlineAttrs(attrs: SvgAttrs, strokeWidth: Double, opacity: Double, dash: String?): SvgAttrs {
@@ -143,7 +145,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val count = arr.optInt("count", 1).coerceIn(1, 1000)
         val layout = arr.optString("layout", "horizontal")
         val prepared = ensureLineCoords(ins, layout)
-        if (count == 1) return listOf(copyWithoutArrangement(prepared))
+        if (count == 1) return listOf(applyColorCycle(copyWithoutArrangement(prepared), arr.optJSONArray("color_cycle"), 0))
         val path = arr.optString("path", "none")
         val preserveSpace = arr.optBoolean("preserve_space", false)
         val margin = if (preserveSpace) {
@@ -152,7 +154,7 @@ class DefaultSvgRenderer : SvgRenderer {
             arr.optDouble("margin", 0.1).coerceIn(0.0, 0.45)
         }
         val clusterCount = arr.optInt("cluster_count", 0)
-        val base = copyWithoutArrangement(prepared)
+        val base = prepared
         val seed = seedForInstruction(ins)
         return (0 until count).map { i ->
             val t = if (count <= 1) 0.5 else i.toDouble() / (count - 1).toDouble()
@@ -205,6 +207,21 @@ class DefaultSvgRenderer : SvgRenderer {
 
     private fun shiftTo(ins: JSONObject, targetX: Double, targetY: Double): JSONObject {
         val copy = JSONObject(ins.toString())
+        val arr = copy.optJSONObject("arrangement")
+        copy.remove("arrangement")
+        if (arr != null) {
+            val notes = mutableListOf<String>()
+            val density = arr.optString("density", "none")
+            val fade = arr.optString("fade", "none")
+            if (density != "none") notes.add("density=$density")
+            if (fade != "none") notes.add("fade=$fade")
+            if (arr.optBoolean("preserve_space", false)) notes.add("preserve_space")
+            if (notes.isNotEmpty()) {
+                val hint = copy.optString("color_hint", "")
+                val effectNote = notes.joinToString("; ")
+                copy.put("color_hint", if (hint.isBlank()) effectNote else "$hint; $effectNote")
+            }
+        }
         when (copy.optString("primitive", "line")) {
             "line" -> {
                 val from = copy.optJSONArray("from") ?: JSONArray(listOf(0.5, 0.0))
@@ -227,7 +244,28 @@ class DefaultSvgRenderer : SvgRenderer {
         if (cycle == null || cycle.length() == 0) return ins
         val copy = JSONObject(ins.toString())
         copy.put("color", cycle.optString(index % cycle.length(), copy.optString("color", "black")))
+        val effectHint = renderEffectHint(copy.optString("color_hint", ""))
+        if (effectHint == null) {
+            copy.remove("color_hint")
+        } else {
+            copy.put("color_hint", effectHint)
+        }
         return copy
+    }
+
+    private fun renderEffectHint(colorHint: String): String? {
+        if (colorHint.isBlank()) return null
+        val hint = colorHint.lowercase().replace(Regex("""[\s:_()'".,/-]+"""), " ").trim()
+        val effectTokens = listOf(
+            "membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄",
+            "soft light", "柔らかな光", "陽光", "日差し",
+            "scent", "fragrance", "香り", "匂",
+            "waiting buds", "開花を待つ蕾", "蕾", "つぼみ",
+            "five-sense", "五感",
+            "fade directional", "fade=directional", "fade outward", "fade=outward",
+            "reflection", "反射", "映り",
+        )
+        return effectTokens.filter { it in hint }.joinToString("; ").ifBlank { null }
     }
 
     private fun pathFor(layout: String, path: String): String = when {
@@ -585,7 +623,7 @@ class DefaultSvgRenderer : SvgRenderer {
         return v1 * (1.0 - t) + v2 * t
     }
 
-    private fun px(value: Double, scale: Double): Double = min(max(value, 0.0), 1.0) * scale
+    private fun px(value: Double, scale: Double): Double = value * scale
 
     private fun fmt(value: Double): String = ServerRendererGeometry.fmt(value)
 

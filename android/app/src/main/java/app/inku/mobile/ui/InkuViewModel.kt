@@ -829,10 +829,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun downloadDefaultModel() {
-        downloadModel(state.value.selectedModelId)
+        downloadModel(state.value.selectedModelId, force = false)
     }
 
-    fun downloadModel(modelId: String) {
+    fun downloadModel(modelId: String, force: Boolean = false) {
         val current = state.value
         val selectedModel = current.modelAssets.firstOrNull { it.modelId == modelId }
         if (selectedModel?.licenseAcceptedAt == null) {
@@ -844,12 +844,18 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         modelDownloadJob = viewModelScope.launch {
-            localState.value = localState.value.copy(activeModelDownloadId = modelId, message = "モデル取得を開始しています...")
+            localState.value = localState.value.copy(
+                activeModelDownloadId = modelId,
+                message = if (force) "モデルを再取得しています..." else "モデル取得を開始しています...",
+            )
             runCatching {
                 repository.markModelDownloadQueued(modelId)
-                repository.downloadModel(modelId)
+                repository.downloadModel(modelId, force = force)
             }.onSuccess {
-                localState.value = localState.value.copy(activeModelDownloadId = null, message = "モデル取得が完了しました。")
+                localState.value = localState.value.copy(
+                    activeModelDownloadId = null,
+                    message = if (force) "モデル再取得が完了しました。" else "モデル取得が完了しました。",
+                )
             }.onFailure { error ->
                 if (error is CancellationException) {
                     repository.markModelDownloadCancelled(modelId)
@@ -860,6 +866,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun redownloadModel(modelId: String) {
+        downloadModel(modelId, force = true)
     }
 
     fun cancelModelDownload() {

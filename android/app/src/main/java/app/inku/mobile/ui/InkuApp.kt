@@ -1436,6 +1436,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
             onDismiss = { modelAssetDialog = null },
             onAccept = { viewModel.acceptModelLicense(asset.modelId) },
             onDownload = { viewModel.downloadModel(asset.modelId) },
+            onRedownload = { viewModel.redownloadModel(asset.modelId) },
         )
     }
 }
@@ -2109,6 +2110,7 @@ private fun ModelAssetLicenseDownloadDialog(
     onDismiss: () -> Unit,
     onAccept: () -> Unit,
     onDownload: () -> Unit,
+    onRedownload: () -> Unit,
 ) {
     val isReady = asset.downloadState == "ready"
     val isBusy = asset.downloadState in setOf("queued", "connecting", "downloading", "verifying")
@@ -2140,17 +2142,25 @@ private fun ModelAssetLicenseDownloadDialog(
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = onDownload,
-                enabled = asset.licenseAcceptedAt != null && !isReady && !isBusy,
-            ) {
-                Text(
-                    when {
-                        isReady -> "取得済み"
-                        isBusy -> "取得中"
-                        else -> "ダウンロード"
-                    },
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = onRedownload,
+                    enabled = asset.licenseAcceptedAt != null && !isBusy,
+                ) {
+                    Text("再取得")
+                }
+                TextButton(
+                    onClick = onDownload,
+                    enabled = asset.licenseAcceptedAt != null && !isReady && !isBusy,
+                ) {
+                    Text(
+                        when {
+                            isReady -> "取得済み"
+                            isBusy -> "取得中"
+                            else -> "ダウンロード"
+                        },
+                    )
+                }
             }
         },
         dismissButton = {

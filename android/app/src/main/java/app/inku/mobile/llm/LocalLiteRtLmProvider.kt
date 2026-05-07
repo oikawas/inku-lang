@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.LogSeverity
 import com.google.ai.edge.litertlm.SamplerConfig
 import java.io.File
@@ -83,9 +84,10 @@ class LocalLiteRtLmProvider(
             }
             current?.close()
             Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
+            ExperimentalFlags.enableSpeculativeDecoding = true
             val cacheDir = File(context.cacheDir, "litert-lm").also { it.mkdirs() }.absolutePath
             val newEngine = createInitializedEngine(modelPath, Backend.GPU(), maxNumTokens, cacheDir)
-            Log.i(TAG, "LiteRT-LM engine initialized model=$modelId backend=${Backend.GPU().name}")
+            Log.i(TAG, "LiteRT-LM engine initialized model=$modelId backend=${Backend.GPU().name} speculativeDecoding=true")
             loadedModelId = modelId
             loadedModelPath = modelPath
             loadedMaxNumTokens = maxNumTokens

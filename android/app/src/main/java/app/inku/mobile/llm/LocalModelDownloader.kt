@@ -17,7 +17,7 @@ class LocalModelDownloader(
     private val context: Context,
     private val modelAssetDao: ModelAssetDao,
 ) {
-    suspend fun download(spec: ModelDownloadSpec) = withContext(Dispatchers.IO) {
+    suspend fun download(spec: ModelDownloadSpec, force: Boolean = false) = withContext(Dispatchers.IO) {
         val asset = modelAssetDao.getByModelId(spec.modelId) ?: error("Model asset is not registered: ${spec.modelId}")
         if (asset.licenseAcceptedAt == null) {
             modelAssetDao.updateDownload(spec.modelId, "license_required", 0L, null, null, now())
@@ -27,6 +27,12 @@ class LocalModelDownloader(
         val modelDir = File(context.filesDir, "models").also { it.mkdirs() }
         val finalFile = File(modelDir, spec.fileName)
         val partFile = File(modelDir, "${spec.fileName}.part")
+
+        if (force) {
+            if (finalFile.exists()) finalFile.delete()
+            if (partFile.exists()) partFile.delete()
+            modelAssetDao.updateDownload(spec.modelId, "queued", 0L, null, null, now())
+        }
 
         if (finalFile.exists() && verifySha256(finalFile, spec.expectedSha256)) {
             modelAssetDao.updateDownload(spec.modelId, "ready", finalFile.length(), finalFile.length(), finalFile.absolutePath, now())

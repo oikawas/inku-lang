@@ -180,10 +180,10 @@ class InkuRepository(
         database.modelAssetDao().acceptLicense(modelId, System.currentTimeMillis(), "ready_to_download", System.currentTimeMillis())
     }
 
-    suspend fun downloadModel(modelId: String) {
+    suspend fun downloadModel(modelId: String, force: Boolean = false) {
         ensureDefaultModelAssets()
         val spec = modelSpec(modelId)
-        modelDownloader.download(spec)
+        modelDownloader.download(spec, force = force)
     }
 
     suspend fun markModelDownloadQueued(modelId: String) {

@@ -111,9 +111,9 @@ class LocalFallbackPipeline(
                 ),
             ).text.cleanModelText()
             val score = runCatching {
-                WebScoreJson.extractJsonObject(response)
+                WebScoreTool.extractJsonObject(response)
             }.getOrNull()
-                ?.takeIf { WebScoreJson.hasRenderableInstructions(it) }
+                ?.takeIf { WebScoreTool.hasRenderableInstructions(it) }
                 ?: retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
             coerceScore(score, "${request.originalText}\n$expandedDdl", request.canvasAspect).toString()
         }.onFailure {
@@ -146,9 +146,9 @@ class LocalFallbackPipeline(
                     tool = WebScoreTool.submitScore,
                 ),
             ).text.cleanModelText()
-            WebScoreJson.extractJsonObject(retryResponse)
+            WebScoreTool.extractJsonObject(retryResponse)
         }.getOrNull()
-        if (retryScore != null && WebScoreJson.hasRenderableInstructions(retryScore)) return retryScore
+        if (retryScore != null && WebScoreTool.hasRenderableInstructions(retryScore)) return retryScore
         Log.w(TAG, "Stage 2 returned no drawable instructions after retry; rebuilding renderable score from DDL.")
         return scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect)
     }
@@ -219,13 +219,19 @@ class LocalFallbackPipeline(
             repairedItems += fallbackInstruction(ddl, visibleForeground("black", background), "pen")
         }
         val presence = score.optJSONObject("presence") ?: presenceFromDdl(ddl)
-        val repaired = ServerScoreRepairPipeline.repair(
-            instructions = repairedItems,
-            ddl = ddl,
-            background = background,
-            presence = presence,
-            hooks = scoreRepairHooks,
-        )
+        val repaired = repairedItems
+            .dedupeInstructions()
+            .withDdlCoverage(ddl, background)
+            .withColorDelivery(ddl, background)
+            .withShapeDelivery(ddl, background)
+            .withComplexMotifRepair(ddl, background)
+            .withCompositionDiversity(ddl, background)
+            .withContextEnergy(ddl, background)
+            .withMotionEnergy(ddl)
+            .withPresenceAuxiliaryShapeRepair(presence)
+            .withContextDensityGovernor(ddl, background)
+            .withStructuralDuplicateRepair()
+            .withDensityBudget()
             .fold(JSONArray()) { array, item -> array.put(item); array }
         val result = JSONObject()
             .put("version", "0.1.0")
@@ -246,21 +252,6 @@ class LocalFallbackPipeline(
             visibleForeground = ::visibleForeground,
         )
     }
-
-    private val scoreRepairHooks = ServerScoreRepairPipeline.Hooks(
-        dedupeInstructions = { it.dedupeInstructions() },
-        withDdlCoverage = { items, ddl, background -> items.withDdlCoverage(ddl, background) },
-        withColorDelivery = { items, ddl, background -> items.withColorDelivery(ddl, background) },
-        withShapeDelivery = { items, ddl, background -> items.withShapeDelivery(ddl, background) },
-        withComplexMotifRepair = { items, ddl, background -> items.withComplexMotifRepair(ddl, background) },
-        withCompositionDiversity = { items, ddl, background -> items.withCompositionDiversity(ddl, background) },
-        withContextEnergy = { items, ddl, background -> items.withContextEnergy(ddl, background) },
-        withMotionEnergy = { items, ddl -> items.withMotionEnergy(ddl) },
-        withPresenceAuxiliaryShapeRepair = { items, presence -> items.withPresenceAuxiliaryShapeRepair(presence) },
-        withContextDensityGovernor = { items, ddl, background -> items.withContextDensityGovernor(ddl, background) },
-        withStructuralDuplicateRepair = { it.withStructuralDuplicateRepair() },
-        withDensityBudget = { it.withDensityBudget() },
-    )
 
     private fun List<JSONObject>.dedupeInstructions(): List<JSONObject> {
         val seen = mutableSetOf<String>()

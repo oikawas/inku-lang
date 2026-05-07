@@ -271,10 +271,8 @@ web/server との parity を優先する。
 | `server/src/inku_server/coerce.py` / semantic marker helpers、presence inference、color/layout/material/radius detection | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSemantics.kt` | context marker detection、quiet-density / motion / colorful context 判定、presence inference、visible color/background、DDL hint helpers |
 | `server/src/inku_server/composer.py` and `coerce.py` / fallback score synthesis | `android/app/src/main/java/app/inku/mobile/pipeline/ServerFallbackComposer.kt` | provider failure / unusable Stage 2 output 時の fallback DDL、fallback instruction、arrangement synthesis |
 | `server/src/inku_server/coerce.py` / DDL coverage、shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | drawable clause extraction、clause primitive/color mapping、coverage instruction、shape/motif repair instruction factories |
-| `server/src/inku_server/coerce.py` / semantic repair order | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairPipeline.kt` | dedupe、DDL coverage、color/shape/motif/composition/context/motion/presence/density repair の適用順序 |
-| `server/src/inku_server/coerce.py` / Android-local repair hook implementation | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration、repair hook bodies、fallback Score construction、Stage 1/2 provider fallback control |
-| `server/src/inku_server/schema.py` / Stage 2 tool contract | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 submit_score schema exposed to local/provider LLMs |
-| `server/src/inku_server/schema.py` and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreJson.kt` | Stage 2 JSON extraction、tool_calls / arguments unwrap、renderable instructions guard |
+| `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration、dedupe、DDL coverage、color/shape/motif/composition/context/motion/presence/density repair order、fallback Score construction、Stage 1/2 provider fallback control |
+| `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 submit_score schema、Stage 2 JSON extraction、tool_calls / arguments unwrap、renderable instructions guard |
 
 ## Web Component Porting Matrix
 

@@ -392,6 +392,62 @@ local single-user equivalent と明記されたものを除き、Web component �
 今後の比較で同一 Score からの描画差が出た場合は、renderer の Kotlin 実装差分として扱う。
 Score 自体が異なる場合は、Stage 2 model response、tool schema、coerce chain の順に server source と照合する。
 
+## 2026-05-07 Renderer Parity 追加修正記録
+
+同一 Score を入力にした server CLI / Android headless renderer の PNG 比較で、DDL 正規化や Score 生成を介さない純 renderer 差分を切り分けた。
+この比較では server 側の `inku-cli render-score` と Android 側の `HeadlessRenderActivity input_mode=score` を使用し、過去履歴から選んだ 5 件の Score を同一入力として描画した。
+
+調査の結果、差分は SVG 文字列ハッシュの不一致ではなく、実際の PNG 上でも確認できる rendering behavior の差だった。
+Android 側のハードウェアに依存しない描画処理は server 実装を master とし、以下を `server/src/inku_server/renderer.py` / `server/src/inku_server/color_catalogs.py` に合わせて修正した。
+
+- renderer hash / noise:
+  - `hash01` は server の `struct.unpack("<I", digest[:4]) / 0xFFFFFFFF` と同じ little-endian unsigned 32-bit にする。
+  - signed hash は server の `struct.unpack("<q", digest[:8]) / 2**63` と同じ little-endian signed 64-bit にする。
+  - smooth noise は `hash01 * 2 - 1` ではなく server の `_hash_to_unit()` 相当を使う。
+- color catalog / color resolution:
+  - render 用 color map は基本 6 色だけでなく `palette:<name>` entries も含める。
+  - `color_hint` と palette label / hue hint から最終色を再解決する `_resolve_color()` 相当を Android に移植する。
+  - `material inferred from DDL: ...` などの hint 文字列に含まれる token も、現行 server と同じ scoring rule で扱う。
+- color cycle:
+  - `arrangement.color_cycle` 展開時は server の `_apply_color_cycle()` と同じく、色選択に関係する hint を落とし、描画効果に関わる hint だけを残す。
+  - `count == 1` の arrangement でも color cycle を適用する。
+- arrangement effect hint:
+  - `_shift()` 相当のタイミングで `density=<value>`、`fade=<value>`、`preserve_space` を `color_hint` に追記し、透明度制御に反映する。
+- coordinate conversion:
+  - server の `_px()` は 0..1 clamp を行わず、キャンバス外へ伸びた geometry は clip-path に任せる。
+  - Android でも `px()` の clamp を削除し、配置展開後の line / shape が server と同じ座標で描かれるようにする。
+- blur / texture:
+  - `quality=pink` の blur は stroke attrs へ直接入れず、server と同じく描画 element/group に後段で filter として適用する。
+  - material texture filter と blur filter の責務を分ける。
+- SVG stroke defaults:
+  - server が明示していない `stroke-linejoin="round"` の Android 常時付与を削除する。
+
+検証:
+
+- `gradle :app:compileDebugKotlin` 成功。
+- `gradle :app:assembleDebug` 成功。
+- Pixel 9 へ debug APK を再インストールして、同一 Score 5 件の server / Android PNG 比較を再実行。
+- 最終確認 run: `/tmp/inku-headless/score-render-server-vs-android-after-linejoin-fix-20260507`
+
+最終 PNG 差分:
+
+| run | mean absolute difference | RMS difference | note |
+| --- | ---: | ---: | --- |
+| score-render-001 | 0.0% | 0.0% | PNG 上は一致。 |
+| score-render-002 | 0.0487% | 0.9241% | 極小差分が残る。 |
+| score-render-003 | 0.0033% | 0.0965% | 実質一致に近い。 |
+| score-render-004 | 0.1387% | 1.4994% | 残差最大。次回は material / filter rasterization と shape outline を優先確認する。 |
+| score-render-005 | 0.0137% | 0.2947% | 実質一致に近い。 |
+
+関連 commit:
+
+- `0999489 fix: align android renderer hashes with server`
+- `0a61e66 fix: align android renderer style with server`
+- `3871dd5 fix: match server stroke join defaults`
+
+今後の renderer parity 作業では、まず同一 Score 入力で PNG 差分を確認し、Score が同一でない場合のみ Stage 2 / coerce chain 側へ戻る。
+同一 Score で残る差分は、SVG element 属性、filter 注入位置、material outline、SVG rasterizer 差の順に server source と比較する。
+
 ## Local Commit Record
 
 - `f34852b feat: add android headless render comparison`

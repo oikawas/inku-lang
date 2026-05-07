@@ -376,6 +376,16 @@ current canvas aspect and color catalog to the history item's values, or keeps
 the current UI selections.  This setting affects only the UI selection state;
 the saved history SVG is displayed as stored and is not re-rendered.
 
+The history DB remains the source of truth for renders saved by the web UI,
+`inku-cli`, Android headless CLI, and other API clients.  The web UI periodically
+refreshes the latest normal history page while the signed-in user is viewing the
+latest non-filtered history.  It also refreshes when the browser window regains
+focus or a hidden tab becomes visible.  This allows CLI-saved renders to appear
+in the history strip without a manual reload, while preserving the currently
+selected history item when it is still present.  The UI does not auto-replace
+history while the user is viewing starred-only history, search results, older
+history pages, or while a history request is already in flight.
+
 PNG export options are managed as per-user templates in the settings modal's
 export tab.  Each template has a name, description, and y-axis height in pixels.
 The default templates are `PNG 1024px` and `PNG 2048px`.  The status bar PNG

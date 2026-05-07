@@ -63,6 +63,8 @@
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 	const BATCH_PROMPT_HISTORY_LIMIT = 20;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
+	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
+	const EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS = 5000;
 	type HistorySelectionBehavior = 'history' | 'current';
 
 	type PaintResult = {
@@ -1775,6 +1777,8 @@
 	let historyStarredOnly = $state(false);
 	let trashItems = $state<Iteration[]>([]);
 	let trashTotal = $state(0);
+	let externalHistoryRefreshInFlight = false;
+	let lastExternalHistoryRefreshAt = 0;
 	const historyManager = new HistoryManagerState(apiFetch, (items, total) => {
 		trashItems = items;
 		trashTotal = total;
@@ -2462,7 +2466,7 @@
 		);
 	}
 
-	async function fetchHistoryOffset(offset: number): Promise<void> {
+	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean } = {}): Promise<void> {
 		if (!authToken) {
 			historyItems = [];
 			historyTotal = 0;
@@ -2470,6 +2474,9 @@
 			return;
 		}
 		const safeOffset = Math.max(0, offset);
+		const selectedHistoryId = options.preserveSelection
+			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? null
+			: null;
 		try {
 			const listLimit = safeOffset === 0 && !historyStarredOnly
 				? estimatedHistoryManagerPageSize()
@@ -2491,14 +2498,38 @@
 				? data.items.slice(0, historyWindowSize)
 				: data.items;
 			historyItems = stripItems; historyTotal = data.total; historyOffset = safeOffset;
-			if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
-			if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
+			if (selectedHistoryId) {
+				const selectedIndex = stripItems.findIndex((item: Iteration) => item.id === selectedHistoryId);
+				if (selectedIndex >= 0) historyCursor = selectedIndex;
+				else if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
+			} else {
+				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
+				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
+			}
 			if (safeOffset === 0 && !historyStarredOnly) {
 				historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
 			} else {
 				preloadHistoryManagerFirstPage();
 			}
 		} catch { /* ignore */ }
+	}
+
+	async function refreshHistoryForExternalSave(force = false): Promise<void> {
+		if (!authToken || historyStarredOnly || historyOffset !== 0 || loading) return;
+		if (document.visibilityState !== 'visible') return;
+		const now = Date.now();
+		if (!force && now - lastExternalHistoryRefreshAt < EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS) return;
+		if (externalHistoryRefreshInFlight) return;
+		externalHistoryRefreshInFlight = true;
+		lastExternalHistoryRefreshAt = now;
+		try {
+			await fetchHistoryOffset(0, { preserveSelection: true });
+			if (historyManager.open && historyManager.view === 'active' && historyManager.page === 0 && !historyManager.search.trim() && !historyManager.starredOnly) {
+				await historyManager.fetch({ view: 'active', page: 0, search: '', starredOnly: false, silent: true });
+			}
+		} finally {
+			externalHistoryRefreshInFlight = false;
+		}
 	}
 
 	async function fetchHistoryPage(page: number): Promise<void> {
@@ -3374,6 +3405,17 @@
 		}
 		window.addEventListener('resize', onResize);
 		document.addEventListener('keydown', handleKeydown, true);
+		const externalHistoryRefreshTimer = window.setInterval(() => {
+			void refreshHistoryForExternalSave();
+		}, EXTERNAL_HISTORY_REFRESH_MS);
+		function onHistoryVisibilityChange() {
+			if (document.visibilityState === 'visible') void refreshHistoryForExternalSave(true);
+		}
+		function onHistoryWindowFocus() {
+			void refreshHistoryForExternalSave(true);
+		}
+		document.addEventListener('visibilitychange', onHistoryVisibilityChange);
+		window.addEventListener('focus', onHistoryWindowFocus);
 
 		initLang();
 		try {
@@ -3402,6 +3444,9 @@
 		return () => {
 			window.removeEventListener('resize', onResize);
 			document.removeEventListener('keydown', handleKeydown, true);
+			window.clearInterval(externalHistoryRefreshTimer);
+			document.removeEventListener('visibilitychange', onHistoryVisibilityChange);
+			window.removeEventListener('focus', onHistoryWindowFocus);
 		};
 	});
 

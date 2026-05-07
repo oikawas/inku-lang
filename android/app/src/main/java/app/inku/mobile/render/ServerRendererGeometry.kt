@@ -20,13 +20,16 @@ internal object ServerRendererGeometry {
         for (offset in 0 until 8) {
             raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
         }
-        return raw.toDouble() / Long.MIN_VALUE.toDouble().let { -it }
+        return raw.toDouble() / 9_223_372_036_854_775_808.0
     }
 
     fun hash01(i: Int, seed: String): Double {
         val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$i".toByteArray())
-        val raw = ((digest[0].toInt() and 0xff) shl 24) or ((digest[1].toInt() and 0xff) shl 16) or ((digest[2].toInt() and 0xff) shl 8) or (digest[3].toInt() and 0xff)
-        return (raw.toLong() and 0xffffffffL).toDouble() / 0xffffffffL.toDouble()
+        val raw = ((digest[0].toLong() and 0xffL)) or
+            ((digest[1].toLong() and 0xffL) shl 8) or
+            ((digest[2].toLong() and 0xffL) shl 16) or
+            ((digest[3].toLong() and 0xffL) shl 24)
+        return (raw and 0xffffffffL).toDouble() / 0xffffffffL.toDouble()
     }
 
     fun pointsForRegular(ins: JSONObject, sides: Int, width: Double, height: Double): List<Pair<Double, Double>> {

@@ -579,8 +579,8 @@ class DefaultSvgRenderer : SvgRenderer {
     private fun smoothNoise(x: Double, seed: String): Double {
         val xi = kotlin.math.floor(x).toInt()
         val xf = x - xi
-        val v1 = hash01(xi, seed) * 2.0 - 1.0
-        val v2 = hash01(xi + 1, seed) * 2.0 - 1.0
+        val v1 = signedHash(xi, seed)
+        val v2 = signedHash(xi + 1, seed)
         val t = xf * xf * (3.0 - 2.0 * xf)
         return v1 * (1.0 - t) + v2 * t
     }

@@ -230,6 +230,46 @@ login や role handling は追加しない。
 
 Server-only web features は、clear local single-user equivalent がない限り Android runtime から外す。
 
+## Web/Server Master Policy
+
+Android 版の開発 master は常に `web/` と `server/` の実装である。
+Android 側は独立した native application package として実装するが、DDL interpretation、
+Stage 1.5 expansion、Score coercion / repair、SVG rendering、history/render metadata の
+behavioral source of truth は web/server 側とする。
+
+今後 web/server 側を更新するときは、Android 側の追従可否を同じ変更単位で確認する。
+Android 側の互換コードは server source の責務境界に対応するファイルへ分割し、
+差分確認と移植漏れ検出を容易にする。
+
+現在の renderer compatibility layout:
+
+| server source | Android compatibility file | Responsibility |
+| --- | --- | --- |
+| `server/src/inku_server/renderer.py` / `_stroke_attrs`、dash、texture、blur | `android/app/src/main/java/app/inku/mobile/render/ServerRendererStyle.kt` | stroke/fill attributes、material weight style、texture filters、blur filters、hint opacity |
+| `server/src/inku_server/renderer.py` / `_arc_path_d`、point generation、variation | `android/app/src/main/java/app/inku/mobile/render/ServerRendererGeometry.kt` | SVG geometry、arc sweep/large-arc rules、regular polygon points、triangle bbox points、variation path |
+| `server/src/inku_server/renderer.py` / material outline helpers | `android/app/src/main/java/app/inku/mobile/render/ServerRendererMaterial.kt` | pencil/crayon/chalk/brush/rope outlines、specks、rope twists |
+| `server/src/inku_server/renderer.py` / `render` and `_render_instruction` flow | `android/app/src/main/java/app/inku/mobile/render/DefaultSvgRenderer.kt` | Android SVG renderer orchestration、arrangement expansion、presence layer、metadata emission |
+
+`DefaultSvgRenderer.kt` には orchestration を残し、server-derived details は
+`ServerRendererStyle.kt` / `ServerRendererGeometry.kt` / `ServerRendererMaterial.kt` に置く。
+server `renderer.py` に変更が入った場合は、まず上表の該当ファイルを更新対象として確認する。
+
+同じ方針を pipeline でも維持する。`server/src/inku_server/interpreter.py`、
+`ddl_expander.py`、`coerce.py`、`schema.py` の変更は、Android の
+`pipeline/` package と compatibility data model へ対応づけて確認する。
+Android 固有の UI / Room / LiteRT-LM / provider routing は native implementation としてよいが、
+生成される DDL、Score、SVG、render metadata、history persistence の user-visible behavior は
+web/server との parity を優先する。
+
+現在の pipeline compatibility layout:
+
+| server source | Android compatibility file | Responsibility |
+| --- | --- | --- |
+| `server/src/inku_server/interpreter.py` / Stage 1 model text cleanup and usable DDL guard | `android/app/src/main/java/app/inku/mobile/pipeline/ServerDdlText.kt` | model output cleanup、Stage 1 DDL normalization、number-noise repair、clause dedupe、drawable vocabulary guard |
+| `server/src/inku_server/ddl_expander.py` | `android/app/src/main/java/app/inku/mobile/pipeline/WebDdlExpander.kt` | Stage 1.5 DDL expansion and sensory / structural marker insertion |
+| `server/src/inku_server/coerce.py` | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion / repair、fallback Score construction、presence inference。今後さらに `ServerScoreCoercer.kt` へ分割する対象 |
+| `server/src/inku_server/schema.py` / Stage 2 tool contract | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 submit_score schema exposed to local/provider LLMs |
+
 ## Web Component Porting Matrix
 
 `web/src/lib/components/` 配下の全 Web component を Android port の検討対象とする。

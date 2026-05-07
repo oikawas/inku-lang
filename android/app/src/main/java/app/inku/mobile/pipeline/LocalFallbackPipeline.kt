@@ -130,13 +130,14 @@ class LocalFallbackPipeline(
         val provider = modelProvider ?: return null
         return runCatching {
             val userPrompt = buildStage2UserMessage(expandedDdl, request.originalText)
+            val systemPrompt = stage2SystemPromptFor(request.stage2Model)
             val response = provider.generate(
                 ModelRequest(
                     modelId = request.stage2Model,
                     prompt = userPrompt,
                     temperature = 0.0,
                     maxTokens = 2048,
-                    systemInstruction = WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA,
+                    systemInstruction = systemPrompt,
                     tool = WebScoreTool.submitScore,
                 ),
             ).text.cleanModelText()
@@ -161,7 +162,7 @@ class LocalFallbackPipeline(
         if (!request.autoRepair && request.stage2Model.isExplicitProviderModelId()) {
             error("Stage 2 model did not return drawable instructions.")
         }
-        val rescuePrompt = WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA + "\n\n# 空描画リトライ / コンパクト描画リトライ\n" +
+        val rescuePrompt = stage2SystemPromptFor(request.stage2Model) + "\n\n# 空描画リトライ / コンパクト描画リトライ\n" +
             "直前の Stage 2 出力は無効または非効率。2〜5個の簡潔な描画命令を返す。" +
             "instructions を空配列にしてはいけない。繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。" +
             "DDLを説明し直さず、JSONを短く保つ。"
@@ -181,6 +182,14 @@ class LocalFallbackPipeline(
         if (retryScore != null && WebScoreTool.hasRenderableInstructions(retryScore)) return retryScore
         Log.w(TAG, "Stage 2 returned no drawable instructions after retry; rebuilding renderable score from DDL.")
         return scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect)
+    }
+
+    private fun stage2SystemPromptFor(modelId: String): String {
+        return if (modelId.startsWith("local-litert-lm:")) {
+            WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA_LITERT
+        } else {
+            WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA
+        }
     }
 
     private fun String.isExplicitProviderModelId(): Boolean {

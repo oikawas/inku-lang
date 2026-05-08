@@ -405,6 +405,10 @@
 		return modelPickerEnabledDraft[modelId] !== false;
 	}
 
+	function serviceIdLabel(provider: Provider): string {
+		return `${t().settingsModelServiceId}: ${provider}`;
+	}
+
 	async function saveModelPicker() {
 		if (!modelPickerProvider) return;
 		await onSaveModelProvider(modelPickerProvider.id, { enabled_models: modelPickerEnabledDraft });
@@ -551,15 +555,7 @@
 										<button class="ghost-btn model-provider-edit" onclick={() => openEditProvider(provider)} disabled={modelSettingsLoading}>{t().editButton}</button>
 									</div>
 									<div class="model-provider-head-actions">
-										<span class="model-key-state">
-											{setting.api_key_set ? t().settingsModelApiKeySet : t().settingsModelApiKeyUnset}
-											{#if !setting.api_key_set}
-												<button type="button" class="model-key-info" aria-label={t().settingsModelApiKeyOptionalHint}>
-													i
-													<span class="model-key-tooltip">{t().settingsModelApiKeyOptionalHint}</span>
-												</button>
-											{/if}
-										</span>
+										<span class="model-key-state">{serviceIdLabel(provider.id)}</span>
 									</div>
 								</div>
 								<label>
@@ -620,8 +616,8 @@
 									{/if}
 								</div>
 								<div class="model-provider-actions">
-									<button class="ghost-btn model-service-delete" onclick={() => onAskDeleteModelProvider(provider.id)} disabled={modelSettingsLoading}>{t().settingsModelDeleteService}</button>
 									<button class="ghost-btn model-service-memo" onclick={() => openMemoProvider(provider)} disabled={modelSettingsLoading}>{t().settingsModelServiceMemoButton}</button>
+									<button class="ghost-btn model-service-delete" onclick={() => onAskDeleteModelProvider(provider.id)} disabled={modelSettingsLoading}>{t().settingsModelDeleteService}</button>
 								</div>
 							</div>
 						{/each}

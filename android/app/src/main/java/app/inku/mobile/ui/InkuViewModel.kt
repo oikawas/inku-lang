@@ -16,12 +16,14 @@ import app.inku.mobile.data.model.CompatibilityConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -47,6 +49,13 @@ data class InkuUiState(
     val batchLatestHashShort: String? = null,
     val demoSeed: String = "春の光",
     val demoIntervalSeconds: Int = 30,
+    val demoRandomColorCatalog: Boolean = false,
+    val demoGeneratedPrompt: String = "",
+    val demoGeneratedDdl: String? = null,
+    val demoWaitingSeconds: Int? = null,
+    val demoCurrentElapsedMs: Long? = null,
+    val demoTotalElapsedMs: Long = 0L,
+    val demoRenderCount: Int = 0,
     val modelLicenseAccepted: Boolean = false,
     val modelDownloadState: String = "not downloaded",
     val modelAssets: List<ModelAssetEntity> = emptyList(),
@@ -231,6 +240,18 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDemoSeed(value: String) {
         localState.value = localState.value.copy(demoSeed = value, message = null)
+        persistSetting("demo_seed_phrase", JSONObject().put("value", value).toString())
+    }
+
+    fun setDemoIntervalSeconds(value: Int) {
+        val normalized = value.coerceIn(1, 999)
+        localState.value = localState.value.copy(demoIntervalSeconds = normalized, message = null)
+        persistSetting("demo_interval_seconds", JSONObject().put("value", normalized).toString())
+    }
+
+    fun setDemoRandomColorCatalog(enabled: Boolean) {
+        localState.value = localState.value.copy(demoRandomColorCatalog = enabled)
+        persistSetting("demo_random_color_catalog", JSONObject().put("enabled", enabled).toString())
     }
 
     fun setCatalog(id: String) {
@@ -755,32 +776,86 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         return ids[Random.nextInt(ids.size)]
     }
 
-    fun runDemoOnce() {
+    fun startDemo() {
         val current = state.value
         validateSelectedModels(current)?.let { message ->
             localState.value = localState.value.copy(message = message)
             return
         }
-        val prompt = demoPrompt(current.demoSeed)
         drawingJob?.cancel()
         drawingJob = viewModelScope.launch {
-            localState.value = localState.value.copy(isDrawing = true, message = "Demo drawing")
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.paint(prompt, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled)
+            localState.value = localState.value.copy(
+                isDrawing = true,
+                demoGeneratedPrompt = "",
+                demoGeneratedDdl = null,
+                demoWaitingSeconds = null,
+                demoCurrentElapsedMs = null,
+                demoTotalElapsedMs = 0L,
+                demoRenderCount = 0,
+                message = "デモ実行中",
+            )
+            try {
+                while (isActive) {
+                    val cycle = state.value
+                    val prompt = demoPrompt(cycle.demoSeed)
+                    val catalogId = if (cycle.demoRandomColorCatalog) randomColorCatalogId() else cycle.selectedCatalogId
+                    val startedAt = System.currentTimeMillis()
+                    localState.value = localState.value.copy(
+                        demoGeneratedPrompt = prompt,
+                        demoGeneratedDdl = null,
+                        demoWaitingSeconds = null,
+                        demoCurrentElapsedMs = null,
+                        message = "デモ描画中",
+                    )
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            repository.paint(
+                                description = prompt,
+                                catalogId = catalogId,
+                                canvasAspect = cycle.selectedCanvasAspect,
+                                stage1ModelId = cycle.selectedModelId,
+                                stage2ModelId = cycle.selectedStage2ModelId,
+                                autoRepair = cycle.ddlAutoRepairEnabled,
+                                historyInput = "[demo] $prompt",
+                            )
+                        }
+                    }.onSuccess { item ->
+                        val elapsed = System.currentTimeMillis() - startedAt
+                        val latest = localState.value
+                        localState.value = latest.copy(
+                            selectedHistory = item,
+                            prompt = item.originalInput.removePrefix("[demo] "),
+                            ddl = item.normalizedDdl,
+                            ddlEditedAfterGeneration = false,
+                            demoGeneratedDdl = item.normalizedDdl,
+                            demoCurrentElapsedMs = elapsed,
+                            demoTotalElapsedMs = latest.demoTotalElapsedMs + elapsed,
+                            demoRenderCount = latest.demoRenderCount + 1,
+                            message = "デモ描画完了 ${item.renderHashShort}",
+                        )
+                    }.onFailure { error ->
+                        if (error is CancellationException) throw error
+                        localState.value = localState.value.copy(
+                            demoCurrentElapsedMs = System.currentTimeMillis() - startedAt,
+                            message = error.message ?: "Demo failed.",
+                        )
+                        delay(1000)
+                    }
+                    val elapsed = System.currentTimeMillis() - startedAt
+                    val waitMs = (state.value.demoIntervalSeconds * 1000L - elapsed).coerceAtLeast(0L)
+                    var left = ((waitMs + 999L) / 1000L).toInt()
+                    while (left > 0 && isActive) {
+                        localState.value = localState.value.copy(demoWaitingSeconds = left, message = "次の描画まで ${left}秒")
+                        delay(1000)
+                        left -= 1
+                    }
                 }
-            }.onSuccess { item ->
+            } finally {
                 localState.value = localState.value.copy(
-                    selectedHistory = item,
-                    prompt = item.originalInput,
-                    ddl = item.normalizedDdl,
-                    ddlEditedAfterGeneration = false,
                     isDrawing = false,
-                    message = "Demo rendered ${item.renderHashShort}",
+                    demoWaitingSeconds = null,
+                    message = "停止しました。",
                 )
-            }.onFailure { error ->
-                val message = if (error is CancellationException) "停止しました。" else error.message ?: "Demo failed."
-                localState.value = localState.value.copy(isDrawing = false, message = message)
             }
         }
     }
@@ -788,7 +863,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun stopDrawing() {
         drawingJob?.cancel()
         drawingJob = null
-        localState.value = localState.value.copy(isDrawing = false, message = "停止しました。")
+        localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, message = "停止しました。")
     }
 
     fun acceptModelLicense() {
@@ -980,6 +1055,9 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val histCanvas = repository.getSetting("history_selection_canvas")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
         val histCatalog = repository.getSetting("history_selection_catalog")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val batchRandom = repository.getSetting("batch_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
+        val demoSeed = repository.getSetting("demo_seed_phrase")?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
+        val demoInterval = repository.getSetting("demo_interval_seconds")?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
+        val demoRandom = repository.getSetting("demo_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.demoRandomColorCatalog) } ?: current.demoRandomColorCatalog
         val batchHistory = repository.getSetting("batch_prompt_history")?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
         val modelSelection = repository.getSetting("model_selection")?.let(::JSONObject)
         val restoredStage1Model = modelSelection?.optString("stage1_model")?.takeIf { it.isNotBlank() }
@@ -999,6 +1077,9 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             historySelectionCanvas = histCanvas,
             historySelectionCatalog = histCatalog,
             batchRandomColorCatalog = batchRandom,
+            demoSeed = demoSeed,
+            demoIntervalSeconds = demoInterval.coerceIn(1, 999),
+            demoRandomColorCatalog = demoRandom,
             batchPromptHistory = batchHistory,
             includeThinking = thinking,
             selectedModelId = restoredUnifiedModel,

@@ -98,6 +98,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -690,7 +691,13 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
 }
 
 @Composable
-private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier.fillMaxWidth()) {
+private fun CanvasHeroCard(
+    state: InkuUiState,
+    viewModel: InkuViewModel,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    showControls: Boolean = true,
+    maxPreviewHeight: Dp = 330.dp,
+) {
     val item = state.selectedHistory
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -701,12 +708,12 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel, modifie
     val presentation = state.canvasPresentationMode
     BoxWithConstraints(modifier = modifier) {
         val ratio = canvasAspectRatio(state.selectedCanvasAspect)
-        val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(330.dp)
+        val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(maxPreviewHeight)
         val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
             if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
         }
         Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!presentation) {
+            if (!presentation && showControls) {
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.align(Alignment.CenterStart),
@@ -819,7 +826,7 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel, modifie
                     }
                 }
             }
-            if (!presentation) item?.let {
+            if (!presentation && showControls) item?.let {
                 WrapRow {
                     RenderTab.entries.forEach { tab ->
                         MiniPill(
@@ -884,8 +891,8 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel, modifie
             }
         }
     }
-    if (!presentation) canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
-    if (!presentation) item?.let {
+    if (!presentation && showControls) canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
+    if (!presentation && showControls) item?.let {
         when (state.renderTab) {
             RenderTab.Artwork -> Unit
             RenderTab.Prompt -> RenderTextView(renderPromptText(it), Modifier.fillMaxWidth().height(180.dp))
@@ -1193,26 +1200,166 @@ private fun BatchFailureSummary(state: InkuUiState) {
 private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        CanvasHeroCard(state, viewModel)
-        CompactLabel("デモ")
+        CanvasHeroCard(state, viewModel, showControls = false, maxPreviewHeight = 250.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                state.demoWaitingSeconds?.let { "次の描画まで ${it}秒" }
+                    ?: state.demoCurrentElapsedMs?.let { "現在 ${formatDuration(it)} / 合計 ${formatDuration(state.demoTotalElapsedMs)}" }
+                    ?: "デモ待機中",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            MiniPill(
+                text = if (state.isDrawing) "● 実行中" else "${state.demoRenderCount}件",
+                selected = state.isDrawing,
+            )
+        }
+
+        CompactLabel("生成された指示文")
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                state.demoGeneratedPrompt.ifBlank { "—" },
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 22.sp,
+                color = if (state.demoGeneratedPrompt.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+
+        CompactLabel("シードフレーズ")
         ImeAwareOutlinedTextField(
             value = state.demoSeed,
             onValueChange = viewModel::setDemoSeed,
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
+            minLines = 2,
+            maxLines = 3,
+            enabled = !state.isDrawing,
         )
-        Text("interval ${state.demoIntervalSeconds}s / save current result manually", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
         DrawingActionButton(
-            idleText = "▶  1回描画",
-            runningText = "■  描画中",
+            idleText = "▶  デモ開始",
+            runningText = "■  デモ実行中",
             state = state,
-            onClick = viewModel::runDemoOnce,
+            onClick = viewModel::startDemo,
             onStop = viewModel::stopDrawing,
         )
+
+        CompactLabel("デモ設定")
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column {
+                DemoSettingRow(
+                    label = "表示間隔",
+                    value = "${state.demoIntervalSeconds} 秒",
+                    last = false,
+                    action = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SecondarySmallButton(
+                                text = "−",
+                                onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds - 5) },
+                                enabled = !state.isDrawing && state.demoIntervalSeconds > 1,
+                            )
+                            Text("${state.demoIntervalSeconds}s", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            SecondarySmallButton(
+                                text = "+",
+                                onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds + 5) },
+                                enabled = !state.isDrawing && state.demoIntervalSeconds < 999,
+                            )
+                        }
+                    },
+                )
+                DemoSettingRow(
+                    label = "指示文生成",
+                    value = "Android内蔵",
+                    sub = "描画モデルとは別レーン",
+                    last = false,
+                )
+                DemoSettingRow(
+                    label = "ランダム色カタログ",
+                    sub = "描画ごとに選択",
+                    checked = state.demoRandomColorCatalog,
+                    enabled = !state.isDrawing,
+                    onCheckedChange = viewModel::setDemoRandomColorCatalog,
+                    last = true,
+                )
+            }
+        }
+        if (state.demoGeneratedDdl != null) {
+            CompactLabel("生成された解釈")
+            RenderTextView(
+                state.demoGeneratedDdl,
+                modifier = Modifier.fillMaxWidth().height(140.dp),
+            )
+        }
         state.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
         MetaPanel(state)
+    }
+}
+
+@Composable
+private fun DemoSettingRow(
+    label: String,
+    value: String? = null,
+    sub: String? = null,
+    checked: Boolean? = null,
+    enabled: Boolean = true,
+    onCheckedChange: ((Boolean) -> Unit)? = null,
+    action: (@Composable () -> Unit)? = null,
+    last: Boolean = false,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (checked != null && onCheckedChange != null && enabled) {
+                    Modifier.clickable { onCheckedChange(!checked) }
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            sub?.let {
+                Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        value?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (checked != null && onCheckedChange != null) {
+            Checkbox(checked = checked, onCheckedChange = if (enabled) onCheckedChange else null)
+        }
+        action?.invoke()
+    }
+    if (!last) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 14.dp)
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+        )
     }
 }
 

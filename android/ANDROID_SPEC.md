@@ -812,3 +812,24 @@ shape by rendering each service as an independent provider panel.
 - Because Android is single-user, published models from this panel are reflected
   directly in the drawing model choices available to that user.
 - The LiteRT-LM download-cancel button is not shown in the model settings panel.
+
+## 2026-05-08 Demo Panel S3 Layout And Random Color Catalog
+
+The Android Demo panel follows the DDL4 `S3 — Demo` layout for the content below
+the image preview: status, generated prompt, seed phrase, demo settings, and
+start / stop action.
+
+- Header elements above the image preview, such as the S3 `inku` label, are not
+  migrated because Android keeps its existing navigation structure.
+- After demo start, Android runs the same conceptual loop as the server/web
+  client: generate instruction, render, wait for the configured interval, and
+  repeat.
+- The Demo settings include `Random color catalog for each render`. When enabled,
+  Android chooses a random color catalog for each render cycle immediately before
+  calling `repository.paint`.
+- The random color catalog option is persisted in Room `app_settings` as
+  `demo_random_color_catalog` and restored on restart.
+- The seed phrase and interval are also saved as demo settings and restored on
+  restart.
+- Demo renders continue to use the existing Android behavior of saving to normal
+  history, with a `[demo] ` prefix in the saved input.

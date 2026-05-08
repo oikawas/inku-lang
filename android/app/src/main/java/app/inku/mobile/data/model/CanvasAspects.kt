@@ -35,9 +35,14 @@ object CanvasAspects {
 
     fun normalize(id: String?): String = if (id != null && byId.containsKey(id)) id else "square"
 
+    fun ratioFor(id: String?): Double {
+        val aspect = byId.getValue(normalize(id))
+        return aspect.ratioW / aspect.ratioH
+    }
+
     fun sizeFor(id: String?): CanvasSize {
         val aspect = byId.getValue(normalize(id))
-        val ratio = aspect.ratioW / aspect.ratioH
+        val ratio = ratioFor(id)
         return if (ratio >= 1.0) {
             CanvasSize(width = (basePx * ratio).toInt(), height = basePx)
         } else {

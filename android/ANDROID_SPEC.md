@@ -1,8 +1,23 @@
 # inku Android Implementation Notes
 
-This directory is a local Android workspace and is intentionally ignored by Git.
+This directory is the Android workspace for the native standalone app and is
+tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
+secrets must remain outside tracked files.
 
 Last updated: 2026-05-06.
+
+## Specification Update Workflow
+
+`ANDROID_SPEC.ja.md` is the canonical Android specification note.
+`ANDROID_SPEC.md` is the maintained English version of the same intent.
+
+When updating Android specifications:
+
+1. Update `ANDROID_SPEC.ja.md` first.
+2. Refresh `ANDROID_SPEC.md` as an English translation or public-facing
+   adaptation of the Japanese source.
+3. Do not introduce English-only Android requirements that are absent from
+   `ANDROID_SPEC.ja.md`.
 
 ## Fixed Decisions
 
@@ -60,16 +75,79 @@ Implemented:
   - DDL to JSON Score
   - JSON Score to SVG
   - render hash and render metadata generation
+- Android rendering follows the same logical stages as the web `/api/paint`
+  flow: Stage 1 interpretation, intermediate DDL expansion, Stage 2 Score
+  composition, Score repair/coercion, SVG rendering, render-hash generation,
+  and Room history persistence.
+- Headless render execution for web/server comparison:
+  - exported `HeadlessRenderActivity`
+  - adb-startable run IDs and prompt/model/catalog/canvas extras
+  - app-sandbox artifacts under `files/headless/<run_id>/`
+  - extracted `result.json`, `normalized.ddl`, `score.json`, and `output.svg`
+  - `INPUT_MODE=ddl` bypasses Stage 1 and sends an already-normalized DDL input
+    directly through Stage 2 and later stages. This isolates LLM variance when
+    comparing DDL -> Score -> SVG behavior against the server.
+  - The server CLI also supports `inku-cli paint --input-mode ddl`, which calls
+    `/api/compose` for DDL -> Score -> SVG and saves through `/api/history`
+    when `--save-history` is set.
+  - `android/scripts/headless_render_compare.sh` as an `inku-cli`-equivalent
+    local comparison runner
+  - `android/scripts/headless_batch_compare.sh` for multi-prompt comparison,
+    retry, and aggregate summary generation
+  - when `COMPARE_WEB=1`, server-side generation is executed through
+    `inku-cli paint`; the script must not call `/api/paint` directly for the
+    comparison path
+  - `android/scripts/headless_render_compare.sh` defaults
+    `CLI_SAVE_HISTORY=true` so server-side CLI drawings are run with
+    `inku-cli paint --save-history` and can be reviewed later in normal server
+    history. `summary.json` and the batch aggregate summary include the
+    server-side `history_id`.
+- LiteRT-LM is wired as the default local model provider for Stage 1 and Stage
+  2. The provider reads the selected Gemma 4 E2B/E4B `.litertlm` file path from
+  Room, verifies that the model is in the `ready` state, initializes a cached
+  LiteRT-LM `Engine`, sends each stage prompt through a `Conversation`, and
+  renders the returned `Message` into text. Requests use a bounded async flow
+  with cancellation so the UI can return to the deterministic local fallback if
+  device-side inference fails or exceeds the current timeout.
+- Stage 1 now uses the web reference `SYSTEM_PROMPT_PREFIX` and dynamic
+  `EXAMPLE_POOL` selection algorithm instead of the earlier Android summary
+  prompt. The Android implementation selects the top five matching examples
+  using the same keyword-count rule as `server/src/inku_server/interpreter.py`.
+- Stage 1.5 now ports the web `expand_intermediate_ddl` path for Japanese DDL:
+  placement-word sanitization, gray-background avoidance, static-center
+  reframing, profile/tag selection, deterministic SHA-256 salted picks,
+  structural/music/painting candidate selection, and centered-layer limiting.
+- Stage 2 now uses the web reference `composer.py` Japanese system prompt
+  verbatim, including the full conversion rules and key examples.
+- If the LiteRT-LM provider cannot run for a stage, the local path falls back to
+  the deterministic Kotlin port of the web fallback/coerce rules. Natural-
+  language input is preserved into normalized DDL with explicit placement
+  augmentation, so the Compose `指示` field, `解釈（正規化DDL）` field, rendered
+  Score, and saved history remain aligned in the same user-visible flow.
+- LiteRT-LM text responses are sanitized before entering the DDL path. Gemma
+  chat control tokens and clearly non-DDL outputs such as SQL-like text are
+  rejected and routed to the deterministic fallback.
 - Kotlin SVG renderer port for the current primitive subset.
+- Renderer support includes the web Score fields needed by the fallback path:
+  `arrangement.color_cycle`, `arrangement.path`, clustered high-count groups,
+  and primitive `rotation`.
 - Native Compose preview renderer for stored JSON Score.
-- Dark Compose workbench UI based on the web reference screenshots:
+- Dark Compose UI in transition from the web-style workbench to a Pixel 9
+  mobile-first layout based on the Claude Design prototype:
   - top application header
-  - mode tabs: Draw, Batch, Demo, History, Settings
-  - drawing input panel
-  - central render panel
+  - bottom navigation: Compose, History, Demo, Settings
+  - Compose segmented mode: Write, Batch
+  - bounded first-screen canvas card that respects the selected canvas aspect
+    while keeping the prompt and DDL path reachable on Pixel 9
+  - prompt and DDL interpretation below the canvas
+  - fixed-height drawing CTAs with an in-place generating state and progress
+    indicator, avoiding layout jumps during local LLM work
   - render sub-tabs: Artwork, Prompt, JSON
   - explicit button rows for model, color catalog, and canvas selection
-  - bottom history strip with thumbnails
+  - dedicated History screen with search/filter placeholders and two-column
+    thumbnail cards
+  - stronger History selected-card affordance using an accent border and
+    corner marker instead of an overlaid text badge
 - History operations for the selected item:
   - star / unstar
   - soft trash
@@ -79,8 +157,6 @@ Implemented:
 - Pixel 9 status bar and navigation bar safe-area handling.
 
 Not implemented yet:
-
-- Real LiteRT-LM runtime integration.
 - Production-polished model download UX, including background continuation,
   notification progress, metered-network policy, and low-storage recovery.
 - External provider execution. Provider records exist only as compatibility
@@ -114,6 +190,69 @@ Verified on device:
 - Gemma 4 E2B/E4B model records are seeded into Room on launch.
 - Gemma 4 E2B license acceptance persists as `ready_to_download`.
 - No fatal Android runtime crash was observed in the checked logcat window.
+- Headless Android render completed without opening the Compose UI. The checked
+  run used NVIDIA Gemma 4 31B for Stage 1 and Stage 2, produced artifacts under
+  `/tmp/inku-headless/codex-headless-test3/`, and reported render hash short
+  `8097`.
+- VPN connectivity to the local reference server was verified for web access
+  through the frontend port. Direct CLI access to the backend API port waited
+  without a response in this test, so the comparison used `inku-cli` through the
+  frontend base URL.
+- The latest Android-vs-server comparison was run with:
+  - input: `青い背景に白い横線を三本引く`
+  - Android device: Pixel 9 over USB
+  - Stage 1: `nvidia:google/gemma-4-31b-it`
+  - Stage 2: `nvidia:google/gemma-4-31b-it`
+  - color catalog: `ink_porcelain`
+  - canvas aspect: `square`
+  - comparison runner: `android/scripts/headless_render_compare.sh`
+  - server generation: `inku-cli paint` against the VPN-reachable frontend URL
+  - artifacts: `/tmp/inku-headless/codex-cli-compare-vpn2/`
+- The comparison completed, but parity was not achieved:
+  - Android render hash short: `8097`
+  - server/inku-cli render hash short: `77FE`
+  - `same_render_hash`: `false`
+  - `same_ddl`: `false`
+- Observed parity gaps from that run:
+  - Android normalized DDL duplicated the final clause:
+    `黒い細い斜め線を右上がりに三本並べる。細かく震える。`
+  - server/inku-cli normalized DDL did not contain that duplicate clause.
+  - Android Score had 3 instructions.
+  - server/inku-cli Score had 4 instructions, including a `color_cycle` repair
+    and a white ellipse composition anchor.
+  - Android render metadata reported `render_engine_version: 1`; the server
+    reported `render_engine_version: 2`.
+- A five-prompt comparison was run using generated 32-character Japanese
+  seasonal instructions, Android headless CLI-equivalent rendering, and server
+  `inku-cli paint`.
+  - batch id: `season32-compare-003`
+  - artifacts: `/tmp/inku-headless/season32-compare-003/`
+  - prompt count: `5`
+  - success count: `5`
+  - error count: `0`
+  - same render hash count: `0`
+  - same DDL count: `1`
+  - all input prompts were verified as 32 characters:
+    - `春の雨に濡れた桜の影を白い余白へ淡く静かに散らす細い銀の線たちよ`
+    - `夏の夜に光る海風を青い円と赤い点で遠く揺らす透明な波音として置く`
+    - `秋の夕暮れに舞う落葉を金の線と黒い余白で斜めに重ねる細い影二本を`
+    - `冬の朝に凍る池の息を白い弧と灰の点で静かに結ぶ細い影青く遠く残す`
+    - `梅雨明けの雲間に虹の欠片を緑の弧と青い粒で軽く浮かべるそっと置く`
+  - hash short comparison:
+    - `season32-001`: Android `18E1`, server `FDCE`, DDL mismatch
+    - `season32-002`: Android `5BF6`, server `CAA0`, DDL mismatch
+    - `season32-003`: Android `588C`, server `E2BC`, DDL mismatch
+    - `season32-004`: Android `2033`, server `2357`, DDL mismatch
+    - `season32-005`: Android `E590`, server `5D2D`, DDL match
+  - `season32-001` showed large Android/server divergence in numeric
+    extraction from natural language.
+  - `season32-002` was semantically close, but Android added material details
+    such as `細筆` and `鉛筆`.
+  - `season32-003` produced the unnatural Android phrase `二本数を二本並べる`.
+  - `season32-004` diverged in background color, placement, count, and whether
+    an additional line was added, showing a large Stage 1/1.5 parity gap.
+  - `season32-005` matched DDL but still produced a different render hash,
+    leaving renderer / metadata / SVG generation parity unresolved.
 
 The latest local verification screenshot was written to:
 
@@ -139,6 +278,120 @@ add login or role handling.
 Server-only web features are kept out of the Android runtime unless they have a
 clear local single-user equivalent.
 
+## Web/Server Master Policy
+
+The Android port always treats the `web/` and `server/` implementations as the
+development master. Android is still a standalone native application package,
+but the behavioral source of truth for DDL interpretation, Stage 1.5 expansion,
+Score coercion/repair, SVG rendering, and history/render metadata is the
+web/server implementation.
+
+Whenever web/server changes, the corresponding Android parity surface must be
+checked in the same change unit. Android compatibility code is split along the
+same responsibility boundaries as the server source so that future diffs are
+easier to inspect and omissions are easier to catch.
+
+Current renderer compatibility layout:
+
+| server source | Android compatibility file | Responsibility |
+| --- | --- | --- |
+| `server/src/inku_server/renderer.py` / `_stroke_attrs`, dash, texture, blur | `android/app/src/main/java/app/inku/mobile/render/ServerRendererStyle.kt` | Stroke/fill attributes, material weight style, texture filters, blur filters, hint opacity |
+| `server/src/inku_server/renderer.py` / `_arc_path_d`, point generation, variation | `android/app/src/main/java/app/inku/mobile/render/ServerRendererGeometry.kt` | SVG geometry, arc sweep/large-arc rules, regular polygon points, triangle bbox points, variation paths |
+| `server/src/inku_server/renderer.py` / material outline helpers | `android/app/src/main/java/app/inku/mobile/render/ServerRendererMaterial.kt` | Pencil/crayon/chalk/brush/rope outlines, specks, rope twists |
+| `server/src/inku_server/renderer.py` / `render` and `_render_instruction` flow | `android/app/src/main/java/app/inku/mobile/render/DefaultSvgRenderer.kt` | Android SVG renderer orchestration, arrangement expansion, presence layer, metadata emission |
+
+`DefaultSvgRenderer.kt` keeps orchestration only. Server-derived details belong
+in `ServerRendererStyle.kt`, `ServerRendererGeometry.kt`, and
+`ServerRendererMaterial.kt`. When server `renderer.py` changes, those files are
+the first Android update targets.
+
+The same policy applies to the pipeline. Changes in
+`server/src/inku_server/interpreter.py`, `ddl_expander.py`, `coerce.py`, and
+`schema.py` must be checked against the Android `pipeline/` package and
+compatibility data models. Android-specific UI, Room, LiteRT-LM, and provider
+routing can remain native, but user-visible DDL, Score, SVG, render metadata,
+and history persistence behavior prioritize web/server parity.
+
+Current pipeline compatibility layout:
+
+| server source | Android compatibility file | Responsibility |
+| --- | --- | --- |
+| `server/src/inku_server/interpreter.py` / Stage 1 model text cleanup and usable DDL guard | `android/app/src/main/java/app/inku/mobile/pipeline/ServerDdlText.kt` | Model output cleanup, Stage 1 DDL normalization, number-noise repair, clause dedupe, drawable vocabulary guard |
+| `server/src/inku_server/ddl_expander.py` | `android/app/src/main/java/app/inku/mobile/pipeline/WebDdlExpander.kt` | Stage 1.5 DDL expansion and sensory/structural marker insertion |
+| `server/src/inku_server/coerce.py` / `PRIMITIVE_SPECS`, field coercion, post-coerce | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreCoercer.kt` | Stage 2 instruction primitive field repair, fallback field selection, arc angle repair |
+| `server/src/inku_server/coerce.py` / semantic marker helpers, presence inference, color/layout/material/radius detection | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSemantics.kt` | Context marker detection, quiet-density/motion/colorful context checks, presence inference, visible color/background, DDL hint helpers |
+| `server/src/inku_server/composer.py` and `coerce.py` / fallback score synthesis | `android/app/src/main/java/app/inku/mobile/pipeline/ServerFallbackComposer.kt` | Fallback DDL, fallback instruction, and arrangement synthesis after provider failure or unusable Stage 2 output |
+| `server/src/inku_server/coerce.py` / DDL coverage, shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | Drawable clause extraction, clause primitive/color mapping, coverage instruction, shape/motif repair instruction factories |
+| `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration, dedupe, DDL coverage, color/shape/motif/composition/context/motion/presence/density repair order, fallback Score construction, Stage 1/2 provider fallback control |
+| `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 `submit_score` schema, Stage 2 JSON extraction, tool_calls/arguments unwrap, renderable instructions guard |
+
+Function-level parity table from prompt to rendering:
+
+| Flow step | server master | Android port | Parity rule / current work item |
+| --- | --- | --- | --- |
+| UI prompt input | `web/src/lib/components/InputPanel.svelte` / `DdlEditor.svelte` | `ui/InkuApp.kt` / `ui/InkuViewModel.kt` | Mobile-native UI is acceptable, but prompt, DDL, auto-repair, model/catalog/canvas state must stay in the same saved flow. |
+| Paint API orchestration | `api.py::api_paint` | `data/InkuRepository.kt::paint` / `pipeline/LocalFallbackPipeline.kt::paint` | Keep the order: Stage 1, Stage 1.5, Stage 2, coerce, render, hash, history save. |
+| Stage 1 model call | `interpreter.py::interpret_detail` / `_build_system_prompt` | `LocalFallbackPipeline.kt` + `WebDdlSpec.kt` | Match the system prompt, example selection, model output cleanup, and fallback control. |
+| Stage 1 text cleanup | `interpreter.py` cleanup / usable DDL checks | `ServerDdlText.kt` | Compare DDL guard, number-noise repair, clause dedupe, and drawable vocabulary guard function by function. |
+| Stage 1.5 expansion | `ddl_expander.py::expand_intermediate_ddl` | `WebDdlExpander.kt` | Track sensory/structural markers, filter candidates, density, and placement insertion with server updates. |
+| Stage 2 model call | `composer.py::compose` / `_compose_*` | `LocalFallbackPipeline.kt` / provider clients | Compare prompt, tool schema, retry/fallback criteria, and timeout policy. |
+| Stage 2 tool schema | `schema.py::Score` / `Instruction` / `composer.py` tool schema | `WebScoreTool.kt` | Match JSON schema, tool_calls unwrap, arguments unwrap, and renderable instruction guard. |
+| Score primitive field coerce | `coerce.py::PRIMITIVE_SPECS` / `POST_COERCE` | `ServerScoreCoercer.kt` | Match primitive required fields, fallback fields, default values, and arc angle repair. |
+| Score semantic coerce | `coerce.py` marker helpers | `ServerScoreSemantics.kt` | Align material, color, variation, presence, density, and motion marker sets and return values. |
+| DDL coverage repair | `coerce.py::_ddl_clauses` / `_primitive_from_clause` / `_fallback_instruction_from_clause` | `ServerScoreRepairFactory.kt` | Match clause extraction, primitive selection, and coverage instruction defaults. `円` / `circle` follows server behavior and becomes `ellipse` in coverage repair. |
+| Fallback Score synthesis | `api.py` fallback helpers / `coerce.py::_fallback_instruction_from_clause` | `ServerFallbackComposer.kt` | Match primitive, geometry, and arrangement defaults after provider failure or unusable Stage 2 output. |
+| Repair order | `coerce.py::coerce_score` | `LocalFallbackPipeline.kt` | Compare visible color, dedupe, coverage, shape/color/motif/composition/context/motion/presence/density order and remove Android-only ordering. |
+| SVG render engine | `render_engines/default.py` / `renderer.py::render` / `_render_instruction` | `DefaultSvgRenderer.kt` / `ServerRenderer*.kt` | Match instruction expansion, arrangement placement, material outlines, filters, and metadata. |
+| Render hash / metadata | `api.py::_render_hash` / render metadata assembly | `LocalFallbackPipeline.kt::renderHash` / renderer metadata | Match hash input fields, build number handling, engine id/version, catalog/canvas metadata. |
+| History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | Store the same user-visible data: input, DDL, Score, SVG, metadata, model IDs, catalog/canvas, hash, and timestamps. |
+| Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | Let both server and Android save history, and keep history_id, DDL, hash, and catalog in summaries. |
+
+Saijiki parity is checked category by category. Android UI word groups must
+match `web/src/lib/saijiki.ts` and `web/src/lib/i18n/ja.ts`. Server Stage 1 is
+checked against the saijiki list and allowed action verbs in `interpreter.py`.
+The verb `draw` / `描く`, which is not exposed by the web UI, is not exposed as
+an independent Android word either; it is handled only when it appears in DDL or
+model output. Score coercion, fallback, and repair map `katachi` to primitives,
+`tezawari` to weights, `tsuranari` to styles, `iro` to visible colors,
+`yuragi` to variation, `basho` to center/position, `ugoki` to arrangement,
+`katamuki` to rotation/line endpoints, and `wariai` to size, arc angle, and line
+span. Even when LLM output is incomplete or variable, saijiki words in the
+post-Stage-1.5 DDL are repaired through `ServerScoreCoercer.kt`,
+`ServerScoreSemantics.kt`, `ServerFallbackComposer.kt`, and
+`ServerScoreRepairFactory.kt` so Android behavior tracks server `composer.py`
+and `coerce.py`.
+
+## Web Component Porting Matrix
+
+All web components under `web/src/lib/components/` are considered for the
+Android port. The Android implementation may use mobile-native layout, but the
+button action, state transition, and persistence target must match the web
+component unless marked as a local single-user equivalent.
+
+| Web component | Android status |
+| --- | --- |
+| `AppRail.svelte` | Mapped to top header and bottom navigation. Settings and app state entry points remain visible. |
+| `AuthPanel.svelte` | Local single-user equivalent. No login UI; the local user has admin-equivalent settings access. |
+| `ProfileModal.svelte` | Local single-user equivalent. Account/password editing is intentionally not shown. |
+| `InputPanel.svelte` | Ported to Compose mode tabs, prompt input, canvas/catalog/model buttons, clear/draw action, batch and demo panels. |
+| `PaintButton.svelte` | Ported to primary draw buttons. |
+| `StopButton.svelte` | Ported to active draw/batch/demo stop action backed by cancellable jobs. |
+| `BatchPanel.svelte` | Ported as local batch text execution, progress message, selected latest result, Room history save. |
+| `DemoPanel.svelte` | Ported as one-shot local demo generation with persisted local settings planned for interval loop parity. |
+| `CanvasAspectPlugin.svelte` | Ported as the Canvas settings panel and plugin enable flag persisted to Room settings. |
+| `ColorCatalogModal.svelte` | Ported as the color catalog selection panel with cancel/confirm semantics. |
+| `DdlEditor.svelte` / `DdlEditPanel.svelte` | Ported as inline DDL editor, editor dialog, auto-repair toggle, Stage 2 replay, and stop action. |
+| `SaijikiInline.svelte` | Ported as the inline Saijiki panel using the same word groups. |
+| `SaijikiDrawer.svelte` | Mobile equivalent is the inline Saijiki panel; drawer layout is not used on Android. |
+| `CanvasPanel.svelte` | Ported for artwork/prompt/score tabs, star, hash copy, render metadata, zoom/pan controls, SVG share, and PNG share. |
+| `OutputTabsContent.svelte` | Ported as prompt and JSON views from the saved Room history item. |
+| `HistoryStrip.svelte` | Ported through the history tab and selected render controls. |
+| `HistoryManager.svelte` | Ported for thumbnails/list modes, search, starred filter, selection, trash, restore, and permanent delete. |
+| `HistoryThumbnail.svelte` | Ported through `ArtworkPreview` in history tiles and list rows. |
+| `ConfirmDialog.svelte` | Ported for DDL overwrite and destructive history operations. Non-history destructive settings confirmations remain in the parity test backlog. |
+| `SettingsModal.svelte` | Ported for model selection, model connection settings, plugin setting, DB status, export templates, and misc settings. Server-only logs/output-save are represented as local-only equivalents. |
+| `KiwiMascot.svelte` | Represented by persisted visibility setting; the Android progress indicator uses native Material progress. |
+
 ## Implementation Order
 
 Completed or substantially implemented:
@@ -152,8 +405,9 @@ Completed or substantially implemented:
 
 Remaining next order:
 
-1. Wire the downloaded `.litertlm` files into LiteRT-LM-backed Gemma 4 E2B/E4B
-   inference stages.
+1. Verify LiteRT-LM inference end to end on Pixel 9 with the downloaded Gemma 4
+   E2B/E4B `.litertlm` model files and expose provider failures in the UI/log
+   surface instead of silently falling back.
 2. Harden model download UX with a foreground service or WorkManager,
    notifications, metered-network policy, and user-visible storage recovery.
 3. Expand the Kotlin renderer and JSON Score parser to cover the full web
@@ -162,8 +416,79 @@ Remaining next order:
    history import/export flows with Android Storage Access Framework.
 5. Add automated compatibility tests against reference web JSON and SVG/render
    metadata fixtures.
-6. Finish settings screens for provider selection, plugins, logs, exports, and
-   local-only equivalents of web administration controls.
+6. Complete destructive confirmations for every non-history settings operation
+   and add automated parity coverage for the Android UI state transitions.
+
+## 2026-05-07 Server Parity Fix Record
+
+Server CLI and Android CLI comparisons from the same DDL showed that DDL
+normalization was broadly aligned, while JSON Score and SVG output still
+diverged. The main causes were Android-side differences in the Stage 2 user
+message, Score tool schema, coerce chain, renderer seed/hash behavior, and
+Android-only support layers.
+
+This update treats the server implementation as the master for Android logic
+that is not hardware-dependent:
+
+- Stage 2 user messages now match `server/src/inku_server/composer.py`
+  `_build_user_message()`. DDL input mode sends only the DDL when the original
+  text and normalized DDL are identical.
+- Stage 2 tool schema no longer uses the Android-only simplified schema.
+  Android now uses `ServerScoreSchemaJson`, generated from the server
+  `_score_tool_schema()`.
+- Stage 2 Score repair reconnects the server `coerce_score()` stage order:
+  material hint, variation hint, DDL coverage, color delivery, shape delivery,
+  complex motif, composition diversity, structural duplicate repair, context
+  energy, presence auxiliary repair, density governor, motion energy, and
+  density budgets.
+- Material and variation hints now use the same markers and defaults as the
+  server `_with_material_hint()` and `_with_variation_hint()`.
+- Android-only repairs that were not present in the server were removed,
+  including treating `震える` as an extra motion-context trigger and adding an
+  automatic membrane-haze support layer.
+- Arrangement expansion, scatter/path/clustered placement, `preserve_space`
+  margins, density radius, cluster axis/bend/jitter, and renderer seeding were
+  aligned with `server/src/inku_server/renderer.py`.
+- Renderer seeds are derived from an `Instruction.model_dump_json()` equivalent
+  field order and default/null representation. Line variation uses the same
+  seed source.
+- Variation and material jitter signed hashes now follow the server SHA-256
+  plus little-endian signed 64-bit behavior.
+
+Verification:
+
+- `gradle :app:compileDebugKotlin` succeeded.
+- `gradle :app:assembleDebug` succeeded.
+- The debug APK was reinstalled on Pixel 9 and headless DDL render comparison
+  was rerun.
+- Final check run:
+  `/tmp/inku-headless/history-ddl5-after-final-parity-fix-20260507/history-ddl5-final-002`
+  - `same_ddl: true`
+  - `same_render_hash: false`
+  - Remaining differences were identified mainly as LLM Stage 2 output
+    variation in `variation.dimensions` and `arrangement.density`.
+
+Future comparisons should classify same-Score drawing differences as renderer
+porting issues. If the Score differs, compare Stage 2 model response, tool
+schema, and the coerce chain against the server source in that order.
+
+## Local Commit Record
+
+- `f34852b feat: add android headless render comparison`
+  - Added the Android headless render entry point and adb-driven comparison
+    script.
+  - Added OpenAI-compatible provider routing, encrypted local provider API key
+    storage, and web-compatible Stage 1 / Stage 1.5 / Stage 2 prompt and tool
+    support.
+  - Added Android-side tests for the web DDL expander port.
+  - Updated the Pixel 9 UI, model/provider selection, batch/history/settings
+    flows, and renderer support as part of the same Android parity checkpoint.
+  - Verified with `gradle :app:compileDebugKotlin` and
+    `bash -n android/scripts/headless_render_compare.sh`.
+
+The commit intentionally excludes local-only artifacts, concrete device IDs,
+local server addresses, downloaded models, and API keys. Unrelated `manual/`
+files were left untracked.
 
 ## Build And Deployment Notes
 
@@ -191,3 +516,394 @@ adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqli
 adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqlite-wal > /tmp/inku-android.sqlite-wal
 adb -s "$ANDROID_SERIAL" exec-out run-as app.inku.mobile cat databases/inku.sqlite-shm > /tmp/inku-android.sqlite-shm
 ```
+
+## 2026-05-07 Pixel 9 UI / Canvas Interaction Update
+
+The Android draw tab UI was updated based on the Claude Design DDL4 S1 Compose
+reference. As a mobile UI rule, horizontal scrolling is prohibited; choices,
+chips, and menus must use wrapping rows or vertical layout instead.
+
+UI requirements from this update:
+
+- The draw tab prioritizes the S1 Compose writing flow: canvas, condition
+  chips, prompt input, and normalized DDL should be easy to inspect in order.
+- Controls and menus must not be overlaid on top of the artwork preview.
+  - Star, render hash, and zoom controls are placed above the image.
+  - Artwork / Prompt / JSON / SVG / PNG controls are placed below the image.
+  - SVG / PNG expanded choices are shown inline below the image, not as
+    popups covering the artwork.
+- Tapping the image itself has no action.
+- The image gesture surface is used only for pinch zoom and panning while
+  zoomed.
+- Existing buttons for tabs, settings, history, saijiki, model selection,
+  color catalog selection, and related flows must always be wired to a
+  transition or real action. Visual-only buttons are not acceptable.
+- Japanese IME behavior must remain supported: input fields should keep the
+  bring-into-view and IME padding behavior so focused fields are not hidden by
+  the keyboard.
+
+SVG / PNG sharing behavior:
+
+- SVG / PNG / JSON sharing must not run heavy file generation on the main
+  thread.
+- PNG generation rasterizes SVG and encodes PNG on a background dispatcher,
+  then opens the Android share sheet after completion.
+- SVG export exposes profile choices with the same intent as the server/web
+  implementation:
+  - display SVG
+  - editable SVG
+  - compatible SVG
+- PNG export exposes at least the server/web template Y-axis sizes:
+  - 1080px
+  - 2160px
+  - 4320px
+- Android uses the system share sheet instead of a browser download, but the
+  user-facing SVG / PNG menu role should match the web version.
+
+Verification:
+
+- `gradle :app:compileDebugKotlin` succeeded.
+- `gradle :app:assembleDebug` succeeded.
+- The debug APK was installed and launched on Pixel 9.
+- Screenshots confirmed that controls and menus are not overlaid on top of the
+  artwork.
+- PNG 1080px export opened the Android share sheet.
+- logcat after PNG export did not show `FATAL EXCEPTION`, `ANR in`, or
+  `Input dispatching timed out`.
+
+## 2026-05-07 Explicit Android History Differences From Server/Web
+
+The Android app remains a native single-user Pixel 9+ application whose
+development master is the server/web implementation. However, management flows
+that are unnecessary or too heavy for the mobile UI are intentionally removed
+when specified here.
+
+For the History screen, the following are explicit Android differences from the
+server/web implementation:
+
+- The trash feature is not exposed in the Android UI.
+  - The History screen does not provide a Trash view switch.
+  - It does not provide a button to move history entries to Trash.
+  - It does not provide a restore-from-Trash button.
+  - It does not provide a permanent-delete button.
+  - It does not show confirmation dialogs for trash operations.
+- The list layout is not exposed in the Android UI.
+  - History uses the S4 History-style three-column thumbnail grid as the
+    default and only layout.
+  - The thumbnail/list layout toggle is not shown.
+- Multi-select actions whose purpose was trash management are not exposed in
+  the Android UI.
+  - The select-all button is not shown.
+  - History cards do not show checkboxes.
+- The remaining History screen actions are limited to search, starred-only
+  filtering, selecting a history item, Star / unstar for the selected item, and
+  JSON sharing.
+
+These removals are intentional Android-specific product differences, not
+unfinished implementation gaps.
+
+## 2026-05-07 LiteRT-LM MTP And Gemma 4 Re-Download Flow
+
+The Android LiteRT-LM integration requires the GPU backend. It must not fall
+back to CPU. For local Gemma 4 E2B / E4B execution, LiteRT-LM speculative
+decoding / Multi-Token Prediction (MTP) is enabled.
+
+Implementation requirements:
+
+- Set `ExperimentalFlags.enableSpeculativeDecoding = true` before initializing
+  the LiteRT-LM Engine.
+- Keep the backend as `Backend.GPU()`.
+- If GPU initialization fails, stop drawing and surface the error to the user.
+- Do not add CPU fallback.
+- Engine initialization logs should make it possible to confirm the GPU backend
+  and speculative decoding state.
+
+Gemma 4 model download UI:
+
+- The LiteRT-LM / Gemma E2B / E4B panel in Model Settings provides a
+  `Re-download` action in addition to the existing license acceptance and
+  download flow.
+- `Re-download` deletes the finished `.litertlm` file and any interrupted
+  `.part` file from the device, then downloads from the same Hugging Face URL
+  from the beginning.
+- Models whose license has not been accepted cannot be re-downloaded.
+- Re-download is disabled while the model is queued, connecting, downloading,
+  or verifying.
+- Re-download progress uses the same Room `model_assets` state as normal
+  downloads.
+
+Model file handling:
+
+- Gemma 4 LiteRT-LM files downloaded before 2026-05-05 may predate MTP support,
+  so users must be able to refresh them with the `Re-download` action.
+- As of 2026-05-07, the Hugging Face `x-linked-etag` values for E2B and E4B
+  match the SHA-256 values stored by the Android implementation.
+- Therefore the current policy keeps the same download URLs and SHA-256 values,
+  and refreshes old on-device files by deleting and downloading them again from
+  the same URLs.
+
+Verification:
+
+- `gradle :app:compileDebugKotlin` succeeded.
+- `gradle :app:assembleDebug` succeeded.
+- The debug APK was installed and launched on Pixel 9.
+
+## 2026-05-08 Android-Specific Swipe History In Compose Preview
+
+As an explicit Android difference from the server/web implementation, the
+Compose screen lets users switch the currently displayed history item by
+swiping directly on the rendered image.
+
+- Swiping right on the rendered image moves one history item backward.
+- Swiping left on the rendered image moves one history item forward.
+- Tapping the image remains a no-op.
+- Pinch-in / pinch-out zoom and panning while zoomed remain supported.
+- While zoomed, image manipulation takes priority over history swiping.
+- Short-term repeated history switching is throttled so one horizontal swipe
+  does not jump across multiple history items.
+
+This gesture is an Android-specific mobile usability addition and is not a
+server/web parity requirement.
+
+Verification:
+
+- `gradle :app:compileDebugKotlin` succeeded.
+- `gradle :app:assembleDebug` succeeded.
+- The debug APK was installed on Pixel 9, and left / right swipes on the
+  Compose preview image were verified to switch history items.
+
+## 2026-05-08 Android-Specific Unified Model Selection
+
+The Android model-selection UI prioritizes mobile simplicity. It exposes a
+single drawing-model choice instead of separate Stage 1 and Stage 2 selectors.
+
+- The Compose model-selection dialog and Settings model-selection panel show
+  one drawing-model selector, not separate Stage 1 / Stage 2 selectors.
+- The Compose model-selection dialog prioritizes fast mobile selection and does
+  not show explanatory text about preserving server/web-compatible metadata.
+- The Compose model-selection dialog should stay compact, containing only the
+  provider selector, model list, OK, and cancel controls required for the
+  unified selection flow.
+- When the user selects a model, Android writes the same model id to both
+  `selectedModelId` and `selectedStage2ModelId`.
+- Persisted settings keep the existing `model_selection.stage1_model` and
+  `model_selection.stage2_model` fields so future per-stage options can be
+  reintroduced without changing the storage shape.
+- History DB records, JSON display, JSON export, and render metadata continue
+  to include server/web-compatible `stage1_model` and `stage2_model` fields.
+- Repository and pipeline calls continue to receive `stage1ModelId` and
+  `stage2ModelId`; Android passes the unified UI selection to both arguments.
+- If old settings contain different Stage 1 and Stage 2 values, Android
+  normalizes the UI selection on restore by preferring the Stage 1 value.
+
+This is an Android UI-specific difference. It does not change the
+server-compatible storage format or history metadata.
+
+## 2026-05-08 Android-Specific Presentation View
+
+On Android, double-tapping the drawing image opens a presentation view.
+
+- Presentation view hides the app UI around the drawing and expands the image
+  area to the full screen.
+- The drawing is centered, and its scale is automatically chosen as the largest
+  size that still keeps the entire image visible.
+- Landscape canvases are rotated 90 degrees on Pixel 9 portrait screens so the
+  drawing's long edge aligns with the screen's long edge.
+- The presentation-view margin background follows the displayed SVG's
+  background `rect fill`, treating that fill as the drawing's dominant
+  background color.
+- If the drawing background is white-ish, the margin background switches to the
+  Android dark-mode background.
+- If the drawing background is black-ish, the margin background switches to the
+  Android light-mode background.
+- For non-white and non-black drawing backgrounds, Android uses the extracted
+  drawing background color as the margin background.
+- While presentation view is active, pinch and pan transforms are disabled.
+  Double-tapping returns to the normal view.
+- Normal pinch zoom, pan, and left/right history swipes remain available outside
+  presentation view.
+
+This is an Android-only mobile viewing behavior. It does not change history DB
+records, SVG/PNG export output, or render metadata.
+
+## 2026-05-08 Render Metadata Canvas Ratio
+
+As a shared server/android metadata change, render metadata now includes
+`render_canvas_aspect_id` and `render_canvas_aspect_ratio` in addition to the
+existing `render_canvas_aspect` field.
+
+- `render_canvas_aspect` remains for compatibility.
+- `render_canvas_aspect_id` is the explicit canvas aspect identifier and is
+  included in new Android render metadata, JSON display, and headless results.
+- `render_canvas_aspect_ratio` is the actual rendered canvas width/height ratio,
+  such as `square=1.0`, `oban=0.666666...`, and `wide=2.35`.
+- Android render-hash calculation includes `render_canvas_aspect_id` and
+  `render_canvas_aspect_ratio`, matching the server metadata contract.
+- For old Android history entries without the new fields, the UI derives them
+  from the saved `canvas_aspect` / `render_canvas_aspect` value.
+
+Ratio source:
+
+- On the server, `render_canvas_aspect_ratio` is calculated from `ratio_w` /
+  `ratio_h` in the system `canvas_aspect` plugin definition.
+- On Android, the migrated `CanvasAspects` table is the only source for canvas
+  ratio values, and the ratio is calculated as `ratioW / ratioH` for the same
+  aspect identifier.
+- JSON display, history records, headless results, and render hashes must use
+  the definition value that corresponds to the selected
+  `render_canvas_aspect_id`.
+- If old history records or external inputs do not contain the ratio value,
+  Android derives it from the saved identifier using the same definition table.
+- Android must not append independent canvas ratio values that are not present
+  in the server plugin definition.
+
+## 2026-05-08 Canvas Selection Entry Point In The Drawing Panel
+
+On Android, the drawing panel exposes canvas selection from the zoom-control row
+above the image preview.
+
+- The canvas button is placed immediately to the right of the zoom-percentage
+  display.
+- The button label uses the selected canvas name and shortens long names so the
+  drawing panel remains usable on Pixel 9 width.
+- Pressing the button opens the canvas-size selection dialog.
+- Selecting a canvas saves the setting and closes the dialog.
+- This entry point is available from both Compose and Batch drawing panels and
+  updates the same `canvas_aspect` setting used by the Settings panel.
+
+## 2026-05-08 Model Settings Provider UI
+
+The Android model settings panel follows the server/web model-provider settings
+shape by rendering each service as an independent provider panel.
+
+- English section headings such as `AI SERVICE CONNECTIONS` are not shown.
+- Each provider panel shows `変更` on the right side of the panel title. It opens
+  the service-name edit dialog. The body does not repeat a `サービス名` label or
+  duplicate value.
+- Connection type is selected from a dropdown. Android uses the server
+  `openai_compatible`, `anthropic`, and `gemini` kinds and adds the
+  Android-specific `litert-lm` kind.
+- `Base URL` is shown as a read-only row with an adjacent `編集` button that
+  opens a URL edit dialog.
+- `APIキー` follows the server/web state transition: when a key is already set,
+  Android does not show the stored key and exposes a single `削除` button; when
+  no key is set, the same action slot becomes `追加` and opens the new-key dialog.
+- The panel shows the models published to the user and provides a `モデル選択`
+  button that opens the model picker.
+- The model picker follows the server/web flow with model-list fetch, select all,
+  clear all, search, checkbox model rows, and save / cancel actions.
+- The model-list fetch button retrieves the latest model list from the selected
+  provider service and reflects it in the publishable model candidates.
+- Fetch-in-progress and fetch-result status is shown at the bottom of the model
+  picker dialog.
+- The model search field requests an ASCII-oriented keyboard because model ids
+  are generally searched in Latin characters.
+- After fetching a model list, Android follows the server/web selection rule:
+  only models that existed before the fetch and were already selected remain
+  selected; newly fetched candidates are not auto-selected.
+- Fetched model candidates are stored separately from the models published to
+  the user. The drawing model picker shows only saved published models and must
+  not include unselected fetched candidates.
+- If an old Android build stored the initial candidate list as published models,
+  startup normalization removes that migration artifact only when the saved list
+  exactly matches a known legacy default candidate list.
+- The bottom row of each provider panel contains `サービス削除` and `保存`.
+- Because Android is single-user, published models from this panel are reflected
+  directly in the drawing model choices available to that user.
+- The LiteRT-LM download-cancel button is not shown in the model settings panel.
+
+## 2026-05-08 Demo Panel S3 Layout And Random Color Catalog
+
+The Android Demo panel follows the DDL4 `S3 — Demo` layout for the content below
+the image preview: status, generated prompt, seed phrase, demo settings, and
+start / stop action.
+
+- Header elements above the image preview, such as the S3 `inku` label, are not
+  migrated because Android keeps its existing navigation structure.
+- After demo start, Android runs the same conceptual loop as the server/web
+  client: generate instruction, render, wait for the configured interval, and
+  repeat.
+- The model used for demo instruction generation follows Android's main model
+  selection. The Demo panel does not show a separate prompt-generation model
+  settings area.
+- Demo rendering keeps random color catalog selection always enabled as an
+  Android-specific behavior. The Demo settings panel does not show a control for
+  this option, and Android chooses a random color catalog immediately before
+  each `repository.paint` call.
+- The interval row is displayed in `-`, `xx sec`, `+` order.
+- Double-tapping the image enters presentation mode. Demo rendering continues in
+  presentation mode, and the bottom-right corner shows the remaining display
+  time for the current image.
+- LLM status text says `指示文生成/Stage1/2共通` to show that Android's single
+  model selection is shared by instruction generation, Stage 1, and Stage 2.
+- Even if an older `demo_random_color_catalog` setting exists, Android restores
+  Demo random color catalog behavior as always enabled.
+- The seed phrase and interval are also saved as demo settings and restored on
+  restart.
+- Demo renders continue to use the existing Android behavior of saving to normal
+  history, with a `[demo] ` prefix in the saved input.
+
+## 2026-05-08 Drawing Panel SVG / PNG Export Menus
+
+The Android drawing panel follows the server/web `CanvasPanel` export behavior
+by making the `SVG` and `PNG` controls menu buttons rather than direct actions.
+
+- The SVG button is labeled `SVG ▾` and opens a menu.
+- The SVG menu contains `表示用SVG`, `編集用SVG`, and `汎用SVG`.
+- `表示用SVG` exports through the Android share sheet with `svg_profile=display`.
+- `編集用SVG` exports with `svg_profile=editable` and includes metadata and ids
+  for vector editing.
+- `汎用SVG` exports with `svg_profile=compat`.
+- The SVG menu includes a help entry, matching the server/web intent of making
+  each SVG format's purpose visible.
+- The PNG button is labeled `PNG ▾` and opens a menu.
+- The PNG menu is populated from Room `export_templates` instead of hard-coded
+  size rows.
+- The default templates match server/web: `PNG 1080px`, `PNG 2160px`, and
+  `PNG 4320px`.
+- Each PNG menu row shows the template name and description. The selected
+  template's `height_px` is used as the PNG output Y-axis pixel size.
+- Selecting an SVG or PNG item opens the Android share sheet. History DB,
+  render metadata, and render hash are unchanged.
+- The older Android UI that expanded export choices as horizontally arranged
+  chips is no longer used.
+
+## 2026-05-09 Android Version / Build Management
+
+The Android app has Android-specific version and build metadata that is
+separate from the web/server `web/BUILD_NUMBER`.
+
+- `android/VERSION` is the source of truth for Android `versionName`.
+- `android/BUILD_NUMBER` is the source of truth for Android `versionCode` and
+  is managed as a monotonically increasing integer.
+- `android/app/build.gradle.kts` reads both files instead of hard-coding
+  `versionName` or `versionCode`.
+- The initial v1.48-generation Android values are
+  `versionName=1.48.0-android.1` and `versionCode=148001`.
+- Increment `android/BUILD_NUMBER` for Android UI or behavior changes that are
+  installed or distributed to devices.
+- Update `android/VERSION` when Android follows a new server/spec generation or
+  when DB schema, history JSON, render metadata, or export compatibility
+  changes.
+- The Settings menu includes a Version Information panel showing
+  `versionName`, `versionCode`, build type, application id, source spec, and
+  render engine version.
+- Version/build metadata must not contain API keys, device IDs, local server
+  details, or personal environment paths.
+
+## 2026-05-09 Model Settings Panel Cleanup
+
+The Android Model Settings panel now treats connection kind as a creation-time
+service property.
+
+- Existing service panels no longer show or edit `接続形式`.
+- Existing service kind remains stored as `provider.kind` and is preserved when
+  saving service name, Base URL, API key, or published models.
+- The per-service `保存` button is removed because it only saved connection
+  kind changes.
+- The service-add button is shown at the end of the provider list. Its dialog
+  collects service id, service name, connection kind, Base URL, and API key.
+- `有効` / `無効` status text is removed from provider panels because it only
+  reflected DB `isEnabled`, not a live connection check.
+- The `サービス削除` button is compact and right-aligned at the bottom of each
+  provider panel.

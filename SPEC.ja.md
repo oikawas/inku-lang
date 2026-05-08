@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.45**
+**Version: v1.48**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -1399,13 +1399,38 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `cli.py` — `inku-api` を操作する API クライアント CLI。`login` / `logout` / `me` / `paint` / `batch` / `demo-instruction` / `history` / `history-export` を提供する。サーバー内部モジュールを import せず、HTTP API のみを利用する
 
 
-**別リポジトリ / 別 PoC**:
+**別リポジトリ / 別 PoC / ネイティブ実装**:
 - `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
-- `android/` — Android 実装 (SPEC_v1.md 参照、E2E 動作確認済)
+- `android/` — ネイティブ Android 実装。Kotlin + Jetpack Compose + Room を使う単体アプリとして、server/web を開発上の master としながら、Pixel 9 以上を主対象に実装する。Android 詳細仕様は `android/ANDROID_SPEC.ja.md` を正本とする
 
 ---
 
 ## 変更履歴
+
+### v1.48 (2026-05-09)
+
+**Android ネイティブ実装の管理対象化と v1.48 対応**
+
+Android 版を Git 管理対象のネイティブ単体アプリとして整理し、web/server 参照実装に追従するモバイル実装として明文化する。
+
+- Android 版は Kotlin + Jetpack Compose で実装し、Room / SQLite を正式なローカル DB レイヤーとする
+- アプリはシングルユーザー前提で動作し、server/web のユーザー管理、DB 管理、プラグイン管理、ログ保存などのサーバー運用機能は Android UI から除外する
+- Android の開発 master は常に `web/` と `server/` とし、DDL 解釈、Stage 1.5 展開、Score 補修、SVG rendering、履歴/render metadata の互換性は server source に照らして検証する
+- LiteRT-LM を Android のローカル LLM provider とし、Gemma 4 E2B を標準、E4B を高品質オプションとして扱う。GPU backend を必須とし、CPU fallback は行わない
+- Gemma 4 E2B/E4B のライセンス同意、初回取得、再取得、SHA-256 検証、取得状態は Room に保存する
+- Android のモデル選択 UI はモバイル操作性のため Stage 1 / Stage 2 を単一の描画モデル選択として扱う。ただし保存形式、履歴 JSON、render metadata では `stage1_model` / `stage2_model` を維持する
+- モデル設定パネルは接続先ごとの独立パネルとし、サービス追加、サービス名編集、Base URL 編集、APIキー追加/削除、公開モデル選択、モデル一覧取得を提供する。接続形式はサービス追加時に設定し、既存パネルでは変更しない
+- 公開モデル候補と公開済みモデルは分離して保存し、描画画面のモデル選択には公開済みモデルだけを表示する
+- 描画画面では画像のピンチズーム、パン、左右スワイプによる履歴移動、ダブルタップによるプレゼンテーション表示を Android 固有 UI として提供する
+- プレゼンテーション表示では画像以外の UI を隠し、余白背景を表示画像の背景色に合わせる。白背景画像ではダーク背景、黒背景画像ではライト背景を使う
+- 履歴画面は 3 列サムネイルグリッドを標準とし、サーバー版のごみ箱、リスト表示、一括選択は Android では提供しない
+- SVG / PNG export は server/web の `CanvasPanel` と同じ profile / template 構造を持つメニューとして実装し、Android では共有シートに渡す
+- PNG template は `1080px` / `2160px` / `4320px` の Y軸高さを既定とし、Room の `export_templates` を正本とする
+- `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を render metadata に含め、Android でも server の canvas aspect 定義に対応する値から算出する
+- Android headless render / comparison tooling を持ち、server CLI の `--input-mode ddl` と組み合わせて DDL 以降、Score 以降の parity を比較できる
+- Android version は `android/VERSION`、Android build number は `android/BUILD_NUMBER` を正本とする。v1.48 世代の初期値は `1.48.0-android.1` / `148001` とする
+- Android 設定メニューには versionName、versionCode、build type、applicationId、source spec、render engine version を表示するバージョン情報画面を置く
+- build number: 148001
 
 ### v1.44 (2026-05-05)
 
@@ -1433,7 +1458,39 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - `/api/paint`、`/api/compose`、JSONタブ、CLI出力JSON、保存 artifact JSON に `render_hash` / `render_hash_short` を含める
 - 履歴DBから artifact JSON を再生成する場合も、DB上の `render_hash` / `render_hash_short` をメタデータ領域へ展開する
 - 履歴DBは引き続き正本であり、出力ファイルは副産物として扱う
+
+### v1.46 (2026-05-07)
+
+**inku-cli の DDL 入力描画モード**
+
+server / Android の CLI 比較で、Stage 1 の LLM 出力揺れを切り離し、
+正規化DDL以降の差分を検証できるようにする。
+
+- `inku-cli paint` / `inku-cli batch` に `--input-mode paint|ddl` を追加する
+- 既定の `paint` は従来どおり自然言語入力を `/api/paint` に渡し、Stage 1 → Stage 1.5 → Stage 2 → render を実行する
+- `--input-mode ddl` は入力テキストを正規化DDLとして扱い、Stage 1 を呼ばずに `/api/compose` へ渡す
+- `--input-mode ddl --save-history` の場合、CLI は `/api/compose` の描画結果を `POST /api/history` で通常履歴DBへ保存する
+- `/api/compose` は Stage 1.5 適用後の実効DDLを `ddl` としてレスポンスに含める
+- CLI の DDL モードでは、出力JSONと履歴保存に `/api/compose` が返した実効DDLを使う
+- Android の headless 比較スクリプト `android/scripts/headless_render_compare.sh` は `INPUT_MODE=ddl` を server 側 `inku-cli paint --input-mode ddl` にも伝搬する
+- `ORIGINAL_TEXT` を指定した場合、Android / server の両方で履歴表示用の元入力および Stage 2 補助文脈として扱う
+- このモードは benchmark / parity 検証用であり、自然言語からの通常描画フローの既定動作は変更しない
 - build number: 352
+
+### v1.47 (2026-05-07)
+
+**外部クライアント保存履歴のWeb UI自動反映**
+
+`inku-cli` や Android headless CLI など、開いている Web UI 以外のクライアントが履歴DBへ保存した描画を、Web UI の履歴ストリップへ自動反映できるようにする。
+
+- 履歴DBは引き続き描画履歴の正本であり、Web UI は外部クライアント保存をローカル状態だけで推測しない
+- Web UI はログイン済み、通常履歴表示、最新ページ表示、ドキュメント表示中の条件で、最新履歴ページを定期的に再取得する
+- 再取得間隔は短すぎる polling を避けるため約12秒とし、同時再取得と5秒未満の重複再取得を抑止する
+- ブラウザウィンドウが focus された時、または非表示タブから表示状態へ戻った時は、通常の間隔を待たずに最新履歴を再取得する
+- 外部保存検出用の再取得では、現在選択中の履歴IDが再取得後の最新ページに残っている場合、その選択状態を維持する
+- スター付きのみ表示、検索中、履歴の旧ページ表示中、履歴ロード中は、ユーザーの閲覧文脈を壊さないよう自動差し替えを行わない
+- 履歴管理ダイアログが開いており、通常履歴の先頭ページを表示している場合は、外部保存反映に合わせて同ページも静かに再取得する
+- build number: 361
 
 ### v1.43 (2026-05-05)
 
@@ -1500,8 +1557,11 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - 色カタログボタンは、固定ラベルではなく現在選択中の色カタログ名を表示する。長い名前は後半を省略し、hover title でフル名称を確認できる
 - 入力パネル上部の操作順は `キャンバス比率` / `色カタログ` / `モデル選択` とする
 - 描画レスポンス、履歴レコード、JSON タブ、artifact JSON に `render_canvas_aspect` を追加し、実際にレンダリングへ使用したキャンバス比率 ID を記録する
+- 描画レスポンス、履歴レコード、JSON タブ、artifact JSON に `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を追加する。`render_canvas_aspect_id` は明示的なキャンバス比率識別子、`render_canvas_aspect_ratio` は実際の幅÷高さの数値である
 - `render_canvas_aspect` は render metadata の一部として、`render_engine_version` の直後、色カタログメタデータの前に表示する
+- `render_canvas_aspect_id` と `render_canvas_aspect_ratio` は `render_canvas_aspect` の直後に表示する
 - JSON Score の `score.canvas` は引き続き楽譜側のキャンバス指定として保持し、`render_canvas_aspect` は成果物側のレンダリング記録として扱う。通常は同じ値になるが、旧データや外部入力の確認性のため二重に保持する
+- 互換性のため `render_canvas_aspect` は従来通り保持する。新規実装では `render_canvas_aspect_id` を識別子として扱い、旧履歴では `render_canvas_aspect` から補完する
 - 設定 > その他に `履歴選択時の挙動` を追加する
 - キャンバスサイズは、履歴から選択時に履歴キャンバスサイズを UI 選択へ反映するか、現時点で UI 上選択されているキャンバスサイズを維持するかを選べる
 - 色カタログは、履歴から選択時に履歴色カタログを UI 選択へ反映するか、現時点で UI 上選択されている色カタログを維持するかを選べる
@@ -1537,7 +1597,7 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - 履歴から画像を開き直した場合も、JSONタブに履歴保存済みの `stage1_model` / `stage2_model` を表示する
 - 設定ダイアログに管理者向け `モデル設定` タブを追加する。Stage 1 / Stage 2 の既定 provider / model と、provider 別の base URL / API key をサーバー DB の app settings に保存する
 - 組み込みの商用 LLM provider は公式名称に合わせて OpenAI API Platform / Claude API / Gemini API とし、非商用 API provider は NVIDIA NIM、ローカル provider は Ollama (OpenAI互換) / Intel OVMS (OpenAI互換) を対象とする
-- 管理者は設定ダイアログのモデル設定タブで、接続サービスを追加・削除できる。追加サービスは service ID、表示名、接続形式 (`openai_compatible` / `anthropic` / `gemini`)、Base URL、任意の初期 API key を持つ。モデル一覧は追加時には手入力せず、サービスごとの `モデルリスト取得` で取得する
+- 管理者は設定ダイアログのモデル設定タブで、接続サービスを追加・削除できる。追加サービスは service ID、表示名、接続形式 (`openai_compatible` / `anthropic` / `gemini`)、Base URL、任意の初期 API key を持つ。サービス追加ダイアログの `追加` は即座にサーバーへ保存し、サービスパネル下部に冗長な全体保存ボタンは置かない。モデル一覧は追加時には手入力せず、サービスごとの `モデルリスト取得` で取得する
 - service ID は DB 内の接続設定キー、Stage 1 / Stage 2 の provider 参照、API 呼び出し時の provider 判定、重複防止に使う内部IDであり、作成後は編集不可とする。画面に表示するサービス名は後から編集できる
 - 接続サービスごとに `モデルリスト取得` を実行できる。サーバーは保存済み Base URL / API key を使って provider 種別ごとの models API を呼び、取得したモデル一覧を当該サービス定義へ保存する。取得結果の成功/エラーは公開モデル選択ダイアログ下部に表示する。API key はブラウザへ送らない
 - API key はサーバー側にのみ保存し、`GET /api/settings/models` の応答では設定済みかどうかのみを UI 表示に使う。ブラウザへ生の API key は返さず、設定済みの場合の入力欄は `保存済みキーを維持` と表示して編集不可にする。未設定の状態で新しい key を入力した場合は、そのサービスの保存ボタンで保存する
@@ -1547,7 +1607,7 @@ PNG保存メニューとモデル設定タブの表示を、現在の運用に�
 - Web UI から `/api/paint` / `/api/interpret` / `/api/compose` へ送るモデルIDは、接続先 provider と結合して `openai:gpt-5.2` のような provider 付き ID に正規化する。API が provider prefix の無い model ID を受け取った場合でも、その ID がユーザー設定中の Stage 1 / Stage 2 model と一致する場合は、同じユーザー設定の provider で補完してから dispatch する
 - デモ指示文生成も同じ provider 解決を使い、OpenAI API Platform / Claude API / Gemini API / NVIDIA NIM / Ollama / Intel OVMS の各接続設定を経由する
 - LLMサーバー接続設定はグローバルな管理者設定とし、Stage 1 / Stage 2 の接続先・モデル選択はユーザーごとの `user_accounts.model_settings` に保存する。モデル選択ダイアログの確定時に `/api/auth/me/settings` へ保存し、ログイン時に復元する
-- 管理者は設定ダイアログのモデル設定タブで、provider ごとに一般ユーザーへ公開するモデルを個別に On/Off できる。公開モデル選択はサービスパネル内ではなく個別ダイアログで行い、`モデルリスト取得` / `全て選択` / `全て解除` も同ダイアログに置く。モデル設定タブ本体には公開中モデルのみを要約表示する。`GET /api/models` はログイン済みユーザー向けに公開モデルのみを返し、モデル選択ダイアログはこの一覧を使う
+- 管理者は設定ダイアログのモデル設定タブで、provider ごとに一般ユーザーへ公開するモデルを個別に On/Off できる。公開モデル選択はサービスパネル内ではなく個別ダイアログで行い、`モデルリスト取得` / 検索 / `全て選択` / `全て解除` も同ダイアログに置く。公開モデル選択ダイアログ内のチェック変更はドラフトとして扱い、`保存` で初めてサーバーへ反映し、`キャンセル` またはダイアログ外クリックでは破棄する。モデル設定タブ本体には公開中モデルのみを要約表示する。`GET /api/models` はログイン済みユーザー向けに公開モデルのみを返し、モデル選択ダイアログはこの一覧を使う
 - CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
 - CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
 - 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める

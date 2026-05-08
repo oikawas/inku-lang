@@ -12,6 +12,8 @@ data class ModelRequest(
     val temperature: Double,
     val maxTokens: Int,
     val stopSequences: List<String> = emptyList(),
+    val systemInstruction: String? = null,
+    val tool: ModelTool? = null,
 )
 
 data class ModelResponse(
@@ -20,4 +22,10 @@ data class ModelResponse(
     val promptTokens: Int? = null,
     val completionTokens: Int? = null,
     val elapsedMs: Long? = null,
+)
+
+data class ModelTool(
+    val name: String,
+    val description: String,
+    val parametersJson: String,
 )

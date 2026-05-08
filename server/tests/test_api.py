@@ -318,6 +318,8 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
         "render_color_catalog",
         "render_color_map",
         "render_canvas_aspect",
+        "render_canvas_aspect_id",
+        "render_canvas_aspect_ratio",
         "render_hash",
         "trashed",
         "starred",
@@ -935,6 +937,8 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
     assert r.json()["render_engine_id"] == "default"
     assert r.json()["render_engine_version"] == "2"
     assert r.json()["render_canvas_aspect"] == "square"
+    assert r.json()["render_canvas_aspect_id"] == "square"
+    assert r.json()["render_canvas_aspect_ratio"] == 1.0
     assert r.json()["render_color_catalog_id"] == "default"
     assert r.json()["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in r.json()
@@ -968,6 +972,8 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "2"
     assert data["render_canvas_aspect"] == "square"
+    assert data["render_canvas_aspect_id"] == "square"
+    assert data["render_canvas_aspect_ratio"] == 1.0
     assert data["render_color_catalog_id"] == "default"
     assert data["render_color_catalog_name"] == "inku Default"
     assert "render_color_catalog" not in data
@@ -1112,6 +1118,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert data["render_color_catalog_name"] == "Vivid Material"
     assert data["render_color_map"]["green"] == "#008f39"
     assert data["render_canvas_aspect"] == "wide"
+    assert data["render_canvas_aspect_id"] == "wide"
+    assert data["render_canvas_aspect_ratio"] == 2.35
 
     history = client.get("/api/history", headers=headers).json()
     assert history["total"] == 1
@@ -1126,6 +1134,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_engine_id"] == "default"
     assert item["render_engine_version"] == "2"
     assert item["render_canvas_aspect"] == "wide"
+    assert item["render_canvas_aspect_id"] == "wide"
+    assert item["render_canvas_aspect_ratio"] == 2.35
     assert item["render_color_catalog_id"] == "vivid_material"
     assert item["render_color_catalog_name"] == "Vivid Material"
     assert "render_color_catalog" not in item
@@ -1260,6 +1270,8 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
             "render_color_catalog_sub": "neutral baseline",
             "render_color_map": {"black": "#111111"},
             "render_canvas_aspect": "square",
+            "render_canvas_aspect_id": "square",
+            "render_canvas_aspect_ratio": 1.0,
             "render_hash": "a" * 64,
             "render_hash_short": "AAAA",
         },
@@ -1283,6 +1295,8 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert "render_color_catalog" not in saved_score
     assert saved_score["render_color_map"]["black"] == "#111111"
     assert saved_score["render_canvas_aspect"] == "square"
+    assert saved_score["render_canvas_aspect_id"] == "square"
+    assert saved_score["render_canvas_aspect_ratio"] == 1.0
     assert saved_score["render_hash"] == "a" * 64
     assert saved_score["render_hash_short"] == "AAAA"
     assert saved_score["score"] == {"instructions": []}

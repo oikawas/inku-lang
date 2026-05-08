@@ -6,6 +6,9 @@ plugins {
     id("androidx.room")
 }
 
+val androidVersionName = rootProject.file("VERSION").readText().trim()
+val androidVersionCode = rootProject.file("BUILD_NUMBER").readText().trim().toInt()
+
 android {
     namespace = "app.inku.mobile"
     compileSdk = 36
@@ -14,14 +17,15 @@ android {
         applicationId = "app.inku.mobile"
         minSdk = 35
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = androidVersionCode
+        versionName = androidVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     kotlin {
@@ -49,9 +53,14 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
 
+    implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")
+    implementation("com.caverock:androidsvg:1.4")
+
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
+
+    testImplementation("junit:junit:4.13.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

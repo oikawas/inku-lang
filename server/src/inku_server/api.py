@@ -37,6 +37,7 @@ from .interpreter import SYSTEM_PROMPT as STAGE1_PROMPT
 from .interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
 from .plugins import (
     canvas_aspect_ids,
+    canvas_aspect_ratio_for_aspect,
     normalize_canvas_aspect_id,
     plugin_status_items,
 )
@@ -361,6 +362,11 @@ def _history_output_prefix(item: dict) -> Path:
 def _history_render_metadata(item: dict) -> dict | None:
     if isinstance(item.get("render_metadata"), dict):
         metadata = dict(item["render_metadata"])
+        if metadata.get("render_canvas_aspect_id") is None and metadata.get("render_canvas_aspect") is not None:
+            canvas_aspect_id = normalize_canvas_aspect_id(metadata.get("render_canvas_aspect"))
+            metadata["render_canvas_aspect_id"] = canvas_aspect_id
+            metadata.setdefault("render_canvas_aspect", canvas_aspect_id)
+            metadata.setdefault("render_canvas_aspect_ratio", canvas_aspect_ratio_for_aspect(canvas_aspect_id))
         if item.get("render_hash") is not None:
             metadata["render_hash"] = item["render_hash"]
             metadata["render_hash_short"] = item.get("render_hash_short") or _db.render_hash_short(item.get("render_hash"))
@@ -371,6 +377,8 @@ def _history_render_metadata(item: dict) -> dict | None:
         "render_engine_id",
         "render_engine_version",
         "render_canvas_aspect",
+        "render_canvas_aspect_id",
+        "render_canvas_aspect_ratio",
         "render_hash",
         "render_hash_short",
         "render_color_catalog_id",
@@ -484,7 +492,10 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
         "render_color_profile": dict(_SRGB_COLOR_PROFILE),
     }
     if canvas_aspect is not None:
-        metadata["render_canvas_aspect"] = canvas_aspect
+        canvas_aspect_id = normalize_canvas_aspect_id(canvas_aspect)
+        metadata["render_canvas_aspect"] = canvas_aspect_id
+        metadata["render_canvas_aspect_id"] = canvas_aspect_id
+        metadata["render_canvas_aspect_ratio"] = canvas_aspect_ratio_for_aspect(canvas_aspect_id)
     metadata.update({
         "render_color_catalog_id": str(catalog["id"]),
         "render_color_catalog_name": str(catalog["name"]),
@@ -553,6 +564,7 @@ class ComposeRequest(BaseModel):
 
 
 class ComposeResponse(BaseModel):
+    ddl: str
     score: Score
     svg: str
     stage2_model: str | None = None
@@ -567,6 +579,8 @@ class ComposeResponse(BaseModel):
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     render_canvas_aspect: str | None = None
+    render_canvas_aspect_id: str | None = None
+    render_canvas_aspect_ratio: float | None = None
     elapsed_ms: int = 0
     tokens_in: int | None = None
     tokens_out: int | None = None
@@ -630,6 +644,8 @@ class PaintResponse(BaseModel):
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     render_canvas_aspect: str | None = None
+    render_canvas_aspect_id: str | None = None
+    render_canvas_aspect_ratio: float | None = None
     render_hash: str | None = None
     render_hash_short: str | None = None
     history_id: str | None = None
@@ -670,6 +686,7 @@ class InterpretDetail:
 @dataclass
 class ComposeDetail:
     score: Score
+    ddl: str
     tokens_in: int | None = None
     tokens_out: int | None = None
     retry_count: int = 0
@@ -714,6 +731,8 @@ class HistoryPostBody(BaseModel):
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     render_canvas_aspect: str | None = None
+    render_canvas_aspect_id: str | None = None
+    render_canvas_aspect_ratio: float | None = None
     save_artifacts: bool = True
     count_generation: bool = Field(default=False, exclude=True)
     color_map: dict[str, str] | None = Field(default=None, exclude=True, description="Deprecated: ignored; catalog_id is resolved server-side")
@@ -1695,11 +1714,12 @@ def _call_compose_detail(
     except StageHardTimeoutError:
         return ComposeDetail(
             score=_fallback_score_from_ddl(ddl, lang=lang),
+            ddl=ddl,
             retry_reasons=["stage2_hard_timeout"],
             fallback_used=True,
         )
     if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
-        return ComposeDetail(score=score, tokens_in=tokens_in, tokens_out=tokens_out)
+        return ComposeDetail(score=score, ddl=ddl, tokens_in=tokens_in, tokens_out=tokens_out)
 
     base_prompt = system_prompt or (STAGE2_PROMPT_EN if lang == "en" else STAGE2_PROMPT)
     reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
@@ -1738,6 +1758,7 @@ def _call_compose_detail(
         retry_score = _fallback_score_from_ddl(ddl, lang=lang)
     return ComposeDetail(
         score=retry_score,
+        ddl=ddl,
         tokens_in=tokens_in,
         tokens_out=tokens_out,
         retry_count=retry_count,
@@ -1811,7 +1832,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         score = compose_detail.score
         ensure_renderable_score(score)
         if req.auto_repair:
-            score = coerce_score(score, ddl=_coerce_context(req.ddl, req.original_text))
+            score = coerce_score(score, ddl=_coerce_context(compose_detail.ddl, req.original_text))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -1826,7 +1847,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         **render_metadata,
         **_render_hash_metadata(
             input_text=req.original_text or req.ddl,
-            ddl=req.ddl,
+            ddl=compose_detail.ddl,
             score=score,
             svg=svg,
             catalog_id=req.catalog_id,
@@ -1836,6 +1857,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
     return ComposeResponse(
+        ddl=compose_detail.ddl,
         score=score,
         svg=svg,
         stage2_model=resolved_stage2_model,

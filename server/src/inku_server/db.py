@@ -16,8 +16,10 @@ from datetime import datetime
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text, create_engine, func, inspect, or_, text
+from sqlalchemy import BigInteger, Column, Float, ForeignKey, Integer, String, Text, create_engine, func, inspect, or_, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 
 _DEFAULT_DB = "sqlite:///" + str(Path.home() / ".local" / "share" / "inku" / "inku.db")
 _DB_URL = os.getenv("INKU_DB_URL", _DEFAULT_DB)
@@ -61,6 +63,8 @@ class HistoryRow(Base):
     render_color_catalog = Column(Text, nullable=True)
     render_color_map = Column(Text, nullable=True)
     render_canvas_aspect = Column(String, nullable=True)
+    render_canvas_aspect_id = Column(String, nullable=True)
+    render_canvas_aspect_ratio = Column(Float, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -130,6 +134,8 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "render_color_catalog": "ALTER TABLE history ADD COLUMN render_color_catalog TEXT",
     "render_color_map": "ALTER TABLE history ADD COLUMN render_color_map TEXT",
     "render_canvas_aspect": "ALTER TABLE history ADD COLUMN render_canvas_aspect VARCHAR",
+    "render_canvas_aspect_id": "ALTER TABLE history ADD COLUMN render_canvas_aspect_id VARCHAR",
+    "render_canvas_aspect_ratio": "ALTER TABLE history ADD COLUMN render_canvas_aspect_ratio FLOAT",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
@@ -325,7 +331,17 @@ def _canonical_json(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def _canvas_aspect_metadata(item: dict) -> tuple[str | None, float | None]:
+    canvas_aspect_id = item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect")
+    if canvas_aspect_id is None:
+        return None, None
+    normalized = normalize_canvas_aspect_id(canvas_aspect_id)
+    ratio = item.get("render_canvas_aspect_ratio")
+    return normalized, ratio if ratio is not None else canvas_aspect_ratio_for_aspect(normalized)
+
+
 def render_hash_for_item(item: dict) -> str:
+    canvas_aspect_id, canvas_aspect_ratio = _canvas_aspect_metadata(item)
     payload = {
         "input": item.get("input", ""),
         "ddl": item.get("ddl"),
@@ -334,7 +350,9 @@ def render_hash_for_item(item: dict) -> str:
         "render_build_number": item.get("render_build_number"),
         "render_engine_id": item.get("render_engine_id"),
         "render_engine_version": item.get("render_engine_version"),
-        "render_canvas_aspect": item.get("render_canvas_aspect"),
+        "render_canvas_aspect": item.get("render_canvas_aspect") or canvas_aspect_id,
+        "render_canvas_aspect_id": canvas_aspect_id,
+        "render_canvas_aspect_ratio": canvas_aspect_ratio,
         "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
         "render_color_catalog_name": item.get("render_color_catalog_name"),
         "render_color_catalog_sub": item.get("render_color_catalog_sub"),
@@ -348,6 +366,11 @@ def render_hash_short(render_hash: str | None) -> str | None:
 
 
 def _row_hash_payload(row: HistoryRow) -> dict:
+    canvas_aspect_id, canvas_aspect_ratio = _canvas_aspect_metadata({
+        "render_canvas_aspect": row.render_canvas_aspect,
+        "render_canvas_aspect_id": row.render_canvas_aspect_id,
+        "render_canvas_aspect_ratio": row.render_canvas_aspect_ratio,
+    })
     item = {
         "input": row.input,
         "ddl": row.ddl,
@@ -357,7 +380,9 @@ def _row_hash_payload(row: HistoryRow) -> dict:
         "render_build_number": row.render_build_number,
         "render_engine_id": row.render_engine_id,
         "render_engine_version": row.render_engine_version,
-        "render_canvas_aspect": row.render_canvas_aspect,
+        "render_canvas_aspect": row.render_canvas_aspect or canvas_aspect_id,
+        "render_canvas_aspect_id": canvas_aspect_id,
+        "render_canvas_aspect_ratio": canvas_aspect_ratio,
         "render_color_catalog_id": row.render_color_catalog_id,
         "render_color_catalog_name": row.render_color_catalog_name,
         "render_color_catalog_sub": row.render_color_catalog_sub,
@@ -378,7 +403,8 @@ def _backfill_render_hashes(conn) -> None:
         SELECT id, input, ddl, score, svg, catalog_id, render_build_number,
                render_engine_id, render_engine_version,
                render_color_catalog_id, render_color_catalog_name,
-               render_color_catalog_sub, render_color_map, render_canvas_aspect
+               render_color_catalog_sub, render_color_map, render_canvas_aspect,
+               render_canvas_aspect_id, render_canvas_aspect_ratio
         FROM history
         WHERE render_hash IS NULL OR render_hash = ''
         """
@@ -394,6 +420,8 @@ def _backfill_render_hashes(conn) -> None:
             "render_engine_id": row["render_engine_id"],
             "render_engine_version": row["render_engine_version"],
             "render_canvas_aspect": row["render_canvas_aspect"],
+            "render_canvas_aspect_id": row["render_canvas_aspect_id"],
+            "render_canvas_aspect_ratio": row["render_canvas_aspect_ratio"],
             "render_color_catalog_id": row["render_color_catalog_id"],
             "render_color_catalog_name": row["render_color_catalog_name"],
             "render_color_catalog_sub": row["render_color_catalog_sub"],
@@ -813,6 +841,16 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["render_color_map"] = None
     if row.render_canvas_aspect is not None:
         item["render_canvas_aspect"] = row.render_canvas_aspect
+    canvas_aspect_id = row.render_canvas_aspect_id or row.render_canvas_aspect
+    if canvas_aspect_id is not None:
+        normalized_canvas_aspect_id = normalize_canvas_aspect_id(canvas_aspect_id)
+        item["render_canvas_aspect_id"] = normalized_canvas_aspect_id
+        item.setdefault("render_canvas_aspect", normalized_canvas_aspect_id)
+        item["render_canvas_aspect_ratio"] = (
+            row.render_canvas_aspect_ratio
+            if row.render_canvas_aspect_ratio is not None
+            else canvas_aspect_ratio_for_aspect(normalized_canvas_aspect_id)
+        )
     return item
 
 
@@ -844,6 +882,12 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
 
 
 def add_item(item: dict) -> dict:
+    canvas_aspect_id = item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect")
+    if canvas_aspect_id is not None:
+        canvas_aspect_id = normalize_canvas_aspect_id(canvas_aspect_id)
+        item.setdefault("render_canvas_aspect", canvas_aspect_id)
+        item["render_canvas_aspect_id"] = canvas_aspect_id
+        item.setdefault("render_canvas_aspect_ratio", canvas_aspect_ratio_for_aspect(canvas_aspect_id))
     render_hash = item.get("render_hash") or render_hash_for_item(item)
     row = HistoryRow(
         id=item["id"],
@@ -869,6 +913,8 @@ def add_item(item: dict) -> dict:
         render_color_catalog_sub=item.get("render_color_catalog_sub"),
         render_color_map=json.dumps(item.get("render_color_map"), ensure_ascii=False) if item.get("render_color_map") is not None else None,
         render_canvas_aspect=item.get("render_canvas_aspect"),
+        render_canvas_aspect_id=item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect"),
+        render_canvas_aspect_ratio=item.get("render_canvas_aspect_ratio"),
         render_hash=render_hash,
         trashed=0,
         starred=0,

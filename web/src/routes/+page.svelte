@@ -63,6 +63,8 @@
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 	const BATCH_PROMPT_HISTORY_LIMIT = 20;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
+	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
+	const EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS = 5000;
 	type HistorySelectionBehavior = 'history' | 'current';
 
 	type PaintResult = {
@@ -81,6 +83,8 @@
 		render_color_catalog_sub?: string | null;
 		render_color_map?: Record<string, string> | null;
 		render_canvas_aspect?: string | null;
+		render_canvas_aspect_id?: string | null;
+		render_canvas_aspect_ratio?: number | null;
 		history_id?: string | null;
 		history_at?: number | null;
 		elapsed_stage1_ms: number;
@@ -957,27 +961,40 @@
 		};
 	}
 
-	function addModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
-		if (!modelSettings || !provider) return;
-		modelCatalog = [
-			...modelCatalog.filter((item) => item.id !== provider),
-			{
-				id: provider,
-				label: patch.label ?? provider,
-				kind: patch.kind,
-				requires_api_key: patch.requires_api_key,
-				memo: patch.memo,
-				models: patch.models ?? [],
-			},
-		];
-		updateModelProvider(provider, {
-			base_url: patch.base_url ?? patch.default_base_url ?? '',
-			api_key_set: false,
-			api_key_hint: null,
-			api_key: patch.api_key,
-			enabled_models: patch.enabled_models ?? {},
-		});
-		modelSettingsStatus = t().settingsModelSaved;
+	async function addModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
+		if (!modelSettings || !provider || currentUser?.role !== 'admin') return;
+		modelSettingsLoading = true;
+		try {
+			const r = await apiFetch('/api/settings/models', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					providers: {
+						[provider]: {
+							label: patch.label ?? provider,
+							kind: patch.kind,
+							requires_api_key: patch.requires_api_key,
+							memo: patch.memo,
+							models: patch.models ?? [],
+							base_url: patch.base_url ?? patch.default_base_url ?? '',
+							api_key: patch.api_key || undefined,
+							enabled_models: patch.enabled_models ?? {},
+						},
+					},
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
+			modelSettings = data.settings;
+			modelSettingsStatus = t().settingsModelSaved;
+			await loadAvailableModels();
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+			throw e;
+		} finally {
+			modelSettingsLoading = false;
+		}
 	}
 
 	function askDeleteModelProvider(provider: Provider) {
@@ -1153,9 +1170,10 @@
 		}
 	}
 
-	async function saveModelProvider(provider: Provider) {
+	async function saveModelProvider(provider: Provider, patch: Partial<ModelProviderSetting> = {}) {
 		if (!modelSettings || currentUser?.role !== 'admin') return;
-		const providerSettings = modelSettings.providers[provider];
+		const currentProviderSettings = modelSettings.providers[provider];
+		const providerSettings = currentProviderSettings ? { ...currentProviderSettings, ...patch } : null;
 		if (!providerSettings) return;
 		modelSettingsLoading = true;
 		try {
@@ -1775,6 +1793,8 @@
 	let historyStarredOnly = $state(false);
 	let trashItems = $state<Iteration[]>([]);
 	let trashTotal = $state(0);
+	let externalHistoryRefreshInFlight = false;
+	let lastExternalHistoryRefreshAt = 0;
 	const historyManager = new HistoryManagerState(apiFetch, (items, total) => {
 		trashItems = items;
 		trashTotal = total;
@@ -1862,6 +1882,7 @@
 		saveArtifacts?: boolean;
 		countGeneration?: boolean;
 		catalogId?: string;
+		canvasAspectId?: CanvasAspectId;
 		signal?: AbortSignal;
 	};
 
@@ -1885,7 +1906,7 @@
 				stage2_model: resolvedStage2Model,
 				include_thinking: includeThinking,
 				lang,
-				canvas_aspect: effectiveCanvasAspectId(),
+				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
@@ -1964,6 +1985,8 @@
 		render_color_catalog_sub?: string | null;
 		render_color_map?: Record<string, string> | null;
 		render_canvas_aspect?: string | null;
+		render_canvas_aspect_id?: string | null;
+		render_canvas_aspect_ratio?: number | null;
 		elapsed_ms: number;
 		tokens_in: number | null;
 		tokens_out: number | null;
@@ -2003,6 +2026,8 @@
 			render_color_catalog_sub?: string | null;
 			render_color_map?: Record<string, string> | null;
 			render_canvas_aspect?: string | null;
+			render_canvas_aspect_id?: string | null;
+			render_canvas_aspect_ratio?: number | null;
 			elapsed_ms: number;
 			tokens_in: number | null;
 			tokens_out: number | null;
@@ -2218,6 +2243,8 @@
 					render_color_catalog_sub: composed.render_color_catalog_sub,
 					render_color_map: composed.render_color_map,
 					render_canvas_aspect: composed.render_canvas_aspect,
+					render_canvas_aspect_id: composed.render_canvas_aspect_id,
+					render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
 					render_hash: composed.render_hash,
 					render_hash_short: composed.render_hash_short,
 					elapsed_stage1_ms: elapsedStage1Ms,
@@ -2255,6 +2282,8 @@
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
 				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
+				const batchCanvasAspectId = effectiveCanvasAspectId();
+				const batchCatalogId = selectedCatalog;
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
 					.filter((item) => item.input);
@@ -2268,7 +2297,8 @@
 					try {
 						const r = await paintOne(lines[i].input, {
 							historyInput: `#${lines[i].line} ${lines[i].input}`,
-							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : selectedCatalog,
+							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : batchCatalogId,
+							canvasAspectId: batchCanvasAspectId,
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) break;
@@ -2382,6 +2412,8 @@
 				render_color_catalog_sub?: string | null;
 				render_color_map?: Record<string, string> | null;
 				render_canvas_aspect?: string | null;
+				render_canvas_aspect_id?: string | null;
+				render_canvas_aspect_ratio?: number | null;
 				render_hash?: string | null;
 				render_hash_short?: string | null;
 				tokens_in: number | null;
@@ -2391,8 +2423,8 @@
 			const resolvedStage1Model = result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
 			const savedStage2Model = d.stage2_model ?? resolvedStage2Model;
 			result = result
-				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_hash: d.render_hash, render_hash_short: d.render_hash_short }
-				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_hash: d.render_hash, render_hash_short: d.render_hash_short, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_canvas_aspect_id: d.render_canvas_aspect_id, render_canvas_aspect_ratio: d.render_canvas_aspect_ratio, render_hash: d.render_hash, render_hash_short: d.render_hash_short }
+				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_canvas_aspect_id: d.render_canvas_aspect_id, render_canvas_aspect_ratio: d.render_canvas_aspect_ratio, render_hash: d.render_hash, render_hash_short: d.render_hash_short, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
@@ -2462,7 +2494,7 @@
 		);
 	}
 
-	async function fetchHistoryOffset(offset: number): Promise<void> {
+	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean } = {}): Promise<void> {
 		if (!authToken) {
 			historyItems = [];
 			historyTotal = 0;
@@ -2470,6 +2502,9 @@
 			return;
 		}
 		const safeOffset = Math.max(0, offset);
+		const selectedHistoryId = options.preserveSelection
+			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? null
+			: null;
 		try {
 			const listLimit = safeOffset === 0 && !historyStarredOnly
 				? estimatedHistoryManagerPageSize()
@@ -2491,14 +2526,38 @@
 				? data.items.slice(0, historyWindowSize)
 				: data.items;
 			historyItems = stripItems; historyTotal = data.total; historyOffset = safeOffset;
-			if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
-			if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
+			if (selectedHistoryId) {
+				const selectedIndex = stripItems.findIndex((item: Iteration) => item.id === selectedHistoryId);
+				if (selectedIndex >= 0) historyCursor = selectedIndex;
+				else if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
+			} else {
+				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
+				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
+			}
 			if (safeOffset === 0 && !historyStarredOnly) {
 				historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
 			} else {
 				preloadHistoryManagerFirstPage();
 			}
 		} catch { /* ignore */ }
+	}
+
+	async function refreshHistoryForExternalSave(force = false): Promise<void> {
+		if (!authToken || historyStarredOnly || historyOffset !== 0 || loading) return;
+		if (document.visibilityState !== 'visible') return;
+		const now = Date.now();
+		if (!force && now - lastExternalHistoryRefreshAt < EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS) return;
+		if (externalHistoryRefreshInFlight) return;
+		externalHistoryRefreshInFlight = true;
+		lastExternalHistoryRefreshAt = now;
+		try {
+			await fetchHistoryOffset(0, { preserveSelection: true });
+			if (historyManager.open && historyManager.view === 'active' && historyManager.page === 0 && !historyManager.search.trim() && !historyManager.starredOnly) {
+				await historyManager.fetch({ view: 'active', page: 0, search: '', starredOnly: false, silent: true });
+			}
+		} finally {
+			externalHistoryRefreshInFlight = false;
+		}
 	}
 
 	async function fetchHistoryPage(page: number): Promise<void> {
@@ -2737,7 +2796,7 @@
 			}
 		}
 		if (historySelectionCanvas === 'history') {
-			const canvasId = it.render_canvas_aspect ?? it.score?.canvas;
+			const canvasId = it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? it.score?.canvas;
 			if (canvasId) {
 				canvasAspectId = normalizeCanvasAspectId(canvasId);
 				void saveCanvasAspectPluginValue();
@@ -2760,6 +2819,8 @@
 			render_color_catalog_sub: it.render_color_catalog_sub,
 			render_color_map: it.render_color_map,
 			render_canvas_aspect: it.render_canvas_aspect,
+			render_canvas_aspect_id: it.render_canvas_aspect_id,
+			render_canvas_aspect_ratio: it.render_canvas_aspect_ratio,
 			render_hash: it.render_hash,
 			render_hash_short: it.render_hash_short,
 			elapsed_stage1_ms: 0,
@@ -3178,6 +3239,8 @@
 		if (result.render_engine_id !== undefined) payload.render_engine_id = result.render_engine_id;
 		if (result.render_engine_version !== undefined) payload.render_engine_version = result.render_engine_version;
 		if (result.render_canvas_aspect !== undefined) payload.render_canvas_aspect = result.render_canvas_aspect;
+		if (result.render_canvas_aspect_id !== undefined) payload.render_canvas_aspect_id = result.render_canvas_aspect_id;
+		if (result.render_canvas_aspect_ratio !== undefined) payload.render_canvas_aspect_ratio = result.render_canvas_aspect_ratio;
 		if (result.render_hash !== undefined) payload.render_hash = result.render_hash;
 		if (result.render_hash_short !== undefined) payload.render_hash_short = result.render_hash_short;
 		if (result.render_color_catalog_id !== undefined) payload.render_color_catalog_id = result.render_color_catalog_id;
@@ -3374,6 +3437,17 @@
 		}
 		window.addEventListener('resize', onResize);
 		document.addEventListener('keydown', handleKeydown, true);
+		const externalHistoryRefreshTimer = window.setInterval(() => {
+			void refreshHistoryForExternalSave();
+		}, EXTERNAL_HISTORY_REFRESH_MS);
+		function onHistoryVisibilityChange() {
+			if (document.visibilityState === 'visible') void refreshHistoryForExternalSave(true);
+		}
+		function onHistoryWindowFocus() {
+			void refreshHistoryForExternalSave(true);
+		}
+		document.addEventListener('visibilitychange', onHistoryVisibilityChange);
+		window.addEventListener('focus', onHistoryWindowFocus);
 
 		initLang();
 		try {
@@ -3402,6 +3476,9 @@
 		return () => {
 			window.removeEventListener('resize', onResize);
 			document.removeEventListener('keydown', handleKeydown, true);
+			window.clearInterval(externalHistoryRefreshTimer);
+			document.removeEventListener('visibilitychange', onHistoryVisibilityChange);
+			window.removeEventListener('focus', onHistoryWindowFocus);
 		};
 	});
 

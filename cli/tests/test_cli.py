@@ -79,6 +79,113 @@ def test_paint_payload_uses_resolved_models():
     assert payload["stage2_model"] == "s2"
 
 
+def test_paint_payload_includes_canvas_aspect():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨", "--canvas-aspect", "golden"])
+
+    payload = cli._paint_payload(args, "一滴の墨")
+
+    assert payload["canvas_aspect"] == "golden"
+
+
+def test_compose_payload_for_ddl_input_mode():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--original-text", "線"])
+
+    payload = cli._compose_payload(args, "白い背景に黒い線を一本引く。", stage2_model="s2", color_catalog="default")
+
+    assert payload == {
+        "ddl": "白い背景に黒い線を一本引く。",
+        "model": "s2",
+        "original_text": "線",
+        "lang": "ja",
+        "catalog_id": "default",
+        "auto_repair": True,
+    }
+
+
+def test_compose_payload_includes_canvas_aspect():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--canvas-aspect", "wide"])
+
+    payload = cli._compose_payload(args, "白い背景に黒い線を一本引く。", stage2_model="s2", color_catalog="default")
+
+    assert payload["canvas_aspect"] == "wide"
+
+
+def test_history_payload_from_compose_result():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--save-history"])
+    result = {
+        "score": {"instructions": []},
+        "svg": "<svg></svg>",
+        "elapsed_total_ms": 1200,
+        "tokens_in_stage2": 10,
+        "tokens_out_stage2": 20,
+        "render_engine_id": "default",
+    }
+
+    payload = cli._history_payload_from_result(
+        args,
+        result,
+        input_text="線",
+        ddl="白い背景に黒い線を一本引く。",
+        stage1_model=None,
+        stage2_model="s2",
+        color_catalog="default",
+        at=123,
+    )
+
+    assert payload["input"] == "線"
+    assert payload["ddl"] == "白い背景に黒い線を一本引く。"
+    assert "stage1_model" not in payload
+    assert payload["stage2_model"] == "s2"
+    assert payload["tokens_in"] == 10
+    assert payload["tokens_out"] == 20
+    assert payload["save_artifacts"] is True
+    assert payload["count_generation"] is True
+
+
+def test_history_payload_includes_requested_canvas_aspect():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "線", "--save-history", "--canvas-aspect", "oban"])
+
+    payload = cli._history_payload_from_result(
+        args,
+        {"score": {"instructions": []}, "svg": "<svg></svg>"},
+        input_text="線",
+        ddl="線を引く。",
+        stage1_model="s1",
+        stage2_model="s2",
+        color_catalog="default",
+        at=123,
+    )
+
+    assert payload["canvas_aspect"] == "oban"
+
+
+def test_compose_response_as_paint_result_uses_effective_ddl():
+    result = cli._compose_response_as_paint_result(
+        {
+            "ddl": "展開後DDL。",
+            "score": {"instructions": []},
+            "svg": "<svg></svg>",
+            "elapsed_ms": 500,
+            "stage2_model": "resolved",
+        },
+        ddl="入力DDL。",
+        input_text="元入力",
+        stage2_model="requested",
+    )
+
+    assert result["text"] == "元入力"
+    assert result["ddl"] == "展開後DDL。"
+    assert result["stage1_model"] is None
+    assert result["stage2_model"] == "resolved"
+    assert result["elapsed_stage1_ms"] == 0
+    assert result["elapsed_total_ms"] == 500
+
+
 def test_model_summary_marks_server_default():
     summary = cli._model_summary(None, "gemma", stage2_provider="nvidia")
 
@@ -209,14 +316,18 @@ def test_write_paint_outputs(tmp_path):
     assert saved_json["ddl"] == result["ddl"]
 
 
-def test_svg_profile_arg_is_accepted_for_paint_and_batch():
+def test_svg_profile_and_canvas_aspect_args_are_accepted_for_paint_and_batch():
     parser = cli.build_parser()
 
-    paint_args = parser.parse_args(["paint", "線", "--svg-profile", "editable"])
-    batch_args = parser.parse_args(["batch", "--file", "prompts.txt", "--svg-profile", "compat"])
+    paint_args = parser.parse_args(["paint", "線", "--svg-profile", "editable", "--input-mode", "ddl", "--canvas-aspect", "golden"])
+    batch_args = parser.parse_args(["batch", "--file", "prompts.txt", "--svg-profile", "compat", "--input-mode", "ddl", "--canvas-aspect", "wide"])
 
     assert paint_args.svg_profile == "editable"
+    assert paint_args.input_mode == "ddl"
+    assert paint_args.canvas_aspect == "golden"
     assert batch_args.svg_profile == "compat"
+    assert batch_args.input_mode == "ddl"
+    assert batch_args.canvas_aspect == "wide"
 
 
 def test_result_with_svg_profile_regenerates_non_display_svg():

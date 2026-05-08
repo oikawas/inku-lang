@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.45**
+**Version: v1.48**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -246,6 +246,11 @@ uppercase suffix used for UI and CLI references.
 artifact.  In normal server-generated output they match, but both are retained
 so render metadata remains visible even when old records or imported Scores are
 inspected.
+`render_canvas_aspect_id` is the explicit canvas aspect identifier for new
+metadata, and `render_canvas_aspect_ratio` records the actual rendered
+width/height ratio as a number.  `render_canvas_aspect` remains for
+compatibility; old records can be backfilled in responses by deriving the new id
+and ratio from it.
 
 ---
 
@@ -375,6 +380,16 @@ Users can choose independently whether selecting a history item updates the UI's
 current canvas aspect and color catalog to the history item's values, or keeps
 the current UI selections.  This setting affects only the UI selection state;
 the saved history SVG is displayed as stored and is not re-rendered.
+
+The history DB remains the source of truth for renders saved by the web UI,
+`inku-cli`, Android headless CLI, and other API clients.  The web UI periodically
+refreshes the latest normal history page while the signed-in user is viewing the
+latest non-filtered history.  It also refreshes when the browser window regains
+focus or a hidden tab becomes visible.  This allows CLI-saved renders to appear
+in the history strip without a manual reload, while preserving the currently
+selected history item when it is still present.  The UI does not auto-replace
+history while the user is viewing starred-only history, search results, older
+history pages, or while a history request is already in flight.
 
 PNG export options are managed as per-user templates in the settings modal's
 export tab.  Each template has a name, description, and y-axis height in pixels.
@@ -606,6 +621,16 @@ renderer behavior.
 CLI configuration is local and editable.  It stores base URL, provider/model
 selection, and timeout values outside the server DB.
 
+`inku-cli paint` and `inku-cli batch` support `--input-mode paint|ddl`.
+The default `paint` mode sends natural-language input to `/api/paint` and runs
+the full Stage 1 -> Stage 1.5 -> Stage 2 -> render pipeline.  `--input-mode ddl`
+treats the input text as already-normalized DDL, skips Stage 1, and sends it to
+`/api/compose`.  When `--input-mode ddl --save-history` is used, the CLI saves
+the compose result through `POST /api/history` so the output appears in normal
+server history.  `/api/compose` returns the effective DDL after Stage 1.5
+expansion, and CLI output/history use that effective DDL for DDL-to-render
+benchmark parity.
+
 `inku-cli batch` can write a benchmark summary JSON file.  When an output
 directory is used, the default summary path is `analysis-summary.json` in that
 directory.  The summary includes all successful samples and review groupings for
@@ -665,6 +690,7 @@ The reference implementation currently includes:
 
 - FastAPI backend
 - SvelteKit frontend
+- native Android app
 - authenticated users and admin user management
 - signed-in user profile editing
 - role-aware settings visibility
@@ -681,6 +707,9 @@ The reference implementation currently includes:
 - CLI client foundation, benchmark summary output, and contact sheet generation
 - CLI history export by render hash for benchmark review contact sheets,
   per-item JSON, and summary JSON
+- CLI DDL input mode for DDL-to-render parity: `inku-cli paint --input-mode ddl`
+  and `batch --input-mode ddl` call `/api/compose` directly and save through
+  `/api/history` when `--save-history` is set
 - CLI version/build reporting and server-owned color catalog lookup
 - CLI benchmark diagnostics for color delivery, negated colors, motif hint
   arrival, and mathematical balance marker sample lines
@@ -691,6 +720,62 @@ The reference implementation currently includes:
   safeguards, and broader primitive use within the current schema
 - renderer material effects, wobble, rotation, arrangement paths, density/fade,
   and canvas aspect support
+
+The Android app is a Kotlin + Jetpack Compose native package with Room/SQLite
+as its local data layer.  It is a single-user application package rather than a
+multi-user server client.  Server/web remains the development master for DDL
+interpretation, Stage 1.5 expansion, Score repair, SVG rendering, history
+metadata, canvas aspect values, and render hash semantics.  Android-specific UI
+decisions are allowed only when they are explicit mobile equivalents or
+documented omissions.
+
+Android local LLM support uses LiteRT-LM with Gemma 4 E2B as the standard local
+model and Gemma 4 E4B as the higher-quality option.  Model license acceptance,
+download state, re-download, checksum validation, and model file paths are
+stored in Room.  The LiteRT-LM GPU backend is required; CPU fallback is not part
+of the Android behavior.
+
+Android simplifies model selection to one drawing model for instruction
+generation, Stage 1, and Stage 2, while preserving server-compatible
+`stage1_model` and `stage2_model` fields in settings, JSON display, exported
+JSON, history records, and render metadata.  The Model Settings page exposes
+provider panels for adding services, editing service names and base URLs,
+adding or deleting API keys, fetching provider model lists, and choosing
+published models.  Connection kind is set when a service is created and is not
+edited from existing service panels.  Fetched candidate models are stored
+separately from the published models shown in the drawing model picker.
+
+The Android drawing view provides mobile-specific controls: pinch zoom, pan,
+left/right image swipes for history navigation, and double-tap presentation
+mode.  Presentation mode hides other UI, centers the image, rotates landscape
+canvases for portrait phones, and chooses the surrounding background from the
+rendered image background.  White-background images use the dark app
+background; black-background images use a light background.
+
+The Android history view intentionally differs from the server/web UI.  It uses
+a three-column thumbnail grid and omits trash, list view, bulk selection, user
+management, DB administration, plugin administration, and server log controls
+because the Android package is single-user and mobile-first.
+
+Android SVG/PNG export follows the server/web `CanvasPanel` intent.  SVG export
+is a menu with display, editable, and compatibility profiles.  PNG export is a
+menu backed by Room `export_templates`, with `1080px`, `2160px`, and `4320px`
+Y-axis defaults.  Android opens the platform share sheet instead of browser
+downloads.
+
+Android render metadata includes `render_canvas_aspect_id` and
+`render_canvas_aspect_ratio`, derived from the same canvas aspect definitions
+ported from the server/web system plugin.  Android headless render and
+comparison tooling can run without the Compose UI and is used with the server
+CLI `--input-mode ddl` flow to compare DDL-to-render and Score-to-render
+parity.
+
+Android versioning is independent of the web build number.  `android/VERSION`
+is the source for Android `versionName`, and `android/BUILD_NUMBER` is the
+source for Android `versionCode`.  For the v1.48 generation, the Android values
+start at `1.48.0-android.1` and `148001`.  The Android Settings menu exposes
+version details including version name, version code, build type, application
+id, source spec generation, and render engine version.
 
 History records carry a server-side `render_hash`: a 64-character SHA-256 hex
 hash of the rendered content and render metadata.  History APIs, paint/compose
@@ -750,9 +835,11 @@ OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama's
 OpenAI-compatible API, and Intel OVMS's OpenAI-compatible API. Admin users can
 add and remove connection services from the model settings tab. Added services
 carry a service ID, display name, connection kind (`openai_compatible`,
-`anthropic`, or `gemini`), base URL, and optional initial API key. Model lists
-are fetched later through each service's model-list fetch action instead of
-being typed manually when the service is created.
+`anthropic`, or `gemini`), base URL, and optional initial API key. The add
+service dialog saves the new service to the server immediately when Add is
+pressed, so service panels do not include a redundant whole-panel save button.
+Model lists are fetched later through each service's model-list fetch action
+instead of being typed manually when the service is created.
 The service ID is the stable internal key used for DB connection settings,
 Stage 1 / Stage 2 provider references, API provider dispatch, and duplicate
 protection, so it is not editable after creation. The user-facing service name
@@ -792,10 +879,13 @@ Stage 1 / Stage 2 provider and model selection is stored separately in
 `user_accounts.model_settings`, saved from the model selection dialog through
 `/api/auth/me/settings`, and restored on login.  Admin users can also toggle
 which models are visible to users for each provider. Published-model selection
-is handled in a separate dialog that also contains model-list fetch, select-all,
-and clear-all controls. The main settings tab summarizes only the currently
-published models. `GET /api/models` returns only published models for signed-in
-users, and the model selection dialog uses that filtered catalog.
+is handled in a separate dialog that also contains model-list fetch, search,
+select-all, and clear-all controls. Checkbox changes inside that dialog are
+drafted locally and are sent to the server only when Save is pressed; Cancel or
+clicking outside the dialog discards them. The main settings tab summarizes
+only the currently published models. `GET /api/models` returns only published
+models for signed-in users, and the model selection dialog uses that filtered
+catalog.
 The status-bar PNG export templates default to Y-axis heights of `1080px`,
 `2160px`, and `4320px`. Older saved defaults of `1024px` and `2048px` are
 automatically replaced by the new defaults, while user-customized templates are

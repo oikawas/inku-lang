@@ -2,6 +2,22 @@
 
 Command line client for controlling an inku API server.
 
+## Save generated drawings to normal history
+
+Use `--save-history` with `paint` or `batch` when benchmark outputs should be
+available later through the regular server history UI/API:
+
+```sh
+inku-cli paint "緑の弧を右上に置く" --save-history
+```
+
+To render from already-normalized DDL, bypass Stage 1 and send the text directly
+through Stage 2/rendering:
+
+```sh
+inku-cli paint "白い背景に黒い線を一本引く。" --input-mode ddl --save-history
+```
+
 ## Export saved history by render hash
 
 `history-export` selects drawings stored in the server history DB by render hash suffix and writes a review bundle:

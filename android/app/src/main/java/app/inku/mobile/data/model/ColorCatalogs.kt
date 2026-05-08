@@ -6,7 +6,10 @@ data class ColorCatalog(
     val sub: String,
     val map: Map<String, String>,
     val swatches: List<String>,
-)
+) {
+    val renderMap: Map<String, String>
+        get() = map + ColorCatalogs.paletteFor(id).mapKeys { "palette:${it.key}" }
+}
 
 object ColorCatalogs {
     val all = listOf(
@@ -26,4 +29,18 @@ object ColorCatalogs {
     private val byId = all.associateBy { it.id }
 
     fun get(id: String?): ColorCatalog = byId[id] ?: byId.getValue("default")
+
+    fun paletteFor(id: String): Map<String, String> = when (id) {
+        "ink_season" -> mapOf("Deep Ink" to "#111111", "Warm Paper" to "#fffffb", "Vermilion Accent" to "#d3381c", "Indigo Shade" to "#165e83", "Evergreen" to "#007b43", "Soft Soot" to "#595857", "Pale Violet" to "#a591c5", "Golden Flower" to "#ffb61e")
+        "fresco_study" -> mapOf("Warm Stone" to "#8a8178", "Deep Blue Pigment" to "#1f4e8c", "Red Earth" to "#c7432f", "Soft Yellow" to "#f7e89f", "Green Earth" to "#4f7942", "Burnt Earth" to "#a0522d", "Plaster White" to "#f5f1e8", "Umber Shadow" to "#4a342e")
+        "open_air_light" -> mapOf("Violet Gray Shade" to "#4b4a78", "Rose Light" to "#ee8fa2", "Sunlit Yellow" to "#ffce00", "Outdoor Green" to "#4e8372", "Lilac Gray" to "#afa6bd", "Sky Blue" to "#82c7de", "Clear White" to "#ffffff", "Apricot Light" to "#fbceb1")
+        "ink_porcelain" -> mapOf("Cinnabar Red" to "#c91f24", "Mineral Gold" to "#d6a01d", "Jade Green" to "#00896c", "Porcelain Blue" to "#0057a8", "Mineral Violet" to "#6a4c8c", "Porcelain White" to "#fffdfa", "Ink Black" to "#1a1a1b", "Bright Vermilion" to "#ff4d00")
+        "cool_material" -> mapOf("Snow Light" to "#fcfcfc", "Midnight Blue" to "#2c3e50", "Moss Wood" to "#4b5d43", "Granite Gray" to "#95a5a6", "Pale Birch" to "#e5e8e8", "Muted Sea" to "#4f8fb8", "Low Sun" to "#f4d03f", "Clay Brown" to "#a98467")
+        "dye_earth" -> mapOf("Saffron Dye" to "#e8862e", "Yellow Dye" to "#d6b72a", "Deep Rose Dye" to "#b7285f", "Leaf Dye" to "#6b7d3a", "Peacock Blue" to "#006c8f", "Bright Pink" to "#d83fb1", "Wet Earth" to "#8d7f73", "Warm Cotton" to "#fffaf0")
+        "desert_mineral" -> mapOf("Deep Mineral Blue" to "#1f4b8f", "Muted Gold" to "#c9ad57", "Red Mineral" to "#b31b1b", "Malachite Green" to "#1c8a68", "Dry Paper" to "#f1e4c8", "Basalt Black" to "#1c1b18", "Desert Ochre" to "#bd6f2c", "Linen Light" to "#e8e4c9")
+        "vivid_material" -> mapOf("Vivid Rose" to "#f50087", "Bright Blue" to "#73c2fb", "Fresh Green" to "#008f39", "Orange Marigold" to "#ff9800", "Urban Stone" to "#7d6f66", "Sun Yellow" to "#fff200", "Lime White" to "#f4f4f4", "Volcanic Black" to "#1c1c1c")
+        "weathered_heritage" -> mapOf("Deep Green" to "#004225", "Rain Blue" to "#4169e1", "Slate Gray" to "#708090", "Brick Red" to "#b93a32", "Wool Gray" to "#8b8589", "Cream" to "#fffdd0", "Fog Light" to "#dcdcdc", "Charcoal" to "#1f2933")
+        "sea_stone" -> mapOf("Clear White" to "#ffffff", "Pale Sea" to "#89cff0", "Deep Sea" to "#005bae", "Stone Gray" to "#b2beb5", "Dry Olive" to "#808000", "Sun Yellow" to "#f9d71c", "Clay Red" to "#e2725b", "Night Sea" to "#191970")
+        else -> mapOf("Black" to "#111111", "White" to "#ffffff", "Blue" to "#2c3e91", "Red" to "#a2342a", "Green" to "#2f6b3a", "Gray" to "#888888", "Ink Shade" to "#555555", "Paper" to "#eeeeee")
+    }
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import hashlib
 import json
 import os
 import sys
@@ -29,6 +30,18 @@ PROVIDERS = ("nvidia", "anthropic", "local")
 COLOR_KEYS = ("white", "black", "blue", "red", "green", "gray")
 DEFAULT_COLOR_CATALOG_ID = "default"
 SVG_PROFILES = ("display", "editable", "compat")
+CANVAS_ASPECT_RATIOS = {
+    "square": 1.0,
+    "golden": 1.618,
+    "a4": 1.0 / 1.414,
+    "b4": 1.0 / 1.414,
+    "pillar": 1.0 / 5.0,
+    "oban": 2.0 / 3.0,
+    "wide": 2.35,
+    "byobu": 2.2,
+    "vertical": 9.0 / 16.0,
+}
+CANVAS_ASPECTS = tuple(CANVAS_ASPECT_RATIOS.keys())
 COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "white": ("white", "ivory", "snow", "paper", "白", "雪", "紙", "光"),
     "black": ("black", "dark", "shadow", "ink", "黒", "闇", "影", "墨"),
@@ -59,6 +72,10 @@ COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     ),
     "gray": ("gray", "grey", "silver", "ash", "stone", "灰", "銀", "石", "埃"),
 }
+
+
+def _canvas_aspect_ratio(canvas_aspect: str | None) -> float:
+    return CANVAS_ASPECT_RATIOS.get(canvas_aspect or "square", CANVAS_ASPECT_RATIOS["square"])
 NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "green": (
         "not green",
@@ -693,6 +710,8 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
             "render_engine_id": item.get("render_engine_id"),
             "render_engine_version": item.get("render_engine_version"),
             "render_canvas_aspect": item.get("render_canvas_aspect"),
+            "render_canvas_aspect_id": item.get("render_canvas_aspect_id"),
+            "render_canvas_aspect_ratio": item.get("render_canvas_aspect_ratio"),
             "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
             "render_color_catalog_name": item.get("render_color_catalog_name"),
             **_score_metrics(item.get("score")),
@@ -714,6 +733,8 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
             "render_engine_id": item.get("render_engine_id"),
             "render_engine_version": item.get("render_engine_version"),
             "render_canvas_aspect": item.get("render_canvas_aspect"),
+            "render_canvas_aspect_id": item.get("render_canvas_aspect_id"),
+            "render_canvas_aspect_ratio": item.get("render_canvas_aspect_ratio"),
             "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
             "render_color_catalog_name": item.get("render_color_catalog_name"),
             "paths": {key: artifact_paths.get(key) for key in ("json", "svg", "png") if artifact_paths.get(key)},
@@ -1138,8 +1159,165 @@ def _paint_payload(
         "save_artifacts": args.save_artifacts,
         "history_input": args.history_input,
         "catalog_id": color_catalog,
+        "canvas_aspect": getattr(args, "canvas_aspect", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
+
+
+def _compose_payload(
+    args: argparse.Namespace,
+    ddl: str,
+    *,
+    stage2_model: str | None = None,
+    color_catalog: str | None = None,
+) -> dict[str, Any]:
+    color_catalog = (
+        color_catalog
+        or getattr(args, "color_catalog", None)
+        or getattr(args, "catalog_id", None)
+        or DEFAULT_COLOR_CATALOG_ID
+    )
+    payload: dict[str, Any] = {
+        "ddl": ddl,
+        "model": stage2_model if stage2_model is not None else args.stage2_model,
+        "original_text": args.original_text,
+        "lang": args.lang,
+        "catalog_id": color_catalog,
+        "canvas_aspect": getattr(args, "canvas_aspect", None),
+        "auto_repair": True,
+    }
+    return {k: v for k, v in payload.items() if v is not None}
+
+
+def _compose_response_as_paint_result(
+    result: dict[str, Any],
+    *,
+    ddl: str,
+    input_text: str,
+    stage2_model: str | None,
+    elapsed_total_ms: int | None = None,
+) -> dict[str, Any]:
+    elapsed = int(elapsed_total_ms if elapsed_total_ms is not None else result.get("elapsed_ms") or 0)
+    effective_ddl = str(result.get("ddl") or ddl)
+    return {
+        "text": input_text,
+        "ddl": effective_ddl,
+        "score": result.get("score"),
+        "svg": result.get("svg"),
+        "stage1_model": None,
+        "stage2_model": result.get("stage2_model") or stage2_model,
+        "render_build_number": result.get("render_build_number"),
+        "render_color_profile": result.get("render_color_profile"),
+        "render_engine_id": result.get("render_engine_id"),
+        "render_engine_version": result.get("render_engine_version"),
+        "render_color_catalog_id": result.get("render_color_catalog_id"),
+        "render_color_catalog_name": result.get("render_color_catalog_name"),
+        "render_color_catalog_sub": result.get("render_color_catalog_sub"),
+        "render_color_map": result.get("render_color_map"),
+        "render_canvas_aspect": result.get("render_canvas_aspect"),
+        "render_canvas_aspect_id": result.get("render_canvas_aspect_id"),
+        "render_canvas_aspect_ratio": result.get("render_canvas_aspect_ratio"),
+        "render_hash": result.get("render_hash"),
+        "render_hash_short": result.get("render_hash_short"),
+        "elapsed_stage1_ms": 0,
+        "elapsed_stage2_ms": int(result.get("elapsed_ms") or elapsed),
+        "elapsed_total_ms": elapsed,
+        "tokens_in_stage1": None,
+        "tokens_out_stage1": None,
+        "tokens_in_stage2": result.get("tokens_in"),
+        "tokens_out_stage2": result.get("tokens_out"),
+        "interpret_fallback_used": False,
+        "interpret_fallback_reasons": [],
+        "compose_retry_count": result.get("retry_count", 0),
+        "compose_retry_reasons": result.get("retry_reasons", []),
+        "compose_fallback_used": result.get("fallback_used", False),
+        "catalog_id": result.get("render_color_catalog_id"),
+    }
+
+
+def _history_payload_from_result(
+    args: argparse.Namespace,
+    result: dict[str, Any],
+    *,
+    input_text: str,
+    ddl: str,
+    stage1_model: str | None,
+    stage2_model: str | None,
+    color_catalog: str,
+    at: int | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "input": args.history_input or input_text,
+        "ddl": ddl,
+        "score": result.get("score") or {},
+        "svg": result.get("svg") or "",
+        "at": at or int(time.time() * 1000),
+        "elapsed_ms": int(result.get("elapsed_total_ms") or result.get("elapsed_ms") or 0),
+        "stage1_model": stage1_model,
+        "stage2_model": stage2_model,
+        "tokens_in": (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0) or None,
+        "tokens_out": (result.get("tokens_out_stage1") or 0) + (result.get("tokens_out_stage2") or 0) or None,
+        "catalog_id": color_catalog,
+        "render_build_number": result.get("render_build_number"),
+        "render_color_profile": result.get("render_color_profile"),
+        "render_engine_id": result.get("render_engine_id"),
+        "render_engine_version": result.get("render_engine_version"),
+        "render_color_catalog_id": result.get("render_color_catalog_id"),
+        "render_color_catalog_name": result.get("render_color_catalog_name"),
+        "render_color_catalog_sub": result.get("render_color_catalog_sub"),
+        "render_color_map": result.get("render_color_map"),
+        "render_canvas_aspect": result.get("render_canvas_aspect"),
+        "render_canvas_aspect_id": result.get("render_canvas_aspect_id"),
+        "render_canvas_aspect_ratio": result.get("render_canvas_aspect_ratio"),
+        "canvas_aspect": getattr(args, "canvas_aspect", None),
+        "save_artifacts": args.save_artifacts if args.save_artifacts is not None else args.save_history,
+        "count_generation": True,
+    }
+    return {k: v for k, v in payload.items() if v is not None}
+
+
+def _save_history_for_result(
+    client: ApiClient,
+    args: argparse.Namespace,
+    result: dict[str, Any],
+    *,
+    input_text: str,
+    ddl: str,
+    stage1_model: str | None,
+    stage2_model: str | None,
+    color_catalog: str,
+) -> dict[str, Any]:
+    item, _ = client.request(
+        "POST",
+        "/api/history",
+        data=_history_payload_from_result(
+            args,
+            result,
+            input_text=input_text,
+            ddl=ddl,
+            stage1_model=stage1_model,
+            stage2_model=stage2_model,
+            color_catalog=color_catalog,
+        ),
+    )
+    updated = dict(result)
+    updated["history_id"] = item.get("id")
+    updated["history_at"] = item.get("at")
+    updated["user_generation_count"] = item.get("user_generation_count")
+    for key in (
+        "render_hash",
+        "render_hash_short",
+        "render_color_catalog_id",
+        "render_color_catalog_name",
+        "render_color_catalog_sub",
+        "render_color_map",
+        "render_canvas_aspect",
+        "render_canvas_aspect_id",
+        "render_canvas_aspect_ratio",
+    ):
+        if item.get(key) is not None:
+            updated[key] = item.get(key)
+    return updated
 
 
 def command_login(args: argparse.Namespace) -> int:
@@ -1266,26 +1444,58 @@ def command_paint(args: argparse.Namespace) -> int:
         stage2_provider=stage2_provider,
     )
     _print_color_catalog_summary(color_catalog, catalog_data)
-    result, _ = _run_with_progress(
-        "drawing",
-        lambda: client.request("POST", "/api/paint", data=_paint_payload(
-            args,
-            text,
-            stage1_model=stage1_model,
+    input_mode = getattr(args, "input_mode", "paint")
+    if input_mode == "ddl":
+        input_text = args.original_text or text
+        raw_result, _ = _run_with_progress(
+            "drawing from DDL",
+            lambda: client.request("POST", "/api/compose", data=_compose_payload(
+                args,
+                text,
+                stage2_model=stage2_model,
+                color_catalog=color_catalog,
+            )),
+            enabled=not args.no_progress,
+        )
+        result = _compose_response_as_paint_result(
+            raw_result,
+            ddl=text,
+            input_text=input_text,
             stage2_model=stage2_model,
-            color_catalog=color_catalog,
-        )),
-        enabled=not args.no_progress,
-    )
+        )
+        if args.save_history:
+            result = _save_history_for_result(
+                client,
+                args,
+                result,
+                input_text=input_text,
+                ddl=str(result.get("ddl") or text),
+                stage1_model=None,
+                stage2_model=stage2_model,
+                color_catalog=color_catalog,
+            )
+    else:
+        result, _ = _run_with_progress(
+            "drawing",
+            lambda: client.request("POST", "/api/paint", data=_paint_payload(
+                args,
+                text,
+                stage1_model=stage1_model,
+                stage2_model=stage2_model,
+                color_catalog=color_catalog,
+            )),
+            enabled=not args.no_progress,
+        )
     prefix = args.prefix or f"inku-{started}"
     output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
     paths = _write_paint_outputs(output_result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
     summary = {
         "text": result.get("text"),
+        "input_mode": input_mode,
         **_model_summary(
-            stage1_model,
+            None if input_mode == "ddl" else stage1_model,
             stage2_model,
-            stage1_provider=stage1_provider,
+            stage1_provider=None if input_mode == "ddl" else stage1_provider,
             stage2_provider=stage2_provider,
         ),
         "timeout_seconds": timeout_seconds,
@@ -1308,10 +1518,11 @@ def command_paint(args: argparse.Namespace) -> int:
     if args.full_json:
         _print_json({
             **output_result,
+            "input_mode": input_mode,
             **_model_summary(
-                stage1_model,
+                None if input_mode == "ddl" else stage1_model,
                 stage2_model,
-                stage1_provider=stage1_provider,
+                stage1_provider=None if input_mode == "ddl" else stage1_provider,
                 stage2_provider=stage2_provider,
             ),
             "timeout_seconds": timeout_seconds,
@@ -1352,19 +1563,50 @@ def command_batch(args: argparse.Namespace) -> int:
         stage2_provider=stage2_provider,
     )
     _print_color_catalog_summary(color_catalog, catalog_data)
+    input_mode = getattr(args, "input_mode", "paint")
     for index, line in enumerate(lines, start=1):
         try:
-            result, _ = _run_with_progress(
-                f"drawing {index}/{len(lines)}",
-                lambda line=line: client.request("POST", "/api/paint", data=_paint_payload(
-                    args,
-                    line,
-                    stage1_model=stage1_model,
+            if input_mode == "ddl":
+                input_text = args.original_text or line
+                raw_result, _ = _run_with_progress(
+                    f"drawing {index}/{len(lines)} from DDL",
+                    lambda line=line: client.request("POST", "/api/compose", data=_compose_payload(
+                        args,
+                        line,
+                        stage2_model=stage2_model,
+                        color_catalog=color_catalog,
+                    )),
+                    enabled=not args.no_progress,
+                )
+                result = _compose_response_as_paint_result(
+                    raw_result,
+                    ddl=line,
+                    input_text=input_text,
                     stage2_model=stage2_model,
-                    color_catalog=color_catalog,
-                )),
-                enabled=not args.no_progress,
-            )
+                )
+                if args.save_history:
+                    result = _save_history_for_result(
+                        client,
+                        args,
+                        result,
+                        input_text=input_text,
+                        ddl=str(result.get("ddl") or line),
+                        stage1_model=None,
+                        stage2_model=stage2_model,
+                        color_catalog=color_catalog,
+                    )
+            else:
+                result, _ = _run_with_progress(
+                    f"drawing {index}/{len(lines)}",
+                    lambda line=line: client.request("POST", "/api/paint", data=_paint_payload(
+                        args,
+                        line,
+                        stage1_model=stage1_model,
+                        stage2_model=stage2_model,
+                        color_catalog=color_catalog,
+                    )),
+                    enabled=not args.no_progress,
+                )
             prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
             output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
             paths = _write_paint_outputs(output_result, out_dir=out_dir, prefix=prefix, png=args.png)
@@ -1377,10 +1619,11 @@ def command_batch(args: argparse.Namespace) -> int:
             results.append({
                 "line": index,
                 "text": result.get("text"),
+                "input_mode": input_mode,
                 **_model_summary(
-                    stage1_model,
+                    None if input_mode == "ddl" else stage1_model,
                     stage2_model,
-                    stage1_provider=stage1_provider,
+                    stage1_provider=None if input_mode == "ddl" else stage1_provider,
                     stage2_provider=stage2_provider,
                 ),
                 "timeout_seconds": timeout_seconds,
@@ -1440,10 +1683,11 @@ def command_batch(args: argparse.Namespace) -> int:
         "success": len(results),
         "failed": len(failures),
         "total": len(lines),
+        "input_mode": input_mode,
         **_model_summary(
-            stage1_model,
+            None if input_mode == "ddl" else stage1_model,
             stage2_model,
-            stage1_provider=stage1_provider,
+            stage1_provider=None if input_mode == "ddl" else stage1_provider,
             stage2_provider=stage2_provider,
         ),
         "timeout_seconds": timeout_seconds,
@@ -1494,6 +1738,51 @@ def command_contact_sheet(args: argparse.Namespace) -> int:
     output_path = Path(args.output) if args.output else input_dir / "contact-sheet.png"
     _make_contact_sheet(input_dir, output_path, columns=args.columns, thumb_size=args.thumb_size)
     print(str(output_path))
+    return 0
+
+
+def command_render_score(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    raw = _read_text_argument(args.score, args.file)
+    try:
+        score = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise CliError("score must be valid JSON") from exc
+    if not isinstance(score, dict):
+        raise CliError("score JSON must be an object")
+    catalog_data = _fetch_color_catalogs(client)
+    color_catalog = _resolved_color_catalog(args, config, catalog_data)
+    svg = client.request_text(
+        "POST",
+        "/api/render-svg",
+        data={
+            "score": score,
+            "catalog_id": color_catalog,
+            "canvas_aspect": args.canvas_aspect,
+            "svg_profile": args.svg_profile,
+        },
+    )
+    render_hash = hashlib.sha256(svg.encode("utf-8")).hexdigest()
+    result = {
+        "status": "ok",
+        "score": score,
+        "svg": svg,
+        "render_hash": render_hash,
+        "render_hash_short": render_hash[-4:].upper(),
+        "render_color_catalog_id": color_catalog,
+        "render_canvas_aspect": args.canvas_aspect,
+        "render_canvas_aspect_id": args.canvas_aspect,
+        "render_canvas_aspect_ratio": _canvas_aspect_ratio(args.canvas_aspect),
+        "svg_profile": args.svg_profile,
+    }
+    paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=args.prefix or "score", png=args.png)
+    result["paths"] = paths
+    _print_json(result if args.full_json else {key: value for key, value in result.items() if key not in {"svg", "score"}})
     return 0
 
 
@@ -1597,6 +1886,12 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--prefix", help="output filename prefix")
     parser.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
     parser.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files")
+    parser.add_argument(
+        "--input-mode",
+        choices=["paint", "ddl"],
+        default="paint",
+        help="paint: natural-language prompt through Stage 1; ddl: normalized DDL directly through Stage 2/render",
+    )
     parser.add_argument("--stage1-provider", choices=PROVIDERS)
     parser.add_argument("--stage1-model")
     parser.add_argument("--stage2-provider", choices=PROVIDERS)
@@ -1605,6 +1900,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--history-input")
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
+    parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--lang", default="ja", choices=["ja", "en"])
     parser.add_argument("--include-thinking", action="store_true")
     parser.add_argument("--save-history", action="store_true")
@@ -1658,6 +1954,20 @@ def build_parser() -> argparse.ArgumentParser:
     contact_sheet.add_argument("--columns", type=int, default=5)
     contact_sheet.add_argument("--thumb-size", type=int, default=220)
     contact_sheet.set_defaults(func=command_contact_sheet)
+
+    render_score = subparsers.add_parser("render-score", help="render a Score JSON object without Stage 1 or Stage 2")
+    _add_common_server_args(render_score)
+    render_score.add_argument("score", nargs="?", help="Score JSON text")
+    render_score.add_argument("--file", "-f", help="read Score JSON from a file, or '-'")
+    render_score.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
+    render_score.add_argument("--prefix", help="output filename prefix")
+    render_score.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
+    render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display")
+    render_score.add_argument("--canvas-aspect", default="square")
+    render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
+    render_score.add_argument("--color-catalog", help="server color catalog id")
+    render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")
+    render_score.set_defaults(func=command_render_score)
 
     demo = subparsers.add_parser("demo-instruction", help="generate one demo prompt from a seed phrase")
     _add_common_server_args(demo)

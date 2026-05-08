@@ -13,4 +13,7 @@ interface ExportTemplateDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(template: ExportTemplateEntity)
+
+    @Query("DELETE FROM export_templates WHERE id = :id")
+    suspend fun delete(id: String)
 }

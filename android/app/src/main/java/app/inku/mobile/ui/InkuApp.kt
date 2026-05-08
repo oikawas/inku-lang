@@ -708,6 +708,7 @@ private fun CanvasHeroCard(
     val scope = rememberCoroutineScope()
     var canvasMessage by remember { mutableStateOf<String?>(null) }
     var svgMenuOpen by remember { mutableStateOf(false) }
+    var svgHelpOpen by remember { mutableStateOf(false) }
     var pngMenuOpen by remember { mutableStateOf(false) }
     val presentation = state.canvasPresentationMode
     BoxWithConstraints(modifier = modifier) {
@@ -865,26 +866,71 @@ private fun CanvasHeroCard(
                     }
                     Box {
                         MiniPill(text = "SVG ▾", onClick = { svgMenuOpen = true })
-                    }
-                    Box {
-                        MiniPill(text = "PNG ▾", onClick = { pngMenuOpen = true })
-                    }
-                }
-                if (svgMenuOpen) {
-                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
-                        listOf(
-                            "display" to "表示用SVG",
-                            "editable" to "編集用SVG",
-                            "compat" to "汎用SVG",
-                        ).forEach { (profile, label) ->
-                            MiniPill(
-                                text = label,
+                        DropdownMenu(
+                            expanded = svgMenuOpen,
+                            onDismissRequest = {
+                                svgMenuOpen = false
+                                svgHelpOpen = false
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(
+                                    "SVG export",
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                TextButton(onClick = { svgHelpOpen = !svgHelpOpen }) {
+                                    Text("?")
+                                }
+                            }
+                            if (svgHelpOpen) {
+                                SvgExportHelp()
+                            }
+                            SvgExportOption(
+                                title = "表示用SVG",
+                                sub = "Web表示向けの標準SVG",
                                 onClick = {
                                     svgMenuOpen = false
+                                    svgHelpOpen = false
                                     canvasMessage = "SVG export preparing..."
                                     scope.launch {
                                         canvasMessage = runCatching {
-                                            shareHistorySvg(context, it, profile)
+                                            shareHistorySvg(context, it, "display")
+                                            "SVG exported F${it.renderHashShort}"
+                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
+                                    }
+                                },
+                            )
+                            SvgExportOption(
+                                title = "編集用SVG",
+                                sub = "編集用メタデータとIDを含む",
+                                onClick = {
+                                    svgMenuOpen = false
+                                    svgHelpOpen = false
+                                    canvasMessage = "SVG export preparing..."
+                                    scope.launch {
+                                        canvasMessage = runCatching {
+                                            shareHistorySvg(context, it, "editable")
+                                            "SVG exported F${it.renderHashShort}"
+                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
+                                    }
+                                },
+                            )
+                            SvgExportOption(
+                                title = "汎用SVG",
+                                sub = "互換性重視のポータブルSVG",
+                                onClick = {
+                                    svgMenuOpen = false
+                                    svgHelpOpen = false
+                                    canvasMessage = "SVG export preparing..."
+                                    scope.launch {
+                                        canvasMessage = runCatching {
+                                            shareHistorySvg(context, it, "compat")
                                             "SVG exported F${it.renderHashShort}"
                                         }.getOrElse { error -> error.message ?: "SVG export failed." }
                                     }
@@ -892,23 +938,36 @@ private fun CanvasHeroCard(
                             )
                         }
                     }
-                }
-                if (pngMenuOpen) {
-                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
-                        listOf(1080, 2160, 4320).forEach { size ->
-                            MiniPill(
-                                text = "PNG ${size}px",
-                                onClick = {
-                                    pngMenuOpen = false
-                                    canvasMessage = "PNG export preparing..."
-                                    scope.launch {
-                                        canvasMessage = runCatching {
-                                            shareHistoryPng(context, it, size)
-                                            "PNG exported F${it.renderHashShort}"
-                                        }.getOrElse { error -> error.message ?: "PNG export failed." }
-                                    }
-                                },
-                            )
+                    Box {
+                        MiniPill(text = "PNG ▾", onClick = { pngMenuOpen = true })
+                        DropdownMenu(
+                            expanded = pngMenuOpen,
+                            onDismissRequest = { pngMenuOpen = false },
+                        ) {
+                            state.exportTemplates.forEach { template ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(template.name, style = MaterialTheme.typography.labelMedium)
+                                            Text(
+                                                exportTemplateDescription(template.description, template.heightPx),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        pngMenuOpen = false
+                                        canvasMessage = "PNG export preparing..."
+                                        scope.launch {
+                                            canvasMessage = runCatching {
+                                                shareHistoryPng(context, it, template.heightPx)
+                                                "PNG exported F${it.renderHashShort}"
+                                            }.getOrElse { error -> error.message ?: "PNG export failed." }
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -923,6 +982,47 @@ private fun CanvasHeroCard(
             RenderTab.Json -> RenderTextView(renderJsonText(it), Modifier.fillMaxWidth().height(220.dp))
         }
     }
+}
+
+@Composable
+private fun SvgExportOption(title: String, sub: String, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = {
+            Column {
+                Text(title, style = MaterialTheme.typography.labelMedium)
+                Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun SvgExportHelp() {
+    Column(
+        modifier = Modifier
+            .widthIn(min = 260.dp, max = 360.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SvgExportHelpRow("表示用SVG", "Web表示", "標準表示向け")
+        SvgExportHelpRow("編集用SVG", "ベクター編集", "メタデータとIDを含む")
+        SvgExportHelpRow("汎用SVG", "外部共有", "互換性重視")
+    }
+}
+
+@Composable
+private fun SvgExportHelpRow(format: String, use: String, feature: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        Text(format, modifier = Modifier.width(76.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+        Text(use, modifier = Modifier.width(82.dp), style = MaterialTheme.typography.labelSmall)
+        Text(feature, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+private fun exportTemplateDescription(description: String, heightPx: Int): String {
+    return description.ifBlank { "PNG / Y軸 ${heightPx}px" }
 }
 
 @Composable

@@ -1868,6 +1868,7 @@
 		saveArtifacts?: boolean;
 		countGeneration?: boolean;
 		catalogId?: string;
+		canvasAspectId?: CanvasAspectId;
 		signal?: AbortSignal;
 	};
 
@@ -1891,7 +1892,7 @@
 				stage2_model: resolvedStage2Model,
 				include_thinking: includeThinking,
 				lang,
-				canvas_aspect: effectiveCanvasAspectId(),
+				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
@@ -2267,6 +2268,8 @@
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
 				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
+				const batchCanvasAspectId = effectiveCanvasAspectId();
+				const batchCatalogId = selectedCatalog;
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
 					.filter((item) => item.input);
@@ -2280,7 +2283,8 @@
 					try {
 						const r = await paintOne(lines[i].input, {
 							historyInput: `#${lines[i].line} ${lines[i].input}`,
-							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : selectedCatalog,
+							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : batchCatalogId,
+							canvasAspectId: batchCanvasAspectId,
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) break;

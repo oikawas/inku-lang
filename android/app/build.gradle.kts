@@ -6,6 +6,9 @@ plugins {
     id("androidx.room")
 }
 
+val androidVersionName = rootProject.file("VERSION").readText().trim()
+val androidVersionCode = rootProject.file("BUILD_NUMBER").readText().trim().toInt()
+
 android {
     namespace = "app.inku.mobile"
     compileSdk = 36
@@ -14,14 +17,15 @@ android {
         applicationId = "app.inku.mobile"
         minSdk = 35
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = androidVersionCode
+        versionName = androidVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     kotlin {

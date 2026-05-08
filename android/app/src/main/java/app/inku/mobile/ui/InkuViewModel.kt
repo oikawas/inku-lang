@@ -118,6 +118,7 @@ enum class SettingsPane {
     OutputFiles,
     ColorCatalog,
     Canvas,
+    Version,
 }
 
 enum class ComposeMode {

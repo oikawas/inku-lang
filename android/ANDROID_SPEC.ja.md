@@ -713,3 +713,27 @@ Android 版の描画パネルでは、server/web 版 `CanvasPanel` の SVG / PNG
 - PNG メニューの各項目はテンプレート名と説明を表示し、選択したテンプレートの `height_px` を PNG 生成の Y 軸ピクセル数として使用する。
 - SVG / PNG の選択後は Android の共有シートを開く。履歴 DB、render metadata、render hash は変更しない。
 - 旧 Android 実装のように、ボタン押下後にチップを横並び展開する UI は使用しない。
+
+## 2026-05-09 Android version / build 管理
+
+Android 版は web/server の `web/BUILD_NUMBER` とは独立した Android 用 version / build を持つ。
+
+- `android/VERSION` を Android `versionName` の正本とする。
+- `android/BUILD_NUMBER` を Android `versionCode` の正本とし、単調増加する整数として管理する。
+- `android/app/build.gradle.kts` は `versionName` / `versionCode` を直書きせず、上記2ファイルから読み込む。
+- v1.48 世代の初期値は `versionName=1.48.0-android.1`、`versionCode=148001` とする。
+- Android の UI / 挙動変更で端末へ配布・展開する場合は、`android/BUILD_NUMBER` を増やす。
+- server/spec 世代への追従、DB schema、履歴 JSON、render metadata、export 互換性に影響する変更では、`android/VERSION` も更新する。
+- 設定メニューには `バージョン情報` パネルを置き、`versionName`、`versionCode`、build type、application id、source spec、render engine version を表示する。
+- version / build metadata には API キー、端末 ID、ローカルサーバー情報、個人環境パスを含めない。
+
+## 2026-05-09 モデル設定パネルの追加整理
+
+Android 版のモデル設定パネルは、接続形式をサービス追加時にのみ設定する。
+
+- 既存サービスパネルから `接続形式` の表示とドロップダウンを削除する。
+- 既存サービスの接続形式は `provider.kind` として保持し、サービス名、Base URL、APIキー、公開モデルの保存時にも変更しない。
+- 接続形式の変更保存だけを担っていた各サービスパネル下部の `保存` ボタンは削除する。
+- サービス追加ボタンを接続先一覧の末尾に表示し、追加ダイアログでサービスID、サービス名、接続形式、Base URL、APIキーを入力する。
+- 各サービスパネルの `有効` / `無効` 表示は、接続確認結果ではなく DB の `isEnabled` 表示にすぎないため UI から削除する。
+- `サービス削除` ボタンは小型化し、各パネル下部の右側へ配置する。

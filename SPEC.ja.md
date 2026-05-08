@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.45**
+**Version: v1.48**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -1399,13 +1399,38 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `cli.py` — `inku-api` を操作する API クライアント CLI。`login` / `logout` / `me` / `paint` / `batch` / `demo-instruction` / `history` / `history-export` を提供する。サーバー内部モジュールを import せず、HTTP API のみを利用する
 
 
-**別リポジトリ / 別 PoC**:
+**別リポジトリ / 別 PoC / ネイティブ実装**:
 - `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
-- `android/` — Android 実装 (SPEC_v1.md 参照、E2E 動作確認済)
+- `android/` — ネイティブ Android 実装。Kotlin + Jetpack Compose + Room を使う単体アプリとして、server/web を開発上の master としながら、Pixel 9 以上を主対象に実装する。Android 詳細仕様は `android/ANDROID_SPEC.ja.md` を正本とする
 
 ---
 
 ## 変更履歴
+
+### v1.48 (2026-05-09)
+
+**Android ネイティブ実装の管理対象化と v1.48 対応**
+
+Android 版を Git 管理対象のネイティブ単体アプリとして整理し、web/server 参照実装に追従するモバイル実装として明文化する。
+
+- Android 版は Kotlin + Jetpack Compose で実装し、Room / SQLite を正式なローカル DB レイヤーとする
+- アプリはシングルユーザー前提で動作し、server/web のユーザー管理、DB 管理、プラグイン管理、ログ保存などのサーバー運用機能は Android UI から除外する
+- Android の開発 master は常に `web/` と `server/` とし、DDL 解釈、Stage 1.5 展開、Score 補修、SVG rendering、履歴/render metadata の互換性は server source に照らして検証する
+- LiteRT-LM を Android のローカル LLM provider とし、Gemma 4 E2B を標準、E4B を高品質オプションとして扱う。GPU backend を必須とし、CPU fallback は行わない
+- Gemma 4 E2B/E4B のライセンス同意、初回取得、再取得、SHA-256 検証、取得状態は Room に保存する
+- Android のモデル選択 UI はモバイル操作性のため Stage 1 / Stage 2 を単一の描画モデル選択として扱う。ただし保存形式、履歴 JSON、render metadata では `stage1_model` / `stage2_model` を維持する
+- モデル設定パネルは接続先ごとの独立パネルとし、サービス追加、サービス名編集、Base URL 編集、APIキー追加/削除、公開モデル選択、モデル一覧取得を提供する。接続形式はサービス追加時に設定し、既存パネルでは変更しない
+- 公開モデル候補と公開済みモデルは分離して保存し、描画画面のモデル選択には公開済みモデルだけを表示する
+- 描画画面では画像のピンチズーム、パン、左右スワイプによる履歴移動、ダブルタップによるプレゼンテーション表示を Android 固有 UI として提供する
+- プレゼンテーション表示では画像以外の UI を隠し、余白背景を表示画像の背景色に合わせる。白背景画像ではダーク背景、黒背景画像ではライト背景を使う
+- 履歴画面は 3 列サムネイルグリッドを標準とし、サーバー版のごみ箱、リスト表示、一括選択は Android では提供しない
+- SVG / PNG export は server/web の `CanvasPanel` と同じ profile / template 構造を持つメニューとして実装し、Android では共有シートに渡す
+- PNG template は `1080px` / `2160px` / `4320px` の Y軸高さを既定とし、Room の `export_templates` を正本とする
+- `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を render metadata に含め、Android でも server の canvas aspect 定義に対応する値から算出する
+- Android headless render / comparison tooling を持ち、server CLI の `--input-mode ddl` と組み合わせて DDL 以降、Score 以降の parity を比較できる
+- Android version は `android/VERSION`、Android build number は `android/BUILD_NUMBER` を正本とする。v1.48 世代の初期値は `1.48.0-android.1` / `148001` とする
+- Android 設定メニューには versionName、versionCode、build type、applicationId、source spec、render engine version を表示するバージョン情報画面を置く
+- build number: 148001
 
 ### v1.44 (2026-05-05)
 

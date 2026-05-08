@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.45**
+**Version: v1.48**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -690,6 +690,7 @@ The reference implementation currently includes:
 
 - FastAPI backend
 - SvelteKit frontend
+- native Android app
 - authenticated users and admin user management
 - signed-in user profile editing
 - role-aware settings visibility
@@ -719,6 +720,62 @@ The reference implementation currently includes:
   safeguards, and broader primitive use within the current schema
 - renderer material effects, wobble, rotation, arrangement paths, density/fade,
   and canvas aspect support
+
+The Android app is a Kotlin + Jetpack Compose native package with Room/SQLite
+as its local data layer.  It is a single-user application package rather than a
+multi-user server client.  Server/web remains the development master for DDL
+interpretation, Stage 1.5 expansion, Score repair, SVG rendering, history
+metadata, canvas aspect values, and render hash semantics.  Android-specific UI
+decisions are allowed only when they are explicit mobile equivalents or
+documented omissions.
+
+Android local LLM support uses LiteRT-LM with Gemma 4 E2B as the standard local
+model and Gemma 4 E4B as the higher-quality option.  Model license acceptance,
+download state, re-download, checksum validation, and model file paths are
+stored in Room.  The LiteRT-LM GPU backend is required; CPU fallback is not part
+of the Android behavior.
+
+Android simplifies model selection to one drawing model for instruction
+generation, Stage 1, and Stage 2, while preserving server-compatible
+`stage1_model` and `stage2_model` fields in settings, JSON display, exported
+JSON, history records, and render metadata.  The Model Settings page exposes
+provider panels for adding services, editing service names and base URLs,
+adding or deleting API keys, fetching provider model lists, and choosing
+published models.  Connection kind is set when a service is created and is not
+edited from existing service panels.  Fetched candidate models are stored
+separately from the published models shown in the drawing model picker.
+
+The Android drawing view provides mobile-specific controls: pinch zoom, pan,
+left/right image swipes for history navigation, and double-tap presentation
+mode.  Presentation mode hides other UI, centers the image, rotates landscape
+canvases for portrait phones, and chooses the surrounding background from the
+rendered image background.  White-background images use the dark app
+background; black-background images use a light background.
+
+The Android history view intentionally differs from the server/web UI.  It uses
+a three-column thumbnail grid and omits trash, list view, bulk selection, user
+management, DB administration, plugin administration, and server log controls
+because the Android package is single-user and mobile-first.
+
+Android SVG/PNG export follows the server/web `CanvasPanel` intent.  SVG export
+is a menu with display, editable, and compatibility profiles.  PNG export is a
+menu backed by Room `export_templates`, with `1080px`, `2160px`, and `4320px`
+Y-axis defaults.  Android opens the platform share sheet instead of browser
+downloads.
+
+Android render metadata includes `render_canvas_aspect_id` and
+`render_canvas_aspect_ratio`, derived from the same canvas aspect definitions
+ported from the server/web system plugin.  Android headless render and
+comparison tooling can run without the Compose UI and is used with the server
+CLI `--input-mode ddl` flow to compare DDL-to-render and Score-to-render
+parity.
+
+Android versioning is independent of the web build number.  `android/VERSION`
+is the source for Android `versionName`, and `android/BUILD_NUMBER` is the
+source for Android `versionCode`.  For the v1.48 generation, the Android values
+start at `1.48.0-android.1` and `148001`.  The Android Settings menu exposes
+version details including version name, version code, build type, application
+id, source spec generation, and render engine version.
 
 History records carry a server-side `render_hash`: a 64-character SHA-256 hex
 hash of the rendered content and render metadata.  History APIs, paint/compose

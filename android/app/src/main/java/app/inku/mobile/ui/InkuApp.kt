@@ -106,9 +106,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.core.content.FileProvider
+import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.ColorCatalogs
+import app.inku.mobile.data.model.CompatibilityConstants
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -1545,6 +1547,7 @@ private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier
         SettingsPane.OutputFiles -> OutputFilesSettingsPanel(state, viewModel, modifier)
         SettingsPane.ColorCatalog -> ColorCatalogSelectionPanel(state, viewModel, modifier)
         SettingsPane.Canvas -> CanvasSelectionPanel(state, viewModel, modifier)
+        SettingsPane.Version -> VersionInfoPanel(viewModel, modifier)
     }
 }
 
@@ -1579,7 +1582,12 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
             sub = CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect,
             onClick = viewModel::openCanvasSelection,
         )
-        Text("BUILD debug · v0.1.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+        SettingsListItem(
+            mark = "#",
+            title = "バージョン情報",
+            sub = "Android ${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}",
+            onClick = { viewModel.setSettingsPane(SettingsPane.Version) },
+        )
     }
 }
 
@@ -1773,6 +1781,43 @@ private fun OutputFilesSettingsPanel(state: InkuUiState, viewModel: InkuViewMode
 }
 
 @Composable
+private fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SettingsHeader(SettingsPane.Version, viewModel)
+        SettingsCard("inku Android", "アプリケーション", BuildConfig.VERSION_NAME) {
+            VersionInfoRow("versionName", BuildConfig.VERSION_NAME)
+            VersionInfoRow("versionCode", BuildConfig.VERSION_CODE.toString())
+            VersionInfoRow("build type", BuildConfig.BUILD_TYPE)
+            VersionInfoRow("applicationId", BuildConfig.APPLICATION_ID)
+            VersionInfoRow("source spec", "inku v1.48")
+            VersionInfoRow("render engine", "${CompatibilityConstants.renderEngineId} ${CompatibilityConstants.renderEngineVersion}")
+        }
+    }
+}
+
+@Composable
+private fun VersionInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            value,
+            modifier = Modifier.padding(start = 12.dp).weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.End,
+        )
+    }
+}
+
+@Composable
 private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     var modelAssetDialog by remember { mutableStateOf<app.inku.mobile.data.db.ModelAssetEntity?>(null) }
     Column(
@@ -1808,6 +1853,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     statusMessage = state.message,
                 )
             }
+            AddProviderCard(onAdd = viewModel::saveProviderSetting)
         }
     }
     modelAssetDialog?.let { asset ->
@@ -1834,13 +1880,12 @@ private fun ProviderConnectionCard(
     val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
     val keySet = !provider.encryptedApiKey.isNullOrBlank()
     var displayName by remember(provider.providerId, provider.displayName) { mutableStateOf(provider.displayName) }
-    var kind by remember(provider.providerId, provider.kind) { mutableStateOf(provider.kind) }
+    val kind = provider.kind
     var baseUrl by remember(provider.providerId, provider.baseUrl) { mutableStateOf(provider.baseUrl.orEmpty()) }
     var apiKey by remember(provider.providerId, provider.encryptedApiKey) { mutableStateOf("") }
     var editNameOpen by remember(provider.providerId) { mutableStateOf(false) }
     var editBaseUrlOpen by remember(provider.providerId) { mutableStateOf(false) }
     var editApiKeyOpen by remember(provider.providerId) { mutableStateOf(false) }
-    var kindMenuOpen by remember(provider.providerId) { mutableStateOf(false) }
     var modelPickerOpen by remember(provider.providerId) { mutableStateOf(false) }
     var confirmClearKey by remember(provider.providerId) { mutableStateOf(false) }
     var confirmDeleteService by remember(provider.providerId) { mutableStateOf(false) }
@@ -1850,48 +1895,16 @@ private fun ProviderConnectionCard(
     val publishedModelIds = remember(provider.providerId, provider.publishedModelsJson) {
         parsePublishedModelIds(provider.publishedModelsJson)
     }
-    val kindLabel = connectionKindLabel(kind)
     val apiKeyState = if (keySet) "APIキー設定済み" else "APIキー未設定"
     SettingsCard(
         provider.displayName,
         "Service ID: ${provider.providerId}",
-        if (provider.isEnabled) "有効" else "無効",
+        "",
         titleAction = {
             SecondarySmallButton(text = "変更", onClick = { editNameOpen = true })
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("接続形式", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Box {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable { kindMenuOpen = true },
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF1B1B1A),
-                        border = BorderStroke(1.dp, Color(0xFF34302B)),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(kindLabel, style = MaterialTheme.typography.bodySmall)
-                            Text("▾", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    DropdownMenu(expanded = kindMenuOpen, onDismissRequest = { kindMenuOpen = false }) {
-                        connectionKindOptions().forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option.second) },
-                                onClick = {
-                                    kind = option.first
-                                    kindMenuOpen = false
-                                },
-                            )
-                        }
-                    }
-                }
-            }
             ModelSettingValueRow(
                 label = "Base URL",
                 value = baseUrl.ifBlank { provider.baseUrl ?: "-" },
@@ -1938,13 +1951,16 @@ private fun ProviderConnectionCard(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                SecondarySmallButton(text = "サービス削除", onClick = { confirmDeleteService = true }, enabled = !provider.isDefaultLocal, modifier = Modifier.weight(1f))
-                PrimarySmallButton(
-                    text = "保存",
-                    onClick = { onSave(provider.providerId, displayName, kind, baseUrl, "", publishedModels) },
-                    modifier = Modifier.weight(1f),
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                OutlinedButton(
+                    onClick = { confirmDeleteService = true },
+                    enabled = !provider.isDefaultLocal,
+                    modifier = Modifier.height(32.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                ) {
+                    Text("サービス削除", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                }
             }
         }
     }
@@ -2271,6 +2287,7 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.OutputFiles -> "出力ファイル"
     SettingsPane.ColorCatalog -> "色カタログ"
     SettingsPane.Canvas -> "キャンバス"
+    SettingsPane.Version -> "バージョン情報"
 }
 
 private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
@@ -2282,6 +2299,7 @@ private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.OutputFiles -> "共有シート · PNG/SVG/JSON"
     SettingsPane.ColorCatalog -> "render color catalog"
     SettingsPane.Canvas -> "canvas aspect"
+    SettingsPane.Version -> "version / build"
 }
 
 @Composable
@@ -2540,7 +2558,9 @@ private fun SettingsCard(title: String, sub: String, status: String, titleAction
                 titleAction?.invoke()
             }
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            if (status.isNotBlank()) {
+                Text(status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            }
             actions()
         }
     }

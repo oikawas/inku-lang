@@ -867,3 +867,43 @@ by making the `SVG` and `PNG` controls menu buttons rather than direct actions.
   render metadata, and render hash are unchanged.
 - The older Android UI that expanded export choices as horizontally arranged
   chips is no longer used.
+
+## 2026-05-09 Android Version / Build Management
+
+The Android app has Android-specific version and build metadata that is
+separate from the web/server `web/BUILD_NUMBER`.
+
+- `android/VERSION` is the source of truth for Android `versionName`.
+- `android/BUILD_NUMBER` is the source of truth for Android `versionCode` and
+  is managed as a monotonically increasing integer.
+- `android/app/build.gradle.kts` reads both files instead of hard-coding
+  `versionName` or `versionCode`.
+- The initial v1.48-generation Android values are
+  `versionName=1.48.0-android.1` and `versionCode=148001`.
+- Increment `android/BUILD_NUMBER` for Android UI or behavior changes that are
+  installed or distributed to devices.
+- Update `android/VERSION` when Android follows a new server/spec generation or
+  when DB schema, history JSON, render metadata, or export compatibility
+  changes.
+- The Settings menu includes a Version Information panel showing
+  `versionName`, `versionCode`, build type, application id, source spec, and
+  render engine version.
+- Version/build metadata must not contain API keys, device IDs, local server
+  details, or personal environment paths.
+
+## 2026-05-09 Model Settings Panel Cleanup
+
+The Android Model Settings panel now treats connection kind as a creation-time
+service property.
+
+- Existing service panels no longer show or edit `接続形式`.
+- Existing service kind remains stored as `provider.kind` and is preserved when
+  saving service name, Base URL, API key, or published models.
+- The per-service `保存` button is removed because it only saved connection
+  kind changes.
+- The service-add button is shown at the end of the provider list. Its dialog
+  collects service id, service name, connection kind, Base URL, and API key.
+- `有効` / `無効` status text is removed from provider panels because it only
+  reflected DB `isEnabled`, not a live connection check.
+- The `サービス削除` button is compact and right-aligned at the bottom of each
+  provider panel.

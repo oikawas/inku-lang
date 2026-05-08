@@ -601,3 +601,30 @@ Android 版の記述パネルでは、モバイル操作に合わせた server/w
 - `gradle :app:compileDebugKotlin` 成功。
 - `gradle :app:assembleDebug` 成功。
 - Pixel 9 へ debug APK を install し、記述パネルの描画画像上で左スワイプ / 右スワイプによる履歴切替を確認。
+
+## 2026-05-08 Android 固有のモデル選択一本化
+
+Android 版のモデル選択 UI は、モバイル操作の単純化を優先し、Stage 1 / Stage 2 を別々に選ばせず単一の「描画モデル」選択として扱う。
+
+- 記述画面のモデル選択ダイアログ、設定画面のモデル選択パネルは、Stage 1 / Stage 2 個別選択ではなく 1 つのモデル選択を表示する。
+- 記述画面のモデル選択ダイアログは、モバイルでの即時選択を優先し、server/web 互換メタデータ維持に関する説明文を表示しない。
+- 記述画面のモデル選択ダイアログは、単一選択に必要な provider / model list / OK / cancel に絞ったコンパクトなサイズにする。
+- ユーザーがモデルを選択した場合、Android 内部状態では `selectedModelId` と `selectedStage2ModelId` の両方へ同じ model id を設定する。
+- 設定保存は将来の個別オプション復活に備え、従来通り `model_selection.stage1_model` と `model_selection.stage2_model` を保持する。
+- 履歴 DB、JSON 表示、JSON export、render metadata の `stage1_model` / `stage2_model` は server/web 互換のため維持する。
+- Repository / pipeline の引数も `stage1ModelId` / `stage2ModelId` を維持し、Android UI の単一選択値を両方へ渡す。
+- 既存設定に Stage 1 / Stage 2 の異なる値が残っている場合、Android UI 復元時は Stage 1 側を優先して単一選択へ正規化する。
+
+この仕様は Android UI の独自差分であり、サーバー互換の保存形式と履歴メタデータを変更するものではない。
+
+## 2026-05-08 Android 固有のプレゼンテーション表示
+
+Android 版の記述画面では、描画画像を 100% 表示中にダブルタップするとプレゼンテーション表示へ移行する。
+
+- プレゼンテーション表示中は、描画画像以外のアプリ内 UI を非表示にし、画像表示領域を画面全体へ広げる。
+- 画像は画面中央に配置し、拡大率は画像全体が切れずに表示される最大サイズへ自動調整する。
+- 横長キャンバスの画像は、Pixel 9 の縦画面に合わせて 90 度回転し、長辺が画面の長辺方向へ揃うように表示する。
+- プレゼンテーション表示中は、ピンチ / パンによる拡大移動を行わず、ダブルタップで通常の 100% 表示へ戻る。
+- 通常表示時のピンチ拡大、パン、左右スワイプによる履歴切替は維持する。
+
+この挙動はモバイル閲覧用の Android 独自 UI であり、履歴 DB、SVG/PNG 書き出し、render metadata の内容は変更しない。

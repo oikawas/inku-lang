@@ -83,6 +83,7 @@ data class InkuUiState(
     val canvasZoom: Float = 1.0f,
     val canvasPanX: Float = 0f,
     val canvasPanY: Float = 0f,
+    val canvasPresentationMode: Boolean = false,
 )
 
 data class BatchFailure(
@@ -235,7 +236,11 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setSelectedModel(modelId: String) {
-        localState.value = localState.value.copy(selectedModelId = modelId, message = null)
+        localState.value = localState.value.copy(
+            selectedModelId = modelId,
+            selectedStage2ModelId = modelId,
+            message = null,
+        )
     }
 
     fun setStage1Model(modelId: String) {
@@ -285,12 +290,18 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun confirmModelSelection() {
         modelSelectionSnapshot = null
         val current = localState.value
+        val unifiedModelId = current.selectedModelId
         persistSetting("model_selection", JSONObject()
-            .put("stage1_model", current.selectedModelId)
-            .put("stage2_model", current.selectedStage2ModelId)
+            .put("stage1_model", unifiedModelId)
+            .put("stage2_model", unifiedModelId)
             .put("include_thinking", current.includeThinking)
             .toString())
-        localState.value = current.copy(modelSelectionOpen = false, message = null)
+        localState.value = current.copy(
+            selectedModelId = unifiedModelId,
+            selectedStage2ModelId = unifiedModelId,
+            modelSelectionOpen = false,
+            message = null,
+        )
     }
 
     fun cancelModelSelection() {
@@ -342,16 +353,25 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setCanvasZoom(value: Float) {
-        localState.value = localState.value.copy(canvasZoom = value.coerceIn(0.5f, 3.0f))
+        localState.value = localState.value.copy(canvasZoom = value.coerceIn(0.5f, 8.0f), canvasPresentationMode = false)
     }
 
     fun scaleCanvasZoom(multiplier: Float) {
         val current = localState.value
-        localState.value = current.copy(canvasZoom = (current.canvasZoom * multiplier).coerceIn(0.5f, 3.0f))
+        localState.value = current.copy(canvasZoom = (current.canvasZoom * multiplier).coerceIn(0.5f, 8.0f))
     }
 
     fun resetCanvasZoom() {
-        localState.value = localState.value.copy(canvasZoom = 1.0f, canvasPanX = 0f, canvasPanY = 0f)
+        localState.value = localState.value.copy(canvasZoom = 1.0f, canvasPanX = 0f, canvasPanY = 0f, canvasPresentationMode = false)
+    }
+
+    fun enterCanvasPresentationMode() {
+        localState.value = localState.value.copy(
+            canvasZoom = 1.0f,
+            canvasPanX = 0f,
+            canvasPanY = 0f,
+            canvasPresentationMode = true,
+        )
     }
 
     fun panCanvas(dx: Float, dy: Float) {
@@ -927,6 +947,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun validateSelectedModels(state: InkuUiState): String? {
         return listOf("Stage1" to state.selectedModelId, "Stage2" to state.selectedStage2ModelId)
+            .distinctBy { it.second }
             .firstNotNullOfOrNull { (stage, modelId) ->
                 if (!modelId.startsWith("local-litert-lm:")) return@firstNotNullOfOrNull null
                 val asset = state.modelAssets.firstOrNull { it.modelId == modelId }
@@ -953,6 +974,9 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val batchRandom = repository.getSetting("batch_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
         val batchHistory = repository.getSetting("batch_prompt_history")?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
         val modelSelection = repository.getSetting("model_selection")?.let(::JSONObject)
+        val restoredStage1Model = modelSelection?.optString("stage1_model")?.takeIf { it.isNotBlank() }
+        val restoredStage2Model = modelSelection?.optString("stage2_model")?.takeIf { it.isNotBlank() }
+        val restoredUnifiedModel = restoredStage1Model ?: restoredStage2Model ?: current.selectedModelId
         val thinking = modelSelection?.optBoolean("include_thinking", current.includeThinking)
             ?: repository.getSetting("include_thinking")?.let { JSONObject(it).optBoolean("enabled", current.includeThinking) }
             ?: current.includeThinking
@@ -969,8 +993,8 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             batchRandomColorCatalog = batchRandom,
             batchPromptHistory = batchHistory,
             includeThinking = thinking,
-            selectedModelId = modelSelection?.optString("stage1_model", current.selectedModelId)?.takeIf { it.isNotBlank() } ?: current.selectedModelId,
-            selectedStage2ModelId = modelSelection?.optString("stage2_model", current.selectedStage2ModelId)?.takeIf { it.isNotBlank() } ?: current.selectedStage2ModelId,
+            selectedModelId = restoredUnifiedModel,
+            selectedStage2ModelId = restoredUnifiedModel,
         )
     }
 

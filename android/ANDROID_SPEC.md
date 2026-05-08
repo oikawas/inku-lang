@@ -671,3 +671,49 @@ Verification:
 - `gradle :app:assembleDebug` succeeded.
 - The debug APK was installed on Pixel 9, and left / right swipes on the
   Compose preview image were verified to switch history items.
+
+## 2026-05-08 Android-Specific Unified Model Selection
+
+The Android model-selection UI prioritizes mobile simplicity. It exposes a
+single drawing-model choice instead of separate Stage 1 and Stage 2 selectors.
+
+- The Compose model-selection dialog and Settings model-selection panel show
+  one drawing-model selector, not separate Stage 1 / Stage 2 selectors.
+- The Compose model-selection dialog prioritizes fast mobile selection and does
+  not show explanatory text about preserving server/web-compatible metadata.
+- The Compose model-selection dialog should stay compact, containing only the
+  provider selector, model list, OK, and cancel controls required for the
+  unified selection flow.
+- When the user selects a model, Android writes the same model id to both
+  `selectedModelId` and `selectedStage2ModelId`.
+- Persisted settings keep the existing `model_selection.stage1_model` and
+  `model_selection.stage2_model` fields so future per-stage options can be
+  reintroduced without changing the storage shape.
+- History DB records, JSON display, JSON export, and render metadata continue
+  to include server/web-compatible `stage1_model` and `stage2_model` fields.
+- Repository and pipeline calls continue to receive `stage1ModelId` and
+  `stage2ModelId`; Android passes the unified UI selection to both arguments.
+- If old settings contain different Stage 1 and Stage 2 values, Android
+  normalizes the UI selection on restore by preferring the Stage 1 value.
+
+This is an Android UI-specific difference. It does not change the
+server-compatible storage format or history metadata.
+
+## 2026-05-08 Android-Specific Presentation View
+
+On the Android Compose screen, double-tapping the drawing image while it is at
+100% opens a presentation view.
+
+- Presentation view hides the app UI around the drawing and expands the image
+  area to the full screen.
+- The drawing is centered, and its scale is automatically chosen as the largest
+  size that still keeps the entire image visible.
+- Landscape canvases are rotated 90 degrees on Pixel 9 portrait screens so the
+  drawing's long edge aligns with the screen's long edge.
+- While presentation view is active, pinch and pan transforms are disabled.
+  Double-tapping returns to the normal 100% view.
+- Normal pinch zoom, pan, and left/right history swipes remain available outside
+  presentation view.
+
+This is an Android-only mobile viewing behavior. It does not change history DB
+records, SVG/PNG export output, or render metadata.

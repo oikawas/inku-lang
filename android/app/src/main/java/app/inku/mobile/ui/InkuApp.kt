@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -207,13 +209,18 @@ fun InkuApp() {
 
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
-            bottomBar = { BottomNavigationBar(state.tab, viewModel) },
+            bottomBar = {
+                if (!state.canvasPresentationMode) {
+                    BottomNavigationBar(state.tab, viewModel)
+                }
+            },
             containerColor = MaterialTheme.colorScheme.background,
         ) { padding ->
+            val contentPadding = if (state.canvasPresentationMode) PaddingValues(0.dp) else padding
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(contentPadding)
                     .imePadding()
                     .background(MaterialTheme.colorScheme.background),
             ) {
@@ -316,15 +323,15 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
         title = { Text("モデル選択") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().height(560.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 WebStyleModelStageEditor(
-                    title = "Stage 1",
-                    sub = "自由記述 → 正規化DDL",
+                    title = "描画モデル",
+                    sub = "Stage 1 / Stage 2 共通",
                     state = state,
                     selectedModelId = state.selectedModelId,
-                    onSelectModel = viewModel::setStage1Model,
+                    onSelectModel = viewModel::setSelectedModel,
                 )
                 if (state.selectedModelId.contains("qwen3")) {
                     SettingCheckRow(
@@ -333,13 +340,6 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
                         onCheckedChange = viewModel::setIncludeThinking,
                     )
                 }
-                WebStyleModelStageEditor(
-                    title = "Stage 2",
-                    sub = "正規化DDL → Score JSON",
-                    state = state,
-                    selectedModelId = state.selectedStage2ModelId,
-                    onSelectModel = viewModel::setStage2Model,
-                )
             }
         },
         confirmButton = {
@@ -648,6 +648,10 @@ private fun canvasLabel(state: InkuUiState): String {
 
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
+    if (state.canvasPresentationMode) {
+        CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize())
+        return
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -662,7 +666,6 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             CanvasHeroCard(state, viewModel)
         } else {
             CanvasHeroCard(state, viewModel)
-            ConditionChips(state, viewModel)
             DrawPanel(state, viewModel)
         }
         Spacer(Modifier.height(96.dp))
@@ -670,7 +673,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
 }
 
 @Composable
-private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
+private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier.fillMaxWidth()) {
     val item = state.selectedHistory
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -678,11 +681,12 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
     var canvasMessage by remember { mutableStateOf<String?>(null) }
     var svgMenuOpen by remember { mutableStateOf(false) }
     var pngMenuOpen by remember { mutableStateOf(false) }
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+    val presentation = state.canvasPresentationMode
+    BoxWithConstraints(modifier = modifier) {
         val ratio = canvasAspectRatio(state.selectedCanvasAspect)
-        val previewHeight = (maxWidth / ratio).coerceAtMost(330.dp)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item?.let {
+        val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(330.dp)
+        Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!presentation) item?.let {
                 WrapRow {
                     MiniPill(text = if (it.starred) "★" else "☆", selected = it.starred, onClick = { viewModel.toggleStar(it) })
                     MiniPill(
@@ -698,9 +702,7 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
                 }
             }
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(previewHeight)
+                modifier = (if (presentation) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(previewHeight))
                     .border(1.dp, Color(0x1A000000)),
                 color = ServerCanvasAreaColor,
                 shape = RoundedCornerShape(0.dp),
@@ -712,6 +714,8 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
                     } else {
                         ArtworkPreview(
                             item,
+                            presentationMode = presentation,
+                            rotateLandscape = presentation && ratio > 1f,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .pointerInput(item.id, state.canvasZoom) {
@@ -748,21 +752,34 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
                                 }
                                 .pointerInput(Unit) {
                                     detectTransformGestures { _, pan, zoom, _ ->
-                                        if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
-                                        if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
+                                        if (!presentation) {
+                                            if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
+                                            if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
+                                        }
                                     }
                                 }
                                 .graphicsLayer(
-                                    scaleX = state.canvasZoom,
-                                    scaleY = state.canvasZoom,
-                                    translationX = state.canvasPanX,
-                                    translationY = state.canvasPanY,
-                                ),
+                                    scaleX = if (presentation) 1f else state.canvasZoom,
+                                    scaleY = if (presentation) 1f else state.canvasZoom,
+                                    translationX = if (presentation) 0f else state.canvasPanX,
+                                    translationY = if (presentation) 0f else state.canvasPanY,
+                                )
+                                .pointerInput(item.id, state.canvasZoom, presentation) {
+                                    detectTapGestures(
+                                        onDoubleTap = {
+                                            if (state.canvasPresentationMode || state.canvasZoom > 1.05f) {
+                                                viewModel.resetCanvasZoom()
+                                            } else {
+                                                viewModel.enterCanvasPresentationMode()
+                                            }
+                                        },
+                                    )
+                                },
                         )
                     }
                 }
             }
-            item?.let {
+            if (!presentation) item?.let {
                 WrapRow {
                     RenderTab.entries.forEach { tab ->
                         MiniPill(
@@ -827,8 +844,8 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
             }
         }
     }
-    canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
-    item?.let {
+    if (!presentation) canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
+    if (!presentation) item?.let {
         when (state.renderTab) {
             RenderTab.Artwork -> Unit
             RenderTab.Prompt -> RenderTextView(renderPromptText(it), Modifier.fillMaxWidth().height(180.dp))
@@ -855,6 +872,16 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
         ) {
             CompactLabel("指示")
             Spacer(Modifier.weight(1f))
+            MiniPill(
+                text = "◐ ${shortCatalogLabel(state)}",
+                onClick = viewModel::openCatalogSelection,
+                modifier = Modifier.widthIn(max = 112.dp),
+            )
+            MiniPill(
+                text = "◇ ${shortModelLabel(state)}",
+                onClick = viewModel::openModelSelection,
+                modifier = Modifier.widthIn(max = 124.dp),
+            )
             MiniPill("新規作成", onClick = viewModel::clearPrompt)
         }
         ImeAwareOutlinedTextField(
@@ -1291,20 +1318,18 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
             SecondarySmallButton(text = "取消", onClick = viewModel::cancelModelSelection)
             PrimarySmallButton(text = "決定", onClick = viewModel::confirmModelSelection)
         }
-        SettingsCard("Stage 1", "自由記述 → 正規化DDL", selectedModelLabel(state)) {
+        SettingsCard("描画モデル", "Stage 1 / Stage 2 共通", selectedModelLabel(state)) {
             ModelChoiceRow(
                 choices = modelChoices,
                 selectedValue = state.selectedModelId,
-                onSelect = viewModel::setStage1Model,
+                onSelect = viewModel::setSelectedModel,
             )
         }
-        SettingsCard("Stage 2", "正規化DDL → Score JSON", selectedStage2ModelLabel(state)) {
-            ModelChoiceRow(
-                choices = modelChoices,
-                selectedValue = state.selectedStage2ModelId,
-                onSelect = viewModel::setStage2Model,
-            )
-        }
+        Text(
+            "内部保存と履歴メタデータはserver互換のstage1_model / stage2_modelを維持し、Android UIでは同じモデルを両Stageへ適用します。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         SecondaryActionButton(text = "接続先設定を開く", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
     }
 }
@@ -1709,7 +1734,7 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
 
 private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "List + Detail"
-    SettingsPane.ModelSelection -> "Stage 1 / Stage 2"
+    SettingsPane.ModelSelection -> "Stage 1 / Stage 2 共通"
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
     SettingsPane.Export -> "PNG / SVG templates"
     SettingsPane.Misc -> "言語・テーマ・密度"
@@ -2160,6 +2185,20 @@ private fun selectedModelLabel(state: InkuUiState): String {
         ?: state.selectedModelId.substringAfterLast(":")
 }
 
+private fun shortCatalogLabel(state: InkuUiState): String {
+    return ColorCatalogs.get(state.selectedCatalogId).name.compactLabel(12)
+}
+
+private fun shortModelLabel(state: InkuUiState): String {
+    return selectedModelLabel(state).compactLabel(14)
+}
+
+private fun String.compactLabel(maxChars: Int): String {
+    val clean = trim().replace(Regex("\\s+"), " ")
+    if (clean.length <= maxChars) return clean
+    return clean.take(maxChars - 1).trimEnd() + "…"
+}
+
 private fun selectedStage2ModelLabel(state: InkuUiState): String {
     modelChoicesFor(state).firstOrNull { it.id == state.selectedStage2ModelId }?.let { return it.label }
     return state.modelAssets.firstOrNull { it.modelId == state.selectedStage2ModelId }?.displayName
@@ -2211,7 +2250,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    state.message ?: "LLM Stage1 ${selectedModelLabel(state)} | Stage2 ${selectedStage2ModelLabel(state)}",
+                    state.message ?: "LLM ${selectedModelLabel(state)} · Stage 1/2共通",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -2610,8 +2649,7 @@ private fun ImeAwareOutlinedTextField(
 private fun MetaPanel(state: InkuUiState) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("LLM Stage1 · ${selectedModelLabel(state)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("LLM Stage2 · ${selectedStage2ModelLabel(state)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("LLM · ${selectedModelLabel(state)} · Stage 1/2共通", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Color · ${ColorCatalogs.get(state.selectedCatalogId).name}   Canvas · ${state.selectedCanvasAspect}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.message?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
@@ -2632,6 +2670,7 @@ private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Un
         style = MaterialTheme.typography.labelSmall,
         color = if (selected) Color(0xFF101010) else MaterialTheme.colorScheme.onSurface,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 
@@ -2789,17 +2828,22 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
 }
 
 @Composable
-private fun ArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifier) {
+private fun ArtworkPreview(
+    item: HistoryItemEntity,
+    modifier: Modifier = Modifier,
+    presentationMode: Boolean = false,
+    rotateLandscape: Boolean = false,
+) {
     val svg = remember(item.id, item.displaySvg) {
         runCatching { SVG.getFromString(item.displaySvg) }.getOrNull()
     }
     Surface(color = ServerCanvasBoxColor, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(ServerCanvasBoxColor)
+            drawRect(if (presentationMode) Color.White else ServerCanvasBoxColor)
             val parsed = svg ?: return@Canvas
             val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
             val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
-            val documentAspect = documentWidth / documentHeight
+            val documentAspect = if (rotateLandscape) documentHeight / documentWidth else documentWidth / documentHeight
             val boxAspect = size.width / size.height
             val drawWidth: Float
             val drawHeight: Float
@@ -2815,9 +2859,19 @@ private fun ArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifie
             drawIntoCanvas { canvas ->
                 val native = canvas.nativeCanvas
                 native.save()
-                native.translate(left, top)
-                parsed.setDocumentWidth(drawWidth)
-                parsed.setDocumentHeight(drawHeight)
+                if (rotateLandscape) {
+                    val contentWidth = drawHeight
+                    val contentHeight = drawWidth
+                    native.translate(size.width / 2f, size.height / 2f)
+                    native.rotate(90f)
+                    native.translate(-contentWidth / 2f, -contentHeight / 2f)
+                    parsed.setDocumentWidth(contentWidth)
+                    parsed.setDocumentHeight(contentHeight)
+                } else {
+                    native.translate(left, top)
+                    parsed.setDocumentWidth(drawWidth)
+                    parsed.setDocumentHeight(drawHeight)
+                }
                 parsed.renderToCanvas(native)
                 native.restore()
             }

@@ -701,8 +701,7 @@ server-compatible storage format or history metadata.
 
 ## 2026-05-08 Android-Specific Presentation View
 
-On the Android Compose screen, double-tapping the drawing image while it is at
-100% opens a presentation view.
+On Android, double-tapping the drawing image opens a presentation view.
 
 - Presentation view hides the app UI around the drawing and expands the image
   area to the full screen.
@@ -720,7 +719,7 @@ On the Android Compose screen, double-tapping the drawing image while it is at
 - For non-white and non-black drawing backgrounds, Android uses the extracted
   drawing background color as the margin background.
 - While presentation view is active, pinch and pan transforms are disabled.
-  Double-tapping returns to the normal 100% view.
+  Double-tapping returns to the normal view.
 - Normal pinch zoom, pan, and left/right history swipes remain available outside
   presentation view.
 
@@ -824,11 +823,21 @@ start / stop action.
 - After demo start, Android runs the same conceptual loop as the server/web
   client: generate instruction, render, wait for the configured interval, and
   repeat.
-- The Demo settings include `Random color catalog for each render`. When enabled,
-  Android chooses a random color catalog for each render cycle immediately before
-  calling `repository.paint`.
-- The random color catalog option is persisted in Room `app_settings` as
-  `demo_random_color_catalog` and restored on restart.
+- The model used for demo instruction generation follows Android's main model
+  selection. The Demo panel does not show a separate prompt-generation model
+  settings area.
+- Demo rendering keeps random color catalog selection always enabled as an
+  Android-specific behavior. The Demo settings panel does not show a control for
+  this option, and Android chooses a random color catalog immediately before
+  each `repository.paint` call.
+- The interval row is displayed in `-`, `xx sec`, `+` order.
+- Double-tapping the image enters presentation mode. Demo rendering continues in
+  presentation mode, and the bottom-right corner shows the remaining display
+  time for the current image.
+- LLM status text says `指示文生成/Stage1/2共通` to show that Android's single
+  model selection is shared by instruction generation, Stage 1, and Stage 2.
+- Even if an older `demo_random_color_catalog` setting exists, Android restores
+  Demo random color catalog behavior as always enabled.
 - The seed phrase and interval are also saved as demo settings and restored on
   restart.
 - Demo renders continue to use the existing Android behavior of saving to normal

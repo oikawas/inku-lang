@@ -49,7 +49,7 @@ data class InkuUiState(
     val batchLatestHashShort: String? = null,
     val demoSeed: String = "春の光",
     val demoIntervalSeconds: Int = 30,
-    val demoRandomColorCatalog: Boolean = false,
+    val demoRandomColorCatalog: Boolean = true,
     val demoGeneratedPrompt: String = "",
     val demoGeneratedDdl: String? = null,
     val demoWaitingSeconds: Int? = null,
@@ -798,7 +798,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                 while (isActive) {
                     val cycle = state.value
                     val prompt = demoPrompt(cycle.demoSeed)
-                    val catalogId = if (cycle.demoRandomColorCatalog) randomColorCatalogId() else cycle.selectedCatalogId
+                    val catalogId = randomColorCatalogId()
                     val startedAt = System.currentTimeMillis()
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
@@ -1057,7 +1057,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val batchRandom = repository.getSetting("batch_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
         val demoSeed = repository.getSetting("demo_seed_phrase")?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = repository.getSetting("demo_interval_seconds")?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
-        val demoRandom = repository.getSetting("demo_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.demoRandomColorCatalog) } ?: current.demoRandomColorCatalog
+        val demoRandom = true
         val batchHistory = repository.getSetting("batch_prompt_history")?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
         val modelSelection = repository.getSetting("model_selection")?.let(::JSONObject)
         val restoredStage1Model = modelSelection?.optString("stage1_model")?.takeIf { it.isNotBlank() }

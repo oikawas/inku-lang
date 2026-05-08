@@ -230,11 +230,15 @@ fun InkuApp() {
                     .imePadding()
                     .background(MaterialTheme.colorScheme.background),
             ) {
-                when (state.tab) {
-                    AppTab.Compose -> ComposeScreen(state, viewModel)
-                    AppTab.History -> HistoryScreen(state, history, viewModel)
-                    AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
-                    AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
+                if (state.canvasPresentationMode) {
+                    CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize())
+                } else {
+                    when (state.tab) {
+                        AppTab.Compose -> ComposeScreen(state, viewModel)
+                        AppTab.History -> HistoryScreen(state, history, viewModel)
+                        AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
+                        AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
+                    }
                 }
                 if (state.confirmDdlOverwrite) {
                     DdlOverwriteDialog(viewModel)
@@ -754,7 +758,21 @@ private fun CanvasHeroCard(
                 shape = RoundedCornerShape(0.dp),
                 tonalElevation = 1.dp,
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(item?.id, state.canvasPresentationMode) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    if (state.canvasPresentationMode) {
+                                        viewModel.resetCanvasZoom()
+                                    } else {
+                                        viewModel.enterCanvasPresentationMode()
+                                    }
+                                },
+                            )
+                        },
+                ) {
                     if (item == null) {
                         CanvasPlaceholderPreview(modifier = Modifier.fillMaxSize())
                     } else {
@@ -811,18 +829,24 @@ private fun CanvasHeroCard(
                                     translationX = if (presentation) 0f else state.canvasPanX,
                                     translationY = if (presentation) 0f else state.canvasPanY,
                                 )
-                                .pointerInput(item.id, state.canvasZoom, presentation) {
-                                    detectTapGestures(
-                                        onDoubleTap = {
-                                            if (state.canvasPresentationMode || state.canvasZoom > 1.05f) {
-                                                viewModel.resetCanvasZoom()
-                                            } else {
-                                                viewModel.enterCanvasPresentationMode()
-                                            }
-                                        },
-                                    )
-                                },
                         )
+                    }
+                    if (presentation && state.demoWaitingSeconds != null) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(16.dp),
+                            shape = RoundedCornerShape(100),
+                            color = Color(0xCC11100F),
+                            border = BorderStroke(1.dp, Color(0x55EDE7DE)),
+                        ) {
+                            Text(
+                                "残り ${state.demoWaitingSeconds}秒",
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color(0xFFEDE7DE),
+                            )
+                        }
                     }
                 }
             }
@@ -1267,8 +1291,7 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             Column {
                 DemoSettingRow(
                     label = "表示間隔",
-                    value = "${state.demoIntervalSeconds} 秒",
-                    last = false,
+                    last = true,
                     action = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                             SecondarySmallButton(
@@ -1276,7 +1299,12 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
                                 onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds - 5) },
                                 enabled = !state.isDrawing && state.demoIntervalSeconds > 1,
                             )
-                            Text("${state.demoIntervalSeconds}s", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "${state.demoIntervalSeconds}秒",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
                             SecondarySmallButton(
                                 text = "+",
                                 onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds + 5) },
@@ -1284,20 +1312,6 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
                             )
                         }
                     },
-                )
-                DemoSettingRow(
-                    label = "指示文生成",
-                    value = "Android内蔵",
-                    sub = "描画モデルとは別レーン",
-                    last = false,
-                )
-                DemoSettingRow(
-                    label = "ランダム色カタログ",
-                    sub = "描画ごとに選択",
-                    checked = state.demoRandomColorCatalog,
-                    enabled = !state.isDrawing,
-                    onCheckedChange = viewModel::setDemoRandomColorCatalog,
-                    last = true,
                 )
             }
         }
@@ -1308,7 +1322,6 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
                 modifier = Modifier.fillMaxWidth().height(140.dp),
             )
         }
-        state.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
         MetaPanel(state)
     }
 }
@@ -2743,7 +2756,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    state.message ?: "LLM ${selectedModelLabel(state)} · Stage 1/2共通",
+                    state.message ?: "LLM ${selectedModelLabel(state)} · 指示文生成/Stage1/2共通",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -3146,7 +3159,7 @@ private fun ImeAwareOutlinedTextField(
 private fun MetaPanel(state: InkuUiState) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("LLM · ${selectedModelLabel(state)} · Stage 1/2共通", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("LLM · ${selectedModelLabel(state)} · 指示文生成/Stage1/2共通", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Color · ${ColorCatalogs.get(state.selectedCatalogId).name}   Canvas · ${state.selectedCanvasAspect}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.message?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)

@@ -1931,17 +1931,9 @@ private fun ProviderConnectionCard(
                 if (publishedModelIds.isEmpty()) {
                     Text("公開モデルは未選択です。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
                         publishedModelIds.forEach { modelId ->
-                            Surface(color = Color(0xFF20201E), shape = RoundedCornerShape(6.dp)) {
-                                Text(
-                                    modelDisplayName(modelId),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+                            PublishedModelChip(modelDisplayName(modelId))
                         }
                     }
                 }
@@ -2054,6 +2046,24 @@ private fun ModelSettingValueRow(label: String, value: String, action: String, o
             Text(value.ifBlank { "-" }, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         SecondarySmallButton(text = action, onClick = onAction)
+    }
+}
+
+@Composable
+private fun PublishedModelChip(label: String) {
+    Surface(
+        color = Color(0xFF20201E),
+        shape = RoundedCornerShape(100),
+        border = BorderStroke(1.dp, Color(0xFF34302B)),
+        modifier = Modifier.widthIn(max = 220.dp),
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

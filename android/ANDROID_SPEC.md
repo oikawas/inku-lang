@@ -842,3 +842,28 @@ start / stop action.
   restart.
 - Demo renders continue to use the existing Android behavior of saving to normal
   history, with a `[demo] ` prefix in the saved input.
+
+## 2026-05-08 Drawing Panel SVG / PNG Export Menus
+
+The Android drawing panel follows the server/web `CanvasPanel` export behavior
+by making the `SVG` and `PNG` controls menu buttons rather than direct actions.
+
+- The SVG button is labeled `SVG ▾` and opens a menu.
+- The SVG menu contains `表示用SVG`, `編集用SVG`, and `汎用SVG`.
+- `表示用SVG` exports through the Android share sheet with `svg_profile=display`.
+- `編集用SVG` exports with `svg_profile=editable` and includes metadata and ids
+  for vector editing.
+- `汎用SVG` exports with `svg_profile=compat`.
+- The SVG menu includes a help entry, matching the server/web intent of making
+  each SVG format's purpose visible.
+- The PNG button is labeled `PNG ▾` and opens a menu.
+- The PNG menu is populated from Room `export_templates` instead of hard-coded
+  size rows.
+- The default templates match server/web: `PNG 1080px`, `PNG 2160px`, and
+  `PNG 4320px`.
+- Each PNG menu row shows the template name and description. The selected
+  template's `height_px` is used as the PNG output Y-axis pixel size.
+- Selecting an SVG or PNG item opens the Android share sheet. History DB,
+  render metadata, and render hash are unchanged.
+- The older Android UI that expanded export choices as horizontally arranged
+  chips is no longer used.

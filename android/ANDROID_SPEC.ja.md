@@ -696,3 +696,20 @@ Android 版のデモパネルは、Claude Design DDL4 の `S3 — Demo（デモ�
 - 旧設定で `demo_random_color_catalog` が保存されていても、デモでは常時オンとして復元する。
 - シードフレーズと表示間隔もデモ設定として保存し、再起動後に復元する。
 - デモ履歴は既存 Android 実装に合わせて通常履歴へ保存し、入力履歴には `[demo] ` prefix を付ける。
+
+## 2026-05-08 描画パネルの SVG / PNG エクスポートメニュー
+
+Android 版の描画パネルでは、server/web 版 `CanvasPanel` の SVG / PNG エクスポート操作に合わせ、`SVG` ボタンと `PNG` ボタンを単発アクションではなくメニュー形式にする。
+
+- `SVG` ボタンは `SVG ▾` と表示し、押下でメニューを開く。
+- SVG メニューには `表示用SVG`、`編集用SVG`、`汎用SVG` を表示する。
+- `表示用SVG` は `svg_profile=display` として共有シートへ渡す。
+- `編集用SVG` は `svg_profile=editable` として共有シートへ渡し、編集用途のメタデータと ID を含める。
+- `汎用SVG` は `svg_profile=compat` として共有シートへ渡す。
+- SVG メニューには server/web 版と同じ意図でヘルプ導線を置き、各形式の用途を確認できるようにする。
+- `PNG` ボタンは `PNG ▾` と表示し、押下でメニューを開く。
+- PNG メニューは固定値を直書きせず、Room に保存された `export_templates` を表示する。
+- 初期テンプレートは server/web 版と同じ `PNG 1080px`、`PNG 2160px`、`PNG 4320px` とする。
+- PNG メニューの各項目はテンプレート名と説明を表示し、選択したテンプレートの `height_px` を PNG 生成の Y 軸ピクセル数として使用する。
+- SVG / PNG の選択後は Android の共有シートを開く。履歴 DB、render metadata、render hash は変更しない。
+- 旧 Android 実装のように、ボタン押下後にチップを横並び展開する UI は使用しない。

@@ -246,6 +246,11 @@ uppercase suffix used for UI and CLI references.
 artifact.  In normal server-generated output they match, but both are retained
 so render metadata remains visible even when old records or imported Scores are
 inspected.
+`render_canvas_aspect_id` is the explicit canvas aspect identifier for new
+metadata, and `render_canvas_aspect_ratio` records the actual rendered
+width/height ratio as a number.  `render_canvas_aspect` remains for
+compatibility; old records can be backfilled in responses by deriving the new id
+and ratio from it.
 
 ---
 

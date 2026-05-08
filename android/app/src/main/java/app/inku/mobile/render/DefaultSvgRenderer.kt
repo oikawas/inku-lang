@@ -48,6 +48,8 @@ class DefaultSvgRenderer : SvgRenderer {
             .put("render_engine_id", "default")
             .put("render_engine_version", "2")
             .put("render_canvas_aspect", CanvasAspects.normalize(request.canvasAspect))
+            .put("render_canvas_aspect_id", CanvasAspects.normalize(request.canvasAspect))
+            .put("render_canvas_aspect_ratio", CanvasAspects.ratioFor(request.canvasAspect))
             .put("render_color_catalog_id", catalog.id)
             .put("render_color_catalog_name", catalog.name)
             .put("render_color_catalog_sub", catalog.sub)

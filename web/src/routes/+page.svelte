@@ -83,6 +83,8 @@
 		render_color_catalog_sub?: string | null;
 		render_color_map?: Record<string, string> | null;
 		render_canvas_aspect?: string | null;
+		render_canvas_aspect_id?: string | null;
+		render_canvas_aspect_ratio?: number | null;
 		history_id?: string | null;
 		history_at?: number | null;
 		elapsed_stage1_ms: number;
@@ -1968,6 +1970,8 @@
 		render_color_catalog_sub?: string | null;
 		render_color_map?: Record<string, string> | null;
 		render_canvas_aspect?: string | null;
+		render_canvas_aspect_id?: string | null;
+		render_canvas_aspect_ratio?: number | null;
 		elapsed_ms: number;
 		tokens_in: number | null;
 		tokens_out: number | null;
@@ -2007,6 +2011,8 @@
 			render_color_catalog_sub?: string | null;
 			render_color_map?: Record<string, string> | null;
 			render_canvas_aspect?: string | null;
+			render_canvas_aspect_id?: string | null;
+			render_canvas_aspect_ratio?: number | null;
 			elapsed_ms: number;
 			tokens_in: number | null;
 			tokens_out: number | null;
@@ -2222,6 +2228,8 @@
 					render_color_catalog_sub: composed.render_color_catalog_sub,
 					render_color_map: composed.render_color_map,
 					render_canvas_aspect: composed.render_canvas_aspect,
+					render_canvas_aspect_id: composed.render_canvas_aspect_id,
+					render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
 					render_hash: composed.render_hash,
 					render_hash_short: composed.render_hash_short,
 					elapsed_stage1_ms: elapsedStage1Ms,
@@ -2386,6 +2394,8 @@
 				render_color_catalog_sub?: string | null;
 				render_color_map?: Record<string, string> | null;
 				render_canvas_aspect?: string | null;
+				render_canvas_aspect_id?: string | null;
+				render_canvas_aspect_ratio?: number | null;
 				render_hash?: string | null;
 				render_hash_short?: string | null;
 				tokens_in: number | null;
@@ -2395,8 +2405,8 @@
 			const resolvedStage1Model = result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
 			const savedStage2Model = d.stage2_model ?? resolvedStage2Model;
 			result = result
-				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_hash: d.render_hash, render_hash_short: d.render_hash_short }
-				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_hash: d.render_hash, render_hash_short: d.render_hash_short, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_canvas_aspect_id: d.render_canvas_aspect_id, render_canvas_aspect_ratio: d.render_canvas_aspect_ratio, render_hash: d.render_hash, render_hash_short: d.render_hash_short }
+				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_canvas_aspect_id: d.render_canvas_aspect_id, render_canvas_aspect_ratio: d.render_canvas_aspect_ratio, render_hash: d.render_hash, render_hash_short: d.render_hash_short, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
@@ -2768,7 +2778,7 @@
 			}
 		}
 		if (historySelectionCanvas === 'history') {
-			const canvasId = it.render_canvas_aspect ?? it.score?.canvas;
+			const canvasId = it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? it.score?.canvas;
 			if (canvasId) {
 				canvasAspectId = normalizeCanvasAspectId(canvasId);
 				void saveCanvasAspectPluginValue();
@@ -2791,6 +2801,8 @@
 			render_color_catalog_sub: it.render_color_catalog_sub,
 			render_color_map: it.render_color_map,
 			render_canvas_aspect: it.render_canvas_aspect,
+			render_canvas_aspect_id: it.render_canvas_aspect_id,
+			render_canvas_aspect_ratio: it.render_canvas_aspect_ratio,
 			render_hash: it.render_hash,
 			render_hash_short: it.render_hash_short,
 			elapsed_stage1_ms: 0,
@@ -3209,6 +3221,8 @@
 		if (result.render_engine_id !== undefined) payload.render_engine_id = result.render_engine_id;
 		if (result.render_engine_version !== undefined) payload.render_engine_version = result.render_engine_version;
 		if (result.render_canvas_aspect !== undefined) payload.render_canvas_aspect = result.render_canvas_aspect;
+		if (result.render_canvas_aspect_id !== undefined) payload.render_canvas_aspect_id = result.render_canvas_aspect_id;
+		if (result.render_canvas_aspect_ratio !== undefined) payload.render_canvas_aspect_ratio = result.render_canvas_aspect_ratio;
 		if (result.render_hash !== undefined) payload.render_hash = result.render_hash;
 		if (result.render_hash_short !== undefined) payload.render_hash_short = result.render_hash_short;
 		if (result.render_color_catalog_id !== undefined) payload.render_color_catalog_id = result.render_color_catalog_id;

@@ -37,6 +37,7 @@ from .interpreter import SYSTEM_PROMPT as STAGE1_PROMPT
 from .interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
 from .plugins import (
     canvas_aspect_ids,
+    canvas_aspect_ratio_for_aspect,
     normalize_canvas_aspect_id,
     plugin_status_items,
 )
@@ -361,6 +362,11 @@ def _history_output_prefix(item: dict) -> Path:
 def _history_render_metadata(item: dict) -> dict | None:
     if isinstance(item.get("render_metadata"), dict):
         metadata = dict(item["render_metadata"])
+        if metadata.get("render_canvas_aspect_id") is None and metadata.get("render_canvas_aspect") is not None:
+            canvas_aspect_id = normalize_canvas_aspect_id(metadata.get("render_canvas_aspect"))
+            metadata["render_canvas_aspect_id"] = canvas_aspect_id
+            metadata.setdefault("render_canvas_aspect", canvas_aspect_id)
+            metadata.setdefault("render_canvas_aspect_ratio", canvas_aspect_ratio_for_aspect(canvas_aspect_id))
         if item.get("render_hash") is not None:
             metadata["render_hash"] = item["render_hash"]
             metadata["render_hash_short"] = item.get("render_hash_short") or _db.render_hash_short(item.get("render_hash"))
@@ -371,6 +377,8 @@ def _history_render_metadata(item: dict) -> dict | None:
         "render_engine_id",
         "render_engine_version",
         "render_canvas_aspect",
+        "render_canvas_aspect_id",
+        "render_canvas_aspect_ratio",
         "render_hash",
         "render_hash_short",
         "render_color_catalog_id",
@@ -484,7 +492,10 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
         "render_color_profile": dict(_SRGB_COLOR_PROFILE),
     }
     if canvas_aspect is not None:
-        metadata["render_canvas_aspect"] = canvas_aspect
+        canvas_aspect_id = normalize_canvas_aspect_id(canvas_aspect)
+        metadata["render_canvas_aspect"] = canvas_aspect_id
+        metadata["render_canvas_aspect_id"] = canvas_aspect_id
+        metadata["render_canvas_aspect_ratio"] = canvas_aspect_ratio_for_aspect(canvas_aspect_id)
     metadata.update({
         "render_color_catalog_id": str(catalog["id"]),
         "render_color_catalog_name": str(catalog["name"]),
@@ -568,6 +579,8 @@ class ComposeResponse(BaseModel):
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     render_canvas_aspect: str | None = None
+    render_canvas_aspect_id: str | None = None
+    render_canvas_aspect_ratio: float | None = None
     elapsed_ms: int = 0
     tokens_in: int | None = None
     tokens_out: int | None = None
@@ -631,6 +644,8 @@ class PaintResponse(BaseModel):
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     render_canvas_aspect: str | None = None
+    render_canvas_aspect_id: str | None = None
+    render_canvas_aspect_ratio: float | None = None
     render_hash: str | None = None
     render_hash_short: str | None = None
     history_id: str | None = None
@@ -716,6 +731,8 @@ class HistoryPostBody(BaseModel):
     render_color_catalog_sub: str | None = None
     render_color_map: dict[str, str] | None = None
     render_canvas_aspect: str | None = None
+    render_canvas_aspect_id: str | None = None
+    render_canvas_aspect_ratio: float | None = None
     save_artifacts: bool = True
     count_generation: bool = Field(default=False, exclude=True)
     color_map: dict[str, str] | None = Field(default=None, exclude=True, description="Deprecated: ignored; catalog_id is resolved server-side")

@@ -1532,8 +1532,11 @@ server / Android の CLI 比較で、Stage 1 の LLM 出力揺れを切り離し
 - 色カタログボタンは、固定ラベルではなく現在選択中の色カタログ名を表示する。長い名前は後半を省略し、hover title でフル名称を確認できる
 - 入力パネル上部の操作順は `キャンバス比率` / `色カタログ` / `モデル選択` とする
 - 描画レスポンス、履歴レコード、JSON タブ、artifact JSON に `render_canvas_aspect` を追加し、実際にレンダリングへ使用したキャンバス比率 ID を記録する
+- 描画レスポンス、履歴レコード、JSON タブ、artifact JSON に `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を追加する。`render_canvas_aspect_id` は明示的なキャンバス比率識別子、`render_canvas_aspect_ratio` は実際の幅÷高さの数値である
 - `render_canvas_aspect` は render metadata の一部として、`render_engine_version` の直後、色カタログメタデータの前に表示する
+- `render_canvas_aspect_id` と `render_canvas_aspect_ratio` は `render_canvas_aspect` の直後に表示する
 - JSON Score の `score.canvas` は引き続き楽譜側のキャンバス指定として保持し、`render_canvas_aspect` は成果物側のレンダリング記録として扱う。通常は同じ値になるが、旧データや外部入力の確認性のため二重に保持する
+- 互換性のため `render_canvas_aspect` は従来通り保持する。新規実装では `render_canvas_aspect_id` を識別子として扱い、旧履歴では `render_canvas_aspect` から補完する
 - 設定 > その他に `履歴選択時の挙動` を追加する
 - キャンバスサイズは、履歴から選択時に履歴キャンバスサイズを UI 選択へ反映するか、現時点で UI 上選択されているキャンバスサイズを維持するかを選べる
 - 色カタログは、履歴から選択時に履歴色カタログを UI 選択へ反映するか、現時点で UI 上選択されている色カタログを維持するかを選べる

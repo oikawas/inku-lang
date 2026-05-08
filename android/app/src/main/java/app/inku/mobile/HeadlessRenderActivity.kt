@@ -121,6 +121,8 @@ class HeadlessRenderActivity : Activity() {
                 .put("render_engine_id", metadata.opt("render_engine_id"))
                 .put("render_engine_version", metadata.opt("render_engine_version"))
                 .put("render_canvas_aspect", metadata.opt("render_canvas_aspect"))
+                .put("render_canvas_aspect_id", metadata.opt("render_canvas_aspect_id"))
+                .put("render_canvas_aspect_ratio", metadata.opt("render_canvas_aspect_ratio"))
                 .put("render_color_catalog_id", metadata.opt("render_color_catalog_id"))
                 .put("render_color_catalog_name", metadata.opt("render_color_catalog_name"))
                 .put("render_color_catalog_sub", metadata.opt("render_color_catalog_sub"))

@@ -54,9 +54,13 @@ def normalize_canvas_aspect_id(value: str | None) -> str:
     return DEFAULT_CANVAS_ASPECT_ID
 
 
-def canvas_size_for_aspect(value: str | None) -> CanvasSize:
+def canvas_aspect_ratio_for_aspect(value: str | None) -> float:
     aspect = _CANVAS_ASPECT_BY_ID[normalize_canvas_aspect_id(value)]
-    ratio = aspect.ratio_w / aspect.ratio_h
+    return aspect.ratio_w / aspect.ratio_h
+
+
+def canvas_size_for_aspect(value: str | None) -> CanvasSize:
+    ratio = canvas_aspect_ratio_for_aspect(value)
     if ratio >= 1:
         return CanvasSize(width=round(CANVAS_BASE_PX * ratio), height=CANVAS_BASE_PX)
     return CanvasSize(width=round(CANVAS_BASE_PX * ratio), height=CANVAS_BASE_PX)

@@ -628,3 +628,13 @@ Android 版の記述画面では、描画画像を 100% 表示中にダブルタ
 - 通常表示時のピンチ拡大、パン、左右スワイプによる履歴切替は維持する。
 
 この挙動はモバイル閲覧用の Android 独自 UI であり、履歴 DB、SVG/PNG 書き出し、render metadata の内容は変更しない。
+
+## 2026-05-08 Render metadata のキャンバス比率値
+
+server/android 共通仕様として、render metadata に従来の `render_canvas_aspect` に加えて `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を追加する。
+
+- `render_canvas_aspect` は互換性のため従来通り保持する。
+- `render_canvas_aspect_id` は明示的なキャンバス比率識別子であり、Android の新規 render metadata / JSON 表示 / headless result に含める。
+- `render_canvas_aspect_ratio` は実際にレンダリングされたキャンバスの幅÷高さの数値であり、例として `square=1.0`、`oban=0.666666...`、`wide=2.35` を記録する。
+- Android の render hash 計算は、server と同じく `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を含める。
+- 旧履歴で新フィールドが存在しない場合、表示時は保存済みの `canvas_aspect` / `render_canvas_aspect` から補完する。

@@ -2296,6 +2296,8 @@ private fun renderJsonText(item: HistoryItemEntity): String {
     payload.putFrom(metadata, "render_engine_id")
     payload.putFrom(metadata, "render_engine_version")
     payload.putFrom(metadata, "render_canvas_aspect", item.canvasAspect)
+    payload.putFrom(metadata, "render_canvas_aspect_id", item.canvasAspect)
+    payload.putFrom(metadata, "render_canvas_aspect_ratio", CanvasAspects.ratioFor(item.canvasAspect))
     payload.put("render_hash", item.renderHash)
     payload.put("render_hash_short", item.renderHashShort)
     payload.putFrom(metadata, "render_color_catalog_id", item.colorCatalogId)
@@ -2310,10 +2312,10 @@ private fun JSONObject.putIfNotBlank(key: String, value: String?) {
     if (!value.isNullOrBlank()) put(key, value)
 }
 
-private fun JSONObject.putFrom(source: JSONObject, key: String, fallback: String? = null) {
+private fun JSONObject.putFrom(source: JSONObject, key: String, fallback: Any? = null) {
     if (source.has(key) && !source.isNull(key)) {
         put(key, source.get(key))
-    } else if (!fallback.isNullOrBlank()) {
+    } else if (fallback != null && fallback != "") {
         put(key, fallback)
     }
 }

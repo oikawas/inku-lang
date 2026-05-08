@@ -717,3 +717,19 @@ On the Android Compose screen, double-tapping the drawing image while it is at
 
 This is an Android-only mobile viewing behavior. It does not change history DB
 records, SVG/PNG export output, or render metadata.
+
+## 2026-05-08 Render Metadata Canvas Ratio
+
+As a shared server/android metadata change, render metadata now includes
+`render_canvas_aspect_id` and `render_canvas_aspect_ratio` in addition to the
+existing `render_canvas_aspect` field.
+
+- `render_canvas_aspect` remains for compatibility.
+- `render_canvas_aspect_id` is the explicit canvas aspect identifier and is
+  included in new Android render metadata, JSON display, and headless results.
+- `render_canvas_aspect_ratio` is the actual rendered canvas width/height ratio,
+  such as `square=1.0`, `oban=0.666666...`, and `wide=2.35`.
+- Android render-hash calculation includes `render_canvas_aspect_id` and
+  `render_canvas_aspect_ratio`, matching the server metadata contract.
+- For old Android history entries without the new fields, the UI derives them
+  from the saved `canvas_aspect` / `render_canvas_aspect` value.

@@ -13,6 +13,7 @@ from .system.canvas_aspect import (
     CanvasAspect,
     CanvasSize,
     canvas_aspect_ids,
+    canvas_aspect_ratio_for_aspect,
     canvas_size_for_aspect,
     normalize_canvas_aspect_id,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "CanvasAspect",
     "CanvasSize",
     "canvas_aspect_ids",
+    "canvas_aspect_ratio_for_aspect",
     "canvas_size_for_aspect",
     "normalize_canvas_aspect_id",
     "plugin_status_items",

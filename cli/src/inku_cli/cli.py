@@ -30,6 +30,17 @@ PROVIDERS = ("nvidia", "anthropic", "local")
 COLOR_KEYS = ("white", "black", "blue", "red", "green", "gray")
 DEFAULT_COLOR_CATALOG_ID = "default"
 SVG_PROFILES = ("display", "editable", "compat")
+CANVAS_ASPECT_RATIOS = {
+    "square": 1.0,
+    "golden": 1.618,
+    "a4": 1.0 / 1.414,
+    "b4": 1.0 / 1.414,
+    "pillar": 1.0 / 5.0,
+    "oban": 2.0 / 3.0,
+    "wide": 2.35,
+    "byobu": 2.2,
+    "vertical": 9.0 / 16.0,
+}
 COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "white": ("white", "ivory", "snow", "paper", "白", "雪", "紙", "光"),
     "black": ("black", "dark", "shadow", "ink", "黒", "闇", "影", "墨"),
@@ -60,6 +71,10 @@ COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     ),
     "gray": ("gray", "grey", "silver", "ash", "stone", "灰", "銀", "石", "埃"),
 }
+
+
+def _canvas_aspect_ratio(canvas_aspect: str | None) -> float:
+    return CANVAS_ASPECT_RATIOS.get(canvas_aspect or "square", CANVAS_ASPECT_RATIOS["square"])
 NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "green": (
         "not green",
@@ -694,6 +709,8 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
             "render_engine_id": item.get("render_engine_id"),
             "render_engine_version": item.get("render_engine_version"),
             "render_canvas_aspect": item.get("render_canvas_aspect"),
+            "render_canvas_aspect_id": item.get("render_canvas_aspect_id"),
+            "render_canvas_aspect_ratio": item.get("render_canvas_aspect_ratio"),
             "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
             "render_color_catalog_name": item.get("render_color_catalog_name"),
             **_score_metrics(item.get("score")),
@@ -715,6 +732,8 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
             "render_engine_id": item.get("render_engine_id"),
             "render_engine_version": item.get("render_engine_version"),
             "render_canvas_aspect": item.get("render_canvas_aspect"),
+            "render_canvas_aspect_id": item.get("render_canvas_aspect_id"),
+            "render_canvas_aspect_ratio": item.get("render_canvas_aspect_ratio"),
             "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
             "render_color_catalog_name": item.get("render_color_catalog_name"),
             "paths": {key: artifact_paths.get(key) for key in ("json", "svg", "png") if artifact_paths.get(key)},
@@ -1193,6 +1212,8 @@ def _compose_response_as_paint_result(
         "render_color_catalog_sub": result.get("render_color_catalog_sub"),
         "render_color_map": result.get("render_color_map"),
         "render_canvas_aspect": result.get("render_canvas_aspect"),
+        "render_canvas_aspect_id": result.get("render_canvas_aspect_id"),
+        "render_canvas_aspect_ratio": result.get("render_canvas_aspect_ratio"),
         "render_hash": result.get("render_hash"),
         "render_hash_short": result.get("render_hash_short"),
         "elapsed_stage1_ms": 0,
@@ -1243,6 +1264,8 @@ def _history_payload_from_result(
         "render_color_catalog_sub": result.get("render_color_catalog_sub"),
         "render_color_map": result.get("render_color_map"),
         "render_canvas_aspect": result.get("render_canvas_aspect"),
+        "render_canvas_aspect_id": result.get("render_canvas_aspect_id"),
+        "render_canvas_aspect_ratio": result.get("render_canvas_aspect_ratio"),
         "save_artifacts": args.save_artifacts if args.save_artifacts is not None else args.save_history,
         "count_generation": True,
     }
@@ -1285,6 +1308,8 @@ def _save_history_for_result(
         "render_color_catalog_sub",
         "render_color_map",
         "render_canvas_aspect",
+        "render_canvas_aspect_id",
+        "render_canvas_aspect_ratio",
     ):
         if item.get(key) is not None:
             updated[key] = item.get(key)
@@ -1747,6 +1772,8 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_hash_short": render_hash[-4:].upper(),
         "render_color_catalog_id": color_catalog,
         "render_canvas_aspect": args.canvas_aspect,
+        "render_canvas_aspect_id": args.canvas_aspect,
+        "render_canvas_aspect_ratio": _canvas_aspect_ratio(args.canvas_aspect),
         "svg_profile": args.svg_profile,
     }
     paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=args.prefix or "score", png=args.png)

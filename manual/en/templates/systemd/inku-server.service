@@ -1,0 +1,20 @@
+[Unit]
+Description=inku SvelteKit web UI
+After=network-online.target inku-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=inku
+Group=inku
+WorkingDirectory=/opt/inku/inku-lang/web
+Environment=NODE_ENV=development
+ExecStart=/usr/bin/npm run dev -- --host 0.0.0.0 --port 5173
+Restart=on-failure
+RestartSec=5
+LogsDirectory=inku
+StandardOutput=journal+append:/var/log/inku/inku-server.log
+StandardError=journal+append:/var/log/inku/inku-server.log
+
+[Install]
+WantedBy=multi-user.target

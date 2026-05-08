@@ -27,7 +27,12 @@ web/build/
 .vscode/
 .idea/
 *.swp
+
+# macOS metadata
 .DS_Store
+._*
+.Spotlight-V100/
+.Trashes/
 
 # 環境変数
 .env

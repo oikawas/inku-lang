@@ -133,6 +133,8 @@ private val InkuColors = darkColorScheme(
 private val ServerCanvasAreaColor = Color(0xFF20201F)
 private val ServerCanvasBoxColor = Color(0xFF242321)
 private val ServerCanvasPaperColor = Color(0xFFF5F1E9)
+private val PresentationDarkBackground = Color(0xFF11100F)
+private val PresentationLightBackground = Color(0xFFF8F8F6)
 
 private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
@@ -424,7 +426,10 @@ private fun CanvasAspectSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                 CanvasAspects.all.forEach { aspect ->
                     val active = aspect.id == state.selectedCanvasAspect
                     Surface(
-                        modifier = Modifier.fillMaxWidth().clickable { viewModel.setCanvasAspect(aspect.id) },
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            viewModel.setCanvasAspect(aspect.id)
+                            viewModel.closeTransientPanel()
+                        },
                         shape = RoundedCornerShape(8.dp),
                         color = if (active) Color(0x1AEAD7A3) else MaterialTheme.colorScheme.surface,
                     ) {
@@ -646,6 +651,15 @@ private fun canvasLabel(state: InkuUiState): String {
     return CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect
 }
 
+private fun shortCanvasLabel(state: InkuUiState): String {
+    val label = canvasLabel(state)
+    return when {
+        label.length <= 10 -> label
+        label.contains(" ") -> label.split(" ").filter { it.isNotBlank() }.joinToString(" ") { it.take(1) }.take(10)
+        else -> label.take(9) + "…"
+    }
+}
+
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     if (state.canvasPresentationMode) {
@@ -685,26 +699,48 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel, modifie
     BoxWithConstraints(modifier = modifier) {
         val ratio = canvasAspectRatio(state.selectedCanvasAspect)
         val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(330.dp)
+        val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
+            if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
+        }
         Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!presentation) item?.let {
-                WrapRow {
-                    MiniPill(text = if (it.starred) "★" else "☆", selected = it.starred, onClick = { viewModel.toggleStar(it) })
+            if (!presentation) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterStart),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        item?.let {
+                            MiniPill(text = if (it.starred) "★" else "☆", selected = it.starred, onClick = { viewModel.toggleStar(it) })
+                            MiniPill(
+                                text = "F${it.renderHashShort}",
+                                onClick = {
+                                    clipboard.setText(AnnotatedString(it.renderHashShort))
+                                    canvasMessage = "Hash copied."
+                                },
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MiniPill("-", onClick = { viewModel.setCanvasZoom(state.canvasZoom - 0.25f) })
+                        MiniPill("${(state.canvasZoom * 100).toInt()}%", onClick = viewModel::resetCanvasZoom)
+                        MiniPill("+", onClick = { viewModel.setCanvasZoom(state.canvasZoom + 0.25f) })
+                    }
                     MiniPill(
-                        text = "F${it.renderHashShort}",
-                        onClick = {
-                            clipboard.setText(AnnotatedString(it.renderHashShort))
-                            canvasMessage = "Hash copied."
-                        },
+                        shortCanvasLabel(state),
+                        onClick = viewModel::openCanvasSelection,
+                        modifier = Modifier.align(Alignment.CenterEnd).widthIn(max = 72.dp),
                     )
-                    MiniPill("-", onClick = { viewModel.setCanvasZoom(state.canvasZoom - 0.25f) })
-                    MiniPill("${(state.canvasZoom * 100).toInt()}%", onClick = viewModel::resetCanvasZoom)
-                    MiniPill("+", onClick = { viewModel.setCanvasZoom(state.canvasZoom + 0.25f) })
                 }
             }
             Surface(
                 modifier = (if (presentation) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(previewHeight))
                     .border(1.dp, Color(0x1A000000)),
-                color = ServerCanvasAreaColor,
+                color = if (presentation) presentationBackground else ServerCanvasAreaColor,
                 shape = RoundedCornerShape(0.dp),
                 tonalElevation = 1.dp,
             ) {
@@ -715,6 +751,7 @@ private fun CanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel, modifie
                         ArtworkPreview(
                             item,
                             presentationMode = presentation,
+                            presentationBackground = presentationBackground,
                             rotateLandscape = presentation && ratio > 1f,
                             modifier = Modifier
                                 .fillMaxSize()
@@ -2834,6 +2871,7 @@ private fun ArtworkPreview(
     item: HistoryItemEntity,
     modifier: Modifier = Modifier,
     presentationMode: Boolean = false,
+    presentationBackground: Color = Color.White,
     rotateLandscape: Boolean = false,
 ) {
     val svg = remember(item.id, item.displaySvg) {
@@ -2841,7 +2879,7 @@ private fun ArtworkPreview(
     }
     Surface(color = ServerCanvasBoxColor, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(if (presentationMode) Color.White else ServerCanvasBoxColor)
+            drawRect(if (presentationMode) presentationBackground else ServerCanvasBoxColor)
             val parsed = svg ?: return@Canvas
             val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
             val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
@@ -3049,6 +3087,31 @@ private fun shiftPreview(base: JSONObject, x: Double, y: Double): JSONObject {
 
 private fun parseColor(value: String): Color {
     return Color(android.graphics.Color.parseColor(value))
+}
+
+private fun presentationBackgroundForSvg(svgText: String): Color {
+    val imageBackground = firstSvgFillColor(svgText) ?: return PresentationDarkBackground
+    val red = imageBackground.red
+    val green = imageBackground.green
+    val blue = imageBackground.blue
+    val luminance = (0.2126f * red) + (0.7152f * green) + (0.0722f * blue)
+    val spread = maxOf(red, green, blue) - minOf(red, green, blue)
+    return when {
+        luminance >= 0.92f && spread <= 0.08f -> PresentationDarkBackground
+        luminance <= 0.08f && spread <= 0.08f -> PresentationLightBackground
+        else -> imageBackground
+    }
+}
+
+private fun firstSvgFillColor(svgText: String): Color? {
+    val fill = Regex("""<rect\b[^>]*\bfill=["']([^"']+)["']""")
+        .find(svgText)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.trim()
+        ?: return null
+    if (fill.equals("none", ignoreCase = true) || fill.startsWith("url(", ignoreCase = true)) return null
+    return runCatching { parseColor(fill) }.getOrNull()
 }
 
 private fun strokeWidthPx(weight: String): Float = when (weight) {

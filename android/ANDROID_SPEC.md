@@ -710,6 +710,15 @@ On the Android Compose screen, double-tapping the drawing image while it is at
   size that still keeps the entire image visible.
 - Landscape canvases are rotated 90 degrees on Pixel 9 portrait screens so the
   drawing's long edge aligns with the screen's long edge.
+- The presentation-view margin background follows the displayed SVG's
+  background `rect fill`, treating that fill as the drawing's dominant
+  background color.
+- If the drawing background is white-ish, the margin background switches to the
+  Android dark-mode background.
+- If the drawing background is black-ish, the margin background switches to the
+  Android light-mode background.
+- For non-white and non-black drawing backgrounds, Android uses the extracted
+  drawing background color as the margin background.
 - While presentation view is active, pinch and pan transforms are disabled.
   Double-tapping returns to the normal 100% view.
 - Normal pinch zoom, pan, and left/right history swipes remain available outside
@@ -733,3 +742,32 @@ existing `render_canvas_aspect` field.
   `render_canvas_aspect_ratio`, matching the server metadata contract.
 - For old Android history entries without the new fields, the UI derives them
   from the saved `canvas_aspect` / `render_canvas_aspect` value.
+
+Ratio source:
+
+- On the server, `render_canvas_aspect_ratio` is calculated from `ratio_w` /
+  `ratio_h` in the system `canvas_aspect` plugin definition.
+- On Android, the migrated `CanvasAspects` table is the only source for canvas
+  ratio values, and the ratio is calculated as `ratioW / ratioH` for the same
+  aspect identifier.
+- JSON display, history records, headless results, and render hashes must use
+  the definition value that corresponds to the selected
+  `render_canvas_aspect_id`.
+- If old history records or external inputs do not contain the ratio value,
+  Android derives it from the saved identifier using the same definition table.
+- Android must not append independent canvas ratio values that are not present
+  in the server plugin definition.
+
+## 2026-05-08 Canvas Selection Entry Point In The Drawing Panel
+
+On Android, the drawing panel exposes canvas selection from the zoom-control row
+above the image preview.
+
+- The canvas button is placed immediately to the right of the zoom-percentage
+  display.
+- The button label uses the selected canvas name and shortens long names so the
+  drawing panel remains usable on Pixel 9 width.
+- Pressing the button opens the canvas-size selection dialog.
+- Selecting a canvas saves the setting and closes the dialog.
+- This entry point is available from both Compose and Batch drawing panels and
+  updates the same `canvas_aspect` setting used by the Settings panel.

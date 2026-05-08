@@ -18,6 +18,7 @@ import app.inku.mobile.pipeline.PaintRequest
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -31,6 +32,7 @@ class InkuRepository(
         ),
     ),
 ) {
+    private val providerModelCandidatePrefix = "provider_model_candidates:"
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
     private val modelRouter = RoutingModelProvider(
         database = database,
@@ -44,6 +46,13 @@ class InkuRepository(
     fun modelAssets(): Flow<List<ModelAssetEntity>> = database.modelAssetDao().observeAll()
 
     fun providerSettings(): Flow<List<ProviderSettingEntity>> = database.providerSettingDao().observeAll()
+
+    fun providerModelCandidates(): Flow<Map<String, List<String>>> =
+        database.settingsDao().observeLike("$providerModelCandidatePrefix%").map { rows ->
+            rows.associate { row ->
+                row.key.removePrefix(providerModelCandidatePrefix) to parseModelIds(row.valueJson)
+            }
+        }
 
     fun exportTemplates(): Flow<List<ExportTemplateEntity>> = database.exportTemplateDao().observeAll()
 
@@ -85,7 +94,7 @@ class InkuRepository(
                     encryptedApiKey = existing?.encryptedApiKey?.let { key ->
                         if (AndroidSecretBox.isEncrypted(key)) key else AndroidSecretBox.decryptOrPlain(key)?.let(AndroidSecretBox::encrypt)
                     } ?: setting.encryptedApiKey,
-                    publishedModelsJson = existing?.publishedModelsJson ?: setting.publishedModelsJson,
+                    publishedModelsJson = normalizedPublishedModels(setting, existing),
                     updatedAt = System.currentTimeMillis(),
                 ),
             )
@@ -162,9 +171,18 @@ class InkuRepository(
         ensureDefaultProviderSettings()
         val models = modelRouter.fetchModels(providerId)
         val existing = database.providerSettingDao().get(providerId) ?: error("サービスが見つかりません: $providerId")
+        val fetchedIds = models.toSet()
+        val selected = parseModelIds(existing.publishedModelsJson).filter { it in fetchedIds }
+        database.settingsDao().upsert(
+            AppSettingEntity(
+                key = "$providerModelCandidatePrefix$providerId",
+                valueJson = JSONArray(models).toString(),
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
         database.providerSettingDao().upsert(
             existing.copy(
-                publishedModelsJson = JSONArray(models).toString(),
+                publishedModelsJson = JSONArray(selected).toString(),
                 updatedAt = System.currentTimeMillis(),
             ),
         )
@@ -390,7 +408,7 @@ class InkuRepository(
                 kind = "openai-compatible",
                 baseUrl = "https://api.openai.com/v1",
                 encryptedApiKey = null,
-                publishedModelsJson = models("openai:gpt-5.1", "openai:gpt-5.1-mini", "openai:gpt-4.1", "openai:gpt-4.1-mini"),
+                publishedModelsJson = models(),
                 isEnabled = true,
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
@@ -401,7 +419,7 @@ class InkuRepository(
                 kind = "openai-compatible",
                 baseUrl = "https://integrate.api.nvidia.com/v1",
                 encryptedApiKey = null,
-                publishedModelsJson = models("google/gemma-4-31b-it", "meta/llama-3.3-70b-instruct", "mistralai/mistral-large-2-instruct"),
+                publishedModelsJson = models("google/gemma-4-31b-it"),
                 isEnabled = true,
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
@@ -412,7 +430,7 @@ class InkuRepository(
                 kind = "anthropic",
                 baseUrl = "https://api.anthropic.com",
                 encryptedApiKey = null,
-                publishedModelsJson = models("anthropic:claude-opus-4-7", "anthropic:claude-sonnet-4-6", "anthropic:claude-haiku-4-5-20251001"),
+                publishedModelsJson = models(),
                 isEnabled = true,
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
@@ -423,7 +441,7 @@ class InkuRepository(
                 kind = "gemini",
                 baseUrl = "https://generativelanguage.googleapis.com",
                 encryptedApiKey = null,
-                publishedModelsJson = models("gemini:gemini-2.5-pro", "gemini:gemini-2.5-flash", "gemini:gemini-2.5-flash-lite"),
+                publishedModelsJson = models(),
                 isEnabled = true,
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
@@ -434,7 +452,7 @@ class InkuRepository(
                 kind = "openai-compatible",
                 baseUrl = "http://127.0.0.1:11434/v1",
                 encryptedApiKey = null,
-                publishedModelsJson = models("ollama:llama3.2", "ollama:gpt-oss:20b", "ollama:qwen3:8b"),
+                publishedModelsJson = models(),
                 isEnabled = true,
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
@@ -445,12 +463,42 @@ class InkuRepository(
                 kind = "openai-compatible",
                 baseUrl = "http://127.0.0.1:8101/v3",
                 encryptedApiKey = null,
-                publishedModelsJson = models("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api"),
+                publishedModelsJson = models(),
                 isEnabled = true,
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
             ),
         )
+    }
+
+    private fun normalizedPublishedModels(defaultSetting: ProviderSettingEntity, existing: ProviderSettingEntity?): String {
+        val current = existing?.publishedModelsJson ?: return defaultSetting.publishedModelsJson
+        val currentIds = parseModelIds(current)
+        val legacyIds = legacyDefaultPublishedModels(defaultSetting.providerId)
+        return if (legacyIds.isNotEmpty() && currentIds.toSet() == legacyIds.toSet()) {
+            defaultSetting.publishedModelsJson
+        } else {
+            current
+        }
+    }
+
+    private fun legacyDefaultPublishedModels(providerId: String): List<String> = when (providerId) {
+        "openai" -> listOf("openai:gpt-5.1", "openai:gpt-5.1-mini", "openai:gpt-4.1", "openai:gpt-4.1-mini")
+        "nvidia" -> listOf("google/gemma-4-31b-it", "meta/llama-3.3-70b-instruct", "mistralai/mistral-large-2-instruct")
+        "anthropic" -> listOf("anthropic:claude-opus-4-7", "anthropic:claude-sonnet-4-6", "anthropic:claude-haiku-4-5-20251001")
+        "gemini" -> listOf("gemini:gemini-2.5-pro", "gemini:gemini-2.5-flash", "gemini:gemini-2.5-flash-lite")
+        "ollama" -> listOf("ollama:llama3.2", "ollama:gpt-oss:20b", "ollama:qwen3:8b")
+        "ovms" -> listOf("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api")
+        else -> emptyList()
+    }
+
+    private fun parseModelIds(value: String): List<String> {
+        return runCatching {
+            val array = JSONArray(value)
+            List(array.length()) { index -> array.optString(index).trim() }.filter { it.isNotBlank() }
+        }.getOrElse {
+            value.lines().map { it.trim() }.filter { it.isNotBlank() }
+        }
     }
 
     private fun defaultExportTemplates(): List<ExportTemplateEntity> {

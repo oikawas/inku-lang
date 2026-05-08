@@ -43,6 +43,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -102,6 +103,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.core.content.FileProvider
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.model.CanvasAspects
@@ -139,6 +141,7 @@ private val PresentationLightBackground = Color(0xFFF8F8F6)
 private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
+private data class ProviderModelCandidate(val id: String, val label: String, val notes: String? = null)
 
 private object HistoryThumbnailCache {
     private const val THUMBNAIL_PX = 384
@@ -1511,9 +1514,6 @@ private fun OutputFilesSettingsPanel(state: InkuUiState, viewModel: InkuViewMode
 
 @Composable
 private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    val downloadInProgress = state.modelAssets.any { asset ->
-        asset.downloadState in setOf("queued", "connecting", "downloading", "verifying")
-    }
     var modelAssetDialog by remember { mutableStateOf<app.inku.mobile.data.db.ModelAssetEntity?>(null) }
     Column(
         modifier = modifier
@@ -1531,23 +1531,23 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     onOpenLicenseDownload = { modelAssetDialog = asset },
                 )
             }
-            SecondaryActionButton(text = "取得中断", onClick = viewModel::cancelModelDownload, enabled = downloadInProgress)
             state.message?.let {
                 Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
             }
         }
 
-        SettingsSectionHeader("AI SERVICE CONNECTIONS", "接続先")
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             state.providerSettings.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
+                    candidateModelIds = state.providerModelCandidates[provider.providerId].orEmpty(),
                     onSave = viewModel::saveProviderSetting,
                     onClearApiKey = { viewModel.clearProviderApiKey(provider.providerId) },
                     onDelete = { viewModel.deleteProvider(provider.providerId) },
+                    onFetchModels = { viewModel.fetchProviderModels(provider.providerId) },
+                    statusMessage = state.message,
                 )
             }
-            AddProviderCard(onAdd = viewModel::saveProviderSetting)
         }
     }
     modelAssetDialog?.let { asset ->
@@ -1564,9 +1564,12 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
 @Composable
 private fun ProviderConnectionCard(
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
+    candidateModelIds: List<String>,
     onSave: (String, String, String, String, String, String) -> Unit,
     onClearApiKey: () -> Unit,
     onDelete: () -> Unit,
+    onFetchModels: () -> Unit,
+    statusMessage: String?,
 ) {
     val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
     val keySet = !provider.encryptedApiKey.isNullOrBlank()
@@ -1574,84 +1577,180 @@ private fun ProviderConnectionCard(
     var kind by remember(provider.providerId, provider.kind) { mutableStateOf(provider.kind) }
     var baseUrl by remember(provider.providerId, provider.baseUrl) { mutableStateOf(provider.baseUrl.orEmpty()) }
     var apiKey by remember(provider.providerId, provider.encryptedApiKey) { mutableStateOf("") }
+    var editNameOpen by remember(provider.providerId) { mutableStateOf(false) }
+    var editBaseUrlOpen by remember(provider.providerId) { mutableStateOf(false) }
+    var editApiKeyOpen by remember(provider.providerId) { mutableStateOf(false) }
+    var kindMenuOpen by remember(provider.providerId) { mutableStateOf(false) }
+    var modelPickerOpen by remember(provider.providerId) { mutableStateOf(false) }
     var confirmClearKey by remember(provider.providerId) { mutableStateOf(false) }
     var confirmDeleteService by remember(provider.providerId) { mutableStateOf(false) }
     val publishedModels = remember(provider.providerId, provider.publishedModelsJson) {
         parsePublishedModelIds(provider.publishedModelsJson).joinToString("\n")
     }
-    val apiKeyLabel = if (provider.providerId == "local-litert-lm") "HuggingFace APIキー" else "APIキー"
-    val baseUrlChanged = baseUrl.trim() != provider.baseUrl.orEmpty()
-    val pendingApiKey = !keySet && apiKey.isNotBlank()
+    val publishedModelIds = remember(provider.providerId, provider.publishedModelsJson) {
+        parsePublishedModelIds(provider.publishedModelsJson)
+    }
+    val kindLabel = connectionKindLabel(kind)
+    val apiKeyState = if (keySet) "APIキー設定済み" else "APIキー未設定"
     SettingsCard(
         provider.displayName,
-        "接続形式: ${provider.kind}${if (requiresKey) " / APIキー必須" else " / APIキー任意"}",
-        "Service ID: ${provider.providerId} / Base URL: ${provider.baseUrl ?: "-"}",
+        "Service ID: ${provider.providerId}",
+        if (provider.isEnabled) "有効" else "無効",
+        titleAction = {
+            SecondarySmallButton(text = "変更", onClick = { editNameOpen = true })
+        },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                StatusPill(if (keySet) "APIキー設定済み" else if (requiresKey) "APIキー未設定" else "APIキー不要", if (keySet || !requiresKey) MaterialTheme.colorScheme.secondary else Color(0xFFE08A7A))
-                StatusPill(if (provider.isEnabled) "有効" else "無効", if (provider.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                if (provider.isDefaultLocal) StatusPill("LOCAL", MaterialTheme.colorScheme.primary)
-            }
-            ImeAwareOutlinedTextField(
-                value = displayName,
-                onValueChange = { displayName = it },
-                label = "サービス名",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            ImeAwareOutlinedTextField(
-                value = kind,
-                onValueChange = { kind = it },
-                label = "接続形式",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            ImeAwareOutlinedTextField(
-                value = baseUrl,
-                onValueChange = { baseUrl = it },
-                label = "Base URL",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondarySmallButton(
-                    text = "Base URL保存",
-                    onClick = { onSave(provider.providerId, displayName, kind, baseUrl, "", publishedModels) },
-                    enabled = baseUrlChanged,
-                    modifier = Modifier.weight(1f),
-                )
-                PrimarySmallButton(
-                    text = "基本設定保存",
-                    onClick = { onSave(provider.providerId, displayName, kind, baseUrl, "", publishedModels) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                ImeAwareOutlinedTextField(
-                    value = if (keySet) "設定済みのAPIキーを維持" else apiKey,
-                    onValueChange = { if (!keySet) apiKey = it },
-                    label = apiKeyLabel,
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    enabled = !keySet,
-                )
-                if (pendingApiKey) {
-                    PrimarySmallButton(
-                        text = "保存",
-                        onClick = {
-                            onSave(provider.providerId, displayName, kind, baseUrl, apiKey, publishedModels)
-                            apiKey = ""
-                        },
-                    )
-                } else {
-                    SecondarySmallButton(text = "削除", onClick = { confirmClearKey = true }, enabled = keySet)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("接続形式", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { kindMenuOpen = true },
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF1B1B1A),
+                        border = BorderStroke(1.dp, Color(0xFF34302B)),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(kindLabel, style = MaterialTheme.typography.bodySmall)
+                            Text("▾", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    DropdownMenu(expanded = kindMenuOpen, onDismissRequest = { kindMenuOpen = false }) {
+                        connectionKindOptions().forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.second) },
+                                onClick = {
+                                    kind = option.first
+                                    kindMenuOpen = false
+                                },
+                            )
+                        }
+                    }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ModelSettingValueRow(
+                label = "Base URL",
+                value = baseUrl.ifBlank { provider.baseUrl ?: "-" },
+                action = "編集",
+                onAction = { editBaseUrlOpen = true },
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("APIキー", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(apiKeyState, style = MaterialTheme.typography.bodySmall)
+                            if (!keySet) Text("ローカルLLMの場合、APIキー無しで利用可能な場合があります。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    SecondarySmallButton(
+                        text = if (keySet) "削除" else "追加",
+                        onClick = {
+                            if (keySet) confirmClearKey = true else editApiKeyOpen = true
+                        },
+                    )
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("ユーザーに公開するモデル", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SecondarySmallButton(text = "モデル選択", onClick = { modelPickerOpen = true })
+                }
+                if (publishedModelIds.isEmpty()) {
+                    Text("公開モデルは未選択です。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        publishedModelIds.forEach { modelId ->
+                            Surface(color = Color(0xFF20201E), shape = RoundedCornerShape(6.dp)) {
+                                Text(
+                                    modelDisplayName(modelId),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 SecondarySmallButton(text = "サービス削除", onClick = { confirmDeleteService = true }, enabled = !provider.isDefaultLocal, modifier = Modifier.weight(1f))
+                PrimarySmallButton(
+                    text = "保存",
+                    onClick = { onSave(provider.providerId, displayName, kind, baseUrl, "", publishedModels) },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
+    }
+    if (editNameOpen) {
+        TextEditDialog(
+            title = "サービス名を変更",
+            label = "サービス名",
+            initialValue = displayName,
+            onDismiss = { editNameOpen = false },
+            onSave = { value ->
+                displayName = value
+                editNameOpen = false
+                onSave(provider.providerId, value, kind, baseUrl, "", publishedModels)
+            },
+        )
+    }
+    if (editBaseUrlOpen) {
+        TextEditDialog(
+            title = "Base URLを変更",
+            label = "Base URL",
+            initialValue = baseUrl,
+            onDismiss = { editBaseUrlOpen = false },
+            onSave = { value ->
+                baseUrl = value
+                editBaseUrlOpen = false
+                onSave(provider.providerId, displayName, kind, value, "", publishedModels)
+            },
+        )
+    }
+    if (editApiKeyOpen) {
+        TextEditDialog(
+            title = "APIキーを設定",
+            label = "新しいAPIキー",
+            initialValue = apiKey,
+            onDismiss = { editApiKeyOpen = false },
+            onSave = { value ->
+                apiKey = value
+                editApiKeyOpen = false
+                if (apiKey.isNotBlank()) {
+                    onSave(provider.providerId, displayName, kind, baseUrl, apiKey, publishedModels)
+                    apiKey = ""
+                }
+            },
+        )
+    }
+    if (modelPickerOpen) {
+        ProviderModelPickerDialog(
+            provider = provider,
+            candidateModelIds = candidateModelIds,
+            selectedModels = publishedModelIds,
+            onDismiss = { modelPickerOpen = false },
+            onFetchModels = onFetchModels,
+            statusMessage = statusMessage,
+            onSave = { selected ->
+                modelPickerOpen = false
+                onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
+            },
+        )
     }
     if (confirmClearKey) {
         AlertDialog(
@@ -1680,6 +1779,141 @@ private fun ProviderConnectionCard(
             },
             dismissButton = { TextButton(onClick = { confirmDeleteService = false }) { Text("キャンセル") } },
         )
+    }
+}
+
+@Composable
+private fun ModelSettingValueRow(label: String, value: String, action: String, onAction: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value.ifBlank { "-" }, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        SecondarySmallButton(text = action, onClick = onAction)
+    }
+}
+
+@Composable
+private fun TextEditDialog(
+    title: String,
+    label: String,
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var value by remember(title, initialValue) { mutableStateOf(initialValue) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            ImeAwareOutlinedTextField(
+                value = value,
+                onValueChange = { value = it },
+                label = label,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(value.trim()) }) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("キャンセル") }
+        },
+    )
+}
+
+@Composable
+private fun ProviderModelPickerDialog(
+    provider: app.inku.mobile.data.db.ProviderSettingEntity,
+    candidateModelIds: List<String>,
+    selectedModels: List<String>,
+    onDismiss: () -> Unit,
+    onFetchModels: () -> Unit,
+    statusMessage: String?,
+    onSave: (List<String>) -> Unit,
+) {
+    var search by remember(provider.providerId) { mutableStateOf("") }
+    var selected by remember(provider.providerId) { mutableStateOf(selectedModels.toSet()) }
+    val candidateModels = remember(provider.providerId, provider.publishedModelsJson, candidateModelIds) {
+        providerModelCandidates(provider, candidateModelIds)
+    }
+    val candidateIds = candidateModels.map { it.id }.toSet()
+    val filtered = candidateModels.filter { model ->
+        val query = search.trim().lowercase()
+        query.isBlank() || model.id.lowercase().contains(query) || model.label.lowercase().contains(query) || (model.notes?.lowercase()?.contains(query) == true)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(provider.displayName) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().height(520.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    ModelPickerActionButton(text = "モデルリスト取得", onClick = onFetchModels, modifier = Modifier.weight(1.5f))
+                    ModelPickerActionButton(text = "全選択", onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f))
+                    ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.weight(1f))
+                }
+                ImeAwareOutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    label = "モデル検索",
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                )
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    filtered.forEach { model ->
+                        val checked = selected.contains(model.id)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selected = if (checked) selected - model.id else selected + model.id
+                            }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Checkbox(checked = checked, onCheckedChange = { enabled ->
+                                selected = if (enabled) selected + model.id else selected - model.id
+                            })
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(model.label, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(model.notes ?: model.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+                statusMessage?.takeIf { it.contains("モデル") || it.contains(provider.providerId) }?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(selected.filter { it in candidateIds }) }) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("キャンセル") }
+        },
+    )
+}
+
+@Composable
+private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.height(40.dp),
+        shape = RoundedCornerShape(4.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+    ) {
+        Text(text, maxLines = 1, overflow = TextOverflow.Clip, fontSize = 11.sp)
     }
 }
 
@@ -1868,6 +2102,74 @@ private fun parsePublishedModelIds(value: String): List<String> {
     }
 }
 
+private fun connectionKindOptions(): List<Pair<String, String>> {
+    return listOf(
+        "openai_compatible" to "OpenAI compatible",
+        "anthropic" to "Anthropic",
+        "gemini" to "Gemini",
+        "litert-lm" to "LiteRT-LM",
+    )
+}
+
+private fun connectionKindLabel(value: String): String {
+    return when (value) {
+        "openai_compatible", "openai-compatible" -> "OpenAI compatible"
+        "anthropic" -> "Anthropic"
+        "gemini" -> "Gemini"
+        "litert-lm" -> "LiteRT-LM"
+        else -> value.ifBlank { "OpenAI compatible" }
+    }
+}
+
+private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSettingEntity, fetchedModelIds: List<String>): List<ProviderModelCandidate> {
+    val defaults = when (provider.providerId) {
+        "local-litert-lm" -> listOf(
+            ProviderModelCandidate("local-litert-lm:gemma-4-e2b", "Gemma 4 E2B", "LiteRT-LM"),
+            ProviderModelCandidate("local-litert-lm:gemma-4-e4b", "Gemma 4 E4B", "LiteRT-LM"),
+        )
+        "openai" -> listOf(
+            ProviderModelCandidate("openai:gpt-5.1", "GPT-5.1"),
+            ProviderModelCandidate("openai:gpt-5.1-mini", "GPT-5.1 mini"),
+            ProviderModelCandidate("openai:gpt-4.1", "GPT-4.1"),
+            ProviderModelCandidate("openai:gpt-4.1-mini", "GPT-4.1 mini"),
+        )
+        "nvidia" -> listOf(
+            ProviderModelCandidate("google/gemma-4-31b-it", "Google Gemma 4 31B Instruct"),
+            ProviderModelCandidate("meta/llama-3.3-70b-instruct", "Meta Llama 3.3 70B Instruct"),
+            ProviderModelCandidate("mistralai/mistral-large-2-instruct", "Mistral AI Mistral Large 2 Instruct"),
+        )
+        "anthropic" -> listOf(
+            ProviderModelCandidate("anthropic:claude-opus-4-7", "Claude Opus 4.7"),
+            ProviderModelCandidate("anthropic:claude-sonnet-4-6", "Claude Sonnet 4.6"),
+            ProviderModelCandidate("anthropic:claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
+        )
+        "gemini" -> listOf(
+            ProviderModelCandidate("gemini:gemini-2.5-pro", "Gemini 2.5 Pro"),
+            ProviderModelCandidate("gemini:gemini-2.5-flash", "Gemini 2.5 Flash"),
+            ProviderModelCandidate("gemini:gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite"),
+        )
+        "ollama" -> listOf(
+            ProviderModelCandidate("ollama:llama3.2", "Llama 3.2"),
+            ProviderModelCandidate("ollama:gpt-oss:20b", "gpt-oss 20B"),
+            ProviderModelCandidate("ollama:qwen3:8b", "Qwen3 8B"),
+        )
+        "ovms" -> listOf(
+            ProviderModelCandidate("qwen3-api", "Qwen3 8B Instruct", "thinking"),
+            ProviderModelCandidate("qwen-api", "Qwen2.5 7B Instruct"),
+            ProviderModelCandidate("gemma3-12b-api", "Google Gemma 3 12B Instruct"),
+            ProviderModelCandidate("gemma3-4b-api", "Google Gemma 3 4B Instruct"),
+        )
+        else -> emptyList()
+    }
+    val fetched = fetchedModelIds.map { id ->
+        ProviderModelCandidate(id, modelDisplayName(id), id)
+    }
+    val stored = parsePublishedModelIds(provider.publishedModelsJson).map { id ->
+        ProviderModelCandidate(id, modelDisplayName(id), id)
+    }
+    return (defaults + fetched + stored).distinctBy { it.id }
+}
+
 private fun modelChoicesFor(state: InkuUiState): List<ModelChoice> {
     val choices = mutableListOf<ModelChoice>()
     state.modelAssets.forEach { asset ->
@@ -1947,7 +2249,7 @@ private fun formatDuration(ms: Long): String {
 }
 
 @Composable
-private fun SettingsCard(title: String, sub: String, status: String, actions: @Composable () -> Unit) {
+private fun SettingsCard(title: String, sub: String, status: String, titleAction: (@Composable () -> Unit)? = null, actions: @Composable () -> Unit) {
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1A18)),
@@ -1959,7 +2261,14 @@ private fun SettingsCard(title: String, sub: String, status: String, actions: @C
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                titleAction?.invoke()
+            }
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             actions()
@@ -2659,6 +2968,7 @@ private fun ImeAwareOutlinedTextField(
     maxLines: Int = Int.MAX_VALUE,
     singleLine: Boolean = false,
     enabled: Boolean = true,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
@@ -2680,6 +2990,7 @@ private fun ImeAwareOutlinedTextField(
         maxLines = maxLines,
         singleLine = singleLine,
         enabled = enabled,
+        keyboardOptions = keyboardOptions,
         shape = RoundedCornerShape(16.dp),
     )
 }

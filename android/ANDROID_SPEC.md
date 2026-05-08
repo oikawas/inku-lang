@@ -771,3 +771,44 @@ above the image preview.
 - Selecting a canvas saves the setting and closes the dialog.
 - This entry point is available from both Compose and Batch drawing panels and
   updates the same `canvas_aspect` setting used by the Settings panel.
+
+## 2026-05-08 Model Settings Provider UI
+
+The Android model settings panel follows the server/web model-provider settings
+shape by rendering each service as an independent provider panel.
+
+- English section headings such as `AI SERVICE CONNECTIONS` are not shown.
+- Each provider panel shows `変更` on the right side of the panel title. It opens
+  the service-name edit dialog. The body does not repeat a `サービス名` label or
+  duplicate value.
+- Connection type is selected from a dropdown. Android uses the server
+  `openai_compatible`, `anthropic`, and `gemini` kinds and adds the
+  Android-specific `litert-lm` kind.
+- `Base URL` is shown as a read-only row with an adjacent `編集` button that
+  opens a URL edit dialog.
+- `APIキー` follows the server/web state transition: when a key is already set,
+  Android does not show the stored key and exposes a single `削除` button; when
+  no key is set, the same action slot becomes `追加` and opens the new-key dialog.
+- The panel shows the models published to the user and provides a `モデル選択`
+  button that opens the model picker.
+- The model picker follows the server/web flow with model-list fetch, select all,
+  clear all, search, checkbox model rows, and save / cancel actions.
+- The model-list fetch button retrieves the latest model list from the selected
+  provider service and reflects it in the publishable model candidates.
+- Fetch-in-progress and fetch-result status is shown at the bottom of the model
+  picker dialog.
+- The model search field requests an ASCII-oriented keyboard because model ids
+  are generally searched in Latin characters.
+- After fetching a model list, Android follows the server/web selection rule:
+  only models that existed before the fetch and were already selected remain
+  selected; newly fetched candidates are not auto-selected.
+- Fetched model candidates are stored separately from the models published to
+  the user. The drawing model picker shows only saved published models and must
+  not include unselected fetched candidates.
+- If an old Android build stored the initial candidate list as published models,
+  startup normalization removes that migration artifact only when the saved list
+  exactly matches a known legacy default candidate list.
+- The bottom row of each provider panel contains `サービス削除` and `保存`.
+- Because Android is single-user, published models from this panel are reflected
+  directly in the drawing model choices available to that user.
+- The LiteRT-LM download-cancel button is not shown in the model settings panel.

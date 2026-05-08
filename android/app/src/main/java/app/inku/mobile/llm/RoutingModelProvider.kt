@@ -22,7 +22,7 @@ class RoutingModelProvider(
 
     suspend fun fetchModels(providerId: String): List<String> {
         val provider = database.providerSettingDao().get(providerId) ?: error("サービスが見つかりません: $providerId")
-        if (provider.kind != "openai-compatible") {
+        if (provider.kind != "openai-compatible" && provider.kind != "openai_compatible") {
             error("${provider.displayName} のモデル取得はAndroid版では未対応です。")
         }
         return remoteProvider(provider).fetchModels()

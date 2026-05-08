@@ -51,6 +51,7 @@ data class InkuUiState(
     val modelDownloadState: String = "not downloaded",
     val modelAssets: List<ModelAssetEntity> = emptyList(),
     val providerSettings: List<ProviderSettingEntity> = emptyList(),
+    val providerModelCandidates: Map<String, List<String>> = emptyMap(),
     val exportTemplates: List<ExportTemplateEntity> = emptyList(),
     val activeModelDownloadId: String? = null,
     val selectedModelId: String = CompatibilityConstants.defaultStage1Model,
@@ -132,6 +133,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     private val history = repository.history()
     private val modelAssets = repository.modelAssets()
     private val providerSettings = repository.providerSettings()
+    private val providerModelCandidates = repository.providerModelCandidates()
     private val exportTemplates = repository.exportTemplates()
     private var modelDownloadJob: Job? = null
     private var drawingJob: Job? = null
@@ -141,7 +143,12 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     private var catalogSelectionSnapshot: String? = null
     private var lastHistorySwipeAt = 0L
 
-    val state: StateFlow<InkuUiState> = combine(localState, history, modelAssets, providerSettings, exportTemplates) { state, items, assets, providers, templates ->
+    private val providerConfig = combine(providerSettings, providerModelCandidates) { providers, candidates ->
+        providers to candidates
+    }
+
+    val state: StateFlow<InkuUiState> = combine(localState, history, modelAssets, providerConfig, exportTemplates) { state, items, assets, providerPair, templates ->
+        val (providers, candidates) = providerPair
         val selected = state.selectedHistory?.let { current ->
             items.firstOrNull { it.id == current.id }
         } ?: items.firstOrNull()
@@ -151,6 +158,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             selectedHistory = selected,
             modelAssets = assets,
             providerSettings = providers,
+            providerModelCandidates = candidates,
             exportTemplates = templates,
             modelLicenseAccepted = selectedModel?.licenseAcceptedAt != null,
             modelDownloadState = modelState,

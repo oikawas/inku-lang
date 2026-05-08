@@ -159,13 +159,13 @@
 		onSetStage2Provider: (provider: Provider) => void;
 		onSetStage2Model: (model: string) => void;
 		onUpdateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
-		onAddModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
+		onAddModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void | Promise<void>;
 		onAskDeleteModelProvider: (provider: Provider) => void;
 		onAskClearModelApiKey: (provider: Provider) => void;
 		onFetchModelList: (provider: Provider) => void | Promise<void>;
 		onSaveModelProviderName: (provider: Provider, label: string) => void | Promise<void>;
 		onSaveModelProviderMemo: (provider: Provider, memo: string) => void | Promise<void>;
-		onSaveModelProvider: (provider: Provider) => void | Promise<void>;
+		onSaveModelProvider: (provider: Provider, patch?: Partial<ModelProviderSetting>) => void | Promise<void>;
 		onSaveModelSettings: () => void | Promise<void>;
 		onLoadModelSettings: () => void | Promise<void>;
 		onLoadSettingsStatus: () => void;
@@ -296,6 +296,7 @@
 	let showAddServiceDialog = $state(false);
 	let modelPickerProviderId = $state<Provider | null>(null);
 	let modelPickerSearch = $state('');
+	let modelPickerEnabledDraft = $state<Record<string, boolean>>({});
 	let editProviderId = $state<Provider | null>(null);
 	let editProviderLabel = $state('');
 	let memoProviderId = $state<Provider | null>(null);
@@ -307,11 +308,11 @@
 		return providerGroups.find((group) => group.id === provider)?.models ?? [];
 	}
 
-	function addModelProvider() {
+	async function addModelProvider() {
 		const id = newProviderId.trim().toLowerCase();
 		const label = newProviderLabel.trim() || id;
 		if (!id || !label || !newProviderBaseUrl.trim()) return;
-		onAddModelProvider(id, {
+		await onAddModelProvider(id, {
 			label,
 			kind: newProviderKind,
 			base_url: newProviderBaseUrl.trim(),
@@ -376,24 +377,46 @@
 		baseUrlDrafts = nextDrafts;
 	}
 
-	function setAllPublishedModels(provider: Provider, models: { id: string }[], enabled: boolean) {
-		onUpdateModelProvider(provider, {
-			enabled_models: Object.fromEntries(models.map((model) => [model.id, enabled])),
-		});
+	function setAllPublishedModels(models: { id: string }[], enabled: boolean) {
+		modelPickerEnabledDraft = {
+			...modelPickerEnabledDraft,
+			...Object.fromEntries(models.map((model) => [model.id, enabled])),
+		};
 	}
 
 	function openModelPicker(provider: Provider) {
+		const setting = modelSettings?.providers[provider];
 		modelPickerSearch = '';
+		modelPickerEnabledDraft = { ...(setting?.enabled_models ?? {}) };
 		modelPickerProviderId = provider;
 	}
 
 	function closeModelPicker() {
 		modelPickerProviderId = null;
 		modelPickerSearch = '';
+		modelPickerEnabledDraft = {};
 	}
 
 	function modelEnabled(setting: ModelProviderSetting, modelId: string): boolean {
 		return setting.enabled_models?.[modelId] !== false;
+	}
+
+	function modelPickerDraftEnabled(modelId: string): boolean {
+		return modelPickerEnabledDraft[modelId] !== false;
+	}
+
+	async function saveModelPicker() {
+		if (!modelPickerProvider) return;
+		await onSaveModelProvider(modelPickerProvider.id, { enabled_models: modelPickerEnabledDraft });
+		closeModelPicker();
+	}
+
+	async function fetchModelPickerModels() {
+		if (!modelPickerProvider) return;
+		const providerId = modelPickerProvider.id;
+		await onFetchModelList(providerId);
+		const setting = modelSettings?.providers[providerId];
+		modelPickerEnabledDraft = { ...(setting?.enabled_models ?? {}) };
 	}
 
 	function hasPendingApiKey(setting: ModelProviderSetting): boolean {
@@ -599,7 +622,6 @@
 								<div class="model-provider-actions">
 									<button class="ghost-btn model-service-delete" onclick={() => onAskDeleteModelProvider(provider.id)} disabled={modelSettingsLoading}>{t().settingsModelDeleteService}</button>
 									<button class="ghost-btn model-service-memo" onclick={() => openMemoProvider(provider)} disabled={modelSettingsLoading}>{t().settingsModelServiceMemoButton}</button>
-									<button class="ghost-btn primary-inline model-service-save" onclick={() => saveBaseUrl(provider.id, setting)} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
 								</div>
 							</div>
 						{/each}
@@ -1225,9 +1247,9 @@
 		</div>
 		<div class="model-picker-body">
 			<div class="model-picker-actions">
-				<button class="ghost-btn" onclick={() => onFetchModelList(modelPickerProvider.id)} disabled={modelSettingsLoading}>{t().settingsModelFetchModels}</button>
-				<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerProvider.id, filteredModelPickerModels, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectAll}</button>
-				<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerProvider.id, filteredModelPickerModels, false)} disabled={modelSettingsLoading}>{t().settingsModelClearAll}</button>
+				<button class="ghost-btn" onclick={fetchModelPickerModels} disabled={modelSettingsLoading}>{t().settingsModelFetchModels}</button>
+				<button class="ghost-btn" onclick={() => setAllPublishedModels(filteredModelPickerModels, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectAll}</button>
+				<button class="ghost-btn" onclick={() => setAllPublishedModels(filteredModelPickerModels, false)} disabled={modelSettingsLoading}>{t().settingsModelClearAll}</button>
 			</div>
 			<input
 				class="model-picker-search"
@@ -1243,13 +1265,13 @@
 					<label class="check-row model-picker-row">
 						<input
 							type="checkbox"
-							checked={modelEnabled(modelPickerSetting, model.id)}
-							onchange={(e) => onUpdateModelProvider(modelPickerProvider.id, {
-								enabled_models: {
-									...(modelPickerSetting.enabled_models ?? {}),
+							checked={modelPickerDraftEnabled(model.id)}
+							onchange={(e) => {
+								modelPickerEnabledDraft = {
+									...modelPickerEnabledDraft,
 									[model.id]: (e.currentTarget as HTMLInputElement).checked,
-								},
-							})}
+								};
+							}}
 						/>
 						<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
 					</label>
@@ -1261,7 +1283,7 @@
 				<div class:error={modelFetchResults[modelPickerProvider.id].type === 'error'} class="model-picker-result">{modelFetchResults[modelPickerProvider.id].message}</div>
 			{/if}
 			<button class="ghost-btn" onclick={closeModelPicker}>{t().confirmCancel}</button>
-			<button class="ghost-btn primary-inline" onclick={() => { void saveBaseUrl(modelPickerProvider.id, modelPickerSetting); closeModelPicker(); }} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
+			<button class="ghost-btn primary-inline" onclick={saveModelPicker} disabled={modelSettingsLoading}>{t().profileSaveButton}</button>
 		</div>
 	</div>
 {/if}

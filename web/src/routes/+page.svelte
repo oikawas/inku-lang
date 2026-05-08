@@ -961,27 +961,40 @@
 		};
 	}
 
-	function addModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
-		if (!modelSettings || !provider) return;
-		modelCatalog = [
-			...modelCatalog.filter((item) => item.id !== provider),
-			{
-				id: provider,
-				label: patch.label ?? provider,
-				kind: patch.kind,
-				requires_api_key: patch.requires_api_key,
-				memo: patch.memo,
-				models: patch.models ?? [],
-			},
-		];
-		updateModelProvider(provider, {
-			base_url: patch.base_url ?? patch.default_base_url ?? '',
-			api_key_set: false,
-			api_key_hint: null,
-			api_key: patch.api_key,
-			enabled_models: patch.enabled_models ?? {},
-		});
-		modelSettingsStatus = t().settingsModelSaved;
+	async function addModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
+		if (!modelSettings || !provider || currentUser?.role !== 'admin') return;
+		modelSettingsLoading = true;
+		try {
+			const r = await apiFetch('/api/settings/models', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					providers: {
+						[provider]: {
+							label: patch.label ?? provider,
+							kind: patch.kind,
+							requires_api_key: patch.requires_api_key,
+							memo: patch.memo,
+							models: patch.models ?? [],
+							base_url: patch.base_url ?? patch.default_base_url ?? '',
+							api_key: patch.api_key || undefined,
+							enabled_models: patch.enabled_models ?? {},
+						},
+					},
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
+			modelCatalog = data.catalog;
+			modelSettings = data.settings;
+			modelSettingsStatus = t().settingsModelSaved;
+			await loadAvailableModels();
+		} catch (e) {
+			modelSettingsStatus = e instanceof Error ? e.message : String(e);
+			throw e;
+		} finally {
+			modelSettingsLoading = false;
+		}
 	}
 
 	function askDeleteModelProvider(provider: Provider) {
@@ -1157,9 +1170,10 @@
 		}
 	}
 
-	async function saveModelProvider(provider: Provider) {
+	async function saveModelProvider(provider: Provider, patch: Partial<ModelProviderSetting> = {}) {
 		if (!modelSettings || currentUser?.role !== 'admin') return;
-		const providerSettings = modelSettings.providers[provider];
+		const currentProviderSettings = modelSettings.providers[provider];
+		const providerSettings = currentProviderSettings ? { ...currentProviderSettings, ...patch } : null;
 		if (!providerSettings) return;
 		modelSettingsLoading = true;
 		try {

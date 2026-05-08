@@ -778,9 +778,11 @@ OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama's
 OpenAI-compatible API, and Intel OVMS's OpenAI-compatible API. Admin users can
 add and remove connection services from the model settings tab. Added services
 carry a service ID, display name, connection kind (`openai_compatible`,
-`anthropic`, or `gemini`), base URL, and optional initial API key. Model lists
-are fetched later through each service's model-list fetch action instead of
-being typed manually when the service is created.
+`anthropic`, or `gemini`), base URL, and optional initial API key. The add
+service dialog saves the new service to the server immediately when Add is
+pressed, so service panels do not include a redundant whole-panel save button.
+Model lists are fetched later through each service's model-list fetch action
+instead of being typed manually when the service is created.
 The service ID is the stable internal key used for DB connection settings,
 Stage 1 / Stage 2 provider references, API provider dispatch, and duplicate
 protection, so it is not editable after creation. The user-facing service name
@@ -820,10 +822,13 @@ Stage 1 / Stage 2 provider and model selection is stored separately in
 `user_accounts.model_settings`, saved from the model selection dialog through
 `/api/auth/me/settings`, and restored on login.  Admin users can also toggle
 which models are visible to users for each provider. Published-model selection
-is handled in a separate dialog that also contains model-list fetch, select-all,
-and clear-all controls. The main settings tab summarizes only the currently
-published models. `GET /api/models` returns only published models for signed-in
-users, and the model selection dialog uses that filtered catalog.
+is handled in a separate dialog that also contains model-list fetch, search,
+select-all, and clear-all controls. Checkbox changes inside that dialog are
+drafted locally and are sent to the server only when Save is pressed; Cancel or
+clicking outside the dialog discards them. The main settings tab summarizes
+only the currently published models. `GET /api/models` returns only published
+models for signed-in users, and the model selection dialog uses that filtered
+catalog.
 The status-bar PNG export templates default to Y-axis heights of `1080px`,
 `2160px`, and `4320px`. Older saved defaults of `1024px` and `2048px` are
 automatically replaced by the new defaults, while user-customized templates are

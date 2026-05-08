@@ -1572,7 +1572,7 @@ server / Android の CLI 比較で、Stage 1 の LLM 出力揺れを切り離し
 - 履歴から画像を開き直した場合も、JSONタブに履歴保存済みの `stage1_model` / `stage2_model` を表示する
 - 設定ダイアログに管理者向け `モデル設定` タブを追加する。Stage 1 / Stage 2 の既定 provider / model と、provider 別の base URL / API key をサーバー DB の app settings に保存する
 - 組み込みの商用 LLM provider は公式名称に合わせて OpenAI API Platform / Claude API / Gemini API とし、非商用 API provider は NVIDIA NIM、ローカル provider は Ollama (OpenAI互換) / Intel OVMS (OpenAI互換) を対象とする
-- 管理者は設定ダイアログのモデル設定タブで、接続サービスを追加・削除できる。追加サービスは service ID、表示名、接続形式 (`openai_compatible` / `anthropic` / `gemini`)、Base URL、任意の初期 API key を持つ。モデル一覧は追加時には手入力せず、サービスごとの `モデルリスト取得` で取得する
+- 管理者は設定ダイアログのモデル設定タブで、接続サービスを追加・削除できる。追加サービスは service ID、表示名、接続形式 (`openai_compatible` / `anthropic` / `gemini`)、Base URL、任意の初期 API key を持つ。サービス追加ダイアログの `追加` は即座にサーバーへ保存し、サービスパネル下部に冗長な全体保存ボタンは置かない。モデル一覧は追加時には手入力せず、サービスごとの `モデルリスト取得` で取得する
 - service ID は DB 内の接続設定キー、Stage 1 / Stage 2 の provider 参照、API 呼び出し時の provider 判定、重複防止に使う内部IDであり、作成後は編集不可とする。画面に表示するサービス名は後から編集できる
 - 接続サービスごとに `モデルリスト取得` を実行できる。サーバーは保存済み Base URL / API key を使って provider 種別ごとの models API を呼び、取得したモデル一覧を当該サービス定義へ保存する。取得結果の成功/エラーは公開モデル選択ダイアログ下部に表示する。API key はブラウザへ送らない
 - API key はサーバー側にのみ保存し、`GET /api/settings/models` の応答では設定済みかどうかのみを UI 表示に使う。ブラウザへ生の API key は返さず、設定済みの場合の入力欄は `保存済みキーを維持` と表示して編集不可にする。未設定の状態で新しい key を入力した場合は、そのサービスの保存ボタンで保存する
@@ -1582,7 +1582,7 @@ server / Android の CLI 比較で、Stage 1 の LLM 出力揺れを切り離し
 - Web UI から `/api/paint` / `/api/interpret` / `/api/compose` へ送るモデルIDは、接続先 provider と結合して `openai:gpt-5.2` のような provider 付き ID に正規化する。API が provider prefix の無い model ID を受け取った場合でも、その ID がユーザー設定中の Stage 1 / Stage 2 model と一致する場合は、同じユーザー設定の provider で補完してから dispatch する
 - デモ指示文生成も同じ provider 解決を使い、OpenAI API Platform / Claude API / Gemini API / NVIDIA NIM / Ollama / Intel OVMS の各接続設定を経由する
 - LLMサーバー接続設定はグローバルな管理者設定とし、Stage 1 / Stage 2 の接続先・モデル選択はユーザーごとの `user_accounts.model_settings` に保存する。モデル選択ダイアログの確定時に `/api/auth/me/settings` へ保存し、ログイン時に復元する
-- 管理者は設定ダイアログのモデル設定タブで、provider ごとに一般ユーザーへ公開するモデルを個別に On/Off できる。公開モデル選択はサービスパネル内ではなく個別ダイアログで行い、`モデルリスト取得` / `全て選択` / `全て解除` も同ダイアログに置く。モデル設定タブ本体には公開中モデルのみを要約表示する。`GET /api/models` はログイン済みユーザー向けに公開モデルのみを返し、モデル選択ダイアログはこの一覧を使う
+- 管理者は設定ダイアログのモデル設定タブで、provider ごとに一般ユーザーへ公開するモデルを個別に On/Off できる。公開モデル選択はサービスパネル内ではなく個別ダイアログで行い、`モデルリスト取得` / 検索 / `全て選択` / `全て解除` も同ダイアログに置く。公開モデル選択ダイアログ内のチェック変更はドラフトとして扱い、`保存` で初めてサーバーへ反映し、`キャンセル` またはダイアログ外クリックでは破棄する。モデル設定タブ本体には公開中モデルのみを要約表示する。`GET /api/models` はログイン済みユーザー向けに公開モデルのみを返し、モデル選択ダイアログはこの一覧を使う
 - CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
 - CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
 - 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める

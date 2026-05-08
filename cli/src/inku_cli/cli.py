@@ -41,6 +41,7 @@ CANVAS_ASPECT_RATIOS = {
     "byobu": 2.2,
     "vertical": 9.0 / 16.0,
 }
+CANVAS_ASPECTS = tuple(CANVAS_ASPECT_RATIOS.keys())
 COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "white": ("white", "ivory", "snow", "paper", "白", "雪", "紙", "光"),
     "black": ("black", "dark", "shadow", "ink", "黒", "闇", "影", "墨"),
@@ -1158,6 +1159,7 @@ def _paint_payload(
         "save_artifacts": args.save_artifacts,
         "history_input": args.history_input,
         "catalog_id": color_catalog,
+        "canvas_aspect": getattr(args, "canvas_aspect", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -1181,6 +1183,7 @@ def _compose_payload(
         "original_text": args.original_text,
         "lang": args.lang,
         "catalog_id": color_catalog,
+        "canvas_aspect": getattr(args, "canvas_aspect", None),
         "auto_repair": True,
     }
     return {k: v for k, v in payload.items() if v is not None}
@@ -1266,6 +1269,7 @@ def _history_payload_from_result(
         "render_canvas_aspect": result.get("render_canvas_aspect"),
         "render_canvas_aspect_id": result.get("render_canvas_aspect_id"),
         "render_canvas_aspect_ratio": result.get("render_canvas_aspect_ratio"),
+        "canvas_aspect": getattr(args, "canvas_aspect", None),
         "save_artifacts": args.save_artifacts if args.save_artifacts is not None else args.save_history,
         "count_generation": True,
     }
@@ -1896,6 +1900,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--history-input")
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
+    parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--lang", default="ja", choices=["ja", "en"])
     parser.add_argument("--include-thinking", action="store_true")
     parser.add_argument("--save-history", action="store_true")

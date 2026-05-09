@@ -1054,3 +1054,49 @@ moved to `Settings > Demo Settings`.
 
 - A `デフォルト値に戻す` button restores the seed phrase to that default after
   editing.
+
+## 2026-05-10 LiteRT-LM 0.11.0 Pinning And Performance Logs
+
+The Android LiteRT-LM path manages its dependency version and runtime logs
+explicitly to improve benchmark reproducibility and investigation quality.
+
+- The LiteRT-LM Android dependency must not use `latest.release`; it is pinned
+  to `com.google.ai.edge.litertlm:litertlm-android:0.11.0`.
+- Stage 1 / Stage 2 system prompts are not concatenated into the user prompt.
+  They are passed through LiteRT-LM `ConversationConfig(systemInstruction=...)`.
+- `Conversation.sendMessageAsync()` receives only the stage user prompt. This
+  avoids duplicate prompt wrapping and follows the LiteRT-LM conversation API.
+- The existing policy remains unchanged: GPU backend is required, CPU fallback
+  is not allowed, and speculative decoding / MTP is enabled.
+- The LiteRT-LM provider emits the following `InkuPerf` log events:
+  - `litert_request_start`: `model_id`, `prompt_chars`, `system_chars`,
+    `max_tokens`, and `engine_max_tokens`
+  - `litert_engine_init`: `model_id`, `backend`, `speculative_decoding`,
+    `engine_init_ms`, and `max_tokens`
+  - `litert_request_done`: `model_id`, `elapsed_ms`, and `output_chars`
+- The pipeline emits the following `InkuPerf` log events:
+  - `paint_start` / `paint_done`: selected models, prompt length, catalog,
+    canvas, total elapsed time, and render hash
+  - `stage1_start` / `stage1_done` / `stage1_failed`
+  - `stage2_start` / `stage2_done` / `stage2_failed`
+  - `render_start` / `render_done`
+- These logs are for performance investigation only. They must not change the
+  server/web-compatible history JSON, Score, SVG, or render metadata formats.
+- `engine_init_ms`, `stage1_ms`, `stage2_ms`, `render_ms`, `model_id`, and
+  `prompt_chars` are collected from adb logcat and may be saved under
+  `no-git-sync/perf-logs/` when needed. Performance logs under `no-git-sync`
+  are not tracked by git.
+
+As of 2026-05-10, Pixel 9 device measurements with the same prompt,
+`ink_season`, `pixel9_landscape_safe`, GPU backend, and MTP enabled show:
+
+- E2B: `engine_init_ms=6741`, `stage1_ms=18422`, `stage2_ms=89507`,
+  `render_ms=13`, total `107956ms`. Stage 2 retried.
+- E4B: the first run, `perf-litert-e4b-003`, exited during Stage 1 engine
+  initialization. The rerun, `perf-litert-e4b-004`, completed with
+  `engine_init_ms=12011`, `stage1_ms=29937`, `stage2_ms=41931`,
+  `render_ms=47`, total `71933ms`. Stage 2 retried.
+- `ConversationConfig(systemInstruction=...)` reduces user-side `prompt_chars`
+  to about 31 for Stage 1 and 132 for Stage 2, but the system prompt is still
+  passed separately. Total latency therefore remains strongly affected by model
+  output length and retry behavior.

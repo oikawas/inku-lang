@@ -814,3 +814,29 @@ Android 版では、デモ画面のシードフレーズ編集を画面本体か
 ```
 
 - `デフォルト値に戻す` ボタンを置き、編集後でも上記の既定値へ戻せるようにする。
+
+## 2026-05-10 LiteRT-LM 0.11.0 固定と性能計測ログ
+
+Android 版の LiteRT-LM 実行は、比較再現性と調査容易性を優先し、依存バージョンと実行時ログを明示的に管理する。
+
+- LiteRT-LM Android dependency は `latest.release` を使用せず、`com.google.ai.edge.litertlm:litertlm-android:0.11.0` に固定する。
+- Stage 1 / Stage 2 の system prompt は user prompt に連結せず、LiteRT-LM の `ConversationConfig(systemInstruction=...)` として渡す。
+- `Conversation.sendMessageAsync()` には各 stage の user prompt のみを渡す。これにより prompt 包装の重複を避け、LiteRT-LM 公式 API の会話モデルに合わせる。
+- GPU backend 必須、CPU fallback なし、speculative decoding / MTP 有効の方針は維持する。
+- LiteRT-LM provider は `InkuPerf` log tag で以下を出力する。
+  - `litert_request_start`: `model_id`、`prompt_chars`、`system_chars`、`max_tokens`、`engine_max_tokens`
+  - `litert_engine_init`: `model_id`、`backend`、`speculative_decoding`、`engine_init_ms`、`max_tokens`
+  - `litert_request_done`: `model_id`、`elapsed_ms`、`output_chars`
+- pipeline は `InkuPerf` log tag で以下を出力する。
+  - `paint_start` / `paint_done`: 選択 model、prompt length、catalog、canvas、total elapsed、render hash
+  - `stage1_start` / `stage1_done` / `stage1_failed`
+  - `stage2_start` / `stage2_done` / `stage2_failed`
+  - `render_start` / `render_done`
+- これらのログは performance investigation 用であり、履歴 JSON、Score、SVG、render metadata の server/web 互換形式を変更しない。
+- `engine_init_ms`、`stage1_ms`、`stage2_ms`、`render_ms`、`model_id`、`prompt_chars` は adb logcat から収集し、必要に応じて `no-git-sync/perf-logs/` に保存する。`no-git-sync` 配下の計測ログは git 管理対象外とする。
+
+2026-05-10 時点の Pixel 9 実機計測では、同一指示文、`ink_season`、`pixel9_landscape_safe`、GPU backend、MTP 有効で以下を確認した。
+
+- E2B: `engine_init_ms=6741`、`stage1_ms=18422`、`stage2_ms=89507`、`render_ms=13`、total `107956ms`。Stage 2 は再投入が発生した。
+- E4B: 初回 `perf-litert-e4b-003` は Stage 1 engine init 中に process 終了。再実行 `perf-litert-e4b-004` は `engine_init_ms=12011`、`stage1_ms=29937`、`stage2_ms=41931`、`render_ms=47`、total `71933ms`。Stage 2 は再投入が発生した。
+- `ConversationConfig(systemInstruction=...)` 化により user prompt 側の `prompt_chars` は Stage 1 で 31、Stage 2 で 132 程度まで短縮されるが、system prompt は別枠で渡るため、総処理時間の改善は model output と retry の有無に強く依存する。

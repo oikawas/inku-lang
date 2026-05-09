@@ -3130,8 +3130,8 @@ private fun HistoryTile(item: HistoryItemEntity, selected: Boolean, onSelect: ()
             .width(84.dp)
             .height(96.dp)
             .clickable(onClick = onSelect)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.secondary else Color.Transparent, RoundedCornerShape(4.dp)),
-        shape = RoundedCornerShape(4.dp),
+            .border(1.dp, if (selected) MaterialTheme.colorScheme.secondary else Color.Transparent, RoundedCornerShape(0.dp)),
+        shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF24211E)),
     ) {
         Column(modifier = Modifier.padding(5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -3156,9 +3156,9 @@ private fun HistoryGridTile(
                 onClick = onSelect,
                 onLongClick = onToggleStar,
             )
-            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(14.dp))
-            .border(4.dp, if (selected) Color(0x337FA6D8) else Color.Transparent, RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(14.dp),
+            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp))
+            .border(4.dp, if (selected) Color(0x337FA6D8) else Color.Transparent, RoundedCornerShape(0.dp)),
+        shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

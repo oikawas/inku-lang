@@ -474,7 +474,9 @@ VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
 )
 MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
     "余白", "間", "空白", "気配", "押す", "避け", "離れ",
+    "紙", "新聞", "手紙", "紙片", "風", "交差", "迷う", "漂う",
     "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
+    "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift",
 )
 
 

@@ -1294,6 +1294,33 @@ def test_coerce_score_restores_rhythm_and_ma_without_count_growth():
     assert "ma pressure restored" in (ins.color_hint or "")
 
 
+def test_coerce_score_restores_ma_for_thin_planar_drift_without_count_growth():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.46, 0.46],
+                    "size": [0.08, 0.05],
+                    "color": "gray",
+                    "rotation": 12,
+                    "arrangement": {"count": 6, "layout": "scatter", "path": "wave"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="北風の交差点で、新聞紙が迷うように回っている。")
+
+    ins = fixed.instructions[0]
+    assert ins.arrangement is not None
+    assert ins.arrangement.count == 6
+    assert ins.arrangement.preserve_space is True
+    assert ins.arrangement.margin >= 0.22
+    assert ins.arrangement.fade == "outward"
+    assert "ma pressure restored" in (ins.color_hint or "")
+
+
 def test_fallback_score_preserves_explicit_count_circle_and_polygon():
     from inku_server.api import _fallback_score_from_ddl
 

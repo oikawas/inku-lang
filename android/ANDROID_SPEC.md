@@ -969,3 +969,26 @@ This is an intentional Android difference from the server/web UI.
   the top and labeled as alternative candidates.
 - This UI affects only Android editing ergonomics. It must not change
   server/web-compatible DDL, Score, SVG, history persistence, or JSON metadata.
+
+## 2026-05-09 Compose Auto-Repair State And IME Return Flow
+
+The Android compose screen defines the following mobile-specific input-state
+behavior.
+
+- The `補正` button controls whether DDL auto-repair / Stage-1.5-style DDL
+  expansion is allowed.
+- New installs default `補正` to OFF.
+- The `補正` state is saved in Room setting `ddl_auto_repair` and restored after
+  app restart.
+- When `補正` is OFF, Android does not run `expandIntermediateDdl()` after Stage
+  1 or during DDL-to-render execution, so Android does not append additional
+  phrases to the displayed DDL.
+- When `補正` is ON, Android uses the server/web-compatible DDL expansion and
+  repair path.
+- The compose-screen `新規作成` action clears both the prompt and interpreted
+  DDL, and resets `ddlEditedAfterGeneration` to false.
+- When the IME opens, focused input fields retry `bringIntoView()` at multiple
+  timings instead of relying on a single focus-time scroll. This keeps input
+  areas visible after Japanese IME candidate rows or keyboard height changes.
+- When drawing finishes, Android clears input focus, hides the IME, and scrolls
+  the compose screen back to the image area.

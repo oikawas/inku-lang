@@ -81,7 +81,7 @@ data class InkuUiState(
     val saveReplayAsNewVersion: Boolean = true,
     val historySelectionCanvas: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val historySelectionCatalog: HistorySelectionBehavior = HistorySelectionBehavior.Current,
-    val ddlAutoRepairEnabled: Boolean = true,
+    val ddlAutoRepairEnabled: Boolean = false,
     val saijikiOpen: Boolean = false,
     val ddlEditorOpen: Boolean = false,
     val isDrawing: Boolean = false,
@@ -484,7 +484,9 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleDdlAutoRepair() {
         val current = localState.value
-        localState.value = current.copy(ddlAutoRepairEnabled = !current.ddlAutoRepairEnabled, message = null)
+        val enabled = !current.ddlAutoRepairEnabled
+        localState.value = current.copy(ddlAutoRepairEnabled = enabled, message = null)
+        persistSetting("ddl_auto_repair", JSONObject().put("enabled", enabled).toString())
     }
 
     fun toggleSaijiki() {
@@ -1054,6 +1056,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val replay = repository.getSetting("save_replay_as_new_version")?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
         val histCanvas = repository.getSetting("history_selection_canvas")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
         val histCatalog = repository.getSetting("history_selection_catalog")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
+        val ddlAutoRepair = repository.getSetting("ddl_auto_repair")?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
         val batchRandom = repository.getSetting("batch_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
         val demoSeed = repository.getSetting("demo_seed_phrase")?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = repository.getSetting("demo_interval_seconds")?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
@@ -1076,6 +1079,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             saveReplayAsNewVersion = replay,
             historySelectionCanvas = histCanvas,
             historySelectionCatalog = histCatalog,
+            ddlAutoRepairEnabled = ddlAutoRepair,
             batchRandomColorCatalog = batchRandom,
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),

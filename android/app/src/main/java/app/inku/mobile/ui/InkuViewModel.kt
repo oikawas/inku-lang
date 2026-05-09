@@ -210,7 +210,12 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun clearPrompt() {
         if (state.value.isDrawing) return
         promptEditedByUser = true
-        localState.value = localState.value.copy(prompt = "", message = null)
+        localState.value = localState.value.copy(
+            prompt = "",
+            ddl = "",
+            ddlEditedAfterGeneration = false,
+            message = null,
+        )
     }
 
     fun setDdl(value: String) {

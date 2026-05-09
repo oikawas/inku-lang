@@ -1544,10 +1544,7 @@ private fun NumberedBatchTextField(
                             .heightIn(min = 32.dp)
                             .onFocusChanged { focusState ->
                                 if (focusState.isFocused) {
-                                    scope.launch {
-                                        delay(260)
-                                        bringIntoViewRequester.bringIntoView()
-                                    }
+                                    scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                                 }
                             },
                     )
@@ -3373,6 +3370,16 @@ private fun CompactLabel(text: String) {
     Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+private fun kotlinx.coroutines.CoroutineScope.launchImeBringIntoViewGuard(requester: BringIntoViewRequester) {
+    launch {
+        listOf(80L, 220L, 420L, 700L, 1000L).forEach { waitMs ->
+            delay(waitMs)
+            requester.bringIntoView()
+        }
+    }
+}
+
 @Composable
 private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
     WrapRow(horizontal = 6.dp, vertical = 6.dp) {
@@ -3402,10 +3409,7 @@ private fun DenseMultilineInput(
             .bringIntoViewRequester(bringIntoViewRequester)
             .onFocusChanged { focusState ->
                 if (focusState.isFocused) {
-                    scope.launch {
-                        delay(260)
-                        bringIntoViewRequester.bringIntoView()
-                    }
+                    scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
             }
             .background(Color(0xFF191816), RoundedCornerShape(4.dp))
@@ -3466,10 +3470,7 @@ private fun DenseTextFieldValueInput(
                 .fillMaxSize()
                 .onFocusChanged { focusState ->
                     if (focusState.isFocused) {
-                        scope.launch {
-                            delay(260)
-                            bringIntoViewRequester.bringIntoView()
-                        }
+                        scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                     }
                 }
                 .drawBehind {
@@ -3564,6 +3565,7 @@ private class DdlKeywordHighlightTransformation(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DenseSingleLineInput(
     value: String,
@@ -3571,10 +3573,18 @@ private fun DenseSingleLineInput(
     placeholder: String,
     modifier: Modifier = Modifier,
 ) {
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onFocusChanged { focusState ->
+                if (focusState.isFocused) {
+                    scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
+                }
+            }
             .background(Color(0xFF191816), RoundedCornerShape(4.dp))
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
             .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -3632,10 +3642,7 @@ private fun ImeAwareOutlinedTextField(
             .bringIntoViewRequester(bringIntoViewRequester)
             .onFocusChanged { focusState ->
                 if (focusState.isFocused) {
-                    scope.launch {
-                        delay(260)
-                        bringIntoViewRequester.bringIntoView()
-                    }
+                    scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
             },
         minLines = minLines,

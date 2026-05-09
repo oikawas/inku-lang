@@ -26,7 +26,11 @@ class LocalFallbackPipeline(
         } else {
             interpretText(request.description)
         }
-        val expandedDdl = expandIntermediateDdl(normalizedDdl, request.originalText)
+        val expandedDdl = if (request.autoRepair) {
+            expandIntermediateDdl(normalizedDdl, request.originalText)
+        } else {
+            normalizedDdl
+        }
         return InterpretResult(
             originalInput = request.originalText,
             normalizedDdl = normalizedDdl,
@@ -36,7 +40,11 @@ class LocalFallbackPipeline(
     }
 
     suspend fun composeFromDdl(ddl: String, request: PaintRequest): PaintResult {
-        val expandedDdl = expandIntermediateDdl(ddl, request.originalText)
+        val expandedDdl = if (request.autoRepair) {
+            expandIntermediateDdl(ddl, request.originalText)
+        } else {
+            ddl
+        }
         val generatedScore = generateStage2(request, expandedDdl)
         val scoreJson = generatedScore ?: if (request.stage2Model.isExplicitProviderModelId()) {
             error("Stage 2 explicit provider returned no usable Score.")

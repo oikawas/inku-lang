@@ -478,6 +478,10 @@ MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
     "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
     "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift",
 )
+SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = (
+    "布", "果実", "重", "影", "沈む", "沈め",
+    "cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink",
+)
 
 
 def _context_has_density_governor(ddl: str | None) -> bool:
@@ -1093,6 +1097,43 @@ def _with_context_energy_repair(
             continue
         repaired.append(_context_energy_instruction(kind, background=background))
     return repaired
+
+
+def _has_surface_tension(instructions: list[Instruction]) -> bool:
+    return any("surface tension restored" in (ins.color_hint or "") for ins in instructions)
+
+
+def _with_surface_tension(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    """大きな面の静けさを壊さず、薄い圧痕で視覚的な持続を足す。"""
+    if not _context_has_marker(ddl, SURFACE_TENSION_CONTEXT_MARKERS):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+    if len(instructions) >= 9 or _has_surface_tension(instructions):
+        return instructions
+    if background == "white" and not any(_closed_shape_area(ins) >= 0.08 for ins in instructions):
+        return instructions
+
+    color = "black" if background != "black" else VISIBLE_ON_BACKGROUND.get(background, "white")
+    tension = Instruction.model_validate(
+        {
+            "primitive": "arc",
+            "center": [0.58, 0.62],
+            "radius": 0.18,
+            "angle_start": 198,
+            "angle_end": 342,
+            "rotation": -4,
+            "color": color,
+            "weight": "hair",
+            "color_hint": "surface tension restored as a quiet shadow trace",
+        }
+    )
+    return [*instructions, tension]
 
 
 def _has_compensating_accent(instructions: list[Instruction]) -> bool:
@@ -2439,6 +2480,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_composition_diversity_repair(instructions, ddl=ddl, background=background)
     instructions = _with_structural_duplicate_repair(instructions)
     instructions = _with_context_energy_repair(instructions, ddl=ddl, background=background)
+    instructions = _with_surface_tension(instructions, ddl=ddl, background=background)
     effective_presence = score.presence or _presence_from_ddl(ddl)
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
     instructions = [_with_unintentional_filled_shape_tempering(ins, ddl=ddl) for ins in instructions]

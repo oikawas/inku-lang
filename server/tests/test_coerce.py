@@ -1321,6 +1321,30 @@ def test_coerce_score_restores_ma_for_thin_planar_drift_without_count_growth():
     assert "ma pressure restored" in (ins.color_hint or "")
 
 
+def test_coerce_score_adds_surface_tension_for_heavy_surface_context():
+    score = Score.model_validate(
+        {
+            "background": "red",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.22],
+                    "size": [0.24, 0.14],
+                    "color": "black",
+                    "filled": True,
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="赤い布の上で、熟した果実が重く静かな影を落とす。")
+
+    assert len(fixed.instructions) == 2
+    assert fixed.instructions[1].primitive == "arc"
+    assert fixed.instructions[1].weight == "hair"
+    assert "surface tension restored" in (fixed.instructions[1].color_hint or "")
+
+
 def test_fallback_score_preserves_explicit_count_circle_and_polygon():
     from inku_server.api import _fallback_score_from_ddl
 

@@ -7,6 +7,7 @@ import getpass
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -41,6 +42,8 @@ CANVAS_ASPECT_RATIOS = {
     "byobu": 2.2,
     "vertical": 9.0 / 16.0,
 }
+
+FIGURATIVE_HINT_RE = re.compile(r"\b(body|face|eye|mouth)\b")
 CANVAS_ASPECTS = tuple(CANVAS_ASPECT_RATIOS.keys())
 COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "white": ("white", "ivory", "snow", "白", "雪", "光"),
@@ -965,7 +968,7 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
                 fallback_hints += 1
             if "coverage from ddl clause" in lower_hint:
                 coverage_hints += 1
-            if any(marker in hint or marker in lower_hint for marker in ("顔", "人型", "body", "face", "eye", "mouth")):
+            if "顔" in hint or "人型" in hint or FIGURATIVE_HINT_RE.search(lower_hint):
                 object_like_hints += 1
             if any(marker in lower_hint for marker in ("visual event", "accent", "collision", "jump", "反転", "衝突")):
                 visual_event += 1

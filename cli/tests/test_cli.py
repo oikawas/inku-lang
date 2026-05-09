@@ -678,6 +678,26 @@ def test_quality_metrics_scores_rhythm_spacing_as_motion_energy():
     assert metrics["score_quality_metrics"]["motion_energy"] > 0
 
 
+def test_quality_metrics_does_not_treat_surface_as_face():
+    score = {
+        "instructions": [
+            {
+                "primitive": "arc",
+                "color": "black",
+                "center": [0.58, 0.62],
+                "radius": 0.18,
+                "angle_start": 198,
+                "angle_end": 342,
+                "color_hint": "surface tension restored as a quiet shadow trace",
+            }
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_quality_metrics"]["figurative_risk"] == 0
+
+
 def test_paper_words_do_not_request_white_by_themselves():
     trace = cli._color_trace(
         {"text": "新聞紙が迷うように回っている。", "ddl": "灰色の四角を置く。", "score": {"instructions": [{"primitive": "square", "color": "gray"}]}},

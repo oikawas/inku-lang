@@ -564,6 +564,18 @@ def _review_sets(results: list[dict[str, Any]], *, slow_ms: int = 100_000) -> di
     }
 
 
+def _server_timeout_reasons(result: dict[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    for key in ("interpret_fallback_reasons", "compose_retry_reasons"):
+        values = result.get(key)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if isinstance(value, str) and "hard_timeout" in value:
+                reasons.append(value)
+    return reasons
+
+
 def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thumb_size: int) -> None:
     try:
         from PIL import Image, ImageDraw
@@ -1707,91 +1719,138 @@ def command_batch(args: argparse.Namespace) -> int:
     )
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
+    pending_timeout_retries: list[tuple[int, str]] = []
+    result_index_by_line: dict[int, int] = {}
+
+    def process_line(index: int, line: str, *, retry_timeout: bool = False) -> dict[str, Any]:
+        progress_label = (
+            f"retrying timeout {index}/{len(lines)}"
+            if retry_timeout
+            else f"drawing {index}/{len(lines)}"
+        )
+        if input_mode == "ddl":
+            input_text = args.original_text or line
+            raw_result, _ = _run_with_progress(
+                f"{progress_label} from DDL",
+                lambda line=line: client.request("POST", "/api/compose", data=_compose_payload(
+                    args,
+                    line,
+                    stage2_model=stage2_model,
+                    color_catalog=color_catalog,
+                )),
+                enabled=not args.no_progress,
+            )
+            result = _compose_response_as_paint_result(
+                raw_result,
+                ddl=line,
+                input_text=input_text,
+                stage2_model=stage2_model,
+            )
+            if args.save_history:
+                result = _save_history_for_result(
+                    client,
+                    args,
+                    result,
+                    input_text=input_text,
+                    ddl=str(result.get("ddl") or line),
+                    stage1_model=None,
+                    stage2_model=stage2_model,
+                    color_catalog=color_catalog,
+                )
+        else:
+            result, _ = _run_with_progress(
+                progress_label,
+                lambda line=line: client.request("POST", "/api/paint", data=_paint_payload(
+                    args,
+                    line,
+                    stage1_model=stage1_model,
+                    stage2_model=stage2_model,
+                    color_catalog=color_catalog,
+                )),
+                enabled=not args.no_progress,
+            )
+        prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
+        output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
+        paths = _write_paint_outputs(output_result, out_dir=out_dir, prefix=prefix, png=args.png)
+        tokens_in = (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0)
+        tokens_out = (result.get("tokens_out_stage1") or 0) + (result.get("tokens_out_stage2") or 0)
+        elapsed = int(result.get("elapsed_total_ms") or 0)
+        entry = {
+            "line": index,
+            "text": result.get("text"),
+            "input_mode": input_mode,
+            **_model_summary(
+                None if input_mode == "ddl" else stage1_model,
+                stage2_model,
+                stage1_provider=None if input_mode == "ddl" else stage1_provider,
+                stage2_provider=stage2_provider,
+            ),
+            "timeout_seconds": timeout_seconds,
+            **_color_catalog_summary(color_catalog, catalog_data),
+            **_render_response_summary(result),
+            "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
+            "history_id": result.get("history_id"),
+            "svg_profile": args.svg_profile,
+            "elapsed_total_ms": elapsed,
+            "tokens_in": tokens_in or None,
+            "tokens_out": tokens_out or None,
+            "interpret_fallback_used": result.get("interpret_fallback_used", False),
+            "interpret_fallback_reasons": result.get("interpret_fallback_reasons", []),
+            "compose_retry_count": result.get("compose_retry_count", 0),
+            "compose_retry_reasons": result.get("compose_retry_reasons", []),
+            "compose_fallback_used": result.get("compose_fallback_used", False),
+            **_score_metrics(result.get("score")),
+            "paths": paths,
+        }
+        timeout_reasons = _server_timeout_reasons(entry)
+        if timeout_reasons:
+            entry["server_timeout_reasons"] = timeout_reasons
+            entry["server_timeout_retry_attempted"] = retry_timeout
+        return entry
+
     for index, line in enumerate(lines, start=1):
         try:
-            if input_mode == "ddl":
-                input_text = args.original_text or line
-                raw_result, _ = _run_with_progress(
-                    f"drawing {index}/{len(lines)} from DDL",
-                    lambda line=line: client.request("POST", "/api/compose", data=_compose_payload(
-                        args,
-                        line,
-                        stage2_model=stage2_model,
-                        color_catalog=color_catalog,
-                    )),
-                    enabled=not args.no_progress,
+            entry = process_line(index, line)
+            result_index_by_line[index] = len(results)
+            results.append(entry)
+            timeout_reasons = entry.get("server_timeout_reasons") or []
+            if timeout_reasons:
+                pending_timeout_retries.append((index, line))
+                print(
+                    f"{index}/{len(lines)} server timeout ({', '.join(timeout_reasons)}); queued final retry",
+                    file=sys.stderr,
                 )
-                result = _compose_response_as_paint_result(
-                    raw_result,
-                    ddl=line,
-                    input_text=input_text,
-                    stage2_model=stage2_model,
-                )
-                if args.save_history:
-                    result = _save_history_for_result(
-                        client,
-                        args,
-                        result,
-                        input_text=input_text,
-                        ddl=str(result.get("ddl") or line),
-                        stage1_model=None,
-                        stage2_model=stage2_model,
-                        color_catalog=color_catalog,
-                    )
-            else:
-                result, _ = _run_with_progress(
-                    f"drawing {index}/{len(lines)}",
-                    lambda line=line: client.request("POST", "/api/paint", data=_paint_payload(
-                        args,
-                        line,
-                        stage1_model=stage1_model,
-                        stage2_model=stage2_model,
-                        color_catalog=color_catalog,
-                    )),
-                    enabled=not args.no_progress,
-                )
-            prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
-            output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
-            paths = _write_paint_outputs(output_result, out_dir=out_dir, prefix=prefix, png=args.png)
-            tokens_in = (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0)
-            tokens_out = (result.get("tokens_out_stage1") or 0) + (result.get("tokens_out_stage2") or 0)
-            elapsed = int(result.get("elapsed_total_ms") or 0)
-            total_in += tokens_in
-            total_out += tokens_out
-            total_elapsed += elapsed
-            results.append({
-                "line": index,
-                "text": result.get("text"),
-                "input_mode": input_mode,
-                **_model_summary(
-                    None if input_mode == "ddl" else stage1_model,
-                    stage2_model,
-                    stage1_provider=None if input_mode == "ddl" else stage1_provider,
-                    stage2_provider=stage2_provider,
-                ),
-                "timeout_seconds": timeout_seconds,
-                **_color_catalog_summary(color_catalog, catalog_data),
-                **_render_response_summary(result),
-                "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
-                "history_id": result.get("history_id"),
-                "svg_profile": args.svg_profile,
-                "elapsed_total_ms": elapsed,
-                "tokens_in": tokens_in or None,
-                "tokens_out": tokens_out or None,
-                "interpret_fallback_used": result.get("interpret_fallback_used", False),
-                "interpret_fallback_reasons": result.get("interpret_fallback_reasons", []),
-                "compose_retry_count": result.get("compose_retry_count", 0),
-                "compose_retry_reasons": result.get("compose_retry_reasons", []),
-                "compose_fallback_used": result.get("compose_fallback_used", False),
-                **_score_metrics(result.get("score")),
-                "paths": paths,
-            })
-            print(f"{index}/{len(lines)} ok {elapsed}ms", file=sys.stderr)
+            print(f"{index}/{len(lines)} ok {entry['elapsed_total_ms']}ms", file=sys.stderr)
         except CliError as exc:
             failures.append({"line": index, "text": line, "message": str(exc)})
             print(f"{index}/{len(lines)} failed: {exc}", file=sys.stderr)
             if not args.continue_on_error:
                 break
+    if pending_timeout_retries:
+        print(f"server timeout final retry: {len(pending_timeout_retries)} item(s)", file=sys.stderr)
+    for index, line in pending_timeout_retries:
+        try:
+            retry_entry = process_line(index, line, retry_timeout=True)
+            original_result_index = result_index_by_line.get(index)
+            if original_result_index is not None:
+                results[original_result_index] = retry_entry
+            else:
+                results.append(retry_entry)
+            timeout_reasons = retry_entry.get("server_timeout_reasons") or []
+            if timeout_reasons:
+                print(
+                    f"{index}/{len(lines)} final retry still server timeout ({', '.join(timeout_reasons)}); using fallback result",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"{index}/{len(lines)} final retry ok {retry_entry['elapsed_total_ms']}ms", file=sys.stderr)
+        except CliError as exc:
+            failures.append({"line": index, "text": line, "message": f"final retry failed: {exc}"})
+            print(f"{index}/{len(lines)} final retry failed: {exc}", file=sys.stderr)
+
+    total_in = sum(int(result.get("tokens_in") or 0) for result in results)
+    total_out = sum(int(result.get("tokens_out") or 0) for result in results)
+    total_elapsed = sum(int(result.get("elapsed_total_ms") or 0) for result in results)
     aggregate_density: Counter[str] = Counter()
     aggregate_fade: Counter[str] = Counter()
     aggregate_primitive: Counter[str] = Counter()
@@ -1865,6 +1924,16 @@ def command_batch(args: argparse.Namespace) -> int:
         "math_balance_markers": dict(sorted(aggregate_math_balance.items())),
         "math_balance_marker_lines": _aggregate_marker_lines(results, "math_balance_markers"),
         "score_quality_metrics": _aggregate_quality_metrics(results),
+        "server_timeout_samples": [
+            int(result["line"])
+            for result in results
+            if result.get("server_timeout_reasons") and result.get("line")
+        ],
+        "server_timeout_retry_attempted_samples": [
+            int(result["line"])
+            for result in results
+            if result.get("server_timeout_retry_attempted") and result.get("line")
+        ],
         "review_sets": _review_sets(results),
         "results": results,
         "failures": failures,

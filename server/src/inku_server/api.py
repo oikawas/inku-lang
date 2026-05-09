@@ -1669,14 +1669,8 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
 
 
 def _compose_retry_reason(score: Score, *, tokens_out: int | None, elapsed_ms: int) -> str:
-    token_limit = int(os.getenv("INKU_STAGE2_RETRY_TOKENS_OUT", "3800"))
-    elapsed_limit = int(os.getenv("INKU_STAGE2_RETRY_ELAPSED_MS", "120000"))
     if not score.instructions:
         return "empty_instructions"
-    if tokens_out is not None and tokens_out >= token_limit:
-        return "excessive_tokens_out"
-    if elapsed_ms >= elapsed_limit and len(score.instructions) <= 1:
-        return "slow_single_instruction"
     return "none"
 
 

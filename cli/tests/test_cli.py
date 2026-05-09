@@ -488,6 +488,16 @@ def test_review_sets_groups_successful_samples_without_excluding_slow():
     assert sets["fallback_samples"] == [3, 4]
 
 
+def test_server_timeout_reasons_detects_stage_hard_timeouts_only():
+    result = {
+        "interpret_fallback_reasons": ["stage1_hard_timeout"],
+        "compose_retry_reasons": ["empty_instructions", "stage2_hard_timeout"],
+    }
+
+    assert cli._server_timeout_reasons(result) == ["stage1_hard_timeout", "stage2_hard_timeout"]
+    assert cli._server_timeout_reasons({"compose_retry_reasons": ["empty_instructions"]}) == []
+
+
 def test_batch_accepts_summary_json_option():
     parser = cli.build_parser()
     args = parser.parse_args(["batch", "--file", "prompts.txt", "--summary-json", "summary.json"])

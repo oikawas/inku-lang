@@ -853,6 +853,14 @@ def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
 
 
+def test_compose_retry_reason_only_retries_empty_instructions():
+    assert api_module._compose_retry_reason(Score(instructions=[]), tokens_out=10, elapsed_ms=1) == "empty_instructions"
+    score = Score.model_validate(
+        {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "color": "black"}]}
+    )
+    assert api_module._compose_retry_reason(score, tokens_out=999999, elapsed_ms=999999) == "none"
+
+
 def test_stage1_fallback_does_not_treat_dawn_as_night():
     ddl = api_module._fallback_ddl_from_text("夜明けの湖で、最初の光が水のしわをほどく。", lang="ja")
 

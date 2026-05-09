@@ -1544,7 +1544,6 @@ private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier
         SettingsPane.Models -> ModelSettingsPanel(state, viewModel, modifier)
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
         SettingsPane.Misc -> MiscSettingsPanel(state, viewModel, modifier)
-        SettingsPane.OutputFiles -> OutputFilesSettingsPanel(state, viewModel, modifier)
         SettingsPane.ColorCatalog -> ColorCatalogSelectionPanel(state, viewModel, modifier)
         SettingsPane.Canvas -> CanvasSelectionPanel(state, viewModel, modifier)
         SettingsPane.Version -> VersionInfoPanel(viewModel, modifier)
@@ -1575,7 +1574,6 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
             onClick = viewModel::openCatalogSelection,
         )
         SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
-        SettingsListItem(mark = "◭", title = "出力ファイル", sub = "共有シート · PNG/SVG/JSON", onClick = { viewModel.setSettingsPane(SettingsPane.OutputFiles) })
         SettingsListItem(
             mark = "□",
             title = "キャンバス",
@@ -1747,35 +1745,6 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 onSelect = viewModel::setHistorySelectionCatalog,
             )
             SettingCheckRow(state.saveReplayAsNewVersion, "DDL再描画を新しい履歴として保存", viewModel::setSaveReplayAsNewVersion)
-        }
-    }
-}
-
-@Composable
-private fun OutputFilesSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        SettingsHeader(state.settingsPane, viewModel)
-        SettingsCard("共有形式", "Android share sheet", "有効") {
-            Text("描画結果はSVG、PNG、JSONとして共有できます。PNG生成はバックグラウンドで実行し、生成完了後に共有シートを開きます。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            WrapRow {
-                MiniPill("SVG display")
-                MiniPill("SVG editable")
-                MiniPill("SVG compat")
-                MiniPill("PNG 1080")
-                MiniPill("PNG 2160")
-                MiniPill("PNG 4320")
-                MiniPill("JSON")
-            }
-        }
-        SettingsCard("PNG背景", "Web版のPNG出力設定", if (state.pngAlphaWhite) "白背景" else "透明") {
-            SettingCheckRow(
-                checked = state.pngAlphaWhite,
-                text = "PNG透過時の白背景",
-                onCheckedChange = viewModel::setPngAlphaWhite,
-            )
         }
     }
 }
@@ -2285,7 +2254,6 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Models -> "モデル設定"
     SettingsPane.Export -> "エクスポート"
     SettingsPane.Misc -> "表示設定"
-    SettingsPane.OutputFiles -> "出力ファイル"
     SettingsPane.ColorCatalog -> "色カタログ"
     SettingsPane.Canvas -> "キャンバス"
     SettingsPane.Version -> "バージョン情報"
@@ -2297,7 +2265,6 @@ private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
     SettingsPane.Export -> "PNG / SVG templates"
     SettingsPane.Misc -> "言語・テーマ・密度"
-    SettingsPane.OutputFiles -> "共有シート · PNG/SVG/JSON"
     SettingsPane.ColorCatalog -> "render color catalog"
     SettingsPane.Canvas -> "canvas aspect"
     SettingsPane.Version -> "version / build"

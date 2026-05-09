@@ -115,7 +115,6 @@ enum class SettingsPane {
     Models,
     Export,
     Misc,
-    OutputFiles,
     ColorCatalog,
     Canvas,
     Version,

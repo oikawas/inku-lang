@@ -869,6 +869,14 @@ by making the `SVG` and `PNG` controls menu buttons rather than direct actions.
   render metadata, and render hash are unchanged.
 - The older Android UI that expanded export choices as horizontally arranged
   chips is no longer used.
+- `Settings > Output Files` is removed because server/web has no equivalent
+  user-facing settings tab and Android does not maintain separate file-save
+  settings for it.
+- SVG / PNG / JSON sharing remains available from the drawing panel menus. PNG
+  background and PNG template management are consolidated under
+  `Settings > Export`.
+- The server/web `server_misc` output auto-save setting is a server operations
+  feature and is not migrated to the single-user Android app.
 
 ## 2026-05-09 Android Version / Build Management
 

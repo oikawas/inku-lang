@@ -714,6 +714,9 @@ Android 版の描画パネルでは、server/web 版 `CanvasPanel` の SVG / PNG
 - PNG メニューの各項目はテンプレート名と説明を表示し、選択したテンプレートの `height_px` を PNG 生成の Y 軸ピクセル数として使用する。
 - SVG / PNG の選択後は Android の共有シートを開く。履歴 DB、render metadata、render hash は変更しない。
 - 旧 Android 実装のように、ボタン押下後にチップを横並び展開する UI は使用しない。
+- `設定 > 出力ファイル` は server/web 版に同等の設定タブがなく、Android 側でも固有の保存設定を持たないため廃止する。
+- SVG / PNG / JSON の共有機能は描画パネルの各メニューから実行し、PNG 背景と PNG テンプレート管理は `設定 > エクスポート` に集約する。
+- server/web 版の `server_misc` にある出力ファイル自動保存設定はサーバー運用機能であり、シングルユーザー Android 版には移植しない。
 
 ## 2026-05-09 Android version / build 管理
 

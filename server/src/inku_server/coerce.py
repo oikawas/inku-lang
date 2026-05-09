@@ -721,12 +721,17 @@ def _has_explicit_background_intent(ddl: str | None) -> bool:
     if _looks_like_generated_background_plan(context):
         return False
     lower = context.lower()
+    explicit_surface_markers = (
+        "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇", "夕焼け", "夕暮れ",
+        "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness", "sunset", "dusk",
+    )
+    if any(marker in context or marker in lower for marker in explicit_surface_markers):
+        return True
+    if any(marker in context or marker in lower for marker in ("夜明け", "明け方", "朝焼け", "dawn", "daybreak", "sunrise")):
+        return False
     return any(
         marker in context or marker in lower
-        for marker in (
-            "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜", "夜空", "暗闇", "夕焼け", "夕暮れ",
-            "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness", "sunset", "dusk",
-        )
+        for marker in ("夜", "night")
     )
 
 

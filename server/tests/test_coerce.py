@@ -1172,6 +1172,35 @@ def test_coerce_score_keeps_explicit_sunset_background():
     assert fixed.background == "red"
 
 
+def test_coerce_score_governs_dawn_background_generated_from_source_context():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.26],
+                    "size": [0.42, 0.12],
+                    "color": "white",
+                    "filled": True,
+                    "color_hint": "soft light",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl=(
+            "夜明けの湖で、最初の光が水のしわを金色にほどく。\n"
+            "背景を黒で塗りつぶす。白い薄い水彩の横長の楕円を柔らかな光として上端寄りに三つ重ねる。"
+            "白い薄い水彩の楕円を五感の気配として右上に二つ重ねる。"
+        ),
+    )
+
+    assert fixed.background == "white"
+
+
 def test_coerce_score_tempers_unintentional_large_filled_shape():
     score = Score.model_validate(
         {

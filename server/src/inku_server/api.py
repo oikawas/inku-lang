@@ -1634,6 +1634,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
     elif explicit_count and explicit_count > 1:
         arrangement = {"count": explicit_count, "layout": "scatter", "margin": 0.18}
 
+    ma_fallback = _fallback_needs_negative_space_support(ddl)
     if arrangement is not None:
         if ("波打つ軌跡" in ddl) or ("undulating trace" in lower):
             arrangement["path"] = "wave"
@@ -1662,10 +1663,92 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         if color_cycle:
             arrangement["color_cycle"] = color_cycle
         instruction["arrangement"] = arrangement
+    elif ma_fallback:
+        instruction["arrangement"] = {
+            "count": 3,
+            "layout": "scatter",
+            "margin": 0.26,
+            "density": "low",
+            "fade": "outward",
+            "preserve_space": True,
+        }
     elif color_cycle:
         instruction["color_hint"] = f"{instruction['color_hint']}; palette {'/'.join(color_cycle)}"
 
-    return Score.model_validate({"background": background, "instructions": [instruction]})
+    instructions = [instruction]
+    if ma_fallback:
+        support_color = _fallback_support_color(background, color)
+        instructions.append(
+            {
+                "primitive": "arc",
+                "center": [0.28, 0.72],
+                "radius": 0.075,
+                "angle_start": 25,
+                "angle_end": 205,
+                "rotation": -18,
+                "color": support_color,
+                "weight": "hair",
+                "color_hint": "fallback negative space support",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "radial",
+                    "margin": 0.26,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                },
+            }
+        )
+
+    return Score.model_validate({"background": background, "instructions": instructions})
+
+
+def _fallback_needs_negative_space_support(ddl: str) -> bool:
+    lower = ddl.lower()
+    return any(
+        marker in ddl or marker in lower
+        for marker in (
+            "余白",
+            "間",
+            "気配",
+            "記憶",
+            "忘れ",
+            "手紙",
+            "新聞紙",
+            "紙片",
+            "窓",
+            "鏡",
+            "膜",
+            "透明",
+            "消え",
+            "迷う",
+            "漂う",
+            "薄い",
+            "negative space",
+            "presence",
+            "memory",
+            "forgotten",
+            "letter",
+            "newspaper",
+            "paper",
+            "window",
+            "mirror",
+            "membrane",
+            "transparent",
+            "fade",
+            "fading",
+            "wander",
+            "drift",
+            "thin",
+        )
+    )
+
+
+def _fallback_support_color(background: str, main_color: str) -> str:
+    for color in ("gray", "blue", "red", "black", "white"):
+        if color != background and color != main_color:
+            return color
+    return "white" if background in {"black", "blue"} else "black"
 
 
 def _compose_retry_reason(score: Score, *, tokens_out: int | None, elapsed_ms: int) -> str:

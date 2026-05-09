@@ -832,6 +832,28 @@ def test_compose_fallback_uses_triangle_for_mountain(monkeypatch, auth_context):
     assert instruction["arrangement"]["count"] == 2
 
 
+def test_compose_fallback_adds_negative_space_support_for_paper_trace(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "compose",
+        lambda ddl, model=None, original_text=None, system_prompt=None, lang="ja": Score(instructions=[]),
+    )
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "新聞紙が迷うように回っている。灰色の四角を右下に置く。"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    instructions = r.json()["score"]["instructions"]
+    assert len(instructions) >= 2
+    assert instructions[0]["arrangement"]["preserve_space"] is True
+    assert instructions[0]["arrangement"]["fade"] == "outward"
+    assert any("fallback negative space support" in (ins.get("color_hint") or "") for ins in instructions)
+
+
 def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setenv("INKU_STAGE2_HARD_TIMEOUT_SECONDS", "0.01")

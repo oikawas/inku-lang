@@ -708,6 +708,8 @@ def test_compose_empty_instruction_result_is_retried(monkeypatch, auth_context):
     assert calls[0] is None
     assert calls[1] is not None
     assert "空描画リトライ" in calls[1]
+    assert "空配列は禁止" in calls[1]
+    assert "Score.presence" not in calls[1]
 
 
 def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch, auth_context):

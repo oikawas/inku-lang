@@ -1684,6 +1684,34 @@ def _should_retry_compose_result(score: Score, *, tokens_out: int | None, elapse
     return _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms) != "none"
 
 
+def _compose_retry_prompt(*, reason: str, lang: str) -> str:
+    if lang == "en":
+        return (
+            "# Compact Stage 2 retry\n"
+            f"The previous Stage 2 result was invalid or inefficient: {reason}.\n"
+            "Submit a valid Score through the submit_score tool.\n"
+            "Required: instructions must contain 1-5 drawable items.\n"
+            "Allowed primitives: line, circle, ellipse, triangle, square, polygon, arc.\n"
+            "Allowed colors: white, black, blue, red, green, gray.\n"
+            "For repeated marks, use one instruction with arrangement instead of many instructions.\n"
+            "Do not draw humans, faces, or animals as objects; convert them to abstract presence, weight, spacing, symmetry, or gaze pressure.\n"
+            "Do not add unspecified helper lines or helper shapes. Apply adjectives and motion words to the requested primitive.\n"
+            "Keep the result compact and do not restate the DDL."
+        )
+    return (
+        "# 空描画リトライ / コンパクト描画リトライ\n"
+        f"直前の Stage 2 出力は無効または非効率: {reason}。\n"
+        "submit_score tool で有効な Score を提出する。\n"
+        "必須: instructions には描画可能な命令を1〜5個入れる。空配列は禁止。\n"
+        "使用できる primitive: line, circle, ellipse, triangle, square, polygon, arc。\n"
+        "使用できる color: white, black, blue, red, green, gray。\n"
+        "繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。\n"
+        "人・顔・動物を対象物として描かず、存在感、重心、余白、対称性、視線圧として抽象化する。\n"
+        "未指定の補助線・補助図形を追加しない。形容・動作語は指定された primitive へ適用する。\n"
+        "DDLを説明し直さず、JSONを短く保つ。"
+    )
+
+
 def _call_compose_detail(
     ddl: str,
     *,
@@ -1736,27 +1764,13 @@ def _call_compose_detail(
     if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
         return ComposeDetail(score=score, ddl=ddl, tokens_in=tokens_in, tokens_out=tokens_out)
 
-    base_prompt = system_prompt or (STAGE2_PROMPT_EN if lang == "en" else STAGE2_PROMPT)
     reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
     retry_count += 1
     retry_reasons.append(reason)
-    rescue_note = (
-        "\n\n# Compact result retry\n"
-        f"The previous Stage 2 result was invalid or inefficient: {reason}. "
-        "Return 2-5 concise drawable instructions. "
-        "Do not return an empty instructions array. "
-        "Use one instruction plus arrangement for repeated shapes. "
-        "Keep the response compact and avoid restating the DDL."
-        if lang == "en"
-        else "\n\n# 空描画リトライ / コンパクト描画リトライ\n"
-        f"直前の Stage 2 出力は無効または非効率: {reason}。"
-        "2〜5個の簡潔な描画命令を返す。"
-        "instructions を空配列にしてはいけない。"
-        "繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。"
-        "DDLを説明し直さず、JSONを短く保つ。"
-    )
     try:
-        retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(base_prompt + rescue_note)
+        retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(
+            _compose_retry_prompt(reason=reason, lang=lang)
+        )
     except StageHardTimeoutError:
         fallback_used = True
         retry_reasons.append("stage2_retry_hard_timeout")

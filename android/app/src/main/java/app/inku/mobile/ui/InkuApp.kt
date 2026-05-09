@@ -960,7 +960,11 @@ private fun ComposeModeTabs(selected: ComposeMode, viewModel: InkuViewModel) {
 }
 
 private fun canvasLabel(state: InkuUiState): String {
-    return CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect
+    return canvasLabelFor(state.selectedCanvasAspect)
+}
+
+private fun canvasLabelFor(id: String): String {
+    return CanvasAspects.all.firstOrNull { it.id == id }?.label ?: id
 }
 
 private fun shortCanvasLabel(state: InkuUiState): String {
@@ -1015,8 +1019,10 @@ private fun CanvasHeroCard(
     modifier: Modifier = Modifier.fillMaxWidth(),
     showControls: Boolean = true,
     maxPreviewHeight: Dp = 330.dp,
+    canvasAspectOverride: String? = null,
 ) {
     val item = state.selectedHistory
+    val canvasAspectId = canvasAspectOverride ?: state.selectedCanvasAspect
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -1026,7 +1032,7 @@ private fun CanvasHeroCard(
     var pngMenuOpen by remember { mutableStateOf(false) }
     val presentation = state.canvasPresentationMode
     BoxWithConstraints(modifier = modifier) {
-        val ratio = canvasAspectRatio(state.selectedCanvasAspect)
+        val ratio = canvasAspectRatio(canvasAspectId)
         val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(maxPreviewHeight)
         val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
             if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
@@ -1637,7 +1643,13 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
         modifier = modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        CanvasHeroCard(state, viewModel, showControls = false, maxPreviewHeight = 250.dp)
+        CanvasHeroCard(
+            state,
+            viewModel,
+            showControls = false,
+            maxPreviewHeight = 250.dp,
+            canvasAspectOverride = DemoCanvasAspectId,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1673,16 +1685,6 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
                 color = if (state.demoGeneratedPrompt.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
         }
-
-        CompactLabel("シードフレーズ")
-        ImeAwareOutlinedTextField(
-            value = state.demoSeed,
-            onValueChange = viewModel::setDemoSeed,
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            maxLines = 3,
-            enabled = !state.isDrawing,
-        )
 
         DrawingActionButton(
             idleText = "▶  デモ開始",
@@ -1733,7 +1735,11 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
                 modifier = Modifier.fillMaxWidth().height(140.dp),
             )
         }
-        MetaPanel(state)
+        MetaPanel(
+            state,
+            catalogIdOverride = state.demoCurrentCatalogId ?: state.selectedHistory?.colorCatalogId,
+            canvasAspectOverride = DemoCanvasAspectId,
+        )
     }
 }
 
@@ -1851,6 +1857,7 @@ private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier
         SettingsPane.Home -> SettingsHomePanel(state, viewModel, modifier)
         SettingsPane.ModelSelection -> ModelSelectionPanel(state, viewModel, modifier)
         SettingsPane.Models -> ModelSettingsPanel(state, viewModel, modifier)
+        SettingsPane.Demo -> DemoSettingsPanel(state, viewModel, modifier)
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
         SettingsPane.Misc -> MiscSettingsPanel(state, viewModel, modifier)
         SettingsPane.Version -> VersionInfoPanel(viewModel, modifier)
@@ -1874,6 +1881,7 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
         }
         SettingsListItem(mark = "◐", title = "表示設定", sub = "言語・テーマ・密度", onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(mark = "◇", title = "モデル設定", sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
+        SettingsListItem(mark = "◉", title = "デモ設定", sub = "シードフレーズ", onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
         SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
         SettingsListItem(
             mark = "#",
@@ -1932,6 +1940,41 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SecondaryActionButton(text = "接続先設定を開く", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
+    }
+}
+
+@Composable
+private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SettingsHeader(state.settingsPane, viewModel)
+        SettingsCard("シードフレーズ", "デモ指示文生成", "保存済み") {
+            ImeAwareOutlinedTextField(
+                value = state.demoSeed,
+                onValueChange = viewModel::setDemoSeed,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 5,
+                maxLines = 8,
+            )
+            SecondarySmallButton(text = "デフォルト値に戻す", onClick = viewModel::resetDemoSeed)
+        }
+        SettingsCard("表示間隔", "デモ表示", "${state.demoIntervalSeconds}秒") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                SecondarySmallButton(
+                    text = "−",
+                    onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds - 5) },
+                    enabled = state.demoIntervalSeconds > 1,
+                )
+                Text("${state.demoIntervalSeconds}秒", style = MaterialTheme.typography.labelMedium)
+                SecondarySmallButton(
+                    text = "+",
+                    onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds + 5) },
+                    enabled = state.demoIntervalSeconds < 999,
+                )
+            }
+        }
     }
 }
 
@@ -2488,6 +2531,7 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "設定"
     SettingsPane.ModelSelection -> "モデル選択"
     SettingsPane.Models -> "モデル設定"
+    SettingsPane.Demo -> "デモ設定"
     SettingsPane.Export -> "エクスポート"
     SettingsPane.Misc -> "表示設定"
     SettingsPane.Version -> "バージョン情報"
@@ -2497,6 +2541,7 @@ private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "List + Detail"
     SettingsPane.ModelSelection -> "Stage 1 / Stage 2 共通"
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
+    SettingsPane.Demo -> "seed phrase / interval"
     SettingsPane.Export -> "PNG / SVG templates"
     SettingsPane.Misc -> "言語・テーマ・密度"
     SettingsPane.Version -> "version / build"
@@ -3668,11 +3713,17 @@ private fun ImeAwareOutlinedTextField(
 }
 
 @Composable
-private fun MetaPanel(state: InkuUiState) {
+private fun MetaPanel(
+    state: InkuUiState,
+    catalogIdOverride: String? = null,
+    canvasAspectOverride: String? = null,
+) {
+    val catalogName = ColorCatalogs.get(catalogIdOverride ?: state.selectedCatalogId).name
+    val canvasAspect = canvasLabelFor(canvasAspectOverride ?: state.selectedCanvasAspect)
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text("LLM · ${selectedModelLabel(state)} · 指示文生成/Stage1/2共通", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Color · ${ColorCatalogs.get(state.selectedCatalogId).name}   Canvas · ${state.selectedCanvasAspect}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Color · $catalogName   Canvas · $canvasAspect", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.message?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }

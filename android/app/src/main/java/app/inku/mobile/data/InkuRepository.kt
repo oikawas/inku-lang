@@ -12,6 +12,7 @@ import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.LocalLiteRtLmProvider
 import app.inku.mobile.llm.LocalModelDownloader
 import app.inku.mobile.llm.ModelDownloadSpec
+import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.RoutingModelProvider
 import app.inku.mobile.pipeline.LocalFallbackPipeline
 import app.inku.mobile.pipeline.PaintRequest
@@ -287,6 +288,26 @@ class InkuRepository(
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started)
+    }
+
+    suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {
+        val seed = seedPhrase.trim().ifBlank { "96文字以内の短い描画指示文を1つ作って。" }
+        val response = modelRouter.generate(
+            ModelRequest(
+                modelId = modelId,
+                prompt = seed,
+                temperature = 0.85,
+                maxTokens = 256,
+                systemInstruction = "あなたはinkuのデモ用短文を作る。回答は日本語の短文1つだけ。前置き、箇条書き、番号、引用符、説明、Markdownを出さない。",
+            ),
+        )
+        return response.text
+            .trim()
+            .trim('"', '“', '”', '\'', '「', '」')
+            .lineSequence()
+            .map { it.trim().removePrefix("-").trim() }
+            .firstOrNull { it.isNotBlank() }
+            ?: error("デモ指示文生成が空でした。")
     }
 
     suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String): HistoryItemEntity {

@@ -29,6 +29,7 @@ object CanvasAspects {
         CanvasAspect("wide", "Cinema", "CinemaScope", 2.35, 1.0, "Wide cinematic panorama"),
         CanvasAspect("byobu", "Classic JP", "Byobu", 2.2, 1.0, "Japanese folding screen panel based on one half of a six-panel pair"),
         CanvasAspect("vertical", "Mobile", "Mobile Vertical", 9.0, 16.0, "Contemporary phone-screen format"),
+        CanvasAspect("pixel9_landscape_safe", "Mobile", "Pixel 9 Landscape Safe", 9.0, 5.0, "Pixel 9 landscape canvas with side margins for the camera cutout"),
     )
 
     private val byId = all.associateBy { it.id }

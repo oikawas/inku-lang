@@ -30,6 +30,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.random.Random
 
+const val DefaultDemoSeedPhrase = "世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。"
+const val DemoCanvasAspectId = "pixel9_landscape_safe"
+
 data class InkuUiState(
     val prompt: String = "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
     val ddl: String = "",
@@ -47,11 +50,12 @@ data class InkuUiState(
     val batchActiveElapsedMs: Long? = null,
     val batchElapsedMs: Long = 0L,
     val batchLatestHashShort: String? = null,
-    val demoSeed: String = "春の光",
+    val demoSeed: String = DefaultDemoSeedPhrase,
     val demoIntervalSeconds: Int = 30,
     val demoRandomColorCatalog: Boolean = true,
     val demoGeneratedPrompt: String = "",
     val demoGeneratedDdl: String? = null,
+    val demoCurrentCatalogId: String? = null,
     val demoWaitingSeconds: Int? = null,
     val demoCurrentElapsedMs: Long? = null,
     val demoTotalElapsedMs: Long = 0L,
@@ -113,6 +117,7 @@ enum class SettingsPane {
     Home,
     ModelSelection,
     Models,
+    Demo,
     Export,
     Misc,
     Version,
@@ -244,6 +249,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun setDemoSeed(value: String) {
         localState.value = localState.value.copy(demoSeed = value, message = null)
         persistSetting("demo_seed_phrase", JSONObject().put("value", value).toString())
+    }
+
+    fun resetDemoSeed() {
+        setDemoSeed(DefaultDemoSeedPhrase)
     }
 
     fun setDemoIntervalSeconds(value: Int) {
@@ -790,6 +799,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                 isDrawing = true,
                 demoGeneratedPrompt = "",
                 demoGeneratedDdl = null,
+                demoCurrentCatalogId = null,
                 demoWaitingSeconds = null,
                 demoCurrentElapsedMs = null,
                 demoTotalElapsedMs = 0L,
@@ -799,12 +809,22 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 while (isActive) {
                     val cycle = state.value
-                    val prompt = demoPrompt(cycle.demoSeed)
-                    val catalogId = randomColorCatalogId()
                     val startedAt = System.currentTimeMillis()
+                    localState.value = localState.value.copy(
+                        demoGeneratedPrompt = "",
+                        demoGeneratedDdl = null,
+                        demoWaitingSeconds = null,
+                        demoCurrentElapsedMs = null,
+                        message = "デモ指示文生成中",
+                    )
+                    val prompt = withContext(Dispatchers.IO) {
+                        repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
+                    }
+                    val catalogId = randomColorCatalogId()
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
                         demoGeneratedDdl = null,
+                        demoCurrentCatalogId = catalogId,
                         demoWaitingSeconds = null,
                         demoCurrentElapsedMs = null,
                         message = "デモ描画中",
@@ -814,7 +834,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                             repository.paint(
                                 description = prompt,
                                 catalogId = catalogId,
-                                canvasAspect = cycle.selectedCanvasAspect,
+                                canvasAspect = DemoCanvasAspectId,
                                 stage1ModelId = cycle.selectedModelId,
                                 stage2ModelId = cycle.selectedStage2ModelId,
                                 autoRepair = cycle.ddlAutoRepairEnabled,
@@ -1017,17 +1037,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.setStarred(item.id, !item.starred)
         }
-    }
-
-    private fun demoPrompt(seed: String): String {
-        val clean = seed.ifBlank { "静かな光" }
-        val variants = listOf(
-            "$clean の中に青い線を12本、波打つ軌跡に沿って置く",
-            "$clean を赤い円5個と灰色の弧で散らす",
-            "$clean から黒い細筆の線を3本、斜めに引く",
-        )
-        val index = ((System.currentTimeMillis() / 1000) % variants.size).toInt()
-        return variants[index]
     }
 
     private fun validateSelectedModels(state: InkuUiState): String? {

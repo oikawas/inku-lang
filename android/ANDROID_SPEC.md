@@ -992,3 +992,65 @@ behavior.
   areas visible after Japanese IME candidate rows or keyboard height changes.
 - When drawing finishes, Android clears input focus, hides the IME, and scrolls
   the compose screen back to the image area.
+
+## 2026-05-09 Pixel 9 Landscape Safe Canvas
+
+As an Android-specific canvas option, Android adds
+`pixel9_landscape_safe` for Pixel 9 landscape display.
+
+- The measured Pixel 9 physical display is `1080 x 2424 px` in portrait,
+  `2424 x 1080 px` in landscape, with density `420 dpi` and density scale
+  `2.625`.
+- The camera hole is centered at the portrait top edge and becomes a side-edge
+  avoidance area in landscape. The measured display cutout is
+  `Rect(485, 0 - 595, 173)` in portrait coordinates, so the landscape side
+  intrusion is about `173 px`.
+- To avoid the camera hole and rounded corners with comfortable room, this
+  canvas assumes about `240 px` side margin on both landscape sides.
+- The usable landscape area is `2424 - 240 * 2 = 1944 px` by `1080 px`, so the
+  largest practical safe ratio is `1944:1080 = 1.8`.
+- Android represents this as the simple `9:5` ratio:
+  `id=pixel9_landscape_safe`, `label=Pixel 9 Landscape Safe`, `ratioW=9.0`,
+  and `ratioH=5.0`.
+- This is an Android-only display optimization and does not exist in the
+  server/web canvas aspect plugin. History, JSON, render metadata, and render
+  hashes still record it through the standard `render_canvas_aspect_id` and
+  `render_canvas_aspect_ratio` fields.
+
+## 2026-05-09 Demo Settings Panel
+
+On Android, demo seed phrase editing is removed from the main Demo screen and
+moved to `Settings > Demo Settings`.
+
+- The main Demo screen focuses on the image, status, generated prompt,
+  start/stop action, and display interval.
+- `Settings > Demo Settings` allows editing the seed phrase and display
+  interval.
+- The seed phrase is saved in Room setting `demo_seed_phrase` and restored after
+  app restart.
+- After Demo starts, each render cycle sends the seed phrase to the currently
+  selected main LLM and displays that response in the `生成された指示文` box.
+- The LLM response shown in `生成された指示文` is used directly as the normal
+  prompt for Stage 1 DDL generation, Stage 2 Score generation, and rendering.
+- The older Android implementation that assembled demo prompts from fixed local
+  templates is no longer used.
+- Demo rendering always uses the Android-specific `pixel9_landscape_safe`
+  canvas aspect and does not follow the canvas selected on the normal Compose
+  screen.
+- Demo rendering always picks a random color catalog for each render cycle and
+  does not follow the color catalog selected on the normal Compose screen.
+- The metadata shown at the bottom of the Demo screen displays the actual color
+  catalog name used for that render cycle. When showing an existing history item
+  after app startup, the display name is resolved from the color catalog ID saved
+  in history.
+- The `Canvas` metadata on the Demo screen shows the user-facing
+  `CanvasAspects` label instead of the internal ID. `pixel9_landscape_safe` is
+  displayed as `Pixel 9 Landscape Safe`.
+- The default seed phrase is:
+
+```text
+世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。
+```
+
+- A `デフォルト値に戻す` button restores the seed phrase to that default after
+  editing.

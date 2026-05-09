@@ -954,3 +954,98 @@ def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touch
 
     bus_stop = coerce_score(base, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
     assert not any("energy restored" in (ins.color_hint or "") for ins in bus_stop.instructions)
+
+
+def test_coerce_score_enforces_explicit_shape_and_count_constraints_after_repairs():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.4, 0.4],
+                    "size": [0.12, 0.12],
+                    "color": "black",
+                },
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="黒い四角だけを三つだけ、楽しいリズムで置く。")
+
+    assert len(fixed.instructions) == 1
+    assert fixed.instructions[0].primitive == "square"
+    assert fixed.instructions[0].arrangement is not None
+    assert fixed.instructions[0].arrangement.count == 3
+    assert "explicit count constraint enforced" in (fixed.instructions[0].color_hint or "")
+
+
+def test_coerce_score_enforces_color_only_constraints_after_repairs():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.18, 0.08],
+                    "color": "green",
+                    "arrangement": {"count": 6, "layout": "scatter", "color_cycle": ["red", "blue", "green"]},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="赤と青のみで、弾む楕円を散らす。")
+
+    ins = fixed.instructions[0]
+    assert ins.color in {"red", "blue"}
+    assert ins.arrangement is not None
+    assert set(ins.arrangement.color_cycle) <= {"red", "blue"}
+    assert "explicit color-only constraint enforced" in (ins.color_hint or "")
+
+
+def test_coerce_score_restores_rhythm_and_ma_without_count_growth():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.08, 0.04],
+                    "color": "blue",
+                    "arrangement": {"count": 7, "layout": "scatter"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="余白の間に楽しいリズムで青い楕円が跳ねる。")
+
+    ins = fixed.instructions[0]
+    assert ins.arrangement is not None
+    assert ins.arrangement.count == 7
+    assert ins.arrangement.path in {"wave", "diagonal"}
+    assert ins.arrangement.preserve_space is True
+    assert ins.arrangement.fade == "outward"
+    assert "rhythm variation restored without increasing count" in (ins.color_hint or "")
+    assert "ma pressure restored" in (ins.color_hint or "")
+
+
+def test_fallback_score_preserves_explicit_count_circle_and_polygon():
+    from inku_server.api import _fallback_score_from_ddl
+
+    circle = _fallback_score_from_ddl("黒い円を三つだけ置く。", lang="ja")
+    assert circle.instructions[0].primitive == "circle"
+    assert circle.instructions[0].arrangement is not None
+    assert circle.instructions[0].arrangement.count == 3
+
+    polygon = _fallback_score_from_ddl("青い六角の多角形を二つ置く。", lang="ja")
+    assert polygon.instructions[0].primitive == "polygon"
+    assert polygon.instructions[0].sides == 6
+    assert polygon.instructions[0].arrangement is not None
+    assert polygon.instructions[0].arrangement.count == 2

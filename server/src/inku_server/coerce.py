@@ -436,6 +436,18 @@ HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = (
 PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
     "自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime",
 )
+RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
+    "リズム", "踊", "跳ね", "弾む", "反復", "交互", "楽しい", "楽しさ", "喜び", "祝祭", "明快",
+    "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration",
+)
+VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
+    "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける",
+    "collision", "burst", "focus", "turning point", "pop", "release",
+)
+MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
+    "余白", "間", "空白", "気配", "押す", "避け", "離れ",
+    "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
+)
 
 
 def _context_has_density_governor(ddl: str | None) -> bool:
@@ -688,6 +700,107 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
             note = "motion energy restored through trajectory and rotation"
             data["color_hint"] = f"{hint}; {note}" if hint else note
         adjusted.append(Instruction.model_validate(data))
+    return adjusted
+
+
+def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """楽しい・躍動的な文脈では数を足さず、配置リズムだけを強める。"""
+    if not _context_has_marker(ddl, RHYTHM_CONTEXT_MARKERS):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for index, ins in enumerate(instructions):
+        data = ins.model_dump(by_alias=True)
+        changed = False
+        if ins.arrangement is not None:
+            arr_data = dict(data["arrangement"])
+            if arr_data.get("path", "none") == "none":
+                arr_data["path"] = "wave" if index % 2 == 0 else "diagonal"
+                changed = True
+            if arr_data.get("density", "none") == "none":
+                arr_data["density"] = "low"
+                changed = True
+            if float(arr_data.get("margin") or 0.1) < 0.14:
+                arr_data["margin"] = 0.14
+                changed = True
+            data["arrangement"] = arr_data
+        if ins.primitive in ("line", "ellipse", "arc", "square", "triangle", "polygon") and data.get("rotation") is None:
+            data["rotation"] = -15 if index % 2 == 0 else 21
+            changed = True
+        if ins.variation is None and ins.primitive in ("line", "ellipse", "arc", "polygon"):
+            data["variation"] = {
+                "amplitude": "medium",
+                "frequency": "medium",
+                "quality": "wave",
+                "dimensions": ["position_x", "position_y", "rotation"],
+            }
+            changed = True
+        if changed:
+            hint = data.get("color_hint")
+            note = "rhythm variation restored without increasing count"
+            data["color_hint"] = f"{hint}; {note}" if hint else note
+        adjusted.append(Instruction.model_validate(data))
+    return adjusted
+
+
+def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+    """抽象画としての見せ場を、小さな焦点だけで補う。"""
+    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+    if any("visual event restored" in (ins.color_hint or "") for ins in instructions):
+        return instructions
+    if len(instructions) >= 10:
+        return instructions
+
+    color = "red" if background != "red" else VISIBLE_ON_BACKGROUND.get(background, "black")
+    accent = Instruction.model_validate(
+        {
+            "primitive": "circle",
+            "center": [0.68, 0.34],
+            "radius": 0.026,
+            "color": color,
+            "filled": True,
+            "color_hint": "visual event restored as a small focal pulse",
+        }
+    )
+    return [*instructions, accent]
+
+
+def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """余白・間の文脈では描画数を増やさず、配置余白と薄れ方で圧を作る。"""
+    if not _context_has_marker(ddl, MA_PRESSURE_CONTEXT_MARKERS):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for ins in instructions:
+        if ins.arrangement is None:
+            adjusted.append(ins)
+            continue
+        data = ins.model_dump(by_alias=True)
+        arr_data = dict(data["arrangement"])
+        changed = False
+        if not arr_data.get("preserve_space", False):
+            arr_data["preserve_space"] = True
+            changed = True
+        if float(arr_data.get("margin") or 0.1) < 0.22:
+            arr_data["margin"] = 0.22
+            changed = True
+        if arr_data.get("fade", "none") == "none":
+            arr_data["fade"] = "outward"
+            changed = True
+        if arr_data.get("density", "none") == "none":
+            arr_data["density"] = "low"
+            changed = True
+        if changed:
+            data["arrangement"] = arr_data
+            hint = data.get("color_hint")
+            note = "ma pressure restored through spacing and preserved negative space"
+            data["color_hint"] = f"{hint}; {note}" if hint else note
+            adjusted.append(Instruction.model_validate(data))
+        else:
+            adjusted.append(ins)
     return adjusted
 
 
@@ -1884,6 +1997,175 @@ def count_hint_from_ddl(ddl: str) -> int | None:
     return min(max(value, 1), 1000)
 
 
+ENGLISH_SMALL_NUMBERS: dict[str, int] = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+}
+
+
+def _parse_count_token(token: str) -> int | None:
+    token = token.strip().lower()
+    if token.isdigit():
+        return int(token)
+    if token in ENGLISH_SMALL_NUMBERS:
+        return ENGLISH_SMALL_NUMBERS[token]
+    return _parse_small_japanese_number(token)
+
+
+def _strict_count_hint_from_ddl(ddl: str | None) -> int | None:
+    if not ddl:
+        return None
+    lower = ddl.lower()
+    patterns = (
+        r"(\d{1,3}|[一二三四五六七八九十百]{1,8})(?:本|個|つ|点|枚)?(?:だけ|のみ)",
+        r"(?:only|just)\s+(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\b",
+        r"\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:only|just)\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, lower if "only" in pattern or "just" in pattern else ddl)
+        if not match:
+            continue
+        value = _parse_count_token(match.group(1))
+        if value is not None:
+            return min(max(value, 1), 1000)
+    return None
+
+
+ONLY_PRIMITIVE_MARKERS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (("円だけ", "円のみ", "丸だけ", "丸のみ", "circle only", "circles only", "only circle", "only circles"), ("circle",)),
+    (("楕円だけ", "楕円のみ", "oval only", "ovals only", "ellipse only", "ellipses only"), ("ellipse",)),
+    (("線だけ", "線のみ", "line only", "lines only", "only line", "only lines"), ("line",)),
+    (("四角だけ", "四角のみ", "square only", "squares only", "rectangle only", "only squares"), ("square",)),
+    (("三角だけ", "三角のみ", "triangle only", "triangles only", "only triangles"), ("triangle",)),
+    (("多角形だけ", "多角形のみ", "polygon only", "polygons only", "only polygons"), ("polygon",)),
+    (("弧だけ", "弧のみ", "arc only", "arcs only", "only arcs"), ("arc",)),
+)
+
+
+def _primitive_only_constraint_from_ddl(ddl: str | None) -> set[str]:
+    if not ddl:
+        return set()
+    lower = ddl.lower()
+    primitives: set[str] = set()
+    for markers, allowed in ONLY_PRIMITIVE_MARKERS:
+        if any(marker in ddl or marker in lower for marker in markers):
+            primitives.update(allowed)
+    return primitives
+
+
+def _color_only_constraint_from_ddl(ddl: str | None) -> list[str]:
+    if not ddl:
+        return []
+    lower = ddl.lower()
+    if not any(marker in ddl or marker in lower for marker in ("だけ", "のみ", "限定", "only", "limited to")):
+        return []
+    requested = _color_repair_order(_requested_colors_from_ddl(ddl))
+    if len(requested) <= 1:
+        return requested if any(marker in ddl or marker in lower for marker in ("だけ", "のみ", "only")) else []
+    return requested
+
+
+def _append_hint(data: dict[str, Any], note: str) -> None:
+    hint = data.get("color_hint")
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+
+
+def _as_circle_instruction(ins: Instruction, note: str) -> Instruction:
+    if ins.primitive == "circle":
+        return ins
+    data = ins.model_dump(by_alias=True)
+    center = data.get("center") or data.get("position") or [0.5, 0.5]
+    if ins.primitive == "ellipse" and ins.size is not None:
+        radius = min(max(float(ins.size[0]), float(ins.size[1])) / 2, 0.45)
+    elif ins.primitive in ("arc", "polygon") and ins.radius is not None:
+        radius = float(ins.radius)
+    elif ins.size is not None:
+        radius = min(max(float(ins.size[0]), float(ins.size[1])) / 2, 0.45)
+    else:
+        radius = 0.12
+    converted = {
+        "primitive": "circle",
+        "center": center,
+        "radius": max(0.005, radius),
+        "color": data.get("color", "black"),
+        "weight": data.get("weight", "pen"),
+        "filled": data.get("filled", False),
+        "style": data.get("style", "solid"),
+        "arrangement": data.get("arrangement"),
+        "variation": data.get("variation"),
+        "color_hint": data.get("color_hint"),
+    }
+    _append_hint(converted, note)
+    return Instruction.model_validate(converted)
+
+
+def _with_explicit_constraint_enforcement(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    primitive_only = _primitive_only_constraint_from_ddl(ddl)
+    color_only = _color_only_constraint_from_ddl(ddl)
+    strict_count = _strict_count_hint_from_ddl(ddl)
+
+    repaired = list(instructions)
+    if primitive_only:
+        constrained: list[Instruction] = []
+        for ins in repaired:
+            if ins.primitive in primitive_only:
+                constrained.append(ins)
+            elif primitive_only == {"circle"} and ins.primitive == "ellipse":
+                constrained.append(_as_circle_instruction(ins, "explicit circle-only constraint enforced"))
+        if constrained:
+            repaired = constrained
+
+    if color_only:
+        visible_first = next((color for color in color_only if color != background), color_only[0])
+        color_set = set(color_only)
+        adjusted: list[Instruction] = []
+        for ins in repaired:
+            data = ins.model_dump(by_alias=True)
+            changed = False
+            if data.get("color") not in color_set:
+                data["color"] = visible_first
+                changed = True
+            arr_data = data.get("arrangement")
+            if arr_data:
+                arr_data = dict(arr_data)
+                cycle = [color for color in arr_data.get("color_cycle", []) if color in color_set]
+                if arr_data.get("color_cycle") and cycle != arr_data.get("color_cycle"):
+                    arr_data["color_cycle"] = cycle or [visible_first]
+                    data["arrangement"] = arr_data
+                    changed = True
+            if changed:
+                _append_hint(data, "explicit color-only constraint enforced")
+            adjusted.append(Instruction.model_validate(data))
+        repaired = adjusted
+
+    if strict_count is not None and repaired:
+        first = repaired[0].model_dump(by_alias=True)
+        if strict_count == 1:
+            first["arrangement"] = None
+        else:
+            arr_data = dict(first.get("arrangement") or {})
+            arr_data["count"] = strict_count
+            arr_data["layout"] = arr_data.get("layout") or "scatter"
+            first["arrangement"] = arr_data
+        _append_hint(first, "explicit count constraint enforced")
+        repaired = [Instruction.model_validate(first)]
+
+    return repaired
+
+
 def _repair_visibility(ins: Instruction, background: str) -> Instruction:
     repaired = _with_visible_color(ins, background)
     repaired = _with_visible_particle(repaired)
@@ -1969,8 +2251,12 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
     instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)
     instructions = _with_motion_energy(instructions, ddl=ddl)
+    instructions = _with_rhythm_variation(instructions, ddl=ddl)
+    instructions = _with_visual_event(instructions, ddl=ddl, background=background)
+    instructions = _with_ma_pressure(instructions, ddl=ddl)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
+    instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
     data = score.model_dump(by_alias=True)
     data["background"] = background
     if score.presence is None and effective_presence is not None:

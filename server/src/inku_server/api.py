@@ -1581,21 +1581,34 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "filled": "塗" in ddl or "fill" in lower,
             "color_hint": "fallback from DDL",
         }
-    elif (
-        ("円" in ddl)
-        or ("circle" in lower)
-        or ("moon" in lower)
-        or ("月" in ddl)
-        or ("蕾" in ddl)
-        or ("花びら" in ddl)
-        or ("petal" in lower)
-        or ("bud" in lower)
-    ):
+    elif ("多角形" in ddl) or ("五角" in ddl) or ("六角" in ddl) or ("polygon" in lower):
+        instruction = {
+            "primitive": "polygon",
+            "center": [0.62, 0.30],
+            "radius": 0.13,
+            "sides": 6 if ("六角" in ddl or "hexagon" in lower) else 5,
+            "rotation": -12,
+            "color": color,
+            "weight": weight,
+            "filled": "塗" in ddl or "fill" in lower,
+            "color_hint": "fallback from DDL",
+        }
+    elif ("楕円" in ddl) or ("oval" in lower) or ("ellipse" in lower) or ("蕾" in ddl) or ("花びら" in ddl) or ("petal" in lower) or ("bud" in lower):
         instruction = {
             "primitive": "ellipse",
             "center": [0.72, 0.32],
             "size": [0.18, 0.11],
             "rotation": -18,
+            "color": color,
+            "weight": weight,
+            "filled": "塗" in ddl or "fill" in lower,
+            "color_hint": "fallback from DDL",
+        }
+    elif ("円" in ddl) or ("circle" in lower) or ("moon" in lower) or ("月" in ddl):
+        instruction = {
+            "primitive": "circle",
+            "center": [0.72, 0.32],
+            "radius": 0.09,
             "color": color,
             "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
@@ -1618,6 +1631,8 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         arrangement = {"count": explicit_count or 11, "layout": "scatter", "margin": 0.18}
     elif ("並べる" in ddl) or ("line up" in lower):
         arrangement = {"count": explicit_count or 3, "layout": "horizontal", "margin": 0.1}
+    elif explicit_count and explicit_count > 1:
+        arrangement = {"count": explicit_count, "layout": "scatter", "margin": 0.18}
 
     if arrangement is not None:
         if ("波打つ軌跡" in ddl) or ("undulating trace" in lower):

@@ -923,6 +923,7 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     path_motion = 0
     varied_rotation = 0
     diagonal_or_wave = 0
+    rhythm_spacing_count = 0
     visual_event = 0
     visible_colors: set[str] = set()
     filled_large = 0
@@ -986,6 +987,8 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
                 path_motion += 1
             if path in {"diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"}:
                 diagonal_or_wave += 1
+            if arrangement.get("rhythm_spacing") not in (None, "none"):
+                rhythm_spacing_count += 1
         else:
             expanded_count += 1
 
@@ -995,7 +998,7 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     fallback_used = fallback_hints > 0
 
     negative_space_pressure = min(100, preserve_space * 18 + fade_count * 8 + min(off_center, 4) * 8 + min(counterweights, 3) * 8)
-    motion_energy = min(100, path_motion * 18 + diagonal_or_wave * 12 + varied_rotation * 8)
+    motion_energy = min(100, path_motion * 18 + diagonal_or_wave * 12 + varied_rotation * 8 + rhythm_spacing_count * 10)
     color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14)
     if color_resonance == 0 and visible_colors and visible_colors <= {"white", "black", "gray"}:
         color_resonance = min(

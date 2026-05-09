@@ -656,6 +656,28 @@ def test_quality_metrics_scores_achromatic_tonal_resonance():
     assert metrics["score_quality_metrics"]["color_resonance"] > 0
 
 
+def test_quality_metrics_scores_rhythm_spacing_as_motion_energy():
+    score = {
+        "instructions": [
+            {
+                "primitive": "ellipse",
+                "color": "blue",
+                "center": [0.5, 0.5],
+                "size": [0.08, 0.04],
+                "arrangement": {
+                    "count": 7,
+                    "layout": "horizontal",
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_quality_metrics"]["motion_energy"] > 0
+
+
 def test_paper_words_do_not_request_white_by_themselves():
     trace = cli._color_trace(
         {"text": "新聞紙が迷うように回っている。", "ddl": "灰色の四角を置く。", "score": {"instructions": [{"primitive": "square", "color": "gray"}]}},

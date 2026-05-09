@@ -173,6 +173,10 @@ MAX_QUIET_SINGLE_SHAPE_WIDTH = 0.34
 MAX_QUIET_SINGLE_SHAPE_HEIGHT = 0.24
 MAX_QUIET_SINGLE_SHAPE_RADIUS = 0.17
 MAX_QUIET_SINGLE_SHAPE_AREA = 0.14
+MAX_UNINTENTIONAL_FILLED_SHAPE_WIDTH = 0.42
+MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT = 0.30
+MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS = 0.20
+MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
 
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("白", "white"), "white"),
@@ -681,6 +685,32 @@ def _has_intentional_large_surface(ddl: str | None) -> bool:
     )
 
 
+def _has_explicit_background_intent(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(
+        marker in ddl or marker in lower
+        for marker in (
+            "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇", "夕焼け", "夕暮れ",
+            "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness", "sunset", "dusk",
+        )
+    )
+
+
+def _with_background_dominance_governor(background: str, *, ddl: str | None) -> str:
+    """主題指定なしの濃色背景が画面全体を支配するのを避ける。"""
+    if background not in {"red", "blue", "green"}:
+        return background
+    if _has_explicit_background_intent(ddl) or _has_intentional_large_surface(ddl):
+        return background
+    if _color_only_constraint_from_ddl(ddl):
+        return background
+    if _context_has_density_governor(ddl) or _presence_from_ddl(ddl) is not None:
+        return "white"
+    return background
+
+
 def _with_quiet_single_shape_tempering(ins: Instruction, *, ddl: str | None) -> Instruction:
     if _has_intentional_large_surface(ddl):
         return ins
@@ -696,6 +726,33 @@ def _with_quiet_single_shape_tempering(ins: Instruction, *, ddl: str | None) -> 
         data["size"] = _cap_size(ins.size, MAX_QUIET_SINGLE_SHAPE_WIDTH, MAX_QUIET_SINGLE_SHAPE_HEIGHT)
     hint = data.get("color_hint")
     note = "quiet single large shape tempered to keep trace/space legible"
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
+def _with_unintentional_filled_shape_tempering(ins: Instruction, *, ddl: str | None) -> Instruction:
+    if _has_intentional_large_surface(ddl):
+        return ins
+    if _context_has_density_governor(ddl):
+        return ins
+    if not ins.filled or ins.arrangement is not None:
+        return ins
+    if ins.primitive not in ("circle", "ellipse", "square", "triangle", "polygon"):
+        return ins
+    if _closed_shape_area(ins) < MAX_UNINTENTIONAL_FILLED_SHAPE_AREA:
+        return ins
+
+    data = ins.model_dump(by_alias=True)
+    if ins.primitive in ("circle", "polygon"):
+        data["radius"] = min(float(ins.radius or MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS), MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS)
+    elif ins.size is not None:
+        data["size"] = _cap_size(
+            ins.size,
+            MAX_UNINTENTIONAL_FILLED_SHAPE_WIDTH,
+            MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT,
+        )
+    hint = data.get("color_hint")
+    note = "large filled shape tempered to avoid unintended surface dominance"
     data["color_hint"] = f"{hint}; {note}" if hint else note
     return Instruction.model_validate(data)
 
@@ -1045,6 +1102,7 @@ def _with_context_density_governor(
     for ins in instructions:
         ins = _with_quiet_symbolic_shape_tempering(ins, ddl=ddl)
         ins = _with_quiet_single_shape_tempering(ins, ddl=ddl)
+        ins = _with_unintentional_filled_shape_tempering(ins, ddl=ddl)
         arr = ins.arrangement
         if arr is None:
             adjusted.append(ins)
@@ -2278,7 +2336,7 @@ def _coerce_instruction(ins: Instruction) -> Instruction:
 
 def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。"""
-    background = _visible_background(score.background)
+    background = _with_background_dominance_governor(_visible_background(score.background), ddl=ddl)
     instructions = [
         _coerce_and_repair_instruction(ins, original_background=score.background, background=background, ddl=ddl)
         for ins in score.instructions
@@ -2293,6 +2351,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_context_energy_repair(instructions, ddl=ddl, background=background)
     effective_presence = score.presence or _presence_from_ddl(ddl)
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
+    instructions = [_with_unintentional_filled_shape_tempering(ins, ddl=ddl) for ins in instructions]
     instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)
     instructions = _with_motion_energy(instructions, ddl=ddl)
     instructions = _with_rhythm_variation(instructions, ddl=ddl)

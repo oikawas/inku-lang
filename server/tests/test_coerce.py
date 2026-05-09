@@ -1058,6 +1058,73 @@ def test_coerce_score_tempers_single_large_shape_in_quiet_trace_context():
     assert "quiet single large shape tempered" in (ins.color_hint or "")
 
 
+def test_coerce_score_governs_unrequested_saturated_background_in_presence_scene():
+    score = Score.model_validate(
+        {
+            "background": "blue",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.18, 0.08],
+                    "color": "white",
+                    "filled": True,
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
+
+    assert fixed.background == "white"
+    assert fixed.instructions[0].color == "black"
+    assert "white foreground made visible" in (fixed.instructions[0].color_hint or "")
+
+
+def test_coerce_score_keeps_explicit_sunset_background():
+    score = Score.model_validate(
+        {
+            "background": "red",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.6],
+                    "to": [0.8, 0.4],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
+
+    assert fixed.background == "red"
+
+
+def test_coerce_score_tempers_unintentional_large_filled_shape():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.62, 0.45],
+                    "size": [0.86, 0.48],
+                    "color": "red",
+                    "filled": True,
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="カフェの奥に赤い形が残る。")
+
+    ins = fixed.instructions[0]
+    assert ins.size is not None
+    assert ins.size[0] <= 0.42
+    assert ins.size[1] <= 0.30
+    assert "large filled shape tempered" in (ins.color_hint or "")
+
+
 def test_coerce_score_restores_rhythm_and_ma_without_count_growth():
     score = Score.model_validate(
         {

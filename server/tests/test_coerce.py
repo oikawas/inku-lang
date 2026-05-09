@@ -311,6 +311,26 @@ def test_coerce_score_repairs_missing_green_from_natural_ddl():
     assert any("green restored in color_cycle from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_repairs_blue_from_sky_and_water_context():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="錆びた鉄骨が空を細かく分けている。")
+
+    assert any(ins.color == "blue" or (ins.arrangement and "blue" in ins.arrangement.color_cycle) for ins in fixed.instructions)
+    assert any("blue restored in color_cycle from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_repairs_multiple_missing_colors_without_overwriting_green():
     score = Score.model_validate(
         {
@@ -614,10 +634,8 @@ def test_coerce_score_adds_generic_accent_when_shape_exists_but_color_is_flat():
 
     fixed = coerce_score(score, ddl="水の冷たさが石の横に残る。")
 
-    accents = [ins for ins in fixed.instructions if "composition accent restored for shape/color diversity" in (ins.color_hint or "")]
-    assert len(accents) == 1
-    assert accents[0].primitive == "arc"
-    assert accents[0].color == "blue"
+    assert any(ins.color == "blue" or (ins.arrangement and "blue" in ins.arrangement.color_cycle) for ins in fixed.instructions)
+    assert any("blue restored in color_cycle from DDL color intent" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_restores_human_presence_as_abstract_score_field():
@@ -945,12 +963,13 @@ def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touch
     )
     red_bicycle = coerce_score(red_scene, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
     playful = [ins for ins in red_bicycle.instructions if "playful motion energy restored as a small moving color cluster" in (ins.color_hint or "")]
+    assert red_bicycle.background == "white"
     assert playful
     assert playful[0].primitive == "ellipse"
-    assert playful[0].color == "white"
+    assert playful[0].color == "red"
     assert playful[0].arrangement is not None
     assert playful[0].arrangement.count == 5
-    assert playful[0].arrangement.color_cycle == ["white", "blue", "black"]
+    assert "red" in playful[0].arrangement.color_cycle
 
     bus_stop = coerce_score(base, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
     assert not any("energy restored" in (ins.color_hint or "") for ins in bus_stop.instructions)
@@ -1027,10 +1046,11 @@ def test_coerce_score_does_not_treat_motif_only_as_color_only_constraint():
     fixed = coerce_score(score, ddl="夕暮れの坂道で、黒い影だけが先に帰っていく。")
 
     playful = [ins for ins in fixed.instructions if "playful motion energy restored as a small moving color cluster" in (ins.color_hint or "")]
+    assert fixed.background == "white"
     assert playful
-    assert playful[0].color == "white"
+    assert playful[0].color == "red"
     assert playful[0].arrangement is not None
-    assert playful[0].arrangement.color_cycle == ["white", "blue", "black"]
+    assert "red" in playful[0].arrangement.color_cycle
     assert not any("explicit color-only constraint enforced" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
@@ -1152,7 +1172,7 @@ def test_coerce_score_keeps_explicit_black_background_in_direct_ddl():
     assert fixed.background == "black"
 
 
-def test_coerce_score_keeps_explicit_sunset_background():
+def test_coerce_score_governs_incidental_dusk_background():
     score = Score.model_validate(
         {
             "background": "red",
@@ -1168,6 +1188,26 @@ def test_coerce_score_keeps_explicit_sunset_background():
     )
 
     fixed = coerce_score(score, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
+
+    assert fixed.background == "white"
+
+
+def test_coerce_score_keeps_explicit_sunset_sky_background():
+    score = Score.model_validate(
+        {
+            "background": "red",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.6],
+                    "to": [0.8, 0.4],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夕暮れの空を赤い背景として置き、自転車の影を細く走らせる。")
 
     assert fixed.background == "red"
 

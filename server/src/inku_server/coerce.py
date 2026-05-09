@@ -181,7 +181,25 @@ MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("白", "white"), "white"),
     (("黒", "black"), "black"),
-    (("青", "blue"), "blue"),
+    (
+        (
+            "青",
+            "blue",
+            "空",
+            "sky",
+            "水",
+            "water",
+            "湖",
+            "lake",
+            "海",
+            "sea",
+            "雨",
+            "rain",
+            "冷たい",
+            "cold",
+        ),
+        "blue",
+    ),
     (("赤", "red"), "red"),
     (
         (
@@ -450,7 +468,9 @@ RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
 )
 VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
     "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける",
+    "迷う", "消えかけ", "震える", "一滴", "先に帰", "丸ま",
     "collision", "burst", "focus", "turning point", "pop", "release",
+    "wandering", "fading", "trembling", "single drop", "goes home first", "curling",
 )
 MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
     "余白", "間", "空白", "気配", "押す", "避け", "離れ",
@@ -722,10 +742,12 @@ def _has_explicit_background_intent(ddl: str | None) -> bool:
         return False
     lower = context.lower()
     explicit_surface_markers = (
-        "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇", "夕焼け", "夕暮れ",
-        "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness", "sunset", "dusk",
+        "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇",
+        "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness",
     )
     if any(marker in context or marker in lower for marker in explicit_surface_markers):
+        return True
+    if any(marker in context or marker in lower for marker in ("夕焼け空", "夕暮れの空", "sunset sky", "dusk sky")):
         return True
     if any(marker in context or marker in lower for marker in ("夜明け", "明け方", "朝焼け", "dawn", "daybreak", "sunrise")):
         return False
@@ -884,14 +906,18 @@ def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, back
     if len(instructions) >= 10:
         return instructions
 
-    color = "red" if background != "red" else VISIBLE_ON_BACKGROUND.get(background, "black")
+    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
+    color = requested[0] if requested else ("blue" if background != "blue" else VISIBLE_ON_BACKGROUND.get(background, "black"))
     accent = Instruction.model_validate(
         {
-            "primitive": "circle",
+            "primitive": "arc",
             "center": [0.68, 0.34],
-            "radius": 0.026,
+            "radius": 0.055,
+            "angle_start": 35,
+            "angle_end": 245,
+            "rotation": -18,
             "color": color,
-            "filled": True,
+            "weight": "hair",
             "color_hint": "visual event restored as a small focal pulse",
         }
     )

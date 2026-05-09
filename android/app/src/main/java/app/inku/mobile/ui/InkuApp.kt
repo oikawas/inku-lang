@@ -1022,7 +1022,8 @@ private fun CanvasHeroCard(
     canvasAspectOverride: String? = null,
 ) {
     val item = state.selectedHistory
-    val canvasAspectId = canvasAspectOverride ?: state.selectedCanvasAspect
+    val canvasAspectId = canvasAspectOverride
+        ?: if (state.canvasPresentationMode) item?.canvasAspect ?: state.selectedCanvasAspect else state.selectedCanvasAspect
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -1650,25 +1651,6 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             maxPreviewHeight = 250.dp,
             canvasAspectOverride = DemoCanvasAspectId,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                state.demoWaitingSeconds?.let { "次の描画まで ${it}秒" }
-                    ?: state.demoCurrentElapsedMs?.let { "現在 ${formatDuration(it)} / 合計 ${formatDuration(state.demoTotalElapsedMs)}" }
-                    ?: "デモ待機中",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            MiniPill(
-                text = if (state.isDrawing) "● 実行中" else "${state.demoRenderCount}件",
-                selected = state.isDrawing,
-            )
-        }
 
         CompactLabel("生成された指示文")
         Surface(
@@ -1694,38 +1676,39 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             onStop = viewModel::stopDrawing,
         )
 
-        CompactLabel("デモ設定")
-        Surface(
-            color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column {
-                DemoSettingRow(
-                    label = "表示間隔",
-                    last = true,
-                    action = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            SecondarySmallButton(
-                                text = "−",
-                                onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds - 5) },
-                                enabled = !state.isDrawing && state.demoIntervalSeconds > 1,
-                            )
-                            Text(
-                                "${state.demoIntervalSeconds}秒",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                            )
-                            SecondarySmallButton(
-                                text = "+",
-                                onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds + 5) },
-                                enabled = !state.isDrawing && state.demoIntervalSeconds < 999,
-                            )
-                        }
-                    },
-                )
+        if (!state.isDrawing) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column {
+                    DemoSettingRow(
+                        label = "表示間隔",
+                        last = true,
+                        action = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                SecondarySmallButton(
+                                    text = "−",
+                                    onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds - 5) },
+                                    enabled = state.demoIntervalSeconds > 1,
+                                )
+                                Text(
+                                    "${state.demoIntervalSeconds}秒",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                                SecondarySmallButton(
+                                    text = "+",
+                                    onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds + 5) },
+                                    enabled = state.demoIntervalSeconds < 999,
+                                )
+                            }
+                        },
+                    )
+                }
             }
         }
         if (state.demoGeneratedDdl != null) {

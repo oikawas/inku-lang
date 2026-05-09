@@ -6,8 +6,25 @@ plugins {
     id("androidx.room")
 }
 
+fun shouldIncrementAndroidBuildNumber(): Boolean {
+    return gradle.startParameter.taskNames.any { taskName ->
+        val name = taskName.substringAfterLast(':')
+        name.startsWith("assemble") || name.startsWith("bundle") || name.startsWith("install")
+    }
+}
+
+fun nextAndroidBuildNumber(): Int {
+    val buildNumberFile = rootProject.file("BUILD_NUMBER")
+    val current = buildNumberFile.readText().trim().toInt()
+    if (!shouldIncrementAndroidBuildNumber()) return current
+    val next = current + 1
+    buildNumberFile.writeText("$next\n")
+    logger.lifecycle("Android BUILD_NUMBER incremented: $current -> $next")
+    return next
+}
+
 val androidVersionName = rootProject.file("VERSION").readText().trim()
-val androidVersionCode = rootProject.file("BUILD_NUMBER").readText().trim().toInt()
+val androidVersionCode = nextAndroidBuildNumber()
 
 android {
     namespace = "app.inku.mobile"
@@ -19,6 +36,7 @@ android {
         targetSdk = 36
         versionCode = androidVersionCode
         versionName = androidVersionName
+        buildConfigField("int", "BUILD_NUMBER", androidVersionCode.toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

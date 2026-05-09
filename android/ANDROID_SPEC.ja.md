@@ -719,12 +719,13 @@ Android 版の描画パネルでは、server/web 版 `CanvasPanel` の SVG / PNG
 Android 版は web/server の `web/BUILD_NUMBER` とは独立した Android 用 version / build を持つ。
 
 - `android/VERSION` を Android `versionName` の正本とする。
-- `android/BUILD_NUMBER` を Android `versionCode` の正本とし、単調増加する整数として管理する。
+- `android/BUILD_NUMBER` を Android `versionCode` とアプリ内 build number の正本とし、単調増加する整数として管理する。
 - `android/app/build.gradle.kts` は `versionName` / `versionCode` を直書きせず、上記2ファイルから読み込む。
 - v1.48 世代の初期値は `versionName=1.48.0-android.1`、`versionCode=148001` とする。
-- Android の UI / 挙動変更で端末へ配布・展開する場合は、`android/BUILD_NUMBER` を増やす。
+- `assemble*` / `bundle*` / `install*` の Android アプリ build タスクを実行するたびに、Gradle が `android/BUILD_NUMBER` を 1 増やし、その増えた値を同じ build の `versionCode` と `BuildConfig.BUILD_NUMBER` に使う。
+- `compileDebugKotlin` などのコンパイル確認タスクでは `android/BUILD_NUMBER` を増やさない。
 - server/spec 世代への追従、DB schema、履歴 JSON、render metadata、export 互換性に影響する変更では、`android/VERSION` も更新する。
-- 設定メニューには `バージョン情報` パネルを置き、`versionName`、`versionCode`、build type、application id、source spec、render engine version を表示する。
+- 設定メニューには `バージョン情報` パネルを置き、`versionName`、`versionCode`、build number、build type、application id、source spec、render engine version を表示する。
 - version / build metadata には API キー、端末 ID、ローカルサーバー情報、個人環境パスを含めない。
 
 ## 2026-05-09 モデル設定パネルの追加整理

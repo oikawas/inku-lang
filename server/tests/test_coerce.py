@@ -1345,6 +1345,78 @@ def test_coerce_score_adds_surface_tension_for_heavy_surface_context():
     assert "surface tension restored" in (fixed.instructions[1].color_hint or "")
 
 
+def test_coerce_score_adds_edge_light_event_for_dark_light_context():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.24, 0.12],
+                    "to": [0.24, 0.88],
+                    "color": "blue",
+                    "weight": "hair",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="真夜中の港で、遠い灯台の光だけが黒い海を切っている。")
+
+    edge = [ins for ins in fixed.instructions if "edge light event restored" in (ins.color_hint or "")]
+    assert edge
+    assert edge[0].primitive == "line"
+    assert edge[0].arrangement is not None
+    assert edge[0].arrangement.count == 2
+    assert edge[0].arrangement.preserve_space is True
+
+
+def test_coerce_score_does_not_add_edge_light_when_presence_handles_gaze():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.45, 0.52],
+                    "size": [0.18, 0.08],
+                    "color": "blue",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夜のガラス越しに、視線の圧力が透明な膜のように滲む。")
+
+    assert not any("edge light event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert fixed.presence is not None
+    assert fixed.presence.gaze_pressure == "medium"
+
+
+def test_coerce_score_adds_vanishing_trace_for_fading_context():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.42, 0.50],
+                    "size": [0.10, 0.04],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
+
+    trace = [ins for ins in fixed.instructions if "vanishing trace restored" in (ins.color_hint or "")]
+    assert trace
+    assert trace[0].primitive == "arc"
+    assert trace[0].arrangement is not None
+    assert trace[0].arrangement.fade == "directional"
+    assert trace[0].arrangement.rhythm_spacing == "loose"
+
+
 def test_fallback_score_preserves_explicit_count_circle_and_polygon():
     from inku_server.api import _fallback_score_from_ddl
 

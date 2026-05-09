@@ -462,6 +462,14 @@ HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = (
 PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
     "自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime",
 )
+EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
+    "夜", "真夜中", "黒い", "暗", "灯台", "光だけ", "海", "ガラス", "ネオン",
+    "night", "black", "dark", "lighthouse", "only light", "sea", "glass", "neon",
+)
+VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = (
+    "白い息", "足跡", "消え", "消える", "消えかけ", "ほどけ", "輪郭", "記憶", "跡", "遠く",
+    "breath", "footprint", "fade", "fading", "dissolve", "outline", "memory", "trace", "far",
+)
 RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
     "リズム", "踊", "跳ね", "弾む", "反復", "交互", "楽しい", "楽しさ", "喜び", "祝祭", "明快",
     "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration",
@@ -1040,6 +1048,53 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
                 },
             }
         )
+    if kind == "edge_light":
+        light_color = "white" if background in {"black", "blue", "red", "green"} else "blue"
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.58, 0.30],
+                "to": [0.84, 0.24],
+                "rotation": -8,
+                "color": light_color,
+                "weight": "hair",
+                "color_hint": "edge light event restored as a small cutting point",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "horizontal",
+                    "path": "diagonal",
+                    "margin": 0.18,
+                    "density": "low",
+                    "fade": "directional",
+                    "preserve_space": True,
+                },
+            }
+        )
+    if kind == "vanishing_trace":
+        trace_color = "blue" if background == "white" else VISIBLE_ON_BACKGROUND.get(background, "white")
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.72, 0.56],
+                "radius": 0.075,
+                "angle_start": 210,
+                "angle_end": 315,
+                "rotation": -18,
+                "color": trace_color,
+                "weight": "hair",
+                "color_hint": "vanishing trace restored with a fading endpoint",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "directional",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
     playful_color = "white" if background == "red" else "red" if background != "red" else visible
     return Instruction.model_validate(
         {
@@ -1088,12 +1143,16 @@ def _with_context_energy_repair(
         ("leaf_grain", LEAF_GRAIN_CONTEXT_MARKERS),
         ("silence_layer", SILENCE_LAYER_CONTEXT_MARKERS),
         ("hard_edge", HARD_EDGE_CONTEXT_MARKERS),
+        ("edge_light", EDGE_LIGHT_CONTEXT_MARKERS),
+        ("vanishing_trace", VANISHING_TRACE_CONTEXT_MARKERS),
         ("playful_motion", PLAYFUL_MOTION_CONTEXT_MARKERS),
     ]
     for kind, markers in candidates:
         if len(repaired) >= 10:
             break
         if not _context_has_marker(ddl, markers) or _has_context_energy(repaired, kind):
+            continue
+        if kind == "edge_light" and _presence_from_ddl(ddl) is not None:
             continue
         repaired.append(_context_energy_instruction(kind, background=background))
     return repaired

@@ -3701,7 +3701,8 @@ private fun presentationBackgroundForSvg(svgText: String): Color {
     return when {
         luminance >= 0.92f && spread <= 0.08f -> PresentationDarkBackground
         luminance <= 0.08f && spread <= 0.08f -> PresentationLightBackground
-        else -> imageBackground
+        luminance >= 0.5f -> PresentationDarkBackground
+        else -> PresentationLightBackground
     }
 }
 

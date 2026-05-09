@@ -716,8 +716,10 @@ On Android, double-tapping the drawing image opens a presentation view.
   Android dark-mode background.
 - If the drawing background is black-ish, the margin background switches to the
   Android light-mode background.
-- For non-white and non-black drawing backgrounds, Android uses the extracted
-  drawing background color as the margin background.
+- For non-white and non-black drawing backgrounds, Android classifies the
+  extracted drawing background by luminance.
+- Non-white/non-black light backgrounds use the Android dark-mode background as
+  the margin color, and dark backgrounds use the Android light-mode background.
 - While presentation view is active, pinch and pan transforms are disabled.
   Double-tapping returns to the normal view.
 - Normal pinch zoom, pan, and left/right history swipes remain available outside

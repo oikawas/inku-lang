@@ -903,6 +903,106 @@ def _math_balance_markers(instructions: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
+def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, Any]]) -> dict[str, Any]:
+    expanded_count = 0
+    preserve_space = 0
+    fade_count = 0
+    color_cycle_count = 0
+    path_motion = 0
+    varied_rotation = 0
+    diagonal_or_wave = 0
+    visual_event = 0
+    visible_colors: set[str] = set()
+    filled_large = 0
+    bilateral_presence = 0
+    gaze_presence = 0
+    object_like_hints = 0
+    fallback_hints = 0
+    coverage_hints = 0
+    centers: list[tuple[float, float]] = []
+
+    presence = score.get("presence")
+    if isinstance(presence, dict):
+        if presence.get("symmetry") == "bilateral":
+            bilateral_presence += 1
+        if presence.get("gaze_pressure") not in (None, "none"):
+            gaze_presence += 1
+
+    for instruction in instructions:
+        center = _instruction_center(instruction)
+        if center is not None:
+            centers.append(center)
+        color = instruction.get("color")
+        if isinstance(color, str):
+            visible_colors.add(color)
+        if instruction.get("filled") is True:
+            size = _coord_pair(instruction.get("size"))
+            radius = instruction.get("radius")
+            if size is not None and size[0] * size[1] >= 0.10:
+                filled_large += 1
+            elif isinstance(radius, (int, float)) and float(radius) >= 0.22:
+                filled_large += 1
+        rotation = instruction.get("rotation")
+        if isinstance(rotation, (int, float)) and abs(float(rotation)) >= 8:
+            varied_rotation += 1
+        hint = instruction.get("color_hint")
+        if isinstance(hint, str):
+            lower_hint = hint.lower()
+            if "fallback from ddl" in lower_hint:
+                fallback_hints += 1
+            if "coverage from ddl clause" in lower_hint:
+                coverage_hints += 1
+            if any(marker in hint or marker in lower_hint for marker in ("顔", "人型", "body", "face", "eye", "mouth")):
+                object_like_hints += 1
+            if any(marker in lower_hint for marker in ("visual event", "accent", "collision", "jump", "反転", "衝突")):
+                visual_event += 1
+
+        arrangement = instruction.get("arrangement")
+        if isinstance(arrangement, dict):
+            count = arrangement.get("count")
+            expanded_count += int(count) if isinstance(count, int) and count > 0 else 1
+            if arrangement.get("preserve_space") is True:
+                preserve_space += 1
+            if arrangement.get("fade") not in (None, "none"):
+                fade_count += 1
+            color_cycle = arrangement.get("color_cycle")
+            if isinstance(color_cycle, list) and color_cycle:
+                color_cycle_count += 1
+                visible_colors.update(item for item in color_cycle if isinstance(item, str))
+            path = arrangement.get("path")
+            if path not in (None, "none"):
+                path_motion += 1
+            if path in {"diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"}:
+                diagonal_or_wave += 1
+        else:
+            expanded_count += 1
+
+    off_center = sum(1 for x, y in centers if abs(x - 0.5) >= 0.12 or abs(y - 0.5) >= 0.12)
+    counterweights = _math_balance_markers(instructions)["counterweight_like_opposite_placements"]
+    instruction_count = len(instructions)
+    fallback_used = fallback_hints > 0
+
+    negative_space_pressure = min(100, preserve_space * 18 + fade_count * 8 + min(off_center, 4) * 8 + min(counterweights, 3) * 8)
+    motion_energy = min(100, path_motion * 18 + diagonal_or_wave * 12 + varied_rotation * 8)
+    color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14)
+    visual_event_score = min(100, visual_event * 28 + min(off_center, 3) * 8 + min(counterweights, 2) * 14 + (12 if color_cycle_count else 0))
+    figurative_risk = min(100, bilateral_presence * 22 + gaze_presence * 18 + object_like_hints * 25 + filled_large * 10)
+    fallback_quality = None
+    if fallback_used:
+        fallback_quality = min(100, coverage_hints * 18 + min(len(visible_colors), 3) * 12 + min(instruction_count, 5) * 8 + preserve_space * 8)
+    constraint_adherence = max(0, 100 - max(0, instruction_count - 5) * 10 - max(0, expanded_count - 160) // 4 - filled_large * 8)
+
+    return {
+        "constraint_adherence": int(constraint_adherence),
+        "negative_space_pressure": int(negative_space_pressure),
+        "motion_energy": int(motion_energy),
+        "color_resonance": int(color_resonance),
+        "visual_event": int(visual_event_score),
+        "figurative_risk": int(figurative_risk),
+        "fallback_quality": int(fallback_quality) if fallback_quality is not None else None,
+    }
+
+
 def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(score, dict):
         return {}
@@ -969,6 +1069,10 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         if isinstance(color_cycle, list) and color_cycle:
             color_cycle_count += 1
 
+    quality_metrics = _score_quality_metrics(
+        score,
+        [instruction for instruction in instructions if isinstance(instruction, dict)],
+    )
     return {
         "score_instruction_count": len(instructions),
         "score_arrangement_count": arrangement_count,
@@ -983,6 +1087,7 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_motif_hint_counts": dict(sorted(motif_hint_counts.items())),
         "score_presence_counts": dict(sorted(presence_counts.items())),
         "score_presence_gaze_counts": dict(sorted(presence_gaze_counts.items())),
+        "score_quality_metrics": quality_metrics,
         "math_balance_markers": _math_balance_markers([
             instruction for instruction in instructions if isinstance(instruction, dict)
         ]),
@@ -1132,6 +1237,44 @@ def _aggregate_marker_lines(results: list[dict[str, Any]], key: str) -> dict[str
             if isinstance(marker, str) and int(count or 0) > 0:
                 lines.setdefault(marker, []).append(line)
     return dict(sorted(lines.items()))
+
+
+def _aggregate_quality_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
+    values: dict[str, list[int]] = {}
+    fallback_values: list[int] = []
+    for result in results:
+        metrics = result.get("score_quality_metrics")
+        if not isinstance(metrics, dict):
+            continue
+        for key, value in metrics.items():
+            if key == "fallback_quality":
+                if isinstance(value, int):
+                    fallback_values.append(value)
+                continue
+            if isinstance(value, int):
+                values.setdefault(key, []).append(value)
+    averages = {
+        key: round(sum(items) / len(items), 1)
+        for key, items in sorted(values.items())
+        if items
+    }
+    lows = {
+        key: min(items)
+        for key, items in sorted(values.items())
+        if items
+    }
+    highs = {
+        key: max(items)
+        for key, items in sorted(values.items())
+        if items
+    }
+    return {
+        "average": averages,
+        "min": lows,
+        "max": highs,
+        "fallback_quality_average": round(sum(fallback_values) / len(fallback_values), 1) if fallback_values else None,
+        "fallback_quality_samples": len(fallback_values),
+    }
 
 
 def _paint_payload(
@@ -1721,6 +1864,7 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_presence_lines": _aggregate_marker_lines(results, "score_presence_counts"),
         "math_balance_markers": dict(sorted(aggregate_math_balance.items())),
         "math_balance_marker_lines": _aggregate_marker_lines(results, "math_balance_markers"),
+        "score_quality_metrics": _aggregate_quality_metrics(results),
         "review_sets": _review_sets(results),
         "results": results,
         "failures": failures,

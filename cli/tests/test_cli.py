@@ -392,6 +392,12 @@ def test_score_metrics_reports_density_cluster_and_fade_fields():
     assert metrics["score_primitive_counts"] == {"line": 1, "square": 1}
     assert metrics["score_color_counts"] == {"black": 1, "white": 1}
     assert metrics["score_motif_hint_counts"] == {}
+    assert metrics["score_quality_metrics"]["constraint_adherence"] == 100
+    assert metrics["score_quality_metrics"]["motion_energy"] == 0
+    assert metrics["score_quality_metrics"]["negative_space_pressure"] > 0
+    assert metrics["score_quality_metrics"]["color_resonance"] > 0
+    assert metrics["score_quality_metrics"]["figurative_risk"] == 0
+    assert metrics["score_quality_metrics"]["fallback_quality"] is None
     assert metrics["math_balance_markers"] == {
         "counterweight_like_opposite_placements": 0,
         "golden_like_centers": 0,
@@ -584,3 +590,38 @@ def test_history_export_writes_contact_sheet_and_evaluation_json(tmp_path, monke
     assert summary["ai_evaluation"]["items"][0]["prompt"] == "丸が跳ねる"
     assert summary["ai_evaluation"]["items"][0]["paths"]["json"].endswith("001-ABCD.json")
     assert summary["results"][0]["score_primitive_counts"] == {"ellipse": 1}
+
+
+def test_aggregate_quality_metrics_reports_average_and_fallback_quality():
+    results = [
+        {
+            "score_quality_metrics": {
+                "constraint_adherence": 100,
+                "negative_space_pressure": 40,
+                "motion_energy": 30,
+                "color_resonance": 20,
+                "visual_event": 10,
+                "figurative_risk": 0,
+                "fallback_quality": None,
+            }
+        },
+        {
+            "score_quality_metrics": {
+                "constraint_adherence": 80,
+                "negative_space_pressure": 60,
+                "motion_energy": 50,
+                "color_resonance": 40,
+                "visual_event": 30,
+                "figurative_risk": 20,
+                "fallback_quality": 70,
+            }
+        },
+    ]
+
+    summary = cli._aggregate_quality_metrics(results)
+
+    assert summary["average"]["constraint_adherence"] == 90.0
+    assert summary["min"]["figurative_risk"] == 0
+    assert summary["max"]["motion_energy"] == 50
+    assert summary["fallback_quality_average"] == 70.0
+    assert summary["fallback_quality_samples"] == 1

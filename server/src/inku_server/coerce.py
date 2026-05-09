@@ -257,7 +257,7 @@ MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "leaves"), "leaf_cluster"),
     (("紙片", "破片", "折", "手紙", "paper", "fragment", "shard", "letter"), "paper_shard"),
     (("波紋", "渦", "螺旋", "巻", "ripple", "spiral", "coil"), "ripple_knot"),
-    (("山", "屋根", "峰", "稜線", "切妻", "mountain", "roof", "ridge", "peak"), "mountain_sign"),
+    (("山", "峰", "稜線", "mountain", "ridge", "peak"), "mountain_sign"),
 )
 
 

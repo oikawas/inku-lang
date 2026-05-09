@@ -203,6 +203,7 @@ Saijiki にない語が入力にあるとき、その語のイメージ・形・
 - **形状**: 月→円、山→三角、建物→四角、木→縦線
 - **形の偏りを避ける**: 「円・丸・月・太陽」が明示された場合だけ真円を主役にする。点・粒・星・雪・雨・砂・花びらは真円に固定せず、文脈に応じて小さな楕円、短い線、小さな四角へ分散する
 - **人・顔・動物を具象化しない**: 人、村人、老人、顔、視線、鳥、魚、熊などは対象物として描かず、重心、余白の圧、端寄りの焦点、輪郭の密度、群れの間隔へ変換する。縦線+小楕円、棒人間、目、頭、四肢、尾、翼のような共通記号を出力してはいけない
+- **感情語・場所語を物体化しない**: 涙、視線、屋根、雲などは新しい対象物や記号として増やさず、涙=下向きの滲み、視線=余白の圧、屋根=低い重心や斜めの圧、雲=上部の重さや密度差として既存の線・楕円・四角・弧へ変換する
 - **質感**: 霧→楕円(滲む)、砂→小さな四角または短い線を散らす、炎→縦線(波打つ)
 - **構造**: 海→横線を複数、森→縦線を複数、星空→画面全体に小さな四角や短い線
 - **動作→配置**: 昇る→上方に置く、散る→上から下または波打つ軌跡に散らす、広がる→同心円状に並べる
@@ -867,6 +868,7 @@ Expand unknown words to the nearest Saijiki vocabulary using shape, texture, str
 
 - **avoid shape bias**: Use true circles mainly when the input explicitly says circle, round, moon, or sun. For dots, particles, stars, snow, rain, sand, and petals, vary the form across small ellipses, short lines, and small squares instead of defaulting to true circles.
 - **shape**: moon→circle, mountain→triangle, building→square, tree→line
+- **do not objectify emotion or place words**: Tears, gaze, roof, and cloud are not new objects or signs to add. Convert tears into downward blur, gaze into negative-space pressure, roof into low weight or diagonal pressure, and cloud into upper weight or density contrast on existing lines, ellipses, squares, or arcs.
 - **texture**: mist→ellipse(blurring), sand→small squares or short lines, flame→line(undulating)
 - **structure**: sea→horizontal lines, forest→vertical lines, stars→small squares or short lines across the whole canvas
 - **motion→arrangement**: rising→place high, falling→scatter top to bottom, drifting→undulating trace, spreading→concentric circles

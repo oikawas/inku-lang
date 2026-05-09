@@ -530,6 +530,25 @@ def test_coerce_score_prioritizes_triangle_delivery_for_roof_intent_when_many_in
     assert any("mountain_sign motif restored from DDL intent" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_does_not_restore_mountain_sign_for_roof_without_mountain_context():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.4, 0.45],
+                    "size": [0.18, 0.12],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="低い雲の下に街の屋根を重く置く。")
+
+    assert not any("mountain_sign motif restored from DDL intent" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_adds_limited_compound_motifs_from_ddl():
     score = Score.model_validate(
         {

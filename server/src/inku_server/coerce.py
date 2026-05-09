@@ -685,14 +685,46 @@ def _has_intentional_large_surface(ddl: str | None) -> bool:
     )
 
 
+def _source_context(ddl: str | None) -> str:
+    if not ddl:
+        return ""
+    return ddl.split("\n", 1)[0].strip()
+
+
+def _looks_like_generated_background_plan(context: str) -> bool:
+    if "\n" in context:
+        return False
+    clauses = [part.strip() for part in re.split(r"[。\n;；]+", context) if part.strip()]
+    if len(clauses) < 4:
+        return False
+    first = clauses[0].lower()
+    if not (
+        first.startswith("背景を")
+        or first.startswith("background")
+        or "fill background" in first
+    ):
+        return False
+    lower = context.lower()
+    return any(
+        marker in context or marker in lower
+        for marker in (
+            "気配", "透明な膜", "五感", "存在", "境界が滲", "画面全体",
+            "presence", "transparent membrane", "five-sense", "boundary blur", "full canvas",
+        )
+    )
+
+
 def _has_explicit_background_intent(ddl: str | None) -> bool:
     if not ddl:
         return False
-    lower = ddl.lower()
+    context = _source_context(ddl) or ddl
+    if _looks_like_generated_background_plan(context):
+        return False
+    lower = context.lower()
     return any(
-        marker in ddl or marker in lower
+        marker in context or marker in lower
         for marker in (
-            "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇", "夕焼け", "夕暮れ",
+            "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜", "夜空", "暗闇", "夕焼け", "夕暮れ",
             "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness", "sunset", "dusk",
         )
     )
@@ -700,7 +732,7 @@ def _has_explicit_background_intent(ddl: str | None) -> bool:
 
 def _with_background_dominance_governor(background: str, *, ddl: str | None) -> str:
     """主題指定なしの濃色背景が画面全体を支配するのを避ける。"""
-    if background not in {"red", "blue", "green"}:
+    if background not in {"black", "red", "blue", "green"}:
         return background
     if _has_explicit_background_intent(ddl) or _has_intentional_large_surface(ddl):
         return background

@@ -1081,6 +1081,77 @@ def test_coerce_score_governs_unrequested_saturated_background_in_presence_scene
     assert "white foreground made visible" in (fixed.instructions[0].color_hint or "")
 
 
+def test_coerce_score_governs_stage1_inferred_black_background_when_source_did_not_request_it():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.62, 0.28],
+                    "size": [0.18, 0.12],
+                    "color": "gray",
+                    "filled": True,
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="古い鏡の奥に、忘れた部屋の冷たい気配が沈んでいる。\n背景を黒で塗りつぶす。灰色の四角を置く。",
+    )
+
+    assert fixed.background == "white"
+
+
+def test_coerce_score_governs_generated_background_plan_without_original_source_context():
+    score = Score.model_validate(
+        {
+            "background": "blue",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.5, 0.0],
+                    "to": [0.5, 1.0],
+                    "color": "white",
+                    "arrangement": {"count": 110, "layout": "vertical"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl=(
+            "背景を青で塗りつぶす。画面全体に白い細筆の細い縦線を三百本、上から下へ散らす。"
+            "黒い細い余白線を存在の重心として右上の焦点へ二本引く。透明な膜を重ねる。境界が滲む。"
+        ),
+    )
+
+    assert fixed.background == "white"
+
+
+def test_coerce_score_keeps_explicit_black_background_in_direct_ddl():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.6],
+                    "to": [0.8, 0.4],
+                    "color": "white",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="背景を黒で塗りつぶす。白い線を一本引く。")
+
+    assert fixed.background == "black"
+
+
 def test_coerce_score_keeps_explicit_sunset_background():
     score = Score.model_validate(
         {

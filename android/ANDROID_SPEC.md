@@ -779,6 +779,21 @@ above the image preview.
 - The server/web plugin enable/disable setting is a server operations and plugin
   management feature and is not migrated to the single-user Android app.
 
+## 2026-05-09 Color Catalog Selection Entry Point
+
+Android aligns color catalog selection with the server/web `InputPanel` and
+`ColorCatalogModal` flow by opening a shared dialog from the writing / drawing
+screen buttons instead of the Settings menu.
+
+- Server/web has no standalone Color Catalog settings tab.
+- Android removes `Settings > Color Catalog`.
+- The color catalog selection dialog remains available from the writing /
+  drawing screen color catalog button.
+- `color_catalog` persistence, history DB records, render metadata, JSON
+  display, and render hash behavior are unchanged.
+- The setting that controls whether history selection applies the history color
+  catalog remains under Display settings, matching the server/web behavior.
+
 ## 2026-05-08 Model Settings Provider UI
 
 The Android model settings panel follows the server/web model-provider settings

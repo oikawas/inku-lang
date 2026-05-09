@@ -1544,7 +1544,6 @@ private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier
         SettingsPane.Models -> ModelSettingsPanel(state, viewModel, modifier)
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
         SettingsPane.Misc -> MiscSettingsPanel(state, viewModel, modifier)
-        SettingsPane.ColorCatalog -> ColorCatalogSelectionPanel(state, viewModel, modifier)
         SettingsPane.Version -> VersionInfoPanel(viewModel, modifier)
     }
 }
@@ -1566,12 +1565,6 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
         }
         SettingsListItem(mark = "◐", title = "表示設定", sub = "言語・テーマ・密度", onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(mark = "◇", title = "モデル設定", sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
-        SettingsListItem(
-            mark = "◓",
-            title = "色カタログ",
-            sub = "${ColorCatalogs.get(state.selectedCatalogId).name}（選択中）",
-            onClick = viewModel::openCatalogSelection,
-        )
         SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
         SettingsListItem(
             mark = "#",
@@ -1630,36 +1623,6 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SecondaryActionButton(text = "接続先設定を開く", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
-    }
-}
-
-@Composable
-private fun ColorCatalogSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text("色カタログ", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            SecondarySmallButton(text = "取消", onClick = viewModel::cancelCatalogSelection)
-            PrimarySmallButton(text = "決定", onClick = viewModel::confirmCatalogSelection)
-        }
-        ColorCatalogButtonRow(state.selectedCatalogId, viewModel::setCatalog)
-        ColorCatalogs.all.forEach { catalog ->
-            SettingsCard(catalog.name, catalog.id, if (catalog.id == state.selectedCatalogId) "選択中" else "未選択") {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SwatchStrip(catalog.swatches.take(8))
-                    Spacer(Modifier.weight(1f))
-                    SecondarySmallButton(text = "選択", onClick = { viewModel.setCatalog(catalog.id) })
-                }
-            }
-        }
     }
 }
 
@@ -2218,7 +2181,6 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Models -> "モデル設定"
     SettingsPane.Export -> "エクスポート"
     SettingsPane.Misc -> "表示設定"
-    SettingsPane.ColorCatalog -> "色カタログ"
     SettingsPane.Version -> "バージョン情報"
 }
 
@@ -2228,7 +2190,6 @@ private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
     SettingsPane.Export -> "PNG / SVG templates"
     SettingsPane.Misc -> "言語・テーマ・密度"
-    SettingsPane.ColorCatalog -> "render color catalog"
     SettingsPane.Version -> "version / build"
 }
 

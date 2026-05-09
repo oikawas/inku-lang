@@ -115,7 +115,6 @@ enum class SettingsPane {
     Models,
     Export,
     Misc,
-    ColorCatalog,
     Version,
 }
 
@@ -287,17 +286,14 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun setTab(tab: AppTab) {
         val current = localState.value
         val restoredModelSelection = if (tab != AppTab.Settings && current.settingsPane == SettingsPane.ModelSelection) modelSelectionSnapshot else null
-        val restoredCatalog = if (tab != AppTab.Settings && current.settingsPane == SettingsPane.ColorCatalog) catalogSelectionSnapshot else null
         if (restoredModelSelection != null) modelSelectionSnapshot = null
-        if (restoredCatalog != null) catalogSelectionSnapshot = null
         localState.value = current.copy(
             tab = tab,
             selectedModelId = restoredModelSelection?.first ?: current.selectedModelId,
             selectedStage2ModelId = restoredModelSelection?.second ?: current.selectedStage2ModelId,
-            selectedCatalogId = restoredCatalog ?: current.selectedCatalogId,
             settingsPane = if (tab == AppTab.Settings && current.tab != AppTab.Settings) {
                 SettingsPane.Home
-            } else if (tab == AppTab.Settings && current.settingsPane in setOf(SettingsPane.ModelSelection, SettingsPane.ColorCatalog)) {
+            } else if (tab == AppTab.Settings && current.settingsPane == SettingsPane.ModelSelection) {
                 SettingsPane.Home
             } else {
                 current.settingsPane

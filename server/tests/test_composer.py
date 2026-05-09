@@ -244,6 +244,7 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert 'symmetry="bilateral" は' in SYSTEM_PROMPT
     assert "縦線+小楕円" in SYSTEM_PROMPT
     assert "涙・視線・屋根・雲" in SYSTEM_PROMPT
+    assert "対象物化を避けた語は削除してはいけない" in SYSTEM_PROMPT
     assert '"symmetry":"none","gaze_pressure":"none"' in SYSTEM_PROMPT
     assert "待つ人の気配" in SYSTEM_PROMPT
     assert "反射" in SYSTEM_PROMPT
@@ -286,6 +287,7 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "油絵の厚塗り" in SYSTEM_PROMPT
     assert "水彩" in SYSTEM_PROMPT
     assert "tears, gaze, roof, and cloud" in SYSTEM_PROMPT_EN
+    assert "Do not simply delete words that were not objectified" in SYSTEM_PROMPT_EN
     assert "パッチワーク" in SYSTEM_PROMPT
     assert "フレスコの下地" in SYSTEM_PROMPT
     assert "水墨" in SYSTEM_PROMPT

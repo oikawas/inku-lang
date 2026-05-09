@@ -466,6 +466,10 @@ EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
     "夜", "真夜中", "黒い", "暗", "灯台", "光だけ", "海", "ガラス", "ネオン",
     "night", "black", "dark", "lighthouse", "only light", "sea", "glass", "neon",
 )
+STRONG_EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
+    "灯台", "光だけ", "切って", "切る", "切断", "一筋の光",
+    "lighthouse", "only light", "cutting light", "single beam",
+)
 VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = (
     "白い息", "足跡", "消え", "消える", "消えかけ", "ほどけ", "輪郭", "記憶", "跡", "遠く",
     "breath", "footprint", "fade", "fading", "dissolve", "outline", "memory", "trace", "far",
@@ -1125,7 +1129,8 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
 
 
 def _has_context_energy(instructions: list[Instruction], kind: str) -> bool:
-    return any(kind in (ins.color_hint or "") for ins in instructions)
+    marker = kind.replace("_", " ")
+    return any(kind in (ins.color_hint or "") or marker in (ins.color_hint or "") for ins in instructions)
 
 
 def _with_context_energy_repair(
@@ -1152,7 +1157,12 @@ def _with_context_energy_repair(
             break
         if not _context_has_marker(ddl, markers) or _has_context_energy(repaired, kind):
             continue
-        if kind == "edge_light" and _presence_from_ddl(ddl) is not None:
+        if kind == "edge_light":
+            if _presence_from_ddl(ddl) is not None:
+                continue
+            if not _context_has_marker(ddl, STRONG_EDGE_LIGHT_CONTEXT_MARKERS):
+                continue
+        if kind == "vanishing_trace" and _has_context_energy(repaired, "edge_light"):
             continue
         repaired.append(_context_energy_instruction(kind, background=background))
     return repaired

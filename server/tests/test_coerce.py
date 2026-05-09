@@ -1393,6 +1393,68 @@ def test_coerce_score_does_not_add_edge_light_when_presence_handles_gaze():
     assert fixed.presence.gaze_pressure == "medium"
 
 
+def test_coerce_score_does_not_add_edge_light_for_dark_context_without_cutting_light():
+    score = Score.model_validate(
+        {
+            "background": "white",
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.4, 0.4],
+                    "size": [0.2, 0.2],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="遠雷の前、低い黒い雲が街の屋根を押し沈めている。")
+
+    assert not any("edge light event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_prefers_vanishing_trace_over_weak_edge_light_context():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "white",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="黒い夜の窓辺で、指で描いた円がすぐに消えかけている。")
+
+    assert not any("edge light event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("vanishing trace restored" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_uses_edge_light_over_vanishing_trace_for_strong_light_cut():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "white",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="真夜中の港で、灯台の一筋の光が黒い海を切って消えていく。")
+
+    assert any("edge light event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("vanishing trace restored" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_adds_vanishing_trace_for_fading_context():
     score = Score.model_validate(
         {

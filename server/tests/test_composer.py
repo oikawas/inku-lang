@@ -148,6 +148,7 @@ def test_submit_tool_schema_is_valid():
     assert "cluster_count" in arrangement["properties"]
     assert "fade" in arrangement["properties"]
     assert "preserve_space" in arrangement["properties"]
+    assert "rhythm_spacing" in arrangement["properties"]
     assert arrangement["properties"]["path"]["enum"] == [
         "none",
         "diagonal",
@@ -155,6 +156,12 @@ def test_submit_tool_schema_is_valid():
         "top_to_bottom",
         "left_to_right",
         "right_half",
+    ]
+    assert arrangement["properties"]["rhythm_spacing"]["enum"] == [
+        "none",
+        "syncopated",
+        "accelerando",
+        "loose",
     ]
 
 

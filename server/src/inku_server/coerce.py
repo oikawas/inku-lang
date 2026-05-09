@@ -830,6 +830,9 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
             if arr_data.get("path", "none") == "none":
                 arr_data["path"] = "wave" if index % 2 == 0 else "diagonal"
                 changed = True
+            if arr_data.get("rhythm_spacing", "none") == "none":
+                arr_data["rhythm_spacing"] = "loose"
+                changed = True
             if ins.primitive in ("ellipse", "square", "triangle", "polygon") and data.get("rotation") is None:
                 data["rotation"] = -24 if index % 2 == 0 else 18
                 changed = True
@@ -871,6 +874,9 @@ def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) 
                 changed = True
             if arr_data.get("density", "none") == "none":
                 arr_data["density"] = "low"
+                changed = True
+            if arr_data.get("rhythm_spacing", "none") == "none":
+                arr_data["rhythm_spacing"] = "syncopated"
                 changed = True
             if float(arr_data.get("margin") or 0.1) < 0.14:
                 arr_data["margin"] = 0.14

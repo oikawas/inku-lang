@@ -74,6 +74,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「画面全体に点々」「全面に細かく」は layout=scatter でよいが、意味は無秩序ではなく全面分布として扱う**
 - **scatter は均一な乱数ではない。密度勾配、端部の薄れ、斜めの帯、右半分、上から下など、DDL の配置語に沿った偏りを持つものとして扱う**
 - **「波打つ軌跡に沿って」→ arrangement.path="wave"。「斜めの帯」→ path="diagonal"。「右半分」→ path="right_half"**
+- **「リズム」「跳ねる」「踊る」「輪唱のずれ」「ほどける反復」→ count を増やさず arrangement.rhythm_spacing を使う。楽しい/跳ねる=syncopated、加速/流れ=accelerando、ゆるい揺れ=loose**
 - **「上から下へ散らす」は layout=vertical, path="top_to_bottom"。「左から右へ」「横に」は layout=horizontal, path="left_to_right"。「放射状」「同心円状」は layout=radial**
 - **「右上の黄金比の位置」→ center=[0.618,0.382]。左下なら [0.382,0.618]。数学的な均衡点として扱う**
 - **「左上の三分割の交点」→ center=[0.333,0.333]。「右下の三分割の交点」→ center=[0.667,0.667]。三分割構図として扱う**
@@ -319,6 +320,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"dotted across the whole canvas" / "finely across the whole canvas" may use layout=scatter, but treat it as all-over distribution, not disorder**
 - **scatter is not uniform noise. Treat it as biased by density gradient, fading edges, diagonal band, right half, or top-to-bottom placement from the DDL**
 - **"undulating trace" → arrangement.path="wave". "diagonal band" → path="diagonal". "right half" → path="right_half"**
+- **"rhythm", "bounce", "dance", "canon-like offset", or "unraveling repetition" → use arrangement.rhythm_spacing without increasing count. playful/bouncing=syncopated, accelerating/flowing=accelerando, loose swaying=loose**
 - **"top to bottom" → layout=vertical, path="top_to_bottom". "left to right" / "horizontal" → layout=horizontal, path="left_to_right". "radial" / "concentric" → layout=radial**
 - **"upper-right golden-ratio position" → center=[0.618,0.382]. Lower-left uses [0.382,0.618]. Treat it as a mathematical balance point**
 - **"upper-left rule-of-thirds point" → center=[0.333,0.333]. "lower-right rule-of-thirds point" → center=[0.667,0.667]. Treat it as rule-of-thirds composition**

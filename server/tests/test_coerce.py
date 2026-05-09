@@ -916,6 +916,7 @@ def test_coerce_score_restores_motion_energy_without_increasing_count():
     assert ins.arrangement is not None
     assert ins.arrangement.count == 5
     assert ins.arrangement.path == "wave"
+    assert ins.arrangement.rhythm_spacing == "loose"
     assert ins.rotation is not None
     assert ins.variation is not None
     assert ins.variation.quality == "wave"
@@ -1286,6 +1287,7 @@ def test_coerce_score_restores_rhythm_and_ma_without_count_growth():
     assert ins.arrangement is not None
     assert ins.arrangement.count == 7
     assert ins.arrangement.path in {"wave", "diagonal"}
+    assert ins.arrangement.rhythm_spacing == "syncopated"
     assert ins.arrangement.preserve_space is True
     assert ins.arrangement.fade == "outward"
     assert "rhythm variation restored without increasing count" in (ins.color_hint or "")

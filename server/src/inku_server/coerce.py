@@ -443,8 +443,10 @@ VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
     "雨", "雪", "降", "縦", "上から下", "rain", "snow", "falling", "vertical", "top to bottom",
 )
 MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "風", "波", "ためらう",
+    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "先に帰", "風", "波", "ためらう",
+    "低い雲", "押し沈", "影だけ", "滲", "涙",
     "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
+    "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
 )
 COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
     "祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色",
@@ -480,9 +482,10 @@ RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
 )
 VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
     "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける",
-    "迷う", "消えかけ", "震える", "一滴", "先に帰", "丸ま",
+    "迷う", "消えかけ", "震える", "一滴", "先に帰", "丸ま", "低い雲", "押し沈", "影だけ", "滲", "涙",
     "collision", "burst", "focus", "turning point", "pop", "release",
     "wandering", "fading", "trembling", "single drop", "goes home first", "curling",
+    "low cloud", "pressing down", "shadow only", "blur", "tear",
 )
 MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
     "余白", "間", "空白", "気配", "押す", "避け", "離れ",

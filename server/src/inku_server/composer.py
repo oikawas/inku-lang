@@ -58,6 +58,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **人・動物の補助 instruction を作る場合も、縦線+小楕円、棒人間、頭、胴体、翼、尾のような共通シルエットにしない。余白線、端寄りの焦点、薄い弧、群れの間隔として抽象化する**
 - **涙・視線・屋根・雲のような名詞は、それ自体を別の対象物や記号として足さない。涙=下向きの滲み/透明度差、視線=余白の圧力、屋根=低い重心や斜めの圧、雲=上部の重さや密度差として、既に指定された primitive の配置・方向・密度・fade に変換する**
 - **対象物化を避けた語は削除してはいけない。必ず path、fade、density、rotation、preserve_space、または color_cycle の薄い差として残す。涙/滲みは下向きまたは垂直方向、雲/押し沈めは上部の重さと下方向の圧、視線は片側の余白圧として扱う**
+- **低い雲、押し沈める、影だけ、先に帰る、涙、滲み、ほどける、消えかけは対象物ではなく motion intent として扱う。既存 instruction に path、fade、rotation、rhythm_spacing、片側余白、または小さな焦点差を必ず付ける**
+- **自転車・車・電車などの乗り物は、車輪・フレーム・車体を instruction にしない。影、斜線、重心、先行/遅れ、余白のずれとして抽象化する**
 - **反射・映り込み → line または arc の少数反復。fade="directional" と path="wave" または "top_to_bottom" を使う**
 - **柔らかな光・日差し → 白または黄色寄りの薄い ellipse を重ね、filled=true, color_hint に原文の光を保持する。香り・匂い → 緑/白/灰の小さな ellipse または arc を wave path で少数散らす。蕾・開花待ち → 赤/白の小さな ellipse を斜めの帯で残す。五感・気配 → 薄い arc/ellipse と fade で残す**
 - **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
@@ -306,6 +308,8 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **If supporting instructions are needed for human/animal context, do not make a vertical-line + small-ellipse silhouette, stick figure, head/body, wing, or tail. Abstract it as negative-space lines, edge-biased focus, pale arcs, or group spacing**
 - **Nouns such as tears, gaze, roof, and cloud are not separate objects or signs to add. Convert tears into downward blur or opacity contrast, gaze into negative-space pressure, roof into low weight or diagonal pressure, and cloud into upper weight or density contrast on the primitives already specified**
 - **Do not simply delete words that were not objectified. Preserve them as path, fade, density, rotation, preserve_space, or a faint color_cycle contrast. Tears/blurring should bias downward or vertical; cloud/pressing-down should become upper weight and downward pressure; gaze should become one-sided negative-space pressure**
+- **Low cloud, pressing down, shadow only, going ahead, tears, blur, unraveling, and fading are motion intents, not objects. Always apply them to existing instructions as path, fade, rotation, rhythm_spacing, one-sided negative space, or a small focal contrast**
+- **Vehicles such as bicycles, cars, and trains must not become wheels, frames, or bodies. Abstract them as shadows, diagonals, center of gravity, leading/lagging motion, or shifted negative space**
 - **Reflection → sparse repeated line or arc with fade="directional" and path="wave" or "top_to_bottom"**
 - **Soft light / sunlight → layered pale white or yellow-leaning ellipse, filled=true, preserving the original phrase in color_hint. Scent / fragrance → small green/white/gray ellipse or arc along path="wave". Buds / waiting to bloom → small red/white ellipses along a diagonal band. Five-sense presence / atmosphere → faint arc/ellipse with fade**
 - **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**

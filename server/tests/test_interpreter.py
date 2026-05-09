@@ -110,6 +110,8 @@ def test_quantity_prompt_uses_dynamic_range():
     assert "人・顔・動物を具象化しない" in prompt
     assert "感情語・場所語を物体化しない" in prompt
     assert "物体化しない語も削除しない" in prompt
+    assert "motion intent として扱う" in prompt
+    assert "乗り物を記号化しない" in prompt
     assert "縦線+小楕円" in prompt
     assert "ランダムに六百十個" not in prompt
     assert "ランダムに八百九十個" not in prompt
@@ -132,6 +134,8 @@ def test_quantity_prompt_en_uses_dynamic_range():
     assert "same foreground and background color" in prompt
     assert "do not objectify emotion or place words" in prompt
     assert "do not delete non-objectified words" in prompt
+    assert "treat as motion intent" in prompt
+    assert "do not turn vehicles into signs" in prompt
     assert "six hundred ten small white circles randomly" not in prompt
     assert "eight hundred ninety small gray circles randomly" not in prompt
 

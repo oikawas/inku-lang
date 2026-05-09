@@ -1037,7 +1037,7 @@ private fun ConditionChips(state: InkuUiState, viewModel: InkuViewModel) {
 
 @Composable
 private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -1057,12 +1057,12 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             )
             MiniPill("新規作成", onClick = viewModel::clearPrompt)
         }
-        ImeAwareOutlinedTextField(
+        DenseMultilineInput(
             value = state.prompt,
             onValueChange = viewModel::setPrompt,
             modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            maxLines = 4,
+            minLines = 5,
+            maxLines = 8,
         )
         DrawingActionButton(
             idleText = "▶  描画する",
@@ -1079,19 +1079,19 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CompactLabel("解釈（正規化DDL）")
+            CompactLabel("解釈")
             Spacer(Modifier.weight(1f))
             DdlActionRow(state, viewModel)
         }
         if (state.saijikiOpen) {
             SaijikiPanel(viewModel)
         }
-        ImeAwareOutlinedTextField(
+        DenseMultilineInput(
             value = state.ddl,
             onValueChange = viewModel::setDdl,
             modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            maxLines = 5,
+            minLines = 6,
+            maxLines = 10,
         )
         DrawingActionButton(
             idleText = "▶  DDLから描画",
@@ -3078,9 +3078,46 @@ private fun CompactLabel(text: String) {
 private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
     WrapRow(horizontal = 6.dp, vertical = 6.dp) {
         MiniPill("歳時記", selected = state.saijikiOpen, onClick = viewModel::toggleSaijiki)
-        MiniPill("DDL編集", onClick = viewModel::openDdlEditor)
-        MiniPill("自動補正", selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
+        MiniPill("編集", onClick = viewModel::openDdlEditor)
+        MiniPill("補正", selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DenseMultilineInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    minLines: Int,
+    maxLines: Int,
+) {
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onFocusChanged { focusState ->
+                if (focusState.isFocused) {
+                    scope.launch {
+                        delay(260)
+                        bringIntoViewRequester.bringIntoView()
+                    }
+                }
+            }
+            .background(Color(0xFF191816), RoundedCornerShape(4.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        textStyle = MaterialTheme.typography.bodySmall.copy(
+            color = MaterialTheme.colorScheme.onSurface,
+            lineHeight = 17.sp,
+        ),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        minLines = minLines,
+        maxLines = maxLines,
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

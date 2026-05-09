@@ -635,3 +635,33 @@ def test_aggregate_quality_metrics_reports_average_and_fallback_quality():
     assert summary["max"]["motion_energy"] == 50
     assert summary["fallback_quality_average"] == 70.0
     assert summary["fallback_quality_samples"] == 1
+
+
+def test_quality_metrics_scores_achromatic_tonal_resonance():
+    score = {
+        "instructions": [
+            {
+                "primitive": "line",
+                "color": "gray",
+                "from": [0.2, 0.7],
+                "to": [0.8, 0.3],
+                "rotation": -18,
+                "arrangement": {"count": 5, "layout": "scatter", "fade": "outward", "preserve_space": True},
+            }
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_quality_metrics"]["color_resonance"] > 0
+
+
+def test_paper_words_do_not_request_white_by_themselves():
+    trace = cli._color_trace(
+        {"text": "新聞紙が迷うように回っている。", "ddl": "灰色の四角を置く。", "score": {"instructions": [{"primitive": "square", "color": "gray"}]}},
+        catalog_id="default",
+        catalog_data=CATALOG_DATA,
+    )
+
+    assert "white" not in trace["requested_colors"]
+    assert trace["missing_requested_colors"] == []

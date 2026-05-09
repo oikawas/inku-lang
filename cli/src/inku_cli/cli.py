@@ -43,7 +43,7 @@ CANVAS_ASPECT_RATIOS = {
 }
 CANVAS_ASPECTS = tuple(CANVAS_ASPECT_RATIOS.keys())
 COLOR_MARKERS: dict[str, tuple[str, ...]] = {
-    "white": ("white", "ivory", "snow", "paper", "白", "雪", "紙", "光"),
+    "white": ("white", "ivory", "snow", "白", "雪", "光"),
     "black": ("black", "dark", "shadow", "ink", "黒", "闇", "影", "墨"),
     "blue": ("blue", "water", "night", "cold", "sky", "青", "水", "夜", "冷", "空", "湖"),
     "red": ("red", "pink", "warm", "fire", "fruit", "赤", "紅", "桜", "桃", "温", "火", "果実"),
@@ -997,6 +997,15 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     negative_space_pressure = min(100, preserve_space * 18 + fade_count * 8 + min(off_center, 4) * 8 + min(counterweights, 3) * 8)
     motion_energy = min(100, path_motion * 18 + diagonal_or_wave * 12 + varied_rotation * 8)
     color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14)
+    if color_resonance == 0 and visible_colors and visible_colors <= {"white", "black", "gray"}:
+        color_resonance = min(
+            100,
+            18
+            + preserve_space * 8
+            + fade_count * 6
+            + min(off_center, 3) * 6
+            + min(varied_rotation, 3) * 4,
+        )
     visual_event_score = min(100, visual_event * 28 + min(off_center, 3) * 8 + min(counterweights, 2) * 14 + (12 if color_cycle_count else 0))
     figurative_risk = min(100, bilateral_presence * 22 + gaze_presence * 18 + object_like_hints * 25 + filled_large * 10)
     fallback_quality = None

@@ -473,7 +473,7 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
     if any(token in context for token in ("葉", "花びら", "羽", "紙片", "破片", "舟")):
         structural.append(f"{main_color}細い右上がりの楕円を葉片として波打つ軌跡に沿って五個散らす。")
     if not roof_pressure_context and any(token in context for token in ("扉", "窓", "箱", "街", "部屋", "格子")):
-        structural.append(f"{contrast_color}回転した細い四角を視線の切片として右半分に三つ散らす。")
+        structural.append(f"{contrast_color}回転した細い四角を余白の切片として右半分に三つ散らす。")
     if roof_pressure_context:
         structural.append(f"{contrast_color}薄い斜め線を上端から下へ三本置く。低い重さとしてゆっくり揺れる。")
     if any(token in context for token in ("膜", "透明", "霞", "霧", "靄", "気配", "余韻")):

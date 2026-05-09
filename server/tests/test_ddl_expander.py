@@ -150,6 +150,15 @@ def test_expand_intermediate_ddl_abstracts_presence_without_body_symbols():
     assert "小さな楕円" not in expanded
 
 
+def test_expand_intermediate_ddl_does_not_invent_gaze_for_city_context():
+    expanded = expand_intermediate_ddl(
+        "夜のガラス越しに、街のネオンが涙のように滲んでいる。",
+    )
+
+    assert "視線の切片" not in expanded
+    assert "余白の切片" in expanded
+
+
 def test_expand_intermediate_ddl_en_selects_focused_layers():
     ddl = "Scatter five small red circles randomly. Draw three thin white horizontal lines."
 

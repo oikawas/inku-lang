@@ -247,6 +247,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "対象物化を避けた語は削除してはいけない" in SYSTEM_PROMPT
     assert "motion intent として扱う" in SYSTEM_PROMPT
     assert "車輪・フレーム・車体" in SYSTEM_PROMPT
+    assert "屋根は triangle として対象物化せず" in SYSTEM_PROMPT
+    assert "Mountain / roof / sharp peak" not in SYSTEM_PROMPT_EN
+    assert "Do not objectify roof as a triangle" in SYSTEM_PROMPT_EN
     assert '"symmetry":"none","gaze_pressure":"none"' in SYSTEM_PROMPT
     assert "待つ人の気配" in SYSTEM_PROMPT
     assert "反射" in SYSTEM_PROMPT

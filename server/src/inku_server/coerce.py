@@ -248,7 +248,7 @@ NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
 
 SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("多角形", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片", "polygon", "crystal", "mineral", "hard shard"), "polygon"),
-    (("山", "屋根", "尖", "鋭", "三角", "峰", "頂", "稜線", "切妻", "mountain", "roof", "sharp", "peak", "ridge", "triangle"), "triangle"),
+    (("山", "尖", "鋭", "三角", "峰", "頂", "稜線", "mountain", "sharp", "peak", "ridge", "triangle"), "triangle"),
     (("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple"), "arc"),
     (("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square"), "square"),
 )

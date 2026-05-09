@@ -64,7 +64,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **柔らかな光・日差し → 白または黄色寄りの薄い ellipse を重ね、filled=true, color_hint に原文の光を保持する。香り・匂い → 緑/白/灰の小さな ellipse または arc を wave path で少数散らす。蕾・開花待ち → 赤/白の小さな ellipse を斜めの帯で残す。五感・気配 → 薄い arc/ellipse と fade で残す**
 - **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
 - **多角形語彙は polygon だけを使い、sides=5-8 に限る。結晶、鉱物、硬い欠片、人工物の硬さ、都市的構造にだけ使う。五角形/六角形などを個別 primitive にしない**
-- **山・屋根・鋭い先端 → triangle を使える。葉・花びら・羽・紙片 → thin ellipse / rotated square / small polygon として扱い、自然プリミティブ plugin が無い現在も抽象化された自然/物質形として残す**
+- **山・鋭い先端 → triangle を使える。屋根は triangle として対象物化せず、低い重心・斜めの圧・上部密度差として扱う。葉・花びら・羽・紙片 → thin ellipse / rotated square / small polygon として扱い、自然プリミティブ plugin が無い現在も抽象化された自然/物質形として残す**
 - **楽しい形・複雑な形は、単体 primitive ではなく 2〜5 個の primitive の局所 motif として作る。例: 葉=細い ellipse + arc、紙片=rotated square + 細線、種=ellipse + 小粒、山=triangle + 余白を切る line、波紋=arc + 小 ellipse**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
@@ -314,7 +314,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Soft light / sunlight → layered pale white or yellow-leaning ellipse, filled=true, preserving the original phrase in color_hint. Scent / fragrance → small green/white/gray ellipse or arc along path="wave". Buds / waiting to bloom → small red/white ellipses along a diagonal band. Five-sense presence / atmosphere → faint arc/ellipse with fade**
 - **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**
 - **Use only polygon for polygonal vocabulary, with sides=5-8. Use it only for crystals, minerals, hard shards, artificial hardness, or urban structure. Do not add separate pentagon/hexagon primitives**
-- **Mountain / roof / sharp peak → triangle is allowed. Leaf / petal / feather / paper fragment → use thin ellipse, rotated square, or small polygon so abstract natural/material forms survive until natural primitive plugins exist**
+- **Mountain / sharp peak → triangle is allowed. Do not objectify roof as a triangle; treat it as low weight, diagonal pressure, or upper density contrast. Leaf / petal / feather / paper fragment → use thin ellipse, rotated square, or small polygon so abstract natural/material forms survive until natural primitive plugins exist**
 - **Playful or complex shapes should be local motifs made from 2-5 primitives, not a single primitive. Examples: leaf=thin ellipse + arc, paper shard=rotated square + thin line, seed pod=ellipse + small particles, mountain=triangle + a line cutting negative space, ripple=arc + small ellipse**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**

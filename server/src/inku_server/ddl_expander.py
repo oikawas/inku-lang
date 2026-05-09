@@ -467,12 +467,15 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
 
     if any(token in ddl for token in ("弧", "円", "波", "水", "月", "中心")):
         structural.append(f"{contrast_color}細い弧を左下の焦点から三つ広げる。半径は0.11。")
-    if any(token in context for token in ("山", "屋根", "尖", "針葉樹", "頂", "鋭")):
+    roof_pressure_context = any(token in context for token in ("低い雲", "押し沈", "屋根"))
+    if any(token in context for token in ("山", "尖", "針葉樹", "頂", "鋭")):
         structural.append(f"{main_color}細い三角を上端寄りの焦点に二つ置く。少し傾ける。")
     if any(token in context for token in ("葉", "花びら", "羽", "紙片", "破片", "舟")):
         structural.append(f"{main_color}細い右上がりの楕円を葉片として波打つ軌跡に沿って五個散らす。")
-    if any(token in context for token in ("扉", "窓", "箱", "街", "部屋", "格子")):
+    if not roof_pressure_context and any(token in context for token in ("扉", "窓", "箱", "街", "部屋", "格子")):
         structural.append(f"{contrast_color}回転した細い四角を視線の切片として右半分に三つ散らす。")
+    if roof_pressure_context:
+        structural.append(f"{contrast_color}薄い斜め線を上端から下へ三本置く。低い重さとしてゆっくり揺れる。")
     if any(token in context for token in ("膜", "透明", "霞", "霧", "靄", "気配", "余韻")):
         structural.append(f"{main_color}薄い水彩の楕円を透明な膜として右半分に三つ重ねる。境界が滲む。")
     if any(token in context for token in ("反射", "映り")):
@@ -553,12 +556,15 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
 
     if any(token in lower for token in ("arc", "circle", "wave", "water", "moon", "center")):
         structural.append(f"Line up three thin {contrast_color} arcs spreading from a lower-left focus. Radius 0.11.")
-    if any(token in context.lower() for token in ("mountain", "roof", "sharp", "pine", "peak", "needle")):
+    roof_pressure_context = any(token in context.lower() for token in ("low cloud", "pressing down", "roof"))
+    if any(token in context.lower() for token in ("mountain", "sharp", "pine", "peak", "needle")):
         structural.append(f"Place two thin {main_color} triangles near the upper-edge focus. Tilt them slightly.")
     if any(token in context.lower() for token in ("leaf", "petal", "feather", "paper", "fragment", "boat")):
         structural.append(f"Scatter five thin {main_color} ellipses rising to the right along an undulating trace as leaf-like pieces.")
-    if any(token in context.lower() for token in ("door", "window", "box", "city", "room", "grid")):
+    if not roof_pressure_context and any(token in context.lower() for token in ("door", "window", "box", "city", "room", "grid")):
         structural.append(f"Scatter three thin rotated {contrast_color} squares in the right half as visual cuts.")
+    if roof_pressure_context:
+        structural.append(f"Place three pale {contrast_color} diagonal lines from the upper edge downward as slow overhead weight.")
     if any(token in context.lower() for token in ("membrane", "transparent", "haze", "fog", "mist", "atmosphere", "presence")):
         structural.append(f"Layer three pale {main_color} watercolor ellipses in the right half as a transparent membrane. Edges blurring.")
     if any(token in context.lower() for token in ("reflection", "reflected")):

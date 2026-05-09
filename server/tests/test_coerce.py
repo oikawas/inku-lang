@@ -507,7 +507,7 @@ def test_coerce_score_repairs_polygon_shape_intent_from_ddl():
     assert "polygon restored from DDL shape intent" in (polygons[0].color_hint or "")
 
 
-def test_coerce_score_prioritizes_triangle_delivery_for_roof_intent_when_many_instructions():
+def test_coerce_score_prioritizes_triangle_delivery_for_ridge_intent_when_many_instructions():
     score = Score.model_validate(
         {
             "instructions": [
@@ -528,6 +528,25 @@ def test_coerce_score_prioritizes_triangle_delivery_for_roof_intent_when_many_in
     assert len(fixed.instructions) == 10
     assert any("triangle restored from DDL shape intent" in (ins.color_hint or "") for ins in fixed.instructions)
     assert any("mountain_sign motif restored from DDL intent" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_does_not_restore_triangle_for_roof_pressure_alone():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.4],
+                    "to": [0.8, 0.4],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="遠雷の前、低い雲が街の屋根を押し沈めている。")
+
+    assert not any("triangle restored from DDL shape intent" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_does_not_restore_mountain_sign_for_roof_without_mountain_context():

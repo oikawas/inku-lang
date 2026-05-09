@@ -1949,18 +1949,30 @@ def _run_with_hard_timeout(label: str, timeout_seconds: float, operation):
     return result
 
 
-def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
+def _fallback_background_from_text(text: str, *, lang: str) -> tuple[str, str]:
     lower = text.lower()
     if lang == "en":
-        background = "black" if "night" in lower or "dark" in lower or "black" in lower else "white"
+        has_dawn = "dawn" in lower or "daybreak" in lower or "sunrise" in lower
+        is_dark = not has_dawn and any(marker in lower for marker in ("night", "dark", "black"))
+        background = "black" if is_dark else "white"
         foreground = "white" if background == "black" else "black"
+        return background, foreground
+    has_dawn = any(marker in text for marker in ("夜明け", "明け方", "朝焼け"))
+    is_dark = not has_dawn and any(marker in text for marker in ("夜", "黒", "暗"))
+    background = "黒" if is_dark else "白"
+    foreground = "白" if background == "黒" else "黒"
+    return background, foreground
+
+
+def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
+    if lang == "en":
+        background, foreground = _fallback_background_from_text(text, lang=lang)
         return (
             f"Fill background with {background}. "
             f"Draw three thin {foreground} diagonal lines. "
             "Scatter twelve small gray dots across the whole canvas."
         )
-    background = "黒" if ("夜" in text or "黒" in text or "暗" in text) else "白"
-    foreground = "白" if background == "黒" else "黒"
+    background, foreground = _fallback_background_from_text(text, lang=lang)
     accent = "青" if foreground == "黒" and ("白" in text or "雪" in text) else "灰色"
     return (
         f"背景を{background}で塗りつぶす。"

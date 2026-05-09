@@ -1915,7 +1915,16 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
     }
     offset = min(index, 4) * 0.09
     if primitive == "line":
-        common.update({"from": [0.16 + offset, 0.76 - offset], "to": [0.78, 0.30 + offset], "rotation": -8 + index * 7})
+        if any(marker in clause or marker in lower for marker in ("画面右端", "右端", "right edge")):
+            common.update({"from": [0.88, 0.18 + offset / 2], "to": [0.88, 0.82 - offset / 2], "rotation": 0})
+        elif any(marker in clause or marker in lower for marker in ("縦線", "vertical line")):
+            x = 0.58 + min(index, 3) * 0.08
+            common.update({"from": [x, 0.20 + offset / 2], "to": [x, 0.78 - offset / 2], "rotation": 0})
+        elif any(marker in clause or marker in lower for marker in ("横線", "horizontal line")):
+            y = 0.38 + min(index, 3) * 0.08
+            common.update({"from": [0.16, y], "to": [0.84, y], "rotation": 0})
+        else:
+            common.update({"from": [0.16 + offset, 0.76 - offset], "to": [0.78, 0.30 + offset], "rotation": -8 + index * 7})
     elif primitive == "arc":
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.11, "angle_start": 210, "angle_end": 330})
     elif primitive == "polygon":
@@ -1925,6 +1934,16 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "size": [0.16, 0.09], "rotation": -18 + index * 9})
     else:
         common.update({"position": [0.58 - offset / 2, 0.24 + offset], "size": [0.14, 0.10], "rotation": -12 + index * 8})
+
+    if any(marker in clause or marker in lower for marker in ("右半分", "right half")):
+        if "center" in common:
+            common["center"] = [0.66, common["center"][1]]
+        elif "position" in common:
+            common["position"] = [0.66, common["position"][1]]
+    if any(marker in clause or marker in lower for marker in ("右上", "upper right")) and "center" in common:
+        common["center"] = [0.68, 0.30]
+    elif any(marker in clause or marker in lower for marker in ("上端", "upper edge", "top edge")) and "center" in common:
+        common["center"] = [common["center"][0], 0.22]
 
     count = count_hint_from_ddl(clause)
     cycle = _color_cycle_from_clause(clause, background)

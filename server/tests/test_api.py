@@ -851,6 +851,13 @@ def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
 
 
+def test_stage1_fallback_does_not_treat_dawn_as_night():
+    ddl = api_module._fallback_ddl_from_text("夜明けの湖で、最初の光が水のしわをほどく。", lang="ja")
+
+    assert ddl.startswith("背景を白で塗りつぶす。")
+    assert "背景を黒" not in ddl
+
+
 def test_stage_timeout_keeps_capacity_bound_until_worker_finishes(monkeypatch):
     executor = ThreadPoolExecutor(max_workers=1)
     monkeypatch.setattr(api_module, "_stage_executor", executor)

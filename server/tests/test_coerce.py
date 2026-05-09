@@ -1236,3 +1236,33 @@ def test_fallback_score_preserves_explicit_count_circle_and_polygon():
     assert polygon.instructions[0].sides == 6
     assert polygon.instructions[0].arrangement is not None
     assert polygon.instructions[0].arrangement.count == 2
+
+
+def test_stage2_fallback_coverage_preserves_right_edge_and_presence_context():
+    from inku_server.api import _fallback_score_from_ddl
+    from inku_server.coerce import coerce_score
+
+    ddl = (
+        "背景を青で塗りつぶす。"
+        "画面右端に黒い太筆の縦線を一本引く。"
+        "その周りに白い細筆の楕円を三十個、波打つ軌跡に沿って散らす。"
+        "線は滲む。"
+    )
+    score = coerce_score(
+        _fallback_score_from_ddl(ddl, lang="ja"),
+        ddl=f"雨のバス停で、待つ人の気配が透明な膜になっている。\n{ddl}",
+    )
+
+    assert score.background == "white"
+    assert score.presence is not None
+    assert score.presence.kind == "figure_like"
+    right_edge_lines = [
+        ins
+        for ins in score.instructions
+        if ins.primitive == "line"
+        and ins.from_ is not None
+        and ins.to is not None
+        and ins.from_[0] >= 0.85
+        and ins.to[0] >= 0.85
+    ]
+    assert right_edge_lines

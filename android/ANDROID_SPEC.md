@@ -875,19 +875,23 @@ separate from the web/server `web/BUILD_NUMBER`.
 
 - `android/VERSION` is the source of truth for Android `versionName`.
 - `android/BUILD_NUMBER` is the source of truth for Android `versionCode` and
-  is managed as a monotonically increasing integer.
+  the in-app build number. It is managed as a monotonically increasing integer.
 - `android/app/build.gradle.kts` reads both files instead of hard-coding
   `versionName` or `versionCode`.
 - The initial v1.48-generation Android values are
   `versionName=1.48.0-android.1` and `versionCode=148001`.
-- Increment `android/BUILD_NUMBER` for Android UI or behavior changes that are
-  installed or distributed to devices.
+- Every `assemble*`, `bundle*`, or `install*` Android app build task increments
+  `android/BUILD_NUMBER` by 1 during Gradle configuration. The incremented
+  value is used by that same build as both `versionCode` and
+  `BuildConfig.BUILD_NUMBER`.
+- Compile-only verification tasks such as `compileDebugKotlin` do not increment
+  `android/BUILD_NUMBER`.
 - Update `android/VERSION` when Android follows a new server/spec generation or
   when DB schema, history JSON, render metadata, or export compatibility
   changes.
 - The Settings menu includes a Version Information panel showing
-  `versionName`, `versionCode`, build type, application id, source spec, and
-  render engine version.
+  `versionName`, `versionCode`, build number, build type, application id,
+  source spec, and render engine version.
 - Version/build metadata must not contain API keys, device IDs, local server
   details, or personal environment paths.
 

@@ -1585,7 +1585,7 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
         SettingsListItem(
             mark = "#",
             title = "バージョン情報",
-            sub = "Android ${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}",
+            sub = "Android ${BuildConfig.VERSION_NAME} · build ${BuildConfig.BUILD_NUMBER}",
             onClick = { viewModel.setSettingsPane(SettingsPane.Version) },
         )
     }
@@ -1792,6 +1792,7 @@ private fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Modi
         SettingsCard("inku Android", "アプリケーション", BuildConfig.VERSION_NAME) {
             VersionInfoRow("versionName", BuildConfig.VERSION_NAME)
             VersionInfoRow("versionCode", BuildConfig.VERSION_CODE.toString())
+            VersionInfoRow("build number", BuildConfig.BUILD_NUMBER.toString())
             VersionInfoRow("build type", BuildConfig.BUILD_TYPE)
             VersionInfoRow("applicationId", BuildConfig.APPLICATION_ID)
             VersionInfoRow("source spec", "inku v1.48")

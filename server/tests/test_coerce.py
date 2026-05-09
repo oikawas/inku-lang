@@ -1009,6 +1009,55 @@ def test_coerce_score_enforces_color_only_constraints_after_repairs():
     assert "explicit color-only constraint enforced" in (ins.color_hint or "")
 
 
+def test_coerce_score_does_not_treat_motif_only_as_color_only_constraint():
+    score = Score.model_validate(
+        {
+            "background": "red",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.6],
+                    "to": [0.8, 0.4],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夕暮れの坂道で、黒い影だけが先に帰っていく。")
+
+    playful = [ins for ins in fixed.instructions if "playful motion energy restored as a small moving color cluster" in (ins.color_hint or "")]
+    assert playful
+    assert playful[0].color == "white"
+    assert playful[0].arrangement is not None
+    assert playful[0].arrangement.color_cycle == ["white", "blue", "black"]
+    assert not any("explicit color-only constraint enforced" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_tempers_single_large_shape_in_quiet_trace_context():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.5, 0.5],
+                    "size": [0.82, 0.52],
+                    "color": "gray",
+                    "filled": True,
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="地下鉄の壁に、過ぎ去る列車の気配が銀色の筋を残す。")
+
+    ins = fixed.instructions[0]
+    assert ins.size is not None
+    assert ins.size[0] <= 0.34
+    assert ins.size[1] <= 0.24
+    assert "quiet single large shape tempered" in (ins.color_hint or "")
+
+
 def test_coerce_score_restores_rhythm_and_ma_without_count_growth():
     score = Score.model_validate(
         {

@@ -169,6 +169,10 @@ MAX_QUIET_LARGE_SHAPE_COUNT = 16
 MAX_QUIET_SYMBOLIC_SHAPE_COUNT = 8
 MAX_QUIET_SYMBOLIC_SHAPE_WIDTH = 0.12
 MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT = 0.09
+MAX_QUIET_SINGLE_SHAPE_WIDTH = 0.34
+MAX_QUIET_SINGLE_SHAPE_HEIGHT = 0.24
+MAX_QUIET_SINGLE_SHAPE_RADIUS = 0.17
+MAX_QUIET_SINGLE_SHAPE_AREA = 0.14
 
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("白", "white"), "white"),
@@ -664,6 +668,38 @@ def _with_quiet_symbolic_shape_tempering(ins: Instruction, *, ddl: str | None) -
     return Instruction.model_validate(data)
 
 
+def _has_intentional_large_surface(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(
+        marker in ddl or marker in lower
+        for marker in (
+            "大き", "巨大", "広い", "広がる", "布", "幕", "壁一面", "面で", "面として",
+            "large", "huge", "wide", "broad surface", "cloth", "fabric",
+        )
+    )
+
+
+def _with_quiet_single_shape_tempering(ins: Instruction, *, ddl: str | None) -> Instruction:
+    if _has_intentional_large_surface(ddl):
+        return ins
+    if ins.arrangement is not None or ins.primitive not in ("circle", "ellipse", "square", "triangle", "polygon"):
+        return ins
+    if _closed_shape_area(ins) < MAX_QUIET_SINGLE_SHAPE_AREA:
+        return ins
+
+    data = ins.model_dump(by_alias=True)
+    if ins.primitive in ("circle", "polygon"):
+        data["radius"] = min(float(ins.radius or MAX_QUIET_SINGLE_SHAPE_RADIUS), MAX_QUIET_SINGLE_SHAPE_RADIUS)
+    elif ins.size is not None:
+        data["size"] = _cap_size(ins.size, MAX_QUIET_SINGLE_SHAPE_WIDTH, MAX_QUIET_SINGLE_SHAPE_HEIGHT)
+    hint = data.get("color_hint")
+    note = "quiet single large shape tempered to keep trace/space legible"
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
 def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
     """動きのある入力では count を増やさず、軌跡・回転・揺らぎで発散を保つ。"""
     if not _context_has_motion(ddl):
@@ -1008,6 +1044,7 @@ def _with_context_density_governor(
     governed_count = 0
     for ins in instructions:
         ins = _with_quiet_symbolic_shape_tempering(ins, ddl=ddl)
+        ins = _with_quiet_single_shape_tempering(ins, ddl=ddl)
         arr = ins.arrangement
         if arr is None:
             adjusted.append(ins)
@@ -2065,11 +2102,18 @@ def _color_only_constraint_from_ddl(ddl: str | None) -> list[str]:
     if not ddl:
         return []
     lower = ddl.lower()
-    if not any(marker in ddl or marker in lower for marker in ("だけ", "のみ", "限定", "only", "limited to")):
+    japanese_color = r"(?:白|黒|青|赤|緑|灰)(?:色)?"
+    japanese_list = rf"{japanese_color}(?:\s*(?:と|、|・|,|/)\s*{japanese_color})*"
+    english_color = r"(?:white|black|blue|red|green|gray|grey)"
+    english_list = rf"{english_color}(?:\s*(?:and|,|/)\s*{english_color})*"
+    has_color_only_phrase = bool(
+        re.search(rf"{japanese_list}\s*(?:だけ|のみ|に限定|で限定)", ddl)
+        or re.search(rf"(?:{english_list})\s+only\b", lower)
+        or re.search(rf"limited to\s+(?:{english_list})", lower)
+    )
+    if not has_color_only_phrase:
         return []
     requested = _color_repair_order(_requested_colors_from_ddl(ddl))
-    if len(requested) <= 1:
-        return requested if any(marker in ddl or marker in lower for marker in ("だけ", "のみ", "only")) else []
     return requested
 
 

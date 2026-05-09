@@ -334,7 +334,7 @@ local single-user equivalent と明記されたものを除き、Web component �
 | `SaijikiDrawer.svelte` | Android では inline Saijiki panel が mobile equivalent。drawer layout は使わない。 |
 | `CanvasPanel.svelte` | artwork/prompt/score tabs、star、hash copy、render metadata、zoom/pan controls、SVG share、PNG share として移植。 |
 | `OutputTabsContent.svelte` | saved Room history item からの prompt / JSON views として移植。 |
-| `HistoryStrip.svelte` | history tab と selected render controls 経由で移植。 |
+| `HistoryStrip.svelte` | Android 版では未使用の下部履歴ストリップを廃止し、履歴タブのグリッド表示と描画パネルの選択中結果操作に集約。 |
 | `HistoryManager.svelte` | thumbnails/list modes、search、starred filter、selection、trash、restore、permanent delete として移植。 |
 | `HistoryThumbnail.svelte` | history tiles / list rows の `ArtworkPreview` 経由で移植。 |
 | `ConfirmDialog.svelte` | DDL overwrite と destructive history operations に移植。Non-history destructive settings confirmations は parity test backlog。 |

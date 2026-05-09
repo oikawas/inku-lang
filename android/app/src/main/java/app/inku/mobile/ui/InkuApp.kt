@@ -2996,43 +2996,6 @@ private fun historySearchText(item: HistoryItemEntity): String {
 }
 
 @Composable
-private fun HistoryStrip(history: List<HistoryItemEntity>, selected: HistoryItemEntity?, viewModel: InkuViewModel) {
-    Surface(modifier = Modifier.navigationBarsPadding(), color = Color(0xFF151412), tonalElevation = 2.dp) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("履歴 (${history.size})", style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.weight(1f))
-                selected?.let { Text(it.renderHashShort, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary) }
-            }
-            WrapRow {
-                history.take(8).forEach { item ->
-                    HistoryTile(item = item, selected = selected?.id == item.id, onSelect = { viewModel.selectHistory(item) })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HistoryTile(item: HistoryItemEntity, selected: Boolean, onSelect: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .width(84.dp)
-            .height(96.dp)
-            .clickable(onClick = onSelect)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.secondary else Color.Transparent, RoundedCornerShape(0.dp)),
-        shape = RoundedCornerShape(0.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF24211E)),
-    ) {
-        Column(modifier = Modifier.padding(5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            HistoryArtworkPreview(item, modifier = Modifier.fillMaxWidth().height(52.dp))
-            Text(item.elapsedMs?.let { "${it / 1000.0}s" } ?: item.renderHashShort, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-            Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-@Composable
 private fun HistoryGridTile(
     item: HistoryItemEntity,
     selected: Boolean,
@@ -3067,8 +3030,7 @@ private fun HistoryGridTile(
                 }
             }
             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text(item.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
             }
         }
     }

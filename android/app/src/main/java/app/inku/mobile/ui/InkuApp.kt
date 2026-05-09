@@ -77,8 +77,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -94,6 +96,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,7 +107,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -142,6 +153,7 @@ private val PresentationDarkBackground = Color(0xFF11100F)
 private val PresentationLightBackground = Color(0xFFF8F8F6)
 
 private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
+private data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
 private data class ProviderModelCandidate(val id: String, val label: String, val notes: String? = null)
@@ -207,6 +219,18 @@ private val saijikiGroups = listOf(
     SaijikiGroup("うごき", "motions", listOf("置く", "並べる", "埋める", "散らす", "引く")),
     SaijikiGroup("かたむき", "angles", listOf("水平", "垂直", "斜め", "右上がり", "右下がり", "回転")),
     SaijikiGroup("わりあい", "proportions", listOf("縦長", "横長", "全幅", "半幅", "半円", "上弦", "下弦", "三日月")),
+)
+
+private val saijikiGroupColors = listOf(
+    Color(0xFFEAD7A3),
+    Color(0xFF9CC6E8),
+    Color(0xFFB8D58A),
+    Color(0xFFE08A7A),
+    Color(0xFFD2B7F0),
+    Color(0xFF8FD8C1),
+    Color(0xFFF2B66D),
+    Color(0xFFAEB7D8),
+    Color(0xFFE7A9C1),
 )
 
 @Composable
@@ -288,44 +312,319 @@ private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
 
 @Composable
 private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
-    AlertDialog(
+    var editorValue by remember {
+        mutableStateOf(TextFieldValue(state.ddl, selection = TextRange(state.ddl.length)))
+    }
+    var vocabularyOpen by remember { mutableStateOf(false) }
+    var vocabularyQuery by remember { mutableStateOf("") }
+    val vocabularyTokens = remember {
+        saijikiGroups.flatMapIndexed { index, group ->
+            group.words.map { word ->
+                DdlVocabularyToken(word = word, group = group, color = saijikiGroupColors[index % saijikiGroupColors.size])
+            }
+        }.distinctBy { it.word }.sortedByDescending { it.word.length }
+    }
+    val allVocabularyWords = remember(vocabularyTokens) { vocabularyTokens.map { it.word } }
+    val detectedWords = remember(editorValue.text) {
+        vocabularyTokens.filter { editorValue.text.contains(it.word) }
+    }
+    val selectedWord = remember(editorValue.selection, editorValue.text, vocabularyTokens) {
+        selectedVocabularyToken(editorValue, vocabularyTokens)
+    }
+    val filteredGroups = remember(vocabularyQuery) {
+        val query = vocabularyQuery.trim()
+        if (query.isBlank()) {
+            saijikiGroups
+        } else {
+            saijikiGroups.mapNotNull { group ->
+                val words = group.words.filter { word ->
+                    word.contains(query, ignoreCase = true) ||
+                        group.label.contains(query, ignoreCase = true) ||
+                        group.en.contains(query, ignoreCase = true)
+                }
+                if (words.isEmpty()) null else group.copy(words = words)
+            }
+        }
+    }
+    fun updateEditor(value: TextFieldValue) {
+        editorValue = value
+        viewModel.setDdl(value.text)
+    }
+    fun insertVocabulary(word: String) {
+        updateEditor(insertWordAtSelection(editorValue, word))
+    }
+    fun selectVocabulary(word: String) {
+        updateEditor(selectNextWordOccurrence(editorValue, word))
+    }
+    Dialog(
         onDismissRequest = viewModel::closeDdlEditor,
-        title = { Text("DDL編集") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ImeAwareOutlinedTextField(
-                    value = state.ddl,
-                    onValueChange = viewModel::setDdl,
-                    label = "正規化DDL",
-                    modifier = Modifier.fillMaxWidth().height(320.dp),
-                    minLines = 12,
-                    maxLines = 18,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .padding(12.dp),
+            shape = RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("DDL編集", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = viewModel::closeDdlEditor) {
+                        Text("閉じる")
+                    }
+                    TextButton(
+                        onClick = {
+                            viewModel.closeDdlEditor()
+                            viewModel.drawFromDdl()
+                        },
+                        enabled = !state.isDrawing,
+                    ) {
+                        Text("描画")
+                    }
+                }
+                DdlSelectedVocabularyHeader(selectedWord)
+                DenseTextFieldValueInput(
+                    value = editorValue,
+                    onValueChange = ::updateEditor,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    minLines = 20,
+                    maxLines = 80,
                     enabled = !state.isDrawing,
+                    highlightTokens = vocabularyTokens,
+                    selectWords = allVocabularyWords,
                 )
+                DdlVocabularyBar(
+                    open = vocabularyOpen,
+                    query = vocabularyQuery,
+                    groups = filteredGroups,
+                    detectedWords = detectedWords,
+                    selectedWord = selectedWord,
+                    tokenForWord = { word -> vocabularyTokens.firstOrNull { it.word == word } },
+                    onToggle = { vocabularyOpen = !vocabularyOpen },
+                    onQueryChange = { vocabularyQuery = it },
+                    onInsert = ::insertVocabulary,
+                    onSelectDetected = ::selectVocabulary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DdlSelectedVocabularyHeader(selectedWord: DdlVocabularyToken?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            "選択中",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (selectedWord != null) {
+            DdlVocabularyPill(token = selectedWord, selected = true, onClick = {})
+            Text(
+                "候補タップで置換",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Text(
+                "本文の歳時記語をタップ",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun insertWordAtSelection(value: TextFieldValue, word: String): TextFieldValue {
+    val start = minOf(value.selection.start, value.selection.end).coerceIn(0, value.text.length)
+    val end = maxOf(value.selection.start, value.selection.end).coerceIn(0, value.text.length)
+    val prefix = value.text.substring(0, start)
+    val suffix = value.text.substring(end)
+    val leading = if (prefix.isBlank() || prefix.endsWith(" ") || prefix.endsWith("\n")) "" else " "
+    val trailing = if (suffix.isBlank() || suffix.startsWith(" ") || suffix.startsWith("\n")) "" else " "
+    val inserted = leading + word + trailing
+    val nextText = prefix + inserted + suffix
+    val cursor = (prefix.length + inserted.length).coerceIn(0, nextText.length)
+    return TextFieldValue(nextText, selection = TextRange(cursor))
+}
+
+private fun selectNextWordOccurrence(value: TextFieldValue, word: String): TextFieldValue {
+    if (word.isBlank() || value.text.isBlank()) return value
+    val from = maxOf(value.selection.end, 0).coerceAtMost(value.text.length)
+    val next = value.text.indexOf(word, startIndex = from).takeIf { it >= 0 }
+        ?: value.text.indexOf(word).takeIf { it >= 0 }
+        ?: return value
+    return value.copy(selection = TextRange(next, next + word.length))
+}
+
+private fun selectVocabularyAtOffset(value: TextFieldValue, offset: Int, words: List<String>): TextFieldValue {
+    if (value.text.isBlank()) return value
+    val caret = offset.coerceIn(0, value.text.length)
+    val match = words.firstNotNullOfOrNull { word ->
+        if (word.isBlank()) return@firstNotNullOfOrNull null
+        var start = value.text.indexOf(word)
+        while (start >= 0) {
+            val end = start + word.length
+            if (caret in start..end) return@firstNotNullOfOrNull start to end
+            start = value.text.indexOf(word, startIndex = end)
+        }
+        null
+    } ?: return value
+    return value.copy(selection = TextRange(match.first, match.second))
+}
+
+private fun selectedVocabularyToken(value: TextFieldValue, tokens: List<DdlVocabularyToken>): DdlVocabularyToken? {
+    if (value.selection.collapsed) return null
+    val start = minOf(value.selection.start, value.selection.end).coerceIn(0, value.text.length)
+    val end = maxOf(value.selection.start, value.selection.end).coerceIn(0, value.text.length)
+    val selected = value.text.substring(start, end)
+    return tokens.firstOrNull { it.word == selected }
+}
+
+@Composable
+private fun DdlVocabularyBar(
+    open: Boolean,
+    query: String,
+    groups: List<SaijikiGroup>,
+    detectedWords: List<DdlVocabularyToken>,
+    selectedWord: DdlVocabularyToken?,
+    tokenForWord: (String) -> DdlVocabularyToken?,
+    onToggle: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onInsert: (String) -> Unit,
+    onSelectDetected: (String) -> Unit,
+) {
+    val alternativeTokens = remember(selectedWord) {
+        selectedWord?.let { selected ->
+            selected.group.words
+                .filter { it != selected.word }
+                .mapNotNull(tokenForWord)
+        }.orEmpty()
+    }
+    val prioritizedDetectedWords = remember(detectedWords, selectedWord, alternativeTokens) {
+        if (selectedWord == null) {
+            detectedWords
+        } else {
+            (alternativeTokens + detectedWords)
+                .distinctBy { it.word }
+                .filter { it.word != selectedWord.word }
+        }
+    }
+    val prioritizedGroups = remember(groups, selectedWord) {
+        if (selectedWord == null) {
+            groups
+        } else {
+            groups.sortedWith(
+                compareByDescending<SaijikiGroup> { it.label == selectedWord.group.label }
+                    .thenBy { group -> saijikiGroups.indexOfFirst { it.label == group.label }.let { if (it < 0) Int.MAX_VALUE else it } },
+            )
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            MiniPill(if (open) "素材を閉じる" else "素材", selected = open, onClick = onToggle)
+            if (selectedWord != null) {
+                DdlVocabularyPill(token = selectedWord, selected = true, onClick = { onSelectDetected(selectedWord.word) })
+                Text("を置換", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
                 Text(
-                    "歳時記の語は編集欄へ挿入されます。編集後は「DDLから描画」で Stage 2 を再実行します。",
+                    "本文の語をタップで選択",
+                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    viewModel.closeDdlEditor()
-                    viewModel.drawFromDdl()
-                },
-                enabled = !state.isDrawing,
+        }
+        if (prioritizedDetectedWords.isNotEmpty()) {
+            WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                prioritizedDetectedWords.take(12).forEach { token ->
+                    DdlVocabularyPill(token = token, selected = token.word == selectedWord?.word, onClick = { onSelectDetected(token.word) })
+                }
+            }
+        }
+        if (open) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 248.dp),
             ) {
-                Text("DDLから描画")
+                Column(
+                    modifier = Modifier.padding(8.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    DenseSingleLineInput(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        placeholder = "検索",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    prioritizedGroups.forEach { group ->
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                if (selectedWord?.group?.label == group.label) "${group.label} / 代替候補" else group.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                                group.words.forEach { word ->
+                                    val token = tokenForWord(word)
+                                    if (token != null) {
+                                        DdlVocabularyPill(token = token, onClick = { onInsert(word) })
+                                    } else {
+                                        MiniPill(word, onClick = { onInsert(word) })
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = viewModel::closeDdlEditor) {
-                Text("閉じる")
-            }
-        },
+        }
+    }
+}
+
+@Composable
+private fun DdlVocabularyPill(token: DdlVocabularyToken, selected: Boolean = false, onClick: () -> Unit) {
+    val background = if (selected) token.color else token.color.copy(alpha = 0.84f)
+    val foreground = if (isLightColor(background)) Color(0xFF12110F) else Color(0xFFF8F8F6)
+    Text(
+        token.word,
+        modifier = Modifier
+            .background(background, RoundedCornerShape(3.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+        style = MaterialTheme.typography.labelSmall,
+        color = foreground,
+        maxLines = 1,
     )
+}
+
+private fun isLightColor(color: Color): Boolean {
+    val luminance = (0.2126f * color.red) + (0.7152f * color.green) + (0.0722f * color.blue)
+    return luminance >= 0.58f
 }
 
 @Composable
@@ -3091,12 +3390,14 @@ private fun DenseMultilineInput(
     modifier: Modifier = Modifier,
     minLines: Int,
     maxLines: Int,
+    enabled: Boolean = true,
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
+        enabled = enabled,
         modifier = modifier
             .bringIntoViewRequester(bringIntoViewRequester)
             .onFocusChanged { focusState ->
@@ -3117,6 +3418,177 @@ private fun DenseMultilineInput(
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         minLines = minLines,
         maxLines = maxLines,
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DenseTextFieldValueInput(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    modifier: Modifier = Modifier,
+    minLines: Int,
+    maxLines: Int,
+    enabled: Boolean = true,
+    highlightTokens: List<DdlVocabularyToken> = emptyList(),
+    selectWords: List<String> = emptyList(),
+) {
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val visualTransformation = remember(highlightTokens) {
+        DdlKeywordHighlightTransformation(highlightTokens)
+    }
+    val normalizedOnValueChange: (TextFieldValue) -> Unit = { nextValue ->
+        val shouldSelectVocabulary =
+            nextValue.text == value.text &&
+                nextValue.selection.collapsed &&
+                selectWords.isNotEmpty()
+        if (shouldSelectVocabulary) {
+            val selected = selectVocabularyAtOffset(nextValue, nextValue.selection.start, selectWords)
+            onValueChange(selected)
+        } else {
+            onValueChange(nextValue)
+        }
+    }
+    Box(
+        modifier = modifier
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .background(Color(0xFF191816), RoundedCornerShape(4.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = normalizedOnValueChange,
+            enabled = enabled,
+            modifier = Modifier
+                .fillMaxSize()
+                .onFocusChanged { focusState ->
+                    if (focusState.isFocused) {
+                        scope.launch {
+                            delay(260)
+                            bringIntoViewRequester.bringIntoView()
+                        }
+                    }
+                }
+                .drawBehind {
+                    val layout = textLayoutResult ?: return@drawBehind
+                    drawDdlKeywordHighlights(layout, value.text, highlightTokens)
+                },
+            textStyle = MaterialTheme.typography.bodySmall.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 16.sp,
+                lineHeight = 21.sp,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            visualTransformation = visualTransformation,
+            onTextLayout = { textLayoutResult = it },
+            minLines = minLines,
+            maxLines = maxLines,
+        )
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHighlights(
+    layout: TextLayoutResult,
+    text: String,
+    tokens: List<DdlVocabularyToken>,
+) {
+    if (text.isBlank() || tokens.isEmpty()) return
+    val occupied = BooleanArray(text.length)
+    val horizontalPad = 1.5.dp.toPx()
+    val verticalPad = 1.dp.toPx()
+    val radius = 2.5.dp.toPx()
+    tokens.forEach { token ->
+        val word = token.word
+        if (word.isBlank()) return@forEach
+        var start = text.indexOf(word)
+        while (start >= 0) {
+            val end = start + word.length
+            val overlaps = (start until end).any { occupied[it] }
+            if (!overlaps) {
+                var segmentStart = start
+                while (segmentStart < end) {
+                    val line = layout.getLineForOffset(segmentStart)
+                    val segmentEnd = minOf(end, layout.getLineEnd(line, visibleEnd = false))
+                    val firstBox = layout.getBoundingBox(segmentStart)
+                    val lastBox = layout.getBoundingBox(segmentEnd - 1)
+                    val top = minOf(firstBox.top, lastBox.top) + verticalPad
+                    val bottom = maxOf(firstBox.bottom, lastBox.bottom) - verticalPad
+                    drawRoundRect(
+                        color = token.color.copy(alpha = 0.92f),
+                        topLeft = Offset(firstBox.left - horizontalPad, top),
+                        size = Size((lastBox.right - firstBox.left) + horizontalPad * 2f, bottom - top),
+                        cornerRadius = CornerRadius(radius, radius),
+                    )
+                    segmentStart = segmentEnd
+                }
+                for (i in start until end) occupied[i] = true
+            }
+            start = text.indexOf(word, startIndex = end)
+        }
+    }
+}
+
+private class DdlKeywordHighlightTransformation(
+    private val tokens: List<DdlVocabularyToken>,
+) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        if (tokens.isEmpty() || text.text.isBlank()) {
+            return TransformedText(text, OffsetMapping.Identity)
+        }
+        val builder = AnnotatedString.Builder(text)
+        val occupied = BooleanArray(text.text.length)
+        tokens.forEach { token ->
+            val word = token.word
+            if (word.isBlank()) return@forEach
+            var start = text.text.indexOf(word)
+            while (start >= 0) {
+                val end = start + word.length
+                val overlaps = (start until end).any { occupied[it] }
+                if (!overlaps) {
+                    builder.addStyle(
+                        SpanStyle(
+                            color = if (isLightColor(token.color)) Color(0xFF12110F) else Color(0xFFF8F8F6),
+                        ),
+                        start,
+                        end,
+                    )
+                    for (i in start until end) occupied[i] = true
+                }
+                start = text.text.indexOf(word, startIndex = end)
+            }
+        }
+        return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
+    }
+}
+
+@Composable
+private fun DenseSingleLineInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .background(Color(0xFF191816), RoundedCornerShape(4.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        singleLine = true,
+        decorationBox = { innerTextField ->
+            Box {
+                if (value.isBlank()) {
+                    Text(placeholder, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                innerTextField()
+            }
+        },
     )
 }
 

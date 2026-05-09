@@ -942,3 +942,30 @@ service property.
   reflected DB `isEnabled`, not a live connection check.
 - The `サービス削除` button is compact and right-aligned at the bottom of each
   provider panel.
+
+## 2026-05-09 Mobile Vocabulary Editing UI For DDL Dialog
+
+The Android DDL edit dialog has a mobile-specific vocabulary editing UI so that
+users can edit DDL directly while referencing saijiki terms on a limited screen.
+This is an intentional Android difference from the server/web UI.
+
+- Saijiki terms in the DDL body are shown as chip-like highlights with
+  category-specific colors. The body remains dense and readable, with minimal
+  padding and only slight corner rounding.
+- The inline highlight color and candidate chip color use the same category
+  color so terms in the body and vocabulary candidates are visually linked.
+- Body taps do not rely on Android-side coordinate estimation. After Compose
+  `BasicTextField` resolves the caret position, Android converts that caret to
+  a vocabulary selection when it lands inside a saijiki term. This avoids offset
+  drift caused by wrapping, IME, scrolling, or font-size changes.
+- The selected term is shown explicitly above the body box and in the material
+  bar, making it clear that tapping a candidate will replace that term.
+- Candidate taps replace the selected range when a term is selected. If no term
+  is selected, the candidate is inserted at the current caret position.
+- When a term is selected, the candidate row prioritizes alternative terms from
+  the same saijiki category. The selected term itself is excluded, and terms
+  already present in the body follow without duplicates.
+- When the material panel is opened, the selected term's category is moved to
+  the top and labeled as alternative candidates.
+- This UI affects only Android editing ergonomics. It must not change
+  server/web-compatible DDL, Score, SVG, history persistence, or JSON metadata.

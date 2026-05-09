@@ -771,7 +771,13 @@ above the image preview.
 - Pressing the button opens the canvas-size selection dialog.
 - Selecting a canvas saves the setting and closes the dialog.
 - This entry point is available from both Compose and Batch drawing panels and
-  updates the same `canvas_aspect` setting used by the Settings panel.
+  updates the `canvas_aspect` setting.
+- Server/web has no standalone Canvas settings tab. Canvas aspect selection is
+  performed from the input panel `CanvasAspectPlugin`.
+- Android removes `Settings > Canvas` and consolidates canvas selection into
+  drawing / writing screen buttons that open the shared selection dialog.
+- The server/web plugin enable/disable setting is a server operations and plugin
+  management feature and is not migrated to the single-user Android app.
 
 ## 2026-05-08 Model Settings Provider UI
 

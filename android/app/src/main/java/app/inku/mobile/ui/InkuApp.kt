@@ -1545,7 +1545,6 @@ private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
         SettingsPane.Misc -> MiscSettingsPanel(state, viewModel, modifier)
         SettingsPane.ColorCatalog -> ColorCatalogSelectionPanel(state, viewModel, modifier)
-        SettingsPane.Canvas -> CanvasSelectionPanel(state, viewModel, modifier)
         SettingsPane.Version -> VersionInfoPanel(viewModel, modifier)
     }
 }
@@ -1574,12 +1573,6 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
             onClick = viewModel::openCatalogSelection,
         )
         SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
-        SettingsListItem(
-            mark = "□",
-            title = "キャンバス",
-            sub = CanvasAspects.all.firstOrNull { it.id == state.selectedCanvasAspect }?.label ?: state.selectedCanvasAspect,
-            onClick = viewModel::openCanvasSelection,
-        )
         SettingsListItem(
             mark = "#",
             title = "バージョン情報",
@@ -1665,35 +1658,6 @@ private fun ColorCatalogSelectionPanel(state: InkuUiState, viewModel: InkuViewMo
                     Spacer(Modifier.weight(1f))
                     SecondarySmallButton(text = "選択", onClick = { viewModel.setCatalog(catalog.id) })
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CanvasSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text("キャンバス", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            PrimarySmallButton(text = "閉じる", onClick = viewModel::closeTransientPanel)
-        }
-        HorizontalChoiceRow(
-            values = CanvasAspects.all.map { it.id to it.label },
-            selectedValue = state.selectedCanvasAspect,
-            onSelect = viewModel::setCanvasAspect,
-        )
-        CanvasAspects.all.forEach { aspect ->
-            SettingsCard(aspect.label, "${aspect.ratioW}:${aspect.ratioH}", if (aspect.id == state.selectedCanvasAspect) "選択中" else "未選択") {
-                SecondarySmallButton(text = "選択", onClick = { viewModel.setCanvasAspect(aspect.id) })
             }
         }
     }
@@ -2255,7 +2219,6 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Export -> "エクスポート"
     SettingsPane.Misc -> "表示設定"
     SettingsPane.ColorCatalog -> "色カタログ"
-    SettingsPane.Canvas -> "キャンバス"
     SettingsPane.Version -> "バージョン情報"
 }
 
@@ -2266,7 +2229,6 @@ private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Export -> "PNG / SVG templates"
     SettingsPane.Misc -> "言語・テーマ・密度"
     SettingsPane.ColorCatalog -> "render color catalog"
-    SettingsPane.Canvas -> "canvas aspect"
     SettingsPane.Version -> "version / build"
 }
 

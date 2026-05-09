@@ -116,7 +116,6 @@ enum class SettingsPane {
     Export,
     Misc,
     ColorCatalog,
-    Canvas,
     Version,
 }
 
@@ -298,7 +297,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             selectedCatalogId = restoredCatalog ?: current.selectedCatalogId,
             settingsPane = if (tab == AppTab.Settings && current.tab != AppTab.Settings) {
                 SettingsPane.Home
-            } else if (tab == AppTab.Settings && current.settingsPane in setOf(SettingsPane.ModelSelection, SettingsPane.ColorCatalog, SettingsPane.Canvas)) {
+            } else if (tab == AppTab.Settings && current.settingsPane in setOf(SettingsPane.ModelSelection, SettingsPane.ColorCatalog)) {
                 SettingsPane.Home
             } else {
                 current.settingsPane

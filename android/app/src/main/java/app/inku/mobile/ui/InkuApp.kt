@@ -1676,41 +1676,6 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             onStop = viewModel::stopDrawing,
         )
 
-        if (!state.isDrawing) {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column {
-                    DemoSettingRow(
-                        label = "表示間隔",
-                        last = true,
-                        action = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                SecondarySmallButton(
-                                    text = "−",
-                                    onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds - 5) },
-                                    enabled = state.demoIntervalSeconds > 1,
-                                )
-                                Text(
-                                    "${state.demoIntervalSeconds}秒",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                )
-                                SecondarySmallButton(
-                                    text = "+",
-                                    onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds + 5) },
-                                    enabled = state.demoIntervalSeconds < 999,
-                                )
-                            }
-                        },
-                    )
-                }
-            }
-        }
         if (state.demoGeneratedDdl != null) {
             CompactLabel("生成された解釈")
             RenderTextView(
@@ -2051,7 +2016,6 @@ private fun VersionInfoRow(label: String, value: String) {
 
 @Composable
 private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    var modelAssetDialog by remember { mutableStateOf<app.inku.mobile.data.db.ModelAssetEntity?>(null) }
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -2060,42 +2024,24 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
     ) {
         SettingsHeader(state.settingsPane, viewModel)
 
-        SettingsSectionHeader("LiteRT-LM", "Gemma E2B / E4B ローカルモデル")
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            state.modelAssets.forEach { asset ->
-                ModelAssetControls(
-                    asset = asset,
-                    onOpenLicenseDownload = { modelAssetDialog = asset },
-                )
-            }
-            state.message?.let {
-                Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             state.providerSettings.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
                     candidateModelIds = state.providerModelCandidates[provider.providerId].orEmpty(),
+                    modelAssets = state.modelAssets,
                     onSave = viewModel::saveProviderSetting,
                     onClearApiKey = { viewModel.clearProviderApiKey(provider.providerId) },
                     onDelete = { viewModel.deleteProvider(provider.providerId) },
                     onFetchModels = { viewModel.fetchProviderModels(provider.providerId) },
+                    onAcceptModelLicense = viewModel::acceptModelLicense,
+                    onDownloadModel = viewModel::downloadModel,
+                    onRedownloadModel = viewModel::redownloadModel,
                     statusMessage = state.message,
                 )
             }
             AddProviderCard(onAdd = viewModel::saveProviderSetting)
         }
-    }
-    modelAssetDialog?.let { asset ->
-        ModelAssetLicenseDownloadDialog(
-            asset = state.modelAssets.firstOrNull { it.modelId == asset.modelId } ?: asset,
-            onDismiss = { modelAssetDialog = null },
-            onAccept = { viewModel.acceptModelLicense(asset.modelId) },
-            onDownload = { viewModel.downloadModel(asset.modelId) },
-            onRedownload = { viewModel.redownloadModel(asset.modelId) },
-        )
     }
 }
 
@@ -2103,10 +2049,14 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
 private fun ProviderConnectionCard(
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
     candidateModelIds: List<String>,
+    modelAssets: List<app.inku.mobile.data.db.ModelAssetEntity>,
     onSave: (String, String, String, String, String, String) -> Unit,
     onClearApiKey: () -> Unit,
     onDelete: () -> Unit,
     onFetchModels: () -> Unit,
+    onAcceptModelLicense: (String) -> Unit,
+    onDownloadModel: (String) -> Unit,
+    onRedownloadModel: (String) -> Unit,
     statusMessage: String?,
 ) {
     val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
@@ -2239,18 +2189,35 @@ private fun ProviderConnectionCard(
         )
     }
     if (modelPickerOpen) {
-        ProviderModelPickerDialog(
-            provider = provider,
-            candidateModelIds = candidateModelIds,
-            selectedModels = publishedModelIds,
-            onDismiss = { modelPickerOpen = false },
-            onFetchModels = onFetchModels,
-            statusMessage = statusMessage,
-            onSave = { selected ->
-                modelPickerOpen = false
-                onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
-            },
-        )
+        if (provider.isDefaultLocal) {
+            LocalModelManagementDialog(
+                provider = provider,
+                modelAssets = modelAssets,
+                selectedModels = publishedModelIds,
+                onDismiss = { modelPickerOpen = false },
+                onAcceptModelLicense = onAcceptModelLicense,
+                onDownloadModel = onDownloadModel,
+                onRedownloadModel = onRedownloadModel,
+                statusMessage = statusMessage,
+                onSave = { selected ->
+                    modelPickerOpen = false
+                    onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
+                },
+            )
+        } else {
+            ProviderModelPickerDialog(
+                provider = provider,
+                candidateModelIds = candidateModelIds,
+                selectedModels = publishedModelIds,
+                onDismiss = { modelPickerOpen = false },
+                onFetchModels = onFetchModels,
+                statusMessage = statusMessage,
+                onSave = { selected ->
+                    modelPickerOpen = false
+                    onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
+                },
+            )
+        }
     }
     if (confirmClearKey) {
         AlertDialog(
@@ -2421,6 +2388,168 @@ private fun ProviderModelPickerDialog(
             TextButton(onClick = onDismiss) { Text("キャンセル") }
         },
     )
+}
+
+@Composable
+private fun LocalModelManagementDialog(
+    provider: app.inku.mobile.data.db.ProviderSettingEntity,
+    modelAssets: List<app.inku.mobile.data.db.ModelAssetEntity>,
+    selectedModels: List<String>,
+    onDismiss: () -> Unit,
+    onAcceptModelLicense: (String) -> Unit,
+    onDownloadModel: (String) -> Unit,
+    onRedownloadModel: (String) -> Unit,
+    statusMessage: String?,
+    onSave: (List<String>) -> Unit,
+) {
+    var selected by remember(provider.providerId, selectedModels) { mutableStateOf(selectedModels.toSet()) }
+    val assetIds = modelAssets.map { it.modelId }.toSet()
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .heightIn(max = 680.dp),
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("LiteRT-LM", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
+                        Text("ローカルモデル", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ModelPickerActionButton(text = "全選択", onClick = { selected = assetIds }, modifier = Modifier.width(76.dp))
+                        ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.width(76.dp))
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    modelAssets.forEach { asset ->
+                        LocalModelAssetRow(
+                            asset = asset,
+                            checked = selected.contains(asset.modelId),
+                            onCheckedChange = { checked ->
+                                selected = if (checked) selected + asset.modelId else selected - asset.modelId
+                            },
+                            onAcceptModelLicense = { onAcceptModelLicense(asset.modelId) },
+                            onDownloadModel = { onDownloadModel(asset.modelId) },
+                            onRedownloadModel = { onRedownloadModel(asset.modelId) },
+                        )
+                    }
+                }
+
+                statusMessage?.takeIf { it.contains("モデル") || it.contains("Gemma") || it.contains("LiteRT") }?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onDismiss) { Text("キャンセル") }
+                    TextButton(onClick = { onSave(selected.filter { it in assetIds }) }) { Text("保存") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalModelAssetRow(
+    asset: app.inku.mobile.data.db.ModelAssetEntity,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onAcceptModelLicense: () -> Unit,
+    onDownloadModel: () -> Unit,
+    onRedownloadModel: () -> Unit,
+) {
+    val isReady = asset.downloadState == "ready"
+    val isBusy = asset.downloadState in setOf("queued", "connecting", "downloading", "verifying")
+    val progressValue = if (asset.bytesTotal != null && asset.bytesTotal > 0L) {
+        (asset.bytesDownloaded.toFloat() / asset.bytesTotal.toFloat()).coerceIn(0f, 1f)
+    } else {
+        null
+    }
+    val progress = if (asset.bytesTotal != null && asset.bytesTotal > 0L) {
+        val percent = (asset.bytesDownloaded * 100.0 / asset.bytesTotal).coerceIn(0.0, 100.0)
+        " ${"%.1f".format(percent)}%"
+    } else {
+        ""
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFF181715),
+        border = BorderStroke(1.dp, Color(0xFF34302B)),
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(asset.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(asset.qualityTier, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+                StatusPill(modelStatusLabel(asset.downloadState), modelStatusColor(asset.downloadState))
+            }
+            progressValue?.let {
+                LinearProgressIndicator(
+                    progress = { it },
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    color = if (isReady) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                    trackColor = Color(0x3324211E),
+                )
+            }
+            Text(
+                "状態: ${modelStatusLabel(asset.downloadState)}$progress",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when {
+                    asset.licenseAcceptedAt == null -> {
+                        SecondarySmallButton(text = "ライセンス同意", onClick = onAcceptModelLicense)
+                    }
+                    isReady -> {
+                        SecondarySmallButton(text = "再取得", onClick = onRedownloadModel, enabled = !isBusy)
+                    }
+                    else -> {
+                        SecondarySmallButton(text = "再取得", onClick = onRedownloadModel, enabled = !isBusy)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        PrimarySmallButton(text = if (isBusy) "取得中" else "ダウンロード", onClick = onDownloadModel, enabled = !isBusy)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

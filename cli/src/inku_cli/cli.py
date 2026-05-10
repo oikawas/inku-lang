@@ -1324,7 +1324,8 @@ def _paint_payload(
         "stage1_model": stage1_model if stage1_model is not None else args.stage1_model,
         "stage2_model": stage2_model if stage2_model is not None else args.stage2_model,
         "include_thinking": args.include_thinking,
-        "lang": args.lang,
+        "instruction_lang": args.instruction_lang,
+        "ui_lang": args.ui_lang,
         "save_history": args.save_history,
         "save_artifacts": args.save_artifacts,
         "history_input": args.history_input,
@@ -1351,7 +1352,8 @@ def _compose_payload(
         "ddl": ddl,
         "model": stage2_model if stage2_model is not None else args.stage2_model,
         "original_text": args.original_text,
-        "lang": args.lang,
+        "instruction_lang": args.instruction_lang,
+        "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "auto_repair": True,
@@ -2024,7 +2026,12 @@ def command_demo_instruction(args: argparse.Namespace) -> int:
     data, _ = client.request(
         "POST",
         "/api/demo/instruction",
-        data={"seed_phrase": args.seed_phrase, "model": args.model, "lang": args.lang},
+        data={
+            "seed_phrase": args.seed_phrase,
+            "model": args.model,
+            "instruction_lang": args.instruction_lang,
+            "ui_lang": args.ui_lang,
+        },
     )
     print(data["instruction"])
     return 0
@@ -2129,7 +2136,8 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
-    parser.add_argument("--lang", default="ja", choices=["ja", "en"])
+    parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
+    parser.add_argument("--ui-lang")
     parser.add_argument("--include-thinking", action="store_true")
     parser.add_argument("--save-history", action="store_true")
     parser.add_argument("--save-artifacts", action=argparse.BooleanOptionalAction, default=None)
@@ -2201,7 +2209,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_server_args(demo)
     demo.add_argument("seed_phrase")
     demo.add_argument("--model")
-    demo.add_argument("--lang", default="ja", choices=["ja", "en"])
+    demo.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
+    demo.add_argument("--ui-lang")
     demo.set_defaults(func=command_demo_instruction)
 
     history = subparsers.add_parser("history", help="list history items")

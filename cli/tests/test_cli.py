@@ -98,7 +98,7 @@ def test_compose_payload_for_ddl_input_mode():
         "ddl": "白い背景に黒い線を一本引く。",
         "model": "s2",
         "original_text": "線",
-        "lang": "ja",
+        "instruction_lang": "auto",
         "catalog_id": "default",
         "auto_repair": True,
     }

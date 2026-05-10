@@ -30,6 +30,9 @@ export type HistoryItem = {
 	render_canvas_aspect?: string | null;
 	render_canvas_aspect_id?: string | null;
 	render_canvas_aspect_ratio?: number | null;
+	instruction_lang_requested?: string | null;
+	instruction_lang_resolved?: string | null;
+	ui_lang?: string | null;
 	render_hash?: string | null;
 	render_hash_short?: string | null;
 	trashed?: boolean;

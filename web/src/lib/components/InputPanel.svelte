@@ -19,6 +19,7 @@
 		total: number;
 		failures: BatchFailure[];
 	};
+	type InstructionLang = 'auto' | 'ja' | 'en';
 	type Props = {
 		inputMode: 'single' | 'batch' | 'demo';
 		input: string;
@@ -42,6 +43,7 @@
 		error: string | null;
 		batchPromptHistory: string[];
 		batchRandomColorCatalog: boolean;
+		instructionLang: InstructionLang;
 		demoSettings: DemoSettings;
 		demoRunning: boolean;
 		demoWaitingSeconds: number | null;
@@ -104,6 +106,7 @@
 		error,
 		batchPromptHistory,
 		batchRandomColorCatalog = $bindable(false),
+		instructionLang = $bindable('auto'),
 		demoSettings = $bindable(),
 		demoRunning,
 		demoWaitingSeconds,
@@ -182,6 +185,11 @@
 				/>
 			{/if}
 			<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal} title={`${t().colorCatalogButton}: ${selectedCatalogName}`}>{selectedCatalogName}</button>
+			<select class="ghost-select" bind:value={instructionLang} title={t().instructionLangLabel} aria-label={t().instructionLangLabel}>
+				<option value="auto">{t().instructionLangAuto}</option>
+				<option value="ja">{t().instructionLangJapanese}</option>
+				<option value="en">{t().instructionLangEnglish}</option>
+			</select>
 			<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			{#if inputMode !== 'demo'}
 				<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
@@ -339,6 +347,18 @@
 		white-space: nowrap;
 	}
 	.ghost-btn:hover { background: var(--bg2); }
+	.ghost-select {
+		height: 25px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg2);
+		font-size: 11px;
+		font-family: inherit;
+		padding: 0 22px 0 8px;
+		cursor: pointer;
+		max-width: 92px;
+	}
 	.catalog-btn {
 		display: inline-block;
 		max-width: 128px;

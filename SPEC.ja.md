@@ -313,7 +313,19 @@ JSONは「楽譜」であって「演奏」ではない。楽譜が国際記譜�
 - JSON Score は英語キーで統一（言語非依存の中間層）
 - プリミティブ名、フィールド名は英語
 
-### 6.5 二言語並行開発の意義
+### 6.5 UI表示言語と指示文言語
+
+Web UI の表示言語と、ユーザーが入力する指示文の言語は別の設定として扱う。
+UI は日本語で使いながら英語の指示を書く、または英語 UI で日本語の指示を書くことを許容する。
+
+- `ui_lang` は画面表示・操作文言の言語であり、描画解釈の言語ではない
+- `instruction_lang` は指示文を解釈する言語であり、`auto` / `ja` / `en` を持つ
+- `auto` の場合、サーバーは入力文字列から日本語 / 英語を軽量判定し、Stage 1 / Stage 1.5 / Stage 2 に渡す言語を決める
+- 解決結果は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` として `/api/paint`、`/api/compose`、履歴、JSONタブ、保存 artifact JSON に記録する
+- これらの言語メタデータは監査・再現補助用であり、既存履歴の `render_hash` 互換性を壊さないため、現行の `render_hash` canonical payload には含めない
+- 将来の他言語対応は、コア API を増やすのではなく、`instruction_lang` の解決と Stage prompt / filter / expander の言語別実装を差し替える形で拡張する
+
+### 6.6 二言語並行開発の意義
 
 日英の二言語で並行開発することは、設計の質を上げる装置として機能する：
 
@@ -1406,6 +1418,22 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.50 (2026-05-11)
+
+**英語指示文対応と指示文言語 / UI言語の分離**
+
+日本語 UI / 英語 UI の切替とは独立して、描画指示文の言語を選べるようにした。
+将来の多言語対応を見据え、表示言語と解釈言語を API 境界で分離する。
+
+- Web UI の入力ヘッダーに `指示文の言語` セレクタを追加し、`自動` / `日本語` / `English` を選択できるようにする
+- `/api/paint`、`/api/interpret`、`/api/compose`、`/api/demo/instruction` は `instruction_lang` と `ui_lang` を受け取る
+- `instruction_lang=auto` の場合、サーバーは入力文字列から `ja` / `en` を判定し、Stage 1 / Stage 1.5 / Stage 2 / デモ指示生成に渡す
+- `/api/paint`、`/api/compose`、履歴保存、JSONタブ、保存 artifact JSON は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` を記録する
+- `history` テーブルに `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` カラムを追加する
+- `inku-cli paint` / `batch` / `demo-instruction` は旧 `--lang` ではなく `--instruction-lang auto|ja|en` と任意の `--ui-lang` を送信する
+- 既存履歴や `cli/tune_bench.md` のハッシュ参照を壊さないため、言語メタデータは `render_hash` の canonical payload には含めない
+- build number: 402
 
 ### v1.49 (2026-05-11)
 

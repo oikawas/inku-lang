@@ -97,6 +97,35 @@ _SRGB_COLOR_PROFILE = {
     "name": "sRGB IEC61966-2.1",
     "standard": "IEC 61966-2-1:1999",
 }
+_SUPPORTED_INSTRUCTION_LANGS = {"ja", "en"}
+_REQUESTED_INSTRUCTION_LANGS = _SUPPORTED_INSTRUCTION_LANGS | {"auto"}
+_JAPANESE_TEXT_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
+_LATIN_TEXT_RE = re.compile(r"[A-Za-z]")
+
+
+def _normalize_instruction_lang(value: str | None, *, default: str = "ja") -> str:
+    lang = (value or default).strip().lower()
+    if lang not in _REQUESTED_INSTRUCTION_LANGS:
+        raise HTTPException(status_code=422, detail=f"unsupported instruction language: {value}")
+    return lang
+
+
+def _resolve_instruction_lang(text: str, requested: str) -> str:
+    lang = _normalize_instruction_lang(requested)
+    if lang != "auto":
+        return lang
+    if _JAPANESE_TEXT_RE.search(text):
+        return "ja"
+    if _LATIN_TEXT_RE.search(text):
+        return "en"
+    return "ja"
+
+
+def _normalize_ui_lang(value: str | None) -> str | None:
+    lang = (value or "").strip().lower()
+    if not lang:
+        return None
+    return lang[:32]
 
 
 def _build_number() -> str | None:
@@ -556,7 +585,8 @@ class ComposeRequest(BaseModel):
         default=None, description="Stage 2 モデル名 (未指定時は OPENAI_MODEL 既定)"
     )
     original_text: str | None = Field(default=None, description="元のユーザー記述 (省略可)")
-    lang: str = Field(default="ja", description="言語コード (ja / en)")
+    instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
+    ui_lang: str | None = Field(default=None, description="UI表示言語")
     color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
     catalog_id: str | None = Field(default=None, description="使用するサーバー側色カタログID")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
@@ -581,6 +611,9 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
+    instruction_lang_requested: str | None = None
+    instruction_lang_resolved: str | None = None
+    ui_lang: str | None = None
     elapsed_ms: int = 0
     tokens_in: int | None = None
     tokens_out: int | None = None
@@ -598,7 +631,8 @@ class InterpretRequest(BaseModel):
     include_thinking: bool = Field(
         default=False, description="qwen3 の <think> 内容を別フィールドで返すか"
     )
-    lang: str = Field(default="ja", description="言語コード (ja / en)")
+    instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
+    ui_lang: str | None = Field(default=None, description="UI表示言語")
     expand_intermediate: bool = Field(default=False, description="Stage 1.5 の中間DDL拡張を適用するか")
 
 
@@ -615,7 +649,8 @@ class PaintRequest(BaseModel):
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
-    lang: str = Field(default="ja", description="言語コード (ja / en)")
+    instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
+    ui_lang: str | None = Field(default=None, description="UI表示言語")
     color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     save_history: bool = Field(default=False, description="描画結果を履歴に保存するか")
@@ -646,6 +681,9 @@ class PaintResponse(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
+    instruction_lang_requested: str | None = None
+    instruction_lang_resolved: str | None = None
+    ui_lang: str | None = None
     render_hash: str | None = None
     render_hash_short: str | None = None
     history_id: str | None = None
@@ -733,6 +771,9 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
+    instruction_lang_requested: str | None = None
+    instruction_lang_resolved: str | None = None
+    ui_lang: str | None = None
     save_artifacts: bool = True
     count_generation: bool = Field(default=False, exclude=True)
     color_map: dict[str, str] | None = Field(default=None, exclude=True, description="Deprecated: ignored; catalog_id is resolved server-side")
@@ -868,7 +909,8 @@ class DemoSettingsBody(BaseModel):
 class DemoInstructionBody(BaseModel):
     seed_phrase: str = Field(..., min_length=1, max_length=1000)
     model: str | None = Field(default=None)
-    lang: str = Field(default="ja")
+    instruction_lang: str = Field(default="auto")
+    ui_lang: str | None = None
 
 
 class DemoInstructionResponse(BaseModel):
@@ -1922,6 +1964,9 @@ def _call_interpret_detail(
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
 def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> ComposeResponse:
     t0 = time.perf_counter()
+    instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
+    instruction_lang_resolved = _resolve_instruction_lang(req.original_text or req.ddl, instruction_lang_requested)
+    ui_lang = _normalize_ui_lang(req.ui_lang)
     resolved_stage2_model = _resolved_stage2_model(req.model, actor)
     try:
         compose_detail = _call_compose_detail(
@@ -1929,7 +1974,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             model=resolved_stage2_model,
             original_text=req.original_text,
             system_prompt=None,
-            lang=req.lang,
+            lang=instruction_lang_resolved,
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
@@ -1944,7 +1989,12 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
-    render_metadata = _render_metadata(req.catalog_id, canvas_aspect=score.canvas)
+    render_metadata = {
+        **_render_metadata(req.catalog_id, canvas_aspect=score.canvas),
+        "instruction_lang_requested": instruction_lang_requested,
+        "instruction_lang_resolved": instruction_lang_resolved,
+        "ui_lang": ui_lang,
+    }
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except Exception as e:  # noqa: BLE001
@@ -1979,20 +2029,29 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 
 @app.post("/api/interpret")
 def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
+    instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
+    source_text = req.original_text or req.text
+    instruction_lang_resolved = _resolve_instruction_lang(source_text, instruction_lang_requested)
+    ui_lang = _normalize_ui_lang(req.ui_lang)
     try:
         detail = _call_interpret_detail(
             req.text,
             model=_resolved_stage1_model(req.model, actor),
             include_thinking=req.include_thinking,
             system_prompt_prefix=None,
-            lang=req.lang,
+            lang=instruction_lang_resolved,
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     if req.expand_intermediate:
-        source_text = req.original_text or req.text
-        detail.ddl = expand_intermediate_ddl(detail.ddl, lang=req.lang, context_text=source_text)
-    data: dict = {"ddl": detail.ddl, "thinking": detail.thinking}
+        detail.ddl = expand_intermediate_ddl(detail.ddl, lang=instruction_lang_resolved, context_text=source_text)
+    data: dict = {
+        "ddl": detail.ddl,
+        "thinking": detail.thinking,
+        "instruction_lang_requested": instruction_lang_requested,
+        "instruction_lang_resolved": instruction_lang_resolved,
+        "ui_lang": ui_lang,
+    }
     if detail.tokens_in is not None:
         data["tokens_in"] = detail.tokens_in
     if detail.tokens_out is not None:
@@ -2152,8 +2211,9 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
 
 @app.post("/api/demo/instruction", response_model=DemoInstructionResponse)
 def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_current_user)) -> DemoInstructionResponse:
+    instruction_lang = _resolve_instruction_lang(req.seed_phrase, _normalize_instruction_lang(req.instruction_lang))
     try:
-        instruction = _generate_demo_instruction(req.seed_phrase, model=req.model, lang=req.lang)
+        instruction = _generate_demo_instruction(req.seed_phrase, model=req.model, lang=instruction_lang)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"demo instruction failed: {e}") from e
     return DemoInstructionResponse(instruction=instruction)
@@ -2237,21 +2297,30 @@ def _add_history_item(
 def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintResponse:
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
+    instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
+    instruction_lang_resolved = _resolve_instruction_lang(source_text, instruction_lang_requested)
+    ui_lang = _normalize_ui_lang(req.ui_lang)
     catalog_id = _resolved_catalog_id(req.catalog_id)
     resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     try:
         interpret_detail_result = _call_interpret_detail(
-            req.text, model=resolved_stage1_model, include_thinking=req.include_thinking, lang=req.lang
+            req.text,
+            model=resolved_stage1_model,
+            include_thinking=req.include_thinking,
+            lang=instruction_lang_resolved,
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     ddl = interpret_detail_result.ddl
-    ddl = expand_intermediate_ddl(ddl, lang=req.lang, context_text=source_text)
+    ddl = expand_intermediate_ddl(ddl, lang=instruction_lang_resolved, context_text=source_text)
     t1 = time.perf_counter()
     try:
         compose_detail = _call_compose_detail(
-            ddl, model=resolved_stage2_model, original_text=source_text, lang=req.lang
+            ddl,
+            model=resolved_stage2_model,
+            original_text=source_text,
+            lang=instruction_lang_resolved,
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
@@ -2266,7 +2335,12 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
-    render_metadata = _render_metadata(catalog_id, canvas_aspect=score.canvas)
+    render_metadata = {
+        **_render_metadata(catalog_id, canvas_aspect=score.canvas),
+        "instruction_lang_requested": instruction_lang_requested,
+        "instruction_lang_resolved": instruction_lang_resolved,
+        "ui_lang": ui_lang,
+    }
     t2 = time.perf_counter()
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
@@ -2535,7 +2609,12 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
         if canvas_aspect is not None:
             score = _score_with_canvas(score, canvas_aspect)
-        render_metadata = _render_metadata(catalog_id, canvas_aspect=score.canvas)
+        render_metadata = {
+            **_render_metadata(catalog_id, canvas_aspect=score.canvas),
+            "instruction_lang_requested": body.instruction_lang_requested,
+            "instruction_lang_resolved": body.instruction_lang_resolved,
+            "ui_lang": body.ui_lang,
+        }
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except HTTPException:
         raise

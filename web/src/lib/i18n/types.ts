@@ -108,6 +108,10 @@ export interface LangPack {
 	canvasAspectTitle: string;
 	modelSelectButton: string;
 	colorCatalogButton: string;
+	instructionLangLabel: string;
+	instructionLangAuto: string;
+	instructionLangJapanese: string;
+	instructionLangEnglish: string;
 	clearInputBtn: string;
 
 	// DDL edit

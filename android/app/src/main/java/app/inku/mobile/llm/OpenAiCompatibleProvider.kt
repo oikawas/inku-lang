@@ -46,7 +46,7 @@ class OpenAiCompatibleProvider(
         if (request.stopSequences.isNotEmpty()) {
             payload.put("stop", JSONArray(request.stopSequences))
         }
-        val response = postJson("${baseUrl.trimEnd('/')}/chat/completions", payload)
+        val response = postJson(endpoint("/chat/completions"), payload)
         val choices = response.optJSONArray("choices") ?: error("Chat Completions response did not contain choices.")
         val first = choices.optJSONObject(0) ?: error("Chat Completions response was empty.")
         val message = first.optJSONObject("message")
@@ -79,7 +79,7 @@ class OpenAiCompatibleProvider(
     }
 
     suspend fun fetchModels(): List<String> = withContext(Dispatchers.IO) {
-        val payload = getJson("${baseUrl.trimEnd('/')}/models")
+        val payload = getJson(endpoint("/models"))
         val rawModels = payload.optJSONArray("data") ?: payload.optJSONArray("models")
             ?: error("Model list response did not contain models.")
         (0 until rawModels.length()).mapNotNull { index ->
@@ -106,7 +106,9 @@ class OpenAiCompatibleProvider(
     }
 
     private fun open(url: String, method: String): HttpURLConnection {
-        val connection = (URL(url).openConnection() as HttpURLConnection)
+        val parsedUrl = URL(url)
+        validateUrl(parsedUrl)
+        val connection = (parsedUrl.openConnection() as HttpURLConnection)
         connection.requestMethod = method
         connection.connectTimeout = REQUEST_TIMEOUT_MS
         connection.readTimeout = REQUEST_TIMEOUT_MS
@@ -119,9 +121,43 @@ class OpenAiCompatibleProvider(
         val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
         val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
         if (connection.responseCode !in 200..299) {
-            error("HTTP ${connection.responseCode}: ${body.take(240)}")
+            val host = connection.url.host.orEmpty()
+            error("HTTP ${connection.responseCode} from $host: ${redactForDisplay(body).take(180)}")
         }
         return JSONObject(body)
+    }
+
+    private fun endpoint(path: String): String {
+        return baseUrl.trimEnd('/') + path
+    }
+
+    private fun validateUrl(url: URL) {
+        val protocol = url.protocol.lowercase()
+        val host = url.host.orEmpty()
+        val secure = protocol == "https"
+        val loopbackHttp = protocol == "http" && isLoopbackHost(host)
+        require(secure || loopbackHttp) {
+            "安全でないBase URLです。HTTPS、または端末内localhost/127.0.0.1のHTTPのみ使用できます。"
+        }
+    }
+
+    private fun isLoopbackHost(host: String): Boolean {
+        val normalized = host.lowercase()
+        return normalized == "localhost" ||
+            normalized == "127.0.0.1" ||
+            normalized == "::1" ||
+            normalized == "[::1]"
+    }
+
+    private fun redactForDisplay(body: String): String {
+        return body
+            .replace(Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE), "Bearer [redacted]")
+            .replace(Regex("nvapi-[A-Za-z0-9._~+/=-]+"), "nvapi-[redacted]")
+            .replace(Regex("sk-[A-Za-z0-9._~+/=-]+"), "sk-[redacted]")
+            .replace(Regex("AIza[0-9A-Za-z_-]+"), "AIza[redacted]")
+            .replace(Regex("(?i)(api[_-]?key|authorization|token)\"?\\s*[:=]\\s*\"?[A-Za-z0-9._~+/=-]+"), "\$1=[redacted]")
+            .lineSequence()
+            .joinToString(" ") { it.trim() }
     }
 
     private companion object {

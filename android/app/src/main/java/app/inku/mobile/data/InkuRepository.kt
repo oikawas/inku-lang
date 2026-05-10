@@ -26,19 +26,15 @@ import org.json.JSONObject
 class InkuRepository(
     private val context: Context,
     private val database: InkuDatabase,
-    private val pipeline: LocalFallbackPipeline = LocalFallbackPipeline(
-        modelProvider = RoutingModelProvider(
-            database = database,
-            localProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao()),
-        ),
-    ),
 ) {
     private val providerModelCandidatePrefix = "provider_model_candidates:"
-    private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
+    private val localLiteRtProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao())
     private val modelRouter = RoutingModelProvider(
         database = database,
-        localProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao()),
+        localProvider = localLiteRtProvider,
     )
+    private val pipeline = LocalFallbackPipeline(modelProvider = modelRouter)
+    private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
 
     fun history(): Flow<List<HistoryItemEntity>> = database.historyDao().listActive(100, 0)
 
@@ -56,6 +52,10 @@ class InkuRepository(
         }
 
     fun exportTemplates(): Flow<List<ExportTemplateEntity>> = database.exportTemplateDao().observeAll()
+
+    suspend fun close() {
+        localLiteRtProvider.close()
+    }
 
     suspend fun ensureDefaultModelAssets() {
         ensureDefaultProviderSettings()

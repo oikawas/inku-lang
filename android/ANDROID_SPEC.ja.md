@@ -874,3 +874,21 @@ Android 独自仕様として、`設定 > モデル設定 > LiteRT-LM` パネル
 - LiteRT-LM 描画の Stage 2 system prompt は、常に LiteRT-LM 専用の圧縮版 Stage 2 prompt を表示する。
 - LiteRT-LM 描画の Stage 1 system prompt は、表示時点の `litert_stage1_prompt_optimization` 設定を反映する。ON の場合は LiteRT-LM 専用の圧縮版 Stage 1 prompt を表示し、OFF の場合は通常 Stage 1 system prompt を表示する。
 - この仕様は Android の表示上の独自差分であり、DDL、Score、SVG、履歴 JSON、render metadata、render hash の保存形式は変更しない。
+
+## 2026-05-10 安定性・セキュリティ強化
+
+Android 版の安定性とローカルデータ保護のため、以下を実装する。
+
+- `HeadlessRenderActivity` は Android 開発・外部検証に必須のため、debug build では `exported=true` を維持する。一方、release build では manifest placeholder により `exported=false` とし、通常配布版では外部アプリから起動できないようにする。
+- headless `run_id` は `[A-Za-z0-9._-]{1,80}` のみ許可し、出力先 canonical path が `files/headless/<run_id>` 配下であることを検証する。
+- headless `text_file` は任意ファイルパスを許可しない。`text` extra 直接指定、または `app:headless-inputs/<file>` 形式でアプリ内部の専用入力ディレクトリ配下だけを読む。
+- headless 入力は最大 250,000 文字に制限する。
+- アプリバックアップは無効化する。DB、履歴、provider 設定、暗号化済み API key、ローカルモデル状態、headless 出力を cloud backup / device transfer の対象にしない。
+- remote provider の Base URL は HTTPS、または端末内 loopback (`localhost` / `127.0.0.1` / `::1`) の HTTP のみ許可する。Ollama / OVMS のローカル検証用途は維持し、LAN / 外部 HTTP への prompt・API key 平文送信は許可しない。
+- remote provider の HTTP エラー本文は UI 表示前に redaction し、Bearer token、NVIDIA API key、OpenAI key、Google API key、`api_key` / `authorization` / `token` らしき値を伏せる。
+- LiteRT-LM provider は明示的な `close()` を持ち、ViewModel 破棄時および headless render 完了時に cached Engine を閉じる。
+- 描画、DDL描画、バッチ、デモは run id を持ち、古い Job の完了・失敗通知が新しい描画状態を上書きしないようにする。
+- バッチ実行は最大 100 件までとする。100 件を超える入力は実行前に拒否する。
+- デモ実行は開始 1 回あたり最大 100 サイクルまでとし、上限到達時に停止する。
+- Room DB は履歴、provider 設定、API key 関連のユーザーデータを保持するため、破壊的 migration を使わない。schema 変更時は明示的な Room migration を追加する。
+- Android build number は APK / bundle / install など package 生成系 task のみで increment する。clean な作業ツリーが必要な確認では assemble/install を不用意に実行しない。

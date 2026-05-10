@@ -149,6 +149,16 @@ class LocalLiteRtLmProvider(
         return current + rendered
     }
 
+    suspend fun close() {
+        engineMutex.withLock {
+            engine?.close()
+            engine = null
+            loadedModelId = null
+            loadedModelPath = null
+            loadedMaxNumTokens = null
+        }
+    }
+
     private companion object {
         private const val TAG = "InkuLiteRtLm"
         private const val PERF_TAG = "InkuPerf"

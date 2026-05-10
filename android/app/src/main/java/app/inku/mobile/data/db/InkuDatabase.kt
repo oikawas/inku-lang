@@ -31,6 +31,8 @@ abstract class InkuDatabase : RoomDatabase() {
         private const val DB_NAME = "inku.sqlite"
 
         fun open(context: Context): InkuDatabase {
+            // Do not use destructive migration. History, provider settings, and encrypted API keys
+            // are user data; schema changes must add explicit Room migrations.
             return Room.databaseBuilder(
                 context.applicationContext,
                 InkuDatabase::class.java,

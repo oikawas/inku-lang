@@ -17,6 +17,8 @@ fun nextAndroidBuildNumber(): Int {
     val buildNumberFile = rootProject.file("BUILD_NUMBER")
     val current = buildNumberFile.readText().trim().toInt()
     if (!shouldIncrementAndroidBuildNumber()) return current
+    // Build number is intentionally incremented only for package-producing tasks.
+    // Avoid invoking assemble/install from unrelated checks when a clean worktree is required.
     val next = current + 1
     buildNumberFile.writeText("$next\n")
     logger.lifecycle("Android BUILD_NUMBER incremented: $current -> $next")
@@ -44,6 +46,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    buildTypes {
+        debug {
+            manifestPlaceholders["headlessExported"] = "true"
+        }
+        release {
+            manifestPlaceholders["headlessExported"] = "false"
+        }
     }
 
     kotlin {

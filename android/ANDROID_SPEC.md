@@ -1184,3 +1184,44 @@ server/web `/api/prompts` display behavior.
   normal Stage 1 system prompt is displayed.
 - This is an Android-specific display difference only. It must not change DDL,
   Score, SVG, history JSON, render metadata, or render hash persistence formats.
+
+## 2026-05-10 Stability And Security Hardening
+
+The Android app implements the following stability and local-data protection
+rules.
+
+- `HeadlessRenderActivity` remains externally launchable in debug builds because
+  Android development and external verification require it. In release builds,
+  a manifest placeholder sets it to `exported=false`, so normal distribution
+  builds cannot be launched by other apps.
+- Headless `run_id` accepts only `[A-Za-z0-9._-]{1,80}` and the canonical output
+  path must remain under `files/headless/<run_id>`.
+- Headless `text_file` must not read arbitrary filesystem paths. Input may be
+  passed directly through the `text` extra, or by using
+  `app:headless-inputs/<file>` to read only from the app-internal dedicated
+  input directory.
+- Headless input is limited to 250,000 characters.
+- App backup is disabled. The database, history, provider settings, encrypted
+  API keys, local model state, and headless outputs are excluded from cloud
+  backup and device transfer.
+- Remote provider Base URLs must use HTTPS, except for device-local loopback
+  HTTP (`localhost`, `127.0.0.1`, or `::1`). This preserves local Ollama / OVMS
+  verification while preventing plaintext prompt/API-key transmission to LAN or
+  external HTTP endpoints.
+- Remote provider HTTP error bodies are redacted before display. Bearer tokens,
+  NVIDIA API keys, OpenAI keys, Google API keys, and values that look like
+  `api_key`, `authorization`, or `token` are hidden.
+- The LiteRT-LM provider exposes an explicit `close()` and closes the cached
+  Engine when the ViewModel is destroyed and after headless rendering finishes.
+- Draw, DDL render, batch, and demo jobs carry a run id so stale completion or
+  failure callbacks from older jobs cannot overwrite the current drawing state.
+- Batch execution is limited to 100 items. Inputs above 100 non-empty lines are
+  rejected before execution.
+- Demo execution is limited to 100 cycles per start and stops when the limit is
+  reached.
+- Room DB stores history, provider settings, and API-key-related user data, so
+  destructive migration is prohibited. Schema changes must add explicit Room
+  migrations.
+- Android build number increments only for package-producing tasks such as APK,
+  bundle, and install tasks. Avoid running assemble/install for checks that need
+  a clean worktree.

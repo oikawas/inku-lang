@@ -5,7 +5,9 @@
 
     <application
         android:name=".InkuApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -37,7 +39,7 @@
         <activity
             android:name=".HeadlessRenderActivity"
             android:excludeFromRecents="true"
-            android:exported="true"
+            android:exported="${headlessExported}"
             android:noHistory="true"
             android:theme="@style/Theme.Inku.Headless" />
     </application>

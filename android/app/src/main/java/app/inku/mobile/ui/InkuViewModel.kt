@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -32,6 +33,8 @@ import kotlin.random.Random
 
 const val DefaultDemoSeedPhrase = "世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。"
 const val DemoCanvasAspectId = "pixel9_landscape_safe"
+private const val MaxBatchItems = 100
+private const val MaxDemoCycles = 100
 
 data class InkuUiState(
     val prompt: String = "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
@@ -150,6 +153,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     private val exportTemplates = repository.exportTemplates()
     private var modelDownloadJob: Job? = null
     private var drawingJob: Job? = null
+    private var drawingRunSerial: Long = 0L
     private var restoredInitialHistory = false
     private var promptEditedByUser = false
     private var modelSelectionSnapshot: Pair<String, String>? = null
@@ -206,6 +210,14 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    override fun onCleared() {
+        drawingRunSerial += 1
+        drawingJob?.cancel()
+        modelDownloadJob?.cancel()
+        runBlocking(Dispatchers.IO) { repository.close() }
+        super.onCleared()
     }
 
     fun setPrompt(value: String) {
@@ -589,12 +601,22 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         drawFromDdl()
     }
 
+    private fun beginDrawingRun(): Long {
+        drawingRunSerial += 1
+        drawingJob?.cancel()
+        return drawingRunSerial
+    }
+
+    private fun isCurrentDrawingRun(runId: Long): Boolean {
+        return drawingRunSerial == runId
+    }
+
     private fun runSubmit(current: InkuUiState) {
         if (current.prompt.isBlank()) {
             localState.value = current.copy(message = "Prompt is empty.")
             return
         }
-        drawingJob?.cancel()
+        val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             localState.value = localState.value.copy(
                 isDrawing = true,
@@ -616,6 +638,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.litertStage1PromptOptimization,
                     )
                 }
+                if (!isCurrentDrawingRun(runId)) return@launch
                 localState.value = localState.value.copy(
                     ddl = interpreted.ddlForDisplay,
                     ddlEditedAfterGeneration = false,
@@ -634,6 +657,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }.onSuccess { item ->
+                if (!isCurrentDrawingRun(runId)) return@onSuccess
                 promptEditedByUser = false
                 localState.value = localState.value.copy(
                     prompt = item.originalInput,
@@ -645,6 +669,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     message = "Rendered ${item.renderHashShort}",
                 )
             }.onFailure { error ->
+                if (!isCurrentDrawingRun(runId)) return@onFailure
                 val message = if (error is CancellationException) "停止しました。" else error.message ?: "Draw failed."
                 localState.value = localState.value.copy(isDrawing = false, message = message)
             }
@@ -658,7 +683,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val ddl = current.ddl.ifBlank { current.prompt }
-        drawingJob?.cancel()
+        val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
@@ -666,6 +691,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization)
                 }
             }.onSuccess { item ->
+                if (!isCurrentDrawingRun(runId)) return@onSuccess
                 promptEditedByUser = false
                 localState.value = localState.value.copy(
                     prompt = item.originalInput,
@@ -677,6 +703,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     message = "Composed ${item.renderHashShort}",
                 )
             }.onFailure { error ->
+                if (!isCurrentDrawingRun(runId)) return@onFailure
                 val message = if (error is CancellationException) "停止しました。" else error.message ?: "Compose failed."
                 localState.value = localState.value.copy(isDrawing = false, message = message)
             }
@@ -696,8 +723,12 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             localState.value = current.copy(message = "Batch is empty.")
             return
         }
+        if (lines.size > MaxBatchItems) {
+            localState.value = current.copy(message = "バッチは最大 ${MaxBatchItems} 件までです。現在: ${lines.size} 件")
+            return
+        }
         rememberBatchPrompt(current.batchText)
-        drawingJob?.cancel()
+        val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             val startedAt = System.currentTimeMillis()
             var last: HistoryItemEntity? = null
@@ -741,6 +772,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 }.onSuccess { item ->
+                    if (!isCurrentDrawingRun(runId)) return@onSuccess
                     success += 1
                     last = item
                     localState.value = localState.value.copy(
@@ -757,6 +789,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
+                    if (!isCurrentDrawingRun(runId)) return@onFailure
                     failures = (failures + BatchFailure(lineNumber, prompt, error.message ?: "Draw failed.")).take(30)
                     localState.value = localState.value.copy(
                         batchSuccess = success,
@@ -767,6 +800,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+            if (!isCurrentDrawingRun(runId)) return@launch
             localState.value = localState.value.copy(
                 selectedHistory = last,
                 ddl = last?.normalizedDdl.orEmpty(),
@@ -802,7 +836,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             localState.value = localState.value.copy(message = message)
             return
         }
-        drawingJob?.cancel()
+        val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             localState.value = localState.value.copy(
                 isDrawing = true,
@@ -815,8 +849,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                 demoRenderCount = 0,
                 message = "デモ実行中",
             )
+            var demoCycles = 0
             try {
-                while (isActive) {
+                while (isActive && demoCycles < MaxDemoCycles) {
+                    demoCycles += 1
                     val cycle = state.value
                     val startedAt = System.currentTimeMillis()
                     localState.value = localState.value.copy(
@@ -829,6 +865,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     val prompt = withContext(Dispatchers.IO) {
                         repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
                     }
+                    if (!isCurrentDrawingRun(runId)) return@launch
                     val catalogId = randomColorCatalogId()
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
@@ -852,6 +889,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                             )
                         }
                     }.onSuccess { item ->
+                        if (!isCurrentDrawingRun(runId)) return@onSuccess
                         val elapsed = System.currentTimeMillis() - startedAt
                         val latest = localState.value
                         localState.value = latest.copy(
@@ -867,6 +905,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
+                        if (!isCurrentDrawingRun(runId)) return@onFailure
                         localState.value = localState.value.copy(
                             demoCurrentElapsedMs = System.currentTimeMillis() - startedAt,
                             message = error.message ?: "Demo failed.",
@@ -883,16 +922,20 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } finally {
-                localState.value = localState.value.copy(
-                    isDrawing = false,
-                    demoWaitingSeconds = null,
-                    message = "停止しました。",
-                )
+                if (isCurrentDrawingRun(runId)) {
+                    val reachedLimit = demoCycles >= MaxDemoCycles
+                    localState.value = localState.value.copy(
+                        isDrawing = false,
+                        demoWaitingSeconds = null,
+                        message = if (reachedLimit) "デモ上限 ${MaxDemoCycles} 件で停止しました。" else "停止しました。",
+                    )
+                }
             }
         }
     }
 
     fun stopDrawing() {
+        drawingRunSerial += 1
         drawingJob?.cancel()
         drawingJob = null
         localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, message = "停止しました。")

@@ -991,20 +991,34 @@ def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) 
     return adjusted
 
 
-def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
-    """抽象画としての見せ場を、小さな焦点だけで補う。"""
-    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS):
-        return instructions
-    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
-        return instructions
-    if any("visual event restored" in (ins.color_hint or "") for ins in instructions):
-        return instructions
-    if len(instructions) >= 10:
-        return instructions
+def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
+    return any(
+        ins.primitive in ("square", "triangle", "polygon") and _shape_extent(ins) >= 0.035
+        for ins in instructions
+    )
 
-    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
-    color = requested[0] if requested else ("blue" if background != "blue" else VISIBLE_ON_BACKGROUND.get(background, "black"))
-    accent = Instruction.model_validate(
+
+def _visual_event_instruction(
+    instructions: list[Instruction],
+    *,
+    color: str,
+    background: str,
+) -> Instruction:
+    if not _has_angular_event_anchor(instructions):
+        visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+        return Instruction.model_validate(
+            {
+                "primitive": "polygon",
+                "center": [0.68, 0.34],
+                "radius": 0.045,
+                "sides": 5,
+                "rotation": -18,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a small angular pulse",
+            }
+        )
+    return Instruction.model_validate(
         {
             "primitive": "arc",
             "center": [0.68, 0.34],
@@ -1017,6 +1031,22 @@ def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, back
             "color_hint": "visual event restored as a small focal pulse",
         }
     )
+
+
+def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+    """抽象画としての見せ場を、既存語彙に足りない形で小さく補う。"""
+    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+    if any("visual event restored" in (ins.color_hint or "") for ins in instructions):
+        return instructions
+    if len(instructions) >= 10:
+        return instructions
+
+    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
+    color = requested[0] if requested else ("blue" if background != "blue" else VISIBLE_ON_BACKGROUND.get(background, "black"))
+    accent = _visual_event_instruction(instructions, color=color, background=background)
     return [*instructions, accent]
 
 

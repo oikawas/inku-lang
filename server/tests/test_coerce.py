@@ -1526,7 +1526,29 @@ def test_coerce_score_adds_visual_event_for_vanishing_footprint_context():
 
     fixed = coerce_score(score, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
 
+    assert any(ins.primitive == "polygon" for ins in fixed.instructions)
+    assert any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_keeps_visual_event_as_arc_when_angular_anchor_exists():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.42, 0.42],
+                    "size": [0.12, 0.12],
+                    "color": "gray",
+                    "rotation": -18,
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="一滴のインクが紙の上で震える。")
+
     assert any("visual event restored as a small focal pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_adds_edge_light_event_for_dark_light_context():

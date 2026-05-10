@@ -36,6 +36,7 @@ Layout = Literal["horizontal", "vertical", "radial", "scatter"]
 Path = Literal["none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"]
 Density = Literal["none", "low", "medium", "high"]
 Fade = Literal["none", "outward", "directional"]
+RhythmSpacing = Literal["none", "syncopated", "accelerando", "loose"]
 PresenceKind = Literal["none", "figure_like", "creature_like", "group_like"]
 PresenceIntensity = Literal["low", "medium", "high"]
 PresenceSymmetry = Literal["none", "bilateral", "radial"]
@@ -142,6 +143,13 @@ class Arrangement(BaseModel):
     preserve_space: bool = Field(
         default=False,
         description="true の場合、Renderer は margin と分布を広めに取り、余白を構図要素として残す",
+    )
+    rhythm_spacing: RhythmSpacing = Field(
+        default="none",
+        description=(
+            "反復間隔の揺らし方。none=等間隔 / syncopated=詰まりと抜けを交互に作る"
+            " / accelerando=後半へ向けて間隔を詰める / loose=ゆるい不均等間隔"
+        ),
     )
 
 

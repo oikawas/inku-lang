@@ -233,9 +233,33 @@ def _hash01(i: int, seed: int, salt: str) -> float:
     return struct.unpack("<I", h[:4])[0] / 0xFFFFFFFF
 
 
-def _path_pos(i: int, n: int, seed: int, margin: float, path: str) -> tuple[float, float]:
+def _rhythm_t(i: int, n: int, seed: int, rhythm_spacing: str) -> float:
+    """Return deterministic non-linear spacing for repeated arrangements."""
+    if n <= 1:
+        return 0.0
+    base = i / (n - 1)
+    if rhythm_spacing == "accelerando":
+        return base ** 1.35
+    if rhythm_spacing == "loose":
+        jitter = (_hash01(i, seed, "rhythm-loose") - 0.5) * 0.16
+        return _clamp01(base + jitter)
+    if rhythm_spacing == "syncopated":
+        beat = 0.09 if i % 2 else -0.045
+        taper = math.sin(base * math.pi)
+        return _clamp01(base + beat * taper)
+    return base
+
+
+def _path_pos(
+    i: int,
+    n: int,
+    seed: int,
+    margin: float,
+    path: str,
+    rhythm_spacing: str = "none",
+) -> tuple[float, float]:
     span = 1.0 - 2 * margin
-    t = i / max(n - 1, 1)
+    t = _rhythm_t(i, n, seed, rhythm_spacing)
     jitter_a = (_hash01(i, seed, "a") - 0.5)
     jitter_b = (_hash01(i, seed, "b") - 0.5)
 
@@ -282,6 +306,7 @@ def _clustered_pos(
     cluster_count: int,
     density: str,
     preserve_space: bool,
+    rhythm_spacing: str = "none",
 ) -> tuple[float, float]:
     """大数量の配置を、均一散布ではなく複数のまとまりとして決定的に配置する。
 
@@ -296,7 +321,7 @@ def _clustered_pos(
     if path == "none":
         cx, cy = _scatter_pos(cluster_index, seed ^ 0xC1A57, center_margin)
     else:
-        cx, cy = _path_pos(cluster_index, cluster_count, seed ^ 0xC1A57, center_margin, path)
+        cx, cy = _path_pos(cluster_index, cluster_count, seed ^ 0xC1A57, center_margin, path, rhythm_spacing)
 
     if path == "diagonal":
         axis_angle = -math.pi / 4
@@ -309,6 +334,8 @@ def _clustered_pos(
     tx, ty = math.cos(axis_angle), math.sin(axis_angle)
     nx, ny = -ty, tx
     local_t = (local_index + 0.5) / local_total
+    if rhythm_spacing != "none" and local_total > 1:
+        local_t = _rhythm_t(local_index, local_total, seed ^ cluster_index, rhythm_spacing)
     centered = (local_t - 0.5) * 2.0
     radius = _density_radius(density, preserve_space)
     long_span = radius * (1.45 + _hash01(cluster_index, seed, "cluster-long") * 0.95)
@@ -446,6 +473,7 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
                 cluster_count=cluster_count,
                 density=arr.density,
                 preserve_space=arr.preserve_space,
+                rhythm_spacing=arr.rhythm_spacing,
             )
             for i in range(n)
         ]
@@ -454,21 +482,21 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
 
     if arr.layout == "horizontal":
         if arr.path != "none":
-            targets = [_path_pos(i, n, seed, margin, arr.path) for i in range(n)]
+            targets = [_path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing) for i in range(n)]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
             return _apply_color_cycle(result, arr.color_cycle)
         span = 1.0 - 2 * margin
-        targets = [(margin + i / max(n - 1, 1) * span, ay) for i in range(n)]
+        targets = [(margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span, ay) for i in range(n)]
         result = [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "vertical":
         if arr.path != "none":
-            targets = [_path_pos(i, n, seed, margin, arr.path) for i in range(n)]
+            targets = [_path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing) for i in range(n)]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
             return _apply_color_cycle(result, arr.color_cycle)
         span = 1.0 - 2 * margin
-        targets = [(ax, margin + i / max(n - 1, 1) * span) for i in range(n)]
+        targets = [(ax, margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span) for i in range(n)]
         result = [_shift(ins, 0.0, ty - ay) for _, ty in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 
@@ -477,15 +505,17 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
         cy = arr.center[1] if arr.center else 0.5
         r = arr.radius if arr.radius else 0.3
         targets = [
-            (cx + r * math.cos(math.radians(i * 360 / n)),
-             cy - r * math.sin(math.radians(i * 360 / n)))
+            (
+                cx + r * math.cos(math.radians(_rhythm_t(i, n, seed, arr.rhythm_spacing) * 360)),
+                cy - r * math.sin(math.radians(_rhythm_t(i, n, seed, arr.rhythm_spacing) * 360)),
+            )
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "scatter":
-        targets = [_path_pos(i, n, seed, margin, arr.path) for i in range(n)]
+        targets = [_path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing) for i in range(n)]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 

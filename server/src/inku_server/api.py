@@ -1581,21 +1581,34 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "filled": "塗" in ddl or "fill" in lower,
             "color_hint": "fallback from DDL",
         }
-    elif (
-        ("円" in ddl)
-        or ("circle" in lower)
-        or ("moon" in lower)
-        or ("月" in ddl)
-        or ("蕾" in ddl)
-        or ("花びら" in ddl)
-        or ("petal" in lower)
-        or ("bud" in lower)
-    ):
+    elif ("多角形" in ddl) or ("五角" in ddl) or ("六角" in ddl) or ("polygon" in lower):
+        instruction = {
+            "primitive": "polygon",
+            "center": [0.62, 0.30],
+            "radius": 0.13,
+            "sides": 6 if ("六角" in ddl or "hexagon" in lower) else 5,
+            "rotation": -12,
+            "color": color,
+            "weight": weight,
+            "filled": "塗" in ddl or "fill" in lower,
+            "color_hint": "fallback from DDL",
+        }
+    elif ("楕円" in ddl) or ("oval" in lower) or ("ellipse" in lower) or ("蕾" in ddl) or ("花びら" in ddl) or ("petal" in lower) or ("bud" in lower):
         instruction = {
             "primitive": "ellipse",
             "center": [0.72, 0.32],
             "size": [0.18, 0.11],
             "rotation": -18,
+            "color": color,
+            "weight": weight,
+            "filled": "塗" in ddl or "fill" in lower,
+            "color_hint": "fallback from DDL",
+        }
+    elif ("円" in ddl) or ("circle" in lower) or ("moon" in lower) or ("月" in ddl):
+        instruction = {
+            "primitive": "circle",
+            "center": [0.72, 0.32],
+            "radius": 0.09,
             "color": color,
             "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
@@ -1618,7 +1631,10 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         arrangement = {"count": explicit_count or 11, "layout": "scatter", "margin": 0.18}
     elif ("並べる" in ddl) or ("line up" in lower):
         arrangement = {"count": explicit_count or 3, "layout": "horizontal", "margin": 0.1}
+    elif explicit_count and explicit_count > 1:
+        arrangement = {"count": explicit_count, "layout": "scatter", "margin": 0.18}
 
+    ma_fallback = _fallback_needs_negative_space_support(ddl)
     if arrangement is not None:
         if ("波打つ軌跡" in ddl) or ("undulating trace" in lower):
             arrangement["path"] = "wave"
@@ -1647,26 +1663,130 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         if color_cycle:
             arrangement["color_cycle"] = color_cycle
         instruction["arrangement"] = arrangement
+    elif ma_fallback:
+        instruction["arrangement"] = {
+            "count": 3,
+            "layout": "scatter",
+            "margin": 0.26,
+            "density": "low",
+            "fade": "outward",
+            "preserve_space": True,
+        }
     elif color_cycle:
         instruction["color_hint"] = f"{instruction['color_hint']}; palette {'/'.join(color_cycle)}"
 
-    return Score.model_validate({"background": background, "instructions": [instruction]})
+    instructions = [instruction]
+    if ma_fallback:
+        support_color = _fallback_support_color(background, color)
+        instructions.append(
+            {
+                "primitive": "arc",
+                "center": [0.28, 0.72],
+                "radius": 0.075,
+                "angle_start": 25,
+                "angle_end": 205,
+                "rotation": -18,
+                "color": support_color,
+                "weight": "hair",
+                "color_hint": "fallback negative space support",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "radial",
+                    "margin": 0.26,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                },
+            }
+        )
+
+    return Score.model_validate({"background": background, "instructions": instructions})
+
+
+def _fallback_needs_negative_space_support(ddl: str) -> bool:
+    lower = ddl.lower()
+    return any(
+        marker in ddl or marker in lower
+        for marker in (
+            "余白",
+            "間",
+            "気配",
+            "記憶",
+            "忘れ",
+            "手紙",
+            "新聞紙",
+            "紙片",
+            "窓",
+            "鏡",
+            "膜",
+            "透明",
+            "消え",
+            "迷う",
+            "漂う",
+            "薄い",
+            "negative space",
+            "presence",
+            "memory",
+            "forgotten",
+            "letter",
+            "newspaper",
+            "paper",
+            "window",
+            "mirror",
+            "membrane",
+            "transparent",
+            "fade",
+            "fading",
+            "wander",
+            "drift",
+            "thin",
+        )
+    )
+
+
+def _fallback_support_color(background: str, main_color: str) -> str:
+    for color in ("gray", "blue", "red", "black", "white"):
+        if color != background and color != main_color:
+            return color
+    return "white" if background in {"black", "blue"} else "black"
 
 
 def _compose_retry_reason(score: Score, *, tokens_out: int | None, elapsed_ms: int) -> str:
-    token_limit = int(os.getenv("INKU_STAGE2_RETRY_TOKENS_OUT", "3800"))
-    elapsed_limit = int(os.getenv("INKU_STAGE2_RETRY_ELAPSED_MS", "120000"))
     if not score.instructions:
         return "empty_instructions"
-    if tokens_out is not None and tokens_out >= token_limit:
-        return "excessive_tokens_out"
-    if elapsed_ms >= elapsed_limit and len(score.instructions) <= 1:
-        return "slow_single_instruction"
     return "none"
 
 
 def _should_retry_compose_result(score: Score, *, tokens_out: int | None, elapsed_ms: int) -> bool:
     return _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms) != "none"
+
+
+def _compose_retry_prompt(*, reason: str, lang: str) -> str:
+    if lang == "en":
+        return (
+            "# Compact Stage 2 retry\n"
+            f"The previous Stage 2 result was invalid or inefficient: {reason}.\n"
+            "Submit a valid Score through the submit_score tool.\n"
+            "Required: instructions must contain 1-5 drawable items.\n"
+            "Allowed primitives: line, circle, ellipse, triangle, square, polygon, arc.\n"
+            "Allowed colors: white, black, blue, red, green, gray.\n"
+            "For repeated marks, use one instruction with arrangement instead of many instructions.\n"
+            "Do not draw humans, faces, or animals as objects; convert them to abstract presence, weight, spacing, symmetry, or gaze pressure.\n"
+            "Do not add unspecified helper lines or helper shapes. Apply adjectives and motion words to the requested primitive.\n"
+            "Keep the result compact and do not restate the DDL."
+        )
+    return (
+        "# 空描画リトライ / コンパクト描画リトライ\n"
+        f"直前の Stage 2 出力は無効または非効率: {reason}。\n"
+        "submit_score tool で有効な Score を提出する。\n"
+        "必須: instructions には描画可能な命令を1〜5個入れる。空配列は禁止。\n"
+        "使用できる primitive: line, circle, ellipse, triangle, square, polygon, arc。\n"
+        "使用できる color: white, black, blue, red, green, gray。\n"
+        "繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。\n"
+        "人・顔・動物を対象物として描かず、存在感、重心、余白、対称性、視線圧として抽象化する。\n"
+        "未指定の補助線・補助図形を追加しない。形容・動作語は指定された primitive へ適用する。\n"
+        "DDLを説明し直さず、JSONを短く保つ。"
+    )
 
 
 def _call_compose_detail(
@@ -1721,27 +1841,13 @@ def _call_compose_detail(
     if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
         return ComposeDetail(score=score, ddl=ddl, tokens_in=tokens_in, tokens_out=tokens_out)
 
-    base_prompt = system_prompt or (STAGE2_PROMPT_EN if lang == "en" else STAGE2_PROMPT)
     reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
     retry_count += 1
     retry_reasons.append(reason)
-    rescue_note = (
-        "\n\n# Compact result retry\n"
-        f"The previous Stage 2 result was invalid or inefficient: {reason}. "
-        "Return 2-5 concise drawable instructions. "
-        "Do not return an empty instructions array. "
-        "Use one instruction plus arrangement for repeated shapes. "
-        "Keep the response compact and avoid restating the DDL."
-        if lang == "en"
-        else "\n\n# 空描画リトライ / コンパクト描画リトライ\n"
-        f"直前の Stage 2 出力は無効または非効率: {reason}。"
-        "2〜5個の簡潔な描画命令を返す。"
-        "instructions を空配列にしてはいけない。"
-        "繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。"
-        "DDLを説明し直さず、JSONを短く保つ。"
-    )
     try:
-        retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(base_prompt + rescue_note)
+        retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(
+            _compose_retry_prompt(reason=reason, lang=lang)
+        )
     except StageHardTimeoutError:
         fallback_used = True
         retry_reasons.append("stage2_retry_hard_timeout")
@@ -1934,18 +2040,30 @@ def _run_with_hard_timeout(label: str, timeout_seconds: float, operation):
     return result
 
 
-def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
+def _fallback_background_from_text(text: str, *, lang: str) -> tuple[str, str]:
     lower = text.lower()
     if lang == "en":
-        background = "black" if "night" in lower or "dark" in lower or "black" in lower else "white"
+        has_dawn = "dawn" in lower or "daybreak" in lower or "sunrise" in lower
+        is_dark = not has_dawn and any(marker in lower for marker in ("night", "dark", "black"))
+        background = "black" if is_dark else "white"
         foreground = "white" if background == "black" else "black"
+        return background, foreground
+    has_dawn = any(marker in text for marker in ("夜明け", "明け方", "朝焼け"))
+    is_dark = not has_dawn and any(marker in text for marker in ("夜", "黒", "暗"))
+    background = "黒" if is_dark else "白"
+    foreground = "白" if background == "黒" else "黒"
+    return background, foreground
+
+
+def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
+    if lang == "en":
+        background, foreground = _fallback_background_from_text(text, lang=lang)
         return (
             f"Fill background with {background}. "
             f"Draw three thin {foreground} diagonal lines. "
             "Scatter twelve small gray dots across the whole canvas."
         )
-    background = "黒" if ("夜" in text or "黒" in text or "暗" in text) else "白"
-    foreground = "白" if background == "黒" else "黒"
+    background, foreground = _fallback_background_from_text(text, lang=lang)
     accent = "青" if foreground == "黒" and ("白" in text or "雪" in text) else "灰色"
     return (
         f"背景を{background}で塗りつぶす。"

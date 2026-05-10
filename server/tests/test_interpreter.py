@@ -108,6 +108,11 @@ def test_quantity_prompt_uses_dynamic_range():
     assert "画面全体に細かく八百九十個" in prompt
     assert "背景色と主描画色を同じにしてはいけない" in prompt
     assert "人・顔・動物を具象化しない" in prompt
+    assert "感情語・場所語を物体化しない" in prompt
+    assert "街・建物語も文脈を見る" in prompt
+    assert "物体化しない語も削除しない" in prompt
+    assert "motion intent として扱う" in prompt
+    assert "乗り物を記号化しない" in prompt
     assert "縦線+小楕円" in prompt
     assert "ランダムに六百十個" not in prompt
     assert "ランダムに八百九十個" not in prompt
@@ -128,6 +133,11 @@ def test_quantity_prompt_en_uses_dynamic_range():
     assert "dotted across the whole canvas" in prompt
     assert "finely across the whole canvas" in prompt
     assert "same foreground and background color" in prompt
+    assert "do not objectify emotion or place words" in prompt
+    assert "respect context for city/building words" in prompt
+    assert "do not delete non-objectified words" in prompt
+    assert "treat as motion intent" in prompt
+    assert "do not turn vehicles into signs" in prompt
     assert "six hundred ten small white circles randomly" not in prompt
     assert "eight hundred ninety small gray circles randomly" not in prompt
 

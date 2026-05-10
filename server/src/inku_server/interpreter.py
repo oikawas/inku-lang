@@ -203,6 +203,11 @@ Saijiki にない語が入力にあるとき、その語のイメージ・形・
 - **形状**: 月→円、山→三角、建物→四角、木→縦線
 - **形の偏りを避ける**: 「円・丸・月・太陽」が明示された場合だけ真円を主役にする。点・粒・星・雪・雨・砂・花びらは真円に固定せず、文脈に応じて小さな楕円、短い線、小さな四角へ分散する
 - **人・顔・動物を具象化しない**: 人、村人、老人、顔、視線、鳥、魚、熊などは対象物として描かず、重心、余白の圧、端寄りの焦点、輪郭の密度、群れの間隔へ変換する。縦線+小楕円、棒人間、目、頭、四肢、尾、翼のような共通記号を出力してはいけない
+- **感情語・場所語を物体化しない**: 涙、視線、屋根、雲などは新しい対象物や記号として増やさず、涙=下向きの滲み、視線=余白の圧、屋根=低い重心や斜めの圧、雲=上部の重さや密度差として既存の線・楕円・四角・弧へ変換する
+- **街・建物語も文脈を見る**: 街や建物は通常四角へ展開できるが、低い雲・屋根・押し沈めの文脈では建物ブロックにせず、上からの重さ、斜めの圧、下方向の配置として扱う
+- **物体化しない語も削除しない**: 涙/滲みは下向きまたは上から下、雲/押し沈めは上部の重さと下方向の圧、視線は片側の余白圧として配置語に残す
+- **motion intent として扱う**: 低い雲、押し沈める、影だけ、先に帰る、涙、滲み、ほどける、消えかけは対象物ではなく、既存の線・楕円・四角・弧の path、fade、rotation、rhythm_spacing、片側余白に変換する
+- **乗り物を記号化しない**: 自転車・車・電車などは車輪、フレーム、車体として出力せず、影、斜線、重心、先行/遅れ、余白のずれとして抽象化する
 - **質感**: 霧→楕円(滲む)、砂→小さな四角または短い線を散らす、炎→縦線(波打つ)
 - **構造**: 海→横線を複数、森→縦線を複数、星空→画面全体に小さな四角や短い線
 - **動作→配置**: 昇る→上方に置く、散る→上から下または波打つ軌跡に散らす、広がる→同心円状に並べる
@@ -867,6 +872,11 @@ Expand unknown words to the nearest Saijiki vocabulary using shape, texture, str
 
 - **avoid shape bias**: Use true circles mainly when the input explicitly says circle, round, moon, or sun. For dots, particles, stars, snow, rain, sand, and petals, vary the form across small ellipses, short lines, and small squares instead of defaulting to true circles.
 - **shape**: moon→circle, mountain→triangle, building→square, tree→line
+- **do not objectify emotion or place words**: Tears, gaze, roof, and cloud are not new objects or signs to add. Convert tears into downward blur, gaze into negative-space pressure, roof into low weight or diagonal pressure, and cloud into upper weight or density contrast on existing lines, ellipses, squares, or arcs.
+- **respect context for city/building words**: City and building words may normally become squares, but in low-cloud, roof, or pressing-down contexts, do not make building blocks; convert them into overhead weight, diagonal pressure, or downward placement.
+- **do not delete non-objectified words**: Keep tears/blurring as downward or top-to-bottom placement, cloud/pressing-down as upper weight and downward pressure, and gaze as one-sided negative-space pressure.
+- **treat as motion intent**: Low cloud, pressing down, shadow only, going ahead, tears, blur, unraveling, and fading are not objects; convert them into path, fade, rotation, rhythm_spacing, or one-sided negative space on existing lines, ellipses, squares, or arcs.
+- **do not turn vehicles into signs**: Bicycles, cars, and trains must not become wheels, frames, or bodies; abstract them as shadows, diagonals, center of gravity, leading/lagging motion, or shifted negative space.
 - **texture**: mist→ellipse(blurring), sand→small squares or short lines, flame→line(undulating)
 - **structure**: sea→horizontal lines, forest→vertical lines, stars→small squares or short lines across the whole canvas
 - **motion→arrangement**: rising→place high, falling→scatter top to bottom, drifting→undulating trace, spreading→concentric circles

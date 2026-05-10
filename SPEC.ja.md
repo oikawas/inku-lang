@@ -2412,6 +2412,11 @@ Stage 2 の契約も強化した。
 - Build 349-351: polygon 5件ベンチで `polygon` 出力を確認し、落ち葉・廊下・鉄骨・自転車の影などで context energy を調整した
 - Build 351-355: 共通図形再発調査に基づき、presence 補助層が固定シルエットや ring-like mark へ収束しないよう調整した
 - Build 356-357: 自動補正OFF時の未指定横線3本混入を調査し、Stage 2 contract guard で未指定補助 instruction を除去する方針を追加した
+- Build 386-395: 画質改善を個別ケース分岐ではなく、品質メトリクスと汎用 Score 補修として進めた。`constraint_adherence` / `negative_space_pressure` / `motion_energy` / `color_resonance` / `visual_event` / `figurative_risk` をベンチ summary に記録し、fallback / timeout サンプルは品質判断から分離する
+- Build 386-391: quiet / membrane / fog / memory / shadow / neon blur 系で、過密な縦線、粒、大きな閉図形、背景面の支配を抑える density / negative-space governor を強化した。ネオン滲みは粒塊ではなく透明な streak として読める密度へ制御する
+- Build 392-393: motion 語があるのに有効な軌跡がない場合、count を増やさず小さな方向性のある `arc` 群を補う motion floor を追加した。要求色が `color_cycle` にだけ存在する場合は主 stroke へ昇格し、色の読みを強める
+- Build 394: visual event 補修を小さな弧に固定せず、既存 Score に角要素が不足する場合は小さな `polygon` を使う。これにより、赤い小楕円や淡い補助弧への語彙固定を避ける
+- Build 395: 反復線が画面を支配する場合、要素数を増やさず `rhythm_spacing=syncopated`、余白保持、方向性 fade、端点の小さな欠落で線群自体を出来事化する。風鈴やネオンのような題材では視覚イベントが改善した一方、砂浜/波の記憶のような低彩度・曲線・記憶系では余白を失いやすく、次の調整対象として残る
 - Build 359
 
 ### v1.19 (2026-04-30)

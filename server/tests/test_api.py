@@ -708,6 +708,8 @@ def test_compose_empty_instruction_result_is_retried(monkeypatch, auth_context):
     assert calls[0] is None
     assert calls[1] is not None
     assert "空描画リトライ" in calls[1]
+    assert "空配列は禁止" in calls[1]
+    assert "Score.presence" not in calls[1]
 
 
 def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch, auth_context):
@@ -830,6 +832,28 @@ def test_compose_fallback_uses_triangle_for_mountain(monkeypatch, auth_context):
     assert instruction["arrangement"]["count"] == 2
 
 
+def test_compose_fallback_adds_negative_space_support_for_paper_trace(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "compose",
+        lambda ddl, model=None, original_text=None, system_prompt=None, lang="ja": Score(instructions=[]),
+    )
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "新聞紙が迷うように回っている。灰色の四角を右下に置く。"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    instructions = r.json()["score"]["instructions"]
+    assert len(instructions) >= 2
+    assert instructions[0]["arrangement"]["preserve_space"] is True
+    assert instructions[0]["arrangement"]["fade"] == "outward"
+    assert any("fallback negative space support" in (ins.get("color_hint") or "") for ins in instructions)
+
+
 def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setenv("INKU_STAGE2_HARD_TIMEOUT_SECONDS", "0.01")
@@ -849,6 +873,21 @@ def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     assert data["fallback_used"] is True
     assert data["retry_reasons"] == ["stage2_hard_timeout"]
     assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
+
+
+def test_compose_retry_reason_only_retries_empty_instructions():
+    assert api_module._compose_retry_reason(Score(instructions=[]), tokens_out=10, elapsed_ms=1) == "empty_instructions"
+    score = Score.model_validate(
+        {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "color": "black"}]}
+    )
+    assert api_module._compose_retry_reason(score, tokens_out=999999, elapsed_ms=999999) == "none"
+
+
+def test_stage1_fallback_does_not_treat_dawn_as_night():
+    ddl = api_module._fallback_ddl_from_text("夜明けの湖で、最初の光が水のしわをほどく。", lang="ja")
+
+    assert ddl.startswith("背景を白で塗りつぶす。")
+    assert "背景を黒" not in ddl
 
 
 def test_stage_timeout_keeps_capacity_bound_until_worker_finishes(monkeypatch):

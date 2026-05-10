@@ -165,15 +165,43 @@ MAX_EXPANDED_PER_INSTRUCTION = 240
 MAX_VISUAL_CLUSTERED_COUNT = 120
 MAX_QUIET_VISUAL_COUNT = 64
 MAX_QUIET_VERTICAL_COUNT = 48
+MAX_NEON_BLUR_VISUAL_COUNT = 24
+MAX_NEON_BLUR_VERTICAL_COUNT = 18
 MAX_QUIET_LARGE_SHAPE_COUNT = 16
 MAX_QUIET_SYMBOLIC_SHAPE_COUNT = 8
 MAX_QUIET_SYMBOLIC_SHAPE_WIDTH = 0.12
 MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT = 0.09
+MAX_QUIET_SINGLE_SHAPE_WIDTH = 0.34
+MAX_QUIET_SINGLE_SHAPE_HEIGHT = 0.24
+MAX_QUIET_SINGLE_SHAPE_RADIUS = 0.17
+MAX_QUIET_SINGLE_SHAPE_AREA = 0.14
+MAX_UNINTENTIONAL_FILLED_SHAPE_WIDTH = 0.42
+MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT = 0.30
+MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS = 0.20
+MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
 
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("白", "white"), "white"),
     (("黒", "black"), "black"),
-    (("青", "blue"), "blue"),
+    (
+        (
+            "青",
+            "blue",
+            "空",
+            "sky",
+            "水",
+            "water",
+            "湖",
+            "lake",
+            "海",
+            "sea",
+            "雨",
+            "rain",
+            "冷たい",
+            "cold",
+        ),
+        "blue",
+    ),
     (("赤", "red"), "red"),
     (
         (
@@ -222,7 +250,7 @@ NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
 
 SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("多角形", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片", "polygon", "crystal", "mineral", "hard shard"), "polygon"),
-    (("山", "屋根", "尖", "鋭", "三角", "峰", "頂", "稜線", "切妻", "mountain", "roof", "sharp", "peak", "ridge", "triangle"), "triangle"),
+    (("山", "尖", "鋭", "三角", "峰", "頂", "稜線", "mountain", "sharp", "peak", "ridge", "triangle"), "triangle"),
     (("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple"), "arc"),
     (("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square"), "square"),
 )
@@ -231,7 +259,7 @@ MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "leaves"), "leaf_cluster"),
     (("紙片", "破片", "折", "手紙", "paper", "fragment", "shard", "letter"), "paper_shard"),
     (("波紋", "渦", "螺旋", "巻", "ripple", "spiral", "coil"), "ripple_knot"),
-    (("山", "屋根", "峰", "稜線", "切妻", "mountain", "roof", "ridge", "peak"), "mountain_sign"),
+    (("山", "峰", "稜線", "mountain", "ridge", "peak"), "mountain_sign"),
 )
 
 
@@ -417,8 +445,11 @@ VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
     "雨", "雪", "降", "縦", "上から下", "rain", "snow", "falling", "vertical", "top to bottom",
 )
 MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "風", "波", "ためらう",
+    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "先に帰", "風", "波", "ためらう",
+    "低い雲", "押し沈", "影だけ", "滲", "涙", "震える", "一滴", "残る",
     "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
+    "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
+    "trembling", "single drop", "remain", "remains",
 )
 COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
     "祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色",
@@ -436,6 +467,41 @@ HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = (
 PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
     "自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime",
 )
+EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
+    "夜", "真夜中", "黒い", "暗", "灯台", "光だけ", "海", "ガラス", "ネオン",
+    "night", "black", "dark", "lighthouse", "only light", "sea", "glass", "neon",
+)
+STRONG_EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
+    "灯台", "光だけ", "切って", "切る", "切断", "一筋の光",
+    "lighthouse", "only light", "cutting light", "single beam",
+)
+VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = (
+    "白い息", "足跡", "消え", "消える", "消えかけ", "ほどけ", "輪郭", "記憶", "跡", "遠く",
+    "breath", "footprint", "fade", "fading", "dissolve", "outline", "memory", "trace", "far",
+)
+RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
+    "リズム", "踊", "跳ね", "弾む", "反復", "交互", "楽しい", "楽しさ", "喜び", "祝祭", "明快",
+    "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration",
+)
+VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
+    "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける",
+    "迷う", "消えかけ", "震える", "一滴", "先に帰", "丸ま", "低い雲", "押し沈", "影だけ", "滲", "涙",
+    "白い息", "映", "反射", "灯台", "光だけ", "足跡", "輪郭", "ほどけ", "花びら", "ためらう",
+    "collision", "burst", "focus", "turning point", "pop", "release",
+    "wandering", "fading", "trembling", "single drop", "goes home first", "curling",
+    "low cloud", "pressing down", "shadow only", "blur", "tear",
+    "breath", "reflect", "reflection", "lighthouse", "only light", "footprint", "outline", "unravel", "petal",
+)
+MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
+    "余白", "間", "空白", "気配", "押す", "避け", "離れ",
+    "紙", "新聞", "手紙", "紙片", "風", "交差", "迷う", "漂う",
+    "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
+    "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift",
+)
+SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = (
+    "布", "果実", "重", "影", "沈む", "沈め",
+    "cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink",
+)
 
 
 def _context_has_density_governor(ddl: str | None) -> bool:
@@ -450,6 +516,17 @@ def _context_has_vertical_density(ddl: str | None) -> bool:
         return False
     lower = ddl.lower()
     return any(marker in ddl or marker in lower for marker in VERTICAL_DENSITY_CONTEXT_MARKERS)
+
+
+def _context_has_neon_blur_density(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    scene_markers = ("夜", "ガラス", "ネオン", "night", "glass", "neon")
+    blur_markers = ("涙", "滲", "にじ", "blur", "tear")
+    return any(marker in ddl or marker in lower for marker in scene_markers) and any(
+        marker in ddl or marker in lower for marker in blur_markers
+    )
 
 
 def _context_has_motion(ddl: str | None) -> bool:
@@ -652,6 +729,130 @@ def _with_quiet_symbolic_shape_tempering(ins: Instruction, *, ddl: str | None) -
     return Instruction.model_validate(data)
 
 
+def _has_intentional_large_surface(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    return any(
+        marker in ddl or marker in lower
+        for marker in (
+            "大き", "巨大", "広い", "広がる", "布", "幕", "壁一面", "面で", "面として",
+            "large", "huge", "wide", "broad surface", "cloth", "fabric",
+        )
+    )
+
+
+def _source_context(ddl: str | None) -> str:
+    if not ddl:
+        return ""
+    return ddl.split("\n", 1)[0].strip()
+
+
+def _looks_like_generated_background_plan(context: str) -> bool:
+    if "\n" in context:
+        return False
+    clauses = [part.strip() for part in re.split(r"[。\n;；]+", context) if part.strip()]
+    if len(clauses) < 4:
+        return False
+    first = clauses[0].lower()
+    if not (
+        first.startswith("背景を")
+        or first.startswith("background")
+        or "fill background" in first
+    ):
+        return False
+    lower = context.lower()
+    return any(
+        marker in context or marker in lower
+        for marker in (
+            "気配", "透明な膜", "五感", "存在", "境界が滲", "画面全体",
+            "presence", "transparent membrane", "five-sense", "boundary blur", "full canvas",
+        )
+    )
+
+
+def _has_explicit_background_intent(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    context = _source_context(ddl) or ddl
+    if _looks_like_generated_background_plan(context):
+        return False
+    lower = context.lower()
+    explicit_surface_markers = (
+        "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇",
+        "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness",
+    )
+    if any(marker in context or marker in lower for marker in explicit_surface_markers):
+        return True
+    if any(marker in context or marker in lower for marker in ("夕焼け空", "夕暮れの空", "sunset sky", "dusk sky")):
+        return True
+    if any(marker in context or marker in lower for marker in ("夜明け", "明け方", "朝焼け", "dawn", "daybreak", "sunrise")):
+        return False
+    return any(
+        marker in context or marker in lower
+        for marker in ("夜", "night")
+    )
+
+
+def _with_background_dominance_governor(background: str, *, ddl: str | None) -> str:
+    """主題指定なしの濃色背景が画面全体を支配するのを避ける。"""
+    if background not in {"black", "red", "blue", "green"}:
+        return background
+    if _has_explicit_background_intent(ddl) or _has_intentional_large_surface(ddl):
+        return background
+    if _color_only_constraint_from_ddl(ddl):
+        return background
+    if _context_has_density_governor(ddl) or _presence_from_ddl(ddl) is not None:
+        return "white"
+    return background
+
+
+def _with_quiet_single_shape_tempering(ins: Instruction, *, ddl: str | None) -> Instruction:
+    if _has_intentional_large_surface(ddl):
+        return ins
+    if ins.arrangement is not None or ins.primitive not in ("circle", "ellipse", "square", "triangle", "polygon"):
+        return ins
+    if _closed_shape_area(ins) < MAX_QUIET_SINGLE_SHAPE_AREA:
+        return ins
+
+    data = ins.model_dump(by_alias=True)
+    if ins.primitive in ("circle", "polygon"):
+        data["radius"] = min(float(ins.radius or MAX_QUIET_SINGLE_SHAPE_RADIUS), MAX_QUIET_SINGLE_SHAPE_RADIUS)
+    elif ins.size is not None:
+        data["size"] = _cap_size(ins.size, MAX_QUIET_SINGLE_SHAPE_WIDTH, MAX_QUIET_SINGLE_SHAPE_HEIGHT)
+    hint = data.get("color_hint")
+    note = "quiet single large shape tempered to keep trace/space legible"
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
+def _with_unintentional_filled_shape_tempering(ins: Instruction, *, ddl: str | None) -> Instruction:
+    if _has_intentional_large_surface(ddl):
+        return ins
+    if _context_has_density_governor(ddl):
+        return ins
+    if not ins.filled or ins.arrangement is not None:
+        return ins
+    if ins.primitive not in ("circle", "ellipse", "square", "triangle", "polygon"):
+        return ins
+    if _closed_shape_area(ins) < MAX_UNINTENTIONAL_FILLED_SHAPE_AREA:
+        return ins
+
+    data = ins.model_dump(by_alias=True)
+    if ins.primitive in ("circle", "polygon"):
+        data["radius"] = min(float(ins.radius or MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS), MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS)
+    elif ins.size is not None:
+        data["size"] = _cap_size(
+            ins.size,
+            MAX_UNINTENTIONAL_FILLED_SHAPE_WIDTH,
+            MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT,
+        )
+    hint = data.get("color_hint")
+    note = "large filled shape tempered to avoid unintended surface dominance"
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+    return Instruction.model_validate(data)
+
+
 def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
     """動きのある入力では count を増やさず、軌跡・回転・揺らぎで発散を保つ。"""
     if not _context_has_motion(ddl):
@@ -665,6 +866,9 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
             arr_data = dict(data["arrangement"])
             if arr_data.get("path", "none") == "none":
                 arr_data["path"] = "wave" if index % 2 == 0 else "diagonal"
+                changed = True
+            if arr_data.get("rhythm_spacing", "none") == "none":
+                arr_data["rhythm_spacing"] = "loose"
                 changed = True
             if ins.primitive in ("ellipse", "square", "triangle", "polygon") and data.get("rotation") is None:
                 data["rotation"] = -24 if index % 2 == 0 else 18
@@ -688,6 +892,249 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
             note = "motion energy restored through trajectory and rotation"
             data["color_hint"] = f"{hint}; {note}" if hint else note
         adjusted.append(Instruction.model_validate(data))
+    return adjusted
+
+
+def _has_motion_path(instructions: list[Instruction]) -> bool:
+    return any(
+        ins.arrangement is not None and ins.arrangement.path != "none" and _expanded_count(ins) >= 3
+        for ins in instructions
+    )
+
+
+def _motion_floor_instruction(*, ddl: str | None, background: str) -> Instruction:
+    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
+    color = requested[0] if requested else ("red" if background != "red" else VISIBLE_ON_BACKGROUND.get(background, "black"))
+    return Instruction.model_validate(
+        {
+            "primitive": "arc",
+            "center": [0.58, 0.52],
+            "radius": 0.11,
+            "angle_start": 205,
+            "angle_end": 330,
+            "rotation": -16,
+            "color": color,
+            "weight": "hair",
+            "color_hint": "motion floor restored as a small directional trace",
+            "arrangement": {
+                "count": 3,
+                "layout": "scatter",
+                "path": "diagonal",
+                "margin": 0.24,
+                "density": "low",
+                "fade": "directional",
+                "preserve_space": True,
+                "rhythm_spacing": "loose",
+            },
+        }
+    )
+
+
+def _with_motion_floor(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    """動作語があるのに全体が静物化した場合だけ、少数の方向性を補う。"""
+    if not _context_has_motion(ddl):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+    if len(instructions) >= 10 or _has_motion_path(instructions):
+        return instructions
+    if any("motion floor restored" in (ins.color_hint or "") for ins in instructions):
+        return instructions
+    return [*instructions, _motion_floor_instruction(ddl=ddl, background=background)]
+
+
+def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """楽しい・躍動的な文脈では数を足さず、配置リズムだけを強める。"""
+    if not _context_has_marker(ddl, RHYTHM_CONTEXT_MARKERS):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for index, ins in enumerate(instructions):
+        data = ins.model_dump(by_alias=True)
+        changed = False
+        if ins.arrangement is not None:
+            arr_data = dict(data["arrangement"])
+            if arr_data.get("path", "none") == "none":
+                arr_data["path"] = "wave" if index % 2 == 0 else "diagonal"
+                changed = True
+            if arr_data.get("density", "none") == "none":
+                arr_data["density"] = "low"
+                changed = True
+            if arr_data.get("rhythm_spacing", "none") == "none":
+                arr_data["rhythm_spacing"] = "syncopated"
+                changed = True
+            if float(arr_data.get("margin") or 0.1) < 0.14:
+                arr_data["margin"] = 0.14
+                changed = True
+            data["arrangement"] = arr_data
+        if ins.primitive in ("line", "ellipse", "arc", "square", "triangle", "polygon") and data.get("rotation") is None:
+            data["rotation"] = -15 if index % 2 == 0 else 21
+            changed = True
+        if ins.variation is None and ins.primitive in ("line", "ellipse", "arc", "polygon"):
+            data["variation"] = {
+                "amplitude": "medium",
+                "frequency": "medium",
+                "quality": "wave",
+                "dimensions": ["position_x", "position_y", "rotation"],
+            }
+            changed = True
+        if changed:
+            hint = data.get("color_hint")
+            note = "rhythm variation restored without increasing count"
+            data["color_hint"] = f"{hint}; {note}" if hint else note
+        adjusted.append(Instruction.model_validate(data))
+    return adjusted
+
+
+def _clamp_unit(value: float) -> float:
+    return min(max(value, 0.0), 1.0)
+
+
+def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """反復線が支配する場面では、線群自体に間隔差と欠落感を作る。"""
+    if not (
+        _context_has_motion(ddl)
+        or _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS)
+        or _context_has_marker(ddl, RHYTHM_CONTEXT_MARKERS)
+    ):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for index, ins in enumerate(instructions):
+        if ins.primitive != "line" or ins.arrangement is None or _expanded_count(ins) < 6:
+            adjusted.append(ins)
+            continue
+        data = ins.model_dump(by_alias=True)
+        arr_data = dict(data["arrangement"])
+        changed = False
+        if arr_data.get("rhythm_spacing", "none") in ("none", "loose"):
+            arr_data["rhythm_spacing"] = "syncopated"
+            changed = True
+        if float(arr_data.get("margin") or 0.1) < 0.18:
+            arr_data["margin"] = 0.18
+            changed = True
+        if arr_data.get("fade", "none") == "none":
+            arr_data["fade"] = "directional"
+            changed = True
+        if not arr_data.get("preserve_space", False):
+            arr_data["preserve_space"] = True
+            changed = True
+        if arr_data.get("path", "none") == "none":
+            arr_data["path"] = "wave" if index % 2 == 0 else "diagonal"
+            changed = True
+        if ins.from_ is not None and ins.to is not None and _shape_extent(ins) >= 0.35:
+            offset = 0.035 if index % 2 == 0 else -0.035
+            data["from"] = [_clamp_unit(float(ins.from_[0]) + 0.04), _clamp_unit(float(ins.from_[1]) + offset)]
+            data["to"] = [_clamp_unit(float(ins.to[0]) - 0.10), _clamp_unit(float(ins.to[1]) - offset)]
+            changed = True
+        if changed:
+            data["arrangement"] = arr_data
+            _append_hint(data, "repetition event shaped with syncopated gaps")
+            adjusted.append(Instruction.model_validate(data))
+        else:
+            adjusted.append(ins)
+    return adjusted
+
+
+def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
+    return any(
+        ins.primitive in ("square", "triangle", "polygon") and _shape_extent(ins) >= 0.035
+        for ins in instructions
+    )
+
+
+def _visual_event_instruction(
+    instructions: list[Instruction],
+    *,
+    color: str,
+    background: str,
+) -> Instruction:
+    if not _has_angular_event_anchor(instructions):
+        visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+        return Instruction.model_validate(
+            {
+                "primitive": "polygon",
+                "center": [0.68, 0.34],
+                "radius": 0.045,
+                "sides": 5,
+                "rotation": -18,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a small angular pulse",
+            }
+        )
+    return Instruction.model_validate(
+        {
+            "primitive": "arc",
+            "center": [0.68, 0.34],
+            "radius": 0.055,
+            "angle_start": 35,
+            "angle_end": 245,
+            "rotation": -18,
+            "color": color,
+            "weight": "hair",
+            "color_hint": "visual event restored as a small focal pulse",
+        }
+    )
+
+
+def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+    """抽象画としての見せ場を、既存語彙に足りない形で小さく補う。"""
+    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+    if any("visual event restored" in (ins.color_hint or "") for ins in instructions):
+        return instructions
+    if len(instructions) >= 10:
+        return instructions
+
+    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
+    color = requested[0] if requested else ("blue" if background != "blue" else VISIBLE_ON_BACKGROUND.get(background, "black"))
+    accent = _visual_event_instruction(instructions, color=color, background=background)
+    return [*instructions, accent]
+
+
+def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """余白・間の文脈では描画数を増やさず、配置余白と薄れ方で圧を作る。"""
+    if not _context_has_marker(ddl, MA_PRESSURE_CONTEXT_MARKERS):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for ins in instructions:
+        if ins.arrangement is None:
+            adjusted.append(ins)
+            continue
+        data = ins.model_dump(by_alias=True)
+        arr_data = dict(data["arrangement"])
+        changed = False
+        if not arr_data.get("preserve_space", False):
+            arr_data["preserve_space"] = True
+            changed = True
+        if float(arr_data.get("margin") or 0.1) < 0.22:
+            arr_data["margin"] = 0.22
+            changed = True
+        if arr_data.get("fade", "none") == "none":
+            arr_data["fade"] = "outward"
+            changed = True
+        if arr_data.get("density", "none") == "none":
+            arr_data["density"] = "low"
+            changed = True
+        if changed:
+            data["arrangement"] = arr_data
+            hint = data.get("color_hint")
+            note = "ma pressure restored through spacing and preserved negative space"
+            data["color_hint"] = f"{hint}; {note}" if hint else note
+            adjusted.append(Instruction.model_validate(data))
+        else:
+            adjusted.append(ins)
     return adjusted
 
 
@@ -759,6 +1206,53 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
                 },
             }
         )
+    if kind == "edge_light":
+        light_color = "white" if background in {"black", "blue", "red", "green"} else "blue"
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.58, 0.30],
+                "to": [0.84, 0.24],
+                "rotation": -8,
+                "color": light_color,
+                "weight": "hair",
+                "color_hint": "edge light event restored as a small cutting point",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "horizontal",
+                    "path": "diagonal",
+                    "margin": 0.18,
+                    "density": "low",
+                    "fade": "directional",
+                    "preserve_space": True,
+                },
+            }
+        )
+    if kind == "vanishing_trace":
+        trace_color = "blue" if background == "white" else VISIBLE_ON_BACKGROUND.get(background, "white")
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.72, 0.56],
+                "radius": 0.075,
+                "angle_start": 210,
+                "angle_end": 315,
+                "rotation": -18,
+                "color": trace_color,
+                "weight": "hair",
+                "color_hint": "vanishing trace restored with a fading endpoint",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "directional",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
     playful_color = "white" if background == "red" else "red" if background != "red" else visible
     return Instruction.model_validate(
         {
@@ -789,7 +1283,8 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
 
 
 def _has_context_energy(instructions: list[Instruction], kind: str) -> bool:
-    return any(kind in (ins.color_hint or "") for ins in instructions)
+    marker = kind.replace("_", " ")
+    return any(kind in (ins.color_hint or "") or marker in (ins.color_hint or "") for ins in instructions)
 
 
 def _with_context_energy_repair(
@@ -807,6 +1302,8 @@ def _with_context_energy_repair(
         ("leaf_grain", LEAF_GRAIN_CONTEXT_MARKERS),
         ("silence_layer", SILENCE_LAYER_CONTEXT_MARKERS),
         ("hard_edge", HARD_EDGE_CONTEXT_MARKERS),
+        ("edge_light", EDGE_LIGHT_CONTEXT_MARKERS),
+        ("vanishing_trace", VANISHING_TRACE_CONTEXT_MARKERS),
         ("playful_motion", PLAYFUL_MOTION_CONTEXT_MARKERS),
     ]
     for kind, markers in candidates:
@@ -814,8 +1311,52 @@ def _with_context_energy_repair(
             break
         if not _context_has_marker(ddl, markers) or _has_context_energy(repaired, kind):
             continue
+        if kind == "edge_light":
+            if _presence_from_ddl(ddl) is not None:
+                continue
+            if not _context_has_marker(ddl, STRONG_EDGE_LIGHT_CONTEXT_MARKERS):
+                continue
+        if kind == "vanishing_trace" and _has_context_energy(repaired, "edge_light"):
+            continue
         repaired.append(_context_energy_instruction(kind, background=background))
     return repaired
+
+
+def _has_surface_tension(instructions: list[Instruction]) -> bool:
+    return any("surface tension restored" in (ins.color_hint or "") for ins in instructions)
+
+
+def _with_surface_tension(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    """大きな面の静けさを壊さず、薄い圧痕で視覚的な持続を足す。"""
+    if not _context_has_marker(ddl, SURFACE_TENSION_CONTEXT_MARKERS):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+    if len(instructions) >= 9 or _has_surface_tension(instructions):
+        return instructions
+    if background == "white" and not any(_closed_shape_area(ins) >= 0.08 for ins in instructions):
+        return instructions
+
+    color = "black" if background != "black" else VISIBLE_ON_BACKGROUND.get(background, "white")
+    tension = Instruction.model_validate(
+        {
+            "primitive": "arc",
+            "center": [0.58, 0.62],
+            "radius": 0.18,
+            "angle_start": 198,
+            "angle_end": 342,
+            "rotation": -4,
+            "color": color,
+            "weight": "hair",
+            "color_hint": "surface tension restored as a quiet shadow trace",
+        }
+    )
+    return [*instructions, tension]
 
 
 def _has_compensating_accent(instructions: list[Instruction]) -> bool:
@@ -891,29 +1432,34 @@ def _with_context_density_governor(
         return instructions
 
     has_vertical_context = _context_has_vertical_density(ddl)
+    has_neon_blur_context = _context_has_neon_blur_density(ddl)
     adjusted: list[Instruction] = []
     governed_count = 0
     for ins in instructions:
         ins = _with_quiet_symbolic_shape_tempering(ins, ddl=ddl)
+        ins = _with_quiet_single_shape_tempering(ins, ddl=ddl)
+        ins = _with_unintentional_filled_shape_tempering(ins, ddl=ddl)
         arr = ins.arrangement
         if arr is None:
             adjusted.append(ins)
             continue
 
-        is_vertical_load = has_vertical_context and (
-            ins.primitive == "line"
-            or arr.layout == "vertical"
-            or arr.path == "top_to_bottom"
-        )
-        if is_vertical_load and arr.count > MAX_QUIET_VERTICAL_COUNT:
+        is_vertical_arrangement = arr.layout == "vertical" or arr.path == "top_to_bottom"
+        is_vertical_load = is_vertical_arrangement or (has_vertical_context and ins.primitive == "line")
+        vertical_count_cap = MAX_NEON_BLUR_VERTICAL_COUNT if has_neon_blur_context else MAX_QUIET_VERTICAL_COUNT
+        if is_vertical_load and arr.count > vertical_count_cap:
             governed_count += 1
             adjusted.append(
                 _with_arrangement_density_governor(
                     ins,
-                    count=MAX_QUIET_VERTICAL_COUNT,
+                    count=vertical_count_cap,
                     density="low",
                     fade="directional",
-                    note="quiet vertical density governed to keep membrane/space legible",
+                    note=(
+                        "neon blur vertical density governed to keep transparent streaks legible"
+                        if has_neon_blur_context
+                        else "quiet vertical density governed to keep membrane/space legible"
+                    ),
                 )
             )
             continue
@@ -933,13 +1479,18 @@ def _with_context_density_governor(
 
         if arr.count > MAX_QUIET_VISUAL_COUNT:
             governed_count += 1
+            count_cap = MAX_NEON_BLUR_VISUAL_COUNT if has_neon_blur_context else MAX_QUIET_VISUAL_COUNT
             adjusted.append(
                 _with_arrangement_density_governor(
                     ins,
-                    count=MAX_QUIET_VISUAL_COUNT,
+                    count=count_cap,
                     density="medium" if arr.count >= 120 else "low",
                     fade="outward" if arr.layout == "scatter" else "directional",
-                    note="quiet density governed to preserve lightness",
+                    note=(
+                        "neon blur density governed to avoid particle dominance"
+                        if has_neon_blur_context
+                        else "quiet density governed to preserve lightness"
+                    ),
                 )
             )
             continue
@@ -1073,6 +1624,10 @@ def _score_contains_color(instructions: list[Instruction], color: str) -> bool:
     return False
 
 
+def _score_contains_primary_color(instructions: list[Instruction], color: str) -> bool:
+    return any(ins.color == color for ins in instructions)
+
+
 def _color_repair_order(colors: set[str]) -> list[str]:
     ordered = [color for color in ("red", "blue", "green", "white", "black", "gray") if color in colors]
     return ordered or sorted(colors)
@@ -1148,6 +1703,41 @@ def _with_color_delivery_repair(instructions: list[Instruction], *, ddl: str | N
     if candidate_index < 0:
         return repaired
     repaired[candidate_index] = _with_color_cycle_delivery(repaired[candidate_index], _color_repair_order(missing), ddl=ddl)
+    return repaired
+
+
+def _with_primary_color_delivery(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+    """要求色が cycle の補助色だけに留まる場合、主strokeへ昇格して色の読みを強める。"""
+    requested = [
+        color
+        for color in _color_repair_order(_requested_colors_from_ddl(ddl))
+        if color != background and color not in {"white"}
+    ]
+    if not requested:
+        return instructions
+    if _color_only_constraint_from_ddl(ddl):
+        return instructions
+
+    repaired = list(instructions)
+    for color in requested:
+        if _score_contains_primary_color(repaired, color):
+            continue
+        candidate_index = next(
+            (
+                index
+                for index, ins in enumerate(repaired)
+                if ins.arrangement is not None
+                and color in ins.arrangement.color_cycle
+                and ins.primitive in ("line", "arc", "ellipse", "square", "triangle", "polygon")
+            ),
+            -1,
+        )
+        if candidate_index < 0:
+            continue
+        data = repaired[candidate_index].model_dump(by_alias=True)
+        data["color"] = color
+        _append_hint(data, f"{color} promoted to primary stroke from DDL color intent")
+        repaired[candidate_index] = Instruction.model_validate(data)
     return repaired
 
 
@@ -1675,7 +2265,16 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
     }
     offset = min(index, 4) * 0.09
     if primitive == "line":
-        common.update({"from": [0.16 + offset, 0.76 - offset], "to": [0.78, 0.30 + offset], "rotation": -8 + index * 7})
+        if any(marker in clause or marker in lower for marker in ("画面右端", "右端", "right edge")):
+            common.update({"from": [0.88, 0.18 + offset / 2], "to": [0.88, 0.82 - offset / 2], "rotation": 0})
+        elif any(marker in clause or marker in lower for marker in ("縦線", "vertical line")):
+            x = 0.58 + min(index, 3) * 0.08
+            common.update({"from": [x, 0.20 + offset / 2], "to": [x, 0.78 - offset / 2], "rotation": 0})
+        elif any(marker in clause or marker in lower for marker in ("横線", "horizontal line")):
+            y = 0.38 + min(index, 3) * 0.08
+            common.update({"from": [0.16, y], "to": [0.84, y], "rotation": 0})
+        else:
+            common.update({"from": [0.16 + offset, 0.76 - offset], "to": [0.78, 0.30 + offset], "rotation": -8 + index * 7})
     elif primitive == "arc":
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.11, "angle_start": 210, "angle_end": 330})
     elif primitive == "polygon":
@@ -1685,6 +2284,16 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "size": [0.16, 0.09], "rotation": -18 + index * 9})
     else:
         common.update({"position": [0.58 - offset / 2, 0.24 + offset], "size": [0.14, 0.10], "rotation": -12 + index * 8})
+
+    if any(marker in clause or marker in lower for marker in ("右半分", "right half")):
+        if "center" in common:
+            common["center"] = [0.66, common["center"][1]]
+        elif "position" in common:
+            common["position"] = [0.66, common["position"][1]]
+    if any(marker in clause or marker in lower for marker in ("右上", "upper right")) and "center" in common:
+        common["center"] = [0.68, 0.30]
+    elif any(marker in clause or marker in lower for marker in ("上端", "upper edge", "top edge")) and "center" in common:
+        common["center"] = [common["center"][0], 0.22]
 
     count = count_hint_from_ddl(clause)
     cycle = _color_cycle_from_clause(clause, background)
@@ -1884,6 +2493,182 @@ def count_hint_from_ddl(ddl: str) -> int | None:
     return min(max(value, 1), 1000)
 
 
+ENGLISH_SMALL_NUMBERS: dict[str, int] = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+}
+
+
+def _parse_count_token(token: str) -> int | None:
+    token = token.strip().lower()
+    if token.isdigit():
+        return int(token)
+    if token in ENGLISH_SMALL_NUMBERS:
+        return ENGLISH_SMALL_NUMBERS[token]
+    return _parse_small_japanese_number(token)
+
+
+def _strict_count_hint_from_ddl(ddl: str | None) -> int | None:
+    if not ddl:
+        return None
+    lower = ddl.lower()
+    patterns = (
+        r"(\d{1,3}|[一二三四五六七八九十百]{1,8})(?:本|個|つ|点|枚)?(?:だけ|のみ)",
+        r"(?:only|just)\s+(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\b",
+        r"\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:only|just)\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, lower if "only" in pattern or "just" in pattern else ddl)
+        if not match:
+            continue
+        value = _parse_count_token(match.group(1))
+        if value is not None:
+            return min(max(value, 1), 1000)
+    return None
+
+
+ONLY_PRIMITIVE_MARKERS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (("円だけ", "円のみ", "丸だけ", "丸のみ", "circle only", "circles only", "only circle", "only circles"), ("circle",)),
+    (("楕円だけ", "楕円のみ", "oval only", "ovals only", "ellipse only", "ellipses only"), ("ellipse",)),
+    (("線だけ", "線のみ", "line only", "lines only", "only line", "only lines"), ("line",)),
+    (("四角だけ", "四角のみ", "square only", "squares only", "rectangle only", "only squares"), ("square",)),
+    (("三角だけ", "三角のみ", "triangle only", "triangles only", "only triangles"), ("triangle",)),
+    (("多角形だけ", "多角形のみ", "polygon only", "polygons only", "only polygons"), ("polygon",)),
+    (("弧だけ", "弧のみ", "arc only", "arcs only", "only arcs"), ("arc",)),
+)
+
+
+def _primitive_only_constraint_from_ddl(ddl: str | None) -> set[str]:
+    if not ddl:
+        return set()
+    lower = ddl.lower()
+    primitives: set[str] = set()
+    for markers, allowed in ONLY_PRIMITIVE_MARKERS:
+        if any(marker in ddl or marker in lower for marker in markers):
+            primitives.update(allowed)
+    return primitives
+
+
+def _color_only_constraint_from_ddl(ddl: str | None) -> list[str]:
+    if not ddl:
+        return []
+    lower = ddl.lower()
+    japanese_color = r"(?:白|黒|青|赤|緑|灰)(?:色)?"
+    japanese_list = rf"{japanese_color}(?:\s*(?:と|、|・|,|/)\s*{japanese_color})*"
+    english_color = r"(?:white|black|blue|red|green|gray|grey)"
+    english_list = rf"{english_color}(?:\s*(?:and|,|/)\s*{english_color})*"
+    has_color_only_phrase = bool(
+        re.search(rf"{japanese_list}\s*(?:だけ|のみ|に限定|で限定)", ddl)
+        or re.search(rf"(?:{english_list})\s+only\b", lower)
+        or re.search(rf"limited to\s+(?:{english_list})", lower)
+    )
+    if not has_color_only_phrase:
+        return []
+    requested = _color_repair_order(_requested_colors_from_ddl(ddl))
+    return requested
+
+
+def _append_hint(data: dict[str, Any], note: str) -> None:
+    hint = data.get("color_hint")
+    data["color_hint"] = f"{hint}; {note}" if hint else note
+
+
+def _as_circle_instruction(ins: Instruction, note: str) -> Instruction:
+    if ins.primitive == "circle":
+        return ins
+    data = ins.model_dump(by_alias=True)
+    center = data.get("center") or data.get("position") or [0.5, 0.5]
+    if ins.primitive == "ellipse" and ins.size is not None:
+        radius = min(max(float(ins.size[0]), float(ins.size[1])) / 2, 0.45)
+    elif ins.primitive in ("arc", "polygon") and ins.radius is not None:
+        radius = float(ins.radius)
+    elif ins.size is not None:
+        radius = min(max(float(ins.size[0]), float(ins.size[1])) / 2, 0.45)
+    else:
+        radius = 0.12
+    converted = {
+        "primitive": "circle",
+        "center": center,
+        "radius": max(0.005, radius),
+        "color": data.get("color", "black"),
+        "weight": data.get("weight", "pen"),
+        "filled": data.get("filled", False),
+        "style": data.get("style", "solid"),
+        "arrangement": data.get("arrangement"),
+        "variation": data.get("variation"),
+        "color_hint": data.get("color_hint"),
+    }
+    _append_hint(converted, note)
+    return Instruction.model_validate(converted)
+
+
+def _with_explicit_constraint_enforcement(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    primitive_only = _primitive_only_constraint_from_ddl(ddl)
+    color_only = _color_only_constraint_from_ddl(ddl)
+    strict_count = _strict_count_hint_from_ddl(ddl)
+
+    repaired = list(instructions)
+    if primitive_only:
+        constrained: list[Instruction] = []
+        for ins in repaired:
+            if ins.primitive in primitive_only:
+                constrained.append(ins)
+            elif primitive_only == {"circle"} and ins.primitive == "ellipse":
+                constrained.append(_as_circle_instruction(ins, "explicit circle-only constraint enforced"))
+        if constrained:
+            repaired = constrained
+
+    if color_only:
+        visible_first = next((color for color in color_only if color != background), color_only[0])
+        color_set = set(color_only)
+        adjusted: list[Instruction] = []
+        for ins in repaired:
+            data = ins.model_dump(by_alias=True)
+            changed = False
+            if data.get("color") not in color_set:
+                data["color"] = visible_first
+                changed = True
+            arr_data = data.get("arrangement")
+            if arr_data:
+                arr_data = dict(arr_data)
+                cycle = [color for color in arr_data.get("color_cycle", []) if color in color_set]
+                if arr_data.get("color_cycle") and cycle != arr_data.get("color_cycle"):
+                    arr_data["color_cycle"] = cycle or [visible_first]
+                    data["arrangement"] = arr_data
+                    changed = True
+            if changed:
+                _append_hint(data, "explicit color-only constraint enforced")
+            adjusted.append(Instruction.model_validate(data))
+        repaired = adjusted
+
+    if strict_count is not None and repaired:
+        first = repaired[0].model_dump(by_alias=True)
+        if strict_count == 1:
+            first["arrangement"] = None
+        else:
+            arr_data = dict(first.get("arrangement") or {})
+            arr_data["count"] = strict_count
+            arr_data["layout"] = arr_data.get("layout") or "scatter"
+            first["arrangement"] = arr_data
+        _append_hint(first, "explicit count constraint enforced")
+        repaired = [Instruction.model_validate(first)]
+
+    return repaired
+
+
 def _repair_visibility(ins: Instruction, background: str) -> Instruction:
     repaired = _with_visible_color(ins, background)
     repaired = _with_visible_particle(repaired)
@@ -1952,25 +2737,34 @@ def _coerce_instruction(ins: Instruction) -> Instruction:
 
 def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。"""
-    background = _visible_background(score.background)
+    background = _with_background_dominance_governor(_visible_background(score.background), ddl=ddl)
     instructions = [
         _coerce_and_repair_instruction(ins, original_background=score.background, background=background, ddl=ddl)
         for ins in score.instructions
     ]
     instructions = _dedupe_instructions(instructions)
     instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
+    instructions = _with_primary_color_delivery(instructions, ddl=ddl, background=background)
     instructions = _with_color_delivery_repair(instructions, ddl=ddl)
     instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
     instructions = _with_complex_motif_repair(instructions, ddl=ddl, background=background)
     instructions = _with_composition_diversity_repair(instructions, ddl=ddl, background=background)
     instructions = _with_structural_duplicate_repair(instructions)
     instructions = _with_context_energy_repair(instructions, ddl=ddl, background=background)
+    instructions = _with_surface_tension(instructions, ddl=ddl, background=background)
     effective_presence = score.presence or _presence_from_ddl(ddl)
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
+    instructions = [_with_unintentional_filled_shape_tempering(ins, ddl=ddl) for ins in instructions]
     instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)
     instructions = _with_motion_energy(instructions, ddl=ddl)
+    instructions = _with_motion_floor(instructions, ddl=ddl, background=background)
+    instructions = _with_rhythm_variation(instructions, ddl=ddl)
+    instructions = _with_repetition_event_variation(instructions, ddl=ddl)
+    instructions = _with_visual_event(instructions, ddl=ddl, background=background)
+    instructions = _with_ma_pressure(instructions, ddl=ddl)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
+    instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
     data = score.model_dump(by_alias=True)
     data["background"] = background
     if score.presence is None and effective_presence is not None:

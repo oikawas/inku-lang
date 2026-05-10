@@ -392,6 +392,12 @@ def test_score_metrics_reports_density_cluster_and_fade_fields():
     assert metrics["score_primitive_counts"] == {"line": 1, "square": 1}
     assert metrics["score_color_counts"] == {"black": 1, "white": 1}
     assert metrics["score_motif_hint_counts"] == {}
+    assert metrics["score_quality_metrics"]["constraint_adherence"] == 100
+    assert metrics["score_quality_metrics"]["motion_energy"] == 0
+    assert metrics["score_quality_metrics"]["negative_space_pressure"] > 0
+    assert metrics["score_quality_metrics"]["color_resonance"] > 0
+    assert metrics["score_quality_metrics"]["figurative_risk"] == 0
+    assert metrics["score_quality_metrics"]["fallback_quality"] is None
     assert metrics["math_balance_markers"] == {
         "counterweight_like_opposite_placements": 0,
         "golden_like_centers": 0,
@@ -480,6 +486,16 @@ def test_review_sets_groups_successful_samples_without_excluding_slow():
     assert sets["normal_samples"] == [1]
     assert sets["slow_samples"] == [2, 4]
     assert sets["fallback_samples"] == [3, 4]
+
+
+def test_server_timeout_reasons_detects_stage_hard_timeouts_only():
+    result = {
+        "interpret_fallback_reasons": ["stage1_hard_timeout"],
+        "compose_retry_reasons": ["empty_instructions", "stage2_hard_timeout"],
+    }
+
+    assert cli._server_timeout_reasons(result) == ["stage1_hard_timeout", "stage2_hard_timeout"]
+    assert cli._server_timeout_reasons({"compose_retry_reasons": ["empty_instructions"]}) == []
 
 
 def test_batch_accepts_summary_json_option():
@@ -584,3 +600,110 @@ def test_history_export_writes_contact_sheet_and_evaluation_json(tmp_path, monke
     assert summary["ai_evaluation"]["items"][0]["prompt"] == "丸が跳ねる"
     assert summary["ai_evaluation"]["items"][0]["paths"]["json"].endswith("001-ABCD.json")
     assert summary["results"][0]["score_primitive_counts"] == {"ellipse": 1}
+
+
+def test_aggregate_quality_metrics_reports_average_and_fallback_quality():
+    results = [
+        {
+            "score_quality_metrics": {
+                "constraint_adherence": 100,
+                "negative_space_pressure": 40,
+                "motion_energy": 30,
+                "color_resonance": 20,
+                "visual_event": 10,
+                "figurative_risk": 0,
+                "fallback_quality": None,
+            }
+        },
+        {
+            "score_quality_metrics": {
+                "constraint_adherence": 80,
+                "negative_space_pressure": 60,
+                "motion_energy": 50,
+                "color_resonance": 40,
+                "visual_event": 30,
+                "figurative_risk": 20,
+                "fallback_quality": 70,
+            }
+        },
+    ]
+
+    summary = cli._aggregate_quality_metrics(results)
+
+    assert summary["average"]["constraint_adherence"] == 90.0
+    assert summary["min"]["figurative_risk"] == 0
+    assert summary["max"]["motion_energy"] == 50
+    assert summary["fallback_quality_average"] == 70.0
+    assert summary["fallback_quality_samples"] == 1
+
+
+def test_quality_metrics_scores_achromatic_tonal_resonance():
+    score = {
+        "instructions": [
+            {
+                "primitive": "line",
+                "color": "gray",
+                "from": [0.2, 0.7],
+                "to": [0.8, 0.3],
+                "rotation": -18,
+                "arrangement": {"count": 5, "layout": "scatter", "fade": "outward", "preserve_space": True},
+            }
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_quality_metrics"]["color_resonance"] > 0
+
+
+def test_quality_metrics_scores_rhythm_spacing_as_motion_energy():
+    score = {
+        "instructions": [
+            {
+                "primitive": "ellipse",
+                "color": "blue",
+                "center": [0.5, 0.5],
+                "size": [0.08, 0.04],
+                "arrangement": {
+                    "count": 7,
+                    "layout": "horizontal",
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_quality_metrics"]["motion_energy"] > 0
+
+
+def test_quality_metrics_does_not_treat_surface_as_face():
+    score = {
+        "instructions": [
+            {
+                "primitive": "arc",
+                "color": "black",
+                "center": [0.58, 0.62],
+                "radius": 0.18,
+                "angle_start": 198,
+                "angle_end": 342,
+                "color_hint": "surface tension restored as a quiet shadow trace",
+            }
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_quality_metrics"]["figurative_risk"] == 0
+
+
+def test_paper_words_do_not_request_white_by_themselves():
+    trace = cli._color_trace(
+        {"text": "新聞紙が迷うように回っている。", "ddl": "灰色の四角を置く。", "score": {"instructions": [{"primitive": "square", "color": "gray"}]}},
+        catalog_id="default",
+        catalog_data=CATALOG_DATA,
+    )
+
+    assert "white" not in trace["requested_colors"]
+    assert trace["missing_requested_colors"] == []

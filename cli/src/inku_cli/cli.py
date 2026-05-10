@@ -7,6 +7,7 @@ import getpass
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -41,9 +42,11 @@ CANVAS_ASPECT_RATIOS = {
     "byobu": 2.2,
     "vertical": 9.0 / 16.0,
 }
+
+FIGURATIVE_HINT_RE = re.compile(r"\b(body|face|eye|mouth)\b")
 CANVAS_ASPECTS = tuple(CANVAS_ASPECT_RATIOS.keys())
 COLOR_MARKERS: dict[str, tuple[str, ...]] = {
-    "white": ("white", "ivory", "snow", "paper", "白", "雪", "紙", "光"),
+    "white": ("white", "ivory", "snow", "白", "雪", "光"),
     "black": ("black", "dark", "shadow", "ink", "黒", "闇", "影", "墨"),
     "blue": ("blue", "water", "night", "cold", "sky", "青", "水", "夜", "冷", "空", "湖"),
     "red": ("red", "pink", "warm", "fire", "fruit", "赤", "紅", "桜", "桃", "温", "火", "果実"),
@@ -564,6 +567,18 @@ def _review_sets(results: list[dict[str, Any]], *, slow_ms: int = 100_000) -> di
     }
 
 
+def _server_timeout_reasons(result: dict[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    for key in ("interpret_fallback_reasons", "compose_retry_reasons"):
+        values = result.get(key)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if isinstance(value, str) and "hard_timeout" in value:
+                reasons.append(value)
+    return reasons
+
+
 def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thumb_size: int) -> None:
     try:
         from PIL import Image, ImageDraw
@@ -903,6 +918,118 @@ def _math_balance_markers(instructions: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
+def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, Any]]) -> dict[str, Any]:
+    expanded_count = 0
+    preserve_space = 0
+    fade_count = 0
+    color_cycle_count = 0
+    path_motion = 0
+    varied_rotation = 0
+    diagonal_or_wave = 0
+    rhythm_spacing_count = 0
+    visual_event = 0
+    visible_colors: set[str] = set()
+    filled_large = 0
+    bilateral_presence = 0
+    gaze_presence = 0
+    object_like_hints = 0
+    fallback_hints = 0
+    coverage_hints = 0
+    centers: list[tuple[float, float]] = []
+
+    presence = score.get("presence")
+    if isinstance(presence, dict):
+        if presence.get("symmetry") == "bilateral":
+            bilateral_presence += 1
+        if presence.get("gaze_pressure") not in (None, "none"):
+            gaze_presence += 1
+
+    for instruction in instructions:
+        center = _instruction_center(instruction)
+        if center is not None:
+            centers.append(center)
+        color = instruction.get("color")
+        if isinstance(color, str):
+            visible_colors.add(color)
+        if instruction.get("filled") is True:
+            size = _coord_pair(instruction.get("size"))
+            radius = instruction.get("radius")
+            if size is not None and size[0] * size[1] >= 0.10:
+                filled_large += 1
+            elif isinstance(radius, (int, float)) and float(radius) >= 0.22:
+                filled_large += 1
+        rotation = instruction.get("rotation")
+        if isinstance(rotation, (int, float)) and abs(float(rotation)) >= 8:
+            varied_rotation += 1
+        hint = instruction.get("color_hint")
+        if isinstance(hint, str):
+            lower_hint = hint.lower()
+            if "fallback from ddl" in lower_hint:
+                fallback_hints += 1
+            if "coverage from ddl clause" in lower_hint:
+                coverage_hints += 1
+            if "顔" in hint or "人型" in hint or FIGURATIVE_HINT_RE.search(lower_hint):
+                object_like_hints += 1
+            if any(marker in lower_hint for marker in ("visual event", "accent", "collision", "jump", "反転", "衝突")):
+                visual_event += 1
+
+        arrangement = instruction.get("arrangement")
+        if isinstance(arrangement, dict):
+            count = arrangement.get("count")
+            expanded_count += int(count) if isinstance(count, int) and count > 0 else 1
+            if arrangement.get("preserve_space") is True:
+                preserve_space += 1
+            if arrangement.get("fade") not in (None, "none"):
+                fade_count += 1
+            color_cycle = arrangement.get("color_cycle")
+            if isinstance(color_cycle, list) and color_cycle:
+                color_cycle_count += 1
+                visible_colors.update(item for item in color_cycle if isinstance(item, str))
+            path = arrangement.get("path")
+            if path not in (None, "none"):
+                path_motion += 1
+            if path in {"diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"}:
+                diagonal_or_wave += 1
+            if arrangement.get("rhythm_spacing") not in (None, "none"):
+                rhythm_spacing_count += 1
+        else:
+            expanded_count += 1
+
+    off_center = sum(1 for x, y in centers if abs(x - 0.5) >= 0.12 or abs(y - 0.5) >= 0.12)
+    counterweights = _math_balance_markers(instructions)["counterweight_like_opposite_placements"]
+    instruction_count = len(instructions)
+    fallback_used = fallback_hints > 0
+
+    negative_space_pressure = min(100, preserve_space * 18 + fade_count * 8 + min(off_center, 4) * 8 + min(counterweights, 3) * 8)
+    motion_energy = min(100, path_motion * 18 + diagonal_or_wave * 12 + varied_rotation * 8 + rhythm_spacing_count * 10)
+    color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14)
+    if color_resonance == 0 and visible_colors and visible_colors <= {"white", "black", "gray"}:
+        color_resonance = min(
+            100,
+            18
+            + preserve_space * 8
+            + fade_count * 6
+            + min(off_center, 3) * 6
+            + min(varied_rotation, 3) * 4,
+        )
+    visual_event_score = min(100, visual_event * 28 + min(off_center, 3) * 8 + min(counterweights, 2) * 14 + (12 if color_cycle_count else 0))
+    figurative_risk = min(100, bilateral_presence * 22 + gaze_presence * 18 + object_like_hints * 25 + filled_large * 10)
+    fallback_quality = None
+    if fallback_used:
+        fallback_quality = min(100, coverage_hints * 18 + min(len(visible_colors), 3) * 12 + min(instruction_count, 5) * 8 + preserve_space * 8)
+    constraint_adherence = max(0, 100 - max(0, instruction_count - 5) * 10 - max(0, expanded_count - 160) // 4 - filled_large * 8)
+
+    return {
+        "constraint_adherence": int(constraint_adherence),
+        "negative_space_pressure": int(negative_space_pressure),
+        "motion_energy": int(motion_energy),
+        "color_resonance": int(color_resonance),
+        "visual_event": int(visual_event_score),
+        "figurative_risk": int(figurative_risk),
+        "fallback_quality": int(fallback_quality) if fallback_quality is not None else None,
+    }
+
+
 def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(score, dict):
         return {}
@@ -969,6 +1096,10 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         if isinstance(color_cycle, list) and color_cycle:
             color_cycle_count += 1
 
+    quality_metrics = _score_quality_metrics(
+        score,
+        [instruction for instruction in instructions if isinstance(instruction, dict)],
+    )
     return {
         "score_instruction_count": len(instructions),
         "score_arrangement_count": arrangement_count,
@@ -983,6 +1114,7 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_motif_hint_counts": dict(sorted(motif_hint_counts.items())),
         "score_presence_counts": dict(sorted(presence_counts.items())),
         "score_presence_gaze_counts": dict(sorted(presence_gaze_counts.items())),
+        "score_quality_metrics": quality_metrics,
         "math_balance_markers": _math_balance_markers([
             instruction for instruction in instructions if isinstance(instruction, dict)
         ]),
@@ -1132,6 +1264,44 @@ def _aggregate_marker_lines(results: list[dict[str, Any]], key: str) -> dict[str
             if isinstance(marker, str) and int(count or 0) > 0:
                 lines.setdefault(marker, []).append(line)
     return dict(sorted(lines.items()))
+
+
+def _aggregate_quality_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
+    values: dict[str, list[int]] = {}
+    fallback_values: list[int] = []
+    for result in results:
+        metrics = result.get("score_quality_metrics")
+        if not isinstance(metrics, dict):
+            continue
+        for key, value in metrics.items():
+            if key == "fallback_quality":
+                if isinstance(value, int):
+                    fallback_values.append(value)
+                continue
+            if isinstance(value, int):
+                values.setdefault(key, []).append(value)
+    averages = {
+        key: round(sum(items) / len(items), 1)
+        for key, items in sorted(values.items())
+        if items
+    }
+    lows = {
+        key: min(items)
+        for key, items in sorted(values.items())
+        if items
+    }
+    highs = {
+        key: max(items)
+        for key, items in sorted(values.items())
+        if items
+    }
+    return {
+        "average": averages,
+        "min": lows,
+        "max": highs,
+        "fallback_quality_average": round(sum(fallback_values) / len(fallback_values), 1) if fallback_values else None,
+        "fallback_quality_samples": len(fallback_values),
+    }
 
 
 def _paint_payload(
@@ -1564,91 +1734,138 @@ def command_batch(args: argparse.Namespace) -> int:
     )
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
+    pending_timeout_retries: list[tuple[int, str]] = []
+    result_index_by_line: dict[int, int] = {}
+
+    def process_line(index: int, line: str, *, retry_timeout: bool = False) -> dict[str, Any]:
+        progress_label = (
+            f"retrying timeout {index}/{len(lines)}"
+            if retry_timeout
+            else f"drawing {index}/{len(lines)}"
+        )
+        if input_mode == "ddl":
+            input_text = args.original_text or line
+            raw_result, _ = _run_with_progress(
+                f"{progress_label} from DDL",
+                lambda line=line: client.request("POST", "/api/compose", data=_compose_payload(
+                    args,
+                    line,
+                    stage2_model=stage2_model,
+                    color_catalog=color_catalog,
+                )),
+                enabled=not args.no_progress,
+            )
+            result = _compose_response_as_paint_result(
+                raw_result,
+                ddl=line,
+                input_text=input_text,
+                stage2_model=stage2_model,
+            )
+            if args.save_history:
+                result = _save_history_for_result(
+                    client,
+                    args,
+                    result,
+                    input_text=input_text,
+                    ddl=str(result.get("ddl") or line),
+                    stage1_model=None,
+                    stage2_model=stage2_model,
+                    color_catalog=color_catalog,
+                )
+        else:
+            result, _ = _run_with_progress(
+                progress_label,
+                lambda line=line: client.request("POST", "/api/paint", data=_paint_payload(
+                    args,
+                    line,
+                    stage1_model=stage1_model,
+                    stage2_model=stage2_model,
+                    color_catalog=color_catalog,
+                )),
+                enabled=not args.no_progress,
+            )
+        prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
+        output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
+        paths = _write_paint_outputs(output_result, out_dir=out_dir, prefix=prefix, png=args.png)
+        tokens_in = (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0)
+        tokens_out = (result.get("tokens_out_stage1") or 0) + (result.get("tokens_out_stage2") or 0)
+        elapsed = int(result.get("elapsed_total_ms") or 0)
+        entry = {
+            "line": index,
+            "text": result.get("text"),
+            "input_mode": input_mode,
+            **_model_summary(
+                None if input_mode == "ddl" else stage1_model,
+                stage2_model,
+                stage1_provider=None if input_mode == "ddl" else stage1_provider,
+                stage2_provider=stage2_provider,
+            ),
+            "timeout_seconds": timeout_seconds,
+            **_color_catalog_summary(color_catalog, catalog_data),
+            **_render_response_summary(result),
+            "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
+            "history_id": result.get("history_id"),
+            "svg_profile": args.svg_profile,
+            "elapsed_total_ms": elapsed,
+            "tokens_in": tokens_in or None,
+            "tokens_out": tokens_out or None,
+            "interpret_fallback_used": result.get("interpret_fallback_used", False),
+            "interpret_fallback_reasons": result.get("interpret_fallback_reasons", []),
+            "compose_retry_count": result.get("compose_retry_count", 0),
+            "compose_retry_reasons": result.get("compose_retry_reasons", []),
+            "compose_fallback_used": result.get("compose_fallback_used", False),
+            **_score_metrics(result.get("score")),
+            "paths": paths,
+        }
+        timeout_reasons = _server_timeout_reasons(entry)
+        if timeout_reasons:
+            entry["server_timeout_reasons"] = timeout_reasons
+            entry["server_timeout_retry_attempted"] = retry_timeout
+        return entry
+
     for index, line in enumerate(lines, start=1):
         try:
-            if input_mode == "ddl":
-                input_text = args.original_text or line
-                raw_result, _ = _run_with_progress(
-                    f"drawing {index}/{len(lines)} from DDL",
-                    lambda line=line: client.request("POST", "/api/compose", data=_compose_payload(
-                        args,
-                        line,
-                        stage2_model=stage2_model,
-                        color_catalog=color_catalog,
-                    )),
-                    enabled=not args.no_progress,
+            entry = process_line(index, line)
+            result_index_by_line[index] = len(results)
+            results.append(entry)
+            timeout_reasons = entry.get("server_timeout_reasons") or []
+            if timeout_reasons:
+                pending_timeout_retries.append((index, line))
+                print(
+                    f"{index}/{len(lines)} server timeout ({', '.join(timeout_reasons)}); queued final retry",
+                    file=sys.stderr,
                 )
-                result = _compose_response_as_paint_result(
-                    raw_result,
-                    ddl=line,
-                    input_text=input_text,
-                    stage2_model=stage2_model,
-                )
-                if args.save_history:
-                    result = _save_history_for_result(
-                        client,
-                        args,
-                        result,
-                        input_text=input_text,
-                        ddl=str(result.get("ddl") or line),
-                        stage1_model=None,
-                        stage2_model=stage2_model,
-                        color_catalog=color_catalog,
-                    )
-            else:
-                result, _ = _run_with_progress(
-                    f"drawing {index}/{len(lines)}",
-                    lambda line=line: client.request("POST", "/api/paint", data=_paint_payload(
-                        args,
-                        line,
-                        stage1_model=stage1_model,
-                        stage2_model=stage2_model,
-                        color_catalog=color_catalog,
-                    )),
-                    enabled=not args.no_progress,
-                )
-            prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
-            output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
-            paths = _write_paint_outputs(output_result, out_dir=out_dir, prefix=prefix, png=args.png)
-            tokens_in = (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0)
-            tokens_out = (result.get("tokens_out_stage1") or 0) + (result.get("tokens_out_stage2") or 0)
-            elapsed = int(result.get("elapsed_total_ms") or 0)
-            total_in += tokens_in
-            total_out += tokens_out
-            total_elapsed += elapsed
-            results.append({
-                "line": index,
-                "text": result.get("text"),
-                "input_mode": input_mode,
-                **_model_summary(
-                    None if input_mode == "ddl" else stage1_model,
-                    stage2_model,
-                    stage1_provider=None if input_mode == "ddl" else stage1_provider,
-                    stage2_provider=stage2_provider,
-                ),
-                "timeout_seconds": timeout_seconds,
-                **_color_catalog_summary(color_catalog, catalog_data),
-                **_render_response_summary(result),
-                "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
-                "history_id": result.get("history_id"),
-                "svg_profile": args.svg_profile,
-                "elapsed_total_ms": elapsed,
-                "tokens_in": tokens_in or None,
-                "tokens_out": tokens_out or None,
-                "interpret_fallback_used": result.get("interpret_fallback_used", False),
-                "interpret_fallback_reasons": result.get("interpret_fallback_reasons", []),
-                "compose_retry_count": result.get("compose_retry_count", 0),
-                "compose_retry_reasons": result.get("compose_retry_reasons", []),
-                "compose_fallback_used": result.get("compose_fallback_used", False),
-                **_score_metrics(result.get("score")),
-                "paths": paths,
-            })
-            print(f"{index}/{len(lines)} ok {elapsed}ms", file=sys.stderr)
+            print(f"{index}/{len(lines)} ok {entry['elapsed_total_ms']}ms", file=sys.stderr)
         except CliError as exc:
             failures.append({"line": index, "text": line, "message": str(exc)})
             print(f"{index}/{len(lines)} failed: {exc}", file=sys.stderr)
             if not args.continue_on_error:
                 break
+    if pending_timeout_retries:
+        print(f"server timeout final retry: {len(pending_timeout_retries)} item(s)", file=sys.stderr)
+    for index, line in pending_timeout_retries:
+        try:
+            retry_entry = process_line(index, line, retry_timeout=True)
+            original_result_index = result_index_by_line.get(index)
+            if original_result_index is not None:
+                results[original_result_index] = retry_entry
+            else:
+                results.append(retry_entry)
+            timeout_reasons = retry_entry.get("server_timeout_reasons") or []
+            if timeout_reasons:
+                print(
+                    f"{index}/{len(lines)} final retry still server timeout ({', '.join(timeout_reasons)}); using fallback result",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"{index}/{len(lines)} final retry ok {retry_entry['elapsed_total_ms']}ms", file=sys.stderr)
+        except CliError as exc:
+            failures.append({"line": index, "text": line, "message": f"final retry failed: {exc}"})
+            print(f"{index}/{len(lines)} final retry failed: {exc}", file=sys.stderr)
+
+    total_in = sum(int(result.get("tokens_in") or 0) for result in results)
+    total_out = sum(int(result.get("tokens_out") or 0) for result in results)
+    total_elapsed = sum(int(result.get("elapsed_total_ms") or 0) for result in results)
     aggregate_density: Counter[str] = Counter()
     aggregate_fade: Counter[str] = Counter()
     aggregate_primitive: Counter[str] = Counter()
@@ -1721,6 +1938,17 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_presence_lines": _aggregate_marker_lines(results, "score_presence_counts"),
         "math_balance_markers": dict(sorted(aggregate_math_balance.items())),
         "math_balance_marker_lines": _aggregate_marker_lines(results, "math_balance_markers"),
+        "score_quality_metrics": _aggregate_quality_metrics(results),
+        "server_timeout_samples": [
+            int(result["line"])
+            for result in results
+            if result.get("server_timeout_reasons") and result.get("line")
+        ],
+        "server_timeout_retry_attempted_samples": [
+            int(result["line"])
+            for result in results
+            if result.get("server_timeout_retry_attempted") and result.get("line")
+        ],
         "review_sets": _review_sets(results),
         "results": results,
         "failures": failures,

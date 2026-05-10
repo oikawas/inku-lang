@@ -269,6 +269,33 @@ def test_render_scatter_path_wave_places_items_on_trace():
     assert svg.count("<circle") == 5
 
 
+def test_render_rhythm_spacing_breaks_equal_repetition():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.01,
+                    "arrangement": {
+                        "count": 5,
+                        "layout": "horizontal",
+                        "margin": 0.1,
+                        "rhythm_spacing": "syncopated",
+                    },
+                }
+            ]
+        }
+    )
+
+    svg = render(score)
+    root = ElementTree.fromstring(svg)
+    xs = [float(node.attrib["cx"]) for node in root.iter() if node.tag.endswith("circle") and "cx" in node.attrib]
+    gaps = [round(xs[index + 1] - xs[index], 3) for index in range(len(xs) - 1)]
+    assert len(xs) == 5
+    assert len(set(gaps)) > 1
+
+
 def test_render_arrangement_path_right_half_constrains_x():
     score = Score.model_validate(
         {

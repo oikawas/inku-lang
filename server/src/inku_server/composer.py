@@ -56,11 +56,15 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **人・顔・動物を対象物として描かない。目鼻口・頭身・四肢・耳・尻尾を instruction にしない。存在感、重心、左右対称性、視線の圧力、群れ、輪郭密度として Score.presence に変換する**
 - **Score.presence は固定の人型記号ではない。symmetry="bilateral" は「正面・対称・顔」など明示がある時だけ使い、通常は symmetry="none" を選ぶ。gaze_pressure も視線・顔・見つめる等が明示された時だけ none 以外にする**
 - **人・動物の補助 instruction を作る場合も、縦線+小楕円、棒人間、頭、胴体、翼、尾のような共通シルエットにしない。余白線、端寄りの焦点、薄い弧、群れの間隔として抽象化する**
+- **涙・視線・屋根・雲のような名詞は、それ自体を別の対象物や記号として足さない。涙=下向きの滲み/透明度差、視線=余白の圧力、屋根=低い重心や斜めの圧、雲=上部の重さや密度差として、既に指定された primitive の配置・方向・密度・fade に変換する**
+- **対象物化を避けた語は削除してはいけない。必ず path、fade、density、rotation、preserve_space、または color_cycle の薄い差として残す。涙/滲みは下向きまたは垂直方向、雲/押し沈めは上部の重さと下方向の圧、視線は片側の余白圧として扱う**
+- **低い雲、押し沈める、影だけ、先に帰る、涙、滲み、ほどける、消えかけは対象物ではなく motion intent として扱う。既存 instruction に path、fade、rotation、rhythm_spacing、片側余白、または小さな焦点差を必ず付ける**
+- **自転車・車・電車などの乗り物は、車輪・フレーム・車体を instruction にしない。影、斜線、重心、先行/遅れ、余白のずれとして抽象化する**
 - **反射・映り込み → line または arc の少数反復。fade="directional" と path="wave" または "top_to_bottom" を使う**
 - **柔らかな光・日差し → 白または黄色寄りの薄い ellipse を重ね、filled=true, color_hint に原文の光を保持する。香り・匂い → 緑/白/灰の小さな ellipse または arc を wave path で少数散らす。蕾・開花待ち → 赤/白の小さな ellipse を斜めの帯で残す。五感・気配 → 薄い arc/ellipse と fade で残す**
 - **点・星・雨・雪・砂・粒は多めにするが、真円へ固定しない。明示的に円・丸・月・太陽がある場合だけ circle を優先し、それ以外は ellipse・square・短い line へ分散する。ellipse・square を使う場合は水平/垂直に揃えすぎず、右上がり・右下がり・回転などの rotation を付ける**
 - **多角形語彙は polygon だけを使い、sides=5-8 に限る。結晶、鉱物、硬い欠片、人工物の硬さ、都市的構造にだけ使う。五角形/六角形などを個別 primitive にしない**
-- **山・屋根・鋭い先端 → triangle を使える。葉・花びら・羽・紙片 → thin ellipse / rotated square / small polygon として扱い、自然プリミティブ plugin が無い現在も抽象化された自然/物質形として残す**
+- **山・鋭い先端 → triangle を使える。屋根は triangle として対象物化せず、低い重心・斜めの圧・上部密度差として扱う。葉・花びら・羽・紙片 → thin ellipse / rotated square / small polygon として扱い、自然プリミティブ plugin が無い現在も抽象化された自然/物質形として残す**
 - **楽しい形・複雑な形は、単体 primitive ではなく 2〜5 個の primitive の局所 motif として作る。例: 葉=細い ellipse + arc、紙片=rotated square + 細線、種=ellipse + 小粒、山=triangle + 余白を切る line、波紋=arc + 小 ellipse**
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
@@ -74,6 +78,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「画面全体に点々」「全面に細かく」は layout=scatter でよいが、意味は無秩序ではなく全面分布として扱う**
 - **scatter は均一な乱数ではない。密度勾配、端部の薄れ、斜めの帯、右半分、上から下など、DDL の配置語に沿った偏りを持つものとして扱う**
 - **「波打つ軌跡に沿って」→ arrangement.path="wave"。「斜めの帯」→ path="diagonal"。「右半分」→ path="right_half"**
+- **「リズム」「跳ねる」「踊る」「輪唱のずれ」「ほどける反復」→ count を増やさず arrangement.rhythm_spacing を使う。楽しい/跳ねる=syncopated、加速/流れ=accelerando、ゆるい揺れ=loose**
 - **「上から下へ散らす」は layout=vertical, path="top_to_bottom"。「左から右へ」「横に」は layout=horizontal, path="left_to_right"。「放射状」「同心円状」は layout=radial**
 - **「右上の黄金比の位置」→ center=[0.618,0.382]。左下なら [0.382,0.618]。数学的な均衡点として扱う**
 - **「左上の三分割の交点」→ center=[0.333,0.333]。「右下の三分割の交点」→ center=[0.667,0.667]。三分割構図として扱う**
@@ -194,7 +199,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.58,0.46],"size":[0.46,0.18],"color":"blue","filled":true,"color_hint":"透明な膜","arrangement":{"count":5,"layout":"scatter","density":"low","cluster_count":3,"fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.35,0.22],"to":[0.72,0.78],"color":"white","color_hint":"雨の反射","arrangement":{"count":9,"layout":"vertical","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.18}}]}
 
 入力: 雨のバス停で、待つ人の気配が透明な膜になっている。
-出力: {"presence":{"kind":"figure_like","intensity":"low","center":[0.56,0.52],"symmetry":"bilateral","gaze_pressure":"low","contour_density":"low"},"instructions":[{"primitive":"ellipse","center":[0.56,0.52],"size":[0.42,0.16],"color":"blue","filled":true,"color_hint":"透明な膜","arrangement":{"count":4,"layout":"scatter","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
+出力: {"presence":{"kind":"figure_like","intensity":"low","center":[0.56,0.52],"symmetry":"none","gaze_pressure":"none","contour_density":"low"},"instructions":[{"primitive":"ellipse","center":[0.56,0.52],"size":[0.42,0.16],"color":"blue","filled":true,"color_hint":"透明な膜","arrangement":{"count":4,"layout":"scatter","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
 
 入力: 柔らかな光と沈丁花の香りの中で、桜の蕾が開花を待つ。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.48,0.20],"size":[0.42,0.12],"color":"white","filled":true,"color_hint":"柔らかな光","arrangement":{"count":3,"layout":"horizontal","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"ellipse","center":[0.56,0.55],"size":[0.045,0.022],"color":"green","rotation":-18,"color_hint":"沈丁花の香り","arrangement":{"count":7,"layout":"scatter","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.24}},{"primitive":"ellipse","center":[0.70,0.62],"size":[0.055,0.026],"color":"red","rotation":-30,"color_hint":"開花を待つ蕾","arrangement":{"count":5,"layout":"scatter","path":"diagonal","margin":0.18}}]}
@@ -301,11 +306,15 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Do not draw humans, faces, or animals as objects. Do not make eyes, mouth, body proportions, limbs, ears, or tails into instructions. Convert them into Score.presence as presence, weight, bilateral symmetry, gaze pressure, group behavior, and contour density**
 - **Score.presence is not a fixed human-symbol overlay. Use symmetry="bilateral" only when frontality, symmetry, or a face is explicit; otherwise prefer symmetry="none". Use gaze_pressure other than none only when gaze, face, looking, or staring is explicit**
 - **If supporting instructions are needed for human/animal context, do not make a vertical-line + small-ellipse silhouette, stick figure, head/body, wing, or tail. Abstract it as negative-space lines, edge-biased focus, pale arcs, or group spacing**
+- **Nouns such as tears, gaze, roof, and cloud are not separate objects or signs to add. Convert tears into downward blur or opacity contrast, gaze into negative-space pressure, roof into low weight or diagonal pressure, and cloud into upper weight or density contrast on the primitives already specified**
+- **Do not simply delete words that were not objectified. Preserve them as path, fade, density, rotation, preserve_space, or a faint color_cycle contrast. Tears/blurring should bias downward or vertical; cloud/pressing-down should become upper weight and downward pressure; gaze should become one-sided negative-space pressure**
+- **Low cloud, pressing down, shadow only, going ahead, tears, blur, unraveling, and fading are motion intents, not objects. Always apply them to existing instructions as path, fade, rotation, rhythm_spacing, one-sided negative space, or a small focal contrast**
+- **Vehicles such as bicycles, cars, and trains must not become wheels, frames, or bodies. Abstract them as shadows, diagonals, center of gravity, leading/lagging motion, or shifted negative space**
 - **Reflection → sparse repeated line or arc with fade="directional" and path="wave" or "top_to_bottom"**
 - **Soft light / sunlight → layered pale white or yellow-leaning ellipse, filled=true, preserving the original phrase in color_hint. Scent / fragrance → small green/white/gray ellipse or arc along path="wave". Buds / waiting to bloom → small red/white ellipses along a diagonal band. Five-sense presence / atmosphere → faint arc/ellipse with fade**
 - **Use more for dots/stars/rain/snow/sand/particles, but do not default them to true circles. Prefer ellipse, square, or short line unless circle/round/moon/sun is explicit. Add rotation to ellipses and squares so they are not locked to horizontal/vertical symmetry**
 - **Use only polygon for polygonal vocabulary, with sides=5-8. Use it only for crystals, minerals, hard shards, artificial hardness, or urban structure. Do not add separate pentagon/hexagon primitives**
-- **Mountain / roof / sharp peak → triangle is allowed. Leaf / petal / feather / paper fragment → use thin ellipse, rotated square, or small polygon so abstract natural/material forms survive until natural primitive plugins exist**
+- **Mountain / sharp peak → triangle is allowed. Do not objectify roof as a triangle; treat it as low weight, diagonal pressure, or upper density contrast. Leaf / petal / feather / paper fragment → use thin ellipse, rotated square, or small polygon so abstract natural/material forms survive until natural primitive plugins exist**
 - **Playful or complex shapes should be local motifs made from 2-5 primitives, not a single primitive. Examples: leaf=thin ellipse + arc, paper shard=rotated square + thin line, seed pod=ellipse + small particles, mountain=triangle + a line cutting negative space, ripple=arc + small ellipse**
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
@@ -319,6 +328,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"dotted across the whole canvas" / "finely across the whole canvas" may use layout=scatter, but treat it as all-over distribution, not disorder**
 - **scatter is not uniform noise. Treat it as biased by density gradient, fading edges, diagonal band, right half, or top-to-bottom placement from the DDL**
 - **"undulating trace" → arrangement.path="wave". "diagonal band" → path="diagonal". "right half" → path="right_half"**
+- **"rhythm", "bounce", "dance", "canon-like offset", or "unraveling repetition" → use arrangement.rhythm_spacing without increasing count. playful/bouncing=syncopated, accelerating/flowing=accelerando, loose swaying=loose**
 - **"top to bottom" → layout=vertical, path="top_to_bottom". "left to right" / "horizontal" → layout=horizontal, path="left_to_right". "radial" / "concentric" → layout=radial**
 - **"upper-right golden-ratio position" → center=[0.618,0.382]. Lower-left uses [0.382,0.618]. Treat it as a mathematical balance point**
 - **"upper-left rule-of-thirds point" → center=[0.333,0.333]. "lower-right rule-of-thirds point" → center=[0.667,0.667]. Treat it as rule-of-thirds composition**
@@ -439,7 +449,7 @@ Input: A transparent membrane wraps faint reflections at a rainy bus stop.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.58,0.46],"size":[0.46,0.18],"color":"blue","filled":true,"color_hint":"transparent membrane","arrangement":{"count":5,"layout":"scatter","density":"low","cluster_count":3,"fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.35,0.22],"to":[0.72,0.78],"color":"white","color_hint":"rain reflection","arrangement":{"count":9,"layout":"vertical","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.18}}]}
 
 Input: At a rainy bus stop, the presence of a waiting person becomes a transparent membrane.
-Output: {"presence":{"kind":"figure_like","intensity":"low","center":[0.56,0.52],"symmetry":"bilateral","gaze_pressure":"low","contour_density":"low"},"instructions":[{"primitive":"ellipse","center":[0.56,0.52],"size":[0.42,0.16],"color":"blue","filled":true,"color_hint":"transparent membrane","arrangement":{"count":4,"layout":"scatter","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
+Output: {"presence":{"kind":"figure_like","intensity":"low","center":[0.56,0.52],"symmetry":"none","gaze_pressure":"none","contour_density":"low"},"instructions":[{"primitive":"ellipse","center":[0.56,0.52],"size":[0.42,0.16],"color":"blue","filled":true,"color_hint":"transparent membrane","arrangement":{"count":4,"layout":"scatter","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
 
 Input: Soft light and daphne fragrance surround cherry buds waiting to bloom.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.48,0.20],"size":[0.42,0.12],"color":"white","filled":true,"color_hint":"soft light","arrangement":{"count":3,"layout":"horizontal","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"ellipse","center":[0.56,0.55],"size":[0.045,0.022],"color":"green","rotation":-18,"color_hint":"daphne fragrance","arrangement":{"count":7,"layout":"scatter","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.24}},{"primitive":"ellipse","center":[0.70,0.62],"size":[0.055,0.026],"color":"red","rotation":-30,"color_hint":"waiting buds","arrangement":{"count":5,"layout":"scatter","path":"diagonal","margin":0.18}}]}

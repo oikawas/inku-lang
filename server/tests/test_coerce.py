@@ -805,11 +805,43 @@ def test_coerce_score_governs_quiet_high_density_scatter():
 
     arr = fixed.instructions[0].arrangement
     assert arr is not None
-    assert arr.count == 64
+    assert arr.count == 24
     assert arr.preserve_space is True
     assert arr.fade == "outward"
-    assert "quiet density governed" in (fixed.instructions[0].color_hint or "")
+    assert "neon blur density governed" in (fixed.instructions[0].color_hint or "")
     assert any("quiet expression accent restored" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_governs_neon_blur_vertical_density_more_strictly():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.03, 0.06],
+                    "color": "red",
+                    "color_hint": "涙のような滲み",
+                    "arrangement": {
+                        "count": 110,
+                        "layout": "vertical",
+                        "path": "top_to_bottom",
+                        "density": "high",
+                    },
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夜のガラス越しに、街のネオンが涙のように滲んでいる。")
+
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.count == 18
+    assert arr.density == "low"
+    assert arr.fade == "directional"
+    assert "neon blur vertical density governed" in (fixed.instructions[0].color_hint or "")
 
 
 def test_coerce_score_governs_quiet_vertical_rain_density():

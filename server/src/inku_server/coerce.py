@@ -165,6 +165,8 @@ MAX_EXPANDED_PER_INSTRUCTION = 240
 MAX_VISUAL_CLUSTERED_COUNT = 120
 MAX_QUIET_VISUAL_COUNT = 64
 MAX_QUIET_VERTICAL_COUNT = 48
+MAX_NEON_BLUR_VISUAL_COUNT = 24
+MAX_NEON_BLUR_VERTICAL_COUNT = 18
 MAX_QUIET_LARGE_SHAPE_COUNT = 16
 MAX_QUIET_SYMBOLIC_SHAPE_COUNT = 8
 MAX_QUIET_SYMBOLIC_SHAPE_WIDTH = 0.12
@@ -511,6 +513,17 @@ def _context_has_vertical_density(ddl: str | None) -> bool:
         return False
     lower = ddl.lower()
     return any(marker in ddl or marker in lower for marker in VERTICAL_DENSITY_CONTEXT_MARKERS)
+
+
+def _context_has_neon_blur_density(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    scene_markers = ("夜", "ガラス", "ネオン", "night", "glass", "neon")
+    blur_markers = ("涙", "滲", "にじ", "blur", "tear")
+    return any(marker in ddl or marker in lower for marker in scene_markers) and any(
+        marker in ddl or marker in lower for marker in blur_markers
+    )
 
 
 def _context_has_motion(ddl: str | None) -> bool:
@@ -1281,6 +1294,7 @@ def _with_context_density_governor(
         return instructions
 
     has_vertical_context = _context_has_vertical_density(ddl)
+    has_neon_blur_context = _context_has_neon_blur_density(ddl)
     adjusted: list[Instruction] = []
     governed_count = 0
     for ins in instructions:
@@ -1292,20 +1306,22 @@ def _with_context_density_governor(
             adjusted.append(ins)
             continue
 
-        is_vertical_load = has_vertical_context and (
-            ins.primitive == "line"
-            or arr.layout == "vertical"
-            or arr.path == "top_to_bottom"
-        )
-        if is_vertical_load and arr.count > MAX_QUIET_VERTICAL_COUNT:
+        is_vertical_arrangement = arr.layout == "vertical" or arr.path == "top_to_bottom"
+        is_vertical_load = is_vertical_arrangement or (has_vertical_context and ins.primitive == "line")
+        vertical_count_cap = MAX_NEON_BLUR_VERTICAL_COUNT if has_neon_blur_context else MAX_QUIET_VERTICAL_COUNT
+        if is_vertical_load and arr.count > vertical_count_cap:
             governed_count += 1
             adjusted.append(
                 _with_arrangement_density_governor(
                     ins,
-                    count=MAX_QUIET_VERTICAL_COUNT,
+                    count=vertical_count_cap,
                     density="low",
                     fade="directional",
-                    note="quiet vertical density governed to keep membrane/space legible",
+                    note=(
+                        "neon blur vertical density governed to keep transparent streaks legible"
+                        if has_neon_blur_context
+                        else "quiet vertical density governed to keep membrane/space legible"
+                    ),
                 )
             )
             continue
@@ -1325,13 +1341,18 @@ def _with_context_density_governor(
 
         if arr.count > MAX_QUIET_VISUAL_COUNT:
             governed_count += 1
+            count_cap = MAX_NEON_BLUR_VISUAL_COUNT if has_neon_blur_context else MAX_QUIET_VISUAL_COUNT
             adjusted.append(
                 _with_arrangement_density_governor(
                     ins,
-                    count=MAX_QUIET_VISUAL_COUNT,
+                    count=count_cap,
                     density="medium" if arr.count >= 120 else "low",
                     fade="outward" if arr.layout == "scatter" else "directional",
-                    note="quiet density governed to preserve lightness",
+                    note=(
+                        "neon blur density governed to avoid particle dominance"
+                        if has_neon_blur_context
+                        else "quiet density governed to preserve lightness"
+                    ),
                 )
             )
             continue

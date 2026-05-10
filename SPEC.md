@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.48**
+**Version: v1.49**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -393,6 +393,17 @@ Users can choose independently whether selecting a history item updates the UI's
 current canvas aspect and color catalog to the history item's values, or keeps
 the current UI selections.  This setting affects only the UI selection state;
 the saved history SVG is displayed as stored and is not re-rendered.
+
+The canvas panel also supports viewing-oriented controls.  A fullscreen icon in
+the drawing tab opens presentation mode, which maximizes the current SVG and
+shows a compact control bar for history navigation, latest item, star toggle,
+instruction caption toggle, and close.  Escape closes presentation mode.  A
+caption icon in the drawing tab toggles an instruction caption.  In normal
+canvas view, the caption uses 10% left and right margins relative to the drawing
+tab and is clipped inside that tab.  In presentation mode, the caption uses 10%
+left and right margins relative to the window.  Captions display the original
+user-facing instruction text, not the internally augmented Stage 1 prompt; this
+keeps emotion-hint or system prompt material out of presentation captions.
 
 The history DB remains the source of truth for renders saved by the web UI,
 `inku-cli`, Android headless CLI, and other API clients.  The web UI periodically

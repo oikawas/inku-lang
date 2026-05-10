@@ -110,6 +110,11 @@ export const en: LangPack = {
 	tabScore: 'JSON',
 
 	canvasPlaceholder: '(not yet drawn)',
+	canvasCaptionToggle: 'show instruction caption',
+	canvasPresentationOpen: 'open presentation mode',
+	canvasPresentationClose: 'close presentation mode',
+	canvasPresentationTitle: 'presentation mode',
+	canvasPresentationControls: 'presentation controls',
 	starOn: 'remove star',
 	starOff: 'add star',
 	historyStarredOnly: 'starred only',

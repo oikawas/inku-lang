@@ -110,6 +110,11 @@ export const ja: LangPack = {
 	tabScore: 'JSON',
 
 	canvasPlaceholder: '（まだ描画されていない）',
+	canvasCaptionToggle: '指示文の字幕表示',
+	canvasPresentationOpen: 'プレゼンテーションモードを開く',
+	canvasPresentationClose: 'プレゼンテーションモードを閉じる',
+	canvasPresentationTitle: 'プレゼンテーションモード',
+	canvasPresentationControls: 'プレゼンテーション操作',
 	starOn: 'スターを外す',
 	starOff: 'スターを付ける',
 	historyStarredOnly: 'スターのみ',

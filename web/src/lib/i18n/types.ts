@@ -120,6 +120,11 @@ export interface LangPack {
 
 	// Canvas
 	canvasPlaceholder: string;
+	canvasCaptionToggle: string;
+	canvasPresentationOpen: string;
+	canvasPresentationClose: string;
+	canvasPresentationTitle: string;
+	canvasPresentationControls: string;
 	starOn: string;
 	starOff: string;
 	historyStarredOnly: string;

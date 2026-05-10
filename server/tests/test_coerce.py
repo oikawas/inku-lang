@@ -1415,6 +1415,55 @@ def test_coerce_score_adds_surface_tension_for_heavy_surface_context():
     assert "surface tension restored" in (fixed.instructions[1].color_hint or "")
 
 
+def test_coerce_score_adds_visual_event_for_quiet_reflection_context():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.5],
+                    "to": [0.75, 0.5],
+                    "color": "red",
+                    "arrangement": {
+                        "count": 12,
+                        "layout": "vertical",
+                        "path": "right_half",
+                        "density": "low",
+                    },
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雨上がりの路地で、濡れた石畳が夕焼けを細く映している。")
+
+    assert any("visual event restored as a small focal pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_adds_visual_event_for_vanishing_footprint_context():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.67],
+                    "to": [0.78, 0.39],
+                    "color": "blue",
+                    "arrangement": {
+                        "count": 7,
+                        "layout": "scatter",
+                        "path": "diagonal",
+                    },
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
+
+    assert any("visual event restored as a small focal pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_adds_edge_light_event_for_dark_light_context():
     score = Score.model_validate(
         {

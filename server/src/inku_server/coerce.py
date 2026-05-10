@@ -485,9 +485,11 @@ RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
 VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
     "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける",
     "迷う", "消えかけ", "震える", "一滴", "先に帰", "丸ま", "低い雲", "押し沈", "影だけ", "滲", "涙",
+    "白い息", "映", "反射", "灯台", "光だけ", "足跡", "輪郭", "ほどけ", "花びら", "ためらう",
     "collision", "burst", "focus", "turning point", "pop", "release",
     "wandering", "fading", "trembling", "single drop", "goes home first", "curling",
     "low cloud", "pressing down", "shadow only", "blur", "tear",
+    "breath", "reflect", "reflection", "lighthouse", "only light", "footprint", "outline", "unravel", "petal",
 )
 MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
     "余白", "間", "空白", "気配", "押す", "避け", "離れ",

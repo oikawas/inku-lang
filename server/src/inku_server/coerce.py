@@ -446,9 +446,10 @@ VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
 )
 MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
     "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "先に帰", "風", "波", "ためらう",
-    "低い雲", "押し沈", "影だけ", "滲", "涙",
+    "低い雲", "押し沈", "影だけ", "滲", "涙", "震える", "一滴", "残る",
     "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
     "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
+    "trembling", "single drop", "remain", "remains",
 )
 COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
     "祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色",
@@ -892,6 +893,59 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
             data["color_hint"] = f"{hint}; {note}" if hint else note
         adjusted.append(Instruction.model_validate(data))
     return adjusted
+
+
+def _has_motion_path(instructions: list[Instruction]) -> bool:
+    return any(
+        ins.arrangement is not None and ins.arrangement.path != "none" and _expanded_count(ins) >= 3
+        for ins in instructions
+    )
+
+
+def _motion_floor_instruction(*, ddl: str | None, background: str) -> Instruction:
+    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
+    color = requested[0] if requested else ("red" if background != "red" else VISIBLE_ON_BACKGROUND.get(background, "black"))
+    return Instruction.model_validate(
+        {
+            "primitive": "arc",
+            "center": [0.58, 0.52],
+            "radius": 0.11,
+            "angle_start": 205,
+            "angle_end": 330,
+            "rotation": -16,
+            "color": color,
+            "weight": "hair",
+            "color_hint": "motion floor restored as a small directional trace",
+            "arrangement": {
+                "count": 3,
+                "layout": "scatter",
+                "path": "diagonal",
+                "margin": 0.24,
+                "density": "low",
+                "fade": "directional",
+                "preserve_space": True,
+                "rhythm_spacing": "loose",
+            },
+        }
+    )
+
+
+def _with_motion_floor(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    """動作語があるのに全体が静物化した場合だけ、少数の方向性を補う。"""
+    if not _context_has_motion(ddl):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+    if len(instructions) >= 10 or _has_motion_path(instructions):
+        return instructions
+    if any("motion floor restored" in (ins.color_hint or "") for ins in instructions):
+        return instructions
+    return [*instructions, _motion_floor_instruction(ddl=ddl, background=background)]
 
 
 def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
@@ -1488,6 +1542,10 @@ def _score_contains_color(instructions: list[Instruction], color: str) -> bool:
     return False
 
 
+def _score_contains_primary_color(instructions: list[Instruction], color: str) -> bool:
+    return any(ins.color == color for ins in instructions)
+
+
 def _color_repair_order(colors: set[str]) -> list[str]:
     ordered = [color for color in ("red", "blue", "green", "white", "black", "gray") if color in colors]
     return ordered or sorted(colors)
@@ -1563,6 +1621,41 @@ def _with_color_delivery_repair(instructions: list[Instruction], *, ddl: str | N
     if candidate_index < 0:
         return repaired
     repaired[candidate_index] = _with_color_cycle_delivery(repaired[candidate_index], _color_repair_order(missing), ddl=ddl)
+    return repaired
+
+
+def _with_primary_color_delivery(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+    """要求色が cycle の補助色だけに留まる場合、主strokeへ昇格して色の読みを強める。"""
+    requested = [
+        color
+        for color in _color_repair_order(_requested_colors_from_ddl(ddl))
+        if color != background and color not in {"white"}
+    ]
+    if not requested:
+        return instructions
+    if _color_only_constraint_from_ddl(ddl):
+        return instructions
+
+    repaired = list(instructions)
+    for color in requested:
+        if _score_contains_primary_color(repaired, color):
+            continue
+        candidate_index = next(
+            (
+                index
+                for index, ins in enumerate(repaired)
+                if ins.arrangement is not None
+                and color in ins.arrangement.color_cycle
+                and ins.primitive in ("line", "arc", "ellipse", "square", "triangle", "polygon")
+            ),
+            -1,
+        )
+        if candidate_index < 0:
+            continue
+        data = repaired[candidate_index].model_dump(by_alias=True)
+        data["color"] = color
+        _append_hint(data, f"{color} promoted to primary stroke from DDL color intent")
+        repaired[candidate_index] = Instruction.model_validate(data)
     return repaired
 
 
@@ -2569,6 +2662,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     ]
     instructions = _dedupe_instructions(instructions)
     instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
+    instructions = _with_primary_color_delivery(instructions, ddl=ddl, background=background)
     instructions = _with_color_delivery_repair(instructions, ddl=ddl)
     instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
     instructions = _with_complex_motif_repair(instructions, ddl=ddl, background=background)
@@ -2581,6 +2675,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = [_with_unintentional_filled_shape_tempering(ins, ddl=ddl) for ins in instructions]
     instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)
     instructions = _with_motion_energy(instructions, ddl=ddl)
+    instructions = _with_motion_floor(instructions, ddl=ddl, background=background)
     instructions = _with_rhythm_variation(instructions, ddl=ddl)
     instructions = _with_visual_event(instructions, ddl=ddl, background=background)
     instructions = _with_ma_pressure(instructions, ddl=ddl)

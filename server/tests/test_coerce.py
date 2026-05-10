@@ -993,6 +993,71 @@ def test_coerce_score_restores_motion_energy_without_increasing_count():
     assert "motion energy restored" in (ins.color_hint or "")
 
 
+def test_coerce_score_adds_motion_floor_when_motion_context_has_no_path():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.45, 0.45],
+                    "radius": 0.03,
+                    "color": "black",
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="黒い点が震える。")
+
+    floor = [ins for ins in fixed.instructions if "motion floor restored" in (ins.color_hint or "")]
+    assert floor
+    assert floor[0].arrangement is not None
+    assert floor[0].arrangement.count == 3
+    assert floor[0].arrangement.path == "diagonal"
+    assert floor[0].arrangement.preserve_space is True
+
+
+def test_coerce_score_adds_motion_floor_when_existing_path_is_too_small():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.45, 0.45],
+                    "size": [0.06, 0.03],
+                    "color": "gray",
+                    "arrangement": {"count": 2, "layout": "scatter", "path": "wave"},
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="一滴の水が丸く震える。")
+
+    assert any("motion floor restored" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_promotes_requested_cycle_color_to_primary_stroke():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "gray",
+                    "arrangement": {"count": 4, "layout": "horizontal", "color_cycle": ["gray", "red"]},
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="赤い余韻が薄い線として残る。")
+
+    assert fixed.instructions[0].color == "red"
+    assert "red promoted to primary stroke from DDL color intent" in (fixed.instructions[0].color_hint or "")
+
+
 def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touching_good_presence_scene():
     base = Score.model_validate(
         {

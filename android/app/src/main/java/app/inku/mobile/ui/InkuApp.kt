@@ -1470,15 +1470,26 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
             enabled = !state.isDrawing,
             modifier = Modifier.fillMaxWidth(),
         )
-        if (nonEmpty > 0) {
-            Text("${nonEmpty} 件", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                "${nonEmpty}件/100件",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.weight(1f))
+            MiniPill(
+                text = "ランダムな色カタログ",
+                selected = state.batchRandomColorCatalog,
+                onClick = if (state.isDrawing) null else {
+                    { viewModel.setBatchRandomColorCatalog(!state.batchRandomColorCatalog) }
+                },
+            )
         }
         if (!state.isDrawing) {
-            SettingCheckRow(
-                checked = state.batchRandomColorCatalog,
-                text = "描画ごとに色カタログをランダム選択",
-                onCheckedChange = viewModel::setBatchRandomColorCatalog,
-            )
             if (state.batchPromptHistory.isNotEmpty()) {
                 CompactLabel("バッチ指示履歴")
                 WrapRow(horizontal = 6.dp, vertical = 6.dp) {
@@ -1523,17 +1534,17 @@ private fun NumberedBatchTextField(
     val scrollState = rememberScrollState()
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(
+    val textStyle = MaterialTheme.typography.bodySmall.copy(
         color = MaterialTheme.colorScheme.onSurface,
-        lineHeight = 32.sp,
+        lineHeight = 17.sp,
     )
 
     Surface(
         modifier = modifier
             .height(320.dp)
             .bringIntoViewRequester(bringIntoViewRequester),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.Transparent,
+        shape = RoundedCornerShape(4.dp),
+        color = Color(0xFF191816),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(
@@ -1541,13 +1552,13 @@ private fun NumberedBatchTextField(
                 .fillMaxSize()
                 .clipToBounds()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 12.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             lines.forEachIndexed { index, line ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
                     Text(
@@ -1555,7 +1566,7 @@ private fun NumberedBatchTextField(
                         style = textStyle,
                         textAlign = TextAlign.End,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(36.dp),
+                        modifier = Modifier.width(28.dp),
                     )
                     BasicTextField(
                         value = line,
@@ -1567,7 +1578,7 @@ private fun NumberedBatchTextField(
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier
                             .weight(1f)
-                            .heightIn(min = 32.dp)
+                            .heightIn(min = 20.dp)
                             .onFocusChanged { focusState ->
                                 if (focusState.isFocused) {
                                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
@@ -1577,7 +1588,7 @@ private fun NumberedBatchTextField(
                 }
             }
             if (lineCount < 6) {
-                Spacer(Modifier.height(32.dp * (6 - lineCount)))
+                Spacer(Modifier.height(20.dp * (6 - lineCount)))
             }
         }
     }

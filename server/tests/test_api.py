@@ -626,6 +626,37 @@ def test_compose_resolves_english_instruction_language(monkeypatch, auth_context
     assert data["ui_lang"] == "ja"
 
 
+def test_language_metadata_does_not_change_render_hash():
+    item = {
+        "input": "one black line",
+        "ddl": "Draw one black line.",
+        "score": {
+            "instructions": [
+                {"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "color": "black"}
+            ]
+        },
+        "svg": "<svg><line x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\" /></svg>",
+        "render_build_number": "402",
+        "render_engine_id": "default",
+        "render_engine_version": "1",
+        "render_canvas_aspect": "square",
+        "render_canvas_aspect_id": "square",
+        "render_canvas_aspect_ratio": 1.0,
+        "render_color_catalog_id": "default",
+        "render_color_catalog_name": "inku Default",
+        "render_color_catalog_sub": "neutral baseline",
+        "render_color_map": {"black": "#111111"},
+    }
+    with_language = {
+        **item,
+        "instruction_lang_requested": "auto",
+        "instruction_lang_resolved": "en",
+        "ui_lang": "ja",
+    }
+
+    assert db.render_hash_for_item(with_language) == db.render_hash_for_item(item)
+
+
 def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
     headers, _, _ = auth_context
     fake_score = Score.model_validate(

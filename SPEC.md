@@ -68,6 +68,15 @@ records `instruction_lang_requested`, `instruction_lang_resolved`, and
 part of the current canonical `render_hash` payload, so existing history hashes
 and benchmark references remain stable.
 
+Instruction-language implementation is organized through an internal
+Instruction Language Registry.  Each registered language owns its language code,
+Stage 1 prompt, Stage 2 prompt, and Stage 1.5 expander/filter entry point.
+Japanese and English are registered by binding the existing prompts and
+expanders without changing their text or behavior.  A third-party language such
+as Spanish should be added first as a new registry entry, keeping JSON Score
+schema, renderer behavior, and color catalogs separate unless the new language
+demonstrably needs a core extension.
+
 ---
 
 ## 3. Design Principles

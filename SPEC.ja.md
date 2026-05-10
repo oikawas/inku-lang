@@ -323,7 +323,16 @@ UI は日本語で使いながら英語の指示を書く、または英語 UI �
 - `auto` の場合、サーバーは入力文字列から日本語 / 英語を軽量判定し、Stage 1 / Stage 1.5 / Stage 2 に渡す言語を決める
 - 解決結果は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` として `/api/paint`、`/api/compose`、履歴、JSONタブ、保存 artifact JSON に記録する
 - これらの言語メタデータは監査・再現補助用であり、既存履歴の `render_hash` 互換性を壊さないため、現行の `render_hash` canonical payload には含めない
-- 将来の他言語対応は、コア API を増やすのではなく、`instruction_lang` の解決と Stage prompt / filter / expander の言語別実装を差し替える形で拡張する
+- 将来の他言語対応は、コア API を増やすのではなく、Instruction Language Registry に言語サポートを追加する形で拡張する
+
+Instruction Language Registry は、各指示文言語について以下の境界をまとめる内部登録表である。
+
+- 言語コード
+- Stage 1 prompt
+- Stage 2 prompt
+- Stage 1.5 expander / filter
+
+第三者がスペイン語などを追加する場合は、JSON Score schema や renderer を変更する前に、この registry に `es` などの言語サポートを追加する。既存の `ja` / `en` は従来の prompt と expander をそのまま登録するため、registry 化それ自体は既存描画結果を変えない。言語メタデータは `render_hash` の canonical payload に含めず、既存履歴やベンチマークのハッシュ参照を安定させる。
 
 ### 6.6 二言語並行開発の意義
 
@@ -1433,6 +1442,9 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `history` テーブルに `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` カラムを追加する
 - `inku-cli paint` / `batch` / `demo-instruction` は旧 `--lang` ではなく `--instruction-lang auto|ja|en` と任意の `--ui-lang` を送信する
 - 既存履歴や `cli/tune_bench.md` のハッシュ参照を壊さないため、言語メタデータは `render_hash` の canonical payload には含めない
+- Stage 1 prompt、Stage 2 prompt、Stage 1.5 expander / filter は `InstructionLanguageSupport` として registry に登録する
+- `ja` / `en` の既存 prompt と expander は内容を変更せず registry に載せるため、描画結果の変化を伴わない
+- 第三者が追加言語を実装する場合は、まず registry に言語コード・prompt・expander を追加し、JSON Score schema / renderer / 色カタログの変更とは分離して検証する
 - build number: 402
 
 ### v1.49 (2026-05-11)

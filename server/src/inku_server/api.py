@@ -29,12 +29,13 @@ from pydantic import BaseModel, Field
 from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import compose
-from .composer import SYSTEM_PROMPT as STAGE2_PROMPT
-from .composer import SYSTEM_PROMPT_EN as STAGE2_PROMPT_EN
-from .ddl_expander import expand_intermediate_ddl
 from .interpreter import _sanitize_placement_words, interpret_detail
-from .interpreter import SYSTEM_PROMPT as STAGE1_PROMPT
-from .interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
+from .languages import (
+    expand_intermediate_for_lang,
+    normalize_instruction_lang,
+    resolve_instruction_lang,
+    stage_prompts_for_lang,
+)
 from .plugins import (
     canvas_aspect_ids,
     canvas_aspect_ratio_for_aspect,
@@ -97,28 +98,17 @@ _SRGB_COLOR_PROFILE = {
     "name": "sRGB IEC61966-2.1",
     "standard": "IEC 61966-2-1:1999",
 }
-_SUPPORTED_INSTRUCTION_LANGS = {"ja", "en"}
-_REQUESTED_INSTRUCTION_LANGS = _SUPPORTED_INSTRUCTION_LANGS | {"auto"}
-_JAPANESE_TEXT_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
-_LATIN_TEXT_RE = re.compile(r"[A-Za-z]")
 
 
 def _normalize_instruction_lang(value: str | None, *, default: str = "ja") -> str:
-    lang = (value or default).strip().lower()
-    if lang not in _REQUESTED_INSTRUCTION_LANGS:
+    try:
+        return normalize_instruction_lang(value, default=default)
+    except ValueError:
         raise HTTPException(status_code=422, detail=f"unsupported instruction language: {value}")
-    return lang
 
 
 def _resolve_instruction_lang(text: str, requested: str) -> str:
-    lang = _normalize_instruction_lang(requested)
-    if lang != "auto":
-        return lang
-    if _JAPANESE_TEXT_RE.search(text):
-        return "ja"
-    if _LATIN_TEXT_RE.search(text):
-        return "en"
-    return "ja"
+    return resolve_instruction_lang(text, requested)
 
 
 def _normalize_ui_lang(value: str | None) -> str | None:
@@ -1516,8 +1506,11 @@ def api_auth_logout(response: Response, token: str = Depends(_session_token)) ->
 
 @app.get("/api/prompts", response_model=PromptsResponse)
 def api_prompts(lang: str = Query(default="ja")) -> PromptsResponse:
-    s1 = STAGE1_PROMPT_EN if lang == "en" else STAGE1_PROMPT
-    s2 = STAGE2_PROMPT_EN if lang == "en" else STAGE2_PROMPT
+    try:
+        requested_lang = _normalize_instruction_lang(lang)
+        s1, s2 = stage_prompts_for_lang("ja" if requested_lang == "auto" else requested_lang)
+    except (HTTPException, ValueError):
+        s1, s2 = stage_prompts_for_lang("ja")
     return PromptsResponse(stage1_system=s1, stage2_system=s2)
 
 
@@ -1839,7 +1832,7 @@ def _call_compose_detail(
     system_prompt: str | None = None,
     lang: str = "ja",
 ) -> ComposeDetail:
-    ddl = expand_intermediate_ddl(ddl, lang=lang, context_text=original_text)
+    ddl = expand_intermediate_for_lang(ddl, lang=lang, context_text=original_text)
     retry_count = 0
     retry_reasons: list[str] = []
     fallback_used = False
@@ -2044,7 +2037,7 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     if req.expand_intermediate:
-        detail.ddl = expand_intermediate_ddl(detail.ddl, lang=instruction_lang_resolved, context_text=source_text)
+        detail.ddl = expand_intermediate_for_lang(detail.ddl, lang=instruction_lang_resolved, context_text=source_text)
     data: dict = {
         "ddl": detail.ddl,
         "thinking": detail.thinking,
@@ -2313,7 +2306,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     ddl = interpret_detail_result.ddl
-    ddl = expand_intermediate_ddl(ddl, lang=instruction_lang_resolved, context_text=source_text)
+    ddl = expand_intermediate_for_lang(ddl, lang=instruction_lang_resolved, context_text=source_text)
     t1 = time.perf_counter()
     try:
         compose_detail = _call_compose_detail(

@@ -51,9 +51,11 @@ android {
     buildTypes {
         debug {
             manifestPlaceholders["headlessExported"] = "true"
+            manifestPlaceholders["headlessPermission"] = ""
         }
         release {
             manifestPlaceholders["headlessExported"] = "false"
+            manifestPlaceholders["headlessPermission"] = "app.inku.mobile.permission.HEADLESS_RENDER"
         }
     }
 

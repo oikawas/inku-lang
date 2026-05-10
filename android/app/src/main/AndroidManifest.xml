@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <permission
+        android:name="${applicationId}.permission.HEADLESS_RENDER"
+        android:protectionLevel="signature" />
 
     <application
         android:name=".InkuApplication"
@@ -41,6 +44,7 @@
             android:excludeFromRecents="true"
             android:exported="${headlessExported}"
             android:noHistory="true"
+            android:permission="${headlessPermission}"
             android:theme="@style/Theme.Inku.Headless" />
     </application>
 

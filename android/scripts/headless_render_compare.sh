@@ -16,6 +16,7 @@ CATALOG_ID="${CATALOG_ID:-}"
 CANVAS_ASPECT="${CANVAS_ASPECT:-}"
 AUTO_REPAIR="${AUTO_REPAIR:-true}"
 SAVE_HISTORY="${SAVE_HISTORY:-false}"
+HEADLESS_AUTH_TOKEN="${HEADLESS_AUTH_TOKEN:-}"
 COMPARE_WEB="${COMPARE_WEB:-1}"
 CLI_SAVE_HISTORY="${CLI_SAVE_HISTORY:-true}"
 CLI_DIR="${CLI_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/cli}"
@@ -46,12 +47,26 @@ start_args=(
   --ez auto_repair "$AUTO_REPAIR"
   --ez save_history "$SAVE_HISTORY"
 )
+
+if [[ -z "$HEADLESS_AUTH_TOKEN" ]]; then
+  HEADLESS_AUTH_TOKEN="$("${adb_cmd[@]}" exec-out run-as "$APP_ID" cat "files/headless-auth-token" 2>/dev/null || true)"
+  HEADLESS_AUTH_TOKEN="$(printf '%s' "$HEADLESS_AUTH_TOKEN" | tr -d '\r\n')"
+fi
+if [[ -z "$HEADLESS_AUTH_TOKEN" ]]; then
+  "${adb_cmd[@]}" shell am start -W -n "$APP_ID/.HeadlessRenderActivity" >/dev/null 2>&1 || true
+  HEADLESS_AUTH_TOKEN="$("${adb_cmd[@]}" exec-out run-as "$APP_ID" cat "files/headless-auth-token" 2>/dev/null || true)"
+  HEADLESS_AUTH_TOKEN="$(printf '%s' "$HEADLESS_AUTH_TOKEN" | tr -d '\r\n')"
+fi
+if [[ -n "$HEADLESS_AUTH_TOKEN" ]]; then
+  start_args+=(--es auth_token "$HEADLESS_AUTH_TOKEN")
+fi
+
 if [[ "$INPUT_MODE" == "score" ]]; then
   host_input_file="$OUT_DIR/$RUN_ID/score-input.json"
   printf '%s\n' "$TEXT" > "$host_input_file"
-  "${adb_cmd[@]}" shell run-as "$APP_ID" mkdir -p "files/headless-input" >/dev/null
-  "${adb_cmd[@]}" exec-in run-as "$APP_ID" sh -c "cat > files/headless-input/$RUN_ID.txt" < "$host_input_file"
-  start_args+=(--es text_file "app:headless-input/$RUN_ID.txt")
+  "${adb_cmd[@]}" shell run-as "$APP_ID" mkdir -p "files/headless-inputs" >/dev/null
+  "${adb_cmd[@]}" exec-in run-as "$APP_ID" sh -c "cat > files/headless-inputs/$RUN_ID.txt" < "$host_input_file"
+  start_args+=(--es text_file "app:headless-inputs/$RUN_ID.txt")
 else
   start_args+=(--es text "$TEXT")
 fi

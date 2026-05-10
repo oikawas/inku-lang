@@ -168,15 +168,21 @@ private data class ProviderModelCandidate(val id: String, val label: String, val
 
 private object HistoryThumbnailCache {
     private const val THUMBNAIL_PX = 384
-    private val cache = LruCache<String, ImageBitmap>(64)
+    private const val MAX_CACHE_KB = 24 * 1024
+    private val cache = object : LruCache<String, ImageBitmap>(MAX_CACHE_KB) {
+        override fun sizeOf(key: String, value: ImageBitmap): Int {
+            return ((value.width.toLong() * value.height.toLong() * 4L) / 1024L).coerceAtLeast(1L).toInt()
+        }
+    }
 
-    suspend fun get(item: HistoryListItem): ImageBitmap? {
+    suspend fun get(context: Context, item: HistoryListItem): ImageBitmap? {
         val key = "${item.renderHash}:$THUMBNAIL_PX"
         synchronized(cache) {
             cache.get(key)?.let { return it }
         }
         return withContext(Dispatchers.Default) {
             val rendered = item.thumbnailPath
+                ?.takeIf { isAppThumbnailPath(context, it) }
                 ?.let { path -> runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull() }
             if (rendered != null) {
                 synchronized(cache) {
@@ -186,11 +192,24 @@ private object HistoryThumbnailCache {
             rendered
         }
     }
+
+    private fun isAppThumbnailPath(context: Context, path: String): Boolean {
+        return runCatching {
+            val root = File(context.filesDir, "thumbnails").canonicalFile
+            val target = File(path).canonicalFile
+            target.path.startsWith(root.path + File.separator)
+        }.getOrDefault(false)
+    }
 }
 
 private object ArtworkBitmapCache {
     private const val MAX_RENDER_PX = 2048
-    private val cache = LruCache<String, ImageBitmap>(12)
+    private const val MAX_CACHE_KB = 64 * 1024
+    private val cache = object : LruCache<String, ImageBitmap>(MAX_CACHE_KB) {
+        override fun sizeOf(key: String, value: ImageBitmap): Int {
+            return ((value.width.toLong() * value.height.toLong() * 4L) / 1024L).coerceAtLeast(1L).toInt()
+        }
+    }
 
     suspend fun get(item: HistoryItemEntity, size: IntSize, rotateLandscape: Boolean): ImageBitmap? {
         if (size.width <= 0 || size.height <= 0) return null
@@ -4257,8 +4276,9 @@ private fun CanvasPlaceholderPreview(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HistoryArtworkPreview(item: HistoryListItem, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val thumbnail by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, item.thumbnailPath) {
-        value = HistoryThumbnailCache.get(item)
+        value = HistoryThumbnailCache.get(context, item)
     }
     Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         val image = thumbnail

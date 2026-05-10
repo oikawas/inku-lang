@@ -1194,25 +1194,44 @@ rules.
   Android development and external verification require it. In release builds,
   a manifest placeholder sets it to `exported=false`, so normal distribution
   builds cannot be launched by other apps.
+- Debug builds keep `HeadlessRenderActivity` externally launchable, but the
+  activity does not proceed to rendering unless the caller passes the debug-only
+  random token stored in app-internal `files/headless-auth-token` as either the
+  `auth_token` or `headless_auth_token` extra.
+- `app.inku.mobile.permission.HEADLESS_RENDER` is declared as a signature
+  permission for `HeadlessRenderActivity`. Release builds attach this
+  permission to the activity.
 - Headless `run_id` accepts only `[A-Za-z0-9._-]{1,80}` and the canonical output
   path must remain under `files/headless/<run_id>`.
 - Headless `text_file` must not read arbitrary filesystem paths. Input may be
   passed directly through the `text` extra, or by using
   `app:headless-inputs/<file>` to read only from the app-internal dedicated
   input directory.
-- Headless input is limited to 250,000 characters.
+- Headless input is limited to 250,000 characters. `text_file` input is read
+  with an explicit limit instead of using unbounded `readText()`.
+- Headless artifacts remain under `files/headless`. At launch, old runs are
+  pruned to at most 50 run directories and at most 7 days of retention.
 - App backup is disabled. The database, history, provider settings, encrypted
   API keys, local model state, and headless outputs are excluded from cloud
   backup and device transfer.
 - Remote provider Base URLs must use HTTPS, except for device-local loopback
   HTTP (`localhost`, `127.0.0.1`, or `::1`). This preserves local Ollama / OVMS
   verification while preventing plaintext prompt/API-key transmission to LAN or
-  external HTTP endpoints.
+  external HTTP endpoints. This validation is performed both when saving a
+  provider setting and when opening a request.
 - Remote provider HTTP error bodies are redacted before display. Bearer tokens,
   NVIDIA API keys, OpenAI keys, Google API keys, and values that look like
   `api_key`, `authorization`, or `token` are hidden.
+- Remote provider HTTP response bodies are not read without limit. Successful
+  responses are capped at 2,000,000 characters; error responses are capped at
+  16,384 characters and are truncated for display. `HttpURLConnection` is always
+  disconnected in `finally`.
+- Headless results and remote-provider error display share redaction for API
+  keys, Bearer tokens, and internal device data paths.
 - The LiteRT-LM provider exposes an explicit `close()` and closes the cached
   Engine when the ViewModel is destroyed and after headless rendering finishes.
+  ViewModel destruction must not block the UI thread with `runBlocking`; close
+  runs on the Application-scope IO coroutine.
 - Draw, DDL render, batch, and demo jobs carry a run id so stale completion or
   failure callbacks from older jobs cannot overwrite the current drawing state.
 - Batch execution is limited to 100 items. Inputs above 100 non-empty lines are
@@ -1222,6 +1241,13 @@ rules.
 - Room DB stores history, provider settings, and API-key-related user data, so
   destructive migration is prohibited. Schema changes must add explicit Room
   migrations.
+- Local model downloads carry `ModelDownloadSpec.maxDownloadBytes`, and
+  downloads are aborted both when `Content-Length` is too large and when the
+  streamed byte count exceeds the limit.
+- History thumbnail decoding is allowed only for canonical paths under
+  `files/thumbnails`, preventing unexpected file decoding if the DB is damaged.
+- Compose artwork and history-thumbnail caches are limited by estimated bitmap
+  bytes rather than entry count.
 - Android build number increments only for package-producing tasks such as APK,
   bundle, and install tasks. Avoid running assemble/install for checks that need
   a clean worktree.

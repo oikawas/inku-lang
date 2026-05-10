@@ -75,6 +75,7 @@ class LocalModelDownloader(
             }
 
             val totalBytes = contentTotalBytes(connection, if (append) existingBytes else 0L)
+            totalBytes?.let { check(it <= spec.maxDownloadBytes) { "Model download is larger than the allowed limit." } }
             ensureSpace(totalBytes, modelDir)
             modelAssetDao.updateDownload(spec.modelId, "downloading", if (append) existingBytes else 0L, totalBytes, partFile.absolutePath, now())
 
@@ -105,6 +106,10 @@ class LocalModelDownloader(
             if (read < 0) break
             output.write(buffer, 0, read)
             downloaded += read
+            if (downloaded > spec.maxDownloadBytes) {
+                modelAssetDao.updateDownload(spec.modelId, "failed_size", downloaded, totalBytes, partFile.absolutePath, now())
+                error("Model download exceeded the allowed size limit.")
+            }
             val timestamp = now()
             if (timestamp - lastUpdateAt > 500L || totalBytes == downloaded) {
                 modelAssetDao.updateDownload(spec.modelId, "downloading", downloaded, totalBytes, partFile.absolutePath, timestamp)

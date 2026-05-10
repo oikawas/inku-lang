@@ -1,5 +1,6 @@
 package app.inku.mobile.llm
 
+import app.inku.mobile.security.DisplaySanitizer
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -93,21 +94,30 @@ class OpenAiCompatibleProvider(
 
     private fun postJson(url: String, payload: JSONObject): JSONObject {
         val connection = open(url, "POST")
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.doOutput = true
-        OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-            writer.write(payload.toString())
+        try {
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
+                writer.write(payload.toString())
+            }
+            return readJson(connection)
+        } finally {
+            connection.disconnect()
         }
-        return readJson(connection)
     }
 
     private fun getJson(url: String): JSONObject {
-        return readJson(open(url, "GET"))
+        val connection = open(url, "GET")
+        try {
+            return readJson(connection)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun open(url: String, method: String): HttpURLConnection {
         val parsedUrl = URL(url)
-        validateUrl(parsedUrl)
+        ProviderUrlValidator.validateRemoteBaseUrl(parsedUrl.toString())
         val connection = (parsedUrl.openConnection() as HttpURLConnection)
         connection.requestMethod = method
         connection.connectTimeout = REQUEST_TIMEOUT_MS
@@ -118,12 +128,15 @@ class OpenAiCompatibleProvider(
     }
 
     private fun readJson(connection: HttpURLConnection): JSONObject {
-        val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
-        val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-        if (connection.responseCode !in 200..299) {
+        val success = connection.responseCode in 200..299
+        val stream = if (success) connection.inputStream else connection.errorStream
+        val (body, truncated) = readTextLimited(stream, if (success) MAX_RESPONSE_CHARS else MAX_ERROR_CHARS)
+        if (!success) {
             val host = connection.url.host.orEmpty()
-            error("HTTP ${connection.responseCode} from $host: ${redactForDisplay(body).take(180)}")
+            val suffix = if (truncated) " [truncated]" else ""
+            error("HTTP ${connection.responseCode} from $host: ${DisplaySanitizer.redact(body).take(180)}$suffix")
         }
+        require(!truncated) { "Remote response was too large." }
         return JSONObject(body)
     }
 
@@ -131,36 +144,28 @@ class OpenAiCompatibleProvider(
         return baseUrl.trimEnd('/') + path
     }
 
-    private fun validateUrl(url: URL) {
-        val protocol = url.protocol.lowercase()
-        val host = url.host.orEmpty()
-        val secure = protocol == "https"
-        val loopbackHttp = protocol == "http" && isLoopbackHost(host)
-        require(secure || loopbackHttp) {
-            "安全でないBase URLです。HTTPS、または端末内localhost/127.0.0.1のHTTPのみ使用できます。"
+    private fun readTextLimited(stream: java.io.InputStream?, maxChars: Int): Pair<String, Boolean> {
+        if (stream == null) return "" to false
+        stream.bufferedReader(Charsets.UTF_8).use { reader ->
+            val buffer = CharArray(8192)
+            val builder = StringBuilder()
+            while (true) {
+                val read = reader.read(buffer)
+                if (read < 0) return builder.toString() to false
+                val remaining = maxChars - builder.length
+                if (remaining <= 0) return builder.toString() to true
+                if (read > remaining) {
+                    builder.append(buffer, 0, remaining)
+                    return builder.toString() to true
+                }
+                builder.append(buffer, 0, read)
+            }
         }
-    }
-
-    private fun isLoopbackHost(host: String): Boolean {
-        val normalized = host.lowercase()
-        return normalized == "localhost" ||
-            normalized == "127.0.0.1" ||
-            normalized == "::1" ||
-            normalized == "[::1]"
-    }
-
-    private fun redactForDisplay(body: String): String {
-        return body
-            .replace(Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE), "Bearer [redacted]")
-            .replace(Regex("nvapi-[A-Za-z0-9._~+/=-]+"), "nvapi-[redacted]")
-            .replace(Regex("sk-[A-Za-z0-9._~+/=-]+"), "sk-[redacted]")
-            .replace(Regex("AIza[0-9A-Za-z_-]+"), "AIza[redacted]")
-            .replace(Regex("(?i)(api[_-]?key|authorization|token)\"?\\s*[:=]\\s*\"?[A-Za-z0-9._~+/=-]+"), "\$1=[redacted]")
-            .lineSequence()
-            .joinToString(" ") { it.trim() }
     }
 
     private companion object {
         private const val REQUEST_TIMEOUT_MS = 600_000
+        private const val MAX_RESPONSE_CHARS = 2_000_000
+        private const val MAX_ERROR_CHARS = 16_384
     }
 }

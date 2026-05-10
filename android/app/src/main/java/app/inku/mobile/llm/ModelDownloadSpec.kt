@@ -8,6 +8,7 @@ data class ModelDownloadSpec(
     val licenseUrl: String,
     val expectedSha256: String?,
     val fileName: String,
+    val maxDownloadBytes: Long = 10L * 1024L * 1024L * 1024L,
 )
 
 object DefaultModelDownloads {

@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -220,7 +219,9 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         drawingJob?.cancel()
         modelDownloadJob?.cancel()
         litertWarmupJob?.cancel()
-        runBlocking(Dispatchers.IO) { repository.close() }
+        (getApplication() as InkuApplication).applicationScope.launch {
+            repository.close()
+        }
         super.onCleared()
     }
 

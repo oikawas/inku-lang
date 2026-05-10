@@ -16,6 +16,7 @@ import app.inku.mobile.llm.LocalLiteRtLmProvider
 import app.inku.mobile.llm.LocalModelDownloader
 import app.inku.mobile.llm.ModelDownloadSpec
 import app.inku.mobile.llm.ModelRequest
+import app.inku.mobile.llm.ProviderUrlValidator
 import app.inku.mobile.llm.RoutingModelProvider
 import app.inku.mobile.pipeline.LocalFallbackPipeline
 import app.inku.mobile.pipeline.PaintRequest
@@ -154,12 +155,16 @@ class InkuRepository(
     ) {
         val cleanId = providerId.trim().lowercase()
         require(cleanId.matches(Regex("[a-z0-9][a-z0-9_-]*"))) { "Service ID は英数字・_・- で入力してください。" }
+        val cleanBaseUrl = baseUrl?.trim()?.ifBlank { null }
+        if (cleanId != "local-litert-lm" && cleanBaseUrl != null) {
+            ProviderUrlValidator.validateRemoteBaseUrl(cleanBaseUrl)
+        }
         val existing = database.providerSettingDao().get(cleanId)
         val next = ProviderSettingEntity(
             providerId = cleanId,
             displayName = displayName.trim().ifBlank { cleanId },
             kind = kind.trim().ifBlank { "openai-compatible" },
-            baseUrl = baseUrl?.trim()?.ifBlank { null },
+            baseUrl = cleanBaseUrl,
             encryptedApiKey = apiKey
                 ?.takeIf { it.isNotBlank() }
                 ?.let { AndroidSecretBox.encrypt(it) }

@@ -880,17 +880,25 @@ Android 独自仕様として、`設定 > モデル設定 > LiteRT-LM` パネル
 Android 版の安定性とローカルデータ保護のため、以下を実装する。
 
 - `HeadlessRenderActivity` は Android 開発・外部検証に必須のため、debug build では `exported=true` を維持する。一方、release build では manifest placeholder により `exported=false` とし、通常配布版では外部アプリから起動できないようにする。
+- debug build の `HeadlessRenderActivity` は外部起動可能性を維持するが、アプリ内部領域 `files/headless-auth-token` に生成した debug 専用ランダム token を `auth_token` または `headless_auth_token` extra として渡さない限り、描画処理へ進まない。
+- `HeadlessRenderActivity` 用に `app.inku.mobile.permission.HEADLESS_RENDER` を signature permission として定義する。release build ではこの permission を activity に設定する。
 - headless `run_id` は `[A-Za-z0-9._-]{1,80}` のみ許可し、出力先 canonical path が `files/headless/<run_id>` 配下であることを検証する。
 - headless `text_file` は任意ファイルパスを許可しない。`text` extra 直接指定、または `app:headless-inputs/<file>` 形式でアプリ内部の専用入力ディレクトリ配下だけを読む。
-- headless 入力は最大 250,000 文字に制限する。
+- headless 入力は最大 250,000 文字に制限する。`text_file` も全量 `readText()` で読むのではなく、上限を超えた時点で拒否する。
+- headless 出力 artifact は `files/headless` 配下に限定し、最大 50 run、または 7 日を超えた古い run を起動時に削除する。
 - アプリバックアップは無効化する。DB、履歴、provider 設定、暗号化済み API key、ローカルモデル状態、headless 出力を cloud backup / device transfer の対象にしない。
-- remote provider の Base URL は HTTPS、または端末内 loopback (`localhost` / `127.0.0.1` / `::1`) の HTTP のみ許可する。Ollama / OVMS のローカル検証用途は維持し、LAN / 外部 HTTP への prompt・API key 平文送信は許可しない。
+- remote provider の Base URL は HTTPS、または端末内 loopback (`localhost` / `127.0.0.1` / `::1`) の HTTP のみ許可する。Ollama / OVMS のローカル検証用途は維持し、LAN / 外部 HTTP への prompt・API key 平文送信は許可しない。この検証は保存時と使用時の両方で行う。
 - remote provider の HTTP エラー本文は UI 表示前に redaction し、Bearer token、NVIDIA API key、OpenAI key、Google API key、`api_key` / `authorization` / `token` らしき値を伏せる。
-- LiteRT-LM provider は明示的な `close()` を持ち、ViewModel 破棄時および headless render 完了時に cached Engine を閉じる。
+- remote provider の HTTP response body は無制限に読み込まない。成功応答は最大 2,000,000 文字、エラー応答は最大 16,384 文字まで読み、超過時は拒否または切り詰めて表示する。`HttpURLConnection` は成功・失敗に関わらず `disconnect()` する。
+- headless result と remote provider error display には共通 redaction を適用し、API key、Bearer token、端末内データパスをそのまま表示・保存しない。
+- LiteRT-LM provider は明示的な `close()` を持ち、ViewModel 破棄時および headless render 完了時に cached Engine を閉じる。ViewModel 破棄時の close は UI thread を `runBlocking` で止めず、Application scope の IO coroutine で実行する。
 - 描画、DDL描画、バッチ、デモは run id を持ち、古い Job の完了・失敗通知が新しい描画状態を上書きしないようにする。
 - バッチ実行は最大 100 件までとする。100 件を超える入力は実行前に拒否する。
 - デモ実行は開始 1 回あたり最大 100 サイクルまでとし、上限到達時に停止する。
 - Room DB は履歴、provider 設定、API key 関連のユーザーデータを保持するため、破壊的 migration を使わない。schema 変更時は明示的な Room migration を追加する。
+- ローカルモデル download は `ModelDownloadSpec.maxDownloadBytes` を持ち、Content-Length 判明時と stream 中の両方で上限を超える download を中断する。
+- 履歴サムネイルの decode は `files/thumbnails` 配下の canonical path のみ許可する。DB破損や想定外 path による任意ファイル decode を避ける。
+- Compose の artwork / history thumbnail cache は entry 数ではなく推定 bitmap byte 数で制限する。
 - Android build number は APK / bundle / install など package 生成系 task のみで increment する。clean な作業ツリーが必要な確認では assemble/install を不用意に実行しない。
 
 ## 2026-05-10 Android 性能最適化

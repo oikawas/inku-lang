@@ -125,6 +125,7 @@ import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
+import app.inku.mobile.pipeline.WebDdlSpec
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -320,13 +321,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     }
     var vocabularyOpen by remember { mutableStateOf(false) }
     var vocabularyQuery by remember { mutableStateOf("") }
-    val vocabularyTokens = remember {
-        saijikiGroups.flatMapIndexed { index, group ->
-            group.words.map { word ->
-                DdlVocabularyToken(word = word, group = group, color = saijikiGroupColors[index % saijikiGroupColors.size])
-            }
-        }.distinctBy { it.word }.sortedByDescending { it.word.length }
-    }
+    val vocabularyTokens = rememberDdlVocabularyTokens()
     val allVocabularyWords = remember(vocabularyTokens) { vocabularyTokens.map { it.word } }
     val detectedWords = remember(editorValue.text) {
         vocabularyTokens.filter { editorValue.text.contains(it.word) }
@@ -421,6 +416,17 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun rememberDdlVocabularyTokens(): List<DdlVocabularyToken> {
+    return remember {
+        saijikiGroups.flatMapIndexed { index, group ->
+            group.words.map { word ->
+                DdlVocabularyToken(word = word, group = group, color = saijikiGroupColors[index % saijikiGroupColors.size])
+            }
+        }.distinctBy { it.word }.sortedByDescending { it.word.length }
     }
 }
 
@@ -1299,8 +1305,11 @@ private fun CanvasHeroCard(
     if (!presentation && showControls) item?.let {
         when (state.renderTab) {
             RenderTab.Artwork -> Unit
-            RenderTab.Prompt -> RenderTextView(renderPromptText(it), Modifier.fillMaxWidth().height(180.dp))
-            RenderTab.Json -> RenderTextView(renderJsonText(it), Modifier.fillMaxWidth().height(220.dp))
+            RenderTab.Prompt -> RenderTextView(
+                renderPromptText(it, state.litertStage1PromptOptimization),
+                Modifier.fillMaxWidth().height(360.dp),
+            )
+            RenderTab.Json -> RenderTextView(renderJsonText(it), Modifier.fillMaxWidth().height(360.dp))
         }
     }
 }
@@ -1405,12 +1414,10 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
         if (state.saijikiOpen) {
             SaijikiPanel(viewModel)
         }
-        DenseMultilineInput(
+        DdlPreviewBox(
             value = state.ddl,
-            onValueChange = viewModel::setDdl,
+            onClick = viewModel::openDdlEditor,
             modifier = Modifier.fillMaxWidth(),
-            minLines = 6,
-            maxLines = 10,
         )
         DrawingActionButton(
             idleText = "▶  DDLから描画",
@@ -1420,7 +1427,6 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             onStop = viewModel::stopDrawing,
             tonal = true,
         )
-        MetaPanel(state)
     }
 }
 
@@ -1827,10 +1833,10 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
         ) {
             Text("設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
         }
-        SettingsListItem(mark = "◐", title = "表示設定", sub = "言語・テーマ・密度", onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(mark = "◇", title = "モデル設定", sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
         SettingsListItem(mark = "◉", title = "デモ設定", sub = "シードフレーズ", onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
         SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
+        SettingsListItem(mark = "◐", title = "その他", sub = "言語・テーマ・密度", onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(
             mark = "#",
             title = "バージョン情報",
@@ -2037,6 +2043,8 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     onAcceptModelLicense = viewModel::acceptModelLicense,
                     onDownloadModel = viewModel::downloadModel,
                     onRedownloadModel = viewModel::redownloadModel,
+                    litertStage1PromptOptimization = state.litertStage1PromptOptimization,
+                    onLiteRtStage1PromptOptimizationChange = viewModel::setLiteRtStage1PromptOptimization,
                     statusMessage = state.message,
                 )
             }
@@ -2057,6 +2065,8 @@ private fun ProviderConnectionCard(
     onAcceptModelLicense: (String) -> Unit,
     onDownloadModel: (String) -> Unit,
     onRedownloadModel: (String) -> Unit,
+    litertStage1PromptOptimization: Boolean,
+    onLiteRtStage1PromptOptimizationChange: (Boolean) -> Unit,
     statusMessage: String?,
 ) {
     val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
@@ -2093,6 +2103,18 @@ private fun ProviderConnectionCard(
                 action = "編集",
                 onAction = { editBaseUrlOpen = true },
             )
+            if (provider.isDefaultLocal) {
+                SettingCheckRow(
+                    checked = litertStage1PromptOptimization,
+                    text = "プロンプト最適化",
+                    onCheckedChange = onLiteRtStage1PromptOptimizationChange,
+                )
+                Text(
+                    "ONの場合、LiteRT-LMのStage 1だけ圧縮版system promptを使用します。server互換モデルには影響しません。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -2645,7 +2667,7 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Models -> "モデル設定"
     SettingsPane.Demo -> "デモ設定"
     SettingsPane.Export -> "エクスポート"
-    SettingsPane.Misc -> "表示設定"
+    SettingsPane.Misc -> "その他"
     SettingsPane.Version -> "バージョン情報"
 }
 
@@ -3236,7 +3258,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                 } else {
                     when (state.renderTab) {
                         RenderTab.Artwork -> ArtworkPreview(item, modifier = Modifier.fillMaxSize())
-                        RenderTab.Prompt -> RenderTextView(renderPromptText(item), Modifier.fillMaxSize())
+                        RenderTab.Prompt -> RenderTextView(renderPromptText(item, state.litertStage1PromptOptimization), Modifier.fillMaxSize())
                         RenderTab.Json -> RenderTextView(renderJsonText(item), Modifier.fillMaxSize())
                     }
                 }
@@ -3264,19 +3286,35 @@ private fun RenderTextView(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-private fun renderPromptText(item: HistoryItemEntity): String {
+private fun renderPromptText(item: HistoryItemEntity, litertStage1PromptOptimization: Boolean): String {
+    val usesLiteRt = item.stage1Model.isLiteRtModelId() || item.stage2Model.isLiteRtModelId()
+    val stage1System = if (usesLiteRt && litertStage1PromptOptimization) {
+        WebDdlSpec.buildStage1LiteRtSystemPrompt(item.originalInput)
+    } else {
+        WebDdlSpec.stage1SystemPromptForDisplay()
+    }
+    val stage2System = if (usesLiteRt) {
+        WebDdlSpec.stage2LiteRtSystemPromptForDisplay()
+    } else {
+        WebDdlSpec.stage2SystemPromptForDisplay()
+    }
     return buildString {
-        appendLine("original:")
+        appendLine("Stage 1 input:")
         appendLine(item.originalInput)
         appendLine()
-        appendLine("normalized DDL:")
+        appendLine("Stage 1 system:")
+        appendLine(stage1System)
+        appendLine()
+        appendLine("Stage 2 input:")
         appendLine(item.normalizedDdl)
-        item.expandedDdl?.let {
-            appendLine()
-            appendLine("expanded DDL:")
-            appendLine(it)
-        }
+        appendLine()
+        appendLine("Stage 2 system:")
+        appendLine(stage2System)
     }
+}
+
+private fun String?.isLiteRtModelId(): Boolean {
+    return this?.startsWith("local-litert-lm:") == true
 }
 
 private fun renderJsonText(item: HistoryItemEntity): String {
@@ -3554,8 +3592,59 @@ private fun kotlinx.coroutines.CoroutineScope.launchImeBringIntoViewGuard(reques
 private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
     WrapRow(horizontal = 6.dp, vertical = 6.dp) {
         MiniPill("歳時記", selected = state.saijikiOpen, onClick = viewModel::toggleSaijiki)
-        MiniPill("編集", onClick = viewModel::openDdlEditor)
         MiniPill("補正", selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
+    }
+}
+
+@Composable
+private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val vocabularyTokens = rememberDdlVocabularyTokens()
+    val visualTransformation = remember(vocabularyTokens) {
+        DdlKeywordHighlightTransformation(vocabularyTokens)
+    }
+    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Box(
+        modifier = modifier
+            .background(Color(0xFF191816), RoundedCornerShape(4.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .clickable(onClick = onClick),
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 112.dp)
+                .pointerInput(value) {
+                    detectTapGestures(onTap = { onClick() })
+                }
+                .drawBehind {
+                    val layout = textLayoutResult ?: return@drawBehind
+                    drawDdlKeywordHighlights(layout, value, vocabularyTokens)
+                },
+            textStyle = MaterialTheme.typography.bodySmall.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 17.sp,
+            ),
+            cursorBrush = SolidColor(Color.Transparent),
+            visualTransformation = visualTransformation,
+            onTextLayout = { textLayoutResult = it },
+            minLines = 6,
+            maxLines = 10,
+            decorationBox = { innerTextField ->
+                if (value.isBlank()) {
+                    Text(
+                        "解釈を待機中...",
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 17.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    innerTextField()
+                }
+            },
+        )
     }
 }
 

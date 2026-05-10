@@ -86,6 +86,7 @@ data class InkuUiState(
     val historySelectionCanvas: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val historySelectionCatalog: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val ddlAutoRepairEnabled: Boolean = false,
+    val litertStage1PromptOptimization: Boolean = false,
     val saijikiOpen: Boolean = false,
     val ddlEditorOpen: Boolean = false,
     val isDrawing: Boolean = false,
@@ -498,6 +499,11 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         persistSetting("ddl_auto_repair", JSONObject().put("enabled", enabled).toString())
     }
 
+    fun setLiteRtStage1PromptOptimization(enabled: Boolean) {
+        localState.value = localState.value.copy(litertStage1PromptOptimization = enabled, message = null)
+        persistSetting("litert_stage1_prompt_optimization", JSONObject().put("enabled", enabled).toString())
+    }
+
     fun toggleSaijiki() {
         val current = localState.value
         localState.value = current.copy(saijikiOpen = !current.saijikiOpen, message = null)
@@ -607,6 +613,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.selectedModelId,
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
+                        current.litertStage1PromptOptimization,
                     )
                 }
                 localState.value = localState.value.copy(
@@ -623,6 +630,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.selectedModelId,
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
+                        current.litertStage1PromptOptimization,
                     )
                 }
             }.onSuccess { item ->
@@ -655,7 +663,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled)
+                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization)
                 }
             }.onSuccess { item ->
                 promptEditedByUser = false
@@ -729,6 +737,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                             stage2ModelId = current.selectedStage2ModelId,
                             autoRepair = current.ddlAutoRepairEnabled,
                             historyInput = "#$lineNumber $prompt",
+                            litertStage1PromptOptimization = current.litertStage1PromptOptimization,
                         )
                     }
                 }.onSuccess { item ->
@@ -839,6 +848,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                                 stage2ModelId = cycle.selectedStage2ModelId,
                                 autoRepair = cycle.ddlAutoRepairEnabled,
                                 historyInput = "[demo] $prompt",
+                                litertStage1PromptOptimization = cycle.litertStage1PromptOptimization,
                             )
                         }
                     }.onSuccess { item ->
@@ -1066,6 +1076,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val histCanvas = repository.getSetting("history_selection_canvas")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
         val histCatalog = repository.getSetting("history_selection_catalog")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val ddlAutoRepair = repository.getSetting("ddl_auto_repair")?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
+        val litertPromptOptimization = repository.getSetting("litert_stage1_prompt_optimization")?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
         val batchRandom = repository.getSetting("batch_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
         val demoSeed = repository.getSetting("demo_seed_phrase")?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = repository.getSetting("demo_interval_seconds")?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
@@ -1089,6 +1100,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             historySelectionCanvas = histCanvas,
             historySelectionCatalog = histCatalog,
             ddlAutoRepairEnabled = ddlAutoRepair,
+            litertStage1PromptOptimization = litertPromptOptimization,
             batchRandomColorCatalog = batchRandom,
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),

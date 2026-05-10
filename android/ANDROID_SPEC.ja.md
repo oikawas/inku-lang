@@ -831,7 +831,10 @@ Android 版の LiteRT-LM 実行は、比較再現性と調査容易性を優先�
   - `paint_start` / `paint_done`: 選択 model、prompt length、catalog、canvas、total elapsed、render hash
   - `stage1_start` / `stage1_done` / `stage1_failed`
   - `stage2_start` / `stage2_done` / `stage2_failed`
+  - `stage2_invalid`: 初回 Stage 2 出力が retry へ回った理由、response length、instructions 有無、短い preview
   - `render_start` / `render_done`
+- LiteRT-LM Stage 2 では、Gemma が `0. 0`、`0. 01`、`50 0` のように JSON 数値の内部へ空白を混入させることがあるため、Stage 2 system prompt に数値内部空白の禁止例を明記する。
+- Stage 2 JSON 取り込み側では、strict parse、JSON object substring parse、LiteRT-LM 数値空白補修後 parse の順に試行する。さらに `org.json` が壊れた数値を文字列として受けた場合も、key と文字列 value を trim し、数値に見える文字列だけを `Int` / `Long` / `Double` へ正規化する。key 内の改行・空白崩れは schema 互換の snake_case へ正規化する。
 - これらのログは performance investigation 用であり、履歴 JSON、Score、SVG、render metadata の server/web 互換形式を変更しない。
 - `engine_init_ms`、`stage1_ms`、`stage2_ms`、`render_ms`、`model_id`、`prompt_chars` は adb logcat から収集し、必要に応じて `no-git-sync/perf-logs/` に保存する。`no-git-sync` 配下の計測ログは git 管理対象外とする。
 
@@ -840,3 +843,34 @@ Android 版の LiteRT-LM 実行は、比較再現性と調査容易性を優先�
 - E2B: `engine_init_ms=6741`、`stage1_ms=18422`、`stage2_ms=89507`、`render_ms=13`、total `107956ms`。Stage 2 は再投入が発生した。
 - E4B: 初回 `perf-litert-e4b-003` は Stage 1 engine init 中に process 終了。再実行 `perf-litert-e4b-004` は `engine_init_ms=12011`、`stage1_ms=29937`、`stage2_ms=41931`、`render_ms=47`、total `71933ms`。Stage 2 は再投入が発生した。
 - `ConversationConfig(systemInstruction=...)` 化により user prompt 側の `prompt_chars` は Stage 1 で 31、Stage 2 で 132 程度まで短縮されるが、system prompt は別枠で渡るため、総処理時間の改善は model output と retry の有無に強く依存する。
+- Stage 1 prompt 最適化 ON、E2B、同一指示文で `perf-litert-e2b-opt-002` を実行したところ、初回 Stage 2 出力は `0. 0`、`0. 01`、`50 0` のような数値内部空白を含む JSON で、`stage2_invalid reason=json_extract_failed` により retry へ回った。
+- 数値内部空白禁止 prompt と JSON 取り込み補修を追加後、同一条件の `perf-litert-e2b-opt-004` は retry なしで完了した。実測は `engine_init_ms=3644`、`stage1_ms=10223`、`stage2_ms=28124`、total `38466ms`、render hash short `DCB9`。
+- 同じ指示文を server 側 `inku-cli paint` で `nvidia:google/gemma-4-31b-it`、`ink_season`、server 有効 canvas `wide` にて実行した `server-stage2-retry-001` では、`compose_retry_count=0`、`compose_retry_reasons=[]`、`compose_fallback_used=false`、`elapsed_stage2_ms=26060`、`tokens_out_stage2=351` であり、server 側 Stage 2 retry は発生しなかった。
+- 以上から、今回観測した retry は server 共通の Stage 2 仕様問題ではなく、Android LiteRT-LM / Gemma E2B の自由テキスト JSON 出力が壊れる局所問題として扱う。ただし JSON 補修は provider 非依存の Score 取り込み層に置くため、他 provider が同種の壊れた JSON を返した場合にも防御的に有効とする。
+
+## 2026-05-10 LiteRT-LM Stage 1 プロンプト最適化オプション
+
+Android 独自仕様として、`設定 > モデル設定 > LiteRT-LM` パネルに `プロンプト最適化` チェックボックスを追加する。
+
+- 設定値は Room `app_settings` の `litert_stage1_prompt_optimization` に保存し、再起動後に復元する。
+- デフォルトは OFF とする。
+- ON の場合でも、対象は Stage 1 model が `local-litert-lm:` のときだけとする。OpenAI / Claude / Gemini / NVIDIA / Ollama / OVMS などの非ローカル provider には影響させない。
+- ON の場合、Stage 1 system prompt は web/server 版の巨大な Stage 1 prompt ではなく、LiteRT-LM 専用の圧縮版を `ConversationConfig(systemInstruction=...)` に渡す。
+- 圧縮版 Stage 1 prompt は、以下の契約を維持する。
+  - 正規化DDL本文のみを出力する。
+  - Saijiki 語彙、属性保持、数量具体化、配置明示、ランダム禁止、点/粒/星/雨/雪/砂/花びらの真円固定禁止、人/顔/動物の非具象化、背景コントラスト保持、灰背景禁止を保持する。
+  - 入力に近い Stage 1 変換例を少数だけ選び、prompt size を抑える。
+- DDL、Score、SVG、履歴 JSON、render metadata の保存形式は変更しない。
+- headless render でも同設定を参照する。CLI/ADB extras の `litert_stage1_prompt_optimization` が指定された場合は、その値を優先する。
+- 圧縮版 prompt の導入にあたり、通常 Stage 1 prompt より十分短いことと、主要 fixture の変換例出力が一致することを unit test で確認する。
+
+## 2026-05-10 Prompt タブ表示と LiteRT-LM 圧縮 prompt 表示
+
+描画画面 / 履歴画面の `Prompt` タブは、原則として server/web 版の `/api/prompts` 表示に合わせる。
+
+- 非 LiteRT-LM 描画では、履歴の保存時点の system prompt 文字列を DB に保存せず、表示時点の Android 実装が持つ通常の Stage 1 / Stage 2 system prompt を再構成して表示する。
+- この通常表示では、履歴の model 種別による Stage 2 prompt 分岐や、入力文に応じた Stage 1 example 再選択を行わない。server/web の `OutputTabsContent` と同様に、通常の Stage 1 input、Stage 1 system、Stage 2 input、Stage 2 system を表示する。
+- Android 独自仕様として、`stage1_model` または `stage2_model` が `local-litert-lm:` で始まる履歴は LiteRT-LM 描画として扱い、`Prompt` タブに LiteRT-LM 用 prompt を表示する。
+- LiteRT-LM 描画の Stage 2 system prompt は、常に LiteRT-LM 専用の圧縮版 Stage 2 prompt を表示する。
+- LiteRT-LM 描画の Stage 1 system prompt は、表示時点の `litert_stage1_prompt_optimization` 設定を反映する。ON の場合は LiteRT-LM 専用の圧縮版 Stage 1 prompt を表示し、OFF の場合は通常 Stage 1 system prompt を表示する。
+- この仕様は Android の表示上の独自差分であり、DDL、Score、SVG、履歴 JSON、render metadata、render hash の保存形式は変更しない。

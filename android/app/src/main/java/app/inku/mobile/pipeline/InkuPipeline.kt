@@ -67,6 +67,7 @@ data class PaintRequest(
     val colorCatalogId: String,
     val canvasAspect: String,
     val autoRepair: Boolean,
+    val litertStage1PromptOptimization: Boolean = false,
 )
 
 data class PaintResult(

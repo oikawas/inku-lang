@@ -146,7 +146,7 @@ class LocalFallbackPipeline(
                     prompt = request.description,
                     temperature = 0.2,
                     maxTokens = 1024,
-                    systemInstruction = WebDdlSpec.buildStage1SystemPrompt(request.description),
+                    systemInstruction = stage1SystemPromptFor(request.stage1Model, request.description, request.litertStage1PromptOptimization),
                 ),
             ).text.cleanModelText().normalizeStage1DdlText()
             if (!generated.isUsableStage1Ddl()) {
@@ -194,11 +194,15 @@ class LocalFallbackPipeline(
                     tool = WebScoreTool.submitScore,
                 ),
             ).text.cleanModelText()
-            val score = runCatching {
+            val extracted = runCatching {
                 WebScoreTool.extractJsonObject(response)
-            }.getOrNull()
+            }
+            val score = extracted.getOrNull()
                 ?.takeIf { WebScoreTool.hasRenderableInstructions(it) }
-                ?: retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
+                ?: run {
+                    logStage2InvalidResponse(request.stage2Model, response, extracted.exceptionOrNull(), extracted.getOrNull())
+                    retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
+                }
             normalizeServerScore(score, expandedDdl, request.canvasAspect).toString()
         }.onSuccess { scoreJson ->
             Log.i(
@@ -248,11 +252,44 @@ class LocalFallbackPipeline(
         return scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect)
     }
 
+    private fun logStage2InvalidResponse(modelId: String, response: String, error: Throwable?, score: JSONObject?) {
+        val reason = when {
+            error != null -> "json_extract_failed"
+            score == null -> "json_extract_failed"
+            score.optJSONArray("instructions") == null -> "missing_instructions"
+            else -> "no_renderable_instructions"
+        }
+        val instructions = score?.optJSONArray("instructions")
+        Log.i(
+            PERF_TAG,
+            "stage2_invalid model_id=$modelId reason=$reason response_chars=${response.length} " +
+                "has_instructions=${instructions != null} instructions_count=${instructions?.length() ?: 0} " +
+                "error=${error?.message?.let(::logPreview) ?: "-"} preview=${logPreview(response)}",
+        )
+    }
+
+    private fun logPreview(text: String, limit: Int = 180): String {
+        return text
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(limit)
+            .replace("|", "/")
+            .ifBlank { "-" }
+    }
+
     private fun stage2SystemPromptFor(modelId: String): String {
         return if (modelId.startsWith("local-litert-lm:")) {
             WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA_LITERT
         } else {
             WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA
+        }
+    }
+
+    private fun stage1SystemPromptFor(modelId: String, text: String, optimizeLiteRt: Boolean): String {
+        return if (optimizeLiteRt && modelId.startsWith("local-litert-lm:")) {
+            WebDdlSpec.buildStage1LiteRtSystemPrompt(text)
+        } else {
+            WebDdlSpec.buildStage1SystemPrompt(text)
         }
     }
 

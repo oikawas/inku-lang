@@ -1551,6 +1551,34 @@ def test_coerce_score_keeps_visual_event_as_arc_when_angular_anchor_exists():
     assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_shapes_repeated_lines_as_event_without_adding_density():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.12, 0.5],
+                    "to": [0.88, 0.5],
+                    "color": "red",
+                    "arrangement": {"count": 12, "layout": "horizontal"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="風鈴の余韻が薄い影を揺らしている。")
+
+    line = next(ins for ins in fixed.instructions if ins.primitive == "line")
+    assert line.arrangement is not None
+    assert line.arrangement.count == 12
+    assert line.arrangement.rhythm_spacing == "syncopated"
+    assert line.arrangement.preserve_space is True
+    assert line.arrangement.margin >= 0.18
+    assert line.from_ != (0.12, 0.5)
+    assert line.to != (0.88, 0.5)
+    assert "repetition event shaped with syncopated gaps" in (line.color_hint or "")
+
+
 def test_coerce_score_adds_edge_light_event_for_dark_light_context():
     score = Score.model_validate(
         {

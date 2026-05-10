@@ -991,6 +991,58 @@ def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) 
     return adjusted
 
 
+def _clamp_unit(value: float) -> float:
+    return min(max(value, 0.0), 1.0)
+
+
+def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """反復線が支配する場面では、線群自体に間隔差と欠落感を作る。"""
+    if not (
+        _context_has_motion(ddl)
+        or _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS)
+        or _context_has_marker(ddl, RHYTHM_CONTEXT_MARKERS)
+    ):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for index, ins in enumerate(instructions):
+        if ins.primitive != "line" or ins.arrangement is None or _expanded_count(ins) < 6:
+            adjusted.append(ins)
+            continue
+        data = ins.model_dump(by_alias=True)
+        arr_data = dict(data["arrangement"])
+        changed = False
+        if arr_data.get("rhythm_spacing", "none") in ("none", "loose"):
+            arr_data["rhythm_spacing"] = "syncopated"
+            changed = True
+        if float(arr_data.get("margin") or 0.1) < 0.18:
+            arr_data["margin"] = 0.18
+            changed = True
+        if arr_data.get("fade", "none") == "none":
+            arr_data["fade"] = "directional"
+            changed = True
+        if not arr_data.get("preserve_space", False):
+            arr_data["preserve_space"] = True
+            changed = True
+        if arr_data.get("path", "none") == "none":
+            arr_data["path"] = "wave" if index % 2 == 0 else "diagonal"
+            changed = True
+        if ins.from_ is not None and ins.to is not None and _shape_extent(ins) >= 0.35:
+            offset = 0.035 if index % 2 == 0 else -0.035
+            data["from"] = [_clamp_unit(float(ins.from_[0]) + 0.04), _clamp_unit(float(ins.from_[1]) + offset)]
+            data["to"] = [_clamp_unit(float(ins.to[0]) - 0.10), _clamp_unit(float(ins.to[1]) - offset)]
+            changed = True
+        if changed:
+            data["arrangement"] = arr_data
+            _append_hint(data, "repetition event shaped with syncopated gaps")
+            adjusted.append(Instruction.model_validate(data))
+        else:
+            adjusted.append(ins)
+    return adjusted
+
+
 def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
     return any(
         ins.primitive in ("square", "triangle", "polygon") and _shape_extent(ins) >= 0.035
@@ -2707,6 +2759,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_motion_energy(instructions, ddl=ddl)
     instructions = _with_motion_floor(instructions, ddl=ddl, background=background)
     instructions = _with_rhythm_variation(instructions, ddl=ddl)
+    instructions = _with_repetition_event_variation(instructions, ddl=ddl)
     instructions = _with_visual_event(instructions, ddl=ddl, background=background)
     instructions = _with_ma_pressure(instructions, ddl=ddl)
     instructions = _with_per_instruction_density_budget(instructions)

@@ -1,9 +1,12 @@
 package app.inku.mobile.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import app.inku.mobile.data.db.AppSettingEntity
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
@@ -18,6 +21,9 @@ import app.inku.mobile.pipeline.LocalFallbackPipeline
 import app.inku.mobile.pipeline.PaintRequest
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
+import com.caverock.androidsvg.SVG
+import java.io.File
+import java.io.FileOutputStream
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
@@ -36,7 +42,7 @@ class InkuRepository(
     private val pipeline = LocalFallbackPipeline(modelProvider = modelRouter)
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
 
-    fun history(): Flow<List<HistoryItemEntity>> = database.historyDao().listActive(100, 0)
+    fun history(): Flow<List<HistoryListItem>> = database.historyDao().listActiveSummaries(100, 0)
 
     fun trashedHistory(): Flow<List<HistoryItemEntity>> = database.historyDao().listTrashed(100, 0)
 
@@ -56,6 +62,8 @@ class InkuRepository(
     suspend fun close() {
         localLiteRtProvider.close()
     }
+
+    suspend fun getHistoryById(id: String): HistoryItemEntity? = database.historyDao().getById(id)
 
     suspend fun ensureDefaultModelAssets() {
         ensureDefaultProviderSettings()
@@ -109,6 +117,9 @@ class InkuRepository(
     }
 
     suspend fun getSetting(key: String): String? = database.settingsDao().get(key)?.valueJson
+
+    suspend fun getSettingsMap(): Map<String, String> =
+        database.settingsDao().listAll().associate { it.key to it.valueJson }
 
     suspend fun saveSetting(key: String, valueJson: String) {
         database.settingsDao().upsert(AppSettingEntity(key, valueJson, System.currentTimeMillis()))
@@ -203,6 +214,13 @@ class InkuRepository(
         ensureDefaultModelAssets()
         val spec = modelSpec(modelId)
         modelDownloader.download(spec, force = force)
+    }
+
+    suspend fun warmupLocalModelIfReady(modelId: String) {
+        if (!modelId.startsWith("local-litert-lm:")) return
+        val asset = database.modelAssetDao().getByModelId(modelId) ?: return
+        if (asset.downloadState != "ready") return
+        localLiteRtProvider.warmup(modelId)
     }
 
     suspend fun markModelDownloadQueued(modelId: String) {
@@ -336,6 +354,7 @@ class InkuRepository(
             .put("render_hash", result.renderHash)
             .put("render_hash_short", result.renderHashShort)
             .toString()
+        val thumbnail = createHistoryThumbnail(result.displaySvg, result.renderHash)
         val item = HistoryItemEntity(
             id = pipeline.newHistoryId(),
             createdAt = now,
@@ -356,9 +375,25 @@ class InkuRepository(
             trashed = false,
             elapsedMs = elapsedMs,
             tokenMetadataJson = null,
+            thumbnailPath = thumbnail?.path,
+            thumbnailWidth = thumbnail?.width,
+            thumbnailHeight = thumbnail?.height,
         )
         database.historyDao().upsert(item)
         return item
+    }
+
+    suspend fun backfillMissingThumbnails(limit: Int = 20) {
+        database.historyDao().listMissingThumbnails(limit).forEach { item ->
+            val thumbnail = createHistoryThumbnail(item.displaySvg, item.renderHash) ?: return@forEach
+            database.historyDao().updateThumbnail(
+                id = item.id,
+                path = thumbnail.path,
+                width = thumbnail.width,
+                height = thumbnail.height,
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
     }
 
     suspend fun setStarred(id: String, starred: Boolean) {
@@ -524,6 +559,46 @@ class InkuRepository(
             value.lines().map { it.trim() }.filter { it.isNotBlank() }
         }
     }
+
+    private fun createHistoryThumbnail(svgText: String, renderHash: String): ThumbnailInfo? {
+        return runCatching {
+            val sizePx = 384
+            val svg = SVG.getFromString(svgText)
+            val documentWidth = svg.documentWidth.takeIf { it > 0f } ?: 1000f
+            val documentHeight = svg.documentHeight.takeIf { it > 0f } ?: 1000f
+            val documentAspect = documentWidth / documentHeight
+            val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(android.graphics.Color.WHITE)
+            val drawWidth: Float
+            val drawHeight: Float
+            if (documentAspect >= 1f) {
+                drawWidth = sizePx.toFloat()
+                drawHeight = sizePx.toFloat() / documentAspect
+            } else {
+                drawHeight = sizePx.toFloat()
+                drawWidth = sizePx.toFloat() * documentAspect
+            }
+            val left = (sizePx - drawWidth) / 2f
+            val top = (sizePx - drawHeight) / 2f
+            canvas.save()
+            canvas.translate(left, top)
+            svg.setDocumentWidth(drawWidth)
+            svg.setDocumentHeight(drawHeight)
+            svg.renderToCanvas(canvas)
+            canvas.restore()
+
+            val dir = File(context.filesDir, "thumbnails").also { it.mkdirs() }
+            val file = File(dir, "$renderHash.webp")
+            FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 86, out)
+            }
+            bitmap.recycle()
+            ThumbnailInfo(file.absolutePath, sizePx, sizePx)
+        }.getOrNull()
+    }
+
+    private data class ThumbnailInfo(val path: String, val width: Int, val height: Int)
 
     private fun defaultExportTemplates(): List<ExportTemplateEntity> {
         val now = System.currentTimeMillis()

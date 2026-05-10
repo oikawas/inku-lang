@@ -1225,3 +1225,41 @@ rules.
 - Android build number increments only for package-producing tasks such as APK,
   bundle, and install tasks. Avoid running assemble/install for checks that need
   a clean worktree.
+
+## 2026-05-10 Android Performance Optimizations
+
+The Android app implements the following optimizations to improve Pixel 9
+history browsing, artwork previews, and first local-model render latency.
+
+- The history grid loads a `HistoryListItem` DTO and does not select
+  `display_svg`, `expanded_ddl`, `score_json`, or `render_metadata_json` for
+  list rendering.
+- Operations that need the full history payload, such as detail selection,
+  replay, JSON display, or Prompt display, lazily load `HistoryItemEntity` by
+  history id.
+- History thumbnails are persisted at render-save time as 384px WebP files in
+  app-internal storage. Room `history_items` stores `thumbnail_path`,
+  `thumbnail_width`, and `thumbnail_height`.
+- Existing history rows without thumbnails are backfilled at startup, up to 100
+  rows per startup pass.
+- This schema change uses Room version 2 and `MIGRATION_1_2` to add the three
+  thumbnail columns. Destructive migration remains prohibited.
+- Main artwork previews in Compose and History reuse bitmap output through an
+  `LruCache` keyed by history item, display size, and presentation rotation,
+  instead of re-rendering SVG on every recomposition.
+- The renderer hot path avoids unnecessary JSON stringify/parse deep copies
+  while applying colors. This must not change the server/web-compatible meaning
+  of Score, SVG, render metadata, or render hash.
+- When a selected LiteRT-LM model is already downloaded and in `ready` state,
+  Android attempts a background Engine warmup after settings restore, model
+  selection, and model download completion.
+  - Warmup is only a latency optimization. It does not change render success
+    semantics or the GPU-required/no-CPU-fallback policy.
+  - A warmed Engine is reused by the normal render path.
+- Settings restore loads `app_settings` in one pass instead of issuing many
+  sequential `getSetting()` calls during startup.
+- PNG share/export is capped at 4320px height and an estimated 128MB bitmap
+  allocation. Oversized exports fail before bitmap creation to avoid OOM.
+- These changes are Android-internal performance optimizations. They must not
+  change DDL, Score, SVG, history JSON, render metadata, or render hash
+  compatibility with server/web.

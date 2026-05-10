@@ -14,6 +14,9 @@ interface SettingsDao {
     @Query("SELECT * FROM app_settings WHERE key = :key LIMIT 1")
     suspend fun get(key: String): AppSettingEntity?
 
+    @Query("SELECT * FROM app_settings")
+    suspend fun listAll(): List<AppSettingEntity>
+
     @Query("SELECT * FROM app_settings WHERE key LIKE :pattern")
     fun observeLike(pattern: String): Flow<List<AppSettingEntity>>
 

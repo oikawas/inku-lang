@@ -244,15 +244,14 @@ class DefaultSvgRenderer : SvgRenderer {
 
     private fun applyColorCycle(ins: JSONObject, cycle: JSONArray?, index: Int): JSONObject {
         if (cycle == null || cycle.length() == 0) return ins
-        val copy = JSONObject(ins.toString())
-        copy.put("color", cycle.optString(index % cycle.length(), copy.optString("color", "black")))
-        val effectHint = renderEffectHint(copy.optString("color_hint", ""))
+        ins.put("color", cycle.optString(index % cycle.length(), ins.optString("color", "black")))
+        val effectHint = renderEffectHint(ins.optString("color_hint", ""))
         if (effectHint == null) {
-            copy.remove("color_hint")
+            ins.remove("color_hint")
         } else {
-            copy.put("color_hint", effectHint)
+            ins.put("color_hint", effectHint)
         }
-        return copy
+        return ins
     }
 
     private fun renderEffectHint(colorHint: String): String? {

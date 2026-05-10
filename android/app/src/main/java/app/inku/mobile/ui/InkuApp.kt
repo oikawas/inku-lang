@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ClipData
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas as AndroidCanvas
 import android.net.Uri
 import android.util.LruCache
@@ -97,10 +98,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
@@ -122,6 +125,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
@@ -166,13 +170,39 @@ private object HistoryThumbnailCache {
     private const val THUMBNAIL_PX = 384
     private val cache = LruCache<String, ImageBitmap>(64)
 
-    suspend fun get(item: HistoryItemEntity): ImageBitmap? {
-        val key = "${item.id}:${item.renderHash}:${item.displaySvg.length}:$THUMBNAIL_PX"
+    suspend fun get(item: HistoryListItem): ImageBitmap? {
+        val key = "${item.renderHash}:$THUMBNAIL_PX"
         synchronized(cache) {
             cache.get(key)?.let { return it }
         }
         return withContext(Dispatchers.Default) {
-            val rendered = renderSvgThumbnail(item.displaySvg, THUMBNAIL_PX)
+            val rendered = item.thumbnailPath
+                ?.let { path -> runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull() }
+            if (rendered != null) {
+                synchronized(cache) {
+                    cache.put(key, rendered)
+                }
+            }
+            rendered
+        }
+    }
+}
+
+private object ArtworkBitmapCache {
+    private const val MAX_RENDER_PX = 2048
+    private val cache = LruCache<String, ImageBitmap>(12)
+
+    suspend fun get(item: HistoryItemEntity, size: IntSize, rotateLandscape: Boolean): ImageBitmap? {
+        if (size.width <= 0 || size.height <= 0) return null
+        val scale = minOf(1f, MAX_RENDER_PX.toFloat() / maxOf(size.width, size.height).toFloat())
+        val width = maxOf(1, (size.width * scale).toInt())
+        val height = maxOf(1, (size.height * scale).toInt())
+        val key = "${item.renderHash}:$width:$height:$rotateLandscape"
+        synchronized(cache) {
+            cache.get(key)?.let { return it }
+        }
+        return withContext(Dispatchers.Default) {
+            val rendered = renderArtworkBitmap(item.displaySvg, width, height, rotateLandscape)
             if (rendered != null) {
                 synchronized(cache) {
                     cache.put(key, rendered)
@@ -182,32 +212,12 @@ private object HistoryThumbnailCache {
         }
     }
 
-    private fun renderSvgThumbnail(svgText: String, sizePx: Int): ImageBitmap? {
+    private fun renderArtworkBitmap(svgText: String, width: Int, height: Int, rotateLandscape: Boolean): ImageBitmap? {
         return runCatching {
             val parsed = SVG.getFromString(svgText)
-            val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
-            val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
-            val documentAspect = documentWidth / documentHeight
-            val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
-            val canvas = AndroidCanvas(bitmap)
-            canvas.drawColor(android.graphics.Color.WHITE)
-            val drawWidth: Float
-            val drawHeight: Float
-            if (documentAspect >= 1f) {
-                drawWidth = sizePx.toFloat()
-                drawHeight = sizePx.toFloat() / documentAspect
-            } else {
-                drawHeight = sizePx.toFloat()
-                drawWidth = sizePx.toFloat() * documentAspect
-            }
-            val left = (sizePx - drawWidth) / 2f
-            val top = (sizePx - drawHeight) / 2f
-            canvas.save()
-            canvas.translate(left, top)
-            parsed.setDocumentWidth(drawWidth)
-            parsed.setDocumentHeight(drawHeight)
-            parsed.renderToCanvas(canvas)
-            canvas.restore()
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val native = AndroidCanvas(bitmap)
+            renderSvgIntoNativeCanvas(parsed, native, width.toFloat(), height.toFloat(), rotateLandscape)
             bitmap.asImageBitmap()
         }.getOrNull()
     }
@@ -1761,7 +1771,7 @@ private fun DemoSettingRow(
 @Composable
 private fun HistoryScreen(
     state: InkuUiState,
-    history: List<HistoryItemEntity>,
+    history: List<HistoryListItem>,
     viewModel: InkuViewModel,
 ) {
     val filteredHistory = remember(history, state.historySearchQuery, state.historyStarredOnly) {
@@ -3409,8 +3419,12 @@ private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, ta
     val svg = SVG.getFromString(item.displaySvg)
     val documentWidth = svg.documentWidth.takeIf { it > 0f } ?: 1000f
     val documentHeight = svg.documentHeight.takeIf { it > 0f } ?: 1000f
-    val height = targetHeight.coerceIn(64, 12000)
+    val height = targetHeight.coerceIn(64, MaxPngExportHeightPx)
     val width = (height * documentWidth / documentHeight).toInt().coerceAtLeast(64)
+    val estimatedBytes = width.toLong() * height.toLong() * 4L
+    require(estimatedBytes <= MaxPngExportBitmapBytes) {
+        "PNG出力サイズが大きすぎます。キャンバス比率または出力サイズを下げてください。"
+    }
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(bitmap)
     svg.setDocumentWidth(width.toFloat())
@@ -3426,6 +3440,9 @@ private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, ta
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
 }
+
+private const val MaxPngExportHeightPx = 4320
+private const val MaxPngExportBitmapBytes = 128L * 1024L * 1024L
 
 private fun launchShareIntent(context: Context, payload: SharePayload) {
     val intent = Intent(Intent.ACTION_SEND).apply {
@@ -3489,7 +3506,7 @@ private fun historyExportJson(item: HistoryItemEntity): JSONObject {
     }
 }
 
-private fun filterHistoryItems(history: List<HistoryItemEntity>, state: InkuUiState): List<HistoryItemEntity> {
+private fun filterHistoryItems(history: List<HistoryListItem>, state: InkuUiState): List<HistoryListItem> {
     val query = state.historySearchQuery.trim().lowercase()
     return history.filter { item ->
         (!state.historyStarredOnly || item.starred) &&
@@ -3497,7 +3514,7 @@ private fun filterHistoryItems(history: List<HistoryItemEntity>, state: InkuUiSt
     }
 }
 
-private fun historySearchText(item: HistoryItemEntity): String {
+private fun historySearchText(item: HistoryListItem): String {
     return listOf(
         item.originalInput,
         item.normalizedDdl,
@@ -3512,7 +3529,7 @@ private fun historySearchText(item: HistoryItemEntity): String {
 
 @Composable
 private fun HistoryGridTile(
-    item: HistoryItemEntity,
+    item: HistoryListItem,
     selected: Boolean,
     onSelect: () -> Unit,
     onToggleStar: () -> Unit,
@@ -3572,7 +3589,7 @@ private fun HistoryBadge(text: String, selected: Boolean = false, onClick: (() -
     }
 }
 
-private fun historyTitle(item: HistoryItemEntity): String {
+private fun historyTitle(item: HistoryListItem): String {
     val original = item.originalInput.trim()
     if (original.isNotBlank() && !original.startsWith("{") && !original.startsWith("[")) {
         return original
@@ -4120,49 +4137,63 @@ private fun ArtworkPreview(
     presentationBackground: Color = Color.White,
     rotateLandscape: Boolean = false,
 ) {
-    val svg = remember(item.id, item.displaySvg) {
-        runCatching { SVG.getFromString(item.displaySvg) }.getOrNull()
+    var pixelSize by remember { mutableStateOf(IntSize.Zero) }
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, pixelSize, rotateLandscape) {
+        value = ArtworkBitmapCache.get(item, pixelSize, rotateLandscape)
     }
     Surface(color = ServerCanvasBoxColor, shape = RoundedCornerShape(0.dp), modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(if (presentationMode) presentationBackground else ServerCanvasBoxColor)
-            val parsed = svg ?: return@Canvas
-            val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
-            val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
-            val documentAspect = if (rotateLandscape) documentHeight / documentWidth else documentWidth / documentHeight
-            val boxAspect = size.width / size.height
-            val drawWidth: Float
-            val drawHeight: Float
-            if (documentAspect >= boxAspect) {
-                drawWidth = size.width
-                drawHeight = size.width / documentAspect
-            } else {
-                drawHeight = size.height
-                drawWidth = size.height * documentAspect
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { pixelSize = it },
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawRect(if (presentationMode) presentationBackground else ServerCanvasBoxColor)
             }
-            val left = (size.width - drawWidth) / 2f
-            val top = (size.height - drawHeight) / 2f
-            drawIntoCanvas { canvas ->
-                val native = canvas.nativeCanvas
-                native.save()
-                if (rotateLandscape) {
-                    val contentWidth = drawHeight
-                    val contentHeight = drawWidth
-                    native.translate(size.width / 2f, size.height / 2f)
-                    native.rotate(90f)
-                    native.translate(-contentWidth / 2f, -contentHeight / 2f)
-                    parsed.setDocumentWidth(contentWidth)
-                    parsed.setDocumentHeight(contentHeight)
-                } else {
-                    native.translate(left, top)
-                    parsed.setDocumentWidth(drawWidth)
-                    parsed.setDocumentHeight(drawHeight)
-                }
-                parsed.renderToCanvas(native)
-                native.restore()
+            bitmap?.let { image ->
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillBounds,
+                )
             }
         }
     }
+}
+
+private fun renderSvgIntoNativeCanvas(parsed: SVG, native: AndroidCanvas, width: Float, height: Float, rotateLandscape: Boolean) {
+    val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
+    val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
+    val documentAspect = if (rotateLandscape) documentHeight / documentWidth else documentWidth / documentHeight
+    val boxAspect = width / height
+    val drawWidth: Float
+    val drawHeight: Float
+    if (documentAspect >= boxAspect) {
+        drawWidth = width
+        drawHeight = width / documentAspect
+    } else {
+        drawHeight = height
+        drawWidth = height * documentAspect
+    }
+    val left = (width - drawWidth) / 2f
+    val top = (height - drawHeight) / 2f
+    native.save()
+    if (rotateLandscape) {
+        val contentWidth = drawHeight
+        val contentHeight = drawWidth
+        native.translate(width / 2f, height / 2f)
+        native.rotate(90f)
+        native.translate(-contentWidth / 2f, -contentHeight / 2f)
+        parsed.setDocumentWidth(contentWidth)
+        parsed.setDocumentHeight(contentHeight)
+    } else {
+        native.translate(left, top)
+        parsed.setDocumentWidth(drawWidth)
+        parsed.setDocumentHeight(drawHeight)
+    }
+    parsed.renderToCanvas(native)
+    native.restore()
 }
 
 @Composable
@@ -4225,8 +4256,8 @@ private fun CanvasPlaceholderPreview(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun HistoryArtworkPreview(item: HistoryItemEntity, modifier: Modifier = Modifier) {
-    val thumbnail by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, item.displaySvg) {
+private fun HistoryArtworkPreview(item: HistoryListItem, modifier: Modifier = Modifier) {
+    val thumbnail by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, item.thumbnailPath) {
         value = HistoryThumbnailCache.get(item)
     }
     Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {

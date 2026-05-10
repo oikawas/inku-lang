@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.inku.mobile.InkuApplication
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
@@ -153,6 +154,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     private val exportTemplates = repository.exportTemplates()
     private var modelDownloadJob: Job? = null
     private var drawingJob: Job? = null
+    private var litertWarmupJob: Job? = null
     private var drawingRunSerial: Long = 0L
     private var restoredInitialHistory = false
     private var promptEditedByUser = false
@@ -166,13 +168,9 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     val state: StateFlow<InkuUiState> = combine(localState, history, modelAssets, providerConfig, exportTemplates) { state, items, assets, providerPair, templates ->
         val (providers, candidates) = providerPair
-        val selected = state.selectedHistory?.let { current ->
-            items.firstOrNull { it.id == current.id }
-        } ?: items.firstOrNull()
         val selectedModel = assets.firstOrNull { it.modelId == state.selectedModelId }
         val modelState = selectedModel?.let { modelStatusText(it) } ?: "model catalog initializing"
         state.copy(
-            selectedHistory = selected,
             modelAssets = assets,
             providerSettings = providers,
             providerModelCandidates = candidates,
@@ -182,7 +180,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), InkuUiState())
 
-    val historyItems: StateFlow<List<HistoryItemEntity>> = history.stateIn(
+    val historyItems: StateFlow<List<HistoryListItem>> = history.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         emptyList(),
@@ -194,20 +192,25 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             repository.ensureDefaultProviderSettings()
             repository.ensureDefaultExportTemplates()
             restorePersistedSettings()
+            withContext(Dispatchers.IO) {
+                repository.backfillMissingThumbnails(limit = 100)
+            }
         }
         viewModelScope.launch {
             val latest = history.first { it.isNotEmpty() }.first()
             val current = localState.value
             if (!restoredInitialHistory && !promptEditedByUser && current.selectedHistory == null) {
-                restoredInitialHistory = true
-                localState.value = current.copy(
-                    selectedHistory = latest,
-                    prompt = latest.originalInput,
-                    ddl = latest.normalizedDdl,
-                    ddlEditedAfterGeneration = false,
-                    selectedCatalogId = latest.colorCatalogId,
-                    selectedCanvasAspect = latest.canvasAspect,
-                )
+                repository.getHistoryById(latest.id)?.let { full ->
+                    restoredInitialHistory = true
+                    localState.value = current.copy(
+                        selectedHistory = full,
+                        prompt = full.originalInput,
+                        ddl = full.normalizedDdl,
+                        ddlEditedAfterGeneration = false,
+                        selectedCatalogId = full.colorCatalogId,
+                        selectedCanvasAspect = full.canvasAspect,
+                    )
+                }
             }
         }
     }
@@ -216,6 +219,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         drawingRunSerial += 1
         drawingJob?.cancel()
         modelDownloadJob?.cancel()
+        litertWarmupJob?.cancel()
         runBlocking(Dispatchers.IO) { repository.close() }
         super.onCleared()
     }
@@ -295,14 +299,17 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             selectedStage2ModelId = modelId,
             message = null,
         )
+        warmupLiteRtModels(modelId)
     }
 
     fun setStage1Model(modelId: String) {
         localState.value = localState.value.copy(selectedModelId = modelId, message = null)
+        warmupLiteRtModels(modelId)
     }
 
     fun setStage2Model(modelId: String) {
         localState.value = localState.value.copy(selectedStage2ModelId = modelId, message = null)
+        warmupLiteRtModels(modelId)
     }
 
     fun setIncludeThinking(enabled: Boolean) {
@@ -353,6 +360,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             modelSelectionOpen = false,
             message = null,
         )
+        warmupLiteRtModels(unifiedModelId)
     }
 
     fun cancelModelSelection() {
@@ -551,6 +559,12 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             tab = AppTab.Compose,
             composeMode = ComposeMode.Write,
         )
+    }
+
+    fun selectHistory(item: HistoryListItem) {
+        viewModelScope.launch {
+            repository.getHistoryById(item.id)?.let { selectHistory(it) }
+        }
     }
 
     fun selectPreviousHistory() {
@@ -1060,6 +1074,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     activeModelDownloadId = null,
                     message = if (force) "モデル再取得が完了しました。" else "モデル取得が完了しました。",
                 )
+                warmupLiteRtModels(modelId)
             }.onFailure { error ->
                 if (error is CancellationException) {
                     repository.markModelDownloadCancelled(modelId)
@@ -1092,6 +1107,12 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleStar(item: HistoryListItem) {
+        viewModelScope.launch {
+            repository.setStarred(item.id, !item.starred)
+        }
+    }
+
     private fun validateSelectedModels(state: InkuUiState): String? {
         return listOf("Stage1" to state.selectedModelId, "Stage2" to state.selectedStage2ModelId)
             .distinctBy { it.second }
@@ -1109,28 +1130,29 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun restorePersistedSettings() {
         val current = localState.value
-        val catalog = repository.getSetting("color_catalog")?.let { JSONObject(it).optString("value", current.selectedCatalogId) } ?: current.selectedCatalogId
-        val canvas = repository.getSetting("canvas_aspect")?.let { JSONObject(it).optString("value", current.selectedCanvasAspect) } ?: current.selectedCanvasAspect
-        val canvasPlugin = repository.getSetting("canvas_aspect_plugin")?.let { JSONObject(it).optBoolean("enabled", current.canvasAspectPluginEnabled) } ?: current.canvasAspectPluginEnabled
-        val pngAlpha = repository.getSetting("png_alpha_white")?.let { JSONObject(it).optBoolean("enabled", current.pngAlphaWhite) } ?: current.pngAlphaWhite
-        val kiwi = repository.getSetting("show_kiwi")?.let { JSONObject(it).optBoolean("enabled", current.showKiwi) } ?: current.showKiwi
-        val crab = repository.getSetting("show_crab")?.let { JSONObject(it).optBoolean("enabled", current.showCrab) } ?: current.showCrab
-        val replay = repository.getSetting("save_replay_as_new_version")?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
-        val histCanvas = repository.getSetting("history_selection_canvas")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
-        val histCatalog = repository.getSetting("history_selection_catalog")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
-        val ddlAutoRepair = repository.getSetting("ddl_auto_repair")?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
-        val litertPromptOptimization = repository.getSetting("litert_stage1_prompt_optimization")?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
-        val batchRandom = repository.getSetting("batch_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
-        val demoSeed = repository.getSetting("demo_seed_phrase")?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
-        val demoInterval = repository.getSetting("demo_interval_seconds")?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
+        val settings = repository.getSettingsMap()
+        val catalog = settings["color_catalog"]?.let { JSONObject(it).optString("value", current.selectedCatalogId) } ?: current.selectedCatalogId
+        val canvas = settings["canvas_aspect"]?.let { JSONObject(it).optString("value", current.selectedCanvasAspect) } ?: current.selectedCanvasAspect
+        val canvasPlugin = settings["canvas_aspect_plugin"]?.let { JSONObject(it).optBoolean("enabled", current.canvasAspectPluginEnabled) } ?: current.canvasAspectPluginEnabled
+        val pngAlpha = settings["png_alpha_white"]?.let { JSONObject(it).optBoolean("enabled", current.pngAlphaWhite) } ?: current.pngAlphaWhite
+        val kiwi = settings["show_kiwi"]?.let { JSONObject(it).optBoolean("enabled", current.showKiwi) } ?: current.showKiwi
+        val crab = settings["show_crab"]?.let { JSONObject(it).optBoolean("enabled", current.showCrab) } ?: current.showCrab
+        val replay = settings["save_replay_as_new_version"]?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
+        val histCanvas = settings["history_selection_canvas"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
+        val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
+        val ddlAutoRepair = settings["ddl_auto_repair"]?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
+        val litertPromptOptimization = settings["litert_stage1_prompt_optimization"]?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
+        val batchRandom = settings["batch_random_color_catalog"]?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
+        val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
+        val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
         val demoRandom = true
-        val batchHistory = repository.getSetting("batch_prompt_history")?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
-        val modelSelection = repository.getSetting("model_selection")?.let(::JSONObject)
+        val batchHistory = settings["batch_prompt_history"]?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
+        val modelSelection = settings["model_selection"]?.let(::JSONObject)
         val restoredStage1Model = modelSelection?.optString("stage1_model")?.takeIf { it.isNotBlank() }
         val restoredStage2Model = modelSelection?.optString("stage2_model")?.takeIf { it.isNotBlank() }
         val restoredUnifiedModel = restoredStage1Model ?: restoredStage2Model ?: current.selectedModelId
         val thinking = modelSelection?.optBoolean("include_thinking", current.includeThinking)
-            ?: repository.getSetting("include_thinking")?.let { JSONObject(it).optBoolean("enabled", current.includeThinking) }
+            ?: settings["include_thinking"]?.let { JSONObject(it).optBoolean("enabled", current.includeThinking) }
             ?: current.includeThinking
         localState.value = current.copy(
             selectedCatalogId = ColorCatalogs.get(catalog).id,
@@ -1153,6 +1175,20 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             selectedModelId = restoredUnifiedModel,
             selectedStage2ModelId = restoredUnifiedModel,
         )
+        warmupLiteRtModels(restoredUnifiedModel)
+    }
+
+    private fun warmupLiteRtModels(vararg modelIds: String) {
+        val targets = modelIds.distinct().filter { it.startsWith("local-litert-lm:") }
+        if (targets.isEmpty()) return
+        litertWarmupJob?.cancel()
+        litertWarmupJob = viewModelScope.launch(Dispatchers.IO) {
+            targets.forEach { modelId ->
+                runCatching {
+                    repository.warmupLocalModelIfReady(modelId)
+                }
+            }
+        }
     }
 
     private fun parseStringArray(array: JSONArray?): List<String> {

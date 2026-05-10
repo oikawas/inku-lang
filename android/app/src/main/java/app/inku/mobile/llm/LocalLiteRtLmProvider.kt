@@ -73,6 +73,13 @@ class LocalLiteRtLmProvider(
         )
     }
 
+    suspend fun warmup(modelId: String): Unit = withContext(Dispatchers.IO) {
+        val started = System.currentTimeMillis()
+        val modelPath = resolveModelPath(modelId)
+        engineFor(modelId, modelPath, ENGINE_MAX_NUM_TOKENS)
+        Log.i(PERF_TAG, "litert_warmup_done model_id=$modelId elapsed_ms=${System.currentTimeMillis() - started}")
+    }
+
     private suspend fun resolveModelPath(modelId: String): String {
         val asset = modelAssetDao.getByModelId(modelId) ?: error("モデル情報がありません: $modelId")
         if (asset.downloadState != "ready") {

@@ -892,3 +892,21 @@ Android 版の安定性とローカルデータ保護のため、以下を実装
 - デモ実行は開始 1 回あたり最大 100 サイクルまでとし、上限到達時に停止する。
 - Room DB は履歴、provider 設定、API key 関連のユーザーデータを保持するため、破壊的 migration を使わない。schema 変更時は明示的な Room migration を追加する。
 - Android build number は APK / bundle / install など package 生成系 task のみで increment する。clean な作業ツリーが必要な確認では assemble/install を不用意に実行しない。
+
+## 2026-05-10 Android 性能最適化
+
+Android 版は Pixel 9 実機での履歴表示、描画 preview、ローカルモデル初回実行の体感速度を改善するため、以下を実装する。
+
+- 履歴一覧は `HistoryListItem` DTO で取得し、一覧表示に不要な `display_svg`、`expanded_ddl`、`score_json`、`render_metadata_json` を SELECT しない。
+- 履歴詳細、再描画、JSON / Prompt 表示など完全な履歴内容が必要な操作では、履歴 ID から `HistoryItemEntity` を遅延取得する。
+- 履歴サムネイルは描画保存時に 384px の WebP としてアプリ内部領域へ永続化し、Room `history_items` に `thumbnail_path`、`thumbnail_width`、`thumbnail_height` を保存する。
+- 既存履歴でサムネイルが存在しないものは、起動時に最大 100 件までバックフィルする。
+- この DB schema 変更は Room version 2 とし、`MIGRATION_1_2` で上記 3 列を追加する。破壊的 migration は使わない。
+- 記述 / 履歴のメイン描画 preview は SVG を毎 recomposition で再描画せず、表示サイズと回転状態を key にした `LruCache` 上の bitmap を再利用する。
+- Renderer の hot path では、色適用時の不要な JSON stringify / parse deep copy を避ける。ただし server/web 互換の Score、SVG、render metadata、render hash の意味は変更しない。
+- LiteRT-LM モデルが選択され、かつ取得済み `ready` の場合、設定復元後、モデル選択後、モデル取得完了後に background で Engine warmup を試行する。
+  - warmup は初回描画待ちを短縮するための先読みであり、描画の成功判定や GPU 必須方針を変更しない。
+  - warmup で初期化済みの Engine は通常描画時に再利用する。
+- 設定復元は `app_settings` を一括取得し、起動時に多数の `getSetting()` を逐次発行しない。
+- PNG 共有 / 書き出しは最大高さ 4320px、推定 bitmap メモリ 128MB までに制限する。超過時はエラーとして扱い、巨大 bitmap 生成による OOM を避ける。
+- これらの変更は Android 内部の性能最適化であり、DDL、Score、SVG、履歴 JSON、render metadata、render hash の server/web 互換形式は変更しない。

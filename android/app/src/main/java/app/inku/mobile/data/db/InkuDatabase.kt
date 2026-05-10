@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -15,7 +17,7 @@ import androidx.room.RoomDatabase
         PluginSettingEntity::class,
         ExportTemplateEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class InkuDatabase : RoomDatabase() {
@@ -37,7 +39,15 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 DB_NAME,
-            ).build()
+            ).addMigrations(MIGRATION_1_2).build()
+        }
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE history_items ADD COLUMN thumbnail_path TEXT")
+                db.execSQL("ALTER TABLE history_items ADD COLUMN thumbnail_width INTEGER")
+                db.execSQL("ALTER TABLE history_items ADD COLUMN thumbnail_height INTEGER")
+            }
         }
     }
 }

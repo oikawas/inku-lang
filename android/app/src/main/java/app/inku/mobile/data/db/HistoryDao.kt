@@ -11,6 +11,14 @@ interface HistoryDao {
     @Query("SELECT * FROM history_items WHERE trashed = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listActive(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
+    @Query(
+        "SELECT id, created_at, updated_at, original_input, normalized_ddl, stage1_model, stage2_model, " +
+            "render_hash, render_hash_short, color_catalog_id, canvas_aspect, starred, trashed, " +
+            "thumbnail_path, thumbnail_width, thumbnail_height " +
+            "FROM history_items WHERE trashed = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+    )
+    fun listActiveSummaries(limit: Int, offset: Int): Flow<List<HistoryListItem>>
+
     @Query("SELECT * FROM history_items WHERE trashed = 1 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listTrashed(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
@@ -23,6 +31,9 @@ interface HistoryDao {
     @Query("SELECT * FROM history_items WHERE render_hash = :hash OR render_hash_short = :hash LIMIT 1")
     suspend fun getByHash(hash: String): HistoryItemEntity?
 
+    @Query("SELECT * FROM history_items WHERE thumbnail_path IS NULL ORDER BY created_at DESC LIMIT :limit")
+    suspend fun listMissingThumbnails(limit: Int): List<HistoryItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: HistoryItemEntity)
 
@@ -31,6 +42,9 @@ interface HistoryDao {
 
     @Query("UPDATE history_items SET trashed = :trashed, updated_at = :updatedAt WHERE id = :id")
     suspend fun setTrashed(id: String, trashed: Boolean, updatedAt: Long)
+
+    @Query("UPDATE history_items SET thumbnail_path = :path, thumbnail_width = :width, thumbnail_height = :height, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateThumbnail(id: String, path: String, width: Int, height: Int, updatedAt: Long)
 
     @Query("DELETE FROM history_items WHERE id = :id")
     suspend fun deletePermanently(id: String)

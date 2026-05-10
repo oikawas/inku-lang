@@ -192,7 +192,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             repository.ensureDefaultExportTemplates()
             restorePersistedSettings()
             withContext(Dispatchers.IO) {
-                repository.backfillMissingThumbnails(limit = 100)
+                repeat(4) {
+                    repository.backfillMissingThumbnails(limit = 8)
+                    delay(750)
+                }
             }
         }
         viewModelScope.launch {

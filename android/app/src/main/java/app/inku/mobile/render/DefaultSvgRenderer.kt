@@ -192,11 +192,11 @@ class DefaultSvgRenderer : SvgRenderer {
         }
     }
 
-    private fun copyWithoutArrangement(ins: JSONObject): JSONObject = JSONObject(ins.toString()).also { it.remove("arrangement") }
+    private fun copyWithoutArrangement(ins: JSONObject): JSONObject = copyJsonObject(ins).also { it.remove("arrangement") }
 
     private fun ensureLineCoords(ins: JSONObject, layout: String): JSONObject {
         if (ins.optString("primitive", "line") != "line" || ins.has("from") || ins.has("to")) return ins
-        val copy = JSONObject(ins.toString())
+        val copy = copyJsonObject(ins)
         if (layout == "vertical") {
             copy.put("from", JSONArray(listOf(0.0, 0.5)))
             copy.put("to", JSONArray(listOf(1.0, 0.5)))
@@ -208,7 +208,7 @@ class DefaultSvgRenderer : SvgRenderer {
     }
 
     private fun shiftTo(ins: JSONObject, targetX: Double, targetY: Double): JSONObject {
-        val copy = JSONObject(ins.toString())
+        val copy = copyJsonObject(ins)
         val arr = copy.optJSONObject("arrangement")
         copy.remove("arrangement")
         if (arr != null) {
@@ -252,6 +252,12 @@ class DefaultSvgRenderer : SvgRenderer {
             ins.put("color_hint", effectHint)
         }
         return ins
+    }
+
+    private fun copyJsonObject(source: JSONObject): JSONObject {
+        val copy = JSONObject()
+        source.keys().forEach { key -> copy.put(key, source.opt(key)) }
+        return copy
     }
 
     private fun renderEffectHint(colorHint: String): String? {

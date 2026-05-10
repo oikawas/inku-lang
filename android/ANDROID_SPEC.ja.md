@@ -918,3 +918,19 @@ Android 版は Pixel 9 実機での履歴表示、描画 preview、ローカル�
 - 設定復元は `app_settings` を一括取得し、起動時に多数の `getSetting()` を逐次発行しない。
 - PNG 共有 / 書き出しは最大高さ 4320px、推定 bitmap メモリ 128MB までに制限する。超過時はエラーとして扱い、巨大 bitmap 生成による OOM を避ける。
 - これらの変更は Android 内部の性能最適化であり、DDL、Score、SVG、履歴 JSON、render metadata、render hash の server/web 互換形式は変更しない。
+
+## 2026-05-10 Android 性能最適化 第2段
+
+Android 版は追加の性能改善として、以下を実装する。
+
+- Room DB を version 3 に上げ、履歴一覧で使う `trashed, created_at` と `starred, trashed, created_at` の複合 index を追加する。migration は `MIGRATION_2_3` で行い、破壊的 migration は使わない。
+- `HistoryListItem` は検索用の lower-case 連結文字列を生成済み property として持ち、履歴検索入力ごとの全文連結・lowercaseを避ける。
+- 履歴 Flow はトップレベルで常時 collect せず、履歴タブ表示時にのみ collect する。これにより記述 / デモ / 設定操作時の履歴リスト更新による不要な compose work を減らす。
+- 描画保存時は履歴本体を先に保存し、384px WebP thumbnail 生成は repository 内の IO coroutine で非同期実行する。thumbnail列更新後に履歴一覧へ反映する。
+- 起動時の既存履歴 thumbnail backfill は一度に100件処理せず、8件ずつ少量バッチで間隔を空けて実行する。
+- Renderer / pipeline の hot path では、`JSONObject(item.toString())` による stringify / parse deep copy を top-level copy helper に置き換える。server/web 互換の Score 意味論は変更しない。
+- LiteRT-LM streaming response の結合は `StringBuilder` ベースにし、Stage 2 の長い出力で文字列コピーを減らす。
+- Stage 1 system prompt 生成は通常版 / LiteRT-LM圧縮版とも小さなLRU cacheを持ち、同一・近似入力での例選択と巨大文字列再構成を抑える。
+- モデル設定 UI の公開モデルID parse は小さなLRU cacheを通し、同じ `publishedModelsJson` の再parseを避ける。
+- PNG export 中は progress indicator と状態メッセージを表示する。大きなPNG出力時にUIが無反応に見えないようにする。
+- Compose の artwork / history thumbnail cache は引き続き推定bitmap byte数で制限し、今回の追加変更でも保存形式・render hash・履歴JSONの互換性は変更しない。

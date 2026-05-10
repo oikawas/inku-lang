@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PluginSettingEntity::class,
         ExportTemplateEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class InkuDatabase : RoomDatabase() {
@@ -39,7 +39,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 DB_NAME,
-            ).addMigrations(MIGRATION_1_2).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -47,6 +47,13 @@ abstract class InkuDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE history_items ADD COLUMN thumbnail_path TEXT")
                 db.execSQL("ALTER TABLE history_items ADD COLUMN thumbnail_width INTEGER")
                 db.execSQL("ALTER TABLE history_items ADD COLUMN thumbnail_height INTEGER")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_history_items_trashed_created_at` ON `history_items` (`trashed`, `created_at`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_history_items_starred_trashed_created_at` ON `history_items` (`starred`, `trashed`, `created_at`)")
             }
         }
     }

@@ -25,8 +25,13 @@ import app.inku.mobile.pipeline.InterpretResult
 import com.caverock.androidsvg.SVG
 import java.io.File
 import java.io.FileOutputStream
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -42,6 +47,7 @@ class InkuRepository(
     )
     private val pipeline = LocalFallbackPipeline(modelProvider = modelRouter)
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
+    private val thumbnailScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun history(): Flow<List<HistoryListItem>> = database.historyDao().listActiveSummaries(100, 0)
 
@@ -61,6 +67,7 @@ class InkuRepository(
     fun exportTemplates(): Flow<List<ExportTemplateEntity>> = database.exportTemplateDao().observeAll()
 
     suspend fun close() {
+        thumbnailScope.cancel()
         localLiteRtProvider.close()
     }
 
@@ -359,7 +366,6 @@ class InkuRepository(
             .put("render_hash", result.renderHash)
             .put("render_hash_short", result.renderHashShort)
             .toString()
-        val thumbnail = createHistoryThumbnail(result.displaySvg, result.renderHash)
         val item = HistoryItemEntity(
             id = pipeline.newHistoryId(),
             createdAt = now,
@@ -380,19 +386,33 @@ class InkuRepository(
             trashed = false,
             elapsedMs = elapsedMs,
             tokenMetadataJson = null,
-            thumbnailPath = thumbnail?.path,
-            thumbnailWidth = thumbnail?.width,
-            thumbnailHeight = thumbnail?.height,
+            thumbnailPath = null,
+            thumbnailWidth = null,
+            thumbnailHeight = null,
         )
         database.historyDao().upsert(item)
+        scheduleThumbnailGeneration(item.id, result.displaySvg, result.renderHash)
         return item
     }
 
-    suspend fun backfillMissingThumbnails(limit: Int = 20) {
+    suspend fun backfillMissingThumbnails(limit: Int = 8) {
         database.historyDao().listMissingThumbnails(limit).forEach { item ->
             val thumbnail = createHistoryThumbnail(item.displaySvg, item.renderHash) ?: return@forEach
             database.historyDao().updateThumbnail(
                 id = item.id,
+                path = thumbnail.path,
+                width = thumbnail.width,
+                height = thumbnail.height,
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
+    private fun scheduleThumbnailGeneration(id: String, svgText: String, renderHash: String) {
+        thumbnailScope.launch {
+            val thumbnail = createHistoryThumbnail(svgText, renderHash) ?: return@launch
+            database.historyDao().updateThumbnail(
+                id = id,
                 path = thumbnail.path,
                 width = thumbnail.width,
                 height = thumbnail.height,

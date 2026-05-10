@@ -408,7 +408,7 @@ class LocalFallbackPipeline(
         if (targeted.size == instructions.length() && targeted.all { it.optJSONObject("variation") != null }) return score
         val repaired = JSONArray()
         for (item in targeted) {
-            val copy = JSONObject(item.toString())
+            val copy = copyJsonObject(item)
             if (copy.optJSONObject("variation") == null && targetPrimitive == "line") {
                 copy.put(
                     "variation",
@@ -421,7 +421,7 @@ class LocalFallbackPipeline(
             }
             repaired.put(copy)
         }
-        return JSONObject(score.toString()).put("instructions", repaired)
+        return copyJsonObject(score).put("instructions", repaired)
     }
 
     private fun containsMotionOrTextureTerm(text: String): Boolean {
@@ -448,7 +448,7 @@ class LocalFallbackPipeline(
     private fun List<JSONObject>.dedupeInstructions(): List<JSONObject> {
         val seen = mutableSetOf<String>()
         return filter { item ->
-            val copy = JSONObject(item.toString()).also { it.remove("color_hint") }
+            val copy = copyJsonObject(item).also { it.remove("color_hint") }
             seen.add(canonicalJson(copy))
         }
     }
@@ -485,7 +485,7 @@ class LocalFallbackPipeline(
         val targetIndex = indexOfFirst { it.optString("primitive") in setOf("ellipse", "arc", "circle", "square", "triangle") }.takeIf { it >= 0 } ?: 0
         return mapIndexed { index, item ->
             if (index != targetIndex) return@mapIndexed item
-            val copy = JSONObject(item.toString())
+            val copy = copyJsonObject(item)
             val arrangement = copy.optJSONObject("arrangement") ?: JSONObject().put("count", maxOf(2, missing.size + 1)).put("layout", "scatter").put("margin", 0.16)
             val cycle = JSONArray()
             arrangement.optJSONArray("color_cycle")?.let { existing ->
@@ -611,7 +611,7 @@ class LocalFallbackPipeline(
     private fun List<JSONObject>.withMotionEnergy(ddl: String): List<JSONObject> {
         if (!contextHasMotion(ddl)) return this
         return mapIndexed { index, item ->
-            val copy = JSONObject(item.toString())
+            val copy = copyJsonObject(item)
             var changed = false
             val primitive = copy.optString("primitive", "line")
             val arrangement = copy.optJSONObject("arrangement")
@@ -653,7 +653,7 @@ class LocalFallbackPipeline(
         var governedCount = 0
         val hasVerticalContext = contextHasVerticalDensity(ddl)
         for (item in this) {
-            val copy = temperQuietSymbolicShape(JSONObject(item.toString()), ddl)
+            val copy = temperQuietSymbolicShape(copyJsonObject(item), ddl)
             val arrangement = copy.optJSONObject("arrangement")
             if (arrangement == null) {
                 adjusted += copy
@@ -1074,7 +1074,7 @@ class LocalFallbackPipeline(
         if (primitive !in setOf("circle", "ellipse", "square", "triangle", "polygon", "arc")) return item
         val count = arrangement.optInt("count", 1)
         if (count <= 8 || shapeExtent(item) <= 0.12) return item
-        val copy = JSONObject(item.toString())
+        val copy = copyJsonObject(item)
         val adjusted = copy.optJSONObject("arrangement") ?: return copy
         adjusted.put("count", minOf(count, 8))
         adjusted.put("density", "low")
@@ -1218,6 +1218,12 @@ class LocalFallbackPipeline(
             is Number, is Boolean -> value.toString()
             else -> JSONObject.quote(value.toString())
         }
+    }
+
+    private fun copyJsonObject(source: JSONObject): JSONObject {
+        val copy = JSONObject()
+        source.keys().forEach { key -> copy.put(key, source.opt(key)) }
+        return copy
     }
 
     private fun sha256(value: String): String {

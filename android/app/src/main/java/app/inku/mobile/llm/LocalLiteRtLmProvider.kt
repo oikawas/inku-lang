@@ -46,13 +46,13 @@ class LocalLiteRtLmProvider(
         )
         val activeEngine = engineFor(request.modelId, modelPath, maxNumTokens)
         val response = activeEngine.createConversation(conversationConfig(request)).use { conversation ->
-            var text = ""
+            val text = StringBuilder()
             try {
                 withTimeout(REQUEST_TIMEOUT_MS) {
                     conversation.sendMessageAsync(prompt).collect { message ->
                         val rendered = conversation.renderMessageIntoString(message).trim()
                         if (rendered.isNotBlank()) {
-                            text = mergeStreamText(text, rendered)
+                            mergeStreamText(text, rendered)
                         }
                     }
                 }
@@ -60,7 +60,7 @@ class LocalLiteRtLmProvider(
                 conversation.cancelProcess()
                 throw IllegalStateException("LiteRT-LM request timed out.", error)
             }
-            text.ifBlank { error("LiteRT-LM returned an empty response.") }
+            text.toString().ifBlank { error("LiteRT-LM returned an empty response.") }
         }
         Log.i(
             PERF_TAG,
@@ -149,11 +149,18 @@ class LocalLiteRtLmProvider(
         )
     }
 
-    private fun mergeStreamText(current: String, rendered: String): String {
-        if (current.isBlank()) return rendered
-        if (rendered == current) return current
-        if (rendered.startsWith(current)) return rendered
-        return current + rendered
+    private fun mergeStreamText(current: StringBuilder, rendered: String) {
+        if (current.isEmpty()) {
+            current.append(rendered)
+            return
+        }
+        val existing = current.toString()
+        if (rendered == existing) return
+        if (rendered.startsWith(existing)) {
+            current.append(rendered.substring(existing.length))
+            return
+        }
+        current.append(rendered)
     }
 
     suspend fun close() {

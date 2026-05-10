@@ -56,6 +56,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
@@ -270,7 +271,6 @@ private val saijikiGroupColors = listOf(
 fun InkuApp() {
     val viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by viewModel.state.collectAsState()
-    val history by viewModel.historyItems.collectAsState()
 
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
@@ -294,7 +294,10 @@ fun InkuApp() {
                 } else {
                     when (state.tab) {
                         AppTab.Compose -> ComposeScreen(state, viewModel)
-                        AppTab.History -> HistoryScreen(state, history, viewModel)
+                        AppTab.History -> {
+                            val history by viewModel.historyItems.collectAsState()
+                            HistoryScreen(state, history, viewModel)
+                        }
                         AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
                         AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
                     }
@@ -1066,6 +1069,7 @@ private fun CanvasHeroCard(
     var svgMenuOpen by remember { mutableStateOf(false) }
     var svgHelpOpen by remember { mutableStateOf(false) }
     var pngMenuOpen by remember { mutableStateOf(false) }
+    var pngExporting by remember { mutableStateOf(false) }
     val presentation = state.canvasPresentationMode
     BoxWithConstraints(modifier = modifier) {
         val ratio = canvasAspectRatio(canvasAspectId)
@@ -1314,12 +1318,14 @@ private fun CanvasHeroCard(
                                     },
                                     onClick = {
                                         pngMenuOpen = false
+                                        pngExporting = true
                                         canvasMessage = "PNG export preparing..."
                                         scope.launch {
                                             canvasMessage = runCatching {
                                                 shareHistoryPng(context, it, template.heightPx)
                                                 "PNG exported F${it.renderHashShort}"
                                             }.getOrElse { error -> error.message ?: "PNG export failed." }
+                                            pngExporting = false
                                         }
                                     },
                                 )
@@ -1330,7 +1336,14 @@ private fun CanvasHeroCard(
             }
         }
     }
-    if (!presentation && showControls) canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
+    if (!presentation && showControls && pngExporting) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+            Text(canvasMessage ?: "PNG export preparing...", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+        }
+    } else if (!presentation && showControls) {
+        canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
+    }
     if (!presentation && showControls) item?.let {
         when (state.renderTab) {
             RenderTab.Artwork -> Unit
@@ -2801,12 +2814,23 @@ private fun ModelChoiceRow(
 }
 
 private fun parsePublishedModelIds(value: String): List<String> {
-    return runCatching {
+    synchronized(PublishedModelIdCache) {
+        PublishedModelIdCache[value]?.let { return it }
+    }
+    val parsed = runCatching {
         val array = JSONArray(value)
         (0 until array.length()).mapNotNull { array.optString(it).takeIf { id -> id.isNotBlank() } }
     }.getOrElse {
         value.lines().map { it.trim() }.filter { it.isNotBlank() }
     }
+    synchronized(PublishedModelIdCache) {
+        PublishedModelIdCache[value] = parsed
+    }
+    return parsed
+}
+
+private val PublishedModelIdCache = object : LinkedHashMap<String, List<String>>(64, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<String>>?): Boolean = size > 64
 }
 
 private fun connectionKindOptions(): List<Pair<String, String>> {
@@ -3529,21 +3553,8 @@ private fun filterHistoryItems(history: List<HistoryListItem>, state: InkuUiStat
     val query = state.historySearchQuery.trim().lowercase()
     return history.filter { item ->
         (!state.historyStarredOnly || item.starred) &&
-            (query.isBlank() || historySearchText(item).contains(query))
+            (query.isBlank() || item.searchText.contains(query))
     }
-}
-
-private fun historySearchText(item: HistoryListItem): String {
-    return listOf(
-        item.originalInput,
-        item.normalizedDdl,
-        item.renderHash,
-        item.renderHashShort,
-        item.stage1Model,
-        item.stage2Model,
-        item.colorCatalogId,
-        item.canvasAspect,
-    ).joinToString("\n").lowercase()
 }
 
 @Composable

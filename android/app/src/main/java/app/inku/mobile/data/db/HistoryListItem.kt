@@ -1,6 +1,7 @@
 package app.inku.mobile.data.db
 
 import androidx.room.ColumnInfo
+import androidx.room.Ignore
 
 data class HistoryListItem(
     val id: String,
@@ -32,4 +33,16 @@ data class HistoryListItem(
     val thumbnailWidth: Int?,
     @ColumnInfo(name = "thumbnail_height")
     val thumbnailHeight: Int?,
-)
+) {
+    @Ignore
+    val searchText: String = listOf(
+        originalInput,
+        normalizedDdl,
+        renderHash,
+        renderHashShort,
+        stage1Model.orEmpty(),
+        stage2Model.orEmpty(),
+        colorCatalogId,
+        canvasAspect,
+    ).joinToString("\n").lowercase()
+}

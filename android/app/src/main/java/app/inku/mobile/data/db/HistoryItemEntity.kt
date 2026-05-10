@@ -13,6 +13,8 @@ import androidx.room.PrimaryKey
         Index("render_hash_short"),
         Index("starred"),
         Index("trashed"),
+        Index(value = ["trashed", "created_at"]),
+        Index(value = ["starred", "trashed", "created_at"]),
     ],
 )
 data class HistoryItemEntity(

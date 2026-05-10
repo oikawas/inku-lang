@@ -1289,3 +1289,37 @@ history browsing, artwork previews, and first local-model render latency.
 - These changes are Android-internal performance optimizations. They must not
   change DDL, Score, SVG, history JSON, render metadata, or render hash
   compatibility with server/web.
+
+## 2026-05-10 Android Performance Optimizations, Phase 2
+
+The Android app implements the following additional performance improvements.
+
+- Room DB is upgraded to version 3 and adds composite history indexes for
+  `trashed, created_at` and `starred, trashed, created_at`. The schema change is
+  handled by `MIGRATION_2_3`; destructive migration remains prohibited.
+- `HistoryListItem` exposes a precomputed lower-case search string so history
+  filtering does not rebuild and lowercase the same fields on every query
+  change.
+- The history Flow is no longer collected at the app root for every tab. It is
+  collected only while the History tab is displayed, reducing unnecessary
+  compose work during Compose, Demo, and Settings interactions.
+- Render save writes the history row first and schedules 384px WebP thumbnail
+  generation on a repository IO coroutine. The history list updates after the
+  thumbnail columns are written.
+- Startup thumbnail backfill runs in small batches of 8 rows with spacing,
+  instead of rendering up to 100 thumbnails in one burst.
+- Renderer and pipeline hot paths replace several `JSONObject(item.toString())`
+  stringify/parse deep copies with top-level JSON object copy helpers. This
+  must not change server/web-compatible Score semantics.
+- LiteRT-LM streaming response merging uses `StringBuilder` to reduce repeated
+  string copies for long Stage 2 outputs.
+- Stage 1 system prompt generation has small LRU caches for both the normal
+  prompt and the LiteRT-LM compressed prompt, avoiding repeated example
+  selection and large string reconstruction for equivalent inputs.
+- Model settings UI parses published model IDs through a small LRU cache, so
+  identical `publishedModelsJson` values are not reparsed repeatedly.
+- PNG export displays a progress indicator and status text so large PNG exports
+  do not appear unresponsive.
+- These are Android-internal performance optimizations. They do not change
+  saved DDL, Score, SVG, history JSON, render metadata, or render hash
+  compatibility.

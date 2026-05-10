@@ -30,6 +30,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.random.Random
 
+const val DefaultDemoSeedPhrase = "世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。"
+const val DemoCanvasAspectId = "pixel9_landscape_safe"
+
 data class InkuUiState(
     val prompt: String = "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
     val ddl: String = "",
@@ -47,11 +50,12 @@ data class InkuUiState(
     val batchActiveElapsedMs: Long? = null,
     val batchElapsedMs: Long = 0L,
     val batchLatestHashShort: String? = null,
-    val demoSeed: String = "春の光",
+    val demoSeed: String = DefaultDemoSeedPhrase,
     val demoIntervalSeconds: Int = 30,
     val demoRandomColorCatalog: Boolean = true,
     val demoGeneratedPrompt: String = "",
     val demoGeneratedDdl: String? = null,
+    val demoCurrentCatalogId: String? = null,
     val demoWaitingSeconds: Int? = null,
     val demoCurrentElapsedMs: Long? = null,
     val demoTotalElapsedMs: Long = 0L,
@@ -82,6 +86,7 @@ data class InkuUiState(
     val historySelectionCanvas: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val historySelectionCatalog: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val ddlAutoRepairEnabled: Boolean = false,
+    val litertStage1PromptOptimization: Boolean = false,
     val saijikiOpen: Boolean = false,
     val ddlEditorOpen: Boolean = false,
     val isDrawing: Boolean = false,
@@ -113,6 +118,7 @@ enum class SettingsPane {
     Home,
     ModelSelection,
     Models,
+    Demo,
     Export,
     Misc,
     Version,
@@ -244,6 +250,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun setDemoSeed(value: String) {
         localState.value = localState.value.copy(demoSeed = value, message = null)
         persistSetting("demo_seed_phrase", JSONObject().put("value", value).toString())
+    }
+
+    fun resetDemoSeed() {
+        setDemoSeed(DefaultDemoSeedPhrase)
     }
 
     fun setDemoIntervalSeconds(value: Int) {
@@ -489,6 +499,11 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         persistSetting("ddl_auto_repair", JSONObject().put("enabled", enabled).toString())
     }
 
+    fun setLiteRtStage1PromptOptimization(enabled: Boolean) {
+        localState.value = localState.value.copy(litertStage1PromptOptimization = enabled, message = null)
+        persistSetting("litert_stage1_prompt_optimization", JSONObject().put("enabled", enabled).toString())
+    }
+
     fun toggleSaijiki() {
         val current = localState.value
         localState.value = current.copy(saijikiOpen = !current.saijikiOpen, message = null)
@@ -598,6 +613,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.selectedModelId,
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
+                        current.litertStage1PromptOptimization,
                     )
                 }
                 localState.value = localState.value.copy(
@@ -614,6 +630,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.selectedModelId,
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
+                        current.litertStage1PromptOptimization,
                     )
                 }
             }.onSuccess { item ->
@@ -646,7 +663,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled)
+                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization)
                 }
             }.onSuccess { item ->
                 promptEditedByUser = false
@@ -720,6 +737,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                             stage2ModelId = current.selectedStage2ModelId,
                             autoRepair = current.ddlAutoRepairEnabled,
                             historyInput = "#$lineNumber $prompt",
+                            litertStage1PromptOptimization = current.litertStage1PromptOptimization,
                         )
                     }
                 }.onSuccess { item ->
@@ -790,6 +808,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                 isDrawing = true,
                 demoGeneratedPrompt = "",
                 demoGeneratedDdl = null,
+                demoCurrentCatalogId = null,
                 demoWaitingSeconds = null,
                 demoCurrentElapsedMs = null,
                 demoTotalElapsedMs = 0L,
@@ -799,12 +818,22 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 while (isActive) {
                     val cycle = state.value
-                    val prompt = demoPrompt(cycle.demoSeed)
-                    val catalogId = randomColorCatalogId()
                     val startedAt = System.currentTimeMillis()
+                    localState.value = localState.value.copy(
+                        demoGeneratedPrompt = "",
+                        demoGeneratedDdl = null,
+                        demoWaitingSeconds = null,
+                        demoCurrentElapsedMs = null,
+                        message = "デモ指示文生成中",
+                    )
+                    val prompt = withContext(Dispatchers.IO) {
+                        repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
+                    }
+                    val catalogId = randomColorCatalogId()
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
                         demoGeneratedDdl = null,
+                        demoCurrentCatalogId = catalogId,
                         demoWaitingSeconds = null,
                         demoCurrentElapsedMs = null,
                         message = "デモ描画中",
@@ -814,11 +843,12 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                             repository.paint(
                                 description = prompt,
                                 catalogId = catalogId,
-                                canvasAspect = cycle.selectedCanvasAspect,
+                                canvasAspect = DemoCanvasAspectId,
                                 stage1ModelId = cycle.selectedModelId,
                                 stage2ModelId = cycle.selectedStage2ModelId,
                                 autoRepair = cycle.ddlAutoRepairEnabled,
                                 historyInput = "[demo] $prompt",
+                                litertStage1PromptOptimization = cycle.litertStage1PromptOptimization,
                             )
                         }
                     }.onSuccess { item ->
@@ -1019,17 +1049,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun demoPrompt(seed: String): String {
-        val clean = seed.ifBlank { "静かな光" }
-        val variants = listOf(
-            "$clean の中に青い線を12本、波打つ軌跡に沿って置く",
-            "$clean を赤い円5個と灰色の弧で散らす",
-            "$clean から黒い細筆の線を3本、斜めに引く",
-        )
-        val index = ((System.currentTimeMillis() / 1000) % variants.size).toInt()
-        return variants[index]
-    }
-
     private fun validateSelectedModels(state: InkuUiState): String? {
         return listOf("Stage1" to state.selectedModelId, "Stage2" to state.selectedStage2ModelId)
             .distinctBy { it.second }
@@ -1057,6 +1076,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val histCanvas = repository.getSetting("history_selection_canvas")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
         val histCatalog = repository.getSetting("history_selection_catalog")?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val ddlAutoRepair = repository.getSetting("ddl_auto_repair")?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
+        val litertPromptOptimization = repository.getSetting("litert_stage1_prompt_optimization")?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
         val batchRandom = repository.getSetting("batch_random_color_catalog")?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
         val demoSeed = repository.getSetting("demo_seed_phrase")?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = repository.getSetting("demo_interval_seconds")?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
@@ -1080,6 +1100,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             historySelectionCanvas = histCanvas,
             historySelectionCatalog = histCatalog,
             ddlAutoRepairEnabled = ddlAutoRepair,
+            litertStage1PromptOptimization = litertPromptOptimization,
             batchRandomColorCatalog = batchRandom,
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),

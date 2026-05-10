@@ -15,8 +15,20 @@ class LocalFallbackPipeline(
     private val modelProvider: ModelProvider? = null,
 ) {
     suspend fun paint(request: PaintRequest): PaintResult {
+        val started = System.currentTimeMillis()
+        Log.i(
+            PERF_TAG,
+            "paint_start stage1_model=${request.stage1Model} stage2_model=${request.stage2Model} " +
+                "prompt_chars=${request.description.length} catalog_id=${request.colorCatalogId} canvas_aspect=${request.canvasAspect}",
+        )
         val interpreted = interpret(request)
-        return composeFromDdl(interpreted.ddlForDisplay, request)
+        return composeFromDdl(interpreted.ddlForDisplay, request).also {
+            Log.i(
+                PERF_TAG,
+                "paint_done elapsed_ms=${System.currentTimeMillis() - started} stage1_model=${request.stage1Model} " +
+                    "stage2_model=${request.stage2Model} prompt_chars=${request.description.length} hash=${it.renderHashShort}",
+            )
+        }
     }
 
     suspend fun interpret(request: PaintRequest): InterpretResult {
@@ -51,6 +63,12 @@ class LocalFallbackPipeline(
         } else {
             scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect).toString()
         }
+        val renderStarted = System.currentTimeMillis()
+        Log.i(
+            PERF_TAG,
+            "render_start model_id=${request.stage2Model} score_chars=${scoreJson.length} " +
+                "catalog_id=${request.colorCatalogId} canvas_aspect=${request.canvasAspect}",
+        )
         val render = renderer.render(
             RenderRequest(
                 scoreJson = scoreJson,
@@ -58,6 +76,11 @@ class LocalFallbackPipeline(
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
             ),
+        )
+        Log.i(
+            PERF_TAG,
+            "render_done render_ms=${System.currentTimeMillis() - renderStarted} svg_chars=${render.svg.length} " +
+                "catalog_id=${request.colorCatalogId} canvas_aspect=${request.canvasAspect}",
         )
         val hash = renderHash(
             input = request.originalText,
@@ -111,14 +134,19 @@ class LocalFallbackPipeline(
 
     private suspend fun generateStage1(request: PaintRequest): String? {
         val provider = modelProvider ?: return null
+        val started = System.currentTimeMillis()
         return runCatching {
+            Log.i(
+                PERF_TAG,
+                "stage1_start model_id=${request.stage1Model} prompt_chars=${request.description.length}",
+            )
             val generated = provider.generate(
                 ModelRequest(
                     modelId = request.stage1Model,
                     prompt = request.description,
                     temperature = 0.2,
                     maxTokens = 1024,
-                    systemInstruction = WebDdlSpec.buildStage1SystemPrompt(request.description),
+                    systemInstruction = stage1SystemPromptFor(request.stage1Model, request.description, request.litertStage1PromptOptimization),
                 ),
             ).text.cleanModelText().normalizeStage1DdlText()
             if (!generated.isUsableStage1Ddl()) {
@@ -128,7 +156,18 @@ class LocalFallbackPipeline(
                 return@runCatching null
             }
             sanitizePlacementWords(generated)
+        }.onSuccess { generated ->
+            Log.i(
+                PERF_TAG,
+                "stage1_done model_id=${request.stage1Model} stage1_ms=${System.currentTimeMillis() - started} " +
+                    "output_chars=${generated?.length ?: 0} fallback=${generated == null}",
+            )
         }.onFailure {
+            Log.i(
+                PERF_TAG,
+                "stage1_failed model_id=${request.stage1Model} stage1_ms=${System.currentTimeMillis() - started} " +
+                    "error=${it.message ?: it::class.java.simpleName}",
+            )
             if (request.stage1Model.isExplicitProviderModelId()) throw it
             Log.w(TAG, "Stage 1 provider failed; using deterministic fallback.", it)
         }.getOrNull()
@@ -136,9 +175,15 @@ class LocalFallbackPipeline(
 
     private suspend fun generateStage2(request: PaintRequest, expandedDdl: String): String? {
         val provider = modelProvider ?: return null
+        val started = System.currentTimeMillis()
         return runCatching {
             val userPrompt = buildStage2UserMessage(expandedDdl, request.originalText)
             val systemPrompt = stage2SystemPromptFor(request.stage2Model)
+            Log.i(
+                PERF_TAG,
+                "stage2_start model_id=${request.stage2Model} ddl_chars=${expandedDdl.length} " +
+                    "user_prompt_chars=${userPrompt.length} system_prompt_chars=${systemPrompt.length}",
+            )
             val response = provider.generate(
                 ModelRequest(
                     modelId = request.stage2Model,
@@ -149,13 +194,28 @@ class LocalFallbackPipeline(
                     tool = WebScoreTool.submitScore,
                 ),
             ).text.cleanModelText()
-            val score = runCatching {
+            val extracted = runCatching {
                 WebScoreTool.extractJsonObject(response)
-            }.getOrNull()
+            }
+            val score = extracted.getOrNull()
                 ?.takeIf { WebScoreTool.hasRenderableInstructions(it) }
-                ?: retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
+                ?: run {
+                    logStage2InvalidResponse(request.stage2Model, response, extracted.exceptionOrNull(), extracted.getOrNull())
+                    retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
+                }
             normalizeServerScore(score, expandedDdl, request.canvasAspect).toString()
+        }.onSuccess { scoreJson ->
+            Log.i(
+                PERF_TAG,
+                "stage2_done model_id=${request.stage2Model} stage2_ms=${System.currentTimeMillis() - started} " +
+                    "score_chars=${scoreJson.length}",
+            )
         }.onFailure {
+            Log.i(
+                PERF_TAG,
+                "stage2_failed model_id=${request.stage2Model} stage2_ms=${System.currentTimeMillis() - started} " +
+                    "error=${it.message ?: it::class.java.simpleName}",
+            )
             if (request.stage2Model.isExplicitProviderModelId()) throw it
             Log.w(TAG, "Stage 2 provider failed; using deterministic fallback.", it)
         }.getOrNull()
@@ -192,11 +252,44 @@ class LocalFallbackPipeline(
         return scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect)
     }
 
+    private fun logStage2InvalidResponse(modelId: String, response: String, error: Throwable?, score: JSONObject?) {
+        val reason = when {
+            error != null -> "json_extract_failed"
+            score == null -> "json_extract_failed"
+            score.optJSONArray("instructions") == null -> "missing_instructions"
+            else -> "no_renderable_instructions"
+        }
+        val instructions = score?.optJSONArray("instructions")
+        Log.i(
+            PERF_TAG,
+            "stage2_invalid model_id=$modelId reason=$reason response_chars=${response.length} " +
+                "has_instructions=${instructions != null} instructions_count=${instructions?.length() ?: 0} " +
+                "error=${error?.message?.let(::logPreview) ?: "-"} preview=${logPreview(response)}",
+        )
+    }
+
+    private fun logPreview(text: String, limit: Int = 180): String {
+        return text
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(limit)
+            .replace("|", "/")
+            .ifBlank { "-" }
+    }
+
     private fun stage2SystemPromptFor(modelId: String): String {
         return if (modelId.startsWith("local-litert-lm:")) {
             WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA_LITERT
         } else {
             WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA
+        }
+    }
+
+    private fun stage1SystemPromptFor(modelId: String, text: String, optimizeLiteRt: Boolean): String {
+        return if (optimizeLiteRt && modelId.startsWith("local-litert-lm:")) {
+            WebDdlSpec.buildStage1LiteRtSystemPrompt(text)
+        } else {
+            WebDdlSpec.buildStage1SystemPrompt(text)
         }
     }
 
@@ -1141,6 +1234,7 @@ class LocalFallbackPipeline(
 
     companion object {
         private const val TAG = "InkuPipeline"
+        private const val PERF_TAG = "InkuPerf"
         private const val MAX_EXPANDED_PRIMITIVES = 400
         private const val MAX_EXPANDED_PER_INSTRUCTION = 240
         private const val MAX_VISUAL_CLUSTERED_COUNT = 120

@@ -69,6 +69,11 @@ class HeadlessRenderActivity : Activity() {
             ?: repository.getSetting("canvas_aspect")?.let { JSONObject(it).optString("value") }?.takeIf { it.isNotBlank() }
             ?: CompatibilityConstants.defaultCanvasAspect
         val autoRepair = intent.getBooleanExtra("auto_repair", true)
+        val litertStage1PromptOptimization = if (intent.hasExtra("litert_stage1_prompt_optimization")) {
+            intent.getBooleanExtra("litert_stage1_prompt_optimization", false)
+        } else {
+            repository.getSetting("litert_stage1_prompt_optimization")?.let { JSONObject(it).optBoolean("enabled", false) } ?: false
+        }
         val saveHistory = intent.getBooleanExtra("save_history", false)
         val inputMode = intent.getStringExtra("input_mode")?.takeIf { it.isNotBlank() } ?: "paint"
         val originalText = intent.getStringExtra("original_text")?.takeIf { it.isNotBlank() } ?: text
@@ -82,6 +87,7 @@ class HeadlessRenderActivity : Activity() {
                 stage1ModelId = stage1Model,
                 stage2ModelId = stage2Model,
                 autoRepair = autoRepair,
+                litertStage1PromptOptimization = litertStage1PromptOptimization,
             )
             "score" -> repository.renderFromScore(
                 description = originalText,
@@ -99,6 +105,7 @@ class HeadlessRenderActivity : Activity() {
                 stage2ModelId = stage2Model,
                 autoRepair = autoRepair,
                 historyInput = text,
+                litertStage1PromptOptimization = litertStage1PromptOptimization,
             )
         }
         if (!saveHistory) {

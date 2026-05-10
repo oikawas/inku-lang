@@ -26,6 +26,7 @@ internal object WebDdlSpec {
         "人・顔・動物は具象化禁止。目鼻口、頭身、四肢、翼、尾を描かず、必要なら presence(kind/intensity/center/symmetry/gaze_pressure/contour_density) または余白・弧・群れ間隔へ抽象化する。\n" +
         "膜・霞・霧・透明・気配・余韻・光・香りは削らず、薄いellipse/arc/lineに filled, color_hint, fade, preserve_space を使って1〜2層で残す。\n" +
         "てざわりは weight に反映: 髪=hair, 鉛筆=pencil, ペン=pen, ロットリング=rotring, クレヨン=crayon, チョーク=chalk, 細筆=brush_thin, 太筆=brush_thick, 縄=rope。\n" +
+        "JSON数値の内部に空白を入れてはいけない。正しい例: 0.0, 0.01, 500。禁止例: 0. 0, 0. 01, 50 0。\n" +
         "代表例: 縦の実線を横に三本並べる -> {\"instructions\":[{\"primitive\":\"line\",\"from\":[0.5,0.0],\"to\":[0.5,1.0],\"arrangement\":{\"count\":3,\"layout\":\"horizontal\"}}]}\n" +
         "代表例: 白い回転した小さな四角を画面全体に六百十個散らす -> {\"instructions\":[{\"primitive\":\"square\",\"position\":[0.49,0.49],\"size\":[0.014,0.014],\"color\":\"white\",\"rotation\":30,\"arrangement\":{\"count\":110,\"layout\":\"scatter\",\"density\":\"high\",\"cluster_count\":9,\"fade\":\"outward\",\"preserve_space\":true,\"margin\":0.2}}]}\n" +
         "説明、Markdown、コードブロックは禁止。submit_scoreツールが使える場合はsubmit_scoreを呼ぶ。"
@@ -144,6 +145,30 @@ internal object WebDdlSpec {
         return prefix + "\n\n" + sectionHeader + examples
     }
 
+    fun buildStage1LiteRtSystemPrompt(text: String, k: Int = 3): String {
+        val scored = EXAMPLE_POOL_JA.map { example ->
+            example.keywords.count { keyword -> text.contains(keyword, ignoreCase = true) } to example
+        }.sortedByDescending { it.first }
+        val initial = scored.take(k)
+        val selected = if (initial.all { it.first == 0 }) LITERT_STAGE1_BASE_EXAMPLES else initial.map { it.second }
+        val examples = selected.joinToString("\n") { example ->
+            "入力: ${example.input}\n出力: ${example.output}"
+        }
+        return STAGE1_PROMPT_PREFIX_JA_LITERT + "\n\n# 変換例\n" + examples
+    }
+
+    fun stage1SystemPromptForDisplay(lang: String = "ja"): String {
+        return if (lang == "en") STAGE1_PROMPT_PREFIX_EN else STAGE1_PROMPT_PREFIX_JA
+    }
+
+    fun stage2SystemPromptForDisplay(lang: String = "ja"): String {
+        return if (lang == "en") STAGE2_SYSTEM_PROMPT_EN else STAGE2_SYSTEM_PROMPT_JA
+    }
+
+    fun stage2LiteRtSystemPromptForDisplay(): String {
+        return STAGE2_SYSTEM_PROMPT_JA_LITERT
+    }
+
     fun sanitizePlacementWords(ddl: String): String {
         var sanitized = ddl
         sanitized = sanitized.replace(Regex("ランダムに", RegexOption.IGNORE_CASE), "画面全体に点々と")
@@ -153,4 +178,23 @@ internal object WebDdlSpec {
         sanitized = sanitized.replace(Regex("\\brandom\\b", RegexOption.IGNORE_CASE), "all-over")
         return sanitized
     }
+
+    private const val STAGE1_PROMPT_PREFIX_JA_LITERT: String = "あなたは inku DDL の第一段階インタプリタ。作者の自由記述を、Saijiki語彙だけの短い日本語の正規化DDLに変換する。\n" +
+        "出力は正規化DDL本文のみ。説明、箇条書き、Markdown、前置きは禁止。\n" +
+        "静止画として書く。動く/流れる/落ちる/広がる等の時間動詞は禁止し、置く/並べる/引く/描く/散らす/埋めるに変換する。\n" +
+        "入力の色、素材、数量、太さ、サイズ、方向、場所、配置、ゆらぎは落とさない。感情語だけ削る。複数属性は一文にまとめる。\n" +
+        "使える語彙: かたち=円/楕円/三角/四角/線/弧、かたむき=水平/垂直/斜め/右上がり/右下がり/回転、てざわり=髪/鉛筆/ペン/ロットリング/クレヨン/チョーク/細筆/太筆/縄、つらなり=実線/破線/点線/一点鎖線、いろ=白/黒/青/赤/緑/灰、ゆらぎ=細かく/大きく/ゆっくり/速く/揺れる/波打つ/震える/滲む、ばしょ=上/下/中央/左端/右端/上端/下端/中心/隅、わりあい=縦長/横長/全幅/半幅/半円/上弦/下弦/三日月。\n" +
+        "素材未指定でも文脈で選ぶ: 淡い/素描=鉛筆または細筆、粉/乾いた=チョーク、手描き/蝋=クレヨン、墨/筆跡=細筆または太筆、精密/機械=ロットリング、太い/荒い=縄。\n" +
+        "曖昧数量は具体数に変換する: 少し=3〜8、点々=8〜20、反復=12〜40、たくさん=40〜120、密集=120〜350、無数/雨/雪/星/砂=300〜800、全面=700〜1000。1000超だけ1000に丸める。\n" +
+        "ランダムは禁止。画面全体に点々と/中央付近に/上から下へ/左から右へ/波打つ軌跡に沿って/右半分に/放射状に等の明示配置へ変換する。\n" +
+        "点/粒/星/雨/雪/砂/花びらは真円固定禁止。小さな楕円、短い線、小さな四角を文脈で使う。明示的な円/丸/月/太陽だけ円を優先する。\n" +
+        "人/顔/動物は具象化しない。目鼻口、頭身、四肢、翼、尾を出さず、重心、余白、端寄り焦点、輪郭密度、群れ間隔へ抽象化する。\n" +
+        "背景指定は独立文にする。背景と描画が同色なら小さい側を黒/白/青/赤/緑など見える色に変える。灰背景は禁止、灰は前景に使う。\n" +
+        "色とりどり/カラフルは赤・青・緑・黒・灰などの色名を明示する。中央は明示時だけ使い、迷ったら右上/左上/右下/左下/上端/右半分などを選ぶ。"
+
+    private val LITERT_STAGE1_BASE_EXAMPLES: List<DdlExample> = listOf(
+        DdlExample(listOf("竹", "縦"), "三本の竹を縦に並べる", "縦の実線を横に三本並べる。"),
+        DdlExample(listOf("花", "散る"), "花びらが散る", "上から下へ白い右下がりの小さな楕円を四十七個散らす。大きく揺れる。"),
+        DdlExample(listOf("背景", "白"), "白い背景に白い線を引く", "背景を白で塗りつぶす。黒い横線を中央に引く。"),
+    )
 }

@@ -992,3 +992,195 @@ behavior.
   areas visible after Japanese IME candidate rows or keyboard height changes.
 - When drawing finishes, Android clears input focus, hides the IME, and scrolls
   the compose screen back to the image area.
+
+## 2026-05-09 Pixel 9 Landscape Safe Canvas
+
+As an Android-specific canvas option, Android adds
+`pixel9_landscape_safe` for Pixel 9 landscape display.
+
+- The measured Pixel 9 physical display is `1080 x 2424 px` in portrait,
+  `2424 x 1080 px` in landscape, with density `420 dpi` and density scale
+  `2.625`.
+- The camera hole is centered at the portrait top edge and becomes a side-edge
+  avoidance area in landscape. The measured display cutout is
+  `Rect(485, 0 - 595, 173)` in portrait coordinates, so the landscape side
+  intrusion is about `173 px`.
+- To avoid the camera hole and rounded corners with comfortable room, this
+  canvas assumes about `240 px` side margin on both landscape sides.
+- The usable landscape area is `2424 - 240 * 2 = 1944 px` by `1080 px`, so the
+  largest practical safe ratio is `1944:1080 = 1.8`.
+- Android represents this as the simple `9:5` ratio:
+  `id=pixel9_landscape_safe`, `label=Pixel 9 Landscape Safe`, `ratioW=9.0`,
+  and `ratioH=5.0`.
+- This is an Android-only display optimization and does not exist in the
+  server/web canvas aspect plugin. History, JSON, render metadata, and render
+  hashes still record it through the standard `render_canvas_aspect_id` and
+  `render_canvas_aspect_ratio` fields.
+
+## 2026-05-09 Demo Settings Panel
+
+On Android, demo seed phrase editing is removed from the main Demo screen and
+moved to `Settings > Demo Settings`.
+
+- The main Demo screen focuses on the image, status, generated prompt,
+  start/stop action, and display interval.
+- `Settings > Demo Settings` allows editing the seed phrase and display
+  interval.
+- The seed phrase is saved in Room setting `demo_seed_phrase` and restored after
+  app restart.
+- After Demo starts, each render cycle sends the seed phrase to the currently
+  selected main LLM and displays that response in the `生成された指示文` box.
+- The LLM response shown in `生成された指示文` is used directly as the normal
+  prompt for Stage 1 DDL generation, Stage 2 Score generation, and rendering.
+- The older Android implementation that assembled demo prompts from fixed local
+  templates is no longer used.
+- Demo rendering always uses the Android-specific `pixel9_landscape_safe`
+  canvas aspect and does not follow the canvas selected on the normal Compose
+  screen.
+- Demo rendering always picks a random color catalog for each render cycle and
+  does not follow the color catalog selected on the normal Compose screen.
+- The metadata shown at the bottom of the Demo screen displays the actual color
+  catalog name used for that render cycle. When showing an existing history item
+  after app startup, the display name is resolved from the color catalog ID saved
+  in history.
+- The `Canvas` metadata on the Demo screen shows the user-facing
+  `CanvasAspects` label instead of the internal ID. `pixel9_landscape_safe` is
+  displayed as `Pixel 9 Landscape Safe`.
+- The default seed phrase is:
+
+```text
+世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。
+```
+
+- A `デフォルト値に戻す` button restores the seed phrase to that default after
+  editing.
+
+## 2026-05-10 LiteRT-LM 0.11.0 Pinning And Performance Logs
+
+The Android LiteRT-LM path manages its dependency version and runtime logs
+explicitly to improve benchmark reproducibility and investigation quality.
+
+- The LiteRT-LM Android dependency must not use `latest.release`; it is pinned
+  to `com.google.ai.edge.litertlm:litertlm-android:0.11.0`.
+- Stage 1 / Stage 2 system prompts are not concatenated into the user prompt.
+  They are passed through LiteRT-LM `ConversationConfig(systemInstruction=...)`.
+- `Conversation.sendMessageAsync()` receives only the stage user prompt. This
+  avoids duplicate prompt wrapping and follows the LiteRT-LM conversation API.
+- The existing policy remains unchanged: GPU backend is required, CPU fallback
+  is not allowed, and speculative decoding / MTP is enabled.
+- The LiteRT-LM provider emits the following `InkuPerf` log events:
+  - `litert_request_start`: `model_id`, `prompt_chars`, `system_chars`,
+    `max_tokens`, and `engine_max_tokens`
+  - `litert_engine_init`: `model_id`, `backend`, `speculative_decoding`,
+    `engine_init_ms`, and `max_tokens`
+  - `litert_request_done`: `model_id`, `elapsed_ms`, and `output_chars`
+- The pipeline emits the following `InkuPerf` log events:
+  - `paint_start` / `paint_done`: selected models, prompt length, catalog,
+    canvas, total elapsed time, and render hash
+  - `stage1_start` / `stage1_done` / `stage1_failed`
+  - `stage2_start` / `stage2_done` / `stage2_failed`
+  - `stage2_invalid`: why the first Stage 2 output was retried, response
+    length, whether `instructions` existed, and a short preview
+  - `render_start` / `render_done`
+- LiteRT-LM Stage 2 system prompts explicitly forbid whitespace inside JSON
+  numbers because Gemma can emit malformed values such as `0. 0`, `0. 01`,
+  or `50 0`.
+- Stage 2 JSON ingestion tries strict parsing, JSON object substring parsing,
+  and parsing after LiteRT-LM numeric-whitespace repair. If `org.json` accepts
+  malformed numbers as strings, keys and string values are trimmed, only
+  number-like strings are normalized back to `Int` / `Long` / `Double`, and
+  whitespace/newline corruption inside keys is normalized to schema-compatible
+  snake_case.
+- These logs are for performance investigation only. They must not change the
+  server/web-compatible history JSON, Score, SVG, or render metadata formats.
+- `engine_init_ms`, `stage1_ms`, `stage2_ms`, `render_ms`, `model_id`, and
+  `prompt_chars` are collected from adb logcat and may be saved under
+  `no-git-sync/perf-logs/` when needed. Performance logs under `no-git-sync`
+  are not tracked by git.
+
+As of 2026-05-10, Pixel 9 device measurements with the same prompt,
+`ink_season`, `pixel9_landscape_safe`, GPU backend, and MTP enabled show:
+
+- E2B: `engine_init_ms=6741`, `stage1_ms=18422`, `stage2_ms=89507`,
+  `render_ms=13`, total `107956ms`. Stage 2 retried.
+- E4B: the first run, `perf-litert-e4b-003`, exited during Stage 1 engine
+  initialization. The rerun, `perf-litert-e4b-004`, completed with
+  `engine_init_ms=12011`, `stage1_ms=29937`, `stage2_ms=41931`,
+  `render_ms=47`, total `71933ms`. Stage 2 retried.
+- `ConversationConfig(systemInstruction=...)` reduces user-side `prompt_chars`
+  to about 31 for Stage 1 and 132 for Stage 2, but the system prompt is still
+  passed separately. Total latency therefore remains strongly affected by model
+  output length and retry behavior.
+- With Stage 1 prompt optimization enabled, E2B, and the same prompt,
+  `perf-litert-e2b-opt-002` produced malformed Stage 2 JSON on the first pass:
+  numeric whitespace such as `0. 0`, `0. 01`, and `50 0` caused
+  `stage2_invalid reason=json_extract_failed` and triggered retry.
+- After adding the numeric-whitespace prohibition to the prompt and the JSON
+  ingestion repair path, the same condition in `perf-litert-e2b-opt-004`
+  completed without retry: `engine_init_ms=3644`, `stage1_ms=10223`,
+  `stage2_ms=28124`, total `38466ms`, render hash short `DCB9`.
+- The same prompt was also run through server-side `inku-cli paint` with
+  `nvidia:google/gemma-4-31b-it`, `ink_season`, and server-supported canvas
+  `wide` as `server-stage2-retry-001`. The server result had
+  `compose_retry_count=0`, `compose_retry_reasons=[]`,
+  `compose_fallback_used=false`, `elapsed_stage2_ms=26060`, and
+  `tokens_out_stage2=351`; no server-side Stage 2 retry occurred.
+- Therefore the observed retry is treated as a localized Android LiteRT-LM /
+  Gemma E2B free-text JSON output issue, not a shared server Stage 2 contract
+  issue. The repair remains in the provider-independent Score ingestion layer
+  so it also protects against equivalent malformed JSON from other providers.
+
+## 2026-05-10 LiteRT-LM Stage 1 Prompt Optimization Option
+
+As an Android-specific feature, the `Settings > Model Settings > LiteRT-LM`
+panel provides a `プロンプト最適化` checkbox.
+
+- The setting is saved in Room `app_settings` as
+  `litert_stage1_prompt_optimization` and restored after app restart.
+- The default is OFF.
+- Even when enabled, it applies only when the Stage 1 model starts with
+  `local-litert-lm:`. It must not affect non-local providers such as OpenAI,
+  Claude, Gemini, NVIDIA, Ollama, or OVMS.
+- When enabled, Stage 1 uses a LiteRT-LM-specific compressed system prompt
+  instead of the large web/server Stage 1 prompt, passed through
+  `ConversationConfig(systemInstruction=...)`.
+- The compressed Stage 1 prompt keeps the following contract:
+  - output only normalized DDL text
+  - preserve Saijiki vocabulary, attribute retention, concrete counts,
+    explicit placement, random-word prohibition, no forced true circles for
+    dots/particles/stars/rain/snow/sand/petals, no concrete human/face/animal
+    rendering, background contrast preservation, and gray-background
+    prohibition
+  - include only a small number of Stage 1 examples selected for the input to
+    reduce prompt size
+- DDL, Score, SVG, history JSON, and render metadata persistence formats are
+  unchanged.
+- Headless rendering also reads this setting. If the CLI/ADB extra
+  `litert_stage1_prompt_optimization` is provided, that value takes precedence.
+- Unit tests verify that the compressed prompt is substantially shorter than
+  the normal Stage 1 prompt and that key fixture example outputs remain
+  aligned.
+
+## 2026-05-10 Prompt Tab Display And LiteRT-LM Compressed Prompts
+
+The `Prompt` tab in the draw screen and history screen generally follows the
+server/web `/api/prompts` display behavior.
+
+- For non-LiteRT-LM renders, Android does not persist the exact system prompt
+  string used at render time in the history DB. At display time, it reconstructs
+  the current normal Android Stage 1 / Stage 2 system prompts.
+- This normal display path does not branch the Stage 2 prompt by history model
+  kind and does not reselect Stage 1 examples from the input text. Like the
+  server/web `OutputTabsContent`, it displays the normal Stage 1 input, Stage 1
+  system, Stage 2 input, and Stage 2 system sections.
+- As an Android-specific behavior, a history item whose `stage1_model` or
+  `stage2_model` starts with `local-litert-lm:` is treated as a LiteRT-LM
+  render, and the `Prompt` tab displays LiteRT-LM prompts.
+- For LiteRT-LM renders, the Stage 2 system prompt always displays the
+  LiteRT-LM-specific compressed Stage 2 prompt.
+- For LiteRT-LM renders, the Stage 1 system prompt reflects the current
+  `litert_stage1_prompt_optimization` setting at display time. If enabled, the
+  LiteRT-LM-specific compressed Stage 1 prompt is displayed; if disabled, the
+  normal Stage 1 system prompt is displayed.
+- This is an Android-specific display difference only. It must not change DDL,
+  Score, SVG, history JSON, render metadata, or render hash persistence formats.

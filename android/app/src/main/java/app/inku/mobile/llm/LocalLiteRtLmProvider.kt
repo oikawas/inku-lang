@@ -5,6 +5,7 @@ import android.util.Log
 import app.inku.mobile.data.db.ModelAssetDao
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ExperimentalApi
@@ -37,13 +38,18 @@ class LocalLiteRtLmProvider(
         val started = System.currentTimeMillis()
         val modelPath = resolveModelPath(request.modelId)
         val maxNumTokens = ENGINE_MAX_NUM_TOKENS
-        Log.i(TAG, "LiteRT-LM request starting model=${request.modelId} maxTokens=$maxNumTokens")
+        val prompt = request.prompt
+        Log.i(
+            PERF_TAG,
+            "litert_request_start model_id=${request.modelId} prompt_chars=${prompt.length} " +
+                "system_chars=${request.systemInstruction?.length ?: 0} max_tokens=${request.maxTokens} engine_max_tokens=$maxNumTokens",
+        )
         val activeEngine = engineFor(request.modelId, modelPath, maxNumTokens)
         val response = activeEngine.createConversation(conversationConfig(request)).use { conversation ->
             var text = ""
             try {
                 withTimeout(REQUEST_TIMEOUT_MS) {
-                    conversation.sendMessageAsync(localPrompt(request)).collect { message ->
+                    conversation.sendMessageAsync(prompt).collect { message ->
                         val rendered = conversation.renderMessageIntoString(message).trim()
                         if (rendered.isNotBlank()) {
                             text = mergeStreamText(text, rendered)
@@ -56,7 +62,10 @@ class LocalLiteRtLmProvider(
             }
             text.ifBlank { error("LiteRT-LM returned an empty response.") }
         }
-        Log.i(TAG, "LiteRT-LM request finished model=${request.modelId} elapsedMs=${System.currentTimeMillis() - started}")
+        Log.i(
+            PERF_TAG,
+            "litert_request_done model_id=${request.modelId} elapsed_ms=${System.currentTimeMillis() - started} output_chars=${response.length}",
+        )
         ModelResponse(
             text = response,
             modelId = request.modelId,
@@ -86,8 +95,13 @@ class LocalLiteRtLmProvider(
             Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
             ExperimentalFlags.enableSpeculativeDecoding = true
             val cacheDir = File(context.cacheDir, "litert-lm").also { it.mkdirs() }.absolutePath
+            val initStarted = System.currentTimeMillis()
             val newEngine = createInitializedEngine(modelPath, Backend.GPU(), maxNumTokens, cacheDir)
-            Log.i(TAG, "LiteRT-LM engine initialized model=$modelId backend=${Backend.GPU().name} speculativeDecoding=true")
+            Log.i(
+                PERF_TAG,
+                "litert_engine_init model_id=$modelId backend=${Backend.GPU().name} speculative_decoding=true " +
+                    "engine_init_ms=${System.currentTimeMillis() - initStarted} max_tokens=$maxNumTokens",
+            )
             loadedModelId = modelId
             loadedModelPath = modelPath
             loadedMaxNumTokens = maxNumTokens
@@ -117,22 +131,15 @@ class LocalLiteRtLmProvider(
 
     private fun conversationConfig(request: ModelRequest): ConversationConfig {
         return ConversationConfig(
+            systemInstruction = request.systemInstruction
+                ?.takeIf { it.isNotBlank() }
+                ?.let { Contents.of(it) },
             samplerConfig = SamplerConfig(
                 topK = 10,
                 topP = 0.95,
                 temperature = request.temperature,
             ),
         )
-    }
-
-    private fun localPrompt(request: ModelRequest): String {
-        val instruction = request.systemInstruction?.takeIf { it.isNotBlank() } ?: return request.prompt
-        return buildString {
-            append(instruction)
-            append("\n\n# 入力\n")
-            append(request.prompt)
-            append("\n\n# 出力\n")
-        }
     }
 
     private fun mergeStreamText(current: String, rendered: String): String {
@@ -144,6 +151,7 @@ class LocalLiteRtLmProvider(
 
     private companion object {
         private const val TAG = "InkuLiteRtLm"
+        private const val PERF_TAG = "InkuPerf"
         private const val REQUEST_TIMEOUT_MS = 600_000L
         private const val ENGINE_MAX_NUM_TOKENS = 4096
     }

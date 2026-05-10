@@ -158,6 +158,19 @@ with `polygon` and `sides=5-8`.  Motion energy is handled by trajectory,
 rotation, diagonal placement, wave paths, and asymmetry rather than simply
 increasing count or density.
 
+The score coercion layer also contains rendering-core quality repairs used by
+the current default engine.  These repairs are deliberately generic rather than
+prompt-specific.  Quiet, mist, memory, shadow, and neon-blur contexts apply
+density and negative-space governors so vertical lines, particles, large filled
+shapes, or background surfaces do not overwhelm the work.  Motion words that
+arrive without an effective trajectory can receive a small directional motion
+floor, and requested colors that appear only in a color cycle may be promoted to
+a primary stroke so the color intent remains visible.  Visual events are
+distributed across available vocabulary: when a scene lacks angular anchors,
+the repair may add a small `polygon`; when repeated lines dominate, it shapes
+the existing line group with syncopated spacing, preserved negative space,
+directional fading, and slight endpoint gaps instead of increasing density.
+
 The rendering core is exposed internally through a RenderEngine contract.  A
 render engine receives JSON Score, render options, and server-owned color
 metadata, then returns SVG plus render metadata.  The current `renderer.py`
@@ -677,6 +690,14 @@ Benchmarks focus on:
 - whether deterministic fallback keeps enough DDL content to be reviewable
 - whether the renderer makes DDL features visible
 - whether the output has enough negative space, variation, and artistic focus
+
+Current render-core tuning records explicit artwork-quality metrics in CLI
+benchmark summaries: `constraint_adherence`, `negative_space_pressure`,
+`motion_energy`, `color_resonance`, `visual_event`, and `figurative_risk`.
+Fallback use, server hard timeouts, motif hints, presence counts, color traces,
+and compositional markers are recorded separately.  Queue or retry duration is
+diagnostic only and is not treated as a primary quality metric, because free
+inference endpoints can be dominated by external queue behavior.
 
 For NVIDIA free API testing, elapsed time is treated as operational metadata,
 not as an artistic quality signal.  Queue delays can indicate service pressure,

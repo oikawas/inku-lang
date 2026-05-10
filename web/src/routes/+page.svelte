@@ -249,6 +249,7 @@
 	let batchLatestResult = $state<PaintResult | null>(null);
 	let batchLatestDdl = $state<string | null>(null);
 	let batchLatestThinking = $state<string | null>(null);
+	let batchLatestPrompt = $state('');
 	let batchAutoFollowLatest = $state(false);
 	let previousInputMode = $state<'single' | 'batch' | 'demo'>('single');
 	let error        = $state<string | null>(null);
@@ -1815,6 +1816,12 @@
 	const canSubmit     = $derived(
 		inputMode === 'single' ? !!input.trim() : inputMode === 'batch' ? batchNonEmpty > 0 : false
 	);
+	const currentInstructionText = $derived.by(() => {
+		if (displayedHistoryItem?.input) return displayedHistoryItem.input;
+		if (inputMode === 'demo' || activeRunMode === 'demo') return demoGeneratedPrompt;
+		if (inputMode === 'batch' || activeRunMode === 'batch') return batchLatestPrompt;
+		return input;
+	});
 
 	// ── Timer ───────────────────────────────────────────────
 	function startTimer() {
@@ -2201,6 +2208,7 @@
 			batchLatestResult = null;
 			batchLatestDdl = null;
 			batchLatestThinking = null;
+			batchLatestPrompt = '';
 			batchAutoFollowLatest = true;
 		}
 		startTimer();
@@ -2311,6 +2319,7 @@
 						batchLatestResult = r;
 						batchLatestDdl = r.ddl;
 						batchLatestThinking = r.thinking;
+						batchLatestPrompt = `#${lines[i].line} ${lines[i].input}`;
 						if (inputMode === 'batch' && batchAutoFollowLatest) {
 							displayLatestBatchRender();
 						}
@@ -2717,6 +2726,7 @@
 		setBatchFailureReport(null);
 		batchActiveLine = null;
 		batchActiveDdl = null;
+		batchLatestPrompt = '';
 		outputTab = 'canvas';
 		elapsedStage1Ms = 0;
 		elapsedStage2Ms = 0;
@@ -3703,6 +3713,7 @@
 				{canvasDragging}
 				{promptsData}
 				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : demoGeneratedPrompt)}
+				instructionText={currentInstructionText}
 				{ddl}
 				{copiedPrompt}
 				{scoreJsonText}

@@ -698,6 +698,33 @@ def test_quality_metrics_scores_achromatic_value_contrast_without_extra_colors()
     assert metrics["score_quality_metrics"]["color_resonance"] >= 50
 
 
+def test_quality_metrics_scores_isolated_chromatic_accent():
+    score = {
+        "instructions": [
+            {
+                "primitive": "line",
+                "color": "black",
+                "from": [0.1, 0.7],
+                "to": [0.8, 0.45],
+                "arrangement": {"count": 1, "layout": "scatter", "fade": "outward", "preserve_space": True},
+            },
+            {
+                "primitive": "square",
+                "color": "red",
+                "center": [0.68, 0.42],
+                "size": [0.08, 0.08],
+                "filled": True,
+                "color_hint": "small red interruption",
+            },
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_color_counts"] == {"black": 1, "red": 1}
+    assert metrics["score_quality_metrics"]["color_resonance"] >= 54
+
+
 def test_quality_metrics_scores_rhythm_spacing_as_motion_energy():
     score = {
         "instructions": [

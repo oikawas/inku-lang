@@ -29,6 +29,8 @@ SERVER_DEFAULT_MODEL_LABEL = "server default"
 SERVER_DEFAULT_PROVIDER_LABEL = "server default"
 PROVIDERS = ("nvidia", "anthropic", "local")
 COLOR_KEYS = ("white", "black", "blue", "red", "green", "gray")
+ACHROMATIC_COLOR_KEYS = {"white", "black", "gray"}
+CHROMATIC_ACCENT_COLOR_KEYS = {"blue", "red", "green"}
 DEFAULT_COLOR_CATALOG_ID = "default"
 SVG_PROFILES = ("display", "editable", "compat")
 CANVAS_ASPECT_RATIOS = {
@@ -937,6 +939,7 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     visual_event = 0
     visible_colors: set[str] = set()
     weight_values: set[str] = set()
+    chromatic_accent_score = 0
     filled_large = 0
     bilateral_presence = 0
     gaze_presence = 0
@@ -973,6 +976,7 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
         if isinstance(rotation, (int, float)) and abs(float(rotation)) >= 8:
             varied_rotation += 1
         hint = instruction.get("color_hint")
+        lower_hint = ""
         if isinstance(hint, str):
             lower_hint = hint.lower()
             if "fallback from ddl" in lower_hint:
@@ -1006,6 +1010,22 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
         else:
             expanded_count += 1
 
+        if isinstance(color, str) and color in CHROMATIC_ACCENT_COLOR_KEYS:
+            accent_terms = ("accent", "interruption", "focal", "point", "punctuation", "small", "中断", "アクセント", "焦点")
+            is_compact = False
+            size = _coord_pair(instruction.get("size"))
+            radius = instruction.get("radius")
+            if instruction.get("primitive") == "line":
+                is_compact = True
+            elif size is not None and size[0] * size[1] <= 0.035:
+                is_compact = True
+            elif isinstance(radius, (int, float)) and float(radius) <= 0.12:
+                is_compact = True
+            if is_compact and (any(term in lower_hint for term in accent_terms) or instruction.get("filled") is True):
+                chromatic_accent_score += 24
+                if center is not None and (abs(center[0] - 0.5) >= 0.12 or abs(center[1] - 0.5) >= 0.12):
+                    chromatic_accent_score += 12
+
     off_center = sum(1 for x, y in centers if abs(x - 0.5) >= 0.12 or abs(y - 0.5) >= 0.12)
     counterweights = _math_balance_markers(instructions)["counterweight_like_opposite_placements"]
     instruction_count = len(instructions)
@@ -1026,6 +1046,15 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
             + min(len(weight_values), 3) * 6,
         )
         color_resonance = max(color_resonance, achromatic_tonal_resonance)
+    if visible_colors & CHROMATIC_ACCENT_COLOR_KEYS and visible_colors - CHROMATIC_ACCENT_COLOR_KEYS <= ACHROMATIC_COLOR_KEYS:
+        isolated_accent_resonance = min(
+            100,
+            max(0, len(visible_colors & ACHROMATIC_COLOR_KEYS)) * 12
+            + min(chromatic_accent_score, 48)
+            + min(off_center, 3) * 6
+            + min(preserve_space, 2) * 6,
+        )
+        color_resonance = max(color_resonance, isolated_accent_resonance)
     visual_event_score = min(100, visual_event * 28 + min(off_center, 3) * 8 + min(counterweights, 2) * 14 + (12 if color_cycle_count else 0))
     figurative_risk = min(100, bilateral_presence * 22 + gaze_presence * 18 + object_like_hints * 25 + filled_large * 10)
     fallback_quality = None

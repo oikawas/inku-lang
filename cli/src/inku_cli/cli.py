@@ -936,6 +936,7 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     rhythm_spacing_count = 0
     visual_event = 0
     visible_colors: set[str] = set()
+    weight_values: set[str] = set()
     filled_large = 0
     bilateral_presence = 0
     gaze_presence = 0
@@ -958,6 +959,9 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
         color = instruction.get("color")
         if isinstance(color, str):
             visible_colors.add(color)
+        weight = instruction.get("weight")
+        if isinstance(weight, str):
+            weight_values.add(weight)
         if instruction.get("filled") is True:
             size = _coord_pair(instruction.get("size"))
             radius = instruction.get("radius")
@@ -1010,15 +1014,18 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     negative_space_pressure = min(100, preserve_space * 18 + fade_count * 8 + min(off_center, 4) * 8 + min(counterweights, 3) * 8)
     motion_energy = min(100, path_motion * 18 + diagonal_or_wave * 12 + varied_rotation * 8 + rhythm_spacing_count * 10)
     color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14)
-    if color_resonance == 0 and visible_colors and visible_colors <= {"white", "black", "gray"}:
-        color_resonance = min(
+    if visible_colors and visible_colors <= {"white", "black", "gray"}:
+        achromatic_tonal_resonance = min(
             100,
             18
+            + max(0, len(visible_colors) - 1) * 18
             + preserve_space * 8
             + fade_count * 6
             + min(off_center, 3) * 6
-            + min(varied_rotation, 3) * 4,
+            + min(varied_rotation, 3) * 4
+            + min(len(weight_values), 3) * 6,
         )
+        color_resonance = max(color_resonance, achromatic_tonal_resonance)
     visual_event_score = min(100, visual_event * 28 + min(off_center, 3) * 8 + min(counterweights, 2) * 14 + (12 if color_cycle_count else 0))
     figurative_risk = min(100, bilateral_presence * 22 + gaze_presence * 18 + object_like_hints * 25 + filled_large * 10)
     fallback_quality = None

@@ -1642,7 +1642,29 @@ def test_coerce_score_does_not_read_english_verb_leaves_as_leaf_motif():
     fixed = coerce_score(score, ddl="Rain on a bus-stop window leaves transparent reflections.")
 
     assert not any("leaf_cluster motif restored from DDL intent" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("leaf/grain energy restored" in (ins.color_hint or "") for ins in fixed.instructions)
     assert any("visual event restored as a thin reflected cut" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_does_not_read_english_verb_leaves_empty_page_as_leaf_grain():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.5],
+                    "to": [0.75, 0.5],
+                    "color": "black",
+                    "arrangement": {"count": 1, "preserve_space": True, "fade": "outward"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A quiet black pencil line leaves most of the page empty.")
+
+    assert not any("leaf/grain energy restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event restored as a small broken line" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_does_not_read_crescent_as_scent_or_green():

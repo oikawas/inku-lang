@@ -468,7 +468,7 @@ COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
     "festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color",
 )
 LEAF_GRAIN_CONTEXT_MARKERS: tuple[str, ...] = (
-    "落ち葉", "紅葉", "湿った土", "森", "leaf", "leaves", "autumn forest", "fallen leaves",
+    "落ち葉", "紅葉", "湿った土", "森", "leaf", "autumn forest", "fallen leaves", "autumn leaves", "dry leaves",
 )
 SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = (
     "廃校", "廊下", "長い沈黙", "夕方の光", "abandoned school", "corridor", "long silence",

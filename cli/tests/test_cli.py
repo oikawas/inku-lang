@@ -670,6 +670,34 @@ def test_quality_metrics_scores_achromatic_tonal_resonance():
     assert metrics["score_quality_metrics"]["color_resonance"] > 0
 
 
+def test_quality_metrics_scores_achromatic_value_contrast_without_extra_colors():
+    score = {
+        "instructions": [
+            {
+                "primitive": "line",
+                "color": "gray",
+                "from": [0.15, 0.75],
+                "to": [0.82, 0.28],
+                "weight": "thin",
+                "rotation": -14,
+                "arrangement": {"count": 1, "layout": "scatter", "fade": "outward", "preserve_space": True},
+            },
+            {
+                "primitive": "line",
+                "color": "black",
+                "from": [0.2, 0.78],
+                "to": [0.62, 0.36],
+                "weight": "heavy",
+            },
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_color_counts"] == {"black": 1, "gray": 1}
+    assert metrics["score_quality_metrics"]["color_resonance"] >= 50
+
+
 def test_quality_metrics_scores_rhythm_spacing_as_motion_energy():
     score = {
         "instructions": [

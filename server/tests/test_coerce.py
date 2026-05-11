@@ -1546,7 +1546,10 @@ def test_coerce_score_adds_broken_line_event_for_quiet_negative_space():
 
     fixed = coerce_score(score, ddl="A quiet black pencil line holds a wide field of negative space.")
 
-    assert any("visual event restored as a small broken line" in (ins.color_hint or "") for ins in fixed.instructions)
+    event = next(ins for ins in fixed.instructions if "visual event restored as a small broken line" in (ins.color_hint or ""))
+    assert event.arrangement is not None
+    assert event.arrangement.preserve_space is True
+    assert event.arrangement.fade == "outward"
     assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
 
 

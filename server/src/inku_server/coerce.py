@@ -1081,6 +1081,7 @@ def _visual_event_instruction(
                 "color": "blue" if background != "blue" else "white",
                 "weight": "hair",
                 "color_hint": "visual event restored as a thin reflected cut",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
     if _any_marker_in_text(
@@ -1096,6 +1097,7 @@ def _visual_event_instruction(
                 "color": visible,
                 "weight": "brush_thin",
                 "color_hint": "visual event restored as a small broken line",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
     if _any_marker_in_text(("光", "灯", "月", "light", "moon", "neon", "sign"), source, lower):
@@ -1108,6 +1110,7 @@ def _visual_event_instruction(
                 "color": visible,
                 "weight": "brush_thin",
                 "color_hint": "visual event restored as a small light plane",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
     if _any_marker_in_text(("jazz", "syncopated", "backbeat", "blue-note", "improvised"), source, lower):
@@ -1122,6 +1125,7 @@ def _visual_event_instruction(
                 "color": visible,
                 "weight": "hair",
                 "color_hint": "visual event restored as a small offbeat arc",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
     if not _has_angular_event_anchor(instructions):
@@ -1135,6 +1139,7 @@ def _visual_event_instruction(
                 "color": visible,
                 "weight": "brush_thin",
                 "color_hint": "visual event restored as a small angular pulse",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
     return Instruction.model_validate(
@@ -1148,6 +1153,7 @@ def _visual_event_instruction(
             "color": color,
             "weight": "hair",
             "color_hint": "visual event restored as a small focal pulse",
+            "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
         }
     )
 

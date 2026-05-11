@@ -1123,6 +1123,9 @@ def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touch
     warehouse = coerce_score(base, ddl="Warehouse grid cuts hold dust and late afternoon shadow.")
     assert any(ins.primitive == "polygon" and "hard edge visual event restored" in (ins.color_hint or "") for ins in warehouse.instructions)
 
+    parking_lot = coerce_score(base, ddl="Parking-lot light cuts a rectangle with a falling diagonal.")
+    assert any(ins.primitive == "polygon" and "hard edge visual event restored" in (ins.color_hint or "") for ins in parking_lot.instructions)
+
     bicycle = coerce_score(base, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
     assert any("playful motion energy restored as a small moving color cluster" in (ins.color_hint or "") for ins in bicycle.instructions)
 
@@ -1151,6 +1154,32 @@ def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touch
 
     bus_stop = coerce_score(base, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
     assert not any("energy restored" in (ins.color_hint or "") for ins in bus_stop.instructions)
+
+
+def test_coerce_score_restores_visual_events_for_english_handmade_and_sensory_contexts():
+    base = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.06, 0.03],
+                    "color": "green",
+                }
+            ],
+        }
+    )
+
+    patchwork = coerce_score(
+        base,
+        ddl="Quilt-like patchwork drifts across a porch shadow in red, blue, green, and gray.",
+    )
+    assert any("visual event restored as a small handmade rhythm offset" in (ins.color_hint or "") for ins in patchwork.instructions)
+    assert any("rhythm variation restored without increasing count" in (ins.color_hint or "") for ins in patchwork.instructions)
+
+    scent = coerce_score(base, ddl="The scent of grass after rain drifts as small green ellipses.")
+    assert any("visual event restored as a small sensory drift" in (ins.color_hint or "") for ins in scent.instructions)
+    assert any("motion floor restored" in (ins.color_hint or "") for ins in scent.instructions)
 
 
 def test_coerce_score_enforces_explicit_shape_and_count_constraints_after_repairs():

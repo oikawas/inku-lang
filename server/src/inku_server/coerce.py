@@ -461,7 +461,7 @@ MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
     "低い雲", "押し沈", "影だけ", "滲", "涙", "震える", "一滴", "残る",
     "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
     "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
-    "trembling", "single drop", "remain", "remains",
+    "trembling", "single drop", "remain", "remains", "drift", "drifts", "drifting",
 )
 COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
     "祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色",
@@ -475,7 +475,7 @@ SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = (
 )
 HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = (
     "工場", "鉄骨", "錆", "錆び", "空を細かく分け", "factory", "steel frame", "rust", "girder",
-    "warehouse", "grid", "cut", "cuts", "brick",
+    "warehouse", "grid", "cut", "cuts", "brick", "parking-lot", "parking lot", "diagonal", "rectangle",
 )
 PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
     "自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime",
@@ -495,6 +495,7 @@ VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = (
 RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
     "リズム", "踊", "跳ね", "弾む", "反復", "交互", "楽しい", "楽しさ", "喜び", "祝祭", "明快",
     "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration",
+    "quilt", "patchwork", "handmade", "folk",
 )
 VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
     "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける",
@@ -506,6 +507,8 @@ VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
     "breath", "reflect", "reflection", "reflections", "lighthouse", "only light", "footprint", "outline", "unravel", "petal",
     "quiet", "negative space", "horizon", "prairie", "open road",
     "jazz", "syncopated", "backbeat", "blue-note", "improvised",
+    "quilt", "patchwork", "handmade", "folk", "scent", "fragrance", "grass", "parking-lot", "parking lot",
+    "diagonal", "rectangle",
 )
 MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
     "余白", "間", "空白", "気配", "押す", "避け", "離れ",
@@ -1074,6 +1077,29 @@ def _visual_event_instruction(
     lower = (ddl or "").lower()
     source = ddl or ""
     visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    if _any_marker_in_text(("scent", "fragrance", "grass"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.64, 0.42],
+                "radius": 0.058,
+                "angle_start": 15,
+                "angle_end": 185,
+                "rotation": -26,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as a small sensory drift",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
     if _any_marker_in_text(("雨", "反射", "透明", "滲", "rain", "reflection", "reflections", "transparent", "window"), source, lower):
         return Instruction.model_validate(
             {
@@ -1128,6 +1154,27 @@ def _visual_event_instruction(
                 "weight": "hair",
                 "color_hint": "visual event restored as a small offbeat arc",
                 "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
+            }
+        )
+    if _any_marker_in_text(("quilt", "patchwork", "handmade", "folk"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.64, 0.40],
+                "size": [0.072, 0.052],
+                "rotation": 22,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a small handmade rhythm offset",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
             }
         )
     if not _has_angular_event_anchor(instructions):

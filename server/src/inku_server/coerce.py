@@ -182,7 +182,7 @@ MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
 
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("白", "white"), "white"),
-    (("黒", "black"), "black"),
+    (("黒", "闇", "影", "墨", "black", "dark", "shadow", "ink"), "black"),
     (
         (
             "青",

@@ -461,6 +461,25 @@ def test_coerce_score_repairs_green_from_specific_leaf_terms():
     assert any(ins.color == "green" or (ins.arrangement and "green" in ins.arrangement.color_cycle) for ins in fixed.instructions)
 
 
+def test_coerce_score_repairs_black_from_shadow_terms():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.1, 0.5],
+                    "to": [0.9, 0.5],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Warehouse grid cuts hold dust and late afternoon shadow.")
+
+    assert any(ins.color == "black" or (ins.arrangement and "black" in ins.arrangement.color_cycle) for ins in fixed.instructions)
+
+
 def test_coerce_score_repairs_missing_shape_intents_from_ddl():
     score = Score.model_validate(
         {

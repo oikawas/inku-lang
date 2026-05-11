@@ -1177,6 +1177,140 @@ def _with_semantic_visual_event_hints(instructions: list[Instruction], *, ddl: s
     return adjusted
 
 
+FOCAL_EVENT_MIN_EXTENT = 0.075
+FOCAL_EVENT_MIN_LINE_EXTENT = 0.14
+
+
+def _has_focal_event_hint(ins: Instruction) -> bool:
+    hint = (ins.color_hint or "").lower()
+    return any(
+        marker in hint
+        for marker in (
+            "visual event",
+            "vanishing trace",
+            "edge light event",
+            "playful motion",
+            "motion floor",
+            "surface tension",
+            "action residue",
+            "temporal hinge",
+            "presence weight",
+        )
+    )
+
+
+def _instruction_anchor(ins: Instruction) -> tuple[float, float]:
+    if ins.primitive == "line" and ins.from_ is not None and ins.to is not None:
+        return ((ins.from_[0] + ins.to[0]) / 2, (ins.from_[1] + ins.to[1]) / 2)
+    if ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center is not None:
+        return ins.center
+    if ins.primitive in ("square", "triangle") and ins.position is not None and ins.size is not None:
+        return (ins.position[0] + ins.size[0] / 2, ins.position[1] + ins.size[1] / 2)
+    return (0.62, 0.40)
+
+
+def _with_minimum_focal_extent(ins: Instruction) -> Instruction:
+    if not _has_focal_event_hint(ins):
+        return ins
+    if _shape_extent(ins) >= FOCAL_EVENT_MIN_EXTENT:
+        return ins
+
+    data = ins.model_dump(by_alias=True)
+    changed = False
+    if ins.primitive == "line" and ins.from_ is not None and ins.to is not None:
+        cx, cy = _instruction_anchor(ins)
+        dx = ins.to[0] - ins.from_[0]
+        dy = ins.to[1] - ins.from_[1]
+        length = max((dx * dx + dy * dy) ** 0.5, 1e-6)
+        target = max(FOCAL_EVENT_MIN_LINE_EXTENT, length)
+        ux, uy = dx / length, dy / length
+        data["from"] = [_clamp_unit(cx - ux * target / 2), _clamp_unit(cy - uy * target / 2)]
+        data["to"] = [_clamp_unit(cx + ux * target / 2), _clamp_unit(cy + uy * target / 2)]
+        changed = True
+    elif ins.primitive in ("circle", "arc", "polygon"):
+        data["radius"] = max(float(ins.radius or 0.0), FOCAL_EVENT_MIN_EXTENT / 2)
+        changed = True
+    elif ins.primitive == "ellipse" and ins.size is not None:
+        data["size"] = [
+            max(float(ins.size[0]), FOCAL_EVENT_MIN_EXTENT),
+            max(float(ins.size[1]), FOCAL_EVENT_MIN_EXTENT * 0.42),
+        ]
+        changed = True
+    elif ins.primitive in ("square", "triangle") and ins.size is not None:
+        data["size"] = [
+            max(float(ins.size[0]), FOCAL_EVENT_MIN_EXTENT),
+            max(float(ins.size[1]), FOCAL_EVENT_MIN_EXTENT * 0.62),
+        ]
+        changed = True
+
+    if not changed:
+        return ins
+    _append_hint(data, "focal event visibility floor applied")
+    return Instruction.model_validate(data)
+
+
+def _has_adjacent_reaction(instructions: list[Instruction]) -> bool:
+    return any("adjacent reaction" in (ins.color_hint or "").lower() for ins in instructions)
+
+
+def _adjacent_reaction_instruction(
+    event: Instruction,
+    *,
+    ddl: str | None,
+    background: str,
+) -> Instruction:
+    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
+    color = requested[0] if requested else VISIBLE_ON_BACKGROUND.get(background, "black")
+    cx, cy = _instruction_anchor(event)
+    rx = _clamp_unit(cx + 0.075 if cx < 0.72 else cx - 0.075)
+    ry = _clamp_unit(cy - 0.055 if cy > 0.22 else cy + 0.055)
+    return Instruction.model_validate(
+        {
+            "primitive": "arc",
+            "center": [rx, ry],
+            "radius": 0.052,
+            "angle_start": 24,
+            "angle_end": 192,
+            "rotation": -18,
+            "color": color,
+            "weight": "hair",
+            "color_hint": "adjacent reaction added to hold focal event",
+            "arrangement": {
+                "count": 2,
+                "layout": "scatter",
+                "path": "diagonal",
+                "margin": 0.22,
+                "density": "low",
+                "fade": "outward",
+                "preserve_space": True,
+                "rhythm_spacing": "loose",
+            },
+        }
+    )
+
+
+def _with_focal_event_floor(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    """見せ場を密度ではなく、最小視認サイズと近接反応で支える。"""
+    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS):
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+
+    adjusted = [_with_minimum_focal_extent(ins) for ins in instructions]
+    if _has_adjacent_reaction(adjusted) or len(adjusted) >= 9:
+        return adjusted
+
+    event = next((ins for ins in adjusted if _has_focal_event_hint(ins)), None)
+    if event is None:
+        return adjusted
+    return [*adjusted, _adjacent_reaction_instruction(event, ddl=ddl, background=background)]
+
+
 def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
     visible = VISIBLE_ON_BACKGROUND.get(background, "black")
     if kind == "leaf_grain":
@@ -2808,6 +2942,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_crescent_sensory_suppression(instructions, ddl=ddl, background=background)
     instructions = _with_ma_pressure(instructions, ddl=ddl)
     instructions = _with_semantic_visual_event_hints(instructions, ddl=ddl)
+    instructions = _with_focal_event_floor(instructions, ddl=ddl, background=background)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)

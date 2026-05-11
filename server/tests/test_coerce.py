@@ -1990,6 +1990,75 @@ def test_coerce_score_adds_motion_to_open_road_pull_focus():
     assert "visual event preserved as a road-pull focus accent" in (road.color_hint or "")
 
 
+def test_coerce_score_adds_visible_japanese_focal_event_and_reaction():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.50, 0.50],
+                    "radius": 0.008,
+                    "color": "red",
+                    "color_hint": "小さな赤い点",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="大きな美術館の白い部屋で、小さな赤い点だけが見る人の足を止めた。")
+
+    assert any("visual event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_keeps_english_action_residue_visible():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.48, 0.50],
+                    "to": [0.52, 0.50],
+                    "color": "gray",
+                    "weight": "hair",
+                    "color_hint": "bow",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A fisherman on the Mekong bows to the river each morning.")
+
+    bow = next(ins for ins in fixed.instructions if "bow" in (ins.color_hint or ""))
+    assert bow.from_ is not None
+    assert bow.to is not None
+    assert abs(bow.to[0] - bow.from_[0]) >= 0.14
+    assert "visual event preserved as action residue" in (bow.color_hint or "")
+    assert "focal event visibility floor applied" in (bow.color_hint or "")
+    assert any("adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_turns_english_repetition_time_into_focal_event():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.48, 0.55],
+                    "size": [0.05, 0.02],
+                    "color": "blue",
+                    "color_hint": "small sounds",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="In a thawing stream, small sounds were born under the stones and vanished again and again.")
+
+    assert any("visual event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_does_not_add_edge_light_when_presence_handles_gaze():
     score = Score.model_validate(
         {

@@ -21,6 +21,96 @@ _ENGLISH_TASTE_MARKERS = (
     "warehouse grid",
 )
 
+COERCE_MARKERS = {
+    "material_weight_hints": (
+        (("rotring",), "rotring"),
+        (("pencil",), "pencil"),
+        (("crayon",), "crayon"),
+        (("chalk",), "chalk"),
+        (("fine-brush", "fine brush"), "brush_thin"),
+        (("thick-brush", "thick brush"), "brush_thick"),
+        (("ink-wash", "ink wash"), "brush_thin"),
+        (("rope",), "rope"),
+    ),
+    "color_markers": (
+        (("white",), "white"),
+        (("black", "dark", "shadow", "ink"), "black"),
+        (("blue", "sky", "water", "lake", "sea", "rain", "cold"), "blue"),
+        (("red",), "red"),
+        (("green", "forest", "leaf", "grass", "moss", "bamboo", "garden", "scent", "fragrance"), "green"),
+        (("gray", "grey"), "gray"),
+    ),
+    "negated_color_markers": {
+        "green": ("not green", "avoid green", "without green", "no green"),
+    },
+    "shape_intent_markers": (
+        (("polygon", "crystal", "mineral", "hard shard"), "polygon"),
+        (("mountain", "sharp", "peak", "ridge", "triangle"), "triangle"),
+        (("arc", "spiral", "coil", "curl", "ripple"), "arc"),
+        (("paper", "fragment", "fold", "shard", "square"), "square"),
+    ),
+    "motif_intent_markers": (
+        (("leaf", "fallen leaves", "autumn leaves", "dry leaves"), "leaf_cluster"),
+        (("paper", "fragment", "shard", "letter"), "paper_shard"),
+        (("ripple", "spiral", "coil"), "ripple_knot"),
+        (("mountain", "ridge", "peak"), "mountain_sign"),
+    ),
+    "atmospheric_effect": (
+        "membrane", "haze", "fog", "mist", "atmosphere", "soft light", "scent", "fragrance",
+        "five-sense", "reflection",
+    ),
+    "quiet_density": (
+        "quiet", "silence", "negative space", "thin", "pale", "slight", "single", "one ",
+        "presence", "trace", "memory", "forgotten", "shadow", "cold", "transparent", "membrane",
+        "haze", "fog", "mist", "blur", "low cloud", "pressing down",
+    ),
+    "vertical_density": ("rain", "snow", "falling", "vertical", "top to bottom"),
+    "motion": (
+        "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
+        "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
+        "trembling", "single drop", "remain", "remains", "drift", "drifts", "drifting",
+    ),
+    "colorful": ("festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color"),
+    "leaf_grain": ("leaf", "autumn forest", "fallen leaves", "autumn leaves", "dry leaves"),
+    "silence_layer": ("abandoned school", "corridor", "long silence"),
+    "hard_edge": (
+        "factory", "steel frame", "rust", "girder", "warehouse", "grid", "cut", "cuts", "brick",
+        "parking-lot", "parking lot", "diagonal", "rectangle",
+    ),
+    "playful_motion": ("bicycle", "slope", "petal", "colored paper", "wind chime"),
+    "edge_light": ("night", "black", "dark", "lighthouse", "only light", "sea", "glass", "neon"),
+    "strong_edge_light": ("lighthouse", "only light", "cutting light", "single beam"),
+    "vanishing_trace": ("breath", "footprint", "fade", "fading", "dissolve", "outline", "memory", "trace", "far"),
+    "rhythm": (
+        "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration",
+        "quilt", "patchwork", "handmade", "folk",
+    ),
+    "visual_event": (
+        "collision", "burst", "focus", "turning point", "pop", "release",
+        "wandering", "fading", "trembling", "single drop", "goes home first", "curling",
+        "low cloud", "pressing down", "shadow only", "blur", "tear",
+        "breath", "reflect", "reflection", "reflections", "lighthouse", "only light", "footprint", "outline",
+        "unravel", "petal", "quiet", "negative space", "horizon", "prairie", "open road",
+        "jazz", "syncopated", "backbeat", "blue-note", "improvised",
+        "quilt", "patchwork", "handmade", "folk", "scent", "fragrance", "grass", "parking-lot", "parking lot",
+        "diagonal", "rectangle",
+    ),
+    "ma_pressure": (
+        "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
+        "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift",
+        "horizon", "prairie", "open road",
+    ),
+    "surface_tension": ("cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink"),
+    "intentional_large_surface": ("large", "huge", "wide", "broad surface", "cloth", "fabric"),
+    "generated_background_plan": ("presence", "transparent membrane", "five-sense", "boundary blur", "full canvas"),
+    "explicit_surface": (
+        "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness", "dark field",
+    ),
+    "sunset_sky": ("sunset sky", "dusk sky"),
+    "dawn": ("dawn", "daybreak", "sunrise"),
+    "night": ("night",),
+}
+
 
 def _seed(text: str, salt: str) -> int:
     digest = hashlib.sha256(f"{salt}:{text}".encode("utf-8")).digest()
@@ -95,4 +185,5 @@ SUPPORT = InstructionLanguageSupport(
     stage1_prompt=STAGE1_PROMPT,
     stage2_prompt=STAGE2_PROMPT,
     expand_intermediate=expand_intermediate,
+    coerce_markers=COERCE_MARKERS,
 )

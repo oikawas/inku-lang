@@ -331,8 +331,11 @@ Instruction Language Registry は、各指示文言語について以下の境�
 - Stage 1 prompt
 - Stage 2 prompt
 - Stage 1.5 expander / filter
+- Score coerce layer が使う言語別 marker セット
 
-第三者がスペイン語などを追加する場合は、JSON Score schema や renderer を変更する前に、この registry に `es` などの言語サポートを追加する。既存の `ja` / `en` は従来の prompt と expander をそのまま登録するため、registry 化それ自体は既存描画結果を変えない。言語メタデータは `render_hash` の canonical payload に含めず、既存履歴やベンチマークのハッシュ参照を安定させる。
+Score coerce layer の補修アルゴリズム本体は、JSON Score 構造に対する言語非依存の処理として共通化する。一方で、どの語が `motion` / `visual_event` / `hard_edge` / `dark field` などの抽象文脈を意味するかは言語依存であるため、`ja` / `en` の各 `InstructionLanguageSupport` が `coerce_markers` として所有する。
+
+第三者がスペイン語などを追加する場合は、JSON Score schema や renderer を変更する前に、この registry に `es` などの言語サポートを追加する。追加言語は prompt / expander だけでなく、Score coerce layer 用の marker セットも持つ。既存の `ja` / `en` は従来の prompt と expander をそのまま登録し、coerce marker も言語別ファイルへ分離するため、言語固有語彙を共通コアへ混入させない。言語メタデータは `render_hash` の canonical payload に含めず、既存履歴やベンチマークのハッシュ参照を安定させる。
 
 ### 6.6 二言語並行開発の意義
 
@@ -1443,8 +1446,10 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - `inku-cli paint` / `batch` / `demo-instruction` は旧 `--lang` ではなく `--instruction-lang auto|ja|en` と任意の `--ui-lang` を送信する
 - 既存履歴や `cli/tune_bench.md` のハッシュ参照を壊さないため、言語メタデータは `render_hash` の canonical payload には含めない
 - Stage 1 prompt、Stage 2 prompt、Stage 1.5 expander / filter は `InstructionLanguageSupport` として registry に登録する
+- Score coerce layer が参照する語彙・文脈 marker は `InstructionLanguageSupport.coerce_markers` として `ja` / `en` の言語別ファイルに分離する
+- Score coerce layer の補修アルゴリズム本体は JSON Score 構造に対する共通処理として維持し、言語ごとの違いは marker セット側で表現する
 - `ja` / `en` の既存 prompt と expander は内容を変更せず registry に載せるため、描画結果の変化を伴わない
-- 第三者が追加言語を実装する場合は、まず registry に言語コード・prompt・expander を追加し、JSON Score schema / renderer / 色カタログの変更とは分離して検証する
+- 第三者が追加言語を実装する場合は、まず registry に言語コード・prompt・expander・coerce marker を追加し、JSON Score schema / renderer / 色カタログの変更とは分離して検証する
 - build number: 402
 
 ### v1.49 (2026-05-11)

@@ -39,6 +39,16 @@ def test_english_language_support_adds_language_specific_taste_without_touching_
     assert "syncopated city rhythm" in en_after or "blue-note value" in en_after
 
 
+def test_language_support_owns_coerce_marker_sets():
+    ja_markers = INSTRUCTION_LANGUAGE_REGISTRY["ja"].coerce_markers
+    en_markers = INSTRUCTION_LANGUAGE_REGISTRY["en"].coerce_markers
+
+    assert "patchwork" in en_markers["rhythm"]
+    assert "patchwork" not in ja_markers["rhythm"]
+    assert "暗闇" in ja_markers["explicit_surface"]
+    assert "dark field" in en_markers["explicit_surface"]
+
+
 def test_auto_instruction_language_resolution_remains_stable():
     assert resolve_instruction_lang("一滴の墨", "auto") == "ja"
     assert resolve_instruction_lang("one black line", "auto") == "en"

@@ -70,10 +70,16 @@ and benchmark references remain stable.
 
 Instruction-language implementation is organized through an internal
 Instruction Language Registry.  Each registered language owns its language code,
-Stage 1 prompt, Stage 2 prompt, and Stage 1.5 expander/filter entry point.
+Stage 1 prompt, Stage 2 prompt, Stage 1.5 expander/filter entry point, and
+the language-specific marker set used by the Score coerce layer.
 Japanese and English are registered by binding the existing prompts and
-expanders without changing their text or behavior.  A third-party language such
-as Spanish should be added first as a new registry entry, keeping JSON Score
+expanders without changing their text or behavior, while their coerce marker
+sets live in separate language files.  The coerce algorithms remain common
+because they operate on language-independent JSON Score structure; language
+differences belong in the marker sets that map words such as motion,
+visual-event, hard-edge, or dark-field cues to those shared repair policies.  A
+third-party language such as Spanish should be added first as a new registry
+entry with prompts, expander behavior, and coerce markers, keeping JSON Score
 schema, renderer behavior, and color catalogs separate unless the new language
 demonstrably needs a core extension.
 

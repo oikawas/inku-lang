@@ -19,6 +19,7 @@ import re
 from dataclasses import dataclass, field as dc_field
 from typing import Any, Callable
 
+from .language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
 from .schema import Instruction, Score
 
 
@@ -149,16 +150,27 @@ VISIBLE_ON_BACKGROUND: dict[str, str] = {
     "green": "white",
 }
 
-MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("ロットリング", "rotring"), "rotring"),
-    (("鉛筆", "pencil"), "pencil"),
-    (("クレヨン", "crayon"), "crayon"),
-    (("チョーク", "chalk"), "chalk"),
-    (("細筆", "fine-brush", "fine brush"), "brush_thin"),
-    (("太筆", "thick-brush", "thick brush", "厚塗り", "油絵"), "brush_thick"),
-    (("水墨", "墨", "ink-wash", "ink wash"), "brush_thin"),
-    (("縄", "ロープ", "rope"), "rope"),
-)
+def _coerce_marker_values(name: str) -> tuple[Any, ...]:
+    values: list[Any] = []
+    for support in INSTRUCTION_LANGUAGE_REGISTRY.values():
+        language_values = support.coerce_markers.get(name, ())
+        if isinstance(language_values, tuple):
+            values.extend(language_values)
+    return tuple(values)
+
+
+def _coerce_marker_dict(name: str) -> dict[str, tuple[str, ...]]:
+    merged: dict[str, list[str]] = {}
+    for support in INSTRUCTION_LANGUAGE_REGISTRY.values():
+        language_values = support.coerce_markers.get(name, {})
+        if not isinstance(language_values, dict):
+            continue
+        for key, markers in language_values.items():
+            merged.setdefault(str(key), []).extend(str(marker) for marker in markers)
+    return {key: tuple(markers) for key, markers in merged.items()}
+
+
+MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("material_weight_hints")
 
 MAX_EXPANDED_PRIMITIVES = 400
 MAX_EXPANDED_PER_INSTRUCTION = 240
@@ -180,58 +192,7 @@ MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT = 0.30
 MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS = 0.20
 MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
 
-COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("白", "white"), "white"),
-    (("黒", "闇", "影", "墨", "black", "dark", "shadow", "ink"), "black"),
-    (
-        (
-            "青",
-            "blue",
-            "空",
-            "sky",
-            "水",
-            "water",
-            "湖",
-            "lake",
-            "海",
-            "sea",
-            "雨",
-            "rain",
-            "冷たい",
-            "cold",
-        ),
-        "blue",
-    ),
-    (("赤", "red"), "red"),
-    (
-        (
-            "緑",
-            "green",
-            "森",
-            "forest",
-            "leaf",
-            "草",
-            "grass",
-            "苔",
-            "moss",
-            "竹",
-            "bamboo",
-            "庭",
-            "garden",
-            "香り",
-            "scent",
-            "fragrance",
-            "芽",
-            "落ち葉",
-            "若葉",
-            "木の葉",
-            "葉っぱ",
-            "葉脈",
-        ),
-        "green",
-    ),
-    (("灰", "gray", "grey"), "gray"),
-)
+COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("color_markers")
 
 
 def _marker_in_text(marker: str, text: str, lower: str) -> bool:
@@ -245,34 +206,11 @@ def _any_marker_in_text(markers: tuple[str, ...], text: str, lower: str) -> bool
     return any(_marker_in_text(marker, text, lower) for marker in markers)
 
 
-NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
-    "green": (
-        "not green",
-        "avoid green",
-        "without green",
-        "no green",
-        "緑には寄せず",
-        "緑に寄せず",
-        "緑ではなく",
-        "緑を避け",
-        "緑を使わず",
-        "緑なし",
-    ),
-}
+NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = _coerce_marker_dict("negated_color_markers")
 
-SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("多角形", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片", "polygon", "crystal", "mineral", "hard shard"), "polygon"),
-    (("山", "尖", "鋭", "三角", "峰", "頂", "稜線", "mountain", "sharp", "peak", "ridge", "triangle"), "triangle"),
-    (("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple"), "arc"),
-    (("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square"), "square"),
-)
+SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("shape_intent_markers")
 
-MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "fallen leaves", "autumn leaves", "dry leaves"), "leaf_cluster"),
-    (("紙片", "破片", "折", "手紙", "paper", "fragment", "shard", "letter"), "paper_shard"),
-    (("波紋", "渦", "螺旋", "巻", "ripple", "spiral", "coil"), "ripple_knot"),
-    (("山", "峰", "稜線", "mountain", "ridge", "peak"), "mountain_sign"),
-)
+MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("motif_intent_markers")
 
 
 def _visible_background(background: str) -> str:
@@ -437,90 +375,28 @@ def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[I
     return repaired
 
 
-ATMOSPHERIC_EFFECT_MARKERS: tuple[str, ...] = (
-    "membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄",
-    "soft light", "柔らかな光", "陽光", "日差し",
-    "scent", "fragrance", "香り", "匂",
-    "five-sense", "五感",
-    "reflection", "反射", "映り",
-)
-
-QUIET_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
-    "静か", "静けさ", "沈黙", "余白", "薄い", "薄く", "細い", "少しだけ", "一つ", "一滴",
-    "気配", "余韻", "記憶", "忘れ", "影", "冷たい", "透明", "膜", "霞", "霧", "靄", "滲",
-    "低い雲", "押し沈",
-    "quiet", "silence", "negative space", "thin", "pale", "slight", "single", "one ",
-    "presence", "trace", "memory", "forgotten", "shadow", "cold", "transparent", "membrane",
-    "haze", "fog", "mist", "blur", "low cloud", "pressing down",
-)
-VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
-    "雨", "雪", "降", "縦", "上から下", "rain", "snow", "falling", "vertical", "top to bottom",
-)
-MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "先に帰", "風", "波", "ためらう",
-    "低い雲", "押し沈", "影だけ", "滲", "涙", "震える", "一滴", "残る",
-    "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
-    "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
-    "trembling", "single drop", "remain", "remains", "drift", "drifts", "drifting",
-)
-COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
-    "祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色",
-    "festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color",
-)
-LEAF_GRAIN_CONTEXT_MARKERS: tuple[str, ...] = (
-    "落ち葉", "紅葉", "湿った土", "森", "leaf", "autumn forest", "fallen leaves", "autumn leaves", "dry leaves",
-)
-SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = (
-    "廃校", "廊下", "長い沈黙", "夕方の光", "abandoned school", "corridor", "long silence",
-)
-HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = (
-    "工場", "鉄骨", "錆", "錆び", "空を細かく分け", "factory", "steel frame", "rust", "girder",
-    "warehouse", "grid", "cut", "cuts", "brick", "parking-lot", "parking lot", "diagonal", "rectangle",
-)
-PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime",
-)
-EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
-    "夜", "真夜中", "黒い", "暗", "灯台", "光だけ", "海", "ガラス", "ネオン",
-    "night", "black", "dark", "lighthouse", "only light", "sea", "glass", "neon",
-)
-STRONG_EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
-    "灯台", "光だけ", "切って", "切る", "切断", "一筋の光",
-    "lighthouse", "only light", "cutting light", "single beam",
-)
-VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = (
-    "白い息", "足跡", "消え", "消える", "消えかけ", "ほどけ", "輪郭", "記憶", "跡", "遠く",
-    "breath", "footprint", "fade", "fading", "dissolve", "outline", "memory", "trace", "far",
-)
-RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
-    "リズム", "踊", "跳ね", "弾む", "反復", "交互", "楽しい", "楽しさ", "喜び", "祝祭", "明快",
-    "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration",
-    "quilt", "patchwork", "handmade", "folk",
-)
-VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
-    "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける",
-    "迷う", "消えかけ", "震える", "一滴", "先に帰", "丸ま", "低い雲", "押し沈", "影だけ", "滲", "涙",
-    "白い息", "映", "反射", "灯台", "光だけ", "足跡", "輪郭", "ほどけ", "花びら", "ためらう",
-    "collision", "burst", "focus", "turning point", "pop", "release",
-    "wandering", "fading", "trembling", "single drop", "goes home first", "curling",
-    "low cloud", "pressing down", "shadow only", "blur", "tear",
-    "breath", "reflect", "reflection", "reflections", "lighthouse", "only light", "footprint", "outline", "unravel", "petal",
-    "quiet", "negative space", "horizon", "prairie", "open road",
-    "jazz", "syncopated", "backbeat", "blue-note", "improvised",
-    "quilt", "patchwork", "handmade", "folk", "scent", "fragrance", "grass", "parking-lot", "parking lot",
-    "diagonal", "rectangle",
-)
-MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
-    "余白", "間", "空白", "気配", "押す", "避け", "離れ",
-    "紙", "新聞", "手紙", "紙片", "風", "交差", "迷う", "漂う",
-    "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
-    "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift",
-    "horizon", "prairie", "open road",
-)
-SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "布", "果実", "重", "影", "沈む", "沈め",
-    "cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink",
-)
+ATMOSPHERIC_EFFECT_MARKERS: tuple[str, ...] = _coerce_marker_values("atmospheric_effect")
+QUIET_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("quiet_density")
+VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("vertical_density")
+MOTION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("motion")
+COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("colorful")
+LEAF_GRAIN_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("leaf_grain")
+SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("silence_layer")
+HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("hard_edge")
+PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("playful_motion")
+EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("edge_light")
+STRONG_EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("strong_edge_light")
+VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("vanishing_trace")
+RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("rhythm")
+VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("visual_event")
+MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("ma_pressure")
+SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("surface_tension")
+INTENTIONAL_LARGE_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("intentional_large_surface")
+GENERATED_BACKGROUND_PLAN_MARKERS: tuple[str, ...] = _coerce_marker_values("generated_background_plan")
+EXPLICIT_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("explicit_surface")
+SUNSET_SKY_MARKERS: tuple[str, ...] = _coerce_marker_values("sunset_sky")
+DAWN_MARKERS: tuple[str, ...] = _coerce_marker_values("dawn")
+NIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("night")
 
 
 def _context_has_density_governor(ddl: str | None) -> bool:
@@ -750,13 +626,7 @@ def _has_intentional_large_surface(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(
-        marker in ddl or marker in lower
-        for marker in (
-            "大き", "巨大", "広い", "広がる", "布", "幕", "壁一面", "面で", "面として",
-            "large", "huge", "wide", "broad surface", "cloth", "fabric",
-        )
-    )
+    return _any_marker_in_text(INTENTIONAL_LARGE_SURFACE_MARKERS, ddl, lower)
 
 
 def _source_context(ddl: str | None) -> str:
@@ -779,13 +649,7 @@ def _looks_like_generated_background_plan(context: str) -> bool:
     ):
         return False
     lower = context.lower()
-    return any(
-        marker in context or marker in lower
-        for marker in (
-            "気配", "透明な膜", "五感", "存在", "境界が滲", "画面全体",
-            "presence", "transparent membrane", "five-sense", "boundary blur", "full canvas",
-        )
-    )
+    return _any_marker_in_text(GENERATED_BACKGROUND_PLAN_MARKERS, context, lower)
 
 
 def _has_explicit_background_intent(ddl: str | None) -> bool:
@@ -795,21 +659,13 @@ def _has_explicit_background_intent(ddl: str | None) -> bool:
     if _looks_like_generated_background_plan(context):
         return False
     lower = context.lower()
-    explicit_surface_markers = (
-        "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇",
-        "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness",
-        "dark field",
-    )
-    if any(marker in context or marker in lower for marker in explicit_surface_markers):
+    if _any_marker_in_text(EXPLICIT_SURFACE_MARKERS, context, lower):
         return True
-    if any(marker in context or marker in lower for marker in ("夕焼け空", "夕暮れの空", "sunset sky", "dusk sky")):
+    if _any_marker_in_text(SUNSET_SKY_MARKERS, context, lower):
         return True
-    if any(marker in context or marker in lower for marker in ("夜明け", "明け方", "朝焼け", "dawn", "daybreak", "sunrise")):
+    if _any_marker_in_text(DAWN_MARKERS, context, lower):
         return False
-    return any(
-        marker in context or marker in lower
-        for marker in ("夜", "night")
-    )
+    return _any_marker_in_text(NIGHT_MARKERS, context, lower)
 
 
 def _with_background_dominance_governor(background: str, *, ddl: str | None) -> str:

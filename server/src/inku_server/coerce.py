@@ -502,7 +502,9 @@ VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
     "collision", "burst", "focus", "turning point", "pop", "release",
     "wandering", "fading", "trembling", "single drop", "goes home first", "curling",
     "low cloud", "pressing down", "shadow only", "blur", "tear",
-    "breath", "reflect", "reflection", "lighthouse", "only light", "footprint", "outline", "unravel", "petal",
+    "breath", "reflect", "reflection", "reflections", "lighthouse", "only light", "footprint", "outline", "unravel", "petal",
+    "quiet", "negative space", "horizon", "prairie", "open road",
+    "jazz", "syncopated", "backbeat", "blue-note", "improvised",
 )
 MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
     "余白", "間", "空白", "気配", "押す", "避け", "離れ",
@@ -520,14 +522,14 @@ def _context_has_density_governor(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker in lower for marker in QUIET_DENSITY_CONTEXT_MARKERS)
+    return _any_marker_in_text(QUIET_DENSITY_CONTEXT_MARKERS, ddl, lower)
 
 
 def _context_has_vertical_density(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker in lower for marker in VERTICAL_DENSITY_CONTEXT_MARKERS)
+    return _any_marker_in_text(VERTICAL_DENSITY_CONTEXT_MARKERS, ddl, lower)
 
 
 def _context_has_neon_blur_density(ddl: str | None) -> bool:
@@ -536,30 +538,28 @@ def _context_has_neon_blur_density(ddl: str | None) -> bool:
     lower = ddl.lower()
     scene_markers = ("夜", "ガラス", "ネオン", "night", "glass", "neon")
     blur_markers = ("涙", "滲", "にじ", "blur", "tear")
-    return any(marker in ddl or marker in lower for marker in scene_markers) and any(
-        marker in ddl or marker in lower for marker in blur_markers
-    )
+    return _any_marker_in_text(scene_markers, ddl, lower) and _any_marker_in_text(blur_markers, ddl, lower)
 
 
 def _context_has_motion(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker in lower for marker in MOTION_CONTEXT_MARKERS)
+    return _any_marker_in_text(MOTION_CONTEXT_MARKERS, ddl, lower)
 
 
 def _context_has_colorful_accent(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker in lower for marker in COLORFUL_CONTEXT_MARKERS)
+    return _any_marker_in_text(COLORFUL_CONTEXT_MARKERS, ddl, lower)
 
 
 def _context_has_marker(ddl: str | None, markers: tuple[str, ...]) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker.lower() in lower for marker in markers)
+    return _any_marker_in_text(markers, ddl, lower)
 
 
 def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
@@ -1072,7 +1072,7 @@ def _visual_event_instruction(
     lower = (ddl or "").lower()
     source = ddl or ""
     visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
-    if any(marker in source or marker in lower for marker in ("雨", "反射", "透明", "滲", "rain", "reflection", "transparent", "window")):
+    if _any_marker_in_text(("雨", "反射", "透明", "滲", "rain", "reflection", "reflections", "transparent", "window"), source, lower):
         return Instruction.model_validate(
             {
                 "primitive": "line",
@@ -1083,9 +1083,10 @@ def _visual_event_instruction(
                 "color_hint": "visual event restored as a thin reflected cut",
             }
         )
-    if any(
-        marker in source or marker in lower
-        for marker in ("地平", "水平", "余白", "静か", "horizon", "prairie", "open road", "negative space", "quiet")
+    if _any_marker_in_text(
+        ("地平", "水平", "余白", "静か", "horizon", "prairie", "open road", "negative space", "quiet"),
+        source,
+        lower,
     ):
         return Instruction.model_validate(
             {
@@ -1097,7 +1098,7 @@ def _visual_event_instruction(
                 "color_hint": "visual event restored as a small broken line",
             }
         )
-    if any(marker in source or marker in lower for marker in ("光", "灯", "月", "light", "moon", "neon", "sign")):
+    if _any_marker_in_text(("光", "灯", "月", "light", "moon", "neon", "sign"), source, lower):
         return Instruction.model_validate(
             {
                 "primitive": "square",
@@ -1107,6 +1108,20 @@ def _visual_event_instruction(
                 "color": visible,
                 "weight": "brush_thin",
                 "color_hint": "visual event restored as a small light plane",
+            }
+        )
+    if _any_marker_in_text(("jazz", "syncopated", "backbeat", "blue-note", "improvised"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.66, 0.38],
+                "radius": 0.06,
+                "angle_start": 20,
+                "angle_end": 210,
+                "rotation": 24,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as a small offbeat arc",
             }
         )
     if not _has_angular_event_anchor(instructions):
@@ -1829,7 +1844,7 @@ def _requested_shapes_from_ddl(ddl: str | None) -> set[str]:
     lower = ddl.lower()
     shapes: set[str] = set()
     for markers, primitive in SHAPE_INTENT_MARKERS:
-        if any(marker.lower() in lower or marker in ddl for marker in markers):
+        if _any_marker_in_text(markers, ddl, lower):
             shapes.add(primitive)
     return shapes
 
@@ -1919,7 +1934,7 @@ def _requested_motifs_from_ddl(ddl: str | None) -> list[str]:
     lower = ddl.lower()
     motifs: list[str] = []
     for markers, motif in MOTIF_INTENT_MARKERS:
-        if any(marker.lower() in lower or marker in ddl for marker in markers):
+        if _any_marker_in_text(markers, ddl, lower):
             motifs.append(motif)
     return motifs
 
@@ -1977,11 +1992,12 @@ def _composition_accent_color(ddl: str | None, instructions: list[Instruction], 
     if existing and not existing <= {"black", "gray"}:
         return None
     lower = (ddl or "").lower()
-    if any(marker in (ddl or "") or marker in lower for marker in ("祭", "火", "灯", "温", "赤", "warm", "fire", "light")):
+    source = ddl or ""
+    if _any_marker_in_text(("祭", "火", "灯", "温", "赤", "warm", "fire", "light"), source, lower):
         return "red" if background != "red" else "white"
-    if any(marker in (ddl or "") or marker in lower for marker in ("水", "夜", "湖", "冷", "青", "water", "night", "cold")):
+    if _any_marker_in_text(("水", "夜", "湖", "冷", "青", "water", "night", "cold"), source, lower):
         return "blue" if background != "blue" else "white"
-    if any(marker in (ddl or "") or marker in lower for marker in ("森", "草", "苔", "庭", "竹", "green", "forest", "grass")):
+    if _any_marker_in_text(("森", "草", "苔", "庭", "竹", "green", "forest", "grass"), source, lower):
         return "green" if background != "green" else "white"
     return None
 

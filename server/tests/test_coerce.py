@@ -1530,6 +1530,67 @@ def test_coerce_score_adds_visual_event_for_vanishing_footprint_context():
     assert any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_adds_broken_line_event_for_quiet_negative_space():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.15, 0.52],
+                    "to": [0.85, 0.52],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A quiet black pencil line holds a wide field of negative space.")
+
+    assert any("visual event restored as a small broken line" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_adds_offbeat_arc_for_jazz_context():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.22, 0.48],
+                    "to": [0.78, 0.48],
+                    "color": "blue",
+                    "arrangement": {"count": 3, "layout": "horizontal"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Three blue lines swing like jazz syncopation near a city corner.")
+
+    assert any("visual event restored as a small offbeat arc" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_does_not_read_horizontal_as_horizon():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.22, 0.48],
+                    "to": [0.78, 0.48],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Backbeat rhythm makes seven short black horizontal lines skip unevenly.")
+
+    assert any("visual event restored as a small offbeat arc" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("visual event restored as a small broken line" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_does_not_read_english_verb_leaves_as_leaf_motif():
     score = Score.model_validate(
         {

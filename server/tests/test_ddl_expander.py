@@ -193,3 +193,13 @@ def test_expand_intermediate_ddl_en_reframes_center():
 
     assert "center" not in expanded.lower()
     assert "focus" in expanded.lower()
+
+
+def test_expand_intermediate_ddl_en_does_not_read_crescent_as_scent():
+    expanded = expand_intermediate_ddl(
+        "A single white crescent waits in an off-center dark field.",
+        lang="en",
+    )
+
+    assert "scent layer" not in expanded.lower()
+    assert "five-sense presence" not in expanded.lower()

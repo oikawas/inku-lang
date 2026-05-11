@@ -56,6 +56,7 @@
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
+	const INSTRUCTION_LANG_KEY = 'inku-instruction-lang';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 	const APP_VERSION = '0.1.0';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
@@ -66,6 +67,7 @@
 	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
 	const EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS = 5000;
 	type HistorySelectionBehavior = 'history' | 'current';
+	type InstructionLang = 'auto' | 'ja' | 'en';
 
 	type PaintResult = {
 		svg: string;
@@ -85,6 +87,9 @@
 		render_canvas_aspect?: string | null;
 		render_canvas_aspect_id?: string | null;
 		render_canvas_aspect_ratio?: number | null;
+		instruction_lang_requested?: string | null;
+		instruction_lang_resolved?: string | null;
+		ui_lang?: string | null;
 		history_id?: string | null;
 		history_at?: number | null;
 		elapsed_stage1_ms: number;
@@ -216,6 +221,7 @@
 	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
 	let input       = $state(DEFAULT_INPUT);
 	let batchInput  = $state('');
+	let instructionLang = $state<InstructionLang>('auto');
 	let stage1UserPrompt = $state('');
 	let ddlTextareaEl = $state<HTMLTextAreaElement | null>(null);
 	let ddlHighlightEl = $state<HTMLDivElement | null>(null);
@@ -1713,11 +1719,16 @@
 			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
 			localStorage.setItem(HISTORY_SELECTION_CANVAS_KEY, historySelectionCanvas);
 			localStorage.setItem(HISTORY_SELECTION_CATALOG_KEY, historySelectionCatalog);
+			localStorage.setItem(INSTRUCTION_LANG_KEY, instructionLang);
 		} catch {}
 	}
 
 	function normalizeHistorySelectionBehavior(value: string | null): HistorySelectionBehavior {
 		return value === 'history' ? 'history' : 'current';
+	}
+
+	function normalizeInstructionLang(value: string | null): InstructionLang {
+		return value === 'ja' || value === 'en' ? value : 'auto';
 	}
 
 	// ── 感情語 → DDL ヒント ──────────────────────────────────
@@ -1894,7 +1905,7 @@
 	};
 
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
-		const lang = getLang();
+		const uiLang = getLang();
 		stageLabel = t().stageInterpreting;
 		const historyInput = options.historyInput ?? text;
 		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
@@ -1912,7 +1923,8 @@
 				stage1_model: resolvedStage1Model,
 				stage2_model: resolvedStage2Model,
 				include_thinking: includeThinking,
-				lang,
+				instruction_lang: instructionLang,
+				ui_lang: uiLang,
 				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
@@ -1942,7 +1954,7 @@
 	};
 
 	async function interpretOne(text: string, signal?: AbortSignal): Promise<InterpretResult> {
-		const lang = getLang();
+		const uiLang = getLang();
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
 		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
@@ -1955,7 +1967,8 @@
 				original_text: text,
 				model: resolvedStage1Model,
 				include_thinking: includeThinking,
-				lang,
+				instruction_lang: instructionLang,
+				ui_lang: uiLang,
 				expand_intermediate: true,
 			})
 		});
@@ -1994,11 +2007,14 @@
 		render_canvas_aspect?: string | null;
 		render_canvas_aspect_id?: string | null;
 		render_canvas_aspect_ratio?: number | null;
+		instruction_lang_requested?: string | null;
+		instruction_lang_resolved?: string | null;
+		ui_lang?: string | null;
 		elapsed_ms: number;
 		tokens_in: number | null;
 		tokens_out: number | null;
 	}> {
-		const lang = getLang();
+		const uiLang = getLang();
 		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
 		const r = await apiFetch('/api/compose', {
 			method: 'POST',
@@ -2008,7 +2024,8 @@
 				ddl: currentDdl,
 				model: resolvedStage2Model,
 				original_text: originalText,
-				lang,
+				instruction_lang: instructionLang,
+				ui_lang: uiLang,
 				catalog_id: selectedCatalog,
 				canvas_aspect: effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
@@ -2065,7 +2082,8 @@
 			body: JSON.stringify({
 				seed_phrase: settings.seed_phrase,
 				model,
-				lang: getLang(),
+				instruction_lang: instructionLang,
+				ui_lang: getLang(),
 			})
 		});
 		if (!r.ok) {
@@ -2253,6 +2271,9 @@
 					render_canvas_aspect: composed.render_canvas_aspect,
 					render_canvas_aspect_id: composed.render_canvas_aspect_id,
 					render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
+					instruction_lang_requested: composed.instruction_lang_requested,
+					instruction_lang_resolved: composed.instruction_lang_resolved,
+					ui_lang: composed.ui_lang,
 					render_hash: composed.render_hash,
 					render_hash_short: composed.render_hash_short,
 					elapsed_stage1_ms: elapsedStage1Ms,
@@ -2389,7 +2410,7 @@
 		replayStopRequested = false;
 		reloading = true; reloadError = null;
 		displayedHistoryItem = null;
-		const lang = getLang();
+		const uiLang = getLang();
 		const replayInput = input;
 		const startedAt = Date.now();
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
@@ -2402,7 +2423,16 @@
 				method: 'POST',
 				signal: abortController.signal,
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ddl, model: resolvedStage2Model, original_text: replayInput, lang, catalog_id: selectedCatalog, canvas_aspect: effectiveCanvasAspectId(), auto_repair: ddlAutoRepairEnabled })
+				body: JSON.stringify({
+					ddl,
+					model: resolvedStage2Model,
+					original_text: replayInput,
+					instruction_lang: instructionLang,
+					ui_lang: uiLang,
+					catalog_id: selectedCatalog,
+					canvas_aspect: effectiveCanvasAspectId(),
+					auto_repair: ddlAutoRepairEnabled
+				})
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: string };
@@ -2423,6 +2453,9 @@
 				render_canvas_aspect?: string | null;
 				render_canvas_aspect_id?: string | null;
 				render_canvas_aspect_ratio?: number | null;
+				instruction_lang_requested?: string | null;
+				instruction_lang_resolved?: string | null;
+				ui_lang?: string | null;
 				render_hash?: string | null;
 				render_hash_short?: string | null;
 				tokens_in: number | null;
@@ -2431,9 +2464,27 @@
 			const elapsedMs = Date.now() - startedAt;
 			const resolvedStage1Model = result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
 			const savedStage2Model = d.stage2_model ?? resolvedStage2Model;
+			const replayMetadata = {
+				render_build_number: d.render_build_number,
+				render_color_profile: d.render_color_profile,
+				render_engine_id: d.render_engine_id,
+				render_engine_version: d.render_engine_version,
+				render_color_catalog_id: d.render_color_catalog_id,
+				render_color_catalog_name: d.render_color_catalog_name,
+				render_color_catalog_sub: d.render_color_catalog_sub,
+				render_color_map: d.render_color_map,
+				render_canvas_aspect: d.render_canvas_aspect,
+				render_canvas_aspect_id: d.render_canvas_aspect_id,
+				render_canvas_aspect_ratio: d.render_canvas_aspect_ratio,
+				instruction_lang_requested: d.instruction_lang_requested,
+				instruction_lang_resolved: d.instruction_lang_resolved,
+				ui_lang: d.ui_lang,
+				render_hash: d.render_hash,
+				render_hash_short: d.render_hash_short
+			};
 			result = result
-				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_canvas_aspect_id: d.render_canvas_aspect_id, render_canvas_aspect_ratio: d.render_canvas_aspect_ratio, render_hash: d.render_hash, render_hash_short: d.render_hash_short }
-				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, render_build_number: d.render_build_number, render_color_profile: d.render_color_profile, render_engine_id: d.render_engine_id, render_engine_version: d.render_engine_version, render_color_catalog_id: d.render_color_catalog_id, render_color_catalog_name: d.render_color_catalog_name, render_color_catalog_sub: d.render_color_catalog_sub, render_color_map: d.render_color_map, render_canvas_aspect: d.render_canvas_aspect, render_canvas_aspect_id: d.render_canvas_aspect_id, render_canvas_aspect_ratio: d.render_canvas_aspect_ratio, render_hash: d.render_hash, render_hash_short: d.render_hash_short, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
+				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, ...replayMetadata }
+				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, ...replayMetadata, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			if (result) {
 				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
 			}
@@ -2653,7 +2704,7 @@
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: effectiveCanvasAspectId() })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang() })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -2684,6 +2735,9 @@
 					catalog_id: result.render_color_catalog_id ?? (selectedCatalog !== 'default' ? selectedCatalog : null),
 					save_artifacts: demoSettings.save_files,
 					canvas_aspect: effectiveCanvasAspectId(),
+					instruction_lang_requested: result.instruction_lang_requested ?? instructionLang,
+					instruction_lang_resolved: result.instruction_lang_resolved ?? null,
+					ui_lang: result.ui_lang ?? getLang(),
 				})
 			});
 			if (!r.ok) {
@@ -2831,6 +2885,9 @@
 			render_canvas_aspect: it.render_canvas_aspect,
 			render_canvas_aspect_id: it.render_canvas_aspect_id,
 			render_canvas_aspect_ratio: it.render_canvas_aspect_ratio,
+			instruction_lang_requested: it.instruction_lang_requested,
+			instruction_lang_resolved: it.instruction_lang_resolved,
+			ui_lang: it.ui_lang,
 			render_hash: it.render_hash,
 			render_hash_short: it.render_hash_short,
 			elapsed_stage1_ms: 0,
@@ -3251,6 +3308,9 @@
 		if (result.render_canvas_aspect !== undefined) payload.render_canvas_aspect = result.render_canvas_aspect;
 		if (result.render_canvas_aspect_id !== undefined) payload.render_canvas_aspect_id = result.render_canvas_aspect_id;
 		if (result.render_canvas_aspect_ratio !== undefined) payload.render_canvas_aspect_ratio = result.render_canvas_aspect_ratio;
+		if (result.instruction_lang_requested !== undefined) payload.instruction_lang_requested = result.instruction_lang_requested;
+		if (result.instruction_lang_resolved !== undefined) payload.instruction_lang_resolved = result.instruction_lang_resolved;
+		if (result.ui_lang !== undefined) payload.ui_lang = result.ui_lang;
 		if (result.render_hash !== undefined) payload.render_hash = result.render_hash;
 		if (result.render_hash_short !== undefined) payload.render_hash_short = result.render_hash_short;
 		if (result.render_color_catalog_id !== undefined) payload.render_color_catalog_id = result.render_color_catalog_id;
@@ -3475,6 +3535,7 @@
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			historySelectionCanvas = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CANVAS_KEY));
 			historySelectionCatalog = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CATALOG_KEY));
+			instructionLang = normalizeInstructionLang(localStorage.getItem(INSTRUCTION_LANG_KEY));
 			const savedBatchFailureReport = loadBatchFailureReport();
 			setBatchFailureReport(savedBatchFailureReport);
 			miscSettingsLoaded = true;
@@ -3494,7 +3555,7 @@
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
+		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog; instructionLang;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -3571,6 +3632,7 @@
 						{batchFailureReport}
 						{batchPromptHistory}
 						bind:batchRandomColorCatalog
+						bind:instructionLang
 						bind:demoSettings
 						{demoRunning}
 						{demoWaitingSeconds}

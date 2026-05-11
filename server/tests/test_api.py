@@ -596,6 +596,65 @@ def test_compose_happy_path(monkeypatch, auth_context):
     assert "<circle" in data["svg"]
     assert len(data["render_hash"]) == 64
     assert data["render_hash_short"] == data["render_hash"][-4:].upper()
+    assert data["instruction_lang_requested"] == "auto"
+    assert data["instruction_lang_resolved"] == "ja"
+
+
+def test_compose_resolves_english_instruction_language(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    captured: dict[str, str] = {}
+
+    def fake_compose(ddl: str, model=None, original_text=None, system_prompt=None, lang="ja"):
+        captured["lang"] = lang
+        return Score.model_validate(
+            {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "one blue diagonal line", "instruction_lang": "auto", "ui_lang": "ja"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert captured["lang"] == "en"
+    assert data["instruction_lang_requested"] == "auto"
+    assert data["instruction_lang_resolved"] == "en"
+    assert data["ui_lang"] == "ja"
+
+
+def test_language_metadata_does_not_change_render_hash():
+    item = {
+        "input": "one black line",
+        "ddl": "Draw one black line.",
+        "score": {
+            "instructions": [
+                {"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "color": "black"}
+            ]
+        },
+        "svg": "<svg><line x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\" /></svg>",
+        "render_build_number": "402",
+        "render_engine_id": "default",
+        "render_engine_version": "1",
+        "render_canvas_aspect": "square",
+        "render_canvas_aspect_id": "square",
+        "render_canvas_aspect_ratio": 1.0,
+        "render_color_catalog_id": "default",
+        "render_color_catalog_name": "inku Default",
+        "render_color_catalog_sub": "neutral baseline",
+        "render_color_map": {"black": "#111111"},
+    }
+    with_language = {
+        **item,
+        "instruction_lang_requested": "auto",
+        "instruction_lang_resolved": "en",
+        "ui_lang": "ja",
+    }
+
+    assert db.render_hash_for_item(with_language) == db.render_hash_for_item(item)
 
 
 def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
@@ -726,7 +785,7 @@ def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch,
     data = r.json()
     assert data["score"]["instructions"]
     assert data["score"]["instructions"][0]["primitive"] == "line"
-    assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
+    assert data["score"]["instructions"][0]["color_hint"].startswith("fallback from DDL")
 
 
 def test_compose_can_skip_auto_repair(monkeypatch, auth_context):
@@ -872,7 +931,7 @@ def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     data = r.json()
     assert data["fallback_used"] is True
     assert data["retry_reasons"] == ["stage2_hard_timeout"]
-    assert data["score"]["instructions"][0]["color_hint"] == "fallback from DDL"
+    assert data["score"]["instructions"][0]["color_hint"].startswith("fallback from DDL")
 
 
 def test_compose_retry_reason_only_retries_empty_instructions():
@@ -923,7 +982,13 @@ def test_interpret_happy_path(monkeypatch, auth_context):
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
     r = client.post("/api/interpret", json={"text": "一滴の墨"}, headers=headers)
     assert r.status_code == 200
-    assert r.json() == {"ddl": "中心に黒い円を置く。", "thinking": None}
+    assert r.json() == {
+        "ddl": "中心に黒い円を置く。",
+        "thinking": None,
+        "instruction_lang_requested": "auto",
+        "instruction_lang_resolved": "ja",
+        "ui_lang": None,
+    }
 
 
 def test_interpret_sanitizes_random_placement(monkeypatch, auth_context):

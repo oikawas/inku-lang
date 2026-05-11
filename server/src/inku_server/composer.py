@@ -290,6 +290,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
 - **If normalized DDL contains shapes, lines, or arcs, instructions must not be empty. If exact conversion is difficult, map it to the nearest line, ellipse, or square**
+- **Sparse or minimal works are valid. A single directional line, horizon line, or edge-biased focus must still become at least one drawable instruction**
 - **Compress the output to 1–5 instructions. Do not restate the whole DDL; convert only the main visual relationship that makes the work readable**
 - **Use one dominant technique per work. If the DDL contains multiple technique words, choose the one that best fits the subject and keep the others only as small supporting layers when needed**
 - **Do not over-compress. If the DDL contains sensory words such as light, scent, temperature, sound, waiting time, or bodily senses, keep 1–2 of them as faint supporting layers when they do not break the subject. Do not remove so much information that the work loses richness or playfulness**
@@ -351,6 +352,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"patchwork" → square repetition; use color_cycle for multiple colors and add slight rotation to the pieces**
 - **"fresco ground" → chalk gray horizontal lines or ground plane with blurring**
 - **"ink-wash value" → black/gray brush lines with blurring or weight contrast**
+- **English idiom and cultural texture are compositional signals, not objects. "syncopated city rhythm" / "blue-note value" → short line or arc rhythm with rhythm_spacing="syncopated"; "quilt-like patchwork" → rotated square color_cycle; "subway-map pressure" → rotring line convergence; "billboard edge pressure" → cropped rectangle/diagonal edge tension; "prairie horizon" → low horizontal negative-space pressure; "coastal fog plane" → pale watercolor ellipse layers with blurring; "warehouse grid cuts" → sparse rotated square/line grid fragments**
 - **Strong solid backgrounds (black/red/blue/green) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
 
 # Examples (key patterns)
@@ -418,6 +420,15 @@ Output: {"instructions":[{"primitive":"square","position":[0.45,0.45],"size":[0.
 Input: Line up five black fine-brush vertical lines left to right as ink-wash value. Edges blurring.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.2],"to":[0.5,0.8],"color":"black","weight":"brush_thin","arrangement":{"count":5,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x"]}}]}
 
+Input: Line up seven short blue fine-brush lines left to right as syncopated city rhythm. Swaying slowly.
+Output: {"instructions":[{"primitive":"line","from":[0.47,0.5],"to":[0.53,0.5],"color":"blue","weight":"brush_thin","arrangement":{"count":7,"layout":"horizontal","rhythm_spacing":"syncopated"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+Input: Draw five thin rotring lines toward an upper-right focus as subway-map pressure.
+Output: {"instructions":[{"primitive":"line","from":[0.14,0.82],"to":[0.72,0.28],"color":"black","weight":"rotring","arrangement":{"count":5,"layout":"vertical","margin":0.08}}]}
+
+Input: Draw one long pale horizontal line near the lower third as prairie horizon.
+Output: {"instructions":[{"primitive":"line","from":[0.06,0.66],"to":[0.94,0.66],"color":"gray","weight":"pencil","color_hint":"prairie horizon"}]}
+
 Input: Draw a horizontal line at center. Fine trembling.
 Output: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}
 
@@ -435,6 +446,9 @@ Output: {"background":"black","instructions":[{"primitive":"line","from":[0.0,0.
 
 Input: Fill background with white. Draw a white horizontal line at center.
 Output: {"background":"white","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"black","color_hint":"white line made visible"}]}
+
+Input: Draw one gray line rising from the bottom-left to the upper-right.
+Output: {"instructions":[{"primitive":"line","from":[0.15,0.78],"to":[0.78,0.28],"color":"gray","arrangement":{"count":1,"layout":"scatter","density":"low","fade":"outward","preserve_space":true}}]}
 
 Input: Fill background with white. Scatter one hundred thirty-seven short white lines from top to bottom.
 Output: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"white lines made visible on the smaller area","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}

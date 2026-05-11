@@ -98,7 +98,7 @@ def test_compose_payload_for_ddl_input_mode():
         "ddl": "白い背景に黒い線を一本引く。",
         "model": "s2",
         "original_text": "線",
-        "lang": "ja",
+        "instruction_lang": "auto",
         "catalog_id": "default",
         "auto_repair": True,
     }
@@ -267,6 +267,20 @@ def test_color_trace_does_not_treat_words_as_green_leaf_marker():
     assert trace["green_requested"] is False
     assert "green" not in trace["requested_colors"]
     assert "green_requested_but_missing_in_score" not in trace["warnings"]
+
+
+def test_color_trace_does_not_read_crescent_as_scent():
+    result = {
+        "text": "A single white crescent waits in an off-center dark field.",
+        "ddl": "Fill background with black. Place a white crescent arc in the upper right.",
+        "score": {"instructions": [{"primitive": "arc", "color": "white"}]},
+    }
+
+    trace = cli._color_trace(result, catalog_id="default")
+
+    assert "green" not in trace["text_color_markers"]
+    assert "green" not in trace["ddl_color_markers"]
+    assert "green" not in trace["requested_colors"]
 
 
 def test_color_trace_detects_specific_leaf_terms_as_green():
@@ -654,6 +668,81 @@ def test_quality_metrics_scores_achromatic_tonal_resonance():
     metrics = cli._score_metrics(score)
 
     assert metrics["score_quality_metrics"]["color_resonance"] > 0
+
+
+def test_quality_metrics_scores_achromatic_value_contrast_without_extra_colors():
+    score = {
+        "instructions": [
+            {
+                "primitive": "line",
+                "color": "gray",
+                "from": [0.15, 0.75],
+                "to": [0.82, 0.28],
+                "weight": "thin",
+                "rotation": -14,
+                "arrangement": {"count": 1, "layout": "scatter", "fade": "outward", "preserve_space": True},
+            },
+            {
+                "primitive": "line",
+                "color": "black",
+                "from": [0.2, 0.78],
+                "to": [0.62, 0.36],
+                "weight": "heavy",
+            },
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_color_counts"] == {"black": 1, "gray": 1}
+    assert metrics["score_quality_metrics"]["color_resonance"] >= 50
+
+
+def test_quality_metrics_counts_background_color_as_rendered_color():
+    score = {
+        "background": "blue",
+        "instructions": [
+            {
+                "primitive": "ellipse",
+                "color": "white",
+                "center": [0.5, 0.5],
+                "size": [0.12, 0.08],
+                "arrangement": {"count": 2, "layout": "scatter", "color_cycle": ["white", "blue"]},
+            }
+        ],
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_color_counts"] == {"white": 1}
+    assert metrics["score_quality_metrics"]["color_resonance"] >= 50
+
+
+def test_quality_metrics_scores_isolated_chromatic_accent():
+    score = {
+        "instructions": [
+            {
+                "primitive": "line",
+                "color": "black",
+                "from": [0.1, 0.7],
+                "to": [0.8, 0.45],
+                "arrangement": {"count": 1, "layout": "scatter", "fade": "outward", "preserve_space": True},
+            },
+            {
+                "primitive": "square",
+                "color": "red",
+                "center": [0.68, 0.42],
+                "size": [0.08, 0.08],
+                "filled": True,
+                "color_hint": "small red interruption",
+            },
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_color_counts"] == {"black": 1, "red": 1}
+    assert metrics["score_quality_metrics"]["color_resonance"] >= 54
 
 
 def test_quality_metrics_scores_rhythm_spacing_as_motion_energy():

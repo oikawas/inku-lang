@@ -29,6 +29,8 @@ SERVER_DEFAULT_MODEL_LABEL = "server default"
 SERVER_DEFAULT_PROVIDER_LABEL = "server default"
 PROVIDERS = ("nvidia", "anthropic", "local")
 COLOR_KEYS = ("white", "black", "blue", "red", "green", "gray")
+ACHROMATIC_COLOR_KEYS = {"white", "black", "gray"}
+CHROMATIC_ACCENT_COLOR_KEYS = {"blue", "red", "green"}
 DEFAULT_COLOR_CATALOG_ID = "default"
 SVG_PROFILES = ("display", "editable", "compat")
 CANVAS_ASPECT_RATIOS = {
@@ -75,6 +77,13 @@ COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     ),
     "gray": ("gray", "grey", "silver", "ash", "stone", "灰", "銀", "石", "埃"),
 }
+
+
+def _marker_in_text(marker: str, text: str, lower: str) -> bool:
+    marker_lower = marker.lower()
+    if marker.isascii() and any(ch.isalpha() for ch in marker):
+        return re.search(rf"(?<![a-z]){re.escape(marker_lower)}(?![a-z])", lower) is not None
+    return marker in text or marker_lower in lower
 
 
 def _canvas_aspect_ratio(canvas_aspect: str | None) -> float:
@@ -929,6 +938,8 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     rhythm_spacing_count = 0
     visual_event = 0
     visible_colors: set[str] = set()
+    weight_values: set[str] = set()
+    chromatic_accent_score = 0
     filled_large = 0
     bilateral_presence = 0
     gaze_presence = 0
@@ -936,6 +947,11 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     fallback_hints = 0
     coverage_hints = 0
     centers: list[tuple[float, float]] = []
+
+    background = score.get("background")
+    background_contrast = 0
+    if isinstance(background, str) and background in COLOR_KEYS:
+        visible_colors.add(background)
 
     presence = score.get("presence")
     if isinstance(presence, dict):
@@ -951,6 +967,11 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
         color = instruction.get("color")
         if isinstance(color, str):
             visible_colors.add(color)
+            if isinstance(background, str) and background in COLOR_KEYS and color != background:
+                background_contrast = 1
+        weight = instruction.get("weight")
+        if isinstance(weight, str):
+            weight_values.add(weight)
         if instruction.get("filled") is True:
             size = _coord_pair(instruction.get("size"))
             radius = instruction.get("radius")
@@ -962,6 +983,7 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
         if isinstance(rotation, (int, float)) and abs(float(rotation)) >= 8:
             varied_rotation += 1
         hint = instruction.get("color_hint")
+        lower_hint = ""
         if isinstance(hint, str):
             lower_hint = hint.lower()
             if "fallback from ddl" in lower_hint:
@@ -995,6 +1017,22 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
         else:
             expanded_count += 1
 
+        if isinstance(color, str) and color in CHROMATIC_ACCENT_COLOR_KEYS:
+            accent_terms = ("accent", "interruption", "focal", "point", "punctuation", "small", "中断", "アクセント", "焦点")
+            is_compact = False
+            size = _coord_pair(instruction.get("size"))
+            radius = instruction.get("radius")
+            if instruction.get("primitive") == "line":
+                is_compact = True
+            elif size is not None and size[0] * size[1] <= 0.035:
+                is_compact = True
+            elif isinstance(radius, (int, float)) and float(radius) <= 0.12:
+                is_compact = True
+            if is_compact and (any(term in lower_hint for term in accent_terms) or instruction.get("filled") is True):
+                chromatic_accent_score += 24
+                if center is not None and (abs(center[0] - 0.5) >= 0.12 or abs(center[1] - 0.5) >= 0.12):
+                    chromatic_accent_score += 12
+
     off_center = sum(1 for x, y in centers if abs(x - 0.5) >= 0.12 or abs(y - 0.5) >= 0.12)
     counterweights = _math_balance_markers(instructions)["counterweight_like_opposite_placements"]
     instruction_count = len(instructions)
@@ -1002,16 +1040,28 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
 
     negative_space_pressure = min(100, preserve_space * 18 + fade_count * 8 + min(off_center, 4) * 8 + min(counterweights, 3) * 8)
     motion_energy = min(100, path_motion * 18 + diagonal_or_wave * 12 + varied_rotation * 8 + rhythm_spacing_count * 10)
-    color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14)
-    if color_resonance == 0 and visible_colors and visible_colors <= {"white", "black", "gray"}:
-        color_resonance = min(
+    color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14 + background_contrast * 18)
+    if visible_colors and visible_colors <= {"white", "black", "gray"}:
+        achromatic_tonal_resonance = min(
             100,
             18
+            + max(0, len(visible_colors) - 1) * 18
             + preserve_space * 8
             + fade_count * 6
             + min(off_center, 3) * 6
-            + min(varied_rotation, 3) * 4,
+            + min(varied_rotation, 3) * 4
+            + min(len(weight_values), 3) * 6,
         )
+        color_resonance = max(color_resonance, achromatic_tonal_resonance)
+    if visible_colors & CHROMATIC_ACCENT_COLOR_KEYS and visible_colors - CHROMATIC_ACCENT_COLOR_KEYS <= ACHROMATIC_COLOR_KEYS:
+        isolated_accent_resonance = min(
+            100,
+            max(0, len(visible_colors & ACHROMATIC_COLOR_KEYS)) * 12
+            + min(chromatic_accent_score, 48)
+            + min(off_center, 3) * 6
+            + min(preserve_space, 2) * 6,
+        )
+        color_resonance = max(color_resonance, isolated_accent_resonance)
     visual_event_score = min(100, visual_event * 28 + min(off_center, 3) * 8 + min(counterweights, 2) * 14 + (12 if color_cycle_count else 0))
     figurative_risk = min(100, bilateral_presence * 22 + gaze_presence * 18 + object_like_hints * 25 + filled_large * 10)
     fallback_quality = None
@@ -1128,7 +1178,7 @@ def _marker_colors(text: str | None) -> list[str]:
     found = [
         color
         for color, markers in COLOR_MARKERS.items()
-        if any(marker.lower() in lower or marker in text for marker in markers)
+        if any(_marker_in_text(marker, text, lower) for marker in markers)
     ]
     return sorted(found)
 
@@ -1140,7 +1190,7 @@ def _negated_marker_colors(text: str | None) -> list[str]:
     found = [
         color
         for color, markers in NEGATED_COLOR_MARKERS.items()
-        if any(marker.lower() in lower or marker in text for marker in markers)
+        if any(_marker_in_text(marker, text, lower) for marker in markers)
     ]
     return sorted(found)
 
@@ -1324,7 +1374,8 @@ def _paint_payload(
         "stage1_model": stage1_model if stage1_model is not None else args.stage1_model,
         "stage2_model": stage2_model if stage2_model is not None else args.stage2_model,
         "include_thinking": args.include_thinking,
-        "lang": args.lang,
+        "instruction_lang": args.instruction_lang,
+        "ui_lang": args.ui_lang,
         "save_history": args.save_history,
         "save_artifacts": args.save_artifacts,
         "history_input": args.history_input,
@@ -1351,7 +1402,8 @@ def _compose_payload(
         "ddl": ddl,
         "model": stage2_model if stage2_model is not None else args.stage2_model,
         "original_text": args.original_text,
-        "lang": args.lang,
+        "instruction_lang": args.instruction_lang,
+        "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "auto_repair": True,
@@ -2024,7 +2076,12 @@ def command_demo_instruction(args: argparse.Namespace) -> int:
     data, _ = client.request(
         "POST",
         "/api/demo/instruction",
-        data={"seed_phrase": args.seed_phrase, "model": args.model, "lang": args.lang},
+        data={
+            "seed_phrase": args.seed_phrase,
+            "model": args.model,
+            "instruction_lang": args.instruction_lang,
+            "ui_lang": args.ui_lang,
+        },
     )
     print(data["instruction"])
     return 0
@@ -2129,7 +2186,8 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
-    parser.add_argument("--lang", default="ja", choices=["ja", "en"])
+    parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
+    parser.add_argument("--ui-lang")
     parser.add_argument("--include-thinking", action="store_true")
     parser.add_argument("--save-history", action="store_true")
     parser.add_argument("--save-artifacts", action=argparse.BooleanOptionalAction, default=None)
@@ -2201,7 +2259,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_server_args(demo)
     demo.add_argument("seed_phrase")
     demo.add_argument("--model")
-    demo.add_argument("--lang", default="ja", choices=["ja", "en"])
+    demo.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
+    demo.add_argument("--ui-lang")
     demo.set_defaults(func=command_demo_instruction)
 
     history = subparsers.add_parser("history", help="list history items")

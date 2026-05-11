@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.49**
+**Version: v1.50**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -55,6 +55,58 @@ enough for machines.  The SVG is a performance.
 Variation is intentional.  DDL does not attempt to eliminate all model or
 renderer variation.  It uses variation as part of the medium, while keeping the
 score, schema, and renderer boundaries explicit.
+
+The UI display language and the instruction language are separate concerns.
+Users may run the Japanese UI while writing English instructions, or use the
+English UI while writing Japanese instructions.  API requests use
+`instruction_lang` (`auto`, `ja`, or `en`) for interpretation and `ui_lang` for
+display context.  When `instruction_lang` is `auto`, the server lightly detects
+Japanese or English from the input text and passes the resolved language to
+Stage 1, Stage 1.5, Stage 2, and demo-instruction generation.  Render metadata
+records `instruction_lang_requested`, `instruction_lang_resolved`, and
+`ui_lang` for audit and replay context.  These language metadata fields are not
+part of the current canonical `render_hash` payload, so existing history hashes
+and benchmark references remain stable.
+
+Instruction-language implementation is organized through an internal
+Instruction Language Registry.  Each registered language owns its language code,
+Stage 1 prompt, Stage 2 prompt, Stage 1.5 expander/filter entry point, and
+the language-specific marker set used by the Score coerce layer.
+Japanese and English are registered by binding the existing prompts and
+expanders without changing their text or behavior, while their coerce marker
+sets live in separate language files.  The coerce algorithms remain common
+because they operate on language-independent JSON Score structure; language
+differences belong in the marker sets that map words such as motion,
+visual-event, hard-edge, or dark-field cues to those shared repair policies.  A
+third-party language such as Spanish should be added first as a new registry
+entry with prompts, expander behavior, and coerce markers, keeping JSON Score
+schema, renderer behavior, and color catalogs separate unless the new language
+demonstrably needs a core extension.
+
+Builds 403-427 extend the English instruction path beyond structural routing.
+Japanese and English now live in separate language files for Stage 1 prompts,
+Stage 1.5 expansion/filter behavior, Stage 2 prompts, and coerce marker sets.
+They still share the same JSON Score schema, renderer, color catalogs, and
+repair algorithms.  Language-specific behavior is therefore kept at the prompt,
+expander, marker, and repair-input boundary.
+
+The English path is tuned to preserve English-specific phrasing instead of
+performing word-by-word translation.  Temporal and relational phrases such as
+`before`, `after`, `again and again`, `as if`, and `at once`, along with
+composition cues such as `diagonal`, `same beat`, `shifted`, reflection, fog,
+road, sound, flock, and transparent-event language, are treated as cues for
+abstract visual parameters and focal events.
+
+Build 427 was checked with 30 Japanese/English equivalent prompt pairs rendered
+with the same square canvas and default color catalog, without saving benchmark
+history.  Expert review found the English path close to Japanese quality:
+English tended to score slightly higher on color resonance, while Japanese
+remained slightly stronger on constraint adherence and visual-event presence.
+The remaining English risk is becoming too orderly and letting the event moment
+sink into background structure.  The remaining Japanese risk is compressing
+quiet poetic scenes into marks that are too small to carry a visible event.
+Future tuning should strengthen focal-event size, contrast, and neighboring
+reactions without increasing overall density.
 
 ---
 
@@ -245,15 +297,20 @@ compose, the JSON tab, and saved artifact JSON include the resolved
 `render_build_number`, `render_color_profile`, `render_engine_id`,
 `render_engine_version`, `render_canvas_aspect`, `render_hash`,
 `render_hash_short`, `render_color_catalog_id`, `render_color_catalog_name`,
-`render_color_catalog_sub`, and `render_color_map`, where abstract colors and
-`palette:<name>` entries are expanded to the exact `#RRGGBB` codes used for SVG
-rendering.  The current engine metadata is `render_engine_id: "default"` and
+`render_color_catalog_sub`, `render_color_map`,
+`instruction_lang_requested`, `instruction_lang_resolved`, and `ui_lang`, where
+abstract colors and `palette:<name>` entries are expanded to the exact
+`#RRGGBB` codes used for SVG rendering.  The current engine metadata is
+`render_engine_id: "default"` and
 `render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
 `render_hash` is a 64-character SHA-256 hex hash of the rendered content and
 server-owned render metadata.  `render_hash_short` is the four-character
 uppercase suffix used for UI and CLI references.
+Instruction-language metadata is retained in JSON and history, but is excluded
+from the current hash payload to avoid changing existing history and benchmark
+hash references.
 `score.canvas` remains the score-level canvas instruction, while
 `render_canvas_aspect` records the canvas aspect actually used for this rendered
 artifact.  In normal server-generated output they match, but both are retained
@@ -654,6 +711,10 @@ the compose result through `POST /api/history` so the output appears in normal
 server history.  `/api/compose` returns the effective DDL after Stage 1.5
 expansion, and CLI output/history use that effective DDL for DDL-to-render
 benchmark parity.
+The CLI sends instruction language through `--instruction-lang auto|ja|en`.
+`auto` is the default and lets the server resolve Japanese or English from the
+input text.  `--ui-lang` may be supplied as display-context metadata, but it
+does not control interpretation.
 
 `inku-cli batch` can write a benchmark summary JSON file.  When an output
 directory is used, the default summary path is `analysis-summary.json` in that

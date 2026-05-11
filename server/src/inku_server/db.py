@@ -65,6 +65,9 @@ class HistoryRow(Base):
     render_canvas_aspect = Column(String, nullable=True)
     render_canvas_aspect_id = Column(String, nullable=True)
     render_canvas_aspect_ratio = Column(Float, nullable=True)
+    instruction_lang_requested = Column(String, nullable=True)
+    instruction_lang_resolved = Column(String, nullable=True)
+    ui_lang = Column(String, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -136,6 +139,9 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "render_canvas_aspect": "ALTER TABLE history ADD COLUMN render_canvas_aspect VARCHAR",
     "render_canvas_aspect_id": "ALTER TABLE history ADD COLUMN render_canvas_aspect_id VARCHAR",
     "render_canvas_aspect_ratio": "ALTER TABLE history ADD COLUMN render_canvas_aspect_ratio FLOAT",
+    "instruction_lang_requested": "ALTER TABLE history ADD COLUMN instruction_lang_requested VARCHAR",
+    "instruction_lang_resolved": "ALTER TABLE history ADD COLUMN instruction_lang_resolved VARCHAR",
+    "ui_lang": "ALTER TABLE history ADD COLUMN ui_lang VARCHAR",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
@@ -851,6 +857,12 @@ def _row_to_dict(row: HistoryRow) -> dict:
             if row.render_canvas_aspect_ratio is not None
             else canvas_aspect_ratio_for_aspect(normalized_canvas_aspect_id)
         )
+    if row.instruction_lang_requested is not None:
+        item["instruction_lang_requested"] = row.instruction_lang_requested
+    if row.instruction_lang_resolved is not None:
+        item["instruction_lang_resolved"] = row.instruction_lang_resolved
+    if row.ui_lang is not None:
+        item["ui_lang"] = row.ui_lang
     return item
 
 
@@ -915,6 +927,9 @@ def add_item(item: dict) -> dict:
         render_canvas_aspect=item.get("render_canvas_aspect"),
         render_canvas_aspect_id=item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect"),
         render_canvas_aspect_ratio=item.get("render_canvas_aspect_ratio"),
+        instruction_lang_requested=item.get("instruction_lang_requested"),
+        instruction_lang_resolved=item.get("instruction_lang_resolved"),
+        ui_lang=item.get("ui_lang"),
         render_hash=render_hash,
         trashed=0,
         starred=0,

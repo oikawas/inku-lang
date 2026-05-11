@@ -19,6 +19,7 @@ import re
 from dataclasses import dataclass, field as dc_field
 from typing import Any, Callable
 
+from .language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
 from .schema import Instruction, Score
 
 
@@ -149,16 +150,27 @@ VISIBLE_ON_BACKGROUND: dict[str, str] = {
     "green": "white",
 }
 
-MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("ロットリング", "rotring"), "rotring"),
-    (("鉛筆", "pencil"), "pencil"),
-    (("クレヨン", "crayon"), "crayon"),
-    (("チョーク", "chalk"), "chalk"),
-    (("細筆", "fine-brush", "fine brush"), "brush_thin"),
-    (("太筆", "thick-brush", "thick brush", "厚塗り", "油絵"), "brush_thick"),
-    (("水墨", "墨", "ink-wash", "ink wash"), "brush_thin"),
-    (("縄", "ロープ", "rope"), "rope"),
-)
+def _coerce_marker_values(name: str) -> tuple[Any, ...]:
+    values: list[Any] = []
+    for support in INSTRUCTION_LANGUAGE_REGISTRY.values():
+        language_values = support.coerce_markers.get(name, ())
+        if isinstance(language_values, tuple):
+            values.extend(language_values)
+    return tuple(values)
+
+
+def _coerce_marker_dict(name: str) -> dict[str, tuple[str, ...]]:
+    merged: dict[str, list[str]] = {}
+    for support in INSTRUCTION_LANGUAGE_REGISTRY.values():
+        language_values = support.coerce_markers.get(name, {})
+        if not isinstance(language_values, dict):
+            continue
+        for key, markers in language_values.items():
+            merged.setdefault(str(key), []).extend(str(marker) for marker in markers)
+    return {key: tuple(markers) for key, markers in merged.items()}
+
+
+MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("material_weight_hints")
 
 MAX_EXPANDED_PRIMITIVES = 400
 MAX_EXPANDED_PER_INSTRUCTION = 240
@@ -180,87 +192,25 @@ MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT = 0.30
 MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS = 0.20
 MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
 
-COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("白", "white"), "white"),
-    (("黒", "black"), "black"),
-    (
-        (
-            "青",
-            "blue",
-            "空",
-            "sky",
-            "水",
-            "water",
-            "湖",
-            "lake",
-            "海",
-            "sea",
-            "雨",
-            "rain",
-            "冷たい",
-            "cold",
-        ),
-        "blue",
-    ),
-    (("赤", "red"), "red"),
-    (
-        (
-            "緑",
-            "green",
-            "森",
-            "forest",
-            "leaf",
-            "草",
-            "grass",
-            "苔",
-            "moss",
-            "竹",
-            "bamboo",
-            "庭",
-            "garden",
-            "香り",
-            "scent",
-            "fragrance",
-            "芽",
-            "落ち葉",
-            "若葉",
-            "木の葉",
-            "葉っぱ",
-            "葉脈",
-        ),
-        "green",
-    ),
-    (("灰", "gray", "grey"), "gray"),
-)
+COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("color_markers")
 
-NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
-    "green": (
-        "not green",
-        "avoid green",
-        "without green",
-        "no green",
-        "緑には寄せず",
-        "緑に寄せず",
-        "緑ではなく",
-        "緑を避け",
-        "緑を使わず",
-        "緑なし",
-    ),
-}
 
-SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("多角形", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片", "polygon", "crystal", "mineral", "hard shard"), "polygon"),
-    (("山", "尖", "鋭", "三角", "峰", "頂", "稜線", "mountain", "sharp", "peak", "ridge", "triangle"), "triangle"),
-    (("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple"), "arc"),
-    (("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square"), "square"),
-)
+def _marker_in_text(marker: str, text: str, lower: str) -> bool:
+    marker_lower = marker.lower()
+    if marker.isascii() and any(ch.isalpha() for ch in marker):
+        return re.search(rf"(?<![a-z]){re.escape(marker_lower)}(?![a-z])", lower) is not None
+    return marker in text or marker_lower in lower
 
-MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "leaves"), "leaf_cluster"),
-    (("紙片", "破片", "折", "手紙", "paper", "fragment", "shard", "letter"), "paper_shard"),
-    (("波紋", "渦", "螺旋", "巻", "ripple", "spiral", "coil"), "ripple_knot"),
-    (("山", "峰", "稜線", "mountain", "ridge", "peak"), "mountain_sign"),
-)
+
+def _any_marker_in_text(markers: tuple[str, ...], text: str, lower: str) -> bool:
+    return any(_marker_in_text(marker, text, lower) for marker in markers)
+
+
+NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = _coerce_marker_dict("negated_color_markers")
+
+SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("shape_intent_markers")
+
+MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("motif_intent_markers")
 
 
 def _visible_background(background: str) -> str:
@@ -425,97 +375,43 @@ def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[I
     return repaired
 
 
-ATMOSPHERIC_EFFECT_MARKERS: tuple[str, ...] = (
-    "membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄",
-    "soft light", "柔らかな光", "陽光", "日差し",
-    "scent", "fragrance", "香り", "匂",
-    "five-sense", "五感",
-    "reflection", "反射", "映り",
-)
-
-QUIET_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
-    "静か", "静けさ", "沈黙", "余白", "薄い", "薄く", "細い", "少しだけ", "一つ", "一滴",
-    "気配", "余韻", "記憶", "忘れ", "影", "冷たい", "透明", "膜", "霞", "霧", "靄", "滲",
-    "低い雲", "押し沈",
-    "quiet", "silence", "negative space", "thin", "pale", "slight", "single", "one ",
-    "presence", "trace", "memory", "forgotten", "shadow", "cold", "transparent", "membrane",
-    "haze", "fog", "mist", "blur", "low cloud", "pressing down",
-)
-VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = (
-    "雨", "雪", "降", "縦", "上から下", "rain", "snow", "falling", "vertical", "top to bottom",
-)
-MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "先に帰", "風", "波", "ためらう",
-    "低い雲", "押し沈", "影だけ", "滲", "涙", "震える", "一滴", "残る",
-    "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
-    "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
-    "trembling", "single drop", "remain", "remains",
-)
-COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = (
-    "祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色",
-    "festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color",
-)
-LEAF_GRAIN_CONTEXT_MARKERS: tuple[str, ...] = (
-    "落ち葉", "紅葉", "湿った土", "森", "leaf", "leaves", "autumn forest", "fallen leaves",
-)
-SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = (
-    "廃校", "廊下", "長い沈黙", "夕方の光", "abandoned school", "corridor", "long silence",
-)
-HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = (
-    "工場", "鉄骨", "錆", "錆び", "空を細かく分け", "factory", "steel frame", "rust", "girder",
-)
-PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime",
-)
-EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
-    "夜", "真夜中", "黒い", "暗", "灯台", "光だけ", "海", "ガラス", "ネオン",
-    "night", "black", "dark", "lighthouse", "only light", "sea", "glass", "neon",
-)
-STRONG_EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = (
-    "灯台", "光だけ", "切って", "切る", "切断", "一筋の光",
-    "lighthouse", "only light", "cutting light", "single beam",
-)
-VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = (
-    "白い息", "足跡", "消え", "消える", "消えかけ", "ほどけ", "輪郭", "記憶", "跡", "遠く",
-    "breath", "footprint", "fade", "fading", "dissolve", "outline", "memory", "trace", "far",
-)
-RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = (
-    "リズム", "踊", "跳ね", "弾む", "反復", "交互", "楽しい", "楽しさ", "喜び", "祝祭", "明快",
-    "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration",
-)
-VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = (
-    "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける",
-    "迷う", "消えかけ", "震える", "一滴", "先に帰", "丸ま", "低い雲", "押し沈", "影だけ", "滲", "涙",
-    "白い息", "映", "反射", "灯台", "光だけ", "足跡", "輪郭", "ほどけ", "花びら", "ためらう",
-    "collision", "burst", "focus", "turning point", "pop", "release",
-    "wandering", "fading", "trembling", "single drop", "goes home first", "curling",
-    "low cloud", "pressing down", "shadow only", "blur", "tear",
-    "breath", "reflect", "reflection", "lighthouse", "only light", "footprint", "outline", "unravel", "petal",
-)
-MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
-    "余白", "間", "空白", "気配", "押す", "避け", "離れ",
-    "紙", "新聞", "手紙", "紙片", "風", "交差", "迷う", "漂う",
-    "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
-    "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift",
-)
-SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = (
-    "布", "果実", "重", "影", "沈む", "沈め",
-    "cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink",
-)
+ATMOSPHERIC_EFFECT_MARKERS: tuple[str, ...] = _coerce_marker_values("atmospheric_effect")
+QUIET_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("quiet_density")
+VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("vertical_density")
+MOTION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("motion")
+COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("colorful")
+LEAF_GRAIN_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("leaf_grain")
+SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("silence_layer")
+HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("hard_edge")
+PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("playful_motion")
+EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("edge_light")
+STRONG_EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("strong_edge_light")
+VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("vanishing_trace")
+RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("rhythm")
+VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("visual_event")
+MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("ma_pressure")
+SEMANTIC_VISUAL_EVENT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("semantic_visual_event_hints")
+SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("surface_tension")
+INTENTIONAL_LARGE_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("intentional_large_surface")
+GENERATED_BACKGROUND_PLAN_MARKERS: tuple[str, ...] = _coerce_marker_values("generated_background_plan")
+EXPLICIT_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("explicit_surface")
+SUNSET_SKY_MARKERS: tuple[str, ...] = _coerce_marker_values("sunset_sky")
+DAWN_MARKERS: tuple[str, ...] = _coerce_marker_values("dawn")
+NIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("night")
 
 
 def _context_has_density_governor(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker in lower for marker in QUIET_DENSITY_CONTEXT_MARKERS)
+    return _any_marker_in_text(QUIET_DENSITY_CONTEXT_MARKERS, ddl, lower)
 
 
 def _context_has_vertical_density(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker in lower for marker in VERTICAL_DENSITY_CONTEXT_MARKERS)
+    return _any_marker_in_text(VERTICAL_DENSITY_CONTEXT_MARKERS, ddl, lower)
 
 
 def _context_has_neon_blur_density(ddl: str | None) -> bool:
@@ -524,30 +420,28 @@ def _context_has_neon_blur_density(ddl: str | None) -> bool:
     lower = ddl.lower()
     scene_markers = ("夜", "ガラス", "ネオン", "night", "glass", "neon")
     blur_markers = ("涙", "滲", "にじ", "blur", "tear")
-    return any(marker in ddl or marker in lower for marker in scene_markers) and any(
-        marker in ddl or marker in lower for marker in blur_markers
-    )
+    return _any_marker_in_text(scene_markers, ddl, lower) and _any_marker_in_text(blur_markers, ddl, lower)
 
 
 def _context_has_motion(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker in lower for marker in MOTION_CONTEXT_MARKERS)
+    return _any_marker_in_text(MOTION_CONTEXT_MARKERS, ddl, lower)
 
 
 def _context_has_colorful_accent(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker in lower for marker in COLORFUL_CONTEXT_MARKERS)
+    return _any_marker_in_text(COLORFUL_CONTEXT_MARKERS, ddl, lower)
 
 
 def _context_has_marker(ddl: str | None, markers: tuple[str, ...]) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(marker in ddl or marker.lower() in lower for marker in markers)
+    return _any_marker_in_text(markers, ddl, lower)
 
 
 def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
@@ -733,13 +627,7 @@ def _has_intentional_large_surface(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return any(
-        marker in ddl or marker in lower
-        for marker in (
-            "大き", "巨大", "広い", "広がる", "布", "幕", "壁一面", "面で", "面として",
-            "large", "huge", "wide", "broad surface", "cloth", "fabric",
-        )
-    )
+    return _any_marker_in_text(INTENTIONAL_LARGE_SURFACE_MARKERS, ddl, lower)
 
 
 def _source_context(ddl: str | None) -> str:
@@ -762,13 +650,7 @@ def _looks_like_generated_background_plan(context: str) -> bool:
     ):
         return False
     lower = context.lower()
-    return any(
-        marker in context or marker in lower
-        for marker in (
-            "気配", "透明な膜", "五感", "存在", "境界が滲", "画面全体",
-            "presence", "transparent membrane", "five-sense", "boundary blur", "full canvas",
-        )
-    )
+    return _any_marker_in_text(GENERATED_BACKGROUND_PLAN_MARKERS, context, lower)
 
 
 def _has_explicit_background_intent(ddl: str | None) -> bool:
@@ -778,20 +660,13 @@ def _has_explicit_background_intent(ddl: str | None) -> bool:
     if _looks_like_generated_background_plan(context):
         return False
     lower = context.lower()
-    explicit_surface_markers = (
-        "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇",
-        "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness",
-    )
-    if any(marker in context or marker in lower for marker in explicit_surface_markers):
+    if _any_marker_in_text(EXPLICIT_SURFACE_MARKERS, context, lower):
         return True
-    if any(marker in context or marker in lower for marker in ("夕焼け空", "夕暮れの空", "sunset sky", "dusk sky")):
+    if _any_marker_in_text(SUNSET_SKY_MARKERS, context, lower):
         return True
-    if any(marker in context or marker in lower for marker in ("夜明け", "明け方", "朝焼け", "dawn", "daybreak", "sunrise")):
+    if _any_marker_in_text(DAWN_MARKERS, context, lower):
         return False
-    return any(
-        marker in context or marker in lower
-        for marker in ("夜", "night")
-    )
+    return _any_marker_in_text(NIGHT_MARKERS, context, lower)
 
 
 def _with_background_dominance_governor(background: str, *, ddl: str | None) -> str:
@@ -1036,7 +911,7 @@ def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: st
             changed = True
         if changed:
             data["arrangement"] = arr_data
-            _append_hint(data, "repetition event shaped with syncopated gaps")
+            _append_hint(data, "visual event shaped with syncopated gaps")
             adjusted.append(Instruction.model_validate(data))
         else:
             adjusted.append(ins)
@@ -1053,11 +928,114 @@ def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
 def _visual_event_instruction(
     instructions: list[Instruction],
     *,
+    ddl: str | None,
     color: str,
     background: str,
 ) -> Instruction:
+    lower = (ddl or "").lower()
+    source = ddl or ""
+    visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    if _any_marker_in_text(("scent", "fragrance", "grass"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.64, 0.42],
+                "radius": 0.058,
+                "angle_start": 15,
+                "angle_end": 185,
+                "rotation": -26,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as a small sensory drift",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if _any_marker_in_text(("雨", "反射", "透明", "滲", "rain", "reflection", "reflections", "transparent", "window"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.54, 0.42],
+                "to": [0.75, 0.38],
+                "color": "blue" if background != "blue" else "white",
+                "weight": "hair",
+                "color_hint": "visual event restored as a thin reflected cut",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
+            }
+        )
+    if _any_marker_in_text(
+        ("地平", "水平", "余白", "静か", "horizon", "prairie", "open road", "negative space", "quiet"),
+        source,
+        lower,
+    ):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.60, 0.61],
+                "to": [0.71, 0.58],
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a small broken line",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
+            }
+        )
+    if _any_marker_in_text(("光", "灯", "月", "light", "moon", "neon", "sign"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.64, 0.28],
+                "size": [0.11, 0.065],
+                "rotation": -18,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a small light plane",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
+            }
+        )
+    if _any_marker_in_text(("jazz", "syncopated", "backbeat", "blue-note", "improvised"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.66, 0.38],
+                "radius": 0.06,
+                "angle_start": 20,
+                "angle_end": 210,
+                "rotation": 24,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as a small offbeat arc",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
+            }
+        )
+    if _any_marker_in_text(("quilt", "patchwork", "handmade", "folk"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.64, 0.40],
+                "size": [0.072, 0.052],
+                "rotation": 22,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a small handmade rhythm offset",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
     if not _has_angular_event_anchor(instructions):
-        visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
         return Instruction.model_validate(
             {
                 "primitive": "polygon",
@@ -1068,6 +1046,7 @@ def _visual_event_instruction(
                 "color": visible,
                 "weight": "brush_thin",
                 "color_hint": "visual event restored as a small angular pulse",
+                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
     return Instruction.model_validate(
@@ -1081,6 +1060,7 @@ def _visual_event_instruction(
             "color": color,
             "weight": "hair",
             "color_hint": "visual event restored as a small focal pulse",
+            "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
         }
     )
 
@@ -1098,8 +1078,38 @@ def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, back
 
     requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
     color = requested[0] if requested else ("blue" if background != "blue" else VISIBLE_ON_BACKGROUND.get(background, "black"))
-    accent = _visual_event_instruction(instructions, color=color, background=background)
+    accent = _visual_event_instruction(instructions, ddl=ddl, color=color, background=background)
     return [*instructions, accent]
+
+
+def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+    if not ddl or "crescent" not in ddl.lower():
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for ins in instructions:
+        hint = (ins.color_hint or "").lower()
+        if "five-sense" in hint or "scent layer" in hint:
+            continue
+        if "crescent" in hint and "sensory layer" in hint and ins.color == "green":
+            data = ins.model_dump(by_alias=True)
+            data["color"] = "blue" if background != "blue" else "white"
+            if isinstance(data.get("color_hint"), str):
+                data["color_hint"] = (
+                    data["color_hint"]
+                    .replace("white sensory layer made visible as pale green", "crescent white layer kept abstract")
+                    .replace("pale green", "pale blue")
+                )
+            arrangement = data.get("arrangement")
+            if isinstance(arrangement, dict):
+                arrangement["color_cycle"] = [
+                    item for item in (arrangement.get("color_cycle") or []) if item != "green"
+                ]
+            _append_hint(data, "crescent sensory color suppressed")
+            adjusted.append(Instruction.model_validate(data))
+            continue
+        adjusted.append(ins)
+    return adjusted or instructions
 
 
 def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
@@ -1135,6 +1145,35 @@ def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> li
             adjusted.append(Instruction.model_validate(data))
         else:
             adjusted.append(ins)
+    return adjusted
+
+
+def _with_semantic_visual_event_hints(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """言語別markerで、既存要素に含まれる意味上の見せ場を明示する。"""
+    if not SEMANTIC_VISUAL_EVENT_HINTS:
+        return instructions
+
+    source = ddl or ""
+    lower_source = source.lower()
+    adjusted = instructions
+    for markers, note in SEMANTIC_VISUAL_EVENT_HINTS:
+        if note in " ".join(ins.color_hint or "" for ins in adjusted):
+            continue
+        if not _any_marker_in_text(markers, source, lower_source):
+            continue
+
+        next_instructions: list[Instruction] = []
+        applied = False
+        for ins in adjusted:
+            data = ins.model_dump(by_alias=True)
+            hint = data.get("color_hint") or ""
+            hint_lower = hint.lower()
+            marker_in_hint = _any_marker_in_text(markers, hint, hint_lower)
+            if not applied and marker_in_hint and "visual event" not in hint_lower:
+                data["color_hint"] = f"{hint}; {note}" if hint else note
+                applied = True
+            next_instructions.append(Instruction.model_validate(data))
+        adjusted = next_instructions
     return adjusted
 
 
@@ -1193,7 +1232,7 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
                 "rotation": 18,
                 "color": "gray" if background != "gray" else visible,
                 "weight": "brush_thin",
-                "color_hint": "hard edge energy restored with polygonal rust/steel fragments",
+                "color_hint": "hard edge visual event restored with polygonal rust/steel fragments",
                 "arrangement": {
                     "count": 5,
                     "layout": "scatter",
@@ -1208,6 +1247,9 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
         )
     if kind == "edge_light":
         light_color = "white" if background in {"black", "blue", "red", "green"} else "blue"
+        cycle = [light_color, "gray"]
+        if background == "white":
+            cycle.insert(0, "blue")
         return Instruction.model_validate(
             {
                 "primitive": "line",
@@ -1225,6 +1267,7 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
                     "density": "low",
                     "fade": "directional",
                     "preserve_space": True,
+                    "color_cycle": cycle,
                 },
             }
         )
@@ -1598,7 +1641,7 @@ def _requested_colors_from_ddl(ddl: str | None) -> set[str]:
     lower = ddl.lower()
     colors: set[str] = set()
     for markers, color in COLOR_MARKERS:
-        if any(marker.lower() in lower or marker in ddl for marker in markers):
+        if _any_marker_in_text(markers, ddl, lower):
             colors.add(color)
     return colors - _negated_colors_from_text(ddl)
 
@@ -1610,7 +1653,7 @@ def _negated_colors_from_text(text: str | None) -> set[str]:
     return {
         color
         for color, markers in NEGATED_COLOR_MARKERS.items()
-        if any(marker.lower() in lower or marker in text for marker in markers)
+        if _any_marker_in_text(markers, text, lower)
     }
 
 
@@ -1747,7 +1790,7 @@ def _requested_shapes_from_ddl(ddl: str | None) -> set[str]:
     lower = ddl.lower()
     shapes: set[str] = set()
     for markers, primitive in SHAPE_INTENT_MARKERS:
-        if any(marker.lower() in lower or marker in ddl for marker in markers):
+        if _any_marker_in_text(markers, ddl, lower):
             shapes.add(primitive)
     return shapes
 
@@ -1837,7 +1880,7 @@ def _requested_motifs_from_ddl(ddl: str | None) -> list[str]:
     lower = ddl.lower()
     motifs: list[str] = []
     for markers, motif in MOTIF_INTENT_MARKERS:
-        if any(marker.lower() in lower or marker in ddl for marker in markers):
+        if _any_marker_in_text(markers, ddl, lower):
             motifs.append(motif)
     return motifs
 
@@ -1895,11 +1938,12 @@ def _composition_accent_color(ddl: str | None, instructions: list[Instruction], 
     if existing and not existing <= {"black", "gray"}:
         return None
     lower = (ddl or "").lower()
-    if any(marker in (ddl or "") or marker in lower for marker in ("祭", "火", "灯", "温", "赤", "warm", "fire", "light")):
+    source = ddl or ""
+    if _any_marker_in_text(("祭", "火", "灯", "温", "赤", "warm", "fire", "light"), source, lower):
         return "red" if background != "red" else "white"
-    if any(marker in (ddl or "") or marker in lower for marker in ("水", "夜", "湖", "冷", "青", "water", "night", "cold")):
+    if _any_marker_in_text(("水", "夜", "湖", "冷", "青", "water", "night", "cold"), source, lower):
         return "blue" if background != "blue" else "white"
-    if any(marker in (ddl or "") or marker in lower for marker in ("森", "草", "苔", "庭", "竹", "green", "forest", "grass")):
+    if _any_marker_in_text(("森", "草", "苔", "庭", "竹", "green", "forest", "grass"), source, lower):
         return "green" if background != "green" else "white"
     return None
 
@@ -2088,7 +2132,7 @@ SYMMETRY_PRESENCE_MARKERS: tuple[str, ...] = (
 
 def _context_has_any(context: str, markers: tuple[str, ...]) -> bool:
     lower = context.lower()
-    return any(marker in context or marker.lower() in lower for marker in markers)
+    return _any_marker_in_text(markers, context, lower)
 
 
 def _presence_center_from_context(context: str) -> list[float] | None:
@@ -2153,7 +2197,7 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
         clause
         for clause in clauses
         if not (clause.startswith("背景") or clause.lower().startswith("background"))
-        and any(marker in clause for marker in markers)
+        and _any_marker_in_text(markers, clause, clause.lower())
     ]
 
 
@@ -2230,13 +2274,13 @@ def _is_fading_clause(clause: str) -> bool:
 
 def _sensory_kind(clause: str) -> str | None:
     lower = clause.lower()
-    if any(marker in clause or marker in lower for marker in ("光", "陽光", "日差し", "柔ら", "light", "sunlight", "soft")):
+    if _any_marker_in_text(("光", "陽光", "日差し", "柔ら", "light", "sunlight", "soft"), clause, lower):
         return "light"
-    if any(marker in clause or marker in lower for marker in ("香", "匂", "沈丁花", "scent", "fragrance")):
+    if _any_marker_in_text(("香", "匂", "沈丁花", "scent", "fragrance"), clause, lower):
         return "scent"
-    if any(marker in clause or marker in lower for marker in ("蕾", "つぼみ", "開花", "bud", "bloom")):
+    if _any_marker_in_text(("蕾", "つぼみ", "開花", "bud", "bloom"), clause, lower):
         return "bud"
-    if any(marker in clause or marker in lower for marker in ("五感", "気配", "訪れ", "sense", "presence", "arrival")):
+    if _any_marker_in_text(("五感", "気配", "訪れ", "sense", "presence", "arrival"), clause, lower):
         return "sense"
     return None
 
@@ -2761,7 +2805,9 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_rhythm_variation(instructions, ddl=ddl)
     instructions = _with_repetition_event_variation(instructions, ddl=ddl)
     instructions = _with_visual_event(instructions, ddl=ddl, background=background)
+    instructions = _with_crescent_sensory_suppression(instructions, ddl=ddl, background=background)
     instructions = _with_ma_pressure(instructions, ddl=ddl)
+    instructions = _with_semantic_visual_event_hints(instructions, ddl=ddl)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)

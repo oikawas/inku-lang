@@ -313,7 +313,31 @@ JSONは「楽譜」であって「演奏」ではない。楽譜が国際記譜�
 - JSON Score は英語キーで統一（言語非依存の中間層）
 - プリミティブ名、フィールド名は英語
 
-### 6.5 二言語並行開発の意義
+### 6.5 UI表示言語と指示文言語
+
+Web UI の表示言語と、ユーザーが入力する指示文の言語は別の設定として扱う。
+UI は日本語で使いながら英語の指示を書く、または英語 UI で日本語の指示を書くことを許容する。
+
+- `ui_lang` は画面表示・操作文言の言語であり、描画解釈の言語ではない
+- `instruction_lang` は指示文を解釈する言語であり、`auto` / `ja` / `en` を持つ
+- `auto` の場合、サーバーは入力文字列から日本語 / 英語を軽量判定し、Stage 1 / Stage 1.5 / Stage 2 に渡す言語を決める
+- 解決結果は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` として `/api/paint`、`/api/compose`、履歴、JSONタブ、保存 artifact JSON に記録する
+- これらの言語メタデータは監査・再現補助用であり、既存履歴の `render_hash` 互換性を壊さないため、現行の `render_hash` canonical payload には含めない
+- 将来の他言語対応は、コア API を増やすのではなく、Instruction Language Registry に言語サポートを追加する形で拡張する
+
+Instruction Language Registry は、各指示文言語について以下の境界をまとめる内部登録表である。
+
+- 言語コード
+- Stage 1 prompt
+- Stage 2 prompt
+- Stage 1.5 expander / filter
+- Score coerce layer が使う言語別 marker セット
+
+Score coerce layer の補修アルゴリズム本体は、JSON Score 構造に対する言語非依存の処理として共通化する。一方で、どの語が `motion` / `visual_event` / `hard_edge` / `dark field` などの抽象文脈を意味するかは言語依存であるため、`ja` / `en` の各 `InstructionLanguageSupport` が `coerce_markers` として所有する。
+
+第三者がスペイン語などを追加する場合は、JSON Score schema や renderer を変更する前に、この registry に `es` などの言語サポートを追加する。追加言語は prompt / expander だけでなく、Score coerce layer 用の marker セットも持つ。既存の `ja` / `en` は従来の prompt と expander をそのまま登録し、coerce marker も言語別ファイルへ分離するため、言語固有語彙を共通コアへ混入させない。言語メタデータは `render_hash` の canonical payload に含めず、既存履歴やベンチマークのハッシュ参照を安定させる。
+
+### 6.6 二言語並行開発の意義
 
 日英の二言語で並行開発することは、設計の質を上げる装置として機能する：
 
@@ -1406,6 +1430,34 @@ inku-lang/                         # github.com/oikawas/inku-lang
 ---
 
 ## 変更履歴
+
+### v1.50 (2026-05-11)
+
+**英語指示文対応と指示文言語 / UI言語の分離**
+
+日本語 UI / 英語 UI の切替とは独立して、描画指示文の言語を選べるようにした。
+将来の多言語対応を見据え、表示言語と解釈言語を API 境界で分離する。
+
+- Web UI の入力ヘッダーに `指示文の言語` セレクタを追加し、`自動` / `日本語` / `English` を選択できるようにする
+- `/api/paint`、`/api/interpret`、`/api/compose`、`/api/demo/instruction` は `instruction_lang` と `ui_lang` を受け取る
+- `instruction_lang=auto` の場合、サーバーは入力文字列から `ja` / `en` を判定し、Stage 1 / Stage 1.5 / Stage 2 / デモ指示生成に渡す
+- `/api/paint`、`/api/compose`、履歴保存、JSONタブ、保存 artifact JSON は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` を記録する
+- `history` テーブルに `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` カラムを追加する
+- `inku-cli paint` / `batch` / `demo-instruction` は旧 `--lang` ではなく `--instruction-lang auto|ja|en` と任意の `--ui-lang` を送信する
+- 既存履歴や `cli/tune_bench.md` のハッシュ参照を壊さないため、言語メタデータは `render_hash` の canonical payload には含めない
+- Stage 1 prompt、Stage 2 prompt、Stage 1.5 expander / filter は `InstructionLanguageSupport` として registry に登録する
+- Score coerce layer が参照する語彙・文脈 marker は `InstructionLanguageSupport.coerce_markers` として `ja` / `en` の言語別ファイルに分離する
+- Score coerce layer の補修アルゴリズム本体は JSON Score 構造に対する共通処理として維持し、言語ごとの違いは marker セット側で表現する
+- `ja` / `en` の既存 prompt と expander は内容を変更せず registry に載せるため、描画結果の変化を伴わない
+- 第三者が追加言語を実装する場合は、まず registry に言語コード・prompt・expander・coerce marker を追加し、JSON Score schema / renderer / 色カタログの変更とは分離して検証する
+- Build 403-427 では、英語版 Stage 1 / Stage 1.5 / Stage 2 の実装を日本語版とファイルレベルで分離し、英語固有の意味解釈・marker・補修語彙を追加した
+- 英語版は、単語置換ではなく、英語文の時間構造・反復・前後関係・視線・出来事の核を抽象描画パラメータへ変換する方針とする
+- 英語版 Stage 1.5 / coerce marker は、`before` / `after` / `again and again` / `as if` / `at once` などの時間接続、`diagonal` / `same beat` / `shifted` などの構図語、透明・反射・霧・道路・音・群れ等の視覚イベント語を言語固有の補修手がかりとして扱う
+- 日本語版と英語版は同一の JSON Score schema / renderer / 色カタログを共有し、言語差は prompt、expander、marker、補修入力の段階に閉じ込める
+- 英語版の品質確認として、同義の日本語 / 英語指示文30組を `square` canvas、`default` color catalog、履歴保存なしで描画し、専門家3名ペルソナで比較評価した
+- Build 427 時点の30件平均では、英語版は日本語版に近い品質へ到達している。英語版は color resonance がやや高く、日本語版は constraint adherence と visual event がやや高い
+- 残課題は、英語版では「整いすぎて出来事の瞬間が背景化する」こと、日本語版では「詩的な静けさが小さすぎる記号に縮約される」こと。次の改善では密度を増やさず、focal event の最小可視サイズ、コントラスト、隣接反応を強める
+- build number: 427
 
 ### v1.49 (2026-05-11)
 

@@ -148,6 +148,10 @@ def _has_any(text: str, tokens: tuple[str, ...]) -> bool:
     return any(token in text for token in tokens)
 
 
+def _has_en_terms(text: str, tokens: tuple[str, ...]) -> bool:
+    return any(re.search(rf"(?<![a-z]){re.escape(token)}(?![a-z])", text) for token in tokens)
+
+
 def _profile_ja(text: str) -> _FilterProfile:
     tags: set[str] = set()
     intensity = 2
@@ -405,7 +409,7 @@ def _dominant_en_color(ddl: str) -> str:
             return color
     if _has_any(lower, ("spring", "cherry", "flower", "bud", "sunset", "warm", "sunlight", "festival")):
         return "red"
-    if _has_any(lower, ("forest", "leaf", "grass", "scent", "fragrance", "field", "moss")):
+    if _has_en_terms(lower, ("forest", "leaf", "grass", "scent", "fragrance", "field", "moss")):
         return "green"
     if _has_any(lower, ("night", "moon", "water", "rain", "mist", "cold", "sea", "sky")):
         return "blue"
@@ -573,7 +577,7 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
         structural.append(f"Scatter five thin {contrast_color} fading lines from lower left to upper right. Fine trembling.")
     if any(token in context.lower() for token in ("sunlight", "light", "warm", "soft")):
         structural.append("Layer three pale white watercolor ellipses near the upper edge as soft light. Edges blurring.")
-    if any(token in context.lower() for token in ("scent", "fragrance")):
+    if _has_en_terms(context.lower(), ("scent", "fragrance")):
         structural.append("Scatter seven small green ellipses along an undulating trace as a scent layer. Swaying slowly.")
     if any(token in context.lower() for token in ("spring", "bud", "bloom", "waiting")):
         structural.append("Scatter five small red ellipses rising to the right along a diagonal band in the right half as waiting buds.")

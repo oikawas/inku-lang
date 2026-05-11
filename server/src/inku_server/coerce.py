@@ -511,6 +511,7 @@ MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = (
     "紙", "新聞", "手紙", "紙片", "風", "交差", "迷う", "漂う",
     "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
     "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift",
+    "horizon", "prairie", "open road",
 )
 SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = (
     "布", "果実", "重", "影", "沈む", "沈め",

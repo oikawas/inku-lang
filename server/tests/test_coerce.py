@@ -1553,6 +1553,37 @@ def test_coerce_score_adds_broken_line_event_for_quiet_negative_space():
     assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_adds_ma_pressure_to_prairie_horizon_line():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.0, 0.82],
+                    "to": [1.0, 0.82],
+                    "color": "black",
+                    "color_hint": "prairie horizon",
+                    "arrangement": {"count": 1, "layout": "horizontal"},
+                },
+                {
+                    "primitive": "square",
+                    "position": [0.68, 0.79],
+                    "size": [0.03, 0.03],
+                    "color": "red",
+                    "color_hint": "small red interruption",
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A prairie horizon sits low, with one small red interruption.")
+
+    horizon = next(ins for ins in fixed.instructions if "prairie horizon" in (ins.color_hint or ""))
+    assert horizon.arrangement is not None
+    assert horizon.arrangement.preserve_space is True
+    assert horizon.arrangement.fade == "outward"
+
+
 def test_coerce_score_adds_offbeat_arc_for_jazz_context():
     score = Score.model_validate(
         {

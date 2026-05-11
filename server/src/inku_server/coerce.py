@@ -935,6 +935,94 @@ def _visual_event_instruction(
     lower = (ddl or "").lower()
     source = ddl or ""
     visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    if _any_marker_in_text(("発車ベル", "案内板", "明るくな", "departure board", "lit up", "bell"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.58, 0.27],
+                "size": [0.16, 0.072],
+                "rotation": -6,
+                "color": "blue" if background != "blue" else visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a pre-bell light hinge",
+                "arrangement": {
+                    "count": 1,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if _any_marker_in_text(("礼をする", "父も", "父の父", "毎朝", "bow", "bows", "each morning"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.58, 0.46],
+                "radius": 0.082,
+                "angle_start": 28,
+                "angle_end": 218,
+                "rotation": 18,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as an inherited bow sequence",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if _any_marker_in_text(("whistled", "whistle", "dog moved", "flock moved", "listen", "口笛", "犬が動", "羊の群れ"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.39, 0.48],
+                "to": [0.72, 0.36],
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as a chain reaction",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if _any_marker_in_text(("tatami", "tilted the quiet", "whole room", "部屋全体", "傾け"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "ellipse",
+                "center": [0.56, 0.49],
+                "size": [0.11, 0.034],
+                "rotation": -16,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as a tilted-room drop",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
     if _any_marker_in_text(("scent", "fragrance", "grass"), source, lower):
         return Instruction.model_validate(
             {

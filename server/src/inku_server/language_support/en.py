@@ -105,7 +105,10 @@ COERCE_MARKERS = {
     ),
     "semantic_visual_event_hints": (
         (("blue-note", "dark pause", "pause"), "visual event preserved as a blue-note pause accent"),
-        (("transparent reflection", "transparent reflections", "faint reflection", "reflection"), "visual event preserved as a reflected accent"),
+        (
+            ("transparent reflection", "transparent reflections", "transparent membrane", "transparent", "faint reflection", "reflection"),
+            "visual event preserved as a reflected accent",
+        ),
         (("red interruption", "interruption"), "visual event preserved as a small interruption accent"),
         (("brick wall dust", "chalk", "dust"), "visual event preserved as chalk dust tension"),
     ),

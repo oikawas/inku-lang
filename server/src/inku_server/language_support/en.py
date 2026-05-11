@@ -69,6 +69,7 @@ COERCE_MARKERS = {
         "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
         "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
         "trembling", "single drop", "remain", "remains", "drift", "drifts", "drifting",
+        "pull", "pulls", "toward", "upper-right focus",
     ),
     "colorful": ("festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color"),
     "leaf_grain": ("leaf", "autumn forest", "fallen leaves", "autumn leaves", "dry leaves"),
@@ -104,6 +105,7 @@ COERCE_MARKERS = {
         "dark pause", "pause", "transparent", "reflections", "sparse", "dust", "chalk",
     ),
     "semantic_visual_event_hints": (
+        (("open road", "upper-right focus"), "visual event preserved as a road-pull focus accent"),
         (("blue-note", "dark pause", "pause"), "visual event preserved as a blue-note pause accent"),
         (
             ("transparent reflection", "transparent reflections", "transparent membrane", "transparent", "faint reflection", "reflection"),

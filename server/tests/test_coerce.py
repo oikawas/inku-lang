@@ -1961,6 +1961,33 @@ def test_coerce_score_adds_edge_light_event_for_dark_light_context():
     assert edge[0].arrangement is not None
     assert edge[0].arrangement.count == 2
     assert edge[0].arrangement.preserve_space is True
+    assert edge[0].arrangement.color_cycle
+
+
+def test_coerce_score_adds_motion_to_open_road_pull_focus():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.15, 0.85],
+                    "to": [0.72, 0.28],
+                    "color": "gray",
+                    "color_hint": "open road",
+                    "arrangement": {"count": 1, "layout": "scatter"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="An open road pulls one gray line toward the upper-right focus.")
+
+    road = next(ins for ins in fixed.instructions if "open road" in (ins.color_hint or ""))
+    assert road.arrangement is not None
+    assert road.arrangement.path != "none"
+    assert road.arrangement.rhythm_spacing != "none"
+    assert "motion energy restored through trajectory and rotation" in (road.color_hint or "")
+    assert "visual event preserved as a road-pull focus accent" in (road.color_hint or "")
 
 
 def test_coerce_score_does_not_add_edge_light_when_presence_handles_gaze():

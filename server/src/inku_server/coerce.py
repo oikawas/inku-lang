@@ -1247,6 +1247,9 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
         )
     if kind == "edge_light":
         light_color = "white" if background in {"black", "blue", "red", "green"} else "blue"
+        cycle = [light_color, "gray"]
+        if background == "white":
+            cycle.insert(0, "blue")
         return Instruction.model_validate(
             {
                 "primitive": "line",
@@ -1264,6 +1267,7 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
                     "density": "low",
                     "fade": "directional",
                     "preserve_space": True,
+                    "color_cycle": cycle,
                 },
             }
         )

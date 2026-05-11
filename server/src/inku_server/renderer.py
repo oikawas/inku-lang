@@ -1210,7 +1210,7 @@ def _add_material_circle_outline(
     for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
         group.add(dwg.circle(center=(cx, cy), r=max(0.0, r + offset), **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash)))
     if ins.weight == "rope":
-        for idx, (px, py) in enumerate(_circle_points(cx, cy, r, 16)):
+        for idx, (px, py) in enumerate(_circle_points(cx, cy, r, r, 16)):
             angle = math.atan2(py - cy, px - cx)
             tangent = (-math.sin(angle), math.cos(angle))
             normal = (math.cos(angle), math.sin(angle))

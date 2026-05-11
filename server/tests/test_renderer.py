@@ -445,6 +445,27 @@ def test_render_circle_material_applies_outline_texture():
     assert 'stroke-dasharray="8,12,1,8"' in svg
 
 
+def test_render_rope_circle_applies_twist_texture():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.18,
+                    "weight": "rope",
+                }
+            ]
+        }
+    )
+
+    svg = render(score)
+
+    assert "<circle" in svg
+    assert svg.count("<line") >= 16
+    assert 'stroke-dasharray="4,8"' in svg
+
+
 def test_render_ellipse_material_applies_outline_texture():
     score = Score.model_validate(
         {

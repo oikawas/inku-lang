@@ -290,6 +290,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
 - **If normalized DDL contains shapes, lines, or arcs, instructions must not be empty. If exact conversion is difficult, map it to the nearest line, ellipse, or square**
+- **Sparse or minimal works are valid. A single directional line, horizon line, or edge-biased focus must still become at least one drawable instruction**
 - **Compress the output to 1–5 instructions. Do not restate the whole DDL; convert only the main visual relationship that makes the work readable**
 - **Use one dominant technique per work. If the DDL contains multiple technique words, choose the one that best fits the subject and keep the others only as small supporting layers when needed**
 - **Do not over-compress. If the DDL contains sensory words such as light, scent, temperature, sound, waiting time, or bodily senses, keep 1–2 of them as faint supporting layers when they do not break the subject. Do not remove so much information that the work loses richness or playfulness**
@@ -445,6 +446,9 @@ Output: {"background":"black","instructions":[{"primitive":"line","from":[0.0,0.
 
 Input: Fill background with white. Draw a white horizontal line at center.
 Output: {"background":"white","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"black","color_hint":"white line made visible"}]}
+
+Input: Draw one gray line rising from the bottom-left to the upper-right.
+Output: {"instructions":[{"primitive":"line","from":[0.15,0.78],"to":[0.78,0.28],"color":"gray","arrangement":{"count":1,"layout":"scatter","density":"low","fade":"outward","preserve_space":true}}]}
 
 Input: Fill background with white. Scatter one hundred thirty-seven short white lines from top to bottom.
 Output: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"white lines made visible on the smaller area","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}

@@ -307,6 +307,7 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "700–1000" in SYSTEM_PROMPT_EN
     assert "six hundred ten" in SYSTEM_PROMPT_EN
     assert "instructions must not be empty" in SYSTEM_PROMPT_EN
+    assert "Sparse or minimal works are valid" in SYSTEM_PROMPT_EN
     assert "Preserve negative space" in SYSTEM_PROMPT_EN
     assert "cluster_count" in SYSTEM_PROMPT_EN
     assert "preserve_space" in SYSTEM_PROMPT_EN
@@ -329,6 +330,7 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert 'Do not use background="gray"' in SYSTEM_PROMPT_EN
     assert 'Treat gray subjects as foreground color="gray"' in SYSTEM_PROMPT_EN
     assert "white line made visible" in SYSTEM_PROMPT_EN
+    assert "one gray line rising from the bottom-left to the upper-right" in SYSTEM_PROMPT_EN
     assert "short white lines from top to bottom" in SYSTEM_PROMPT_EN
     assert "Swaying slowly" in SYSTEM_PROMPT_EN
     assert "Apply adjectives, motion words, and texture words" in SYSTEM_PROMPT_EN

@@ -1698,6 +1698,8 @@ def test_coerce_score_adds_offbeat_arc_for_jazz_context():
 
     assert any("visual event restored as a small offbeat arc" in (ins.color_hint or "") for ins in fixed.instructions)
     assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("hard edge visual event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("ma pressure restored through spacing and preserved negative space" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_does_not_read_horizontal_as_horizon():
@@ -1847,7 +1849,7 @@ def test_coerce_score_shapes_repeated_lines_as_event_without_adding_density():
     assert line.arrangement.margin >= 0.18
     assert line.from_ != (0.12, 0.5)
     assert line.to != (0.88, 0.5)
-    assert "repetition event shaped with syncopated gaps" in (line.color_hint or "")
+    assert "visual event shaped with syncopated gaps" in (line.color_hint or "")
 
 
 def test_coerce_score_adds_edge_light_event_for_dark_light_context():

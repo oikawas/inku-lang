@@ -910,7 +910,7 @@ def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: st
             changed = True
         if changed:
             data["arrangement"] = arr_data
-            _append_hint(data, "repetition event shaped with syncopated gaps")
+            _append_hint(data, "visual event shaped with syncopated gaps")
             adjusted.append(Instruction.model_validate(data))
         else:
             adjusted.append(ins)

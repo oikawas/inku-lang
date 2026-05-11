@@ -75,7 +75,7 @@ COERCE_MARKERS = {
     "silence_layer": ("abandoned school", "corridor", "long silence"),
     "hard_edge": (
         "factory", "steel frame", "rust", "girder", "warehouse", "grid", "cut", "cuts", "brick",
-        "parking-lot", "parking lot", "diagonal", "rectangle",
+        "parking-lot", "parking lot", "rectangle",
     ),
     "playful_motion": ("bicycle", "slope", "petal", "colored paper", "wind chime"),
     "edge_light": ("night", "black", "dark", "lighthouse", "only light", "sea", "glass", "neon"),
@@ -99,6 +99,7 @@ COERCE_MARKERS = {
         "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
         "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift",
         "horizon", "prairie", "open road",
+        "jazz", "syncopated", "blue-note", "city corner",
     ),
     "surface_tension": ("cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink"),
     "intentional_large_surface": ("large", "huge", "wide", "broad surface", "cloth", "fabric"),

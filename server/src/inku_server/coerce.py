@@ -798,6 +798,7 @@ def _has_explicit_background_intent(ddl: str | None) -> bool:
     explicit_surface_markers = (
         "背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇",
         "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness",
+        "dark field",
     )
     if any(marker in context or marker in lower for marker in explicit_surface_markers):
         return True

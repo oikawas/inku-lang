@@ -1419,6 +1419,30 @@ def test_coerce_score_keeps_explicit_sunset_sky_background():
     assert fixed.background == "red"
 
 
+def test_coerce_score_keeps_explicit_dark_field_background():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.62, 0.35],
+                    "radius": 0.12,
+                    "angle_start": 210,
+                    "angle_end": 330,
+                    "color": "white",
+                    "color_hint": "crescent",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A single white crescent waits in an off-center dark field.")
+
+    assert fixed.background == "black"
+    assert any(ins.color == "white" for ins in fixed.instructions)
+
+
 def test_coerce_score_governs_dawn_background_generated_from_source_context():
     score = Score.model_validate(
         {

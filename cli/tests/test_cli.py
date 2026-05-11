@@ -698,6 +698,26 @@ def test_quality_metrics_scores_achromatic_value_contrast_without_extra_colors()
     assert metrics["score_quality_metrics"]["color_resonance"] >= 50
 
 
+def test_quality_metrics_counts_background_color_as_rendered_color():
+    score = {
+        "background": "blue",
+        "instructions": [
+            {
+                "primitive": "ellipse",
+                "color": "white",
+                "center": [0.5, 0.5],
+                "size": [0.12, 0.08],
+                "arrangement": {"count": 2, "layout": "scatter", "color_cycle": ["white", "blue"]},
+            }
+        ],
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_color_counts"] == {"white": 1}
+    assert metrics["score_quality_metrics"]["color_resonance"] >= 50
+
+
 def test_quality_metrics_scores_isolated_chromatic_accent():
     score = {
         "instructions": [

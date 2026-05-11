@@ -948,6 +948,11 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
     coverage_hints = 0
     centers: list[tuple[float, float]] = []
 
+    background = score.get("background")
+    background_contrast = 0
+    if isinstance(background, str) and background in COLOR_KEYS:
+        visible_colors.add(background)
+
     presence = score.get("presence")
     if isinstance(presence, dict):
         if presence.get("symmetry") == "bilateral":
@@ -962,6 +967,8 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
         color = instruction.get("color")
         if isinstance(color, str):
             visible_colors.add(color)
+            if isinstance(background, str) and background in COLOR_KEYS and color != background:
+                background_contrast = 1
         weight = instruction.get("weight")
         if isinstance(weight, str):
             weight_values.add(weight)
@@ -1033,7 +1040,7 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
 
     negative_space_pressure = min(100, preserve_space * 18 + fade_count * 8 + min(off_center, 4) * 8 + min(counterweights, 3) * 8)
     motion_energy = min(100, path_motion * 18 + diagonal_or_wave * 12 + varied_rotation * 8 + rhythm_spacing_count * 10)
-    color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14)
+    color_resonance = min(100, max(0, len(visible_colors) - 1) * 18 + color_cycle_count * 14 + background_contrast * 18)
     if visible_colors and visible_colors <= {"white", "black", "gray"}:
         achromatic_tonal_resonance = min(
             100,

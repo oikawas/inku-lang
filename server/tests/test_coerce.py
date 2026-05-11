@@ -1743,6 +1743,27 @@ def test_coerce_score_does_not_read_english_verb_leaves_as_leaf_motif():
     assert any("visual event restored as a thin reflected cut" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_marks_existing_reflection_as_visual_event():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.5],
+                    "to": [0.75, 0.5],
+                    "color": "gray",
+                    "color_hint": "faint reflection",
+                    "arrangement": {"count": 3, "layout": "scatter"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Rain on a bus-stop window leaves transparent reflections.")
+
+    assert any("visual event preserved as a reflected accent" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_does_not_read_english_verb_leaves_empty_page_as_leaf_grain():
     score = Score.model_validate(
         {
@@ -1762,6 +1783,70 @@ def test_coerce_score_does_not_read_english_verb_leaves_empty_page_as_leaf_grain
 
     assert not any("leaf/grain energy restored" in (ins.color_hint or "") for ins in fixed.instructions)
     assert any("visual event restored as a small broken line" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_adds_ma_pressure_for_sparse_chalk_wall():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.24, 0.22],
+                    "to": [0.24, 0.78],
+                    "color": "gray",
+                    "color_hint": "cold brick wall dust",
+                    "arrangement": {"count": 5, "layout": "vertical"},
+                },
+                {
+                    "primitive": "square",
+                    "position": [0.60, 0.48],
+                    "size": [0.035, 0.035],
+                    "color": "gray",
+                    "arrangement": {"count": 12, "layout": "scatter", "margin": 0.08},
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Cold brick wall dust is held by sparse chalk lines.")
+
+    arranged = [ins for ins in fixed.instructions if ins.arrangement is not None]
+    assert arranged
+    assert all(ins.arrangement.preserve_space is True for ins in arranged)
+    assert all(ins.arrangement.margin >= 0.22 for ins in arranged)
+    assert any("ma pressure restored through spacing and preserved negative space" in (ins.color_hint or "") for ins in arranged)
+    assert any("visual event preserved as chalk dust tension" in (ins.color_hint or "") for ins in arranged)
+
+
+def test_coerce_score_marks_blue_note_pause_as_existing_visual_event():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.45, 0.42],
+                    "radius": 0.16,
+                    "angle_start": 15,
+                    "angle_end": 220,
+                    "color": "blue",
+                    "color_hint": "blue-note value",
+                    "arrangement": {"count": 2, "layout": "horizontal"},
+                },
+                {
+                    "primitive": "square",
+                    "position": [0.62, 0.52],
+                    "size": [0.05, 0.05],
+                    "color": "black",
+                    "color_hint": "dark pause",
+                    "arrangement": {"count": 1, "layout": "horizontal"},
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Blue-note value moves through two thin arcs and a dark pause.")
+
+    assert any("visual event preserved as a blue-note pause accent" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_does_not_read_crescent_as_scent_or_green():

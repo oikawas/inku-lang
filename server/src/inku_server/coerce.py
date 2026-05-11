@@ -390,6 +390,7 @@ VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("vanish
 RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("rhythm")
 VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("visual_event")
 MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("ma_pressure")
+SEMANTIC_VISUAL_EVENT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("semantic_visual_event_hints")
 SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("surface_tension")
 INTENTIONAL_LARGE_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("intentional_large_surface")
 GENERATED_BACKGROUND_PLAN_MARKERS: tuple[str, ...] = _coerce_marker_values("generated_background_plan")
@@ -1144,6 +1145,35 @@ def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> li
             adjusted.append(Instruction.model_validate(data))
         else:
             adjusted.append(ins)
+    return adjusted
+
+
+def _with_semantic_visual_event_hints(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """言語別markerで、既存要素に含まれる意味上の見せ場を明示する。"""
+    if not SEMANTIC_VISUAL_EVENT_HINTS:
+        return instructions
+
+    source = ddl or ""
+    lower_source = source.lower()
+    adjusted = instructions
+    for markers, note in SEMANTIC_VISUAL_EVENT_HINTS:
+        if note in " ".join(ins.color_hint or "" for ins in adjusted):
+            continue
+        if not _any_marker_in_text(markers, source, lower_source):
+            continue
+
+        next_instructions: list[Instruction] = []
+        applied = False
+        for ins in adjusted:
+            data = ins.model_dump(by_alias=True)
+            hint = data.get("color_hint") or ""
+            hint_lower = hint.lower()
+            marker_in_hint = _any_marker_in_text(markers, hint, hint_lower)
+            if not applied and marker_in_hint and "visual event" not in hint_lower:
+                data["color_hint"] = f"{hint}; {note}" if hint else note
+                applied = True
+            next_instructions.append(Instruction.model_validate(data))
+        adjusted = next_instructions
     return adjusted
 
 
@@ -2773,6 +2803,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_visual_event(instructions, ddl=ddl, background=background)
     instructions = _with_crescent_sensory_suppression(instructions, ddl=ddl, background=background)
     instructions = _with_ma_pressure(instructions, ddl=ddl)
+    instructions = _with_semantic_visual_event_hints(instructions, ddl=ddl)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)

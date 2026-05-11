@@ -1450,7 +1450,14 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - Score coerce layer の補修アルゴリズム本体は JSON Score 構造に対する共通処理として維持し、言語ごとの違いは marker セット側で表現する
 - `ja` / `en` の既存 prompt と expander は内容を変更せず registry に載せるため、描画結果の変化を伴わない
 - 第三者が追加言語を実装する場合は、まず registry に言語コード・prompt・expander・coerce marker を追加し、JSON Score schema / renderer / 色カタログの変更とは分離して検証する
-- build number: 402
+- Build 403-427 では、英語版 Stage 1 / Stage 1.5 / Stage 2 の実装を日本語版とファイルレベルで分離し、英語固有の意味解釈・marker・補修語彙を追加した
+- 英語版は、単語置換ではなく、英語文の時間構造・反復・前後関係・視線・出来事の核を抽象描画パラメータへ変換する方針とする
+- 英語版 Stage 1.5 / coerce marker は、`before` / `after` / `again and again` / `as if` / `at once` などの時間接続、`diagonal` / `same beat` / `shifted` などの構図語、透明・反射・霧・道路・音・群れ等の視覚イベント語を言語固有の補修手がかりとして扱う
+- 日本語版と英語版は同一の JSON Score schema / renderer / 色カタログを共有し、言語差は prompt、expander、marker、補修入力の段階に閉じ込める
+- 英語版の品質確認として、同義の日本語 / 英語指示文30組を `square` canvas、`default` color catalog、履歴保存なしで描画し、専門家3名ペルソナで比較評価した
+- Build 427 時点の30件平均では、英語版は日本語版に近い品質へ到達している。英語版は color resonance がやや高く、日本語版は constraint adherence と visual event がやや高い
+- 残課題は、英語版では「整いすぎて出来事の瞬間が背景化する」こと、日本語版では「詩的な静けさが小さすぎる記号に縮約される」こと。次の改善では密度を増やさず、focal event の最小可視サイズ、コントラスト、隣接反応を強める
+- build number: 427
 
 ### v1.49 (2026-05-11)
 

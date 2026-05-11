@@ -83,6 +83,31 @@ entry with prompts, expander behavior, and coerce markers, keeping JSON Score
 schema, renderer behavior, and color catalogs separate unless the new language
 demonstrably needs a core extension.
 
+Builds 403-427 extend the English instruction path beyond structural routing.
+Japanese and English now live in separate language files for Stage 1 prompts,
+Stage 1.5 expansion/filter behavior, Stage 2 prompts, and coerce marker sets.
+They still share the same JSON Score schema, renderer, color catalogs, and
+repair algorithms.  Language-specific behavior is therefore kept at the prompt,
+expander, marker, and repair-input boundary.
+
+The English path is tuned to preserve English-specific phrasing instead of
+performing word-by-word translation.  Temporal and relational phrases such as
+`before`, `after`, `again and again`, `as if`, and `at once`, along with
+composition cues such as `diagonal`, `same beat`, `shifted`, reflection, fog,
+road, sound, flock, and transparent-event language, are treated as cues for
+abstract visual parameters and focal events.
+
+Build 427 was checked with 30 Japanese/English equivalent prompt pairs rendered
+with the same square canvas and default color catalog, without saving benchmark
+history.  Expert review found the English path close to Japanese quality:
+English tended to score slightly higher on color resonance, while Japanese
+remained slightly stronger on constraint adherence and visual-event presence.
+The remaining English risk is becoming too orderly and letting the event moment
+sink into background structure.  The remaining Japanese risk is compressing
+quiet poetic scenes into marks that are too small to carry a visible event.
+Future tuning should strengthen focal-event size, contrast, and neighboring
+reactions without increasing overall density.
+
 ---
 
 ## 3. Design Principles

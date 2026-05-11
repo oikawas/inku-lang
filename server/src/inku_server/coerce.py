@@ -2193,7 +2193,7 @@ SYMMETRY_PRESENCE_MARKERS: tuple[str, ...] = (
 
 def _context_has_any(context: str, markers: tuple[str, ...]) -> bool:
     lower = context.lower()
-    return any(marker in context or marker.lower() in lower for marker in markers)
+    return _any_marker_in_text(markers, context, lower)
 
 
 def _presence_center_from_context(context: str) -> list[float] | None:

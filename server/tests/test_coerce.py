@@ -738,6 +738,26 @@ def test_coerce_score_restores_animal_group_presence_without_extra_primitives():
     assert all("animal" not in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_does_not_read_scatter_as_cat_presence():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.6, 0.6],
+                    "size": [0.08, 0.04],
+                    "color": "gray",
+                    "arrangement": {"count": 40, "layout": "scatter"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Scatter forty rotated squares along an undulating trace in the lower right.")
+
+    assert fixed.presence is None
+
+
 def test_coerce_score_dedupes_structurally_identical_auxiliary_layers():
     score = Score.model_validate(
         {

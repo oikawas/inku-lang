@@ -269,6 +269,20 @@ def test_color_trace_does_not_treat_words_as_green_leaf_marker():
     assert "green_requested_but_missing_in_score" not in trace["warnings"]
 
 
+def test_color_trace_does_not_read_crescent_as_scent():
+    result = {
+        "text": "A single white crescent waits in an off-center dark field.",
+        "ddl": "Fill background with black. Place a white crescent arc in the upper right.",
+        "score": {"instructions": [{"primitive": "arc", "color": "white"}]},
+    }
+
+    trace = cli._color_trace(result, catalog_id="default")
+
+    assert "green" not in trace["text_color_markers"]
+    assert "green" not in trace["ddl_color_markers"]
+    assert "green" not in trace["requested_colors"]
+
+
 def test_color_trace_detects_specific_leaf_terms_as_green():
     assert cli._marker_colors("落ち葉と若葉、木の葉、葉っぱ、葉脈") == ["green"]
 

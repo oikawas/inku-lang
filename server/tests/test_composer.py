@@ -351,6 +351,10 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "perspective depth" in SYSTEM_PROMPT_EN
     assert "pointillism" in SYSTEM_PROMPT_EN
     assert "add rotation to break axis symmetry" in SYSTEM_PROMPT_EN
+    assert "syncopated city rhythm" in SYSTEM_PROMPT_EN
+    assert "blue-note value" in SYSTEM_PROMPT_EN
+    assert "subway-map pressure" in SYSTEM_PROMPT_EN
+    assert "prairie horizon" in SYSTEM_PROMPT_EN
     assert '"rotation":30' in SYSTEM_PROMPT_EN
     assert '"rotation":-30' in SYSTEM_PROMPT_EN
     assert "oil impasto" in SYSTEM_PROMPT_EN

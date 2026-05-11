@@ -25,6 +25,20 @@ def test_language_registry_preserves_existing_expander_behavior():
     assert expand_intermediate_for_lang(en_ddl, lang="en") == expand_intermediate_ddl(en_ddl, lang="en")
 
 
+def test_english_language_support_adds_language_specific_taste_without_touching_ja():
+    ja_ddl = "中心に黒い四角を置く。白い横線を三本引く。"
+    en_ddl = "Draw three blue lines with jazz syncopation near a city corner."
+
+    ja_before = expand_intermediate_ddl(ja_ddl, lang="ja")
+    ja_after = expand_intermediate_for_lang(ja_ddl, lang="ja")
+    en_base = expand_intermediate_ddl(en_ddl, lang="en")
+    en_after = expand_intermediate_for_lang(en_ddl, lang="en")
+
+    assert ja_after == ja_before
+    assert en_after != en_base
+    assert "syncopated city rhythm" in en_after or "blue-note value" in en_after
+
+
 def test_auto_instruction_language_resolution_remains_stable():
     assert resolve_instruction_lang("一滴の墨", "auto") == "ja"
     assert resolve_instruction_lang("one black line", "auto") == "en"

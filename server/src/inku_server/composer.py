@@ -351,6 +351,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"patchwork" → square repetition; use color_cycle for multiple colors and add slight rotation to the pieces**
 - **"fresco ground" → chalk gray horizontal lines or ground plane with blurring**
 - **"ink-wash value" → black/gray brush lines with blurring or weight contrast**
+- **English idiom and cultural texture are compositional signals, not objects. "syncopated city rhythm" / "blue-note value" → short line or arc rhythm with rhythm_spacing="syncopated"; "quilt-like patchwork" → rotated square color_cycle; "subway-map pressure" → rotring line convergence; "billboard edge pressure" → cropped rectangle/diagonal edge tension; "prairie horizon" → low horizontal negative-space pressure; "coastal fog plane" → pale watercolor ellipse layers with blurring; "warehouse grid cuts" → sparse rotated square/line grid fragments**
 - **Strong solid backgrounds (black/red/blue/green) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
 
 # Examples (key patterns)
@@ -417,6 +418,15 @@ Output: {"instructions":[{"primitive":"square","position":[0.45,0.45],"size":[0.
 
 Input: Line up five black fine-brush vertical lines left to right as ink-wash value. Edges blurring.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.2],"to":[0.5,0.8],"color":"black","weight":"brush_thin","arrangement":{"count":5,"layout":"horizontal"},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x"]}}]}
+
+Input: Line up seven short blue fine-brush lines left to right as syncopated city rhythm. Swaying slowly.
+Output: {"instructions":[{"primitive":"line","from":[0.47,0.5],"to":[0.53,0.5],"color":"blue","weight":"brush_thin","arrangement":{"count":7,"layout":"horizontal","rhythm_spacing":"syncopated"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+Input: Draw five thin rotring lines toward an upper-right focus as subway-map pressure.
+Output: {"instructions":[{"primitive":"line","from":[0.14,0.82],"to":[0.72,0.28],"color":"black","weight":"rotring","arrangement":{"count":5,"layout":"vertical","margin":0.08}}]}
+
+Input: Draw one long pale horizontal line near the lower third as prairie horizon.
+Output: {"instructions":[{"primitive":"line","from":[0.06,0.66],"to":[0.94,0.66],"color":"gray","weight":"pencil","color_hint":"prairie horizon"}]}
 
 Input: Draw a horizontal line at center. Fine trembling.
 Output: {"instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_y"]}}]}

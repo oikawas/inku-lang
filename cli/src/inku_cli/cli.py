@@ -77,6 +77,13 @@ COLOR_MARKERS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _marker_in_text(marker: str, text: str, lower: str) -> bool:
+    marker_lower = marker.lower()
+    if marker.isascii() and any(ch.isalpha() for ch in marker):
+        return re.search(rf"(?<![a-z]){re.escape(marker_lower)}(?![a-z])", lower) is not None
+    return marker in text or marker_lower in lower
+
+
 def _canvas_aspect_ratio(canvas_aspect: str | None) -> float:
     return CANVAS_ASPECT_RATIOS.get(canvas_aspect or "square", CANVAS_ASPECT_RATIOS["square"])
 NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
@@ -1128,7 +1135,7 @@ def _marker_colors(text: str | None) -> list[str]:
     found = [
         color
         for color, markers in COLOR_MARKERS.items()
-        if any(marker.lower() in lower or marker in text for marker in markers)
+        if any(_marker_in_text(marker, text, lower) for marker in markers)
     ]
     return sorted(found)
 
@@ -1140,7 +1147,7 @@ def _negated_marker_colors(text: str | None) -> list[str]:
     found = [
         color
         for color, markers in NEGATED_COLOR_MARKERS.items()
-        if any(marker.lower() in lower or marker in text for marker in markers)
+        if any(_marker_in_text(marker, text, lower) for marker in markers)
     ]
     return sorted(found)
 

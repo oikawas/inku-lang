@@ -800,6 +800,14 @@ Use that relationship to decide focus, negative space, repetition, and line qual
 - wind, flow, drifting, scent → use an undulating trace or diagonal band
 - road, corridor, bridge, rail, depth → use an off-edge diagonal or edge-biased focus
 - repetition, row, thread, fence, keyboard → avoid perfect spacing; include a small gap or angle difference
+- jazz, blues, swing, backbeat, improvisation → keep the phrase as syncopated city rhythm or blue-note value; it is a rhythm/spacing signal, not a musical object
+- quilt, porch, handmade, folk → keep as quilt-like patchwork; use rotated square fragments and color rhythm
+- subway, metro, transit map, rail crossing → keep as subway-map pressure; use rotring line convergence and edge-biased focus
+- billboard, neon sign, highway, motel, parking lot → keep as billboard edge pressure; use cropped rectangles, diagonals, and high-contrast edge tension
+- prairie, plain, open road, horizon → keep as prairie horizon; use low horizontal negative-space pressure
+- coastal fog, harbor, pier, lighthouse → keep as coastal fog plane; use pale watercolor layers and blurring
+- warehouse, loft, factory, brick, fire escape → keep as warehouse grid cuts; use sparse rotated grid fragments
+- Do not read substrings as sensory words. "crescent" is an arc/moon word, not "scent"; "waits" alone is not "waiting time", "buds", or "five-sense presence".
 
 Use "center" only when explicitly requested. If unsure, choose a dynamic focus: upper right, upper left, lower right, lower left, upper edge, or right half.
 Strong solid backgrounds such as black, red, blue, or green are allowed only when the context needs them.

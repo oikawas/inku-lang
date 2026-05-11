@@ -233,6 +233,18 @@ COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("灰", "gray", "grey"), "gray"),
 )
 
+
+def _marker_in_text(marker: str, text: str, lower: str) -> bool:
+    marker_lower = marker.lower()
+    if marker.isascii() and any(ch.isalpha() for ch in marker):
+        return re.search(rf"(?<![a-z]){re.escape(marker_lower)}(?![a-z])", lower) is not None
+    return marker in text or marker_lower in lower
+
+
+def _any_marker_in_text(markers: tuple[str, ...], text: str, lower: str) -> bool:
+    return any(_marker_in_text(marker, text, lower) for marker in markers)
+
+
 NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "green": (
         "not green",
@@ -256,7 +268,7 @@ SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "leaves"), "leaf_cluster"),
+    (("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "fallen leaves", "autumn leaves", "dry leaves"), "leaf_cluster"),
     (("紙片", "破片", "折", "手紙", "paper", "fragment", "shard", "letter"), "paper_shard"),
     (("波紋", "渦", "螺旋", "巻", "ripple", "spiral", "coil"), "ripple_knot"),
     (("山", "峰", "稜線", "mountain", "ridge", "peak"), "mountain_sign"),
@@ -1053,11 +1065,51 @@ def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
 def _visual_event_instruction(
     instructions: list[Instruction],
     *,
+    ddl: str | None,
     color: str,
     background: str,
 ) -> Instruction:
+    lower = (ddl or "").lower()
+    source = ddl or ""
+    visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    if any(marker in source or marker in lower for marker in ("雨", "反射", "透明", "滲", "rain", "reflection", "transparent", "window")):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.54, 0.42],
+                "to": [0.75, 0.38],
+                "color": "blue" if background != "blue" else "white",
+                "weight": "hair",
+                "color_hint": "visual event restored as a thin reflected cut",
+            }
+        )
+    if any(
+        marker in source or marker in lower
+        for marker in ("地平", "水平", "余白", "静か", "horizon", "prairie", "open road", "negative space", "quiet")
+    ):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.60, 0.61],
+                "to": [0.71, 0.58],
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a small broken line",
+            }
+        )
+    if any(marker in source or marker in lower for marker in ("光", "灯", "月", "light", "moon", "neon", "sign")):
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.64, 0.28],
+                "size": [0.11, 0.065],
+                "rotation": -18,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a small light plane",
+            }
+        )
     if not _has_angular_event_anchor(instructions):
-        visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
         return Instruction.model_validate(
             {
                 "primitive": "polygon",
@@ -1098,8 +1150,38 @@ def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, back
 
     requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
     color = requested[0] if requested else ("blue" if background != "blue" else VISIBLE_ON_BACKGROUND.get(background, "black"))
-    accent = _visual_event_instruction(instructions, color=color, background=background)
+    accent = _visual_event_instruction(instructions, ddl=ddl, color=color, background=background)
     return [*instructions, accent]
+
+
+def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+    if not ddl or "crescent" not in ddl.lower():
+        return instructions
+
+    adjusted: list[Instruction] = []
+    for ins in instructions:
+        hint = (ins.color_hint or "").lower()
+        if "five-sense" in hint or "scent layer" in hint:
+            continue
+        if "crescent" in hint and "sensory layer" in hint and ins.color == "green":
+            data = ins.model_dump(by_alias=True)
+            data["color"] = "blue" if background != "blue" else "white"
+            if isinstance(data.get("color_hint"), str):
+                data["color_hint"] = (
+                    data["color_hint"]
+                    .replace("white sensory layer made visible as pale green", "crescent white layer kept abstract")
+                    .replace("pale green", "pale blue")
+                )
+            arrangement = data.get("arrangement")
+            if isinstance(arrangement, dict):
+                arrangement["color_cycle"] = [
+                    item for item in (arrangement.get("color_cycle") or []) if item != "green"
+                ]
+            _append_hint(data, "crescent sensory color suppressed")
+            adjusted.append(Instruction.model_validate(data))
+            continue
+        adjusted.append(ins)
+    return adjusted or instructions
 
 
 def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
@@ -1598,7 +1680,7 @@ def _requested_colors_from_ddl(ddl: str | None) -> set[str]:
     lower = ddl.lower()
     colors: set[str] = set()
     for markers, color in COLOR_MARKERS:
-        if any(marker.lower() in lower or marker in ddl for marker in markers):
+        if _any_marker_in_text(markers, ddl, lower):
             colors.add(color)
     return colors - _negated_colors_from_text(ddl)
 
@@ -1610,7 +1692,7 @@ def _negated_colors_from_text(text: str | None) -> set[str]:
     return {
         color
         for color, markers in NEGATED_COLOR_MARKERS.items()
-        if any(marker.lower() in lower or marker in text for marker in markers)
+        if _any_marker_in_text(markers, text, lower)
     }
 
 
@@ -2153,7 +2235,7 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
         clause
         for clause in clauses
         if not (clause.startswith("背景") or clause.lower().startswith("background"))
-        and any(marker in clause for marker in markers)
+        and _any_marker_in_text(markers, clause, clause.lower())
     ]
 
 
@@ -2230,13 +2312,13 @@ def _is_fading_clause(clause: str) -> bool:
 
 def _sensory_kind(clause: str) -> str | None:
     lower = clause.lower()
-    if any(marker in clause or marker in lower for marker in ("光", "陽光", "日差し", "柔ら", "light", "sunlight", "soft")):
+    if _any_marker_in_text(("光", "陽光", "日差し", "柔ら", "light", "sunlight", "soft"), clause, lower):
         return "light"
-    if any(marker in clause or marker in lower for marker in ("香", "匂", "沈丁花", "scent", "fragrance")):
+    if _any_marker_in_text(("香", "匂", "沈丁花", "scent", "fragrance"), clause, lower):
         return "scent"
-    if any(marker in clause or marker in lower for marker in ("蕾", "つぼみ", "開花", "bud", "bloom")):
+    if _any_marker_in_text(("蕾", "つぼみ", "開花", "bud", "bloom"), clause, lower):
         return "bud"
-    if any(marker in clause or marker in lower for marker in ("五感", "気配", "訪れ", "sense", "presence", "arrival")):
+    if _any_marker_in_text(("五感", "気配", "訪れ", "sense", "presence", "arrival"), clause, lower):
         return "sense"
     return None
 
@@ -2761,6 +2843,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_rhythm_variation(instructions, ddl=ddl)
     instructions = _with_repetition_event_variation(instructions, ddl=ddl)
     instructions = _with_visual_event(instructions, ddl=ddl, background=background)
+    instructions = _with_crescent_sensory_suppression(instructions, ddl=ddl, background=background)
     instructions = _with_ma_pressure(instructions, ddl=ddl)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)

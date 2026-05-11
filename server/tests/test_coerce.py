@@ -1502,7 +1502,7 @@ def test_coerce_score_adds_visual_event_for_quiet_reflection_context():
 
     fixed = coerce_score(score, ddl="雨上がりの路地で、濡れた石畳が夕焼けを細く映している。")
 
-    assert any("visual event restored as a small focal pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event restored as a thin reflected cut" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_adds_visual_event_for_vanishing_footprint_context():
@@ -1528,6 +1528,65 @@ def test_coerce_score_adds_visual_event_for_vanishing_footprint_context():
 
     assert any(ins.primitive == "polygon" for ins in fixed.instructions)
     assert any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_does_not_read_english_verb_leaves_as_leaf_motif():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.5],
+                    "to": [0.75, 0.5],
+                    "color": "blue",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Rain on a bus-stop window leaves transparent reflections.")
+
+    assert not any("leaf_cluster motif restored from DDL intent" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event restored as a thin reflected cut" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_does_not_read_crescent_as_scent_or_green():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.55, 0.45],
+                    "radius": 0.12,
+                    "angle_start": 30,
+                    "angle_end": 260,
+                    "color": "white",
+                    "color_hint": "crescent; white sensory layer made visible as pale green",
+                    "arrangement": {"count": 1, "color_cycle": ["green", "white"]},
+                },
+                {
+                    "primitive": "ellipse",
+                    "center": [0.72, 0.28],
+                    "size": [0.3, 0.3],
+                    "color": "blue",
+                    "color_hint": "five-sense presence; white sensory layer made visible as pale blue",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="Fill background with black. Place a white crescent arc in the upper right. "
+        "Layer two pale white watercolor ellipses in the upper right as five-sense presence.",
+    )
+
+    hints = " ".join(ins.color_hint or "" for ins in fixed.instructions)
+    colors = {ins.color for ins in fixed.instructions}
+    assert "scent layer" not in hints
+    assert "five-sense presence" not in hints
+    assert "green" not in colors
+    assert all("green" not in (ins.arrangement.color_cycle if ins.arrangement else []) for ins in fixed.instructions)
 
 
 def test_coerce_score_keeps_visual_event_as_arc_when_angular_anchor_exists():

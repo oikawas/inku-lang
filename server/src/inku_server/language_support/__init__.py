@@ -1,6 +1,6 @@
-"""Compatibility exports for instruction-language support."""
+"""Per-language drawing-core support modules."""
 
-from .language_support import (
+from .registry import (
     INSTRUCTION_LANGUAGE_REGISTRY,
     REQUESTED_INSTRUCTION_LANGS,
     SUPPORTED_INSTRUCTION_LANGS,

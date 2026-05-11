@@ -475,6 +475,7 @@ SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = (
 )
 HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = (
     "工場", "鉄骨", "錆", "錆び", "空を細かく分け", "factory", "steel frame", "rust", "girder",
+    "warehouse", "grid", "cut", "cuts", "brick",
 )
 PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = (
     "自転車", "坂道", "花びら", "色紙", "風鈴", "bicycle", "slope", "petal", "colored paper", "wind chime",
@@ -1297,7 +1298,7 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
                 "rotation": 18,
                 "color": "gray" if background != "gray" else visible,
                 "weight": "brush_thin",
-                "color_hint": "hard edge energy restored with polygonal rust/steel fragments",
+                "color_hint": "hard edge visual event restored with polygonal rust/steel fragments",
                 "arrangement": {
                     "count": 5,
                     "layout": "scatter",

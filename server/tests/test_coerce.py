@@ -1118,7 +1118,10 @@ def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touch
     assert any("silence/layer energy restored" in (ins.color_hint or "") for ins in corridor.instructions)
 
     factory = coerce_score(base, ddl="静かな工場跡で、錆びた鉄骨が空を細かく分けている。")
-    assert any(ins.primitive == "polygon" and "hard edge energy restored" in (ins.color_hint or "") for ins in factory.instructions)
+    assert any(ins.primitive == "polygon" and "hard edge visual event restored" in (ins.color_hint or "") for ins in factory.instructions)
+
+    warehouse = coerce_score(base, ddl="Warehouse grid cuts hold dust and late afternoon shadow.")
+    assert any(ins.primitive == "polygon" and "hard edge visual event restored" in (ins.color_hint or "") for ins in warehouse.instructions)
 
     bicycle = coerce_score(base, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
     assert any("playful motion energy restored as a small moving color cluster" in (ins.color_hint or "") for ins in bicycle.instructions)

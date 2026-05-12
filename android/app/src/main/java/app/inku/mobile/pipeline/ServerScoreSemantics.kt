@@ -31,8 +31,11 @@ internal object ServerScoreSemantics {
         return contextHasMarker(
             ddl,
             listOf(
-                "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "風", "波", "ためらう",
+                "渡る", "揺", "流れ", "消え", "ほどけ", "伸び", "回", "丸ま", "帰って", "先に帰", "風", "波", "ためらう",
+                "低い雲", "押し沈", "影だけ", "滲", "涙", "震える", "一滴", "残る",
                 "moving", "sway", "flow", "fade", "dissolve", "stretch", "turn", "wind", "wave",
+                "goes home first", "returns first", "low cloud", "pressing down", "shadow only", "blur", "tear",
+                "trembling", "single drop", "remain", "remains",
             ),
         )
     }
@@ -42,6 +45,42 @@ internal object ServerScoreSemantics {
             ddl,
             listOf("祭", "色紙", "果実", "ネオン", "夕焼け", "赤", "青", "緑", "色とりどり", "多色", "festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color"),
         )
+    }
+
+    fun contextHasNeonBlurDensity(ddl: String): Boolean {
+        val sceneMarkers = listOf("夜", "ガラス", "ネオン", "night", "glass", "neon")
+        val blurMarkers = listOf("涙", "滲", "にじ", "blur", "tear")
+        return contextHasMarker(ddl, sceneMarkers) && contextHasMarker(ddl, blurMarkers)
+    }
+
+    fun contextHasRhythm(ddl: String): Boolean {
+        return contextHasMarker(
+            ddl,
+            listOf("リズム", "踊", "跳ね", "弾む", "反復", "交互", "楽しい", "楽しさ", "喜び", "祝祭", "明快", "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration"),
+        )
+    }
+
+    fun contextHasVisualEvent(ddl: String): Boolean {
+        return contextHasMarker(
+            ddl,
+            listOf(
+                "衝突", "反転", "集中", "破裂", "弾け", "核", "一点", "転がる", "抜ける", "迷う", "消えかけ", "震える", "一滴", "先に帰", "丸ま",
+                "低い雲", "押し沈", "影だけ", "滲", "涙", "白い息", "映", "反射", "灯台", "光だけ", "足跡", "輪郭", "ほどけ", "花びら", "ためらう",
+                "collision", "burst", "focus", "turning point", "pop", "release", "wandering", "fading", "trembling", "single drop", "goes home first",
+                "curling", "low cloud", "pressing down", "shadow only", "blur", "tear", "breath", "reflect", "reflection", "lighthouse", "only light", "footprint", "outline", "unravel", "petal",
+            ),
+        )
+    }
+
+    fun contextHasMaPressure(ddl: String): Boolean {
+        return contextHasMarker(
+            ddl,
+            listOf("余白", "間", "空白", "気配", "押す", "避け", "離れ", "紙", "新聞", "手紙", "紙片", "風", "交差", "迷う", "漂う", "negative space", "ma", "empty space", "presence", "pull", "push", "avoid", "paper", "newspaper", "letter", "sheet", "wind", "crossing", "wander", "drift"),
+        )
+    }
+
+    fun contextHasSurfaceTension(ddl: String): Boolean {
+        return contextHasMarker(ddl, listOf("布", "果実", "重", "影", "沈む", "沈め", "cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink"))
     }
 
     fun closedShapeArea(item: JSONObject): Double {
@@ -221,7 +260,7 @@ internal object ServerScoreSemantics {
         ).any { it in text || it in lower }
         return when {
             (text.contains("白") || lower.contains("white")) && background != "white" -> "white"
-            (text.contains("青") || lower.contains("blue")) && background != "blue" -> "blue"
+            (listOf("青", "空", "水", "湖", "海", "雨", "冷たい").any { it in text } || listOf("blue", "sky", "water", "lake", "sea", "rain", "cold").any { it in lower }) && background != "blue" -> "blue"
             (text.contains("赤") || lower.contains("red")) && background != "red" -> "red"
             !negatedGreen && (text.contains("緑") || lower.contains("green")) && background != "green" -> "green"
             listOf("森", "forest", "leaf", "草", "grass", "苔", "moss", "竹", "bamboo", "庭", "garden", "香り", "scent", "fragrance", "芽", "落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈")

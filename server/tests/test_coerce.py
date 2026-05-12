@@ -2133,6 +2133,26 @@ def test_coerce_score_restores_english_chain_reaction_event():
     assert event.arrangement.rhythm_spacing == "syncopated"
 
 
+def test_coerce_score_adds_japanese_rusty_door_reaction():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.42, 0.42],
+                    "size": [0.10, 0.12],
+                    "color": "gray",
+                    "color_hint": "錆びた扉",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="港の倉庫で、錆びた扉が開く音だけが広い空間を測っていた。")
+
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_restores_tilted_room_drop_event():
     score = Score.model_validate(
         {

@@ -925,6 +925,136 @@ def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
     )
 
 
+VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "sound_in_space": (
+        ("音", "響", "きし", "鳴", "sound", "sounds", "echo", "creak", "chime", "rang", "ring"),
+        ("空間", "奥行", "広が", "測", "示", "倉庫", "部屋", "space", "depth", "wide", "measure", "measured", "showed", "warehouse", "room"),
+    ),
+    "vanishing_outline": (
+        ("消え", "現れ", "現れて", "戻", "霧", "霞", "輪郭", "outline", "appeared", "disappeared", "dissolved", "returned", "fog", "mist"),
+        ("輪郭", "影", "友人", "人影", "先", "outline", "figure", "friend", "ahead", "trace"),
+    ),
+    "inherited_memory": (
+        ("祖母", "父", "祖父", "父の父", "grandmother", "father", "grandfather"),
+        ("植え", "今も", "そうして", "昨日", "記憶", "planted", "still stands", "did", "yesterday", "memory"),
+    ),
+    "temporal_chain": (
+        ("順に", "一斉", "先に", "その後", "あとで", "また", "before", "after", "in order", "again and again", "at once"),
+        ("揺", "渡り", "動", "猫", "窓", "笛", "whistle", "moving", "moved", "crossed", "cat", "laundry", "window"),
+    ),
+}
+
+
+def _detect_visual_event_type(ddl: str | None) -> str | None:
+    if not ddl:
+        return None
+    lower = ddl.lower()
+    for event_type, evidence_groups in VISUAL_EVENT_TYPE_MARKERS.items():
+        if all(_any_marker_in_text(group, ddl, lower) for group in evidence_groups):
+            return event_type
+    return None
+
+
+def _visual_event_recipe(
+    event_type: str,
+    *,
+    color: str,
+    background: str,
+) -> Instruction | None:
+    visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    if event_type == "sound_in_space":
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.63, 0.40],
+                "radius": 0.066,
+                "angle_start": 18,
+                "angle_end": 214,
+                "rotation": -20,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type sound_in_space restored as a spatial echo",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if event_type == "vanishing_outline":
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.36, 0.54],
+                "to": [0.70, 0.38],
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type vanishing_outline restored as a fading contour",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.26,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if event_type == "inherited_memory":
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.56, 0.45],
+                "radius": 0.092,
+                "angle_start": 24,
+                "angle_end": 232,
+                "rotation": 15,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type inherited_memory restored as a three-part memory sequence",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if event_type == "temporal_chain":
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.36, 0.52],
+                "to": [0.72, 0.39],
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type temporal_chain restored as an ordered reaction path",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    return None
+
+
 def _visual_event_instruction(
     instructions: list[Instruction],
     *,
@@ -935,6 +1065,11 @@ def _visual_event_instruction(
     lower = (ddl or "").lower()
     source = ddl or ""
     visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    event_type = _detect_visual_event_type(ddl)
+    if event_type is not None:
+        event = _visual_event_recipe(event_type, color=color, background=background)
+        if event is not None:
+            return event
     if _any_marker_in_text(("同じ新聞", "手を伸ば", "分け合", "一言も交わさず"), source, lower):
         return Instruction.model_validate(
             {
@@ -1243,7 +1378,8 @@ def _visual_event_instruction(
 
 def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
     """抽象画としての見せ場を、既存語彙に足りない形で小さく補う。"""
-    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS):
+    event_type = _detect_visual_event_type(ddl)
+    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS) and event_type is None:
         return instructions
     if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
         return instructions
@@ -1256,6 +1392,28 @@ def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, back
     color = requested[0] if requested else ("blue" if background != "blue" else VISIBLE_ON_BACKGROUND.get(background, "black"))
     accent = _visual_event_instruction(instructions, ddl=ddl, color=color, background=background)
     return [*instructions, accent]
+
+
+def _with_visual_event_type_hints(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    event_type = _detect_visual_event_type(ddl)
+    if event_type is None:
+        return instructions
+    if any(event_type in (ins.color_hint or "") for ins in instructions):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    applied = False
+    note = f"visual event type {event_type} detected through abstract event evidence"
+    for ins in instructions:
+        data = ins.model_dump(by_alias=True)
+        hint = data.get("color_hint") or ""
+        if not applied and _has_focal_event_hint(ins):
+            data["color_hint"] = f"{hint}; {note}" if hint else note
+            applied = True
+        adjusted.append(Instruction.model_validate(data))
+    if applied:
+        return adjusted
+    return instructions
 
 
 def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
@@ -3118,6 +3276,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_crescent_sensory_suppression(instructions, ddl=ddl, background=background)
     instructions = _with_ma_pressure(instructions, ddl=ddl)
     instructions = _with_semantic_visual_event_hints(instructions, ddl=ddl)
+    instructions = _with_visual_event_type_hints(instructions, ddl=ddl)
     instructions = _with_focal_event_floor(instructions, ddl=ddl, background=background)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)

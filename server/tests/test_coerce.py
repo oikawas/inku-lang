@@ -2100,7 +2100,7 @@ def test_coerce_score_restores_inherited_bow_sequence():
 
     fixed = coerce_score(score, ddl="メコン川の漁師は毎朝、川に向かって礼をする。父もそうしていた。父の父もそうしていた。")
 
-    event = next(ins for ins in fixed.instructions if "inherited bow sequence" in (ins.color_hint or ""))
+    event = next(ins for ins in fixed.instructions if "inherited_memory" in (ins.color_hint or ""))
     assert event.primitive == "arc"
     assert event.arrangement is not None
     assert event.arrangement.count == 3
@@ -2150,7 +2150,104 @@ def test_coerce_score_adds_japanese_rusty_door_reaction():
 
     fixed = coerce_score(score, ddl="港の倉庫で、錆びた扉が開く音だけが広い空間を測っていた。")
 
+    assert any("sound_in_space" in (ins.color_hint or "") for ins in fixed.instructions)
     assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_detects_japanese_sound_in_space_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.34, 0.50],
+                    "to": [0.62, 0.42],
+                    "color": "gray",
+                    "color_hint": "古い扉",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="古い扉のきしみが、倉庫の奥行きを静かに示した。")
+
+    event = next(ins for ins in fixed.instructions if "sound_in_space" in (ins.color_hint or ""))
+    assert event.arrangement is not None
+    assert event.arrangement.preserve_space is True
+    assert event.arrangement.path == "wave"
+
+
+def test_coerce_score_detects_english_inherited_memory_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.50, 0.50],
+                    "radius": 0.05,
+                    "color": "green",
+                    "color_hint": "old tree",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="An old woman sold fruit from a tree her grandmother had planted; it still held the market's shade.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "inherited_memory" in (ins.color_hint or ""))
+    assert event.arrangement is not None
+    assert event.arrangement.count == 3
+    assert event.arrangement.preserve_space is True
+
+
+def test_coerce_score_detects_english_vanishing_outline_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.50, 0.50],
+                    "size": [0.08, 0.03],
+                    "color": "gray",
+                    "color_hint": "fog",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A figure ahead dissolved into fog, returned, and dissolved again.")
+
+    event = next(ins for ins in fixed.instructions if "vanishing_outline" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.arrangement is not None
+    assert event.arrangement.fade == "outward"
+
+
+def test_coerce_score_detects_japanese_temporal_chain_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.50, 0.50],
+                    "radius": 0.05,
+                    "color": "black",
+                    "color_hint": "笛の短い音",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="笛の短い音が路地を渡り、猫、洗濯物、開いた窓の順に揺れた。")
+
+    event = next(ins for ins in fixed.instructions if "temporal_chain" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.arrangement is not None
+    assert event.arrangement.count == 3
+    assert event.arrangement.rhythm_spacing == "syncopated"
 
 
 def test_coerce_score_restores_tilted_room_drop_event():

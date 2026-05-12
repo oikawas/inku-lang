@@ -1450,7 +1450,7 @@ def _adjacent_reaction_instruction(
             "rotation": -18,
             "color": color,
             "weight": "hair",
-            "color_hint": "adjacent reaction added to hold focal event",
+            "color_hint": "visual event adjacent reaction added to hold focal event",
             "arrangement": {
                 "count": 2,
                 "layout": "scatter",

@@ -2008,7 +2008,7 @@ def test_coerce_score_adds_visible_japanese_focal_event_and_reaction():
     fixed = coerce_score(score, ddl="大きな美術館の白い部屋で、小さな赤い点だけが見る人の足を止めた。")
 
     assert any("visual event restored" in (ins.color_hint or "") for ins in fixed.instructions)
-    assert any("adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_keeps_english_action_residue_visible():
@@ -2035,7 +2035,7 @@ def test_coerce_score_keeps_english_action_residue_visible():
     assert abs(bow.to[0] - bow.from_[0]) >= 0.14
     assert "visual event preserved as action residue" in (bow.color_hint or "")
     assert "focal event visibility floor applied" in (bow.color_hint or "")
-    assert any("adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_turns_english_repetition_time_into_focal_event():
@@ -2056,7 +2056,7 @@ def test_coerce_score_turns_english_repetition_time_into_focal_event():
     fixed = coerce_score(score, ddl="In a thawing stream, small sounds were born under the stones and vanished again and again.")
 
     assert any("visual event restored" in (ins.color_hint or "") for ins in fixed.instructions)
-    assert any("adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_restores_pre_bell_light_hinge():

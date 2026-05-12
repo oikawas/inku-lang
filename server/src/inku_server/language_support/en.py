@@ -74,6 +74,7 @@ COERCE_MARKERS = {
         "wake", "rose", "raised", "appeared", "disappeared", "returned", "shifted",
         "whistle", "whistled", "dog moved", "flock moved", "listen", "tilted", "lit up", "bell",
         "moved his feet", "under the table", "father did", "father's father", "line of birds",
+        "grandmother", "planted", "mango", "tree still stands",
     ),
     "colorful": ("festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color"),
     "leaf_grain": ("leaf", "autumn forest", "fallen leaves", "autumn leaves", "dry leaves"),
@@ -105,6 +106,7 @@ COERCE_MARKERS = {
         "appeared", "disappeared", "returned", "slightly changed", "whistle", "whistled", "dog moved",
         "flock moved", "listen", "drop", "tatami", "tilted", "whole room", "departure board", "lit up", "bell",
         "moved his feet", "under the table", "father did", "father's father", "line of birds",
+        "grandmother", "planted", "mango", "tree still stands",
     ),
     "ma_pressure": (
         "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",

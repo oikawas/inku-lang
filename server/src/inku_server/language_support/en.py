@@ -73,6 +73,7 @@ COERCE_MARKERS = {
         "before", "after", "again and again", "as if", "at once", "bow", "bows", "sound", "sounds",
         "wake", "rose", "raised", "appeared", "disappeared", "returned", "shifted",
         "whistle", "whistled", "dog moved", "flock moved", "listen", "tilted", "lit up", "bell",
+        "moved his feet", "under the table", "father did", "father's father", "line of birds",
     ),
     "colorful": ("festival", "colored paper", "fruit", "neon", "sunset", "colorful", "multi-color"),
     "leaf_grain": ("leaf", "autumn forest", "fallen leaves", "autumn leaves", "dry leaves"),
@@ -86,7 +87,7 @@ COERCE_MARKERS = {
     "strong_edge_light": ("lighthouse", "only light", "cutting light", "single beam"),
     "vanishing_trace": ("breath", "footprint", "fade", "fading", "dissolve", "outline", "memory", "trace", "far"),
     "rhythm": (
-        "rhythm", "dance", "bounce", "alternating", "playful", "joy", "celebration",
+        "rhythm", "dance", "dancers", "moved his feet", "under the table", "bounce", "alternating", "playful", "joy", "celebration",
         "quilt", "patchwork", "handmade", "folk",
     ),
     "visual_event": (
@@ -103,6 +104,7 @@ COERCE_MARKERS = {
         "wake", "cloth", "applause", "rose", "river surface", "another road", "same beat", "shifted",
         "appeared", "disappeared", "returned", "slightly changed", "whistle", "whistled", "dog moved",
         "flock moved", "listen", "drop", "tatami", "tilted", "whole room", "departure board", "lit up", "bell",
+        "moved his feet", "under the table", "father did", "father's father", "line of birds",
     ),
     "ma_pressure": (
         "negative space", "ma", "empty space", "presence", "pull", "push", "avoid",
@@ -111,7 +113,7 @@ COERCE_MARKERS = {
         "jazz", "syncopated", "blue-note", "city corner",
         "dark pause", "pause", "transparent", "reflections", "sparse", "dust", "chalk",
         "before", "after", "again and again", "as if", "at once", "bow", "sounds", "wake", "cloth",
-        "river surface", "another road", "whistle", "flock", "tatami", "whole room",
+        "river surface", "another road", "whistle", "flock", "tatami", "whole room", "under the table",
     ),
     "semantic_visual_event_hints": (
         (("open road", "upper-right focus"), "visual event preserved as a road-pull focus accent"),
@@ -127,6 +129,9 @@ COERCE_MARKERS = {
         (("whistled", "dog moved", "flock moved", "listen"), "visual event preserved as chain reaction"),
         (("drop", "tatami", "tilted", "whole room"), "visual event preserved as tilted-room drop"),
         (("departure board", "lit up", "bell"), "visual event preserved as pre-bell light hinge"),
+        (("festival", "dancers", "moved his feet", "under the table"), "visual event preserved as hidden foot rhythm"),
+        (("bows", "father did", "father's father", "each morning"), "visual event preserved as three-generation bow sequence"),
+        (("line of birds", "river surface", "another road"), "visual event preserved as doubled river road"),
     ),
     "surface_tension": ("cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink"),
     "intentional_large_surface": ("large", "huge", "wide", "broad surface", "cloth", "fabric"),

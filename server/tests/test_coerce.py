@@ -2160,6 +2160,130 @@ def test_coerce_score_restores_tilted_room_drop_event():
     assert event.arrangement.path == "wave"
 
 
+def test_coerce_score_restores_shared_newspaper_hinge():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="リスボンのカフェで、見知らぬ二人が同じ新聞に手を伸ばした。二人は一言も交わさず、それを分け合った。")
+
+    event = next(ins for ins in fixed.instructions if "shared newspaper hinge" in (ins.color_hint or ""))
+    assert event.primitive == "square"
+    assert event.size is not None
+    assert event.size[0] >= 0.18
+    assert event.arrangement is not None
+    assert event.arrangement.count == 2
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_restores_diagonal_afternoon_light():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.40, 0.55],
+                    "size": [0.10, 0.05],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="古い図書館の高い窓から、午後の光が誰も読まない本へ斜めに落ちた。")
+
+    event = next(ins for ins in fixed.instructions if "diagonal afternoon light" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.from_ is not None
+    assert event.to is not None
+    assert event.to[0] > event.from_[0]
+    assert event.to[1] > event.from_[1]
+    assert event.arrangement is not None
+    assert event.arrangement.preserve_space is True
+
+
+def test_coerce_score_restores_hidden_english_foot_rhythm():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="At a festival in Rajasthan, an old man watched the dancers and quietly moved his feet under the table.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "hidden foot rhythm" in (ins.color_hint or ""))
+    assert event.primitive == "arc"
+    assert event.arrangement is not None
+    assert event.arrangement.count == 3
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_restores_doubled_river_road():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.20, 0.50],
+                    "to": [0.80, 0.50],
+                    "color": "blue",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="On an evening bridge, a line of birds returning home made another road on the river surface.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "doubled river road" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.arrangement is not None
+    assert event.arrangement.count == 2
+    assert event.arrangement.path == "diagonal"
+
+
+def test_coerce_score_marks_shared_footstep_beat_as_visual_event():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "gray",
+                    "color_hint": "急ぐ人々の靴音",
+                    "arrangement": {"count": 4, "layout": "scatter"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="地下鉄の階段で、急ぐ人々の靴音が一瞬だけ同じ拍子になった。")
+
+    assert any("visual event preserved as shared footstep beat" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_does_not_add_edge_light_when_presence_handles_gaze():
     score = Score.model_validate(
         {

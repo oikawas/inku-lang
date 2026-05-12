@@ -935,6 +935,94 @@ def _visual_event_instruction(
     lower = (ddl or "").lower()
     source = ddl or ""
     visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    if _any_marker_in_text(("同じ新聞", "手を伸ば", "分け合", "一言も交わさず"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.45, 0.45],
+                "size": [0.18, 0.055],
+                "rotation": -8,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a shared newspaper hinge",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "left_to_right",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if _any_marker_in_text(("高い窓", "午後の光", "読まない本", "斜めに落ち"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.33, 0.24],
+                "to": [0.68, 0.63],
+                "color": "white" if background != "white" else visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as diagonal afternoon light",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.26,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if _any_marker_in_text(("festival", "dancers", "moved his feet", "under the table"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.55, 0.63],
+                "radius": 0.075,
+                "angle_start": 205,
+                "angle_end": 342,
+                "rotation": 10,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as hidden foot rhythm",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "margin": 0.25,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if _any_marker_in_text(("line of birds", "river surface", "another road", "鳥の列", "川面", "もう一つの道"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.30, 0.43],
+                "to": [0.74, 0.56],
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as doubled river road",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.25,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
     if _any_marker_in_text(("発車ベル", "案内板", "明るくな", "departure board", "lit up", "bell"), source, lower):
         return Instruction.model_validate(
             {
@@ -956,15 +1044,15 @@ def _visual_event_instruction(
                 },
             }
         )
-    if _any_marker_in_text(("礼をする", "父も", "父の父", "毎朝", "bow", "bows", "each morning"), source, lower):
+    if _any_marker_in_text(("礼をする", "父も", "父の父", "毎朝", "bow", "bows", "father did", "father's father", "each morning"), source, lower):
         return Instruction.model_validate(
             {
                 "primitive": "arc",
-                "center": [0.58, 0.46],
-                "radius": 0.082,
-                "angle_start": 28,
-                "angle_end": 218,
-                "rotation": 18,
+                "center": [0.56, 0.45],
+                "radius": 0.096,
+                "angle_start": 24,
+                "angle_end": 232,
+                "rotation": 15,
                 "color": visible,
                 "weight": "hair",
                 "color_hint": "visual event restored as an inherited bow sequence",

@@ -156,10 +156,11 @@ class DefaultSvgRenderer : SvgRenderer {
             arr.optDouble("margin", 0.1).coerceIn(0.0, 0.45)
         }
         val clusterCount = arr.optInt("cluster_count", 0)
+        val rhythmSpacing = arr.optString("rhythm_spacing", "none")
         val base = prepared
         val seed = seedForInstruction(ins)
         return (0 until count).map { i ->
-            val t = if (count <= 1) 0.5 else i.toDouble() / (count - 1).toDouble()
+            val t = rhythmT(i, count, seed, rhythmSpacing)
             val target = if (clusterCount > 0 && layout in setOf("scatter", "horizontal", "vertical")) {
                 clusteredPosition(
                     i = i,
@@ -170,9 +171,10 @@ class DefaultSvgRenderer : SvgRenderer {
                     density = arr.optString("density", "none"),
                     preserveSpace = preserveSpace,
                     seed = seed,
+                    rhythmSpacing = rhythmSpacing,
                 )
             } else if (path != "none") {
-                pathPosition(i, count, margin, path, seed)
+                pathPosition(i, count, margin, path, seed, rhythmSpacing)
             } else {
                 when (layout) {
                     "vertical" -> margin to (margin + t * (1.0 - margin * 2.0))
@@ -181,7 +183,7 @@ class DefaultSvgRenderer : SvgRenderer {
                         val center = arr.optJSONArray("center")
                         val cx = center?.optDouble(0, 0.5) ?: 0.5
                         val cy = center?.optDouble(1, 0.5) ?: 0.5
-                        val a = Math.toRadians(i * 360.0 / count)
+                        val a = Math.toRadians(t * 360.0)
                         (cx + cos(a) * arr.optDouble("radius", 0.3)) to (cy - sin(a) * arr.optDouble("radius", 0.3))
                     }
                     else -> (margin + t * (1.0 - margin * 2.0)) to 0.5
@@ -290,9 +292,26 @@ class DefaultSvgRenderer : SvgRenderer {
         return (margin + xv * span) to (margin + yv * span)
     }
 
-    private fun pathPosition(i: Int, count: Int, margin: Double, path: String, seed: String): Pair<Double, Double> {
+    private fun rhythmT(i: Int, count: Int, seed: String, rhythmSpacing: String): Double {
+        if (count <= 1) return 0.5
+        val base = i.toDouble() / (count - 1).toDouble()
+        return when (rhythmSpacing) {
+            "syncopated" -> {
+                val pulse = if (i % 2 == 0) -0.055 else 0.085
+                clamp01(base + pulse * sin(base * Math.PI))
+            }
+            "accelerando" -> base * base
+            "loose" -> {
+                val jitter = (hash01(i, seed, "rhythm-loose") - 0.5) * 0.12 / maxOf(count / 8.0, 1.0)
+                clamp01(base + jitter)
+            }
+            else -> base
+        }
+    }
+
+    private fun pathPosition(i: Int, count: Int, margin: Double, path: String, seed: String, rhythmSpacing: String = "none"): Pair<Double, Double> {
         val span = 1.0 - 2.0 * margin
-        val t = if (count <= 1) 0.5 else i.toDouble() / (count - 1).toDouble()
+        val t = rhythmT(i, count, seed, rhythmSpacing)
         val jitterA = hash01(i, seed, "a") - 0.5
         val jitterB = hash01(i, seed, "b") - 0.5
         return when (path) {
@@ -313,7 +332,17 @@ class DefaultSvgRenderer : SvgRenderer {
         }
     }
 
-    private fun clusteredPosition(i: Int, count: Int, clusterCount: Int, path: String, margin: Double, density: String, preserveSpace: Boolean, seed: String): Pair<Double, Double> {
+    private fun clusteredPosition(
+        i: Int,
+        count: Int,
+        clusterCount: Int,
+        path: String,
+        margin: Double,
+        density: String,
+        preserveSpace: Boolean,
+        seed: String,
+        rhythmSpacing: String = "none",
+    ): Pair<Double, Double> {
         val nClusters = clusterCount.coerceIn(1, count)
         val clusterIndex = i % nClusters
         val localIndex = i / nClusters
@@ -322,7 +351,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val center = if (path == "none") {
             scatterPosition(clusterIndex, centerMargin, seedForCluster(seed))
         } else {
-            pathPosition(clusterIndex, nClusters, centerMargin, path, seedForCluster(seed))
+            pathPosition(clusterIndex, nClusters, centerMargin, path, seedForCluster(seed), rhythmSpacing)
         }
         val axisAngle = when (path) {
             "diagonal" -> -Math.PI / 4.0
@@ -334,7 +363,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val ty = sin(axisAngle)
         val nx = -ty
         val ny = tx
-        val localT = (localIndex + 0.5) / localTotal
+        val localT = rhythmT(localIndex, localTotal, seed, rhythmSpacing)
         val centered = (localT - 0.5) * 2.0
         val radius = densityRadius(density, preserveSpace)
         val longSpan = radius * (1.45 + hash01(clusterIndex, seed, "cluster-long") * 0.95)
@@ -708,6 +737,7 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"cluster_count\":"); append(intOrNull(arr, "cluster_count"))
             append(",\"fade\":"); append(jsonString(arr.optString("fade", "none")))
             append(",\"preserve_space\":"); append(arr.optBoolean("preserve_space", false))
+            append(",\"rhythm_spacing\":"); append(jsonString(arr.optString("rhythm_spacing", "none")))
             append("}")
         }
     }

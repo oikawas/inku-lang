@@ -28,7 +28,7 @@ internal object ServerFallbackComposer {
                 .put("radius", 0.08)
                 .put("sides", 6)
                 .put("rotation", 18)
-            text.containsAny("三角", "山", "屋根", "尖", "峰") || lower.contains("triangle") || lower.contains("mountain") -> base
+            text.containsAny("三角", "山", "尖", "峰") || lower.contains("triangle") || lower.contains("mountain") -> base
                 .put("primitive", "triangle")
                 .put("position", JSONArray(listOf(0.54, 0.22)))
                 .put("size", JSONArray(listOf(0.20, 0.18)))
@@ -112,6 +112,14 @@ internal object ServerFallbackComposer {
             text.contains("上から下") || lower.contains("top to bottom") -> arrangement.put("layout", "vertical").put("path", "top_to_bottom")
             text.contains("左から右") || lower.contains("left to right") -> arrangement.put("layout", "horizontal").put("path", "left_to_right")
             else -> arrangement.put("path", "none")
+        }
+        when {
+            text.containsAny("リズム", "踊", "跳ね", "弾む", "楽しい", "祝祭") || lower.contains("rhythm") || lower.contains("dance") || lower.contains("bounce") || lower.contains("playful") ->
+                arrangement.put("rhythm_spacing", "syncopated")
+            text.containsAny("加速", "流れ") || lower.contains("accelerando") || lower.contains("flow") ->
+                arrangement.put("rhythm_spacing", "accelerando")
+            text.containsAny("ほどけ", "ゆるい", "ゆっくり") || lower.contains("unravel") || lower.contains("loose") || lower.contains("slow") ->
+                arrangement.put("rhythm_spacing", "loose")
         }
         val originalCount = arrangement.optInt("count", 1)
         when {

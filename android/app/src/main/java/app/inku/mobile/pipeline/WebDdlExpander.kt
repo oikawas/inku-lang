@@ -78,14 +78,18 @@ internal object WebDdlExpander {
         if (reframed.containsAny("弧", "円", "波", "水", "月", "中心")) {
             structural += "${contrastColor}細い弧を左下の焦点から三つ広げる。半径は0.11。"
         }
-        if (context.containsAny("山", "屋根", "尖", "針葉樹", "頂", "鋭")) {
+        val roofPressureContext = context.containsAny("低い雲", "押し沈", "屋根")
+        if (context.containsAny("山", "尖", "針葉樹", "頂", "鋭")) {
             structural += "${mainColor}細い三角を上端寄りの焦点に二つ置く。少し傾ける。"
         }
         if (context.containsAny("葉", "花びら", "羽", "紙片", "破片", "舟")) {
             structural += "${mainColor}細い右上がりの楕円を葉片として波打つ軌跡に沿って五個散らす。"
         }
-        if (context.containsAny("扉", "窓", "箱", "街", "部屋", "格子")) {
-            structural += "${contrastColor}回転した細い四角を視線の切片として右半分に三つ散らす。"
+        if (!roofPressureContext && context.containsAny("扉", "窓", "箱", "街", "部屋", "格子")) {
+            structural += "${contrastColor}回転した細い四角を余白の切片として右半分に三つ散らす。"
+        }
+        if (roofPressureContext) {
+            structural += "${contrastColor}薄い斜め線を上端から下へ三本置く。低い重さとしてゆっくり揺れる。"
         }
         if (context.containsAny("膜", "透明", "霞", "霧", "靄", "気配", "余韻")) {
             structural += "${mainColor}薄い水彩の楕円を透明な膜として右半分に三つ重ねる。境界が滲む。"

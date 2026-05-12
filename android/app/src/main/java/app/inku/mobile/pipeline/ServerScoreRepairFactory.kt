@@ -104,7 +104,7 @@ internal object ServerScoreRepairFactory {
         listOf(
             "white" to listOf("白", "white"),
             "black" to listOf("黒", "black"),
-            "blue" to listOf("青", "blue"),
+            "blue" to listOf("青", "blue", "空", "sky", "水", "water", "湖", "lake", "海", "sea", "雨", "rain", "冷たい", "cold"),
             "red" to listOf("赤", "red"),
             "green" to listOf(
                 "緑", "green", "森", "forest", "leaf", "草", "grass", "苔", "moss", "竹", "bamboo", "庭", "garden", "香り", "scent", "fragrance",
@@ -213,7 +213,7 @@ internal object ServerScoreRepairFactory {
         val shapes = linkedSetOf<String>()
         val markers = listOf(
             listOf("多角形", "五角", "六角", "結晶", "鉱物", "硬い欠片", "硬い破片", "polygon", "crystal", "mineral", "hard shard") to "polygon",
-            listOf("山", "屋根", "尖", "鋭", "三角", "峰", "頂", "稜線", "切妻", "mountain", "roof", "sharp", "peak", "ridge", "triangle") to "triangle",
+            listOf("山", "尖", "鋭", "三角", "峰", "頂", "稜線", "mountain", "sharp", "peak", "ridge", "triangle") to "triangle",
             listOf("弧", "渦", "螺旋", "波紋", "巻", "arc", "spiral", "coil", "curl", "ripple") to "arc",
             listOf("紙片", "破片", "折", "畳", "四角", "paper", "fragment", "fold", "shard", "square") to "square",
         )
@@ -246,7 +246,7 @@ internal object ServerScoreRepairFactory {
             listOf("落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈", "leaf", "leaves") to "leaf_cluster",
             listOf("紙片", "破片", "折", "手紙", "paper", "fragment", "shard", "letter") to "paper_shard",
             listOf("波紋", "渦", "螺旋", "巻", "ripple", "spiral", "coil") to "ripple_knot",
-            listOf("山", "屋根", "峰", "稜線", "切妻", "mountain", "roof", "ridge", "peak") to "mountain_sign",
+            listOf("山", "峰", "稜線", "mountain", "ridge", "peak") to "mountain_sign",
         )
         for ((terms, motif) in markers) {
             if (terms.any { it in ddl || it.lowercase() in lower }) motifs += motif

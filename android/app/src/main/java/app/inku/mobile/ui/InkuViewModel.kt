@@ -181,7 +181,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     val historyItems: StateFlow<List<HistoryListItem>> = history.stateIn(
         viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
+        SharingStarted.Eagerly,
         emptyList(),
     )
 
@@ -582,17 +582,19 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     private fun selectAdjacentHistory(offset: Int) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastHistorySwipeAt < 450L) return
-        val items = historyItems.value
-        if (items.isEmpty()) return
-        val current = localState.value.selectedHistory
-        val currentIndex = current
-            ?.let { selected -> items.indexOfFirst { it.id == selected.id } }
-            ?.takeIf { it >= 0 }
-            ?: 0
-        val nextIndex = (currentIndex + offset).coerceIn(0, items.lastIndex)
-        if (nextIndex == currentIndex) return
-        lastHistorySwipeAt = now
-        selectHistory(items[nextIndex])
+        viewModelScope.launch {
+            val items = historyItems.value.ifEmpty { history.first() }
+            if (items.isEmpty()) return@launch
+            val current = localState.value.selectedHistory
+            val currentIndex = current
+                ?.let { selected -> items.indexOfFirst { it.id == selected.id } }
+                ?.takeIf { it >= 0 }
+                ?: 0
+            val nextIndex = (currentIndex + offset).coerceIn(0, items.lastIndex)
+            if (nextIndex == currentIndex) return@launch
+            lastHistorySwipeAt = now
+            selectHistory(items[nextIndex])
+        }
     }
 
     fun draw() {

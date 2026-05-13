@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas as AndroidCanvas
 import android.net.Uri
 import android.util.LruCache
+import android.view.OrientationEventListener
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -69,6 +70,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -163,6 +165,24 @@ private val PresentationDarkBackground = Color(0xFF11100F)
 private val PresentationLightBackground = Color(0xFFF8F8F6)
 private const val HISTORY_SWIPE_MIN_DISTANCE_PX = 96f
 private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
+private val SvgViewBoxRegex = Regex("""\bviewBox\s*=\s*["']\s*[-+]?[0-9.]+\s+[-+]?[0-9.]+\s+([-+]?[0-9.]+)\s+([-+]?[0-9.]+)\s*["']""")
+private val SvgWidthRegex = Regex("""\bwidth\s*=\s*["']\s*([-+]?[0-9.]+)""")
+private val SvgHeightRegex = Regex("""\bheight\s*=\s*["']\s*([-+]?[0-9.]+)""")
+
+private enum class DeviceRotation {
+    Portrait,
+    LandscapeLeft,
+    ReversePortrait,
+    LandscapeRight,
+}
+
+private val DeviceRotation.clockwiseDegrees: Int
+    get() = when (this) {
+        DeviceRotation.Portrait -> 0
+        DeviceRotation.LandscapeLeft -> 90
+        DeviceRotation.ReversePortrait -> 180
+        DeviceRotation.LandscapeRight -> 270
+    }
 
 private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
 private data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
@@ -215,17 +235,17 @@ private object ArtworkBitmapCache {
         }
     }
 
-    suspend fun get(item: HistoryItemEntity, size: IntSize, rotateLandscape: Boolean): ImageBitmap? {
+    suspend fun get(item: HistoryItemEntity, size: IntSize, rotationDegrees: Int): ImageBitmap? {
         if (size.width <= 0 || size.height <= 0) return null
         val scale = minOf(1f, MAX_RENDER_PX.toFloat() / maxOf(size.width, size.height).toFloat())
         val width = maxOf(1, (size.width * scale).toInt())
         val height = maxOf(1, (size.height * scale).toInt())
-        val key = "${item.renderHash}:$width:$height:$rotateLandscape"
+        val key = "${item.renderHash}:$width:$height:${rotationDegrees.floorMod360()}"
         synchronized(cache) {
             cache.get(key)?.let { return it }
         }
         return withContext(Dispatchers.Default) {
-            val rendered = renderArtworkBitmap(item.displaySvg, width, height, rotateLandscape)
+            val rendered = renderArtworkBitmap(item.displaySvg, width, height, rotationDegrees)
             if (rendered != null) {
                 synchronized(cache) {
                     cache.put(key, rendered)
@@ -235,12 +255,12 @@ private object ArtworkBitmapCache {
         }
     }
 
-    private fun renderArtworkBitmap(svgText: String, width: Int, height: Int, rotateLandscape: Boolean): ImageBitmap? {
+    private fun renderArtworkBitmap(svgText: String, width: Int, height: Int, rotationDegrees: Int): ImageBitmap? {
         return runCatching {
             val parsed = SVG.getFromString(svgText)
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val native = AndroidCanvas(bitmap)
-            renderSvgIntoNativeCanvas(parsed, native, width.toFloat(), height.toFloat(), rotateLandscape)
+            renderSvgIntoNativeCanvas(parsed, native, width.toFloat(), height.toFloat(), rotationDegrees)
             bitmap.asImageBitmap()
         }.getOrNull()
     }
@@ -274,6 +294,7 @@ private val saijikiGroupColors = listOf(
 fun InkuApp() {
     val viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by viewModel.state.collectAsState()
+    val deviceRotation = rememberDeviceRotation(enabled = state.canvasPresentationMode)
 
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
@@ -293,7 +314,7 @@ fun InkuApp() {
                     .background(MaterialTheme.colorScheme.background),
             ) {
                 if (state.canvasPresentationMode) {
-                    CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize())
+                    CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize(), deviceRotation = deviceRotation)
                 } else {
                     when (state.tab) {
                         AppTab.Compose -> ComposeScreen(state, viewModel)
@@ -923,6 +944,34 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
 }
 
 @Composable
+private fun rememberDeviceRotation(enabled: Boolean): DeviceRotation {
+    val context = LocalContext.current
+    var rotation by remember { mutableStateOf(DeviceRotation.Portrait) }
+    DisposableEffect(context, enabled) {
+        if (!enabled) {
+            rotation = DeviceRotation.Portrait
+            return@DisposableEffect onDispose { }
+        }
+        val listener = object : OrientationEventListener(context.applicationContext) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                rotation = when {
+                    orientation >= 315 || orientation < 45 -> DeviceRotation.Portrait
+                    orientation < 135 -> DeviceRotation.LandscapeLeft
+                    orientation < 225 -> DeviceRotation.ReversePortrait
+                    else -> DeviceRotation.LandscapeRight
+                }
+            }
+        }
+        if (listener.canDetectOrientation()) {
+            listener.enable()
+        }
+        onDispose { listener.disable() }
+    }
+    return rotation
+}
+
+@Composable
 private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
     Surface(
         modifier = Modifier
@@ -1061,6 +1110,7 @@ private fun CanvasHeroCard(
     showControls: Boolean = true,
     maxPreviewHeight: Dp = 330.dp,
     canvasAspectOverride: String? = null,
+    deviceRotation: DeviceRotation = DeviceRotation.Portrait,
 ) {
     val item = state.selectedHistory
     val canvasAspectId = canvasAspectOverride
@@ -1075,9 +1125,12 @@ private fun CanvasHeroCard(
     var pngExporting by remember { mutableStateOf(false) }
     val presentation = state.canvasPresentationMode
     BoxWithConstraints(modifier = modifier) {
-        val ratio = canvasAspectRatio(canvasAspectId)
+        val ratio = remember(item?.id, item?.displaySvg, canvasAspectId) {
+            item?.displaySvg?.let(::svgAspectRatio) ?: canvasAspectRatio(canvasAspectId)
+        }
         val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(maxPreviewHeight)
-        val presentationRatio = if (ratio > 1f) 1f / ratio else ratio
+        val presentationArtworkRotation = presentationArtworkRotationDegrees(ratio, deviceRotation, presentation)
+        val presentationRatio = if (presentationArtworkRotation.swapsAxes()) 1f / ratio else ratio
         val presentationBoundsRatio = if (maxHeight > 0.dp) maxWidth / maxHeight else 1f
         val presentationCanvasWidth: Dp
         val presentationCanvasHeight: Dp
@@ -1164,14 +1217,15 @@ private fun CanvasHeroCard(
                                 item,
                                 presentationMode = presentation,
                                 presentationBackground = presentationBackground,
-                                rotateLandscape = presentation && ratio > 1f,
+                                rotationDegrees = presentationArtworkRotation,
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .historySwipeNavigation(
                                         enabled = presentation || state.canvasZoom <= 1.05f,
                                         gestureKey = item.id,
-                                        onSwipeRight = viewModel::selectPreviousHistory,
-                                        onSwipeLeft = viewModel::selectNextHistory,
+                                        deviceRotation = if (presentation) deviceRotation else DeviceRotation.Portrait,
+                                        onSwipeRight = if (presentation) viewModel::selectNextHistory else viewModel::selectPreviousHistory,
+                                        onSwipeLeft = if (presentation) viewModel::selectPreviousHistory else viewModel::selectNextHistory,
                                     )
                                     .then(
                                         if (presentation) {
@@ -4164,6 +4218,7 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
 private fun Modifier.historySwipeNavigation(
     enabled: Boolean,
     gestureKey: Any?,
+    deviceRotation: DeviceRotation,
     onSwipeRight: () -> Unit,
     onSwipeLeft: () -> Unit,
 ): Modifier {
@@ -4201,7 +4256,7 @@ private fun Modifier.historySwipeNavigation(
                     }
 
                     val change = active.firstOrNull { it.id == pointerId } ?: break
-                    total += change.position - change.previousPosition
+                    total += (change.position - change.previousPosition).asDeviceRelativeOffset(deviceRotation)
 
                     val horizontal = abs(total.x) >= HISTORY_SWIPE_MIN_DISTANCE_PX &&
                         abs(total.x) >= abs(total.y) * HISTORY_SWIPE_AXIS_LOCK
@@ -4233,17 +4288,36 @@ private fun Modifier.historySwipeNavigation(
     }
 }
 
+private fun Offset.asDeviceRelativeOffset(rotation: DeviceRotation): Offset {
+    return when (rotation) {
+        DeviceRotation.Portrait -> this
+        DeviceRotation.LandscapeLeft -> Offset(y, -x)
+        DeviceRotation.ReversePortrait -> Offset(-x, -y)
+        DeviceRotation.LandscapeRight -> Offset(-y, x)
+    }
+}
+
+private fun presentationArtworkRotationDegrees(aspectRatio: Float, deviceRotation: DeviceRotation, presentation: Boolean): Int {
+    if (!presentation) return 0
+    val landscapeCanvasBaseRotation = if (aspectRatio > 1f) 90 else 0
+    return (landscapeCanvasBaseRotation + deviceRotation.clockwiseDegrees).floorMod360()
+}
+
+private fun Int.floorMod360(): Int = ((this % 360) + 360) % 360
+
+private fun Int.swapsAxes(): Boolean = floorMod360() == 90 || floorMod360() == 270
+
 @Composable
 private fun ArtworkPreview(
     item: HistoryItemEntity,
     modifier: Modifier = Modifier,
     presentationMode: Boolean = false,
     presentationBackground: Color = Color.White,
-    rotateLandscape: Boolean = false,
+    rotationDegrees: Int = 0,
 ) {
     var pixelSize by remember { mutableStateOf(IntSize.Zero) }
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, pixelSize, rotateLandscape) {
-        value = ArtworkBitmapCache.get(item, pixelSize, rotateLandscape)
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, pixelSize, rotationDegrees) {
+        value = ArtworkBitmapCache.get(item, pixelSize, rotationDegrees)
     }
     Surface(color = ServerCanvasBoxColor, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         Box(
@@ -4266,10 +4340,12 @@ private fun ArtworkPreview(
     }
 }
 
-private fun renderSvgIntoNativeCanvas(parsed: SVG, native: AndroidCanvas, width: Float, height: Float, rotateLandscape: Boolean) {
+private fun renderSvgIntoNativeCanvas(parsed: SVG, native: AndroidCanvas, width: Float, height: Float, rotationDegrees: Int) {
     val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
     val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
-    val documentAspect = if (rotateLandscape) documentHeight / documentWidth else documentWidth / documentHeight
+    val rotation = rotationDegrees.floorMod360()
+    val swapsAxes = rotation.swapsAxes()
+    val documentAspect = if (swapsAxes) documentHeight / documentWidth else documentWidth / documentHeight
     val boxAspect = width / height
     val drawWidth: Float
     val drawHeight: Float
@@ -4282,20 +4358,18 @@ private fun renderSvgIntoNativeCanvas(parsed: SVG, native: AndroidCanvas, width:
     }
     val left = (width - drawWidth) / 2f
     val top = (height - drawHeight) / 2f
+    val contentWidth = if (swapsAxes) drawHeight else drawWidth
+    val contentHeight = if (swapsAxes) drawWidth else drawHeight
     native.save()
-    if (rotateLandscape) {
-        val contentWidth = drawHeight
-        val contentHeight = drawWidth
-        native.translate(width / 2f, height / 2f)
-        native.rotate(90f)
-        native.translate(-contentWidth / 2f, -contentHeight / 2f)
-        parsed.setDocumentWidth(contentWidth)
-        parsed.setDocumentHeight(contentHeight)
-    } else {
+    if (rotation == 0) {
         native.translate(left, top)
-        parsed.setDocumentWidth(drawWidth)
-        parsed.setDocumentHeight(drawHeight)
+    } else {
+        native.translate(width / 2f, height / 2f)
+        native.rotate(rotation.toFloat())
+        native.translate(-contentWidth / 2f, -contentHeight / 2f)
     }
+    parsed.setDocumentWidth(contentWidth)
+    parsed.setDocumentHeight(contentHeight)
     parsed.renderToCanvas(native)
     native.restore()
 }
@@ -4509,17 +4583,20 @@ private fun strokeWidthPx(weight: String): Float = when (weight) {
 private fun ratio(value: Double): Float = value.coerceIn(0.0, 1.0).toFloat()
 
 private fun canvasAspectRatio(id: String): Float {
-    return when (CanvasAspects.normalize(id)) {
-        "golden" -> 1.618f
-        "a4" -> 0.707f
-        "b4" -> 0.707f
-        "pillar" -> 0.5f
-        "oban" -> 0.68f
-        "wide" -> 1.777f
-        "byobu" -> 2.4f
-        "vertical" -> 0.75f
-        else -> 1f
+    return CanvasAspects.ratioFor(id).toFloat().takeIf { it > 0f } ?: 1f
+}
+
+private fun svgAspectRatio(svgText: String): Float? {
+    SvgViewBoxRegex.find(svgText)?.let { match ->
+        val width = match.groupValues.getOrNull(1)?.toFloatOrNull()
+        val height = match.groupValues.getOrNull(2)?.toFloatOrNull()
+        if (width != null && height != null && width > 0f && height > 0f) {
+            return width / height
+        }
     }
+    val width = SvgWidthRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()
+    val height = SvgHeightRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()
+    return if (width != null && height != null && width > 0f && height > 0f) width / height else null
 }
 
 private fun hash01(index: Int, seed: String): Double {

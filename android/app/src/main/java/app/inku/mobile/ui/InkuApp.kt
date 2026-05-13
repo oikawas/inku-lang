@@ -1128,6 +1128,8 @@ private fun CanvasHeroCard(
     val presentation = state.canvasPresentationMode
     val historyItems by viewModel.historyItems.collectAsState()
     BoxWithConstraints(modifier = modifier) {
+        val screenWidth = maxWidth
+        val screenHeight = maxHeight
         val ratio = remember(item?.id, item?.displaySvg, canvasAspectId) {
             item?.displaySvg?.let(::svgAspectRatio) ?: canvasAspectRatio(canvasAspectId)
         }
@@ -1287,7 +1289,7 @@ private fun CanvasHeroCard(
                         PresentationCaption(
                             text = instructionCaptionText,
                             rotation = deviceRotation,
-                            modifier = presentationCaptionPlacement(deviceRotation),
+                            modifier = presentationCaptionPlacement(deviceRotation, screenWidth, screenHeight),
                         )
                     }
                     if (presentation) {
@@ -4112,31 +4114,41 @@ private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Un
     )
 }
 
-private fun BoxScope.presentationCaptionPlacement(rotation: DeviceRotation): Modifier {
+private fun BoxScope.presentationCaptionPlacement(rotation: DeviceRotation, screenWidth: Dp, screenHeight: Dp): Modifier {
+    val captionWidth = when (rotation) {
+        DeviceRotation.Portrait,
+        DeviceRotation.ReversePortrait -> screenWidth * 0.7f
+        DeviceRotation.LandscapeLeft,
+        DeviceRotation.LandscapeRight -> screenHeight * 0.7f
+    }
     return when (rotation) {
         DeviceRotation.Portrait -> Modifier.align(Alignment.BottomCenter)
-            .padding(start = 28.dp, end = 28.dp, bottom = 82.dp)
+            .width(captionWidth)
+            .padding(bottom = 82.dp)
         DeviceRotation.ReversePortrait -> Modifier.align(Alignment.TopCenter)
-            .padding(start = 28.dp, end = 28.dp, top = 82.dp)
+            .width(captionWidth)
+            .padding(top = 82.dp)
         DeviceRotation.LandscapeLeft -> Modifier.align(Alignment.CenterStart)
-            .padding(start = 22.dp, top = 28.dp, bottom = 28.dp)
-            .widthIn(max = 360.dp)
+            .width(captionWidth)
+            .graphicsLayer {
+                rotationZ = 90f
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+            }
+            .padding(start = screenWidth * 0.15f)
         DeviceRotation.LandscapeRight -> Modifier.align(Alignment.CenterEnd)
-            .padding(end = 22.dp, top = 28.dp, bottom = 28.dp)
-            .widthIn(max = 360.dp)
+            .width(captionWidth)
+            .graphicsLayer {
+                rotationZ = 270f
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+            }
+            .padding(end = screenWidth * 0.15f)
     }
 }
 
 @Composable
 private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.graphicsLayer {
-            rotationZ = when (rotation) {
-                DeviceRotation.LandscapeLeft -> 90f
-                DeviceRotation.LandscapeRight -> 270f
-                else -> 0f
-            }
-        }.fillMaxWidth(),
+        modifier = modifier,
         shape = RoundedCornerShape(8.dp),
         color = Color(0xB8000000),
         tonalElevation = 0.dp,

@@ -4128,20 +4128,18 @@ private fun BoxScope.presentationCaptionPlacement(rotation: DeviceRotation, scre
         DeviceRotation.ReversePortrait -> Modifier.align(Alignment.TopCenter)
             .width(captionWidth)
             .padding(top = 82.dp)
-        DeviceRotation.LandscapeLeft -> Modifier.align(Alignment.CenterStart)
-            .width(captionWidth)
-            .graphicsLayer {
-                rotationZ = 90f
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-            }
-            .padding(start = screenWidth * 0.15f)
-        DeviceRotation.LandscapeRight -> Modifier.align(Alignment.CenterEnd)
+        DeviceRotation.LandscapeLeft -> Modifier.align(Alignment.Center)
             .width(captionWidth)
             .graphicsLayer {
                 rotationZ = 270f
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
             }
-            .padding(end = screenWidth * 0.15f)
+            .padding(bottom = screenWidth * 0.35f)
+        DeviceRotation.LandscapeRight -> Modifier.align(Alignment.Center)
+            .width(captionWidth)
+            .graphicsLayer {
+                rotationZ = 90f
+            }
+            .padding(bottom = screenWidth * 0.35f)
     }
 }
 

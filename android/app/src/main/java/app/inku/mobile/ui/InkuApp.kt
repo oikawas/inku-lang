@@ -4299,8 +4299,21 @@ private fun Offset.asDeviceRelativeOffset(rotation: DeviceRotation): Offset {
 
 private fun presentationArtworkRotationDegrees(aspectRatio: Float, deviceRotation: DeviceRotation, presentation: Boolean): Int {
     if (!presentation) return 0
-    val landscapeCanvasBaseRotation = if (aspectRatio > 1f) 90 else 0
-    return (landscapeCanvasBaseRotation + deviceRotation.clockwiseDegrees).floorMod360()
+    val screenIsPortrait = true
+    val artworkIsLandscape = aspectRatio > 1f
+    val mustSwapAxes = artworkIsLandscape == screenIsPortrait
+    return if (mustSwapAxes) {
+        when (deviceRotation) {
+            DeviceRotation.ReversePortrait,
+            DeviceRotation.LandscapeRight -> 270
+            else -> 90
+        }
+    } else {
+        when (deviceRotation) {
+            DeviceRotation.ReversePortrait -> 180
+            else -> 0
+        }
+    }
 }
 
 private fun Int.floorMod360(): Int = ((this % 360) + 360) % 360

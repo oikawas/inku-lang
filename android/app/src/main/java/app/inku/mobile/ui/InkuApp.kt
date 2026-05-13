@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -1285,9 +1286,8 @@ private fun CanvasHeroCard(
                     if (presentation && instructionCaptionVisible && canShowInstructionCaption) {
                         PresentationCaption(
                             text = instructionCaptionText,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(horizontal = 28.dp, vertical = 82.dp),
+                            rotation = deviceRotation,
+                            modifier = presentationCaptionPlacement(deviceRotation),
                         )
                     }
                     if (presentation) {
@@ -4112,10 +4112,31 @@ private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Un
     )
 }
 
+private fun BoxScope.presentationCaptionPlacement(rotation: DeviceRotation): Modifier {
+    return when (rotation) {
+        DeviceRotation.Portrait -> Modifier.align(Alignment.BottomCenter)
+            .padding(start = 28.dp, end = 28.dp, bottom = 82.dp)
+        DeviceRotation.ReversePortrait -> Modifier.align(Alignment.TopCenter)
+            .padding(start = 28.dp, end = 28.dp, top = 82.dp)
+        DeviceRotation.LandscapeLeft -> Modifier.align(Alignment.CenterStart)
+            .padding(start = 22.dp, top = 28.dp, bottom = 28.dp)
+            .widthIn(max = 360.dp)
+        DeviceRotation.LandscapeRight -> Modifier.align(Alignment.CenterEnd)
+            .padding(end = 22.dp, top = 28.dp, bottom = 28.dp)
+            .widthIn(max = 360.dp)
+    }
+}
+
 @Composable
-private fun PresentationCaption(text: String, modifier: Modifier = Modifier) {
+private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.graphicsLayer {
+            rotationZ = when (rotation) {
+                DeviceRotation.LandscapeLeft -> 90f
+                DeviceRotation.LandscapeRight -> 270f
+                else -> 0f
+            }
+        }.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = Color(0xB8000000),
         tonalElevation = 0.dp,

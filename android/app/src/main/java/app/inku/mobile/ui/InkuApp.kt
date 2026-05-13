@@ -82,6 +82,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -160,6 +161,8 @@ private val ServerCanvasBoxColor = Color(0xFF242321)
 private val ServerCanvasPaperColor = Color(0xFFF5F1E9)
 private val PresentationDarkBackground = Color(0xFF11100F)
 private val PresentationLightBackground = Color(0xFFF8F8F6)
+private const val HISTORY_SWIPE_MIN_DISTANCE_PX = 96f
+private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
 
 private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
 private data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
@@ -1074,6 +1077,17 @@ private fun CanvasHeroCard(
     BoxWithConstraints(modifier = modifier) {
         val ratio = canvasAspectRatio(canvasAspectId)
         val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(maxPreviewHeight)
+        val presentationRatio = if (ratio > 1f) 1f / ratio else ratio
+        val presentationBoundsRatio = if (maxHeight > 0.dp) maxWidth / maxHeight else 1f
+        val presentationCanvasWidth: Dp
+        val presentationCanvasHeight: Dp
+        if (presentationRatio >= presentationBoundsRatio) {
+            presentationCanvasWidth = maxWidth
+            presentationCanvasHeight = maxWidth / presentationRatio
+        } else {
+            presentationCanvasHeight = maxHeight
+            presentationCanvasWidth = maxHeight * presentationRatio
+        }
         val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
             if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
         }
@@ -1134,63 +1148,51 @@ private fun CanvasHeroCard(
                             )
                         },
                 ) {
-                    if (item == null) {
-                        CanvasPlaceholderPreview(modifier = Modifier.fillMaxSize())
+                    val canvasModifier = if (presentation) {
+                        Modifier
+                            .align(Alignment.Center)
+                            .width(presentationCanvasWidth)
+                            .height(presentationCanvasHeight)
                     } else {
-                        ArtworkPreview(
-                            item,
-                            presentationMode = presentation,
-                            presentationBackground = presentationBackground,
-                            rotateLandscape = presentation && ratio > 1f,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(item.id, state.canvasZoom) {
-                                    awaitPointerEventScope {
-                                        var total = Offset.Zero
-                                        var switched = false
-                                        while (true) {
-                                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                                            val pressed = event.changes.filter { it.pressed }
-                                            if (pressed.isEmpty()) {
-                                                total = Offset.Zero
-                                                switched = false
-                                                continue
-                                            }
-                                            if (pressed.size != 1 || state.canvasZoom > 1.05f) {
-                                                total = Offset.Zero
-                                                continue
-                                            }
-                                            if (!switched) {
-                                                val change = pressed.first()
-                                                total += change.position - change.previousPosition
-                                                val horizontal = abs(total.x) > 96f && abs(total.x) > abs(total.y) * 1.6f
-                                                if (horizontal) {
-                                                    if (total.x > 0f) {
-                                                        viewModel.selectPreviousHistory()
-                                                    } else {
-                                                        viewModel.selectNextHistory()
-                                                    }
-                                                    switched = true
+                        Modifier.fillMaxSize()
+                    }
+                    Box(modifier = canvasModifier) {
+                        if (item == null) {
+                            CanvasPlaceholderPreview(modifier = Modifier.fillMaxSize())
+                        } else {
+                            ArtworkPreview(
+                                item,
+                                presentationMode = presentation,
+                                presentationBackground = presentationBackground,
+                                rotateLandscape = presentation && ratio > 1f,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .historySwipeNavigation(
+                                        enabled = presentation || state.canvasZoom <= 1.05f,
+                                        gestureKey = item.id,
+                                        onSwipeRight = viewModel::selectPreviousHistory,
+                                        onSwipeLeft = viewModel::selectNextHistory,
+                                    )
+                                    .then(
+                                        if (presentation) {
+                                            Modifier
+                                        } else {
+                                            Modifier.pointerInput(Unit) {
+                                                detectTransformGestures { _, pan, zoom, _ ->
+                                                    if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
+                                                    if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
                                                 }
                                             }
-                                        }
-                                    }
-                                }
-                                .pointerInput(Unit) {
-                                    detectTransformGestures { _, pan, zoom, _ ->
-                                        if (!presentation) {
-                                            if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
-                                            if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
-                                        }
-                                    }
-                                }
-                                .graphicsLayer(
-                                    scaleX = if (presentation) 1f else state.canvasZoom,
-                                    scaleY = if (presentation) 1f else state.canvasZoom,
-                                    translationX = if (presentation) 0f else state.canvasPanX,
-                                    translationY = if (presentation) 0f else state.canvasPanY,
-                                )
-                        )
+                                        },
+                                    )
+                                    .graphicsLayer(
+                                        scaleX = if (presentation) 1f else state.canvasZoom,
+                                        scaleY = if (presentation) 1f else state.canvasZoom,
+                                        translationX = if (presentation) 0f else state.canvasPanX,
+                                        translationY = if (presentation) 0f else state.canvasPanY,
+                                    )
+                            )
+                        }
                     }
                     if (presentation && state.demoWaitingSeconds != null) {
                         Surface(
@@ -4157,6 +4159,78 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
         modifier = modifier.height(40.dp),
         shape = RoundedCornerShape(4.dp),
     ) { Text(text, maxLines = 1) }
+}
+
+private fun Modifier.historySwipeNavigation(
+    enabled: Boolean,
+    gestureKey: Any?,
+    onSwipeRight: () -> Unit,
+    onSwipeLeft: () -> Unit,
+): Modifier {
+    if (!enabled) return this
+    return pointerInput(gestureKey, enabled) {
+        awaitPointerEventScope {
+            while (true) {
+                var pressed = emptyList<PointerInputChange>()
+                while (pressed.size != 1) {
+                    val downEvent = awaitPointerEvent(PointerEventPass.Initial)
+                    pressed = downEvent.changes.filter { it.pressed }
+                    if (pressed.size > 1) {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.changes.none { it.pressed }) break
+                        }
+                        pressed = emptyList()
+                    }
+                }
+
+                val pointerId = pressed.first().id
+                var total = Offset.Zero
+                var triggered = false
+                var released = false
+
+                while (!triggered && !released) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val active = event.changes.filter { it.pressed }
+                    if (active.isEmpty()) {
+                        released = true
+                        break
+                    }
+                    if (active.size != 1) {
+                        break
+                    }
+
+                    val change = active.firstOrNull { it.id == pointerId } ?: break
+                    total += change.position - change.previousPosition
+
+                    val horizontal = abs(total.x) >= HISTORY_SWIPE_MIN_DISTANCE_PX &&
+                        abs(total.x) >= abs(total.y) * HISTORY_SWIPE_AXIS_LOCK
+                    val vertical = abs(total.y) >= HISTORY_SWIPE_MIN_DISTANCE_PX &&
+                        abs(total.y) > abs(total.x)
+
+                    if (vertical) {
+                        break
+                    }
+                    if (horizontal) {
+                        if (total.x > 0f) onSwipeRight() else onSwipeLeft()
+                        change.consume()
+                        triggered = true
+                    }
+                }
+
+                if (!released) {
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (triggered) {
+                            event.changes.forEach { change ->
+                                if (change.pressed) change.consume()
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            }
+        }
+    }
 }
 
 @Composable

@@ -1189,6 +1189,13 @@ private fun CanvasHeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .historySwipeNavigation(
+                            enabled = presentation,
+                            gestureKey = item?.id,
+                            deviceRotation = deviceRotation,
+                            onSwipeRight = viewModel::selectNextHistory,
+                            onSwipeLeft = viewModel::selectPreviousHistory,
+                        )
                         .pointerInput(item?.id, state.canvasPresentationMode) {
                             detectTapGestures(
                                 onDoubleTap = {
@@ -1221,11 +1228,11 @@ private fun CanvasHeroCard(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .historySwipeNavigation(
-                                        enabled = presentation || state.canvasZoom <= 1.05f,
+                                        enabled = !presentation && state.canvasZoom <= 1.05f,
                                         gestureKey = item.id,
-                                        deviceRotation = if (presentation) deviceRotation else DeviceRotation.Portrait,
-                                        onSwipeRight = if (presentation) viewModel::selectNextHistory else viewModel::selectPreviousHistory,
-                                        onSwipeLeft = if (presentation) viewModel::selectPreviousHistory else viewModel::selectNextHistory,
+                                        deviceRotation = DeviceRotation.Portrait,
+                                        onSwipeRight = viewModel::selectPreviousHistory,
+                                        onSwipeLeft = viewModel::selectNextHistory,
                                     )
                                     .then(
                                         if (presentation) {

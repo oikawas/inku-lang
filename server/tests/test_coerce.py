@@ -2175,6 +2175,7 @@ def test_coerce_score_detects_japanese_sound_in_space_holdout():
     assert event.arrangement is not None
     assert event.arrangement.preserve_space is True
     assert event.arrangement.path == "wave"
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_detects_english_inherited_memory_holdout():
@@ -2250,6 +2251,55 @@ def test_coerce_score_detects_japanese_temporal_chain_holdout():
     assert event.arrangement.rhythm_spacing == "syncopated"
 
 
+def test_coerce_score_detects_english_shared_object_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "black",
+                    "color_hint": "same map",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Without speaking, two hands held opposite edges of the same map.")
+
+    event = next(ins for ins in fixed.instructions if "shared_object" in (ins.color_hint or ""))
+    assert event.primitive == "square"
+    assert event.arrangement is not None
+    assert event.arrangement.path == "left_to_right"
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_maps_single_before_event_to_anticipatory_shift():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.55, 0.35],
+                    "size": [0.18, 0.09],
+                    "color": "white",
+                    "color_hint": "white cloth lifted before applause",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="At a seaside wedding, a piece of white cloth rose in the wind before the applause.")
+
+    assert not any("temporal_chain" in (ins.color_hint or "") for ins in fixed.instructions)
+    event = next(ins for ins in fixed.instructions if "anticipatory_shift" in (ins.color_hint or ""))
+    assert event.primitive == "arc"
+    assert event.arrangement is not None
+    assert event.arrangement.path == "wave"
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
 def test_coerce_score_restores_tilted_room_drop_event():
     score = Score.model_validate(
         {
@@ -2293,7 +2343,7 @@ def test_coerce_score_restores_shared_newspaper_hinge():
 
     fixed = coerce_score(score, ddl="リスボンのカフェで、見知らぬ二人が同じ新聞に手を伸ばした。二人は一言も交わさず、それを分け合った。")
 
-    event = next(ins for ins in fixed.instructions if "shared newspaper hinge" in (ins.color_hint or ""))
+    event = next(ins for ins in fixed.instructions if "shared_object" in (ins.color_hint or ""))
     assert event.primitive == "square"
     assert event.size is not None
     assert event.size[0] >= 0.18

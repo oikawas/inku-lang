@@ -926,6 +926,12 @@ def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
 
 
 VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "shared_object": (
+        ("二人", "見知らぬ二人", "別々", "手", "two", "strangers", "hands"),
+        ("同じ", "一枚", "別々の端", "same", "opposite edges", "opposite"),
+        ("新聞", "地図", "紙", "newspaper", "map", "paper"),
+        ("手を伸ば", "分け合", "押さえ", "held", "hold", "reached", "split"),
+    ),
     "sound_in_space": (
         ("音", "響", "きし", "鳴", "sound", "sounds", "echo", "creak", "chime", "rang", "ring"),
         ("空間", "奥行", "広が", "測", "示", "倉庫", "部屋", "space", "depth", "wide", "measure", "measured", "showed", "warehouse", "room"),
@@ -938,11 +944,38 @@ VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("祖母", "父", "祖父", "父の父", "grandmother", "father", "grandfather"),
         ("植え", "今も", "そうして", "昨日", "記憶", "planted", "still stands", "did", "yesterday", "memory"),
     ),
+    "anticipatory_shift": (
+        ("先に", "前に", "before", "ahead"),
+        ("持ち上", "届", "満た", "明るく", "帰", "rose", "arrived", "filled", "lit up", "returned"),
+    ),
     "temporal_chain": (
-        ("順に", "一斉", "先に", "その後", "あとで", "また", "before", "after", "in order", "again and again", "at once"),
+        ("順に", "一斉", "その後", "あとで", "また", "in order", "again and again", "at once"),
         ("揺", "渡り", "動", "猫", "窓", "笛", "whistle", "moving", "moved", "crossed", "cat", "laundry", "window"),
     ),
 }
+
+
+def _has_temporal_chain_evidence(text: str, lower: str) -> bool:
+    sequence = _any_marker_in_text(
+        ("順に", "一斉", "その後", "あとで", "また", "in order", "again and again", "at once"),
+        text,
+        lower,
+    )
+    action = _any_marker_in_text(
+        ("揺", "渡り", "動", "犬", "羊", "猫", "窓", "笛", "whistle", "moving", "moved", "crossed", "dog", "flock", "cat", "laundry", "window"),
+        text,
+        lower,
+    )
+    if sequence and action:
+        return True
+
+    before_after = _any_marker_in_text(("先に", "before", "after"), text, lower)
+    reaction = _any_marker_in_text(
+        ("一斉", "順に", "その瞬間", "looked up", "at once", "dog moved", "flock moved", "moving the"),
+        text,
+        lower,
+    )
+    return before_after and reaction and action
 
 
 def _detect_visual_event_type(ddl: str | None) -> str | None:
@@ -950,6 +983,16 @@ def _detect_visual_event_type(ddl: str | None) -> str | None:
         return None
     lower = ddl.lower()
     for event_type, evidence_groups in VISUAL_EVENT_TYPE_MARKERS.items():
+        if event_type == "temporal_chain":
+            if _has_temporal_chain_evidence(ddl, lower):
+                return event_type
+            continue
+        if event_type == "anticipatory_shift" and _any_marker_in_text(
+            ("発車ベル", "案内板", "departure board", "bell"),
+            ddl,
+            lower,
+        ):
+            continue
         if all(_any_marker_in_text(group, ddl, lower) for group in evidence_groups):
             return event_type
     return None
@@ -962,6 +1005,31 @@ def _visual_event_recipe(
     background: str,
 ) -> Instruction | None:
     visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    event_cycle = [visible, "gray"] if visible != "gray" else ["gray", "black"]
+    if event_type == "shared_object":
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.31, 0.58],
+                "size": [0.18, 0.055],
+                "rotation": -8,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event type shared_object restored as a shared surface hinge",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "left_to_right",
+                    "color_cycle": event_cycle,
+                    "margin": 0.24,
+                    "center": [0.68, 0.36],
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
     if event_type == "sound_in_space":
         return Instruction.model_validate(
             {
@@ -1023,7 +1091,9 @@ def _visual_event_recipe(
                     "count": 3,
                     "layout": "scatter",
                     "path": "diagonal",
+                    "color_cycle": event_cycle,
                     "margin": 0.24,
+                    "center": [0.32, 0.64],
                     "density": "low",
                     "fade": "outward",
                     "preserve_space": True,
@@ -1044,7 +1114,35 @@ def _visual_event_recipe(
                     "count": 3,
                     "layout": "scatter",
                     "path": "diagonal",
+                    "color_cycle": event_cycle,
                     "margin": 0.24,
+                    "center": [0.32, 0.64],
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if event_type == "anticipatory_shift":
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.58, 0.34],
+                "radius": 0.084,
+                "angle_start": 18,
+                "angle_end": 206,
+                "rotation": -22,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type anticipatory_shift restored as an early hinge",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "color_cycle": event_cycle,
+                    "margin": 0.24,
+                    "center": [0.34, 0.66],
                     "density": "low",
                     "fade": "outward",
                     "preserve_space": True,
@@ -1630,7 +1728,8 @@ def _with_focal_event_floor(
     background: str,
 ) -> list[Instruction]:
     """見せ場を密度ではなく、最小視認サイズと近接反応で支える。"""
-    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS):
+    event_type = _detect_visual_event_type(ddl)
+    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS) and event_type is None:
         return instructions
     if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
         return instructions

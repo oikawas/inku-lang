@@ -166,6 +166,8 @@ private val PresentationDarkBackground = Color(0xFF11100F)
 private val PresentationLightBackground = Color(0xFFF8F8F6)
 private const val HISTORY_SWIPE_MIN_DISTANCE_PX = 96f
 private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
+private const val PRESENTATION_PREFS_NAME = "presentation_preferences"
+private const val PRESENTATION_CAPTION_VISIBLE_KEY = "caption_visible"
 private val SvgViewBoxRegex = Regex("""\bviewBox\s*=\s*["']\s*[-+]?[0-9.]+\s+[-+]?[0-9.]+\s+([-+]?[0-9.]+)\s+([-+]?[0-9.]+)\s*["']""")
 private val SvgWidthRegex = Regex("""\bwidth\s*=\s*["']\s*([-+]?[0-9.]+)""")
 private val SvgHeightRegex = Regex("""\bheight\s*=\s*["']\s*([-+]?[0-9.]+)""")
@@ -1119,12 +1121,17 @@ private fun CanvasHeroCard(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val presentationPreferences = remember(context) {
+        context.applicationContext.getSharedPreferences(PRESENTATION_PREFS_NAME, Context.MODE_PRIVATE)
+    }
     var canvasMessage by remember { mutableStateOf<String?>(null) }
     var svgMenuOpen by remember { mutableStateOf(false) }
     var svgHelpOpen by remember { mutableStateOf(false) }
     var pngMenuOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
-    var instructionCaptionVisible by remember { mutableStateOf(false) }
+    var instructionCaptionVisible by remember {
+        mutableStateOf(presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
+    }
     val presentation = state.canvasPresentationMode
     val historyItems by viewModel.historyItems.collectAsState()
     BoxWithConstraints(modifier = modifier) {
@@ -1311,7 +1318,11 @@ private fun CanvasHeroCard(
                             onToggleStar = { item?.let(viewModel::toggleStar) },
                             onToggleCaption = {
                                 if (canShowInstructionCaption) {
-                                    instructionCaptionVisible = !instructionCaptionVisible
+                                    val nextVisible = !instructionCaptionVisible
+                                    instructionCaptionVisible = nextVisible
+                                    presentationPreferences.edit()
+                                        .putBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, nextVisible)
+                                        .apply()
                                 }
                             },
                             onClose = viewModel::resetCanvasZoom,
@@ -4117,29 +4128,29 @@ private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Un
 private fun BoxScope.presentationCaptionPlacement(rotation: DeviceRotation, screenWidth: Dp, screenHeight: Dp): Modifier {
     val captionWidth = when (rotation) {
         DeviceRotation.Portrait,
-        DeviceRotation.ReversePortrait -> screenWidth * 0.7f
+        DeviceRotation.ReversePortrait -> screenWidth * 0.84f
         DeviceRotation.LandscapeLeft,
-        DeviceRotation.LandscapeRight -> screenHeight * 0.7f
+        DeviceRotation.LandscapeRight -> screenHeight * 0.84f
     }
     return when (rotation) {
         DeviceRotation.Portrait -> Modifier.align(Alignment.BottomCenter)
             .width(captionWidth)
-            .padding(bottom = 82.dp)
+            .padding(bottom = 10.dp)
         DeviceRotation.ReversePortrait -> Modifier.align(Alignment.TopCenter)
             .width(captionWidth)
-            .padding(top = 82.dp)
+            .padding(top = 10.dp)
         DeviceRotation.LandscapeLeft -> Modifier.align(Alignment.Center)
             .width(captionWidth)
             .graphicsLayer {
                 rotationZ = 270f
             }
-            .padding(bottom = screenWidth * 0.35f)
+            .padding(bottom = screenWidth * 0.46f)
         DeviceRotation.LandscapeRight -> Modifier.align(Alignment.Center)
             .width(captionWidth)
             .graphicsLayer {
                 rotationZ = 90f
             }
-            .padding(bottom = screenWidth * 0.35f)
+            .padding(bottom = screenWidth * 0.46f)
     }
 }
 

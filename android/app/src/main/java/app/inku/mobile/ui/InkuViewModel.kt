@@ -579,6 +579,13 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         selectAdjacentHistory(1)
     }
 
+    fun selectLatestHistory() {
+        viewModelScope.launch {
+            val latest = historyItems.value.firstOrNull() ?: history.first().firstOrNull() ?: return@launch
+            selectHistory(latest)
+        }
+    }
+
     private fun selectAdjacentHistory(offset: Int) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastHistorySwipeAt < 450L) return
@@ -1109,7 +1116,11 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleStar(item: HistoryItemEntity) {
         viewModelScope.launch {
-            repository.setStarred(item.id, !item.starred)
+            val nextStarred = !item.starred
+            repository.setStarred(item.id, nextStarred)
+            if (localState.value.selectedHistory?.id == item.id) {
+                localState.value = localState.value.copy(selectedHistory = item.copy(starred = nextStarred))
+            }
         }
     }
 

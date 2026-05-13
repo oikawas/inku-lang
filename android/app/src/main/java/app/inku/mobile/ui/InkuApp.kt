@@ -1123,7 +1123,9 @@ private fun CanvasHeroCard(
     var svgHelpOpen by remember { mutableStateOf(false) }
     var pngMenuOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
+    var instructionCaptionVisible by remember { mutableStateOf(false) }
     val presentation = state.canvasPresentationMode
+    val historyItems by viewModel.historyItems.collectAsState()
     BoxWithConstraints(modifier = modifier) {
         val ratio = remember(item?.id, item?.displaySvg, canvasAspectId) {
             item?.displaySvg?.let(::svgAspectRatio) ?: canvasAspectRatio(canvasAspectId)
@@ -1144,6 +1146,14 @@ private fun CanvasHeroCard(
         val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
             if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
         }
+        val instructionCaptionText = item?.originalInput?.trim().orEmpty()
+        val canShowInstructionCaption = instructionCaptionText.isNotBlank()
+        val historyIndex = item?.let { selected -> historyItems.indexOfFirst { it.id == selected.id } } ?: -1
+        val historyTotal = historyItems.size
+        val canGoLatest = historyIndex > 0
+        val canGoNewer = historyIndex > 0
+        val canGoOlder = historyIndex >= 0 && historyIndex < historyItems.lastIndex
+        val historyCounter = if (historyIndex >= 0 && historyTotal > 0) "${historyIndex + 1} / $historyTotal" else ""
         Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!presentation && showControls) {
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -1259,7 +1269,7 @@ private fun CanvasHeroCard(
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(16.dp),
+                                .padding(end = 16.dp, bottom = 78.dp),
                             shape = RoundedCornerShape(100),
                             color = Color(0xCC11100F),
                             border = BorderStroke(1.dp, Color(0x55EDE7DE)),
@@ -1271,6 +1281,39 @@ private fun CanvasHeroCard(
                                 color = Color(0xFFEDE7DE),
                             )
                         }
+                    }
+                    if (presentation && instructionCaptionVisible && canShowInstructionCaption) {
+                        PresentationCaption(
+                            text = instructionCaptionText,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = 28.dp, vertical = 82.dp),
+                        )
+                    }
+                    if (presentation) {
+                        PresentationControls(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(start = 12.dp, end = 12.dp, bottom = 14.dp),
+                            counter = historyCounter,
+                            starred = item?.starred == true,
+                            canGoOlder = canGoOlder,
+                            canGoLatest = canGoLatest,
+                            canGoNewer = canGoNewer,
+                            canToggleStar = item != null,
+                            captionEnabled = canShowInstructionCaption,
+                            captionVisible = instructionCaptionVisible,
+                            onGoOlder = viewModel::selectNextHistory,
+                            onGoLatest = viewModel::selectLatestHistory,
+                            onGoNewer = viewModel::selectPreviousHistory,
+                            onToggleStar = { item?.let(viewModel::toggleStar) },
+                            onToggleCaption = {
+                                if (canShowInstructionCaption) {
+                                    instructionCaptionVisible = !instructionCaptionVisible
+                                }
+                            },
+                            onClose = viewModel::resetCanvasZoom,
+                        )
                     }
                 }
             }
@@ -4067,6 +4110,116 @@ private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Un
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+@Composable
+private fun PresentationCaption(text: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xB8000000),
+        tonalElevation = 0.dp,
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+            color = Color(0xFFFFFDF8),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PresentationControls(
+    counter: String,
+    starred: Boolean,
+    canGoOlder: Boolean,
+    canGoLatest: Boolean,
+    canGoNewer: Boolean,
+    canToggleStar: Boolean,
+    captionEnabled: Boolean,
+    captionVisible: Boolean,
+    onGoOlder: () -> Unit,
+    onGoLatest: () -> Unit,
+    onGoNewer: () -> Unit,
+    onToggleStar: () -> Unit,
+    onToggleCaption: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(100),
+        color = Color(0xE01C1C1C),
+        border = BorderStroke(1.dp, Color(0x2EFFFFFF)),
+        tonalElevation = 0.dp,
+        shadowElevation = 8.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PresentationControlButton("‹", enabled = canGoOlder, onClick = onGoOlder)
+            PresentationControlButton("最新", enabled = canGoLatest, wide = true, onClick = onGoLatest)
+            PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
+            Text(
+                counter,
+                modifier = Modifier.widthIn(min = 44.dp).padding(horizontal = 4.dp),
+                color = Color(0xB8FFFDF8),
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+            PresentationControlButton("★", selected = starred, enabled = canToggleStar, onClick = onToggleStar)
+            PresentationControlButton("▭", selected = captionVisible, enabled = captionEnabled, onClick = onToggleCaption)
+            PresentationControlButton("×", onClick = onClose)
+        }
+    }
+}
+
+@Composable
+private fun PresentationControlButton(
+    text: String,
+    enabled: Boolean = true,
+    selected: Boolean = false,
+    wide: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val shape = if (wide) RoundedCornerShape(100) else RoundedCornerShape(50)
+    val background = when {
+        selected -> Color(0x29FFFFFF)
+        else -> Color(0x10FFFFFF)
+    }
+    val border = when {
+        selected && text == "★" -> Color(0x9EFFD45C)
+        else -> Color(0x2EFFFFFF)
+    }
+    Box(
+        modifier = Modifier
+            .then(if (wide) Modifier.widthIn(min = 54.dp) else Modifier.size(34.dp))
+            .height(34.dp)
+            .background(background, shape)
+            .border(1.dp, border, shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = if (wide) 12.dp else 0.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = when {
+                !enabled -> Color(0x59FFFDF8)
+                selected && text == "★" -> Color(0xFFFFD45C)
+                else -> Color(0xFFFFFDF8)
+            },
+            style = if (wide) MaterialTheme.typography.labelSmall else MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+    }
 }
 
 @Composable

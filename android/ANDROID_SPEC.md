@@ -743,6 +743,17 @@ On Android, double-tapping the drawing image opens a presentation view.
 - In presentation view, a right swipe advances one history item and a left
   swipe moves back one item. This intentionally reverses the normal image-area
   swipe mapping to favor fullscreen viewing/page-turn behavior on Android.
+- Matching the server/web `CanvasPanel.svelte` presentation controls, Android
+  shows a control strip at the bottom of presentation view. The strip provides
+  the same user-facing roles: move one history item backward, jump to the latest
+  history item, move one history item forward, show current position / total
+  count, star / unstar, toggle instruction captions, and close presentation
+  view.
+- Instruction captions use the displayed history item's original user input,
+  not the internally expanded Stage 1 prompt. Captions are overlaid near the
+  lower part of the presentation surface with horizontal margins.
+- The caption toggle is disabled when there is no original instruction text to
+  display.
 - Normal pinch zoom, pan, and left/right history swipes remain available outside
   presentation view.
 

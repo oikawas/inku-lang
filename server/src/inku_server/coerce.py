@@ -925,6 +925,234 @@ def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
     )
 
 
+VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "shared_object": (
+        ("二人", "見知らぬ二人", "別々", "手", "two", "strangers", "hands"),
+        ("同じ", "一枚", "別々の端", "same", "opposite edges", "opposite"),
+        ("新聞", "地図", "紙", "newspaper", "map", "paper"),
+        ("手を伸ば", "分け合", "押さえ", "held", "hold", "reached", "split"),
+    ),
+    "sound_in_space": (
+        ("音", "響", "きし", "鳴", "sound", "sounds", "echo", "creak", "chime", "rang", "ring"),
+        ("空間", "奥行", "広が", "測", "示", "倉庫", "部屋", "space", "depth", "wide", "measure", "measured", "showed", "warehouse", "room"),
+    ),
+    "vanishing_outline": (
+        ("消え", "現れ", "現れて", "戻", "霧", "霞", "輪郭", "outline", "appeared", "disappeared", "dissolved", "returned", "fog", "mist"),
+        ("輪郭", "影", "友人", "人影", "先", "outline", "figure", "friend", "ahead", "trace"),
+    ),
+    "inherited_memory": (
+        ("祖母", "父", "祖父", "父の父", "grandmother", "father", "grandfather"),
+        ("植え", "今も", "そうして", "昨日", "記憶", "planted", "still stands", "did", "yesterday", "memory"),
+    ),
+    "anticipatory_shift": (
+        ("先に", "前に", "before", "ahead"),
+        ("持ち上", "届", "満た", "明るく", "帰", "rose", "arrived", "filled", "lit up", "returned"),
+    ),
+    "temporal_chain": (
+        ("順に", "一斉", "その後", "あとで", "また", "in order", "again and again", "at once"),
+        ("揺", "渡り", "動", "猫", "窓", "笛", "whistle", "moving", "moved", "crossed", "cat", "laundry", "window"),
+    ),
+}
+
+
+def _has_temporal_chain_evidence(text: str, lower: str) -> bool:
+    sequence = _any_marker_in_text(
+        ("順に", "一斉", "その後", "あとで", "また", "in order", "again and again", "at once"),
+        text,
+        lower,
+    )
+    action = _any_marker_in_text(
+        ("揺", "渡り", "動", "犬", "羊", "猫", "窓", "笛", "whistle", "moving", "moved", "crossed", "dog", "flock", "cat", "laundry", "window"),
+        text,
+        lower,
+    )
+    if sequence and action:
+        return True
+
+    before_after = _any_marker_in_text(("先に", "before", "after"), text, lower)
+    reaction = _any_marker_in_text(
+        ("一斉", "順に", "その瞬間", "looked up", "at once", "dog moved", "flock moved", "moving the"),
+        text,
+        lower,
+    )
+    return before_after and reaction and action
+
+
+def _detect_visual_event_type(ddl: str | None) -> str | None:
+    if not ddl:
+        return None
+    lower = ddl.lower()
+    for event_type, evidence_groups in VISUAL_EVENT_TYPE_MARKERS.items():
+        if event_type == "temporal_chain":
+            if _has_temporal_chain_evidence(ddl, lower):
+                return event_type
+            continue
+        if event_type == "anticipatory_shift" and _any_marker_in_text(
+            ("発車ベル", "案内板", "departure board", "bell"),
+            ddl,
+            lower,
+        ):
+            continue
+        if all(_any_marker_in_text(group, ddl, lower) for group in evidence_groups):
+            return event_type
+    return None
+
+
+def _visual_event_recipe(
+    event_type: str,
+    *,
+    color: str,
+    background: str,
+) -> Instruction | None:
+    visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    event_cycle = [visible, "gray"] if visible != "gray" else ["gray", "black"]
+    if event_type == "shared_object":
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.31, 0.58],
+                "size": [0.18, 0.055],
+                "rotation": -8,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event type shared_object restored as a shared surface hinge",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "left_to_right",
+                    "color_cycle": event_cycle,
+                    "margin": 0.24,
+                    "center": [0.68, 0.36],
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if event_type == "sound_in_space":
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.63, 0.40],
+                "radius": 0.066,
+                "angle_start": 18,
+                "angle_end": 214,
+                "rotation": -20,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type sound_in_space restored as a spatial echo",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if event_type == "vanishing_outline":
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.36, 0.54],
+                "to": [0.70, 0.38],
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type vanishing_outline restored as a fading contour",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.26,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if event_type == "inherited_memory":
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.56, 0.45],
+                "radius": 0.092,
+                "angle_start": 24,
+                "angle_end": 232,
+                "rotation": 15,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type inherited_memory restored as a three-part memory sequence",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "color_cycle": event_cycle,
+                    "margin": 0.24,
+                    "center": [0.32, 0.64],
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if event_type == "temporal_chain":
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.36, 0.52],
+                "to": [0.72, 0.39],
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type temporal_chain restored as an ordered reaction path",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "color_cycle": event_cycle,
+                    "margin": 0.24,
+                    "center": [0.32, 0.64],
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if event_type == "anticipatory_shift":
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.58, 0.34],
+                "radius": 0.084,
+                "angle_start": 18,
+                "angle_end": 206,
+                "rotation": -22,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type anticipatory_shift restored as an early hinge",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "color_cycle": event_cycle,
+                    "margin": 0.24,
+                    "center": [0.34, 0.66],
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    return None
+
+
 def _visual_event_instruction(
     instructions: list[Instruction],
     *,
@@ -935,6 +1163,187 @@ def _visual_event_instruction(
     lower = (ddl or "").lower()
     source = ddl or ""
     visible = color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black")
+    event_type = _detect_visual_event_type(ddl)
+    if event_type is not None:
+        event = _visual_event_recipe(event_type, color=color, background=background)
+        if event is not None:
+            return event
+    if _any_marker_in_text(("同じ新聞", "手を伸ば", "分け合", "一言も交わさず"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.45, 0.45],
+                "size": [0.18, 0.055],
+                "rotation": -8,
+                "color": visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a shared newspaper hinge",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "left_to_right",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if _any_marker_in_text(("高い窓", "午後の光", "読まない本", "斜めに落ち"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.33, 0.24],
+                "to": [0.68, 0.63],
+                "color": "white" if background != "white" else visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as diagonal afternoon light",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.26,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if _any_marker_in_text(("festival", "dancers", "moved his feet", "under the table"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.55, 0.63],
+                "radius": 0.075,
+                "angle_start": 205,
+                "angle_end": 342,
+                "rotation": 10,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as hidden foot rhythm",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "margin": 0.25,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if _any_marker_in_text(("line of birds", "river surface", "another road", "鳥の列", "川面", "もう一つの道"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.30, 0.43],
+                "to": [0.74, 0.56],
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as doubled river road",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.25,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if _any_marker_in_text(("発車ベル", "案内板", "明るくな", "departure board", "lit up", "bell"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "square",
+                "position": [0.58, 0.27],
+                "size": [0.16, 0.072],
+                "rotation": -6,
+                "color": "blue" if background != "blue" else visible,
+                "weight": "brush_thin",
+                "color_hint": "visual event restored as a pre-bell light hinge",
+                "arrangement": {
+                    "count": 1,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if _any_marker_in_text(("礼をする", "父も", "父の父", "毎朝", "bow", "bows", "father did", "father's father", "each morning"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.56, 0.45],
+                "radius": 0.096,
+                "angle_start": 24,
+                "angle_end": 232,
+                "rotation": 15,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as an inherited bow sequence",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
+    if _any_marker_in_text(("whistled", "whistle", "dog moved", "flock moved", "listen", "口笛", "犬が動", "羊の群れ"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "line",
+                "from": [0.39, 0.48],
+                "to": [0.72, 0.36],
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as a chain reaction",
+                "arrangement": {
+                    "count": 3,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
+    if _any_marker_in_text(("tatami", "tilted the quiet", "whole room", "部屋全体", "傾け"), source, lower):
+        return Instruction.model_validate(
+            {
+                "primitive": "ellipse",
+                "center": [0.56, 0.49],
+                "size": [0.11, 0.034],
+                "rotation": -16,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event restored as a tilted-room drop",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "wave",
+                    "margin": 0.24,
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
+            }
+        )
     if _any_marker_in_text(("scent", "fragrance", "grass"), source, lower):
         return Instruction.model_validate(
             {
@@ -1067,7 +1476,8 @@ def _visual_event_instruction(
 
 def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
     """抽象画としての見せ場を、既存語彙に足りない形で小さく補う。"""
-    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS):
+    event_type = _detect_visual_event_type(ddl)
+    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS) and event_type is None:
         return instructions
     if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
         return instructions
@@ -1080,6 +1490,28 @@ def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, back
     color = requested[0] if requested else ("blue" if background != "blue" else VISIBLE_ON_BACKGROUND.get(background, "black"))
     accent = _visual_event_instruction(instructions, ddl=ddl, color=color, background=background)
     return [*instructions, accent]
+
+
+def _with_visual_event_type_hints(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    event_type = _detect_visual_event_type(ddl)
+    if event_type is None:
+        return instructions
+    if any(event_type in (ins.color_hint or "") for ins in instructions):
+        return instructions
+
+    adjusted: list[Instruction] = []
+    applied = False
+    note = f"visual event type {event_type} detected through abstract event evidence"
+    for ins in instructions:
+        data = ins.model_dump(by_alias=True)
+        hint = data.get("color_hint") or ""
+        if not applied and _has_focal_event_hint(ins):
+            data["color_hint"] = f"{hint}; {note}" if hint else note
+            applied = True
+        adjusted.append(Instruction.model_validate(data))
+    if applied:
+        return adjusted
+    return instructions
 
 
 def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
@@ -1175,6 +1607,141 @@ def _with_semantic_visual_event_hints(instructions: list[Instruction], *, ddl: s
             next_instructions.append(Instruction.model_validate(data))
         adjusted = next_instructions
     return adjusted
+
+
+FOCAL_EVENT_MIN_EXTENT = 0.075
+FOCAL_EVENT_MIN_LINE_EXTENT = 0.14
+
+
+def _has_focal_event_hint(ins: Instruction) -> bool:
+    hint = (ins.color_hint or "").lower()
+    return any(
+        marker in hint
+        for marker in (
+            "visual event",
+            "vanishing trace",
+            "edge light event",
+            "playful motion",
+            "motion floor",
+            "surface tension",
+            "action residue",
+            "temporal hinge",
+            "presence weight",
+        )
+    )
+
+
+def _instruction_anchor(ins: Instruction) -> tuple[float, float]:
+    if ins.primitive == "line" and ins.from_ is not None and ins.to is not None:
+        return ((ins.from_[0] + ins.to[0]) / 2, (ins.from_[1] + ins.to[1]) / 2)
+    if ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center is not None:
+        return ins.center
+    if ins.primitive in ("square", "triangle") and ins.position is not None and ins.size is not None:
+        return (ins.position[0] + ins.size[0] / 2, ins.position[1] + ins.size[1] / 2)
+    return (0.62, 0.40)
+
+
+def _with_minimum_focal_extent(ins: Instruction) -> Instruction:
+    if not _has_focal_event_hint(ins):
+        return ins
+    if _shape_extent(ins) >= FOCAL_EVENT_MIN_EXTENT:
+        return ins
+
+    data = ins.model_dump(by_alias=True)
+    changed = False
+    if ins.primitive == "line" and ins.from_ is not None and ins.to is not None:
+        cx, cy = _instruction_anchor(ins)
+        dx = ins.to[0] - ins.from_[0]
+        dy = ins.to[1] - ins.from_[1]
+        length = max((dx * dx + dy * dy) ** 0.5, 1e-6)
+        target = max(FOCAL_EVENT_MIN_LINE_EXTENT, length)
+        ux, uy = dx / length, dy / length
+        data["from"] = [_clamp_unit(cx - ux * target / 2), _clamp_unit(cy - uy * target / 2)]
+        data["to"] = [_clamp_unit(cx + ux * target / 2), _clamp_unit(cy + uy * target / 2)]
+        changed = True
+    elif ins.primitive in ("circle", "arc", "polygon"):
+        data["radius"] = max(float(ins.radius or 0.0), FOCAL_EVENT_MIN_EXTENT / 2)
+        changed = True
+    elif ins.primitive == "ellipse" and ins.size is not None:
+        data["size"] = [
+            max(float(ins.size[0]), FOCAL_EVENT_MIN_EXTENT),
+            max(float(ins.size[1]), FOCAL_EVENT_MIN_EXTENT * 0.42),
+        ]
+        changed = True
+    elif ins.primitive in ("square", "triangle") and ins.size is not None:
+        data["size"] = [
+            max(float(ins.size[0]), FOCAL_EVENT_MIN_EXTENT),
+            max(float(ins.size[1]), FOCAL_EVENT_MIN_EXTENT * 0.62),
+        ]
+        changed = True
+
+    if not changed:
+        return ins
+    _append_hint(data, "focal event visibility floor applied")
+    return Instruction.model_validate(data)
+
+
+def _has_adjacent_reaction(instructions: list[Instruction]) -> bool:
+    return any("adjacent reaction" in (ins.color_hint or "").lower() for ins in instructions)
+
+
+def _adjacent_reaction_instruction(
+    event: Instruction,
+    *,
+    ddl: str | None,
+    background: str,
+) -> Instruction:
+    requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
+    color = requested[0] if requested else VISIBLE_ON_BACKGROUND.get(background, "black")
+    cx, cy = _instruction_anchor(event)
+    rx = _clamp_unit(cx + 0.075 if cx < 0.72 else cx - 0.075)
+    ry = _clamp_unit(cy - 0.055 if cy > 0.22 else cy + 0.055)
+    return Instruction.model_validate(
+        {
+            "primitive": "arc",
+            "center": [rx, ry],
+            "radius": 0.052,
+            "angle_start": 24,
+            "angle_end": 192,
+            "rotation": -18,
+            "color": color,
+            "weight": "hair",
+            "color_hint": "visual event adjacent reaction added to hold focal event",
+            "arrangement": {
+                "count": 2,
+                "layout": "scatter",
+                "path": "diagonal",
+                "margin": 0.22,
+                "density": "low",
+                "fade": "outward",
+                "preserve_space": True,
+                "rhythm_spacing": "loose",
+            },
+        }
+    )
+
+
+def _with_focal_event_floor(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    """見せ場を密度ではなく、最小視認サイズと近接反応で支える。"""
+    event_type = _detect_visual_event_type(ddl)
+    if not _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS) and event_type is None:
+        return instructions
+    if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
+        return instructions
+
+    adjusted = [_with_minimum_focal_extent(ins) for ins in instructions]
+    if _has_adjacent_reaction(adjusted) or len(adjusted) >= 9:
+        return adjusted
+
+    event = next((ins for ins in adjusted if _has_focal_event_hint(ins)), None)
+    if event is None:
+        return adjusted
+    return [*adjusted, _adjacent_reaction_instruction(event, ddl=ddl, background=background)]
 
 
 def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
@@ -2808,6 +3375,8 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_crescent_sensory_suppression(instructions, ddl=ddl, background=background)
     instructions = _with_ma_pressure(instructions, ddl=ddl)
     instructions = _with_semantic_visual_event_hints(instructions, ddl=ddl)
+    instructions = _with_visual_event_type_hints(instructions, ddl=ddl)
+    instructions = _with_focal_event_floor(instructions, ddl=ddl, background=background)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)

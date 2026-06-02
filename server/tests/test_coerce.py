@@ -1990,6 +1990,467 @@ def test_coerce_score_adds_motion_to_open_road_pull_focus():
     assert "visual event preserved as a road-pull focus accent" in (road.color_hint or "")
 
 
+def test_coerce_score_adds_visible_japanese_focal_event_and_reaction():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.50, 0.50],
+                    "radius": 0.008,
+                    "color": "red",
+                    "color_hint": "小さな赤い点",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="大きな美術館の白い部屋で、小さな赤い点だけが見る人の足を止めた。")
+
+    assert any("visual event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_keeps_english_action_residue_visible():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.48, 0.50],
+                    "to": [0.52, 0.50],
+                    "color": "gray",
+                    "weight": "hair",
+                    "color_hint": "bow",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A fisherman on the Mekong bows to the river each morning.")
+
+    bow = next(ins for ins in fixed.instructions if "bow" in (ins.color_hint or ""))
+    assert bow.from_ is not None
+    assert bow.to is not None
+    assert abs(bow.to[0] - bow.from_[0]) >= 0.14
+    assert "visual event preserved as action residue" in (bow.color_hint or "")
+    assert "focal event visibility floor applied" in (bow.color_hint or "")
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_turns_english_repetition_time_into_focal_event():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.48, 0.55],
+                    "size": [0.05, 0.02],
+                    "color": "blue",
+                    "color_hint": "small sounds",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="In a thawing stream, small sounds were born under the stones and vanished again and again.")
+
+    assert any("visual event restored" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_restores_pre_bell_light_hinge():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.20, 0.60],
+                    "to": [0.80, 0.60],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="夜明け前の駅で、発車ベルの前に青い案内板だけが明るくなった。")
+
+    event = next(ins for ins in fixed.instructions if "pre-bell light hinge" in (ins.color_hint or ""))
+    assert event.primitive == "square"
+    assert event.color == "blue"
+    assert event.size is not None
+    assert event.size[0] >= 0.16
+    assert event.arrangement is not None
+    assert event.arrangement.preserve_space is True
+
+
+def test_coerce_score_restores_inherited_bow_sequence():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.30, 0.50],
+                    "to": [0.70, 0.50],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="メコン川の漁師は毎朝、川に向かって礼をする。父もそうしていた。父の父もそうしていた。")
+
+    event = next(ins for ins in fixed.instructions if "inherited_memory" in (ins.color_hint or ""))
+    assert event.primitive == "arc"
+    assert event.arrangement is not None
+    assert event.arrangement.count == 3
+    assert event.arrangement.rhythm_spacing == "loose"
+
+
+def test_coerce_score_restores_english_chain_reaction_event():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.50, 0.50],
+                    "size": [0.08, 0.035],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="A shepherd in the Pyrenees whistled once. The dog moved. The flock moved. The mountain seemed to listen.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "chain reaction" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.arrangement is not None
+    assert event.arrangement.count == 3
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_adds_japanese_rusty_door_reaction():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.42, 0.42],
+                    "size": [0.10, 0.12],
+                    "color": "gray",
+                    "color_hint": "錆びた扉",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="港の倉庫で、錆びた扉が開く音だけが広い空間を測っていた。")
+
+    assert any("sound_in_space" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_detects_japanese_sound_in_space_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.34, 0.50],
+                    "to": [0.62, 0.42],
+                    "color": "gray",
+                    "color_hint": "古い扉",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="古い扉のきしみが、倉庫の奥行きを静かに示した。")
+
+    event = next(ins for ins in fixed.instructions if "sound_in_space" in (ins.color_hint or ""))
+    assert event.arrangement is not None
+    assert event.arrangement.preserve_space is True
+    assert event.arrangement.path == "wave"
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_detects_english_inherited_memory_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.50, 0.50],
+                    "radius": 0.05,
+                    "color": "green",
+                    "color_hint": "old tree",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="An old woman sold fruit from a tree her grandmother had planted; it still held the market's shade.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "inherited_memory" in (ins.color_hint or ""))
+    assert event.arrangement is not None
+    assert event.arrangement.count == 3
+    assert event.arrangement.preserve_space is True
+
+
+def test_coerce_score_detects_english_vanishing_outline_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.50, 0.50],
+                    "size": [0.08, 0.03],
+                    "color": "gray",
+                    "color_hint": "fog",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A figure ahead dissolved into fog, returned, and dissolved again.")
+
+    event = next(ins for ins in fixed.instructions if "vanishing_outline" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.arrangement is not None
+    assert event.arrangement.fade == "outward"
+
+
+def test_coerce_score_detects_japanese_temporal_chain_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.50, 0.50],
+                    "radius": 0.05,
+                    "color": "black",
+                    "color_hint": "笛の短い音",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="笛の短い音が路地を渡り、猫、洗濯物、開いた窓の順に揺れた。")
+
+    event = next(ins for ins in fixed.instructions if "temporal_chain" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.arrangement is not None
+    assert event.arrangement.count == 3
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_detects_english_shared_object_holdout():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "black",
+                    "color_hint": "same map",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Without speaking, two hands held opposite edges of the same map.")
+
+    event = next(ins for ins in fixed.instructions if "shared_object" in (ins.color_hint or ""))
+    assert event.primitive == "square"
+    assert event.arrangement is not None
+    assert event.arrangement.path == "left_to_right"
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_maps_single_before_event_to_anticipatory_shift():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.55, 0.35],
+                    "size": [0.18, 0.09],
+                    "color": "white",
+                    "color_hint": "white cloth lifted before applause",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="At a seaside wedding, a piece of white cloth rose in the wind before the applause.")
+
+    assert not any("temporal_chain" in (ins.color_hint or "") for ins in fixed.instructions)
+    event = next(ins for ins in fixed.instructions if "anticipatory_shift" in (ins.color_hint or ""))
+    assert event.primitive == "arc"
+    assert event.arrangement is not None
+    assert event.arrangement.path == "wave"
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_restores_tilted_room_drop_event():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="A single drop of water on the tatami in a tea room tilted the quiet of the whole room slightly.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "tilted-room drop" in (ins.color_hint or ""))
+    assert event.primitive == "ellipse"
+    assert event.size is not None
+    assert event.size[0] >= 0.11
+    assert event.arrangement is not None
+    assert event.arrangement.path == "wave"
+
+
+def test_coerce_score_restores_shared_newspaper_hinge():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="リスボンのカフェで、見知らぬ二人が同じ新聞に手を伸ばした。二人は一言も交わさず、それを分け合った。")
+
+    event = next(ins for ins in fixed.instructions if "shared_object" in (ins.color_hint or ""))
+    assert event.primitive == "square"
+    assert event.size is not None
+    assert event.size[0] >= 0.18
+    assert event.arrangement is not None
+    assert event.arrangement.count == 2
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_restores_diagonal_afternoon_light():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.40, 0.55],
+                    "size": [0.10, 0.05],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="古い図書館の高い窓から、午後の光が誰も読まない本へ斜めに落ちた。")
+
+    event = next(ins for ins in fixed.instructions if "diagonal afternoon light" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.from_ is not None
+    assert event.to is not None
+    assert event.to[0] > event.from_[0]
+    assert event.to[1] > event.from_[1]
+    assert event.arrangement is not None
+    assert event.arrangement.preserve_space is True
+
+
+def test_coerce_score_restores_hidden_english_foot_rhythm():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="At a festival in Rajasthan, an old man watched the dancers and quietly moved his feet under the table.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "hidden foot rhythm" in (ins.color_hint or ""))
+    assert event.primitive == "arc"
+    assert event.arrangement is not None
+    assert event.arrangement.count == 3
+    assert event.arrangement.rhythm_spacing == "syncopated"
+
+
+def test_coerce_score_restores_doubled_river_road():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.20, 0.50],
+                    "to": [0.80, 0.50],
+                    "color": "blue",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="On an evening bridge, a line of birds returning home made another road on the river surface.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "doubled river road" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.arrangement is not None
+    assert event.arrangement.count == 2
+    assert event.arrangement.path == "diagonal"
+
+
+def test_coerce_score_marks_shared_footstep_beat_as_visual_event():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.25, 0.50],
+                    "to": [0.75, 0.50],
+                    "color": "gray",
+                    "color_hint": "急ぐ人々の靴音",
+                    "arrangement": {"count": 4, "layout": "scatter"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="地下鉄の階段で、急ぐ人々の靴音が一瞬だけ同じ拍子になった。")
+
+    assert any("visual event preserved as shared footstep beat" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
 def test_coerce_score_does_not_add_edge_light_when_presence_handles_gaze():
     score = Score.model_validate(
         {

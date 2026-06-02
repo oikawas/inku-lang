@@ -356,7 +356,7 @@ class LocalFallbackPipeline(
     }
 
     private fun normalizeServerScore(score: JSONObject, ddl: String, canvasAspect: String): JSONObject {
-        val background = visibleBackground(score.optString("background", "white"))
+        val background = backgroundDominanceGovernor(visibleBackground(score.optString("background", "white")), ddl)
         val source = score.optJSONArray("instructions") ?: JSONArray()
         val repairedItems = mutableListOf<JSONObject>()
         for (i in 0 until source.length()) {
@@ -371,14 +371,21 @@ class LocalFallbackPipeline(
             .dedupeInstructions()
             .withDdlCoverage(ddl, background)
             .withColorDelivery(ddl, background)
+            .withPrimaryColorDelivery(ddl, background)
             .withShapeDelivery(ddl, background)
             .withComplexMotifRepair(ddl, background)
             .withCompositionDiversity(ddl, background)
             .withStructuralDuplicateRepair()
             .withContextEnergy(ddl, background)
+            .withSurfaceTension(ddl, background)
             .withPresenceAuxiliaryShapeRepair(presence)
             .withContextDensityGovernor(ddl, background)
             .withMotionEnergy(ddl)
+            .withRhythmVariation(ddl)
+            .withRepetitionEventVariation(ddl)
+            .withMaPressure(ddl)
+            .withVisualEvent(ddl, background)
+            .withMotionFloor(ddl, background)
             .withDensityBudget()
             .fold(JSONArray()) { array, item -> array.put(item); array }
         val result = JSONObject()
@@ -508,6 +515,29 @@ class LocalFallbackPipeline(
         }
     }
 
+    private fun List<JSONObject>.withPrimaryColorDelivery(ddl: String, background: String): List<JSONObject> {
+        val requested = requestedColors(ddl).filter { it != background && it != "white" }
+        if (requested.isEmpty()) return this
+        val repaired = toMutableList()
+        for (color in requested) {
+            if (repaired.any { it.optString("color") == color }) continue
+            val candidateIndex = repaired.indexOfFirst { item ->
+                val arrangement = item.optJSONObject("arrangement")
+                arrangement != null &&
+                    item.optString("primitive") in setOf("line", "arc", "ellipse", "square", "triangle", "polygon") &&
+                    arrangement.optJSONArray("color_cycle")?.let { cycle ->
+                        (0 until cycle.length()).any { cycle.optString(it) == color }
+                    } == true
+            }
+            if (candidateIndex < 0) continue
+            val copy = copyJsonObject(repaired[candidateIndex])
+            copy.put("color", color)
+            copy.put("color_hint", appendHint(copy.optString("color_hint"), "$color promoted to primary stroke from DDL color intent"))
+            repaired[candidateIndex] = copy
+        }
+        return repaired
+    }
+
     private fun greenIntentContext(ddl: String): String? {
         val lower = ddl.lowercase()
         if ("green" in ServerScoreRepairFactory.negatedColors(ddl)) return null
@@ -620,6 +650,10 @@ class LocalFallbackPipeline(
                     arrangement.put("path", if (index % 2 == 0) "wave" else "diagonal")
                     changed = true
                 }
+                if (arrangement.optString("rhythm_spacing", "none") == "none") {
+                    arrangement.put("rhythm_spacing", "loose")
+                    changed = true
+                }
                 if (primitive in setOf("ellipse", "square", "triangle", "polygon") && !copy.has("rotation")) {
                     copy.put("rotation", if (index % 2 == 0) -24 else 18)
                     changed = true
@@ -647,11 +681,213 @@ class LocalFallbackPipeline(
         }
     }
 
+    private fun List<JSONObject>.withMotionFloor(ddl: String, background: String): List<JSONObject> {
+        if (!contextHasMotion(ddl)) return this
+        if (countHintFromDdl(ddl) != null || requestedShapes(ddl).isNotEmpty()) return this
+        if (size >= 10 || hasMotionPath()) return this
+        if (any { "motion floor restored" in it.optString("color_hint") }) return this
+        return this + motionFloorInstruction(ddl, background)
+    }
+
+    private fun List<JSONObject>.hasMotionPath(): Boolean {
+        return any { item ->
+            val arrangement = item.optJSONObject("arrangement")
+            arrangement != null && arrangement.optString("path", "none") != "none" && arrangement.optInt("count", 1) >= 3
+        }
+    }
+
+    private fun motionFloorInstruction(ddl: String, background: String): JSONObject {
+        val requested = requestedColors(ddl).filter { it != background }
+        val color = requested.firstOrNull() ?: if (background != "red") "red" else visibleForeground(background, background)
+        return JSONObject()
+            .put("primitive", "arc")
+            .put("center", JSONArray(listOf(0.58, 0.52)))
+            .put("radius", 0.11)
+            .put("angle_start", 205)
+            .put("angle_end", 330)
+            .put("rotation", -16)
+            .put("color", color)
+            .put("weight", "hair")
+            .put("color_hint", "motion floor restored as a small directional trace")
+            .put(
+                "arrangement",
+                JSONObject()
+                    .put("count", 3)
+                    .put("layout", "scatter")
+                    .put("path", "diagonal")
+                    .put("margin", 0.24)
+                    .put("density", "low")
+                    .put("fade", "directional")
+                    .put("preserve_space", true)
+                    .put("rhythm_spacing", "loose"),
+            )
+    }
+
+    private fun List<JSONObject>.withRhythmVariation(ddl: String): List<JSONObject> {
+        if (!contextHasRhythm(ddl)) return this
+        return mapIndexed { index, item ->
+            val copy = copyJsonObject(item)
+            var changed = false
+            val arrangement = copy.optJSONObject("arrangement")
+            if (arrangement != null) {
+                if (arrangement.optString("path", "none") == "none") {
+                    arrangement.put("path", if (index % 2 == 0) "wave" else "diagonal")
+                    changed = true
+                }
+                if (arrangement.optString("density", "none") == "none") {
+                    arrangement.put("density", "low")
+                    changed = true
+                }
+                if (arrangement.optString("rhythm_spacing", "none") == "none") {
+                    arrangement.put("rhythm_spacing", "syncopated")
+                    changed = true
+                }
+                if (arrangement.optDouble("margin", 0.1) < 0.14) {
+                    arrangement.put("margin", 0.14)
+                    changed = true
+                }
+                copy.put("arrangement", arrangement)
+            }
+            val primitive = copy.optString("primitive", "line")
+            if (primitive in setOf("line", "ellipse", "arc", "square", "triangle", "polygon") && !copy.has("rotation")) {
+                copy.put("rotation", if (index % 2 == 0) -15 else 21)
+                changed = true
+            }
+            if (copy.optJSONObject("variation") == null && primitive in setOf("line", "ellipse", "arc", "polygon")) {
+                copy.put(
+                    "variation",
+                    JSONObject().put("amplitude", "medium").put("frequency", "medium").put("quality", "wave")
+                        .put("dimensions", JSONArray(listOf("position_x", "position_y", "rotation"))),
+                )
+                changed = true
+            }
+            if (changed) copy.put("color_hint", appendHint(copy.optString("color_hint"), "rhythm variation restored without increasing count"))
+            copy
+        }
+    }
+
+    private fun List<JSONObject>.withRepetitionEventVariation(ddl: String): List<JSONObject> {
+        if (!contextHasMotion(ddl) && !contextHasVisualEvent(ddl) && !contextHasRhythm(ddl)) return this
+        if (countHintFromDdl(ddl) != null || requestedShapes(ddl).isNotEmpty()) return this
+        return mapIndexed { index, item ->
+            if (item.optString("primitive") != "line" || item.optJSONObject("arrangement") == null || expandedCount(item) < 6) return@mapIndexed item
+            val copy = copyJsonObject(item)
+            val arrangement = copy.optJSONObject("arrangement") ?: return@mapIndexed copy
+            var changed = false
+            if (arrangement.optString("rhythm_spacing", "none") in setOf("none", "loose")) {
+                arrangement.put("rhythm_spacing", "syncopated")
+                changed = true
+            }
+            if (arrangement.optDouble("margin", 0.1) < 0.18) {
+                arrangement.put("margin", 0.18)
+                changed = true
+            }
+            if (arrangement.optString("fade", "none") == "none") {
+                arrangement.put("fade", "directional")
+                changed = true
+            }
+            if (!arrangement.optBoolean("preserve_space", false)) {
+                arrangement.put("preserve_space", true)
+                changed = true
+            }
+            if (arrangement.optString("path", "none") == "none") {
+                arrangement.put("path", if (index % 2 == 0) "wave" else "diagonal")
+                changed = true
+            }
+            if (changed) {
+                copy.put("arrangement", arrangement)
+                copy.put("color_hint", appendHint(copy.optString("color_hint"), "repetition event shaped with syncopated gaps"))
+            }
+            copy
+        }
+    }
+
+    private fun List<JSONObject>.withMaPressure(ddl: String): List<JSONObject> {
+        if (!contextHasMaPressure(ddl)) return this
+        return map { item ->
+            val arrangement = item.optJSONObject("arrangement") ?: return@map item
+            val copy = copyJsonObject(item)
+            var changed = false
+            val adjusted = copy.optJSONObject("arrangement") ?: arrangement
+            if (!adjusted.optBoolean("preserve_space", false)) {
+                adjusted.put("preserve_space", true)
+                changed = true
+            }
+            if (adjusted.optDouble("margin", 0.1) < 0.22) {
+                adjusted.put("margin", 0.22)
+                changed = true
+            }
+            if (adjusted.optString("fade", "none") == "none") {
+                adjusted.put("fade", "outward")
+                changed = true
+            }
+            if (adjusted.optString("density", "none") == "none") {
+                adjusted.put("density", "low")
+                changed = true
+            }
+            if (changed) {
+                copy.put("arrangement", adjusted)
+                copy.put("color_hint", appendHint(copy.optString("color_hint"), "ma pressure restored through spacing and preserved negative space"))
+            }
+            copy
+        }
+    }
+
+    private fun List<JSONObject>.withVisualEvent(ddl: String, background: String): List<JSONObject> {
+        if (!contextHasVisualEvent(ddl)) return this
+        if (countHintFromDdl(ddl) != null || requestedShapes(ddl).isNotEmpty()) return this
+        if (size >= 10 || any { "visual event restored" in it.optString("color_hint") }) return this
+        val color = requestedColors(ddl).firstOrNull { it != background } ?: if (background != "blue") "blue" else visibleForeground(background, background)
+        val hasAngular = any { it.optString("primitive") in setOf("square", "triangle", "polygon") && shapeExtent(it) >= 0.035 }
+        val accent = if (!hasAngular) {
+            JSONObject()
+                .put("primitive", "polygon")
+                .put("center", JSONArray(listOf(0.68, 0.34)))
+                .put("radius", 0.045)
+                .put("sides", 5)
+                .put("rotation", -18)
+                .put("color", if (color != background) color else visibleForeground(background, background))
+                .put("weight", "brush_thin")
+                .put("color_hint", "visual event restored as a small angular pulse")
+        } else {
+            JSONObject()
+                .put("primitive", "arc")
+                .put("center", JSONArray(listOf(0.68, 0.34)))
+                .put("radius", 0.055)
+                .put("angle_start", 35)
+                .put("angle_end", 245)
+                .put("rotation", -18)
+                .put("color", color)
+                .put("weight", "hair")
+                .put("color_hint", "visual event restored as a small focal pulse")
+        }
+        return this + accent
+    }
+
+    private fun List<JSONObject>.withSurfaceTension(ddl: String, background: String): List<JSONObject> {
+        if (!contextHasSurfaceTension(ddl)) return this
+        if (countHintFromDdl(ddl) != null || requestedShapes(ddl).isNotEmpty()) return this
+        if (size >= 9 || any { "surface tension restored" in it.optString("color_hint") }) return this
+        if (background == "white" && none { closedShapeArea(it) >= 0.08 }) return this
+        val color = if (background != "black") "black" else visibleForeground(background, background)
+        return this + JSONObject()
+            .put("primitive", "arc")
+            .put("center", JSONArray(listOf(0.58, 0.62)))
+            .put("radius", 0.18)
+            .put("angle_start", 198)
+            .put("angle_end", 342)
+            .put("rotation", -4)
+            .put("color", color)
+            .put("weight", "hair")
+            .put("color_hint", "surface tension restored as a quiet shadow trace")
+    }
+
     private fun List<JSONObject>.withContextDensityGovernor(ddl: String, background: String): List<JSONObject> {
         if (!contextHasDensityGovernor(ddl)) return this
         val adjusted = mutableListOf<JSONObject>()
         var governedCount = 0
         val hasVerticalContext = contextHasVerticalDensity(ddl)
+        val hasNeonBlurContext = contextHasNeonBlurDensity(ddl)
         for (item in this) {
             val copy = temperQuietSymbolicShape(copyJsonObject(item), ddl)
             val arrangement = copy.optJSONObject("arrangement")
@@ -662,32 +898,34 @@ class LocalFallbackPipeline(
             val count = arrangement.optInt("count", 1)
             val isVerticalLoad = hasVerticalContext &&
                 (copy.optString("primitive") == "line" || arrangement.optString("layout") == "vertical" || arrangement.optString("path") == "top_to_bottom")
+            val verticalCountCap = if (hasNeonBlurContext) MAX_NEON_BLUR_VERTICAL_COUNT else MAX_QUIET_VERTICAL_COUNT
             when {
-                isVerticalLoad && count > 48 -> {
+                isVerticalLoad && count > verticalCountCap -> {
                     governedCount += 1
                     adjusted += copy.withArrangementGovernor(
-                        count = 48,
+                        count = verticalCountCap,
                         density = "low",
                         fade = "directional",
-                        note = "quiet vertical density governed to keep membrane/space legible",
+                        note = if (hasNeonBlurContext) "neon blur vertical density governed to keep transparent streaks legible" else "quiet vertical density governed to keep membrane/space legible",
                     )
                 }
-                closedShapeArea(copy) >= 0.04 && count > 16 -> {
+                closedShapeArea(copy) >= 0.04 && count > MAX_QUIET_LARGE_SHAPE_COUNT -> {
                     governedCount += 1
                     adjusted += copy.withArrangementGovernor(
-                        count = 16,
+                        count = MAX_QUIET_LARGE_SHAPE_COUNT,
                         density = "low",
                         fade = "outward",
                         note = "quiet large-shape repetition governed to preserve negative space",
                     )
                 }
-                count > 64 -> {
+                count > MAX_QUIET_VISUAL_COUNT -> {
                     governedCount += 1
+                    val countCap = if (hasNeonBlurContext) MAX_NEON_BLUR_VISUAL_COUNT else MAX_QUIET_VISUAL_COUNT
                     adjusted += copy.withArrangementGovernor(
-                        count = 64,
+                        count = countCap,
                         density = if (count >= 120) "medium" else "low",
                         fade = if (arrangement.optString("layout") == "scatter") "outward" else "directional",
-                        note = "quiet density governed to preserve lightness",
+                        note = if (hasNeonBlurContext) "neon blur density governed to avoid particle dominance" else "quiet density governed to preserve lightness",
                     )
                 }
                 else -> adjusted += copy
@@ -994,6 +1232,30 @@ class LocalFallbackPipeline(
         return ServerScoreSemantics.contextHasColorfulAccent(ddl)
     }
 
+    private fun contextHasNeonBlurDensity(ddl: String): Boolean {
+        return ServerScoreSemantics.contextHasNeonBlurDensity(ddl)
+    }
+
+    private fun contextHasRhythm(ddl: String): Boolean {
+        return ServerScoreSemantics.contextHasRhythm(ddl)
+    }
+
+    private fun contextHasVisualEvent(ddl: String): Boolean {
+        return ServerScoreSemantics.contextHasVisualEvent(ddl)
+    }
+
+    private fun contextHasMaPressure(ddl: String): Boolean {
+        return ServerScoreSemantics.contextHasMaPressure(ddl)
+    }
+
+    private fun contextHasSurfaceTension(ddl: String): Boolean {
+        return ServerScoreSemantics.contextHasSurfaceTension(ddl)
+    }
+
+    private fun countHintFromDdl(ddl: String): Int? {
+        return ServerScoreSemantics.countHintFromDdl(ddl)
+    }
+
     private fun JSONObject.withArrangementGovernor(count: Int, density: String, fade: String, note: String): JSONObject {
         val copy = JSONObject(toString())
         val arrangement = copy.optJSONObject("arrangement") ?: return copy
@@ -1133,6 +1395,41 @@ class LocalFallbackPipeline(
         return ServerScoreSemantics.detectBackground(text)
     }
 
+    private fun backgroundDominanceGovernor(background: String, ddl: String): String {
+        if (background !in setOf("black", "red", "blue", "green")) return background
+        if (hasExplicitBackgroundIntent(ddl) || hasIntentionalLargeSurface(ddl)) return background
+        if (requestedColors(ddl).isNotEmpty() && requestedShapes(ddl).isEmpty()) return background
+        return if (contextHasDensityGovernor(ddl) || presenceFromDdl(ddl) != null) "white" else background
+    }
+
+    private fun hasIntentionalLargeSurface(ddl: String): Boolean {
+        return contextHasMarker(
+            ddl,
+            listOf("大き", "巨大", "広い", "広がる", "布", "幕", "壁一面", "面で", "面として", "large", "huge", "wide", "broad surface", "cloth", "fabric"),
+        )
+    }
+
+    private fun hasExplicitBackgroundIntent(ddl: String): Boolean {
+        val context = ddl.substringBefore("\n").ifBlank { ddl }
+        val lower = context.lowercase()
+        if (looksLikeGeneratedBackgroundPlan(context)) return false
+        if (listOf("背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇", "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness").any { it in context || it in lower }) return true
+        if (listOf("夕焼け空", "夕暮れの空", "sunset sky", "dusk sky").any { it in context || it in lower }) return true
+        if (listOf("夜明け", "明け方", "朝焼け", "dawn", "daybreak", "sunrise").any { it in context || it in lower }) return false
+        return listOf("夜", "night").any { it in context || it in lower }
+    }
+
+    private fun looksLikeGeneratedBackgroundPlan(context: String): Boolean {
+        if ("\n" in context) return false
+        val clauses = Regex("[。\\n;；]+").split(context).map { it.trim() }.filter { it.isNotBlank() }
+        if (clauses.size < 4) return false
+        val first = clauses.first().lowercase()
+        if (!(first.startsWith("背景を") || first.startsWith("background") || "fill background" in first)) return false
+        val lower = context.lowercase()
+        return listOf("気配", "透明な膜", "五感", "存在", "境界が滲", "画面全体", "presence", "transparent membrane", "five-sense", "boundary blur", "full canvas")
+            .any { it in context || it in lower }
+    }
+
     private fun detectColorKey(text: String, background: String): String {
         return ServerScoreSemantics.detectColorKey(text, background)
     }
@@ -1244,6 +1541,11 @@ class LocalFallbackPipeline(
         private const val MAX_EXPANDED_PRIMITIVES = 400
         private const val MAX_EXPANDED_PER_INSTRUCTION = 240
         private const val MAX_VISUAL_CLUSTERED_COUNT = 120
+        private const val MAX_QUIET_VISUAL_COUNT = 64
+        private const val MAX_QUIET_VERTICAL_COUNT = 48
+        private const val MAX_NEON_BLUR_VISUAL_COUNT = 24
+        private const val MAX_NEON_BLUR_VERTICAL_COUNT = 18
+        private const val MAX_QUIET_LARGE_SHAPE_COUNT = 16
         private val motionOrTextureTerms = listOf(
             "震える", "震え", "揺れる", "揺らぐ", "揺れ", "小刻み", "滲む", "にじむ", "太い", "細い",
             "trembling", "tremble", "swaying", "sway", "wobble", "wobbly", "blurring", "blurred", "thick", "thin",

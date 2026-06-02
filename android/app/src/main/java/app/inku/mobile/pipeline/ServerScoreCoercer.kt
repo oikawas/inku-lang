@@ -103,6 +103,7 @@ internal object ServerScoreCoercer {
         if (result.has("cluster_count")) result.put("cluster_count", result.optInt("cluster_count", 1).coerceIn(1, 12))
         result.put("fade", result.optString("fade", "none").takeIf { it in setOf("none", "outward", "directional") } ?: "none")
         result.put("preserve_space", result.optBoolean("preserve_space", false))
+        result.put("rhythm_spacing", result.optString("rhythm_spacing", "none").takeIf { it in setOf("none", "syncopated", "accelerando", "loose") } ?: "none")
         return result
     }
 

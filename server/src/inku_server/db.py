@@ -68,6 +68,7 @@ class HistoryRow(Base):
     instruction_lang_requested = Column(String, nullable=True)
     instruction_lang_resolved = Column(String, nullable=True)
     ui_lang = Column(String, nullable=True)
+    render_seed = Column(String, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -142,6 +143,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "instruction_lang_requested": "ALTER TABLE history ADD COLUMN instruction_lang_requested VARCHAR",
     "instruction_lang_resolved": "ALTER TABLE history ADD COLUMN instruction_lang_resolved VARCHAR",
     "ui_lang": "ALTER TABLE history ADD COLUMN ui_lang VARCHAR",
+    "render_seed": "ALTER TABLE history ADD COLUMN render_seed VARCHAR",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
@@ -863,6 +865,11 @@ def _row_to_dict(row: HistoryRow) -> dict:
         item["instruction_lang_resolved"] = row.instruction_lang_resolved
     if row.ui_lang is not None:
         item["ui_lang"] = row.ui_lang
+    if row.render_seed is not None:
+        try:
+            item["render_seed"] = int(row.render_seed)
+        except ValueError:
+            item["render_seed"] = row.render_seed
     return item
 
 
@@ -930,6 +937,7 @@ def add_item(item: dict) -> dict:
         instruction_lang_requested=item.get("instruction_lang_requested"),
         instruction_lang_resolved=item.get("instruction_lang_resolved"),
         ui_lang=item.get("ui_lang"),
+        render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
         render_hash=render_hash,
         trashed=0,
         starred=0,

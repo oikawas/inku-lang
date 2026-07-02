@@ -3307,6 +3307,37 @@ def ensure_renderable_score(score: Score) -> None:
         raise ValueError("Stage 2 returned no drawable instructions")
 
 
+def _has_relation_contour(ins: Instruction) -> bool:
+    if ins.primitive == "line":
+        return ins.from_ is not None and ins.to is not None
+    if ins.primitive in {"circle", "arc", "polygon"}:
+        return ins.center is not None and ins.radius is not None
+    if ins.primitive == "ellipse":
+        return ins.center is not None and ins.size is not None
+    if ins.primitive in {"square", "triangle"}:
+        return ins.position is not None and ins.size is not None
+    return False
+
+
+def _drop_invalid_relations(instructions: list[Instruction]) -> list[Instruction]:
+    result: list[Instruction] = []
+    for index, ins in enumerate(instructions):
+        relation = ins.relation
+        if relation is None:
+            result.append(ins)
+            continue
+        invalid = index == 0 or not result or not _has_relation_contour(result[-1])
+        if relation.type == "between":
+            invalid = invalid or len(result) < 2 or not _has_relation_contour(result[-2])
+        if invalid:
+            data = ins.model_dump(by_alias=True)
+            data.pop("relation", None)
+            result.append(Instruction.model_validate(data))
+        else:
+            result.append(ins)
+    return result
+
+
 # ── 汎用補修ループ ────────────────────────────────────────────────────────────────
 
 def _coerce_instruction(ins: Instruction) -> Instruction:
@@ -3380,6 +3411,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
+    instructions = _drop_invalid_relations(instructions)
     data = score.model_dump(by_alias=True)
     data["background"] = background
     if score.presence is None and effective_presence is not None:

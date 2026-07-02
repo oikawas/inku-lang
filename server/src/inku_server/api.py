@@ -42,7 +42,7 @@ from .plugins import (
     normalize_canvas_aspect_id,
     plugin_status_items,
 )
-from .renderer import SVG_PROFILES
+from .renderer import SVG_PROFILES, new_render_seed
 from .render_engines import current_render_engine
 from .schema import Score
 from .model_settings import (
@@ -358,6 +358,7 @@ def _render_score_svg(
     catalog_id: str | None,
     canvas_aspect: str | None = None,
     svg_profile: str | None = None,
+    render_seed: int | None = None,
 ) -> str:
     score = coerce_score(Score.model_validate(score_payload))
     canvas = _validated_canvas_aspect_override(canvas_aspect)
@@ -368,6 +369,7 @@ def _render_score_svg(
         score,
         color_map=render_metadata["render_color_map"],
         svg_profile=_validated_svg_profile(svg_profile),
+        render_seed=render_seed,
     ).svg
 
 
@@ -525,10 +527,13 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
 
 
 def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: str | None = None) -> tuple[str, dict]:
+    effective_seed = int(render_metadata.get("render_seed") or new_render_seed())
+    render_metadata = {**render_metadata, "render_seed": effective_seed}
     result = current_render_engine().render(
         score,
         color_map=render_metadata["render_color_map"],
         svg_profile=_validated_svg_profile(svg_profile),
+        render_seed=effective_seed,
     )
     return result.svg, {**render_metadata, **result.metadata}
 
@@ -581,6 +586,7 @@ class ComposeRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用するサーバー側色カタログID")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
+    render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
 
 
 class ComposeResponse(BaseModel):
@@ -601,6 +607,7 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
+    render_seed: int | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -650,6 +657,7 @@ class PaintRequest(BaseModel):
     history_at: int | None = Field(default=None, description="履歴保存時刻")
     catalog_id: str | None = Field(default=None, description="使用した色カタログID")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
+    render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
 
 
 class PaintResponse(BaseModel):
@@ -671,6 +679,7 @@ class PaintResponse(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
+    render_seed: int | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -699,6 +708,7 @@ class RenderSvgRequest(BaseModel):
     catalog_id: str | None = None
     canvas_aspect: str | None = None
     svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
+    render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
 
 
 @dataclass
@@ -761,6 +771,7 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
+    render_seed: int | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -1987,6 +1998,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
+        "render_seed": req.render_seed,
     }
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
@@ -2220,6 +2232,7 @@ def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user))
             catalog_id=req.catalog_id,
             canvas_aspect=req.canvas_aspect,
             svg_profile=req.svg_profile,
+            render_seed=req.render_seed,
         )
     except HTTPException:
         raise
@@ -2333,6 +2346,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
+        "render_seed": req.render_seed,
     }
     t2 = time.perf_counter()
     try:

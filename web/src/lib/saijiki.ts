@@ -74,6 +74,12 @@ export const SAIJIKI: SaijikiCategory[] = [
 		words: ['水平', '垂直', '斜め', '右上がり', '右下がり', '回転']
 	},
 	{
+		key: 'aida',
+		label: 'あいだ',
+		en: 'relations',
+		words: ['沿う', '触れない', '切る', '間に']
+	},
+	{
 		key: 'wariai',
 		label: 'わりあい',
 		en: 'proportions',

@@ -1027,3 +1027,47 @@ def test_render_color_cycle_preserves_effect_hint_opacity():
     assert svg.count('fill-opacity="0.12"') == 2
     assert 'fill="#111111"' in svg
     assert 'fill="#ffffff"' in svg
+
+
+def test_render_region_uses_seed_for_reproducible_macro_variation():
+    score = Score.model_validate({
+        "instructions": [
+            {"primitive": "circle", "at": {"region": [0.2, 0.2, 0.8, 0.8]}, "radius": 0.04}
+        ]
+    })
+
+    svg_a = render(score, render_seed=101)
+    svg_b = render(score, render_seed=101)
+    svg_c = render(score, render_seed=202)
+
+    assert svg_a == svg_b
+    assert svg_a != svg_c
+
+
+def test_render_not_touching_relation_moves_second_mark_away_from_previous():
+    score = Score.model_validate({
+        "instructions": [
+            {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.08},
+            {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.03, "relation": {"type": "not_touching", "gap": "narrow"}},
+        ]
+    })
+
+    svg = render(score, render_seed=5)
+
+    assert svg.count("<circle") >= 2
+    assert svg.count('cx="500.0"') == 1
+
+
+def test_render_cutting_relation_crosses_previous_line_center():
+    score = Score.model_validate({
+        "instructions": [
+            {"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5]},
+            {"primitive": "line", "from": [0.1, 0.1], "to": [0.2, 0.1], "relation": {"type": "cutting"}},
+        ]
+    })
+
+    svg = render(score, render_seed=7)
+
+    assert 'x1="200.0"' in svg
+    assert 'x2="800.0"' in svg
+    assert '500.0' in svg

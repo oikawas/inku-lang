@@ -18,8 +18,9 @@ class DefaultRenderEngine:
         *,
         color_map: dict[str, str] | None = None,
         svg_profile: str | None = None,
+        render_seed: int | None = None,
     ) -> RenderEngineResult:
-        svg = render_svg(score, color_map=color_map, svg_profile=svg_profile)
+        svg = render_svg(score, color_map=color_map, svg_profile=svg_profile, render_seed=render_seed)
         return RenderEngineResult(
             svg=svg,
             metadata={

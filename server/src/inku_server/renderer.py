@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
 import struct
 from xml.sax.saxutils import escape
@@ -114,11 +115,18 @@ TEXTURE_FILTERS: dict[str, str] = {
 }
 
 
-def _seed_for_instruction(ins: Instruction) -> int:
-    """同一 Score は同一 SVG を出す (決定的)。"""
+def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None) -> int:
+    """Instruction と演奏 seed から安定した乱数 seed を作る。"""
     key = ins.model_dump_json().encode("utf-8")
+    if performance_seed is not None:
+        key += f":render:{performance_seed}".encode("utf-8")
     digest = hashlib.sha256(key).digest()
     return struct.unpack("<Q", digest[:8])[0]
+
+
+def new_render_seed() -> int:
+    """演奏ごとのマクロ揺らぎ seed。明示 seed 指定時は再現可能。"""
+    return struct.unpack("<Q", os.urandom(8))[0]
 
 
 def _hash_to_unit(i: int, seed: int) -> float:
@@ -424,6 +432,141 @@ def _apply_color_cycle(items: list[Instruction], cycle: list) -> list[Instructio
     return result
 
 
+def _strip_performance_fields(ins: Instruction) -> Instruction:
+    data = ins.model_dump(by_alias=True)
+    data.pop("at", None)
+    data.pop("relation", None)
+    return Instruction.model_validate(data)
+
+
+def _move_anchor_to(ins: Instruction, target: tuple[float, float]) -> Instruction:
+    ax, ay = _anchor(ins)
+    data = ins.model_dump(by_alias=True)
+    data.pop("at", None)
+    data.pop("relation", None)
+    dx = target[0] - ax
+    dy = target[1] - ay
+    if ins.primitive == "line" and ins.from_ and ins.to:
+        data["from"] = [_clamp01(ins.from_[0] + dx), _clamp01(ins.from_[1] + dy)]
+        data["to"] = [_clamp01(ins.to[0] + dx), _clamp01(ins.to[1] + dy)]
+    elif ins.primitive in ("circle", "ellipse", "arc", "polygon"):
+        if ins.center:
+            data["center"] = [_clamp01(ins.center[0] + dx), _clamp01(ins.center[1] + dy)]
+        else:
+            data["center"] = [_clamp01(target[0]), _clamp01(target[1])]
+    elif ins.primitive in ("square", "triangle"):
+        if ins.position:
+            data["position"] = [_clamp01(ins.position[0] + dx), _clamp01(ins.position[1] + dy)]
+        else:
+            size = ins.size or (0.2, 0.2)
+            data["size"] = list(size)
+            data["position"] = [_clamp01(target[0] - size[0] / 2), _clamp01(target[1] - size[1] / 2)]
+    return Instruction.model_validate(data)
+
+
+def _resolve_at_region(ins: Instruction, seed: int, index: int) -> Instruction:
+    if ins.at is None:
+        return ins
+    x0, y0, x1, y1 = ins.at.region
+    x = x0 + (x1 - x0) * _hash01(index, seed, "region-x")
+    y = y0 + (y1 - y0) * _hash01(index, seed, "region-y")
+    return _move_anchor_to(ins, (x, y))
+
+
+def _bbox_for_instruction(ins: Instruction) -> tuple[float, float, float, float] | None:
+    if ins.primitive == "line" and ins.from_ and ins.to:
+        return (min(ins.from_[0], ins.to[0]), min(ins.from_[1], ins.to[1]), max(ins.from_[0], ins.to[0]), max(ins.from_[1], ins.to[1]))
+    if ins.primitive in ("circle", "arc", "polygon") and ins.center and ins.radius is not None:
+        return (ins.center[0] - ins.radius, ins.center[1] - ins.radius, ins.center[0] + ins.radius, ins.center[1] + ins.radius)
+    if ins.primitive == "ellipse" and ins.center and ins.size:
+        return (ins.center[0] - ins.size[0] / 2, ins.center[1] - ins.size[1] / 2, ins.center[0] + ins.size[0] / 2, ins.center[1] + ins.size[1] / 2)
+    if ins.primitive in ("square", "triangle") and ins.position and ins.size:
+        return (ins.position[0], ins.position[1], ins.position[0] + ins.size[0], ins.position[1] + ins.size[1])
+    return None
+
+
+def _bbox_center(bbox: tuple[float, float, float, float]) -> tuple[float, float]:
+    return ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
+
+
+def _bbox_radius(bbox: tuple[float, float, float, float]) -> float:
+    return max(0.015, math.hypot(bbox[2] - bbox[0], bbox[3] - bbox[1]) / 2)
+
+
+def _relation_gap(seed: int, index: int, gap: str) -> float:
+    ranges = {
+        "narrow": (0.02, 0.05),
+        "medium": (0.06, 0.12),
+        "wide": (0.15, 0.30),
+    }
+    lo, hi = ranges.get(gap, ranges["medium"])
+    return lo + (hi - lo) * _hash01(index, seed, "relation-gap")
+
+
+def _resolve_relation(ins: Instruction, previous: list[Instruction], seed: int, index: int) -> Instruction:
+    rel = ins.relation
+    if rel is None:
+        return _strip_performance_fields(ins)
+    if rel.type == "between" and len(previous) < 2:
+        return _strip_performance_fields(ins)
+    if rel.type != "between" and not previous:
+        return _strip_performance_fields(ins)
+    prev_bbox = _bbox_for_instruction(previous[-1]) if previous else None
+    if prev_bbox is None:
+        return _strip_performance_fields(ins)
+    prev_center = _bbox_center(prev_bbox)
+    prev_radius = _bbox_radius(prev_bbox)
+    gap = _relation_gap(seed, index, rel.gap)
+
+    if rel.type == "between":
+        other_bbox = _bbox_for_instruction(previous[-2])
+        if other_bbox is None:
+            return _strip_performance_fields(ins)
+        other_center = _bbox_center(other_bbox)
+        jitter = 0.08 * (_hash01(index, seed, "between-jitter") - 0.5)
+        target = (_clamp01((prev_center[0] + other_center[0]) / 2 + jitter), _clamp01((prev_center[1] + other_center[1]) / 2 - jitter))
+    elif rel.type == "along":
+        if previous[-1].primitive == "line" and previous[-1].from_ and previous[-1].to:
+            t = 0.18 + 0.64 * _hash01(index, seed, "along-t")
+            x, y = _point_on_line(previous[-1].from_, previous[-1].to, t)
+            ox, oy = _line_perp_offsets(previous[-1].from_, previous[-1].to, gap)
+            side = -1.0 if _hash01(index, seed, "along-side") < 0.5 else 1.0
+            target = (_clamp01(x + ox * side), _clamp01(y + oy * side))
+        else:
+            angle = math.tau * _hash01(index, seed, "along-angle")
+            target = (_clamp01(prev_center[0] + math.cos(angle) * (prev_radius + gap)), _clamp01(prev_center[1] + math.sin(angle) * (prev_radius + gap)))
+    elif rel.type == "cutting":
+        target = prev_center
+        if ins.primitive == "line":
+            angle = math.tau * _hash01(index, seed, "cut-angle")
+            length = 0.28 + 0.18 * _hash01(index, seed, "cut-length")
+            data = ins.model_dump(by_alias=True)
+            data.pop("relation", None)
+            data.pop("at", None)
+            data["from"] = [_clamp01(target[0] - math.cos(angle) * length / 2), _clamp01(target[1] - math.sin(angle) * length / 2)]
+            data["to"] = [_clamp01(target[0] + math.cos(angle) * length / 2), _clamp01(target[1] + math.sin(angle) * length / 2)]
+            return Instruction.model_validate(data)
+    else:
+        angle = math.tau * _hash01(index, seed, "not-touching-angle")
+        target = (_clamp01(prev_center[0] + math.cos(angle) * (prev_radius + gap)), _clamp01(prev_center[1] + math.sin(angle) * (prev_radius + gap)))
+    return _move_anchor_to(ins, target)
+
+
+def _resolve_performance_score(score: Score, performance_seed: int | None) -> Score:
+    if performance_seed is None:
+        return score
+    resolved: list[Instruction] = []
+    seed = int(performance_seed)
+    for index, original in enumerate(score.instructions):
+        ins = _ensure_line_coords(original)
+        ins = _resolve_at_region(ins, seed, index)
+        ins = _resolve_relation(ins, resolved, seed, index)
+        resolved.append(ins)
+    data = score.model_dump(by_alias=True)
+    data["instructions"] = [ins.model_dump(by_alias=True) for ins in resolved]
+    return Score.model_validate(data)
+
+
 def _render_effect_hint(color_hint: str | None) -> str | None:
     """color_cycle 時も、色選択ではなく描画効果に関わるヒントだけは残す。"""
     if not color_hint:
@@ -442,7 +585,7 @@ def _render_effect_hint(color_hint: str | None) -> str | None:
     return "; ".join(kept) if kept else None
 
 
-def _expand_arrangement(ins: Instruction) -> list[Instruction]:
+def _expand_arrangement(ins: Instruction, performance_seed: int | None = None) -> list[Instruction]:
     """arrangement を展開して N 個の Instruction を返す。"""
     arr = ins.arrangement
     assert arr is not None
@@ -454,7 +597,7 @@ def _expand_arrangement(ins: Instruction) -> list[Instruction]:
     n = arr.count
     margin = max(arr.margin, 0.20) if arr.preserve_space else arr.margin
     ax, ay = _anchor(ins)
-    seed = _seed_for_instruction(ins)
+    seed = _seed_for_instruction(ins, performance_seed)
     cluster_count = arr.cluster_count or 0
 
     if cluster_count > 0 and arr.layout in ("scatter", "horizontal", "vertical"):
@@ -612,8 +755,10 @@ def render(
     *,
     canvas_aspect: str | None = None,
     svg_profile: str | None = None,
+    render_seed: int | None = None,
 ) -> str:
     profile = _normalize_svg_profile(svg_profile)
+    score = _resolve_performance_score(score, render_seed)
     structured = profile != "display"
     use_filters = profile == "display"
     cmap = {**COLOR_MAP, **(color_map or {})}
@@ -646,10 +791,10 @@ def render(
     elem_idx = 0
 
     for ins_idx, ins in enumerate(score.instructions):
-        expanded = _expand_arrangement(ins) if ins.arrangement else [ins]
+        expanded = _expand_arrangement(ins, render_seed) if ins.arrangement else [ins]
         instruction_group = dwg.g(id=_instruction_svg_id(ins, ins_idx)) if structured else content
         for mark_idx, single in enumerate(expanded):
-            element = _render_instruction(dwg, single, cmap, canvas, use_filters=use_filters)
+            element = _render_instruction(dwg, single, cmap, canvas, use_filters=use_filters, render_seed=render_seed)
             if element is not None:
                 if structured:
                     element["id"] = _mark_svg_id(single, ins_idx, mark_idx)
@@ -1439,6 +1584,7 @@ def _render_instruction(
     canvas: CanvasSize | None = None,
     *,
     use_filters: bool = True,
+    render_seed: int | None = None,
 ):
     canvas = canvas or canvas_size_for_aspect(None)
     attrs = _stroke_attrs(ins, cmap, use_filters=use_filters)
@@ -1449,7 +1595,7 @@ def _render_instruction(
         if _needs_path_variation(ins.variation):
             assert ins.variation is not None
             points = _line_with_variation(
-                start, end, ins.variation, _seed_for_instruction(ins)
+                start, end, ins.variation, _seed_for_instruction(ins, render_seed)
             )
             return _apply_rotation(dwg.polyline(points=points, **attrs), ins, canvas)
         textured = _material_line_group(dwg, ins, start, end, attrs, canvas, use_filters=use_filters)

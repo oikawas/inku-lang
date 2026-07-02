@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.50**
+**Version: v1.51**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -113,7 +113,7 @@ reactions without increasing overall density.
 ## 3. Design Principles
 
 1. Descriptions must remain human-readable.
-2. Variation is part of the specification, not a bug.
+2. Variation is part of the specification, not a bug. It exists at two scales: micro variation in line wobble, blur, grain, and texture; and macro variation in composition and placement resolved by the renderer.
 3. Emotional adjectives are excluded from core vocabulary.
 4. Physical, spatial, material, and motion words are preferred.
 5. Coordinates are normalized ratios, not fixed pixels.
@@ -156,8 +156,15 @@ possibilities by selectively applying:
 - abstracted natural or material forms using the current primitive vocabulary
 
 The filter must be selective.  It should not pack every technique into every
-image.  It chooses a small number of relevant techniques based on the sentence's
-context, emotional tone, and implied scale.
+image.  It now favors composition-family selection and relation attachment over
+fixed finished recipes.  The maintained composition families include diagonal
+bands, vertical rhythm, horizontal strata, radial or concentric structures,
+one-sided focus, central stillness, retreat to the edge, and dispersal.  Focus
+points are represented as regions, not hard-coded coordinates.  Techniques such
+as counterpoint, pointillist backgrounds, perspective lines, and canon-like
+repetition should primarily become relations on existing instructions; separate
+fixed auxiliary layers are used only when relation encoding cannot carry the
+intent.
 
 ### Stage 2: Structuring
 
@@ -194,7 +201,11 @@ The renderer converts JSON Score into SVG.  It owns visual realization:
 - canvas aspect handling
 
 The renderer is allowed to produce controlled variation, but it must preserve
-the JSON Score's intent.
+the JSON Score's intent.  Renderer performance has two scales: micro variation
+(line wobble, blur, grain, material texture) and macro variation (seeded
+resolution of regions and relations).  Each render may carry a `render_seed`;
+providing the same seed makes replay reproducible while leaving the canonical
+Score stable.
 
 Human, face, animal, and group motifs are not drawn as literal objects.  Stage 2
 and the coercion layer convert them into `Score.presence`: presence kind,
@@ -261,6 +272,7 @@ Current core categories include:
 | touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
 | line continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | motion | うごき | place, align, scatter, fill, tremble, undulate |
+| relations | あいだ | along, not touching, cutting, between |
 | place | ばしょ | top, bottom, edge, corner, near, across |
 | angle | かたむき | horizontal, vertical, diagonal, rotated |
 | proportion | わりあい | tall, wide, half, quarter, crescent |
@@ -298,7 +310,7 @@ compose, the JSON tab, and saved artifact JSON include the resolved
 `render_engine_version`, `render_canvas_aspect`, `render_hash`,
 `render_hash_short`, `render_color_catalog_id`, `render_color_catalog_name`,
 `render_color_catalog_sub`, `render_color_map`,
-`instruction_lang_requested`, `instruction_lang_resolved`, and `ui_lang`, where
+`instruction_lang_requested`, `instruction_lang_resolved`, `ui_lang`, and `render_seed`, where
 abstract colors and `palette:<name>` entries are expanded to the exact
 `#RRGGBB` codes used for SVG rendering.  The current engine metadata is
 `render_engine_id: "default"` and
@@ -308,9 +320,10 @@ concrete color record needed for replay and audit.
 `render_hash` is a 64-character SHA-256 hex hash of the rendered content and
 server-owned render metadata.  `render_hash_short` is the four-character
 uppercase suffix used for UI and CLI references.
-Instruction-language metadata is retained in JSON and history, but is excluded
-from the current hash payload to avoid changing existing history and benchmark
-hash references.
+Instruction-language metadata and `render_seed` are retained in JSON and history.
+They are excluded from the current canonical Score payload; the rendered SVG and
+server-owned render metadata still identify the concrete artifact for audit and
+replay context.
 `score.canvas` remains the score-level canvas instruction, while
 `render_canvas_aspect` records the canvas aspect actually used for this rendered
 artifact.  In normal server-generated output they match, but both are retained
@@ -339,6 +352,8 @@ Important score concepts:
 - `arrangement`: count, distribution, paths, grouping, density, fade, and color cycles
 - `rotation`: shape-level or group-level orientation
 - `color_hint`: optional hint used when resolving catalog colors
+- `at.region`: optional normalized placement region `[x0,y0,x1,y1]` resolved by the renderer seed
+- `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, or `between`
 
 Large repetitions should prefer group behavior over literal overload.  Dense
 clusters use `arrangement.density`, `cluster_count`, `fade`, and
@@ -352,6 +367,13 @@ Current scene-tone palette behavior uses abstract colors only:
 
 Nuance that cannot be represented by the six abstract colors is retained in
 `color_hint` for catalog-based rendering.
+
+Relations are sequential.  `along`, `not_touching`, and `cutting` refer to the
+immediately previous instruction; `between` refers to the previous two.  There
+are no arbitrary ids, forward references, or repair governors for relations.
+Invalid relations are dropped silently by validation or coercion, and the
+instruction is rendered as an ordinary instruction.  The coerce layer may remove
+invalid relations but must not add new ones.
 
 The system treats the DB history record as the source of truth.  SVG, JSON
 files, PNG files, and other artifacts are derived outputs.
@@ -983,6 +1005,20 @@ The status-bar PNG export templates default to Y-axis heights of `1080px`,
 `2160px`, and `4320px`. Older saved defaults of `1024px` and `2048px` are
 automatically replaced by the new defaults, while user-customized templates are
 preserved. The Japanese UI labels this dimension as `Y軸` / `Y軸の高さ`.
+
+### v1.51 (2026-07-02)
+
+Version 1.51 adds the relation system, called `aida` in Japanese, and assigns
+variation to both micro and macro scales.  JSON Score instructions may now carry
+`at.region` for renderer-resolved placement and `relation` for observable
+relationships to previous instructions: `along`, `not_touching`, `cutting`, and
+`between`.  Renderer performances record `render_seed` so macro placement can
+vary between performances while remaining reproducible when a seed is provided.
+
+Stage 1.5 is redirected away from fixed finished recipes and toward
+composition-family selection plus relation attachment.  Invalid relations are
+dropped rather than repaired, and the coerce layer is forbidden from adding
+relations.
 
 Detailed implementation history remains in the canonical Japanese spec.
 

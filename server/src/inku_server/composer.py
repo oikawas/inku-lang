@@ -80,10 +80,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「波打つ軌跡に沿って」→ arrangement.path="wave"。「斜めの帯」→ path="diagonal"。「右半分」→ path="right_half"**
 - **「リズム」「跳ねる」「踊る」「輪唱のずれ」「ほどける反復」→ count を増やさず arrangement.rhythm_spacing を使う。楽しい/跳ねる=syncopated、加速/流れ=accelerando、ゆるい揺れ=loose**
 - **「上から下へ散らす」は layout=vertical, path="top_to_bottom"。「左から右へ」「横に」は layout=horizontal, path="left_to_right"。「放射状」「同心円状」は layout=radial**
-- **「右上の黄金比の位置」→ center=[0.618,0.382]。左下なら [0.382,0.618]。数学的な均衡点として扱う**
+- **「右上の黄金比の位置」→ at={"region":[0.56,0.32,0.68,0.44]}。左下なら [0.32,0.56,0.44,0.68]。焦点は固定座標ではなく領域として扱う**
 - **「左上の三分割の交点」→ center=[0.333,0.333]。「右下の三分割の交点」→ center=[0.667,0.667]。三分割構図として扱う**
 - **「左下の白銀比の位置」→ center=[0.414,0.586]。「右上の白銀比の位置」→ center=[0.586,0.414]。白銀比の余白として扱う**
-- **「右上の焦点」→ center=[0.72,0.28]。「左上の焦点」→ [0.28,0.28]。「右下の焦点」→ [0.72,0.72]。「左下の焦点」→ [0.28,0.72]。中央の代替焦点として扱う**
+- **「右上の焦点」→ at={"region":[0.60,0.18,0.82,0.40]}。「左上の焦点」→ [0.18,0.18,0.40,0.40]。「右下の焦点」→ [0.60,0.60,0.82,0.82]。「左下の焦点」→ [0.18,0.60,0.40,0.82]。焦点座標をハードコードしない**
 - **「上端寄りの焦点」→ center=[0.5,0.18]。「右半分の焦点」→ center=[0.72,0.5]**
 - **「正五角形の頂点に五個」→ arrangement count=5 layout=radial。五芒星的な均衡の点列として扱う**
 - **「フィボナッチ」「十三」「二十一」などの数量はそのまま使い、意外性のある規則的な層として扱う**
@@ -102,6 +102,14 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「フレスコの下地」→ chalk の横線や灰色面。blurring で古い壁面として扱う**
 - **「水墨」→ brush_thin/brush_thick の黒/灰線。濃淡は blurring または細太の対比で扱う**
 - **強い単色背景 (black/red/blue/green) は DDL が明示する、または夜・炎・標識・海など主題に必要な場合だけ使う。迷ったら white を使う**
+
+# 関係（あいだ）
+
+- **「前の線に沿って」/ "along the previous line" → relation={"type":"along","gap":"narrow"}**
+- **「前の形に触れない」/ "not touching the previous shape" → relation={"type":"not_touching","gap":"narrow"}。広く触れないなら gap="wide"**
+- **「前の線を切る」/ "cutting the previous line" → relation={"type":"cutting","gap":"medium"}**
+- **「前の二つの間に」/ "between the previous two" → relation={"type":"between","gap":"medium"}**
+- relation は正規化DDL に定型句がある時だけ転記する。relation を推測で追加しない。先頭 instruction には relation を付けない。
 
 # 例 (最重要パターン)
 

@@ -42,6 +42,42 @@ PresenceIntensity = Literal["low", "medium", "high"]
 PresenceSymmetry = Literal["none", "bilateral", "radial"]
 GazePressure = Literal["none", "low", "medium", "high"]
 ContourDensity = Literal["low", "medium", "high"]
+RelationType = Literal["along", "not_touching", "cutting", "between"]
+RelationGap = Literal["narrow", "medium", "wide"]
+
+
+class AtRegion(BaseModel):
+    """演奏時に Renderer が解決する配置領域。"""
+
+    region: tuple[float, float, float, float] = Field(
+        description="[x0,y0,x1,y1] の正規化領域。Renderer が render_seed で実座標へ解決する",
+    )
+
+    @field_validator("region", mode="before")
+    @classmethod
+    def _normalize_region(cls, v: object) -> object:
+        if not isinstance(v, (list, tuple)) or len(v) != 4:
+            return v
+        vals = [float(item) for item in v]
+        x0, y0, x1, y1 = vals
+        return (
+            max(0.0, min(1.0, min(x0, x1))),
+            max(0.0, min(1.0, min(y0, y1))),
+            max(0.0, min(1.0, max(x0, x1))),
+            max(0.0, min(1.0, max(y0, y1))),
+        )
+
+
+class Relation(BaseModel):
+    """直前 instruction との観察可能な関係。参照先は暗黙 prev のみ。"""
+
+    type: RelationType = Field(
+        description="along=沿う / not_touching=触れない / cutting=切る / between=直前2要素の間に",
+    )
+    gap: RelationGap = Field(
+        default="medium",
+        description="関係解決時の距離目安: narrow / medium / wide。具体距離は Renderer が解決する",
+    )
 
 
 class Variation(BaseModel):
@@ -240,6 +276,14 @@ class Instruction(BaseModel):
     arrangement: Optional[Arrangement] = Field(
         default=None,
         description="N個配置。2以上の同一図形は必ずこれを使う。複数 instruction 生成は絶対禁止",
+    )
+    at: Optional[AtRegion] = Field(
+        default=None,
+        description="演奏時配置領域。例: {\"region\":[0.56,0.32,0.68,0.44]}。固定座標より弱い指定",
+    )
+    relation: Optional[Relation] = Field(
+        default=None,
+        description="直前 instruction への関係。1 instruction につき最大1つ。coerce は追加せず、invalid は drop",
     )
 
     @field_validator("sides", mode="before")

@@ -6,6 +6,7 @@ import argparse
 import getpass
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -410,6 +411,7 @@ def _color_catalog_summary(catalog_id: str, catalog_data: dict[str, Any]) -> dic
 def _render_response_summary(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "render_build_number": result.get("render_build_number"),
+        "render_seed": result.get("render_seed"),
         "render_hash": result.get("render_hash"),
         "render_hash_short": result.get("render_hash_short"),
         "render_color_catalog_id": result.get("render_color_catalog_id"),
@@ -547,6 +549,7 @@ def _result_with_svg_profile(
             "score": result.get("score") or {},
             "catalog_id": result.get("render_color_catalog_id") or color_catalog,
             "svg_profile": svg_profile,
+            "render_seed": result.get("render_seed"),
         },
     )
     return output
@@ -623,6 +626,242 @@ def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thu
     output_path.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(output_path)
 
+
+
+def _png_occupancy_grid(path: Path, *, cells: int = 16) -> list[float]:
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        raise CliError("analyze --diversity requires Pillow") from exc
+    with Image.open(path) as image:
+        image = image.convert("L").resize((cells, cells))
+        pixels = list(image.getdata())
+    return [1.0 - (float(pixel) / 255.0) for pixel in pixels]
+
+
+def _cosine_distance(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    if na <= 1e-12 and nb <= 1e-12:
+        return 0.0
+    if na <= 1e-12 or nb <= 1e-12:
+        return 1.0
+    return max(0.0, min(1.0, 1.0 - dot / (na * nb)))
+
+
+def _mean_pair_distance(vectors: list[list[float]]) -> float | None:
+    if len(vectors) < 2:
+        return None
+    total = 0.0
+    count = 0
+    for i, first in enumerate(vectors):
+        for second in vectors[i + 1:]:
+            total += _cosine_distance(first, second)
+            count += 1
+    return round(total / count, 6) if count else None
+
+
+def _entropy_bits(counter: Counter[str]) -> float:
+    total = sum(counter.values())
+    if total <= 0:
+        return 0.0
+    entropy = 0.0
+    for count in counter.values():
+        if count <= 0:
+            continue
+        p = count / total
+        entropy -= p * math.log2(p)
+    return entropy
+
+
+def _normalized_entropy(counter: Counter[str]) -> float | None:
+    if not counter:
+        return None
+    k = len(counter)
+    if k <= 1:
+        return 0.0
+    return round(_entropy_bits(counter) / math.log2(k), 6)
+
+
+def _score_from_artifact(data: dict[str, Any]) -> dict[str, Any] | None:
+    score = data.get("score") if isinstance(data, dict) else None
+    if isinstance(score, dict):
+        return score
+    if isinstance(data.get("instructions"), list):
+        return data
+    return None
+
+
+def _iter_score_artifacts(input_dir: Path) -> list[dict[str, Any]]:
+    artifacts: list[dict[str, Any]] = []
+    for path in sorted(input_dir.rglob("*.json")):
+        if path.name in {"analysis-summary.json", "summary.json", "diversity-summary.json"}:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        score = _score_from_artifact(data)
+        if score is None:
+            continue
+        artifacts.append({"path": str(path), "score": score, "artifact": data})
+    return artifacts
+
+
+def _dominant_angle_bin(score: dict[str, Any]) -> int | None:
+    bins: Counter[int] = Counter()
+    instructions = score.get("instructions")
+    if not isinstance(instructions, list):
+        return None
+    for instruction in instructions:
+        if not isinstance(instruction, dict):
+            continue
+        start = _coord_pair(instruction.get("from"))
+        end = _coord_pair(instruction.get("to"))
+        if start is not None and end is not None:
+            angle = math.atan2(end[1] - start[1], end[0] - start[0]) % math.pi
+            bins[int((angle / math.pi) * 8) % 8] += 1
+        arrangement = instruction.get("arrangement")
+        if isinstance(arrangement, dict):
+            path = arrangement.get("path")
+            layout = arrangement.get("layout")
+            if path == "diagonal":
+                bins[7] += 1
+            elif path == "top_to_bottom" or layout == "vertical":
+                bins[2] += 1
+            elif path == "left_to_right" or layout == "horizontal":
+                bins[0] += 1
+            elif path == "wave":
+                bins[0] += 1
+            elif layout == "radial":
+                bins[4] += 1
+    if not bins:
+        return None
+    return bins.most_common(1)[0][0]
+
+
+def _composition_family_from_score(score: dict[str, Any]) -> str:
+    instructions = score.get("instructions")
+    if not isinstance(instructions, list):
+        return "unknown"
+    paths: Counter[str] = Counter()
+    layouts: Counter[str] = Counter()
+    centers: list[tuple[float, float]] = []
+    relations: Counter[str] = Counter()
+    for instruction in instructions:
+        if not isinstance(instruction, dict):
+            continue
+        center = _instruction_center(instruction)
+        if center is not None:
+            centers.append(center)
+        relation = instruction.get("relation")
+        if isinstance(relation, dict) and isinstance(relation.get("type"), str):
+            relations[relation["type"]] += 1
+        arrangement = instruction.get("arrangement")
+        if isinstance(arrangement, dict):
+            path = arrangement.get("path")
+            layout = arrangement.get("layout")
+            if isinstance(path, str) and path != "none":
+                paths[path] += 1
+            if isinstance(layout, str):
+                layouts[layout] += 1
+    if paths["diagonal"] or paths["right_half"]:
+        return "diagonal_band"
+    if paths["top_to_bottom"] or layouts["vertical"]:
+        return "vertical_rhythm"
+    if paths["left_to_right"] or layouts["horizontal"]:
+        return "horizontal_strata"
+    if layouts["radial"]:
+        return "radial_concentric"
+    if relations:
+        return f"relation_{relations.most_common(1)[0][0]}"
+    if centers:
+        avg_x = sum(x for x, _ in centers) / len(centers)
+        avg_y = sum(y for _, y in centers) / len(centers)
+        if 0.42 <= avg_x <= 0.58 and 0.42 <= avg_y <= 0.58:
+            return "central_stillness"
+        if avg_x < 0.25 or avg_x > 0.75 or avg_y < 0.25 or avg_y > 0.75:
+            return "edge_retreat"
+        if avg_x < 0.40 or avg_x > 0.60:
+            return "one_sided_focus"
+    return "dispersal"
+
+
+def _diversity_summary(input_dir: Path) -> dict[str, Any]:
+    png_paths = sorted(path for path in input_dir.rglob("*.png") if path.name != "contact-sheet.png")
+    grids = [_png_occupancy_grid(path) for path in png_paths]
+    artifacts = _iter_score_artifacts(input_dir)
+    primitive_counts: Counter[str] = Counter()
+    color_counts: Counter[str] = Counter()
+    weight_counts: Counter[str] = Counter()
+    layout_counts: Counter[str] = Counter()
+    path_counts: Counter[str] = Counter()
+    family_counts: Counter[str] = Counter()
+    angle_bins: Counter[str] = Counter()
+    relation_counts: Counter[str] = Counter()
+    relation_sample_count = 0
+    density_counts: Counter[str] = Counter()
+    for artifact in artifacts:
+        score = artifact["score"]
+        family_counts[_composition_family_from_score(score)] += 1
+        angle_bin = _dominant_angle_bin(score)
+        if angle_bin is not None:
+            angle_bins[str(angle_bin)] += 1
+        has_relation = False
+        instructions = score.get("instructions")
+        if not isinstance(instructions, list):
+            continue
+        for instruction in instructions:
+            if not isinstance(instruction, dict):
+                continue
+            for key, counter in (("primitive", primitive_counts), ("color", color_counts), ("weight", weight_counts)):
+                value = instruction.get(key)
+                if isinstance(value, str):
+                    counter[value] += 1
+            relation = instruction.get("relation")
+            if isinstance(relation, dict) and isinstance(relation.get("type"), str):
+                relation_counts[relation["type"]] += 1
+                has_relation = True
+            arrangement = instruction.get("arrangement")
+            if isinstance(arrangement, dict):
+                layout = arrangement.get("layout")
+                path = arrangement.get("path")
+                density = arrangement.get("density")
+                if isinstance(layout, str):
+                    layout_counts[layout] += 1
+                if isinstance(path, str):
+                    path_counts[path] += 1
+                if isinstance(density, str):
+                    density_counts[density] += 1
+        if has_relation:
+            relation_sample_count += 1
+    family_total = sum(family_counts.values())
+    return {
+        "input_dir": str(input_dir),
+        "png_count": len(png_paths),
+        "score_count": len(artifacts),
+        "composition_distance": _mean_pair_distance(grids),
+        "angle_entropy_bits": round(_entropy_bits(angle_bins), 6),
+        "angle_bins": dict(sorted(angle_bins.items())),
+        "vocab_entropy": {
+            "primitive": _normalized_entropy(primitive_counts),
+            "color": _normalized_entropy(color_counts),
+            "weight": _normalized_entropy(weight_counts),
+            "layout": _normalized_entropy(layout_counts),
+            "path": _normalized_entropy(path_counts),
+        },
+        "family_counts": dict(sorted(family_counts.items())),
+        "family_share_max": round(max(family_counts.values()) / family_total, 6) if family_total else None,
+        "relation_counts": dict(sorted(relation_counts.items())),
+        "relation_sample_count": relation_sample_count,
+        "relation_sample_rate": round(relation_sample_count / len(artifacts), 6) if artifacts else None,
+        "density_counts": dict(sorted(density_counts.items())),
+        "score_primitive_counts": dict(sorted(primitive_counts.items())),
+        "score_color_counts": dict(sorted(color_counts.items())),
+    }
 
 def _history_hash_label(item: dict[str, Any]) -> str:
     value = item.get("render_hash_short") or str(item.get("render_hash") or "")[-4:]
@@ -1381,6 +1620,7 @@ def _paint_payload(
         "history_input": args.history_input,
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
+        "render_seed": getattr(args, "render_seed", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -1407,6 +1647,7 @@ def _compose_payload(
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "auto_repair": True,
+        "render_seed": getattr(args, "render_seed", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -2021,6 +2262,20 @@ def command_contact_sheet(args: argparse.Namespace) -> int:
     return 0
 
 
+
+def command_analyze(args: argparse.Namespace) -> int:
+    input_dir = Path(args.input_dir)
+    if not input_dir.exists() or not input_dir.is_dir():
+        raise CliError(f"input directory not found: {input_dir}")
+    if not args.diversity:
+        raise CliError("only --diversity analysis is currently supported")
+    summary = _diversity_summary(input_dir)
+    output_path = Path(args.output) if args.output else input_dir / "diversity-summary.json"
+    _write_json_file(output_path, summary)
+    print(f"summary: {output_path}", file=sys.stderr)
+    _print_json(summary)
+    return 0
+
 def command_render_score(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -2045,6 +2300,7 @@ def command_render_score(args: argparse.Namespace) -> int:
             "catalog_id": color_catalog,
             "canvas_aspect": args.canvas_aspect,
             "svg_profile": args.svg_profile,
+            "render_seed": args.render_seed,
         },
     )
     render_hash = hashlib.sha256(svg.encode("utf-8")).hexdigest()
@@ -2058,6 +2314,7 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_canvas_aspect": args.canvas_aspect,
         "render_canvas_aspect_id": args.canvas_aspect,
         "render_canvas_aspect_ratio": _canvas_aspect_ratio(args.canvas_aspect),
+        "render_seed": args.render_seed,
         "svg_profile": args.svg_profile,
     }
     paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=args.prefix or "score", png=args.png)
@@ -2186,6 +2443,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
+    parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
     parser.add_argument("--ui-lang")
     parser.add_argument("--include-thinking", action="store_true")
@@ -2241,6 +2499,12 @@ def build_parser() -> argparse.ArgumentParser:
     contact_sheet.add_argument("--thumb-size", type=int, default=220)
     contact_sheet.set_defaults(func=command_contact_sheet)
 
+    analyze = subparsers.add_parser("analyze", help="analyze generated PNG/JSON outputs")
+    analyze.add_argument("input_dir", help="directory containing PNG and JSON outputs")
+    analyze.add_argument("--diversity", action="store_true", help="compute diversity metrics and write diversity-summary.json")
+    analyze.add_argument("--output", "-o", help="summary JSON path (default: INPUT_DIR/diversity-summary.json)")
+    analyze.set_defaults(func=command_analyze)
+
     render_score = subparsers.add_parser("render-score", help="render a Score JSON object without Stage 1 or Stage 2")
     _add_common_server_args(render_score)
     render_score.add_argument("score", nargs="?", help="Score JSON text")
@@ -2250,6 +2514,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
     render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display")
     render_score.add_argument("--canvas-aspect", default="square")
+    render_score.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     render_score.add_argument("--color-catalog", help="server color catalog id")
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")

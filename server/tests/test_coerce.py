@@ -2602,3 +2602,20 @@ def test_stage2_fallback_coverage_preserves_right_edge_and_presence_context():
         and ins.to[0] >= 0.85
     ]
     assert right_edge_lines
+
+
+
+def test_coerce_disable_keeps_structural_repair_but_skips_style_repairs(monkeypatch):
+    monkeypatch.setenv("INKU_COERCE_DISABLE", "1")
+    score = Score.model_validate({
+        "instructions": [
+            {"primitive": "line", "color": "black", "relation": {"type": "cutting", "gap": "medium"}},
+        ]
+    })
+
+    fixed = coerce_score(score, ddl="黒い線を一本引く。赤い円を添える。")
+
+    assert len(fixed.instructions) == 1
+    assert fixed.instructions[0].from_ == (0.1, 0.5)
+    assert fixed.instructions[0].to == (0.9, 0.5)
+    assert fixed.instructions[0].relation is None

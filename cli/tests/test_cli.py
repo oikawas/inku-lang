@@ -796,3 +796,50 @@ def test_paper_words_do_not_request_white_by_themselves():
 
     assert "white" not in trace["requested_colors"]
     assert trace["missing_requested_colors"] == []
+
+
+
+def test_paint_payload_includes_render_seed():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨", "--render-seed", "123"])
+
+    payload = cli._paint_payload(args, "一滴の墨")
+
+    assert payload["render_seed"] == 123
+
+
+def test_analyze_parser_accepts_diversity_output():
+    parser = cli.build_parser()
+    args = parser.parse_args(["analyze", "out", "--diversity", "--output", "diversity.json"])
+
+    assert args.input_dir == "out"
+    assert args.diversity is True
+    assert args.output == "diversity.json"
+
+
+def test_diversity_summary_counts_png_score_and_relations(tmp_path):
+    from PIL import Image
+
+    Image.new("RGB", (16, 16), "white").save(tmp_path / "a.png")
+    image = Image.new("RGB", (16, 16), "white")
+    for x in range(8):
+        for y in range(16):
+            image.putpixel((x, y), (0, 0, 0))
+    image.save(tmp_path / "b.png")
+    (tmp_path / "a.json").write_text(json.dumps({
+        "score": {
+            "instructions": [
+                {"primitive": "line", "color": "black", "weight": "pen", "from": [0.1, 0.2], "to": [0.9, 0.2]},
+                {"primitive": "circle", "color": "red", "weight": "brush_thin", "center": [0.5, 0.5], "radius": 0.1, "relation": {"type": "not_touching", "gap": "narrow"}},
+            ]
+        }
+    }), encoding="utf-8")
+
+    summary = cli._diversity_summary(tmp_path)
+
+    assert summary["png_count"] == 2
+    assert summary["score_count"] == 1
+    assert summary["composition_distance"] is not None
+    assert summary["relation_counts"] == {"not_touching": 1}
+    assert summary["relation_sample_rate"] == 1.0
+    assert summary["vocab_entropy"]["primitive"] == 1.0

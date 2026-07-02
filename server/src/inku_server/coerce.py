@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field as dc_field
 from typing import Any, Callable
@@ -3377,8 +3378,17 @@ def _coerce_instruction(ins: Instruction) -> Instruction:
     return Instruction.model_validate(data)
 
 
+def _style_coerce_disabled() -> bool:
+    return os.getenv("INKU_COERCE_DISABLE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。"""
+    if _style_coerce_disabled():
+        instructions = _drop_invalid_relations([_coerce_instruction(ins) for ins in score.instructions])
+        data = score.model_dump(by_alias=True)
+        data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
+        return Score.model_validate(data)
     background = _with_background_dominance_governor(_visible_background(score.background), ddl=ddl)
     instructions = [
         _coerce_and_repair_instruction(ins, original_background=score.background, background=background, ddl=ddl)

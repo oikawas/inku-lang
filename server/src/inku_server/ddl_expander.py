@@ -57,6 +57,13 @@ _JA_EXPANSION_MARKERS = (
     "香りの層",
     "開花を待つ蕾",
     "五感の気配",
+    "前の線を切る",
+    "前の線に沿って",
+    "前の形に触れない",
+    "前の二つの間に",
+    "斜めの線を三本",
+    "右下の焦点から外へ",
+    "右下の焦点から放射状に",
 )
 _EN_EXPANSION_MARKERS = (
     "diagonal band in the right half",
@@ -90,6 +97,12 @@ _EN_EXPANSION_MARKERS = (
     "scent layer",
     "waiting buds",
     "five-sense presence",
+    "cutting the previous line",
+    "along the previous line",
+    "not touching the previous shape",
+    "between the previous two",
+    "outward from a lower-right focus",
+    "radiating from a lower-right focus",
 )
 
 
@@ -320,6 +333,60 @@ def _limit_centered(items: list[str], *, centered_tokens: tuple[str, ...], max_c
     return result
 
 
+def _composition_family(profile: _FilterProfile, text: str, *, lang: str) -> str:
+    if profile.mode == "single_tension":
+        pool = ["edge_retreat", "one_sided_focus", "central_stillness"]
+    elif "music" in profile.tags or "line" in profile.tags:
+        pool = ["vertical_rhythm", "horizontal_strata", "diagonal_band", "dispersal"]
+    elif "particle" in profile.tags or "dense" in profile.tags:
+        pool = ["dispersal", "horizontal_strata", "vertical_rhythm", "radial_concentric"]
+    elif "space" in profile.tags or "presence" in profile.tags:
+        pool = ["edge_retreat", "one_sided_focus", "horizontal_strata", "central_stillness"]
+    elif "water" in profile.tags or "soft" in profile.tags:
+        pool = ["horizontal_strata", "radial_concentric", "edge_retreat", "dispersal"]
+    else:
+        pool = ["diagonal_band", "vertical_rhythm", "horizontal_strata", "radial_concentric", "one_sided_focus", "central_stillness", "edge_retreat", "dispersal"]
+    return pool[_seed(text, f"{lang}-composition-family") % len(pool)]
+
+
+def _rewrite_by_map(items: list[str], replacements: tuple[tuple[str, str], ...]) -> list[str]:
+    result: list[str] = []
+    for item in items:
+        changed = item
+        for before, after in replacements:
+            changed = changed.replace(before, after)
+        result.append(changed)
+    return result
+
+
+def _apply_composition_family_ja(items: list[str], *, profile: _FilterProfile, text: str) -> list[str]:
+    family = _composition_family(profile, text, lang="ja")
+    maps: dict[str, tuple[tuple[str, str], ...]] = {
+        "vertical_rhythm": (("右半分の斜めの帯", "上から下への縦の帯"), ("左下から右上へ", "上から下へ"), ("右上の焦点", "上端寄りの焦点"), ("左下の焦点", "上端寄りの焦点")),
+        "horizontal_strata": (("右半分の斜めの帯", "左から右への横の帯"), ("左下から右上へ", "左から右へ"), ("右上の焦点", "右半分の焦点"), ("左下の焦点", "右半分の焦点")),
+        "radial_concentric": (("右半分の斜めの帯", "右下の焦点から放射状に"), ("左下から右上へ", "右下の焦点から外へ"), ("左下の焦点", "右下の焦点")),
+        "one_sided_focus": (("左下の焦点", "右半分の焦点"), ("上端寄りの焦点", "右半分の焦点")),
+        "central_stillness": (("右半分の斜めの帯", "中央静止の周囲に"), ("左下から右上へ", "中央静止の周囲へ"), ("右上の焦点", "中央静止の周囲"), ("左下の焦点", "中央静止の周囲")),
+        "edge_retreat": (("右半分の斜めの帯", "上端寄りに"), ("左下から右上へ", "上端寄りへ"), ("右上の焦点", "上端寄りの焦点"), ("左下の焦点", "上端寄りの焦点")),
+        "dispersal": (("右半分の斜めの帯", "画面全体に点々と"), ("左下から右上へ", "画面全体へ")),
+    }
+    return _rewrite_by_map(items, maps.get(family, ()))
+
+
+def _apply_composition_family_en(items: list[str], *, profile: _FilterProfile, text: str) -> list[str]:
+    family = _composition_family(profile, text, lang="en")
+    maps: dict[str, tuple[tuple[str, str], ...]] = {
+        "vertical_rhythm": (("along a diagonal band in the right half", "from top to bottom in a vertical band"), ("from lower left to upper right", "from top to bottom"), ("upper-right focus", "upper-edge focus"), ("lower-left focus", "upper-edge focus")),
+        "horizontal_strata": (("along a diagonal band in the right half", "left to right in horizontal strata"), ("from lower left to upper right", "left to right"), ("upper-right focus", "right-half focus"), ("lower-left focus", "right-half focus")),
+        "radial_concentric": (("along a diagonal band in the right half", "radiating from a lower-right focus"), ("from lower left to upper right", "outward from a lower-right focus"), ("lower-left focus", "lower-right focus")),
+        "one_sided_focus": (("lower-left focus", "right-half focus"), ("upper-edge focus", "right-half focus")),
+        "central_stillness": (("along a diagonal band in the right half", "around a central stillness"), ("from lower left to upper right", "around a central stillness"), ("upper-right focus", "central stillness"), ("lower-left focus", "central stillness")),
+        "edge_retreat": (("along a diagonal band in the right half", "near the upper edge"), ("from lower left to upper right", "toward the upper edge"), ("upper-right focus", "upper-edge focus"), ("lower-left focus", "upper-edge focus")),
+        "dispersal": (("along a diagonal band in the right half", "dotted across the whole canvas"), ("from lower left to upper right", "across the whole canvas")),
+    }
+    return _rewrite_by_map(items, maps.get(family, ()))
+
+
 def _dynamic_focus_ja(text: str) -> str:
     focuses = (
         "右上の焦点",
@@ -499,19 +566,19 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
         structural.append(f"{main_color}薄い弧を輪郭の密度として左下の焦点から二つ置く。半径は0.09。")
 
     music = [
-        _FilterCandidate(f"{contrast_color}細い線を対位法の反行として右下がりに二本並べる。細かく震える。", frozenset(("line", "music", "contrast"))),
+        _FilterCandidate(f"{contrast_color}細い線を前の線を切るように二本置く。細かく震える。", frozenset(("line", "music", "contrast"))),
         _FilterCandidate(f"{contrast_color}細い弧を倍音列として右下の焦点から三つ並べる。半径は0.07。", frozenset(("music", "water", "soft"))),
-        _FilterCandidate(f"{main_color}短い線を輪唱のずれとして左から右へ四本並べる。ゆっくり揺れる。", frozenset(("particle", "music", "line"))),
+        _FilterCandidate(f"{main_color}短い線を前の線に沿って左から右へ四本並べる。ゆっくり揺れる。", frozenset(("particle", "music", "line"))),
     ]
     painting = [
-        _FilterCandidate(f"{contrast_color}細い線を一点透視法として右上の焦点へ向けて三本引く。", frozenset(("space", "line", "geometry"))),
+        _FilterCandidate(f"{contrast_color}細い線を前の線に沿って右上の焦点へ三本引く。", frozenset(("space", "line", "geometry"))),
         _FilterCandidate(f"{contrast_color}細い横線を遠近法の奥行きとして上へ細かく三本並べる。", frozenset(("space", "line"))),
         _FilterCandidate("黒い細筆の細い線を素描の下線として左から右へ三本並べる。細かく震える。", frozenset(("line", "quiet"))),
         _FilterCandidate(f"{contrast_color}鉛筆の細い線を余白線として上端寄りに二本並べる。細かく震える。", frozenset(("line", "quiet", "soft"))),
         _FilterCandidate(f"{main_color}クレヨンの短い線を擦れとして右半分の斜めの帯に七本散らす。", frozenset(("particle", "dense", "soft"))),
         _FilterCandidate(f"{contrast_color}ロットリングの細い線を均一線として左から右へ五本並べる。", frozenset(("line", "geometry", "contrast"))),
         _FilterCandidate(f"{contrast_color}縄の横線を撚りとして下端寄りに一本引く。ゆっくり揺れる。", frozenset(("line", "dense", "contrast"))),
-        _FilterCandidate(f"{main_color}回転した小さな四角を点描として右半分の斜めの帯に十三個散らす。", frozenset(("particle", "dense", "geometry"))),
+        _FilterCandidate(f"{main_color}回転した小さな四角を前の形に触れないように右半分の斜めの帯に十三個散らす。", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"{main_color}太筆の短い線を油絵の厚塗りとして横に三本並べる。", frozenset(("dense", "contrast"))),
         _FilterCandidate(f"{contrast_color}薄い水彩の楕円を左上に二つ重ねる。境界が滲む。", frozenset(("water", "soft", "quiet"))),
         _FilterCandidate("赤・青・緑・灰の回転した小さな四角をパッチワークとして格子状に六個並べる。", frozenset(("geometry", "dense"))),
@@ -528,6 +595,7 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
         + _select_category(painting, painting_count, profile=profile, text=context, salt=_mode_salt(profile, "ja-painting"))
     )
     selected = _limit_centered(selected, centered_tokens=("中心", "中央", "放射状", "同心円状"))
+    selected = _apply_composition_family_ja(selected, profile=profile, text=context)
 
     return _join_sentences(sentences + selected, lang="ja")
 
@@ -588,19 +656,19 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
         structural.append(f"Place two pale {main_color} arcs from a lower-left focus as contour density. Radius 0.09.")
 
     music = [
-        _FilterCandidate(f"Line up two thin {contrast_color} lines falling to the right as contrapuntal contrary motion. Fine trembling.", frozenset(("line", "music", "contrast"))),
+        _FilterCandidate(f"Place two thin {contrast_color} lines cutting the previous line. Fine trembling.", frozenset(("line", "music", "contrast"))),
         _FilterCandidate(f"Line up three thin {contrast_color} arcs from a lower-right focus as a harmonic overtone series. Radius 0.07.", frozenset(("music", "water", "soft"))),
-        _FilterCandidate(f"Line up four short {main_color} lines left to right as a canon offset. Swaying slowly.", frozenset(("particle", "music", "line"))),
+        _FilterCandidate(f"Line up four short {main_color} lines left to right along the previous line. Swaying slowly.", frozenset(("particle", "music", "line"))),
     ]
     painting = [
-        _FilterCandidate(f"Draw three thin {contrast_color} lines toward an upper-right focus as one-point perspective.", frozenset(("space", "line", "geometry"))),
+        _FilterCandidate(f"Draw three thin {contrast_color} lines toward an upper-right focus along the previous line.", frozenset(("space", "line", "geometry"))),
         _FilterCandidate(f"Line up three thin {contrast_color} horizontal lines upward as perspective depth.", frozenset(("space", "line"))),
         _FilterCandidate("Line up three thin black fine-brush lines left to right as drawing underlines. Fine trembling.", frozenset(("line", "quiet"))),
         _FilterCandidate(f"Line up two thin {contrast_color} pencil lines near the top edge as pencil negative-space line. Fine trembling.", frozenset(("line", "quiet", "soft"))),
         _FilterCandidate(f"Scatter seven short {main_color} crayon lines along a diagonal band in the right half as crayon rubbing.", frozenset(("particle", "dense", "soft"))),
         _FilterCandidate(f"Line up five thin {contrast_color} rotring uniform lines left to right.", frozenset(("line", "geometry", "contrast"))),
         _FilterCandidate(f"Draw one {contrast_color} rope horizontal line near the bottom edge as rope twist. Swaying slowly.", frozenset(("line", "dense", "contrast"))),
-        _FilterCandidate(f"Scatter thirteen small rotated {main_color} squares along a diagonal band in the right half as pointillism.", frozenset(("particle", "dense", "geometry"))),
+        _FilterCandidate(f"Scatter thirteen small rotated {main_color} squares not touching the previous shape along a diagonal band in the right half.", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"Line up three short {main_color} thick-brush lines horizontally as oil impasto.", frozenset(("dense", "contrast"))),
         _FilterCandidate("Layer two pale watercolor ellipses in the upper left. Edges blurring.", frozenset(("water", "soft", "quiet"))),
         _FilterCandidate("Line up six small rotated squares in red, blue, green, gray as patchwork grid.", frozenset(("geometry", "dense"))),
@@ -620,5 +688,6 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
         selected,
         centered_tokens=("center", "radial", "concentric"),
     )
+    selected = _apply_composition_family_en(selected, profile=profile, text=context)
 
     return _join_sentences(sentences + selected, lang="en")

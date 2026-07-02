@@ -78,6 +78,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「画面全体に点々」「全面に細かく」は layout=scatter でよいが、意味は無秩序ではなく全面分布として扱う**
 - **scatter は均一な乱数ではない。密度勾配、端部の薄れ、斜めの帯、右半分、上から下など、DDL の配置語に沿った偏りを持つものとして扱う**
 - **「波打つ軌跡に沿って」→ arrangement.path="wave"。「斜めの帯」→ path="diagonal"。「右半分」→ path="right_half"**
+- **「上から下への縦の帯」→ layout="vertical", path="top_to_bottom"。「左から右への横の帯」→ layout="horizontal", path="left_to_right"。「画面全体へ」→ layout="scatter"。**
+- **「中央静止の周囲」→ at={"region":[0.42,0.42,0.58,0.58]}。固定 center ではなく狭い中央領域として扱う**
 - **「リズム」「跳ねる」「踊る」「輪唱のずれ」「ほどける反復」→ count を増やさず arrangement.rhythm_spacing を使う。楽しい/跳ねる=syncopated、加速/流れ=accelerando、ゆるい揺れ=loose**
 - **「上から下へ散らす」は layout=vertical, path="top_to_bottom"。「左から右へ」「横に」は layout=horizontal, path="left_to_right"。「放射状」「同心円状」は layout=radial**
 - **「右上の黄金比の位置」→ at={"region":[0.56,0.32,0.68,0.44]}。左下なら [0.32,0.56,0.44,0.68]。焦点は固定座標ではなく領域として扱う**
@@ -337,12 +339,14 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"dotted across the whole canvas" / "finely across the whole canvas" may use layout=scatter, but treat it as all-over distribution, not disorder**
 - **scatter is not uniform noise. Treat it as biased by density gradient, fading edges, diagonal band, right half, or top-to-bottom placement from the DDL**
 - **"undulating trace" → arrangement.path="wave". "diagonal band" → path="diagonal". "right half" → path="right_half"**
+- **"vertical band" / "from top to bottom" → layout="vertical", path="top_to_bottom". "horizontal strata" / "left to right" → layout="horizontal", path="left_to_right". "across the whole canvas" → layout="scatter"**
+- **"central stillness" → at={"region":[0.42,0.42,0.58,0.58]}. Treat it as a narrow central region, not a fixed center coordinate**
 - **"rhythm", "bounce", "dance", "canon-like offset", or "unraveling repetition" → use arrangement.rhythm_spacing without increasing count. playful/bouncing=syncopated, accelerating/flowing=accelerando, loose swaying=loose**
 - **"top to bottom" → layout=vertical, path="top_to_bottom". "left to right" / "horizontal" → layout=horizontal, path="left_to_right". "radial" / "concentric" → layout=radial**
-- **"upper-right golden-ratio position" → center=[0.618,0.382]. Lower-left uses [0.382,0.618]. Treat it as a mathematical balance point**
+- **"upper-right golden-ratio position" → at={"region":[0.56,0.32,0.68,0.44]}. Lower-left uses at={"region":[0.32,0.56,0.44,0.68]}. Treat focus as a region, not a hard-coded coordinate**
 - **"upper-left rule-of-thirds point" → center=[0.333,0.333]. "lower-right rule-of-thirds point" → center=[0.667,0.667]. Treat it as rule-of-thirds composition**
 - **"lower-left silver-ratio position" → center=[0.414,0.586]. "upper-right silver-ratio position" → center=[0.586,0.414]. Treat it as silver-ratio spacing**
-- **"upper-right focus" → center=[0.72,0.28]. "upper-left focus" → [0.28,0.28]. "lower-right focus" → [0.72,0.72]. "lower-left focus" → [0.28,0.72]. Treat these as dynamic alternatives to canvas center**
+- **"upper-right focus" → at={"region":[0.60,0.18,0.82,0.40]}. "upper-left focus" → [0.18,0.18,0.40,0.40]. "lower-right focus" → [0.60,0.60,0.82,0.82]. "lower-left focus" → [0.18,0.60,0.40,0.82]. Do not hard-code focus coordinates**
 - **"upper-edge focus" → center=[0.5,0.18]. "right-half focus" → center=[0.72,0.5]**
 - **"regular pentagon vertices" → arrangement count=5 layout=radial. Treat it as a pentagonal balance layer**
 - **Fibonacci-like counts such as thirteen and twenty-one are intentional; keep them as explicit counts**
@@ -362,6 +366,14 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"ink-wash value" → black/gray brush lines with blurring or weight contrast**
 - **English idiom and cultural texture are compositional signals, not objects. "syncopated city rhythm" / "blue-note value" → short line or arc rhythm with rhythm_spacing="syncopated"; "quilt-like patchwork" → rotated square color_cycle; "subway-map pressure" → rotring line convergence; "billboard edge pressure" → cropped rectangle/diagonal edge tension; "prairie horizon" → low horizontal negative-space pressure; "coastal fog plane" → pale watercolor ellipse layers with blurring; "warehouse grid cuts" → sparse rotated square/line grid fragments**
 - **Strong solid backgrounds (black/red/blue/green) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
+
+# Relations
+
+- **"along the previous line" -> relation={"type":"along","gap":"narrow"}**
+- **"not touching the previous shape" -> relation={"type":"not_touching","gap":"narrow"}. Use gap="wide" for wide separation**
+- **"cutting the previous line" -> relation={"type":"cutting","gap":"medium"}**
+- **"between the previous two" -> relation={"type":"between","gap":"medium"}**
+- Copy relation only when the normalized DDL contains one of these fixed phrases. Do not infer relations. Do not attach relation to the first instruction.
 
 # Examples (key patterns)
 

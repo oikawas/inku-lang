@@ -15,6 +15,12 @@ JA_TECHNIQUE_MARKERS = [
     "倍音列",
     "輪唱のずれ",
     "一点透視法",
+    "前の線を切る",
+    "前の線に沿って",
+    "前の形に触れない",
+    "画面全体へ三本",
+    "右下の焦点から外へ",
+    "右下の焦点から放射状に",
     "遠近法の奥行き",
     "素描の下線",
     "点描",
@@ -37,6 +43,12 @@ EN_TECHNIQUE_MARKERS = [
     "harmonic overtone series",
     "canon offset",
     "one-point perspective",
+    "cutting the previous line",
+    "along the previous line",
+    "not touching the previous shape",
+    "across the whole canvas",
+    "outward from a lower-right focus",
+    "radiating from a lower-right focus",
     "perspective depth",
     "drawing underlines",
     "pointillism",
@@ -84,7 +96,7 @@ def test_expand_intermediate_ddl_varies_by_input():
     assert "中央" not in first
     assert "焦点に黒い四角を置く" in first
     assert any(marker in first for marker in ("遠近法の奥行き", "一点透視法", "パッチワーク", "水彩", "素描の下線", "点描"))
-    assert any(marker in second for marker in ("左下の焦点から三つ", "波打つ軌跡に沿って七個", "左下から右上へ三本"))
+    assert any(marker in second for marker in ("左下の焦点から三つ", "波打つ軌跡に沿って七個", "左下から右上へ三本", "画面全体へ三本", "前の線に沿って"))
 
 
 def test_expand_intermediate_ddl_uses_context_to_control_filter_amount():
@@ -203,3 +215,23 @@ def test_expand_intermediate_ddl_en_does_not_read_crescent_as_scent():
 
     assert "scent layer" not in expanded.lower()
     assert "five-sense presence" not in expanded.lower()
+
+
+def test_expand_intermediate_ddl_emits_relation_phrases_for_stage2_copy():
+    expanded = expand_intermediate_ddl(
+        "白い小さな円を画面全体に点々と八十個散らす。",
+        context_text="満天の星が複雑なリズムで重なる",
+    )
+
+    assert any(phrase in expanded for phrase in ("前の線に沿って", "前の線を切る", "前の形に触れない"))
+
+
+def test_expand_intermediate_ddl_composition_family_rewrites_diagonal_bias():
+    outputs = [
+        expand_intermediate_ddl("赤い小さな円を画面全体に点々と二十個散らす。", context_text="満天の星"),
+        expand_intermediate_ddl("青い線を三本引く。", context_text="リズムのある水面"),
+        expand_intermediate_ddl("白い四角を三つ置く。", context_text="静かな部屋と余白"),
+    ]
+
+    joined = "\n".join(outputs)
+    assert any(phrase in joined for phrase in ("上から下への縦の帯", "左から右への横の帯", "画面全体へ", "上端寄り"))

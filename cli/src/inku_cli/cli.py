@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import getpass
 import hashlib
 import json
@@ -639,6 +640,21 @@ def _png_occupancy_grid(path: Path, *, cells: int = 16) -> list[float]:
     return [1.0 - (float(pixel) / 255.0) for pixel in pixels]
 
 
+
+def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
+    try:
+        import cairosvg
+        from PIL import Image
+    except ImportError as exc:
+        raise CliError("analyze --replay requires cairosvg and Pillow") from exc
+    buffer = io.BytesIO()
+    cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=buffer)
+    buffer.seek(0)
+    with Image.open(buffer) as image:
+        image = image.convert("L").resize((cells, cells))
+        pixels = list(image.getdata())
+    return [1.0 - (float(pixel) / 255.0) for pixel in pixels]
+
 def _cosine_distance(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))
@@ -790,7 +806,15 @@ def _composition_family_from_score(score: dict[str, Any]) -> str:
     return "dispersal"
 
 
-def _diversity_summary(input_dir: Path) -> dict[str, Any]:
+def _diversity_summary(
+    input_dir: Path,
+    *,
+    replay: int = 0,
+    replay_limit: int = 5,
+    client: ApiClient | None = None,
+    color_catalog: str = DEFAULT_COLOR_CATALOG_ID,
+    canvas_aspect: str | None = None,
+) -> dict[str, Any]:
     png_paths = sorted(path for path in input_dir.rglob("*.png") if path.name != "contact-sheet.png")
     grids = [_png_occupancy_grid(path) for path in png_paths]
     artifacts = _iter_score_artifacts(input_dir)
@@ -838,6 +862,30 @@ def _diversity_summary(input_dir: Path) -> dict[str, Any]:
                     density_counts[density] += 1
         if has_relation:
             relation_sample_count += 1
+    replay_items: list[dict[str, Any]] = []
+    if replay > 1:
+        if client is None:
+            raise CliError("analyze --replay requires API access; log in or provide --base-url")
+        for artifact in artifacts[: max(1, replay_limit)]:
+            vectors: list[list[float]] = []
+            for seed in range(1, replay + 1):
+                svg = client.request_text(
+                    "POST",
+                    "/api/render-svg",
+                    data={
+                        "score": artifact["score"],
+                        "catalog_id": color_catalog,
+                        "canvas_aspect": canvas_aspect,
+                        "render_seed": seed,
+                    },
+                )
+                vectors.append(_svg_occupancy_grid(svg))
+            replay_items.append({
+                "path": artifact["path"],
+                "replay_count": replay,
+                "composition_distance": _mean_pair_distance(vectors),
+            })
+    replay_values = [item["composition_distance"] for item in replay_items if item.get("composition_distance") is not None]
     family_total = sum(family_counts.values())
     return {
         "input_dir": str(input_dir),
@@ -859,6 +907,12 @@ def _diversity_summary(input_dir: Path) -> dict[str, Any]:
         "relation_sample_count": relation_sample_count,
         "relation_sample_rate": round(relation_sample_count / len(artifacts), 6) if artifacts else None,
         "density_counts": dict(sorted(density_counts.items())),
+        "replay": {
+            "requested_count": replay,
+            "sample_count": len(replay_items),
+            "replay_divergence": round(sum(replay_values) / len(replay_values), 6) if replay_values else None,
+            "items": replay_items,
+        },
         "score_primitive_counts": dict(sorted(primitive_counts.items())),
         "score_color_counts": dict(sorted(color_counts.items())),
     }
@@ -1338,6 +1392,8 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     color_cycle_count = 0
     presence_counts: Counter[str] = Counter()
     presence_gaze_counts: Counter[str] = Counter()
+    relation_counts: Counter[str] = Counter()
+    relation_instruction_count = 0
 
     presence = score.get("presence")
     if isinstance(presence, dict):
@@ -1362,6 +1418,11 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
             for motif in MOTIF_HINT_KEYS:
                 if motif in hint:
                     motif_hint_counts[motif] += 1
+
+        relation = instruction.get("relation")
+        if isinstance(relation, dict) and isinstance(relation.get("type"), str):
+            relation_counts[relation["type"]] += 1
+            relation_instruction_count += 1
 
         arrangement = instruction.get("arrangement")
         if not isinstance(arrangement, dict):
@@ -1403,6 +1464,9 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_motif_hint_counts": dict(sorted(motif_hint_counts.items())),
         "score_presence_counts": dict(sorted(presence_counts.items())),
         "score_presence_gaze_counts": dict(sorted(presence_gaze_counts.items())),
+        "score_relation_counts": dict(sorted(relation_counts.items())),
+        "score_relation_instruction_count": relation_instruction_count,
+        "score_has_relation": relation_instruction_count > 0,
         "score_quality_metrics": quality_metrics,
         "math_balance_markers": _math_balance_markers([
             instruction for instruction in instructions if isinstance(instruction, dict)
@@ -2166,6 +2230,9 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_motif_hints: Counter[str] = Counter()
     aggregate_presence: Counter[str] = Counter()
     aggregate_presence_gaze: Counter[str] = Counter()
+    aggregate_relation: Counter[str] = Counter()
+    aggregate_relation_samples = 0
+    aggregate_relation_instructions = 0
     aggregate_clustered = 0
     aggregate_preserve_space = 0
     aggregate_color_cycle = 0
@@ -2180,6 +2247,10 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_motif_hints.update(result.get("score_motif_hint_counts") or {})
         aggregate_presence.update(result.get("score_presence_counts") or {})
         aggregate_presence_gaze.update(result.get("score_presence_gaze_counts") or {})
+        aggregate_relation.update(result.get("score_relation_counts") or {})
+        aggregate_relation_instructions += int(result.get("score_relation_instruction_count") or 0)
+        if result.get("score_has_relation"):
+            aggregate_relation_samples += 1
         aggregate_math_balance.update(result.get("math_balance_markers") or {})
         aggregate_clustered += int(result.get("score_clustered_arrangements") or 0)
         aggregate_preserve_space += int(result.get("score_preserve_space_count") or 0)
@@ -2229,6 +2300,11 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_presence_counts": dict(sorted(aggregate_presence.items())),
         "score_presence_gaze_counts": dict(sorted(aggregate_presence_gaze.items())),
         "score_presence_lines": _aggregate_marker_lines(results, "score_presence_counts"),
+        "score_relation_counts": dict(sorted(aggregate_relation.items())),
+        "score_relation_instruction_count": aggregate_relation_instructions,
+        "score_relation_sample_count": aggregate_relation_samples,
+        "score_relation_sample_rate": round(aggregate_relation_samples / len(results), 6) if results else None,
+        "score_relation_lines": _aggregate_marker_lines(results, "score_relation_counts"),
         "math_balance_markers": dict(sorted(aggregate_math_balance.items())),
         "math_balance_marker_lines": _aggregate_marker_lines(results, "math_balance_markers"),
         "score_quality_metrics": _aggregate_quality_metrics(results),
@@ -2269,7 +2345,26 @@ def command_analyze(args: argparse.Namespace) -> int:
         raise CliError(f"input directory not found: {input_dir}")
     if not args.diversity:
         raise CliError("only --diversity analysis is currently supported")
-    summary = _diversity_summary(input_dir)
+    config = load_config()
+    client = None
+    catalog_data = None
+    color_catalog = getattr(args, "color_catalog", None) or DEFAULT_COLOR_CATALOG_ID
+    if args.replay and args.replay > 1:
+        client = ApiClient(
+            args.base_url or config.base_url,
+            config.token,
+            timeout_seconds=_resolved_timeout_seconds(args, config),
+        )
+        catalog_data = _fetch_color_catalogs(client)
+        color_catalog = _resolved_color_catalog(args, config, catalog_data)
+    summary = _diversity_summary(
+        input_dir,
+        replay=max(0, int(args.replay or 0)),
+        replay_limit=max(1, int(args.replay_limit or 5)),
+        client=client,
+        color_catalog=color_catalog,
+        canvas_aspect=args.canvas_aspect,
+    )
     output_path = Path(args.output) if args.output else input_dir / "diversity-summary.json"
     _write_json_file(output_path, summary)
     print(f"summary: {output_path}", file=sys.stderr)
@@ -2500,9 +2595,15 @@ def build_parser() -> argparse.ArgumentParser:
     contact_sheet.set_defaults(func=command_contact_sheet)
 
     analyze = subparsers.add_parser("analyze", help="analyze generated PNG/JSON outputs")
+    _add_common_server_args(analyze)
     analyze.add_argument("input_dir", help="directory containing PNG and JSON outputs")
     analyze.add_argument("--diversity", action="store_true", help="compute diversity metrics and write diversity-summary.json")
     analyze.add_argument("--output", "-o", help="summary JSON path (default: INPUT_DIR/diversity-summary.json)")
+    analyze.add_argument("--replay", type=int, default=0, help="render each sampled score N times and compute replay divergence")
+    analyze.add_argument("--replay-limit", type=int, default=5, help="maximum score artifacts to replay")
+    analyze.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, default="square")
+    analyze.add_argument("--catalog-id", help="color catalog id (legacy alias)")
+    analyze.add_argument("--color-catalog", help="server color catalog id for replay rendering")
     analyze.set_defaults(func=command_analyze)
 
     render_score = subparsers.add_parser("render-score", help="render a Score JSON object without Stage 1 or Stage 2")

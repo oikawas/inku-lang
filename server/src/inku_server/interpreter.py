@@ -309,6 +309,11 @@ EXAMPLE_POOL: list[dict] = [
         "input": "100本の細い線を画面全体に並べる",
         "output": "黒い細い縦線を画面全体に百本散らす。",
     },
+    {
+        "keywords": ["沿う", "触れない", "切る", "間", "交差", "そば", "近く"],
+        "input": "黒い線に沿う赤い点、ただし触れない",
+        "output": "黒い細い横線を左から右へ一本引く。赤い小さな楕円を前の線に沿って三つ置く。前の形に触れない。",
+    },
     # 属性保持: 素材 + 色 + 数量 + 配置
     {
         "keywords": ["クレヨン", "背景", "埋め", "埋め尽く", "全体", "びっしり"],
@@ -594,6 +599,11 @@ EXAMPLE_POOL_EN: list[dict] = [
         "keywords": ["100", "200", "500", "hundred", "fill", "dense"],
         "input": "100 thin lines arranged across the canvas",
         "output": "Scatter one hundred thin vertical black lines across the whole canvas.",
+    },
+    {
+        "keywords": ["along", "not touching", "cutting", "between", "cross", "near"],
+        "input": "Red dots along a black line but not touching it",
+        "output": "Draw one thin black horizontal line left to right. Place three small red ellipses along the previous line. Not touching the previous shape.",
     },
     {
         "keywords": ["crayon", "fill", "background", "cover", "dense", "blue"],
@@ -910,6 +920,18 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
     top = scored[:k]
     if all(s == 0 for s, _ in top):
         top = [(0, ex) for ex in pool[:k]]
+    relation_markers = (
+        ("along the previous line", "not touching the previous shape", "cutting the previous line", "between the previous two")
+        if lang == "en"
+        else ("前の線に沿って", "前の形に触れない", "前の線を切る", "前の二つの間に")
+    )
+    if not any(any(marker in ex["output"] for marker in relation_markers) for _, ex in top):
+        relation_example = next(
+            (ex for ex in pool if any(marker in ex["output"] for marker in relation_markers)),
+            None,
+        )
+        if relation_example is not None and top:
+            top[-1] = (0, relation_example)
     if lang == "en":
         return "\n\n".join(f"Input: {ex['input']}\nOutput: {ex['output']}" for _, ex in top)
     return "\n\n".join(

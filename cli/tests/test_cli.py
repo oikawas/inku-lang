@@ -843,3 +843,30 @@ def test_diversity_summary_counts_png_score_and_relations(tmp_path):
     assert summary["relation_counts"] == {"not_touching": 1}
     assert summary["relation_sample_rate"] == 1.0
     assert summary["vocab_entropy"]["primitive"] == 1.0
+
+
+
+def test_score_metrics_counts_relations():
+    metrics = cli._score_metrics({
+        "instructions": [
+            {"primitive": "line", "color": "black", "from": [0.1, 0.2], "to": [0.9, 0.2]},
+            {"primitive": "circle", "color": "red", "center": [0.5, 0.5], "radius": 0.1, "relation": {"type": "cutting", "gap": "medium"}},
+        ]
+    })
+
+    assert metrics["score_relation_counts"] == {"cutting": 1}
+    assert metrics["score_relation_instruction_count"] == 1
+    assert metrics["score_has_relation"] is True
+
+
+def test_diversity_summary_replay_requires_client(tmp_path):
+    (tmp_path / "a.json").write_text(json.dumps({
+        "score": {"instructions": [{"primitive": "line", "from": [0.1, 0.2], "to": [0.9, 0.2]}]}
+    }), encoding="utf-8")
+
+    try:
+        cli._diversity_summary(tmp_path, replay=2)
+    except cli.CliError as exc:
+        assert "--replay requires API access" in str(exc)
+    else:
+        raise AssertionError("expected replay without client to fail")

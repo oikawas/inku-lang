@@ -193,3 +193,18 @@ def test_touch_choice_prompt_en_selects_material_variations():
     assert "crayon" in prompt
     assert "rotring" in prompt
     assert "chalk horizontal lines" in prompt
+
+
+
+def test_relation_examples_are_included_in_stage1_prompt():
+    prompt = _build_system_prompt("黒い線に沿う赤い点、ただし触れない")
+
+    assert "前の線に沿って" in prompt
+    assert "前の形に触れない" in prompt
+
+
+def test_relation_examples_are_included_in_stage1_prompt_en():
+    prompt = _build_system_prompt("red dots along a black line but not touching it", lang="en")
+
+    assert "along the previous line" in prompt
+    assert "not touching the previous shape" in prompt.lower()

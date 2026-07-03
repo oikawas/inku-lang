@@ -73,9 +73,9 @@ Someone else's instruction (song) can be rewritten, and since the output is vect
 inku uses a **Stage 1 / Stage 1.5 / Stage 2 / Renderer** pipeline:
 
 1. **Stage 1: Interpretation** — reads free-form descriptions in the author's native language and produces a normalized DDL using only core vocabulary
-2. **Stage 1.5: Intermediate filter** — a deterministic expander that selectively introduces mathematical, geometric, musical, and painting-technique structure, while adjusting focus and negative space
-3. **Stage 2: Structuring** — converts normalized DDL into a valid JSON Score
-4. **Renderer: Performance** — renders the JSON Score as SVG
+2. **Stage 1.5: Intermediate filter** — a deterministic expander that selects composition families and attaches observable relations instead of injecting fixed recipe layers
+3. **Stage 2: Structuring** — converts normalized DDL into a valid JSON Score, including optional region and relation fields
+4. **Renderer: Performance** — renders the JSON Score as SVG, resolving regions, relations, and performance seed variation
 
 This separation lets natural-language interpretation, expression expansion, structure generation, and rendering be tuned independently. API models, local LLMs, and NVIDIA NIM-style endpoints can be selected per stage.
 
@@ -96,6 +96,7 @@ The reference vocabulary dictionary is called **Saijiki**（歳時記）— a te
 | colors | いろ | white, black, blue, red, green, gray |
 | rotation | かたむき | horizontal, vertical, diagonal, rotated |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, first-quarter, last-quarter, crescent |
+| relations | あいだ | along, not touching, cutting, between |
 
 Only physical and observational words are allowed. Emotional evaluation — "beautifully," "delicately," "powerfully" — is not part of the core.
 
@@ -122,9 +123,11 @@ The web version is operational. Current features:
 - **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with model, token, and elapsed-time metadata
 - **Primitives** — line, circle, ellipse, arc, square, triangle; each can carry material, color, style, variation, rotation, and arrangement
 - **Arrangement** — horizontal, vertical, radial, scatter, plus paths such as wave, diagonal band, top-to-bottom, left-to-right, and right-half
+- **Regions and relations** — scores can leave placement to renderer-resolved regions and express relations such as along, not touching, cutting, and between previous elements
 - **Material rendering** — pencil, rotring, crayon, chalk, brushes, and rope are rendered with texture filters, particles, secondary strokes, or twist marks, not only stroke width
 - **Robust rendering** — invisible colors, over-dense arrangements, duplicate instructions, empty instructions, and slow LLM responses are corrected or routed to deterministic fallback
 - **Batch / Demo / CLI** — single drawing, batch drawing, demo loop, and `inku-cli` login/paint/batch/benchmark workflows are supported
+- **Diversity analysis** — CLI summaries include composition diversity, replay divergence, relation use, and relation drop metrics
 - **History** — DB-backed per-user history with pagination, search, stars, thumbnails, model/color-catalog metadata, and token counts
 - **UI** — Saijiki drawer, JSON/prompt views, light/dark mode, collapsible history strip, and zoom/pan canvas
 

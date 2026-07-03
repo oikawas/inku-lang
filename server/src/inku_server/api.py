@@ -565,6 +565,26 @@ def _score_with_canvas(score: Score, canvas_aspect: str) -> Score:
     return Score.model_validate(data)
 
 
+def _score_relation_count(score: Score | None) -> int:
+    if score is None:
+        return 0
+    return sum(1 for instruction in score.instructions if instruction.relation is not None)
+
+
+def _coerce_relation_report(before: Score | None, after: Score | None) -> dict[str, object]:
+    input_count = _score_relation_count(before)
+    output_count = _score_relation_count(after)
+    dropped_count = max(0, input_count - output_count)
+    warnings = ["relation dropped during coerce validation"] if dropped_count else []
+    return {
+        "coerce_relation_input_count": input_count,
+        "coerce_relation_output_count": output_count,
+        "coerce_relation_dropped_count": dropped_count,
+        "coerce_relation_drop_rate": round(dropped_count / input_count, 6) if input_count else None,
+        "coerce_warnings": warnings,
+    }
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?",
@@ -617,6 +637,11 @@ class ComposeResponse(BaseModel):
     retry_count: int = 0
     retry_reasons: list[str] = Field(default_factory=list)
     fallback_used: bool = False
+    coerce_relation_input_count: int = 0
+    coerce_relation_output_count: int = 0
+    coerce_relation_dropped_count: int = 0
+    coerce_relation_drop_rate: float | None = None
+    coerce_warnings: list[str] = Field(default_factory=list)
 
 
 class InterpretRequest(BaseModel):
@@ -701,6 +726,11 @@ class PaintResponse(BaseModel):
     compose_fallback_used: bool = False
     user_generation_count: int | None = None
     catalog_id: str | None = None
+    coerce_relation_input_count: int = 0
+    coerce_relation_output_count: int = 0
+    coerce_relation_dropped_count: int = 0
+    coerce_relation_drop_rate: float | None = None
+    coerce_warnings: list[str] = Field(default_factory=list)
 
 
 class RenderSvgRequest(BaseModel):
@@ -1983,11 +2013,14 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
+    coerce_report: dict[str, object] = _coerce_relation_report(None, None)
     try:
         score = compose_detail.score
         ensure_renderable_score(score)
         if req.auto_repair:
+            before_coerce = score
             score = coerce_score(score, ddl=_coerce_context(compose_detail.ddl, req.original_text))
+            coerce_report = _coerce_relation_report(before_coerce, score)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -2029,6 +2062,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         retry_count=compose_detail.retry_count,
         retry_reasons=compose_detail.retry_reasons,
         fallback_used=compose_detail.fallback_used,
+        **coerce_report,
     )
 
 
@@ -2331,11 +2365,14 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
+    coerce_report: dict[str, object] = _coerce_relation_report(None, None)
     try:
         score = compose_detail.score
         ensure_renderable_score(score)
         if req.auto_repair:
+            before_coerce = score
             score = coerce_score(score, ddl=_coerce_context(ddl, source_text))
+            coerce_report = _coerce_relation_report(before_coerce, score)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -2438,6 +2475,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         compose_fallback_used=compose_detail.fallback_used,
         user_generation_count=user_generation_count,
         catalog_id=catalog_id,
+        **coerce_report,
     )
 
 

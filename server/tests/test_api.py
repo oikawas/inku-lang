@@ -608,6 +608,35 @@ def test_compose_happy_path(monkeypatch, auth_context):
     assert data["instruction_lang_resolved"] == "ja"
 
 
+def test_compose_reports_relation_drop_during_auto_repair(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    fake_score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "color": "black",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "relation": {"type": "along", "gap": "narrow"},
+                }
+            ]
+        }
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post("/api/compose", json={"ddl": "前の線に沿う線"}, headers=headers)
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["coerce_relation_input_count"] == 1
+    assert data["coerce_relation_output_count"] == 0
+    assert data["coerce_relation_dropped_count"] == 1
+    assert data["coerce_relation_drop_rate"] == 1.0
+    assert data["coerce_warnings"] == ["relation dropped during coerce validation"]
+    assert "relation" not in data["score"]["instructions"][0]
+
+
 def test_compose_resolves_english_instruction_language(monkeypatch, auth_context):
     headers, _, _ = auth_context
     captured: dict[str, str] = {}

@@ -419,6 +419,11 @@ def _render_response_summary(result: dict[str, Any]) -> dict[str, Any]:
         "render_color_catalog_name": result.get("render_color_catalog_name"),
         "render_color_catalog_sub": result.get("render_color_catalog_sub"),
         "render_color_map": result.get("render_color_map"),
+        "coerce_relation_input_count": result.get("coerce_relation_input_count"),
+        "coerce_relation_output_count": result.get("coerce_relation_output_count"),
+        "coerce_relation_dropped_count": result.get("coerce_relation_dropped_count"),
+        "coerce_relation_drop_rate": result.get("coerce_relation_drop_rate"),
+        "coerce_warnings": result.get("coerce_warnings") or [],
     }
 
 
@@ -2233,6 +2238,9 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_relation: Counter[str] = Counter()
     aggregate_relation_samples = 0
     aggregate_relation_instructions = 0
+    aggregate_coerce_relation_input = 0
+    aggregate_coerce_relation_output = 0
+    aggregate_coerce_relation_dropped = 0
     aggregate_clustered = 0
     aggregate_preserve_space = 0
     aggregate_color_cycle = 0
@@ -2251,6 +2259,9 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_relation_instructions += int(result.get("score_relation_instruction_count") or 0)
         if result.get("score_has_relation"):
             aggregate_relation_samples += 1
+        aggregate_coerce_relation_input += int(result.get("coerce_relation_input_count") or 0)
+        aggregate_coerce_relation_output += int(result.get("coerce_relation_output_count") or 0)
+        aggregate_coerce_relation_dropped += int(result.get("coerce_relation_dropped_count") or 0)
         aggregate_math_balance.update(result.get("math_balance_markers") or {})
         aggregate_clustered += int(result.get("score_clustered_arrangements") or 0)
         aggregate_preserve_space += int(result.get("score_preserve_space_count") or 0)
@@ -2305,6 +2316,19 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_relation_sample_count": aggregate_relation_samples,
         "score_relation_sample_rate": round(aggregate_relation_samples / len(results), 6) if results else None,
         "score_relation_lines": _aggregate_marker_lines(results, "score_relation_counts"),
+        "coerce_relation_input_count": aggregate_coerce_relation_input,
+        "coerce_relation_output_count": aggregate_coerce_relation_output,
+        "coerce_relation_dropped_count": aggregate_coerce_relation_dropped,
+        "coerce_relation_drop_rate": (
+            round(aggregate_coerce_relation_dropped / aggregate_coerce_relation_input, 6)
+            if aggregate_coerce_relation_input
+            else None
+        ),
+        "coerce_warning_lines": [
+            int(result["line"])
+            for result in results
+            if result.get("coerce_warnings") and result.get("line")
+        ],
         "math_balance_markers": dict(sorted(aggregate_math_balance.items())),
         "math_balance_marker_lines": _aggregate_marker_lines(results, "math_balance_markers"),
         "score_quality_metrics": _aggregate_quality_metrics(results),

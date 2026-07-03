@@ -469,6 +469,26 @@ def test_score_metrics_reports_motif_hint_counts():
     assert metrics["score_motif_hint_counts"] == {"leaf_cluster": 2, "paper_shard": 1}
 
 
+def test_render_response_summary_keeps_coerce_relation_metrics():
+    summary = cli._render_response_summary(
+        {
+            "render_hash_short": "ABCD",
+            "coerce_relation_input_count": 3,
+            "coerce_relation_output_count": 2,
+            "coerce_relation_dropped_count": 1,
+            "coerce_relation_drop_rate": 0.333333,
+            "coerce_warnings": ["relation dropped during coerce validation"],
+        }
+    )
+
+    assert summary["render_hash_short"] == "ABCD"
+    assert summary["coerce_relation_input_count"] == 3
+    assert summary["coerce_relation_output_count"] == 2
+    assert summary["coerce_relation_dropped_count"] == 1
+    assert summary["coerce_relation_drop_rate"] == 0.333333
+    assert summary["coerce_warnings"] == ["relation dropped during coerce validation"]
+
+
 def test_aggregate_marker_lines_reports_sample_lines():
     results = [
         {"line": 1, "math_balance_markers": {"golden_like_centers": 1}, "score_motif_hint_counts": {"leaf_cluster": 2}},

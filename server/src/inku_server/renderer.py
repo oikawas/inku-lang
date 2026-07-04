@@ -547,8 +547,11 @@ def _resolve_relation(ins: Instruction, previous: list[Instruction], seed: int, 
             data["to"] = [_clamp01(target[0] + math.cos(angle) * length / 2), _clamp01(target[1] + math.sin(angle) * length / 2)]
             return Instruction.model_validate(data)
     else:
+        own_bbox = _bbox_for_instruction(ins)
+        own_radius = _bbox_radius(own_bbox) if own_bbox is not None else 0.0
+        distance = prev_radius + own_radius + gap
         angle = math.tau * _hash01(index, seed, "not-touching-angle")
-        target = (_clamp01(prev_center[0] + math.cos(angle) * (prev_radius + gap)), _clamp01(prev_center[1] + math.sin(angle) * (prev_radius + gap)))
+        target = (_clamp01(prev_center[0] + math.cos(angle) * distance), _clamp01(prev_center[1] + math.sin(angle) * distance))
     return _move_anchor_to(ins, target)
 
 

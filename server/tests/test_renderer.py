@@ -1,7 +1,7 @@
 import math
 from xml.etree import ElementTree
 
-from inku_server.renderer import _clustered_pos, render
+from inku_server.renderer import _clustered_pos, _resolve_performance_score, render
 from inku_server.schema import Instruction, Score
 
 
@@ -1071,3 +1071,63 @@ def test_render_cutting_relation_crosses_previous_line_center():
     assert 'x1="200.0"' in svg
     assert 'x2="800.0"' in svg
     assert '500.0' in svg
+
+
+def _segments_intersect(p1, p2, p3, p4) -> bool:
+    def ccw(a, b, c):
+        return (c[1] - a[1]) * (b[0] - a[0]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    d1 = ccw(p3, p4, p1)
+    d2 = ccw(p3, p4, p2)
+    d3 = ccw(p1, p2, p3)
+    d4 = ccw(p1, p2, p4)
+    if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
+        return True
+    return False
+
+
+def test_not_touching_relation_never_overlaps_across_seeds():
+    for seed in range(1, 101):
+        score = Score.model_validate({
+            "instructions": [
+                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.08},
+                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.05, "relation": {"type": "not_touching", "gap": "narrow"}},
+            ]
+        })
+        resolved = _resolve_performance_score(score, seed)
+        first, second = resolved.instructions
+        distance = math.hypot(first.center[0] - second.center[0], first.center[1] - second.center[1])
+        assert distance >= first.radius + second.radius, f"seed={seed} overlapped: distance={distance}"
+
+
+def test_cutting_relation_always_crosses_previous_line_across_seeds():
+    for seed in range(1, 101):
+        score = Score.model_validate({
+            "instructions": [
+                {"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5]},
+                {"primitive": "line", "from": [0.1, 0.1], "to": [0.2, 0.1], "relation": {"type": "cutting"}},
+            ]
+        })
+        resolved = _resolve_performance_score(score, seed)
+        first, second = resolved.instructions
+        assert _segments_intersect(tuple(first.from_), tuple(first.to), tuple(second.from_), tuple(second.to)), (
+            f"seed={seed} did not cross"
+        )
+
+
+def test_between_relation_places_within_previous_pair_neighborhood_across_seeds():
+    for seed in range(1, 101):
+        score = Score.model_validate({
+            "instructions": [
+                {"primitive": "circle", "center": [0.3, 0.3], "radius": 0.04},
+                {"primitive": "circle", "center": [0.7, 0.7], "radius": 0.04},
+                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.03, "relation": {"type": "between", "gap": "medium"}},
+            ]
+        })
+        resolved = _resolve_performance_score(score, seed)
+        first, second, third = resolved.instructions
+        margin = 0.15
+        x0, x1 = sorted((first.center[0], second.center[0]))
+        y0, y1 = sorted((first.center[1], second.center[1]))
+        assert x0 - margin <= third.center[0] <= x1 + margin, f"seed={seed} x out of neighborhood: {third.center}"
+        assert y0 - margin <= third.center[1] <= y1 + margin, f"seed={seed} y out of neighborhood: {third.center}"

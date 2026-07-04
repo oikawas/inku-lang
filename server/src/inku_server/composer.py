@@ -83,10 +83,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「リズム」「跳ねる」「踊る」「輪唱のずれ」「ほどける反復」→ count を増やさず arrangement.rhythm_spacing を使う。楽しい/跳ねる=syncopated、加速/流れ=accelerando、ゆるい揺れ=loose**
 - **「上から下へ散らす」は layout=vertical, path="top_to_bottom"。「左から右へ」「横に」は layout=horizontal, path="left_to_right"。「放射状」「同心円状」は layout=radial**
 - **「右上の黄金比の位置」→ at={"region":[0.56,0.32,0.68,0.44]}。左下なら [0.32,0.56,0.44,0.68]。焦点は固定座標ではなく領域として扱う**
-- **「左上の三分割の交点」→ center=[0.333,0.333]。「右下の三分割の交点」→ center=[0.667,0.667]。三分割構図として扱う**
-- **「左下の白銀比の位置」→ center=[0.414,0.586]。「右上の白銀比の位置」→ center=[0.586,0.414]。白銀比の余白として扱う**
+- **「左上の三分割の交点」→ at={"region":[0.273,0.273,0.393,0.393]}。「右下の三分割の交点」→ at={"region":[0.607,0.607,0.727,0.727]}。三分割構図として扱う。焦点座標をハードコードしない**
+- **「左下の白銀比の位置」→ at={"region":[0.354,0.526,0.474,0.646]}。「右上の白銀比の位置」→ at={"region":[0.526,0.354,0.646,0.474]}。白銀比の余白として扱う。焦点座標をハードコードしない**
 - **「右上の焦点」→ at={"region":[0.60,0.18,0.82,0.40]}。「左上の焦点」→ [0.18,0.18,0.40,0.40]。「右下の焦点」→ [0.60,0.60,0.82,0.82]。「左下の焦点」→ [0.18,0.60,0.40,0.82]。焦点座標をハードコードしない**
-- **「上端寄りの焦点」→ center=[0.5,0.18]。「右半分の焦点」→ center=[0.72,0.5]**
+- **「上端寄りの焦点」→ at={"region":[0.39,0.07,0.61,0.29]}。「右半分の焦点」→ at={"region":[0.61,0.39,0.83,0.61]}。焦点座標をハードコードしない**
 - **「正五角形の頂点に五個」→ arrangement count=5 layout=radial。五芒星的な均衡の点列として扱う**
 - **「フィボナッチ」「十三」「二十一」などの数量はそのまま使い、意外性のある規則的な層として扱う**
 - **数学的均衡は中央対称ではない。golden offset、三分割、白銀比、prime spacing、fibonacci count、counterweight を使い、主焦点と反対側の小要素で釣り合いを作る**
@@ -138,16 +138,16 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
 
 入力: 白い小さな円を右上の黄金比の位置に一点置く。半径は0.025。
-出力: {"instructions":[{"primitive":"circle","center":[0.618,0.382],"radius":0.025,"color":"white"}]}
+出力: {"instructions":[{"primitive":"circle","at":{"region":[0.56,0.32,0.68,0.44]},"radius":0.025,"color":"white"}]}
 
 入力: 白い小さな円を左上の三分割の交点に一点置く。半径は0.018。
-出力: {"instructions":[{"primitive":"circle","center":[0.333,0.333],"radius":0.018,"color":"white"}]}
+出力: {"instructions":[{"primitive":"circle","at":{"region":[0.273,0.273,0.393,0.393]},"radius":0.018,"color":"white"}]}
 
 入力: 白い小さな円を左下の白銀比の位置に一点置く。半径は0.016。
-出力: {"instructions":[{"primitive":"circle","center":[0.414,0.586],"radius":0.016,"color":"white"}]}
+出力: {"instructions":[{"primitive":"circle","at":{"region":[0.354,0.526,0.474,0.646]},"radius":0.016,"color":"white"}]}
 
 入力: 黒い円を右上の焦点に置く。
-出力: {"instructions":[{"primitive":"circle","center":[0.72,0.28],"radius":0.1,"color":"black"}]}
+出力: {"instructions":[{"primitive":"circle","at":{"region":[0.60,0.18,0.82,0.40]},"radius":0.1,"color":"black"}]}
 
 入力: 赤い小さな円を正五角形の頂点に五個並べる。半径は0.022。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.022,"color":"red","arrangement":{"count":5,"layout":"radial"}}]}
@@ -358,10 +358,10 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"rhythm", "bounce", "dance", "canon-like offset", or "unraveling repetition" → use arrangement.rhythm_spacing without increasing count. playful/bouncing=syncopated, accelerating/flowing=accelerando, loose swaying=loose**
 - **"top to bottom" → layout=vertical, path="top_to_bottom". "left to right" / "horizontal" → layout=horizontal, path="left_to_right". "radial" / "concentric" → layout=radial**
 - **"upper-right golden-ratio position" → at={"region":[0.56,0.32,0.68,0.44]}. Lower-left uses at={"region":[0.32,0.56,0.44,0.68]}. Treat focus as a region, not a hard-coded coordinate**
-- **"upper-left rule-of-thirds point" → center=[0.333,0.333]. "lower-right rule-of-thirds point" → center=[0.667,0.667]. Treat it as rule-of-thirds composition**
-- **"lower-left silver-ratio position" → center=[0.414,0.586]. "upper-right silver-ratio position" → center=[0.586,0.414]. Treat it as silver-ratio spacing**
+- **"upper-left rule-of-thirds point" → at={"region":[0.273,0.273,0.393,0.393]}. "lower-right rule-of-thirds point" → at={"region":[0.607,0.607,0.727,0.727]}. Treat it as rule-of-thirds composition. Do not hard-code focus coordinates**
+- **"lower-left silver-ratio position" → at={"region":[0.354,0.526,0.474,0.646]}. "upper-right silver-ratio position" → at={"region":[0.526,0.354,0.646,0.474]}. Treat it as silver-ratio spacing. Do not hard-code focus coordinates**
 - **"upper-right focus" → at={"region":[0.60,0.18,0.82,0.40]}. "upper-left focus" → [0.18,0.18,0.40,0.40]. "lower-right focus" → [0.60,0.60,0.82,0.82]. "lower-left focus" → [0.18,0.60,0.40,0.82]. Do not hard-code focus coordinates**
-- **"upper-edge focus" → center=[0.5,0.18]. "right-half focus" → center=[0.72,0.5]**
+- **"upper-edge focus" → at={"region":[0.39,0.07,0.61,0.29]}. "right-half focus" → at={"region":[0.61,0.39,0.83,0.61]}. Do not hard-code focus coordinates**
 - **"regular pentagon vertices" → arrangement count=5 layout=radial. Treat it as a pentagonal balance layer**
 - **Fibonacci-like counts such as thirteen and twenty-one are intentional; keep them as explicit counts**
 - **Mathematical balance is not central symmetry. Use golden offset, rule-of-thirds, silver ratio, prime spacing, fibonacci count, and counterweight; balance the main focus with smaller elements on the opposite side**
@@ -414,16 +414,16 @@ Input: Scatter twenty small red ellipses rising to the right vertically in the r
 Output: {"instructions":[{"primitive":"ellipse","center":[0.75,0.5],"size":[0.055,0.028],"color":"red","rotation":-30,"arrangement":{"count":20,"layout":"vertical","path":"right_half","margin":0.1}}]}
 
 Input: Place one small white circle at the upper-right golden-ratio position. Radius 0.025.
-Output: {"instructions":[{"primitive":"circle","center":[0.618,0.382],"radius":0.025,"color":"white"}]}
+Output: {"instructions":[{"primitive":"circle","at":{"region":[0.56,0.32,0.68,0.44]},"radius":0.025,"color":"white"}]}
 
 Input: Place one small white circle at the upper-left rule-of-thirds point. Radius 0.018.
-Output: {"instructions":[{"primitive":"circle","center":[0.333,0.333],"radius":0.018,"color":"white"}]}
+Output: {"instructions":[{"primitive":"circle","at":{"region":[0.273,0.273,0.393,0.393]},"radius":0.018,"color":"white"}]}
 
 Input: Place one small white circle at the lower-left silver-ratio position. Radius 0.016.
-Output: {"instructions":[{"primitive":"circle","center":[0.414,0.586],"radius":0.016,"color":"white"}]}
+Output: {"instructions":[{"primitive":"circle","at":{"region":[0.354,0.526,0.474,0.646]},"radius":0.016,"color":"white"}]}
 
 Input: Place a black circle at the upper-right focus.
-Output: {"instructions":[{"primitive":"circle","center":[0.72,0.28],"radius":0.1,"color":"black"}]}
+Output: {"instructions":[{"primitive":"circle","at":{"region":[0.60,0.18,0.82,0.40]},"radius":0.1,"color":"black"}]}
 
 Input: Line up five small red circles on regular pentagon vertices. Radius 0.022.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.022,"color":"red","arrangement":{"count":5,"layout":"radial"}}]}

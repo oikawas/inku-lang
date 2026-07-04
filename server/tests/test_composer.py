@@ -298,6 +298,10 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "パッチワーク" in SYSTEM_PROMPT
     assert "フレスコの下地" in SYSTEM_PROMPT
     assert "水墨" in SYSTEM_PROMPT
+    assert "既に出力済みの輪郭 instruction" in SYSTEM_PROMPT
+    assert "between は直前2つ" in SYSTEM_PROMPT
+    assert "青い小さな円を一つ置く。白い小さな四角を前の二つの間に置く" in SYSTEM_PROMPT
+    assert "黒い線を二本置く。赤い小さな円を前の二つの間に置く" in SYSTEM_PROMPT
     assert '"layout":"vertical"' in SYSTEM_PROMPT
     assert "ランダム" not in SYSTEM_PROMPT
     assert "20 程度" not in SYSTEM_PROMPT
@@ -364,6 +368,10 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "patchwork" in SYSTEM_PROMPT_EN
     assert "fresco ground" in SYSTEM_PROMPT_EN
     assert "ink-wash value" in SYSTEM_PROMPT_EN
+    assert "already emitted drawable outline instructions" in SYSTEM_PROMPT_EN
+    assert "Use between only when the previous two drawable instructions both have outlines" in SYSTEM_PROMPT_EN
+    assert "Place one small blue circle. Place one small white square between the previous two" in SYSTEM_PROMPT_EN
+    assert "Draw two black lines. Place a small red circle between the previous two" in SYSTEM_PROMPT_EN
     assert '"layout":"vertical"' in SYSTEM_PROMPT_EN
     assert "random" not in SYSTEM_PROMPT_EN.lower()
     assert "≈ 20" not in SYSTEM_PROMPT_EN

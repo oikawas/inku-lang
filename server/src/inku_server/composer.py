@@ -112,6 +112,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「前の線を切る」/ "cutting the previous line" → relation={"type":"cutting","gap":"medium"}**
 - **「前の二つの間に」/ "between the previous two" → relation={"type":"between","gap":"medium"}**
 - relation は正規化DDL に定型句がある時だけ転記する。relation を推測で追加しない。先頭 instruction には relation を付けない。
+- relation は必ず「既に出力済みの輪郭 instruction」だけを参照する。background、filled 面、presence、fade だけの補助層、色補修用の小要素は relation の参照先にしない。
+- **between は直前2つの drawable instruction がどちらも輪郭を持つ時だけ使う。直前が1つしかない、または直前/前々が補助層なら relation を省略する。**
+- 「前の線に沿って」「前の形に触れない」「前の線を切る」を1つの instruction にまとめない。定型句が複数あっても、出力順に成立するものだけを最大1つ付ける。
+- relation を置ける順序にできない時は、補助 instruction を追加して救わず、relation フィールドだけを省略する。
 
 # 例 (最重要パターン)
 
@@ -213,6 +217,16 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 柔らかな光と沈丁花の香りの中で、桜の蕾が開花を待つ。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.48,0.20],"size":[0.42,0.12],"color":"white","filled":true,"color_hint":"柔らかな光","arrangement":{"count":3,"layout":"horizontal","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"ellipse","center":[0.56,0.55],"size":[0.045,0.022],"color":"green","rotation":-18,"color_hint":"沈丁花の香り","arrangement":{"count":7,"layout":"scatter","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.24}},{"primitive":"ellipse","center":[0.70,0.62],"size":[0.055,0.026],"color":"red","rotation":-30,"color_hint":"開花を待つ蕾","arrangement":{"count":5,"layout":"scatter","path":"diagonal","margin":0.18}}]}
+
+
+入力: 黒い横線を一本引く。赤い小さな楕円を前の線に沿って三つ置く。
+出力: {"instructions":[{"primitive":"line","from":[0.12,0.5],"to":[0.88,0.5],"color":"black"},{"primitive":"ellipse","center":[0.5,0.5],"size":[0.04,0.02],"color":"red","arrangement":{"count":3,"layout":"horizontal"},"relation":{"type":"along","gap":"narrow"}}]}
+
+入力: 青い小さな円を一つ置く。白い小さな四角を前の二つの間に置く。
+出力: {"instructions":[{"primitive":"circle","center":[0.42,0.5],"radius":0.04,"color":"blue"},{"primitive":"square","position":[0.55,0.47],"size":[0.06,0.06],"color":"white"}]}
+
+入力: 黒い線を二本置く。赤い小さな円を前の二つの間に置く。
+出力: {"instructions":[{"primitive":"line","from":[0.18,0.36],"to":[0.55,0.36],"color":"black"},{"primitive":"line","from":[0.45,0.64],"to":[0.82,0.64],"color":"black"},{"primitive":"circle","center":[0.5,0.5],"radius":0.035,"color":"red","relation":{"type":"between","gap":"medium"}}]}
 
 # わりあい (比率・描画範囲)
 
@@ -374,6 +388,10 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"cutting the previous line" -> relation={"type":"cutting","gap":"medium"}**
 - **"between the previous two" -> relation={"type":"between","gap":"medium"}**
 - Copy relation only when the normalized DDL contains one of these fixed phrases. Do not infer relations. Do not attach relation to the first instruction.
+- Relations may refer only to already emitted drawable outline instructions. Do not use background, filled planes, presence, fade-only support layers, or small color-repair marks as relation targets.
+- **Use between only when the previous two drawable instructions both have outlines. If only one previous drawable exists, or if either previous item is a support layer, omit the relation.**
+- Do not combine "along", "not touching", and "cutting" on one instruction. If several fixed phrases appear, keep only the one that is valid in output order.
+- If no valid output order can carry the relation, omit only the relation field; do not add a support instruction to rescue it.
 
 # Examples (key patterns)
 
@@ -442,6 +460,16 @@ Output: {"instructions":[{"primitive":"line","from":[0.5,0.2],"to":[0.5,0.8],"co
 
 Input: Line up seven short blue fine-brush lines left to right as syncopated city rhythm. Swaying slowly.
 Output: {"instructions":[{"primitive":"line","from":[0.47,0.5],"to":[0.53,0.5],"color":"blue","weight":"brush_thin","arrangement":{"count":7,"layout":"horizontal","rhythm_spacing":"syncopated"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+
+Input: Draw one black horizontal line. Place three small red ellipses along the previous line.
+Output: {"instructions":[{"primitive":"line","from":[0.12,0.5],"to":[0.88,0.5],"color":"black"},{"primitive":"ellipse","center":[0.5,0.5],"size":[0.04,0.02],"color":"red","arrangement":{"count":3,"layout":"horizontal"},"relation":{"type":"along","gap":"narrow"}}]}
+
+Input: Place one small blue circle. Place one small white square between the previous two.
+Output: {"instructions":[{"primitive":"circle","center":[0.42,0.5],"radius":0.04,"color":"blue"},{"primitive":"square","position":[0.55,0.47],"size":[0.06,0.06],"color":"white"}]}
+
+Input: Draw two black lines. Place a small red circle between the previous two.
+Output: {"instructions":[{"primitive":"line","from":[0.18,0.36],"to":[0.55,0.36],"color":"black"},{"primitive":"line","from":[0.45,0.64],"to":[0.82,0.64],"color":"black"},{"primitive":"circle","center":[0.5,0.5],"radius":0.035,"color":"red","relation":{"type":"between","gap":"medium"}}]}
 
 Input: Draw five thin rotring lines toward an upper-right focus as subway-map pressure.
 Output: {"instructions":[{"primitive":"line","from":[0.14,0.82],"to":[0.72,0.28],"color":"black","weight":"rotring","arrangement":{"count":5,"layout":"vertical","margin":0.08}}]}

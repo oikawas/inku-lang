@@ -1042,6 +1042,18 @@ rates. Coerce repair parts use input-derived placement and shape variation
 instead of fixed coordinates, and adjacent focal reactions fire only for
 isolated visual events.
 
+Build 442 verification confirmed that the `vary_seed` path is implemented
+through the API, CLI, and web UI. A 5-prompt x 5-vary run succeeded 25/25 with
+no fallback, and JP/EN 30-sample repair-part measurement reduced
+`adjacent_reaction` from 56/60 to 14/60.
+
+The benchmark acceptance gate is not yet satisfied. `angular_pulse` remained at
+14/60, `vanishing_trace` rose from 21/60 to 26/60, and average `visual_event`
+fell from the Build 441 baseline of 93.0 to 77.8. Version 1.52 should therefore
+be read as an implemented feature release whose remaining work is repair-part
+path auditing and investigation of the low-quality samples, not as a completed
+quality-tuning pass.
+
 ### v1.51 (2026-07-02)
 
 Version 1.51 adds the relation system, called `aida` in Japanese, and assigns

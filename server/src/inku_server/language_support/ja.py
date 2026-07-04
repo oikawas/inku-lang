@@ -105,8 +105,8 @@ COERCE_MARKERS = {
 }
 
 
-def expand_intermediate(ddl: str, context_text: str | None = None) -> str:
-    return expand_intermediate_ddl(ddl, lang="ja", context_text=context_text)
+def expand_intermediate(ddl: str, context_text: str | None = None, vary_seed: int | None = None) -> str:
+    return expand_intermediate_ddl(ddl, lang="ja", context_text=context_text, vary_seed=vary_seed)
 
 
 SUPPORT = InstructionLanguageSupport(

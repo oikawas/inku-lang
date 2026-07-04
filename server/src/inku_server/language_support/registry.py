@@ -51,5 +51,11 @@ def stage_prompts_for_lang(lang: str) -> tuple[str, str]:
     return support.stage1_prompt, support.stage2_prompt
 
 
-def expand_intermediate_for_lang(ddl: str, *, lang: str, context_text: str | None = None) -> str:
-    return instruction_language(lang).expand_intermediate(ddl, context_text)
+def expand_intermediate_for_lang(
+    ddl: str,
+    *,
+    lang: str,
+    context_text: str | None = None,
+    vary_seed: int | None = None,
+) -> str:
+    return instruction_language(lang).expand_intermediate(ddl, context_text, vary_seed)

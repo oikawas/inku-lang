@@ -455,6 +455,27 @@ def test_score_metrics_reports_math_balance_markers():
     }
 
 
+def test_score_metrics_reports_repair_part_counts():
+    score = {
+        "instructions": [
+            {"primitive": "arc", "color": "black", "color_hint": "visual event adjacent reaction added to hold focal event"},
+            {"primitive": "polygon", "color": "blue", "color_hint": "visual event restored as a small angular pulse"},
+            {"primitive": "arc", "color": "blue", "color_hint": "vanishing trace restored with a fading endpoint"},
+            {"primitive": "square", "color": "gray", "color_hint": "visual event restored as a small handmade rhythm offset"},
+        ],
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_repair_part_counts"] == {
+        "adjacent_reaction": 1,
+        "angular_pulse": 1,
+        "rhythm_offset": 1,
+        "vanishing_trace": 1,
+    }
+    assert metrics["score_has_repair_part"] is True
+
+
 def test_score_metrics_reports_motif_hint_counts():
     score = {
         "instructions": [

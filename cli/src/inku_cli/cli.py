@@ -105,6 +105,12 @@ NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     ),
 }
 MOTIF_HINT_KEYS = ("leaf_cluster", "paper_shard", "ripple_knot", "mountain_sign")
+SCORE_REPAIR_PART_MARKERS = (
+    ("adjacent_reaction", "adjacent reaction"),
+    ("angular_pulse", "angular pulse"),
+    ("vanishing_trace", "vanishing trace"),
+    ("rhythm_offset", "rhythm offset"),
+)
 T = TypeVar("T")
 
 
@@ -839,10 +845,15 @@ def _diversity_summary(
     angle_bins: Counter[str] = Counter()
     relation_counts: Counter[str] = Counter()
     relation_sample_count = 0
+    repair_part_counts: Counter[str] = Counter()
+    repair_part_sample_counts: Counter[str] = Counter()
     density_counts: Counter[str] = Counter()
     for artifact in artifacts:
         score = artifact["score"]
         family_counts[_composition_family_from_score(score)] += 1
+        artifact_repair_parts = _score_metrics(score).get("score_repair_part_counts") or {}
+        repair_part_counts.update(artifact_repair_parts)
+        repair_part_sample_counts.update(artifact_repair_parts.keys())
         angle_bin = _dominant_angle_bin(score)
         if angle_bin is not None:
             angle_bins[str(angle_bin)] += 1
@@ -917,6 +928,11 @@ def _diversity_summary(
         "family_share_max": round(max(family_counts.values()) / family_total, 6) if family_total else None,
         "relation_counts": dict(sorted(relation_counts.items())),
         "relation_sample_count": relation_sample_count,
+        "score_repair_part_counts": dict(sorted(repair_part_counts.items())),
+        "score_repair_part_sample_counts": dict(sorted(repair_part_sample_counts.items())),
+        "score_repair_part_sample_rates": {
+            key: round(value / len(artifacts), 6) for key, value in sorted(repair_part_sample_counts.items())
+        } if artifacts else {},
         "relation_sample_rate": round(relation_sample_count / len(artifacts), 6) if artifacts else None,
         "density_counts": dict(sorted(density_counts.items())),
         "replay": {
@@ -1406,6 +1422,7 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     presence_gaze_counts: Counter[str] = Counter()
     relation_counts: Counter[str] = Counter()
     relation_instruction_count = 0
+    repair_part_counts: Counter[str] = Counter()
 
     presence = score.get("presence")
     if isinstance(presence, dict):
@@ -1427,9 +1444,13 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
             color_counts[color] += 1
         hint = instruction.get("color_hint")
         if isinstance(hint, str):
+            hint_lower = hint.lower()
             for motif in MOTIF_HINT_KEYS:
                 if motif in hint:
                     motif_hint_counts[motif] += 1
+            for key, marker in SCORE_REPAIR_PART_MARKERS:
+                if marker in hint_lower:
+                    repair_part_counts[key] += 1
 
         relation = instruction.get("relation")
         if isinstance(relation, dict) and isinstance(relation.get("type"), str):
@@ -1474,6 +1495,8 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_primitive_counts": dict(sorted(primitive_counts.items())),
         "score_color_counts": dict(sorted(color_counts.items())),
         "score_motif_hint_counts": dict(sorted(motif_hint_counts.items())),
+        "score_repair_part_counts": dict(sorted(repair_part_counts.items())),
+        "score_has_repair_part": bool(repair_part_counts),
         "score_presence_counts": dict(sorted(presence_counts.items())),
         "score_presence_gaze_counts": dict(sorted(presence_gaze_counts.items())),
         "score_relation_counts": dict(sorted(relation_counts.items())),
@@ -1697,6 +1720,7 @@ def _paint_payload(
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
+        "vary_seed": getattr(args, "vary_seed", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -1724,6 +1748,7 @@ def _compose_payload(
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "auto_repair": True,
         "render_seed": getattr(args, "render_seed", None),
+        "vary_seed": getattr(args, "vary_seed", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -2103,8 +2128,9 @@ def command_batch(args: argparse.Namespace) -> int:
     )
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
-    pending_timeout_retries: list[tuple[int, str]] = []
-    result_index_by_line: dict[int, int] = {}
+    vary_count = max(1, int(getattr(args, "vary", 1) or 1))
+    pending_timeout_retries: list[tuple[int, str, int | None]] = []
+    result_index_by_line: dict[tuple[int, int | None], int] = {}
 
     def process_line(index: int, line: str, *, retry_timeout: bool = False) -> dict[str, Any]:
         progress_label = (
@@ -2153,7 +2179,11 @@ def command_batch(args: argparse.Namespace) -> int:
                 )),
                 enabled=not args.no_progress,
             )
-        prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
+        current_vary_seed = getattr(args, "vary_seed", None)
+        if vary_count > 1:
+            prefix = f"{args.prefix}-{index:03d}-v{current_vary_seed}" if args.prefix else f"inku-batch-{index:03d}-v{current_vary_seed}"
+        else:
+            prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
         output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
         paths = _write_paint_outputs(output_result, out_dir=out_dir, prefix=prefix, png=args.png)
         tokens_in = (result.get("tokens_in_stage1") or 0) + (result.get("tokens_in_stage2") or 0)
@@ -2175,6 +2205,7 @@ def command_batch(args: argparse.Namespace) -> int:
             "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
             "history_id": result.get("history_id"),
             "svg_profile": args.svg_profile,
+            "vary_seed": result.get("vary_seed"),
             "elapsed_total_ms": elapsed,
             "tokens_in": tokens_in or None,
             "tokens_out": tokens_out or None,
@@ -2192,30 +2223,39 @@ def command_batch(args: argparse.Namespace) -> int:
             entry["server_timeout_retry_attempted"] = retry_timeout
         return entry
 
-    for index, line in enumerate(lines, start=1):
+    work_items = [(index, line, vary_index if vary_count > 1 else getattr(args, "vary_seed", None)) for index, line in enumerate(lines, start=1) for vary_index in range(vary_count)]
+    for ordinal, (index, line, vary_seed) in enumerate(work_items, start=1):
+        previous_vary_seed = getattr(args, "vary_seed", None)
+        args.vary_seed = vary_seed
         try:
             entry = process_line(index, line)
-            result_index_by_line[index] = len(results)
+            key = (index, vary_seed)
+            result_index_by_line[key] = len(results)
             results.append(entry)
             timeout_reasons = entry.get("server_timeout_reasons") or []
             if timeout_reasons:
-                pending_timeout_retries.append((index, line))
+                pending_timeout_retries.append((index, line, vary_seed))
                 print(
-                    f"{index}/{len(lines)} server timeout ({', '.join(timeout_reasons)}); queued final retry",
+                    f"{ordinal}/{len(work_items)} server timeout ({', '.join(timeout_reasons)}); queued final retry",
                     file=sys.stderr,
                 )
-            print(f"{index}/{len(lines)} ok {entry['elapsed_total_ms']}ms", file=sys.stderr)
+            print(f"{ordinal}/{len(work_items)} ok line {index} {entry['elapsed_total_ms']}ms", file=sys.stderr)
         except CliError as exc:
-            failures.append({"line": index, "text": line, "message": str(exc)})
-            print(f"{index}/{len(lines)} failed: {exc}", file=sys.stderr)
+            failures.append({"line": index, "text": line, "vary_seed": vary_seed, "message": str(exc)})
+            print(f"{ordinal}/{len(work_items)} failed line {index}: {exc}", file=sys.stderr)
             if not args.continue_on_error:
+                args.vary_seed = previous_vary_seed
                 break
+        finally:
+            args.vary_seed = previous_vary_seed
     if pending_timeout_retries:
         print(f"server timeout final retry: {len(pending_timeout_retries)} item(s)", file=sys.stderr)
-    for index, line in pending_timeout_retries:
+    for index, line, vary_seed in pending_timeout_retries:
+        previous_vary_seed = getattr(args, "vary_seed", None)
+        args.vary_seed = vary_seed
         try:
             retry_entry = process_line(index, line, retry_timeout=True)
-            original_result_index = result_index_by_line.get(index)
+            original_result_index = result_index_by_line.get((index, vary_seed))
             if original_result_index is not None:
                 results[original_result_index] = retry_entry
             else:
@@ -2229,8 +2269,10 @@ def command_batch(args: argparse.Namespace) -> int:
             else:
                 print(f"{index}/{len(lines)} final retry ok {retry_entry['elapsed_total_ms']}ms", file=sys.stderr)
         except CliError as exc:
-            failures.append({"line": index, "text": line, "message": f"final retry failed: {exc}"})
+            failures.append({"line": index, "text": line, "vary_seed": vary_seed, "message": f"final retry failed: {exc}"})
             print(f"{index}/{len(lines)} final retry failed: {exc}", file=sys.stderr)
+        finally:
+            args.vary_seed = previous_vary_seed
 
     total_in = sum(int(result.get("tokens_in") or 0) for result in results)
     total_out = sum(int(result.get("tokens_out") or 0) for result in results)
@@ -2240,6 +2282,8 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_primitive: Counter[str] = Counter()
     aggregate_color: Counter[str] = Counter()
     aggregate_motif_hints: Counter[str] = Counter()
+    aggregate_repair_parts: Counter[str] = Counter()
+    aggregate_repair_part_samples: Counter[str] = Counter()
     aggregate_presence: Counter[str] = Counter()
     aggregate_presence_gaze: Counter[str] = Counter()
     aggregate_relation: Counter[str] = Counter()
@@ -2260,6 +2304,9 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_primitive.update(result.get("score_primitive_counts") or {})
         aggregate_color.update(result.get("score_color_counts") or {})
         aggregate_motif_hints.update(result.get("score_motif_hint_counts") or {})
+        repair_parts = result.get("score_repair_part_counts") or {}
+        aggregate_repair_parts.update(repair_parts)
+        aggregate_repair_part_samples.update(repair_parts.keys())
         aggregate_presence.update(result.get("score_presence_counts") or {})
         aggregate_presence_gaze.update(result.get("score_presence_gaze_counts") or {})
         aggregate_relation.update(result.get("score_relation_counts") or {})
@@ -2281,7 +2328,9 @@ def command_batch(args: argparse.Namespace) -> int:
     summary = {
         "success": len(results),
         "failed": len(failures),
-        "total": len(lines),
+        "total": len(work_items),
+        "prompt_total": len(lines),
+        "vary_count": vary_count,
         "input_mode": input_mode,
         **_model_summary(
             None if input_mode == "ddl" else stage1_model,
@@ -2315,6 +2364,12 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_color_counts": dict(sorted(aggregate_color.items())),
         "score_motif_hint_counts": dict(sorted(aggregate_motif_hints.items())),
         "score_motif_hint_lines": _aggregate_marker_lines(results, "score_motif_hint_counts"),
+        "score_repair_part_counts": dict(sorted(aggregate_repair_parts.items())),
+        "score_repair_part_sample_counts": dict(sorted(aggregate_repair_part_samples.items())),
+        "score_repair_part_sample_rates": {
+            key: round(value / len(results), 6) for key, value in sorted(aggregate_repair_part_samples.items())
+        } if results else {},
+        "score_repair_part_lines": _aggregate_marker_lines(results, "score_repair_part_counts"),
         "score_presence_counts": dict(sorted(aggregate_presence.items())),
         "score_presence_gaze_counts": dict(sorted(aggregate_presence_gaze.items())),
         "score_presence_lines": _aggregate_marker_lines(results, "score_presence_counts"),
@@ -2441,6 +2496,7 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_canvas_aspect_id": args.canvas_aspect,
         "render_canvas_aspect_ratio": _canvas_aspect_ratio(args.canvas_aspect),
         "render_seed": args.render_seed,
+        "vary_seed": args.vary_seed,
         "svg_profile": args.svg_profile,
     }
     paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=args.prefix or "score", png=args.png)
@@ -2570,6 +2626,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
+    parser.add_argument("--vary-seed", type=int, help="Stage 1.5 composition variation seed")
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
     parser.add_argument("--ui-lang")
     parser.add_argument("--include-thinking", action="store_true")
@@ -2579,6 +2636,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")
         parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")
+        parser.add_argument("--vary", type=int, default=1, help="generate N Stage 1.5 variations per prompt")
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
@@ -2647,6 +2705,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display")
     render_score.add_argument("--canvas-aspect", default="square")
     render_score.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
+    render_score.add_argument("--vary-seed", type=int, help="record Stage 1.5 composition variation seed in output metadata")
     render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     render_score.add_argument("--color-catalog", help="server color catalog id")
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")

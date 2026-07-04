@@ -264,3 +264,23 @@ def test_expand_intermediate_ddl_composition_family_rewrites_diagonal_bias():
 
     joined = "\n".join(outputs)
     assert any(phrase in joined for phrase in ("上から下への縦の帯", "左から右への横の帯", "画面全体へ", "上端寄り"))
+
+
+
+def test_expand_intermediate_ddl_vary_seed_default_is_backward_compatible():
+    ddl = "青い線を三本引く。"
+    context = "リズムのある水面に反復する音が広がる"
+
+    assert expand_intermediate_ddl(ddl, context_text=context, vary_seed=None) == expand_intermediate_ddl(ddl, context_text=context)
+
+
+def test_expand_intermediate_ddl_vary_seed_is_deterministic_and_diverse():
+    ddl = "青い線を三本引く。"
+    context = "リズムのある水面に反復する音が広がる"
+
+    first = expand_intermediate_ddl(ddl, context_text=context, vary_seed=3)
+    second = expand_intermediate_ddl(ddl, context_text=context, vary_seed=3)
+    variants = {expand_intermediate_ddl(ddl, context_text=context, vary_seed=seed) for seed in range(10)}
+
+    assert first == second
+    assert len(variants) >= 3

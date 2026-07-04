@@ -87,6 +87,8 @@
 		render_canvas_aspect?: string | null;
 		render_canvas_aspect_id?: string | null;
 		render_canvas_aspect_ratio?: number | null;
+		render_seed?: number | null;
+		vary_seed?: number | null;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
 		ui_lang?: string | null;
@@ -289,6 +291,7 @@
 	let ddlAutoRepairEnabled = $state(true);
 	let thinking = $state<string | null>(null);
 	let result   = $state<PaintResult | null>(null);
+	let variationBusy = $state(false);
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -1901,6 +1904,8 @@
 		countGeneration?: boolean;
 		catalogId?: string;
 		canvasAspectId?: CanvasAspectId;
+		renderSeed?: number;
+		varySeed?: number;
 		signal?: AbortSignal;
 	};
 
@@ -1926,6 +1931,8 @@
 				instruction_lang: instructionLang,
 				ui_lang: uiLang,
 				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
+				render_seed: options.renderSeed,
+				vary_seed: options.varySeed,
 				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
@@ -2007,6 +2014,8 @@
 		render_canvas_aspect?: string | null;
 		render_canvas_aspect_id?: string | null;
 		render_canvas_aspect_ratio?: number | null;
+		render_seed?: number | null;
+		vary_seed?: number | null;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
 		ui_lang?: string | null;
@@ -2052,6 +2061,8 @@
 			render_canvas_aspect?: string | null;
 			render_canvas_aspect_id?: string | null;
 			render_canvas_aspect_ratio?: number | null;
+			render_seed?: number | null;
+			vary_seed?: number | null;
 			elapsed_ms: number;
 			tokens_in: number | null;
 			tokens_out: number | null;
@@ -2271,6 +2282,8 @@
 					render_canvas_aspect: composed.render_canvas_aspect,
 					render_canvas_aspect_id: composed.render_canvas_aspect_id,
 					render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
+					render_seed: composed.render_seed,
+					vary_seed: composed.vary_seed,
 					instruction_lang_requested: composed.instruction_lang_requested,
 					instruction_lang_resolved: composed.instruction_lang_resolved,
 					ui_lang: composed.ui_lang,
@@ -2453,6 +2466,8 @@
 				render_canvas_aspect?: string | null;
 				render_canvas_aspect_id?: string | null;
 				render_canvas_aspect_ratio?: number | null;
+				render_seed?: number | null;
+				vary_seed?: number | null;
 				instruction_lang_requested?: string | null;
 				instruction_lang_resolved?: string | null;
 				ui_lang?: string | null;
@@ -2476,6 +2491,8 @@
 				render_canvas_aspect: d.render_canvas_aspect,
 				render_canvas_aspect_id: d.render_canvas_aspect_id,
 				render_canvas_aspect_ratio: d.render_canvas_aspect_ratio,
+				render_seed: d.render_seed,
+				vary_seed: d.vary_seed,
 				instruction_lang_requested: d.instruction_lang_requested,
 				instruction_lang_resolved: d.instruction_lang_resolved,
 				ui_lang: d.ui_lang,
@@ -3015,6 +3032,73 @@
 	function setSelectedCatalog(id: string) {
 		displayedHistoryItem = null;
 		selectedCatalog = id;
+	}
+
+
+	async function varyPerformance() {
+		if (!result || variationBusy) return;
+		variationBusy = true;
+		reloading = true;
+		reloadError = null;
+		try {
+			const nextSeed = Number.isFinite(result.render_seed ?? NaN) ? Number(result.render_seed) + 1 : 1;
+			const r = await apiFetch('/api/render-svg', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					score: result.score,
+					catalog_id: result.render_color_catalog_id ?? selectedCatalog,
+					canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+					render_seed: nextSeed,
+				})
+			});
+			if (!r.ok) throw new Error(await r.text());
+			const svg = await r.text();
+			result = { ...result, svg, render_seed: nextSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null };
+			displayedHistoryItem = null;
+			outputTab = 'canvas';
+			fitCanvasZoom();
+		} catch (e) {
+			reloadError = e instanceof Error ? e.message : String(e);
+		} finally {
+			reloading = false;
+			variationBusy = false;
+		}
+	}
+
+	async function varyComposition() {
+		if (!result || variationBusy || loading) return;
+		const source = input.trim();
+		if (!source) return;
+		variationBusy = true;
+		loading = true;
+		error = null;
+		try {
+			const nextVarySeed = Number.isFinite(result.vary_seed ?? NaN) ? Number(result.vary_seed) + 1 : 0;
+			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source });
+			ddl = r.ddl;
+			ddlGeneratedBaseline = r.ddl;
+			thinking = r.thinking;
+			result = r;
+			displayedHistoryItem = null;
+			elapsedStage1Ms = r.elapsed_stage1_ms;
+			elapsedStage2Ms = r.elapsed_stage2_ms;
+			elapsedTotalMs = r.elapsed_total_ms;
+			tokensInStage1 = r.tokens_in_stage1;
+			tokensOutStage1 = r.tokens_out_stage1;
+			tokensInStage2 = r.tokens_in_stage2;
+			tokensOutStage2 = r.tokens_out_stage2;
+			outputTab = 'canvas';
+			await fetchHistoryOffset(0);
+			historyCursor = 0;
+			fitCanvasZoom();
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			loading = false;
+			variationBusy = false;
+			stopTimer();
+		}
 	}
 
 	// ── Download ────────────────────────────────────────────
@@ -3804,6 +3888,9 @@
 				onToggleStar={toggleHistoryStar}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
+				onVaryPerformance={varyPerformance}
+				onVaryComposition={varyComposition}
+				{variationBusy}
 				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->

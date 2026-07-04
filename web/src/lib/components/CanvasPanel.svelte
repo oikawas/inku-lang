@@ -6,7 +6,7 @@
 
 	type OutputTab = 'canvas' | 'prompts' | 'score';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: { instructions: unknown[]; canvas?: string | null }; render_hash?: string | null; render_hash_short?: string | null };
+	type PaintResult = { svg: string; score: { instructions: unknown[]; canvas?: string | null }; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean };
 
@@ -63,6 +63,9 @@
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
 		onDownloadPNG: (size: number) => void | Promise<void>;
+		onVaryPerformance: () => void | Promise<void>;
+		onVaryComposition: () => void | Promise<void>;
+		variationBusy: boolean;
 	};
 
 	let {
@@ -117,7 +120,10 @@
 		onCopyStatusHash,
 		onToggleStar,
 		onDownloadSVG,
-		onDownloadPNG
+		onDownloadPNG,
+		onVaryPerformance,
+		onVaryComposition,
+		variationBusy = false
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
@@ -168,6 +174,14 @@
 	function closePresentationMode() {
 		presentationMode = false;
 	}
+
+	const seedSummary = $derived(
+		result
+			? t().canvasSeedSummary
+				.replace('{render}', result.render_seed == null ? '-' : String(result.render_seed))
+				.replace('{vary}', result.vary_seed == null ? '-' : String(result.vary_seed))
+			: ''
+	);
 </script>
 
 <svelte:window onkeydown={(event) => {
@@ -320,6 +334,13 @@
 				<button class="zoom-reset" onclick={onResetZoom}>⊙</button>
 			</div>
 		{/if}
+
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="variation-controls" onpointerdown={(event) => event.stopPropagation()}>
+			<button class="ghost-btn variation-btn" onclick={onVaryPerformance} disabled={!result || variationBusy}>{t().canvasVaryPerformance}</button>
+			<button class="ghost-btn variation-btn" onclick={onVaryComposition} disabled={!result || variationBusy}>{t().canvasVaryComposition}</button>
+			{#if result}<span class="seed-summary">{seedSummary}</span>{/if}
+		</div>
 
 		<div class="nav-right">
 			<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
@@ -559,6 +580,36 @@
 		overflow: hidden;
 	}
 	.nav-left,
+	.variation-controls {
+		position: absolute;
+		left: 50%;
+		bottom: 18px;
+		transform: translateX(-50%);
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		z-index: 12;
+		background: color-mix(in srgb, var(--bg) 88%, transparent);
+		border: 1px solid var(--border);
+		padding: 6px 8px;
+		box-shadow: var(--shadow-sm);
+	}
+	.variation-btn { min-width: 88px; }
+	.seed-summary {
+		font-size: 11px;
+		color: var(--fg3);
+		white-space: nowrap;
+	}
+	@media (max-width: 720px) {
+		.variation-controls {
+			left: 12px;
+			right: 12px;
+			transform: none;
+			justify-content: center;
+			flex-wrap: wrap;
+		}
+	}
+
 	.nav-right {
 		position: absolute;
 		z-index: 10;

@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.51**
+**Version: v1.52**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -207,6 +207,10 @@ resolution of regions and relations).  Each render may carry a `render_seed`;
 providing the same seed makes replay reproducible while leaving the canonical
 Score stable.
 
+inku exposes this as the first half of two-step regeneration: **another
+performance** rerenders the same JSON Score with a new explicit performance
+seed. It does not call an LLM and does not change the interpretation or Score.
+
 Human, face, animal, and group motifs are not drawn as literal objects.  Stage 2
 and the coercion layer convert them into `Score.presence`: presence kind,
 intensity, center of gravity, symmetry, gaze pressure, group behavior, and
@@ -223,7 +227,7 @@ increasing count or density.
 
 The score coercion layer also contains rendering-core quality repairs used by
 the current default engine.  These repairs are deliberately generic rather than
-prompt-specific.  Quiet, mist, memory, shadow, and neon-blur contexts apply
+prompt-specific, and must not become a visible system fingerprint.  Quiet, mist, memory, shadow, and neon-blur contexts apply
 density and negative-space governors so vertical lines, particles, large filled
 shapes, or background surfaces do not overwhelm the work.  Motion words that
 arrive without an effective trajectory can receive a small directional motion
@@ -233,6 +237,14 @@ distributed across available vocabulary: when a scene lacks angular anchors,
 the repair may add a small `polygon`; when repeated lines dominate, it shapes
 the existing line group with syncopated spacing, preserved negative space,
 directional fading, and slight endpoint gaps instead of increasing density.
+
+Repair parts such as focal reactions, angular pulses, vanishing traces, and
+rhythm offsets are measured by marker phrase in CLI analysis. Their firing rate
+is monitored, but no new governor or floor may force them into every sample.
+When such a part is necessary, fixed coordinates and fixed shape parameters are
+resolved from the event anchor and input hash so repeated works do not reveal a
+constant inserted component. Focal adjacent reactions are limited to isolated
+visual events where omitting the reaction would weaken the subject.
 
 The rendering core is exposed internally through a RenderEngine contract.  A
 render engine receives JSON Score, render options, and server-owned color
@@ -534,6 +546,14 @@ warns that the DDL edit will be lost.  The choices are `cancel`, `OK`, and
 `draw from DDL`.  `OK` reruns Stage 1 from the natural-language prompt, while
 `draw from DDL` preserves the edited DDL and runs Stage 2 / rendering only.
 The natural-language prompt is not reinterpreted by `Draw from DDL`.
+
+The drawing tab also exposes two explicit regeneration actions. **Another
+performance** keeps the same Score and asks only the renderer for a new
+performance seed. **Another composition** keeps the user-facing text as the
+identity of the work but increments a `vary_seed` for Stage 1.5 selection, so
+composition family, focus, and technique candidates can change without making
+the default path nondeterministic. The same text plus the same `vary_seed` and
+`render_seed` is reproducible from metadata.
 
 DDL replay shows elapsed time, token information, a stop button, and the kiwi
 progress mascot.  Stopping replay aborts the active `/api/compose` request.
@@ -1005,6 +1025,22 @@ The status-bar PNG export templates default to Y-axis heights of `1080px`,
 `2160px`, and `4320px`. Older saved defaults of `1024px` and `2048px` are
 automatically replaced by the new defaults, while user-customized templates are
 preserved. The Japanese UI labels this dimension as `Y軸` / `Y軸の高さ`.
+
+### v1.52 (2026-07-04)
+
+Version 1.52 materializes post-selection through two explicit regeneration
+paths. `render_seed` supports another performance without an LLM call.
+`vary_seed` supports another composition by mixing an explicit counter into the
+Stage 1.5 selection seed while preserving the default rule that the same input
+produces the same expansion. The vary path changes composition-family, focus,
+and technique selection; it does not intentionally change Stage 1
+interpretation.
+
+Version 1.52 also forbids repair parts from becoming a system fingerprint. CLI
+diversity analysis now reports marker-based repair-part counts and sample
+rates. Coerce repair parts use input-derived placement and shape variation
+instead of fixed coordinates, and adjacent focal reactions fire only for
+isolated visual events.
 
 ### v1.51 (2026-07-02)
 

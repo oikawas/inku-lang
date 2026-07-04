@@ -607,6 +607,7 @@ class ComposeRequest(BaseModel):
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
+    vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
 
 
 class ComposeResponse(BaseModel):
@@ -628,6 +629,7 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
+    vary_seed: int | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -683,6 +685,7 @@ class PaintRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用した色カタログID")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
+    vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
 
 
 class PaintResponse(BaseModel):
@@ -705,6 +708,7 @@ class PaintResponse(BaseModel):
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
+    vary_seed: int | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -802,6 +806,7 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
+    vary_seed: int | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -1872,8 +1877,9 @@ def _call_compose_detail(
     original_text: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
+    vary_seed: int | None = None,
 ) -> ComposeDetail:
-    ddl = expand_intermediate_for_lang(ddl, lang=lang, context_text=original_text)
+    ddl = expand_intermediate_for_lang(ddl, lang=lang, context_text=original_text, vary_seed=vary_seed)
     retry_count = 0
     retry_reasons: list[str] = []
     fallback_used = False
@@ -2009,6 +2015,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             original_text=req.original_text,
             system_prompt=None,
             lang=instruction_lang_resolved,
+            vary_seed=req.vary_seed,
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
@@ -2032,6 +2039,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
         "render_seed": req.render_seed,
+        "vary_seed": req.vary_seed,
     }
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
@@ -2353,7 +2361,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
     ddl = interpret_detail_result.ddl
-    ddl = expand_intermediate_for_lang(ddl, lang=instruction_lang_resolved, context_text=source_text)
+    ddl = expand_intermediate_for_lang(ddl, lang=instruction_lang_resolved, context_text=source_text, vary_seed=req.vary_seed)
     t1 = time.perf_counter()
     try:
         compose_detail = _call_compose_detail(
@@ -2384,6 +2392,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
         "render_seed": req.render_seed,
+        "vary_seed": req.vary_seed,
     }
     t2 = time.perf_counter()
     try:

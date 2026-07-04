@@ -79,6 +79,8 @@ inku uses a **Stage 1 / Stage 1.5 / Stage 2 / Renderer** pipeline:
 
 This separation lets natural-language interpretation, expression expansion, structure generation, and rendering be tuned independently. API models, local LLMs, and NVIDIA NIM-style endpoints can be selected per stage.
 
+In the web UI, each result can be regenerated as **another performance** or **another composition**. Another performance rerenders the same JSON Score with a new performance seed and does not call an LLM. Another composition uses an explicit vary seed to reselect Stage 1.5 composition family, focus, and technique candidates while keeping the default path deterministic.
+
 ---
 
 ## Core Vocabulary (Saijiki / 歳時記)

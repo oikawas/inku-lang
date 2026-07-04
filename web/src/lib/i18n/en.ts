@@ -114,6 +114,9 @@ export const en: LangPack = {
 	tabScore: 'JSON',
 
 	canvasPlaceholder: '(not yet drawn)',
+	canvasVaryPerformance: 'another performance',
+	canvasVaryComposition: 'another composition',
+	canvasSeedSummary: 'seed performance {render} / composition {vary}',
 	canvasCaptionToggle: 'show instruction caption',
 	canvasPresentationOpen: 'open presentation mode',
 	canvasPresentationClose: 'close presentation mode',

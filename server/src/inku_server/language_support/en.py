@@ -210,8 +210,8 @@ def _english_taste_additions(expanded: str, context_text: str | None) -> list[st
     return additions[:2]
 
 
-def expand_intermediate(ddl: str, context_text: str | None = None) -> str:
-    expanded = expand_intermediate_ddl(ddl, lang="en", context_text=context_text)
+def expand_intermediate(ddl: str, context_text: str | None = None, vary_seed: int | None = None) -> str:
+    expanded = expand_intermediate_ddl(ddl, lang="en", context_text=context_text, vary_seed=vary_seed)
     return _append_sentences(expanded, _english_taste_additions(expanded, context_text))
 
 

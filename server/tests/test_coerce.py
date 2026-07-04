@@ -2035,7 +2035,7 @@ def test_coerce_score_keeps_english_action_residue_visible():
     assert abs(bow.to[0] - bow.from_[0]) >= 0.14
     assert "visual event preserved as action residue" in (bow.color_hint or "")
     assert "focal event visibility floor applied" in (bow.color_hint or "")
-    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_turns_english_repetition_time_into_focal_event():
@@ -2056,7 +2056,7 @@ def test_coerce_score_turns_english_repetition_time_into_focal_event():
     fixed = coerce_score(score, ddl="In a thawing stream, small sounds were born under the stones and vanished again and again.")
 
     assert any("visual event restored" in (ins.color_hint or "") for ins in fixed.instructions)
-    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
+    assert not any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_restores_pre_bell_light_hinge():
@@ -2619,3 +2619,48 @@ def test_coerce_disable_keeps_structural_repair_but_skips_style_repairs(monkeypa
     assert fixed.instructions[0].from_ == (0.1, 0.5)
     assert fixed.instructions[0].to == (0.9, 0.5)
     assert fixed.instructions[0].relation is None
+
+
+
+def test_coerce_score_limits_adjacent_reaction_to_isolated_focal_event():
+    isolated = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "circle", "center": [0.50, 0.50], "radius": 0.01, "color": "red"},
+            ],
+        }
+    )
+    crowded = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "circle", "center": [0.50, 0.50], "radius": 0.01, "color": "red"},
+                {"primitive": "line", "from": [0.48, 0.47], "to": [0.62, 0.51], "color": "black"},
+                {"primitive": "ellipse", "center": [0.56, 0.54], "size": [0.12, 0.05], "color": "gray"},
+            ],
+        }
+    )
+
+    isolated_fixed = coerce_score(isolated, ddl="大きな美術館の白い部屋で、小さな赤い点だけが見る人の足を止めた。")
+    crowded_fixed = coerce_score(crowded, ddl="大きな美術館の白い部屋で、小さな赤い点だけが見る人の足を止めた。")
+
+    assert any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in isolated_fixed.instructions)
+    assert not any("visual event adjacent reaction added to hold focal event" in (ins.color_hint or "") for ins in crowded_fixed.instructions)
+
+
+def test_coerce_score_varies_repair_part_coordinates_by_input():
+    base = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.25, 0.67], "to": [0.78, 0.39], "color": "blue"},
+            ],
+        }
+    )
+
+    fixed_a = coerce_score(base, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
+    fixed_b = coerce_score(base, ddl="広い駅の白い壁で、小さな青い点だけが見る人の足を止めた。")
+    pulse_a = next(ins for ins in fixed_a.instructions if "small angular pulse" in (ins.color_hint or ""))
+    pulse_b = next(ins for ins in fixed_b.instructions if "small angular pulse" in (ins.color_hint or ""))
+
+    assert pulse_a.center != [0.68, 0.34]
+    assert pulse_b.center != [0.68, 0.34]
+    assert pulse_a.center != pulse_b.center

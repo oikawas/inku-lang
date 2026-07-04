@@ -494,7 +494,19 @@ def _contrast_en_color(ddl: str) -> str:
     return "black"
 
 
-def expand_intermediate_ddl(ddl: str, *, lang: str = "ja", context_text: str | None = None) -> str:
+def _vary_context(text: str, vary_seed: int | None) -> str:
+    if vary_seed is None:
+        return text
+    return f"{text}#vary{int(vary_seed)}"
+
+
+def expand_intermediate_ddl(
+    ddl: str,
+    *,
+    lang: str = "ja",
+    context_text: str | None = None,
+    vary_seed: int | None = None,
+) -> str:
     """Add controlled complexity to normalized DDL before Stage 2.
 
     The filter favors visible mathematical structure over vague randomness:
@@ -510,11 +522,11 @@ def expand_intermediate_ddl(ddl: str, *, lang: str = "ja", context_text: str | N
     if not sanitized:
         return sanitized
     if lang == "en":
-        return _expand_en(sanitized, context_text=context_text)
-    return _expand_ja(sanitized, context_text=context_text)
+        return _expand_en(sanitized, context_text=context_text, vary_seed=vary_seed)
+    return _expand_ja(sanitized, context_text=context_text, vary_seed=vary_seed)
 
 
-def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
+def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | None = None) -> str:
     if any(marker in ddl for marker in _JA_EXPANSION_MARKERS):
         return ddl
     ddl = _reframe_static_center_ja(ddl)
@@ -524,6 +536,7 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
     main_color = _dominant_ja_color(ddl)
     contrast_color = _contrast_ja_color(ddl)
     context = f"{context_text or ''}\n{ddl}"
+    seed_context = _vary_context(context, vary_seed)
     profile = _profile_ja(context)
 
     if any(token in ddl for token in ("円", "点", "粒", "星", "楕円", "四角")):
@@ -590,17 +603,17 @@ def _expand_ja(ddl: str, *, context_text: str | None = None) -> str:
     structural_count, music_count, painting_count = _category_plan(profile, has_structural=bool(structural_candidates))
 
     selected = (
-        _select_category(structural_candidates, structural_count, profile=profile, text=context, salt=_mode_salt(profile, "ja-structure"))
-        + _select_category(music, music_count, profile=profile, text=context, salt=_mode_salt(profile, "ja-music"))
-        + _select_category(painting, painting_count, profile=profile, text=context, salt=_mode_salt(profile, "ja-painting"))
+        _select_category(structural_candidates, structural_count, profile=profile, text=seed_context, salt=_mode_salt(profile, "ja-structure"))
+        + _select_category(music, music_count, profile=profile, text=seed_context, salt=_mode_salt(profile, "ja-music"))
+        + _select_category(painting, painting_count, profile=profile, text=seed_context, salt=_mode_salt(profile, "ja-painting"))
     )
     selected = _limit_centered(selected, centered_tokens=("中心", "中央", "放射状", "同心円状"))
-    selected = _apply_composition_family_ja(selected, profile=profile, text=context)
+    selected = _apply_composition_family_ja(selected, profile=profile, text=seed_context)
 
     return _join_sentences(sentences + selected, lang="ja")
 
 
-def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
+def _expand_en(ddl: str, *, context_text: str | None = None, vary_seed: int | None = None) -> str:
     lower = ddl.lower()
     if any(marker in lower for marker in _EN_EXPANSION_MARKERS):
         return ddl
@@ -612,6 +625,7 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
     main_color = _dominant_en_color(ddl)
     contrast_color = _contrast_en_color(ddl)
     context = f"{context_text or ''}\n{ddl}"
+    seed_context = _vary_context(context, vary_seed)
     profile = _profile_en(context)
 
     if any(token in lower for token in ("circle", "dot", "particle", "star", "ellipse", "square")):
@@ -680,14 +694,14 @@ def _expand_en(ddl: str, *, context_text: str | None = None) -> str:
     structural_count, music_count, painting_count = _category_plan(profile, has_structural=bool(structural_candidates))
 
     selected = (
-        _select_category(structural_candidates, structural_count, profile=profile, text=context, salt=_mode_salt(profile, "en-structure"))
-        + _select_category(music, music_count, profile=profile, text=context, salt=_mode_salt(profile, "en-music"))
-        + _select_category(painting, painting_count, profile=profile, text=context, salt=_mode_salt(profile, "en-painting"))
+        _select_category(structural_candidates, structural_count, profile=profile, text=seed_context, salt=_mode_salt(profile, "en-structure"))
+        + _select_category(music, music_count, profile=profile, text=seed_context, salt=_mode_salt(profile, "en-music"))
+        + _select_category(painting, painting_count, profile=profile, text=seed_context, salt=_mode_salt(profile, "en-painting"))
     )
     selected = _limit_centered(
         selected,
         centered_tokens=("center", "radial", "concentric"),
     )
-    selected = _apply_composition_family_en(selected, profile=profile, text=context)
+    selected = _apply_composition_family_en(selected, profile=profile, text=seed_context)
 
     return _join_sentences(sentences + selected, lang="en")

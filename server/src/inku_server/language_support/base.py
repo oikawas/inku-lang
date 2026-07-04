@@ -12,5 +12,5 @@ class InstructionLanguageSupport:
     code: str
     stage1_prompt: str
     stage2_prompt: str
-    expand_intermediate: Callable[[str, str | None], str]
+    expand_intermediate: Callable[[str, str | None, int | None], str]
     coerce_markers: dict[str, Any]

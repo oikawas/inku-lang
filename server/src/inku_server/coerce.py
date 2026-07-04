@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -871,6 +872,41 @@ def _clamp_unit(value: float) -> float:
     return min(max(value, 0.0), 1.0)
 
 
+def _repair_seed(text: str | None, salt: str) -> int:
+    digest = hashlib.sha256(f"{salt}:{text or ''}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big")
+
+
+def _seed_choice(text: str | None, salt: str, values: tuple[Any, ...]) -> Any:
+    return values[_repair_seed(text, salt) % len(values)]
+
+
+def _seed_float(text: str | None, salt: str, low: float, high: float) -> float:
+    value = (_repair_seed(text, salt) % 10000) / 9999
+    return round(low + (high - low) * value, 3)
+
+
+def _offset_from_anchor(anchor: tuple[float, float], *, ddl: str | None, salt: str, distance: float) -> list[float]:
+    directions = ((1, -1), (1, 1), (-1, -1), (-1, 1), (1, 0), (-1, 0), (0, -1), (0, 1))
+    dx, dy = _seed_choice(ddl, salt, directions)
+    jitter_x = _seed_float(ddl, f"{salt}-jx", -0.018, 0.018)
+    jitter_y = _seed_float(ddl, f"{salt}-jy", -0.018, 0.018)
+    return [_clamp_unit(anchor[0] + dx * distance + jitter_x), _clamp_unit(anchor[1] + dy * distance + jitter_y)]
+
+
+def _has_nearby_contour(instructions: list[Instruction], event: Instruction, *, radius: float = 0.25) -> bool:
+    ex, ey = _instruction_anchor(event)
+    for ins in instructions:
+        if ins is event or _has_focal_event_hint(ins):
+            continue
+        if _shape_extent(ins) <= 0.0:
+            continue
+        ax, ay = _instruction_anchor(ins)
+        if ((ax - ex) ** 2 + (ay - ey) ** 2) ** 0.5 <= radius:
+            return True
+    return False
+
+
 def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
     """反復線が支配する場面では、線群自体に間隔差と欠落感を作る。"""
     if not (
@@ -1425,12 +1461,13 @@ def _visual_event_instruction(
             }
         )
     if _any_marker_in_text(("quilt", "patchwork", "handmade", "folk"), source, lower):
+        anchor = _instruction_anchor(instructions[0]) if instructions else (0.58, 0.42)
         return Instruction.model_validate(
             {
                 "primitive": "square",
-                "position": [0.64, 0.40],
-                "size": [0.072, 0.052],
-                "rotation": 22,
+                "position": _offset_from_anchor(anchor, ddl=ddl, salt="rhythm-offset", distance=0.075),
+                "size": [_seed_float(ddl, "rhythm-offset-w", 0.058, 0.086), _seed_float(ddl, "rhythm-offset-h", 0.04, 0.064)],
+                "rotation": _seed_choice(ddl, "rhythm-offset-rotation", (-28, -14, 12, 22, 34)),
                 "color": visible,
                 "weight": "brush_thin",
                 "color_hint": "visual event restored as a small handmade rhythm offset",
@@ -1446,13 +1483,14 @@ def _visual_event_instruction(
             }
         )
     if not _has_angular_event_anchor(instructions):
+        anchor = _instruction_anchor(instructions[0]) if instructions else (0.62, 0.40)
         return Instruction.model_validate(
             {
                 "primitive": "polygon",
-                "center": [0.68, 0.34],
-                "radius": 0.045,
-                "sides": 5,
-                "rotation": -18,
+                "center": _offset_from_anchor(anchor, ddl=ddl, salt="angular-pulse", distance=0.082),
+                "radius": _seed_float(ddl, "angular-pulse-radius", 0.036, 0.056),
+                "sides": _seed_choice(ddl, "angular-pulse-sides", (5, 6, 7)),
+                "rotation": _seed_choice(ddl, "angular-pulse-rotation", (-34, -18, -6, 14, 28)),
                 "color": visible,
                 "weight": "brush_thin",
                 "color_hint": "visual event restored as a small angular pulse",
@@ -1462,11 +1500,11 @@ def _visual_event_instruction(
     return Instruction.model_validate(
         {
             "primitive": "arc",
-            "center": [0.68, 0.34],
-            "radius": 0.055,
-            "angle_start": 35,
-            "angle_end": 245,
-            "rotation": -18,
+            "center": _offset_from_anchor(_instruction_anchor(instructions[0]) if instructions else (0.62, 0.40), ddl=ddl, salt="focal-pulse", distance=0.075),
+            "radius": _seed_float(ddl, "focal-pulse-radius", 0.044, 0.066),
+            "angle_start": _seed_choice(ddl, "focal-pulse-angle-start", (18, 28, 35, 46)),
+            "angle_end": _seed_choice(ddl, "focal-pulse-angle-end", (192, 220, 245, 272)),
+            "rotation": _seed_choice(ddl, "focal-pulse-rotation", (-28, -12, 8, 22)),
             "color": color,
             "weight": "hair",
             "color_hint": "visual event restored as a small focal pulse",
@@ -1695,23 +1733,17 @@ def _adjacent_reaction_instruction(
     requested = [color for color in _color_repair_order(_requested_colors_from_ddl(ddl)) if color != background]
     color = requested[0] if requested else VISIBLE_ON_BACKGROUND.get(background, "black")
     cx, cy = _instruction_anchor(event)
-    rx = _clamp_unit(cx + 0.075 if cx < 0.72 else cx - 0.075)
-    ry = _clamp_unit(cy - 0.055 if cy > 0.22 else cy + 0.055)
-    return Instruction.model_validate(
-        {
-            "primitive": "arc",
-            "center": [rx, ry],
-            "radius": 0.052,
-            "angle_start": 24,
-            "angle_end": 192,
-            "rotation": -18,
+    rx, ry = _offset_from_anchor((cx, cy), ddl=ddl, salt="adjacent-reaction", distance=_seed_float(ddl, "adjacent-reaction-distance", 0.062, 0.11))
+    primitive = _seed_choice(ddl, "adjacent-reaction-primitive", ("arc", "line", "ellipse"))
+    data: dict[str, Any] = {
+            "primitive": primitive,
             "color": color,
             "weight": "hair",
             "color_hint": "visual event adjacent reaction added to hold focal event",
             "arrangement": {
-                "count": 2,
+                "count": _seed_choice(ddl, "adjacent-reaction-count", (1, 2)),
                 "layout": "scatter",
-                "path": "diagonal",
+                "path": _seed_choice(ddl, "adjacent-reaction-path", ("diagonal", "wave", "left_to_right")),
                 "margin": 0.22,
                 "density": "low",
                 "fade": "outward",
@@ -1719,7 +1751,28 @@ def _adjacent_reaction_instruction(
                 "rhythm_spacing": "loose",
             },
         }
-    )
+    if primitive == "arc":
+        data.update({
+            "center": [rx, ry],
+            "radius": _seed_float(ddl, "adjacent-reaction-radius", 0.038, 0.066),
+            "angle_start": _seed_choice(ddl, "adjacent-reaction-angle-start", (18, 24, 36, 48)),
+            "angle_end": _seed_choice(ddl, "adjacent-reaction-angle-end", (156, 192, 216, 244)),
+            "rotation": _seed_choice(ddl, "adjacent-reaction-rotation", (-32, -18, -6, 14, 26)),
+        })
+    elif primitive == "ellipse":
+        data.update({
+            "center": [rx, ry],
+            "size": [_seed_float(ddl, "adjacent-reaction-w", 0.058, 0.092), _seed_float(ddl, "adjacent-reaction-h", 0.018, 0.04)],
+            "rotation": _seed_choice(ddl, "adjacent-reaction-ellipse-rotation", (-30, -12, 16, 32)),
+        })
+    else:
+        length = _seed_float(ddl, "adjacent-reaction-line-length", 0.07, 0.13)
+        slant = _seed_choice(ddl, "adjacent-reaction-line-slant", (-1, 1))
+        data.update({
+            "from": [_clamp_unit(rx - length / 2), _clamp_unit(ry + slant * length * 0.18)],
+            "to": [_clamp_unit(rx + length / 2), _clamp_unit(ry - slant * length * 0.18)],
+        })
+    return Instruction.model_validate(data)
 
 
 def _with_focal_event_floor(
@@ -1742,10 +1795,13 @@ def _with_focal_event_floor(
     event = next((ins for ins in adjusted if _has_focal_event_hint(ins)), None)
     if event is None:
         return adjusted
+    drawable_count = sum(1 for ins in adjusted if _shape_extent(ins) > 0.0)
+    if drawable_count > 2 and _has_nearby_contour(adjusted, event):
+        return adjusted
     return [*adjusted, _adjacent_reaction_instruction(event, ddl=ddl, background=background)]
 
 
-def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
+def _context_energy_instruction(kind: str, *, background: str, ddl: str | None = None) -> Instruction:
     visible = VISIBLE_ON_BACKGROUND.get(background, "black")
     if kind == "leaf_grain":
         return Instruction.model_validate(
@@ -1844,11 +1900,11 @@ def _context_energy_instruction(kind: str, *, background: str) -> Instruction:
         return Instruction.model_validate(
             {
                 "primitive": "arc",
-                "center": [0.72, 0.56],
-                "radius": 0.075,
-                "angle_start": 210,
-                "angle_end": 315,
-                "rotation": -18,
+                "center": _offset_from_anchor((0.62, 0.50), ddl=ddl, salt="vanishing-trace", distance=0.11),
+                "radius": _seed_float(ddl, "vanishing-trace-radius", 0.056, 0.088),
+                "angle_start": _seed_choice(ddl, "vanishing-trace-angle-start", (184, 205, 222, 238)),
+                "angle_end": _seed_choice(ddl, "vanishing-trace-angle-end", (292, 315, 334, 350)),
+                "rotation": _seed_choice(ddl, "vanishing-trace-rotation", (-32, -18, -4, 16)),
                 "color": trace_color,
                 "weight": "hair",
                 "color_hint": "vanishing trace restored with a fading endpoint",
@@ -1929,7 +1985,7 @@ def _with_context_energy_repair(
                 continue
         if kind == "vanishing_trace" and _has_context_energy(repaired, "edge_light"):
             continue
-        repaired.append(_context_energy_instruction(kind, background=background))
+        repaired.append(_context_energy_instruction(kind, background=background, ddl=ddl))
     return repaired
 
 

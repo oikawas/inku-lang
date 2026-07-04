@@ -866,6 +866,32 @@ def test_diversity_summary_counts_png_score_and_relations(tmp_path):
 
 
 
+def test_composition_family_distinguishes_right_half_from_diagonal():
+    score = {
+        "instructions": [
+            {
+                "primitive": "ellipse",
+                "center": [0.72, 0.5],
+                "size": [0.08, 0.04],
+                "arrangement": {"layout": "scatter", "path": "right_half"},
+            }
+        ]
+    }
+
+    assert cli._composition_family_from_score(score) == "one_sided_focus"
+
+
+def test_composition_family_uses_dominant_layout_votes():
+    score = {
+        "instructions": [
+            {"primitive": "line", "from": [0.1, 0.2], "to": [0.9, 0.2], "arrangement": {"layout": "horizontal", "path": "left_to_right"}},
+            {"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.08, 0.04], "arrangement": {"layout": "scatter", "path": "diagonal"}},
+        ]
+    }
+
+    assert cli._composition_family_from_score(score) == "horizontal_strata"
+
+
 def test_score_metrics_counts_relations():
     metrics = cli._score_metrics({
         "instructions": [

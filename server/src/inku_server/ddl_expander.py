@@ -337,7 +337,7 @@ def _composition_family(profile: _FilterProfile, text: str, *, lang: str) -> str
     if profile.mode == "single_tension":
         pool = ["edge_retreat", "one_sided_focus", "central_stillness"]
     elif "music" in profile.tags or "line" in profile.tags:
-        pool = ["vertical_rhythm", "horizontal_strata", "diagonal_band", "dispersal"]
+        pool = ["vertical_rhythm", "horizontal_strata", "dispersal", "radial_concentric", "edge_retreat"]
     elif "particle" in profile.tags or "dense" in profile.tags:
         pool = ["dispersal", "horizontal_strata", "vertical_rhythm", "radial_concentric"]
     elif "space" in profile.tags or "presence" in profile.tags:

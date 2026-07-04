@@ -226,6 +226,17 @@ def test_expand_intermediate_ddl_emits_relation_phrases_for_stage2_copy():
     assert any(phrase in expanded for phrase in ("前の線に沿って", "前の線を切る", "前の形に触れない"))
 
 
+def test_line_music_profile_does_not_default_to_diagonal_band():
+    outputs = [
+        expand_intermediate_ddl("青い線を三本引く。", context_text="リズムのある水面"),
+        expand_intermediate_ddl("黒い線を左から右へ五本並べる。", context_text="反復する音"),
+    ]
+
+    joined = "\n".join(outputs)
+    assert "右半分の斜めの帯" not in joined
+    assert any(phrase in joined for phrase in ("上から下への縦の帯", "左から右への横の帯", "画面全体へ", "上端寄り", "倍音列", "右下の焦点"))
+
+
 def test_expand_intermediate_ddl_composition_family_rewrites_diagonal_bias():
     outputs = [
         expand_intermediate_ddl("赤い小さな円を画面全体に点々と二十個散らす。", context_text="満天の星"),

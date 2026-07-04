@@ -768,8 +768,7 @@ def _composition_family_from_score(score: dict[str, Any]) -> str:
     instructions = score.get("instructions")
     if not isinstance(instructions, list):
         return "unknown"
-    paths: Counter[str] = Counter()
-    layouts: Counter[str] = Counter()
+    votes: Counter[str] = Counter()
     centers: list[tuple[float, float]] = []
     relations: Counter[str] = Counter()
     for instruction in instructions:
@@ -785,29 +784,37 @@ def _composition_family_from_score(score: dict[str, Any]) -> str:
         if isinstance(arrangement, dict):
             path = arrangement.get("path")
             layout = arrangement.get("layout")
-            if isinstance(path, str) and path != "none":
-                paths[path] += 1
-            if isinstance(layout, str):
-                layouts[layout] += 1
-    if paths["diagonal"] or paths["right_half"]:
-        return "diagonal_band"
-    if paths["top_to_bottom"] or layouts["vertical"]:
-        return "vertical_rhythm"
-    if paths["left_to_right"] or layouts["horizontal"]:
-        return "horizontal_strata"
-    if layouts["radial"]:
-        return "radial_concentric"
-    if relations:
-        return f"relation_{relations.most_common(1)[0][0]}"
+            if path == "diagonal":
+                votes["diagonal_band"] += 2
+            elif path == "right_half":
+                votes["one_sided_focus"] += 2
+            elif path == "top_to_bottom":
+                votes["vertical_rhythm"] += 2
+            elif path == "left_to_right":
+                votes["horizontal_strata"] += 2
+            elif path == "wave":
+                votes["dispersal"] += 1
+            if layout == "vertical":
+                votes["vertical_rhythm"] += 1
+            elif layout == "horizontal":
+                votes["horizontal_strata"] += 1
+            elif layout == "radial":
+                votes["radial_concentric"] += 2
+            elif layout == "scatter":
+                votes["dispersal"] += 1
     if centers:
         avg_x = sum(x for x, _ in centers) / len(centers)
         avg_y = sum(y for _, y in centers) / len(centers)
         if 0.42 <= avg_x <= 0.58 and 0.42 <= avg_y <= 0.58:
-            return "central_stillness"
+            votes["central_stillness"] += 2
         if avg_x < 0.25 or avg_x > 0.75 or avg_y < 0.25 or avg_y > 0.75:
-            return "edge_retreat"
-        if avg_x < 0.40 or avg_x > 0.60:
-            return "one_sided_focus"
+            votes["edge_retreat"] += 2
+        elif avg_x < 0.40 or avg_x > 0.60:
+            votes["one_sided_focus"] += 2
+    if votes:
+        return votes.most_common(1)[0][0]
+    if relations:
+        return f"relation_{relations.most_common(1)[0][0]}"
     return "dispersal"
 
 

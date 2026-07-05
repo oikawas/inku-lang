@@ -1595,6 +1595,10 @@ Build 442 実装後の検証では、`vary_seed` 経路（API / CLI / Web UI）�
 
 Build 443 では `vanishing_trace` の発火条件を「消失文脈」だけでなく足跡・白い息・輪郭・人影などの trace 主体がある場合に限定し、汎用 `visual_event` 補修を小さな角形パルスから入力由来座標の compact mark に変更した。JP/EN 各30件の再ベンチでは `adjacent_reaction` 11/60、`angular_pulse` 0/60、`vanishing_trace` 2/60 となり、修復部品 fingerprint の受け入れ基準は満たした。ただし `visual_event` 平均は 77.93、`negative_space_pressure` 平均は 88.97 で、Build 441 比の品質回帰ガードはまだ満たさない。したがって v1.52 は「機能実装と修復指紋抑制は完了、品質低下サンプルの追加監査が残る」状態として扱う。
 
+Build 444 では、Build 443 で低かった `visual_event` / `negative_space_pressure` の targeted recovery を実施した。汎用 compact visual event に `color_cycle` と入力 hash 由来の対置 center を持たせ、着地して去る一時的イベントを `brief_arrival_departure` として扱い、`line of birds / river surface / another road` と `tatami / tilted quiet` の既存レシピにも色循環と対置配置を追加した。targeted benchmark では EN #06 が `visual_event` 98 / `negative_space_pressure` 100、EN #27 が単独 rerun で 70 / 76、JP #28 が 76 / 86 まで回復した。
+
+Build 444 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-444/{jp,en}/`）では 60/60 成功、fallback 0。修復部品は `adjacent_reaction` 10/60 (16.7%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%) で、v1.52 の repair fingerprint 受け入れ基準は継続して満たした。一方で品質平均は `visual_event` 79.90、`negative_space_pressure` 89.97、`motion_energy` 94.57、`constraint_adherence` 93.33 となり、Build 441 基準（`visual_event` 93.0、`negative_space_pressure` 96.23、`motion_energy` 97.7、`constraint_adherence` 86.0）に対して `visual_event` と `negative_space_pressure` が -5 以内の品質回帰ガードを満たさない。したがって現時点の v1.52 は、Phase A-D の実装・計測・vary・修復指紋 acceptance は完了、品質回帰ガードは未達、という進捗として扱う。追加の修正は、marker 語彙や新 governor を増やすのではなく、低スコア行（例: EN #21 `visual_event` 40 / `negative_space_pressure` 26、JP #23 `negative_space_pressure` 42、JP #02/#03 `visual_event` 48）の原因を個別監査し、既存 recipe の配置・色循環・対置関係を一般化する方向で行う。
+
 ### v1.51 (2026-07-02)
 
 **関係（あいだ）の設計と、揺らぎのマクロスケール拡張**

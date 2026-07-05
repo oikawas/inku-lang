@@ -1062,6 +1062,33 @@ the Build 441 quality-regression guard is still not satisfied. Version 1.52
 should therefore be read as complete for feature delivery and repair-fingerprint
 suppression, with low-quality sample investigation still remaining.
 
+Build 444 targeted the remaining low-quality samples without adding a new
+global floor. The generic compact visual event now carries a color cycle and an
+input-derived opposing center; a `brief_arrival_departure` event type covers
+temporary arrival-and-leaving moments; and the existing doubled-river-road and
+tilted-room-drop recipes now carry color cycling and opposing placement. The
+targeted benchmark recovered EN #06 to `visual_event` 98 /
+`negative_space_pressure` 100, EN #27 to 70 / 76 on a single rerun, and JP #28
+to 76 / 86.
+
+The Build 444 JP/EN 30+30 full benchmark
+(`cli/out/jp-en-30-equivalent-444/{jp,en}/`) completed 60/60 with no fallback.
+Repair parts remained within the v1.52 fingerprint gate:
+`adjacent_reaction` 10/60 (16.7%), `angular_pulse` 0/60, and
+`vanishing_trace` 2/60 (3.3%). The quality averages were `visual_event` 79.90,
+`negative_space_pressure` 89.97, `motion_energy` 94.57, and
+`constraint_adherence` 93.33. Compared with the Build 441 guard baseline
+(`visual_event` 93.0, `negative_space_pressure` 96.23, `motion_energy` 97.7,
+`constraint_adherence` 86.0), `visual_event` and
+`negative_space_pressure` still miss the within-5 regression guard. The current
+v1.52 status is therefore: Phase A-D implementation, measurement, vary, and
+repair-fingerprint acceptance are complete, but the quality-regression guard is
+not yet accepted. Further work should inspect low-scoring rows such as EN #21
+(`visual_event` 40 / `negative_space_pressure` 26), JP #23
+(`negative_space_pressure` 42), and JP #02/#03 (`visual_event` 48), and improve
+existing recipe placement, color cycling, and opposing relationships rather
+than adding marker vocabulary or a new governor.
+
 ### v1.51 (2026-07-02)
 
 Version 1.51 adds the relation system, called `aida` in Japanese, and assigns

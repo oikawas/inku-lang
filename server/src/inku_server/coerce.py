@@ -1023,6 +1023,11 @@ VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("順に", "一斉", "その後", "あとで", "また", "in order", "again and again", "at once"),
         ("揺", "渡り", "動", "猫", "窓", "笛", "whistle", "moving", "moved", "crossed", "cat", "laundry", "window"),
     ),
+    "brief_arrival_departure": (
+        ("舞い降り", "降り", "landed", "arrived"),
+        ("飛び去", "去っ", "left", "departed"),
+        ("カラス", "鳥", "crow", "bird"),
+    ),
 }
 
 
@@ -1117,7 +1122,9 @@ def _visual_event_recipe(
                     "count": 2,
                     "layout": "scatter",
                     "path": "wave",
+                    "color_cycle": event_cycle,
                     "margin": 0.24,
+                    "center": [0.34, 0.68],
                     "density": "low",
                     "fade": "outward",
                     "preserve_space": True,
@@ -1221,6 +1228,32 @@ def _visual_event_recipe(
                 },
             }
         )
+    if event_type == "brief_arrival_departure":
+        return Instruction.model_validate(
+            {
+                "primitive": "arc",
+                "center": [0.64, 0.36],
+                "radius": 0.074,
+                "angle_start": 32,
+                "angle_end": 238,
+                "rotation": -26,
+                "color": visible,
+                "weight": "hair",
+                "color_hint": "visual event type brief_arrival_departure restored as an arrival-leaving trace",
+                "arrangement": {
+                    "count": 2,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "color_cycle": event_cycle,
+                    "margin": 0.26,
+                    "center": [0.33, 0.67],
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "syncopated",
+                },
+            }
+        )
     return None
 
 
@@ -1307,11 +1340,12 @@ def _visual_event_instruction(
             }
         )
     if _any_marker_in_text(("line of birds", "river surface", "another road", "鳥の列", "川面", "もう一つの道"), source, lower):
+        event_cycle = [visible, "gray"] if visible != "gray" else ["gray", "black"]
         return Instruction.model_validate(
             {
                 "primitive": "line",
-                "from": [0.30, 0.43],
-                "to": [0.74, 0.56],
+                "from": [0.27, 0.34],
+                "to": [0.45, 0.38],
                 "color": visible,
                 "weight": "hair",
                 "color_hint": "visual event restored as doubled river road",
@@ -1319,7 +1353,9 @@ def _visual_event_instruction(
                     "count": 2,
                     "layout": "scatter",
                     "path": "diagonal",
+                    "color_cycle": event_cycle,
                     "margin": 0.25,
+                    "center": [0.72, 0.68],
                     "density": "low",
                     "fade": "outward",
                     "preserve_space": True,
@@ -1328,6 +1364,7 @@ def _visual_event_instruction(
             }
         )
     if _any_marker_in_text(("発車ベル", "案内板", "明るくな", "departure board", "lit up", "bell"), source, lower):
+        event_cycle = ["blue", "gray"] if background != "blue" else [visible, "gray"]
         return Instruction.model_validate(
             {
                 "primitive": "square",
@@ -1341,6 +1378,8 @@ def _visual_event_instruction(
                     "count": 1,
                     "layout": "scatter",
                     "path": "diagonal",
+                    "color_cycle": event_cycle,
+                    "center": [0.34, 0.66],
                     "density": "low",
                     "fade": "outward",
                     "preserve_space": True,
@@ -1394,6 +1433,7 @@ def _visual_event_instruction(
             }
         )
     if _any_marker_in_text(("tatami", "tilted the quiet", "whole room", "部屋全体", "傾け"), source, lower):
+        event_cycle = [visible, "gray"] if visible != "gray" else ["gray", "black"]
         return Instruction.model_validate(
             {
                 "primitive": "ellipse",
@@ -1407,7 +1447,9 @@ def _visual_event_instruction(
                     "count": 2,
                     "layout": "scatter",
                     "path": "wave",
+                    "color_cycle": event_cycle,
                     "margin": 0.24,
+                    "center": [0.34, 0.68],
                     "density": "low",
                     "fade": "outward",
                     "preserve_space": True,
@@ -1521,6 +1563,7 @@ def _visual_event_instruction(
         cx, cy = _offset_from_anchor(anchor, ddl=ddl, salt="compact-event", distance=0.092)
         length = _seed_float(ddl, "compact-event-length", 0.10, 0.16)
         slant = _seed_choice(ddl, "compact-event-slant", (-1, 1))
+        event_cycle = [visible, "gray"] if visible != "gray" else ["gray", "black"]
         return Instruction.model_validate(
             {
                 "primitive": "line",
@@ -1534,6 +1577,11 @@ def _visual_event_instruction(
                     "count": 1,
                     "layout": "scatter",
                     "path": "diagonal",
+                    "color_cycle": event_cycle,
+                    "center": [
+                        _clamp_unit(1.0 - cx + _seed_float(ddl, "compact-event-center-x", -0.035, 0.035)),
+                        _clamp_unit(1.0 - cy + _seed_float(ddl, "compact-event-center-y", -0.035, 0.035)),
+                    ],
                     "density": "low",
                     "fade": "outward",
                     "preserve_space": True,

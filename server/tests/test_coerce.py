@@ -1625,7 +1625,36 @@ def test_coerce_score_adds_visual_event_for_vanishing_footprint_context():
     assert event.primitive == "line"
     assert event.arrangement is not None
     assert event.arrangement.path == "diagonal"
+    assert event.arrangement.color_cycle
+    assert event.arrangement.center is not None
     assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+
+
+def test_coerce_score_adds_arrival_departure_event_for_landing_and_leaving():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.20, 0.62],
+                    "to": [0.82, 0.38],
+                    "color": "gray",
+                    "arrangement": {"count": 3, "layout": "scatter"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="The first snow fell on a cemetery. A crow landed, looked around, and left.",
+    )
+
+    event = next(ins for ins in fixed.instructions if "brief_arrival_departure" in (ins.color_hint or ""))
+    assert event.primitive == "arc"
+    assert event.arrangement is not None
+    assert event.arrangement.color_cycle
+    assert tuple(event.arrangement.center) == (0.33, 0.67)
 
 
 def test_coerce_score_adds_broken_line_event_for_quiet_negative_space():

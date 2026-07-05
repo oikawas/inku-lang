@@ -1047,12 +1047,20 @@ through the API, CLI, and web UI. A 5-prompt x 5-vary run succeeded 25/25 with
 no fallback, and JP/EN 30-sample repair-part measurement reduced
 `adjacent_reaction` from 56/60 to 14/60.
 
-The benchmark acceptance gate is not yet satisfied. `angular_pulse` remained at
-14/60, `vanishing_trace` rose from 21/60 to 26/60, and average `visual_event`
-fell from the Build 441 baseline of 93.0 to 77.8. Version 1.52 should therefore
-be read as an implemented feature release whose remaining work is repair-part
-path auditing and investigation of the low-quality samples, not as a completed
-quality-tuning pass.
+Build 442 did not satisfy the benchmark acceptance gate. `angular_pulse`
+remained at 14/60, `vanishing_trace` rose from 21/60 to 26/60, and average
+`visual_event` fell from the Build 441 baseline of 93.0 to 77.8.
+
+Build 443 tightened `vanishing_trace` so it requires both a disappearance
+context and a trace subject such as footprints, breath, outlines, figures, or
+circles. It also changed the generic `visual_event` fallback from a small
+angular pulse to an input-derived compact mark. The JP/EN 30+30 benchmark then
+reported `adjacent_reaction` at 11/60, `angular_pulse` at 0/60, and
+`vanishing_trace` at 2/60, satisfying the repair-fingerprint gate. Average
+`visual_event` remained 77.93 and `negative_space_pressure` remained 88.97, so
+the Build 441 quality-regression guard is still not satisfied. Version 1.52
+should therefore be read as complete for feature delivery and repair-fingerprint
+suppression, with low-quality sample investigation still remaining.
 
 ### v1.51 (2026-07-02)
 

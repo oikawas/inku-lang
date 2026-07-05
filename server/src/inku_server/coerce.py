@@ -962,6 +962,40 @@ def _has_angular_event_anchor(instructions: list[Instruction]) -> bool:
     )
 
 
+def _context_has_strong_vanishing_trace(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    vanish_markers = (
+        "消え",
+        "消える",
+        "消えかけ",
+        "ほどけ",
+        "薄れ",
+        "fade",
+        "fading",
+        "dissolve",
+        "dissolved",
+        "vanish",
+        "vanishing",
+    )
+    trace_subject_markers = (
+        "足跡",
+        "白い息",
+        "輪郭",
+        "人影",
+        "円",
+        "跡",
+        "footprint",
+        "breath",
+        "outline",
+        "figure",
+        "circle",
+        "trace",
+    )
+    return _any_marker_in_text(vanish_markers, ddl, lower) and _any_marker_in_text(trace_subject_markers, ddl, lower)
+
+
 VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
     "shared_object": (
         ("二人", "見知らぬ二人", "別々", "手", "two", "strangers", "hands"),
@@ -1484,17 +1518,27 @@ def _visual_event_instruction(
         )
     if not _has_angular_event_anchor(instructions):
         anchor = _instruction_anchor(instructions[0]) if instructions else (0.62, 0.40)
+        cx, cy = _offset_from_anchor(anchor, ddl=ddl, salt="compact-event", distance=0.092)
+        length = _seed_float(ddl, "compact-event-length", 0.10, 0.16)
+        slant = _seed_choice(ddl, "compact-event-slant", (-1, 1))
         return Instruction.model_validate(
             {
-                "primitive": "polygon",
-                "center": _offset_from_anchor(anchor, ddl=ddl, salt="angular-pulse", distance=0.082),
-                "radius": _seed_float(ddl, "angular-pulse-radius", 0.036, 0.056),
-                "sides": _seed_choice(ddl, "angular-pulse-sides", (5, 6, 7)),
-                "rotation": _seed_choice(ddl, "angular-pulse-rotation", (-34, -18, -6, 14, 28)),
+                "primitive": "line",
+                "from": [_clamp_unit(cx - length / 2), _clamp_unit(cy + slant * length * 0.16)],
+                "to": [_clamp_unit(cx + length / 2), _clamp_unit(cy - slant * length * 0.16)],
+                "rotation": _seed_choice(ddl, "compact-event-rotation", (-24, -10, 12, 26)),
                 "color": visible,
                 "weight": "brush_thin",
-                "color_hint": "visual event restored as a small angular pulse",
-                "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
+                "color_hint": "visual event restored as a compact off-center mark",
+                "arrangement": {
+                    "count": 1,
+                    "layout": "scatter",
+                    "path": "diagonal",
+                    "density": "low",
+                    "fade": "outward",
+                    "preserve_space": True,
+                    "rhythm_spacing": "loose",
+                },
             }
         )
     return Instruction.model_validate(
@@ -1983,8 +2027,11 @@ def _with_context_energy_repair(
                 continue
             if not _context_has_marker(ddl, STRONG_EDGE_LIGHT_CONTEXT_MARKERS):
                 continue
-        if kind == "vanishing_trace" and _has_context_energy(repaired, "edge_light"):
-            continue
+        if kind == "vanishing_trace":
+            if _has_context_energy(repaired, "edge_light"):
+                continue
+            if not _context_has_strong_vanishing_trace(ddl):
+                continue
         repaired.append(_context_energy_instruction(kind, background=background, ddl=ddl))
     return repaired
 

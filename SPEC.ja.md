@@ -1591,7 +1591,9 @@ Build 441（v1.51 実装後の初回フルベンチ + 監査後修正）の3ペ�
 
 Build 442 実装後の検証では、`vary_seed` 経路（API / CLI / Web UI）と二段の再生成は成立した。固定 5 プロンプト × `vary_seed` 0..4 の 25 生成は 25/25 成功し、fallback は 0。JP/EN 各30件の修復部品集計では `adjacent_reaction` は 56/60 から 14/60 へ低下し、指紋抑制の主効果は確認できた。
 
-一方で、v1.52 の品質受け入れは未達。`angular_pulse` は 14/60、`vanishing_trace` は 26/60 で目標を満たさず、`vanishing_trace` は Build 441 の 21/60 から悪化した。`visual_event` 平均も Build 441 の 93.0 から 77.8 に低下し、品質回帰ガードを満たさない。したがって v1.52 は「実装済みだが、修復部品の残存経路と品質低下サンプルの追加監査が必要」な状態として扱う。
+一方で、Build 442 時点の v1.52 品質受け入れは未達だった。`angular_pulse` は 14/60、`vanishing_trace` は 26/60 で目標を満たさず、`vanishing_trace` は Build 441 の 21/60 から悪化した。`visual_event` 平均も Build 441 の 93.0 から 77.8 に低下し、品質回帰ガードを満たさなかった。
+
+Build 443 では `vanishing_trace` の発火条件を「消失文脈」だけでなく足跡・白い息・輪郭・人影などの trace 主体がある場合に限定し、汎用 `visual_event` 補修を小さな角形パルスから入力由来座標の compact mark に変更した。JP/EN 各30件の再ベンチでは `adjacent_reaction` 11/60、`angular_pulse` 0/60、`vanishing_trace` 2/60 となり、修復部品 fingerprint の受け入れ基準は満たした。ただし `visual_event` 平均は 77.93、`negative_space_pressure` 平均は 88.97 で、Build 441 比の品質回帰ガードはまだ満たさない。したがって v1.52 は「機能実装と修復指紋抑制は完了、品質低下サンプルの追加監査が残る」状態として扱う。
 
 ### v1.51 (2026-07-02)
 

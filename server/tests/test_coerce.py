@@ -1621,8 +1621,11 @@ def test_coerce_score_adds_visual_event_for_vanishing_footprint_context():
 
     fixed = coerce_score(score, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
 
-    assert any(ins.primitive == "polygon" for ins in fixed.instructions)
-    assert any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
+    event = next(ins for ins in fixed.instructions if "visual event restored as a compact off-center mark" in (ins.color_hint or ""))
+    assert event.primitive == "line"
+    assert event.arrangement is not None
+    assert event.arrangement.path == "diagonal"
+    assert not any("visual event restored as a small angular pulse" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_adds_broken_line_event_for_quiet_negative_space():
@@ -2658,9 +2661,10 @@ def test_coerce_score_varies_repair_part_coordinates_by_input():
 
     fixed_a = coerce_score(base, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
     fixed_b = coerce_score(base, ddl="広い駅の白い壁で、小さな青い点だけが見る人の足を止めた。")
-    pulse_a = next(ins for ins in fixed_a.instructions if "small angular pulse" in (ins.color_hint or ""))
-    pulse_b = next(ins for ins in fixed_b.instructions if "small angular pulse" in (ins.color_hint or ""))
+    mark_a = next(ins for ins in fixed_a.instructions if "compact off-center mark" in (ins.color_hint or ""))
+    mark_b = next(ins for ins in fixed_b.instructions if "compact off-center mark" in (ins.color_hint or ""))
 
-    assert pulse_a.center != [0.68, 0.34]
-    assert pulse_b.center != [0.68, 0.34]
-    assert pulse_a.center != pulse_b.center
+    assert mark_a.from_ is not None and mark_a.to is not None
+    assert mark_b.from_ is not None and mark_b.to is not None
+    assert mark_a.from_ != mark_b.from_
+    assert mark_a.to != mark_b.to

@@ -1089,6 +1089,90 @@ not yet accepted. Further work should inspect low-scoring rows such as EN #21
 existing recipe placement, color cycling, and opposing relationships rather
 than adding marker vocabulary or a new governor.
 
+Build 445 generalized the Build 444 low-score fixes into DDL coverage handling
+for small dots, circles, and ellipses. English DDL sentence splitting is now
+more precise, `circle` and `ellipse` are no longer collapsed into one fallback
+shape, and `radius` / `半径` plus small-mark coverage such as `small dot` is kept
+as a compact, low-density foreground mark with outward fade and preserved
+negative space. This is a shape, size, and spacing correction in the existing
+coerce fallback path, not a new marker vocabulary or global governor.
+
+The Build 445 JP/EN 30+30 full benchmark
+(`cli/out/jp-en-30-equivalent-445/{jp,en}/`) completed 60/60. JP #27 and JP #28
+still hit stage2 timeouts on the final server-timeout retry and used saved
+fallback results, so fallback was 2/60. Repair parts remained accepted:
+`adjacent_reaction` 8/60 (13.3%), `angular_pulse` 0/60, and
+`vanishing_trace` 2/60 (3.3%). Quality averages were `visual_event` 80.43,
+`negative_space_pressure` 91.47, `motion_energy` 93.73,
+`constraint_adherence` 94.17, `color_resonance` 96.83, and
+`figurative_risk` 1.33. Against the Build 441 guard baseline,
+`negative_space_pressure`, `motion_energy`, and `constraint_adherence` are back
+within the allowed -5 window, but `visual_event` is still below the required
+threshold (`80.43` versus `93.0`). The remaining v1.52 work is now concentrated
+on restoring semantic eventfulness for low rows such as JP #02 (`visual_event`
+40) and JP #21 / EN #04 / EN #20 / EN #21 (`visual_event` 48).
+
+Build 446 / 446-2 addresses those sticky low-event rows by strengthening only
+existing instructions and arrangement metadata. Compact dot, circle, and ellipse
+coverage can now be treated as a compact focal visual event in an event context.
+Existing focal events receive an opposing arrangement center, color cycle,
+preserved negative space, low density, and outward fade so that they read as
+compositional counterweights. For inherited-memory scenes, an existing support
+instruction can carry an inherited-memory trace instead of adding a new repair
+part. This is not a new drawing primitive or global floor; it is a placement,
+color-cycle, and semantic-hint correction on existing elements.
+
+The Build 446-2 JP/EN 30+30 full benchmark
+(`cli/out/jp-en-30-equivalent-446-2/{jp,en}/`) completed 60/60. JP #09 still
+used a fallback result after the final stage2-timeout retry, so fallback was
+1/60. Quality averages were `visual_event` 92.85,
+`negative_space_pressure` 94.30, `motion_energy` 96.95,
+`constraint_adherence` 95.50, and `color_resonance` 99.75, satisfying the
+Build 441 -5 regression guard. Repair fingerprints also remain accepted:
+`adjacent_reaction` 13/60 (21.7%), `angular_pulse` 0/60, and
+`vanishing_trace` 1/60 (1.7%). The inherited-memory arc that fable5 identified
+as a possible successor fingerprint is now measured as `inherited_memory_arc`;
+it appeared in 4/60 samples (6.7%).
+
+The remaining risk is relation drop rate. Build 446-2 measured JP 15/53
+(28.3%), EN 22/51 (43.1%), and 37/104 combined (35.6%), above the 20% reference
+used by fable5. v1.52 keeps relation validation drop-only: coerce must not
+repair or complete relations. If this rate is treated as blocking, mitigation
+should be limited to Stage 2 prompt guidance that emits relations only when they
+are safe in output order and omits them when uncertain.
+
+Build 447 treated relation drop rate as blocking and strengthened the Stage 2
+prompt. Ordinary placement language such as along a diagonal band, along an
+undulating trace, riverbank, and roadside must not become relation; `between`
+requires two immediately previous outline instructions; and uncertain cases
+must omit relation. The Build 447 JP/EN 30+30 benchmark still measured JP 13/55,
+EN 4/29, and 17/84 combined dropped relations, or 20.2%, just over the 20%
+reference used by fable5.
+
+Build 448 adds a Stage 2 output gate that keeps relation only when the
+normalized DDL literally contains one of the fixed previous-object phrases:
+`前の線に沿って` / `along the previous line`, `前の形に触れない` / `not
+touching the previous shape`, `前の線を切る` / `cutting the previous line`, or
+`前の二つの間に` / `between the previous two`. Natural-language-derived ideas
+such as around, same beat, ahead/behind, not touched, near, and far are expressed
+with position, path, rotation, and spacing instead. Coerce remains drop-only for
+relations and still does not repair or complete them.
+
+The Build 448 JP/EN 30+30 full benchmark
+(`cli/out/jp-en-30-equivalent-448/{jp,en}/`) completed 60/60. JP #01 still used
+a fallback result after the final stage2-timeout retry, so fallback was 1/60.
+Combined quality averages were `visual_event` 92.40,
+`negative_space_pressure` 95.87, `motion_energy` 97.77,
+`constraint_adherence` 92.00, and `color_resonance` 99.27, satisfying the Build
+441 -5 regression guard. Repair fingerprints also remain accepted:
+`adjacent_reaction` 14/60 (23.3%), `angular_pulse` 0/60, `vanishing_trace` 2/60
+(3.3%), and `inherited_memory_arc` 4/60 (6.7%). Relation drop improved to JP
+1/6 (16.7%), EN 0/2, and 1/8 combined (12.5%), below the blocking 20% reference.
+The relation sample rate is intentionally low on the natural-language fable set
+because relation is again reserved for fixed previous-object phrases. Version
+1.52 is therefore accepted for vary, repair-fingerprint suppression, the quality
+guard, and the relation-drop blocking item.
+
 ### v1.51 (2026-07-02)
 
 Version 1.51 adds the relation system, called `aida` in Japanese, and assigns

@@ -490,6 +490,23 @@ def test_score_metrics_reports_motif_hint_counts():
     assert metrics["score_motif_hint_counts"] == {"leaf_cluster": 2, "paper_shard": 1}
 
 
+def test_score_metrics_counts_inherited_memory_arc_repair_part():
+    score = {
+        "instructions": [
+            {
+                "primitive": "arc",
+                "color": "gray",
+                "color_hint": "visual event type inherited_memory restored as a three-part memory sequence",
+            },
+            {"primitive": "line", "color": "black", "color_hint": "visual event adjacent reaction added to hold focal event"},
+        ],
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_repair_part_counts"] == {"adjacent_reaction": 1, "inherited_memory_arc": 1}
+
+
 def test_render_response_summary_keeps_coerce_relation_metrics():
     summary = cli._render_response_summary(
         {

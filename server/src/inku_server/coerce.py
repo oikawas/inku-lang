@@ -1772,7 +1772,124 @@ def _instruction_anchor(ins: Instruction) -> tuple[float, float]:
     return (0.62, 0.40)
 
 
+def _opposes_anchor(anchor: tuple[float, float], center: tuple[float, float] | None) -> bool:
+    if center is None:
+        return False
+    ax, ay = anchor
+    cx, cy = center
+    return (
+        (ax - 0.5) * (cx - 0.5) <= 0
+        and (ay - 0.5) * (cy - 0.5) <= 0
+        and abs(ax - cx) >= 0.25
+        and abs(ay - cy) >= 0.25
+    )
+
+
+def _counterweight_center_for_anchor(anchor: tuple[float, float], *, ddl: str | None, salt: str) -> list[float]:
+    ax, ay = anchor
+    x_base = (
+        _seed_float(ddl, f"{salt}-counter-x", 0.18, 0.32)
+        if ax >= 0.5
+        else _seed_float(ddl, f"{salt}-counter-x", 0.68, 0.82)
+    )
+    y_base = (
+        _seed_float(ddl, f"{salt}-counter-y", 0.18, 0.32)
+        if ay >= 0.5
+        else _seed_float(ddl, f"{salt}-counter-y", 0.68, 0.82)
+    )
+    if abs(ax - x_base) < 0.25:
+        x_base = 0.18 if ax >= 0.5 else 0.82
+    if abs(ay - y_base) < 0.25:
+        y_base = 0.18 if ay >= 0.5 else 0.82
+    return [_clamp_unit(x_base), _clamp_unit(y_base)]
+
+
+def _event_color_cycle(color: str, background: str) -> list[str]:
+    visible = VISIBLE_ON_BACKGROUND.get(background, "black")
+    cycle: list[str] = []
+    for item in (color, visible, "gray", "black", "white"):
+        if item != background and item not in cycle:
+            cycle.append(item)
+        if len(cycle) >= 2:
+            break
+    return cycle or [visible]
+
+
+def _with_existing_event_counterweight(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+) -> list[Instruction]:
+    event_type = _detect_visual_event_type(ddl)
+    has_context = _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS) or event_type is not None
+    has_existing_event = any(_has_focal_event_hint(ins) for ins in instructions)
+    has_compact_mark = any(
+        "small focal mark kept compact" in (ins.color_hint or "").lower()
+        or "circle focal mark kept compact" in (ins.color_hint or "").lower()
+        for ins in instructions
+    )
+    if not has_existing_event and not (has_context and has_compact_mark):
+        return instructions
+
+    support_index: int | None = None
+    if event_type == "inherited_memory" and has_existing_event:
+        for candidate_index, candidate in enumerate(instructions):
+            candidate_hint = (candidate.color_hint or "").lower()
+            if _has_focal_event_hint(candidate):
+                continue
+            if "small focal mark kept compact" in candidate_hint or "circle focal mark kept compact" in candidate_hint:
+                continue
+            if _shape_extent(candidate) > 0.0:
+                support_index = candidate_index
+                break
+
+    adjusted: list[Instruction] = []
+    for index, ins in enumerate(instructions):
+        hint = (ins.color_hint or "").lower()
+        compact_mark = "small focal mark kept compact" in hint or "circle focal mark kept compact" in hint
+        focal_event = _has_focal_event_hint(ins)
+        supporting_event = index == support_index
+        if not focal_event and not compact_mark and not supporting_event:
+            adjusted.append(ins)
+            continue
+
+        data = ins.model_dump(by_alias=True)
+        arr_data = dict(data.get("arrangement") or {"count": 1, "layout": "scatter"})
+        anchor = _instruction_anchor(ins)
+        arr_center = arr_data.get("center")
+        parsed_center: tuple[float, float] | None = None
+        if isinstance(arr_center, (list, tuple)) and len(arr_center) == 2:
+            parsed_center = (float(arr_center[0]), float(arr_center[1]))
+        if not _opposes_anchor(anchor, parsed_center):
+            arr_data["center"] = _counterweight_center_for_anchor(anchor, ddl=ddl, salt=f"event-{index}")
+        if not arr_data.get("color_cycle"):
+            arr_data["color_cycle"] = _event_color_cycle(str(data.get("color") or "black"), background)
+        if arr_data.get("path", "none") == "none":
+            arr_data["path"] = _seed_choice(ddl, f"event-{index}-path", ("diagonal", "wave", "left_to_right"))
+        if arr_data.get("rhythm_spacing", "none") == "none":
+            arr_data["rhythm_spacing"] = "loose"
+        if arr_data.get("density", "none") == "none":
+            arr_data["density"] = "low"
+        if arr_data.get("fade", "none") == "none":
+            arr_data["fade"] = "outward"
+        if float(arr_data.get("margin") or 0.1) < 0.22:
+            arr_data["margin"] = 0.22
+        arr_data["preserve_space"] = True
+        data["arrangement"] = arr_data
+        if compact_mark and not focal_event:
+            _append_hint(data, "visual event preserved as compact focal accent")
+        if supporting_event:
+            _append_hint(data, "visual event inherited memory trace preserved on existing support")
+        _append_hint(data, "visual event counterweight preserved through opposing placement")
+        adjusted.append(Instruction.model_validate(data))
+    return adjusted
+
+
 def _with_minimum_focal_extent(ins: Instruction) -> Instruction:
+    hint = (ins.color_hint or "").lower()
+    if "small focal mark kept compact" in hint or "circle focal mark kept compact" in hint:
+        return ins
     if not _has_focal_event_hint(ins):
         return ins
     if _shape_extent(ins) >= FOCAL_EVENT_MIN_EXTENT:
@@ -2435,6 +2552,10 @@ def _with_color_cycle_delivery(ins: Instruction, colors: list[str], *, ddl: str 
         arr_data["count"] = max(2, len(cycle))
         arr_data["layout"] = arr_data.get("layout") or "scatter"
         arr_data["margin"] = max(float(arr_data.get("margin") or 0.1), 0.16)
+    if "small focal mark kept compact" in (data.get("color_hint") or ""):
+        arr_data["density"] = arr_data.get("density") or "low"
+        arr_data["fade"] = arr_data.get("fade") or "outward"
+        arr_data["preserve_space"] = True
     arr_data["color_cycle"] = cycle
     data["arrangement"] = arr_data
     hint = data.get("color_hint")
@@ -2903,7 +3024,7 @@ def _presence_from_ddl(ddl: str | None) -> dict | None:
 def _ddl_clauses(ddl: str | None) -> list[str]:
     if not ddl:
         return []
-    clauses = [part.strip() for part in re.split(r"[。\n;；]+", ddl) if part.strip()]
+    clauses = [part.strip() for part in re.split(r"[。\n;；]+|(?<!\d)\.\s+", ddl) if part.strip()]
     markers = (
         "線", "点", "円", "楕円", "四角", "三角", "多角形", "五角", "六角", "弧", "塗りつぶす", "散らす", "並べる",
         "膜", "霞", "霧", "靄", "気配", "余韻", "反射", "映り", "消え", "滲",
@@ -2968,9 +3089,39 @@ def _primitive_from_clause(clause: str) -> str:
         return "triangle"
     if ("弧" in clause) or ("arc" in lower):
         return "arc"
-    if ("円" in clause) or ("楕円" in clause) or ("circle" in lower) or ("ellipse" in lower):
+    if ("楕円" in clause) or ("ellipse" in lower) or ("oval" in lower):
         return "ellipse"
+    if ("点" in clause) or ("円" in clause) or ("dot" in lower) or ("point" in lower) or ("circle" in lower):
+        return "circle"
     return "line"
+
+
+def _is_small_mark_clause(clause: str) -> bool:
+    lower = clause.lower()
+    size_markers = ("小さ", "細い", "tiny", "small", "little", "thin")
+    mark_markers = ("点", "円", "楕円", "dot", "point", "circle", "ellipse", "oval")
+    return _any_marker_in_text(size_markers, clause, lower) and _any_marker_in_text(mark_markers, clause, lower)
+
+
+def _single_mark_count_from_clause(clause: str) -> int | None:
+    lower = clause.lower()
+    if re.search(r"\b(one|a|single)\b", lower) or any(marker in clause for marker in ("一つ", "一個", "一点", "一本")):
+        return 1
+    return count_hint_from_ddl(clause)
+
+
+def _radius_hint_from_clause(clause: str) -> float | None:
+    lower = clause.lower()
+    match = re.search(r"(?:半径|radius(?:\s+is)?|r)\s*(?:は|=|:)?\s*(0?\.\d+|1(?:\.0+)?)", lower if "radius" in lower else clause)
+    if not match:
+        return None
+    try:
+        value = float(match.group(1))
+    except ValueError:
+        return None
+    if value <= 0:
+        return None
+    return min(value, 0.22)
 
 
 def _is_atmospheric_clause(clause: str) -> bool:
@@ -3043,10 +3194,40 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
     elif primitive == "polygon":
         sides = 6 if ("六角" in clause or "hex" in lower or "mineral" in lower or "鉱物" in clause) else 5
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.055, "sides": sides, "rotation": -18 + index * 9})
+    elif primitive == "circle":
+        radius = _radius_hint_from_clause(clause) or (0.038 if _is_small_mark_clause(clause) else 0.10)
+        common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": radius})
     elif primitive == "ellipse":
-        common.update({"center": [0.68 - offset / 2, 0.30 + offset], "size": [0.16, 0.09], "rotation": -18 + index * 9})
+        size = [0.06, 0.032] if _is_small_mark_clause(clause) else [0.16, 0.09]
+        common.update({"center": [0.68 - offset / 2, 0.30 + offset], "size": size, "rotation": -18 + index * 9})
     else:
         common.update({"position": [0.58 - offset / 2, 0.24 + offset], "size": [0.14, 0.10], "rotation": -12 + index * 8})
+
+    if _is_small_mark_clause(clause):
+        common["filled"] = True
+        common["arrangement"] = {
+            "count": _single_mark_count_from_clause(clause) or 1,
+            "layout": "scatter",
+            "path": "none",
+            "margin": 0.24,
+            "density": "low",
+            "fade": "outward",
+            "preserve_space": True,
+            "rhythm_spacing": "none",
+        }
+        common["color_hint"] = f"{common['color_hint']}; small focal mark kept compact with preserved negative space"
+    elif primitive == "circle":
+        common["arrangement"] = {
+            "count": 1,
+            "layout": "scatter",
+            "path": "none",
+            "margin": 0.24,
+            "density": "low",
+            "fade": "outward",
+            "preserve_space": True,
+            "rhythm_spacing": "none",
+        }
+        common["color_hint"] = f"{common['color_hint']}; circle focal mark kept compact with preserved negative space"
 
     if any(marker in clause or marker in lower for marker in ("右半分", "right half")):
         if "center" in common:
@@ -3064,6 +3245,17 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
         common["arrangement"] = {"count": min(count, 120), "layout": "scatter", "margin": 0.18}
     elif count and (("並べる" in clause) or ("line up" in lower)):
         common["arrangement"] = {"count": min(count, 80), "layout": "horizontal", "margin": 0.1}
+    elif _is_small_mark_clause(clause):
+        pass
+    elif primitive == "circle" and _radius_hint_from_clause(clause) is not None:
+        common["arrangement"] = {
+            "count": 1,
+            "layout": "scatter",
+            "margin": 0.24,
+            "density": "low",
+            "fade": "outward",
+            "preserve_space": True,
+        }
     elif sensory_kind == "light":
         common.update(
             {
@@ -3568,6 +3760,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_ma_pressure(instructions, ddl=ddl)
     instructions = _with_semantic_visual_event_hints(instructions, ddl=ddl)
     instructions = _with_visual_event_type_hints(instructions, ddl=ddl)
+    instructions = _with_existing_event_counterweight(instructions, ddl=ddl, background=background)
     instructions = _with_focal_event_floor(instructions, ddl=ddl, background=background)
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)

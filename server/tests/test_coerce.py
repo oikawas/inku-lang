@@ -178,6 +178,151 @@ def test_coerce_score_adds_ddl_coverage_when_stage2_collapses_to_one_instruction
     assert any("coverage from DDL clause" in (ins.color_hint or "") for ins in fixed.instructions)
 
 
+def test_coerce_score_keeps_small_ddl_mark_coverage_compact():
+    score = Score.model_validate(
+        {
+            "background": "white",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "black",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="Place one small red ellipse near the upper-right focus. Draw one gray line below it.",
+    )
+
+    mark = next(ins for ins in fixed.instructions if "small focal mark kept compact" in (ins.color_hint or ""))
+    assert mark.primitive == "ellipse"
+    assert mark.size is not None
+    assert max(mark.size) <= 0.06
+    assert mark.arrangement is not None
+    assert mark.arrangement.count == 1
+    assert mark.arrangement.preserve_space is True
+
+
+def test_coerce_score_preserves_radius_circle_coverage_as_circle():
+    score = Score.model_validate(
+        {
+            "background": "black",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "color": "white",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="白い円を上端寄りの焦点に置く。半径は0.1。灰色の横線を二十本引く。",
+    )
+
+    circle = next(ins for ins in fixed.instructions if "白い円を上端寄り" in (ins.color_hint or ""))
+    assert circle.primitive == "circle"
+    assert circle.radius == pytest.approx(0.1)
+    assert circle.arrangement is not None
+    assert circle.arrangement.preserve_space is True
+
+
+def test_coerce_score_adds_counterweight_to_existing_visual_event_arrangement():
+    score = Score.model_validate(
+        {
+            "background": "white",
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.58, 0.42],
+                    "radius": 0.05,
+                    "color": "green",
+                    "color_hint": "visual event type inherited_memory preserved through existing shape",
+                    "arrangement": {"count": 3, "layout": "scatter", "center": [0.50, 0.50]},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A remembered tree keeps growing.")
+    event = next(ins for ins in fixed.instructions if "counterweight" in (ins.color_hint or ""))
+
+    assert event.arrangement is not None
+    assert event.arrangement.center is not None
+    assert abs(event.center[0] - event.arrangement.center[0]) >= 0.25
+    assert abs(event.center[1] - event.arrangement.center[1]) >= 0.25
+    assert event.arrangement.color_cycle
+    assert event.arrangement.preserve_space is True
+
+
+def test_coerce_score_marks_existing_support_as_visual_event_for_single_inherited_event():
+    score = Score.model_validate(
+        {
+            "background": "white",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.12, 0.62],
+                    "to": [0.82, 0.50],
+                    "color": "blue",
+                },
+                {
+                    "primitive": "arc",
+                    "center": [0.56, 0.45],
+                    "radius": 0.05,
+                    "color": "blue",
+                    "color_hint": "visual event type inherited_memory restored as a three-part memory sequence",
+                    "arrangement": {"count": 3, "layout": "scatter"},
+                },
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="A fisherman bows to the river. His father did. His grandfather did.")
+    support = next(ins for ins in fixed.instructions if "inherited memory trace" in (ins.color_hint or ""))
+
+    assert support.primitive == "line"
+    assert support.arrangement is not None
+    assert support.arrangement.center is not None
+    assert support.arrangement.color_cycle
+    assert support.arrangement.preserve_space is True
+
+
+def test_coerce_score_marks_compact_ddl_mark_as_visual_event_in_event_context():
+    score = Score.model_validate(
+        {
+            "background": "white",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.6],
+                    "to": [0.8, 0.6],
+                    "color": "gray",
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="A remembered museum wall keeps one quiet trace. Place one small red crayon dot near the lower right.",
+    )
+    mark = next(ins for ins in fixed.instructions if "small focal mark kept compact" in (ins.color_hint or ""))
+
+    assert "visual event preserved as compact focal accent" in (mark.color_hint or "")
+    assert mark.arrangement is not None
+    assert mark.arrangement.center is not None
+    assert mark.arrangement.color_cycle
+    assert mark.arrangement.preserve_space is True
+
+
 def test_count_hint_from_ddl_extracts_japanese_numbers():
     assert count_hint_from_ddl("白い線を二百三十三本散らす。") == 233
     assert count_hint_from_ddl("赤い点を47個散らす。") == 47

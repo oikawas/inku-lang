@@ -283,7 +283,7 @@ class Instruction(BaseModel):
     )
     relation: Optional[Relation] = Field(
         default=None,
-        description="直前 instruction への関係。1 instruction につき最大1つ。coerce は追加せず、invalid は drop",
+        description="直前 instruction への関係。DDL に exact previous-object phrase がある時だけ使う。1 instruction につき最大1つ。coerce は追加せず、invalid は drop",
     )
 
     @field_validator("sides", mode="before")

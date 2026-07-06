@@ -110,6 +110,7 @@ SCORE_REPAIR_PART_MARKERS = (
     ("angular_pulse", "angular pulse"),
     ("vanishing_trace", "vanishing trace"),
     ("rhythm_offset", "rhythm offset"),
+    ("inherited_memory_arc", "visual event type inherited_memory restored as a three-part memory sequence"),
 )
 T = TypeVar("T")
 

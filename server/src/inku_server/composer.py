@@ -111,11 +111,13 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「前の形に触れない」/ "not touching the previous shape" → relation={"type":"not_touching","gap":"narrow"}。広く触れないなら gap="wide"**
 - **「前の線を切る」/ "cutting the previous line" → relation={"type":"cutting","gap":"medium"}**
 - **「前の二つの間に」/ "between the previous two" → relation={"type":"between","gap":"medium"}**
-- relation は正規化DDL に定型句がある時だけ転記する。relation を推測で追加しない。先頭 instruction には relation を付けない。
-- relation は必ず「既に出力済みの輪郭 instruction」だけを参照する。background、filled 面、presence、fade だけの補助層、色補修用の小要素は relation の参照先にしない。
-- **between は直前2つの drawable instruction がどちらも輪郭を持つ時だけ使う。直前が1つしかない、または直前/前々が補助層なら relation を省略する。**
+- relation は正規化DDL に上記の定型句が**完全な関係指定として**文字どおりある時だけ転記する。relation を推測で追加しない。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「触れていない」「近く/遠く」は relation ではない。先頭 instruction には relation を付けない。
+- **普通の配置語を relation にしない。** 「斜めの帯に沿って」「揺れる軌跡に沿って」「川沿い」「道沿い」「along a diagonal band」「along an undulating trace」「along a path/edge/road/river」は arrangement/path/position で表し、relation は付けない。
+- relation を付ける直前に、直前の JSON instruction が輪郭を持つ参照先であることを確認する。line は `from`+`to`、circle/arc/polygon は `center`+`radius`、ellipse は `center`+`size`、square/triangle は `position`+`size` がそろう時だけ有効。
+- relation は必ず「既に出力済みの輪郭 instruction」だけを参照する。background、filled 面、presence、fade だけの補助層、色補修用の小要素、arrangement だけの密度層は relation の参照先にしない。
+- **between は直前2つの JSON instruction がどちらも輪郭を持つ時だけ使う。直前が1つしかない、または直前/前々が補助層なら relation を省略する。**
 - 「前の線に沿って」「前の形に触れない」「前の線を切る」を1つの instruction にまとめない。定型句が複数あっても、出力順に成立するものだけを最大1つ付ける。
-- relation を置ける順序にできない時は、補助 instruction を追加して救わず、relation フィールドだけを省略する。
+- 少しでも順序・参照先・定型句一致に迷う場合は、relation フィールドを省略する。fable/自然文を抽象化した DDL では、原則 relation を使わない。省略しても、位置・path・rotation・余白で関係を表せばよい。補助 instruction を追加して救わない。
 
 # 例 (最重要パターン)
 
@@ -387,11 +389,13 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"not touching the previous shape" -> relation={"type":"not_touching","gap":"narrow"}. Use gap="wide" for wide separation**
 - **"cutting the previous line" -> relation={"type":"cutting","gap":"medium"}**
 - **"between the previous two" -> relation={"type":"between","gap":"medium"}**
-- Copy relation only when the normalized DDL contains one of these fixed phrases. Do not infer relations. Do not attach relation to the first instruction.
-- Relations may refer only to already emitted drawable outline instructions. Do not use background, filled planes, presence, fade-only support layers, or small color-repair marks as relation targets.
-- **Use between only when the previous two drawable instructions both have outlines. If only one previous drawable exists, or if either previous item is a support layer, omit the relation.**
+- Copy relation only when the normalized DDL literally contains one of these fixed phrases as an explicit previous-object relation. Do not infer relations. Natural-language-derived phrases such as "around", "same beat", "ahead/behind", "not touched", "near", or "far" are not relations. Do not attach relation to the first instruction.
+- **Do not turn ordinary placement language into relation.** Phrases such as "along a diagonal band", "along an undulating trace", "along a path/edge/road/river", "riverbank", or "roadside" are arrangement/path/position, not relation.
+- Before writing relation, verify that the immediately previous JSON instruction has an outline target: line has `from`+`to`, circle/arc/polygon has `center`+`radius`, ellipse has `center`+`size`, and square/triangle has `position`+`size`.
+- Relations may refer only to already emitted drawable outline instructions. Do not use background, filled planes, presence, fade-only support layers, small color-repair marks, or arrangement-only density layers as relation targets.
+- **Use between only when the previous two JSON instructions both have outlines. If only one previous drawable exists, or if either previous item is a support layer, omit the relation.**
 - Do not combine "along", "not touching", and "cutting" on one instruction. If several fixed phrases appear, keep only the one that is valid in output order.
-- If no valid output order can carry the relation, omit only the relation field; do not add a support instruction to rescue it.
+- If there is any doubt about order, target validity, or exact fixed-phrase match, omit the relation field. For fable/natural-language-derived DDL, use no relation by default. Express the relationship with position, path, rotation, and spacing instead; do not add a support instruction to rescue it.
 
 # Examples (key patterns)
 
@@ -675,6 +679,23 @@ _COLOR_TERMS = {
 }
 
 
+_RELATION_LITERAL_MARKERS = {
+    "along": ("前の線に沿って", "along the previous line"),
+    "not_touching": ("前の形に触れない", "not touching the previous shape"),
+    "cutting": ("前の線を切る", "cutting the previous line"),
+    "between": ("前の二つの間に", "between the previous two"),
+}
+
+
+def _literal_relation_types(ddl: str) -> set[str]:
+    lower = ddl.lower()
+    return {
+        relation_type
+        for relation_type, markers in _RELATION_LITERAL_MARKERS.items()
+        if any(marker in ddl or marker in lower for marker in markers)
+    }
+
+
 def _mentioned_values(text: str, terms_by_value: dict[str, tuple[str, ...]]) -> set[str]:
     haystack = text.lower()
     return {
@@ -682,6 +703,36 @@ def _mentioned_values(text: str, terms_by_value: dict[str, tuple[str, ...]]) -> 
         for value, terms in terms_by_value.items()
         if any(term.lower() in haystack for term in terms)
     }
+
+
+def _enforce_relation_literal_gate(score: Score, ddl: str) -> Score:
+    """Drop model-inferred relations unless the DDL contains the exact relation phrase."""
+
+    allowed_types = _literal_relation_types(ddl)
+    if not any(ins.relation is not None for ins in score.instructions):
+        return score
+
+    instructions = []
+    changed = False
+    for ins in score.instructions:
+        if ins.relation is None or ins.relation.type in allowed_types:
+            instructions.append(ins.model_dump(by_alias=True))
+            continue
+        data = ins.model_dump(by_alias=True)
+        data.pop("relation", None)
+        instructions.append(data)
+        changed = True
+
+    if not changed:
+        return score
+    data = score.model_dump(by_alias=True)
+    data["instructions"] = instructions
+    return Score.model_validate(data)
+
+
+def _finalize_score(score: Score, ddl: str) -> Score:
+    score = _enforce_modifier_targeting(score, ddl)
+    return _enforce_relation_literal_gate(score, ddl)
 
 
 def _enforce_modifier_targeting(score: Score, ddl: str) -> Score:
@@ -761,7 +812,7 @@ def compose(
                 system_prompt=effective_prompt,
                 settings=settings,
             )
-            return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+            return _finalize_score(score, ddl), tokens_in, tokens_out
         if provider == "gemini":
             score, tokens_in, tokens_out = _compose_gemini(
                 user_msg,
@@ -769,20 +820,20 @@ def compose(
                 system_prompt=effective_prompt,
                 settings=settings,
             )
-            return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+            return _finalize_score(score, ddl), tokens_in, tokens_out
         score, tokens_in, tokens_out = _compose_openai(
             user_msg,
             model=model_id,
             provider=provider,
             system_prompt=effective_prompt,
         )
-        return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+        return _finalize_score(score, ddl), tokens_in, tokens_out
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
         score, tokens_in, tokens_out = _compose_openai(user_msg, model=None, system_prompt=effective_prompt)
-        return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+        return _finalize_score(score, ddl), tokens_in, tokens_out
     score, tokens_in, tokens_out = _compose_anthropic(user_msg, system_prompt=effective_prompt)
-    return _enforce_modifier_targeting(score, ddl), tokens_in, tokens_out
+    return _finalize_score(score, ddl), tokens_in, tokens_out
 
 
 def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT, settings: dict | None = None) -> tuple[Score, int | None, int | None]:

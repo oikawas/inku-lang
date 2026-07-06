@@ -225,6 +225,54 @@ def test_modifier_targeting_leaves_multi_motif_scores_alone():
     assert len(repaired.instructions) == 2
 
 
+def test_relation_literal_gate_drops_narrative_inferred_relations():
+    from inku_server.composer import _enforce_relation_literal_gate
+
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "circle", "center": [0.5, 0.2], "radius": 0.03},
+                {
+                    "primitive": "line",
+                    "from": [0.4, 0.2],
+                    "to": [0.6, 0.2],
+                    "relation": {"type": "along", "gap": "narrow"},
+                },
+            ]
+        }
+    )
+
+    repaired = _enforce_relation_literal_gate(
+        score,
+        "上端に白い小さな円を置く。白い小さな円の周囲に短い線を八本、放射状に散らす。",
+    )
+
+    assert repaired.instructions[1].relation is None
+
+
+def test_relation_literal_gate_keeps_exact_previous_phrase():
+    from inku_server.composer import _enforce_relation_literal_gate
+
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]},
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.04, 0.02],
+                    "relation": {"type": "along", "gap": "narrow"},
+                },
+            ]
+        }
+    )
+
+    repaired = _enforce_relation_literal_gate(score, "黒い横線を一本引く。赤い楕円を前の線に沿って三つ置く。")
+
+    assert repaired.instructions[1].relation is not None
+    assert repaired.instructions[1].relation.type == "along"
+
+
 def test_composer_prompt_keeps_dynamic_quantity_guidance():
     from inku_server.composer import SYSTEM_PROMPT, SYSTEM_PROMPT_EN
 
@@ -300,6 +348,10 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "水墨" in SYSTEM_PROMPT
     assert "既に出力済みの輪郭 instruction" in SYSTEM_PROMPT
     assert "between は直前2つ" in SYSTEM_PROMPT
+    assert "普通の配置語を relation にしない" in SYSTEM_PROMPT
+    assert "少しでも順序・参照先・定型句一致に迷う場合" in SYSTEM_PROMPT
+    assert "自然文由来" in SYSTEM_PROMPT
+    assert "原則 relation を使わない" in SYSTEM_PROMPT
     assert "青い小さな円を一つ置く。白い小さな四角を前の二つの間に置く" in SYSTEM_PROMPT
     assert "黒い線を二本置く。赤い小さな円を前の二つの間に置く" in SYSTEM_PROMPT
     assert '"layout":"vertical"' in SYSTEM_PROMPT
@@ -369,7 +421,11 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "fresco ground" in SYSTEM_PROMPT_EN
     assert "ink-wash value" in SYSTEM_PROMPT_EN
     assert "already emitted drawable outline instructions" in SYSTEM_PROMPT_EN
-    assert "Use between only when the previous two drawable instructions both have outlines" in SYSTEM_PROMPT_EN
+    assert "Use between only when the previous two JSON instructions both have outlines" in SYSTEM_PROMPT_EN
+    assert "Do not turn ordinary placement language into relation" in SYSTEM_PROMPT_EN
+    assert "If there is any doubt about order, target validity, or exact fixed-phrase match" in SYSTEM_PROMPT_EN
+    assert "Natural-language-derived phrases" in SYSTEM_PROMPT_EN
+    assert "use no relation by default" in SYSTEM_PROMPT_EN
     assert "Place one small blue circle. Place one small white square between the previous two" in SYSTEM_PROMPT_EN
     assert "Draw two black lines. Place a small red circle between the previous two" in SYSTEM_PROMPT_EN
     assert '"layout":"vertical"' in SYSTEM_PROMPT_EN

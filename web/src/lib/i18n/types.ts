@@ -129,6 +129,10 @@ export interface LangPack {
 	canvasVaryPerformance: string;
 	canvasVaryComposition: string;
 	canvasVaryInterpretation: string;
+	variationGridDefault: string;
+	variationGridWithInterpretation: string;
+	variationGridSaveSelected: string;
+	variationGridEmpty: string;
 	canvasSeedSummary: string;
 	canvasPresentationOpen: string;
 	canvasPresentationClose: string;

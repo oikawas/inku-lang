@@ -293,7 +293,11 @@
 	let result   = $state<PaintResult | null>(null);
 	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
+	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
+	let variationCandidates = $state<VariationCandidate[]>([]);
+	let variationGridBusy = $state(false);
+	let variationGridStatus = $state<string | null>(null);
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -2730,7 +2734,7 @@
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang() })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed ?? null, vary_seed: it.vary_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang() })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3193,6 +3197,146 @@
 			stopTimer();
 		}
 	}
+
+	function composeCandidateResult(source: string, baseDdl: string, data: PaintResult & { ddl: string; thinking?: string | null; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null }): PaintResult & { ddl: string; thinking: string | null } {
+		return {
+			...data,
+			ddl: data.ddl,
+			thinking: data.thinking ?? thinking,
+			stage1_model: result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model),
+			stage2_model: data.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
+			elapsed_stage1_ms: 0,
+			elapsed_stage2_ms: data.elapsed_ms ?? 0,
+			elapsed_total_ms: data.elapsed_ms ?? 0,
+			tokens_in_stage1: null,
+			tokens_out_stage1: null,
+			tokens_in_stage2: data.tokens_in ?? null,
+			tokens_out_stage2: data.tokens_out ?? null,
+			user_generation_count: null,
+		};
+	}
+
+	async function renderPerformanceCandidate(seed: number, label: string): Promise<VariationCandidate> {
+		if (!result) throw new Error("missing result");
+		const r = await apiFetch("/api/render-svg", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				score: result.score,
+				catalog_id: result.render_color_catalog_id ?? selectedCatalog,
+				canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+				render_seed: seed,
+			})
+		});
+		if (!r.ok) throw new Error(await r.text());
+		const svg = await r.text();
+		return {
+			id: `perf-${seed}`,
+			label,
+			selected: false,
+			result: { ...result, ddl: ddl ?? "", thinking, svg, render_seed: seed, render_hash: null, render_hash_short: null, history_id: null, history_at: null },
+		};
+	}
+
+	async function composeVariationCandidate(varySeed: number, label: string): Promise<VariationCandidate> {
+		const source = input.trim();
+		const baseDdl = ddl ?? "";
+		const r = await apiFetch("/api/compose", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				ddl: baseDdl,
+				original_text: source,
+				model: qualifiedModelId(stage2Provider, stage2Model),
+				instruction_lang: instructionLang,
+				ui_lang: getLang(),
+				catalog_id: selectedCatalog,
+				canvas_aspect: effectiveCanvasAspectId(),
+				auto_repair: ddlAutoRepairEnabled,
+				vary_seed: varySeed,
+			})
+		});
+		if (!r.ok) throw new Error(await r.text());
+		const data = await r.json();
+		return { id: `comp-${varySeed}`, label, selected: false, result: composeCandidateResult(source, baseDdl, data) };
+	}
+
+	async function interpretationVariationCandidate(): Promise<VariationCandidate> {
+		const source = input.trim();
+		const r = await paintOne(source, { historyInput: source, saveHistory: false, saveArtifacts: false, countGeneration: false });
+		return { id: `interp-${Date.now()}`, label: t().canvasVaryInterpretation, selected: false, result: r };
+	}
+
+	async function generateVariationGrid(includeInterpretation = false) {
+		if (!result || variationGridBusy || loading) return;
+		const source = input.trim();
+		if (!source || !ddl) return;
+		variationGridBusy = true;
+		variationGridStatus = null;
+		try {
+			const baseRenderSeed = Number.isFinite(result.render_seed ?? NaN) ? Number(result.render_seed) : 0;
+			const baseVarySeed = Number.isFinite(result.vary_seed ?? NaN) ? Number(result.vary_seed) : -1;
+			const jobs: Promise<VariationCandidate>[] = [
+				renderPerformanceCandidate(baseRenderSeed + 1, `${t().canvasVaryPerformance} 1`),
+				renderPerformanceCandidate(baseRenderSeed + 2, `${t().canvasVaryPerformance} 2`),
+				composeVariationCandidate(baseVarySeed + 1, `${t().canvasVaryComposition} 1`),
+				composeVariationCandidate(baseVarySeed + 2, `${t().canvasVaryComposition} 2`),
+			];
+			if (includeInterpretation) jobs.push(interpretationVariationCandidate());
+			variationCandidates = await Promise.all(jobs);
+		} catch (e) {
+			variationGridStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			variationGridBusy = false;
+		}
+	}
+
+	function toggleVariationCandidate(id: string) {
+		variationCandidates = variationCandidates.map((candidate) => candidate.id === id ? { ...candidate, selected: !candidate.selected } : candidate);
+	}
+
+	function showVariationCandidate(candidate: VariationCandidate) {
+		ddl = candidate.result.ddl;
+		ddlGeneratedBaseline = candidate.result.ddl;
+		thinking = candidate.result.thinking;
+		result = candidate.result;
+		displayedHistoryItem = null;
+		outputTab = "canvas";
+		fitCanvasZoom();
+	}
+
+	async function saveSelectedVariationCandidates() {
+		const selected = variationCandidates.filter((candidate) => candidate.selected && !candidate.saved);
+		if (selected.length === 0) {
+			variationGridStatus = t().variationGridEmpty;
+			return;
+		}
+		variationGridBusy = true;
+		variationGridStatus = null;
+		try {
+			for (const candidate of selected) {
+				const saved = await pushHistory({
+					...candidate.result,
+					input: input.trim(),
+					ddl: candidate.result.ddl,
+					score: candidate.result.score,
+					svg: candidate.result.svg,
+					at: Date.now(),
+					elapsed_ms: candidate.result.elapsed_total_ms ?? 0,
+					stage1_model: candidate.result.stage1_model ?? null,
+					stage2_model: candidate.result.stage2_model ?? null,
+					tokens_in: (candidate.result.tokens_in_stage1 ?? 0) + (candidate.result.tokens_in_stage2 ?? 0) || null,
+					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
+					catalog_id: candidate.result.render_color_catalog_id ?? selectedCatalog,
+				}, { countGeneration: true });
+				if (saved) await toggleHistoryStar({ id: saved.id, starred: false, note: saved.note });
+				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
+			}
+		} finally {
+			variationGridBusy = false;
+		}
+	}
+
 
 	// ── Download ────────────────────────────────────────────
 	function escapeXml(s: string): string {
@@ -3889,6 +4033,33 @@
 						/>
 					{/if}
 
+					{#if result && inputMode === "single"}
+						<section class="panel-section variation-grid-section">
+							<div class="variation-grid-actions">
+								<button class="ghost-btn" onclick={() => generateVariationGrid(false)} disabled={variationGridBusy}>{t().variationGridDefault}</button>
+								<button class="ghost-btn" onclick={() => generateVariationGrid(true)} disabled={variationGridBusy}>{t().variationGridWithInterpretation}</button>
+								<button class="ghost-btn" onclick={saveSelectedVariationCandidates} disabled={variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
+							</div>
+							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
+							{#if variationCandidates.length > 0}
+								<div class="variation-grid">
+									{#each variationCandidates as candidate (candidate.id)}
+										<div class="variation-card-wrap">
+											<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => showVariationCandidate(candidate)} type="button">
+												<span class="variation-card-art">{@html candidate.result.svg}</span>
+												<span class="variation-card-meta">
+													<span>{candidate.label}</span>
+													<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}</span>
+												</span>
+											</button>
+											<button class="variation-select" class:selected={candidate.selected} onclick={() => toggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</section>
+					{/if}
+
 					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
 						<section class="panel-section interpretation-diff">
 							{#each interpretationDiffParts as part}
@@ -4524,6 +4695,88 @@
 	.app-info-meta a:hover {
 		text-decoration: underline;
 	}
+
+	.variation-grid-section {
+		gap: 8px;
+	}
+	.variation-grid-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.variation-grid-status {
+		font-size: 11px;
+		color: var(--fg3);
+	}
+	.variation-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 8px;
+	}
+	.variation-card-wrap {
+		position: relative;
+		min-width: 0;
+	}
+	.variation-card {
+		display: grid;
+		grid-template-rows: minmax(0, 1fr) auto;
+		width: 100%;
+		aspect-ratio: 1 / 1.12;
+		padding: 0;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		overflow: hidden;
+		cursor: pointer;
+	}
+	.variation-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+	.variation-card.saved { opacity: 0.62; }
+	.variation-card-art {
+		display: block;
+		min-height: 0;
+		background: var(--bg2);
+	}
+	.variation-card-art :global(svg) {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+	.variation-card-meta {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1px;
+		padding: 5px 7px;
+		font-size: 10px;
+		line-height: 1.25;
+		text-align: left;
+		color: var(--fg3);
+	}
+	.variation-card-meta span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.variation-select {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		border: 1px solid var(--border2);
+		background: color-mix(in srgb, var(--panel) 88%, transparent);
+		color: var(--fg2);
+		font-size: 15px;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.variation-select.selected {
+		border-color: var(--accent);
+		background: var(--accent);
+		color: white;
+	}
+
 
 	.interpretation-diff {
 		gap: 2px;

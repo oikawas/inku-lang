@@ -117,6 +117,7 @@ export const en: LangPack = {
 	canvasPlaceholder: '(not yet drawn)',
 	canvasVaryPerformance: 'another performance',
 	canvasVaryComposition: 'another composition',
+	canvasVaryInterpretation: 'another interpretation',
 	canvasSeedSummary: 'seed performance {render} / composition {vary}',
 	canvasCaptionToggle: 'show instruction caption',
 	canvasPresentationOpen: 'open presentation mode',

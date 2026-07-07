@@ -292,6 +292,8 @@
 	let thinking = $state<string | null>(null);
 	let result   = $state<PaintResult | null>(null);
 	let variationBusy = $state(false);
+	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
+	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -3070,6 +3072,20 @@
 		displayedHistoryItem = null;
 		stage2Model = v;
 	}
+
+	function buildDdlDiffParts(before: string | null, after: string | null): DdlDiffPart[] {
+		const oldLines = (before ?? "").split(/\n+/).map((line) => line.trim()).filter(Boolean);
+		const newLines = (after ?? "").split(/\n+/).map((line) => line.trim()).filter(Boolean);
+		const parts: DdlDiffPart[] = [];
+		for (const line of oldLines) {
+			parts.push({ kind: newLines.includes(line) ? "same" : "removed", text: line });
+		}
+		for (const line of newLines) {
+			if (!oldLines.includes(line)) parts.push({ kind: "added", text: line });
+		}
+		return parts;
+	}
+
 	function setSelectedCatalog(id: string) {
 		displayedHistoryItem = null;
 		selectedCatalog = id;
@@ -3130,6 +3146,42 @@
 			tokensInStage2 = r.tokens_in_stage2;
 			tokensOutStage2 = r.tokens_out_stage2;
 			outputTab = 'canvas';
+			await fetchHistoryOffset(0);
+			historyCursor = 0;
+			fitCanvasZoom();
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			loading = false;
+			variationBusy = false;
+			stopTimer();
+		}
+	}
+
+	async function varyInterpretation() {
+		if (!result || variationBusy || loading) return;
+		const source = input.trim();
+		if (!source) return;
+		variationBusy = true;
+		loading = true;
+		error = null;
+		const previousDdl = ddl;
+		try {
+			const r = await paintOne(source, { historyInput: source });
+			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
+			ddl = r.ddl;
+			ddlGeneratedBaseline = r.ddl;
+			thinking = r.thinking;
+			result = r;
+			displayedHistoryItem = null;
+			elapsedStage1Ms = r.elapsed_stage1_ms;
+			elapsedStage2Ms = r.elapsed_stage2_ms;
+			elapsedTotalMs = r.elapsed_total_ms;
+			tokensInStage1 = r.tokens_in_stage1;
+			tokensOutStage1 = r.tokens_out_stage1;
+			tokensInStage2 = r.tokens_in_stage2;
+			tokensOutStage2 = r.tokens_out_stage2;
+			outputTab = "canvas";
 			await fetchHistoryOffset(0);
 			historyCursor = 0;
 			fitCanvasZoom();
@@ -3837,6 +3889,14 @@
 						/>
 					{/if}
 
+					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
+						<section class="panel-section interpretation-diff">
+							{#each interpretationDiffParts as part}
+								<div class:removed={part.kind === "removed"} class:added={part.kind === "added"} class:same={part.kind === "same"}>{part.kind === "removed" ? "−" : part.kind === "added" ? "+" : " "} {part.text}</div>
+							{/each}
+						</section>
+					{/if}
+
 					<!-- 統計 -->
 					{#if result && elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
@@ -3933,6 +3993,7 @@
 				onDownloadPNG={downloadPNG}
 				onVaryPerformance={varyPerformance}
 				onVaryComposition={varyComposition}
+				onVaryInterpretation={varyInterpretation}
 				{variationBusy}
 				pngTemplates={exportTemplates}
 			/>
@@ -4463,6 +4524,22 @@
 	.app-info-meta a:hover {
 		text-decoration: underline;
 	}
+
+	.interpretation-diff {
+		gap: 2px;
+		padding: 8px 10px;
+		border: 1px solid var(--border);
+		background: color-mix(in srgb, var(--bg2) 68%, transparent);
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 11px;
+		line-height: 1.55;
+	}
+	.interpretation-diff div {
+		white-space: pre-wrap;
+		color: var(--fg3);
+	}
+	.interpretation-diff .removed { color: color-mix(in srgb, #a2342a 78%, var(--fg3)); }
+	.interpretation-diff .added { color: color-mix(in srgb, #2f6b3a 78%, var(--fg3)); }
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {

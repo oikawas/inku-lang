@@ -65,6 +65,7 @@
 		onDownloadPNG: (size: number) => void | Promise<void>;
 		onVaryPerformance: () => void | Promise<void>;
 		onVaryComposition: () => void | Promise<void>;
+		onVaryInterpretation: () => void | Promise<void>;
 		variationBusy: boolean;
 	};
 
@@ -123,6 +124,7 @@
 		onDownloadPNG,
 		onVaryPerformance,
 		onVaryComposition,
+		onVaryInterpretation,
 		variationBusy = false
 	}: Props = $props();
 
@@ -339,6 +341,7 @@
 		<div class="variation-controls" onpointerdown={(event) => event.stopPropagation()}>
 			<button class="ghost-btn variation-btn" onclick={onVaryPerformance} disabled={!result || variationBusy}>{t().canvasVaryPerformance}</button>
 			<button class="ghost-btn variation-btn" onclick={onVaryComposition} disabled={!result || variationBusy}>{t().canvasVaryComposition}</button>
+			<button class="ghost-btn variation-btn" onclick={onVaryInterpretation} disabled={!result || variationBusy}>{t().canvasVaryInterpretation}</button>
 			{#if result}<span class="seed-summary">{seedSummary}</span>{/if}
 		</div>
 

@@ -128,6 +128,7 @@ export interface LangPack {
 	canvasCaptionToggle: string;
 	canvasVaryPerformance: string;
 	canvasVaryComposition: string;
+	canvasVaryInterpretation: string;
 	canvasSeedSummary: string;
 	canvasPresentationOpen: string;
 	canvasPresentationClose: string;

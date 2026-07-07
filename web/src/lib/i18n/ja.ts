@@ -117,6 +117,7 @@ export const ja: LangPack = {
 	canvasPlaceholder: '（まだ描画されていない）',
 	canvasVaryPerformance: '別の演奏',
 	canvasVaryComposition: '別の構図',
+	canvasVaryInterpretation: '別の解釈',
 	canvasSeedSummary: 'seed 演奏 {render} / 構図 {vary}',
 	canvasCaptionToggle: '指示文の字幕表示',
 	canvasPresentationOpen: 'プレゼンテーションモードを開く',

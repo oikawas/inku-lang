@@ -1026,6 +1026,22 @@ The status-bar PNG export templates default to Y-axis heights of `1080px`,
 automatically replaced by the new defaults, while user-customized templates are
 preserved. The Japanese UI labels this dimension as `Y軸` / `Y軸の高さ`.
 
+### v1.51 (2026-07-02)
+
+Version 1.51 adds the relation system, called `aida` in Japanese, and assigns
+variation to both micro and macro scales.  JSON Score instructions may now carry
+`at.region` for renderer-resolved placement and `relation` for observable
+relationships to previous instructions: `along`, `not_touching`, `cutting`, and
+`between`.  Renderer performances record `render_seed` so macro placement can
+vary between performances while remaining reproducible when a seed is provided.
+
+Stage 1.5 is redirected away from fixed finished recipes and toward
+composition-family selection plus relation attachment.  Invalid relations are
+dropped rather than repaired, and the coerce layer is forbidden from adding
+relations.
+
+Detailed implementation history remains in the canonical Japanese spec.
+
 ### v1.52 (2026-07-04)
 
 Version 1.52 materializes post-selection through two explicit regeneration
@@ -1172,22 +1188,6 @@ The relation sample rate is intentionally low on the natural-language fable set
 because relation is again reserved for fixed previous-object phrases. Version
 1.52 is therefore accepted for vary, repair-fingerprint suppression, the quality
 guard, and the relation-drop blocking item.
-
-### v1.51 (2026-07-02)
-
-Version 1.51 adds the relation system, called `aida` in Japanese, and assigns
-variation to both micro and macro scales.  JSON Score instructions may now carry
-`at.region` for renderer-resolved placement and `relation` for observable
-relationships to previous instructions: `along`, `not_touching`, `cutting`, and
-`between`.  Renderer performances record `render_seed` so macro placement can
-vary between performances while remaining reproducible when a seed is provided.
-
-Stage 1.5 is redirected away from fixed finished recipes and toward
-composition-family selection plus relation attachment.  Invalid relations are
-dropped rather than repaired, and the coerce layer is forbidden from adding
-relations.
-
-Detailed implementation history remains in the canonical Japanese spec.
 
 ---
 

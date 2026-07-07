@@ -104,6 +104,7 @@ export interface LangPack {
 
 	// Input
 	inputSectionLabel: string;
+	interpretationFeedbackLabel: string;
 	canvasAspectButton: string;
 	canvasAspectTitle: string;
 	modelSelectButton: string;
@@ -400,6 +401,9 @@ export interface LangPack {
 	historyImageHeader: string;
 	historyHashHeader: string;
 	historyHashCopyTitle: string;
+	historyReplay: string;
+	historyReplayTitle: string;
+	historyReplayMissingSeed: string;
 	historyCreatedAtHeader: string;
 	historyCanvasHeader: string;
 	historyModelHeader: string;

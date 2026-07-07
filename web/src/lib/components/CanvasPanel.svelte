@@ -129,7 +129,7 @@
 	let canvasContentEl: HTMLDivElement | null = null;
 	let svgMenuOpen = $state(false);
 	let svgHelpOpen = $state(false);
-	let instructionCaptionVisible = $state(false);
+	let instructionCaptionVisible = $state(true);
 	let presentationMode = $state(false);
 	const canvasMaxRatio = $derived(Math.max(canvasAspectWidth, canvasAspectHeight, 1));
 	const canvasBaseWidth = $derived(400 * canvasAspectWidth / canvasMaxRatio);

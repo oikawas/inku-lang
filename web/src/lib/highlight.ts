@@ -79,3 +79,29 @@ export function annotate(text: string): Part[] {
 
 	return parts;
 }
+
+export type InterpretationFeedbackPart = {
+	text: string;
+	tone: 'strong' | 'medium' | 'weak';
+};
+
+function normalizedIncludes(haystack: string, needle: string): boolean {
+	const n = needle.trim().toLowerCase();
+	if (!n) return false;
+	return haystack.toLowerCase().includes(n);
+}
+
+export function interpretationFeedback(text: string, ddl: string | null | undefined): InterpretationFeedbackPart[] {
+	const source = text || '';
+	const normalizedDdl = ddl || '';
+	if (!source.trim() || !normalizedDdl.trim()) return [];
+	return annotate(source).map((part) => {
+		if (part.kind === 'saijiki' && (normalizedIncludes(normalizedDdl, part.text) || normalizedIncludes(normalizedDdl, part.category || ''))) {
+			return { text: part.text, tone: 'strong' };
+		}
+		if (part.kind === 'saijiki') return { text: part.text, tone: 'medium' };
+		if (part.kind === 'emotion') return { text: part.text, tone: 'medium' };
+		if (part.text.trim().length >= 2 && normalizedIncludes(normalizedDdl, part.text)) return { text: part.text, tone: 'medium' };
+		return { text: part.text, tone: 'weak' };
+	});
+}

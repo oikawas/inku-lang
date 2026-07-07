@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.52**
+**Version: v1.60**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -329,13 +329,7 @@ abstract colors and `palette:<name>` entries are expanded to the exact
 `render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
-`render_hash` is a 64-character SHA-256 hex hash of the rendered content and
-server-owned render metadata.  `render_hash_short` is the four-character
-uppercase suffix used for UI and CLI references.
-Instruction-language metadata and `render_seed` are retained in JSON and history.
-They are excluded from the current canonical Score payload; the rendered SVG and
-server-owned render metadata still identify the concrete artifact for audit and
-replay context.
+Starting in v1.60, `render_hash` is an edition identifier in `rh2:<sha256>` form. It is computed from the saved canonical JSON Score plus `render_seed`, `vary_seed`, `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are not part of the hash payload. Existing 64-character history hashes remain legacy display values; they are not rewritten by migration. `render_hash_short` is the four-character uppercase suffix used for UI and CLI references.
 `score.canvas` remains the score-level canvas instruction, while
 `render_canvas_aspect` records the canvas aspect actually used for this rendered
 artifact.  In normal server-generated output they match, but both are retained
@@ -383,9 +377,7 @@ Nuance that cannot be represented by the six abstract colors is retained in
 Relations are sequential.  `along`, `not_touching`, and `cutting` refer to the
 immediately previous instruction; `between` refers to the previous two.  There
 are no arbitrary ids, forward references, or repair governors for relations.
-Invalid relations are dropped silently by validation or coercion, and the
-instruction is rendered as an ordinary instruction.  The coerce layer may remove
-invalid relations but must not add new ones.
+Invalid relations are dropped silently by validation or coercion, and the instruction is rendered as an ordinary instruction.  The coerce layer may remove invalid relations but must not add new ones.  As of the v1.52 closure, JSON Score `relation` is reserved for explicit previous-object phrases in normalized DDL: `前の線に沿って` / `along the previous line`, `前の形に触れない` / `not touching the previous shape`, `前の線を切る` / `cutting the previous line`, and `前の二つの間に` / `between the previous two`. Natural-language proximity, rhythm, ahead/behind, near, and far are represented with position, path, rotation, and spacing instead of relation.
 
 The system treats the DB history record as the source of truth.  SVG, JSON
 files, PNG files, and other artifacts are derived outputs.
@@ -805,13 +797,7 @@ Benchmarks focus on:
 - whether the renderer makes DDL features visible
 - whether the output has enough negative space, variation, and artistic focus
 
-Current render-core tuning records explicit artwork-quality metrics in CLI
-benchmark summaries: `constraint_adherence`, `negative_space_pressure`,
-`motion_energy`, `color_resonance`, `visual_event`, and `figurative_risk`.
-Fallback use, server hard timeouts, motif hints, presence counts, color traces,
-and compositional markers are recorded separately.  Queue or retry duration is
-diagnostic only and is not treated as a primary quality metric, because free
-inference endpoints can be dominated by external queue behavior.
+Current render-core tuning records explicit artwork-quality metrics in CLI benchmark summaries: `constraint_adherence`, `negative_space_pressure`, `motion_energy`, `color_resonance`, `visual_event`, and `figurative_risk`. These judge metrics are regression sensors, not final acceptance gates or substitutes for human selection. Build 448 confirmed divergence between machine scoring and human review, especially JP #23, so the metrics should not be retuned merely to raise preferred works. Fallback use, server hard timeouts, motif hints, presence counts, color traces, and compositional markers are recorded separately. Queue or retry duration is diagnostic only and is not treated as a primary quality metric, because free inference endpoints can be dominated by external queue behavior.
 
 For NVIDIA free API testing, elapsed time is treated as operational metadata,
 not as an artistic quality signal.  Queue delays can indicate service pressure,
@@ -912,10 +898,7 @@ start at `1.48.0-android.1` and `148001`.  The Android Settings menu exposes
 version details including version name, version code, build type, application
 id, source spec generation, and render engine version.
 
-History records carry a server-side `render_hash`: a 64-character SHA-256 hex
-hash of the rendered content and render metadata.  History APIs, paint/compose
-responses, the JSON tab, and saved artifact JSON expose both `render_hash` and
-the four-character uppercase `render_hash_short` for human reference.  The
+History records carry a server-side `render_hash`. New records use the `rh2:<sha256>` edition-id semantics from the render metadata section: saved Score plus explicit render conditions, not SVG text. Legacy 64-character hashes remain display-compatible. History APIs, paint/compose responses, the JSON tab, and saved artifact JSON expose both `render_hash` and the four-character uppercase `render_hash_short` for human reference.  The
 history manager shows the short hash without changing the thumbnail layout;
 clicking it copies the full hash.  The status bar also shows the current
 render's short hash beside the star action and copies the full hash when
@@ -1188,6 +1171,17 @@ The relation sample rate is intentionally low on the natural-language fable set
 because relation is again reserved for fixed previous-object phrases. Version
 1.52 is therefore accepted for vary, repair-fingerprint suppression, the quality
 guard, and the relation-drop blocking item.
+
+### v1.60 (2026-07-07)
+
+Version 1.60 moves the project from quality-loop closure to a one-person playable 1.0 candidate: another person should be able to set up inku from the README, write a visual tanka, consult Saijiki, read interpretation feedback, choose with vary, save, and replay a result.
+
+- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `vary_seed`, `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
+- History now stores `vary_seed`, and the history manager can replay a saved Score with its saved seed.
+- The input panel shows approximate post-processing interpretation feedback using ink-density shading. This does not change the Stage 1 schema or prompt.
+- The canvas displays the input text as a caption by default, treating the relation between words and image as part of the work.
+- The English and Japanese READMEs now include Quick Start setup, provider/API-key guidance, two-stage regeneration, the six-color Saijiki constraint, and history replay.
+- Build 448 gallery candidates are recorded in `docs/gallery-candidates-build448.md`; final gallery selection remains a human post-selection step.
 
 ---
 

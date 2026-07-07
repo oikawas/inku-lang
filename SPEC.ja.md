@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.52**
+**Version: v1.60**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -205,7 +205,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 - 特定の Stage 2 モデルや prompt pack に合わせて調整したエンジン
 
 ただし、Render Engine は DB 正本の互換性を壊してはならない。
-履歴、JSONタブ、CLI、ベンチマークが読む正規メタデータ形式は安定させる。
+履歴、JSONタブ、CLI、ベンチマークが読む正規メタデータ形式は安定させる。`render_hash` は v1.60 以降、保存済み JSON Score と `render_seed` / `vary_seed` / `render_build_number` / `render_color_catalog_id` / render engine metadata から作る作品エディションID（`rh2:<sha256>`）とし、SVG本文・入力文・正規化DDL・LLM応答本文は hash の主材料に含めない。既存履歴の64桁hex hash は legacy として表示互換を維持し、破壊的 migration は行わない。
 外部任意コードをロードする仕組みは現時点では実装しない。まず内部境界とメタデータ記録を作り、
 2つ目以降の実エンジンが必要になった段階で、配布形式・安全性・依存関係を設計する。
 
@@ -535,7 +535,7 @@ DRAW を押した後、記述した文字列に**解釈の度合いを示す色*
 
 vary は記述の同一性を壊さない——変わるのは選択であり、解釈（Stage 1 の正規化DDL）は変わらない。同じ記述 + 同じ vary 値 + 同じ performance seed は同じ出力を再現する（履歴からの再現性）。
 
-この二段が §8.2 の「事後選択を中心にする」の実体である。分散の広い生成系では外れも増えるが、外れの処理は governor による事前の平均化ではなく、並んだものから選ぶという人間の行為に委ねる。選ぶことは記述を推敲することと並ぶ創作の一部である。
+この二段が §8.2 の「事後選択を中心にする」の実体である。分散の広い生成系では外れも増えるが、外れの処理は governor による事前の平均化ではなく、並んだものから選ぶという人間の行為に委ねる。選ぶことは記述を推敲することと並ぶ創作の一部である。品質の最終判定もこの事後選択に属し、judge metric は受け入れゲートではなく回帰検知の参考値として扱う。
 
 ---
 
@@ -610,6 +610,8 @@ Layer 3 の補修（coerce）が挿入する定型部品——アクセント形
 | 全primitiveが実装済みか | 芸術的に面白いか |
 | トークン長が範囲内か | 揺らぎが適切か |
 | レンダリングが完了するか | — |
+
+CLI の judge metric（`visual_event`、`negative_space_pressure`、`motion_energy` など）は、急な品質崩壊や実装回帰を見つけるための診断値である。Build 448 で JP #23 のように低い `visual_event` と高い人間評価が乖離する例を確認したため、これらの指標を最終的な作品評価や受け入れゲートとして再調整しない。品質の最終判断は §8 の事後選択、すなわち人間が並んだ作品から選ぶ行為に属する。
 
 ### 11.2 テストケースの自動生成
 
@@ -1266,6 +1268,8 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 | 間に | between | 直前の2要素の間の領域に置く | `between` |
 
 **排除する語**: 寄り添う、応える、対話する、呼応する——意図・擬人の語であり、外部から観察できない。
+
+v1.52 クローズ時点では、JSON Score の `relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。日本語では `前の線に沿って` / `前の形に触れない` / `前の線を切る` / `前の二つの間に`、英語では `along the previous line` / `not touching the previous shape` / `cutting the previous line` / `between the previous two` を固定句とする。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacing で表す。
 
 **第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く、続きから。初期4語で表現の不足が実測で示されてから追加する。§4.8 の手続き（自由度を増やすときは、その自由度が失わせるものを明示した上で判断する）に従う。
 
@@ -3704,3 +3708,17 @@ Build 448 では、relation を「正規化DDLに `前の線に沿って` / `前
 Build 448 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-448/{jp,en}/`）は 60/60 成功した。JP #01 のみ final retry でも stage2 timeout となり fallback result を使用した（fallback 1/60）。品質平均は合算で `visual_event` 92.40、`negative_space_pressure` 95.87、`motion_energy` 97.77、`constraint_adherence` 92.00、`color_resonance` 99.27 となり、Build 441 基準の -5 以内という品質回帰ガードを満たした。修復部品は `adjacent_reaction` 14/60 (23.3%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%)、`inherited_memory_arc` 4/60 (6.7%) で、v1.52 の repair fingerprint gate を満たした。relation drop は JP 1/6 (16.7%)、EN 0/2、合算 1/8 (12.5%) で、fable5 が blocking とした 20% 目安を下回った。自然文 fable set では relation sample rate が低くなるが、これは relation を fixed previous-object phrase 専用に戻した結果であり、drop-only validator 方針と整合する。これにより v1.52 の残タスク（vary、repair fingerprint、quality guard、relation blocking）は完了として扱う。
 
 **v1.52 クローズ（2026-07-07）**: Build 448 を v1.52 の受け入れとして確定し、クローズする。判断理由は次の4点。(1) 受け入れ基準（repair fingerprint 3ゲート、品質回帰ガード、vary の後方互換・決定性・分散、relation drop blocking）を全項目満たした。(2) Build 448 の JP/EN 60枚に対する3ペルソナ再評価（`cli/tune_bench.md` 参照）で、v1.52 の起点だった Build 441 の2大課題——補修部品の指紋化と振れ幅の上限——の解消を目視確認した。定型部品の反復は消え、外れ値（驚き）が出るようになり、キュレーター視点で60枚中20〜25枚が選出可能な水準に達した。(3) relation の使用縮退（relation を持つサンプルが 30件中 21〜22 件から 2〜3 件へ減少）は、「relation は正規化DDL中の明示的な previous-object 句（前の線に沿って / 前の形に触れない / 前の線を切る / 前の二つの間に、および英語同義句）専用とし、自然文由来の近接・拍子・先行/遅れは position / path / rotation / spacing で表す」という仕様として受け入れる。これは一時的な回避ではなく §14 の関係述語の定義の確定であり、drop-only validator 方針と整合する。(4) 品質判定指標（visual_event 等の judge metric）は人間評価との乖離例（JP #23: visual_event=28 だが目視評価は最良クラス）が確認されたため、以後は受け入れゲートではなく回帰検知の参考値として扱う。品質の最終判定は §8 の設計思想どおり人間の事後選択に属する。judge metric 自体の再調整は行わない（governor 化の回避）。以後の開発の完成軸は品質ゲートの漸近改善ではなく「他人が自分の視覚的短歌を書ける状態」（1.0）に移す。作業計画は v1.6 として別途管理する。
+
+
+### v1.60 (2026-07-07)
+
+**品質ループから「一人で遊べる」状態へ**
+
+v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完成軸をメトリクス改善から、第三者が README だけでセットアップし、自分の視覚的短歌を書き、Saijiki を参照し、解釈フィードバックを見て、vary で選び、履歴から再現できる状態へ移す。
+
+- `render_hash` を `rh2:<sha256>` の作品エディションIDとして再定義した。保存済み JSON Score、`render_seed`、`vary_seed`、`render_build_number`、`render_color_catalog_id`、render engine metadata から算出し、SVG本文・入力文・正規化DDL・LLM応答本文は主材料に含めない。既存64桁hex hash は legacy 表示互換として残す。
+- 履歴DBに `vary_seed` を保存し、履歴管理から保存済み Score + seed で同じ作品を再レンダリングできるようにした。
+- 入力欄に後処理近似の解釈フィードバックを追加した。Stage 1 schema や prompt は変更せず、Saijiki語・感情語・DDLに残った語を墨の濃淡で表示する。
+- 作品表示では詞書（入力記述）を初期表示し、記述と画の緊張関係を作品表示の一部として扱う。
+- README 日英に Quick Start、provider/API key 設定、二段の再生成、Saijiki 6色制約、履歴再現の説明を追加した。
+- Build 448 ギャラリー候補を `docs/gallery-candidates-build448.md` に記録した。最終選定は人間の事後選択として残す。

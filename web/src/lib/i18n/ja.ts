@@ -42,6 +42,7 @@ export const ja: LangPack = {
 
 	clearInputBtn: '新規作成',
 	inputSectionLabel: '指示',
+	interpretationFeedbackLabel: '解釈フィードバック',
 	canvasAspectButton: 'キャンバス比率',
 	canvasAspectTitle: 'キャンバス比率',
 	modelSelectButton: 'モデル選択',
@@ -386,6 +387,9 @@ export const ja: LangPack = {
 	historyImageHeader: '画像',
 	historyHashHeader: 'ハッシュ',
 	historyHashCopyTitle: 'ハッシュをコピー',
+	historyReplay: '再現',
+	historyReplayTitle: '保存済みScoreとseedで再レンダリング',
+	historyReplayMissingSeed: 'この履歴には再現用のrender_seedがありません。',
 	historyCreatedAtHeader: '作成日時',
 	historyCanvasHeader: 'キャンバス',
 	historyModelHeader: 'モデル',

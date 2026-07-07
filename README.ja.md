@@ -79,6 +79,59 @@ inku は **Stage 1 / Stage 1.5 / Stage 2 / Renderer** のパイプラインを�
 
 Web UI では、生成結果に対して「別の演奏」と「別の構図」を選べます。別の演奏は同じ JSON Score を新しい performance seed で再レンダリングし、LLM を呼びません。別の構図は明示的な vary seed で Stage 1.5 の構図族・焦点・技法候補を選び直し、既定の決定性は維持します。
 
+「別の演奏」「別の構図」は、作品を平均化するためではなく、並んだ候補から人間が選ぶための操作です。履歴には `render_seed` / `vary_seed` / build / 色カタログ / `render_hash` が保存され、保存済み Score から同じ作品エディションを再現できます。
+
+---
+
+## Quick Start
+
+### 1. Backend
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache UV_PYTHON_INSTALL_DIR=$HOME/.local/share/uv/python uv run inku-server
+```
+
+既定ではローカル SQLite DB を使います。初回管理者を作る場合は、新規 DB に対して `INKU_BOOTSTRAP_ADMIN_PASSWORD` を明示してください。
+
+### 2. LLM provider
+
+少なくとも Stage 1 / Stage 2 用の provider を設定します。代表的な環境変数は次のとおりです。
+
+```sh
+export INKU_LLM_BACKEND=nvidia        # nvidia / anthropic / local など
+export NVIDIA_API_KEY=...
+export ANTHROPIC_API_KEY=...
+export INKU_OVMS_BASE_URL=http://127.0.0.1:8000/v3
+```
+
+Web UI のモデル設定画面でも provider/model と API key を設定できます。API key は保存後に再表示されず、DB 内では暗号化形式で保持されます。
+
+### 3. Web UI
+
+```sh
+cd web
+npm install
+npm run dev
+```
+
+ブラウザで `http://localhost:5173` を開き、ログイン後に短い記述を書きます。例:
+
+```text
+夜の水面に、青い線がゆっくりほどける
+```
+
+生成後は Saijiki を参照し、解釈フィードバックの濃淡を見て、必要なら DDL を調整します。「別の演奏」は LLM を呼ばずに同じ Score を再レンダリングし、「別の構図」は同じ解釈から別の構図候補を引きます。気に入った結果は履歴に保存し、履歴管理から同じ seed で再現できます。
+
+### 4. CLI smoke test
+
+```sh
+cd cli
+uv run inku-cli login --base-url http://127.0.0.1:8100 -u admin
+uv run inku-cli paint "夜の水面に、青い線がゆっくりほどける" --base-url http://127.0.0.1:8100 -o out/quickstart --prefix first --png --full-json
+```
+
+
 ---
 
 ## コア語彙（歳時記 / Saijiki）

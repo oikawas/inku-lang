@@ -81,6 +81,59 @@ This separation lets natural-language interpretation, expression expansion, stru
 
 In the web UI, each result can be regenerated as **another performance** or **another composition**. Another performance rerenders the same JSON Score with a new performance seed and does not call an LLM. Another composition uses an explicit vary seed to reselect Stage 1.5 composition family, focus, and technique candidates while keeping the default path deterministic.
 
+These controls exist for post-selection, not for averaging the system toward a single safe style. History stores `render_seed`, `vary_seed`, build, color catalog, and `render_hash`, so a saved Score can be replayed as the same work edition.
+
+---
+
+## Quick Start
+
+### 1. Backend
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache UV_PYTHON_INSTALL_DIR=$HOME/.local/share/uv/python uv run inku-server
+```
+
+The default setup uses a local SQLite DB. To create the first admin account on a new DB, set `INKU_BOOTSTRAP_ADMIN_PASSWORD` explicitly.
+
+### 2. LLM provider
+
+Configure at least one provider for Stage 1 and Stage 2. Common environment variables are:
+
+```sh
+export INKU_LLM_BACKEND=nvidia        # nvidia / anthropic / local, etc.
+export NVIDIA_API_KEY=...
+export ANTHROPIC_API_KEY=...
+export INKU_OVMS_BASE_URL=http://127.0.0.1:8000/v3
+```
+
+The web UI model settings page can also store provider/model choices and API keys. Saved API keys are not displayed again and are stored in encrypted DB form.
+
+### 3. Web UI
+
+```sh
+cd web
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`, log in, and write a short description. Example:
+
+```text
+A blue line slowly loosens across the night water.
+```
+
+After generation, consult Saijiki, read the interpretation feedback shading, and edit the DDL if needed. **Another performance** rerenders the same Score without an LLM call. **Another composition** draws a different composition candidate from the same interpretation. Save works you like to history; the history manager can replay them with the saved seed.
+
+### 4. CLI smoke test
+
+```sh
+cd cli
+uv run inku-cli login --base-url http://127.0.0.1:8100 -u admin
+uv run inku-cli paint "A blue line slowly loosens across the night water." --base-url http://127.0.0.1:8100 -o out/quickstart --prefix first --png --full-json
+```
+
+
 ---
 
 ## Core Vocabulary (Saijiki / 歳時記)

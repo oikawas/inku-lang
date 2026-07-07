@@ -18,6 +18,11 @@
 		catalog_id?: string | null;
 		render_hash?: string | null;
 		render_hash_short?: string | null;
+		render_color_catalog_id?: string | null;
+		render_canvas_aspect_id?: string | null;
+		render_canvas_aspect?: string | null;
+		render_seed?: number | string | null;
+		vary_seed?: number | string | null;
 		trashed?: boolean;
 		starred?: boolean;
 	};
@@ -49,6 +54,7 @@
 		onAskPermanentDelete: (ids: string[]) => void;
 		onToggleSelection: (id: string) => void;
 		onLoadItem: (item: HistoryItem) => void;
+		onReplayItem: (item: HistoryItem) => void | Promise<void>;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		historyModelSummary: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
@@ -86,6 +92,7 @@
 		onAskPermanentDelete,
 		onToggleSelection,
 		onLoadItem,
+		onReplayItem,
 		onToggleStar,
 		historyModelSummary,
 		formatHistoryDate,
@@ -112,6 +119,14 @@
 		if (historyManagerView !== 'active') return;
 		hideTooltip();
 		onLoadItem(item);
+		onClose();
+	}
+
+	async function replayItemAndClose(item: HistoryItem, event?: Event) {
+		event?.stopPropagation();
+		if (historyManagerView !== 'active') return;
+		hideTooltip();
+		await onReplayItem(item);
 		onClose();
 	}
 
@@ -315,6 +330,7 @@
 								>★</button>
 								{#if hashLabel(it)}<button class="hash-chip" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>{hashLabel(it)}</button>{/if}
 								{#if historyManagerView === 'active'}
+									<button class="ghost-btn history-replay-btn" onclick={(event) => replayItemAndClose(it, event)} title={t().historyReplayTitle}>{t().historyReplay}</button>
 									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().deleteButton} aria-label={t().deleteButton}>
 										<svg viewBox="2 2 20 20" aria-hidden="true">
 											<path d="M3 6h18" />
@@ -369,6 +385,7 @@
 							<td>{catalogName(it.catalog_id)}</td>
 							<td>
 								{#if historyManagerView === 'active'}
+									<button class="ghost-btn history-replay-btn" onclick={(event) => replayItemAndClose(it, event)} title={t().historyReplayTitle}>{t().historyReplay}</button>
 									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().deleteButton} aria-label={t().deleteButton}>
 										<svg viewBox="2 2 20 20" aria-hidden="true">
 											<path d="M3 6h18" />

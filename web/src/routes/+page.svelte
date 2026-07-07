@@ -4,7 +4,7 @@
 
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { annotate } from '$lib/highlight';
+	import { annotate, interpretationFeedback } from '$lib/highlight';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -2865,6 +2865,40 @@
 		loadIterationItem(historyItems[idx]);
 	}
 
+	async function replayHistoryItem(it: Iteration) {
+		if (demoRunning || reloading) return;
+		if (it.render_seed == null) {
+			reloadError = t().historyReplayMissingSeed;
+			return;
+		}
+		reloading = true;
+		reloadError = null;
+		try {
+			const catalogId = it.render_color_catalog_id ?? it.catalog_id ?? selectedCatalog;
+			const canvasId = it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? it.score?.canvas ?? effectiveCanvasAspectId();
+			const r = await apiFetch('/api/render-svg', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					score: it.score,
+					catalog_id: catalogId,
+					canvas_aspect: canvasId,
+					render_seed: Number(it.render_seed),
+				})
+			});
+			if (!r.ok) throw new Error(await r.text());
+			const svg = await r.text();
+			loadIterationItem({ ...it, svg });
+			result = result ? { ...result, svg, render_hash: it.render_hash, render_hash_short: it.render_hash_short } : result;
+			outputTab = 'canvas';
+			fitCanvasZoom();
+		} catch (e) {
+			reloadError = e instanceof Error ? e.message : String(e);
+		} finally {
+			reloading = false;
+		}
+	}
+
 	function loadIterationItem(it: Iteration) {
 		if (demoRunning) return;
 		inputMode = 'single';
@@ -3407,6 +3441,7 @@
 	const scoreJsonText = $derived(scoreJsonPayload ? JSON.stringify(scoreJsonPayload, null, 2) : '');
 	const scoreJsonLines = $derived(scoreJsonText ? scoreJsonText.split('\n') : []);
 	const scoreJsonHighlightedLines = $derived(scoreJsonLines.map(highlightJsonLine));
+	const interpretationFeedbackParts = $derived(interpretationFeedback(input, ddl));
 	const scoreJsonHighlighted = $derived(scoreJsonHighlightedLines.join('\n'));
 	const scoreJsonSeparatorLine = $derived.by(() => {
 		const index = scoreJsonLines.findIndex((line) => line.startsWith('  "score"'));
@@ -3717,6 +3752,7 @@
 						{batchPromptHistory}
 						bind:batchRandomColorCatalog
 						bind:instructionLang
+						{interpretationFeedbackParts}
 						bind:demoSettings
 						{demoRunning}
 						{demoWaitingSeconds}
@@ -4116,6 +4152,7 @@
 		onAskPermanentDelete={askPermanentDelete}
 		onToggleSelection={toggleHistorySelection}
 		onLoadItem={loadIterationItem}
+		onReplayItem={replayHistoryItem}
 		onToggleStar={toggleHistoryStar}
 		{historyModelSummary}
 		{formatHistoryDate}

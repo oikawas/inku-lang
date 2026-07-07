@@ -20,6 +20,7 @@
 		failures: BatchFailure[];
 	};
 	type InstructionLang = 'auto' | 'ja' | 'en';
+	type InterpretationFeedbackPart = { text: string; tone: 'strong' | 'medium' | 'weak' };
 	type Props = {
 		inputMode: 'single' | 'batch' | 'demo';
 		input: string;
@@ -44,6 +45,7 @@
 		batchPromptHistory: string[];
 		batchRandomColorCatalog: boolean;
 		instructionLang: InstructionLang;
+		interpretationFeedbackParts: InterpretationFeedbackPart[];
 		demoSettings: DemoSettings;
 		demoRunning: boolean;
 		demoWaitingSeconds: number | null;
@@ -107,6 +109,7 @@
 		batchPromptHistory,
 		batchRandomColorCatalog = $bindable(false),
 		instructionLang = $bindable('auto'),
+		interpretationFeedbackParts,
 		demoSettings = $bindable(),
 		demoRunning,
 		demoWaitingSeconds,
@@ -205,6 +208,14 @@
 			placeholder={t().inputPlaceholder}
 			class="input-ta"
 		></textarea>
+
+		{#if interpretationFeedbackParts.length > 0}
+			<div class="interpret-feedback" aria-label={t().interpretationFeedbackLabel}>
+				{#each interpretationFeedbackParts as part}
+					<span class:strong={part.tone === 'strong'} class:medium={part.tone === 'medium'} class:weak={part.tone === 'weak'}>{part.text}</span>
+				{/each}
+			</div>
+		{/if}
 
 		{#if singleRunning && !singleDdlReady}
 			<div class="progress-wrap">
@@ -315,6 +326,22 @@
 	}
 	.panel-tab.active.running::before { background: var(--accent); animation: none; }
 	.panel-tab:disabled { opacity: 0.38; cursor: not-allowed; }
+	.interpret-feedback {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 3px 0;
+		min-height: 24px;
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-top: 0;
+		background: color-mix(in srgb, var(--bg2) 62%, transparent);
+		font-size: 12px;
+		line-height: 1.7;
+	}
+	.interpret-feedback span { white-space: pre-wrap; color: color-mix(in srgb, var(--fg) 28%, transparent); }
+	.interpret-feedback span.medium { color: color-mix(in srgb, var(--fg) 58%, transparent); }
+	.interpret-feedback span.strong { color: var(--fg); font-weight: 600; }
+	.interpret-feedback span.weak { color: color-mix(in srgb, var(--fg) 24%, transparent); }
 	.tab-label { line-height: 1; }
 	.tab-running-dot {
 		width: 6px;

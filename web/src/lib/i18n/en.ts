@@ -42,6 +42,7 @@ export const en: LangPack = {
 
 	clearInputBtn: 'new',
 	inputSectionLabel: 'prompt',
+	interpretationFeedbackLabel: 'interpretation feedback',
 	canvasAspectButton: 'canvas aspect',
 	canvasAspectTitle: 'Canvas aspect',
 	modelSelectButton: 'model selection',
@@ -386,6 +387,9 @@ export const en: LangPack = {
 	historyImageHeader: 'image',
 	historyHashHeader: 'hash',
 	historyHashCopyTitle: 'copy hash',
+	historyReplay: 'replay',
+	historyReplayTitle: 're-render from the saved Score and seed',
+	historyReplayMissingSeed: 'This history item has no render_seed for replay.',
 	historyCreatedAtHeader: 'created',
 	historyCanvasHeader: 'canvas',
 	historyModelHeader: 'model',

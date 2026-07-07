@@ -602,7 +602,8 @@ def test_compose_happy_path(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
     assert "<circle" in data["svg"]
-    assert len(data["render_hash"]) == 64
+    assert data["render_hash"].startswith("rh2:")
+    assert len(data["render_hash"]) == 68
     assert data["render_hash_short"] == data["render_hash"][-4:].upper()
     assert data["instruction_lang_requested"] == "auto"
     assert data["instruction_lang_resolved"] == "ja"
@@ -692,6 +693,57 @@ def test_language_metadata_does_not_change_render_hash():
     }
 
     assert db.render_hash_for_item(with_language) == db.render_hash_for_item(item)
+
+
+def test_render_hash_v2_uses_saved_score_and_render_conditions_not_svg_or_text():
+    base = {
+        "input": "one black line",
+        "ddl": "Draw one black line.",
+        "score": {
+            "instructions": [
+                {"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "color": "black"}
+            ]
+        },
+        "svg": "<svg><line x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\" /></svg>",
+        "render_seed": 7,
+        "vary_seed": 2,
+        "render_build_number": "449",
+        "render_engine_id": "default",
+        "render_engine_version": "2",
+        "render_color_catalog_id": "default",
+    }
+
+    same_edition = {
+        **base,
+        "input": "changed input text",
+        "ddl": "Changed DDL.",
+        "svg": "<svg><path d=\"M0 0L1 1\" /></svg>",
+    }
+
+    render_hash = db.render_hash_for_item(base)
+    assert render_hash.startswith("rh2:")
+    assert len(render_hash) == 68
+    assert db.render_hash_for_item(same_edition) == render_hash
+
+
+def test_render_hash_v2_changes_with_render_or_vary_seed():
+    base = {
+        "score": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]},
+        "render_seed": 7,
+        "vary_seed": 2,
+        "render_build_number": "449",
+        "render_engine_id": "default",
+        "render_engine_version": "2",
+        "render_color_catalog_id": "default",
+    }
+
+    assert db.render_hash_for_item({**base, "render_seed": 8}) != db.render_hash_for_item(base)
+    assert db.render_hash_for_item({**base, "vary_seed": 3}) != db.render_hash_for_item(base)
+
+
+def test_legacy_render_hash_short_remains_display_compatible():
+    legacy = "a" * 60 + "1b2c"
+    assert db.render_hash_short(legacy) == "1B2C"
 
 
 def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
@@ -1246,6 +1298,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
             "history_at": 1_700_000_000_000,
             "catalog_id": "vivid_material",
             "canvas_aspect": "wide",
+            "render_seed": 123,
+            "vary_seed": 4,
         },
         headers=headers,
     )
@@ -1253,7 +1307,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     data = r.json()
     assert data["history_id"]
     assert data["history_at"] == 1_700_000_000_000
-    assert len(data["render_hash"]) == 64
+    assert data["render_hash"].startswith("rh2:")
+    assert len(data["render_hash"]) == 68
     assert data["render_hash_short"] == data["render_hash"][-4:].upper()
     assert data["render_color_catalog_id"] == "vivid_material"
     assert data["render_color_catalog_name"] == "Vivid Material"
@@ -1261,6 +1316,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert data["render_canvas_aspect"] == "wide"
     assert data["render_canvas_aspect_id"] == "wide"
     assert data["render_canvas_aspect_ratio"] == 2.35
+    assert data["render_seed"] == 123
+    assert data["vary_seed"] == 4
 
     history = client.get("/api/history", headers=headers).json()
     assert history["total"] == 1
@@ -1281,6 +1338,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_color_catalog_name"] == "Vivid Material"
     assert "render_color_catalog" not in item
     assert item["render_color_map"]["green"] == "#008f39"
+    assert item["render_seed"] == 123
+    assert item["vary_seed"] == 4
     assert item["svg"] == data["svg"]
 
     db.delete_items(user["id"], [data["history_id"]])

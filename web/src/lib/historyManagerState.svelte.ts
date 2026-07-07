@@ -35,6 +35,8 @@ export type HistoryItem = {
 	ui_lang?: string | null;
 	render_hash?: string | null;
 	render_hash_short?: string | null;
+	render_seed?: number | string | null;
+	vary_seed?: number | string | null;
 	trashed?: boolean;
 	starred?: boolean;
 };

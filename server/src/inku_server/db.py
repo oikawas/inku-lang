@@ -69,6 +69,7 @@ class HistoryRow(Base):
     instruction_lang_resolved = Column(String, nullable=True)
     ui_lang = Column(String, nullable=True)
     render_seed = Column(String, nullable=True)
+    vary_seed = Column(String, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -144,6 +145,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "instruction_lang_resolved": "ALTER TABLE history ADD COLUMN instruction_lang_resolved VARCHAR",
     "ui_lang": "ALTER TABLE history ADD COLUMN ui_lang VARCHAR",
     "render_seed": "ALTER TABLE history ADD COLUMN render_seed VARCHAR",
+    "vary_seed": "ALTER TABLE history ADD COLUMN vary_seed VARCHAR",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
@@ -348,25 +350,27 @@ def _canvas_aspect_metadata(item: dict) -> tuple[str | None, float | None]:
     return normalized, ratio if ratio is not None else canvas_aspect_ratio_for_aspect(normalized)
 
 
+def _canonical_seed(value):
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return value
+
+
 def render_hash_for_item(item: dict) -> str:
-    canvas_aspect_id, canvas_aspect_ratio = _canvas_aspect_metadata(item)
     payload = {
-        "input": item.get("input", ""),
-        "ddl": item.get("ddl"),
+        "version": "rh2",
         "score": item.get("score") or {},
-        "svg": item.get("svg", ""),
+        "render_seed": _canonical_seed(item.get("render_seed")),
+        "vary_seed": _canonical_seed(item.get("vary_seed")),
         "render_build_number": item.get("render_build_number"),
         "render_engine_id": item.get("render_engine_id"),
         "render_engine_version": item.get("render_engine_version"),
-        "render_canvas_aspect": item.get("render_canvas_aspect") or canvas_aspect_id,
-        "render_canvas_aspect_id": canvas_aspect_id,
-        "render_canvas_aspect_ratio": canvas_aspect_ratio,
         "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
-        "render_color_catalog_name": item.get("render_color_catalog_name"),
-        "render_color_catalog_sub": item.get("render_color_catalog_sub"),
-        "render_color_map": item.get("render_color_map"),
     }
-    return sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+    return "rh2:" + sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 
 def render_hash_short(render_hash: str | None) -> str | None:
@@ -394,6 +398,8 @@ def _row_hash_payload(row: HistoryRow) -> dict:
         "render_color_catalog_id": row.render_color_catalog_id,
         "render_color_catalog_name": row.render_color_catalog_name,
         "render_color_catalog_sub": row.render_color_catalog_sub,
+        "render_seed": row.render_seed,
+        "vary_seed": row.vary_seed,
     }
     if row.render_color_map is not None:
         try:
@@ -412,7 +418,8 @@ def _backfill_render_hashes(conn) -> None:
                render_engine_id, render_engine_version,
                render_color_catalog_id, render_color_catalog_name,
                render_color_catalog_sub, render_color_map, render_canvas_aspect,
-               render_canvas_aspect_id, render_canvas_aspect_ratio
+               render_canvas_aspect_id, render_canvas_aspect_ratio, render_seed,
+               vary_seed
         FROM history
         WHERE render_hash IS NULL OR render_hash = ''
         """
@@ -433,6 +440,8 @@ def _backfill_render_hashes(conn) -> None:
             "render_color_catalog_id": row["render_color_catalog_id"],
             "render_color_catalog_name": row["render_color_catalog_name"],
             "render_color_catalog_sub": row["render_color_catalog_sub"],
+            "render_seed": row["render_seed"],
+            "vary_seed": row["vary_seed"],
         }
         if row["render_color_map"] is not None:
             try:
@@ -870,6 +879,11 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["render_seed"] = int(row.render_seed)
         except ValueError:
             item["render_seed"] = row.render_seed
+    if row.vary_seed is not None:
+        try:
+            item["vary_seed"] = int(row.vary_seed)
+        except ValueError:
+            item["vary_seed"] = row.vary_seed
     return item
 
 
@@ -938,6 +952,7 @@ def add_item(item: dict) -> dict:
         instruction_lang_resolved=item.get("instruction_lang_resolved"),
         ui_lang=item.get("ui_lang"),
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
+        vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
         render_hash=render_hash,
         trashed=0,
         starred=0,

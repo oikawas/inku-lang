@@ -857,6 +857,41 @@ def test_paper_words_do_not_request_white_by_themselves():
 
 
 
+def test_render_hash_for_score_uses_rh2_semantics():
+    score = {"instructions": [{"primitive": "line", "from": [0, 0.5], "to": [1, 0.5]}]}
+
+    render_hash = cli._render_hash_for_score(
+        score,
+        render_seed=1,
+        vary_seed=2,
+        render_build_number="449",
+        render_engine_id="default",
+        render_engine_version="2",
+        render_color_catalog_id="default",
+    )
+
+    assert render_hash.startswith("rh2:")
+    assert len(render_hash) == 68
+    assert cli._render_hash_for_score(
+        score,
+        render_seed=1,
+        vary_seed=2,
+        render_build_number="449",
+        render_engine_id="default",
+        render_engine_version="2",
+        render_color_catalog_id="default",
+    ) == render_hash
+    assert cli._render_hash_for_score(
+        score,
+        render_seed=2,
+        vary_seed=2,
+        render_build_number="449",
+        render_engine_id="default",
+        render_engine_version="2",
+        render_color_catalog_id="default",
+    ) != render_hash
+
+
 def test_paint_payload_includes_render_seed():
     parser = cli.build_parser()
     args = parser.parse_args(["paint", "一滴の墨", "--render-seed", "123"])

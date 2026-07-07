@@ -317,6 +317,33 @@ def _cli_build_number() -> str | None:
     return None
 
 
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _render_hash_for_score(
+    score: dict[str, Any],
+    *,
+    render_seed: int | None = None,
+    vary_seed: int | None = None,
+    render_build_number: str | None = None,
+    render_engine_id: str | None = None,
+    render_engine_version: str | None = None,
+    render_color_catalog_id: str | None = None,
+) -> str:
+    payload = {
+        "version": "rh2",
+        "score": score or {},
+        "render_seed": render_seed,
+        "vary_seed": vary_seed,
+        "render_build_number": render_build_number,
+        "render_engine_id": render_engine_id,
+        "render_engine_version": render_engine_version,
+        "render_color_catalog_id": render_color_catalog_id,
+    }
+    return "rh2:" + hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
 def _render_color_map(catalog: dict[str, Any]) -> dict[str, str]:
     base = catalog.get("map")
     if not isinstance(base, dict):
@@ -2458,6 +2485,7 @@ def command_analyze(args: argparse.Namespace) -> int:
     _print_json(summary)
     return 0
 
+
 def command_render_score(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -2485,13 +2513,25 @@ def command_render_score(args: argparse.Namespace) -> int:
             "render_seed": args.render_seed,
         },
     )
-    render_hash = hashlib.sha256(svg.encode("utf-8")).hexdigest()
+    render_build_number = _cli_build_number()
+    render_hash = _render_hash_for_score(
+        score,
+        render_seed=args.render_seed,
+        vary_seed=args.vary_seed,
+        render_build_number=render_build_number,
+        render_engine_id="default",
+        render_engine_version="2",
+        render_color_catalog_id=color_catalog,
+    )
     result = {
         "status": "ok",
         "score": score,
         "svg": svg,
         "render_hash": render_hash,
         "render_hash_short": render_hash[-4:].upper(),
+        "render_build_number": render_build_number,
+        "render_engine_id": "default",
+        "render_engine_version": "2",
         "render_color_catalog_id": color_catalog,
         "render_canvas_aspect": args.canvas_aspect,
         "render_canvas_aspect_id": args.canvas_aspect,

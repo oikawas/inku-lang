@@ -2668,6 +2668,8 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
+            "render_seed": body.render_seed,
+            "vary_seed": body.vary_seed,
         }
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except HTTPException:

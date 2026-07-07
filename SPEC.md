@@ -284,11 +284,15 @@ Current core categories include:
 | touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
 | line continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | motion | うごき | place, align, scatter, fill, tremble, undulate |
-| relations | あいだ | along, not touching, cutting, between |
+| relations | あいだ | along, not touching, cutting, between, with examples such as `along the previous line` |
 | place | ばしょ | top, bottom, edge, corner, near, across |
 | angle | かたむき | horizontal, vertical, diagonal, rotated |
-| proportion | わりあい | tall, wide, half, quarter, crescent |
+| proportion | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | color | いろ | white, black, blue, red, green, gray |
+
+`Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
+
+The core color vocabulary is the six abstract colors that authors can write: white, black, blue, red, green, and gray. Color catalogs are server-owned metadata that change how those six colors are resolved at render time; they are not vocabulary extensions. Yellow and orange appear in some catalog palettes and can be reached through palette resolution or `color_hint`, but they are not added to the core color vocabulary.
 
 Colors in JSON Score are abstract color names.  Rendering resolves them through
 the selected color catalog.  The server is the source of truth for color
@@ -438,6 +442,10 @@ Stage 2, JSON Score, renderer behavior, or only a deterministic vocabulary
 expansion.
 
 ---
+
+## 8.6 Short-Form Guide
+
+The writing surface carries only a non-blocking length hint. Japanese input uses roughly 31 characters as a tanka-like guide; English input uses roughly 12 words. The UI must not block longer text or display evaluative copy about length. It may show only a numeric counter and a subtle density change when the guide is exceeded, so the form is present without scolding the writer.
 
 ## 9. Web Application
 

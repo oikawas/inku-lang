@@ -43,6 +43,16 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 5. 使えるのは Saijiki の語彙のみ
 6. **正規化DDLに「ランダム」という語を出力してはいけない**。入力にあっても必ず「画面全体に点々と」「中央付近に」「上から下へ」「波打つ軌跡に沿って」などの明示配置へ置き換える
 
+# 関係（あいだ）
+
+記述者が要素間の関係を明示的に書いた場合に限り、次の固定 previous-object 句へ正規化してよい。
+- 沿う → 「前の線に沿って」
+- 触れない → 「前の形に触れない」
+- 切る → 「前の線を切る」
+- 間に → 「前の二つの間に」
+
+関係は直前の要素を参照する句であり、普通の配置語ではない。川沿い、道沿い、海沿い、画面の縁に沿って、波打つ軌跡に沿って、斜めの帯に沿って、周囲、近く、遠くは relation にしない。これらは位置・path・rotation・spacing で表す。
+
 # 属性保持 — 脱落禁止
 
 感情語の除去だけが「正規化」であり、**属性の省略は誤り**。
@@ -313,6 +323,11 @@ EXAMPLE_POOL: list[dict] = [
         "keywords": ["沿う", "触れない", "切る", "間", "交差", "そば", "近く"],
         "input": "黒い線に沿う赤い点、ただし触れない",
         "output": "黒い細い横線を左から右へ一本引く。赤い小さな楕円を前の線に沿って三つ置く。前の形に触れない。",
+    },
+    {
+        "keywords": ["川沿い", "道沿い", "海沿い", "沿岸", "岸", "縁", "軌跡"],
+        "input": "川沿いに白い光が並ぶ",
+        "output": "白い小さな楕円を左から右へ波打つ軌跡に沿って十七個並べる。ゆっくり揺れる。",
     },
     # 属性保持: 素材 + 色 + 数量 + 配置
     {
@@ -606,6 +621,11 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Draw one thin black horizontal line left to right. Place three small red ellipses along the previous line. Not touching the previous shape.",
     },
     {
+        "keywords": ["riverbank", "roadside", "coast", "edge", "trace", "path"],
+        "input": "White light along the riverbank",
+        "output": "Line up seventeen small white ellipses from left to right along an undulating trace. Swaying slowly.",
+    },
+    {
         "keywords": ["crayon", "fill", "background", "cover", "dense", "blue"],
         "input": "Fill background with blue crayon lines",
         "output": "Line up one hundred twenty vertical blue crayon lines horizontally.",
@@ -723,6 +743,16 @@ Output: **Normalized DDL** — concise English instructions using only Saijiki v
 4. Output in plain English prose. No bullet points, no explanation, no preamble
 5. Use only Saijiki vocabulary
 6. **Do not output the word "random" or "randomly" in normalized DDL**. Even if the input uses it, replace it with explicit placement such as "dotted across the whole canvas", "near the center", "from top to bottom", or "along an undulating trace".
+
+# Relations
+
+Only when the author explicitly writes a relationship between elements, normalize it to one of these fixed previous-object phrases:
+- along -> "along the previous line"
+- not touching -> "not touching the previous shape"
+- cutting -> "cutting the previous line"
+- between -> "between the previous two"
+
+Relations are previous-object phrases, not ordinary placement. Riverbank, roadside, along the coast, along an edge, along an undulating trace, along a diagonal band, around, near, and far are not relations. Express them with position, path, rotation, or spacing instead.
 
 # Attribute Preservation — Never Drop Attributes
 

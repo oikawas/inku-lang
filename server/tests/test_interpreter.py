@@ -199,12 +199,21 @@ def test_touch_choice_prompt_en_selects_material_variations():
 def test_relation_examples_are_included_in_stage1_prompt():
     prompt = _build_system_prompt("黒い線に沿う赤い点、ただし触れない")
 
+    assert "関係（あいだ）" in prompt
+    assert "要素間の関係を明示的に書いた場合" in prompt
     assert "前の線に沿って" in prompt
     assert "前の形に触れない" in prompt
+    assert "川沿い" in prompt
+    assert "relation にしない" in prompt
 
 
 def test_relation_examples_are_included_in_stage1_prompt_en():
     prompt = _build_system_prompt("red dots along a black line but not touching it", lang="en")
 
+    assert "# Relations" in prompt
+    assert "explicitly writes a relationship between elements" in prompt
     assert "along the previous line" in prompt
     assert "not touching the previous shape" in prompt.lower()
+    lower_prompt = prompt.lower()
+    assert "riverbank" in lower_prompt
+    assert "are not relations" in lower_prompt

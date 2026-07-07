@@ -154,6 +154,17 @@
 		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning },
 		{ mode: 'demo' as const, label: t().modeDemo, running: demoRunning },
 	]);
+
+	const singleInputStats = $derived.by(() => {
+		const source = input.trim();
+		const asciiMostly = source.length > 0 && /^[\x00-\x7F\s.,;:!?()"-]+$/.test(source);
+		const useWords = instructionLang === "en" || (instructionLang === "auto" && asciiMostly);
+		const guide = useWords ? 12 : 31;
+		const count = useWords
+			? (source.match(/[A-Za-z0-9]+(?:[-][A-Za-z0-9]+)*/g) ?? []).length
+			: Array.from(source.replace(/\s/g, "")).length;
+		return { count, guide, over: count > guide };
+	});
 </script>
 
 <div class="panel-tabs">
@@ -208,6 +219,7 @@
 			placeholder={t().inputPlaceholder}
 			class="input-ta"
 		></textarea>
+		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide}</div>
 
 		{#if interpretationFeedbackParts.length > 0}
 			<div class="interpret-feedback" aria-label={t().interpretationFeedbackLabel}>
@@ -413,6 +425,18 @@
 		resize: vertical; outline: none;
 	}
 	.input-ta:focus { border-color: var(--accent); }
+	.input-meter {
+		align-self: flex-end;
+		min-width: 54px;
+		min-height: 16px;
+		margin-top: -3px;
+		font-size: 10px;
+		line-height: 16px;
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+		color: color-mix(in srgb, var(--fg3) 68%, transparent);
+	}
+	.input-meter.soft-over { color: color-mix(in srgb, var(--fg) 78%, transparent); }
 	.progress-wrap {
 		display: flex; align-items: center; justify-content: space-between;
 		gap: 10px;

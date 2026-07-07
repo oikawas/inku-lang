@@ -3722,3 +3722,5 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - 作品表示では詞書（入力記述）を初期表示し、記述と画の緊張関係を作品表示の一部として扱う。
 - README 日英に Quick Start、provider/API key 設定、二段の再生成、Saijiki 6色制約、履歴再現の説明を追加した。
 - Build 448 ギャラリー候補を `docs/gallery-candidates-build448.md` に記録した。最終選定は人間の事後選択として残す。
+- ギャラリーの最終選定は v1.70 以降へ持ち越す。v1.60 では候補記録までを完了範囲とし、作品選定そのものは次世代の評価・公開作業に属する。
+- Phase E（疎出力の Stage 1.5 対応）は E-2 方針を採用する。新しい専用 metric や marker は作らず、既存指標（`visual_event` / `negative_space_pressure`）と目視で観察する。v1.60 では疎出力を blocking 実装対象にしない。

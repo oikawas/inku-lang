@@ -1182,6 +1182,8 @@ Version 1.60 moves the project from quality-loop closure to a one-person playabl
 - The canvas displays the input text as a caption by default, treating the relation between words and image as part of the work.
 - The English and Japanese READMEs now include Quick Start setup, provider/API-key guidance, two-stage regeneration, the six-color Saijiki constraint, and history replay.
 - Build 448 gallery candidates are recorded in `docs/gallery-candidates-build448.md`; final gallery selection remains a human post-selection step.
+- Final gallery selection is deferred to v1.70 or later. Version 1.60 is complete once the candidates are recorded; selecting works for publication belongs to the next evaluation and release cycle.
+- Phase E sparse-output handling adopts the E-2 policy: use the existing `visual_event` / `negative_space_pressure` metrics and visual review only, without adding a dedicated metric or marker. Sparse outputs are not a blocking implementation target for v1.60.
 
 ---
 

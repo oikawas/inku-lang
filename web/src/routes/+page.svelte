@@ -89,6 +89,7 @@
 		render_canvas_aspect_ratio?: number | null;
 		render_seed?: number | null;
 		vary_seed?: number | null;
+		interpretation_seed?: string | null;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
 		ui_lang?: string | null;
@@ -1916,6 +1917,7 @@
 		canvasAspectId?: CanvasAspectId;
 		renderSeed?: number;
 		varySeed?: number;
+		interpretationSeed?: string;
 		signal?: AbortSignal;
 	};
 
@@ -1943,6 +1945,7 @@
 				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
 				render_seed: options.renderSeed,
 				vary_seed: options.varySeed,
+				interpretation_seed: options.interpretationSeed,
 				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
@@ -2734,7 +2737,7 @@
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed ?? null, vary_seed: it.vary_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang() })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed ?? null, vary_seed: it.vary_seed ?? null, interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang() })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3171,7 +3174,8 @@
 		error = null;
 		const previousDdl = ddl;
 		try {
-			const r = await paintOne(source, { historyInput: source });
+			const interpretationSeed = crypto.randomUUID();
+			const r = await paintOne(source, { historyInput: source, interpretationSeed });
 			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
 			ddl = r.ddl;
 			ddlGeneratedBaseline = r.ddl;
@@ -3263,7 +3267,7 @@
 
 	async function interpretationVariationCandidate(): Promise<VariationCandidate> {
 		const source = input.trim();
-		const r = await paintOne(source, { historyInput: source, saveHistory: false, saveArtifacts: false, countGeneration: false });
+		const r = await paintOne(source, { historyInput: source, saveHistory: false, saveArtifacts: false, countGeneration: false, interpretationSeed: crypto.randomUUID() });
 		return { id: `interp-${Date.now()}`, label: t().canvasVaryInterpretation, selected: false, result: r };
 	}
 
@@ -4049,7 +4053,7 @@
 												<span class="variation-card-art">{@html candidate.result.svg}</span>
 												<span class="variation-card-meta">
 													<span>{candidate.label}</span>
-													<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}</span>
+													<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
 												</span>
 											</button>
 											<button class="variation-select" class:selected={candidate.selected} onclick={() => toggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>

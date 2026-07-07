@@ -608,6 +608,7 @@ class ComposeRequest(BaseModel):
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
+    interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
 
 
 class ComposeResponse(BaseModel):
@@ -630,6 +631,7 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     vary_seed: int | None = None
+    interpretation_seed: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -686,6 +688,7 @@ class PaintRequest(BaseModel):
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
+    interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
 
 
 class PaintResponse(BaseModel):
@@ -709,6 +712,7 @@ class PaintResponse(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     vary_seed: int | None = None
+    interpretation_seed: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -807,6 +811,7 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     vary_seed: int | None = None
+    interpretation_seed: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -2042,6 +2047,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "ui_lang": ui_lang,
         "render_seed": req.render_seed,
         "vary_seed": req.vary_seed,
+        "interpretation_seed": req.interpretation_seed,
     }
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
@@ -2395,6 +2401,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         "ui_lang": ui_lang,
         "render_seed": req.render_seed,
         "vary_seed": req.vary_seed,
+        "interpretation_seed": req.interpretation_seed,
     }
     t2 = time.perf_counter()
     try:
@@ -2672,6 +2679,7 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
             "ui_lang": body.ui_lang,
             "render_seed": body.render_seed,
             "vary_seed": body.vary_seed,
+            "interpretation_seed": body.interpretation_seed,
         }
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except HTTPException:

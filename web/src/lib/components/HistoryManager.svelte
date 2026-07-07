@@ -23,6 +23,7 @@
 		render_canvas_aspect?: string | null;
 		render_seed?: number | string | null;
 		vary_seed?: number | string | null;
+	interpretation_seed?: string | null;
 		trashed?: boolean;
 		starred?: boolean;
 	note?: string | null;

@@ -70,6 +70,7 @@ class HistoryRow(Base):
     ui_lang = Column(String, nullable=True)
     render_seed = Column(String, nullable=True)
     vary_seed = Column(String, nullable=True)
+    interpretation_seed = Column(String, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -147,6 +148,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "ui_lang": "ALTER TABLE history ADD COLUMN ui_lang VARCHAR",
     "render_seed": "ALTER TABLE history ADD COLUMN render_seed VARCHAR",
     "vary_seed": "ALTER TABLE history ADD COLUMN vary_seed VARCHAR",
+    "interpretation_seed": "ALTER TABLE history ADD COLUMN interpretation_seed VARCHAR",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
@@ -887,6 +889,8 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["vary_seed"] = int(row.vary_seed)
         except ValueError:
             item["vary_seed"] = row.vary_seed
+    if row.interpretation_seed is not None:
+        item["interpretation_seed"] = row.interpretation_seed
     return item
 
 
@@ -956,6 +960,7 @@ def add_item(item: dict) -> dict:
         ui_lang=item.get("ui_lang"),
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
         vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
+        interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
         render_hash=render_hash,
         trashed=0,
         starred=0,

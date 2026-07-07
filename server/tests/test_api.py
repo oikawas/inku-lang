@@ -1300,6 +1300,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
             "canvas_aspect": "wide",
             "render_seed": 123,
             "vary_seed": 4,
+            "interpretation_seed": "interp-test-seed",
         },
         headers=headers,
     )
@@ -1318,6 +1319,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert data["render_canvas_aspect_ratio"] == 2.35
     assert data["render_seed"] == 123
     assert data["vary_seed"] == 4
+    assert data["interpretation_seed"] == "interp-test-seed"
 
     history = client.get("/api/history", headers=headers).json()
     assert history["total"] == 1
@@ -1340,6 +1342,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_color_map"]["green"] == "#008f39"
     assert item["render_seed"] == 123
     assert item["vary_seed"] == 4
+    assert item["interpretation_seed"] == "interp-test-seed"
     assert item["svg"] == data["svg"]
 
     db.delete_items(user["id"], [data["history_id"]])

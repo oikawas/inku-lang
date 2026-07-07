@@ -1577,994 +1577,1022 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ## 変更履歴
 
-### v1.52 (2026-07-04)
+### v0.1 (2026-04-02)
+
+- 初期コンセプト（東京都現代美術館「ソル・ルウィット オープン・ストラクチャー」展にて構想）
+- 三層パイプライン（記述 → 楽譜 → 演奏）の設計
+- JSON Schema v0.1 の策定
+- DDL_concept.md として初期ドキュメントを記録
+
+---
+
+## 起源
+
+構想: 2026年4月2日、東京都現代美術館「ソル・ルウィット オープン・ストラクチャー」展
+### v0.2 (2026-04-14)
+
+- 最初のプロトタイプとして、コンセプトしたものが動作可能かを簡単にクライアントでテスト
+- Android 実装状態を記録（SPEC_v1.md に分離）
+- LiteRT-LM 0.10.0 API 調査・実装
+- Pixel 9 での E2E 動作確認
+
+### v0.3 (2026-04-21)
+
+- inku-langとしての全体設計の開始
+- プロジェクト名を `inku` (inku-lang) として確定
+- Section 4「プラグイン設計原則」を新規追加（Emacs Lisp 化を避ける5原則）
+- Section 12「Opus 4.7 の役割」を「二段階変換アーキテクチャ」として大幅書き換え
+- Section 13「揺らぎの設計」を新規追加（感情語彙と運動語彙の区別、三層構造）
+- Section 3「コアに入れるもの」に「つらなり」「ゆらぎ」カテゴリを追加
+- Section 5「Base Language 問題」に責任範囲の明確化（日英は作者、他言語はコミュニティ）
+- Section 7「UI設計方針」に Saijiki（歳時記）、解釈フィードバック、書後色付けを追加
+- Section 6「コアとエクステンションの分離」の方針を整理
+
+### v0.4 (2026-04-23)
+
+**Phase 1 実装着手 — Server バックエンドの骨格形成**
+
+- **リポジトリ構成**
+  - `inku-lang` リポジトリを GitHub (`github.com/oikawas/inku-lang`) に作成
+  - `server/` と `web/` の2スロット構成。`server/` 先行実装
+
+- **Python プロジェクト: inku-server 0.1.0**
+  - パッケージマネージャ: `uv` (0.11.7) + src-layout
+  - 依存: anthropic, fastapi, pydantic v2, svgwrite, uvicorn, python-dotenv
+  - dev: pytest, ruff
+  - Python 3.10+
+
+- **JSON Score schema (Pydantic v2 実装)**
+  - `extra="forbid"` で未知フィールド拒否、schema 厳密化
+  - `populate_by_name=True` + alias で予約語回避 (`from` → `from_`)
+  - Primitive: `line | circle | ellipse | triangle | square | arc`
+  - `rotation`: 図形全体の回転角。0=水平、正=時計回り、負=反時計回り。線・楕円・四角・三角・弧を中心まわりに回転
+  - Weight 9種、Color 6種、LineStyle 4種、Variation 4フィールド (amplitude/frequency/quality/dimensions)
+  - `Score.model_json_schema()` を Anthropic tool input_schema にそのまま渡せる形
+
+- **Renderer MVP (svgwrite, 1000x1000 viewBox)**
+  - 実装済 primitive: line, circle, ellipse, triangle (等辺二等辺), square (矩形)
+  - 座標変換: `0.0-1.0` 比率 × `CANVAS_PX=1000` で px 化
+  - weight → `stroke-width` マッピング (hair 0.5 〜 rope 10.0)
+  - color → HEX パレット (黒=#111111, 青=#2c3e91, 赤=#a2342a, 緑=#2f6b3a, 灰=#888888, 白=#ffffff)
+  - style → `stroke-dasharray` (solid=なし, dashed=12,8, dotted=2,6, dash_dot=12,6,2,6)
+  - 背景色: `#f7f5ef` (墨が映える薄黄、和紙を想起)
+  - 未実装: arc (schema に角度フィールド未定義)、variation の実際の波形生成
+
+- **Stage 2 composer (正規化DDL → JSON Score)**
+  - モデル: `claude-haiku-4-5-20251001` via Anthropic tool_use
+  - `submit_score` ツールを定義し `tool_choice` で強制呼び出し
+  - system prompt に Saijiki 歳時記マッピング + 座標系 + 出力ルールを圧縮記述
+  - `Score.model_json_schema()` を tool input_schema に直接注入
+
+- **正規化DDL Fixture 15ケース**
+  - `server/tests/fixtures/stage2/{01..15}/` に input.txt + expected.json ペア
+  - 網羅: 全5 primitive、全4 style、weight 複数 (pencil/pen/brush_thick)、color 全6、variation 2種 (fine+perlin, broad+wave)、複数命令 (3円並列)
+
+- **テスト**
+  - `test_renderer.py`: 10 cases, pytest 全 pass
+  - `test_composer.py`: 15 fixture parametrize + tool schema validation
+  - Integration は `ANTHROPIC_API_KEY` 有時のみ実行 (`pytest.mark.skipif`)
+  - `conftest.py` で `.env` 自動読込 (python-dotenv)
+
+- **二段階変換アーキテクチャの確定**
+  - v0.3 で方針化、v0.4 で Stage 2 (Haiku 4.5) を先行実装 (逆順実装)
+  - Stage 1 (Opus 4.7 解釈) は未着手
+  - `/api/compose` FastAPI 実装は次 phase
+
+### v0.5 (2026-04-23)
+
+**Phase 1 続き — FastAPI + Web クライアント 立ち上げ**
+
+- **FastAPI エンドポイント**
+  - `POST /api/compose`: `{ddl}` → `{score, svg}` (Stage 2 composer → Renderer を縦結合)
+  - `GET /health`: liveness (`{ok: true}`)
+  - CORS: `http://localhost:*` / `127.0.0.1:*` 許可 (regex ベース)
+  - エラーハンドリング: composer 失敗 502, render 失敗 500, 入力不正 422
+  - エントリポイント: `uv run inku-server` で `uvicorn` が `127.0.0.1:8000` reload 起動
+  - テスト: `TestClient` + `monkeypatch` で composer バイパス、API キー不要で 5 cases pass
+
+- **SvelteKit Web クライアント (`web/`)**
+  - SvelteKit 2.57 + Svelte 5.55 (runes モード) + Vite 8 + TypeScript
+  - 単一ルート `/`: 記述 textarea + 演奏 (SVG インライン表示) + 楽譜 (JSON Score collapsible)
+  - スタイル: Renderer パレットと整合 (背景 #f7f5ef, 墨 #111)、和文フォント優先
+  - 名前: `inku-web` v0.1.0
+  - svelte-check: 0 error, 0 warning
+
+- **次段階への布石**
+  - `/api/compose` は Stage 2 のみ。Stage 1 (Opus 解釈) エンドポイントは未実装
+  - 解釈フィードバック (書後色付け)、Saijiki 参照窓、Prev/Next 並置は UI 未着手
+  - Renderer の揺らぎ (perlin/wave) 実装も未着手 (fixture 11/15 が variation 指定)
+
+### v0.6 (2026-04-23)
+
+**Phase 1 完了 — E2E パイプライン稼働 + UI 反復支援**
+
+- **LLM バックエンド 二系統併存**
+  - Claude Code hackathon:参加選考漏れに伴い、Loacl LLMの実装に変更
+  - Stage 2 (composer): `qwen-api` (Qwen2.5-7B) 既定、Anthropic Haiku 4.5 併用可能
+  - Stage 1 (interpreter): `qwen3-api` (Qwen3-8B) 既定、Anthropic Opus 4.7 併用可能
+  - 切替: 環境変数 `INKU_LLM_BACKEND=openai|anthropic`
+  - OVMS (`http://127.0.0.1:18000/v3`) は OpenAI 互換、API key=`none`
+  - qwen3-api は `/no_think` prefix で thinking トレースを抑制して使用
+  - tool_use は Anthropic ネイティブ、OpenAI 側は `<tool_call>` タグが content に埋め込まれるので正規表現で抽出
+
+- **Stage 1 interpreter 実装**
+  - `server/src/inku_server/interpreter.py`
+  - 入力: 自由な自然言語、出力: Saijiki 語彙のみを使う短い日本語 (正規化DDL)
+  - system prompt に 4 few-shot (感情語→物理語 置換、画面座標比率)
+  - 5 ケース smoke test 全通過 (4 は prompt 内例と重複、memorize 傾向あり)
+
+- **API エンドポイント 拡張**
+  - `POST /api/interpret`: 自由記述 → 正規化DDL
+  - `POST /api/paint`: 自由記述 → 正規化DDL → Score → SVG (フルパイプライン)
+  - 既存 `POST /api/compose`, `GET /health` は維持
+  - 起動時 env: `INKU_SERVER_HOST`, `INKU_SERVER_PORT` で上書き可
+
+- **Stage 2 fidelity 記録 (qwen-api strict モード)**
+  - 15 fixture 中 9 通過、残り 6 件の典型的な失敗:
+    - center (円/楕円) と position (三角/四角) の混同
+    - 「中央」指示時の bbox 左上補正未実施
+    - 複数命令並列時の field 一括誤適用
+  - tool_use API 経由で JSON 構造エラー (`]` vs `}` 誤閉じ等) は解消
+  - Haiku 4.5 移行で改善見込みだが、ローカル LLM で回る事実を優先
+
+- **Web UI: モード切替 + Saijiki 参照 + 反復履歴**
+  - タブ: 自由記述 / 正規化DDL (それぞれ /api/paint と /api/compose に繋ぐ)
+  - 自由記述モード: 解釈結果 (正規化DDL) を左カラム下部に常時表示
+  - 歳時記ドロワー: 右スライドイン、9 カテゴリ (かたち/かたむき/てざわり/つらなり/いろ/ゆらぎ/ばしょ/うごき/わりあい)、chip クリックで textarea の caret 位置に挿入
+  - Saijiki 辞書は `web/src/lib/saijiki.ts` に分離
+  - 反復履歴: in-memory、最大 20 件、`◀ N/M ▶` 移動ボタンで input/output/DDL を過去状態に復元
+  - サムネイル列: 履歴 2 件以上で下段に 96px 方形ミニチュア SVG を横並べ、クリックで jump
+
+### v0.7 (2026-04-24)
+
+**LLM 多モデル対応 + Stage 1 静止画強化 + thinking 可視化**
+
+- **LLM モデル: UI から切替可能に**
+  - `POST /api/compose`: `model` フィールド
+  - `POST /api/interpret`: `model` フィールド
+  - `POST /api/paint`: `stage1_model` / `stage2_model` フィールド
+  - `compose()` / `interpret_detail()` に `model` キーワード引数追加、未指定時は env 既定
+  - UI (モード切替下に `解釈` / `構造化` dropdown、localStorage 永続化): Qwen2.5-7B / Qwen3-8B / Gemma3-4B / Gemma3-12B
+
+- **既定モデル**
+  - Stage 1: `qwen3-api` (Qwen3-8B)
+  - Stage 2: `qwen-api` (Qwen2.5-7B)
+  - Gemma3-12B は 15 fixture に 6 時間要、実用外 (選択肢には残す)
+  - Gemma3-4B は Score full schema + tool_choice 組合せで破綻 (bracket 出力異常、空白クォート連鎖)、prompt + schema 簡略化で動作するが品質は未検証
+
+- **Stage 1 system prompt: 静止画原則 強化 (SPEC §2 原則5)**
+  - 禁止動詞: 動く / 動かす / 広がる / 広げる / 流れる / 伸びる / 昇る / 落ちる / 散る / 沈む / 塗る
+  - 使える動作動詞: 置く / 並べる / 引く / 描く / 散らす / 埋める
+  - 動的→静的 言い換え 5 例 (月が昇る→右上に円、花が散る→細かい点を散らす 等)
+
+- **Qwen3 thinking 可視化**
+  - `interpret_detail()` が `(ddl, thinking)` tuple を返す
+  - `include_thinking=True` で `/no_think` を外し、`<think>…</think>` 内容を分離保持
+  - `POST /api/interpret`, `/api/paint` に `include_thinking` request フィールド、`thinking` response フィールド
+  - UI: Stage 1 が qwen3 系のとき「思考を表示」checkbox、結果パネルに faded amber 色の `<details>` で内部思考表示 (作者の思考プロセス可視化)
+
+### v0.8 (2026-04-24)
+
+**Renderer 揺らぎ実装 + arc primitive**
+
+- **line の variation を Renderer で生成** (SPEC §13.8 の核心)
+  - 80 セグメントの polyline に変換、SHA-256(model_dump_json) でシード
+  - quality 4 種: `wave` (sin), `perlin` (smoothstep 1D value noise), `pink` (2 オクターブ合成), `white` (per-segment hash)
+  - amplitude: fine=4px / medium=12px / broad=30px (1000px canvas 上)
+  - frequency: slow=2 / medium=6 / high=14 cycles/線長
+  - dimensions 適用: `position_x` / `position_y` 単独は該軸揺らぎ、両方指定は線に垂直方向揺らぎ
+  - 決定的: 同一 Score → byte 一致 SVG (test 保証)
+- **arc primitive 本実装**
+  - Schema: `angle_start` / `angle_end` (度、0°=東、CCW 正)
+  - Renderer: `<path d="M ... A r r 0 large sweep x y">` で弧描画
+  - large-arc-flag: `(end-start) % 360 > 180`、sweep-flag: `end > start` で 0 (CCW)
+  - Composer prompt に 弧 行追加、1/4円 / 半円 の角度例
+- **新規 test 7件** (arc quarter / half / missing-angles、variation perlin / wave / deterministic / quality=none)
+
+### v0.9 (2026-04-25)
+
+**プロンプト非線形化 + NVIDIA NIM 対応 + arrangement 実装**
+
+#### プロンプト設計の構造改善 (主要変更)
+
+機能追加でプロンプトが際限なく長くなる問題を、MT (機械翻訳) のスペック / コーパス分離原則を援用して構造的に解決。
+
+- **schema.py を仕様の正典 (Source of Truth) に**
+  - 全フィールドに日本語 ↔ 値マッピングを含む `description` を付与
+  - LLM はツールスキーマの description を直接参照 → SYSTEM_PROMPT にフィールド説明を繰り返す必要がなくなる
+  - 新プリミティブ追加 = スキーマ更新のみ。SYSTEM_PROMPT は変えない
+
+- **composer.py: SYSTEM_PROMPT を手順のみに削減**
+  - 3,942 chars → 1,072 chars (-73%)
+  - 変換例は最重要パターン 4 件に絞る (残りはスキーマ description が補う)
+
+- **interpreter.py: EXAMPLE_POOL + 動的例選択**
+  - `EXAMPLE_POOL`: `{keywords, input, output}` タプルのリスト (現在 12 件)
+  - `_select_examples(text, k=3)`: 入力とのキーワード一致数でスコアリングし上位 k 件を選択
+  - `_build_system_prompt(text)`: PREFIX + 選択された k 件を推論ごとに構築
+  - 例を何件追加してもプロンプト長は固定 (PREFIX + 3 件)
+  - SYSTEM_PROMPT モジュール変数はプレフィックスのみを公開 (`/api/prompts` 互換)
+
+- **レイテンシ効果**: 322.7s → 21.5s (同一出力、NVIDIA Gemma 4 31B、15x 高速化)
+
+#### NVIDIA NIM プロバイダー追加
+
+- `google/gemma-4-31b-it` を第一・第二段階の既定モデルに設定
+- モデル ID による自動ルーティング:
+  - `anthropic:<model>` プレフィックス → Anthropic API
+  - `/` を含む ID → NVIDIA NIM (`https://integrate.api.nvidia.com/v1`)
+  - その他 → OVMS (ローカル OpenAI 互換)
+- UI: プロバイダー選択 (NVIDIA NIM / Anthropic / ローカル) + モデル選択の 2 段 dropdown、localStorage 永続化
+- `web/src/lib/models.ts` に `PROVIDER_GROUPS` 構造を追加
+
+#### arrangement フィールド (本数・個数の JSON サイズ問題)
+
+N 個の instruction を展開すると JSON が N 倍になる問題を解決。Renderer 側で展開することで JSON は常に O(1)。
+
+- **schema.py**: `Arrangement` モデル追加 (`count` / `layout` / `path` / `margin` / `center` / `radius`)
+- **renderer.py**: `_anchor()` / `_shift()` / `_expand_arrangement()` — Renderer 側で N 個に展開
+  - layout: `horizontal` / `vertical` / `radial` / `scatter` (基本配置)
+  - path: `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` (軌跡指定)
+  - `count=1` は展開せず単体返却。`ge=2` → `ge=1` に変更 (バリデーションエラー防止)
+- **interpreter.py EXAMPLE_POOL**: 数量表現を 1 文でまとめる例、ランダム配置例を収録
+- **composer.py**: arrangement 使用を SYSTEM_PROMPT で強制、複数 instruction 生成を禁止
+
+#### UI 改善
+
+- 正規化DDL タブ削除 (常に自由記述モード = `/api/paint`)
+- 履歴サムネイルに経過秒数を表示 (`Iteration` に `elapsed_ms` 追加)
+- `GET /api/prompts` エンドポイント追加 → 出力欄「プロンプト (デバッグ)」パネルで Stage 1 / 2 のシステムプロンプトと実際の入力を表示
+- キャンバス背景色を白に変更 (`#f7f5ef` → `#ffffff`)
+- 推論中ライブタイマー + 完了後「解釈 Xs + 構造化 Ys = Zs」内訳表示
+
+---
+
+### v1.0 (2026-04-25)
+
+**大量描画対応 + Renderer 堅牢化 + Stage 1 属性保持強化 + 学習モード + サーバーサイド履歴**
+
+#### 大量オブジェクト描画 (count 上限 500)
+
+「100本の線」「200個の円」を実際に描画できるようアルゴリズムを改良。
+
+- **schema.py**: `Arrangement.count` 上限 50 → 500、`_clamp_count` validator も同様
+- **renderer.py**: 固定10点 `_SCATTER_POSITIONS` を廃止。`_scatter_pos(i, seed, margin)` を追加
+  - SHA-256 hash ベースの決定的ランダム座標生成 — N 個任意対応
+  - 同一 Score → 同一 SVG の決定性を維持 (seed = instruction の hash)
+- **interpreter.py**: 「100本・200個 → 30程度に丸める」規則を撤廃、具体的な数はそのまま通す
+- **composer.py**: count 上限説明を 50 → 500 に更新
+
+#### Renderer: line from/to 省略時の fallback
 
-**事後選択の実体化（vary）と、補修部品の指紋化の禁止**
+LLM が arrangement 付き line を生成するとき `from`/`to` を省略するケースがあり `render failed` エラーが発生していた問題を修正。
 
-Build 441（v1.51 実装後の初回フルベンチ + 監査後修正）の3ペルソナレビューを受けた仕様改訂。レビューの詳細は `cli/tune_bench.md`「Build 441 3ペルソナレビュー」、実装指示は `no-git-sync/codex-task-v1.52.md`。3ペルソナが共通指摘した2点——(1) coerce 補修部品（近接反応の弧 93%、固定座標の小五角形 33% 等）が「システムの指紋」として全作品に反復し連作の鑑賞を壊していること、(2) 出力の振れ幅の上限が低く、外れ値（=驚き）を事後選択で扱う設計（§8）が未実体化であること——への対処。
+- `_ensure_line_coords(ins)` を追加: layout から方向を推定してデフォルト座標を補完
+  - `layout="vertical"` → 横線 (`[0.0, 0.5]`→`[1.0, 0.5]`)
+  - その他 (`horizontal` / `scatter` / `radial`) → 縦線 (`[0.5, 0.0]`→`[0.5, 1.0]`)
+- `_expand_arrangement` 入口で呼び出し (arrangement 展開前に補完)
+- `_render_instruction` でも arrangement なし line に同様の fallback を適用 (raise を除去)
 
-- §8.4「事後選択の実体化 — 二段の再生成」を新設。再生成を「別の演奏」（performance seed、LLM 不要）と「別の構図」（Stage 1.5 選択シードの vary、Stage 2 の1回）の二段として定義
-- §10.4「補修部品の指紋化の禁止」を新設。補修部品に (1) 部品別発火率の計測と上限監視（floor は設けない）、(2) 固定座標・固定形状のハードコード禁止、(3) 発火条件の限定（主題が壊れる場合のみ）を課す
-- §12.11 に選択シードの vary 規定を追記。既定は「同じ入力は同じ拡張」を維持し、明示的な vary 指定時のみ選択をやり直す。暗黙の非決定化（自動インクリメント・時刻シード）を禁止
-- codex-task.md P3-4（v1.51 で判断保留）は本改訂の §8.4 / §12.11 として確定
-- ヘッダーの Version 表記を修正（v1.50/v1.51 改訂時に v1.49 のまま更新漏れとなっていた）
+#### Stage 1 属性保持強化
 
-Build 442 実装後の検証では、`vary_seed` 経路（API / CLI / Web UI）と二段の再生成は成立した。固定 5 プロンプト × `vary_seed` 0..4 の 25 生成は 25/25 成功し、fallback は 0。JP/EN 各30件の修復部品集計では `adjacent_reaction` は 56/60 から 14/60 へ低下し、指紋抑制の主効果は確認できた。
+記述の解釈時に色・素材・方向・揺らぎが脱落する問題を構造的に修正。
 
-一方で、Build 442 時点の v1.52 品質受け入れは未達だった。`angular_pulse` は 14/60、`vanishing_trace` は 26/60 で目標を満たさず、`vanishing_trace` は Build 441 の 21/60 から悪化した。`visual_event` 平均も Build 441 の 93.0 から 77.8 に低下し、品質回帰ガードを満たさなかった。
+- **`# 属性保持 — 脱落禁止` セクション追加**
+  - 「感情語の除去だけが正規化であり、属性の省略は誤り」を明示
+  - いろ / てざわり / 太さ / 方向・ばしょ / ゆらぎ / 配置パターン の保持を個別明記
+- **数量表現ルール更新**: 「色・素材・方向とともに 1 文に」収める例を追加
+- **EXAMPLE_POOL**: 12件 → 21件 (+7件)
+  - 追加例: クレヨン+色+数量、鉛筆+細さ、震える複数線、右半分+色+数量、300本のクレヨン、地平線構成、チョーク+滲み
+- **k: 3 → 5** — 複合属性入力での例参照数を増加
 
-Build 443 では `vanishing_trace` の発火条件を「消失文脈」だけでなく足跡・白い息・輪郭・人影などの trace 主体がある場合に限定し、汎用 `visual_event` 補修を小さな角形パルスから入力由来座標の compact mark に変更した。JP/EN 各30件の再ベンチでは `adjacent_reaction` 11/60、`angular_pulse` 0/60、`vanishing_trace` 2/60 となり、修復部品 fingerprint の受け入れ基準は満たした。ただし `visual_event` 平均は 77.93、`negative_space_pressure` 平均は 88.97 で、Build 441 比の品質回帰ガードはまだ満たさない。したがって v1.52 は「機能実装と修復指紋抑制は完了、品質低下サンプルの追加監査が残る」状態として扱う。
+#### 学習モード (SSE ストリーム)
 
-Build 444 では、Build 443 で低かった `visual_event` / `negative_space_pressure` の targeted recovery を実施した。汎用 compact visual event に `color_cycle` と入力 hash 由来の対置 center を持たせ、着地して去る一時的イベントを `brief_arrival_departure` として扱い、`line of birds / river surface / another road` と `tatami / tilted quiet` の既存レシピにも色循環と対置配置を追加した。targeted benchmark では EN #06 が `visual_event` 98 / `negative_space_pressure` 100、EN #27 が単独 rerun で 70 / 76、JP #28 が 76 / 86 まで回復した。
+コーパスを自動拡張するバックグラウンド学習機能を追加。
 
-Build 444 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-444/{jp,en}/`）では 60/60 成功、fallback 0。修復部品は `adjacent_reaction` 10/60 (16.7%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%) で、v1.52 の repair fingerprint 受け入れ基準は継続して満たした。一方で品質平均は `visual_event` 79.90、`negative_space_pressure` 89.97、`motion_energy` 94.57、`constraint_adherence` 93.33 となり、Build 441 基準（`visual_event` 93.0、`negative_space_pressure` 96.23、`motion_energy` 97.7、`constraint_adherence` 86.0）に対して `visual_event` と `negative_space_pressure` が -5 以内の品質回帰ガードを満たさない。したがって現時点の v1.52 は、Phase A-D の実装・計測・vary・修復指紋 acceptance は完了、品質回帰ガードは未達、という進捗として扱う。追加の修正は、marker 語彙や新 governor を増やすのではなく、低スコア行（例: EN #21 `visual_event` 40 / `negative_space_pressure` 26、JP #23 `negative_space_pressure` 42、JP #02/#03 `visual_event` 48）の原因を個別監査し、既存 recipe の配置・色循環・対置関係を一般化する方向で行う。
+- **`trainer.py` 新規作成**
+  - `VARIATION_STYLES` (5スタイル): 詩的・口語・抽象・自然現象・擬音語をローテーション
+  - `generate_sample(style_idx, model)`: 指定スタイルで記述サンプルを LLM 生成
+  - `run_one_iteration(style_idx, model)`: 生成 → `interpret_detail` → EXAMPLE_POOL 追加
+  - `add_learned_example(input, ddl)`: EXAMPLE_POOL へ追記 + `INKU_LEARNED_FILE` に永続化
+  - `load_learned_examples()`: 起動時に永続化済みコーパスを EXAMPLE_POOL へ注入
+  - `clear_learned_examples()`: auto エントリのみ削除、static 例は保持
+  - backend dispatch: interpreter.py と同じ anthropic / nvidia / ovms ルーティング
+- **`api.py` 追加エンドポイント**
+  - `GET /api/train?n=&model=` → SSE ストリーム (`progress` / `result` / `error` / `done` イベント)
+  - `GET /api/train/stats` → `{"learned_count": N}`
+  - `DELETE /api/train` → コーパスクリア
+  - `asyncio.to_thread` で sync LLM 呼び出しを非同期化
+  - `request.is_disconnected()` でクライアント切断を検出してループを停止
+- **Web UI** (学習モードパネル)
+  - 折り畳み式パネル、イテレーション数入力、モデル選択
+  - リアルタイム進捗バー (shimmer アニメーション)、ログ表示
+  - 停止ボタン → EventSource close → サーバーループも次イテレーション前に停止
+  - `onMount` で初期 `learned_count` を取得
 
-Build 445 では、Build 444 の低スコア監査を受けて、DDL coverage の小さな点・円・楕円を compact focal mark として扱う一般化を追加した。英文 DDL の文分割を改善し、`circle` と `ellipse` を同一視せず、`radius` / `半径` 指定や「小さい点」「small dot」系の coverage を低密度・outward fade・negative space preserved の小さな前景 mark として保持する。これは marker 語彙や新しい全体 governor の追加ではなく、既存 coerce fallback の形状・サイズ・空白保持を入力記述に合わせて補正する変更である。
+#### サーバーサイド履歴 (無制限・ページネーション)
 
-Build 445 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-445/{jp,en}/`）は 60/60 成功したが、JP #27/#28 は server timeout 後の最終リトライでも stage2 timeout となり、保存済み fallback result を使用した（fallback 2/60）。修復部品は `adjacent_reaction` 8/60 (13.3%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%) で、repair fingerprint gate は引き続き合格。品質平均は `visual_event` 80.43、`negative_space_pressure` 91.47、`motion_energy` 93.73、`constraint_adherence` 94.17、`color_resonance` 96.83、`figurative_risk` 1.33。Build 441 基準に対して `negative_space_pressure` / `motion_energy` / `constraint_adherence` は -5 以内に戻ったが、`visual_event` は基準 93.0 に対して 80.43 で未達。低スコア行は JP #02 (`visual_event` 40)、JP #21 / EN #04 / EN #20 / EN #21 (`visual_event` 48) などで、v1.52 の残タスクは visual-event の意味的な出来事性を回復することに絞られた。
+localStorage の容量制限を解消し、セッション跨ぎの履歴を実現。
 
-Build 446 / 446-2 では、Build 445 で固着していた低 `visual_event` 行に対して、既存 instruction / arrangement metadata だけを補強する一般化を追加した。小さな点・円・楕円の compact focal mark は、event context では `visual event preserved as compact focal accent` として扱い、既存 focal event には反対象限の `arrangement.center`、`color_cycle`、余白保持、低密度、outward fade を与えて counterweight を明示する。`inherited_memory` 型で出来事性が弱い場合は、既存 support instruction に `visual event inherited memory trace preserved on existing support` を付与する。これは新しい描画部品の追加ではなく、既存要素の配置・色循環・意味ラベルを補強する変更である。
+- **`api.py`**: `_history: list[dict]` をメモリ保持 + `_HISTORY_FILE` (既定 `/tmp/inku-history.json`) に永続化
+- エンドポイント: `GET /api/history?offset=&limit=` (新着順)、`POST /api/history`、`DELETE /api/history`
+- **Web UI**: `HISTORY_PAGE_SIZE=10`、`← 新` / `旧 →` ページナビ、全件数表示
 
-Build 446-2 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-446-2/{jp,en}/`）は 60/60 成功した。JP #09 のみ final retry でも stage2 timeout となり fallback result を使用した（fallback 1/60）。品質平均は `visual_event` 92.85、`negative_space_pressure` 94.30、`motion_energy` 96.95、`constraint_adherence` 95.50、`color_resonance` 99.75 で、Build 441 基準の -5 以内という品質回帰ガードを満たした。修復部品は `adjacent_reaction` 13/60 (21.7%)、`angular_pulse` 0/60、`vanishing_trace` 1/60 (1.7%) で v1.52 の repair fingerprint gate も合格。fable5 が後継指紋候補として指摘した `inherited_memory_arc` は 4/60 (6.7%) として新たに計測対象へ加えた。
+#### UI 改善
 
-ただし relation drop rate は JP 15/53 (28.3%)、EN 22/51 (43.1%)、合算 37/104 (35.6%) で、fable5 が参照した 20% 目安を超えている。v1.52 の relation 方針は drop-only を維持し、coerce で relation を修復・補完しないことなので、この値は Build 446-2 時点の未解決リスクとして扱う。対策する場合は Stage 2 に「安全に置ける relation だけを出し、迷う場合は relation を省略する」方向のプロンプト改善に限定し、validator の修復化や relation 補完は行わない。
+- **歳時記ボタン**: ヘッダー → 記述エリア右上 (`<div class="input-header">`) に移動
+- **Saijiki トークン色**: `#111` → `#2c3e91` (青) でインライン表示
 
-Build 447 では relation drop を blocking として扱い、Stage 2 prompt に relation の発火条件を強化した。普通の配置語（斜めの帯に沿って、揺れる軌跡に沿って、川沿い、道沿い等）を relation にしないこと、`between` は直前2つの輪郭 instruction が揃う時だけ使うこと、迷う場合は relation を省略することを明示した。しかし Build 447 の JP/EN 30+30 full benchmark では relation drop が JP 13/55、EN 4/29、合算 17/84 (20.2%) となり、fable5 が blocking とした 20% 目安をわずかに超えた。
+---
 
-Build 448 では、relation を「正規化DDLに `前の線に沿って` / `前の形に触れない` / `前の線を切る` / `前の二つの間に`（英語では corresponding previous-object phrase）が文字どおりある場合だけ残す」Stage 2 後段 gate に限定した。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「触れていない」「近く/遠く」などは relation ではなく、position / path / rotation / spacing で表す。coerce の方針は変えず、relation の修復・補完は行わない。
+### v1.1 (2026-04-25)
 
-Build 448 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-448/{jp,en}/`）は 60/60 成功した。JP #01 のみ final retry でも stage2 timeout となり fallback result を使用した（fallback 1/60）。品質平均は合算で `visual_event` 92.40、`negative_space_pressure` 95.87、`motion_energy` 97.77、`constraint_adherence` 92.00、`color_resonance` 99.27 となり、Build 441 基準の -5 以内という品質回帰ガードを満たした。修復部品は `adjacent_reaction` 14/60 (23.3%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%)、`inherited_memory_arc` 4/60 (6.7%) で、v1.52 の repair fingerprint gate を満たした。relation drop は JP 1/6 (16.7%)、EN 0/2、合算 1/8 (12.5%) で、fable5 が blocking とした 20% 目安を下回った。自然文 fable set では relation sample rate が低くなるが、これは relation を fixed previous-object phrase 専用に戻した結果であり、drop-only validator 方針と整合する。これにより v1.52 の残タスク（vary、repair fingerprint、quality guard、relation blocking）は完了として扱う。
+**coerce レイヤー + 背景色 + 配色サイクル + 塗りつぶし + 非 Saijiki 語展開 + UI 改善**
 
-**v1.52 クローズ（2026-07-07）**: Build 448 を v1.52 の受け入れとして確定し、クローズする。判断理由は次の4点。(1) 受け入れ基準（repair fingerprint 3ゲート、品質回帰ガード、vary の後方互換・決定性・分散、relation drop blocking）を全項目満たした。(2) Build 448 の JP/EN 60枚に対する3ペルソナ再評価（`cli/tune_bench.md` 参照）で、v1.52 の起点だった Build 441 の2大課題——補修部品の指紋化と振れ幅の上限——の解消を目視確認した。定型部品の反復は消え、外れ値（驚き）が出るようになり、キュレーター視点で60枚中20〜25枚が選出可能な水準に達した。(3) relation の使用縮退（relation を持つサンプルが 30件中 21〜22 件から 2〜3 件へ減少）は、「relation は正規化DDL中の明示的な previous-object 句（前の線に沿って / 前の形に触れない / 前の線を切る / 前の二つの間に、および英語同義句）専用とし、自然文由来の近接・拍子・先行/遅れは position / path / rotation / spacing で表す」という仕様として受け入れる。これは一時的な回避ではなく §14 の関係述語の定義の確定であり、drop-only validator 方針と整合する。(4) 品質判定指標（visual_event 等の judge metric）は人間評価との乖離例（JP #23: visual_event=28 だが目視評価は最良クラス）が確認されたため、以後は受け入れゲートではなく回帰検知の参考値として扱う。品質の最終判定は §8 の設計思想どおり人間の事後選択に属する。judge metric 自体の再調整は行わない（governor 化の回避）。以後の開発の完成軸は品質ゲートの漸近改善ではなく「他人が自分の視覚的短歌を書ける状態」（1.0）に移す。作業計画は v1.6 として別途管理する。
+#### coerce.py — テーブル駆動の構造補修レイヤー (新規)
 
-### v1.51 (2026-07-02)
+LLM が必須フィールドを省略した Score を renderer に渡す前に自動補修する `coerce.py` を新規作成。
 
-**関係（あいだ）の設計と、揺らぎのマクロスケール拡張**
+- **設計原則**: primitive 個別の if/elif を書かない。`FieldSpec` dataclass + `PRIMITIVE_SPECS` テーブルで要件を宣言し、汎用ループで適用。新 primitive 追加 = テーブルにエントリ追記のみ
+- **`FieldSpec`**: `name / default / fallbacks (cross-field 代替) / coerce (型正規化関数)` を宣言
+- **`PRIMITIVE_SPECS`**: 6 primitive (line/circle/ellipse/arc/square/triangle) の必須フィールド仕様
+  - fallback 例: circle の `center` 欠損時は `position` を代用
+  - 型正規化: `_as_coord / _as_positive_float / _as_positive_size / _as_float`
+- **`POST_COERCE`**: cross-field 制約 (arc の `angle_start == angle_end` → +270° 補正)
+- **`api.py`**: `/api/compose` / `/api/paint` 両エンドポイントで `render()` 前に `coerce_score()` を呼び出し
 
-Build 436 時点で観測された出力分布の収縮（構図・密度・色面の多様性低下）の一次原因分析を受けた仕様改訂。一次原因は (A) 揺らぎがミクロ層（線の震え）にのみ割り当てられ、構図レベルの一回性がどの層にも存在しなかったこと、(B) Stage 1.5 が対角・片側焦点を常時優先する固定レシピの決定的抽選機になっていたこと、(C3) JSON Score が instruction 間の関係を表す述語を持たず、構成の文法が固定レシピにしか存在しなかったこと。
+#### 閉じた形状の自動塗りつぶし
 
-- §2 原則2 に揺らぎの二スケール（ミクロ/マクロ）を明記
-- §3.1 コア語彙に「あいだ (Relations)」カテゴリを追加（沿う、触れない、切る、間に）。名詞ではなく述語の追加であり、プラグイン原則1と矛盾しない
-- §12.10 対策B のキャッシュ方針に、出力の一回性との両立条件を明記
-- §12.11 Stage 1.5 の構図規則を「対角・片側焦点の常時優先」から「構図族からの入力依存選択」へ変更。焦点座標を固定値から領域指定へ変更。役割を「完成品レシピの注入」から「関係述語の付加」へ転換
-- §13.8 に演奏の自由度の二スケール（ミクロ変動 / 関係の逐次解決）を追記
-- §14「関係（あいだ）の設計」を新設。旧 §14〜§16 を §15〜§17 へ繰り下げ
-- 関係修復 governor の作成を禁止（§14.6）。coerce は relation を追加できない
-- 実装指示は codex-task.md、検証・受け入れ基準は tune_bench.md に記録する
+- `_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})`
+- `_stroke_attrs()`: `do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled` — 閉形状は色指定で自動塗りつぶし
+- `Instruction.filled: bool = False` フィールドを schema.py に追加 (明示的塗りつぶし指定)
 
-### v1.50 (2026-05-11)
+#### 背景色 (Score.background)
 
-**英語指示文対応と指示文言語 / UI言語の分離**
+- `Score.background: Color = "white"` フィールド追加
+- `renderer.render()`: `COLOR_MAP.get(score.background, BACKGROUND)` でキャンバス全体を背景色で塗りつぶし
+- Stage 2 プロンプトに background ルール追加
 
-日本語 UI / 英語 UI の切替とは独立して、描画指示文の言語を選べるようにした。
-将来の多言語対応を見据え、表示言語と解釈言語を API 境界で分離する。
+#### 配色サイクル (Arrangement.color_cycle)
 
-- Web UI の入力ヘッダーに `指示文の言語` セレクタを追加し、`自動` / `日本語` / `English` を選択できるようにする
-- `/api/paint`、`/api/interpret`、`/api/compose`、`/api/demo/instruction` は `instruction_lang` と `ui_lang` を受け取る
-- `instruction_lang=auto` の場合、サーバーは入力文字列から `ja` / `en` を判定し、Stage 1 / Stage 1.5 / Stage 2 / デモ指示生成に渡す
-- `/api/paint`、`/api/compose`、履歴保存、JSONタブ、保存 artifact JSON は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` を記録する
-- `history` テーブルに `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` カラムを追加する
-- `inku-cli paint` / `batch` / `demo-instruction` は旧 `--lang` ではなく `--instruction-lang auto|ja|en` と任意の `--ui-lang` を送信する
-- 既存履歴や `cli/tune_bench.md` のハッシュ参照を壊さないため、言語メタデータは `render_hash` の canonical payload には含めない
-- Stage 1 prompt、Stage 2 prompt、Stage 1.5 expander / filter は `InstructionLanguageSupport` として registry に登録する
-- Score coerce layer が参照する語彙・文脈 marker は `InstructionLanguageSupport.coerce_markers` として `ja` / `en` の言語別ファイルに分離する
-- Score coerce layer の補修アルゴリズム本体は JSON Score 構造に対する共通処理として維持し、言語ごとの違いは marker セット側で表現する
-- `ja` / `en` の既存 prompt と expander は内容を変更せず registry に載せるため、描画結果の変化を伴わない
-- 第三者が追加言語を実装する場合は、まず registry に言語コード・prompt・expander・coerce marker を追加し、JSON Score schema / renderer / 色カタログの変更とは分離して検証する
-- Build 403-427 では、英語版 Stage 1 / Stage 1.5 / Stage 2 の実装を日本語版とファイルレベルで分離し、英語固有の意味解釈・marker・補修語彙を追加した
-- 英語版は、単語置換ではなく、英語文の時間構造・反復・前後関係・視線・出来事の核を抽象描画パラメータへ変換する方針とする
-- 英語版 Stage 1.5 / coerce marker は、`before` / `after` / `again and again` / `as if` / `at once` などの時間接続、`diagonal` / `same beat` / `shifted` などの構図語、透明・反射・霧・道路・音・群れ等の視覚イベント語を言語固有の補修手がかりとして扱う
-- 日本語版と英語版は同一の JSON Score schema / renderer / 色カタログを共有し、言語差は prompt、expander、marker、補修入力の段階に閉じ込める
-- 英語版の品質確認として、同義の日本語 / 英語指示文30組を `square` canvas、`default` color catalog、履歴保存なしで描画し、専門家3名ペルソナで比較評価した
-- Build 427 時点の30件平均では、英語版は日本語版に近い品質へ到達している。英語版は color resonance がやや高く、日本語版は constraint adherence と visual event がやや高い
-- 残課題は、英語版では「整いすぎて出来事の瞬間が背景化する」こと、日本語版では「詩的な静けさが小さすぎる記号に縮約される」こと。次の改善では密度を増やさず、focal event の最小可視サイズ、コントラスト、隣接反応を強める
-- build number: 427
+- `Arrangement.color_cycle: list[Color]` フィールド追加 (デフォルト空 = 全要素同色)
+- `_apply_color_cycle(items, cycle)`: arrangement 展開後に `i % len(cycle)` で色を上書き
+- 全 layout (horizontal / vertical / radial / scatter) で適用
 
-### v1.49 (2026-05-11)
+#### count 上限 1000 へ拡張
 
-**描画表示のプレゼンテーションモードと指示文字幕**
+- `Arrangement.count` 上限 500 → 1000、`_clamp_count` validator も更新
+- composer.py / interpreter.py のプロンプト記述も同様に更新
 
-Web UI の描画タブに、展示・鑑賞向けの表示補助を追加した。
+#### Stage 2: original_text パス・スルー
 
-- 描画タブ右下にプレゼンテーションモードを開く全画面アイコンを置く
-- プレゼンテーションモードでは表示中の SVG を最大化し、下部に履歴移動、最新表示、スター、指示文字幕切替、閉じる操作をまとめたコントロールを表示する
-- プレゼンテーションモードは Escape キーでも閉じられる
-- 描画タブ左下に、指示文を字幕として表示するアイコンを置く
-- 通常表示の字幕は描画タブ幅を基準に左右10%のマージンを取り、描画タブ内でクリップする
-- プレゼンテーションモードの字幕はウインドウ幅を基準に左右10%のマージンを取る
-- 字幕に表示するテキストは、Stage 1 送信用に拡張された内部プロンプトではなく、ユーザー入力・履歴 `input`・バッチ最新行・デモ生成指示文の原文とする
-- `buildEmotionHint()` などの内部補助文は、プロンプト/デバッグ表示には残してよいが、鑑賞用字幕には表示しない
-- build number: 401
+- `compose(ddl, *, original_text=None)` に引数追加
+- `_build_user_message(ddl, original_text)`: 原文と正規化DDL が異なる場合 `[原文]…[正規化DDL]…` 形式でユーザーメッセージを構成
+- `/api/paint` で `req.text` を Stage 2 に渡すよう改善 → LLM が元の記述の意図をより正確に反映
 
-### v1.48 (2026-05-09)
+#### 非 Saijiki 語の LLM 意味展開
 
-**Android ネイティブ実装の管理対象化と v1.48 対応**
-
-Android 版を Git 管理対象のネイティブ単体アプリとして整理し、web/server 参照実装に追従するモバイル実装として明文化する。
+- Stage 1 `SYSTEM_PROMPT_PREFIX` に `# 非 Saijiki 語の展開` セクションを追加
+  - 展開の四つの切り口: 形状 / 質感 / 構造 / 動作→配置
+  - 例: 月→円、霧→楕円(滲む)、森→縦線を複数、散る→ランダムに散らす
+- 固定辞書アプローチ (`expansion.py`) を削除 — LLM の意味理解に委ねる方針に転換
+- EXAMPLE_POOL に自然現象・詩的語彙の例 9 件追加 (太陽、星空、水平線+月、山並み、森、雪、炎、都市、花びら)
 
-- Android 版は Kotlin + Jetpack Compose で実装し、Room / SQLite を正式なローカル DB レイヤーとする
-- アプリはシングルユーザー前提で動作し、server/web のユーザー管理、DB 管理、プラグイン管理、ログ保存などのサーバー運用機能は Android UI から除外する
-- Android の開発 master は常に `web/` と `server/` とし、DDL 解釈、Stage 1.5 展開、Score 補修、SVG rendering、履歴/render metadata の互換性は server source に照らして検証する
-- LiteRT-LM を Android のローカル LLM provider とし、Gemma 4 E2B を標準、E4B を高品質オプションとして扱う。GPU backend を必須とし、CPU fallback は行わない
-- Gemma 4 E2B/E4B のライセンス同意、初回取得、再取得、SHA-256 検証、取得状態は Room に保存する
-- Android のモデル選択 UI はモバイル操作性のため Stage 1 / Stage 2 を単一の描画モデル選択として扱う。ただし保存形式、履歴 JSON、render metadata では `stage1_model` / `stage2_model` を維持する
-- モデル設定パネルは接続先ごとの独立パネルとし、サービス追加、サービス名編集、Base URL 編集、APIキー追加/削除、公開モデル選択、モデル一覧取得を提供する。接続形式はサービス追加時に設定し、既存パネルでは変更しない
-- 公開モデル候補と公開済みモデルは分離して保存し、描画画面のモデル選択には公開済みモデルだけを表示する
-- 描画画面では画像のピンチズーム、パン、左右スワイプによる履歴移動、ダブルタップによるプレゼンテーション表示を Android 固有 UI として提供する
-- プレゼンテーション表示では画像以外の UI を隠し、余白背景を表示画像の背景色に合わせる。白背景画像ではダーク背景、黒背景画像ではライト背景を使う
-- 履歴画面は 3 列サムネイルグリッドを標準とし、サーバー版のごみ箱、リスト表示、一括選択は Android では提供しない
-- SVG / PNG export は server/web の `CanvasPanel` と同じ profile / template 構造を持つメニューとして実装し、Android では共有シートに渡す
-- PNG template は `1080px` / `2160px` / `4320px` の Y軸高さを既定とし、Room の `export_templates` を正本とする
-- `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を render metadata に含め、Android でも server の canvas aspect 定義に対応する値から算出する
-- Android headless render / comparison tooling を持ち、server CLI の `--input-mode ddl` と組み合わせて DDL 以降、Score 以降の parity を比較できる
-- Android version は `android/VERSION`、Android build number は `android/BUILD_NUMBER` を正本とする。v1.48 世代の初期値は `1.48.0-android.1` / `148001` とする
-- Android 設定メニューには versionName、versionCode、build type、applicationId、source spec、render engine version を表示するバージョン情報画面を置く
-- build number: 148001
-
-### v1.44 (2026-05-05)
-
-**PNG保存テンプレートとモデル設定のAPIキー注記**
-
-PNG保存メニューとモデル設定タブの表示を、現在の運用に合わせて調整した。
-
-- ナビゲーションバーの PNG 保存テンプレート既定値を `1024px` / `2048px` から `1080px` / `2160px` / `4320px` に変更する
-- PNG 保存テンプレートのサイズは Y軸方向のピクセル数として扱う
-- 日本語UIでは、テンプレート説明と設定ダイアログの項目名を `y-axis` / `y軸高さ` ではなく `Y軸` / `Y軸の高さ` と表記する
-- 既存ユーザーの保存済み PNG テンプレートが旧デフォルト `1024px` / `2048px` のみである場合は、新デフォルトへ自動的に置き換える。ユーザーが独自編集したテンプレートは維持する
-- モデル設定タブの `AIサービス接続` 見出し横に、APIキーの扱いを明記する
-- 表示文は「APIキーはDBに暗号化して保存され、画面には再表示されません。環境変数で設定済みのキーも初期値として扱われます。」とする
-- 英語UIでも同じ意味の注記を表示する
-- build number: 328
-
-### v1.45 (2026-05-05)
-
-**JSONメタデータへの描画ハッシュ記録**
-
-各描画のサーバー側 `render_hash` を、履歴だけでなく JSON メタデータ領域にも記録する。
-
-- `render_hash` は、描画内容とサーバー所有の render metadata から算出する64文字の SHA-256 hex とする
-- `render_hash_short` は UI / CLI で参照しやすい4文字の大文字サフィックスとする
-- `/api/paint`、`/api/compose`、JSONタブ、CLI出力JSON、保存 artifact JSON に `render_hash` / `render_hash_short` を含める
-- 履歴DBから artifact JSON を再生成する場合も、DB上の `render_hash` / `render_hash_short` をメタデータ領域へ展開する
-- 履歴DBは引き続き正本であり、出力ファイルは副産物として扱う
-
-### v1.46 (2026-05-07)
-
-**inku-cli の DDL 入力描画モード**
-
-server / Android の CLI 比較で、Stage 1 の LLM 出力揺れを切り離し、
-正規化DDL以降の差分を検証できるようにする。
-
-- `inku-cli paint` / `inku-cli batch` に `--input-mode paint|ddl` を追加する
-- 既定の `paint` は従来どおり自然言語入力を `/api/paint` に渡し、Stage 1 → Stage 1.5 → Stage 2 → render を実行する
-- `--input-mode ddl` は入力テキストを正規化DDLとして扱い、Stage 1 を呼ばずに `/api/compose` へ渡す
-- `--input-mode ddl --save-history` の場合、CLI は `/api/compose` の描画結果を `POST /api/history` で通常履歴DBへ保存する
-- `/api/compose` は Stage 1.5 適用後の実効DDLを `ddl` としてレスポンスに含める
-- CLI の DDL モードでは、出力JSONと履歴保存に `/api/compose` が返した実効DDLを使う
-- Android の headless 比較スクリプト `android/scripts/headless_render_compare.sh` は `INPUT_MODE=ddl` を server 側 `inku-cli paint --input-mode ddl` にも伝搬する
-- `ORIGINAL_TEXT` を指定した場合、Android / server の両方で履歴表示用の元入力および Stage 2 補助文脈として扱う
-- このモードは benchmark / parity 検証用であり、自然言語からの通常描画フローの既定動作は変更しない
-- build number: 352
-
-### v1.47 (2026-05-07)
-
-**外部クライアント保存履歴のWeb UI自動反映**
-
-`inku-cli` や Android headless CLI など、開いている Web UI 以外のクライアントが履歴DBへ保存した描画を、Web UI の履歴ストリップへ自動反映できるようにする。
-
-- 履歴DBは引き続き描画履歴の正本であり、Web UI は外部クライアント保存をローカル状態だけで推測しない
-- Web UI はログイン済み、通常履歴表示、最新ページ表示、ドキュメント表示中の条件で、最新履歴ページを定期的に再取得する
-- 再取得間隔は短すぎる polling を避けるため約12秒とし、同時再取得と5秒未満の重複再取得を抑止する
-- ブラウザウィンドウが focus された時、または非表示タブから表示状態へ戻った時は、通常の間隔を待たずに最新履歴を再取得する
-- 外部保存検出用の再取得では、現在選択中の履歴IDが再取得後の最新ページに残っている場合、その選択状態を維持する
-- スター付きのみ表示、検索中、履歴の旧ページ表示中、履歴ロード中は、ユーザーの閲覧文脈を壊さないよう自動差し替えを行わない
-- 履歴管理ダイアログが開いており、通常履歴の先頭ページを表示している場合は、外部保存反映に合わせて同ページも静かに再取得する
-- build number: 361
-
-### v1.43 (2026-05-05)
-
-**Render Engine 境界とエンジンメタデータ**
-
-将来の複数描画エンジン受け入れに備え、描画コアを `RenderEngine` 契約越しに呼び出す内部境界を追加した。
-
-- `server/src/inku_server/render_engines/` を追加し、`base.py` に `RenderEngine` Protocol と `RenderEngineResult` を定義する
-- 現行の `renderer.py` は `default` engine として `render_engines/default.py` から呼び出す
-- 現時点では外部任意コードのロードや管理UIは実装しない。`current_render_engine()` は静的に `default` engine を返す
-- `/api/compose`、`/api/paint`、互換用 `/api/history` は RenderEngine 経由で SVG を生成する
-- 描画レスポンス、履歴レコード、JSONタブ、artifact JSON に `render_engine_id` と `render_engine_version` を記録する
-- `history` テーブルに `render_engine_id` / `render_engine_version` カラムを追加し、既存DBは起動時マイグレーションで追従する
-- `render_hash` の canonical payload に engine metadata を含め、同じ Score / SVG でも描画エンジンが異なる場合は別内容として追跡できるようにする
-- 現行値は `render_engine_id: "default"`、`render_engine_version: "1"` とする
-- build number: 326
-
-### v1.43 (2026-05-05)
-
-**サーバーログ保存ポリシー設定**
-
-`inku-server` / `inku-api` のアプリケーションログ保存ポリシーを、管理者向けのサーバーワイド設定として扱う。
-
-- 設定ダイアログに admin 向け `ログ保存` タブを追加する
-- `ログ保存` タブでは、ログ保存とローテーションの On/Off、保存期間（日）、ローテーション周期、ローテーション済みログの圧縮 On/Off を設定できる
-- 既定ポリシーは On、保存期間 `90` 日、ローテーション周期 `daily`、圧縮 On とする
-- サーバーは `app_settings.log_retention_settings` に `enabled` / `retention_days` / `rotate` / `compress` を保存する
-- 初期保存期間は `INKU_LOG_RETENTION_DAYS`、初期ローテーション周期は `INKU_LOG_ROTATE` を使い、未指定時は `90` 日と `daily` を使う
-- `GET /api/settings/status` は現在のログ保存ポリシーに加え、`logrotate` 設定プレビューと `systemd` drop-in 設定プレビューを返す
-- `PUT /api/settings/log-retention` は admin のみ利用でき、保存期間は `1` から `3650` 日、ローテーション周期は `daily` / `weekly` / `monthly` のみ受け付ける
-- 画面上の注記は、ログ保存ポリシーはアプリ DB に保存されるが、`systemd` / `logrotate` への実適用にはサーバー OS の権限が必要であることを明示する
-- systemd drop-in プレビューは `StandardOutput=journal+append:/var/log/inku/<service>.log` / `StandardError=journal+append:/var/log/inku/<service>.log` を使い、`journalctl -fu <service>` とファイルログの両方で追跡できる形を推奨する
-- `inku-api` / `inku-server` の起動時には、60文字の `=` 罫線で囲んだ起動バナーを出力する。バナーにはサービス種別、アプリケーションバージョン、build 番号、build 日付を含める
-- 起動バナーには、運用確認に必要な最小情報として mode、listen host/port、runtime / platform、ログ出力先も含める。API 側は描画エンジン ID / version も表示する
-- 起動バナーの絵文字はサービスの性質に合わせて変える。API は `🧠 ⚙️ 🔌 🖌️ 🚀`、Web UI は `🎨 🖼️ 🌈 🪄 ✨ ... 🚀` を使う
-- 運用検証では `inku-server` / `inku-api` の systemd drop-in と `/etc/logrotate.d/inku` を手動設定し、`NeedDaemonReload=no`、journal 出力、`daily` / `rotate 90` / `maxage 90` / `compress` の反映を確認した
-- build number: 336
-
-### v1.42 (2026-05-04)
-
-**サーバーワイド自動保存設定**
-
-出力 artifact ファイルの自動保存を、ユーザー個別設定ではなくサーバーワイドな管理者設定として扱う。
-
-- 設定ダイアログに admin 向け `その他（サーバー）` タブを追加する
-- `その他（サーバー）` タブでは、描画ファイル自動保存の On/Off、保存先フォルダの絶対パス、PNG 自動保存サイズを設定できる
-- PNG 自動保存サイズは `1080px` / `2160px` から選択する
-- サーバーは `app_settings.output_save_settings` に `enabled` / `output_dir` / `png_size` を保存する
-- 初期保存先は `INKU_OUTPUT_DIR`、初期 PNG サイズは `INKU_OUTPUT_PNG_SIZE` を使い、未指定時は `~/.local/share/inku/outputs` と `2160px` を使う
-- `PUT /api/settings/output-save` は admin のみ利用でき、保存先は絶対パスのみ許可し、PNG サイズは `1080` / `2160` のみ受け付ける
-- 自動保存 Off の場合も履歴 DB は正本として保存し、SVG / JSON / 入力 / DDL / PNG などの artifact ファイル保存だけをスキップする
-- 保存先フォルダ配下は従来どおり `user_id/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history_id>` 形式の日別ディレクトリ構成とする
-- `その他（サーバー）` タブには保存 worker / queue、保存統計、PNG サイズを表示する。保存 worker は同時保存ジョブ数、queue は保存待ちジョブ上限であり、上限超過時は DB 履歴保存を優先して artifact 保存をスキップする
-- 画面上の注記は「履歴DBが正本です。出力ファイルはバックグラウンドで保存される副産物で、DBから再生成できます。」と表示する
-- build number: 324
-
-### v1.42 (2026-05-05)
-
-**レンダリングメタデータと履歴選択挙動**
-
-描画結果のメタデータ表示と、履歴を選択したときの UI 選択状態の扱いを整理した。
-
-- 描画パネル上部に、当該描画の `色カタログ`、`キャンバス`、`作成日時` を表示する
-- 色カタログボタンは、固定ラベルではなく現在選択中の色カタログ名を表示する。長い名前は後半を省略し、hover title でフル名称を確認できる
-- 入力パネル上部の操作順は `キャンバス比率` / `色カタログ` / `モデル選択` とする
-- 描画レスポンス、履歴レコード、JSON タブ、artifact JSON に `render_canvas_aspect` を追加し、実際にレンダリングへ使用したキャンバス比率 ID を記録する
-- 描画レスポンス、履歴レコード、JSON タブ、artifact JSON に `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を追加する。`render_canvas_aspect_id` は明示的なキャンバス比率識別子、`render_canvas_aspect_ratio` は実際の幅÷高さの数値である
-- `render_canvas_aspect` は render metadata の一部として、`render_engine_version` の直後、色カタログメタデータの前に表示する
-- `render_canvas_aspect_id` と `render_canvas_aspect_ratio` は `render_canvas_aspect` の直後に表示する
-- JSON Score の `score.canvas` は引き続き楽譜側のキャンバス指定として保持し、`render_canvas_aspect` は成果物側のレンダリング記録として扱う。通常は同じ値になるが、旧データや外部入力の確認性のため二重に保持する
-- 互換性のため `render_canvas_aspect` は従来通り保持する。新規実装では `render_canvas_aspect_id` を識別子として扱い、旧履歴では `render_canvas_aspect` から補完する
-- 設定 > その他に `履歴選択時の挙動` を追加する
-- キャンバスサイズは、履歴から選択時に履歴キャンバスサイズを UI 選択へ反映するか、現時点で UI 上選択されているキャンバスサイズを維持するかを選べる
-- 色カタログは、履歴から選択時に履歴色カタログを UI 選択へ反映するか、現時点で UI 上選択されている色カタログを維持するかを選べる
-- 履歴選択時の挙動設定はブラウザ localStorage に保存する
-- 履歴選択時の設定は UI 上の選択状態だけを更新し、保存済み履歴 SVG の再レンダリングは行わない
-- build number: 340
-
-### v1.41 (2026-05-03)
-
-**履歴描画ハッシュとCLI履歴エクスポート**
-
-履歴DBの各描画に、描画内容に基づく `render_hash` を付与する。
-
-- `render_hash` は canonical JSON 化した `input` / `ddl` / `score` / `svg` / render metadata から SHA-256 で生成し、DB上には64桁hexを正規値として保存する
-- API の履歴レスポンスと `/api/paint` の履歴保存レスポンスには `render_hash` と、末尾4桁を大文字化した `render_hash_short` を含める
-- 既存履歴はDBマイグレーション時に `render_hash` をバックフィルする
-- 履歴管理ダイアログでは、サムネイルとリスト表示に `#ABCD` 形式の4桁短縮ハッシュをレイアウトを壊さないチップとして表示し、クリックで正規ハッシュをコピーできる
-- 履歴管理ダイアログは現在のウインドウサイズに対して上下左右10%の余白を基準に大きく開き、サムネイル下には指示文の先頭、その下にスター、短縮ハッシュ、削除/復元操作を並べる
-- サムネイル下の指示文は、先頭に `#123` のような番号がある場合はその番号を省略して表示する
-- サムネイル操作部の未スター状態は小さくても視認できるコントラストにし、左上の選択チェックボックスも小型化して枠線を細くする
-- 履歴管理ダイアログのページ切り替えでは、複数の再取得が重なっても最後の完了時に読み込み中表示を必ず解除する
-- 履歴管理ダイアログのサムネイル表示は、ダイアログ内の実表示領域から列数と行数を測定し、スクロールバーを出さずに収まる件数をページサイズとして動的に再計算する
-- サムネイル操作行のスターはクリックイベントをカード選択から分離し、カード実寸を使ってページサイズを再計算することで下端余白を詰める
-- サムネイル操作行は左下にスターを置き、ハッシュは `#` を付けず削除ボタンと同じボタン寸法感に揃える
-- ダークモードでもスター済み状態の色が通常状態に上書きされないよう、スター済み表示を明示する
-- 履歴管理ダイアログのサムネイルにマウスオーバーした際のポップアップには、メタ情報に加えて大きめの画像プレビューを表示する
-- 履歴管理ダイアログ上部は、タイトル/表示切替/件数/ページ移動を1段に集約し、選択/絞り込み/検索を2段目にまとめることでサムネイル表示領域を広げる
-- サムネイル実寸によるページサイズ再計算時は、ページ番号を維持し、次ページ操作後に先頭ページへ戻らないようにする
-- 履歴管理ダイアログの各画像に表示する個別削除操作は、文字ラベルではなく小さなごみ箱アイコンボタンで表示する
-- JSONタブ、描画レスポンス、履歴保存時のartifact JSONには、サーバーが実際に使用した解決済み `stage1_model` / `stage2_model` を記録する
-- 現時点のカラーマネジメントは sRGB のみを対象とし、JSONタブ、描画レスポンス、履歴、artifact JSONには `render_color_profile: { id: "srgb", name: "sRGB IEC61966-2.1", standard: "IEC 61966-2-1:1999" }` を記録する。Adobe RGB 等の広色域プロファイルは将来拡張候補とし、現時点では実装しない
-- JSONタブは、モデル/ビルド/カラープロファイル/色カタログなどの属性メタ情報を先頭に表示し、その後に `score` を表示する
-- 履歴から画像を開き直した場合も、JSONタブに履歴保存済みの `stage1_model` / `stage2_model` を表示する
-- 設定ダイアログに管理者向け `モデル設定` タブを追加する。Stage 1 / Stage 2 の既定 provider / model と、provider 別の base URL / API key をサーバー DB の app settings に保存する
-- 組み込みの商用 LLM provider は公式名称に合わせて OpenAI API Platform / Claude API / Gemini API とし、非商用 API provider は NVIDIA NIM、ローカル provider は Ollama (OpenAI互換) / Intel OVMS (OpenAI互換) を対象とする
-- 管理者は設定ダイアログのモデル設定タブで、接続サービスを追加・削除できる。追加サービスは service ID、表示名、接続形式 (`openai_compatible` / `anthropic` / `gemini`)、Base URL、任意の初期 API key を持つ。サービス追加ダイアログの `追加` は即座にサーバーへ保存し、サービスパネル下部に冗長な全体保存ボタンは置かない。モデル一覧は追加時には手入力せず、サービスごとの `モデルリスト取得` で取得する
-- service ID は DB 内の接続設定キー、Stage 1 / Stage 2 の provider 参照、API 呼び出し時の provider 判定、重複防止に使う内部IDであり、作成後は編集不可とする。画面に表示するサービス名は後から編集できる
-- 接続サービスごとに `モデルリスト取得` を実行できる。サーバーは保存済み Base URL / API key を使って provider 種別ごとの models API を呼び、取得したモデル一覧を当該サービス定義へ保存する。取得結果の成功/エラーは公開モデル選択ダイアログ下部に表示する。API key はブラウザへ送らない
-- API key はサーバー側にのみ保存し、`GET /api/settings/models` の応答では設定済みかどうかのみを UI 表示に使う。ブラウザへ生の API key は返さず、設定済みの場合の入力欄は `保存済みキーを維持` と表示して編集不可にする。未設定の状態で新しい key を入力した場合は、そのサービスの保存ボタンで保存する
-- DB 内の provider API key は `enc:v1:` 形式で暗号化して保存する。暗号鍵は `INKU_SECRET_KEY` を優先し、未設定の場合は `INKU_SECRET_KEY_FILE` または `~/.local/share/inku/secret.key` のローカル鍵を使う。既存の平文キーは読み込み互換を維持し、次回保存時に暗号化形式へ移行する
-- `PUT /api/settings/models` は管理者のみ利用でき、API key の新規設定、保持、明示削除を区別する
-- LLM 呼び出しは model ID の provider prefix (`openai:` / `anthropic:` / `gemini:` / `nvidia:` / `ollama:` / `ovms:`) と、設定タブの既定値から接続先を解決する。旧来の NVIDIA slash ID とローカル OVMS ID も互換扱いとして受け付ける
-- Web UI から `/api/paint` / `/api/interpret` / `/api/compose` へ送るモデルIDは、接続先 provider と結合して `openai:gpt-5.2` のような provider 付き ID に正規化する。API が provider prefix の無い model ID を受け取った場合でも、その ID がユーザー設定中の Stage 1 / Stage 2 model と一致する場合は、同じユーザー設定の provider で補完してから dispatch する
-- デモ指示文生成も同じ provider 解決を使い、OpenAI API Platform / Claude API / Gemini API / NVIDIA NIM / Ollama / Intel OVMS の各接続設定を経由する
-- LLMサーバー接続設定はグローバルな管理者設定とし、Stage 1 / Stage 2 の接続先・モデル選択はユーザーごとの `user_accounts.model_settings` に保存する。モデル選択ダイアログの確定時に `/api/auth/me/settings` へ保存し、ログイン時に復元する
-- 管理者は設定ダイアログのモデル設定タブで、provider ごとに一般ユーザーへ公開するモデルを個別に On/Off できる。公開モデル選択はサービスパネル内ではなく個別ダイアログで行い、`モデルリスト取得` / 検索 / `全て選択` / `全て解除` も同ダイアログに置く。公開モデル選択ダイアログ内のチェック変更はドラフトとして扱い、`保存` で初めてサーバーへ反映し、`キャンセル` またはダイアログ外クリックでは破棄する。モデル設定タブ本体には公開中モデルのみを要約表示する。`GET /api/models` はログイン済みユーザー向けに公開モデルのみを返し、モデル選択ダイアログはこの一覧を使う
-- CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
-- CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
-- 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める
-- build number: 313
-
-### v1.40 (2026-05-03)
-
-**バッチ / デモの色カタログランダム選択**
-
-バッチモードとデモモードに、描画ごとに色カタログをランダム選択するオプションを追加した。
-
-- バッチモードでは実行ごとの一時オプションとして `描画ごとに色カタログをランダム選択` を指定できる
-- デモモードでは同じオプションをデモ設定として保存し、ユーザーごとに復元する
-- ランダム選択はサーバーから取得済みの色カタログ一覧を正とし、各描画の `/api/paint` に選ばれた `catalog_id` を渡す
-- 履歴保存時は、実際にレンダリングした `render_color_catalog_id` を優先して保存する
-- ステータスバーの色カタログ表示は、現在の選択値だけでなく描画結果の `render_color_catalog_id` を反映する
-- build number: 271
-
-### v1.39 (2026-05-03)
-
-**SVG保存形式プロファイル**
-
-SVG保存形式を、表示用・編集用・互換優先に分離した。
-
-- DB の `history.svg` には従来どおり表示用 SVG を保存する
-- 履歴表示、PNG 再生成、artifact 再生成は DB に保存された表示用 SVG を正本として扱う
-- 編集用 SVG は JSON Score とサーバー側の色カタログ情報からダウンロード時に都度生成する
-- 互換優先 SVG も JSON Score とサーバー側の色カタログ情報からダウンロード時に都度生成する
-- `display` プロファイルは現行表示互換を優先し、既存の texture filter / blur / clip を維持する
-- `editable` プロファイルは Illustrator / Affinity で編集しやすいよう、`layer_00_background`、`layer_10_content`、`instruction_###_*`、`mark_###_###_*` 形式の安定 ID とグループ構造を追加する
-- `compat` プロファイルは汎用SVGビューアで壊れにくいことを優先し、filter と clip-path を使わない
-- API として `POST /api/render-svg` と `GET /api/history/{item_id}/svg?profile=...` を追加する
-- Web UI の SVG ボタンは `Display` / `Editable` / `Compat` のメニューから保存形式を選択できる
-- CLI の `paint` / `batch` は `--svg-profile display|editable|compat` で保存する SVG プロファイルを選択できる
-- build number: 267
-
-### v1.38 (2026-05-02)
-
-**解釈 box の DDL 編集ダイアログ統合**
-
-DDL を直接編集する操作を、独立した DDL 編集タブではなく、記述タブの解釈（正規化DDL）box に統合した。
-
-- DDL編集タブは廃止し、記述 / バッチ / デモの3タブ構成に戻す
-- 記述タブで生成後に表示される解釈 box は、ハイライト付き textarea として直接編集できる
-- 解釈 box 上部には `歳時記` / `DDL編集` ボタンを横並びで表示する
-- `歳時記` は右スライド式の歳時記ドロワーを開き、語彙クリック時は解釈 box のカレントキャレット位置へ挿入する
-- `DDL編集` は大きな DDL 編集ダイアログを開く
-- ダイアログ左側に行番号付きの DDL 編集エリア、右側に縦2列の歳時記語彙エリアを表示する
-- ダイアログ下部には、DDLの概要と文法の簡易ガイドを表示する
-- ダイアログ内から `DDLから描画` は実行せず、描画実行は解釈 box 直下のボタンに集約する
-- 解釈 box 直下にも `DDLから描画` ボタンを表示し、ダイアログを開かずに現在の DDL から再描画できる
-- DDL を直接編集した後に記述タブの `描画する` を押した場合は、`DDLの編集結果が失われます、よろしいですか？` の確認ダイアログを表示する。選択肢は `キャンセル` / `OK` / `DDLから描画` とし、`OK` は通常の Stage 1 からの再生成、`DDLから描画` は編集済みDDLからの Stage 2 再描画を実行する
-- 記述タブで通常描画またはDDL再描画が進行中の間は、記述タブに実行中エフェクトを表示し、バッチ / デモ側の開始ボタンを抑制する
-- DDL再描画中は token 表示、経過秒数、停止ボタン、キウイ進捗マスコットを表示する
-- 停止ボタンは `/api/compose` リクエストを abort する
-- キャンバス比率プラグインが追加した任意のキャンバスIDを JSON Score の `canvas` として保持できるよう、Score schema の `canvas` は静的列挙ではなく文字列として扱う
-- build number: 246
-
-### v1.37 (2026-05-02)
-
-**DBバックアップ設定**
-
-DB設定タブに、DBファイルサイズ表示とバックアップ設定を追加した。
-
-- DB設定タブは引き続き `admin` ロールのみ表示する
-- SQLite ファイル DB のサイズを表示する
-- DBバックアップ設定として、保存間隔（日）と最大保存世代数を設定できる
-- 既定値は、保存間隔 7 日、最大保存世代数 4 世代
-- `/api/settings/status` 取得時に保存間隔を超えていれば自動バックアップを作成する
-- 自動バックアップは設定された最大保存世代数に従って古いものを削除する
-- `今すぐバックアップ` ボタンで手動バックアップを作成できる
-- 手動バックアップは最大保存世代数のカウント対象外とする
-- SQLite 以外の DB では、ファイルレプリカ方式のバックアップは非対応として表示する
-- API として `PUT /api/settings/db-backup` と `POST /api/settings/db-backup/run` を追加する
-- build number: 216
-
-### v1.36 (2026-05-02)
-
-**キャンバス比率: 屏風**
-
-キャンバス比率プラグインに `byobu` を追加した。
-
-- 比率は `2.2:1`
-- 表示名は `Byobu`
-- 説明は「日本の屏風。六曲一双の一隻に準じる横長の型」
-- 表示順は `Wide` の下、`Vertical` の上
-- build number: 215
-
-### v1.35 (2026-05-02)
-
-**エクスポートテンプレート**
-
-設定ダイアログに `エクスポート` タブを追加し、PNG 保存形式をユーザーごとのテンプレートとして管理できるようにした。
-
-- `エクスポート` タブは全ログインユーザーが利用できる
-- テンプレートはサーバー DB のユーザー別設定として保存する
-- テンプレート項目は、テンプレート名、説明、y軸高さ（ピクセル数）とする
-- 既定テンプレートとして `PNG 1024px` と `PNG 2048px` を用意する
-- ステータスバーの PNG ボタンから表示されるメニューは、保存済みテンプレートを参照する
-- PNG 書き出し時は y軸高さを基準にし、現在のキャンバス比率から横幅を算出する
-- API として `GET /api/auth/me/export-templates` と `PUT /api/auth/me/export-templates` を追加する
-- build number: 214
-
-### v1.34 (2026-05-02)
-
-**プラグインディレクトリ構成の整理**
-
-プラグインを system と user の配置に分け、各プラグインを専用ディレクトリに置く構成へ変更した。
-
-- サーバー側プラグイン実装を `server/src/inku_server/plugins/` パッケージへ移行
-- system plugin は `server/src/inku_server/plugins/system/<plugin_name>/` に配置する
-- user plugin 用に `server/src/inku_server/plugins/user/` 名前空間を予約する
-- Web 側プラグイン実装を `web/src/lib/plugins/system/<plugin-id>/` に配置する
-- user plugin 用に `web/src/lib/plugins/user/` を予約する
-- 既存の `canvas-aspect` は system plugin として専用ディレクトリへ移動する
-- `server/src/inku_server/plugins/__init__.py` は API / Renderer から参照する安定した hook API を再エクスポートする
-- build number: 213
-
-### v1.33 (2026-05-02)
-
-**設定ダイアログのロール別表示制御**
-
-設定ダイアログで、ロールごとの表示範囲と変更権限を整理した。
-
-- `DB設定` タブは `admin` ロールのみに表示する
-- `ユーザー管理` タブは `admin` ロールのみに表示する
-- `プラグイン` タブは全ログインユーザーに表示する
-- プラグイン設定の変更は `admin` ロールのみに許可する
-- 非 admin ユーザーが設定を開く場合、保存済みタブが `DB設定` / `ユーザー管理` であっても `プラグイン` タブへフォールバックする
-- plugin storage 更新 API は admin のみ利用可能とする
-- build number: 212
-
-### v1.32 (2026-05-02)
-
-**プロフィールダイアログ**
-
-アプリレールのユーザーアイコンメニューにプロフィールを追加し、ログインユーザーが自分のアカウント情報を直接変更できるようにした。
-
-- ユーザーアイコンメニューは、プロフィールとログアウトを選択できる
-- プロフィールを選択すると、設定ダイアログとは独立したプロフィールダイアログを表示する
-- プロフィールダイアログではメールアドレスを変更できる
-- パスワード変更時は、現在のパスワードと新しいパスワードを入力する
-- 新しいパスワードは 8 文字以上とし、現在のパスワードが一致しない場合は変更を拒否する
-- 自己プロフィール更新 API として `PATCH /api/auth/me/profile` を追加する
-- 管理者によるユーザー管理 API とは分離し、ログインユーザー自身のメールアドレス / パスワード変更に限定する
-- build number: 206
-
-### v1.31 (2026-05-02)
-
-**記述タブ進捗マスコットのキウイ化**
-
-記述タブの単発描画中、および解釈（正規化DDL）からの再描画中に表示する進捗バー上のマスコットを、小鳥からキウイへ変更した。
-
-- キウイは左向き固定で表示し、右向き反転や方向転換の中間フレームは使用しない
-- 長いくちばしで地面をつつく、鼻を鳴らす、瞬きする、くちばしを開けてダッシュするなどの仕草を行う
-- 脚は胴体下部の固定位置から生え、足先だけが動くようにして、付け根が揺れない
-- 足先の動きはややダイナミックにし、歩行時の踏み替えが分かるようにする
-- 胴体と尾側を別グループ化し、低頻度でお尻を振る仕草を行う
-- キウイボールでは頭・胴体・くちばしを残した丸まり表現とし、6秒以上その場に留まる
-- キウイボール中は目を閉じ、頭だけがゆっくり「こくり、こくり」と動く
-- 進捗マスコットは `KiwiMascot.svelte` として共通コンポーネント化し、記述パネルと DDL 再描画パネルから利用する
-- build number: 199
-
-### v1.30 (2026-05-01)
-
-**ステータスバーとパネル操作の整理**
-
-描画パネル下部のステータスバーを、現在の生成コンテキストと成果物操作を素早く確認できる場所として整理した。
-
-- ステータスバーには Stage 1 / Stage 2 モデル名、色カタログ名に加えて、キャンバスプラグインの現在キャンバス種類を表示する
-- 履歴表示時は履歴レコード内の JSON Score `canvas` を優先し、当該履歴が生成されたキャンバス種類を表示する
-- SVG / PNG 書き出しボタンから `エクスポート:` ラベルを削除し、download アイコン + 形式名の表示に変更する
-- 記述 / バッチ / デモの開始系ボタンを共通コンポーネント化し、見た目と disabled 状態を統一する
-- 記述パネルの解釈 box を拡大し、語彙ハイライト表示と編集 textarea の高さを揃える
-- build number: 185
-
-### v1.29 follow-up (2026-05-01)
-
-**キャンバスプラグインの Score 反映**
-
-`canvas-aspect` で選択したキャンバス種類を JSON Score と履歴に明示的に保存するようにした。
-
-- `/api/paint`、`/api/compose`、履歴保存時に渡した `canvas_aspect` を `Score.canvas` に反映する
-- Renderer は request の `canvas_aspect` を優先しつつ、未指定時は `Score.canvas` を参照して SVG の `width` / `height` / `viewBox` を決定する
-- 履歴表示・JSON タブで、生成に使われたキャンバス種類が `score.canvas` として確認できる
-- build number: 179
-
-### v1.29 (2026-05-01)
-
-**プラグインサポートの初期実装**
-
-アプリケーションのコア要素とノンコア拡張を分離するため、最初のプラグインフックとして canvas-size hook を導入した。
-
-- `canvas-aspect` 参照プラグインを追加
-- キャンバス比率として `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` をサポート
-- ユーザーごとのプラグイン設定を DB の `plugin_storage` に JSON として保存
-- `/api/auth/me/plugin-storage` と `/api/auth/me/plugin-storage/{plugin_id}` を追加
-- `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を変更
-- Web UI ではモデル選択ボタンの左側にプラグイン呼び出しボタンを追加
-- キャンバス比率変更時は現在の描画コンテキストをクリアし、選択比率のプレースホルダー画像を表示
-- ステータスバーには現在または履歴のキャンバス種類を表示し、プラグイン選択が描画コンテキストに含まれていることを確認できる
-- 設定ダイアログのプラグインタブを整理し、システム標準プラグインとして `canvas-aspect` の説明、バージョン表記、有効/無効トグルを表示
-- ユーザープラグイン追加 UI はスケルトンとして配置し、外部ローダー実装後に有効化する
-- 設定ダイアログはタブ切替で上端位置が動かないよう、通常設定モードでは固定上端・固定高に変更
-- プラグイン作成のリファレンスとして `PLUGIN.md` を追加
-- build number: 178
-
-### v1.28 (2026-05-01)
-
-**Stage 1 / Stage 2 hard timeout と deterministic fallback**
-
-不正・矛盾・曖昧入力30件ストレステストで、API / renderer は落ちない一方、Stage 1 / Stage 2 の LLM 応答が数分単位で返るケースが確認された。これに対し、LLM クライアントの read timeout とは別に、API 層で Stage 単位の hard timeout を実装した。
-
-- Stage 1 は `INKU_STAGE1_HARD_TIMEOUT_SECONDS` を超えた場合、入力文から deterministic fallback DDL を生成する
-- Stage 2 は `INKU_STAGE2_HARD_TIMEOUT_SECONDS` を超えた場合、追加 retry を待たず deterministic fallback Score へ切り替える
-- 既定値はいずれも 120 秒
-- `/api/interpret` は fallback 時のみ `fallback_used` / `fallback_reasons` を返す
-- `/api/paint` は `interpret_fallback_used` / `interpret_fallback_reasons` を返す
-- `/api/compose` / `/api/paint` の Stage 2 診断には `stage2_hard_timeout` / `stage2_retry_hard_timeout` を記録する
-- `inku-cli paint` / `batch` の summary JSON に Stage 1 fallback 情報も含める
-- build number: 172
-
-追加テスト:
-
-- `test_api.py`
-  - Stage 2 hard timeout 時に `/api/compose` が fallback Score を返す
-  - Stage 1 hard timeout 時に `/api/paint` が fallback DDL で継続する
-
-**複数ユーザー同時描画時の安全性**
-
-複数ユーザー、または同一ユーザーが同時に `/api/paint` を実行した場合に、共有資源が無制限に増えたり、ユーザー別の生成回数が欠落したりしないようにする。
-
-- `user_accounts.image_generation_count` は、DB 側の単一 `UPDATE` で `image_generation_count = image_generation_count + amount` として原子的に加算する
-- Stage 1 / Stage 2 の LLM 呼び出しは共有 bounded executor で実行する
-- Stage executor の worker 数は `INKU_STAGE_WORKERS`、待機を含む上限は `INKU_STAGE_QUEUE_LIMIT` で設定する
-- Stage 呼び出しが hard timeout しても、下層の LLM 呼び出しスレッドは Python から強制停止できない。そのため timeout 済みの処理も実際に完了するまで Stage capacity を保持し、後続リクエストが無制限に積み上がらないようにする
-- Stage capacity を取得できない場合は Stage hard timeout と同じ fallback 経路へ進む
-- `/api/settings/status` は `stage_execution` に worker 数、queue 上限、`submitted` / `completed` / `failed` / `timed_out` / `rejected` を返す
-- 履歴保存、履歴一覧、スター、削除、復元は引き続き `user_id` で絞り込み、ユーザー間で履歴が混在しないようにする
-
-追加テスト:
-
-- `test_api.py`
-  - 同一ユーザーの生成回数を並列更新しても最終カウントが欠落しない
-  - Stage hard timeout 後も underlying worker 完了まで capacity が保持され、次の Stage 実行が上限で拒否される
-  - `/api/settings/status` が `stage_execution` の状態を返す
-
-検証:
-
-```sh
-cd server
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
-
-cd ../cli
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
+#### Web UI 改善
+
+- **タブ切り替え**: 演奏 / 楽譜 / プロンプト の 3 タブ (旧: 垂直展開)。新しい結果が来ると自動的に「演奏」タブに戻る
+- **ビルド番号**: `vite.config.ts` に `.build-number` ファイルベースのインクリメント機構を追加。ヘッダー左上に `#N` 表示
+- **接続先 / モデル ラベル**: 「接続先：」「モデル：」を明記
+- **プロンプト表示順**: Stage1ユーザー入力 → Stage1システム → Stage2ユーザー入力 → Stage2システム (文脈順)
+
+---
+
+### v1.2 (2026-04-25)
+
+**バッチモード + 演奏ステージ可視化 + 学習モード廃止 + わりあい語彙追加**
+
+#### バッチ記述モード
+
+- 入力欄に「記述 / バッチ」タブを追加
+- バッチタブ: 改行区切りで複数の記述を入力、左端に行番号を自動表示
+- 順次処理: 演奏中は「N / M 番目を演奏中…」と表示、停止ボタンで中断可能
+- 各結果を履歴に保存し、最後の結果がキャンバスに残る
+
+#### 演奏中ステージ可視化
+
+- フロントエンドの処理方式を `/api/paint` 1 コール → `/api/interpret` + `/api/compose` の 2 コール方式に変更
+- 演奏中に「解釈中…」「構造化中…」をステージラベルとして経過秒と並べてリアルタイム表示
+- `ComposeRequest` に `original_text` フィールド追加 (Stage 2 が元の記述を参照して属性補完に活用)
+
+#### 学習モード廃止
+
+- Web UI の学習モードパネルを削除
+- `GET /api/train`・`GET /api/train/stats`・`DELETE /api/train` エンドポイントを削除
+- 起動時の EXAMPLE_POOL 注入ルーティングも削除 (`trainer.py` は実験的ユーティリティとして残置)
+
+#### Web UI 改善
+
+- 出力タブ順変更: 演奏 → プロンプト → 楽譜 (旧: 演奏→楽譜→プロンプト)
+- プロンプト表示領域拡大: ユーザー入力 max-height 160px、システムプロンプト 400px、外枠 680px
+- 履歴に `stage1_model` / `stage2_model` を記録 (サムネイルの title で確認可)
+
+#### Saijiki わりあいカテゴリ追加
+
+- 新カテゴリ `わりあい (proportions)`: 縦長・横長・全幅・半幅・半円・上弦・下弦・三日月
+- Stage 1 `SYSTEM_PROMPT_PREFIX` に `# わりあい` ルールセクション追加 (縦横比・線長・月形→角度の変換原則)
+- Stage 2 `SYSTEM_PROMPT` にわりあい JSON マッピング例 7 件追加
+- `EXAMPLE_POOL` に 8 件追加 (縦横比 2・線長 2・弧月 4)
+- `saijiki.ts` に `わりあい` カテゴリを追加
+
+---
+
+### v1.3 (2026-04-26)
+
+**Saijiki スナップショット + トークン表示 + ダウンロード + i18n**
+
+#### Saijiki スナップショット
+
+**注記**: この機能は v1.11 で歳時記 v1 仕様確定まで一旦削除。以下は v1.3 時点の履歴として残す。
+
+特定時点のシステムプロンプト状態を名前付きで保存・呼び出す機能を追加。
+
+- **`server/src/inku_server/snapshots.py` 新規作成**
+  - `create_snapshot(name, stage1_prefix, stage2_prompt)` → UUID + タイムスタンプ付きで保存
+  - ストレージ: `/tmp/inku-saijiki-snapshots.json` (env var `INKU_SNAPSHOTS_FILE`)
+  - `list_snapshots()` / `get_snapshot(id)` / `delete_snapshot(id)` の CRUD
+- **API エンドポイント追加**
+  - `GET /api/saijiki/snapshots` → `list[SnapshotMeta]`
+  - `POST /api/saijiki/snapshots` → スナップショット作成
+  - `DELETE /api/saijiki/snapshots/{id}` → 削除
+- **スナップショット適用**: `InterpretRequest` / `ComposeRequest` / `PaintRequest` に `snapshot_id` フィールド追加。推論時に一致するスナップショットのプロンプトを上書き
+- **設計**: Stage 1 はプレフィックス (`SYSTEM_PROMPT_PREFIX`) のみ保存し、EXAMPLE_POOL の動的例選択は引き続きリアルタイム動作。スナップショットはプレフィックスの変更のみをキャプチャ
+- **Web UI**: スナップショットパネル (折り畳み式) を歳時記エリアに追加。現在設定表示・名前入力・保存・削除・選択適用
+
+#### トークン数トラッキング
+
+LLM の消費トークンを処理中に表示し履歴にも記録。
+
+- **`interpreter.py`**: `interpret_detail()` が `(ddl, thinking, tokens_in, tokens_out)` の 4-tuple を返すように変更
+  - Anthropic: `resp.usage.input_tokens / output_tokens`
+  - OpenAI/OVMS: `resp.usage.prompt_tokens / completion_tokens`
+  - いずれも `getattr` で安全取得 (未対応モデルは `None`)
+- **`composer.py`**: `compose()` が `(Score, tokens_in, tokens_out)` の 3-tuple を返すように変更
+- **`api.py`**: `InterpretResponse` / `ComposeResponse` / `PaintResponse` に `tokens_in / tokens_out` フィールド追加
+- **Web UI**: 処理中の「構造化中…」ラベルにトークン数をリアルタイム表示。履歴サムネイルに `{in}→{out}tok` 表示
+
+#### ダウンロード機能
+
+完成した作品を SVG および複数解像度の PNG で保存可能に。
+
+- **SVG ダウンロード**: `<desc>` タグに元の記述テキストを埋め込んで出力。`svgWithDesc()` 関数で `<svg ...>` の直後に挿入
+- **PNG ダウンロード**: 4 解像度 (1080 / 2160 / 1024 / 2048px) をブラウザ Canvas API で変換
+  - SVG に `width` / `height` 属性を注入し `Image` に描画 → Canvas → `toBlob('image/png')` → `<a>` 要素でダウンロード
+  - Canvas 背景は白 (`#ffffff`) でプリフィル (透過 PNG にならないよう)
+- **UI**: キャンバス下部にダウンロードバーを追加。`↓ SVG` ボタン + `PNG:` ラベル + `1080 / 2160 / 1024 / 2048` ボタン
+
+#### 履歴: モデル名・トークン数表示
+
+- 履歴サムネイルに Stage 2 使用モデルの短縮名 (`shortModel()`) を表示
+- `Iteration` 型に `tokens_in / tokens_out` フィールド追加
+- `HistoryPostBody` にも `tokens_in / tokens_out` を追加してサーバー側履歴にも記録
+
+#### ハッカソン関連テキスト削除
+
+UI 全体からハッカソン関連の記述を削除。
+
+#### i18n — 日英言語パック
+
+UI の日本語 / 英語切り替えを実装。将来の多言語対応を設計から内包。
+
+- **`web/src/lib/i18n/types.ts`**: `LangPack` インターフェース定義
+  - 単純文字列フィールドと関数フィールド (`batchCount(n)`, `stageStructuring(tok)`, `tokenSummary(...)` 等) を混在
+- **`web/src/lib/i18n/ja.ts`** / **`en.ts`**: 日本語・英語パックを個別ファイルで管理
+- **`web/src/lib/i18n/index.svelte.ts`**: Svelte 5 `$state` ベースの言語ストア
+  - `t()` 関数でアクティブパックを返す (テンプレート内 `t().key` で全文字列を参照)
+  - `setLang(code)` + `localStorage` 永続化
+  - 新言語追加: `types.ts` にパック実装 + `PACKS` に登録するだけ
+- **`+page.svelte`**: 全ハードコード文字列を `t().xxx` に置き換え。`$derived.by(() => t().tokenSummary(...))` パターンで複合 derived を実装
+- **ヘッダー**: 言語切り替えボタン (`日本語` / `English`) をヘッダー右上に配置
+
+---
+
+### v1.4 (2026-04-26)
+SPEC.mdの内容精査。
+
+### v1.5 (2026-04-26)
+
+
+#### UI 修正
+
+- **canvas max-height 追加**: `.canvas { max-height: 480px }` を設定。`aspect-ratio: 1/1` のみでは canvas がビューポート幅（~560px）まで拡大し、history strip がビューポート外に押し出されていた問題を修正
+- **履歴 each キー修正**: `{#each historyItems as it, i (it.at)}` → `(it.id ?? it.at)`。同一タイムスタンプで複数アイテムが記録された場合の重複キーを解消。`Iteration` 型に `id?: string` 追加
+
+### v1.6 (2026-04-27)
+
+**UI全面再設計 + 色カタログシステム + 再演奏機能**
+
+#### レイアウト刷新
+
+旧来のスクロール型ページ（max-width: 1200px）から、固定ビューポートの2ペイン構成へ全面移行。
+
+```
+[ヘッダー]                          固定
+[左パネル 440px] | [右パネル flex]  flex: 1 / overflow: hidden
+[履歴ストリップ]                     固定（下部）
 ```
 
-結果:
+- **左パネル**: 記述/バッチ タブ → 指示 → 演奏する → 語彙ハイライト → 解釈DDL → 再演奏 → 統計折りたたみ。`overflow-y: auto` で内部スクロール
+- **右パネル**: タブバー（描画/プロンプト/JSON）→ キャンバスエリア → エクスポートバー
+- **履歴ストリップ**: 82px サムネイル横スクロール。ページネーション「← 新 / 旧 →」。現在表示中に「表示中」バッジ
 
-- `ruff`: all checks passed
-- server pytest: `107 passed, 30 skipped`
-- cli pytest: `8 passed`
+#### 接続設定ポップオーバー
 
-### v1.27 (2026-05-01)
+Stage 1 / Stage 2 モデル選択を「⚙ 接続設定」ボタン → ポップオーバーに集約。旧 model-row は廃止。スナップショット選択は v1.11 で歳時記 v1 仕様確定まで削除。
 
-**Stage 2 過長応答対策 + DDL coverage 補完**
+#### 再演奏機能
 
-修正後30件ベンチで、重複・過密は改善した一方、Stage 2 が長時間応答した末に 1 instruction へ縮退するケースが残ったため、追加の診断と補完を実装した。
+解釈DDL ボックス直下に「↺ 再演奏」ボタン追加。`/api/compose` のみ呼ぶ（Stage 1 スキップ）。DDL を手動編集後に再レンダリングするユースケースを想定。進捗バー表示付き。
 
-- Stage 2 の結果が空、`tokens_out` 過大、または長時間かつ単一 instruction の場合は、コンパクトな描画命令を要求して1回再試行する
-- 再試行理由は `empty_instructions` / `excessive_tokens_out` / `slow_single_instruction` として API レスポンスに残す
-- `/api/compose` は `retry_count` / `retry_reasons` / `fallback_used` を返す
-- `/api/paint` は `compose_retry_count` / `compose_retry_reasons` / `compose_fallback_used` を返す
-- `inku-cli paint` / `batch` の summary JSON に Stage 2 retry/fallback 情報を含める
-- Score coerce layer は、Stage 2 が1命令へ縮退した場合、DDL の複数視覚句から最大5命令まで coverage 補完を行う
-- 1つの `arrangement` が過大になりすぎないよう、単一 instruction の展開数にも上限を設ける
+#### ズームUI
 
-追加テスト:
+右パネルキャンバス下部中央に固定配置。`−` / `＋` / `⊙`（リセット）。範囲 0.5×〜3×（0.25 刻み）。`transform: scale()` をキャンバスコンテナに適用。
 
-- `test_coerce.py`
-  - 単一 arrangement count の上限
-  - 1命令縮退時の DDL coverage 補完
+#### ナビゲーション・エクスポート
 
-検証:
+- `‹` / `›` ボタンをキャンバス左右端に絶対配置（円形 38px）
+- 枚数カウンター（N / total）を `›` ボタン下に表示（画像に重ねない）
+- `↓ SVG` + `↓ PNG ▾`（ドロップダウン: 1080px / 2160px / 1024px / 2048px）
 
-```sh
-cd server
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
+#### 歳時記ドロワー刷新
 
-cd ../cli
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
+右端からのスライドイン式ドロワー（幅 0 → 280px、`cubic-bezier(0.4,0,0.2,1)` 0.25s）。カテゴリ見出しを明朝体（ja / en 並記）、語彙をミニマルトークンボタン。ヘッダーの「歳時記」テキストリンク + 左パネルの「歳時記」ボタン両方からトグル。
+
+#### 色カタログシステム
+
+**フロントエンド**: 初期実装では `web/src/lib/colors.ts` にカタログ定義を持った。v1.25 以降はサーバー側 `GET /api/color-catalogs` を正本とし、フロントエンドは取得した一覧を表示・選択に使う。
+
+```typescript
+type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
 ```
 
-結果:
+- `default`（規定値）= 既存 `renderer.py` COLOR_MAP と完全一致
+- 追加10種: Ink & Season / Fresco Study / Open-Air Light / Ink & Porcelain / Cool Material / Dye & Earth / Desert Mineral / Vivid Material / Weathered Heritage / Sea & Stone
+- 各カタログは `map`（6色 ColorMap）+ `swatches`（表示用8色）+ `palette`（名称付き8色）を持つ
+- `default` は文化的な標準ではなく neutral baseline として扱う。追加カタログの `id` / 表示名 / 説明は、国名・民族名・食・祭り・帝国・観光記号で文化全体を代表しないよう、素材・光・技法・描画上の振る舞いを基準に命名する。
+- カタログの `map` は `white / black / blue / red / green / gray` の抽象色としての意味を壊さないことを優先する。特徴色は `palette` に逃がし、`blue` が pink へ、`gray` が terracotta へ、`black` が navy へ変わるような意味崩れを避ける。
+- Build 265 時点の残課題として、`open_air_light`, `dye_earth`, `desert_mineral` は背景・暗色・高彩度差し色が作品全体を支配しやすい。今後の調整は個別プロンプト最適化ではなく、core color の明度・彩度・背景化しやすさを抑える方向で行う。
+- Build 266 では上記3カタログの core color を少し軽くし、背景・暗色・高彩度差し色の支配を抑えた。`default.sub` は英語UI向けに `neutral baseline` とし、日本語UI向け説明は `sub_ja` に分離する。
+- カタログ詳細色は `palette[].name` を英語の正本表示名とし、対応する日本語名がある場合は `palette[].name_ja` を併記できる。日本語UIでは `English（日本語）` と表示し、英語UIでは `name` のみ表示する。
 
-- `ruff`: all checks passed
-- server pytest: `105 passed, 30 skipped`
-- cli pytest: `8 passed`
-
-### v1.26 (2026-05-01)
-
-**軌跡フィールドの追加**
-
-DDL の「波打つ軌跡」「斜めの帯」「上から下」「右半分」などが `scatter` に埋もれないよう、JSON Score の `arrangement` に `path` フィールドを追加した。
-
-- `arrangement.path` は `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` を持つ
-- Stage 2 は「波打つ軌跡に沿って」を `path="wave"`、「斜めの帯」を `path="diagonal"`、「右半分」を `path="right_half"` として出力する
-- 「上から下へ散らす」は `layout="vertical"` に加えて `path="top_to_bottom"` を指定できる
-- Renderer は `path` が指定された arrangement を、決定的な軌跡座標として展開する
-- 既存 JSON 互換のため、`path` の既定値は `none` とする
-
-### v1.25 (2026-05-01)
-
-**てざわり選択と物理素材レンダリング**
-
-DDL の「てざわり」が線幅差だけに見えないよう、Stage 1 / Stage 1.5 / Renderer の各層で素材差を強化した。
-
-- Stage 1 に「てざわり選択」ルールを追加し、明示素材がない入力でも文脈から素材を選ぶ
-  - 薄い / 淡い / 下書き / 素描 → 鉛筆または細筆
-  - 粉 / かすれ / 乾いた / 黒板 / 壁 → チョーク
-  - 手描き / こすれ / 蝋 / 柔らかい色面 → クレヨン
-  - 墨 / 書 / 筆跡 / 濃淡 → 細筆または太筆
-  - 精密 / 機械的 / 均一 / 図面 → ロットリング
-  - 太い / 荒い / 撚り / 重い / 綱 → 縄
-- Stage 1 の few-shot に鉛筆、チョーク、クレヨン、ロットリングの質感例を追加した
-- Stage 1.5 の拡張DDL候補に `鉛筆の余白線`、`クレヨンの擦れ`、`ロットリングの均一線`、`縄の撚り` を追加した
-- Renderer は `weight` ごとに SVG 属性・texture filter・副線・粒・撚り短線を生成する
-- line に加えて circle / ellipse / square / arc の輪郭にも素材処理を適用する
-- `pencil` / `crayon` / `chalk` / `brush_thick` は `feTurbulence` / `feDisplacementMap` を使い、線幅だけではない質感差を出す
-- `rope` は平行な撚り線に加え、周期的な斜め短線で撚りを表現する
-
-### v1.24 (2026-05-01)
-
-**揺らぎの視認性改善**
-
-DDL の「細かく揺れる」「ゆっくり揺れる」が JSON Score と SVG 上で視認しやすくなるように、Stage 2 と Renderer の扱いを調整した。
-
-- Renderer の `fine` 揺れ幅を 1000px キャンバス上で 7px とし、サムネイルでも細かい揺れが読めるようにする
-- 「ゆっくり揺れる」/ `Swaying slowly` は Stage 2 で `variation.quality="wave"` / `frequency="slow"` を優先する
-- 「震える」「細かく揺れる」は `quality="perlin"` を基本とし、微細な不規則性として扱う
-- 短い line の揺らぎは `dimensions=["position_x","position_y"]` を優先し、短線上で揺れが潰れないようにする
-- `schema.py` の `variation.quality` 説明も、`perlin` と `wave` の役割が分かれるように更新した
-
-### v1.23 (2026-05-01)
-
-**inku-cli 初期実装**
-
-macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI は `server/` から独立した root 直下の `cli/` プロジェクトとして管理する。
-
-- `inku-cli` を `cli/pyproject.toml` の console script として登録する
-- 実装は `cli/src/inku_cli/`、テストは `cli/tests/` に配置する
-- CLI はサーバー内部ロジックを直接呼ばず、Web UI と同じ FastAPI API を操作する
-- `login` は `/api/auth/login` の `inku_session` Cookie を取得し、以後は `Authorization: Bearer` として送信する
-- セッション設定は `~/.config/inku-cli/config.json` に保存し、ファイル権限は可能な限り `0600` にする
-- `me` / `logout` / `paint` / `batch` / `demo-instruction` / `history` を初期コマンドとして提供する
-- `paint` / `batch` は SVG / JSON をファイル出力でき、必要に応じて PNG も生成できる
-- `paint` / `batch` は Stage 1 / Stage 2 モデル指定、履歴保存、artifact 保存、言語指定、thinking 取得を指定できる
-- `models` コマンドで Stage 1 / Stage 2 の CLI 既定 provider / model を確認・保存できる
-- provider は `nvidia` / `anthropic` / `local` を保存できる。API へ送るのは model ID で、provider は CLI 側の接続先・運用管理用メタデータとして扱う
-- timeout 秒数も CLI ローカル設定に保存でき、コマンド引数 > ローカル設定 > 600 秒の順で解決する
-- `paint` / `batch` は使用する Stage 1 / Stage 2 provider / model を描画開始時に stderr へ表示し、JSON summary にも含める
-- 描画系 API 呼び出しの既定 timeout は 600 秒とし、長い Stage 2 推論を待てるようにする
-- 描画中は stderr に経過秒数と簡易テキストアニメーションを表示し、停止していないことを確認できる
-- 初期目的は、CLI から指示と画像を生成し、AI による成果物画像の品質判定を組み合わせて Stage 1 / 1.5 / 2 調整用のフィードバックループを構築すること
-- CLI は `inku_server` を import せず、単独の API クライアントとして起動する
-- 開発時は `cd cli && uv run inku-cli ...` で実行する
-- macOS から pentala の `inku-api` へ LAN 経由で接続し、`login` / `paint` / SVG・JSON・PNG 出力の動作を確認した
-- CLI の確認で生成される `cli/out/` はローカル成果物として Git 追跡対象外にする
-
-### v1.25 (2026-05-03)
-
-**サーバー正本の色カタログ API + CLI version/build 表示**
-
-色カタログの正本をクライアント側静的定義からサーバー側へ移した。
-
-- 色カタログ定義は `server/src/inku_server/color_catalogs.py` を正本とする
-- `GET /api/color-catalogs` は default catalog ID と全カタログの `map` / `swatches` / `palette` を返す
-- Web UI と CLI は色カタログ一覧をサーバー API から取得し、クライアント側のカタログ定義を持たない
-- `/api/paint`、`/api/compose`、`/api/history` は `catalog_id` を受け取り、サーバー側でレンダリング用 `color_map` を解決する
-- `color_map` リクエストフィールドは互換用に残すが、色カタログ解決の正本としては扱わない
-- 履歴には従来どおり `catalog_id` を保存する。加えて、描画レスポンス JSON と出力 artifact JSON には、実際に使用した解決済みの `stage1_model` / `stage2_model`、実際にレンダリングした `render_build_number`、sRGB基準であることを示す `render_color_profile`、サーバー解決済みの `render_color_catalog_id` / `render_color_catalog_name` / `render_color_catalog_sub`、および `render_color_map`（抽象色名・`palette:<name>` から実際の `#RRGGBB` コードへの展開）を記録する。`render_color_catalog` の完全な `map` / `swatches` / `palette` snapshot は `render_color_map` と重複するため保存しない
-- `GET /api/info` はサーバー名、バージョン、ビルド番号を返す
-- CLI に `version` コマンドを追加し、CLI 側の version / build number と、接続先サーバーの version / build number を表示する
-- Build 264
-
-### v1.26 (2026-05-03)
-
-**Build 257: CLI benchmark 診断 summary 拡張**
-
-Build 256 の focused small bench と 3 persona review で、green / shape / motif / math balance の到達状況をより機械的に追える必要が明確になった。
-
-CLI benchmark summary は、作品品質の評価そのものではなく、後続の人間評価と実装修正を支える診断データとして扱う。
-
-- `color_trace` は、色 marker だけでなく否定文脈も記録する
-  - 例: `緑には寄せず`, `緑ではなく`, `not green`, `avoid green`
-  - 否定された色は `negated_color_markers` に入り、`requested_colors` から除外する
-  - これにより「緑を出さないことが正しい」サンプルを `green_requested_but_missing_in_score` と誤警告しない
-- `_score_metrics` は `score_motif_hint_counts` を返す
-  - `leaf_cluster`
-  - `paper_shard`
-  - `ripple_knot`
-  - `mountain_sign`
-- `inku-cli batch` summary は、motif / math marker のサンプル番号を列挙する
-  - `score_motif_hint_lines`
-  - `math_balance_marker_lines`
-- `math_balance_markers` は count だけでなく、どの sample で出たかを追跡できる
-- summary は既存キーを維持しつつ追加キーとして拡張する。既存の benchmark JSON consumer を壊さない
-- Build 257
-
-### v1.24 (2026-05-02)
-
-**Build 250: DDL 品質チューニング 2-5 + ベンチマーク tooling**
-
-Build 248 / 249 の sensory retention 後に残った「fallback 作品の縮退」「黒・灰偏重」「形状語彙の狭さ」「ベンチ結果整理の手作業負担」に対応した。
-
-Fallback score の品質改善:
-
-- Stage 2 が timeout / empty instructions で deterministic fallback Score へ切り替わった場合でも、DDL の数量・配置・素材・場のトーンを可能な範囲で保持する
-- `散らす` / `点々` / `scatter` / `dotted` は fallback でも `arrangement` として保持する
-- 40個以上の反復は `density=medium`, `cluster_count`, `fade`, `preserve_space=true` を付与し、余白を残す
-- 120個を超える反復は最大 120 個程度へ代表化し、300個以上は `density=high`, `cluster_count=9` として群の見え方を優先する
-- `波打つ軌跡`、`斜めの帯`、`右半分`、`上から下`、`左から右` は fallback でも `arrangement.path` へ反映する
-- fallback primitive は line / square へ寄せすぎず、DDL の語に応じて `triangle` / `arc` / `square` / `ellipse` / `line` へ分散する
-
-Palette strategy:
-
-- Stage 1.5 の deterministic expansion で、明示色が少ない場合に場のトーンから代表色を選ぶ
-- 春・花・蕾・温かい光は red / green / white 系を優先する
-- 水・夜・月・雨・霧・冷気は blue / white / gray 系を優先する
-- 森・葉・草・香りは green / white / gray 系を優先する
-- fallback でも春系・水夜系・多色系では `arrangement.color_cycle` を使い、単色化を避ける
-- 抽象色に収まらないニュアンスは `color_hint` に保持し、Renderer の色カタログ解決で利用できるようにする
-
-Shape vocabulary:
-
-- 既存 schema の範囲で `triangle` / `arc` / rotated square / thin ellipse をより積極的に使う
-- 山・屋根・尖った先端は `triangle` として表現する
-- 葉・花びら・羽・紙片・破片・舟は thin ellipse または rotated square として抽象化する
-- 扉・窓・箱・街・部屋・格子は rotated square を「視線の切片」として扱えるようにする
-- 自然 primitive plugin が未導入の段階でも、自然・物質形を既存 primitive で失わずに保持する
-
-Sensory visibility:
-
-- 白背景上の `柔らかな光`、`五感`、`透明な膜`、`気配` は単純な黒化を避け、淡い blue と `color_hint` で保持する
-- 白背景上の `香り` / `匂い` / `fragrance` / `scent` は淡い green と `color_hint` で保持する
-- 見えることを優先しつつ、感覚層が硬い黒線になって作品の余韻を壊すことを避ける
-
-CLI benchmark tooling:
-
-- `inku-cli batch` は `--summary-json` を指定すると batch summary JSON を指定パスへ保存する
-- `--out-dir` 指定時は既定で `OUT_DIR/analysis-summary.json` に summary を保存する
-- summary には `review_sets` を追加し、以下を自動分類する:
-  - `all_success_samples`: 成功した全サンプル
-  - `fallback_samples`: Stage 1 / Stage 2 fallback 使用サンプル
-  - `slow_samples`: 実行時間が長いサンプル
-  - `normal_samples`: fallback なし、かつ slow ではないサンプル
-- summary には色到達、否定色、motif 到達、数学的構図 marker の診断情報を含める:
-  - `color_trace`
-  - `negated_color_markers`
-  - `score_motif_hint_counts`
-  - `score_motif_hint_lines`
-  - `math_balance_markers`
-  - `math_balance_marker_lines`
-- NVIDIA Free API の待ち時間はキュー状況による偶然性が高いため、芸術評価では除外し、診断メタデータとしてのみ扱う
-- 成功した描画は、遅かった場合でも今後すべて品質評価対象に含める
-- `inku-cli contact-sheet` を追加し、PNG 出力ディレクトリから contact sheet を生成できる
-- CLI 依存関係として Pillow を明示し、contact sheet 生成を安定して利用できるようにする
-
-検証:
-
-- macOS:
-  - `server`: `76 passed, 15 skipped`
-  - `cli`: `11 passed`
-  - `ruff`: backend / CLI とも all checks passed
-- pentala:
-  - `server`: `76 passed, 15 skipped`
-  - `cli`: `11 passed`
-  - `ruff`: backend / CLI とも all checks passed
-  - `web`: `npm run check` 0 errors / 0 warnings
-  - `web`: `npm run build` success
-  - `inku-api` / `inku-server` health check: HTTP 200
-
-### v1.23 (2026-05-01)
-
-**NVIDIA Free API 前提の LLM retry / fail 機構 + 100件ベンチ由来の Score 補正**
-
-NVIDIA NIM は開発用の Free API 接続先として扱う。SLA は保証されず、リクエスト集中時には `inference connection error`、一時的な 5xx、応答遅延が発生しうる。その前提で、合理的な retry / fail 機構をサーバー側に追加した。
-
-- OpenAI 互換 LLM 呼び出しは `call_with_llm_retry()` を通す
-- retry 対象:
-  - `429 Too Many Requests`
-  - `408 / 500 / 502 / 503 / 504`
-  - `inference connection error`
-  - connection reset / aborted / timeout / gateway 系の一時エラー
-- retry 対象外:
-  - JSON grammar / schema compile error
-  - bad request
-  - authentication / authorization error
-  - not found
-  - その他、クエリや schema 自体の恒久的な問題
-- retry 回数、base delay、max delay、jitter は環境変数で調整できる:
-  - `INKU_LLM_RETRY_ATTEMPTS`
-  - `INKU_LLM_RETRY_BASE_DELAY`
-  - `INKU_LLM_RETRY_MAX_DELAY`
-  - `INKU_LLM_RETRY_JITTER`
-- OpenAI 互換クライアントには request timeout を設定し、無制限に待ち続けない:
-  - `INKU_LLM_REQUEST_TIMEOUT_SECONDS`
-  - 既定値は 120 秒
-- CLI 側の HTTP timeout は従来どおり長い描画待ち用に 600 秒を既定とする。サーバー内の LLM request timeout と、CLI から API への HTTP timeout は別レイヤーとして扱う
-
-100件ベンチで確認した DDL -> JSON の伝達欠落に対し、Score coerce layer を強化した。
-
-- Stage 2 が同一 `arrangement.count` 付き instruction を複製した場合、renderer 前に重複を統合する
-- renderer 展開後の総プリミティブ数に上限を設け、過密化と SVG 肥大を抑制する
-- 現時点の expanded primitive count 上限は 400
-- 上限超過時は `arrangement.count` を縮小し、`color_hint` に density cap の注記を残す
-- DDL の素材語から JSON Score の `weight` を補完する:
-  - ロットリング -> `rotring`
-  - 鉛筆 -> `pencil`
-  - クレヨン -> `crayon`
-  - チョーク -> `chalk`
-  - 細筆 / 水墨 / 墨 -> `brush_thin`
-  - 太筆 / 油絵 / 厚塗り -> `brush_thick`
-  - 縄 / ロープ -> `rope`
-- DDL の揺れ・滲み語から `variation` を補完する:
-  - `ゆっくり揺れる` / `ゆっくり波打つ` -> `quality=wave`, `frequency=slow`
-  - `細かく揺れる` / `細かく震える` / `震える` -> `quality=perlin`
-  - `滲む` / `境界が滲む` -> `quality=pink`
-- `/api/compose` と `/api/paint` は `coerce_score(score, ddl=...)` を呼び、DDL の素材・揺らぎ情報を補正に利用する
-- Stage 2 が空 `instructions` を返した後の deterministic fallback は、DDL の数量と素材語を可能な範囲で保持する
-
-追加テスト:
-
-- `test_llm_retry.py`
-  - rate limit retry
-  - inference connection error retry
-  - schema / grammar 系 bad request は retry しない
-- `test_coerce.py`
-  - repeated arranged instruction の重複統合
-  - expanded primitive count の上限
-  - DDL からの素材 / variation 補完
-  - 日本語数量詞からの count hint 抽出
-
-検証:
-
-```sh
-cd server
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
-```
-
-結果:
-
-- `ruff`: all checks passed
-- `pytest`: `103 passed, 30 skipped`
-
-### v1.22 (2026-05-01)
-
-**サーバー保存負荷制御 + 履歴検索高速化 + 履歴管理ページング安定化 + 状態分離 + デモタブ**
-
-出力ファイル保存は DB 履歴保存とは分離し、バックグラウンド保存キューの上限を設けた。
-
-- `/api/paint` は履歴 DB への保存を正本とし、SVG / JSON / PNG などの artifact ファイル保存は副産物として扱う
-- artifact 保存用 executor は worker 数と queue 数に上限を持つ
-- 保存 queue が上限に達した場合、DB 履歴保存を優先し、artifact 保存だけをスキップできる
-- `/api/settings/status` は `output_save` に worker 数、queue 上限、使用中 slot 数、利用可能 slot 数を返す
-
-履歴検索は SQLite FTS5 を利用する。
-
-- `history_fts` virtual table を作成し、`history` の `input` / `ddl` / `stage1_prompt` / `stage2_prompt` / `model` / `catalog_id` を検索対象にする
-- insert / update / delete trigger で FTS index を履歴 DB と同期する
-- 検索語が短い場合や FTS が利用できない場合は従来の `LIKE` 検索へ fallback する
-
-履歴管理ダイアログのページングを安定化した。
-
-- 履歴管理のページ移動、検索、表示種別、スター絞り込みは、取得時点の条件を明示して `/api/history` を呼び出す
-- 古いレスポンスが後から返っても、最新リクエストでなければ表示状態へ反映しない
-- 検索の debounce effect は `untrack` で fetch を呼び、ページ移動やスター絞り込みの state 更新と競合しないようにする
-- ページあたり件数は 100 件を維持する
-- 履歴管理のサムネイルは `content-visibility` を利用し、100 件表示のまま画面外 SVG の描画負荷を抑える
-
-ページ orchestration の肥大化を抑えるため、履歴管理ダイアログ専用の状態と副作用を `HistoryManagerState` へ切り出した。
-
-- `web/src/lib/historyManagerState.svelte.ts` を追加する
-- 履歴管理ダイアログの active / trash 表示、ページング、検索、スター絞り込み、選択状態、request id による stale response 破棄を同 state に集約する
-- `+page.svelte` は履歴ストリップ、削除 / 復元確認、表示中履歴への反映などページ横断の接続を主責務とする
-
-記述 / バッチの隣にデモタブを追加した。
-
-- `DemoPanel` を新設し、デモ専用 UI をコンポーネントとして分離する
-- デモは「シードフレーズから短い指示文を生成 → 生成された指示で1枚描画 → 表示間隔まで待機 → 繰り返し」で動作する
-- デモ設定はユーザーごとに `user_accounts.demo_settings` へ保存する
-- 設定項目は DB 保存有無、artifact ファイル保存有無、指示文生成モデル、シードフレーズ、表示間隔とする
-- デモの既定値は DB 保存なし / ファイル保存なし / 表示間隔 30 秒
-- `GET/PUT /api/auth/me/demo-settings` を追加する
-- `POST /api/demo/instruction` を追加し、シードフレーズからデモ用指示文を生成する
-- デモ実行中は生成された指示文と、ハイライト付き正規化DDLを表示する
-- デモ開始時は新規作成と同等に描画 / プロンプト / JSON 表示をクリアし、描画タブにはプレースホルダーを表示する
-- デモタブには新規作成ボタンを表示しない
-- デモ中もプロンプト / JSON タブは参照可能とし、生成された指示文と正規化DDLを確認できる
-- デモ実行中は履歴ストリップを操作ロックし、ロック中であることを視覚的に表示する
-- 現在表示中のデモ描画を気に入った場合、デモを止めずに `現在の描画をDBに保存` ボタンから履歴へ追加できる
-- デモ描画を手動保存するまでステータスバーのスター操作では履歴へスターを付与しない
-- デモ実行中は合計実行時間 / 合計トークン数と、現在描画中の指示の実行時間 / トークン数を表示する
-- デモ停止後も合計実行時間 / 合計トークン数 / 描画件数を保持して表示する
-- `/api/history` は `save_artifacts` を受け取り、手動保存時のファイル保存有無を制御できる
-- Stage 2 の tool schema は `$defs` / `$ref` をインライン展開してから LLM API へ渡し、JSON grammar コンパイラが参照解決できない環境でも動作するようにする
-
-- Build 162
-
-### v1.21 (2026-04-30)
-
-**アプリレール導入 + ダークモード導入 + ユーザー別 UI 状態保存 + スター付き履歴 + バッチ進捗視認性**
-
-画面上部の固定ヘッダーを廃止し、左側の収納式アプリレールへ集約した。
-
-- アプリ名、ビルド番号、ユーザー操作、設定、言語切替、テーマ切替を左レールに配置する
-- レールは展開 / 収納でき、通常時の縦方向の作業領域を広げる
-- 開発中の確認用として、ビルド番号はレール収納時でも常時視認できる位置に残す
-- アプリ名は収納時 `inku`、展開時 `inku-lang` として表示する
-- 展開 / 収納で `inku` 部分の位置と大きさが変わらないよう、`inku` 部分は固定幅で表示する
-- ユーザー名操作はメニュー化し、ログオフを選択できる
-- 設定は歯車アイコン、ユーザー操作は人型アイコンで表示する
-
-履歴エリアを折りたためるようにした。
-
-- 下部の履歴ストリップは必要に応じて収納できる
-- 履歴を閉じた状態では描画 / 記述 / バッチの作業領域を広く使える
-- 履歴を再表示した場合も、現在の履歴ページングとスター絞り込みの文脈を維持する
-
-UI にライト / ダークモードを追加した。
-
-- 画面左の収納式アプリレールからテーマを切り替えられる
-- ダークモードでは背景、パネル、入力欄、モーダル、履歴、ステータスバー、ボタン類の配色を切り替える
-- 描画そのものの SVG / PNG 出力はテーマに影響されず、Score の背景色と描画色を正とする
-- ダークモードでは描画パネルの履歴移動ボタン、ズームボタン、倍率表示、記述 / バッチの描画ボタンのコントラストを確保する
-- 履歴管理ダイアログの hover メタデータポップアップもダークモード向けの色へ切り替える
-
-ライト / ダークモードはユーザー情報としてサーバー側に保存する。
-
-- UI テーマは `user_accounts.ui_theme` に保存する
-- ログイン時に `/api/auth/me` から現在ユーザーの UI テーマを取得する
-- テーマ切替時は `PATCH /api/auth/me/settings` でサーバーへ保存する
-
-バッチパネルの指示履歴をユーザーごとのサーバー保存へ変更した。
-
-- `user_accounts.batch_prompt_history` に最大 20 件の指示履歴を保存する
-- `GET /api/auth/me/batch-prompt-history` / `PUT /api/auth/me/batch-prompt-history` を追加する
-- 指示履歴はプルダウンから選択した時点で指示 box へ復元する
-- 復元ボタンは廃止する
-- 新規作成時はバッチ指示 box と表示中のエラーをクリアする
-- バッチサンプルは 3 件分の入力例として、行番号 1〜3 に対応する形で表示する
-
-履歴にスター機能を追加した。
-
-- `history.starred` カラムを追加し、スター状態を DB に保存する
-- `PATCH /api/history/{item_id}/star` でスター状態を切り替える
-- `GET /api/history?starred=true` でスター付き履歴のみ取得できる
-- ステータスバー、履歴ストリップのサムネイル右上、履歴管理ダイアログのサムネイル右上でスターを表示 / 操作できる
-- 履歴ストリップと履歴管理ダイアログに、スター付きのみ表示するフィルタを追加する
-
-履歴管理ダイアログの視認性を調整した。
-
-- ダイアログ幅を広げ、サムネイル一覧とリスト表示の横方向の余裕を増やす
-- サムネイル hover のメタデータポップアップは fixed 表示にし、モーダルや画面端で切れないように viewport 内へ clamp する
-- ダークモード時のポップアップ色を調整する
-- hover からポップアップ表示までのディレイを長めにする
-
-バッチ実行中の進捗表示を強化した。
-
-- バッチパネルにも token 数を表示する
-- 現在行の token 数と、ここまでの累積 token 数を分けて表示する
-- バッチ進捗行に蟹のマスコットを表示する
-- 蟹は左右に移動し、鋏を上げる、目を動かす、砂に潜る、お辞儀する仕草を行う
-- 蟹は横移動できる生物として扱い、移動方向に合わせた左右反転は行わない
-
-サーバー運用時の安定性を調整した。
-
-- `inku-server` の FastAPI 起動は reload 無効を既定とする
-- `INKU_SERVER_RELOAD=1` / `true` / `yes` / `on` の場合のみ `uvicorn` reload を有効にする
-- systemd サービス運用では reloader プロセスを使わず、通常の単一 `uvicorn` 実行を前提にする
-- `inku_session` Cookie の max-age と DB セッション寿命を連動させる
-- DB セッションは `INKU_SESSION_COOKIE_MAX_AGE` を超えた時点で無効扱いにし、アクセス時に削除する
-- 新規セッション作成時にも期限切れセッションを掃除する
-
-- Build 151
+「カタログ設定」モーダル（ヘッダー右端）から選択。選択は `localStorage` に永続化。
+
+**バックエンド**: `renderer.render()` に `color_map: dict[str, str] | None = None` パラメータ追加。初期実装では `ComposeRequest` / `PaintRequest` の `color_map` フィールドで演奏ごとに選択中のカタログ色マップを受け取った。v1.25 以降は `catalog_id` を受け取り、サーバー側の色カタログ定義からレンダリング用 `color_map` を解決する。
+
+#### 色ニュアンス `color_hint`
+
+JSON Score の各 `instruction` は任意の `color_hint` を持てる。`color` は従来どおり `white / black / blue / red / green / gray` の抽象色とし、`color_hint` には「桜色」「朱に近い赤」「冷たい青緑」など、指示に含まれた具体的な色ニュアンスを短く保存する。
+
+Stage 2 は具体色を抽象色へ丸めつつ、元のニュアンスを `color_hint` に保持する。Renderer は選択中の色カタログの `map` と `palette` を受け取り、`color_hint` がある場合はパレット名・色相ヒントを使ってより近い実色を選ぶ。ヒントがない場合、または解決できない場合は従来どおり `color` の抽象色を使う。
+
+#### その他
+
+- ビルド番号表示: `#N` → `Build N`
+- 進捗バー: ステージインジケーター（✓ 完了 / ● 実行中アニメーション）+ 経過時間 + 停止ボタン + フェーズラベル
+
+### v1.7 (2026-04-27)
+
+**UI 8改善 — 感情語ヒント注入 + 履歴 catalog_id 保存 + ナビ修正**
+
+#### 感情語 → DDL ヒント自動注入
+
+Stage 1 解釈時に感情語を検出し、DDL語彙への変換ヒントを入力末尾に付加。
+
+- **`EMOTION_DDL_MAP`** (16語): 「美しい」「激しい」「静かな」「儚い」「神秘的」等 → weight/variation/color の具体値を対応付け
+- `buildEmotionHint(text)`: `annotate()` で `kind === 'emotion'` を抽出 → ヒント文字列生成
+- Stage 1 API 送信直前に `text + buildEmotionHint(text)` を `augmented` として送信 (表示テキストは変更なし)
+
+#### 履歴 catalog_id 保存
+
+選択中の色カタログを履歴レコードに永続化。
+
+- **`db.py`**: `HistoryRow` に `catalog_id VARCHAR` カラム追加。`_migrate_columns()` で `ALTER TABLE ADD COLUMN` (既存 DB への無害マイグレーション)
+- **`api.py`**: `HistoryPostBody` に `catalog_id: str | None` 追加
+- **frontend**: `PaintResult` 型 + `pushHistory` 呼び出しに `catalog_id` 追加。`selectedCatalog !== 'default'` のときのみ保存
+
+#### 歳時記ボタンをヘッダーから削除
+
+入力エリアの歳時記ボタンを残し、ヘッダーリンクを削除。
+
+#### 入力内語彙表示ボックス削除
+
+`result && inputMode === 'single'` のときに表示していた「入力に含まれた語彙」セクション (`annot-box`) を削除。感情語はヒント注入で活用するため、インライン表示は不要と判断。
+
+#### ヒストリーストリップの動的幅
+
+`visibleThumbCount = Math.max(1, Math.floor((windowWidth - 40) / 89))` でウィンドウ幅に応じてサムネイル表示数を動的決定。`window.resize` イベントで `windowWidth` を更新（`onMount` で listener 登録 + cleanup）。
+
+#### ナビ矢印方向の修正
+
+`‹`（左） = 新しい（newer）、`›`（右） = 古い（older）に修正。旧実装では `‹`/`›` と `gotoPrev`/`gotoNext` の対応が逆だった。
+
+#### エクスポートファイル名の統一
+
+`slugify(input)` ベースから日時スタンプ形式へ変更。
+
+- 形式: `inku-YYYY-MM-DD-HH-MM[-size].ext`
+- `exportFilename(ext, size?)` ヘルパー関数を追加
+- SVG / PNG 両方に適用
+
+#### CSS 修正
+
+- `.prompt-area` と `.prompt-pre` に `align-self: stretch; min-height: 0` を追加 → プロンプトタブの縦スクロールが正常化
+- `.thumb-strip` を `overflow: hidden` に変更 (横スクロール廃止、`visibleThumbCount` でクリップ)
+
+---
+
+### v1.8 (2026-04-27)
+
+**てざわり→weight 変換修正 + 滲む SVG フィルター実装**
+
+#### てざわり → weight フィールド変換の修正 (`composer.py`)
+
+**問題**: Stage 1 が正規化DDL に「青いクレヨンの縦線」と正しく出力していても、Stage 2 (composer.py) には `weight` フィールドへの変換例・指示が一切なく、常にデフォルト `pen` が出力されていた。
+
+**修正内容**:
+- `SYSTEM_PROMPT` / `SYSTEM_PROMPT_EN` に「てざわり → weight 変換 (必須)」セクションを追加
+  - 素材語9種 (髪・鉛筆・ペン・ロットリング・クレヨン・チョーク・細筆・太筆・縄) と対応 weight 値の対応表
+  - 4 つの変換例: クレヨン/鉛筆/チョーク+滲む/太筆
+- `EXAMPLE_POOL` に てざわり例を追加: 太筆・縄・ロットリング・チョーク (日本語)、thick-brush・chalk・rope (英語)
+
+**影響範囲**: `server/src/inku_server/composer.py`, `server/src/inku_server/interpreter.py`
+
+**次のステップ**: `server/tests/fixtures/stage2/` にてざわりフィクスチャ (16〜20 番) を追加して regression を防ぐ。
+
+#### 滲む (quality=pink) → SVG feGaussianBlur 実装 (`renderer.py`)
+
+**問題**: `variation.quality = "pink"` が JSON Score に含まれても、renderer が blur フィルターを生成していなかった。
+
+**実装内容**:
+- `BLUR_STD` dict: `{fine: 2.0, medium: 6.0, broad: 15.0}` (pixel単位 stdDeviation)
+- `_needs_blur(v)`: quality=pink のとき True を返す判定関数
+- `render()`: blur 必要な要素に id を付与し `_inject_blur_filters()` でまとめてフィルター定義を `<defs>` に注入
+- `_inject_blur_filters()`: `<defs />` / `<defs/>` / `<defs>` の3形式に対応 (svgwrite の出力方言差吸収)
+
+**フィルター設計**: 要素ごとではなくアンプリチュード別に1つのフィルター定義 (`blur-fine`等) を共有し、SVGサイズを最小化。
+
+---
+
+### v1.9 (2026-04-29)
+
+**UI polish branch — 描画体験整理 + 履歴管理強化 + 運用安全化**
+
+#### 用語整理
+
+UI 上の作品生成表現を「演奏」から「描画」へ寄せた。
+
+- メイン実行ボタンは「描画」
+- Stage 2 のみ再実行するボタンは「解釈から描画」
+- 再描画ボタンは通常の描画ボタンと区別できる青系配色
+- 出力タブや画面文言も「描画」中心に更新
+
+#### ボタン配置整理
+
+- ヘッダーの「接続設定」を「設定」に改名
+- Stage 1 / Stage 2 のモデル選択は「モデル選択」ボタンとして独立
+- 「モデル選択」はモデル選択のみを表示
+- 「設定」は DB設定 / プラグイン / ユーザー管理 / その他を表示
+- 「色カタログ」ボタンを指示エリアへ配置
+- 「歳時記」ボタンを解釈（正規化DDL）エリアへ移動し、編集ボタンの左に配置
+- 「新規作成」ボタンをやや目立つ暖色系デザインに変更
+
+#### 色カタログ UI
+
+- 色カタログダイアログを 2 ペイン化
+- 左にカタログ一覧、右に選択中カタログの詳細色一覧を表示
+- カタログ名を「カタログ設定」から「色カタログ」に変更
+
+#### 鳥アニメーション
+
+- 進捗バー内の小鳥に加え、描画中 / 再描画中に画面左上領域を飛ぶ小鳥を追加
+- 小鳥を大きく、ゆっくり、のんびりした動きに調整
+- 設定 > その他で「小鳥を表示する」On/Off を追加
+
+#### 設定ダイアログ拡張
+
+- DB設定タブ: SQLite / PostgreSQL 入力 UI と接続テスト表示
+- プラグインタブ: プラグイン一覧、追加、削除 UI
+- ユーザー管理タブ: ユーザー名 / パスワード / グループ、ユーザー追加・削除、グループ追加・削除 UI
+- その他タブ:
+  - 小鳥の表示 On/Off
+  - 白背景時アルファチャンネル設定 On/Off
+  - 解釈を再編集した場合も新バージョンとして保存する On/Off
+
+**注意**: v1.9 時点では DB / プラグイン / ユーザー管理はフロントエンド上の prototype UI だった。v1.10 でユーザー管理は DB/API 接続済みとなったが、DB設定変更とプラグイン読込は引き続き未接続。
+
+#### 履歴ストリップ / 履歴管理
+
+- 履歴タイトルをボタンとして視認しやすい pill 表示へ変更
+- 履歴サムネイル hover で保存内容を表示:
+  - Stage 1 / Stage 2 モデル
+  - 保存時間
+  - 秒数
+  - 色カタログ
+  - token in/out
+  - 入力プレビュー
+- 表示列数に応じてページ移動ボタン文言を「新しい N 件」「古い N 件」に変更
+- 履歴管理ダイアログを追加:
+  - サムネイルタブ: 履歴ストリップと同系のタイル表示
+  - リストタブ: 一覧テーブル表示
+  - 検索
+  - 複数選択
+  - ごみ箱移動 / 復元 / 完全削除
+- 履歴管理ダイアログの高さを固定し、検索結果件数の変化でウィンドウ縦位置が動かないよう修正
+
+#### 履歴 DB / API
+
+- `history.trashed` カラム追加
+- `GET /api/history?trashed=true` 対応
+- `POST /api/history/trash`
+- `POST /api/history/restore`
+- `POST /api/history/permanent-delete`
+- 履歴管理の全件取得は FastAPI の `limit <= 100` 制限に合わせ、100 件単位のページングで取得
+
+#### PNG 書き出し
+
+- 設定 > その他の「白背景時アルファチャンネル設定」に応じて、PNG export 時の白背景 prefill を切替
+
+#### ビルド番号
+
+- `.build-number` の自動増分方式を廃止
+- `web/BUILD_NUMBER` を Git 追跡対象に変更
+- アプリに変更を加えるたびに `BUILD_NUMBER` を明示的に更新する運用へ移行
+
+#### 既知課題（v1.9 review）の解決状況
+
+- 設定ダイアログの DB / プラグイン状態表示は v1.11 で read-only API に接続済み
+- Saijiki スナップショットは歳時記 v1 仕様確定まで一旦削除
+- 履歴管理は v1.11 でサーバー検索 / ページングへ変更済み
+- 出力ファイル保存失敗は v1.11 以降でサーバーログへ記録
+- バッチ描画の行単位失敗は v1.11 以降で UI に保持表示
+
+### v1.10 (2026-04-29)
+
+
+#### 認証 / ユーザー管理
+
+設定 > ユーザー管理タブを prototype UI から DB/API 接続済みの管理画面へ更新した。
+
+- ユーザーアカウントを DB に永続化
+- アカウント属性:
+  - ユーザー名
+  - メールアドレス
+  - パスワード
+  - ユーザー種類
+  - 所属ユーザーグループ
+- ユーザー種類:
+  - 管理者: 全設定、ユーザー管理、ユーザーグループ追加・削除・管理が可能
+  - グループリード: 自分のユーザーグループ内の一般ユーザー管理が可能
+  - ユーザー: 作品制作が可能
+- ユーザーグループは教室やイベントのチーム単位として扱う。グループ内作品共有は将来機能
+- パスワードは PBKDF2-SHA256 + 16 byte salt + 310,000 iterations でハッシュ化して保存
+- セッション token は SHA-256 hash のみ DB に保存
+- 初回起動時、ユーザーが存在せず `INKU_BOOTSTRAP_ADMIN_PASSWORD` が設定されている場合のみ bootstrap admin を作成
+  - username: `admin`
+  - email: `admin@local`
+  - password: `INKU_BOOTSTRAP_ADMIN_PASSWORD` の値。8文字以上必須
+  - 環境変数 `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` で username / email を上書き可
+  - `INKU_BOOTSTRAP_ADMIN_PASSWORD` 未設定時は既知のデフォルトパスワードを持つ admin を作成しない
+  - ローカル開発で従来の `inku-admin` を使う場合のみ `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN=1` を明示する
+
+#### ユーザー管理 API
+
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `PATCH /api/auth/me/profile`
+- `PATCH /api/auth/me/settings`
+- `GET /api/auth/me/batch-prompt-history`
+- `PUT /api/auth/me/batch-prompt-history`
+- `POST /api/auth/logout`
+- `GET /api/user-groups`
+- `POST /api/user-groups`
+- `DELETE /api/user-groups/{group_id}`
+- `GET /api/users`
+- `POST /api/users`
+- `PATCH /api/users/{user_id}`
+- `DELETE /api/users/{user_id}`
+
+ロール制御:
+
+- admin は全ユーザー / 全グループを管理できる
+- group_lead / user はユーザー管理 API を利用できない
+- plugin storage 更新 API は admin のみ利用できる
+
+#### ユーザー管理 UI
+
+- 未ログイン時はログイン UI を表示
+- ログイン後、現在ユーザー / ロール / 所属グループを表示
+- アプリレールのユーザーアイコンメニューからプロフィールダイアログを開き、自分のメールアドレス / パスワードを変更できる
+- admin の場合:
+  - ユーザー追加パネル
+  - ユーザー変更パネル
+  - ユーザー一覧の変更 / 削除操作
+  - グループ追加
+  - グループ削除
+- DB設定タブは admin のみに表示
+- ユーザー管理タブは admin のみに表示
+- プラグインタブは全ユーザーに表示するが、設定変更は admin のみに許可
+
+#### ユーザー別履歴保存
+
+履歴 DB をユーザー単位に分離した。
+
+- `history.user_id` カラム追加
+- `history.starred` カラム追加
+- 既存履歴は初回起動時マイグレーションで admin 所有に移行
+- `GET /api/history` はログインユーザーの履歴のみ返す
+- `GET /api/history?starred=true` はログインユーザーのスター付き履歴のみ返す
+- `POST /api/history` はログインユーザーの履歴として保存
+- `PATCH /api/history/{item_id}/star` はログインユーザーの履歴 ID のみ対象
+- `DELETE /api/history` / trash / restore / permanent-delete はログインユーザーの履歴 ID のみ対象
+- 他ユーザーの履歴 ID を指定しても変更されない
+- 履歴を持つユーザー削除は孤立データ防止のため拒否する
+- 出力ファイル保存先は `outputs/{user_id}/YYYY-MM-DD/...` へ分離
+- 旧 `history.json` 移行スクリプトも admin 所有として取り込む
+
+### v1.11 (2026-04-29)
+
+**設定 UI の実挙動接続**
+
+設定 > DB設定 / プラグインを prototype state からサーバー状態表示へ変更した。
+
+- `GET /api/settings/status` を追加
+- 管理者のみ設定状態を取得可能
+- DB設定タブは現在の SQLAlchemy backend / driver / masked URL / database を表示
+- DB接続はランタイム変更できず、`INKU_DB_URL` 変更後にサーバー再起動が必要であることを明示
+- プラグインタブは reference server では loader 未実装であることをサーバー状態として表示
+- フロントエンド上だけでプラグイン追加・削除・有効化できる prototype UI を廃止
+- 未ログイン、または保存済みセッションが無効な場合、アプリ本体ではなく単体ログイン画面を表示
+- ログインダイアログのパスワード欄は入力内容の表示 / 非表示を切り替え可能
+- ログイン画面の背景に inku 生成 SVG をトリミング配置し、単体ログイン画面としての視認性を改善
+- ログインパネルをコンパクトな寸法と抑えた余白へ調整し、業務利用に適した見た目へ整理
+- ログインパスワードの表示切替をテキストボタンからアイコンボタンへ変更
+- ログイン画面に言語切替ボタンを追加し、ログインフォーム文言も日本語 / English に対応
+- 履歴管理ダイアログは全履歴ロードをやめ、サーバーサイド検索 / 100 件単位ページングで現在ページのみ描画
+- Saijiki スナップショット機能は歳時記 v1 仕様確定まで一旦削除。API / フロント state / `snapshot_id` 配線を撤去し、後続仕様で再実装する
+- 出力ファイル保存は SVG/JSON/入力/DDL を PNG 変換と分離し、`cairosvg` 未導入や filesystem / PNG 変換エラーをサーバーログへ記録
+- バッチ描画は行単位の成功 / 失敗サマリーを表示し、失敗した入力行とエラー内容をユーザーが確認できる
+- バッチ入力欄は行番号と入力行がズレないよう、行番号と textarea の文字設定を揃え、長い行は折り返さず横スクロールで扱う
+- 右パネルの旧「楽譜 / score」タブは `JSON` に改名。JSON Score は行番号付きで表示し、キー / 文字列 / 数値 / 真偽値 / null を色分けする
+- Web UI は SvelteKit フロントエンドと FastAPI バックエンドの 2 プロセス構成で動作し、開発時はフロントエンドから `/api/*` をバックエンドへ proxy する
+
+### v1.12 (2026-04-29)
+
+**履歴SVGのサーバー側保存**
+
+履歴保存時に Web UI から送られた SVG を DB に保存する経路を廃止した。
+
+- `/api/paint` は Stage 1 / Stage 2 / SVG レンダリング完了後、必要に応じてその場で履歴DBへ保存する
+- `/api/paint` のレスポンスに `history_id` / `history_at` を追加
+- Web UI の単発描画 / バッチ描画は、描画結果を表示しつつ、履歴保存は `/api/paint` のサーバー側処理に任せる
+- Web UI は履歴保存用に SVG を `/api/history` へ送り返さない
+- 互換用の `POST /api/history` は残すが、リクエストの `svg` は信用せず、受け取った JSON Score からサーバー側で SVG を再レンダリングして保存する
+- 色カタログは初期実装では `color_map` としてサーバーに渡した。v1.25 以降は `catalog_id` をサーバーに渡し、サーバー側の色カタログ正本から `color_map` を解決する。`color_map` 自体は履歴メタデータとして保存しない
+- Build 71
+
+### v1.13 (2026-04-29)
+
+**生成系 API の認証必須化**
+
+LLM 呼び出しや描画生成を行う API をログイン済みユーザーに限定した。
+
+- `/api/interpret` は有効な Bearer セッションを要求する
+- `/api/compose` は有効な Bearer セッションを要求する
+- `/api/paint` は保存有無にかかわらず有効な Bearer セッションを要求する
+- Web UI の再描画 (`/api/compose`) 呼び出しを、認証ヘッダー付きの `apiFetch` 経由へ変更
+- 未認証の生成 API 呼び出しは 401 を返す
+- Build 72
+
+### v1.14 (2026-04-29)
+
+**セッション Cookie の HttpOnly 化**
+
+Web UI がセッショントークンを localStorage に保存する方式を廃止した。
+
+- `/api/auth/login` はレスポンス本文にトークンを返さず、`inku_session` Cookie を発行する
+- `inku_session` Cookie は `HttpOnly` / `SameSite=Lax` / `Path=/` を付与する
+- `INKU_SESSION_COOKIE_SECURE=1` の場合は Cookie に `Secure` を付与する
+- Cookie の max-age は `INKU_SESSION_COOKIE_MAX_AGE` で指定し、既定は 30 日
+- DB の `user_sessions` も同じ `INKU_SESSION_COOKIE_MAX_AGE` に従って期限判定する
+- 期限切れ DB セッションは認証不可とし、アクセス時に削除する
+- 新規セッション作成時にも期限切れ DB セッションを掃除する
+- `/api/auth/me`、生成 API、履歴 API、管理 API は Cookie セッションで認証する
+- 互換性のため Authorization Bearer も引き続き受け付ける
+- `/api/auth/logout` は DB セッションを削除し、Cookie を削除する
+- Web UI はログイン後もトークン値を JavaScript state や localStorage に保持しない
+- Build 73
+
+### v1.15 (2026-04-29)
+
+**履歴DBを正本とする出力ファイル扱い**
+
+履歴データの正本は DB とし、出力ファイルは副産物として扱う方針を明確化した。
+
+- 履歴の `input` / `ddl` / JSON Score / SVG / メタデータは DB レコードを正本とする
+- 出力ファイル保存先の `output_path` は副産物の保存先ヒントとして扱う
+- SVG / JSON / 入力 / DDL / PNG ファイルは、DB履歴から再生成可能な artifacts とする
+- `POST /api/history/rebuild-output-files` を追加し、指定した履歴IDの artifacts を DB から再生成できる
+- artifacts 保存失敗は DB の履歴保存失敗とは扱わず、サーバーログに記録する
+- Build 74
+
+### v1.16 (2026-04-29)
+
+**初期管理者アカウントの明示設定化**
+
+新規DB作成時の bootstrap admin は、環境変数で初期パスワードが明示された場合のみ作成する。
+
+- `INKU_BOOTSTRAP_ADMIN_PASSWORD` が未設定の場合、既知のデフォルトパスワードを持つ admin は作成しない
+- `INKU_BOOTSTRAP_ADMIN_PASSWORD` は8文字以上を必須とする
+- `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` は bootstrap admin 作成時のみ利用する
+- ローカル開発で従来の `inku-admin` を使う場合のみ `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN=1` を明示する
+- 設定画面の bootstrap admin 説明文から既定パスワードの案内を削除
+- Build 75
+
+### v1.17 (2026-04-29)
+
+**ユーザー管理タブの最新状態反映**
+
+ユーザー管理タブの表示を、サーバー側 DB の最新状態へ追従しやすい形に調整した。
+
+- ユーザー管理タブを開く / 切り替える / 再読み込みするたびに `/api/auth/me`、`/api/user-groups`、`/api/users` を再取得する
+- ユーザー管理タブの取得には `cache: no-store` を指定し、古いレスポンスが後から戻って一覧を上書きしないようリクエストIDで抑止する
+- ユーザー管理タブに手動の再読み込みボタンを追加
+- ユーザー一覧とログイン中ユーザーのロール表示は翻訳ラベルではなく `admin` / `group_lead` / `user` の値を表示する
+- pytest は既定で `/tmp` の一時SQLite DBを使い、実DBにテストユーザーやテストグループを残さない
+- Build 77
+
+### v1.18 (2026-04-29)
+
+**歳時記語彙操作の精緻化 + 右パネル操作性改善**
+
+歳時記 v1 仕様に向けて、語彙挿入・プレビュー・解釈編集の操作を整理した。
+
+- 歳時記ドロワー上で語彙ボタンに mouseover / focus したとき、当該語彙の描画効果プレビュー、効果説明、短い使用例を表示する
+- 歳時記に「かたむき」カテゴリを追加し、「うごき」の下、「わりあい」の上に表示する
+- JSON Score schema に `rotation` フィールドを追加し、線・楕円・四角・三角・弧を中心まわりに回転できるようにする
+- 歳時記語彙クリック時の挿入先は常に解釈（正規化DDL）Box のカレントキャレット位置とする
+- 解釈Boxは編集ボタンを廃止し、常時編集可能にする
+- 解釈Box内の歳時記語彙はカテゴリ別の控えめな色でハイライト表示する
+- 解釈Boxのカスタムキャレットを太くし、語彙ハイライト上でも見失いにくくする
+- 「新規作成」は指示・解釈・描画・プロンプト・JSON表示をクリアし、描画タブにはプレースホルダー画像を表示する
+
+右パネルとヘッダーの操作もあわせて整理した。
+
+- 旧エクスポートバーをステータスバーに改名し、Stage 1 / Stage 2 モデル名と色カタログ名を表示する
+- 履歴表示中は当該履歴の使用モデル / 色カタログ / キャンバス種類をステータスバーに表示し、モデルや色カタログの選択を変更したら現在選択を優先表示する
+- モデル選択ダイアログは正式寄りのモデル名を表示し、ダイアログ幅を実測文字数に合わせて調整する
+- 色カタログ / モデル選択ダイアログは閉じるボタンを廃止し、キャンセル / 決定ボタンで変更の破棄・確定を明示する
+- プロンプトタブの Stage 1 ユーザー入力 / Stage 2 ユーザー入力にクリップボードコピーアイコンを追加する
+- プロンプト / JSON 表示時は左右の履歴ナビゲーションボタンと内容が重ならないよう安全余白を確保する
+- ヘッダーのログイン中ユーザー名をクリックすると、ログオフを選択できるメニューを表示する
+- Build 100
+
+### v1.19 (2026-04-30)
+
+**Stage 1.5 中間フィルタ + 数学・音楽・絵画技法の拡張**
+
+Stage 1 と Stage 2 の間に、決定的な中間フィルタを追加した。
+
+- Stage 1 の正規化DDLを、Stage 2 に渡す前に拡張正規化DDLへ変換する
+- `ランダム` / `random` は正規化DDLの禁止語として扱い、明示配置へ置換する
+- `/api/paint` は中間フィルタ後の拡張DDLを Stage 2 に渡し、レスポンス・履歴にも同じDDLを保持する
+- `/api/compose` に直接DDLが渡された場合も、中間フィルタを通してから Stage 2 を呼ぶ
+- 数学・幾何学的拡張:
+  - 黄金比
+  - 三分割構図
+  - 白銀比
+  - 正五角形
+  - フィボナッチ的数量
+  - 放射状配置、同心円、対角線、波打つ軌跡
+- 音楽技法の拡張:
+  - 対位法の反行
+  - 倍音列
+  - 輪唱のずれ
+- 絵画技法の拡張:
+  - 一点透視法
+  - 遠近法
+  - 明暗・濃淡
+  - 素描
+  - 点描
+  - 油絵の厚塗り
+  - 水彩
+  - パッチワーク
+  - フレスコ
+  - 水墨
+- Stage 2 プロンプトに、これらを JSON Score の既存フィールドへ落とすルールと例を追加した
+- `server/src/inku_server/ddl_expander.py` を追加し、決定的変換器としてテスト対象化した
+- v1.19 後続調整として、全技法を毎回投入する方式を廃止し、入力DDLの決定的シードに基づいて少数の技法層を選択する方式へ変更した
+- v1.19 後続調整として、`中心` / `中央` をキャンバス中央へ固定せず、入力DDLごとの動的焦点へ置換する方式へ変更した
+- Build 103
 
 ### v1.20 (2026-04-30)
 
@@ -2688,1020 +2716,991 @@ Stage 2 の契約も強化した。
 - Build 395: 反復線が画面を支配する場合、要素数を増やさず `rhythm_spacing=syncopated`、余白保持、方向性 fade、端点の小さな欠落で線群自体を出来事化する。風鈴やネオンのような題材では視覚イベントが改善した一方、砂浜/波の記憶のような低彩度・曲線・記憶系では余白を失いやすく、次の調整対象として残る
 - Build 359
 
-### v1.19 (2026-04-30)
-
-**Stage 1.5 中間フィルタ + 数学・音楽・絵画技法の拡張**
-
-Stage 1 と Stage 2 の間に、決定的な中間フィルタを追加した。
-
-- Stage 1 の正規化DDLを、Stage 2 に渡す前に拡張正規化DDLへ変換する
-- `ランダム` / `random` は正規化DDLの禁止語として扱い、明示配置へ置換する
-- `/api/paint` は中間フィルタ後の拡張DDLを Stage 2 に渡し、レスポンス・履歴にも同じDDLを保持する
-- `/api/compose` に直接DDLが渡された場合も、中間フィルタを通してから Stage 2 を呼ぶ
-- 数学・幾何学的拡張:
-  - 黄金比
-  - 三分割構図
-  - 白銀比
-  - 正五角形
-  - フィボナッチ的数量
-  - 放射状配置、同心円、対角線、波打つ軌跡
-- 音楽技法の拡張:
-  - 対位法の反行
-  - 倍音列
-  - 輪唱のずれ
-- 絵画技法の拡張:
-  - 一点透視法
-  - 遠近法
-  - 明暗・濃淡
-  - 素描
-  - 点描
-  - 油絵の厚塗り
-  - 水彩
-  - パッチワーク
-  - フレスコ
-  - 水墨
-- Stage 2 プロンプトに、これらを JSON Score の既存フィールドへ落とすルールと例を追加した
-- `server/src/inku_server/ddl_expander.py` を追加し、決定的変換器としてテスト対象化した
-- v1.19 後続調整として、全技法を毎回投入する方式を廃止し、入力DDLの決定的シードに基づいて少数の技法層を選択する方式へ変更した
-- v1.19 後続調整として、`中心` / `中央` をキャンバス中央へ固定せず、入力DDLごとの動的焦点へ置換する方式へ変更した
-- Build 103
-
-### v1.18 (2026-04-29)
-
-**歳時記語彙操作の精緻化 + 右パネル操作性改善**
-
-歳時記 v1 仕様に向けて、語彙挿入・プレビュー・解釈編集の操作を整理した。
-
-- 歳時記ドロワー上で語彙ボタンに mouseover / focus したとき、当該語彙の描画効果プレビュー、効果説明、短い使用例を表示する
-- 歳時記に「かたむき」カテゴリを追加し、「うごき」の下、「わりあい」の上に表示する
-- JSON Score schema に `rotation` フィールドを追加し、線・楕円・四角・三角・弧を中心まわりに回転できるようにする
-- 歳時記語彙クリック時の挿入先は常に解釈（正規化DDL）Box のカレントキャレット位置とする
-- 解釈Boxは編集ボタンを廃止し、常時編集可能にする
-- 解釈Box内の歳時記語彙はカテゴリ別の控えめな色でハイライト表示する
-- 解釈Boxのカスタムキャレットを太くし、語彙ハイライト上でも見失いにくくする
-- 「新規作成」は指示・解釈・描画・プロンプト・JSON表示をクリアし、描画タブにはプレースホルダー画像を表示する
-
-右パネルとヘッダーの操作もあわせて整理した。
-
-- 旧エクスポートバーをステータスバーに改名し、Stage 1 / Stage 2 モデル名と色カタログ名を表示する
-- 履歴表示中は当該履歴の使用モデル / 色カタログ / キャンバス種類をステータスバーに表示し、モデルや色カタログの選択を変更したら現在選択を優先表示する
-- モデル選択ダイアログは正式寄りのモデル名を表示し、ダイアログ幅を実測文字数に合わせて調整する
-- 色カタログ / モデル選択ダイアログは閉じるボタンを廃止し、キャンセル / 決定ボタンで変更の破棄・確定を明示する
-- プロンプトタブの Stage 1 ユーザー入力 / Stage 2 ユーザー入力にクリップボードコピーアイコンを追加する
-- プロンプト / JSON 表示時は左右の履歴ナビゲーションボタンと内容が重ならないよう安全余白を確保する
-- ヘッダーのログイン中ユーザー名をクリックすると、ログオフを選択できるメニューを表示する
-- Build 100
-
-### v1.17 (2026-04-29)
-
-**ユーザー管理タブの最新状態反映**
-
-ユーザー管理タブの表示を、サーバー側 DB の最新状態へ追従しやすい形に調整した。
-
-- ユーザー管理タブを開く / 切り替える / 再読み込みするたびに `/api/auth/me`、`/api/user-groups`、`/api/users` を再取得する
-- ユーザー管理タブの取得には `cache: no-store` を指定し、古いレスポンスが後から戻って一覧を上書きしないようリクエストIDで抑止する
-- ユーザー管理タブに手動の再読み込みボタンを追加
-- ユーザー一覧とログイン中ユーザーのロール表示は翻訳ラベルではなく `admin` / `group_lead` / `user` の値を表示する
-- pytest は既定で `/tmp` の一時SQLite DBを使い、実DBにテストユーザーやテストグループを残さない
-- Build 77
-
-### v1.16 (2026-04-29)
-
-**初期管理者アカウントの明示設定化**
-
-新規DB作成時の bootstrap admin は、環境変数で初期パスワードが明示された場合のみ作成する。
-
-- `INKU_BOOTSTRAP_ADMIN_PASSWORD` が未設定の場合、既知のデフォルトパスワードを持つ admin は作成しない
-- `INKU_BOOTSTRAP_ADMIN_PASSWORD` は8文字以上を必須とする
-- `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` は bootstrap admin 作成時のみ利用する
-- ローカル開発で従来の `inku-admin` を使う場合のみ `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN=1` を明示する
-- 設定画面の bootstrap admin 説明文から既定パスワードの案内を削除
-- Build 75
-
-### v1.15 (2026-04-29)
-
-**履歴DBを正本とする出力ファイル扱い**
-
-履歴データの正本は DB とし、出力ファイルは副産物として扱う方針を明確化した。
-
-- 履歴の `input` / `ddl` / JSON Score / SVG / メタデータは DB レコードを正本とする
-- 出力ファイル保存先の `output_path` は副産物の保存先ヒントとして扱う
-- SVG / JSON / 入力 / DDL / PNG ファイルは、DB履歴から再生成可能な artifacts とする
-- `POST /api/history/rebuild-output-files` を追加し、指定した履歴IDの artifacts を DB から再生成できる
-- artifacts 保存失敗は DB の履歴保存失敗とは扱わず、サーバーログに記録する
-- Build 74
-
-### v1.14 (2026-04-29)
-
-**セッション Cookie の HttpOnly 化**
-
-Web UI がセッショントークンを localStorage に保存する方式を廃止した。
-
-- `/api/auth/login` はレスポンス本文にトークンを返さず、`inku_session` Cookie を発行する
-- `inku_session` Cookie は `HttpOnly` / `SameSite=Lax` / `Path=/` を付与する
-- `INKU_SESSION_COOKIE_SECURE=1` の場合は Cookie に `Secure` を付与する
-- Cookie の max-age は `INKU_SESSION_COOKIE_MAX_AGE` で指定し、既定は 30 日
-- DB の `user_sessions` も同じ `INKU_SESSION_COOKIE_MAX_AGE` に従って期限判定する
-- 期限切れ DB セッションは認証不可とし、アクセス時に削除する
-- 新規セッション作成時にも期限切れ DB セッションを掃除する
-- `/api/auth/me`、生成 API、履歴 API、管理 API は Cookie セッションで認証する
-- 互換性のため Authorization Bearer も引き続き受け付ける
-- `/api/auth/logout` は DB セッションを削除し、Cookie を削除する
-- Web UI はログイン後もトークン値を JavaScript state や localStorage に保持しない
-- Build 73
-
-### v1.13 (2026-04-29)
-
-**生成系 API の認証必須化**
-
-LLM 呼び出しや描画生成を行う API をログイン済みユーザーに限定した。
-
-- `/api/interpret` は有効な Bearer セッションを要求する
-- `/api/compose` は有効な Bearer セッションを要求する
-- `/api/paint` は保存有無にかかわらず有効な Bearer セッションを要求する
-- Web UI の再描画 (`/api/compose`) 呼び出しを、認証ヘッダー付きの `apiFetch` 経由へ変更
-- 未認証の生成 API 呼び出しは 401 を返す
-- Build 72
-
-### v1.12 (2026-04-29)
-
-**履歴SVGのサーバー側保存**
-
-履歴保存時に Web UI から送られた SVG を DB に保存する経路を廃止した。
-
-- `/api/paint` は Stage 1 / Stage 2 / SVG レンダリング完了後、必要に応じてその場で履歴DBへ保存する
-- `/api/paint` のレスポンスに `history_id` / `history_at` を追加
-- Web UI の単発描画 / バッチ描画は、描画結果を表示しつつ、履歴保存は `/api/paint` のサーバー側処理に任せる
-- Web UI は履歴保存用に SVG を `/api/history` へ送り返さない
-- 互換用の `POST /api/history` は残すが、リクエストの `svg` は信用せず、受け取った JSON Score からサーバー側で SVG を再レンダリングして保存する
-- 色カタログは初期実装では `color_map` としてサーバーに渡した。v1.25 以降は `catalog_id` をサーバーに渡し、サーバー側の色カタログ正本から `color_map` を解決する。`color_map` 自体は履歴メタデータとして保存しない
-- Build 71
-
-### v1.11 (2026-04-29)
-
-**設定 UI の実挙動接続**
-
-設定 > DB設定 / プラグインを prototype state からサーバー状態表示へ変更した。
-
-- `GET /api/settings/status` を追加
-- 管理者のみ設定状態を取得可能
-- DB設定タブは現在の SQLAlchemy backend / driver / masked URL / database を表示
-- DB接続はランタイム変更できず、`INKU_DB_URL` 変更後にサーバー再起動が必要であることを明示
-- プラグインタブは reference server では loader 未実装であることをサーバー状態として表示
-- フロントエンド上だけでプラグイン追加・削除・有効化できる prototype UI を廃止
-- 未ログイン、または保存済みセッションが無効な場合、アプリ本体ではなく単体ログイン画面を表示
-- ログインダイアログのパスワード欄は入力内容の表示 / 非表示を切り替え可能
-- ログイン画面の背景に inku 生成 SVG をトリミング配置し、単体ログイン画面としての視認性を改善
-- ログインパネルをコンパクトな寸法と抑えた余白へ調整し、業務利用に適した見た目へ整理
-- ログインパスワードの表示切替をテキストボタンからアイコンボタンへ変更
-- ログイン画面に言語切替ボタンを追加し、ログインフォーム文言も日本語 / English に対応
-- 履歴管理ダイアログは全履歴ロードをやめ、サーバーサイド検索 / 100 件単位ページングで現在ページのみ描画
-- Saijiki スナップショット機能は歳時記 v1 仕様確定まで一旦削除。API / フロント state / `snapshot_id` 配線を撤去し、後続仕様で再実装する
-- 出力ファイル保存は SVG/JSON/入力/DDL を PNG 変換と分離し、`cairosvg` 未導入や filesystem / PNG 変換エラーをサーバーログへ記録
-- バッチ描画は行単位の成功 / 失敗サマリーを表示し、失敗した入力行とエラー内容をユーザーが確認できる
-- バッチ入力欄は行番号と入力行がズレないよう、行番号と textarea の文字設定を揃え、長い行は折り返さず横スクロールで扱う
-- 右パネルの旧「楽譜 / score」タブは `JSON` に改名。JSON Score は行番号付きで表示し、キー / 文字列 / 数値 / 真偽値 / null を色分けする
-- Web UI は SvelteKit フロントエンドと FastAPI バックエンドの 2 プロセス構成で動作し、開発時はフロントエンドから `/api/*` をバックエンドへ proxy する
-
-### v1.10 (2026-04-29)
-
-
-#### 認証 / ユーザー管理
-
-設定 > ユーザー管理タブを prototype UI から DB/API 接続済みの管理画面へ更新した。
-
-- ユーザーアカウントを DB に永続化
-- アカウント属性:
-  - ユーザー名
-  - メールアドレス
-  - パスワード
-  - ユーザー種類
-  - 所属ユーザーグループ
-- ユーザー種類:
-  - 管理者: 全設定、ユーザー管理、ユーザーグループ追加・削除・管理が可能
-  - グループリード: 自分のユーザーグループ内の一般ユーザー管理が可能
-  - ユーザー: 作品制作が可能
-- ユーザーグループは教室やイベントのチーム単位として扱う。グループ内作品共有は将来機能
-- パスワードは PBKDF2-SHA256 + 16 byte salt + 310,000 iterations でハッシュ化して保存
-- セッション token は SHA-256 hash のみ DB に保存
-- 初回起動時、ユーザーが存在せず `INKU_BOOTSTRAP_ADMIN_PASSWORD` が設定されている場合のみ bootstrap admin を作成
-  - username: `admin`
-  - email: `admin@local`
-  - password: `INKU_BOOTSTRAP_ADMIN_PASSWORD` の値。8文字以上必須
-  - 環境変数 `INKU_BOOTSTRAP_ADMIN_USERNAME` / `INKU_BOOTSTRAP_ADMIN_EMAIL` で username / email を上書き可
-  - `INKU_BOOTSTRAP_ADMIN_PASSWORD` 未設定時は既知のデフォルトパスワードを持つ admin を作成しない
-  - ローカル開発で従来の `inku-admin` を使う場合のみ `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN=1` を明示する
-
-#### ユーザー管理 API
-
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `PATCH /api/auth/me/profile`
-- `PATCH /api/auth/me/settings`
-- `GET /api/auth/me/batch-prompt-history`
-- `PUT /api/auth/me/batch-prompt-history`
-- `POST /api/auth/logout`
-- `GET /api/user-groups`
-- `POST /api/user-groups`
-- `DELETE /api/user-groups/{group_id}`
-- `GET /api/users`
-- `POST /api/users`
-- `PATCH /api/users/{user_id}`
-- `DELETE /api/users/{user_id}`
-
-ロール制御:
-
-- admin は全ユーザー / 全グループを管理できる
-- group_lead / user はユーザー管理 API を利用できない
-- plugin storage 更新 API は admin のみ利用できる
-
-#### ユーザー管理 UI
-
-- 未ログイン時はログイン UI を表示
-- ログイン後、現在ユーザー / ロール / 所属グループを表示
-- アプリレールのユーザーアイコンメニューからプロフィールダイアログを開き、自分のメールアドレス / パスワードを変更できる
-- admin の場合:
-  - ユーザー追加パネル
-  - ユーザー変更パネル
-  - ユーザー一覧の変更 / 削除操作
-  - グループ追加
-  - グループ削除
-- DB設定タブは admin のみに表示
-- ユーザー管理タブは admin のみに表示
-- プラグインタブは全ユーザーに表示するが、設定変更は admin のみに許可
-
-#### ユーザー別履歴保存
-
-履歴 DB をユーザー単位に分離した。
-
-- `history.user_id` カラム追加
-- `history.starred` カラム追加
-- 既存履歴は初回起動時マイグレーションで admin 所有に移行
-- `GET /api/history` はログインユーザーの履歴のみ返す
-- `GET /api/history?starred=true` はログインユーザーのスター付き履歴のみ返す
-- `POST /api/history` はログインユーザーの履歴として保存
-- `PATCH /api/history/{item_id}/star` はログインユーザーの履歴 ID のみ対象
-- `DELETE /api/history` / trash / restore / permanent-delete はログインユーザーの履歴 ID のみ対象
-- 他ユーザーの履歴 ID を指定しても変更されない
-- 履歴を持つユーザー削除は孤立データ防止のため拒否する
-- 出力ファイル保存先は `outputs/{user_id}/YYYY-MM-DD/...` へ分離
-- 旧 `history.json` 移行スクリプトも admin 所有として取り込む
-
-### v1.9 (2026-04-29)
-
-**UI polish branch — 描画体験整理 + 履歴管理強化 + 運用安全化**
-
-#### 用語整理
-
-UI 上の作品生成表現を「演奏」から「描画」へ寄せた。
-
-- メイン実行ボタンは「描画」
-- Stage 2 のみ再実行するボタンは「解釈から描画」
-- 再描画ボタンは通常の描画ボタンと区別できる青系配色
-- 出力タブや画面文言も「描画」中心に更新
-
-#### ボタン配置整理
-
-- ヘッダーの「接続設定」を「設定」に改名
-- Stage 1 / Stage 2 のモデル選択は「モデル選択」ボタンとして独立
-- 「モデル選択」はモデル選択のみを表示
-- 「設定」は DB設定 / プラグイン / ユーザー管理 / その他を表示
-- 「色カタログ」ボタンを指示エリアへ配置
-- 「歳時記」ボタンを解釈（正規化DDL）エリアへ移動し、編集ボタンの左に配置
-- 「新規作成」ボタンをやや目立つ暖色系デザインに変更
-
-#### 色カタログ UI
-
-- 色カタログダイアログを 2 ペイン化
-- 左にカタログ一覧、右に選択中カタログの詳細色一覧を表示
-- カタログ名を「カタログ設定」から「色カタログ」に変更
-
-#### 鳥アニメーション
-
-- 進捗バー内の小鳥に加え、描画中 / 再描画中に画面左上領域を飛ぶ小鳥を追加
-- 小鳥を大きく、ゆっくり、のんびりした動きに調整
-- 設定 > その他で「小鳥を表示する」On/Off を追加
-
-#### 設定ダイアログ拡張
-
-- DB設定タブ: SQLite / PostgreSQL 入力 UI と接続テスト表示
-- プラグインタブ: プラグイン一覧、追加、削除 UI
-- ユーザー管理タブ: ユーザー名 / パスワード / グループ、ユーザー追加・削除、グループ追加・削除 UI
-- その他タブ:
-  - 小鳥の表示 On/Off
-  - 白背景時アルファチャンネル設定 On/Off
-  - 解釈を再編集した場合も新バージョンとして保存する On/Off
-
-**注意**: v1.9 時点では DB / プラグイン / ユーザー管理はフロントエンド上の prototype UI だった。v1.10 でユーザー管理は DB/API 接続済みとなったが、DB設定変更とプラグイン読込は引き続き未接続。
-
-#### 履歴ストリップ / 履歴管理
-
-- 履歴タイトルをボタンとして視認しやすい pill 表示へ変更
-- 履歴サムネイル hover で保存内容を表示:
-  - Stage 1 / Stage 2 モデル
-  - 保存時間
-  - 秒数
-  - 色カタログ
-  - token in/out
-  - 入力プレビュー
-- 表示列数に応じてページ移動ボタン文言を「新しい N 件」「古い N 件」に変更
-- 履歴管理ダイアログを追加:
-  - サムネイルタブ: 履歴ストリップと同系のタイル表示
-  - リストタブ: 一覧テーブル表示
-  - 検索
-  - 複数選択
-  - ごみ箱移動 / 復元 / 完全削除
-- 履歴管理ダイアログの高さを固定し、検索結果件数の変化でウィンドウ縦位置が動かないよう修正
+### v1.21 (2026-04-30)
 
-#### 履歴 DB / API
+**アプリレール導入 + ダークモード導入 + ユーザー別 UI 状態保存 + スター付き履歴 + バッチ進捗視認性**
 
-- `history.trashed` カラム追加
-- `GET /api/history?trashed=true` 対応
-- `POST /api/history/trash`
-- `POST /api/history/restore`
-- `POST /api/history/permanent-delete`
-- 履歴管理の全件取得は FastAPI の `limit <= 100` 制限に合わせ、100 件単位のページングで取得
+画面上部の固定ヘッダーを廃止し、左側の収納式アプリレールへ集約した。
 
-#### PNG 書き出し
+- アプリ名、ビルド番号、ユーザー操作、設定、言語切替、テーマ切替を左レールに配置する
+- レールは展開 / 収納でき、通常時の縦方向の作業領域を広げる
+- 開発中の確認用として、ビルド番号はレール収納時でも常時視認できる位置に残す
+- アプリ名は収納時 `inku`、展開時 `inku-lang` として表示する
+- 展開 / 収納で `inku` 部分の位置と大きさが変わらないよう、`inku` 部分は固定幅で表示する
+- ユーザー名操作はメニュー化し、ログオフを選択できる
+- 設定は歯車アイコン、ユーザー操作は人型アイコンで表示する
 
-- 設定 > その他の「白背景時アルファチャンネル設定」に応じて、PNG export 時の白背景 prefill を切替
+履歴エリアを折りたためるようにした。
 
-#### ビルド番号
+- 下部の履歴ストリップは必要に応じて収納できる
+- 履歴を閉じた状態では描画 / 記述 / バッチの作業領域を広く使える
+- 履歴を再表示した場合も、現在の履歴ページングとスター絞り込みの文脈を維持する
 
-- `.build-number` の自動増分方式を廃止
-- `web/BUILD_NUMBER` を Git 追跡対象に変更
-- アプリに変更を加えるたびに `BUILD_NUMBER` を明示的に更新する運用へ移行
+UI にライト / ダークモードを追加した。
 
-#### 既知課題（v1.9 review）の解決状況
+- 画面左の収納式アプリレールからテーマを切り替えられる
+- ダークモードでは背景、パネル、入力欄、モーダル、履歴、ステータスバー、ボタン類の配色を切り替える
+- 描画そのものの SVG / PNG 出力はテーマに影響されず、Score の背景色と描画色を正とする
+- ダークモードでは描画パネルの履歴移動ボタン、ズームボタン、倍率表示、記述 / バッチの描画ボタンのコントラストを確保する
+- 履歴管理ダイアログの hover メタデータポップアップもダークモード向けの色へ切り替える
 
-- 設定ダイアログの DB / プラグイン状態表示は v1.11 で read-only API に接続済み
-- Saijiki スナップショットは歳時記 v1 仕様確定まで一旦削除
-- 履歴管理は v1.11 でサーバー検索 / ページングへ変更済み
-- 出力ファイル保存失敗は v1.11 以降でサーバーログへ記録
-- バッチ描画の行単位失敗は v1.11 以降で UI に保持表示
+ライト / ダークモードはユーザー情報としてサーバー側に保存する。
 
-### v1.8 (2026-04-27)
+- UI テーマは `user_accounts.ui_theme` に保存する
+- ログイン時に `/api/auth/me` から現在ユーザーの UI テーマを取得する
+- テーマ切替時は `PATCH /api/auth/me/settings` でサーバーへ保存する
 
-**てざわり→weight 変換修正 + 滲む SVG フィルター実装**
+バッチパネルの指示履歴をユーザーごとのサーバー保存へ変更した。
 
-#### てざわり → weight フィールド変換の修正 (`composer.py`)
+- `user_accounts.batch_prompt_history` に最大 20 件の指示履歴を保存する
+- `GET /api/auth/me/batch-prompt-history` / `PUT /api/auth/me/batch-prompt-history` を追加する
+- 指示履歴はプルダウンから選択した時点で指示 box へ復元する
+- 復元ボタンは廃止する
+- 新規作成時はバッチ指示 box と表示中のエラーをクリアする
+- バッチサンプルは 3 件分の入力例として、行番号 1〜3 に対応する形で表示する
 
-**問題**: Stage 1 が正規化DDL に「青いクレヨンの縦線」と正しく出力していても、Stage 2 (composer.py) には `weight` フィールドへの変換例・指示が一切なく、常にデフォルト `pen` が出力されていた。
+履歴にスター機能を追加した。
 
-**修正内容**:
-- `SYSTEM_PROMPT` / `SYSTEM_PROMPT_EN` に「てざわり → weight 変換 (必須)」セクションを追加
-  - 素材語9種 (髪・鉛筆・ペン・ロットリング・クレヨン・チョーク・細筆・太筆・縄) と対応 weight 値の対応表
-  - 4 つの変換例: クレヨン/鉛筆/チョーク+滲む/太筆
-- `EXAMPLE_POOL` に てざわり例を追加: 太筆・縄・ロットリング・チョーク (日本語)、thick-brush・chalk・rope (英語)
-
-**影響範囲**: `server/src/inku_server/composer.py`, `server/src/inku_server/interpreter.py`
-
-**次のステップ**: `server/tests/fixtures/stage2/` にてざわりフィクスチャ (16〜20 番) を追加して regression を防ぐ。
-
-#### 滲む (quality=pink) → SVG feGaussianBlur 実装 (`renderer.py`)
-
-**問題**: `variation.quality = "pink"` が JSON Score に含まれても、renderer が blur フィルターを生成していなかった。
-
-**実装内容**:
-- `BLUR_STD` dict: `{fine: 2.0, medium: 6.0, broad: 15.0}` (pixel単位 stdDeviation)
-- `_needs_blur(v)`: quality=pink のとき True を返す判定関数
-- `render()`: blur 必要な要素に id を付与し `_inject_blur_filters()` でまとめてフィルター定義を `<defs>` に注入
-- `_inject_blur_filters()`: `<defs />` / `<defs/>` / `<defs>` の3形式に対応 (svgwrite の出力方言差吸収)
-
-**フィルター設計**: 要素ごとではなくアンプリチュード別に1つのフィルター定義 (`blur-fine`等) を共有し、SVGサイズを最小化。
-
----
-
-### v1.7 (2026-04-27)
-
-**UI 8改善 — 感情語ヒント注入 + 履歴 catalog_id 保存 + ナビ修正**
-
-#### 感情語 → DDL ヒント自動注入
-
-Stage 1 解釈時に感情語を検出し、DDL語彙への変換ヒントを入力末尾に付加。
-
-- **`EMOTION_DDL_MAP`** (16語): 「美しい」「激しい」「静かな」「儚い」「神秘的」等 → weight/variation/color の具体値を対応付け
-- `buildEmotionHint(text)`: `annotate()` で `kind === 'emotion'` を抽出 → ヒント文字列生成
-- Stage 1 API 送信直前に `text + buildEmotionHint(text)` を `augmented` として送信 (表示テキストは変更なし)
-
-#### 履歴 catalog_id 保存
-
-選択中の色カタログを履歴レコードに永続化。
-
-- **`db.py`**: `HistoryRow` に `catalog_id VARCHAR` カラム追加。`_migrate_columns()` で `ALTER TABLE ADD COLUMN` (既存 DB への無害マイグレーション)
-- **`api.py`**: `HistoryPostBody` に `catalog_id: str | None` 追加
-- **frontend**: `PaintResult` 型 + `pushHistory` 呼び出しに `catalog_id` 追加。`selectedCatalog !== 'default'` のときのみ保存
-
-#### 歳時記ボタンをヘッダーから削除
-
-入力エリアの歳時記ボタンを残し、ヘッダーリンクを削除。
-
-#### 入力内語彙表示ボックス削除
-
-`result && inputMode === 'single'` のときに表示していた「入力に含まれた語彙」セクション (`annot-box`) を削除。感情語はヒント注入で活用するため、インライン表示は不要と判断。
-
-#### ヒストリーストリップの動的幅
-
-`visibleThumbCount = Math.max(1, Math.floor((windowWidth - 40) / 89))` でウィンドウ幅に応じてサムネイル表示数を動的決定。`window.resize` イベントで `windowWidth` を更新（`onMount` で listener 登録 + cleanup）。
-
-#### ナビ矢印方向の修正
-
-`‹`（左） = 新しい（newer）、`›`（右） = 古い（older）に修正。旧実装では `‹`/`›` と `gotoPrev`/`gotoNext` の対応が逆だった。
-
-#### エクスポートファイル名の統一
-
-`slugify(input)` ベースから日時スタンプ形式へ変更。
-
-- 形式: `inku-YYYY-MM-DD-HH-MM[-size].ext`
-- `exportFilename(ext, size?)` ヘルパー関数を追加
-- SVG / PNG 両方に適用
-
-#### CSS 修正
-
-- `.prompt-area` と `.prompt-pre` に `align-self: stretch; min-height: 0` を追加 → プロンプトタブの縦スクロールが正常化
-- `.thumb-strip` を `overflow: hidden` に変更 (横スクロール廃止、`visibleThumbCount` でクリップ)
-
----
-
-### v1.6 (2026-04-27)
-
-**UI全面再設計 + 色カタログシステム + 再演奏機能**
-
-#### レイアウト刷新
-
-旧来のスクロール型ページ（max-width: 1200px）から、固定ビューポートの2ペイン構成へ全面移行。
-
-```
-[ヘッダー]                          固定
-[左パネル 440px] | [右パネル flex]  flex: 1 / overflow: hidden
-[履歴ストリップ]                     固定（下部）
+- `history.starred` カラムを追加し、スター状態を DB に保存する
+- `PATCH /api/history/{item_id}/star` でスター状態を切り替える
+- `GET /api/history?starred=true` でスター付き履歴のみ取得できる
+- ステータスバー、履歴ストリップのサムネイル右上、履歴管理ダイアログのサムネイル右上でスターを表示 / 操作できる
+- 履歴ストリップと履歴管理ダイアログに、スター付きのみ表示するフィルタを追加する
+
+履歴管理ダイアログの視認性を調整した。
+
+- ダイアログ幅を広げ、サムネイル一覧とリスト表示の横方向の余裕を増やす
+- サムネイル hover のメタデータポップアップは fixed 表示にし、モーダルや画面端で切れないように viewport 内へ clamp する
+- ダークモード時のポップアップ色を調整する
+- hover からポップアップ表示までのディレイを長めにする
+
+バッチ実行中の進捗表示を強化した。
+
+- バッチパネルにも token 数を表示する
+- 現在行の token 数と、ここまでの累積 token 数を分けて表示する
+- バッチ進捗行に蟹のマスコットを表示する
+- 蟹は左右に移動し、鋏を上げる、目を動かす、砂に潜る、お辞儀する仕草を行う
+- 蟹は横移動できる生物として扱い、移動方向に合わせた左右反転は行わない
+
+サーバー運用時の安定性を調整した。
+
+- `inku-server` の FastAPI 起動は reload 無効を既定とする
+- `INKU_SERVER_RELOAD=1` / `true` / `yes` / `on` の場合のみ `uvicorn` reload を有効にする
+- systemd サービス運用では reloader プロセスを使わず、通常の単一 `uvicorn` 実行を前提にする
+- `inku_session` Cookie の max-age と DB セッション寿命を連動させる
+- DB セッションは `INKU_SESSION_COOKIE_MAX_AGE` を超えた時点で無効扱いにし、アクセス時に削除する
+- 新規セッション作成時にも期限切れセッションを掃除する
+
+- Build 151
+
+### v1.22 (2026-05-01)
+
+**サーバー保存負荷制御 + 履歴検索高速化 + 履歴管理ページング安定化 + 状態分離 + デモタブ**
+
+出力ファイル保存は DB 履歴保存とは分離し、バックグラウンド保存キューの上限を設けた。
+
+- `/api/paint` は履歴 DB への保存を正本とし、SVG / JSON / PNG などの artifact ファイル保存は副産物として扱う
+- artifact 保存用 executor は worker 数と queue 数に上限を持つ
+- 保存 queue が上限に達した場合、DB 履歴保存を優先し、artifact 保存だけをスキップできる
+- `/api/settings/status` は `output_save` に worker 数、queue 上限、使用中 slot 数、利用可能 slot 数を返す
+
+履歴検索は SQLite FTS5 を利用する。
+
+- `history_fts` virtual table を作成し、`history` の `input` / `ddl` / `stage1_prompt` / `stage2_prompt` / `model` / `catalog_id` を検索対象にする
+- insert / update / delete trigger で FTS index を履歴 DB と同期する
+- 検索語が短い場合や FTS が利用できない場合は従来の `LIKE` 検索へ fallback する
+
+履歴管理ダイアログのページングを安定化した。
+
+- 履歴管理のページ移動、検索、表示種別、スター絞り込みは、取得時点の条件を明示して `/api/history` を呼び出す
+- 古いレスポンスが後から返っても、最新リクエストでなければ表示状態へ反映しない
+- 検索の debounce effect は `untrack` で fetch を呼び、ページ移動やスター絞り込みの state 更新と競合しないようにする
+- ページあたり件数は 100 件を維持する
+- 履歴管理のサムネイルは `content-visibility` を利用し、100 件表示のまま画面外 SVG の描画負荷を抑える
+
+ページ orchestration の肥大化を抑えるため、履歴管理ダイアログ専用の状態と副作用を `HistoryManagerState` へ切り出した。
+
+- `web/src/lib/historyManagerState.svelte.ts` を追加する
+- 履歴管理ダイアログの active / trash 表示、ページング、検索、スター絞り込み、選択状態、request id による stale response 破棄を同 state に集約する
+- `+page.svelte` は履歴ストリップ、削除 / 復元確認、表示中履歴への反映などページ横断の接続を主責務とする
+
+記述 / バッチの隣にデモタブを追加した。
+
+- `DemoPanel` を新設し、デモ専用 UI をコンポーネントとして分離する
+- デモは「シードフレーズから短い指示文を生成 → 生成された指示で1枚描画 → 表示間隔まで待機 → 繰り返し」で動作する
+- デモ設定はユーザーごとに `user_accounts.demo_settings` へ保存する
+- 設定項目は DB 保存有無、artifact ファイル保存有無、指示文生成モデル、シードフレーズ、表示間隔とする
+- デモの既定値は DB 保存なし / ファイル保存なし / 表示間隔 30 秒
+- `GET/PUT /api/auth/me/demo-settings` を追加する
+- `POST /api/demo/instruction` を追加し、シードフレーズからデモ用指示文を生成する
+- デモ実行中は生成された指示文と、ハイライト付き正規化DDLを表示する
+- デモ開始時は新規作成と同等に描画 / プロンプト / JSON 表示をクリアし、描画タブにはプレースホルダーを表示する
+- デモタブには新規作成ボタンを表示しない
+- デモ中もプロンプト / JSON タブは参照可能とし、生成された指示文と正規化DDLを確認できる
+- デモ実行中は履歴ストリップを操作ロックし、ロック中であることを視覚的に表示する
+- 現在表示中のデモ描画を気に入った場合、デモを止めずに `現在の描画をDBに保存` ボタンから履歴へ追加できる
+- デモ描画を手動保存するまでステータスバーのスター操作では履歴へスターを付与しない
+- デモ実行中は合計実行時間 / 合計トークン数と、現在描画中の指示の実行時間 / トークン数を表示する
+- デモ停止後も合計実行時間 / 合計トークン数 / 描画件数を保持して表示する
+- `/api/history` は `save_artifacts` を受け取り、手動保存時のファイル保存有無を制御できる
+- Stage 2 の tool schema は `$defs` / `$ref` をインライン展開してから LLM API へ渡し、JSON grammar コンパイラが参照解決できない環境でも動作するようにする
+
+- Build 162
+
+### v1.23 (2026-05-01)
+
+**inku-cli 初期実装**
+
+macOS 開発環境から `inku-api` を操作する CLI を追加した。CLI は `server/` から独立した root 直下の `cli/` プロジェクトとして管理する。
+
+- `inku-cli` を `cli/pyproject.toml` の console script として登録する
+- 実装は `cli/src/inku_cli/`、テストは `cli/tests/` に配置する
+- CLI はサーバー内部ロジックを直接呼ばず、Web UI と同じ FastAPI API を操作する
+- `login` は `/api/auth/login` の `inku_session` Cookie を取得し、以後は `Authorization: Bearer` として送信する
+- セッション設定は `~/.config/inku-cli/config.json` に保存し、ファイル権限は可能な限り `0600` にする
+- `me` / `logout` / `paint` / `batch` / `demo-instruction` / `history` を初期コマンドとして提供する
+- `paint` / `batch` は SVG / JSON をファイル出力でき、必要に応じて PNG も生成できる
+- `paint` / `batch` は Stage 1 / Stage 2 モデル指定、履歴保存、artifact 保存、言語指定、thinking 取得を指定できる
+- `models` コマンドで Stage 1 / Stage 2 の CLI 既定 provider / model を確認・保存できる
+- provider は `nvidia` / `anthropic` / `local` を保存できる。API へ送るのは model ID で、provider は CLI 側の接続先・運用管理用メタデータとして扱う
+- timeout 秒数も CLI ローカル設定に保存でき、コマンド引数 > ローカル設定 > 600 秒の順で解決する
+- `paint` / `batch` は使用する Stage 1 / Stage 2 provider / model を描画開始時に stderr へ表示し、JSON summary にも含める
+- 描画系 API 呼び出しの既定 timeout は 600 秒とし、長い Stage 2 推論を待てるようにする
+- 描画中は stderr に経過秒数と簡易テキストアニメーションを表示し、停止していないことを確認できる
+- 初期目的は、CLI から指示と画像を生成し、AI による成果物画像の品質判定を組み合わせて Stage 1 / 1.5 / 2 調整用のフィードバックループを構築すること
+- CLI は `inku_server` を import せず、単独の API クライアントとして起動する
+- 開発時は `cd cli && uv run inku-cli ...` で実行する
+- macOS から pentala の `inku-api` へ LAN 経由で接続し、`login` / `paint` / SVG・JSON・PNG 出力の動作を確認した
+- CLI の確認で生成される `cli/out/` はローカル成果物として Git 追跡対象外にする
+
+### v1.23 (2026-05-01)
+
+**NVIDIA Free API 前提の LLM retry / fail 機構 + 100件ベンチ由来の Score 補正**
+
+NVIDIA NIM は開発用の Free API 接続先として扱う。SLA は保証されず、リクエスト集中時には `inference connection error`、一時的な 5xx、応答遅延が発生しうる。その前提で、合理的な retry / fail 機構をサーバー側に追加した。
+
+- OpenAI 互換 LLM 呼び出しは `call_with_llm_retry()` を通す
+- retry 対象:
+  - `429 Too Many Requests`
+  - `408 / 500 / 502 / 503 / 504`
+  - `inference connection error`
+  - connection reset / aborted / timeout / gateway 系の一時エラー
+- retry 対象外:
+  - JSON grammar / schema compile error
+  - bad request
+  - authentication / authorization error
+  - not found
+  - その他、クエリや schema 自体の恒久的な問題
+- retry 回数、base delay、max delay、jitter は環境変数で調整できる:
+  - `INKU_LLM_RETRY_ATTEMPTS`
+  - `INKU_LLM_RETRY_BASE_DELAY`
+  - `INKU_LLM_RETRY_MAX_DELAY`
+  - `INKU_LLM_RETRY_JITTER`
+- OpenAI 互換クライアントには request timeout を設定し、無制限に待ち続けない:
+  - `INKU_LLM_REQUEST_TIMEOUT_SECONDS`
+  - 既定値は 120 秒
+- CLI 側の HTTP timeout は従来どおり長い描画待ち用に 600 秒を既定とする。サーバー内の LLM request timeout と、CLI から API への HTTP timeout は別レイヤーとして扱う
+
+100件ベンチで確認した DDL -> JSON の伝達欠落に対し、Score coerce layer を強化した。
+
+- Stage 2 が同一 `arrangement.count` 付き instruction を複製した場合、renderer 前に重複を統合する
+- renderer 展開後の総プリミティブ数に上限を設け、過密化と SVG 肥大を抑制する
+- 現時点の expanded primitive count 上限は 400
+- 上限超過時は `arrangement.count` を縮小し、`color_hint` に density cap の注記を残す
+- DDL の素材語から JSON Score の `weight` を補完する:
+  - ロットリング -> `rotring`
+  - 鉛筆 -> `pencil`
+  - クレヨン -> `crayon`
+  - チョーク -> `chalk`
+  - 細筆 / 水墨 / 墨 -> `brush_thin`
+  - 太筆 / 油絵 / 厚塗り -> `brush_thick`
+  - 縄 / ロープ -> `rope`
+- DDL の揺れ・滲み語から `variation` を補完する:
+  - `ゆっくり揺れる` / `ゆっくり波打つ` -> `quality=wave`, `frequency=slow`
+  - `細かく揺れる` / `細かく震える` / `震える` -> `quality=perlin`
+  - `滲む` / `境界が滲む` -> `quality=pink`
+- `/api/compose` と `/api/paint` は `coerce_score(score, ddl=...)` を呼び、DDL の素材・揺らぎ情報を補正に利用する
+- Stage 2 が空 `instructions` を返した後の deterministic fallback は、DDL の数量と素材語を可能な範囲で保持する
+
+追加テスト:
+
+- `test_llm_retry.py`
+  - rate limit retry
+  - inference connection error retry
+  - schema / grammar 系 bad request は retry しない
+- `test_coerce.py`
+  - repeated arranged instruction の重複統合
+  - expanded primitive count の上限
+  - DDL からの素材 / variation 補完
+  - 日本語数量詞からの count hint 抽出
+
+検証:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
 ```
 
-- **左パネル**: 記述/バッチ タブ → 指示 → 演奏する → 語彙ハイライト → 解釈DDL → 再演奏 → 統計折りたたみ。`overflow-y: auto` で内部スクロール
-- **右パネル**: タブバー（描画/プロンプト/JSON）→ キャンバスエリア → エクスポートバー
-- **履歴ストリップ**: 82px サムネイル横スクロール。ページネーション「← 新 / 旧 →」。現在表示中に「表示中」バッジ
+結果:
 
-#### 接続設定ポップオーバー
+- `ruff`: all checks passed
+- `pytest`: `103 passed, 30 skipped`
 
-Stage 1 / Stage 2 モデル選択を「⚙ 接続設定」ボタン → ポップオーバーに集約。旧 model-row は廃止。スナップショット選択は v1.11 で歳時記 v1 仕様確定まで削除。
+### v1.24 (2026-05-01)
 
-#### 再演奏機能
+**揺らぎの視認性改善**
 
-解釈DDL ボックス直下に「↺ 再演奏」ボタン追加。`/api/compose` のみ呼ぶ（Stage 1 スキップ）。DDL を手動編集後に再レンダリングするユースケースを想定。進捗バー表示付き。
+DDL の「細かく揺れる」「ゆっくり揺れる」が JSON Score と SVG 上で視認しやすくなるように、Stage 2 と Renderer の扱いを調整した。
 
-#### ズームUI
+- Renderer の `fine` 揺れ幅を 1000px キャンバス上で 7px とし、サムネイルでも細かい揺れが読めるようにする
+- 「ゆっくり揺れる」/ `Swaying slowly` は Stage 2 で `variation.quality="wave"` / `frequency="slow"` を優先する
+- 「震える」「細かく揺れる」は `quality="perlin"` を基本とし、微細な不規則性として扱う
+- 短い line の揺らぎは `dimensions=["position_x","position_y"]` を優先し、短線上で揺れが潰れないようにする
+- `schema.py` の `variation.quality` 説明も、`perlin` と `wave` の役割が分かれるように更新した
 
-右パネルキャンバス下部中央に固定配置。`−` / `＋` / `⊙`（リセット）。範囲 0.5×〜3×（0.25 刻み）。`transform: scale()` をキャンバスコンテナに適用。
+### v1.24 (2026-05-02)
 
-#### ナビゲーション・エクスポート
+**Build 250: DDL 品質チューニング 2-5 + ベンチマーク tooling**
 
-- `‹` / `›` ボタンをキャンバス左右端に絶対配置（円形 38px）
-- 枚数カウンター（N / total）を `›` ボタン下に表示（画像に重ねない）
-- `↓ SVG` + `↓ PNG ▾`（ドロップダウン: 1080px / 2160px / 1024px / 2048px）
+Build 248 / 249 の sensory retention 後に残った「fallback 作品の縮退」「黒・灰偏重」「形状語彙の狭さ」「ベンチ結果整理の手作業負担」に対応した。
 
-#### 歳時記ドロワー刷新
+Fallback score の品質改善:
 
-右端からのスライドイン式ドロワー（幅 0 → 280px、`cubic-bezier(0.4,0,0.2,1)` 0.25s）。カテゴリ見出しを明朝体（ja / en 並記）、語彙をミニマルトークンボタン。ヘッダーの「歳時記」テキストリンク + 左パネルの「歳時記」ボタン両方からトグル。
+- Stage 2 が timeout / empty instructions で deterministic fallback Score へ切り替わった場合でも、DDL の数量・配置・素材・場のトーンを可能な範囲で保持する
+- `散らす` / `点々` / `scatter` / `dotted` は fallback でも `arrangement` として保持する
+- 40個以上の反復は `density=medium`, `cluster_count`, `fade`, `preserve_space=true` を付与し、余白を残す
+- 120個を超える反復は最大 120 個程度へ代表化し、300個以上は `density=high`, `cluster_count=9` として群の見え方を優先する
+- `波打つ軌跡`、`斜めの帯`、`右半分`、`上から下`、`左から右` は fallback でも `arrangement.path` へ反映する
+- fallback primitive は line / square へ寄せすぎず、DDL の語に応じて `triangle` / `arc` / `square` / `ellipse` / `line` へ分散する
 
-#### 色カタログシステム
+Palette strategy:
 
-**フロントエンド**: 初期実装では `web/src/lib/colors.ts` にカタログ定義を持った。v1.25 以降はサーバー側 `GET /api/color-catalogs` を正本とし、フロントエンドは取得した一覧を表示・選択に使う。
+- Stage 1.5 の deterministic expansion で、明示色が少ない場合に場のトーンから代表色を選ぶ
+- 春・花・蕾・温かい光は red / green / white 系を優先する
+- 水・夜・月・雨・霧・冷気は blue / white / gray 系を優先する
+- 森・葉・草・香りは green / white / gray 系を優先する
+- fallback でも春系・水夜系・多色系では `arrangement.color_cycle` を使い、単色化を避ける
+- 抽象色に収まらないニュアンスは `color_hint` に保持し、Renderer の色カタログ解決で利用できるようにする
 
-```typescript
-type ColorMap = Record<'white'|'black'|'blue'|'red'|'green'|'gray', string>;
+Shape vocabulary:
+
+- 既存 schema の範囲で `triangle` / `arc` / rotated square / thin ellipse をより積極的に使う
+- 山・屋根・尖った先端は `triangle` として表現する
+- 葉・花びら・羽・紙片・破片・舟は thin ellipse または rotated square として抽象化する
+- 扉・窓・箱・街・部屋・格子は rotated square を「視線の切片」として扱えるようにする
+- 自然 primitive plugin が未導入の段階でも、自然・物質形を既存 primitive で失わずに保持する
+
+Sensory visibility:
+
+- 白背景上の `柔らかな光`、`五感`、`透明な膜`、`気配` は単純な黒化を避け、淡い blue と `color_hint` で保持する
+- 白背景上の `香り` / `匂い` / `fragrance` / `scent` は淡い green と `color_hint` で保持する
+- 見えることを優先しつつ、感覚層が硬い黒線になって作品の余韻を壊すことを避ける
+
+CLI benchmark tooling:
+
+- `inku-cli batch` は `--summary-json` を指定すると batch summary JSON を指定パスへ保存する
+- `--out-dir` 指定時は既定で `OUT_DIR/analysis-summary.json` に summary を保存する
+- summary には `review_sets` を追加し、以下を自動分類する:
+  - `all_success_samples`: 成功した全サンプル
+  - `fallback_samples`: Stage 1 / Stage 2 fallback 使用サンプル
+  - `slow_samples`: 実行時間が長いサンプル
+  - `normal_samples`: fallback なし、かつ slow ではないサンプル
+- summary には色到達、否定色、motif 到達、数学的構図 marker の診断情報を含める:
+  - `color_trace`
+  - `negated_color_markers`
+  - `score_motif_hint_counts`
+  - `score_motif_hint_lines`
+  - `math_balance_markers`
+  - `math_balance_marker_lines`
+- NVIDIA Free API の待ち時間はキュー状況による偶然性が高いため、芸術評価では除外し、診断メタデータとしてのみ扱う
+- 成功した描画は、遅かった場合でも今後すべて品質評価対象に含める
+- `inku-cli contact-sheet` を追加し、PNG 出力ディレクトリから contact sheet を生成できる
+- CLI 依存関係として Pillow を明示し、contact sheet 生成を安定して利用できるようにする
+
+検証:
+
+- macOS:
+  - `server`: `76 passed, 15 skipped`
+  - `cli`: `11 passed`
+  - `ruff`: backend / CLI とも all checks passed
+- pentala:
+  - `server`: `76 passed, 15 skipped`
+  - `cli`: `11 passed`
+  - `ruff`: backend / CLI とも all checks passed
+  - `web`: `npm run check` 0 errors / 0 warnings
+  - `web`: `npm run build` success
+  - `inku-api` / `inku-server` health check: HTTP 200
+
+### v1.25 (2026-05-01)
+
+**てざわり選択と物理素材レンダリング**
+
+DDL の「てざわり」が線幅差だけに見えないよう、Stage 1 / Stage 1.5 / Renderer の各層で素材差を強化した。
+
+- Stage 1 に「てざわり選択」ルールを追加し、明示素材がない入力でも文脈から素材を選ぶ
+  - 薄い / 淡い / 下書き / 素描 → 鉛筆または細筆
+  - 粉 / かすれ / 乾いた / 黒板 / 壁 → チョーク
+  - 手描き / こすれ / 蝋 / 柔らかい色面 → クレヨン
+  - 墨 / 書 / 筆跡 / 濃淡 → 細筆または太筆
+  - 精密 / 機械的 / 均一 / 図面 → ロットリング
+  - 太い / 荒い / 撚り / 重い / 綱 → 縄
+- Stage 1 の few-shot に鉛筆、チョーク、クレヨン、ロットリングの質感例を追加した
+- Stage 1.5 の拡張DDL候補に `鉛筆の余白線`、`クレヨンの擦れ`、`ロットリングの均一線`、`縄の撚り` を追加した
+- Renderer は `weight` ごとに SVG 属性・texture filter・副線・粒・撚り短線を生成する
+- line に加えて circle / ellipse / square / arc の輪郭にも素材処理を適用する
+- `pencil` / `crayon` / `chalk` / `brush_thick` は `feTurbulence` / `feDisplacementMap` を使い、線幅だけではない質感差を出す
+- `rope` は平行な撚り線に加え、周期的な斜め短線で撚りを表現する
+
+### v1.25 (2026-05-03)
+
+**サーバー正本の色カタログ API + CLI version/build 表示**
+
+色カタログの正本をクライアント側静的定義からサーバー側へ移した。
+
+- 色カタログ定義は `server/src/inku_server/color_catalogs.py` を正本とする
+- `GET /api/color-catalogs` は default catalog ID と全カタログの `map` / `swatches` / `palette` を返す
+- Web UI と CLI は色カタログ一覧をサーバー API から取得し、クライアント側のカタログ定義を持たない
+- `/api/paint`、`/api/compose`、`/api/history` は `catalog_id` を受け取り、サーバー側でレンダリング用 `color_map` を解決する
+- `color_map` リクエストフィールドは互換用に残すが、色カタログ解決の正本としては扱わない
+- 履歴には従来どおり `catalog_id` を保存する。加えて、描画レスポンス JSON と出力 artifact JSON には、実際に使用した解決済みの `stage1_model` / `stage2_model`、実際にレンダリングした `render_build_number`、sRGB基準であることを示す `render_color_profile`、サーバー解決済みの `render_color_catalog_id` / `render_color_catalog_name` / `render_color_catalog_sub`、および `render_color_map`（抽象色名・`palette:<name>` から実際の `#RRGGBB` コードへの展開）を記録する。`render_color_catalog` の完全な `map` / `swatches` / `palette` snapshot は `render_color_map` と重複するため保存しない
+- `GET /api/info` はサーバー名、バージョン、ビルド番号を返す
+- CLI に `version` コマンドを追加し、CLI 側の version / build number と、接続先サーバーの version / build number を表示する
+- Build 264
+
+### v1.26 (2026-05-01)
+
+**軌跡フィールドの追加**
+
+DDL の「波打つ軌跡」「斜めの帯」「上から下」「右半分」などが `scatter` に埋もれないよう、JSON Score の `arrangement` に `path` フィールドを追加した。
+
+- `arrangement.path` は `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` を持つ
+- Stage 2 は「波打つ軌跡に沿って」を `path="wave"`、「斜めの帯」を `path="diagonal"`、「右半分」を `path="right_half"` として出力する
+- 「上から下へ散らす」は `layout="vertical"` に加えて `path="top_to_bottom"` を指定できる
+- Renderer は `path` が指定された arrangement を、決定的な軌跡座標として展開する
+- 既存 JSON 互換のため、`path` の既定値は `none` とする
+
+### v1.26 (2026-05-03)
+
+**Build 257: CLI benchmark 診断 summary 拡張**
+
+Build 256 の focused small bench と 3 persona review で、green / shape / motif / math balance の到達状況をより機械的に追える必要が明確になった。
+
+CLI benchmark summary は、作品品質の評価そのものではなく、後続の人間評価と実装修正を支える診断データとして扱う。
+
+- `color_trace` は、色 marker だけでなく否定文脈も記録する
+  - 例: `緑には寄せず`, `緑ではなく`, `not green`, `avoid green`
+  - 否定された色は `negated_color_markers` に入り、`requested_colors` から除外する
+  - これにより「緑を出さないことが正しい」サンプルを `green_requested_but_missing_in_score` と誤警告しない
+- `_score_metrics` は `score_motif_hint_counts` を返す
+  - `leaf_cluster`
+  - `paper_shard`
+  - `ripple_knot`
+  - `mountain_sign`
+- `inku-cli batch` summary は、motif / math marker のサンプル番号を列挙する
+  - `score_motif_hint_lines`
+  - `math_balance_marker_lines`
+- `math_balance_markers` は count だけでなく、どの sample で出たかを追跡できる
+- summary は既存キーを維持しつつ追加キーとして拡張する。既存の benchmark JSON consumer を壊さない
+- Build 257
+
+### v1.27 (2026-05-01)
+
+**Stage 2 過長応答対策 + DDL coverage 補完**
+
+修正後30件ベンチで、重複・過密は改善した一方、Stage 2 が長時間応答した末に 1 instruction へ縮退するケースが残ったため、追加の診断と補完を実装した。
+
+- Stage 2 の結果が空、`tokens_out` 過大、または長時間かつ単一 instruction の場合は、コンパクトな描画命令を要求して1回再試行する
+- 再試行理由は `empty_instructions` / `excessive_tokens_out` / `slow_single_instruction` として API レスポンスに残す
+- `/api/compose` は `retry_count` / `retry_reasons` / `fallback_used` を返す
+- `/api/paint` は `compose_retry_count` / `compose_retry_reasons` / `compose_fallback_used` を返す
+- `inku-cli paint` / `batch` の summary JSON に Stage 2 retry/fallback 情報を含める
+- Score coerce layer は、Stage 2 が1命令へ縮退した場合、DDL の複数視覚句から最大5命令まで coverage 補完を行う
+- 1つの `arrangement` が過大になりすぎないよう、単一 instruction の展開数にも上限を設ける
+
+追加テスト:
+
+- `test_coerce.py`
+  - 単一 arrangement count の上限
+  - 1命令縮退時の DDL coverage 補完
+
+検証:
+
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
+
+cd ../cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
 ```
 
-- `default`（規定値）= 既存 `renderer.py` COLOR_MAP と完全一致
-- 追加10種: Ink & Season / Fresco Study / Open-Air Light / Ink & Porcelain / Cool Material / Dye & Earth / Desert Mineral / Vivid Material / Weathered Heritage / Sea & Stone
-- 各カタログは `map`（6色 ColorMap）+ `swatches`（表示用8色）+ `palette`（名称付き8色）を持つ
-- `default` は文化的な標準ではなく neutral baseline として扱う。追加カタログの `id` / 表示名 / 説明は、国名・民族名・食・祭り・帝国・観光記号で文化全体を代表しないよう、素材・光・技法・描画上の振る舞いを基準に命名する。
-- カタログの `map` は `white / black / blue / red / green / gray` の抽象色としての意味を壊さないことを優先する。特徴色は `palette` に逃がし、`blue` が pink へ、`gray` が terracotta へ、`black` が navy へ変わるような意味崩れを避ける。
-- Build 265 時点の残課題として、`open_air_light`, `dye_earth`, `desert_mineral` は背景・暗色・高彩度差し色が作品全体を支配しやすい。今後の調整は個別プロンプト最適化ではなく、core color の明度・彩度・背景化しやすさを抑える方向で行う。
-- Build 266 では上記3カタログの core color を少し軽くし、背景・暗色・高彩度差し色の支配を抑えた。`default.sub` は英語UI向けに `neutral baseline` とし、日本語UI向け説明は `sub_ja` に分離する。
-- カタログ詳細色は `palette[].name` を英語の正本表示名とし、対応する日本語名がある場合は `palette[].name_ja` を併記できる。日本語UIでは `English（日本語）` と表示し、英語UIでは `name` のみ表示する。
+結果:
 
-「カタログ設定」モーダル（ヘッダー右端）から選択。選択は `localStorage` に永続化。
+- `ruff`: all checks passed
+- server pytest: `105 passed, 30 skipped`
+- cli pytest: `8 passed`
 
-**バックエンド**: `renderer.render()` に `color_map: dict[str, str] | None = None` パラメータ追加。初期実装では `ComposeRequest` / `PaintRequest` の `color_map` フィールドで演奏ごとに選択中のカタログ色マップを受け取った。v1.25 以降は `catalog_id` を受け取り、サーバー側の色カタログ定義からレンダリング用 `color_map` を解決する。
+### v1.28 (2026-05-01)
 
-#### 色ニュアンス `color_hint`
+**Stage 1 / Stage 2 hard timeout と deterministic fallback**
 
-JSON Score の各 `instruction` は任意の `color_hint` を持てる。`color` は従来どおり `white / black / blue / red / green / gray` の抽象色とし、`color_hint` には「桜色」「朱に近い赤」「冷たい青緑」など、指示に含まれた具体的な色ニュアンスを短く保存する。
+不正・矛盾・曖昧入力30件ストレステストで、API / renderer は落ちない一方、Stage 1 / Stage 2 の LLM 応答が数分単位で返るケースが確認された。これに対し、LLM クライアントの read timeout とは別に、API 層で Stage 単位の hard timeout を実装した。
 
-Stage 2 は具体色を抽象色へ丸めつつ、元のニュアンスを `color_hint` に保持する。Renderer は選択中の色カタログの `map` と `palette` を受け取り、`color_hint` がある場合はパレット名・色相ヒントを使ってより近い実色を選ぶ。ヒントがない場合、または解決できない場合は従来どおり `color` の抽象色を使う。
+- Stage 1 は `INKU_STAGE1_HARD_TIMEOUT_SECONDS` を超えた場合、入力文から deterministic fallback DDL を生成する
+- Stage 2 は `INKU_STAGE2_HARD_TIMEOUT_SECONDS` を超えた場合、追加 retry を待たず deterministic fallback Score へ切り替える
+- 既定値はいずれも 120 秒
+- `/api/interpret` は fallback 時のみ `fallback_used` / `fallback_reasons` を返す
+- `/api/paint` は `interpret_fallback_used` / `interpret_fallback_reasons` を返す
+- `/api/compose` / `/api/paint` の Stage 2 診断には `stage2_hard_timeout` / `stage2_retry_hard_timeout` を記録する
+- `inku-cli paint` / `batch` の summary JSON に Stage 1 fallback 情報も含める
+- build number: 172
 
-#### その他
+追加テスト:
 
-- ビルド番号表示: `#N` → `Build N`
-- 進捗バー: ステージインジケーター（✓ 完了 / ● 実行中アニメーション）+ 経過時間 + 停止ボタン + フェーズラベル
+- `test_api.py`
+  - Stage 2 hard timeout 時に `/api/compose` が fallback Score を返す
+  - Stage 1 hard timeout 時に `/api/paint` が fallback DDL で継続する
 
-### v1.5 (2026-04-26)
+**複数ユーザー同時描画時の安全性**
 
+複数ユーザー、または同一ユーザーが同時に `/api/paint` を実行した場合に、共有資源が無制限に増えたり、ユーザー別の生成回数が欠落したりしないようにする。
 
-#### UI 修正
+- `user_accounts.image_generation_count` は、DB 側の単一 `UPDATE` で `image_generation_count = image_generation_count + amount` として原子的に加算する
+- Stage 1 / Stage 2 の LLM 呼び出しは共有 bounded executor で実行する
+- Stage executor の worker 数は `INKU_STAGE_WORKERS`、待機を含む上限は `INKU_STAGE_QUEUE_LIMIT` で設定する
+- Stage 呼び出しが hard timeout しても、下層の LLM 呼び出しスレッドは Python から強制停止できない。そのため timeout 済みの処理も実際に完了するまで Stage capacity を保持し、後続リクエストが無制限に積み上がらないようにする
+- Stage capacity を取得できない場合は Stage hard timeout と同じ fallback 経路へ進む
+- `/api/settings/status` は `stage_execution` に worker 数、queue 上限、`submitted` / `completed` / `failed` / `timed_out` / `rejected` を返す
+- 履歴保存、履歴一覧、スター、削除、復元は引き続き `user_id` で絞り込み、ユーザー間で履歴が混在しないようにする
 
-- **canvas max-height 追加**: `.canvas { max-height: 480px }` を設定。`aspect-ratio: 1/1` のみでは canvas がビューポート幅（~560px）まで拡大し、history strip がビューポート外に押し出されていた問題を修正
-- **履歴 each キー修正**: `{#each historyItems as it, i (it.at)}` → `(it.id ?? it.at)`。同一タイムスタンプで複数アイテムが記録された場合の重複キーを解消。`Iteration` 型に `id?: string` 追加
+追加テスト:
 
-### v1.4 (2026-04-26)
-SPEC.mdの内容精査。
+- `test_api.py`
+  - 同一ユーザーの生成回数を並列更新しても最終カウントが欠落しない
+  - Stage hard timeout 後も underlying worker 完了まで capacity が保持され、次の Stage 実行が上限で拒否される
+  - `/api/settings/status` が `stage_execution` の状態を返す
 
-### v1.3 (2026-04-26)
+検証:
 
-**Saijiki スナップショット + トークン表示 + ダウンロード + i18n**
+```sh
+cd server
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests/test_api.py tests/test_composer.py tests/test_renderer.py tests/test_interpreter.py tests/test_ddl_expander.py tests/test_coerce.py tests/test_llm_retry.py -q
 
-#### Saijiki スナップショット
+cd ../cli
+UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest tests -q
+```
 
-**注記**: この機能は v1.11 で歳時記 v1 仕様確定まで一旦削除。以下は v1.3 時点の履歴として残す。
+結果:
 
-特定時点のシステムプロンプト状態を名前付きで保存・呼び出す機能を追加。
+- `ruff`: all checks passed
+- server pytest: `107 passed, 30 skipped`
+- cli pytest: `8 passed`
 
-- **`server/src/inku_server/snapshots.py` 新規作成**
-  - `create_snapshot(name, stage1_prefix, stage2_prompt)` → UUID + タイムスタンプ付きで保存
-  - ストレージ: `/tmp/inku-saijiki-snapshots.json` (env var `INKU_SNAPSHOTS_FILE`)
-  - `list_snapshots()` / `get_snapshot(id)` / `delete_snapshot(id)` の CRUD
-- **API エンドポイント追加**
-  - `GET /api/saijiki/snapshots` → `list[SnapshotMeta]`
-  - `POST /api/saijiki/snapshots` → スナップショット作成
-  - `DELETE /api/saijiki/snapshots/{id}` → 削除
-- **スナップショット適用**: `InterpretRequest` / `ComposeRequest` / `PaintRequest` に `snapshot_id` フィールド追加。推論時に一致するスナップショットのプロンプトを上書き
-- **設計**: Stage 1 はプレフィックス (`SYSTEM_PROMPT_PREFIX`) のみ保存し、EXAMPLE_POOL の動的例選択は引き続きリアルタイム動作。スナップショットはプレフィックスの変更のみをキャプチャ
-- **Web UI**: スナップショットパネル (折り畳み式) を歳時記エリアに追加。現在設定表示・名前入力・保存・削除・選択適用
+### v1.29 (2026-05-01)
 
-#### トークン数トラッキング
+**プラグインサポートの初期実装**
 
-LLM の消費トークンを処理中に表示し履歴にも記録。
+アプリケーションのコア要素とノンコア拡張を分離するため、最初のプラグインフックとして canvas-size hook を導入した。
 
-- **`interpreter.py`**: `interpret_detail()` が `(ddl, thinking, tokens_in, tokens_out)` の 4-tuple を返すように変更
-  - Anthropic: `resp.usage.input_tokens / output_tokens`
-  - OpenAI/OVMS: `resp.usage.prompt_tokens / completion_tokens`
-  - いずれも `getattr` で安全取得 (未対応モデルは `None`)
-- **`composer.py`**: `compose()` が `(Score, tokens_in, tokens_out)` の 3-tuple を返すように変更
-- **`api.py`**: `InterpretResponse` / `ComposeResponse` / `PaintResponse` に `tokens_in / tokens_out` フィールド追加
-- **Web UI**: 処理中の「構造化中…」ラベルにトークン数をリアルタイム表示。履歴サムネイルに `{in}→{out}tok` 表示
+- `canvas-aspect` 参照プラグインを追加
+- キャンバス比率として `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` をサポート
+- ユーザーごとのプラグイン設定を DB の `plugin_storage` に JSON として保存
+- `/api/auth/me/plugin-storage` と `/api/auth/me/plugin-storage/{plugin_id}` を追加
+- `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を変更
+- Web UI ではモデル選択ボタンの左側にプラグイン呼び出しボタンを追加
+- キャンバス比率変更時は現在の描画コンテキストをクリアし、選択比率のプレースホルダー画像を表示
+- ステータスバーには現在または履歴のキャンバス種類を表示し、プラグイン選択が描画コンテキストに含まれていることを確認できる
+- 設定ダイアログのプラグインタブを整理し、システム標準プラグインとして `canvas-aspect` の説明、バージョン表記、有効/無効トグルを表示
+- ユーザープラグイン追加 UI はスケルトンとして配置し、外部ローダー実装後に有効化する
+- 設定ダイアログはタブ切替で上端位置が動かないよう、通常設定モードでは固定上端・固定高に変更
+- プラグイン作成のリファレンスとして `PLUGIN.md` を追加
+- build number: 178
 
-#### ダウンロード機能
+### v1.29 follow-up (2026-05-01)
 
-完成した作品を SVG および複数解像度の PNG で保存可能に。
+**キャンバスプラグインの Score 反映**
 
-- **SVG ダウンロード**: `<desc>` タグに元の記述テキストを埋め込んで出力。`svgWithDesc()` 関数で `<svg ...>` の直後に挿入
-- **PNG ダウンロード**: 4 解像度 (1080 / 2160 / 1024 / 2048px) をブラウザ Canvas API で変換
-  - SVG に `width` / `height` 属性を注入し `Image` に描画 → Canvas → `toBlob('image/png')` → `<a>` 要素でダウンロード
-  - Canvas 背景は白 (`#ffffff`) でプリフィル (透過 PNG にならないよう)
-- **UI**: キャンバス下部にダウンロードバーを追加。`↓ SVG` ボタン + `PNG:` ラベル + `1080 / 2160 / 1024 / 2048` ボタン
+`canvas-aspect` で選択したキャンバス種類を JSON Score と履歴に明示的に保存するようにした。
 
-#### 履歴: モデル名・トークン数表示
+- `/api/paint`、`/api/compose`、履歴保存時に渡した `canvas_aspect` を `Score.canvas` に反映する
+- Renderer は request の `canvas_aspect` を優先しつつ、未指定時は `Score.canvas` を参照して SVG の `width` / `height` / `viewBox` を決定する
+- 履歴表示・JSON タブで、生成に使われたキャンバス種類が `score.canvas` として確認できる
+- build number: 179
 
-- 履歴サムネイルに Stage 2 使用モデルの短縮名 (`shortModel()`) を表示
-- `Iteration` 型に `tokens_in / tokens_out` フィールド追加
-- `HistoryPostBody` にも `tokens_in / tokens_out` を追加してサーバー側履歴にも記録
+### v1.30 (2026-05-01)
 
-#### ハッカソン関連テキスト削除
+**ステータスバーとパネル操作の整理**
 
-UI 全体からハッカソン関連の記述を削除。
+描画パネル下部のステータスバーを、現在の生成コンテキストと成果物操作を素早く確認できる場所として整理した。
 
-#### i18n — 日英言語パック
+- ステータスバーには Stage 1 / Stage 2 モデル名、色カタログ名に加えて、キャンバスプラグインの現在キャンバス種類を表示する
+- 履歴表示時は履歴レコード内の JSON Score `canvas` を優先し、当該履歴が生成されたキャンバス種類を表示する
+- SVG / PNG 書き出しボタンから `エクスポート:` ラベルを削除し、download アイコン + 形式名の表示に変更する
+- 記述 / バッチ / デモの開始系ボタンを共通コンポーネント化し、見た目と disabled 状態を統一する
+- 記述パネルの解釈 box を拡大し、語彙ハイライト表示と編集 textarea の高さを揃える
+- build number: 185
 
-UI の日本語 / 英語切り替えを実装。将来の多言語対応を設計から内包。
+### v1.31 (2026-05-02)
 
-- **`web/src/lib/i18n/types.ts`**: `LangPack` インターフェース定義
-  - 単純文字列フィールドと関数フィールド (`batchCount(n)`, `stageStructuring(tok)`, `tokenSummary(...)` 等) を混在
-- **`web/src/lib/i18n/ja.ts`** / **`en.ts`**: 日本語・英語パックを個別ファイルで管理
-- **`web/src/lib/i18n/index.svelte.ts`**: Svelte 5 `$state` ベースの言語ストア
-  - `t()` 関数でアクティブパックを返す (テンプレート内 `t().key` で全文字列を参照)
-  - `setLang(code)` + `localStorage` 永続化
-  - 新言語追加: `types.ts` にパック実装 + `PACKS` に登録するだけ
-- **`+page.svelte`**: 全ハードコード文字列を `t().xxx` に置き換え。`$derived.by(() => t().tokenSummary(...))` パターンで複合 derived を実装
-- **ヘッダー**: 言語切り替えボタン (`日本語` / `English`) をヘッダー右上に配置
+**記述タブ進捗マスコットのキウイ化**
 
----
+記述タブの単発描画中、および解釈（正規化DDL）からの再描画中に表示する進捗バー上のマスコットを、小鳥からキウイへ変更した。
 
-### v1.2 (2026-04-25)
+- キウイは左向き固定で表示し、右向き反転や方向転換の中間フレームは使用しない
+- 長いくちばしで地面をつつく、鼻を鳴らす、瞬きする、くちばしを開けてダッシュするなどの仕草を行う
+- 脚は胴体下部の固定位置から生え、足先だけが動くようにして、付け根が揺れない
+- 足先の動きはややダイナミックにし、歩行時の踏み替えが分かるようにする
+- 胴体と尾側を別グループ化し、低頻度でお尻を振る仕草を行う
+- キウイボールでは頭・胴体・くちばしを残した丸まり表現とし、6秒以上その場に留まる
+- キウイボール中は目を閉じ、頭だけがゆっくり「こくり、こくり」と動く
+- 進捗マスコットは `KiwiMascot.svelte` として共通コンポーネント化し、記述パネルと DDL 再描画パネルから利用する
+- build number: 199
 
-**バッチモード + 演奏ステージ可視化 + 学習モード廃止 + わりあい語彙追加**
+### v1.32 (2026-05-02)
 
-#### バッチ記述モード
+**プロフィールダイアログ**
 
-- 入力欄に「記述 / バッチ」タブを追加
-- バッチタブ: 改行区切りで複数の記述を入力、左端に行番号を自動表示
-- 順次処理: 演奏中は「N / M 番目を演奏中…」と表示、停止ボタンで中断可能
-- 各結果を履歴に保存し、最後の結果がキャンバスに残る
+アプリレールのユーザーアイコンメニューにプロフィールを追加し、ログインユーザーが自分のアカウント情報を直接変更できるようにした。
 
-#### 演奏中ステージ可視化
+- ユーザーアイコンメニューは、プロフィールとログアウトを選択できる
+- プロフィールを選択すると、設定ダイアログとは独立したプロフィールダイアログを表示する
+- プロフィールダイアログではメールアドレスを変更できる
+- パスワード変更時は、現在のパスワードと新しいパスワードを入力する
+- 新しいパスワードは 8 文字以上とし、現在のパスワードが一致しない場合は変更を拒否する
+- 自己プロフィール更新 API として `PATCH /api/auth/me/profile` を追加する
+- 管理者によるユーザー管理 API とは分離し、ログインユーザー自身のメールアドレス / パスワード変更に限定する
+- build number: 206
+
+### v1.33 (2026-05-02)
 
-- フロントエンドの処理方式を `/api/paint` 1 コール → `/api/interpret` + `/api/compose` の 2 コール方式に変更
-- 演奏中に「解釈中…」「構造化中…」をステージラベルとして経過秒と並べてリアルタイム表示
-- `ComposeRequest` に `original_text` フィールド追加 (Stage 2 が元の記述を参照して属性補完に活用)
+**設定ダイアログのロール別表示制御**
 
-#### 学習モード廃止
+設定ダイアログで、ロールごとの表示範囲と変更権限を整理した。
 
-- Web UI の学習モードパネルを削除
-- `GET /api/train`・`GET /api/train/stats`・`DELETE /api/train` エンドポイントを削除
-- 起動時の EXAMPLE_POOL 注入ルーティングも削除 (`trainer.py` は実験的ユーティリティとして残置)
+- `DB設定` タブは `admin` ロールのみに表示する
+- `ユーザー管理` タブは `admin` ロールのみに表示する
+- `プラグイン` タブは全ログインユーザーに表示する
+- プラグイン設定の変更は `admin` ロールのみに許可する
+- 非 admin ユーザーが設定を開く場合、保存済みタブが `DB設定` / `ユーザー管理` であっても `プラグイン` タブへフォールバックする
+- plugin storage 更新 API は admin のみ利用可能とする
+- build number: 212
+
+### v1.34 (2026-05-02)
+
+**プラグインディレクトリ構成の整理**
+
+プラグインを system と user の配置に分け、各プラグインを専用ディレクトリに置く構成へ変更した。
+
+- サーバー側プラグイン実装を `server/src/inku_server/plugins/` パッケージへ移行
+- system plugin は `server/src/inku_server/plugins/system/<plugin_name>/` に配置する
+- user plugin 用に `server/src/inku_server/plugins/user/` 名前空間を予約する
+- Web 側プラグイン実装を `web/src/lib/plugins/system/<plugin-id>/` に配置する
+- user plugin 用に `web/src/lib/plugins/user/` を予約する
+- 既存の `canvas-aspect` は system plugin として専用ディレクトリへ移動する
+- `server/src/inku_server/plugins/__init__.py` は API / Renderer から参照する安定した hook API を再エクスポートする
+- build number: 213
+
+### v1.35 (2026-05-02)
 
-#### Web UI 改善
+**エクスポートテンプレート**
 
-- 出力タブ順変更: 演奏 → プロンプト → 楽譜 (旧: 演奏→楽譜→プロンプト)
-- プロンプト表示領域拡大: ユーザー入力 max-height 160px、システムプロンプト 400px、外枠 680px
-- 履歴に `stage1_model` / `stage2_model` を記録 (サムネイルの title で確認可)
+設定ダイアログに `エクスポート` タブを追加し、PNG 保存形式をユーザーごとのテンプレートとして管理できるようにした。
 
-#### Saijiki わりあいカテゴリ追加
-
-- 新カテゴリ `わりあい (proportions)`: 縦長・横長・全幅・半幅・半円・上弦・下弦・三日月
-- Stage 1 `SYSTEM_PROMPT_PREFIX` に `# わりあい` ルールセクション追加 (縦横比・線長・月形→角度の変換原則)
-- Stage 2 `SYSTEM_PROMPT` にわりあい JSON マッピング例 7 件追加
-- `EXAMPLE_POOL` に 8 件追加 (縦横比 2・線長 2・弧月 4)
-- `saijiki.ts` に `わりあい` カテゴリを追加
-
----
-
-### v1.1 (2026-04-25)
-
-**coerce レイヤー + 背景色 + 配色サイクル + 塗りつぶし + 非 Saijiki 語展開 + UI 改善**
-
-#### coerce.py — テーブル駆動の構造補修レイヤー (新規)
-
-LLM が必須フィールドを省略した Score を renderer に渡す前に自動補修する `coerce.py` を新規作成。
-
-- **設計原則**: primitive 個別の if/elif を書かない。`FieldSpec` dataclass + `PRIMITIVE_SPECS` テーブルで要件を宣言し、汎用ループで適用。新 primitive 追加 = テーブルにエントリ追記のみ
-- **`FieldSpec`**: `name / default / fallbacks (cross-field 代替) / coerce (型正規化関数)` を宣言
-- **`PRIMITIVE_SPECS`**: 6 primitive (line/circle/ellipse/arc/square/triangle) の必須フィールド仕様
-  - fallback 例: circle の `center` 欠損時は `position` を代用
-  - 型正規化: `_as_coord / _as_positive_float / _as_positive_size / _as_float`
-- **`POST_COERCE`**: cross-field 制約 (arc の `angle_start == angle_end` → +270° 補正)
-- **`api.py`**: `/api/compose` / `/api/paint` 両エンドポイントで `render()` 前に `coerce_score()` を呼び出し
-
-#### 閉じた形状の自動塗りつぶし
-
-- `_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle"})`
-- `_stroke_attrs()`: `do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled` — 閉形状は色指定で自動塗りつぶし
-- `Instruction.filled: bool = False` フィールドを schema.py に追加 (明示的塗りつぶし指定)
-
-#### 背景色 (Score.background)
-
-- `Score.background: Color = "white"` フィールド追加
-- `renderer.render()`: `COLOR_MAP.get(score.background, BACKGROUND)` でキャンバス全体を背景色で塗りつぶし
-- Stage 2 プロンプトに background ルール追加
-
-#### 配色サイクル (Arrangement.color_cycle)
-
-- `Arrangement.color_cycle: list[Color]` フィールド追加 (デフォルト空 = 全要素同色)
-- `_apply_color_cycle(items, cycle)`: arrangement 展開後に `i % len(cycle)` で色を上書き
-- 全 layout (horizontal / vertical / radial / scatter) で適用
-
-#### count 上限 1000 へ拡張
-
-- `Arrangement.count` 上限 500 → 1000、`_clamp_count` validator も更新
-- composer.py / interpreter.py のプロンプト記述も同様に更新
-
-#### Stage 2: original_text パス・スルー
-
-- `compose(ddl, *, original_text=None)` に引数追加
-- `_build_user_message(ddl, original_text)`: 原文と正規化DDL が異なる場合 `[原文]…[正規化DDL]…` 形式でユーザーメッセージを構成
-- `/api/paint` で `req.text` を Stage 2 に渡すよう改善 → LLM が元の記述の意図をより正確に反映
-
-#### 非 Saijiki 語の LLM 意味展開
-
-- Stage 1 `SYSTEM_PROMPT_PREFIX` に `# 非 Saijiki 語の展開` セクションを追加
-  - 展開の四つの切り口: 形状 / 質感 / 構造 / 動作→配置
-  - 例: 月→円、霧→楕円(滲む)、森→縦線を複数、散る→ランダムに散らす
-- 固定辞書アプローチ (`expansion.py`) を削除 — LLM の意味理解に委ねる方針に転換
-- EXAMPLE_POOL に自然現象・詩的語彙の例 9 件追加 (太陽、星空、水平線+月、山並み、森、雪、炎、都市、花びら)
-
-#### Web UI 改善
-
-- **タブ切り替え**: 演奏 / 楽譜 / プロンプト の 3 タブ (旧: 垂直展開)。新しい結果が来ると自動的に「演奏」タブに戻る
-- **ビルド番号**: `vite.config.ts` に `.build-number` ファイルベースのインクリメント機構を追加。ヘッダー左上に `#N` 表示
-- **接続先 / モデル ラベル**: 「接続先：」「モデル：」を明記
-- **プロンプト表示順**: Stage1ユーザー入力 → Stage1システム → Stage2ユーザー入力 → Stage2システム (文脈順)
-
----
-
-### v1.0 (2026-04-25)
-
-**大量描画対応 + Renderer 堅牢化 + Stage 1 属性保持強化 + 学習モード + サーバーサイド履歴**
-
-#### 大量オブジェクト描画 (count 上限 500)
-
-「100本の線」「200個の円」を実際に描画できるようアルゴリズムを改良。
-
-- **schema.py**: `Arrangement.count` 上限 50 → 500、`_clamp_count` validator も同様
-- **renderer.py**: 固定10点 `_SCATTER_POSITIONS` を廃止。`_scatter_pos(i, seed, margin)` を追加
-  - SHA-256 hash ベースの決定的ランダム座標生成 — N 個任意対応
-  - 同一 Score → 同一 SVG の決定性を維持 (seed = instruction の hash)
-- **interpreter.py**: 「100本・200個 → 30程度に丸める」規則を撤廃、具体的な数はそのまま通す
-- **composer.py**: count 上限説明を 50 → 500 に更新
-
-#### Renderer: line from/to 省略時の fallback
-
-LLM が arrangement 付き line を生成するとき `from`/`to` を省略するケースがあり `render failed` エラーが発生していた問題を修正。
-
-- `_ensure_line_coords(ins)` を追加: layout から方向を推定してデフォルト座標を補完
-  - `layout="vertical"` → 横線 (`[0.0, 0.5]`→`[1.0, 0.5]`)
-  - その他 (`horizontal` / `scatter` / `radial`) → 縦線 (`[0.5, 0.0]`→`[0.5, 1.0]`)
-- `_expand_arrangement` 入口で呼び出し (arrangement 展開前に補完)
-- `_render_instruction` でも arrangement なし line に同様の fallback を適用 (raise を除去)
-
-#### Stage 1 属性保持強化
-
-記述の解釈時に色・素材・方向・揺らぎが脱落する問題を構造的に修正。
-
-- **`# 属性保持 — 脱落禁止` セクション追加**
-  - 「感情語の除去だけが正規化であり、属性の省略は誤り」を明示
-  - いろ / てざわり / 太さ / 方向・ばしょ / ゆらぎ / 配置パターン の保持を個別明記
-- **数量表現ルール更新**: 「色・素材・方向とともに 1 文に」収める例を追加
-- **EXAMPLE_POOL**: 12件 → 21件 (+7件)
-  - 追加例: クレヨン+色+数量、鉛筆+細さ、震える複数線、右半分+色+数量、300本のクレヨン、地平線構成、チョーク+滲み
-- **k: 3 → 5** — 複合属性入力での例参照数を増加
-
-#### 学習モード (SSE ストリーム)
-
-コーパスを自動拡張するバックグラウンド学習機能を追加。
-
-- **`trainer.py` 新規作成**
-  - `VARIATION_STYLES` (5スタイル): 詩的・口語・抽象・自然現象・擬音語をローテーション
-  - `generate_sample(style_idx, model)`: 指定スタイルで記述サンプルを LLM 生成
-  - `run_one_iteration(style_idx, model)`: 生成 → `interpret_detail` → EXAMPLE_POOL 追加
-  - `add_learned_example(input, ddl)`: EXAMPLE_POOL へ追記 + `INKU_LEARNED_FILE` に永続化
-  - `load_learned_examples()`: 起動時に永続化済みコーパスを EXAMPLE_POOL へ注入
-  - `clear_learned_examples()`: auto エントリのみ削除、static 例は保持
-  - backend dispatch: interpreter.py と同じ anthropic / nvidia / ovms ルーティング
-- **`api.py` 追加エンドポイント**
-  - `GET /api/train?n=&model=` → SSE ストリーム (`progress` / `result` / `error` / `done` イベント)
-  - `GET /api/train/stats` → `{"learned_count": N}`
-  - `DELETE /api/train` → コーパスクリア
-  - `asyncio.to_thread` で sync LLM 呼び出しを非同期化
-  - `request.is_disconnected()` でクライアント切断を検出してループを停止
-- **Web UI** (学習モードパネル)
-  - 折り畳み式パネル、イテレーション数入力、モデル選択
-  - リアルタイム進捗バー (shimmer アニメーション)、ログ表示
-  - 停止ボタン → EventSource close → サーバーループも次イテレーション前に停止
-  - `onMount` で初期 `learned_count` を取得
-
-#### サーバーサイド履歴 (無制限・ページネーション)
-
-localStorage の容量制限を解消し、セッション跨ぎの履歴を実現。
-
-- **`api.py`**: `_history: list[dict]` をメモリ保持 + `_HISTORY_FILE` (既定 `/tmp/inku-history.json`) に永続化
-- エンドポイント: `GET /api/history?offset=&limit=` (新着順)、`POST /api/history`、`DELETE /api/history`
-- **Web UI**: `HISTORY_PAGE_SIZE=10`、`← 新` / `旧 →` ページナビ、全件数表示
-
-#### UI 改善
-
-- **歳時記ボタン**: ヘッダー → 記述エリア右上 (`<div class="input-header">`) に移動
-- **Saijiki トークン色**: `#111` → `#2c3e91` (青) でインライン表示
-
----
-
-### v0.9 (2026-04-25)
-
-**プロンプト非線形化 + NVIDIA NIM 対応 + arrangement 実装**
-
-#### プロンプト設計の構造改善 (主要変更)
-
-機能追加でプロンプトが際限なく長くなる問題を、MT (機械翻訳) のスペック / コーパス分離原則を援用して構造的に解決。
-
-- **schema.py を仕様の正典 (Source of Truth) に**
-  - 全フィールドに日本語 ↔ 値マッピングを含む `description` を付与
-  - LLM はツールスキーマの description を直接参照 → SYSTEM_PROMPT にフィールド説明を繰り返す必要がなくなる
-  - 新プリミティブ追加 = スキーマ更新のみ。SYSTEM_PROMPT は変えない
-
-- **composer.py: SYSTEM_PROMPT を手順のみに削減**
-  - 3,942 chars → 1,072 chars (-73%)
-  - 変換例は最重要パターン 4 件に絞る (残りはスキーマ description が補う)
-
-- **interpreter.py: EXAMPLE_POOL + 動的例選択**
-  - `EXAMPLE_POOL`: `{keywords, input, output}` タプルのリスト (現在 12 件)
-  - `_select_examples(text, k=3)`: 入力とのキーワード一致数でスコアリングし上位 k 件を選択
-  - `_build_system_prompt(text)`: PREFIX + 選択された k 件を推論ごとに構築
-  - 例を何件追加してもプロンプト長は固定 (PREFIX + 3 件)
-  - SYSTEM_PROMPT モジュール変数はプレフィックスのみを公開 (`/api/prompts` 互換)
-
-- **レイテンシ効果**: 322.7s → 21.5s (同一出力、NVIDIA Gemma 4 31B、15x 高速化)
-
-#### NVIDIA NIM プロバイダー追加
-
-- `google/gemma-4-31b-it` を第一・第二段階の既定モデルに設定
-- モデル ID による自動ルーティング:
-  - `anthropic:<model>` プレフィックス → Anthropic API
-  - `/` を含む ID → NVIDIA NIM (`https://integrate.api.nvidia.com/v1`)
-  - その他 → OVMS (ローカル OpenAI 互換)
-- UI: プロバイダー選択 (NVIDIA NIM / Anthropic / ローカル) + モデル選択の 2 段 dropdown、localStorage 永続化
-- `web/src/lib/models.ts` に `PROVIDER_GROUPS` 構造を追加
-
-#### arrangement フィールド (本数・個数の JSON サイズ問題)
-
-N 個の instruction を展開すると JSON が N 倍になる問題を解決。Renderer 側で展開することで JSON は常に O(1)。
-
-- **schema.py**: `Arrangement` モデル追加 (`count` / `layout` / `path` / `margin` / `center` / `radius`)
-- **renderer.py**: `_anchor()` / `_shift()` / `_expand_arrangement()` — Renderer 側で N 個に展開
-  - layout: `horizontal` / `vertical` / `radial` / `scatter` (基本配置)
-  - path: `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` (軌跡指定)
-  - `count=1` は展開せず単体返却。`ge=2` → `ge=1` に変更 (バリデーションエラー防止)
-- **interpreter.py EXAMPLE_POOL**: 数量表現を 1 文でまとめる例、ランダム配置例を収録
-- **composer.py**: arrangement 使用を SYSTEM_PROMPT で強制、複数 instruction 生成を禁止
-
-#### UI 改善
-
-- 正規化DDL タブ削除 (常に自由記述モード = `/api/paint`)
-- 履歴サムネイルに経過秒数を表示 (`Iteration` に `elapsed_ms` 追加)
-- `GET /api/prompts` エンドポイント追加 → 出力欄「プロンプト (デバッグ)」パネルで Stage 1 / 2 のシステムプロンプトと実際の入力を表示
-- キャンバス背景色を白に変更 (`#f7f5ef` → `#ffffff`)
-- 推論中ライブタイマー + 完了後「解釈 Xs + 構造化 Ys = Zs」内訳表示
-
----
-
-### v0.8 (2026-04-24)
-
-**Renderer 揺らぎ実装 + arc primitive**
-
-- **line の variation を Renderer で生成** (SPEC §13.8 の核心)
-  - 80 セグメントの polyline に変換、SHA-256(model_dump_json) でシード
-  - quality 4 種: `wave` (sin), `perlin` (smoothstep 1D value noise), `pink` (2 オクターブ合成), `white` (per-segment hash)
-  - amplitude: fine=4px / medium=12px / broad=30px (1000px canvas 上)
-  - frequency: slow=2 / medium=6 / high=14 cycles/線長
-  - dimensions 適用: `position_x` / `position_y` 単独は該軸揺らぎ、両方指定は線に垂直方向揺らぎ
-  - 決定的: 同一 Score → byte 一致 SVG (test 保証)
-- **arc primitive 本実装**
-  - Schema: `angle_start` / `angle_end` (度、0°=東、CCW 正)
-  - Renderer: `<path d="M ... A r r 0 large sweep x y">` で弧描画
-  - large-arc-flag: `(end-start) % 360 > 180`、sweep-flag: `end > start` で 0 (CCW)
-  - Composer prompt に 弧 行追加、1/4円 / 半円 の角度例
-- **新規 test 7件** (arc quarter / half / missing-angles、variation perlin / wave / deterministic / quality=none)
-
-### v0.7 (2026-04-24)
-
-**LLM 多モデル対応 + Stage 1 静止画強化 + thinking 可視化**
-
-- **LLM モデル: UI から切替可能に**
-  - `POST /api/compose`: `model` フィールド
-  - `POST /api/interpret`: `model` フィールド
-  - `POST /api/paint`: `stage1_model` / `stage2_model` フィールド
-  - `compose()` / `interpret_detail()` に `model` キーワード引数追加、未指定時は env 既定
-  - UI (モード切替下に `解釈` / `構造化` dropdown、localStorage 永続化): Qwen2.5-7B / Qwen3-8B / Gemma3-4B / Gemma3-12B
-
-- **既定モデル**
-  - Stage 1: `qwen3-api` (Qwen3-8B)
-  - Stage 2: `qwen-api` (Qwen2.5-7B)
-  - Gemma3-12B は 15 fixture に 6 時間要、実用外 (選択肢には残す)
-  - Gemma3-4B は Score full schema + tool_choice 組合せで破綻 (bracket 出力異常、空白クォート連鎖)、prompt + schema 簡略化で動作するが品質は未検証
-
-- **Stage 1 system prompt: 静止画原則 強化 (SPEC §2 原則5)**
-  - 禁止動詞: 動く / 動かす / 広がる / 広げる / 流れる / 伸びる / 昇る / 落ちる / 散る / 沈む / 塗る
-  - 使える動作動詞: 置く / 並べる / 引く / 描く / 散らす / 埋める
-  - 動的→静的 言い換え 5 例 (月が昇る→右上に円、花が散る→細かい点を散らす 等)
-
-- **Qwen3 thinking 可視化**
-  - `interpret_detail()` が `(ddl, thinking)` tuple を返す
-  - `include_thinking=True` で `/no_think` を外し、`<think>…</think>` 内容を分離保持
-  - `POST /api/interpret`, `/api/paint` に `include_thinking` request フィールド、`thinking` response フィールド
-  - UI: Stage 1 が qwen3 系のとき「思考を表示」checkbox、結果パネルに faded amber 色の `<details>` で内部思考表示 (作者の思考プロセス可視化)
-
-### v0.6 (2026-04-23)
-
-**Phase 1 完了 — E2E パイプライン稼働 + UI 反復支援**
-
-- **LLM バックエンド 二系統併存**
-  - Claude Code hackathon:参加選考漏れに伴い、Loacl LLMの実装に変更
-  - Stage 2 (composer): `qwen-api` (Qwen2.5-7B) 既定、Anthropic Haiku 4.5 併用可能
-  - Stage 1 (interpreter): `qwen3-api` (Qwen3-8B) 既定、Anthropic Opus 4.7 併用可能
-  - 切替: 環境変数 `INKU_LLM_BACKEND=openai|anthropic`
-  - OVMS (`http://127.0.0.1:18000/v3`) は OpenAI 互換、API key=`none`
-  - qwen3-api は `/no_think` prefix で thinking トレースを抑制して使用
-  - tool_use は Anthropic ネイティブ、OpenAI 側は `<tool_call>` タグが content に埋め込まれるので正規表現で抽出
-
-- **Stage 1 interpreter 実装**
-  - `server/src/inku_server/interpreter.py`
-  - 入力: 自由な自然言語、出力: Saijiki 語彙のみを使う短い日本語 (正規化DDL)
-  - system prompt に 4 few-shot (感情語→物理語 置換、画面座標比率)
-  - 5 ケース smoke test 全通過 (4 は prompt 内例と重複、memorize 傾向あり)
-
-- **API エンドポイント 拡張**
-  - `POST /api/interpret`: 自由記述 → 正規化DDL
-  - `POST /api/paint`: 自由記述 → 正規化DDL → Score → SVG (フルパイプライン)
-  - 既存 `POST /api/compose`, `GET /health` は維持
-  - 起動時 env: `INKU_SERVER_HOST`, `INKU_SERVER_PORT` で上書き可
-
-- **Stage 2 fidelity 記録 (qwen-api strict モード)**
-  - 15 fixture 中 9 通過、残り 6 件の典型的な失敗:
-    - center (円/楕円) と position (三角/四角) の混同
-    - 「中央」指示時の bbox 左上補正未実施
-    - 複数命令並列時の field 一括誤適用
-  - tool_use API 経由で JSON 構造エラー (`]` vs `}` 誤閉じ等) は解消
-  - Haiku 4.5 移行で改善見込みだが、ローカル LLM で回る事実を優先
-
-- **Web UI: モード切替 + Saijiki 参照 + 反復履歴**
-  - タブ: 自由記述 / 正規化DDL (それぞれ /api/paint と /api/compose に繋ぐ)
-  - 自由記述モード: 解釈結果 (正規化DDL) を左カラム下部に常時表示
-  - 歳時記ドロワー: 右スライドイン、9 カテゴリ (かたち/かたむき/てざわり/つらなり/いろ/ゆらぎ/ばしょ/うごき/わりあい)、chip クリックで textarea の caret 位置に挿入
-  - Saijiki 辞書は `web/src/lib/saijiki.ts` に分離
-  - 反復履歴: in-memory、最大 20 件、`◀ N/M ▶` 移動ボタンで input/output/DDL を過去状態に復元
-  - サムネイル列: 履歴 2 件以上で下段に 96px 方形ミニチュア SVG を横並べ、クリックで jump
-
-### v0.5 (2026-04-23)
-
-**Phase 1 続き — FastAPI + Web クライアント 立ち上げ**
-
-- **FastAPI エンドポイント**
-  - `POST /api/compose`: `{ddl}` → `{score, svg}` (Stage 2 composer → Renderer を縦結合)
-  - `GET /health`: liveness (`{ok: true}`)
-  - CORS: `http://localhost:*` / `127.0.0.1:*` 許可 (regex ベース)
-  - エラーハンドリング: composer 失敗 502, render 失敗 500, 入力不正 422
-  - エントリポイント: `uv run inku-server` で `uvicorn` が `127.0.0.1:8000` reload 起動
-  - テスト: `TestClient` + `monkeypatch` で composer バイパス、API キー不要で 5 cases pass
-
-- **SvelteKit Web クライアント (`web/`)**
-  - SvelteKit 2.57 + Svelte 5.55 (runes モード) + Vite 8 + TypeScript
-  - 単一ルート `/`: 記述 textarea + 演奏 (SVG インライン表示) + 楽譜 (JSON Score collapsible)
-  - スタイル: Renderer パレットと整合 (背景 #f7f5ef, 墨 #111)、和文フォント優先
-  - 名前: `inku-web` v0.1.0
-  - svelte-check: 0 error, 0 warning
-
-- **次段階への布石**
-  - `/api/compose` は Stage 2 のみ。Stage 1 (Opus 解釈) エンドポイントは未実装
-  - 解釈フィードバック (書後色付け)、Saijiki 参照窓、Prev/Next 並置は UI 未着手
-  - Renderer の揺らぎ (perlin/wave) 実装も未着手 (fixture 11/15 が variation 指定)
-
-### v0.4 (2026-04-23)
-
-**Phase 1 実装着手 — Server バックエンドの骨格形成**
-
-- **リポジトリ構成**
-  - `inku-lang` リポジトリを GitHub (`github.com/oikawas/inku-lang`) に作成
-  - `server/` と `web/` の2スロット構成。`server/` 先行実装
-
-- **Python プロジェクト: inku-server 0.1.0**
-  - パッケージマネージャ: `uv` (0.11.7) + src-layout
-  - 依存: anthropic, fastapi, pydantic v2, svgwrite, uvicorn, python-dotenv
-  - dev: pytest, ruff
-  - Python 3.10+
-
-- **JSON Score schema (Pydantic v2 実装)**
-  - `extra="forbid"` で未知フィールド拒否、schema 厳密化
-  - `populate_by_name=True` + alias で予約語回避 (`from` → `from_`)
-  - Primitive: `line | circle | ellipse | triangle | square | arc`
-  - `rotation`: 図形全体の回転角。0=水平、正=時計回り、負=反時計回り。線・楕円・四角・三角・弧を中心まわりに回転
-  - Weight 9種、Color 6種、LineStyle 4種、Variation 4フィールド (amplitude/frequency/quality/dimensions)
-  - `Score.model_json_schema()` を Anthropic tool input_schema にそのまま渡せる形
-
-- **Renderer MVP (svgwrite, 1000x1000 viewBox)**
-  - 実装済 primitive: line, circle, ellipse, triangle (等辺二等辺), square (矩形)
-  - 座標変換: `0.0-1.0` 比率 × `CANVAS_PX=1000` で px 化
-  - weight → `stroke-width` マッピング (hair 0.5 〜 rope 10.0)
-  - color → HEX パレット (黒=#111111, 青=#2c3e91, 赤=#a2342a, 緑=#2f6b3a, 灰=#888888, 白=#ffffff)
-  - style → `stroke-dasharray` (solid=なし, dashed=12,8, dotted=2,6, dash_dot=12,6,2,6)
-  - 背景色: `#f7f5ef` (墨が映える薄黄、和紙を想起)
-  - 未実装: arc (schema に角度フィールド未定義)、variation の実際の波形生成
-
-- **Stage 2 composer (正規化DDL → JSON Score)**
-  - モデル: `claude-haiku-4-5-20251001` via Anthropic tool_use
-  - `submit_score` ツールを定義し `tool_choice` で強制呼び出し
-  - system prompt に Saijiki 歳時記マッピング + 座標系 + 出力ルールを圧縮記述
-  - `Score.model_json_schema()` を tool input_schema に直接注入
-
-- **正規化DDL Fixture 15ケース**
-  - `server/tests/fixtures/stage2/{01..15}/` に input.txt + expected.json ペア
-  - 網羅: 全5 primitive、全4 style、weight 複数 (pencil/pen/brush_thick)、color 全6、variation 2種 (fine+perlin, broad+wave)、複数命令 (3円並列)
-
-- **テスト**
-  - `test_renderer.py`: 10 cases, pytest 全 pass
-  - `test_composer.py`: 15 fixture parametrize + tool schema validation
-  - Integration は `ANTHROPIC_API_KEY` 有時のみ実行 (`pytest.mark.skipif`)
-  - `conftest.py` で `.env` 自動読込 (python-dotenv)
-
-- **二段階変換アーキテクチャの確定**
-  - v0.3 で方針化、v0.4 で Stage 2 (Haiku 4.5) を先行実装 (逆順実装)
-  - Stage 1 (Opus 4.7 解釈) は未着手
-  - `/api/compose` FastAPI 実装は次 phase
-
-### v0.3 (2026-04-21)
-
-- inku-langとしての全体設計の開始
-- プロジェクト名を `inku` (inku-lang) として確定
-- Section 4「プラグイン設計原則」を新規追加（Emacs Lisp 化を避ける5原則）
-- Section 12「Opus 4.7 の役割」を「二段階変換アーキテクチャ」として大幅書き換え
-- Section 13「揺らぎの設計」を新規追加（感情語彙と運動語彙の区別、三層構造）
-- Section 3「コアに入れるもの」に「つらなり」「ゆらぎ」カテゴリを追加
-- Section 5「Base Language 問題」に責任範囲の明確化（日英は作者、他言語はコミュニティ）
-- Section 7「UI設計方針」に Saijiki（歳時記）、解釈フィードバック、書後色付けを追加
-- Section 6「コアとエクステンションの分離」の方針を整理
-
-### v0.2 (2026-04-14)
-
-- 最初のプロトタイプとして、コンセプトしたものが動作可能かを簡単にクライアントでテスト
-- Android 実装状態を記録（SPEC_v1.md に分離）
-- LiteRT-LM 0.10.0 API 調査・実装
-- Pixel 9 での E2E 動作確認
-
-### v0.1 (2026-04-02)
-
-- 初期コンセプト（東京都現代美術館「ソル・ルウィット オープン・ストラクチャー」展にて構想）
-- 三層パイプライン（記述 → 楽譜 → 演奏）の設計
-- JSON Schema v0.1 の策定
-- DDL_concept.md として初期ドキュメントを記録
-
----
-
-## 起源
-
-構想: 2026年4月2日、東京都現代美術館「ソル・ルウィット オープン・ストラクチャー」展
+- `エクスポート` タブは全ログインユーザーが利用できる
+- テンプレートはサーバー DB のユーザー別設定として保存する
+- テンプレート項目は、テンプレート名、説明、y軸高さ（ピクセル数）とする
+- 既定テンプレートとして `PNG 1024px` と `PNG 2048px` を用意する
+- ステータスバーの PNG ボタンから表示されるメニューは、保存済みテンプレートを参照する
+- PNG 書き出し時は y軸高さを基準にし、現在のキャンバス比率から横幅を算出する
+- API として `GET /api/auth/me/export-templates` と `PUT /api/auth/me/export-templates` を追加する
+- build number: 214
+
+### v1.36 (2026-05-02)
+
+**キャンバス比率: 屏風**
+
+キャンバス比率プラグインに `byobu` を追加した。
+
+- 比率は `2.2:1`
+- 表示名は `Byobu`
+- 説明は「日本の屏風。六曲一双の一隻に準じる横長の型」
+- 表示順は `Wide` の下、`Vertical` の上
+- build number: 215
+
+### v1.37 (2026-05-02)
+
+**DBバックアップ設定**
+
+DB設定タブに、DBファイルサイズ表示とバックアップ設定を追加した。
+
+- DB設定タブは引き続き `admin` ロールのみ表示する
+- SQLite ファイル DB のサイズを表示する
+- DBバックアップ設定として、保存間隔（日）と最大保存世代数を設定できる
+- 既定値は、保存間隔 7 日、最大保存世代数 4 世代
+- `/api/settings/status` 取得時に保存間隔を超えていれば自動バックアップを作成する
+- 自動バックアップは設定された最大保存世代数に従って古いものを削除する
+- `今すぐバックアップ` ボタンで手動バックアップを作成できる
+- 手動バックアップは最大保存世代数のカウント対象外とする
+- SQLite 以外の DB では、ファイルレプリカ方式のバックアップは非対応として表示する
+- API として `PUT /api/settings/db-backup` と `POST /api/settings/db-backup/run` を追加する
+- build number: 216
+
+### v1.38 (2026-05-02)
+
+**解釈 box の DDL 編集ダイアログ統合**
+
+DDL を直接編集する操作を、独立した DDL 編集タブではなく、記述タブの解釈（正規化DDL）box に統合した。
+
+- DDL編集タブは廃止し、記述 / バッチ / デモの3タブ構成に戻す
+- 記述タブで生成後に表示される解釈 box は、ハイライト付き textarea として直接編集できる
+- 解釈 box 上部には `歳時記` / `DDL編集` ボタンを横並びで表示する
+- `歳時記` は右スライド式の歳時記ドロワーを開き、語彙クリック時は解釈 box のカレントキャレット位置へ挿入する
+- `DDL編集` は大きな DDL 編集ダイアログを開く
+- ダイアログ左側に行番号付きの DDL 編集エリア、右側に縦2列の歳時記語彙エリアを表示する
+- ダイアログ下部には、DDLの概要と文法の簡易ガイドを表示する
+- ダイアログ内から `DDLから描画` は実行せず、描画実行は解釈 box 直下のボタンに集約する
+- 解釈 box 直下にも `DDLから描画` ボタンを表示し、ダイアログを開かずに現在の DDL から再描画できる
+- DDL を直接編集した後に記述タブの `描画する` を押した場合は、`DDLの編集結果が失われます、よろしいですか？` の確認ダイアログを表示する。選択肢は `キャンセル` / `OK` / `DDLから描画` とし、`OK` は通常の Stage 1 からの再生成、`DDLから描画` は編集済みDDLからの Stage 2 再描画を実行する
+- 記述タブで通常描画またはDDL再描画が進行中の間は、記述タブに実行中エフェクトを表示し、バッチ / デモ側の開始ボタンを抑制する
+- DDL再描画中は token 表示、経過秒数、停止ボタン、キウイ進捗マスコットを表示する
+- 停止ボタンは `/api/compose` リクエストを abort する
+- キャンバス比率プラグインが追加した任意のキャンバスIDを JSON Score の `canvas` として保持できるよう、Score schema の `canvas` は静的列挙ではなく文字列として扱う
+- build number: 246
+
+### v1.39 (2026-05-03)
+
+**SVG保存形式プロファイル**
+
+SVG保存形式を、表示用・編集用・互換優先に分離した。
+
+- DB の `history.svg` には従来どおり表示用 SVG を保存する
+- 履歴表示、PNG 再生成、artifact 再生成は DB に保存された表示用 SVG を正本として扱う
+- 編集用 SVG は JSON Score とサーバー側の色カタログ情報からダウンロード時に都度生成する
+- 互換優先 SVG も JSON Score とサーバー側の色カタログ情報からダウンロード時に都度生成する
+- `display` プロファイルは現行表示互換を優先し、既存の texture filter / blur / clip を維持する
+- `editable` プロファイルは Illustrator / Affinity で編集しやすいよう、`layer_00_background`、`layer_10_content`、`instruction_###_*`、`mark_###_###_*` 形式の安定 ID とグループ構造を追加する
+- `compat` プロファイルは汎用SVGビューアで壊れにくいことを優先し、filter と clip-path を使わない
+- API として `POST /api/render-svg` と `GET /api/history/{item_id}/svg?profile=...` を追加する
+- Web UI の SVG ボタンは `Display` / `Editable` / `Compat` のメニューから保存形式を選択できる
+- CLI の `paint` / `batch` は `--svg-profile display|editable|compat` で保存する SVG プロファイルを選択できる
+- build number: 267
+
+### v1.40 (2026-05-03)
+
+**バッチ / デモの色カタログランダム選択**
+
+バッチモードとデモモードに、描画ごとに色カタログをランダム選択するオプションを追加した。
+
+- バッチモードでは実行ごとの一時オプションとして `描画ごとに色カタログをランダム選択` を指定できる
+- デモモードでは同じオプションをデモ設定として保存し、ユーザーごとに復元する
+- ランダム選択はサーバーから取得済みの色カタログ一覧を正とし、各描画の `/api/paint` に選ばれた `catalog_id` を渡す
+- 履歴保存時は、実際にレンダリングした `render_color_catalog_id` を優先して保存する
+- ステータスバーの色カタログ表示は、現在の選択値だけでなく描画結果の `render_color_catalog_id` を反映する
+- build number: 271
+
+### v1.41 (2026-05-03)
+
+**履歴描画ハッシュとCLI履歴エクスポート**
+
+履歴DBの各描画に、描画内容に基づく `render_hash` を付与する。
+
+- `render_hash` は canonical JSON 化した `input` / `ddl` / `score` / `svg` / render metadata から SHA-256 で生成し、DB上には64桁hexを正規値として保存する
+- API の履歴レスポンスと `/api/paint` の履歴保存レスポンスには `render_hash` と、末尾4桁を大文字化した `render_hash_short` を含める
+- 既存履歴はDBマイグレーション時に `render_hash` をバックフィルする
+- 履歴管理ダイアログでは、サムネイルとリスト表示に `#ABCD` 形式の4桁短縮ハッシュをレイアウトを壊さないチップとして表示し、クリックで正規ハッシュをコピーできる
+- 履歴管理ダイアログは現在のウインドウサイズに対して上下左右10%の余白を基準に大きく開き、サムネイル下には指示文の先頭、その下にスター、短縮ハッシュ、削除/復元操作を並べる
+- サムネイル下の指示文は、先頭に `#123` のような番号がある場合はその番号を省略して表示する
+- サムネイル操作部の未スター状態は小さくても視認できるコントラストにし、左上の選択チェックボックスも小型化して枠線を細くする
+- 履歴管理ダイアログのページ切り替えでは、複数の再取得が重なっても最後の完了時に読み込み中表示を必ず解除する
+- 履歴管理ダイアログのサムネイル表示は、ダイアログ内の実表示領域から列数と行数を測定し、スクロールバーを出さずに収まる件数をページサイズとして動的に再計算する
+- サムネイル操作行のスターはクリックイベントをカード選択から分離し、カード実寸を使ってページサイズを再計算することで下端余白を詰める
+- サムネイル操作行は左下にスターを置き、ハッシュは `#` を付けず削除ボタンと同じボタン寸法感に揃える
+- ダークモードでもスター済み状態の色が通常状態に上書きされないよう、スター済み表示を明示する
+- 履歴管理ダイアログのサムネイルにマウスオーバーした際のポップアップには、メタ情報に加えて大きめの画像プレビューを表示する
+- 履歴管理ダイアログ上部は、タイトル/表示切替/件数/ページ移動を1段に集約し、選択/絞り込み/検索を2段目にまとめることでサムネイル表示領域を広げる
+- サムネイル実寸によるページサイズ再計算時は、ページ番号を維持し、次ページ操作後に先頭ページへ戻らないようにする
+- 履歴管理ダイアログの各画像に表示する個別削除操作は、文字ラベルではなく小さなごみ箱アイコンボタンで表示する
+- JSONタブ、描画レスポンス、履歴保存時のartifact JSONには、サーバーが実際に使用した解決済み `stage1_model` / `stage2_model` を記録する
+- 現時点のカラーマネジメントは sRGB のみを対象とし、JSONタブ、描画レスポンス、履歴、artifact JSONには `render_color_profile: { id: "srgb", name: "sRGB IEC61966-2.1", standard: "IEC 61966-2-1:1999" }` を記録する。Adobe RGB 等の広色域プロファイルは将来拡張候補とし、現時点では実装しない
+- JSONタブは、モデル/ビルド/カラープロファイル/色カタログなどの属性メタ情報を先頭に表示し、その後に `score` を表示する
+- 履歴から画像を開き直した場合も、JSONタブに履歴保存済みの `stage1_model` / `stage2_model` を表示する
+- 設定ダイアログに管理者向け `モデル設定` タブを追加する。Stage 1 / Stage 2 の既定 provider / model と、provider 別の base URL / API key をサーバー DB の app settings に保存する
+- 組み込みの商用 LLM provider は公式名称に合わせて OpenAI API Platform / Claude API / Gemini API とし、非商用 API provider は NVIDIA NIM、ローカル provider は Ollama (OpenAI互換) / Intel OVMS (OpenAI互換) を対象とする
+- 管理者は設定ダイアログのモデル設定タブで、接続サービスを追加・削除できる。追加サービスは service ID、表示名、接続形式 (`openai_compatible` / `anthropic` / `gemini`)、Base URL、任意の初期 API key を持つ。サービス追加ダイアログの `追加` は即座にサーバーへ保存し、サービスパネル下部に冗長な全体保存ボタンは置かない。モデル一覧は追加時には手入力せず、サービスごとの `モデルリスト取得` で取得する
+- service ID は DB 内の接続設定キー、Stage 1 / Stage 2 の provider 参照、API 呼び出し時の provider 判定、重複防止に使う内部IDであり、作成後は編集不可とする。画面に表示するサービス名は後から編集できる
+- 接続サービスごとに `モデルリスト取得` を実行できる。サーバーは保存済み Base URL / API key を使って provider 種別ごとの models API を呼び、取得したモデル一覧を当該サービス定義へ保存する。取得結果の成功/エラーは公開モデル選択ダイアログ下部に表示する。API key はブラウザへ送らない
+- API key はサーバー側にのみ保存し、`GET /api/settings/models` の応答では設定済みかどうかのみを UI 表示に使う。ブラウザへ生の API key は返さず、設定済みの場合の入力欄は `保存済みキーを維持` と表示して編集不可にする。未設定の状態で新しい key を入力した場合は、そのサービスの保存ボタンで保存する
+- DB 内の provider API key は `enc:v1:` 形式で暗号化して保存する。暗号鍵は `INKU_SECRET_KEY` を優先し、未設定の場合は `INKU_SECRET_KEY_FILE` または `~/.local/share/inku/secret.key` のローカル鍵を使う。既存の平文キーは読み込み互換を維持し、次回保存時に暗号化形式へ移行する
+- `PUT /api/settings/models` は管理者のみ利用でき、API key の新規設定、保持、明示削除を区別する
+- LLM 呼び出しは model ID の provider prefix (`openai:` / `anthropic:` / `gemini:` / `nvidia:` / `ollama:` / `ovms:`) と、設定タブの既定値から接続先を解決する。旧来の NVIDIA slash ID とローカル OVMS ID も互換扱いとして受け付ける
+- Web UI から `/api/paint` / `/api/interpret` / `/api/compose` へ送るモデルIDは、接続先 provider と結合して `openai:gpt-5.2` のような provider 付き ID に正規化する。API が provider prefix の無い model ID を受け取った場合でも、その ID がユーザー設定中の Stage 1 / Stage 2 model と一致する場合は、同じユーザー設定の provider で補完してから dispatch する
+- デモ指示文生成も同じ provider 解決を使い、OpenAI API Platform / Claude API / Gemini API / NVIDIA NIM / Ollama / Intel OVMS の各接続設定を経由する
+- LLMサーバー接続設定はグローバルな管理者設定とし、Stage 1 / Stage 2 の接続先・モデル選択はユーザーごとの `user_accounts.model_settings` に保存する。モデル選択ダイアログの確定時に `/api/auth/me/settings` へ保存し、ログイン時に復元する
+- 管理者は設定ダイアログのモデル設定タブで、provider ごとに一般ユーザーへ公開するモデルを個別に On/Off できる。公開モデル選択はサービスパネル内ではなく個別ダイアログで行い、`モデルリスト取得` / 検索 / `全て選択` / `全て解除` も同ダイアログに置く。公開モデル選択ダイアログ内のチェック変更はドラフトとして扱い、`保存` で初めてサーバーへ反映し、`キャンセル` またはダイアログ外クリックでは破棄する。モデル設定タブ本体には公開中モデルのみを要約表示する。`GET /api/models` はログイン済みユーザー向けに公開モデルのみを返し、モデル選択ダイアログはこの一覧を使う
+- CLI に `history-export` を追加し、`--from` / `--to` の履歴順範囲指定と、個別ハッシュ指定を受け付ける
+- CLI の `history-export` は、選択した履歴からベンチマーク評価用の `contact-sheet.png`、個別JSON、SVG/PNG中間ファイル、`summary.json` を出力する
+- 4桁ハッシュが複数候補に一致する場合、CLI は曖昧としてエラーにし、より長い桁数での指定を求める
+- build number: 313
+
+### v1.42 (2026-05-04)
+
+**サーバーワイド自動保存設定**
+
+出力 artifact ファイルの自動保存を、ユーザー個別設定ではなくサーバーワイドな管理者設定として扱う。
+
+- 設定ダイアログに admin 向け `その他（サーバー）` タブを追加する
+- `その他（サーバー）` タブでは、描画ファイル自動保存の On/Off、保存先フォルダの絶対パス、PNG 自動保存サイズを設定できる
+- PNG 自動保存サイズは `1080px` / `2160px` から選択する
+- サーバーは `app_settings.output_save_settings` に `enabled` / `output_dir` / `png_size` を保存する
+- 初期保存先は `INKU_OUTPUT_DIR`、初期 PNG サイズは `INKU_OUTPUT_PNG_SIZE` を使い、未指定時は `~/.local/share/inku/outputs` と `2160px` を使う
+- `PUT /api/settings/output-save` は admin のみ利用でき、保存先は絶対パスのみ許可し、PNG サイズは `1080` / `2160` のみ受け付ける
+- 自動保存 Off の場合も履歴 DB は正本として保存し、SVG / JSON / 入力 / DDL / PNG などの artifact ファイル保存だけをスキップする
+- 保存先フォルダ配下は従来どおり `user_id/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history_id>` 形式の日別ディレクトリ構成とする
+- `その他（サーバー）` タブには保存 worker / queue、保存統計、PNG サイズを表示する。保存 worker は同時保存ジョブ数、queue は保存待ちジョブ上限であり、上限超過時は DB 履歴保存を優先して artifact 保存をスキップする
+- 画面上の注記は「履歴DBが正本です。出力ファイルはバックグラウンドで保存される副産物で、DBから再生成できます。」と表示する
+- build number: 324
+
+### v1.42 (2026-05-05)
+
+**レンダリングメタデータと履歴選択挙動**
+
+描画結果のメタデータ表示と、履歴を選択したときの UI 選択状態の扱いを整理した。
+
+- 描画パネル上部に、当該描画の `色カタログ`、`キャンバス`、`作成日時` を表示する
+- 色カタログボタンは、固定ラベルではなく現在選択中の色カタログ名を表示する。長い名前は後半を省略し、hover title でフル名称を確認できる
+- 入力パネル上部の操作順は `キャンバス比率` / `色カタログ` / `モデル選択` とする
+- 描画レスポンス、履歴レコード、JSON タブ、artifact JSON に `render_canvas_aspect` を追加し、実際にレンダリングへ使用したキャンバス比率 ID を記録する
+- 描画レスポンス、履歴レコード、JSON タブ、artifact JSON に `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を追加する。`render_canvas_aspect_id` は明示的なキャンバス比率識別子、`render_canvas_aspect_ratio` は実際の幅÷高さの数値である
+- `render_canvas_aspect` は render metadata の一部として、`render_engine_version` の直後、色カタログメタデータの前に表示する
+- `render_canvas_aspect_id` と `render_canvas_aspect_ratio` は `render_canvas_aspect` の直後に表示する
+- JSON Score の `score.canvas` は引き続き楽譜側のキャンバス指定として保持し、`render_canvas_aspect` は成果物側のレンダリング記録として扱う。通常は同じ値になるが、旧データや外部入力の確認性のため二重に保持する
+- 互換性のため `render_canvas_aspect` は従来通り保持する。新規実装では `render_canvas_aspect_id` を識別子として扱い、旧履歴では `render_canvas_aspect` から補完する
+- 設定 > その他に `履歴選択時の挙動` を追加する
+- キャンバスサイズは、履歴から選択時に履歴キャンバスサイズを UI 選択へ反映するか、現時点で UI 上選択されているキャンバスサイズを維持するかを選べる
+- 色カタログは、履歴から選択時に履歴色カタログを UI 選択へ反映するか、現時点で UI 上選択されている色カタログを維持するかを選べる
+- 履歴選択時の挙動設定はブラウザ localStorage に保存する
+- 履歴選択時の設定は UI 上の選択状態だけを更新し、保存済み履歴 SVG の再レンダリングは行わない
+- build number: 340
+
+### v1.43 (2026-05-05)
+
+**Render Engine 境界とエンジンメタデータ**
+
+将来の複数描画エンジン受け入れに備え、描画コアを `RenderEngine` 契約越しに呼び出す内部境界を追加した。
+
+- `server/src/inku_server/render_engines/` を追加し、`base.py` に `RenderEngine` Protocol と `RenderEngineResult` を定義する
+- 現行の `renderer.py` は `default` engine として `render_engines/default.py` から呼び出す
+- 現時点では外部任意コードのロードや管理UIは実装しない。`current_render_engine()` は静的に `default` engine を返す
+- `/api/compose`、`/api/paint`、互換用 `/api/history` は RenderEngine 経由で SVG を生成する
+- 描画レスポンス、履歴レコード、JSONタブ、artifact JSON に `render_engine_id` と `render_engine_version` を記録する
+- `history` テーブルに `render_engine_id` / `render_engine_version` カラムを追加し、既存DBは起動時マイグレーションで追従する
+- `render_hash` の canonical payload に engine metadata を含め、同じ Score / SVG でも描画エンジンが異なる場合は別内容として追跡できるようにする
+- 現行値は `render_engine_id: "default"`、`render_engine_version: "1"` とする
+- build number: 326
+
+### v1.43 (2026-05-05)
+
+**サーバーログ保存ポリシー設定**
+
+`inku-server` / `inku-api` のアプリケーションログ保存ポリシーを、管理者向けのサーバーワイド設定として扱う。
+
+- 設定ダイアログに admin 向け `ログ保存` タブを追加する
+- `ログ保存` タブでは、ログ保存とローテーションの On/Off、保存期間（日）、ローテーション周期、ローテーション済みログの圧縮 On/Off を設定できる
+- 既定ポリシーは On、保存期間 `90` 日、ローテーション周期 `daily`、圧縮 On とする
+- サーバーは `app_settings.log_retention_settings` に `enabled` / `retention_days` / `rotate` / `compress` を保存する
+- 初期保存期間は `INKU_LOG_RETENTION_DAYS`、初期ローテーション周期は `INKU_LOG_ROTATE` を使い、未指定時は `90` 日と `daily` を使う
+- `GET /api/settings/status` は現在のログ保存ポリシーに加え、`logrotate` 設定プレビューと `systemd` drop-in 設定プレビューを返す
+- `PUT /api/settings/log-retention` は admin のみ利用でき、保存期間は `1` から `3650` 日、ローテーション周期は `daily` / `weekly` / `monthly` のみ受け付ける
+- 画面上の注記は、ログ保存ポリシーはアプリ DB に保存されるが、`systemd` / `logrotate` への実適用にはサーバー OS の権限が必要であることを明示する
+- systemd drop-in プレビューは `StandardOutput=journal+append:/var/log/inku/<service>.log` / `StandardError=journal+append:/var/log/inku/<service>.log` を使い、`journalctl -fu <service>` とファイルログの両方で追跡できる形を推奨する
+- `inku-api` / `inku-server` の起動時には、60文字の `=` 罫線で囲んだ起動バナーを出力する。バナーにはサービス種別、アプリケーションバージョン、build 番号、build 日付を含める
+- 起動バナーには、運用確認に必要な最小情報として mode、listen host/port、runtime / platform、ログ出力先も含める。API 側は描画エンジン ID / version も表示する
+- 起動バナーの絵文字はサービスの性質に合わせて変える。API は `🧠 ⚙️ 🔌 🖌️ 🚀`、Web UI は `🎨 🖼️ 🌈 🪄 ✨ ... 🚀` を使う
+- 運用検証では `inku-server` / `inku-api` の systemd drop-in と `/etc/logrotate.d/inku` を手動設定し、`NeedDaemonReload=no`、journal 出力、`daily` / `rotate 90` / `maxage 90` / `compress` の反映を確認した
+- build number: 336
+
+### v1.44 (2026-05-05)
+
+**PNG保存テンプレートとモデル設定のAPIキー注記**
+
+PNG保存メニューとモデル設定タブの表示を、現在の運用に合わせて調整した。
+
+- ナビゲーションバーの PNG 保存テンプレート既定値を `1024px` / `2048px` から `1080px` / `2160px` / `4320px` に変更する
+- PNG 保存テンプレートのサイズは Y軸方向のピクセル数として扱う
+- 日本語UIでは、テンプレート説明と設定ダイアログの項目名を `y-axis` / `y軸高さ` ではなく `Y軸` / `Y軸の高さ` と表記する
+- 既存ユーザーの保存済み PNG テンプレートが旧デフォルト `1024px` / `2048px` のみである場合は、新デフォルトへ自動的に置き換える。ユーザーが独自編集したテンプレートは維持する
+- モデル設定タブの `AIサービス接続` 見出し横に、APIキーの扱いを明記する
+- 表示文は「APIキーはDBに暗号化して保存され、画面には再表示されません。環境変数で設定済みのキーも初期値として扱われます。」とする
+- 英語UIでも同じ意味の注記を表示する
+- build number: 328
+
+### v1.45 (2026-05-05)
+
+**JSONメタデータへの描画ハッシュ記録**
+
+各描画のサーバー側 `render_hash` を、履歴だけでなく JSON メタデータ領域にも記録する。
+
+- `render_hash` は、描画内容とサーバー所有の render metadata から算出する64文字の SHA-256 hex とする
+- `render_hash_short` は UI / CLI で参照しやすい4文字の大文字サフィックスとする
+- `/api/paint`、`/api/compose`、JSONタブ、CLI出力JSON、保存 artifact JSON に `render_hash` / `render_hash_short` を含める
+- 履歴DBから artifact JSON を再生成する場合も、DB上の `render_hash` / `render_hash_short` をメタデータ領域へ展開する
+- 履歴DBは引き続き正本であり、出力ファイルは副産物として扱う
+
+### v1.46 (2026-05-07)
+
+**inku-cli の DDL 入力描画モード**
+
+server / Android の CLI 比較で、Stage 1 の LLM 出力揺れを切り離し、
+正規化DDL以降の差分を検証できるようにする。
+
+- `inku-cli paint` / `inku-cli batch` に `--input-mode paint|ddl` を追加する
+- 既定の `paint` は従来どおり自然言語入力を `/api/paint` に渡し、Stage 1 → Stage 1.5 → Stage 2 → render を実行する
+- `--input-mode ddl` は入力テキストを正規化DDLとして扱い、Stage 1 を呼ばずに `/api/compose` へ渡す
+- `--input-mode ddl --save-history` の場合、CLI は `/api/compose` の描画結果を `POST /api/history` で通常履歴DBへ保存する
+- `/api/compose` は Stage 1.5 適用後の実効DDLを `ddl` としてレスポンスに含める
+- CLI の DDL モードでは、出力JSONと履歴保存に `/api/compose` が返した実効DDLを使う
+- Android の headless 比較スクリプト `android/scripts/headless_render_compare.sh` は `INPUT_MODE=ddl` を server 側 `inku-cli paint --input-mode ddl` にも伝搬する
+- `ORIGINAL_TEXT` を指定した場合、Android / server の両方で履歴表示用の元入力および Stage 2 補助文脈として扱う
+- このモードは benchmark / parity 検証用であり、自然言語からの通常描画フローの既定動作は変更しない
+- build number: 352
+
+### v1.47 (2026-05-07)
+
+**外部クライアント保存履歴のWeb UI自動反映**
+
+`inku-cli` や Android headless CLI など、開いている Web UI 以外のクライアントが履歴DBへ保存した描画を、Web UI の履歴ストリップへ自動反映できるようにする。
+
+- 履歴DBは引き続き描画履歴の正本であり、Web UI は外部クライアント保存をローカル状態だけで推測しない
+- Web UI はログイン済み、通常履歴表示、最新ページ表示、ドキュメント表示中の条件で、最新履歴ページを定期的に再取得する
+- 再取得間隔は短すぎる polling を避けるため約12秒とし、同時再取得と5秒未満の重複再取得を抑止する
+- ブラウザウィンドウが focus された時、または非表示タブから表示状態へ戻った時は、通常の間隔を待たずに最新履歴を再取得する
+- 外部保存検出用の再取得では、現在選択中の履歴IDが再取得後の最新ページに残っている場合、その選択状態を維持する
+- スター付きのみ表示、検索中、履歴の旧ページ表示中、履歴ロード中は、ユーザーの閲覧文脈を壊さないよう自動差し替えを行わない
+- 履歴管理ダイアログが開いており、通常履歴の先頭ページを表示している場合は、外部保存反映に合わせて同ページも静かに再取得する
+- build number: 361
+
+### v1.48 (2026-05-09)
+
+**Android ネイティブ実装の管理対象化と v1.48 対応**
+
+Android 版を Git 管理対象のネイティブ単体アプリとして整理し、web/server 参照実装に追従するモバイル実装として明文化する。
+
+- Android 版は Kotlin + Jetpack Compose で実装し、Room / SQLite を正式なローカル DB レイヤーとする
+- アプリはシングルユーザー前提で動作し、server/web のユーザー管理、DB 管理、プラグイン管理、ログ保存などのサーバー運用機能は Android UI から除外する
+- Android の開発 master は常に `web/` と `server/` とし、DDL 解釈、Stage 1.5 展開、Score 補修、SVG rendering、履歴/render metadata の互換性は server source に照らして検証する
+- LiteRT-LM を Android のローカル LLM provider とし、Gemma 4 E2B を標準、E4B を高品質オプションとして扱う。GPU backend を必須とし、CPU fallback は行わない
+- Gemma 4 E2B/E4B のライセンス同意、初回取得、再取得、SHA-256 検証、取得状態は Room に保存する
+- Android のモデル選択 UI はモバイル操作性のため Stage 1 / Stage 2 を単一の描画モデル選択として扱う。ただし保存形式、履歴 JSON、render metadata では `stage1_model` / `stage2_model` を維持する
+- モデル設定パネルは接続先ごとの独立パネルとし、サービス追加、サービス名編集、Base URL 編集、APIキー追加/削除、公開モデル選択、モデル一覧取得を提供する。接続形式はサービス追加時に設定し、既存パネルでは変更しない
+- 公開モデル候補と公開済みモデルは分離して保存し、描画画面のモデル選択には公開済みモデルだけを表示する
+- 描画画面では画像のピンチズーム、パン、左右スワイプによる履歴移動、ダブルタップによるプレゼンテーション表示を Android 固有 UI として提供する
+- プレゼンテーション表示では画像以外の UI を隠し、余白背景を表示画像の背景色に合わせる。白背景画像ではダーク背景、黒背景画像ではライト背景を使う
+- 履歴画面は 3 列サムネイルグリッドを標準とし、サーバー版のごみ箱、リスト表示、一括選択は Android では提供しない
+- SVG / PNG export は server/web の `CanvasPanel` と同じ profile / template 構造を持つメニューとして実装し、Android では共有シートに渡す
+- PNG template は `1080px` / `2160px` / `4320px` の Y軸高さを既定とし、Room の `export_templates` を正本とする
+- `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を render metadata に含め、Android でも server の canvas aspect 定義に対応する値から算出する
+- Android headless render / comparison tooling を持ち、server CLI の `--input-mode ddl` と組み合わせて DDL 以降、Score 以降の parity を比較できる
+- Android version は `android/VERSION`、Android build number は `android/BUILD_NUMBER` を正本とする。v1.48 世代の初期値は `1.48.0-android.1` / `148001` とする
+- Android 設定メニューには versionName、versionCode、build type、applicationId、source spec、render engine version を表示するバージョン情報画面を置く
+- build number: 148001
+
+### v1.49 (2026-05-11)
+
+**描画表示のプレゼンテーションモードと指示文字幕**
+
+Web UI の描画タブに、展示・鑑賞向けの表示補助を追加した。
+
+- 描画タブ右下にプレゼンテーションモードを開く全画面アイコンを置く
+- プレゼンテーションモードでは表示中の SVG を最大化し、下部に履歴移動、最新表示、スター、指示文字幕切替、閉じる操作をまとめたコントロールを表示する
+- プレゼンテーションモードは Escape キーでも閉じられる
+- 描画タブ左下に、指示文を字幕として表示するアイコンを置く
+- 通常表示の字幕は描画タブ幅を基準に左右10%のマージンを取り、描画タブ内でクリップする
+- プレゼンテーションモードの字幕はウインドウ幅を基準に左右10%のマージンを取る
+- 字幕に表示するテキストは、Stage 1 送信用に拡張された内部プロンプトではなく、ユーザー入力・履歴 `input`・バッチ最新行・デモ生成指示文の原文とする
+- `buildEmotionHint()` などの内部補助文は、プロンプト/デバッグ表示には残してよいが、鑑賞用字幕には表示しない
+- build number: 401
+
+### v1.50 (2026-05-11)
+
+**英語指示文対応と指示文言語 / UI言語の分離**
+
+日本語 UI / 英語 UI の切替とは独立して、描画指示文の言語を選べるようにした。
+将来の多言語対応を見据え、表示言語と解釈言語を API 境界で分離する。
+
+- Web UI の入力ヘッダーに `指示文の言語` セレクタを追加し、`自動` / `日本語` / `English` を選択できるようにする
+- `/api/paint`、`/api/interpret`、`/api/compose`、`/api/demo/instruction` は `instruction_lang` と `ui_lang` を受け取る
+- `instruction_lang=auto` の場合、サーバーは入力文字列から `ja` / `en` を判定し、Stage 1 / Stage 1.5 / Stage 2 / デモ指示生成に渡す
+- `/api/paint`、`/api/compose`、履歴保存、JSONタブ、保存 artifact JSON は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` を記録する
+- `history` テーブルに `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` カラムを追加する
+- `inku-cli paint` / `batch` / `demo-instruction` は旧 `--lang` ではなく `--instruction-lang auto|ja|en` と任意の `--ui-lang` を送信する
+- 既存履歴や `cli/tune_bench.md` のハッシュ参照を壊さないため、言語メタデータは `render_hash` の canonical payload には含めない
+- Stage 1 prompt、Stage 2 prompt、Stage 1.5 expander / filter は `InstructionLanguageSupport` として registry に登録する
+- Score coerce layer が参照する語彙・文脈 marker は `InstructionLanguageSupport.coerce_markers` として `ja` / `en` の言語別ファイルに分離する
+- Score coerce layer の補修アルゴリズム本体は JSON Score 構造に対する共通処理として維持し、言語ごとの違いは marker セット側で表現する
+- `ja` / `en` の既存 prompt と expander は内容を変更せず registry に載せるため、描画結果の変化を伴わない
+- 第三者が追加言語を実装する場合は、まず registry に言語コード・prompt・expander・coerce marker を追加し、JSON Score schema / renderer / 色カタログの変更とは分離して検証する
+- Build 403-427 では、英語版 Stage 1 / Stage 1.5 / Stage 2 の実装を日本語版とファイルレベルで分離し、英語固有の意味解釈・marker・補修語彙を追加した
+- 英語版は、単語置換ではなく、英語文の時間構造・反復・前後関係・視線・出来事の核を抽象描画パラメータへ変換する方針とする
+- 英語版 Stage 1.5 / coerce marker は、`before` / `after` / `again and again` / `as if` / `at once` などの時間接続、`diagonal` / `same beat` / `shifted` などの構図語、透明・反射・霧・道路・音・群れ等の視覚イベント語を言語固有の補修手がかりとして扱う
+- 日本語版と英語版は同一の JSON Score schema / renderer / 色カタログを共有し、言語差は prompt、expander、marker、補修入力の段階に閉じ込める
+- 英語版の品質確認として、同義の日本語 / 英語指示文30組を `square` canvas、`default` color catalog、履歴保存なしで描画し、専門家3名ペルソナで比較評価した
+- Build 427 時点の30件平均では、英語版は日本語版に近い品質へ到達している。英語版は color resonance がやや高く、日本語版は constraint adherence と visual event がやや高い
+- 残課題は、英語版では「整いすぎて出来事の瞬間が背景化する」こと、日本語版では「詩的な静けさが小さすぎる記号に縮約される」こと。次の改善では密度を増やさず、focal event の最小可視サイズ、コントラスト、隣接反応を強める
+- build number: 427
+
+### v1.51 (2026-07-02)
+
+**関係（あいだ）の設計と、揺らぎのマクロスケール拡張**
+
+Build 436 時点で観測された出力分布の収縮（構図・密度・色面の多様性低下）の一次原因分析を受けた仕様改訂。一次原因は (A) 揺らぎがミクロ層（線の震え）にのみ割り当てられ、構図レベルの一回性がどの層にも存在しなかったこと、(B) Stage 1.5 が対角・片側焦点を常時優先する固定レシピの決定的抽選機になっていたこと、(C3) JSON Score が instruction 間の関係を表す述語を持たず、構成の文法が固定レシピにしか存在しなかったこと。
+
+- §2 原則2 に揺らぎの二スケール（ミクロ/マクロ）を明記
+- §3.1 コア語彙に「あいだ (Relations)」カテゴリを追加（沿う、触れない、切る、間に）。名詞ではなく述語の追加であり、プラグイン原則1と矛盾しない
+- §12.10 対策B のキャッシュ方針に、出力の一回性との両立条件を明記
+- §12.11 Stage 1.5 の構図規則を「対角・片側焦点の常時優先」から「構図族からの入力依存選択」へ変更。焦点座標を固定値から領域指定へ変更。役割を「完成品レシピの注入」から「関係述語の付加」へ転換
+- §13.8 に演奏の自由度の二スケール（ミクロ変動 / 関係の逐次解決）を追記
+- §14「関係（あいだ）の設計」を新設。旧 §14〜§16 を §15〜§17 へ繰り下げ
+- 関係修復 governor の作成を禁止（§14.6）。coerce は relation を追加できない
+- 実装指示は codex-task.md、検証・受け入れ基準は tune_bench.md に記録する
+
+### v1.52 (2026-07-04)
+
+**事後選択の実体化（vary）と、補修部品の指紋化の禁止**
+
+Build 441（v1.51 実装後の初回フルベンチ + 監査後修正）の3ペルソナレビューを受けた仕様改訂。レビューの詳細は `cli/tune_bench.md`「Build 441 3ペルソナレビュー」、実装指示は `no-git-sync/codex-task-v1.52.md`。3ペルソナが共通指摘した2点——(1) coerce 補修部品（近接反応の弧 93%、固定座標の小五角形 33% 等）が「システムの指紋」として全作品に反復し連作の鑑賞を壊していること、(2) 出力の振れ幅の上限が低く、外れ値（=驚き）を事後選択で扱う設計（§8）が未実体化であること——への対処。
+
+- §8.4「事後選択の実体化 — 二段の再生成」を新設。再生成を「別の演奏」（performance seed、LLM 不要）と「別の構図」（Stage 1.5 選択シードの vary、Stage 2 の1回）の二段として定義
+- §10.4「補修部品の指紋化の禁止」を新設。補修部品に (1) 部品別発火率の計測と上限監視（floor は設けない）、(2) 固定座標・固定形状のハードコード禁止、(3) 発火条件の限定（主題が壊れる場合のみ）を課す
+- §12.11 に選択シードの vary 規定を追記。既定は「同じ入力は同じ拡張」を維持し、明示的な vary 指定時のみ選択をやり直す。暗黙の非決定化（自動インクリメント・時刻シード）を禁止
+- codex-task.md P3-4（v1.51 で判断保留）は本改訂の §8.4 / §12.11 として確定
+- ヘッダーの Version 表記を修正（v1.50/v1.51 改訂時に v1.49 のまま更新漏れとなっていた）
+
+Build 442 実装後の検証では、`vary_seed` 経路（API / CLI / Web UI）と二段の再生成は成立した。固定 5 プロンプト × `vary_seed` 0..4 の 25 生成は 25/25 成功し、fallback は 0。JP/EN 各30件の修復部品集計では `adjacent_reaction` は 56/60 から 14/60 へ低下し、指紋抑制の主効果は確認できた。
+
+一方で、Build 442 時点の v1.52 品質受け入れは未達だった。`angular_pulse` は 14/60、`vanishing_trace` は 26/60 で目標を満たさず、`vanishing_trace` は Build 441 の 21/60 から悪化した。`visual_event` 平均も Build 441 の 93.0 から 77.8 に低下し、品質回帰ガードを満たさなかった。
+
+Build 443 では `vanishing_trace` の発火条件を「消失文脈」だけでなく足跡・白い息・輪郭・人影などの trace 主体がある場合に限定し、汎用 `visual_event` 補修を小さな角形パルスから入力由来座標の compact mark に変更した。JP/EN 各30件の再ベンチでは `adjacent_reaction` 11/60、`angular_pulse` 0/60、`vanishing_trace` 2/60 となり、修復部品 fingerprint の受け入れ基準は満たした。ただし `visual_event` 平均は 77.93、`negative_space_pressure` 平均は 88.97 で、Build 441 比の品質回帰ガードはまだ満たさない。したがって v1.52 は「機能実装と修復指紋抑制は完了、品質低下サンプルの追加監査が残る」状態として扱う。
+
+Build 444 では、Build 443 で低かった `visual_event` / `negative_space_pressure` の targeted recovery を実施した。汎用 compact visual event に `color_cycle` と入力 hash 由来の対置 center を持たせ、着地して去る一時的イベントを `brief_arrival_departure` として扱い、`line of birds / river surface / another road` と `tatami / tilted quiet` の既存レシピにも色循環と対置配置を追加した。targeted benchmark では EN #06 が `visual_event` 98 / `negative_space_pressure` 100、EN #27 が単独 rerun で 70 / 76、JP #28 が 76 / 86 まで回復した。
+
+Build 444 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-444/{jp,en}/`）では 60/60 成功、fallback 0。修復部品は `adjacent_reaction` 10/60 (16.7%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%) で、v1.52 の repair fingerprint 受け入れ基準は継続して満たした。一方で品質平均は `visual_event` 79.90、`negative_space_pressure` 89.97、`motion_energy` 94.57、`constraint_adherence` 93.33 となり、Build 441 基準（`visual_event` 93.0、`negative_space_pressure` 96.23、`motion_energy` 97.7、`constraint_adherence` 86.0）に対して `visual_event` と `negative_space_pressure` が -5 以内の品質回帰ガードを満たさない。したがって現時点の v1.52 は、Phase A-D の実装・計測・vary・修復指紋 acceptance は完了、品質回帰ガードは未達、という進捗として扱う。追加の修正は、marker 語彙や新 governor を増やすのではなく、低スコア行（例: EN #21 `visual_event` 40 / `negative_space_pressure` 26、JP #23 `negative_space_pressure` 42、JP #02/#03 `visual_event` 48）の原因を個別監査し、既存 recipe の配置・色循環・対置関係を一般化する方向で行う。
+
+Build 445 では、Build 444 の低スコア監査を受けて、DDL coverage の小さな点・円・楕円を compact focal mark として扱う一般化を追加した。英文 DDL の文分割を改善し、`circle` と `ellipse` を同一視せず、`radius` / `半径` 指定や「小さい点」「small dot」系の coverage を低密度・outward fade・negative space preserved の小さな前景 mark として保持する。これは marker 語彙や新しい全体 governor の追加ではなく、既存 coerce fallback の形状・サイズ・空白保持を入力記述に合わせて補正する変更である。
+
+Build 445 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-445/{jp,en}/`）は 60/60 成功したが、JP #27/#28 は server timeout 後の最終リトライでも stage2 timeout となり、保存済み fallback result を使用した（fallback 2/60）。修復部品は `adjacent_reaction` 8/60 (13.3%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%) で、repair fingerprint gate は引き続き合格。品質平均は `visual_event` 80.43、`negative_space_pressure` 91.47、`motion_energy` 93.73、`constraint_adherence` 94.17、`color_resonance` 96.83、`figurative_risk` 1.33。Build 441 基準に対して `negative_space_pressure` / `motion_energy` / `constraint_adherence` は -5 以内に戻ったが、`visual_event` は基準 93.0 に対して 80.43 で未達。低スコア行は JP #02 (`visual_event` 40)、JP #21 / EN #04 / EN #20 / EN #21 (`visual_event` 48) などで、v1.52 の残タスクは visual-event の意味的な出来事性を回復することに絞られた。
+
+Build 446 / 446-2 では、Build 445 で固着していた低 `visual_event` 行に対して、既存 instruction / arrangement metadata だけを補強する一般化を追加した。小さな点・円・楕円の compact focal mark は、event context では `visual event preserved as compact focal accent` として扱い、既存 focal event には反対象限の `arrangement.center`、`color_cycle`、余白保持、低密度、outward fade を与えて counterweight を明示する。`inherited_memory` 型で出来事性が弱い場合は、既存 support instruction に `visual event inherited memory trace preserved on existing support` を付与する。これは新しい描画部品の追加ではなく、既存要素の配置・色循環・意味ラベルを補強する変更である。
+
+Build 446-2 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-446-2/{jp,en}/`）は 60/60 成功した。JP #09 のみ final retry でも stage2 timeout となり fallback result を使用した（fallback 1/60）。品質平均は `visual_event` 92.85、`negative_space_pressure` 94.30、`motion_energy` 96.95、`constraint_adherence` 95.50、`color_resonance` 99.75 で、Build 441 基準の -5 以内という品質回帰ガードを満たした。修復部品は `adjacent_reaction` 13/60 (21.7%)、`angular_pulse` 0/60、`vanishing_trace` 1/60 (1.7%) で v1.52 の repair fingerprint gate も合格。fable5 が後継指紋候補として指摘した `inherited_memory_arc` は 4/60 (6.7%) として新たに計測対象へ加えた。
+
+ただし relation drop rate は JP 15/53 (28.3%)、EN 22/51 (43.1%)、合算 37/104 (35.6%) で、fable5 が参照した 20% 目安を超えている。v1.52 の relation 方針は drop-only を維持し、coerce で relation を修復・補完しないことなので、この値は Build 446-2 時点の未解決リスクとして扱う。対策する場合は Stage 2 に「安全に置ける relation だけを出し、迷う場合は relation を省略する」方向のプロンプト改善に限定し、validator の修復化や relation 補完は行わない。
+
+Build 447 では relation drop を blocking として扱い、Stage 2 prompt に relation の発火条件を強化した。普通の配置語（斜めの帯に沿って、揺れる軌跡に沿って、川沿い、道沿い等）を relation にしないこと、`between` は直前2つの輪郭 instruction が揃う時だけ使うこと、迷う場合は relation を省略することを明示した。しかし Build 447 の JP/EN 30+30 full benchmark では relation drop が JP 13/55、EN 4/29、合算 17/84 (20.2%) となり、fable5 が blocking とした 20% 目安をわずかに超えた。
+
+Build 448 では、relation を「正規化DDLに `前の線に沿って` / `前の形に触れない` / `前の線を切る` / `前の二つの間に`（英語では corresponding previous-object phrase）が文字どおりある場合だけ残す」Stage 2 後段 gate に限定した。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「触れていない」「近く/遠く」などは relation ではなく、position / path / rotation / spacing で表す。coerce の方針は変えず、relation の修復・補完は行わない。
+
+Build 448 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-448/{jp,en}/`）は 60/60 成功した。JP #01 のみ final retry でも stage2 timeout となり fallback result を使用した（fallback 1/60）。品質平均は合算で `visual_event` 92.40、`negative_space_pressure` 95.87、`motion_energy` 97.77、`constraint_adherence` 92.00、`color_resonance` 99.27 となり、Build 441 基準の -5 以内という品質回帰ガードを満たした。修復部品は `adjacent_reaction` 14/60 (23.3%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%)、`inherited_memory_arc` 4/60 (6.7%) で、v1.52 の repair fingerprint gate を満たした。relation drop は JP 1/6 (16.7%)、EN 0/2、合算 1/8 (12.5%) で、fable5 が blocking とした 20% 目安を下回った。自然文 fable set では relation sample rate が低くなるが、これは relation を fixed previous-object phrase 専用に戻した結果であり、drop-only validator 方針と整合する。これにより v1.52 の残タスク（vary、repair fingerprint、quality guard、relation blocking）は完了として扱う。
+
+**v1.52 クローズ（2026-07-07）**: Build 448 を v1.52 の受け入れとして確定し、クローズする。判断理由は次の4点。(1) 受け入れ基準（repair fingerprint 3ゲート、品質回帰ガード、vary の後方互換・決定性・分散、relation drop blocking）を全項目満たした。(2) Build 448 の JP/EN 60枚に対する3ペルソナ再評価（`cli/tune_bench.md` 参照）で、v1.52 の起点だった Build 441 の2大課題——補修部品の指紋化と振れ幅の上限——の解消を目視確認した。定型部品の反復は消え、外れ値（驚き）が出るようになり、キュレーター視点で60枚中20〜25枚が選出可能な水準に達した。(3) relation の使用縮退（relation を持つサンプルが 30件中 21〜22 件から 2〜3 件へ減少）は、「relation は正規化DDL中の明示的な previous-object 句（前の線に沿って / 前の形に触れない / 前の線を切る / 前の二つの間に、および英語同義句）専用とし、自然文由来の近接・拍子・先行/遅れは position / path / rotation / spacing で表す」という仕様として受け入れる。これは一時的な回避ではなく §14 の関係述語の定義の確定であり、drop-only validator 方針と整合する。(4) 品質判定指標（visual_event 等の judge metric）は人間評価との乖離例（JP #23: visual_event=28 だが目視評価は最良クラス）が確認されたため、以後は受け入れゲートではなく回帰検知の参考値として扱う。品質の最終判定は §8 の設計思想どおり人間の事後選択に属する。judge metric 自体の再調整は行わない（governor 化の回避）。以後の開発の完成軸は品質ゲートの漸近改善ではなく「他人が自分の視覚的短歌を書ける状態」（1.0）に移す。作業計画は v1.6 として別途管理する。

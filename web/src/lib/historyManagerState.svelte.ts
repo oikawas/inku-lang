@@ -39,6 +39,7 @@ export type HistoryItem = {
 	vary_seed?: number | string | null;
 	trashed?: boolean;
 	starred?: boolean;
+	note?: string | null;
 };
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
@@ -239,10 +240,11 @@ export class HistoryManagerState {
 		this.selectedIds = this.selectedIds.length === ids.length ? [] : ids;
 	}
 
-	applyStarState(item: { id?: string; starred?: boolean }) {
+	applyStarState(item: { id?: string; starred?: boolean; note?: string | null }) {
 		if (!item.id) return;
-		this.activeItems = this.activeItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
-		this.trashItems = this.trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
+		const hasNote = Object.prototype.hasOwnProperty.call(item, "note");
+		this.activeItems = this.activeItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
+		this.trashItems = this.trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
 		this.preloadKey = "";
 	}
 

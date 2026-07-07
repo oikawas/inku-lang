@@ -123,6 +123,8 @@ export const en: LangPack = {
 	canvasPresentationClose: 'close presentation mode',
 	canvasPresentationTitle: 'presentation mode',
 	canvasPresentationControls: 'presentation controls',
+	selectionNotePrompt: 'Why this one? (optional)',
+	selectionNoteLabel: 'choice',
 	starOn: 'remove star',
 	starOff: 'add star',
 	historyStarredOnly: 'starred only',

@@ -123,6 +123,8 @@ export const ja: LangPack = {
 	canvasPresentationClose: 'プレゼンテーションモードを閉じる',
 	canvasPresentationTitle: 'プレゼンテーションモード',
 	canvasPresentationControls: 'プレゼンテーション操作',
+	selectionNotePrompt: '選んだ理由（任意）',
+	selectionNoteLabel: '選',
 	starOn: 'スターを外す',
 	starOff: 'スターを付ける',
 	historyStarredOnly: 'スターのみ',

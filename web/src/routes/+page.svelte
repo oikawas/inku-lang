@@ -2674,26 +2674,29 @@
 		} catch { /* ignore */ }
 	}
 
-	type HistoryStarTarget = { id?: string; starred?: boolean };
+	type HistoryStarTarget = { id?: string; starred?: boolean; note?: string | null };
 
 	function updateHistoryStarState(item: HistoryStarTarget) {
 		if (!item.id) return;
-		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
+		const hasNote = Object.prototype.hasOwnProperty.call(item, "note");
+		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
 		historyManager.applyStarState(item);
-		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred } : it);
-		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred };
+		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
+		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred, note: hasNote ? item.note : displayedHistoryItem.note };
 	}
 
 	async function toggleHistoryStar(item: HistoryStarTarget | null | undefined, event?: Event): Promise<void> {
 		event?.stopPropagation();
 		if (!item?.id) return;
 		const nextStarred = !item.starred;
-		updateHistoryStarState({ ...item, starred: nextStarred });
+		const rawNote = nextStarred ? window.prompt(t().selectionNotePrompt, item.note ?? "") : null;
+		const nextNote = nextStarred ? (rawNote ?? "").trim().slice(0, 240) || null : null;
+		updateHistoryStarState({ ...item, starred: nextStarred, note: nextNote });
 		try {
 			const r = await apiFetch(`/api/history/${item.id}/star`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ starred: nextStarred })
+				body: JSON.stringify({ starred: nextStarred, note: nextNote })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const updated = await r.json() as Iteration;

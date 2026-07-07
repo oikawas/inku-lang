@@ -823,6 +823,7 @@ class HistoryItem(HistoryPostBody):
     render_hash_short: str | None = None
     trashed: bool = False
     starred: bool = False
+    note: str | None = None
 
 
 class HistoryListResponse(BaseModel):
@@ -838,6 +839,7 @@ class HistoryIdsBody(BaseModel):
 
 class HistoryStarBody(BaseModel):
     starred: bool = False
+    note: str | None = None
 
 
 class UserGroupItem(BaseModel):
@@ -2718,7 +2720,7 @@ def api_history_restore(body: HistoryIdsBody, actor: dict = Depends(_current_use
 
 @app.patch("/api/history/{item_id}/star", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_star(item_id: str, body: HistoryStarBody, actor: dict = Depends(_current_user)) -> HistoryItem:
-    item = _db.set_item_starred(actor["id"], item_id, body.starred)
+    item = _db.set_item_starred(actor["id"], item_id, body.starred, body.note)
     if not item:
         raise HTTPException(status_code=404, detail="history item not found")
     return HistoryItem(**item)

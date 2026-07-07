@@ -135,6 +135,8 @@ export interface LangPack {
 	canvasPresentationControls: string;
 	starOn: string;
 	starOff: string;
+	selectionNotePrompt: string;
+	selectionNoteLabel: string;
 	historyStarredOnly: string;
 
 	// Prompts tab

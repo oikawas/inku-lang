@@ -1892,9 +1892,14 @@ def test_history_is_scoped_to_authenticated_user():
     assert search_a.json()["total"] == 1
     assert search_a.json()["items"][0]["id"] == item_a_second["id"]
 
-    star_a = client.patch(f"/api/history/{item_a_second['id']}/star", json={"starred": True}, headers=headers_a)
+    star_a = client.patch(
+        "/api/history/{}/star".format(item_a_second["id"]),
+        json={"starred": True, "note": "quiet hinge"},
+        headers=headers_a,
+    )
     assert star_a.status_code == 200
     assert star_a.json()["starred"] is True
+    assert star_a.json()["note"] == "quiet hinge"
     starred_a = client.get("/api/history?starred=true", headers=headers_a)
     assert starred_a.status_code == 200
     assert starred_a.json()["total"] == 1

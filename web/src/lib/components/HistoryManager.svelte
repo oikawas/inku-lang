@@ -25,6 +25,7 @@
 		vary_seed?: number | string | null;
 		trashed?: boolean;
 		starred?: boolean;
+	note?: string | null;
 	};
 
 	type Props = {
@@ -320,6 +321,7 @@
 						</div>
 						<div class="manager-thumb-actions">
 							<div class="thumb-catalog" title={it.input}>{thumbnailPromptText(it.input)}</div>
+							{#if it.note}<div class="thumb-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 							<div class="thumb-action-row">
 								<button
 									class="hash-row-star"
@@ -424,6 +426,7 @@
 		{#if hashLabel(tooltipState.item)}<div class="tooltip-row"><span>{t().historyHashHeader}</span><strong>#{hashLabel(tooltipState.item)}</strong></div>{/if}
 		<div class="tooltip-row"><span>{t().historyTooltipTokens}</span><strong>{historyTokenSummary(tooltipState.item)}</strong></div>
 		<div class="tooltip-date">{historyPreviewText(tooltipState.item.input)}</div>
+		{#if tooltipState.item.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{tooltipState.item.note}</div>{/if}
 	</div>
 {/if}
 

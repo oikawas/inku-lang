@@ -73,6 +73,7 @@ class HistoryRow(Base):
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
+    note         = Column(Text,       nullable=True)
 
 
 class UserGroupRow(Base):
@@ -149,6 +150,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
+    "note": "ALTER TABLE history ADD COLUMN note TEXT",
 }
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
@@ -824,6 +826,7 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "render_hash_short": render_hash_short(row.render_hash),
         "trashed":      bool(row.trashed),
         "starred":      bool(row.starred),
+        "note":         row.note,
     }
     if row.render_build_number is not None:
         item["render_build_number"] = row.render_build_number
@@ -956,6 +959,7 @@ def add_item(item: dict) -> dict:
         render_hash=render_hash,
         trashed=0,
         starred=0,
+        note=item.get("note"),
     )
     with SessionLocal() as session:
         session.add(row)
@@ -1632,7 +1636,7 @@ def list_items(
         return [_row_to_dict(r) for r in rows], total
 
 
-def set_item_starred(user_id: str, item_id: str, starred: bool) -> dict | None:
+def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None = None) -> dict | None:
     with SessionLocal() as session:
         row = (
             session.query(HistoryRow)
@@ -1642,6 +1646,11 @@ def set_item_starred(user_id: str, item_id: str, starred: bool) -> dict | None:
         if not row:
             return None
         row.starred = 1 if starred else 0
+        if note is not None:
+            clean_note = note.strip()[:240]
+            row.note = clean_note or None
+        elif not starred:
+            row.note = None
         session.commit()
         session.refresh(row)
         return _row_to_dict(row)

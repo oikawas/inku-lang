@@ -18,6 +18,7 @@
 		catalog_id?: string | null;
 		trashed?: boolean;
 		starred?: boolean;
+	note?: string | null;
 	};
 
 	type Props = {
@@ -131,6 +132,7 @@
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
+							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 						</div>
 						<HistoryThumbnail item={it} scope="strip" size="strip" />
 						<button

@@ -1595,6 +1595,9 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - Nature plugin の参照実装として `Nature.風` / `Nature.うねり` / `Nature.無風` を Stage 1.5 の語彙マクロに追加した。`Nature.` 名前空間の明示参照のみ発火し、名前空間なしの通常語彙は従来通り扱う。
 - Nature plugin は既存の DDL 表現を variation / arrangement へ導くだけで、新 primitive・新 Score フィールド・新 coerce は追加しない。マクロだけで足りたため、プラグイン原則1/5は維持する。
 - Saijiki に Nature plugin カテゴリを追加し、通常語彙と区別する薄い朱系の表示にした。
+- 候補4枚の同時生成、複数選択保存、スター時の任意メモ、別解釈の `interpretation_seed` 記録を追加し、§8 の事後選択を UI と履歴に接続した。
+- LLM Model Inspection の比較先は、現在の Stage 1 provider がクラウド provider の場合、まず API key 不要のローカル provider を候補にする。これは鑑賞用比較を quota や provider 側の利用不能に過度に依存させないための実装上の選択であり、judge 値は引き続き表示しない。
+- Build 458 を pentala 実機で確認し、D-1/D-2 のスクリーンショットを `no-git-sync/screen-cap/`、確認メモを `cli/tune_bench.md` に記録した。
 
 
 ### v0.1 (2026-04-02)

@@ -454,7 +454,7 @@ The writing surface carries only a non-blocking length hint. Japanese input uses
 
 ## 9. Web Application
 
-The web app is the current reference interface. v1.70 adds a comparison area that can juxtapose the current render with the previous history item, show a subdued prompt diff, and run an LLM Model Inspection view that compares two Stage 1 models side by side without judge scores.
+The web app is the current reference interface. v1.70 adds post-selection and comparison as first-class authoring surfaces. A variation grid can generate several candidates from one instruction, let the writer select more than one result, and save the selected works to history with optional star notes. Explicit interpretation variation bypasses the Stage 1 cache, records an `interpretation_seed` identifier, and shows the normalized-DDL diff so interpretation drift is visible. The comparison area can juxtapose the current render with the previous history item, show a subdued prompt diff, and run an LLM Model Inspection view that compares two Stage 1 models side by side without judge scores. When the current Stage 1 provider is cloud-based, the inspection view prefers an API-key-free local provider as the alternate model before trying other cloud providers, so the viewing tool is less dependent on quota or provider availability.
 
 Major UI areas:
 
@@ -542,7 +542,12 @@ input.  The box supports two editing paths:
   requested primitive/color contract.
 
 The same `Draw from DDL` action is also available below the interpretation box
-for quick replay without opening the dialog.  The dialog itself does not start
+for quick replay without opening the dialog.  The single drawing flow also
+includes v1.70 post-selection controls: a candidate grid for multiple
+render/composition/interpretation variants, optional inclusion of an
+interpretation candidate, multi-select saving, and an explicit `another
+interpretation` action that shows the normalized-DDL diff.  Candidate metadata
+shows the render, vary, and interpretation seeds where applicable.  The dialog itself does not start
 drawing, so drawing actions remain concentrated in the main single-drawing
 panel.
 
@@ -1184,6 +1189,20 @@ The relation sample rate is intentionally low on the natural-language fable set
 because relation is again reserved for fixed previous-object phrases. Version
 1.52 is therefore accepted for vary, repair-fingerprint suppression, the quality
 guard, and the relation-drop blocking item.
+
+### v1.70 (2026-07-08)
+
+Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics out of the acceptance gate and instead makes form, post-selection, and comparison visible in the product.
+
+- The language/spec alignment pass clarifies that writer-facing words such as random scattering remain valid input, while unordered randomness is forbidden only as an internal Score representation. The core color vocabulary remains six abstract writer-facing colors; color catalogs are server-owned resolution metadata, not vocabulary expansion.
+- The writing surface now carries only a quiet, non-blocking length hint: roughly 31 Japanese characters or roughly 12 English words.
+- Saijiki relation entries keep poetic headings while examples show the reachable fixed previous-object phrases. Stage 1 only normalizes explicitly written element relationships into relation phrases; place or scene words such as riverbank-style "along" are not relation predicates.
+- Post-selection is now concrete: a variation grid can produce four default candidates, optionally include a fresh interpretation candidate, allow multiple selections, and save selected works to history. Starred history items may carry a short optional note explaining the choice.
+- Explicit interpretation variation records `interpretation_seed` and displays a normalized-DDL diff. Reproduction is anchored in the saved DDL/Score rather than in replaying the LLM nondeterministic text output.
+- The `Nature` reference vocabulary plugin adds `Nature.wind`, `Nature.undulation`, and `Nature.stillness` as deterministic Stage 1.5 macros. The explicit `Nature.` namespace is required; plain natural-language words do not trigger the plugin. The implementation uses existing DDL/Score variation and arrangement only, so no new primitive, Score field, or coerce rule is added.
+- Saijiki shows Nature plugin terms in a separate plugin category with distinct, subdued styling.
+- The comparison area shows previous/current renders side by side, a subdued prompt diff, and an LLM Model Inspection view for two Stage 1 models. It is a viewing tool, not a judge surface, and displays no judge values.
+- Build 458 was verified on pentala for D-1/D-2; screenshots are stored under `no-git-sync/screen-cap/` and the local verification note is recorded in `cli/tune_bench.md`.
 
 ### v1.60 (2026-07-07)
 

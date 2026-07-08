@@ -193,13 +193,13 @@
 
 <div class="right-panel">
 	<div class="right-tabs">
-		<Tooltip text={t().tooltipCanvasTabCanvas}>
+		<Tooltip placement="bottom" text={t().tooltipCanvasTabCanvas}>
 			<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
 		</Tooltip>
-		<Tooltip text={t().tooltipCanvasTabPrompts}>
+		<Tooltip placement="bottom" text={t().tooltipCanvasTabPrompts}>
 			<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
 		</Tooltip>
-		<Tooltip text={t().tooltipCanvasTabScore}>
+		<Tooltip placement="bottom" text={t().tooltipCanvasTabScore}>
 			<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
 		</Tooltip>
 		<div class="rtab-spacer"></div>

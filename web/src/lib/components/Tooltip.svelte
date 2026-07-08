@@ -1,15 +1,16 @@
 <script lang="ts">
 	type Props = {
 		text: string;
+		placement?: 'top' | 'bottom';
 		children: import('svelte').Snippet;
 	};
 
-	let { text, children }: Props = $props();
+	let { text, placement = 'top', children }: Props = $props();
 </script>
 
 <span class="tooltip-wrap">
 	{@render children()}
-	<span class="tooltip-bubble" role="tooltip">{text}</span>
+	<span class="tooltip-bubble" class:bottom={placement === 'bottom'} role="tooltip">{text}</span>
 </span>
 
 <style>
@@ -52,9 +53,29 @@
 		border-top-color: var(--tooltip-bg);
 		transform: translateX(-50%);
 	}
+
+	.tooltip-bubble.bottom {
+		bottom: auto;
+		top: calc(100% + 8px);
+		transform: translate(-50%, -2px);
+	}
+	.tooltip-bubble.bottom::after {
+		top: auto;
+		bottom: 100%;
+		border-top-color: transparent;
+		border-bottom-color: var(--tooltip-bg);
+	}
+
 	.tooltip-wrap:hover .tooltip-bubble,
 	.tooltip-wrap:focus-within .tooltip-bubble {
 		opacity: 1;
+	}
+	.tooltip-wrap:hover .tooltip-bubble:not(.bottom),
+	.tooltip-wrap:focus-within .tooltip-bubble:not(.bottom) {
+		transform: translate(-50%, 0);
+	}
+	.tooltip-wrap:hover .tooltip-bubble.bottom,
+	.tooltip-wrap:focus-within .tooltip-bubble.bottom {
 		transform: translate(-50%, 0);
 	}
 </style>

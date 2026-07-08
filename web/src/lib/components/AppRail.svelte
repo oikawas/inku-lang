@@ -129,7 +129,7 @@
 <style>
 	.app-rail {
 		position: relative;
-		z-index: 80;
+		z-index: 120;
 		width: 44px;
 		flex-shrink: 0;
 		display: flex;

@@ -20,6 +20,10 @@
 		align-items: center;
 		min-width: 0;
 	}
+	.tooltip-wrap:hover,
+	.tooltip-wrap:focus-within {
+		z-index: 1010;
+	}
 	.tooltip-bubble {
 		position: absolute;
 		left: 50%;

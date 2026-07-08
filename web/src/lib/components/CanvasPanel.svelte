@@ -419,7 +419,7 @@
 			>{statusHashCopied ? t().promptCopied : statusHashLabel || '----'}</button>
 		</Tooltip>
 		<div class="png-wrap">
-			<Tooltip text={t().tooltipCanvasDownloadSvg}>
+			<Tooltip placement="left" text={t().tooltipCanvasDownloadSvg}>
 				<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); svgMenuOpen = !svgMenuOpen; }} disabled={!result}>
 					<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
 						<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
@@ -469,7 +469,7 @@
 			{/if}
 		</div>
 		<div class="png-wrap" bind:this={pngWrapEl}>
-			<Tooltip text={t().tooltipCanvasDownloadPng}>
+			<Tooltip placement="left" text={t().tooltipCanvasDownloadPng}>
 				<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>
 					<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
 						<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />

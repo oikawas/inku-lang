@@ -215,7 +215,7 @@
 				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			</Tooltip>
 			{#if inputMode !== 'demo'}
-				<Tooltip text={t().tooltipInputClear}>
+				<Tooltip placement="left" text={t().tooltipInputClear}>
 					<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
 				</Tooltip>
 			{/if}

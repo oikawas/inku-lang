@@ -97,7 +97,7 @@
 			<button class="ddl-inline-btn" type="button" disabled={reloading || loading} onclick={openEditorDialog}>
 				{t().ddlEditSectionLabel}
 			</button>
-			<Tooltip text={t().tooltipDdlAutoRepair}>
+			<Tooltip placement="left" text={t().tooltipDdlAutoRepair}>
 				<label class="ddl-inline-check">
 					<input type="checkbox" bind:checked={autoRepairEnabled} disabled={reloading || loading} />
 					<span>{t().ddlAutoRepairLabel}</span>

@@ -37,36 +37,27 @@
 	}: Props = $props();
 
 	let expanded = $state(false);
-	let openTimer: ReturnType<typeof setTimeout> | null = null;
-	let closeTimer: ReturnType<typeof setTimeout> | null = null;
 
-	function clearTimer(timer: ReturnType<typeof setTimeout> | null) {
-		if (timer) clearTimeout(timer);
-	}
-
-	function scheduleOpen() {
-		clearTimer(closeTimer);
-		closeTimer = null;
-		if (expanded || openTimer) return;
-		openTimer = setTimeout(() => {
-			expanded = true;
-			openTimer = null;
-		}, 220);
-	}
-
-	function scheduleClose() {
-		clearTimer(openTimer);
-		openTimer = null;
-		clearTimer(closeTimer);
-		closeTimer = setTimeout(() => {
-			if (!userMenuOpen) expanded = false;
-			closeTimer = null;
-		}, 380);
+	function toggleExpanded() {
+		expanded = !expanded;
+		if (!expanded) userMenuOpen = false;
 	}
 </script>
 
-<aside class="app-rail" class:expanded onmouseenter={scheduleOpen} onmouseleave={scheduleClose}>
+<aside class="app-rail" class:expanded>
 	<div class="rail-brand">
+		<div class="rail-top-row">
+			<button
+				class="rail-toggle"
+				type="button"
+				onclick={toggleExpanded}
+				aria-pressed={expanded}
+				aria-label={expanded ? t().railCollapseLabel : t().railExpandLabel}
+				title={expanded ? t().railCollapseLabel : t().railExpandLabel}
+			>
+				<span aria-hidden="true">{expanded ? "‹" : "›"}</span>
+			</button>
+		</div>
 		<div class="rail-logo-row">
 			<button class="rail-logo" type="button" onclick={onOpenAppInfo} aria-label={t().appInfoOpenLabel}>
 				<span class="rail-logo-core">inku</span>{#if expanded}<span class="rail-logo-suffix">-lang</span>{/if}
@@ -142,16 +133,36 @@
 		width: 164px;
 	}
 	.rail-brand {
-		min-height: 54px;
+		min-height: 78px;
 		display: flex;
 		flex-direction: column;
 		justify-content: flex-start;
 		padding: 0;
 	}
+	.rail-top-row,
 	.rail-logo-row {
 		height: 30px;
 		display: flex;
 		align-items: center;
+	}
+	.rail-toggle {
+		width: 30px;
+		height: 30px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg2);
+		font-family: inherit;
+		font-size: 18px;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.rail-toggle:hover {
+		background: var(--bg2);
+		color: var(--fg);
 	}
 	.rail-logo {
 		width: auto;

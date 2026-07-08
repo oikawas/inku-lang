@@ -18,6 +18,8 @@ export interface LangPack {
 	settingsButton: string;
 	themeLight: string;
 	themeDark: string;
+	railExpandLabel: string;
+	railCollapseLabel: string;
 
 	// Login
 	loginTitle: string;

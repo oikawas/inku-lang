@@ -19,6 +19,8 @@ export const en: LangPack = {
 	settingsButton: 'settings',
 	themeLight: 'light mode',
 	themeDark: 'dark mode',
+	railExpandLabel: 'expand sidebar',
+	railCollapseLabel: 'collapse sidebar',
 
 	loginTitle: 'Sign in',
 	loginUsernamePlaceholder: 'Username',

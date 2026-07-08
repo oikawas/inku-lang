@@ -19,6 +19,8 @@ export const ja: LangPack = {
 	settingsButton: '設定',
 	themeLight: 'ライトモード',
 	themeDark: 'ダークモード',
+	railExpandLabel: 'サイドバーを伸ばす',
+	railCollapseLabel: 'サイドバーを格納する',
 
 	loginTitle: 'ログイン',
 	loginUsernamePlaceholder: 'ユーザー名',

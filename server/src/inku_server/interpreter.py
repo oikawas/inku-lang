@@ -65,6 +65,18 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - **ゆらぎ**: 震える・波打つ・滲む・細かく → 数量文の後に別文で記述
 - **配置パターン**: 格子・放射状・等間隔・画面全体・上から下・右半分など → 保持
 
+# 面と地の質感 — 属性として保持
+
+質感は補助図形を増やす理由にしない。対象が図形の中身なら「面: ...」、キャンバスそのものなら「地: ...」として短く残す。
+
+- 紙目を残す、生成りの紙、和紙 → 「地: 生成りの紙、細かい紙目。」
+- 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」
+- 点で埋める、点描の面 → 「面: 点で埋める。」
+- 斜線で埋める、ハッチ → 「面: 斜めに埋める。」
+- 粒立つ、かすれ → 「面: 粒立つ。」
+- 薄墨で満たす、水彩の面 → 「面: 薄墨。」
+- 端が滲む → 「面: 滲む。」
+
 複数属性を持つ図形は 1 文に収める: 「青いクレヨンの太い縦線を横に三十本並べる。」
 
 # てざわり選択 — 素材未指定でも物理感を選ぶ
@@ -765,6 +777,18 @@ Preserve all explicitly stated attributes in the input:
 - **direction/places**: vertical, horizontal, radial, center, right-half → preserve
 - **movements**: trembling, undulating, blurring, fine → add as separate sentence after count
 - **arrangement**: grid, radial, evenly spaced, all-over, top-to-bottom, right-half → preserve
+
+# Surface and Ground Texture — preserve as attributes
+
+Texture must not create extra helper shapes. If it belongs to a shape interior, write "Surface: ...". If it belongs to the canvas support, write "Ground: ...".
+
+- paper grain, off-white paper, washi → "Ground: off-white paper, fine paper grain."
+- ink-wash ground → "Ground: ink wash."
+- stippled or dotted fill → "Surface: stippled."
+- hatch or crosshatch → "Surface: hatched diagonally."
+- grainy, rough, scuffed → "Surface: grain."
+- ink wash or watercolor fill → "Surface: pale ink wash."
+- bleeding edge → "Surface: bleeding."
 
 Multiple attributes in one shape go in one sentence: "Line up thirty thick vertical blue crayon lines."
 

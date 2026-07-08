@@ -1588,20 +1588,6 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ## 変更履歴
 
-### v1.70 (2026-07-08)
-
-- 直前/現在の二枚並置と記述 diff を左ペインに追加し、推敲の痕跡を鑑賞できるようにした。
-- LLM Model Inspection として、同一記述を現在の Stage 1 モデルと別 Stage 1 モデルへ並列に通し、正規化DDLと出力を横並び比較できる鑑賞用ビューを追加した。judge 値は表示しない。
-- Nature plugin の参照実装として `Nature.風` / `Nature.うねり` / `Nature.無風` を Stage 1.5 の語彙マクロに追加した。`Nature.` 名前空間の明示参照のみ発火し、名前空間なしの通常語彙は従来通り扱う。
-- Nature plugin は既存の DDL 表現を variation / arrangement へ導くだけで、新 primitive・新 Score フィールド・新 coerce は追加しない。マクロだけで足りたため、プラグイン原則1/5は維持する。
-- Saijiki に Nature plugin カテゴリを追加し、通常語彙と区別する薄い朱系の表示にした。
-- 候補4枚の同時生成、複数選択保存、スター時の任意メモ、別解釈の `interpretation_seed` 記録を追加し、§8 の事後選択を UI と履歴に接続した。
-- LLM Model Inspection の比較先は、現在の Stage 1 provider がクラウド provider の場合、まず API key 不要のローカル provider を候補にする。これは鑑賞用比較を quota や provider 側の利用不能に過度に依存させないための実装上の選択であり、judge 値は引き続き表示しない。
-- 候補4枚、解釈も含める、選を残す、モデル比較、自動補正などの主要操作に多言語対応ツールチップを追加した。ツールチップ文言はメイン UI の言語切替に追従し、表示言語と入力言語を分ける既存方針を保つ。
-- 左アプリレールの展開はマウスオーバーではなく、左上の明示的な伸ばす/格納するトグルボタンで制御する。誤展開を避け、作業領域の幅を利用者が固定できるようにする。
-- Build 458 を pentala 実機で確認し、D-1/D-2 のスクリーンショットを `no-git-sync/screen-cap/`、確認メモを `cli/tune_bench.md` に記録した。
-
-
 ### v0.1 (2026-04-02)
 
 - 初期コンセプト（東京都現代美術館「ソル・ルウィット オープン・ストラクチャー」展にて構想）
@@ -3745,3 +3731,24 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - Build 448 ギャラリー候補を `docs/gallery-candidates-build448.md` に記録した。最終選定は人間の事後選択として残す。
 - ギャラリーの最終選定は v1.70 以降へ持ち越す。v1.60 では候補記録までを完了範囲とし、作品選定そのものは次世代の評価・公開作業に属する。
 - Phase E（疎出力の Stage 1.5 対応）は E-2 方針を採用する。新しい専用 metric や marker は作らず、既存指標（`visual_event` / `negative_space_pressure`）と目視で観察する。v1.60 では疎出力を blocking 実装対象にしない。
+
+### v1.70 (2026-07-08)
+
+- 直前/現在の二枚並置と記述 diff を左ペインに追加し、推敲の痕跡を鑑賞できるようにした。
+- LLM Model Inspection として、同一記述を現在の Stage 1 モデルと別 Stage 1 モデルへ並列に通し、正規化DDLと出力を横並び比較できる鑑賞用ビューを追加した。judge 値は表示しない。
+- Nature plugin の参照実装として `Nature.風` / `Nature.うねり` / `Nature.無風` を Stage 1.5 の語彙マクロに追加した。`Nature.` 名前空間の明示参照のみ発火し、名前空間なしの通常語彙は従来通り扱う。
+- Nature plugin は既存の DDL 表現を variation / arrangement へ導くだけで、新 primitive・新 Score フィールド・新 coerce は追加しない。マクロだけで足りたため、プラグイン原則1/5は維持する。
+- Saijiki に Nature plugin カテゴリを追加し、通常語彙と区別する薄い朱系の表示にした。
+- 候補4枚の同時生成、複数選択保存、スター時の任意メモ、別解釈の `interpretation_seed` 記録を追加し、§8 の事後選択を UI と履歴に接続した。
+- LLM Model Inspection の比較先は、現在の Stage 1 provider がクラウド provider の場合、まず API key 不要のローカル provider を候補にする。これは鑑賞用比較を quota や provider 側の利用不能に過度に依存させないための実装上の選択であり、judge 値は引き続き表示しない。
+- 候補4枚、解釈も含める、選を残す、モデル比較、自動補正などの主要操作に多言語対応ツールチップを追加した。ツールチップ文言はメイン UI の言語切替に追従し、表示言語と入力言語を分ける既存方針を保つ。
+- 左アプリレールの展開はマウスオーバーではなく、左上の明示的な伸ばす/格納するトグルボタンで制御する。誤展開を避け、作業領域の幅を利用者が固定できるようにする。
+- Build 458 を pentala 実機で確認し、D-1/D-2 のスクリーンショットを `no-git-sync/screen-cap/`、確認メモを `cli/tune_bench.md` に記録した。
+
+### v1.71 (2026-07-08)
+
+- JSON Score に instruction-level の `surface` と canvas-level の `canvas.ground` を追加し、面の質感とキャンバス地の質感を SVG 実装詳細から分離した抽象属性として保持できるようにした。
+- Renderer に display / editable / compat profile ごとの質感演奏を追加した。display は filter / clipPath を使い、editable は安定 ID の vector group、compat は filter / clip-path を避ける単純化出力とする。
+- Stage 1 / Stage 2 prompt に「面:」「地:」の扱いと surface / ground mapping を追加し、質感語を補助図形注入ではなく対象 instruction の属性として扱うようにした。
+- render metadata に `render_texture_version`、`render_texture_profile`、`render_canvas_ground`、`render_surface_textures`、`texture_degraded` を追加した。
+- texture seed を Score / instruction / texture kind / performance seed から導出し、固定座標の紙目や高頻度の無指定 texture 注入が Renderer の指紋にならないようにした。

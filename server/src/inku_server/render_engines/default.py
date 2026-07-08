@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..renderer import render as render_svg
+from ..renderer import build_texture_metadata, render as render_svg
 from ..schema import Score
 from .base import RenderEngineResult
 
@@ -26,6 +26,7 @@ class DefaultRenderEngine:
             metadata={
                 "render_engine_id": self.id,
                 "render_engine_version": self.version,
+                **build_texture_metadata(score, svg_profile=svg_profile),
             },
         )
 

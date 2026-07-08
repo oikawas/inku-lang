@@ -1,6 +1,7 @@
 import math
 from xml.etree import ElementTree
 
+from inku_server.render_engines import current_render_engine
 from inku_server.renderer import _clustered_pos, _resolve_performance_score, render
 from inku_server.schema import Instruction, Score
 
@@ -1131,3 +1132,169 @@ def test_between_relation_places_within_previous_pair_neighborhood_across_seeds(
         y0, y1 = sorted((first.center[1], second.center[1]))
         assert x0 - margin <= third.center[0] <= x1 + margin, f"seed={seed} x out of neighborhood: {third.center}"
         assert y0 - margin <= third.center[1] <= y1 + margin, f"seed={seed} y out of neighborhood: {third.center}"
+
+
+
+def test_surface_schema_accepts_canvas_ground_and_clamps_units():
+    score = Score.model_validate(
+        {
+            "canvas": {
+                "aspect": "square",
+                "ground": {
+                    "material": "paper",
+                    "tone": "off_white",
+                    "grain": "fine",
+                    "density": 2.0,
+                    "opacity": -1.0,
+                },
+            },
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.16,
+                    "filled": True,
+                    "surface": {"texture": "wash", "density": 1.5, "opacity": 0.45, "bleed": -0.3},
+                }
+            ],
+        }
+    )
+
+    assert score.canvas.ground.density == 1.0
+    assert score.canvas.ground.opacity == 0.0
+    assert score.instructions[0].surface.density == 1.0
+    assert score.instructions[0].surface.bleed == 0.0
+
+
+def test_render_display_canvas_ground_uses_filter_behind_content():
+    score = Score.model_validate(
+        {
+            "canvas": {"aspect": "square", "ground": {"material": "paper", "tone": "off_white", "grain": "fine"}},
+            "instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}],
+        }
+    )
+
+    svg = render(score, render_seed=123)
+
+    assert 'id="ground_texture_' in svg
+    assert '<feTurbulence' in svg
+    assert svg.index('id="layer_01_canvas_ground"') < svg.index('<g clip-path="url(#canvas-clip)"')
+
+
+def test_render_display_surface_stipple_is_clipped_to_shape():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.16,
+                    "filled": True,
+                    "surface": {"texture": "stipple", "density": 0.5, "opacity": 0.3},
+                }
+            ]
+        }
+    )
+
+    svg = render(score, render_seed=123)
+
+    assert 'id="surface_000_000_stipple"' in svg
+    assert '<clipPath' in svg
+    assert 'clip-path="url(#clip_surface_000_000_stipple_' in svg
+    assert svg.count('<circle') > 10
+
+
+def test_render_editable_surface_has_stable_group_id_without_filters():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.35, 0.35],
+                    "size": [0.3, 0.3],
+                    "filled": True,
+                    "surface": {"texture": "hatch", "direction": "diagonal_falling"},
+                }
+            ]
+        }
+    )
+
+    svg = render(score, svg_profile="editable", render_seed=123)
+
+    assert 'id="surface_000_000_hatch"' in svg
+    assert '<line' in svg
+    assert '<filter' not in svg
+    assert 'clip-path' not in svg
+
+
+def test_render_compat_surface_degrades_without_filter_or_clip_path():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.4, 0.22],
+                    "filled": True,
+                    "surface": {"texture": "wash", "density": 0.3, "opacity": 0.45},
+                }
+            ]
+        }
+    )
+
+    svg = render(score, svg_profile="compat", render_seed=123)
+
+    assert 'id="surface_000_000_wash"' in svg
+    assert '<filter' not in svg
+    assert 'clip-path' not in svg
+
+
+def test_surface_texture_seed_is_deterministic_and_performance_seed_sensitive():
+    score = Score.model_validate(
+        {
+            "canvas": {"aspect": "square", "ground": {"material": "paper", "grain": "fine"}},
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.16,
+                    "filled": True,
+                    "surface": {"texture": "grain", "density": 0.5},
+                }
+            ],
+        }
+    )
+
+    svg_a = render(score, svg_profile="editable", render_seed=123)
+    svg_b = render(score, svg_profile="editable", render_seed=123)
+    svg_c = render(score, svg_profile="editable", render_seed=456)
+
+    assert svg_a == svg_b
+    assert svg_a != svg_c
+    assert 'surface_000_000_grain' in svg_c
+
+
+
+def test_render_engine_reports_texture_metadata():
+    score = Score.model_validate(
+        {
+            "canvas": {"aspect": "square", "ground": {"material": "paper", "tone": "warm", "grain": "medium"}},
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.16,
+                    "filled": True,
+                    "surface": {"texture": "wash", "density": 0.3, "opacity": 0.45},
+                }
+            ],
+        }
+    )
+
+    result = current_render_engine().render(score, svg_profile="compat", render_seed=123)
+
+    assert result.metadata["render_texture_version"] == "1"
+    assert result.metadata["render_texture_profile"] == "compat"
+    assert result.metadata["texture_degraded"] is True
+    assert result.metadata["render_canvas_ground"]["material"] == "paper"
+    assert result.metadata["render_surface_textures"][0]["texture"] == "wash"

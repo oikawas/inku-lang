@@ -18,7 +18,11 @@ Weight = Literal[
     "brush_thin", "brush_thick", "rope",
 ]
 Color = Literal["white", "black", "blue", "red", "green", "gray"]
-Canvas = str
+SurfaceTexture = Literal["none", "stipple", "hatch", "grain", "wash", "bleed", "paper_grain"]
+SurfaceDirection = Literal["none", "horizontal", "vertical", "diagonal_rising", "diagonal_falling"]
+GroundMaterial = Literal["plain", "paper", "washi", "ink_wash", "charcoal_ground"]
+GroundTone = Literal["white", "off_white", "warm", "cool", "gray", "black"]
+GroundGrain = Literal["none", "fine", "medium", "coarse"]
 
 Amplitude = Literal["fine", "medium", "broad"]
 Frequency = Literal["slow", "medium", "high"]
@@ -44,6 +48,71 @@ GazePressure = Literal["none", "low", "medium", "high"]
 ContourDensity = Literal["low", "medium", "high"]
 RelationType = Literal["along", "not_touching", "cutting", "between"]
 RelationGap = Literal["narrow", "medium", "wide"]
+
+
+def _clamp_unit_value(v: object, default: float | None = None) -> object:
+    if v is None:
+        return default if default is not None else v
+    try:
+        return max(0.0, min(1.0, float(v)))
+    except (TypeError, ValueError):
+        return default if default is not None else v
+
+
+class SurfaceSpec(BaseModel):
+    """図形の面に適用する抽象的な質感指定。SVG 実装詳細は持たない。"""
+
+    texture: SurfaceTexture = Field(
+        default="none",
+        description=(
+            "面の質感: none=なし / stipple=点で埋める / hatch=線で埋める / grain=粒立つ"
+            " / wash=薄墨・水彩 / bleed=端が滲む / paper_grain=紙目"
+        ),
+    )
+    density: float = Field(default=0.35, ge=0.0, le=1.0, description="質感密度 0.0-1.0")
+    scale: float = Field(default=0.35, ge=0.0, le=1.0, description="質感粒度・間隔 0.0-1.0")
+    opacity: float = Field(default=0.28, ge=0.0, le=1.0, description="質感の不透明度 0.0-1.0")
+    bleed: float = Field(default=0.0, ge=0.0, le=1.0, description="滲み・広がり量 0.0-1.0")
+    direction: SurfaceDirection = Field(
+        default="none",
+        description="線状質感の向き: none / horizontal / vertical / diagonal_rising / diagonal_falling",
+    )
+    seed: Optional[int] = Field(default=None, description="任意の質感 seed。省略時は Renderer が演奏 seed から導出")
+
+    @field_validator("density", "scale", "opacity", "bleed", mode="before")
+    @classmethod
+    def _clamp_units(cls, v: object) -> object:
+        return _clamp_unit_value(v)
+
+
+class CanvasGroundSpec(BaseModel):
+    """キャンバスそのものの地・支持体の抽象的な質感指定。"""
+
+    material: GroundMaterial = Field(
+        default="plain",
+        description="地の素材: plain=無地 / paper=紙 / washi=和紙 / ink_wash=薄墨地 / charcoal_ground=木炭地",
+    )
+    tone: GroundTone = Field(default="white", description="地の色調")
+    grain: GroundGrain = Field(default="none", description="紙目・粒の粗さ")
+    density: float = Field(default=0.20, ge=0.0, le=1.0, description="地の粒密度 0.0-1.0")
+    opacity: float = Field(default=0.12, ge=0.0, le=1.0, description="地の質感不透明度 0.0-1.0")
+    absorbency: float = Field(default=0.0, ge=0.0, le=1.0, description="吸い込みやすさ 0.0-1.0")
+    seed: Optional[int] = Field(default=None, description="任意の地 texture seed。省略時は Renderer が演奏 seed から導出")
+
+    @field_validator("density", "opacity", "absorbency", mode="before")
+    @classmethod
+    def _clamp_units(cls, v: object) -> object:
+        return _clamp_unit_value(v)
+
+
+class CanvasSpec(BaseModel):
+    """キャンバス比率と地の指定。旧形式の文字列 canvas も互換で受ける。"""
+
+    aspect: str = Field(default="square", description="キャンバス比率ID")
+    ground: Optional[CanvasGroundSpec] = Field(default=None, description="キャンバス地の質感")
+
+
+Canvas = str | CanvasSpec
 
 
 class AtRegion(BaseModel):
@@ -285,6 +354,10 @@ class Instruction(BaseModel):
         default=None,
         description="直前 instruction への関係。DDL に exact previous-object phrase がある時だけ使う。1 instruction につき最大1つ。coerce は追加せず、invalid は drop",
     )
+    surface: Optional[SurfaceSpec] = Field(
+        default=None,
+        description="閉じた図形の面の質感。line/arc では安全に無視または近似される。SVG固有の pattern/filter は入れない",
+    )
 
     @field_validator("sides", mode="before")
     @classmethod
@@ -335,10 +408,9 @@ class Score(BaseModel):
     version: str = "0.1.0"
     canvas: Canvas = Field(
         default="square",
-        min_length=1,
         description=(
-            "キャンバス比率ID。標準値は square。"
-            "利用可能な値は canvas-size plugin が管理するため、スキーマでは静的列挙しない"
+            "キャンバス比率ID、または {aspect, ground}。標準値は square。"
+            "ground は紙目・薄墨地などの支持体質感を保持する"
         ),
     )
     background: Color = Field(
@@ -353,3 +425,12 @@ class Score(BaseModel):
         ),
     )
     instructions: list[Instruction]
+
+    @field_validator("canvas", mode="before")
+    @classmethod
+    def _normalize_canvas(cls, v: object) -> object:
+        if isinstance(v, dict):
+            return v
+        if v is None:
+            return "square"
+        return str(v)

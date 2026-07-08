@@ -1190,6 +1190,19 @@ because relation is again reserved for fixed previous-object phrases. Version
 1.52 is therefore accepted for vary, repair-fingerprint suppression, the quality
 guard, and the relation-drop blocking item.
 
+
+### v1.60 (2026-07-07)
+
+Version 1.60 moves the project from quality-loop closure to a one-person playable 1.0 candidate: another person should be able to set up inku from the README, write a visual tanka, consult Saijiki, read interpretation feedback, choose with vary, save, and replay a result.
+
+- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `vary_seed`, `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
+- History now stores `vary_seed`, and the history manager can replay a saved Score with its saved seed.
+- The input panel shows approximate post-processing interpretation feedback using ink-density shading. This does not change the Stage 1 schema or prompt.
+- The canvas displays the input text as a caption by default, treating the relation between words and image as part of the work.
+- The English and Japanese READMEs now include Quick Start setup, provider/API-key guidance, two-stage regeneration, the six-color Saijiki constraint, and history replay.
+- Final gallery selection is deferred to v1.70 or later. Version 1.60 is complete once the candidates are recorded; selecting works for publication belongs to the next evaluation and release cycle.
+- Phase E sparse-output handling adopts the E-2 policy: use the existing `visual_event` / `negative_space_pressure` metrics and visual review only, without adding a dedicated metric or marker. Sparse outputs are not a blocking implementation target for v1.60.
+
 ### v1.70 (2026-07-08)
 
 Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics out of the acceptance gate and instead makes form, post-selection, and comparison visible in the product.
@@ -1206,18 +1219,12 @@ Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics ou
 - The left app rail no longer expands on mouse hover. Its width is controlled by an explicit top-left expand/collapse toggle, so the working area can remain stable while editing.
 - Build 458 was verified on pentala for D-1/D-2; screenshots are stored under `no-git-sync/screen-cap/` and the local verification note is recorded in `cli/tune_bench.md`.
 
-### v1.60 (2026-07-07)
+### v1.71 (2026-07-08)
 
-Version 1.60 moves the project from quality-loop closure to a one-person playable 1.0 candidate: another person should be able to set up inku from the README, write a visual tanka, consult Saijiki, read interpretation feedback, choose with vary, save, and replay a result.
-
-- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `vary_seed`, `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
-- History now stores `vary_seed`, and the history manager can replay a saved Score with its saved seed.
-- The input panel shows approximate post-processing interpretation feedback using ink-density shading. This does not change the Stage 1 schema or prompt.
-- The canvas displays the input text as a caption by default, treating the relation between words and image as part of the work.
-- The English and Japanese READMEs now include Quick Start setup, provider/API-key guidance, two-stage regeneration, the six-color Saijiki constraint, and history replay.
-- Build 448 gallery candidates are recorded in `docs/gallery-candidates-build448.md`; final gallery selection remains a human post-selection step.
-- Final gallery selection is deferred to v1.70 or later. Version 1.60 is complete once the candidates are recorded; selecting works for publication belongs to the next evaluation and release cycle.
-- Phase E sparse-output handling adopts the E-2 policy: use the existing `visual_event` / `negative_space_pressure` metrics and visual review only, without adding a dedicated metric or marker. Sparse outputs are not a blocking implementation target for v1.60.
+- Added `instruction.surface` and `canvas.ground` to JSON Score for object-surface and canvas-ground texture.
+- Added renderer support for display, editable, and compat texture profiles, including texture metadata and deterministic seed handling.
+- Updated Stage 1 and Stage 2 prompts so texture words become score attributes instead of hidden helper shapes.
+- Preserved backward compatibility: existing scores without surface or ground render as before.
 
 ---
 

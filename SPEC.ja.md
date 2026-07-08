@@ -1597,6 +1597,8 @@ inku-lang/                         # github.com/oikawas/inku-lang
 - Saijiki に Nature plugin カテゴリを追加し、通常語彙と区別する薄い朱系の表示にした。
 - 候補4枚の同時生成、複数選択保存、スター時の任意メモ、別解釈の `interpretation_seed` 記録を追加し、§8 の事後選択を UI と履歴に接続した。
 - LLM Model Inspection の比較先は、現在の Stage 1 provider がクラウド provider の場合、まず API key 不要のローカル provider を候補にする。これは鑑賞用比較を quota や provider 側の利用不能に過度に依存させないための実装上の選択であり、judge 値は引き続き表示しない。
+- 候補4枚、解釈も含める、選を残す、モデル比較、自動補正などの主要操作に多言語対応ツールチップを追加した。ツールチップ文言はメイン UI の言語切替に追従し、表示言語と入力言語を分ける既存方針を保つ。
+- 左アプリレールの展開はマウスオーバーではなく、左上の明示的な伸ばす/格納するトグルボタンで制御する。誤展開を避け、作業領域の幅を利用者が固定できるようにする。
 - Build 458 を pentala 実機で確認し、D-1/D-2 のスクリーンショットを `no-git-sync/screen-cap/`、確認メモを `cli/tune_bench.md` に記録した。
 
 

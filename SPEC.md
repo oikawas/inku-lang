@@ -454,12 +454,12 @@ The writing surface carries only a non-blocking length hint. Japanese input uses
 
 ## 9. Web Application
 
-The web app is the current reference interface. v1.70 adds post-selection and comparison as first-class authoring surfaces. A variation grid can generate several candidates from one instruction, let the writer select more than one result, and save the selected works to history with optional star notes. Explicit interpretation variation bypasses the Stage 1 cache, records an `interpretation_seed` identifier, and shows the normalized-DDL diff so interpretation drift is visible. The comparison area can juxtapose the current render with the previous history item, show a subdued prompt diff, and run an LLM Model Inspection view that compares two Stage 1 models side by side without judge scores. When the current Stage 1 provider is cloud-based, the inspection view prefers an API-key-free local provider as the alternate model before trying other cloud providers, so the viewing tool is less dependent on quota or provider availability.
+The web app is the current reference interface. v1.70 adds post-selection and comparison as first-class authoring surfaces. A variation grid can generate several candidates from one instruction, let the writer select more than one result, and save the selected works to history with optional star notes. Explicit interpretation variation bypasses the Stage 1 cache, records an `interpretation_seed` identifier, and shows the normalized-DDL diff so interpretation drift is visible. The comparison area can juxtapose the current render with the previous history item, show a subdued prompt diff, and run an LLM Model Inspection view that compares two Stage 1 models side by side without judge scores. When the current Stage 1 provider is cloud-based, the inspection view prefers an API-key-free local provider as the alternate model before trying other cloud providers, so the viewing tool is less dependent on quota or provider availability. Key controls use localized tooltips that follow the main UI language, including the variation grid, interpretation variation, selected-work saving, model comparison, and DDL auto-repair controls.
 
 Major UI areas:
 
-- App rail: compact navigation, user menu, profile, settings, language and
-  theme controls
+- App rail: compact navigation with an explicit expand/collapse toggle, user
+  menu, profile, settings, language and theme controls
 - Input panel: single drawing, batch drawing, and demo modes
 - DDL editor: editable normalized DDL embedded in the single drawing flow, with
   Saijiki word highlighting and an expanded dialog editor
@@ -1202,6 +1202,8 @@ Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics ou
 - The `Nature` reference vocabulary plugin adds `Nature.wind`, `Nature.undulation`, and `Nature.stillness` as deterministic Stage 1.5 macros. The explicit `Nature.` namespace is required; plain natural-language words do not trigger the plugin. The implementation uses existing DDL/Score variation and arrangement only, so no new primitive, Score field, or coerce rule is added.
 - Saijiki shows Nature plugin terms in a separate plugin category with distinct, subdued styling.
 - The comparison area shows previous/current renders side by side, a subdued prompt diff, and an LLM Model Inspection view for two Stage 1 models. It is a viewing tool, not a judge surface, and displays no judge values.
+- Localized tooltips were added to the main action controls, including the four-candidate grid, interpretation variation, save selected, model comparison, and DDL auto-repair controls. Tooltip text follows the main UI language switch.
+- The left app rail no longer expands on mouse hover. Its width is controlled by an explicit top-left expand/collapse toggle, so the working area can remain stable while editing.
 - Build 458 was verified on pentala for D-1/D-2; screenshots are stored under `no-git-sync/screen-cap/` and the local verification note is recorded in `cli/tune_bench.md`.
 
 ### v1.60 (2026-07-07)

@@ -1,27 +1,43 @@
 # inku
 
-**A small, deliberately limited language for designing the visual — usable by anyone.**
+**One sentence becomes a picture.**
 
-`inku` is a description-based drawing language that turns short, writable-by-anyone descriptions into abstract vector graphics. It is rooted in three traditions:
+`inku` is the reference implementation of DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic. No drawing skill is required. All you need is one scene that stayed with you, written briefly.
 
-- **Sol LeWitt's instruction-based art** — where the description itself is the artwork
-- **The Japanese practice of bonsai** — where strict constraints on space and material do not limit expression, but concentrate it
-- **The form of tanka** — where the type silences the self, and presentation replaces assertion
+```
+A blue line slowly loosens across the night water.
+```
 
-Constraints on vocabulary, primitives, and coordinate space are not limitations. They are the instruments by which intention becomes visible.
+That sentence is interpreted, written into a score, and performed into a picture. Generate again from the same sentence and a slightly different picture comes back. You choose from what appears — **the back-and-forth of writing and choosing** is how creation works in inku.
+
+inku stands at the crossing of three traditions:
+
+| Tradition | What it gives inku |
+|---|---|
+| **Sol LeWitt's instruction art** | The idea that the description itself is the artwork |
+| **Bonsai** | The practice that constraint is not limitation but concentration |
+| **Tanka** | The form in which the type silences the self, and presentation replaces assertion |
+
+Constraints on vocabulary, primitives, and coordinates are not limits. They are the instruments by which intention becomes visible.
 
 ---
 
-## Concept
+## How it works — score and performance
 
 ```
-description  →  normalized DDL  →  expanded DDL  →  score (JSON)  →  performance (SVG)
-human           Stage 1             Stage 1.5        Stage 2          Renderer
+Your sentence (written in your native language)
+     │  interpretation — the words are read into core vocabulary
+     ▼
+Normalized DDL (a human-readable intermediate form)
+     │  structuring — written down as a score
+     ▼
+JSON Score (the score — saved deterministically)
+     │  performance — drawn, with variation
+     ▼
+SVG (the performance — one-time)
 ```
 
-The description is permanent. The performance is one-time. The output varies slightly each time — by design. The evolution and variance of models themselves become a source of this variation.
-
-Computation is used as a medium, yet the same description yields something a little — or even greatly — different on each rendering.
+**The description is permanent; the performance is one-time.** The score remains fixed, while each picture is born with its own variation. Just as LeWitt's instructions became a slightly different wall drawing under each craftsman's hand, the same score becomes a slightly different performance each time. Variation is not a bug here — it is the specification of the language.
 
 ---
 
@@ -33,14 +49,14 @@ Computation is used as a medium, yet the same description yields something a lit
 A dashed pencil line, trembling finely, crossing the canvas — three of them.
 ```
 
-**Normalized DDL (after first-stage interpretation):**
+**Normalized DDL (after interpretation):**
 
 ```
 pencil dashed line, horizontal, 3 lines, placed
 movement: fine tremble
 ```
 
-**JSON Score (after second-stage structuring):**
+**JSON Score (after structuring, excerpt):**
 
 ```json
 {
@@ -62,26 +78,85 @@ movement: fine tremble
 }
 ```
 
-The renderer then performs (draws) this score — slightly differently each time.
+The renderer performs this score — slightly differently each time. Because the output is vector, it holds up framed on paper, stretched across a wall, or viewed on a phone. There is no physical size constraint.
 
-Someone else's instruction (song) can be rewritten, and since the output is vector, it can be stretched onto a wall, framed on paper, or displayed on a phone. There is no physical size constraint.
+---
+
+## Three ways to say "again"
+
+Every result offers three tiers of regeneration. None of them breaks default reproducibility; each acts only on your explicit request.
+
+| Operation | What is redrawn | What is kept |
+|---|---|---|
+| **Another performance** | Line tremor, placement phase (no LLM call) | Interpretation and composition |
+| **Another composition** | Composition family, focus, technique | Interpretation (how the words were read) |
+| **Another interpretation** | The reading of the words themselves | Your sentence |
+
+With *another interpretation*, the old and new normalized DDL are shown side by side as a diff. The moment your words are read differently — that gap itself becomes material for the next sentence.
+
+You can also generate a grid of candidates and keep the ones you like (multiple selection is allowed), attaching a short note about why you chose them. **Choosing is part of the work, alongside writing.** History stores seeds and an edition ID, so anything you keep can be reproduced exactly as it was.
+
+---
+
+## Core vocabulary (Saijiki)
+
+The reference dictionary is called **Saijiki**（歳時記）— a word borrowed from haiku practice, where it names a book of seasonal words. It is not kept open while you write; it is something you go and consult when you hesitate.
+
+| Category (EN) | Category (JA) | Vocabulary |
+|---|---|---|
+| forms | かたち | circle, ellipse, triangle, square, line, arc |
+| touches | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
+| motions | うごき | place, align, fill, scatter |
+| places | ばしょ | top, bottom, center, edge, corner |
+| continuity | つらなり | solid, dashed, dotted, dot-dashed |
+| movements | ゆらぎ | fine, broad, quick, slow, wobble, undulate, tremble, blur |
+| colors | いろ | white, black, blue, red, green, gray |
+| rotation | かたむき | horizontal, vertical, diagonal, rotated |
+| proportions | わりあい | tall, wide, full-width, half-width, semicircle, first-quarter, last-quarter, crescent |
+| relations | あいだ | along, not touching, cutting, between (used as "along the previous line") |
+
+Only physical, observable words belong to the core. Emotional evaluation — "beautifully," "delicately," "boldly" — is excluded, because evaluation belongs to the viewer, not the writer.
+
+Outside the core live namespaced **plugin words** such as `Nature.wind` — shorthand that summons the variation of a phenomenon in a single word. Plugins can only expand into core vocabulary; they cannot bring in new shapes or syntax. The core stays small on purpose.
 
 ---
 
 ## Architecture
 
-inku uses a **Stage 1 / Stage 1.5 / Stage 2 / Renderer** pipeline:
+```
+ Your description (natural language, your native tongue)
+      │
+      ▼
+┌──────────────────────────────────────┐
+│ Stage 1   Interpretation (LLM)       │ free words → normalized DDL, core vocabulary only
+├──────────────────────────────────────┤
+│ Stage 1.5 Intermediate filter (det.) │ selects composition family and focus, attaches relations
+├──────────────────────────────────────┤
+│ Stage 2   Structuring (LLM)          │ normalized DDL → JSON Score (the score)
+├──────────────────────────────────────┤
+│ Renderer  Performance (seed-driven)  │ score → SVG; resolves variation, regions, relations
+└──────────────────────────────────────┘
+      │
+      ▼
+ SVG (for a wall, a page, a screen)
+```
 
-1. **Stage 1: Interpretation** — reads free-form descriptions in the author's native language and produces a normalized DDL using only core vocabulary
-2. **Stage 1.5: Intermediate filter** — a deterministic expander that selects composition families and attaches observable relations instead of injecting fixed recipe layers
-3. **Stage 2: Structuring** — converts normalized DDL into a valid JSON Score, including optional region and relation fields
-4. **Renderer: Performance** — renders the JSON Score as SVG, resolving regions, relations, and performance seed variation
+Interpretation and structuring are separated because they demand different abilities: interpretation is associative and creative; structuring is mechanical and rule-abiding. Each stage can be tuned independently, and API models, local LLMs, and NVIDIA NIM-style endpoints can be selected per stage. **The choice of model is itself a creative variable.**
 
-This separation lets natural-language interpretation, expression expansion, structure generation, and rendering be tuned independently. API models, local LLMs, and NVIDIA NIM-style endpoints can be selected per stage.
+Non-determinism lives in exactly two places: the renderer's performance (performance seed) and your explicit operations (another composition, another interpretation). The default path is always deterministic, and history's `render_seed` / `vary_seed` / `render_hash` (work edition ID) let any saved work be reproduced exactly.
 
-In the web UI, each result can be regenerated as **another performance** or **another composition**. Another performance rerenders the same JSON Score with a new performance seed and does not call an LLM. Another composition uses an explicit vary seed to reselect Stage 1.5 composition family, focus, and technique candidates while keeping the default path deterministic.
+---
 
-These controls exist for post-selection, not for averaging the system toward a single safe style. History stores `render_seed`, `vary_seed`, build, color catalog, and `render_hash`, so a saved Score can be replayed as the same work edition.
+## Design principles
+
+1. Descriptions are human-readable, between natural language and code
+2. Variation is a feature, not a bug
+3. Emotional vocabulary is excluded; physical and motion vocabulary is embraced
+4. No fixed canvas — coordinates are ratios from 0.0 to 1.0, scalable to any medium
+5. Output is still — the viewer moves, not the image
+6. Input is a constrained DSL, not free-form natural language
+
+For the public English specification, see [SPEC.md](SPEC.md). The canonical Japanese source is [SPEC.ja.md](SPEC.ja.md).
 
 ---
 
@@ -123,7 +198,7 @@ Open `http://localhost:5173`, log in, and write a short description. Example:
 A blue line slowly loosens across the night water.
 ```
 
-After generation, consult Saijiki, read the interpretation feedback shading, and edit the DDL if needed. **Another performance** rerenders the same Score without an LLM call. **Another composition** draws a different composition candidate from the same interpretation. Save works you like to history; the history manager can replay them with the saved seed.
+After generating, consult the Saijiki, read the ink-shaded interpretation feedback to see how your words were read, and refine the description if you like. Widen the field with *another performance*, *another composition*, or *another interpretation*, and keep what you love in history. The history manager replays any saved work with its stored seed.
 
 ### 4. CLI smoke test
 
@@ -133,67 +208,27 @@ uv run inku-cli login --base-url http://127.0.0.1:8100 -u admin
 uv run inku-cli paint "A blue line slowly loosens across the night water." --base-url http://127.0.0.1:8100 -o out/quickstart --prefix first --png --full-json
 ```
 
-
----
-
-## Core Vocabulary (Saijiki / 歳時記)
-
-The reference vocabulary dictionary is called **Saijiki**（歳時記）— a term borrowed from haiku practice, where it refers to a book of seasonal words. It is consulted, not always open.
-
-| Category (EN) | Category (JA) | Vocabulary |
-|---|---|---|
-| forms | かたち | circle, ellipse, triangle, square, line, arc |
-| touches | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
-| motions | うごき | place, align, fill, scatter |
-| places | ばしょ | top, bottom, center, edge, corner |
-| continuity | つらなり | solid, dashed, dotted, dot-dashed |
-| movements | ゆらぎ | fine, broad, quick, slow, wobble, undulate, tremble, blur |
-| colors | いろ | white, black, blue, red, green, gray |
-| rotation | かたむき | horizontal, vertical, diagonal, rotated |
-| proportions | わりあい | tall, wide, full-width, half-width, semicircle, first-quarter, last-quarter, crescent |
-| relations | あいだ | along, not touching, cutting, between |
-
-Only physical and observational words are allowed. Emotional evaluation — "beautifully," "delicately," "powerfully" — is not part of the core.
-
----
-
-## Design Principles
-
-1. Descriptions are human-readable, between natural language and code
-2. Variation is a feature, not a bug
-3. Emotional vocabulary is excluded; physical and motion vocabulary is embraced
-4. No fixed canvas — coordinates are ratios from 0.0 to 1.0, scalable to any medium
-5. Output is still — the viewer moves, not the image
-6. Input is a constrained DSL, not free-form natural language
-
-For the public English specification, see [SPEC.md](SPEC.md).  The canonical
-Japanese source is [SPEC.ja.md](SPEC.ja.md).
-
 ---
 
 ## Capabilities
 
-The web version is operational. Current features:
-
-- **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with model, token, and elapsed-time metadata
-- **Primitives** — line, circle, ellipse, arc, square, triangle; each can carry material, color, style, variation, rotation, and arrangement
-- **Arrangement** — horizontal, vertical, radial, scatter, plus paths such as wave, diagonal band, top-to-bottom, left-to-right, and right-half
-- **Regions and relations** — scores can leave placement to renderer-resolved regions and express relations such as along, not touching, cutting, and between previous elements
-- **Material rendering** — pencil, rotring, crayon, chalk, brushes, and rope are rendered with texture filters, particles, secondary strokes, or twist marks, not only stroke width
-- **Robust rendering** — invisible colors, over-dense arrangements, duplicate instructions, empty instructions, and slow LLM responses are corrected or routed to deterministic fallback
-- **Batch / Demo / CLI** — single drawing, batch drawing, demo loop, and `inku-cli` login/paint/batch/benchmark workflows are supported
-- **Diversity analysis** — CLI summaries include composition diversity, replay divergence, relation use, and relation drop metrics
-- **History** — DB-backed per-user history with pagination, search, stars, thumbnails, model/color-catalog metadata, and token counts
-- **UI** — Saijiki drawer, JSON/prompt views, light/dark mode, collapsible history strip, and zoom/pan canvas
+- **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with model, token, and elapsed-time metadata per stage
+- **Three-tier regeneration** — another performance (no LLM call), another composition (vary seed), another interpretation (Stage 1 re-reading), plus grid generation with multiple selection and notes on why a work was chosen
+- **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle; horizontal, vertical, radial, and scatter layouts with paths such as waves and diagonal bands
+- **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
+- **Material rendering** — pencil, rotring, crayon, chalk, brushes, and rope rendered with texture filters, particles, secondary strokes, and twist marks, not just stroke width
+- **Plugins** — namespaced vocabulary macros such as `Nature.wind`; they expand into core vocabulary only and cannot modify the core
+- **Interpretation feedback** — ink-density shading shows how each written word was read
+- **History and editions** — per-user DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs
+- **Batch / CLI** — `inku-cli` supports login, painting, batch generation, contact sheets, and diversity analysis
+- **UI** — Saijiki panel, caption display of the source sentence beside the work, JSON/prompt views, light/dark mode, zoom/pan canvas
 
 ---
 
 ## Status
 
-Current implementations:
-
-- **Web version** — operational (Python FastAPI + SvelteKit, runs locally or on a server)
-- **CLI** — implemented as an independent `cli/` project; controls the API for login, drawing, batch generation, and benchmark output
+- **Web version** — operational (Python FastAPI + SvelteKit; runs locally or on a server)
+- **CLI** — implemented as an independent `cli/` project; drives the API for login, drawing, batch generation, and benchmark output
 - **Android app** — an older DDL demo has been verified on Pixel 9, but an Android version for the current inku-lang specification is not prepared yet
 
 ---
@@ -204,14 +239,14 @@ Related packages follow the `inku-` prefix convention:
 
 - `inku-core` — core library
 - `inku-saijiki` — vocabulary dictionary
-- `inku-nature` — Nature plugin (wind, ripple, etc.)
+- `inku-nature` — Nature plugin (wind, etc.)
 - `inku-web` — web UI implementation
 - `inku-android` — Android implementation
 - `inku-cli` — command-line tool
 
 ---
 
-## Language Versions
+## Language versions
 
 The author maintains the **Japanese** and **English** versions of inku. Other language implementations are welcomed from the community as open-source contributions.
 
@@ -227,9 +262,9 @@ MIT License. See [LICENSE](LICENSE).
 
 ## Origin
 
-Conceived on April 2, 2026, at the Museum of Contemporary Art Tokyo, during the final day of the *Sol LeWitt: Open Structures* exhibition.
+Conceived on April 2, 2026, at the Museum of Contemporary Art Tokyo, on the final day of the *Sol LeWitt: Open Structures* exhibition.
 
-The experience of reaching into one's own mind with words, and finding in the return something that was always there — this is what inku attempts to make available in a visual form.
+Reaching into your own mind with words, and finding in what returns something that was always there — this is the experience inku attempts to make available in visual form.
 
 > *The fog of the mind is brushed away, and what was always there comes into view.*
 

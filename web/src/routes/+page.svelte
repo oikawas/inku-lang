@@ -294,11 +294,16 @@
 	let result   = $state<PaintResult | null>(null);
 	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
+	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
+	type ModelInspectionResult = { id: string; model: string; ddl: string; svg: string; tokensIn: number | null; tokensOut: number | null; elapsedMs: number };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
 	let variationGridBusy = $state(false);
 	let variationGridStatus = $state<string | null>(null);
+	let modelInspectionBusy = $state(false);
+	let modelInspectionStatus = $state<string | null>(null);
+	let modelInspectionResults = $state<ModelInspectionResult[]>([]);
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -1985,11 +1990,11 @@
 		tokens_out: number | null;
 	};
 
-	async function interpretOne(text: string, signal?: AbortSignal): Promise<InterpretResult> {
+	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string): Promise<InterpretResult> {
 		const uiLang = getLang();
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
-		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
+		const resolvedStage1Model = modelOverride ?? qualifiedModelId(stage1Provider, stage1Model);
 		const r = await apiFetch('/api/interpret', {
 			method: 'POST',
 			signal,
@@ -2891,6 +2896,96 @@
 		if (idx < 0 || idx >= historyItems.length) return;
 		historyCursor = idx;
 		loadIterationItem(historyItems[idx]);
+	}
+
+	function currentComparisonItem(): Iteration | null {
+		if (displayedHistoryItem) return displayedHistoryItem;
+		if (!result) return null;
+		return {
+			input,
+			ddl,
+			score: result.score,
+			svg: result.svg,
+			at: Date.now(),
+			elapsed_ms: result.elapsed_total_ms,
+			stage1_model: result.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model),
+			stage2_model: result.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
+		};
+	}
+
+	const previousComparisonItem = $derived.by(() => {
+		if (historyCursor >= 0 && historyCursor + 1 < historyItems.length) return historyItems[historyCursor + 1];
+		if (!displayedHistoryItem && result && historyItems.length > 0) return historyItems[0];
+		return null;
+	});
+	const activeComparisonItem = $derived(currentComparisonItem());
+	const comparisonDiffParts = $derived(activeComparisonItem && previousComparisonItem
+		? buildPromptDiffParts(previousComparisonItem.input, activeComparisonItem.input)
+		: []);
+
+	function buildPromptDiffParts(beforeText: string, afterText: string): TextDiffPart[] {
+		const tokenize = (value: string) => {
+			const trimmed = value.trim();
+			if (!trimmed) return [];
+			if (/\s/.test(trimmed)) return trimmed.split(/(\s+)/).filter(Boolean);
+			return Array.from(trimmed);
+		};
+		const before = tokenize(beforeText);
+		const after = tokenize(afterText);
+		let prefix = 0;
+		while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;
+		let suffix = 0;
+		while (suffix + prefix < before.length && suffix + prefix < after.length && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix += 1;
+		const parts: TextDiffPart[] = [];
+		if (prefix > 0) parts.push({ kind: "same", text: before.slice(0, prefix).join("") });
+		const removed = before.slice(prefix, before.length - suffix).join("");
+		const added = after.slice(prefix, after.length - suffix).join("");
+		if (removed) parts.push({ kind: "removed", text: removed });
+		if (added) parts.push({ kind: "added", text: added });
+		if (suffix > 0) parts.push({ kind: "same", text: before.slice(before.length - suffix).join("") });
+		return parts;
+	}
+
+	function alternateStage1Model(): string | null {
+		const current = qualifiedModelId(stage1Provider, stage1Model);
+		for (const group of availableModelCatalog) {
+			for (const model of group.models) {
+				const candidate = qualifiedModelId(group.id as Provider, model.id);
+				if (candidate !== current) return candidate;
+			}
+		}
+		return null;
+	}
+
+	async function runModelInspection() {
+		if (modelInspectionBusy || loading) return;
+		const source = input.trim();
+		if (!source) return;
+		const currentModel = qualifiedModelId(stage1Provider, stage1Model);
+		const altModel = alternateStage1Model();
+		const models = altModel ? [currentModel, altModel] : [currentModel];
+		modelInspectionBusy = true;
+		modelInspectionStatus = null;
+		try {
+			modelInspectionResults = await Promise.all(models.map(async (model) => {
+				const started = Date.now();
+				const interpreted = await interpretOne(source, undefined, model);
+				const composed = await composeOne(interpreted.ddl, source);
+				return {
+					id: model,
+					model,
+					ddl: interpreted.ddl,
+					svg: composed.svg,
+					tokensIn: interpreted.tokens_in,
+					tokensOut: interpreted.tokens_out,
+					elapsedMs: Date.now() - started,
+				};
+			}));
+		} catch (e) {
+			modelInspectionStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			modelInspectionBusy = false;
+		}
 	}
 
 	async function replayHistoryItem(it: Iteration) {
@@ -4085,6 +4180,43 @@
 						</section>
 					{/if}
 
+					{#if result && inputMode === "single"}
+						<section class="panel-section comparison-section">
+							<div class="comparison-actions">
+								<button class="ghost-btn" onclick={runModelInspection} disabled={modelInspectionBusy}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</button>
+							</div>
+							{#if previousComparisonItem && activeComparisonItem}
+								<div class="comparison-pair">
+									<div class="comparison-card">
+										<div class="comparison-label">{t().comparisonPrev}</div>
+										<div class="comparison-art">{@html previousComparisonItem.svg}</div>
+									</div>
+									<div class="comparison-card">
+										<div class="comparison-label">{t().comparisonCurrent}</div>
+										<div class="comparison-art">{@html activeComparisonItem.svg}</div>
+									</div>
+								</div>
+								<div class="prompt-diff">
+									{#each comparisonDiffParts as part}
+										<span class:removed={part.kind === "removed"} class:added={part.kind === "added"}>{part.text}</span>
+									{/each}
+								</div>
+							{/if}
+							{#if modelInspectionStatus}<div class="variation-grid-status">{modelInspectionStatus}</div>{/if}
+							{#if modelInspectionResults.length > 0}
+								<div class="model-inspection-grid">
+									{#each modelInspectionResults as item (item.id)}
+										<div class="model-inspection-card">
+											<div class="comparison-label">{statusModelName(item.model)}</div>
+											<div class="comparison-art">{@html item.svg}</div>
+											<pre>{item.ddl}</pre>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</section>
+					{/if}
+
 					<!-- 統計 -->
 					{#if result && elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
@@ -4810,6 +4942,19 @@
 	}
 	.interpretation-diff .removed { color: color-mix(in srgb, #a2342a 78%, var(--fg3)); }
 	.interpretation-diff .added { color: color-mix(in srgb, #2f6b3a 78%, var(--fg3)); }
+	.comparison-section { gap: 8px; }
+	.comparison-actions { display: flex; justify-content: flex-end; }
+	.comparison-pair,
+	.model-inspection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+	.comparison-card,
+	.model-inspection-card { border: 1px solid var(--border); background: var(--panel); padding: 6px; min-width: 0; }
+	.comparison-label { font-size: 10px; color: var(--fg3); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.comparison-art { aspect-ratio: 1 / 1; background: var(--canvas-paper); overflow: hidden; }
+	.comparison-art :global(svg) { width: 100%; height: 100%; display: block; }
+	.prompt-diff { font-size: 12px; line-height: 1.6; color: var(--fg2); background: var(--bg2); border: 1px solid var(--border); padding: 6px 8px; }
+	.prompt-diff .removed { color: #9a3d3d; background: rgba(154, 61, 61, 0.08); text-decoration: line-through; }
+	.prompt-diff .added { color: #2f6b3a; background: rgba(47, 107, 58, 0.09); }
+	.model-inspection-card pre { margin: 6px 0 0; max-height: 96px; overflow: auto; white-space: pre-wrap; font-size: 10px; line-height: 1.45; color: var(--fg3); }
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {

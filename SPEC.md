@@ -454,7 +454,7 @@ The writing surface carries only a non-blocking length hint. Japanese input uses
 
 ## 9. Web Application
 
-The web app is the current reference interface.
+The web app is the current reference interface. v1.70 adds a comparison area that can juxtapose the current render with the previous history item, show a subdued prompt diff, and run an LLM Model Inspection view that compares two Stage 1 models side by side without judge scores.
 
 Major UI areas:
 

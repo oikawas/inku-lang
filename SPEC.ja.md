@@ -1590,6 +1590,8 @@ inku-lang/                         # github.com/oikawas/inku-lang
 
 ### v1.70 (2026-07-08)
 
+- 直前/現在の二枚並置と記述 diff を左ペインに追加し、推敲の痕跡を鑑賞できるようにした。
+- LLM Model Inspection として、同一記述を現在の Stage 1 モデルと別 Stage 1 モデルへ並列に通し、正規化DDLと出力を横並び比較できる鑑賞用ビューを追加した。judge 値は表示しない。
 - Nature plugin の参照実装として `Nature.風` / `Nature.うねり` / `Nature.無風` を Stage 1.5 の語彙マクロに追加した。`Nature.` 名前空間の明示参照のみ発火し、名前空間なしの通常語彙は従来通り扱う。
 - Nature plugin は既存の DDL 表現を variation / arrangement へ導くだけで、新 primitive・新 Score フィールド・新 coerce は追加しない。マクロだけで足りたため、プラグイン原則1/5は維持する。
 - Saijiki に Nature plugin カテゴリを追加し、通常語彙と区別する薄い朱系の表示にした。

@@ -133,6 +133,10 @@ export interface LangPack {
 	variationGridWithInterpretation: string;
 	variationGridSaveSelected: string;
 	variationGridEmpty: string;
+	comparisonPrev: string;
+	comparisonCurrent: string;
+	modelCompareButton: string;
+	modelCompareBusy: string;
 	canvasSeedSummary: string;
 	canvasPresentationOpen: string;
 	canvasPresentationClose: string;

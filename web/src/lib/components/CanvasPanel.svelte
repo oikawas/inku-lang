@@ -3,6 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import OutputTabsContent from './OutputTabsContent.svelte';
+	import Tooltip from './Tooltip.svelte';
 
 	type OutputTab = 'canvas' | 'prompts' | 'score';
 	type SvgProfile = 'display' | 'editable' | 'compat';
@@ -192,9 +193,15 @@
 
 <div class="right-panel">
 	<div class="right-tabs">
-		<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
-		<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
-		<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
+		<Tooltip text={t().tooltipCanvasTabCanvas}>
+			<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
+		</Tooltip>
+		<Tooltip text={t().tooltipCanvasTabPrompts}>
+			<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
+		</Tooltip>
+		<Tooltip text={t().tooltipCanvasTabScore}>
+			<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
+		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if currentRenderedAt}
 			<div class="render-meta-strip">
@@ -216,7 +223,9 @@
 
 	<div class="canvas-area">
 		<div class="nav-left">
-			<button class="nav-circle" onclick={onGotoNext} disabled={nextDisabled}>‹</button>
+			<Tooltip text={t().tooltipCanvasNavPrev}>
+				<button class="nav-circle" onclick={onGotoNext} disabled={nextDisabled}>‹</button>
+			</Tooltip>
 		</div>
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -256,41 +265,43 @@
 					</div>
 				</div>
 				<div class="canvas-corner-controls canvas-corner-left" onpointerdown={(event) => event.stopPropagation()}>
-					<button
-						type="button"
-						class="canvas-icon-btn"
-						class:active={instructionCaptionVisible}
-						disabled={!canShowInstructionCaption}
-						title={t().canvasCaptionToggle}
-						aria-label={t().canvasCaptionToggle}
-						onclick={(event) => {
-							event.stopPropagation();
-							instructionCaptionVisible = !instructionCaptionVisible;
-						}}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true">
-							<rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
-							<path d="M7.5 10.5h4.5M14.5 10.5h2M7.5 14h3M13 14h3.5" />
-						</svg>
-					</button>
+					<Tooltip text={t().tooltipCanvasCaption}>
+						<button
+							type="button"
+							class="canvas-icon-btn"
+							class:active={instructionCaptionVisible}
+							disabled={!canShowInstructionCaption}
+							aria-label={t().canvasCaptionToggle}
+							onclick={(event) => {
+								event.stopPropagation();
+								instructionCaptionVisible = !instructionCaptionVisible;
+							}}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+								<path d="M7.5 10.5h4.5M14.5 10.5h2M7.5 14h3M13 14h3.5" />
+							</svg>
+						</button>
+					</Tooltip>
 				</div>
 				<div class="canvas-corner-controls canvas-corner-right" onpointerdown={(event) => event.stopPropagation()}>
-					<button
-						type="button"
-						class="canvas-icon-btn"
-						disabled={!result}
-						title={t().canvasPresentationOpen}
-						aria-label={t().canvasPresentationOpen}
-						onclick={(event) => {
-							event.stopPropagation();
-							presentationMode = true;
-						}}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true">
-							<path d="M8.5 4.5h-4v4M15.5 4.5h4v4M8.5 19.5h-4v-4M15.5 19.5h4v-4" />
-							<path d="M8 8 4.5 4.5M16 8l3.5-3.5M8 16l-3.5 3.5M16 16l3.5 3.5" />
-						</svg>
-					</button>
+					<Tooltip text={t().tooltipCanvasPresentation}>
+						<button
+							type="button"
+							class="canvas-icon-btn"
+							disabled={!result}
+							aria-label={t().canvasPresentationOpen}
+							onclick={(event) => {
+								event.stopPropagation();
+								presentationMode = true;
+							}}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M8.5 4.5h-4v4M15.5 4.5h4v4M8.5 19.5h-4v-4M15.5 19.5h4v-4" />
+								<path d="M8 8 4.5 4.5M16 8l3.5-3.5M8 16l-3.5 3.5M16 16l3.5 3.5" />
+							</svg>
+						</button>
+					</Tooltip>
 				</div>
 				{#if instructionCaptionVisible && canShowInstructionCaption}
 					<div class="instruction-caption" aria-live="polite">{displayInstructionText}</div>
@@ -330,24 +341,40 @@
 
 		{#if outputTab === 'canvas'}
 			<div class="zoom-controls">
-				<button onclick={() => onSetZoom(zoom - 0.25)}>−</button>
+				<Tooltip text={t().tooltipCanvasZoomOut}>
+					<button onclick={() => onSetZoom(zoom - 0.25)}>−</button>
+				</Tooltip>
 				<span class="zoom-pct">{Math.round(zoom * 100)}%</span>
-				<button onclick={() => onSetZoom(zoom + 0.25)}>＋</button>
-				<button class="zoom-reset" onclick={onResetZoom}>⊙</button>
+				<Tooltip text={t().tooltipCanvasZoomIn}>
+					<button onclick={() => onSetZoom(zoom + 0.25)}>＋</button>
+				</Tooltip>
+				<Tooltip text={t().tooltipCanvasZoomReset}>
+					<button class="zoom-reset" onclick={onResetZoom}>⊙</button>
+				</Tooltip>
 			</div>
 		{/if}
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="variation-controls" onpointerdown={(event) => event.stopPropagation()}>
-			<button class="ghost-btn variation-btn" onclick={onVaryPerformance} disabled={!result || variationBusy}>{t().canvasVaryPerformance}</button>
-			<button class="ghost-btn variation-btn" onclick={onVaryComposition} disabled={!result || variationBusy}>{t().canvasVaryComposition}</button>
-			<button class="ghost-btn variation-btn" onclick={onVaryInterpretation} disabled={!result || variationBusy}>{t().canvasVaryInterpretation}</button>
+			<Tooltip text={t().tooltipCanvasVaryPerformance}>
+				<button class="ghost-btn variation-btn" onclick={onVaryPerformance} disabled={!result || variationBusy}>{t().canvasVaryPerformance}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasVaryComposition}>
+				<button class="ghost-btn variation-btn" onclick={onVaryComposition} disabled={!result || variationBusy}>{t().canvasVaryComposition}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasVaryInterpretation}>
+				<button class="ghost-btn variation-btn" onclick={onVaryInterpretation} disabled={!result || variationBusy}>{t().canvasVaryInterpretation}</button>
+			</Tooltip>
 			{#if result}<span class="seed-summary">{seedSummary}</span>{/if}
 		</div>
 
 		<div class="nav-right">
-			<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
-			<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
+			<Tooltip text={t().tooltipCanvasNavLatest}>
+				<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasNavNext}>
+				<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
+			</Tooltip>
 			{#if historyTotal > 0}
 				<span class="nav-counter">{navPos} / {historyTotal}</span>
 			{/if}
@@ -372,30 +399,34 @@
 				<span class="status-v">{statusCanvasName}</span>
 			</span>
 		</div>
-		<button
-			class="star-btn status-star"
-			class:starred={!!statusHistoryItem?.starred}
-			disabled={!statusHistoryItem?.id}
-			onclick={(event) => onToggleStar(statusHistoryItem, event)}
-			title={statusHistoryItem?.starred ? t().starOn : t().starOff}
-			aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
-		>★</button>
-		<button
-			class="hash-copy-btn"
-			class:copied={statusHashCopied}
-			disabled={!result || !statusHashLabel}
-			onclick={onCopyStatusHash}
-			title={statusHashCopyTitle}
-			aria-label={statusHashCopyTitle}
-		>{statusHashCopied ? t().promptCopied : statusHashLabel || '----'}</button>
+		<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
+			<button
+				class="star-btn status-star"
+				class:starred={!!statusHistoryItem?.starred}
+				disabled={!statusHistoryItem?.id}
+				onclick={(event) => onToggleStar(statusHistoryItem, event)}
+				aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
+			>★</button>
+		</Tooltip>
+		<Tooltip text={statusHashCopyTitle}>
+			<button
+				class="hash-copy-btn"
+				class:copied={statusHashCopied}
+				disabled={!result || !statusHashLabel}
+				onclick={onCopyStatusHash}
+				aria-label={statusHashCopyTitle}
+			>{statusHashCopied ? t().promptCopied : statusHashLabel || '----'}</button>
+		</Tooltip>
 		<div class="png-wrap">
-			<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); svgMenuOpen = !svgMenuOpen; }} disabled={!result}>
-				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-				</svg>
-				<span>SVG</span>
-				<span class="menu-caret">▾</span>
-			</button>
+			<Tooltip text={t().tooltipCanvasDownloadSvg}>
+				<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); svgMenuOpen = !svgMenuOpen; }} disabled={!result}>
+					<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+					</svg>
+					<span>SVG</span>
+					<span class="menu-caret">▾</span>
+				</button>
+			</Tooltip>
 			{#if svgMenuOpen}
 				<div class="png-menu">
 					<div class="svg-menu-head">
@@ -437,13 +468,15 @@
 			{/if}
 		</div>
 		<div class="png-wrap" bind:this={pngWrapEl}>
-			<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>
-				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-				</svg>
-				<span>PNG</span>
-				<span class="menu-caret">▾</span>
-			</button>
+			<Tooltip text={t().tooltipCanvasDownloadPng}>
+				<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>
+					<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+					</svg>
+					<span>PNG</span>
+					<span class="menu-caret">▾</span>
+				</button>
+			</Tooltip>
 			{#if pngMenuOpen}
 				<div class="png-menu">
 					{#each pngTemplates as template (template.id)}
@@ -469,44 +502,54 @@
 			{/if}
 		</div>
 		<div class="presentation-controls" aria-label={t().canvasPresentationControls}>
-			<button type="button" class="presentation-icon-btn" onclick={onGotoNext} disabled={nextDisabled} title={t().historyOlderPage(1)} aria-label={t().historyOlderPage(1)}>
-				‹
-			</button>
-			<button type="button" class="presentation-text-btn" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
-			<button type="button" class="presentation-icon-btn" onclick={onGotoPrev} disabled={prevDisabled} title={t().historyNewerPage(1)} aria-label={t().historyNewerPage(1)}>
-				›
-			</button>
+			<Tooltip text={t().tooltipCanvasNavPrev}>
+				<button type="button" class="presentation-icon-btn" onclick={onGotoNext} disabled={nextDisabled} aria-label={t().historyOlderPage(1)}>
+					‹
+				</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasNavLatest}>
+				<button type="button" class="presentation-text-btn" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasNavNext}>
+				<button type="button" class="presentation-icon-btn" onclick={onGotoPrev} disabled={prevDisabled} aria-label={t().historyNewerPage(1)}>
+					›
+				</button>
+			</Tooltip>
 			<span class="presentation-counter">{historyTotal > 0 ? `${navPos} / ${historyTotal}` : ''}</span>
-			<button
-				type="button"
-				class="presentation-icon-btn presentation-star-btn"
-				class:starred={!!statusHistoryItem?.starred}
-				disabled={!statusHistoryItem?.id}
-				onclick={(event) => onToggleStar(statusHistoryItem, event)}
-				title={statusHistoryItem?.starred ? t().starOn : t().starOff}
-				aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
-			>
-				★
-			</button>
-			<button
-				type="button"
-				class="presentation-icon-btn"
-				class:active={instructionCaptionVisible}
-				disabled={!canShowInstructionCaption}
-				onclick={() => (instructionCaptionVisible = !instructionCaptionVisible)}
-				title={t().canvasCaptionToggle}
-				aria-label={t().canvasCaptionToggle}
-			>
-				<svg viewBox="0 0 24 24" aria-hidden="true">
-					<rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
-					<path d="M7.5 10.5h4.5M14.5 10.5h2M7.5 14h3M13 14h3.5" />
-				</svg>
-			</button>
-			<button type="button" class="presentation-icon-btn" onclick={closePresentationMode} title={t().canvasPresentationClose} aria-label={t().canvasPresentationClose}>
-				<svg viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M6 6l12 12M18 6 6 18" />
-				</svg>
-			</button>
+			<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
+				<button
+					type="button"
+					class="presentation-icon-btn presentation-star-btn"
+					class:starred={!!statusHistoryItem?.starred}
+					disabled={!statusHistoryItem?.id}
+					onclick={(event) => onToggleStar(statusHistoryItem, event)}
+					aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
+				>
+					★
+				</button>
+			</Tooltip>
+			<Tooltip text={t().canvasCaptionToggle}>
+				<button
+					type="button"
+					class="presentation-icon-btn"
+					class:active={instructionCaptionVisible}
+					disabled={!canShowInstructionCaption}
+					onclick={() => (instructionCaptionVisible = !instructionCaptionVisible)}
+					aria-label={t().canvasCaptionToggle}
+				>
+					<svg viewBox="0 0 24 24" aria-hidden="true">
+						<rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+						<path d="M7.5 10.5h4.5M14.5 10.5h2M7.5 14h3M13 14h3.5" />
+					</svg>
+				</button>
+			</Tooltip>
+			<Tooltip text={t().canvasPresentationClose}>
+				<button type="button" class="presentation-icon-btn" onclick={closePresentationMode} aria-label={t().canvasPresentationClose}>
+					<svg viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M6 6l12 12M18 6 6 18" />
+					</svg>
+				</button>
+			</Tooltip>
 		</div>
 	</div>
 {/if}

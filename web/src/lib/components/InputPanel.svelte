@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import Tooltip from './Tooltip.svelte';
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
@@ -169,20 +170,22 @@
 
 <div class="panel-tabs">
 	{#each tabItems as item (item.mode)}
-		<button
-			class="panel-tab"
-			class:active={inputMode === item.mode}
-			class:running={item.running}
-			aria-busy={item.running}
-			disabled={lockNonDemo && item.mode !== 'demo'}
-			onclick={() => {
-				if (lockNonDemo && item.mode !== 'demo') return;
-				inputMode = item.mode;
-			}}
-		>
-			<span class="tab-label">{item.label}</span>
-			{#if item.running}<span class="tab-running-dot" aria-hidden="true"></span>{/if}
-		</button>
+		<Tooltip text={item.mode === 'single' ? t().tooltipInputTabSingle : item.mode === 'batch' ? t().tooltipInputTabBatch : t().tooltipInputTabDemo}>
+			<button
+				class="panel-tab"
+				class:active={inputMode === item.mode}
+				class:running={item.running}
+				aria-busy={item.running}
+				disabled={lockNonDemo && item.mode !== 'demo'}
+				onclick={() => {
+					if (lockNonDemo && item.mode !== 'demo') return;
+					inputMode = item.mode;
+				}}
+			>
+				<span class="tab-label">{item.label}</span>
+				{#if item.running}<span class="tab-running-dot" aria-hidden="true"></span>{/if}
+			</button>
+		</Tooltip>
 	{/each}
 </div>
 
@@ -198,15 +201,23 @@
 					onSelect={onSelectCanvasAspect}
 				/>
 			{/if}
-			<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal} title={`${t().colorCatalogButton}: ${selectedCatalogName}`}>{selectedCatalogName}</button>
-			<select class="ghost-select" bind:value={instructionLang} title={t().instructionLangLabel} aria-label={t().instructionLangLabel}>
-				<option value="auto">{t().instructionLangAuto}</option>
-				<option value="ja">{t().instructionLangJapanese}</option>
-				<option value="en">{t().instructionLangEnglish}</option>
-			</select>
-			<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
+			<Tooltip text={t().tooltipInputCatalog}>
+				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{selectedCatalogName}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipInputLang}>
+				<select class="ghost-select" bind:value={instructionLang} aria-label={t().instructionLangLabel}>
+					<option value="auto">{t().instructionLangAuto}</option>
+					<option value="ja">{t().instructionLangJapanese}</option>
+					<option value="en">{t().instructionLangEnglish}</option>
+				</select>
+			</Tooltip>
+			<Tooltip text={t().tooltipInputModel}>
+				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
+			</Tooltip>
 			{#if inputMode !== 'demo'}
-				<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+				<Tooltip text={t().tooltipInputClear}>
+					<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+				</Tooltip>
 			{/if}
 		</div>
 	</div>
@@ -312,6 +323,7 @@
 
 <style>
 	.panel-tabs { display: flex; border-bottom: 1px solid var(--border); }
+	.panel-tabs :global(.tooltip-wrap) { flex: 1; }
 	.panel-tab {
 		position: relative;
 		flex: 1; padding: 10px; background: none; border: none;

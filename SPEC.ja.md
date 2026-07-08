@@ -3752,3 +3752,4 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - Stage 1 / Stage 2 prompt に「面:」「地:」の扱いと surface / ground mapping を追加し、質感語を補助図形注入ではなく対象 instruction の属性として扱うようにした。
 - render metadata に `render_texture_version`、`render_texture_profile`、`render_canvas_ground`、`render_surface_textures`、`texture_degraded` を追加した。
 - texture seed を Score / instruction / texture kind / performance seed から導出し、固定座標の紙目や高頻度の無指定 texture 注入が Renderer の指紋にならないようにした。
+- 左アプリレール、入力・出力パネルの各ボタンやタブに多言語対応ツールチップを追加・拡大適用し、操作の明瞭化を図った。

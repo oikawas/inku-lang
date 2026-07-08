@@ -1225,6 +1225,7 @@ Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics ou
 - Added renderer support for display, editable, and compat texture profiles, including texture metadata and deterministic seed handling.
 - Updated Stage 1 and Stage 2 prompts so texture words become score attributes instead of hidden helper shapes.
 - Preserved backward compatibility: existing scores without surface or ground render as before.
+- Expanded Svelte tooltip coverage across AppRail icons, Input panel tabs/buttons, and Canvas panel controls (zoom, vary, downloads, navigation) to improve usability.
 
 ---
 

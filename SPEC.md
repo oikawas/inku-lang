@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.60**
+**Version: v1.70**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest

@@ -1,7 +1,7 @@
 <script lang="ts">
 	type Props = {
 		text: string;
-		placement?: 'top' | 'bottom';
+		placement?: 'top' | 'bottom' | 'left' | 'right';
 		children: import('svelte').Snippet;
 	};
 
@@ -10,7 +10,7 @@
 
 <span class="tooltip-wrap">
 	{@render children()}
-	<span class="tooltip-bubble" class:bottom={placement === 'bottom'} role="tooltip">{text}</span>
+	<span class="tooltip-bubble" class:bottom={placement === 'bottom'} class:left={placement === 'left'} class:right={placement === 'right'} role="tooltip">{text}</span>
 </span>
 
 <style>
@@ -66,16 +66,56 @@
 		border-bottom-color: var(--tooltip-bg);
 	}
 
+	.tooltip-bubble.left {
+		bottom: auto;
+		left: auto;
+		right: calc(100% + 8px);
+		top: 50%;
+		transform: translate(-2px, -50%);
+	}
+	.tooltip-bubble.left::after {
+		top: 50%;
+		left: 100%;
+		bottom: auto;
+		border-top-color: transparent;
+		border-left-color: var(--tooltip-bg);
+		transform: translateY(-50%);
+	}
+
+	.tooltip-bubble.right {
+		bottom: auto;
+		left: calc(100% + 8px);
+		top: 50%;
+		transform: translate(2px, -50%);
+	}
+	.tooltip-bubble.right::after {
+		top: 50%;
+		right: 100%;
+		left: auto;
+		bottom: auto;
+		border-top-color: transparent;
+		border-right-color: var(--tooltip-bg);
+		transform: translateY(-50%);
+	}
+
 	.tooltip-wrap:hover .tooltip-bubble,
 	.tooltip-wrap:focus-within .tooltip-bubble {
 		opacity: 1;
 	}
-	.tooltip-wrap:hover .tooltip-bubble:not(.bottom),
-	.tooltip-wrap:focus-within .tooltip-bubble:not(.bottom) {
+	.tooltip-wrap:hover .tooltip-bubble:not(.bottom):not(.left):not(.right),
+	.tooltip-wrap:focus-within .tooltip-bubble:not(.bottom):not(.left):not(.right) {
 		transform: translate(-50%, 0);
 	}
 	.tooltip-wrap:hover .tooltip-bubble.bottom,
 	.tooltip-wrap:focus-within .tooltip-bubble.bottom {
 		transform: translate(-50%, 0);
+	}
+	.tooltip-wrap:hover .tooltip-bubble.left,
+	.tooltip-wrap:focus-within .tooltip-bubble.left {
+		transform: translate(0, -50%);
+	}
+	.tooltip-wrap:hover .tooltip-bubble.right,
+	.tooltip-wrap:focus-within .tooltip-bubble.right {
+		transform: translate(0, -50%);
 	}
 </style>

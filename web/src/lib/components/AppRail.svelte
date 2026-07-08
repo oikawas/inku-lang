@@ -48,7 +48,7 @@
 <aside class="app-rail" class:expanded>
 	<div class="rail-brand">
 		<div class="rail-top-row">
-			<Tooltip text={t().tooltipAppRailToggle}>
+			<Tooltip placement="right" text={t().tooltipAppRailToggle}>
 				<button
 					class="rail-toggle"
 					type="button"
@@ -61,7 +61,7 @@
 			</Tooltip>
 		</div>
 		<div class="rail-logo-row">
-			<Tooltip text={t().tooltipAppRailLogo}>
+			<Tooltip placement="right" text={t().tooltipAppRailLogo}>
 				<button class="rail-logo" type="button" onclick={onOpenAppInfo} aria-label={t().appInfoOpenLabel}>
 					<span class="rail-logo-core">inku</span>{#if expanded}<span class="rail-logo-suffix">-lang</span>{/if}
 				</button>
@@ -72,7 +72,7 @@
 
 	<div class="rail-actions">
 		<div class="rail-menu-wrap" bind:this={userMenuWrapEl}>
-			<Tooltip text={`${t().tooltipAppRailUser} (${currentUser.email || currentUser.username})`}>
+			<Tooltip placement="right" text={`${t().tooltipAppRailUser} (${currentUser.email || currentUser.username})`}>
 				<button
 					class="rail-action"
 					class:active={userMenuOpen}
@@ -93,14 +93,14 @@
 			{/if}
 		</div>
 
-		<Tooltip text={t().tooltipAppRailSettings}>
+		<Tooltip placement="right" text={t().tooltipAppRailSettings}>
 			<button class="rail-action" class:active={settingsOpen} onclick={onOpenSettings}>
 				<span class="rail-icon gear-icon" aria-hidden="true"></span>
 				{#if expanded}<span class="rail-label">{t().settingsButton}</span>{/if}
 			</button>
 		</Tooltip>
 
-		<Tooltip text={t().tooltipAppRailTheme}>
+		<Tooltip placement="right" text={t().tooltipAppRailTheme}>
 			<button class="rail-action" onclick={onToggleTheme}>
 				<span class="rail-icon theme-icon" class:dark={darkMode} aria-hidden="true"></span>
 				{#if expanded}<span class="rail-label">{darkMode ? t().themeLight : t().themeDark}</span>{/if}
@@ -109,7 +109,7 @@
 
 		<div class="rail-lang" class:expanded>
 			{#each PACK_LIST as pack (pack.code)}
-				<Tooltip text={`${t().tooltipAppRailLang}: ${pack.label}`}>
+				<Tooltip placement="right" text={`${t().tooltipAppRailLang}: ${pack.label}`}>
 					<button class:active={getLang() === pack.code} onclick={() => setLang(pack.code)}>
 						{expanded ? pack.label : pack.code.toUpperCase()}
 					</button>
@@ -119,7 +119,7 @@
 	</div>
 
 	<div class="rail-spacer"></div>
-	<Tooltip text={`Build ${buildNumber}`}>
+	<Tooltip placement="right" text={`Build ${buildNumber}`}>
 		<div class="rail-build">
 			{#if expanded}<span>Build </span>{/if}{buildNumber}
 		</div>

@@ -70,6 +70,31 @@ The plugin supports these aspect identifiers:
 | Classic JP | `byobu` | 2.2:1 | Japanese folding screen format based on one half of a six-panel pair |
 | Mobile | `vertical` | 9:16 | Smartphone vertical format |
 
+
+## Reference Plugin: Nature
+
+`Nature` is the v1.70 reference vocabulary plugin. It is not a runtime-loaded
+third-party plugin; it is a bundled Stage 1.5 macro that demonstrates the
+plugin principles for phenomenon-driven motion.
+
+Supported terms:
+
+| Term | Expansion intent |
+| --- | --- |
+| `Nature.風` / `Nature.wind` | Slow left-to-right wind-like sway |
+| `Nature.うねり` / `Nature.undulation` | Broad medium-independent undulation |
+| `Nature.無風` / `Nature.stillness` | Suppress variation and placement paths |
+
+The macro fires only when the `Nature.` namespace is explicit. Plain words such
+as wind, wave, 風, or うねり remain ordinary author language and do not invoke
+the plugin. The expansion emits ordinary DDL that Stage 2 maps to existing
+`variation` and `arrangement` fields. It does not add primitives, Score fields,
+renderer hooks, or coerce rules.
+
+The v1.70 result answers the open freedom question conservatively: the reference
+Nature behavior was expressible as a vocabulary macro, so the plugin principles
+do not need to be relaxed.
+
 ## User Storage
 
 Each user has a JSON plugin extension field in the server DB:

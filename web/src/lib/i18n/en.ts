@@ -421,5 +421,6 @@ export const en: LangPack = {
 		basho: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'middle', 'corner'],
 		ugoki: ['place', 'line-up', 'fill', 'scatter', 'draw'],
 		wariai: ['tall', 'wide', 'full-width', 'half-width', 'semicircle', 'waxing', 'waning', 'crescent'],
+		'plugin-nature': ['Nature.wind', 'Nature.undulation', 'Nature.stillness'],
 	},
 };

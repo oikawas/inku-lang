@@ -420,7 +420,8 @@ accidental stretching.
 ## 8. Plugin Model
 
 Plugins separate the core language from optional extensions.  The first
-reference plugin is `canvas-aspect`, which uses the canvas-size hook.
+reference plugin is `canvas-aspect`, which uses the canvas-size hook. v1.70
+also adds the `Nature` reference vocabulary plugin as a Stage 1.5 macro layer.
 
 Plugin principles:
 
@@ -436,10 +437,14 @@ owns its own directory.  The built-in `canvas-aspect` plugin lives under
 `web/src/lib/plugins/system/canvas-aspect/` in the frontend.  User plugin
 directories are reserved for future local or third-party plugin loading.
 
-The next likely plugin family is nature primitives or phenomena, such as
-leaves, wind, rain, or water.  Such plugins must define whether they extend
-Stage 2, JSON Score, renderer behavior, or only a deterministic vocabulary
-expansion.
+The `Nature` reference plugin is intentionally narrow: `Nature.wind`,
+`Nature.undulation`, and `Nature.stillness` expand only when the `Nature.`
+namespace is written explicitly. The expansion is deterministic Stage 1.5 DDL
+text that steers existing Score `variation` and `arrangement`; it does not add
+new primitives, new Score fields, or new repair/coerce rules. v1.70 found that
+this macro-only model is sufficient for the reference implementation, so the
+plugin principles remain unchanged. Saijiki displays these plugin words in a
+separate Nature category.
 
 ---
 

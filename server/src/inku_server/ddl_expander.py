@@ -64,6 +64,8 @@ _JA_EXPANSION_MARKERS = (
     "斜めの線を三本",
     "右下の焦点から外へ",
     "右下の焦点から放射状に",
+    "全体の反復配置",
+    "全体の揺らぎ",
 )
 _EN_EXPANSION_MARKERS = (
     "diagonal band in the right half",
@@ -103,6 +105,8 @@ _EN_EXPANSION_MARKERS = (
     "between the previous two",
     "outward from a lower-right focus",
     "radiating from a lower-right focus",
+    "set repeated placement",
+    "use no variation",
 )
 
 
@@ -116,6 +120,58 @@ def _join_sentences(sentences: list[str], *, lang: str) -> str:
     if lang == "en":
         return " ".join(s if s.endswith((".", "!", "?")) else f"{s}." for s in sentences)
     return "".join(s if s.endswith("。") else f"{s}。" for s in sentences)
+
+
+_NATURE_PLUGIN_RE = re.compile(r"Nature\.(風|うねり|無風|wind|undulation|stillness|calm)", re.IGNORECASE)
+
+
+def _nature_plugin_terms(text: str) -> set[str]:
+    terms: set[str] = set()
+    for match in _NATURE_PLUGIN_RE.finditer(text):
+        term = match.group(1).lower()
+        if term in {"風", "wind"}:
+            terms.add("wind")
+        elif term in {"うねり", "undulation"}:
+            terms.add("undulation")
+        elif term in {"無風", "stillness", "calm"}:
+            terms.add("stillness")
+    return terms
+
+
+def _drop_nature_plugin_sentences(text: str, *, lang: str) -> str:
+    sentences = _split_sentences(text, lang=lang)
+    kept = [sentence for sentence in sentences if not _NATURE_PLUGIN_RE.search(sentence)]
+    if kept:
+        return _join_sentences(kept, lang=lang)
+    return ""
+
+
+def _apply_nature_plugin_macros(ddl: str, *, lang: str, enable_plugins: bool) -> str:
+    if not enable_plugins:
+        return ddl
+    terms = _nature_plugin_terms(ddl)
+    if not terms:
+        return ddl
+    base = _drop_nature_plugin_sentences(ddl, lang=lang)
+    macro: list[str] = []
+    if lang == "en":
+        if "stillness" in terms:
+            macro.append("Use no variation. Use no placement path; keep the repeated placement still.")
+        else:
+            if "wind" in terms:
+                macro.append("Set repeated placement left to right in horizontal strata. Swaying slowly.")
+            if "undulation" in terms:
+                macro.append("Set repeated placement along an undulating trace. Broad slow swaying.")
+    else:
+        if "stillness" in terms:
+            macro.append("全体の揺らぎをなしにする。配置軌跡は使わず静止させる。")
+        else:
+            if "wind" in terms:
+                macro.append("全体の反復配置を左から右への横の帯に沿わせる。ゆっくり揺れる。")
+            if "undulation" in terms:
+                macro.append("全体の反復配置を波打つ軌跡に沿わせる。揺らぎは大きくゆっくり。")
+    joined_macro = _join_sentences(macro, lang=lang) if macro else ""
+    return _join_sentences([base, joined_macro], lang=lang) if base and joined_macro else (base or joined_macro or ddl)
 
 
 def _avoid_gray_background(text: str, *, lang: str) -> str:
@@ -506,6 +562,7 @@ def expand_intermediate_ddl(
     lang: str = "ja",
     context_text: str | None = None,
     vary_seed: int | None = None,
+    enable_plugins: bool = True,
 ) -> str:
     """Add controlled complexity to normalized DDL before Stage 2.
 
@@ -519,6 +576,7 @@ def expand_intermediate_ddl(
 
     sanitized = _sanitize_placement_words(ddl).strip()
     sanitized = _avoid_gray_background(sanitized, lang=lang)
+    sanitized = _apply_nature_plugin_macros(sanitized, lang=lang, enable_plugins=enable_plugins)
     if not sanitized:
         return sanitized
     if lang == "en":

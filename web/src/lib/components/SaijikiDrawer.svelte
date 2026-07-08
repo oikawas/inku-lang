@@ -52,7 +52,7 @@
 			</div>
 			{#each SAIJIKI as cat, ci (cat.key)}
 				{@const words = t().saijikiWords[cat.key] ?? cat.words}
-				<div class="saijiki-cat" style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
+				<div class="saijiki-cat" class:plugin-cat={cat.key.startsWith("plugin-")} style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
 					<div class="saijiki-cat-head">
 						<span class="saijiki-cat-ja">{cat.label}</span>
 						<span class="saijiki-cat-en">{cat.en}</span>
@@ -62,6 +62,7 @@
 							{@const canonicalWord = cat.words[wi] ?? word}
 							<button
 								class="saijiki-chip"
+								class:plugin-chip={cat.key.startsWith("plugin-")}
 								onpointerdown={(e) => e.preventDefault()}
 								onclick={() => onInsertWord(word)}
 								onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word))}
@@ -171,5 +172,7 @@
 		background: var(--panel); color: var(--fg); font-size: 12px; cursor: pointer;
 		font-family: inherit; line-height: 1.3; transition: background 0.1s, border-color 0.1s;
 	}
+	.saijiki-cat.plugin-cat { border-left: 2px solid rgba(185, 88, 69, 0.45); }
+	.saijiki-chip.plugin-chip { color: #9f4b3b; border-color: rgba(185, 88, 69, 0.35); background: rgba(185, 88, 69, 0.08); }
 	.saijiki-chip:hover { background: var(--bg2); border-color: var(--fg3); }
 </style>

@@ -369,6 +369,18 @@
 		};
 		const lineSvg = (attrs = '', strokeWidth = 5, lineCap = 'round', stroke = '#2b2b2b') => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M22 56 C56 26 95 76 158 38" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="${lineCap}" ${attrs}/></svg>`;
 		const shapeSvg = (shape: string) => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/>${shape}</svg>`;
+		if (categoryKey === "plugin-nature") {
+			const natureSvg = shapeSvg("<path d=\"M32 48 C52 28 74 68 94 48 S132 28 150 48\" stroke=\"#b95845\" stroke-width=\"5\" fill=\"none\" stroke-linecap=\"round\"/><path d=\"M34 62 C58 50 78 76 102 62 S134 50 150 62\" stroke=\"#d39a7b\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/>");
+			const naturePreviews: Record<string, Omit<SaijikiPreview, "categoryKey" | "word" | "canonicalWord">> = {
+				"Nature.風": { effect: "左から右へのゆるやかな揺れを全体に通します。", example: "Nature.風を通す", svg: natureSvg },
+				"Nature.うねり": { effect: "媒質を限定しない大きな波の揺れを全体に通します。", example: "Nature.うねりを通す", svg: natureSvg },
+				"Nature.無風": { effect: "揺らぎと配置軌跡を抑え、静止に寄せます。", example: "Nature.無風", svg: natureSvg },
+				"Nature.wind": { effect: "Adds a slow left-to-right wind-like sway.", example: "Nature.wind", svg: natureSvg },
+				"Nature.undulation": { effect: "Adds a broad medium-free undulation.", example: "Nature.undulation", svg: natureSvg },
+				"Nature.stillness": { effect: "Suppresses sway and placement paths.", example: "Nature.stillness", svg: natureSvg },
+			};
+			return { ...base, ...(naturePreviews[canonicalWord] ?? naturePreviews[word] ?? naturePreviews["Nature.うねり"]) };
+		}
 		const angleSvg = (rotation: number, line = false) => shapeSvg(line
 			? `<g transform="rotate(${rotation} 90 46)"><path d="M42 46 H138" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`
 			: `<g transform="rotate(${rotation} 90 46)"><rect x="58" y="29" width="64" height="34" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`);
@@ -3695,6 +3707,7 @@
 			case 'うごき': return 'action';
 			case 'かたむき': return 'angle';
 			case 'わりあい': return 'ratio';
+			case 'Nature': return 'plugin';
 			default: return 'word';
 		}
 	}

@@ -284,3 +284,44 @@ def test_expand_intermediate_ddl_vary_seed_is_deterministic_and_diverse():
 
     assert first == second
     assert len(variants) >= 3
+
+
+def test_nature_plugin_expands_only_explicit_namespace():
+    ddl = "青い線を左から右へ五本並べる。Nature.風を 通す。"
+    expanded = expand_intermediate_ddl(ddl)
+    plain = expand_intermediate_ddl("青い線を左から右へ五本並べる。風を通す。")
+
+    assert "Nature." not in expanded
+    assert "全体の反復配置を左から右への横の帯に沿わせる" in expanded
+    assert "ゆっくり揺れる" in expanded
+    assert "全体の反復配置" not in plain
+
+
+def test_nature_uneri_plugin_is_deterministic():
+    ddl = "黒い線を三本引く。Nature.うねり。"
+
+    first = expand_intermediate_ddl(ddl)
+    second = expand_intermediate_ddl(ddl)
+
+    assert first == second
+    assert "波打つ軌跡" in first
+    assert "揺らぎは大きくゆっくり" in first
+
+
+def test_nature_plugin_can_be_disabled():
+    ddl = "黒い線を三本引く。Nature.無風。"
+
+    disabled = expand_intermediate_ddl(ddl, enable_plugins=False)
+
+    assert "Nature.無風" in disabled
+    assert "全体の揺らぎをなし" not in disabled
+
+
+def test_nature_plugin_expands_in_english():
+    ddl = "Draw five blue lines left to right. Nature.undulation."
+
+    expanded = expand_intermediate_ddl(ddl, lang="en")
+
+    assert "Nature." not in expanded
+    assert "Set repeated placement along an undulating trace" in expanded
+    assert "Broad slow swaying" in expanded

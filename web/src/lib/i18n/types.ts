@@ -133,6 +133,11 @@ export interface LangPack {
 	variationGridWithInterpretation: string;
 	variationGridSaveSelected: string;
 	variationGridEmpty: string;
+	tooltipVariationGridDefault: string;
+	tooltipVariationGridWithInterpretation: string;
+	tooltipVariationGridSaveSelected: string;
+	tooltipModelCompare: string;
+	tooltipDdlAutoRepair: string;
 	comparisonPrev: string;
 	comparisonCurrent: string;
 	modelCompareButton: string;

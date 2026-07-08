@@ -4,6 +4,7 @@
 	import KiwiMascot from './KiwiMascot.svelte';
 	import SaijikiInline from './SaijikiInline.svelte';
 	import StopButton from './StopButton.svelte';
+	import Tooltip from './Tooltip.svelte';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -96,10 +97,12 @@
 			<button class="ddl-inline-btn" type="button" disabled={reloading || loading} onclick={openEditorDialog}>
 				{t().ddlEditSectionLabel}
 			</button>
-			<label class="ddl-inline-check">
-				<input type="checkbox" bind:checked={autoRepairEnabled} disabled={reloading || loading} />
-				<span>{t().ddlAutoRepairLabel}</span>
-			</label>
+			<Tooltip text={t().tooltipDdlAutoRepair}>
+				<label class="ddl-inline-check">
+					<input type="checkbox" bind:checked={autoRepairEnabled} disabled={reloading || loading} />
+					<span>{t().ddlAutoRepairLabel}</span>
+				</label>
+			</Tooltip>
 		</div>
 		<div class="ddl-highlight-wrap inline-editor">
 			<div class="ddl-highlight" bind:this={ddlHighlightEl} aria-hidden="true">{@html ddlHighlighted}</div>

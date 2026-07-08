@@ -354,19 +354,7 @@
 			</div>
 		{/if}
 
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="variation-controls" onpointerdown={(event) => event.stopPropagation()}>
-			<Tooltip text={t().tooltipCanvasVaryPerformance}>
-				<button class="ghost-btn variation-btn" onclick={onVaryPerformance} disabled={!result || variationBusy}>{t().canvasVaryPerformance}</button>
-			</Tooltip>
-			<Tooltip text={t().tooltipCanvasVaryComposition}>
-				<button class="ghost-btn variation-btn" onclick={onVaryComposition} disabled={!result || variationBusy}>{t().canvasVaryComposition}</button>
-			</Tooltip>
-			<Tooltip text={t().tooltipCanvasVaryInterpretation}>
-				<button class="ghost-btn variation-btn" onclick={onVaryInterpretation} disabled={!result || variationBusy}>{t().canvasVaryInterpretation}</button>
-			</Tooltip>
-			{#if result}<span class="seed-summary">{seedSummary}</span>{/if}
-		</div>
+
 
 		<div class="nav-right">
 			<Tooltip text={t().tooltipCanvasNavLatest}>
@@ -398,6 +386,19 @@
 				<span class="status-label">Canvas</span>
 				<span class="status-v">{statusCanvasName}</span>
 			</span>
+		</div>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="status-variation-controls" onpointerdown={(event) => event.stopPropagation()}>
+			<Tooltip text={t().tooltipCanvasVaryPerformance}>
+				<button class="ghost-btn variation-btn" onclick={onVaryPerformance} disabled={!result || variationBusy}>{t().canvasVaryPerformance}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasVaryComposition}>
+				<button class="ghost-btn variation-btn" onclick={onVaryComposition} disabled={!result || variationBusy}>{t().canvasVaryComposition}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasVaryInterpretation}>
+				<button class="ghost-btn variation-btn" onclick={onVaryInterpretation} disabled={!result || variationBusy}>{t().canvasVaryInterpretation}</button>
+			</Tooltip>
+			{#if result}<span class="seed-summary">{seedSummary}</span>{/if}
 		</div>
 		<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
 			<button
@@ -626,36 +627,6 @@
 		overflow: hidden;
 	}
 	.nav-left,
-	.variation-controls {
-		position: absolute;
-		left: 50%;
-		bottom: 18px;
-		transform: translateX(-50%);
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		z-index: 12;
-		background: color-mix(in srgb, var(--bg) 88%, transparent);
-		border: 1px solid var(--border);
-		padding: 6px 8px;
-		box-shadow: var(--shadow-sm);
-	}
-	.variation-btn { min-width: 88px; }
-	.seed-summary {
-		font-size: 11px;
-		color: var(--fg3);
-		white-space: nowrap;
-	}
-	@media (max-width: 720px) {
-		.variation-controls {
-			left: 12px;
-			right: 12px;
-			transform: none;
-			justify-content: center;
-			flex-wrap: wrap;
-		}
-	}
-
 	.nav-right {
 		position: absolute;
 		z-index: 10;
@@ -666,6 +637,24 @@
 	}
 	.nav-left { left: 14px; }
 	.nav-right { right: 14px; }
+
+	.status-variation-controls {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-right: 12px;
+	}
+	.status-variation-controls .variation-btn {
+		min-width: 86px;
+		padding: 4px 8px;
+		font-size: 11px;
+	}
+	.status-variation-controls .seed-summary {
+		font-size: 11px;
+		color: var(--fg3);
+		white-space: nowrap;
+		margin-left: 4px;
+	}
 	.nav-circle {
 		width: 38px;
 		height: 38px;

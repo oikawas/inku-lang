@@ -2948,7 +2948,16 @@
 
 	function alternateStage1Model(): string | null {
 		const current = qualifiedModelId(stage1Provider, stage1Model);
-		for (const group of availableModelCatalog) {
+		const currentProviderGroup = availableModelCatalog.find((group) => group.id === stage1Provider);
+		const sameProviderGroups = availableModelCatalog.filter((group) => group.id === stage1Provider);
+		const localProviderGroups = availableModelCatalog.filter((group) => group.id !== stage1Provider && group.requires_api_key === false);
+		const remainingProviderGroups = availableModelCatalog.filter(
+			(group) => group.id !== stage1Provider && group.requires_api_key !== false,
+		);
+		const providerGroups = currentProviderGroup?.requires_api_key === false
+			? [...sameProviderGroups, ...localProviderGroups, ...remainingProviderGroups]
+			: [...localProviderGroups, ...sameProviderGroups, ...remainingProviderGroups];
+		for (const group of providerGroups) {
 			for (const model of group.models) {
 				const candidate = qualifiedModelId(group.id as Provider, model.id);
 				if (candidate !== current) return candidate;

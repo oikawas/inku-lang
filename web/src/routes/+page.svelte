@@ -4158,13 +4158,13 @@
 					{#if result && inputMode === "single"}
 						<section class="panel-section variation-grid-section">
 							<div class="variation-grid-actions">
-								<Tooltip text={t().tooltipVariationGridDefault}>
+								<Tooltip placement="top-right" text={t().tooltipVariationGridDefault}>
 									<button class="ghost-btn" onclick={() => generateVariationGrid(false)} disabled={variationGridBusy}>{t().variationGridDefault}</button>
 								</Tooltip>
-								<Tooltip text={t().tooltipVariationGridWithInterpretation}>
+								<Tooltip placement="top-right" text={t().tooltipVariationGridWithInterpretation}>
 									<button class="ghost-btn" onclick={() => generateVariationGrid(true)} disabled={variationGridBusy}>{t().variationGridWithInterpretation}</button>
 								</Tooltip>
-								<Tooltip text={t().tooltipVariationGridSaveSelected}>
+								<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
 									<button class="ghost-btn" onclick={saveSelectedVariationCandidates} disabled={variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
 								</Tooltip>
 							</div>

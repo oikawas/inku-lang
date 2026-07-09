@@ -193,7 +193,7 @@
 
 <div class="right-panel">
 	<div class="right-tabs">
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabCanvas}>
+		<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
 			<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
 		</Tooltip>
 		<Tooltip placement="bottom" text={t().tooltipCanvasTabPrompts}>
@@ -223,7 +223,7 @@
 
 	<div class="canvas-area">
 		<div class="nav-left">
-			<Tooltip text={t().tooltipCanvasNavPrev}>
+			<Tooltip placement="right" text={t().tooltipCanvasNavPrev}>
 				<button class="nav-circle" onclick={onGotoNext} disabled={nextDisabled}>‹</button>
 			</Tooltip>
 		</div>
@@ -357,10 +357,10 @@
 
 
 		<div class="nav-right">
-			<Tooltip text={t().tooltipCanvasNavLatest}>
+			<Tooltip placement="left" text={t().tooltipCanvasNavLatest}>
 				<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
 			</Tooltip>
-			<Tooltip text={t().tooltipCanvasNavNext}>
+			<Tooltip placement="left" text={t().tooltipCanvasNavNext}>
 				<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
 			</Tooltip>
 			{#if historyTotal > 0}

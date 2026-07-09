@@ -170,7 +170,10 @@
 
 <div class="panel-tabs">
 	{#each tabItems as item (item.mode)}
-		<Tooltip placement="bottom" text={item.mode === 'single' ? t().tooltipInputTabSingle : item.mode === 'batch' ? t().tooltipInputTabBatch : t().tooltipInputTabDemo}>
+		<Tooltip
+			placement={item.mode === 'single' ? 'bottom-right' : item.mode === 'demo' ? 'bottom-left' : 'bottom'}
+			text={item.mode === 'single' ? t().tooltipInputTabSingle : item.mode === 'batch' ? t().tooltipInputTabBatch : t().tooltipInputTabDemo}
+		>
 			<button
 				class="panel-tab"
 				class:active={inputMode === item.mode}

@@ -367,7 +367,7 @@
 					<div class="refine-stage">
 						<div class="refine-target-card">
 							<div class="comparison-label">{t().refineTargetTitle}</div>
-							<div class="comparison-art">{#if result}{@html result.svg}{/if}</div>
+							<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if result}{@html result.svg}{/if}</div>
 							{#if result}<div class="model-target-meta">{seedSummary}</div>{/if}
 						</div>
 						<div class="refine-workspace">
@@ -456,7 +456,7 @@
 					<div class="model-compare-stage" class:busy={modelInspectionBusy}>
 						<div class="model-target-card">
 							<div class="comparison-label">{t().modelCompareTargetTitle}</div>
-							<div class="comparison-art">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div>
+							<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div>
 							<div class="model-target-meta">{t().modelCompareTargetModelLabel}: {statusStage1Model}</div>
 						</div>
 						<div class="model-results-column">
@@ -474,7 +474,7 @@
 									{#each modelInspectionResults as item (item.id)}
 										<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
 											<div class="comparison-label">{item.label}</div>
-											<div class="comparison-art">{@html item.svg}</div>
+											<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div>
 											<div class="model-result-actions">
 												<Tooltip text={item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}>
 													<button class="ghost-btn model-adopt-btn" type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptModelInspectionResult(item)}>{item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdopt}</button>
@@ -1030,10 +1030,9 @@
 	}
 	.comparison-art {
 		background: var(--bg2);
-		aspect-ratio: 1 / 1;
 		overflow: hidden;
 	}
-	.comparison-art :global(svg) { width: 100%; height: 100%; display: block; }
+	.comparison-art :global(> svg) { width: 100%; height: 100%; display: block; }
 	.model-target-meta { margin-top: 7px; }
 	.model-results-column {
 		display: flex;
@@ -1206,7 +1205,7 @@
 		overflow: hidden;
 		flex-shrink: 0;
 	}
-	.canvas-box :global(svg) { width: 100%; height: 100%; display: block; }
+	.canvas-box :global(> svg) { width: 100%; height: 100%; display: block; }
 	.canvas-placeholder-art {
 		width: 100%;
 		height: 100%;

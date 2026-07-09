@@ -184,6 +184,8 @@ export interface LangPack {
 	modelCompareModelSelectLabel: string;
 	modelCompareSelectPrompt: string;
 	modelCompareMaxSelected: string;
+	modelCompareFailedModel: string;
+	modelCompareFailedSummary: (count: number) => string;
 	modelCompareSelectedCount: (selected: number, max: number) => string;
 	modelCompareTargetModel: string;
 	modelCompareTargetTitle: string;

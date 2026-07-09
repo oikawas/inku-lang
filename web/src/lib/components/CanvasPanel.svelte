@@ -84,6 +84,7 @@
 		modelInspectionTargetModel: string;
 		modelInspectionChoices: ModelInspectionChoice[];
 		modelInspectionSelectedModels: string[];
+		modelInspectionFailedModels: Record<string, string>;
 		modelInspectionBusy: boolean;
 		modelInspectionStatus: string | null;
 		modelInspectionResults: ModelInspectionResult[];
@@ -161,6 +162,7 @@
 		modelInspectionTargetModel,
 		modelInspectionChoices = [],
 		modelInspectionSelectedModels = [],
+		modelInspectionFailedModels = {},
 		modelInspectionBusy = false,
 		modelInspectionStatus = null,
 		modelInspectionResults = [],
@@ -424,11 +426,12 @@
 						{#each modelInspectionChoices as choice (choice.id)}
 							{@const isTarget = choice.id === modelInspectionTargetModel}
 							{@const checked = modelInspectionSelectedModels.includes(choice.id)}
-							<label class="model-choice" class:checked={checked} class:target={isTarget} class:disabled={!checked && !isTarget && modelInspectionSelectedModels.length >= 4}>
+							{@const failed = !!modelInspectionFailedModels[choice.id]}
+							<label class="model-choice" class:checked={checked} class:target={isTarget} class:failed={failed} class:disabled={!checked && !isTarget && modelInspectionSelectedModels.length >= 4}>
 								<input type="checkbox" checked={checked} disabled={modelInspectionBusy || isTarget || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
 								<span>
 									<strong>{choice.label}</strong>
-									<small>{choice.providerLabel}{isTarget ? ` · ${t().modelCompareTargetModel}` : ''}</small>
+									<small>{choice.providerLabel}{isTarget ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small>
 								</span>
 							</label>
 						{/each}
@@ -943,6 +946,12 @@
 		color: var(--fg);
 	}
 	.model-choice.target small { color: color-mix(in srgb, var(--accent) 72%, var(--fg3)); }
+	.model-choice.failed {
+		border-color: color-mix(in srgb, #cf3f35 70%, var(--border));
+		background: color-mix(in srgb, #cf3f35 12%, var(--panel));
+		color: var(--fg);
+	}
+	.model-choice.failed small { color: #b8332d; }
 	.model-choice.disabled { opacity: 0.48; }
 	.model-choice strong,
 	.model-choice small {

@@ -338,6 +338,7 @@
 	let modelInspectionStatus = $state<string | null>(null);
 	let modelInspectionResults = $state<ModelInspectionResult[]>([]);
 	let modelInspectionSelectedModels = $state<string[]>([]);
+	let modelInspectionFailedModels = $state<Record<string, string>>({});
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -3015,6 +3016,10 @@
 		}
 		const next = [...modelInspectionSelectedModels, modelId];
 		modelInspectionSelectedModels = next;
+		if (modelInspectionFailedModels[modelId]) {
+			const { [modelId]: _failed, ...rest } = modelInspectionFailedModels;
+			modelInspectionFailedModels = rest;
+		}
 		void persistModelInspectionSelection(next);
 		modelInspectionStatus = null;
 	}
@@ -3030,45 +3035,59 @@
 		}
 		modelInspectionBusy = true;
 		modelInspectionStatus = null;
+		modelInspectionResults = [];
+		modelInspectionFailedModels = Object.fromEntries(Object.entries(modelInspectionFailedModels).filter(([id]) => !models.includes(id)));
+		const successful: ModelInspectionResult[] = [];
+		const failed: Record<string, string> = {};
 		try {
-			modelInspectionResults = await Promise.all(models.map(async (model) => {
-				const started = Date.now();
-				const interpreted = await interpretOne(source, undefined, model);
-				const composed = await composeOne(interpreted.ddl, source);
-				return {
-					id: model,
-					model,
-					label: statusModelName(model),
-					input: source,
-					ddl: interpreted.ddl,
-					svg: composed.svg,
-					score: composed.score,
-					stage2Model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
-					renderBuildNumber: composed.render_build_number ?? null,
-					renderColorProfile: composed.render_color_profile ?? null,
-					renderEngineId: composed.render_engine_id ?? null,
-					renderEngineVersion: composed.render_engine_version ?? null,
-					renderColorCatalogId: composed.render_color_catalog_id ?? null,
-					renderColorCatalogName: composed.render_color_catalog_name ?? null,
-					renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
-					renderColorMap: composed.render_color_map ?? null,
-					renderCanvasAspect: composed.render_canvas_aspect ?? null,
-					renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
-					renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
-					renderSeed: composed.render_seed ?? null,
-					varySeed: composed.vary_seed ?? null,
-					tokensIn: interpreted.tokens_in,
-					tokensOut: interpreted.tokens_out,
-					tokensInStage2: composed.tokens_in,
-					tokensOutStage2: composed.tokens_out,
-					elapsedMs: Date.now() - started,
-					savedHistoryId: null,
-					starred: false,
-					saving: false,
-				};
-			}));
-		} catch (e) {
-			modelInspectionStatus = e instanceof Error ? e.message : String(e);
+			for (const model of models) {
+				try {
+					const started = Date.now();
+					const interpreted = await interpretOne(source, undefined, model);
+					const composed = await composeOne(interpreted.ddl, source);
+					successful.push({
+						id: model,
+						model,
+						label: statusModelName(model),
+						input: source,
+						ddl: interpreted.ddl,
+						svg: composed.svg,
+						score: composed.score,
+						stage2Model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
+						renderBuildNumber: composed.render_build_number ?? null,
+						renderColorProfile: composed.render_color_profile ?? null,
+						renderEngineId: composed.render_engine_id ?? null,
+						renderEngineVersion: composed.render_engine_version ?? null,
+						renderColorCatalogId: composed.render_color_catalog_id ?? null,
+						renderColorCatalogName: composed.render_color_catalog_name ?? null,
+						renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
+						renderColorMap: composed.render_color_map ?? null,
+						renderCanvasAspect: composed.render_canvas_aspect ?? null,
+						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
+						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
+						renderSeed: composed.render_seed ?? null,
+						varySeed: composed.vary_seed ?? null,
+						tokensIn: interpreted.tokens_in,
+						tokensOut: interpreted.tokens_out,
+						tokensInStage2: composed.tokens_in,
+						tokensOutStage2: composed.tokens_out,
+						elapsedMs: Date.now() - started,
+						savedHistoryId: null,
+						starred: false,
+						saving: false,
+					});
+					modelInspectionResults = [...successful];
+				} catch (e) {
+					failed[model] = e instanceof Error ? e.message : String(e);
+					modelInspectionFailedModels = { ...modelInspectionFailedModels, [model]: failed[model] };
+					const next = modelInspectionSelectedModels.filter((id) => id !== model);
+					modelInspectionSelectedModels = next;
+					void persistModelInspectionSelection(next);
+				}
+			}
+			if (Object.keys(failed).length > 0) {
+				modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
+			}
 		} finally {
 			modelInspectionBusy = false;
 		}
@@ -4405,6 +4424,7 @@
 				modelInspectionTargetModel={modelInspectionTargetModel}
 				{modelInspectionChoices}
 				{modelInspectionSelectedModels}
+				{modelInspectionFailedModels}
 				{modelInspectionBusy}
 				{modelInspectionStatus}
 				{modelInspectionResults}

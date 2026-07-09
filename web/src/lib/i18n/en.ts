@@ -173,6 +173,8 @@ export const en: LangPack = {
 	modelCompareModelSelectLabel: 'Select inference models to compare',
 	modelCompareSelectPrompt: 'Select at least one inference model to compare.',
 	modelCompareMaxSelected: 'You can compare up to four inference models.',
+	modelCompareFailedModel: 'NG',
+	modelCompareFailedSummary: (count) => `${count} model${count === 1 ? '' : 's'} returned an error and were removed from comparison.`,
 	modelCompareSelectedCount: (selected, max) => `${selected} / ${max} models selected`,
 	modelCompareTargetModel: 'used by target work',
 	modelCompareTargetTitle: 'Target work',

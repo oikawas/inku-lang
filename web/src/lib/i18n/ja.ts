@@ -173,6 +173,8 @@ export const ja: LangPack = {
 	modelCompareModelSelectLabel: '比較する推論モデルを選択',
 	modelCompareSelectPrompt: '比較する推論モデルを1つ以上選択してください。',
 	modelCompareMaxSelected: '比較できる推論モデルは最大4つです。',
+	modelCompareFailedModel: 'NG',
+	modelCompareFailedSummary: (count) => `${count}件のモデルがエラーを返したため、比較対象から外しました。`,
 	modelCompareSelectedCount: (selected, max) => `${selected} / ${max} モデルを選択中`,
 	modelCompareTargetModel: '対象作品で使用中',
 	modelCompareTargetTitle: '対象作品',

@@ -101,6 +101,8 @@ export interface LangPack {
 
 	// Output tabs
 	tabCanvas: string;
+	tabRefine: string;
+	tabCompare: string;
 	tabPrompts: string;
 	tabScore: string;
 
@@ -169,13 +171,28 @@ export interface LangPack {
 	tooltipCanvasDownloadSvg: string;
 	tooltipCanvasDownloadPng: string;
 	tooltipCanvasTabCanvas: string;
+	tooltipCanvasTabRefine: string;
+	tooltipCanvasTabCompare: string;
 	tooltipCanvasTabPrompts: string;
 	tooltipCanvasTabScore: string;
 	comparisonPrev: string;
 	comparisonCurrent: string;
 	modelCompareButton: string;
 	modelCompareBusy: string;
+	modelCompareTitle: string;
+	modelCompareSubtitle: string;
+	modelCompareModelSelectLabel: string;
+	modelCompareSelectPrompt: string;
+	modelCompareMaxSelected: string;
+	modelCompareSelectedCount: (selected: number, max: number) => string;
+	compareHistoryTitle: string;
+	compareHistorySubtitle: string;
+	compareHistoryEmpty: string;
 	canvasSeedSummary: string;
+	refineTitle: string;
+	refineSubtitle: string;
+	refineGenerating: string;
+	refineEmpty: string;
 	canvasPresentationOpen: string;
 	canvasPresentationClose: string;
 	canvasPresentationTitle: string;

@@ -296,7 +296,8 @@
 	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
-	type ModelInspectionResult = { id: string; model: string; ddl: string; svg: string; tokensIn: number | null; tokensOut: number | null; elapsedMs: number };
+	type ModelInspectionResult = { id: string; model: string; label: string; ddl: string; svg: string; tokensIn: number | null; tokensOut: number | null; elapsedMs: number };
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
@@ -305,6 +306,7 @@
 	let modelInspectionBusy = $state(false);
 	let modelInspectionStatus = $state<string | null>(null);
 	let modelInspectionResults = $state<ModelInspectionResult[]>([]);
+	let modelInspectionSelectedModels = $state<string[]>([]);
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -324,7 +326,7 @@
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
-	let outputTab    = $state<'canvas' | 'prompts' | 'score'>('canvas');
+	let outputTab    = $state<'canvas' | 'refine' | 'compare' | 'prompts' | 'score'>('canvas');
 	let zoom         = $state(1);
 	let canvasFitZoom = $state(1);
 	let panX         = $state(0);
@@ -2947,33 +2949,53 @@
 		return parts;
 	}
 
-	function alternateStage1Model(): string | null {
-		const current = qualifiedModelId(stage1Provider, stage1Model);
-		const currentProviderGroup = availableModelCatalog.find((group) => group.id === stage1Provider);
-		const sameProviderGroups = availableModelCatalog.filter((group) => group.id === stage1Provider);
-		const localProviderGroups = availableModelCatalog.filter((group) => group.id !== stage1Provider && group.requires_api_key === false);
-		const remainingProviderGroups = availableModelCatalog.filter(
-			(group) => group.id !== stage1Provider && group.requires_api_key !== false,
-		);
-		const providerGroups = currentProviderGroup?.requires_api_key === false
-			? [...sameProviderGroups, ...localProviderGroups, ...remainingProviderGroups]
-			: [...localProviderGroups, ...sameProviderGroups, ...remainingProviderGroups];
-		for (const group of providerGroups) {
+	function modelInspectionModelChoices(): ModelInspectionChoice[] {
+		const seen = new Set<string>();
+		const choices: ModelInspectionChoice[] = [];
+		for (const group of availableModelCatalog) {
 			for (const model of group.models) {
-				const candidate = qualifiedModelId(group.id as Provider, model.id);
-				if (candidate !== current) return candidate;
+				const id = qualifiedModelId(group.id as Provider, model.id);
+				if (seen.has(id)) continue;
+				seen.add(id);
+				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id) });
 			}
 		}
-		return null;
+		return choices;
+	}
+
+	const modelInspectionChoices = $derived(modelInspectionModelChoices());
+
+	$effect(() => {
+		const available = new Set(modelInspectionChoices.map((choice) => choice.id));
+		const current = qualifiedModelId(stage1Provider, stage1Model);
+		const next = modelInspectionSelectedModels.filter((id) => available.has(id)).slice(0, 4);
+		if (next.length === 0 && available.has(current)) next.push(current);
+		if (next.join("\n") !== modelInspectionSelectedModels.join("\n")) modelInspectionSelectedModels = next;
+	});
+
+	function toggleModelInspectionModel(modelId: string) {
+		if (modelInspectionBusy) return;
+		if (modelInspectionSelectedModels.includes(modelId)) {
+			modelInspectionSelectedModels = modelInspectionSelectedModels.filter((id) => id !== modelId);
+			return;
+		}
+		if (modelInspectionSelectedModels.length >= 4) {
+			modelInspectionStatus = t().modelCompareMaxSelected;
+			return;
+		}
+		modelInspectionSelectedModels = [...modelInspectionSelectedModels, modelId];
+		modelInspectionStatus = null;
 	}
 
 	async function runModelInspection() {
 		if (modelInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const currentModel = qualifiedModelId(stage1Provider, stage1Model);
-		const altModel = alternateStage1Model();
-		const models = altModel ? [currentModel, altModel] : [currentModel];
+		const models = modelInspectionSelectedModels.slice(0, 4);
+		if (models.length === 0) {
+			modelInspectionStatus = t().modelCompareSelectPrompt;
+			return;
+		}
 		modelInspectionBusy = true;
 		modelInspectionStatus = null;
 		try {
@@ -2984,6 +3006,7 @@
 				return {
 					id: model,
 					model,
+					label: statusModelName(model),
 					ddl: interpreted.ddl,
 					svg: composed.svg,
 					tokensIn: interpreted.tokens_in,
@@ -2997,6 +3020,7 @@
 			modelInspectionBusy = false;
 		}
 	}
+
 
 	async function replayHistoryItem(it: Iteration) {
 		if (demoRunning || reloading) return;
@@ -4155,38 +4179,6 @@
 						/>
 					{/if}
 
-					{#if result && inputMode === "single"}
-						<section class="panel-section variation-grid-section">
-							<div class="variation-grid-actions">
-								<Tooltip placement="top-right" text={t().tooltipVariationGridDefault}>
-									<button class="ghost-btn" onclick={() => generateVariationGrid(false)} disabled={variationGridBusy}>{t().variationGridDefault}</button>
-								</Tooltip>
-								<Tooltip placement="top-right" text={t().tooltipVariationGridWithInterpretation}>
-									<button class="ghost-btn" onclick={() => generateVariationGrid(true)} disabled={variationGridBusy}>{t().variationGridWithInterpretation}</button>
-								</Tooltip>
-								<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
-									<button class="ghost-btn" onclick={saveSelectedVariationCandidates} disabled={variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
-								</Tooltip>
-							</div>
-							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
-							{#if variationCandidates.length > 0}
-								<div class="variation-grid">
-									{#each variationCandidates as candidate (candidate.id)}
-										<div class="variation-card-wrap">
-											<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => showVariationCandidate(candidate)} type="button">
-												<span class="variation-card-art">{@html candidate.result.svg}</span>
-												<span class="variation-card-meta">
-													<span>{candidate.label}</span>
-													<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
-												</span>
-											</button>
-											<button class="variation-select" class:selected={candidate.selected} onclick={() => toggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</section>
-					{/if}
 
 					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
 						<section class="panel-section interpretation-diff">
@@ -4196,44 +4188,6 @@
 						</section>
 					{/if}
 
-					{#if result && inputMode === "single"}
-						<section class="panel-section comparison-section">
-							<div class="comparison-actions">
-								<Tooltip text={t().tooltipModelCompare}>
-									<button class="ghost-btn" onclick={runModelInspection} disabled={modelInspectionBusy}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</button>
-								</Tooltip>
-							</div>
-							{#if previousComparisonItem && activeComparisonItem}
-								<div class="comparison-pair">
-									<div class="comparison-card">
-										<div class="comparison-label">{t().comparisonPrev}</div>
-										<div class="comparison-art">{@html previousComparisonItem.svg}</div>
-									</div>
-									<div class="comparison-card">
-										<div class="comparison-label">{t().comparisonCurrent}</div>
-										<div class="comparison-art">{@html activeComparisonItem.svg}</div>
-									</div>
-								</div>
-								<div class="prompt-diff">
-									{#each comparisonDiffParts as part}
-										<span class:removed={part.kind === "removed"} class:added={part.kind === "added"}>{part.text}</span>
-									{/each}
-								</div>
-							{/if}
-							{#if modelInspectionStatus}<div class="variation-grid-status">{modelInspectionStatus}</div>{/if}
-							{#if modelInspectionResults.length > 0}
-								<div class="model-inspection-grid">
-									{#each modelInspectionResults as item (item.id)}
-										<div class="model-inspection-card">
-											<div class="comparison-label">{statusModelName(item.model)}</div>
-											<div class="comparison-art">{@html item.svg}</div>
-											<pre>{item.ddl}</pre>
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</section>
-					{/if}
 
 					<!-- 統計 -->
 					{#if result && elapsedTotalMs > 0}
@@ -4333,6 +4287,23 @@
 				onVaryComposition={varyComposition}
 				onVaryInterpretation={varyInterpretation}
 				{variationBusy}
+				{variationCandidates}
+				{variationGridBusy}
+				{variationGridStatus}
+				onGenerateVariationGrid={generateVariationGrid}
+				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
+				onShowVariationCandidate={showVariationCandidate}
+				onToggleVariationCandidate={toggleVariationCandidate}
+				{previousComparisonItem}
+				{activeComparisonItem}
+				{comparisonDiffParts}
+				{modelInspectionChoices}
+				{modelInspectionSelectedModels}
+				{modelInspectionBusy}
+				{modelInspectionStatus}
+				{modelInspectionResults}
+				onToggleModelInspectionModel={toggleModelInspectionModel}
+				onRunModelInspection={runModelInspection}
 				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->
@@ -4863,87 +4834,6 @@
 		text-decoration: underline;
 	}
 
-	.variation-grid-section {
-		gap: 8px;
-	}
-	.variation-grid-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
-	.variation-grid-status {
-		font-size: 11px;
-		color: var(--fg3);
-	}
-	.variation-grid {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 8px;
-	}
-	.variation-card-wrap {
-		position: relative;
-		min-width: 0;
-	}
-	.variation-card {
-		display: grid;
-		grid-template-rows: minmax(0, 1fr) auto;
-		width: 100%;
-		aspect-ratio: 1 / 1.12;
-		padding: 0;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg);
-		overflow: hidden;
-		cursor: pointer;
-	}
-	.variation-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-	.variation-card.saved { opacity: 0.62; }
-	.variation-card-art {
-		display: block;
-		min-height: 0;
-		background: var(--bg2);
-	}
-	.variation-card-art :global(svg) {
-		display: block;
-		width: 100%;
-		height: 100%;
-	}
-	.variation-card-meta {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		gap: 1px;
-		padding: 5px 7px;
-		font-size: 10px;
-		line-height: 1.25;
-		text-align: left;
-		color: var(--fg3);
-	}
-	.variation-card-meta span {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.variation-select {
-		position: absolute;
-		top: 6px;
-		right: 6px;
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		border: 1px solid var(--border2);
-		background: color-mix(in srgb, var(--panel) 88%, transparent);
-		color: var(--fg2);
-		font-size: 15px;
-		line-height: 1;
-		cursor: pointer;
-	}
-	.variation-select.selected {
-		border-color: var(--accent);
-		background: var(--accent);
-		color: white;
-	}
-
 
 	.interpretation-diff {
 		gap: 2px;
@@ -4960,19 +4850,6 @@
 	}
 	.interpretation-diff .removed { color: color-mix(in srgb, #a2342a 78%, var(--fg3)); }
 	.interpretation-diff .added { color: color-mix(in srgb, #2f6b3a 78%, var(--fg3)); }
-	.comparison-section { gap: 8px; }
-	.comparison-actions { display: flex; justify-content: flex-end; }
-	.comparison-pair,
-	.model-inspection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-	.comparison-card,
-	.model-inspection-card { border: 1px solid var(--border); background: var(--panel); padding: 6px; min-width: 0; }
-	.comparison-label { font-size: 10px; color: var(--fg3); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.comparison-art { aspect-ratio: 1 / 1; background: var(--canvas-paper); overflow: hidden; }
-	.comparison-art :global(svg) { width: 100%; height: 100%; display: block; }
-	.prompt-diff { font-size: 12px; line-height: 1.6; color: var(--fg2); background: var(--bg2); border: 1px solid var(--border); padding: 6px 8px; }
-	.prompt-diff .removed { color: #9a3d3d; background: rgba(154, 61, 61, 0.08); text-decoration: line-through; }
-	.prompt-diff .added { color: #2f6b3a; background: rgba(47, 107, 58, 0.09); }
-	.model-inspection-card pre { margin: 6px 0 0; max-height: 96px; overflow: auto; white-space: pre-wrap; font-size: 10px; line-height: 1.45; color: var(--fg3); }
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {

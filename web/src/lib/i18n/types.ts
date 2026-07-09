@@ -185,9 +185,12 @@ export interface LangPack {
 	modelCompareSelectPrompt: string;
 	modelCompareMaxSelected: string;
 	modelCompareSelectedCount: (selected: number, max: number) => string;
-	compareHistoryTitle: string;
-	compareHistorySubtitle: string;
-	compareHistoryEmpty: string;
+	modelCompareTargetModel: string;
+	modelCompareTargetTitle: string;
+	modelCompareTargetModelLabel: string;
+	modelCompareDrawingTitle: string;
+	modelCompareDrawingBody: string;
+	modelCompareEmpty: string;
 	canvasSeedSummary: string;
 	refineTitle: string;
 	refineSubtitle: string;

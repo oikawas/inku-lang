@@ -2916,38 +2916,8 @@
 		};
 	}
 
-	const previousComparisonItem = $derived.by(() => {
-		if (historyCursor >= 0 && historyCursor + 1 < historyItems.length) return historyItems[historyCursor + 1];
-		if (!displayedHistoryItem && result && historyItems.length > 0) return historyItems[0];
-		return null;
-	});
 	const activeComparisonItem = $derived(currentComparisonItem());
-	const comparisonDiffParts = $derived(activeComparisonItem && previousComparisonItem
-		? buildPromptDiffParts(previousComparisonItem.input, activeComparisonItem.input)
-		: []);
 
-	function buildPromptDiffParts(beforeText: string, afterText: string): TextDiffPart[] {
-		const tokenize = (value: string) => {
-			const trimmed = value.trim();
-			if (!trimmed) return [];
-			if (/\s/.test(trimmed)) return trimmed.split(/(\s+)/).filter(Boolean);
-			return Array.from(trimmed);
-		};
-		const before = tokenize(beforeText);
-		const after = tokenize(afterText);
-		let prefix = 0;
-		while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;
-		let suffix = 0;
-		while (suffix + prefix < before.length && suffix + prefix < after.length && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix += 1;
-		const parts: TextDiffPart[] = [];
-		if (prefix > 0) parts.push({ kind: "same", text: before.slice(0, prefix).join("") });
-		const removed = before.slice(prefix, before.length - suffix).join("");
-		const added = after.slice(prefix, after.length - suffix).join("");
-		if (removed) parts.push({ kind: "removed", text: removed });
-		if (added) parts.push({ kind: "added", text: added });
-		if (suffix > 0) parts.push({ kind: "same", text: before.slice(before.length - suffix).join("") });
-		return parts;
-	}
 
 	function modelInspectionModelChoices(): ModelInspectionChoice[] {
 		const seen = new Set<string>();
@@ -2965,16 +2935,21 @@
 
 	const modelInspectionChoices = $derived(modelInspectionModelChoices());
 
+	const modelInspectionTargetModel = $derived(result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model));
+
 	$effect(() => {
 		const available = new Set(modelInspectionChoices.map((choice) => choice.id));
-		const current = qualifiedModelId(stage1Provider, stage1Model);
-		const next = modelInspectionSelectedModels.filter((id) => available.has(id)).slice(0, 4);
-		if (next.length === 0 && available.has(current)) next.push(current);
+		const target = modelInspectionTargetModel;
+		const next = modelInspectionSelectedModels.filter((id) => available.has(id) && id !== target).slice(0, 4);
+		if (next.length === 0) {
+			const firstAlternative = modelInspectionChoices.find((choice) => choice.id !== target)?.id;
+			if (firstAlternative) next.push(firstAlternative);
+		}
 		if (next.join("\n") !== modelInspectionSelectedModels.join("\n")) modelInspectionSelectedModels = next;
 	});
 
 	function toggleModelInspectionModel(modelId: string) {
-		if (modelInspectionBusy) return;
+		if (modelInspectionBusy || modelId === modelInspectionTargetModel) return;
 		if (modelInspectionSelectedModels.includes(modelId)) {
 			modelInspectionSelectedModels = modelInspectionSelectedModels.filter((id) => id !== modelId);
 			return;
@@ -4294,9 +4269,8 @@
 				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
 				onShowVariationCandidate={showVariationCandidate}
 				onToggleVariationCandidate={toggleVariationCandidate}
-				{previousComparisonItem}
 				{activeComparisonItem}
-				{comparisonDiffParts}
+				modelInspectionTargetModel={modelInspectionTargetModel}
 				{modelInspectionChoices}
 				{modelInspectionSelectedModels}
 				{modelInspectionBusy}

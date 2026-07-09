@@ -4,6 +4,7 @@
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { Score } from '$lib/historyManagerState.svelte';
 	import OutputTabsContent from './OutputTabsContent.svelte';
+	import PaintButton from './PaintButton.svelte';
 	import Tooltip from './Tooltip.svelte';
 
 	type OutputTab = 'canvas' | 'refine' | 'compare' | 'prompts' | 'score';
@@ -12,8 +13,6 @@
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	type ComparisonItem = { input: string; ddl?: string | null; svg: string };
-	type TextDiffPart = { kind: 'same' | 'removed' | 'added'; text: string };
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
 	type ModelInspectionResult = { id: string; model: string; label: string; ddl: string; svg: string; tokensIn: number | null; tokensOut: number | null; elapsedMs: number };
 
@@ -81,9 +80,8 @@
 		onSaveSelectedVariationCandidates: () => void | Promise<void>;
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
 		onToggleVariationCandidate: (id: string) => void;
-		previousComparisonItem: ComparisonItem | null;
-		activeComparisonItem: ComparisonItem | null;
-		comparisonDiffParts: TextDiffPart[];
+		activeComparisonItem: { svg: string } | null;
+		modelInspectionTargetModel: string;
 		modelInspectionChoices: ModelInspectionChoice[];
 		modelInspectionSelectedModels: string[];
 		modelInspectionBusy: boolean;
@@ -157,9 +155,8 @@
 		onSaveSelectedVariationCandidates,
 		onShowVariationCandidate,
 		onToggleVariationCandidate,
-		previousComparisonItem,
 		activeComparisonItem,
-		comparisonDiffParts = [],
+		modelInspectionTargetModel,
 		modelInspectionChoices = [],
 		modelInspectionSelectedModels = [],
 		modelInspectionBusy = false,
@@ -408,68 +405,62 @@
 				</div>
 			{:else if outputTab === 'compare'}
 				<div class="compare-panel">
-					<div class="compare-section">
-						<div class="compare-head">
-							<div>
-								<div class="refine-title">{t().compareHistoryTitle}</div>
-								<div class="refine-sub">{t().compareHistorySubtitle}</div>
-							</div>
+					<div class="compare-head">
+						<div>
+							<div class="refine-title">{t().modelCompareTitle}</div>
+							<div class="refine-sub">{t().modelCompareSubtitle}</div>
 						</div>
-						{#if previousComparisonItem && activeComparisonItem}
-							<div class="comparison-pair">
-								<div class="comparison-card">
-									<div class="comparison-label">{t().comparisonPrev}</div>
-									<div class="comparison-art">{@html previousComparisonItem.svg}</div>
-								</div>
-								<div class="comparison-card">
-									<div class="comparison-label">{t().comparisonCurrent}</div>
-									<div class="comparison-art">{@html activeComparisonItem.svg}</div>
-								</div>
-							</div>
-							<div class="prompt-diff">
-								{#each comparisonDiffParts as part}
-									<span class:removed={part.kind === "removed"} class:added={part.kind === "added"}>{part.text}</span>
-								{/each}
-							</div>
-						{:else}
-							<div class="refine-empty">{t().compareHistoryEmpty}</div>
-						{/if}
-					</div>
-					<div class="compare-section">
-						<div class="compare-head">
-							<div>
-								<div class="refine-title">{t().modelCompareTitle}</div>
-								<div class="refine-sub">{t().modelCompareSubtitle}</div>
-							</div>
+						<div class="compare-action-wrap">
 							<Tooltip text={t().tooltipModelCompare}>
-								<button class="ghost-btn" onclick={onRunModelInspection} disabled={!result || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</button>
+								<PaintButton onclick={onRunModelInspection} disabled={!result || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</PaintButton>
 							</Tooltip>
 						</div>
-						<div class="model-choice-grid" aria-label={t().modelCompareModelSelectLabel}>
-							{#each modelInspectionChoices as choice (choice.id)}
-								{@const checked = modelInspectionSelectedModels.includes(choice.id)}
-								<label class="model-choice" class:checked={checked} class:disabled={!checked && modelInspectionSelectedModels.length >= 4}>
-									<input type="checkbox" checked={checked} disabled={modelInspectionBusy || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
-									<span>
-										<strong>{choice.label}</strong>
-										<small>{choice.providerLabel}</small>
-									</span>
-								</label>
-							{/each}
+					</div>
+					<div class="model-choice-grid" aria-label={t().modelCompareModelSelectLabel}>
+						{#each modelInspectionChoices as choice (choice.id)}
+							{@const isTarget = choice.id === modelInspectionTargetModel}
+							{@const checked = modelInspectionSelectedModels.includes(choice.id)}
+							<label class="model-choice" class:checked={checked} class:target={isTarget} class:disabled={!checked && !isTarget && modelInspectionSelectedModels.length >= 4}>
+								<input type="checkbox" checked={checked} disabled={modelInspectionBusy || isTarget || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
+								<span>
+									<strong>{choice.label}</strong>
+									<small>{choice.providerLabel}{isTarget ? ` · ${t().modelCompareTargetModel}` : ''}</small>
+								</span>
+							</label>
+						{/each}
+					</div>
+					<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspectionSelectedModels.length, 4)}</div>
+					{#if modelInspectionStatus}<div class="variation-grid-status">{modelInspectionStatus}</div>{/if}
+					<div class="model-compare-stage" class:busy={modelInspectionBusy}>
+						<div class="model-target-card">
+							<div class="comparison-label">{t().modelCompareTargetTitle}</div>
+							<div class="comparison-art">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div>
+							<div class="model-target-meta">{t().modelCompareTargetModelLabel}: {statusStage1Model}</div>
 						</div>
-						<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspectionSelectedModels.length, 4)}</div>
-						{#if modelInspectionStatus}<div class="variation-grid-status">{modelInspectionStatus}</div>{/if}
-						{#if modelInspectionResults.length > 0}
-							<div class="model-inspection-grid">
-								{#each modelInspectionResults as item (item.id)}
-									<div class="model-inspection-card">
-										<div class="comparison-label">{item.label}</div>
-										<div class="comparison-art">{@html item.svg}</div>
-										<pre>{item.ddl}</pre>
+						<div class="model-results-column">
+							{#if modelInspectionBusy}
+								<div class="model-drawing-animation" aria-live="polite">
+									<div class="model-drawing-spinner" aria-hidden="true"></div>
+									<div>
+										<strong>{t().modelCompareDrawingTitle}</strong>
+										<span>{t().modelCompareDrawingBody}</span>
 									</div>
-								{/each}
-							</div>
-						{/if}
+								</div>
+							{/if}
+							{#if modelInspectionResults.length > 0}
+								<div class="model-inspection-grid">
+									{#each modelInspectionResults as item (item.id)}
+										<div class="model-inspection-card">
+											<div class="comparison-label">{item.label}</div>
+											<div class="comparison-art">{@html item.svg}</div>
+											<pre>{item.ddl}</pre>
+										</div>
+									{/each}
+								</div>
+							{:else if !modelInspectionBusy}
+								<div class="refine-empty">{t().modelCompareEmpty}</div>
+							{/if}
+						</div>
 					</div>
 				</div>
 			{:else if outputTab === 'prompts'}
@@ -894,63 +885,27 @@
 
 	.compare-panel {
 		align-self: stretch;
-		width: min(1060px, calc(100% - 136px));
+		width: min(1120px, calc(100% - 136px));
 		max-height: calc(100% - 28px);
 		overflow: auto;
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
+		gap: 12px;
 		padding: 16px;
 		box-sizing: border-box;
-	}
-	.compare-section {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
 	}
 	.compare-head {
 		display: flex;
 		align-items: flex-start;
 		justify-content: space-between;
-		gap: 12px;
+		gap: 16px;
 	}
-	.comparison-pair,
-	.model-inspection-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		gap: 10px;
+	.compare-action-wrap {
+		width: min(260px, 34%);
+		min-width: 210px;
 	}
-	.comparison-card,
-	.model-inspection-card {
-		border: 1px solid var(--border);
-		background: var(--panel);
-		padding: 8px;
-		min-width: 0;
-	}
-	.comparison-label {
-		font-size: 11px;
-		color: var(--fg3);
-		margin-bottom: 5px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.comparison-art {
-		background: var(--bg2);
-		aspect-ratio: 1 / 1;
-		overflow: hidden;
-	}
-	.comparison-art :global(svg) { width: 100%; height: 100%; display: block; }
-	.prompt-diff {
-		font-size: 11px;
-		line-height: 1.5;
-		color: var(--fg3);
-		padding: 8px;
-		border: 1px solid var(--border);
-		background: var(--panel);
-	}
-	.prompt-diff .removed { text-decoration: line-through; opacity: 0.55; }
-	.prompt-diff .added { color: var(--accent); }
+	.compare-action-wrap :global(.tooltip-wrap) { width: 100%; }
+	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
 	.model-choice-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -969,6 +924,10 @@
 		font-size: 11px;
 	}
 	.model-choice.checked { border-color: var(--accent); color: var(--fg); }
+	.model-choice.target {
+		border-style: dashed;
+		background: color-mix(in srgb, var(--panel) 88%, var(--bg2));
+	}
 	.model-choice.disabled { opacity: 0.48; }
 	.model-choice strong,
 	.model-choice small {
@@ -978,9 +937,53 @@
 		white-space: nowrap;
 	}
 	.model-choice small { color: var(--fg3); margin-top: 2px; }
-	.model-choice-count {
+	.model-choice-count,
+	.model-target-meta {
 		font-size: 11px;
 		color: var(--fg3);
+	}
+	.model-compare-stage {
+		display: grid;
+		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+		gap: 14px;
+		align-items: start;
+	}
+	.model-target-card,
+	.model-inspection-card {
+		border: 1px solid var(--border);
+		background: var(--panel);
+		padding: 8px;
+		min-width: 0;
+	}
+	.model-target-card {
+		position: sticky;
+		top: 0;
+	}
+	.comparison-label {
+		font-size: 11px;
+		color: var(--fg3);
+		margin-bottom: 5px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.comparison-art {
+		background: var(--bg2);
+		aspect-ratio: 1 / 1;
+		overflow: hidden;
+	}
+	.comparison-art :global(svg) { width: 100%; height: 100%; display: block; }
+	.model-target-meta { margin-top: 7px; }
+	.model-results-column {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+	.model-inspection-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 10px;
 	}
 	.model-inspection-card pre {
 		margin: 8px 0 0;
@@ -991,6 +994,33 @@
 		line-height: 1.45;
 		color: var(--fg3);
 	}
+	.model-drawing-animation {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 12px;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		color: var(--fg2);
+	}
+	.model-drawing-animation strong,
+	.model-drawing-animation span { display: block; }
+	.model-drawing-animation span {
+		font-size: 11px;
+		color: var(--fg3);
+		margin-top: 2px;
+	}
+	.model-drawing-spinner {
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		border: 2px solid var(--border2);
+		border-top-color: var(--accent);
+		animation: spin 0.85s linear infinite;
+		flex: 0 0 auto;
+	}
+
+
 
 	.nav-left,
 	.nav-right {
@@ -1576,4 +1606,5 @@
 			flex-wrap: wrap;
 		}
 	}
+	@keyframes spin { to { transform: rotate(360deg); } }
 </style>

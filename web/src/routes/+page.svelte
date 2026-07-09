@@ -183,6 +183,7 @@
 		stage1_model: string;
 		stage2_provider: Provider;
 		stage2_model: string;
+		model_inspection_selected_models?: string[];
 	};
 	type ModelProviderSetting = {
 		label?: string;
@@ -536,6 +537,9 @@
 		stage1Model = settings.stage1_model;
 		stage2Provider = settings.stage2_provider;
 		stage2Model = settings.stage2_model;
+		modelInspectionSelectedModels = Array.isArray(settings.model_inspection_selected_models)
+			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
+			: [];
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
@@ -859,6 +863,7 @@
 			stage1_model: stage1Model,
 			stage2_provider: stage2Provider,
 			stage2_model: stage2Model,
+			model_inspection_selected_models: modelInspectionSelectedModels,
 		};
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
@@ -2937,28 +2942,50 @@
 
 	const modelInspectionTargetModel = $derived(result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model));
 
+	async function persistModelInspectionSelection(models: string[]) {
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					model_settings: {
+						model_inspection_selected_models: models.slice(0, 4),
+					},
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			console.warn('failed to save model comparison selection', e);
+		}
+	}
+
 	$effect(() => {
 		const available = new Set(modelInspectionChoices.map((choice) => choice.id));
 		const target = modelInspectionTargetModel;
 		const next = modelInspectionSelectedModels.filter((id) => available.has(id) && id !== target).slice(0, 4);
-		if (next.length === 0) {
-			const firstAlternative = modelInspectionChoices.find((choice) => choice.id !== target)?.id;
-			if (firstAlternative) next.push(firstAlternative);
+		if (next.join("\n") !== modelInspectionSelectedModels.join("\n")) {
+			modelInspectionSelectedModels = next;
+			void persistModelInspectionSelection(next);
 		}
-		if (next.join("\n") !== modelInspectionSelectedModels.join("\n")) modelInspectionSelectedModels = next;
 	});
 
 	function toggleModelInspectionModel(modelId: string) {
 		if (modelInspectionBusy || modelId === modelInspectionTargetModel) return;
 		if (modelInspectionSelectedModels.includes(modelId)) {
-			modelInspectionSelectedModels = modelInspectionSelectedModels.filter((id) => id !== modelId);
+			const next = modelInspectionSelectedModels.filter((id) => id !== modelId);
+			modelInspectionSelectedModels = next;
+			void persistModelInspectionSelection(next);
 			return;
 		}
 		if (modelInspectionSelectedModels.length >= 4) {
 			modelInspectionStatus = t().modelCompareMaxSelected;
 			return;
 		}
-		modelInspectionSelectedModels = [...modelInspectionSelectedModels, modelId];
+		const next = [...modelInspectionSelectedModels, modelId];
+		modelInspectionSelectedModels = next;
+		void persistModelInspectionSelection(next);
 		modelInspectionStatus = null;
 	}
 

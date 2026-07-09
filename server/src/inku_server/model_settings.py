@@ -171,12 +171,13 @@ def default_model_settings() -> dict[str, Any]:
     }
 
 
-def default_user_model_settings() -> dict[str, str]:
+def default_user_model_settings() -> dict[str, Any]:
     return {
         "stage1_provider": "nvidia",
         "stage1_model": "google/gemma-4-31b-it",
         "stage2_provider": "nvidia",
         "stage2_model": "google/gemma-4-31b-it",
+        "model_inspection_selected_models": [],
     }
 
 
@@ -258,7 +259,25 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     return clean
 
 
-def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, str]:
+def _normalize_selected_model_ids(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    clean: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        model_id = item.strip()
+        if not model_id or model_id in seen:
+            continue
+        clean.append(model_id)
+        seen.add(model_id)
+        if len(clean) >= 4:
+            break
+    return clean
+
+
+def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     default = default_user_model_settings()
     if not isinstance(settings, dict):
         return default
@@ -269,10 +288,11 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     for key in ("stage1_model", "stage2_model"):
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = settings[key].strip()
+    clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
     return clean
 
 
-def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, str]:
+def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, Any]:
     clean = normalize_user_model_settings(current)
     for key in ("stage1_provider", "stage2_provider"):
         if isinstance(patch.get(key), str) and patch[key].strip():
@@ -280,6 +300,8 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
     for key in ("stage1_model", "stage2_model"):
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = patch[key].strip()
+    if "model_inspection_selected_models" in patch:
+        clean["model_inspection_selected_models"] = _normalize_selected_model_ids(patch.get("model_inspection_selected_models"))
     return normalize_user_model_settings(clean)
 
 

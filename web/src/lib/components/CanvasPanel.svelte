@@ -925,9 +925,12 @@
 	}
 	.model-choice.checked { border-color: var(--accent); color: var(--fg); }
 	.model-choice.target {
-		border-style: dashed;
-		background: color-mix(in srgb, var(--panel) 88%, var(--bg2));
+		border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+		border-left-width: 4px;
+		background: color-mix(in srgb, var(--accent) 13%, var(--panel));
+		color: var(--fg);
 	}
+	.model-choice.target small { color: color-mix(in srgb, var(--accent) 72%, var(--fg3)); }
 	.model-choice.disabled { opacity: 0.48; }
 	.model-choice strong,
 	.model-choice small {

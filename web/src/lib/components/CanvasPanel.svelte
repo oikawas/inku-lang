@@ -371,28 +371,40 @@
 							{#if result}<div class="model-target-meta">{seedSummary}</div>{/if}
 						</div>
 						<div class="refine-workspace">
-							<div class="refine-actions refine-paint-actions">
-								<Tooltip text={t().tooltipCanvasVaryPerformance}>
-									<div class="refine-action-wrap"><PaintButton onclick={onVaryPerformance} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryPerformance}</PaintButton></div>
-								</Tooltip>
-								<Tooltip text={t().tooltipCanvasVaryComposition}>
-									<div class="refine-action-wrap"><PaintButton onclick={onVaryComposition} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryComposition}</PaintButton></div>
-								</Tooltip>
-								<Tooltip text={t().tooltipCanvasVaryInterpretation}>
-									<div class="refine-action-wrap"><PaintButton onclick={onVaryInterpretation} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryInterpretation}</PaintButton></div>
-								</Tooltip>
-							</div>
-							<div class="refine-actions refine-grid-actions refine-paint-actions">
-								<Tooltip placement="top-right" text={t().tooltipVariationGridDefault}>
-									<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(false)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridDefault}</PaintButton></div>
-								</Tooltip>
-								<Tooltip placement="top" text={t().tooltipVariationGridWithInterpretation}>
-									<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(true)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridWithInterpretation}</PaintButton></div>
-								</Tooltip>
-								<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
-									<button class="ghost-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
-								</Tooltip>
-							</div>
+							<section class="refine-action-section">
+								<div class="refine-section-head">
+									<div class="refine-section-title">{t().refineSingleTitle}</div>
+									<div class="refine-section-sub">{t().refineSingleSubtitle}</div>
+								</div>
+								<div class="refine-actions refine-paint-actions">
+									<Tooltip text={t().tooltipCanvasVaryPerformance}>
+										<div class="refine-action-wrap"><PaintButton onclick={onVaryPerformance} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryPerformance}</PaintButton></div>
+									</Tooltip>
+									<Tooltip text={t().tooltipCanvasVaryComposition}>
+										<div class="refine-action-wrap"><PaintButton onclick={onVaryComposition} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryComposition}</PaintButton></div>
+									</Tooltip>
+									<Tooltip text={t().tooltipCanvasVaryInterpretation}>
+										<div class="refine-action-wrap"><PaintButton onclick={onVaryInterpretation} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryInterpretation}</PaintButton></div>
+									</Tooltip>
+								</div>
+							</section>
+							<section class="refine-action-section refine-action-section-grid">
+								<div class="refine-section-head">
+									<div class="refine-section-title">{t().refineGridTitle}</div>
+									<div class="refine-section-sub">{t().refineGridSubtitle}</div>
+								</div>
+								<div class="refine-actions refine-grid-actions refine-paint-actions">
+									<Tooltip placement="top-right" text={t().tooltipVariationGridDefault}>
+										<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(false)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridDefault}</PaintButton></div>
+									</Tooltip>
+									<Tooltip placement="top" text={t().tooltipVariationGridWithInterpretation}>
+										<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(true)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridWithInterpretation}</PaintButton></div>
+									</Tooltip>
+									<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
+										<button class="ghost-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
+									</Tooltip>
+								</div>
+							</section>
 							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
 							{#if variationBusy || variationGridBusy}
 								<div class="model-drawing-animation" aria-live="polite">
@@ -852,6 +864,31 @@
 		gap: 10px;
 		min-width: 0;
 	}
+	.refine-action-section {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-bottom: 2px;
+	}
+	.refine-action-section-grid {
+		padding-top: 10px;
+		border-top: 1px solid var(--border);
+	}
+	.refine-section-head {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.refine-section-title {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--fg);
+	}
+	.refine-section-sub {
+		font-size: 11px;
+		line-height: 1.45;
+		color: var(--fg3);
+	}
 	.refine-actions {
 		display: flex;
 		flex-wrap: wrap;
@@ -862,10 +899,7 @@
 	.refine-action-wrap :global(.tooltip-wrap),
 	.refine-action-wrap :global(.paint-btn) { width: 100%; }
 	.refine-action-wrap :global(.paint-btn) { margin-top: 0; min-height: 34px; font-size: 12px; letter-spacing: 0.03em; }
-	.refine-grid-actions {
-		padding-top: 4px;
-		border-top: 1px solid var(--border);
-	}
+	.refine-grid-actions { padding-top: 0; }
 	.variation-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));

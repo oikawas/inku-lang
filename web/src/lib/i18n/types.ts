@@ -203,6 +203,10 @@ export interface LangPack {
 	refineTitle: string;
 	refineSubtitle: string;
 	refineTargetTitle: string;
+	refineSingleTitle: string;
+	refineSingleSubtitle: string;
+	refineGridTitle: string;
+	refineGridSubtitle: string;
 	refineGenerating: string;
 	refineGeneratingBody: string;
 	refineEmpty: string;

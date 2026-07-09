@@ -3028,16 +3028,21 @@
 		if (modelInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const models = modelInspectionSelectedModels.slice(0, 4);
-		if (models.length === 0) {
+		const selectedModels = modelInspectionSelectedModels.slice(0, 4);
+		if (selectedModels.length === 0) {
 			modelInspectionStatus = t().modelCompareSelectPrompt;
+			return;
+		}
+		const renderedModels = new Set(modelInspectionResults.map((item) => item.model));
+		const models = selectedModels.filter((model) => !renderedModels.has(model));
+		if (models.length === 0) {
+			modelInspectionStatus = t().modelCompareAllRendered;
 			return;
 		}
 		modelInspectionBusy = true;
 		modelInspectionStatus = null;
-		modelInspectionResults = [];
 		modelInspectionFailedModels = Object.fromEntries(Object.entries(modelInspectionFailedModels).filter(([id]) => !models.includes(id)));
-		const successful: ModelInspectionResult[] = [];
+		const successful = [...modelInspectionResults];
 		const failed: Record<string, string> = {};
 		try {
 			for (const model of models) {

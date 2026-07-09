@@ -150,6 +150,8 @@ export interface LangPack {
 	tooltipInputLang: string;
 	tooltipInputModel: string;
 	tooltipInputClear: string;
+	tooltipSubmit: string;
+	tooltipDdlPaint: string;
 	tooltipInputTabSingle: string;
 	tooltipInputTabBatch: string;
 	tooltipInputTabDemo: string;

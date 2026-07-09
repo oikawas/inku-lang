@@ -265,7 +265,9 @@
 			</div>
 			<div class="progress-stage-text">{stageLabel}</div>
 		{:else if !singleRunning}
-			<PaintButton onclick={onSubmit} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
+			<Tooltip placement="top" text={t().tooltipSubmit}>
+				<PaintButton onclick={onSubmit} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
+			</Tooltip>
 		{/if}
 
 		{#if error}<p class="error-text">{error}</p>{/if}
@@ -327,6 +329,7 @@
 <style>
 	.panel-tabs { display: flex; border-bottom: 1px solid var(--border); }
 	.panel-tabs :global(.tooltip-wrap) { flex: 1; }
+	.panel-section > :global(.tooltip-wrap) { width: 100%; }
 	.panel-tab {
 		position: relative;
 		flex: 1; padding: 10px; background: none; border: none;

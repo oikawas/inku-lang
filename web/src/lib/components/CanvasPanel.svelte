@@ -265,7 +265,7 @@
 					</div>
 				</div>
 				<div class="canvas-corner-controls canvas-corner-left" onpointerdown={(event) => event.stopPropagation()}>
-					<Tooltip text={t().tooltipCanvasCaption}>
+					<Tooltip placement="top-right" text={t().tooltipCanvasCaption}>
 						<button
 							type="button"
 							class="canvas-icon-btn"
@@ -285,7 +285,7 @@
 					</Tooltip>
 				</div>
 				<div class="canvas-corner-controls canvas-corner-right" onpointerdown={(event) => event.stopPropagation()}>
-					<Tooltip text={t().tooltipCanvasPresentation}>
+					<Tooltip placement="top-left" text={t().tooltipCanvasPresentation}>
 						<button
 							type="button"
 							class="canvas-icon-btn"

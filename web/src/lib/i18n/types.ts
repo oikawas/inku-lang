@@ -191,6 +191,11 @@ export interface LangPack {
 	modelCompareDrawingTitle: string;
 	modelCompareDrawingBody: string;
 	modelCompareEmpty: string;
+	modelCompareAdopt: string;
+	modelCompareAdopted: string;
+	modelCompareSaving: string;
+	modelCompareAdoptTooltip: string;
+	modelCompareStarTooltip: string;
 	canvasSeedSummary: string;
 	refineTitle: string;
 	refineSubtitle: string;

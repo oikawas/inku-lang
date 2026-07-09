@@ -297,7 +297,37 @@
 	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
-	type ModelInspectionResult = { id: string; model: string; label: string; ddl: string; svg: string; tokensIn: number | null; tokensOut: number | null; elapsedMs: number };
+	type ModelInspectionResult = {
+		id: string;
+		model: string;
+		label: string;
+		input: string;
+		ddl: string;
+		svg: string;
+		score: Score;
+		stage2Model?: string | null;
+		renderBuildNumber?: string | null;
+		renderColorProfile?: Record<string, string> | null;
+		renderEngineId?: string | null;
+		renderEngineVersion?: string | null;
+		renderColorCatalogId?: string | null;
+		renderColorCatalogName?: string | null;
+		renderColorCatalogSub?: string | null;
+		renderColorMap?: Record<string, string> | null;
+		renderCanvasAspect?: string | null;
+		renderCanvasAspectId?: string | null;
+		renderCanvasAspectRatio?: number | null;
+		renderSeed?: number | null;
+		varySeed?: number | null;
+		tokensIn: number | null;
+		tokensOut: number | null;
+		tokensInStage2: number | null;
+		tokensOutStage2: number | null;
+		elapsedMs: number;
+		savedHistoryId?: string | null;
+		starred?: boolean;
+		saving?: boolean;
+	};
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
@@ -3009,17 +3039,92 @@
 					id: model,
 					model,
 					label: statusModelName(model),
+					input: source,
 					ddl: interpreted.ddl,
 					svg: composed.svg,
+					score: composed.score,
+					stage2Model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
+					renderBuildNumber: composed.render_build_number ?? null,
+					renderColorProfile: composed.render_color_profile ?? null,
+					renderEngineId: composed.render_engine_id ?? null,
+					renderEngineVersion: composed.render_engine_version ?? null,
+					renderColorCatalogId: composed.render_color_catalog_id ?? null,
+					renderColorCatalogName: composed.render_color_catalog_name ?? null,
+					renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
+					renderColorMap: composed.render_color_map ?? null,
+					renderCanvasAspect: composed.render_canvas_aspect ?? null,
+					renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
+					renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
+					renderSeed: composed.render_seed ?? null,
+					varySeed: composed.vary_seed ?? null,
 					tokensIn: interpreted.tokens_in,
 					tokensOut: interpreted.tokens_out,
+					tokensInStage2: composed.tokens_in,
+					tokensOutStage2: composed.tokens_out,
 					elapsedMs: Date.now() - started,
+					savedHistoryId: null,
+					starred: false,
+					saving: false,
 				};
 			}));
 		} catch (e) {
 			modelInspectionStatus = e instanceof Error ? e.message : String(e);
 		} finally {
 			modelInspectionBusy = false;
+		}
+	}
+
+	function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
+		modelInspectionResults = modelInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
+	}
+
+	async function saveModelInspectionResult(item: ModelInspectionResult, options: { star?: boolean } = {}) {
+		if (item.saving) return;
+		if (item.savedHistoryId) {
+			if (options.star) {
+				await toggleHistoryStar({ id: item.savedHistoryId, starred: !!item.starred });
+				updateModelInspectionResult(item.id, { starred: !item.starred });
+			}
+			return;
+		}
+		updateModelInspectionResult(item.id, { saving: true });
+		modelInspectionStatus = null;
+		try {
+			const saved = await pushHistory({
+				input: item.input,
+				ddl: item.ddl,
+				score: item.score,
+				svg: item.svg,
+				at: Date.now(),
+				elapsed_ms: item.elapsedMs,
+				stage1_model: item.model,
+				stage2_model: item.stage2Model ?? null,
+				tokens_in: (item.tokensIn ?? 0) + (item.tokensInStage2 ?? 0) || null,
+				tokens_out: (item.tokensOut ?? 0) + (item.tokensOutStage2 ?? 0) || null,
+				catalog_id: item.renderColorCatalogId ?? selectedCatalog,
+				render_build_number: item.renderBuildNumber ?? null,
+				render_color_profile: item.renderColorProfile ?? null,
+				render_engine_id: item.renderEngineId ?? null,
+				render_engine_version: item.renderEngineVersion ?? null,
+				render_color_catalog_id: item.renderColorCatalogId ?? null,
+				render_color_catalog_name: item.renderColorCatalogName ?? null,
+				render_color_catalog_sub: item.renderColorCatalogSub ?? null,
+				render_color_map: item.renderColorMap ?? null,
+				render_canvas_aspect: item.renderCanvasAspect ?? item.renderCanvasAspectId ?? effectiveCanvasAspectId(),
+				render_canvas_aspect_id: item.renderCanvasAspectId ?? item.renderCanvasAspect ?? effectiveCanvasAspectId(),
+				render_canvas_aspect_ratio: item.renderCanvasAspectRatio ?? null,
+				render_seed: item.renderSeed ?? null,
+				vary_seed: item.varySeed ?? null,
+			}, { countGeneration: true });
+			if (!saved?.id) throw new Error('failed to save comparison result');
+			updateModelInspectionResult(item.id, { savedHistoryId: saved.id, starred: !!saved.starred, saving: false });
+			if (options.star) {
+				await toggleHistoryStar({ id: saved.id, starred: !!saved.starred, note: saved.note });
+				updateModelInspectionResult(item.id, { starred: !saved.starred });
+			}
+		} catch (e) {
+			updateModelInspectionResult(item.id, { saving: false });
+			modelInspectionStatus = e instanceof Error ? e.message : String(e);
 		}
 	}
 
@@ -4305,6 +4410,8 @@
 				{modelInspectionResults}
 				onToggleModelInspectionModel={toggleModelInspectionModel}
 				onRunModelInspection={runModelInspection}
+				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
+				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->

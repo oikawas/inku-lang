@@ -14,7 +14,7 @@
 	type HistoryItem = { id?: string; starred?: boolean };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
-	type ModelInspectionResult = { id: string; model: string; label: string; ddl: string; svg: string; tokensIn: number | null; tokensOut: number | null; elapsedMs: number };
+	type ModelInspectionResult = { id: string; model: string; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
 		outputTab: OutputTab;
@@ -89,6 +89,8 @@
 		modelInspectionResults: ModelInspectionResult[];
 		onToggleModelInspectionModel: (modelId: string) => void;
 		onRunModelInspection: () => void | Promise<void>;
+		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
+		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
 	};
 
 	let {
@@ -163,7 +165,9 @@
 		modelInspectionStatus = null,
 		modelInspectionResults = [],
 		onToggleModelInspectionModel,
-		onRunModelInspection
+		onRunModelInspection,
+		onAdoptModelInspectionResult,
+		onToggleModelInspectionStar
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
@@ -450,9 +454,17 @@
 							{#if modelInspectionResults.length > 0}
 								<div class="model-inspection-grid">
 									{#each modelInspectionResults as item (item.id)}
-										<div class="model-inspection-card">
+										<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
 											<div class="comparison-label">{item.label}</div>
 											<div class="comparison-art">{@html item.svg}</div>
+											<div class="model-result-actions">
+												<Tooltip text={item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}>
+													<button class="ghost-btn model-adopt-btn" type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptModelInspectionResult(item)}>{item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdopt}</button>
+												</Tooltip>
+												<Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}>
+													<button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button>
+												</Tooltip>
+											</div>
 											<pre>{item.ddl}</pre>
 										</div>
 									{/each}
@@ -988,6 +1000,36 @@
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 10px;
 	}
+	.model-inspection-card.saved {
+		border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+	}
+	.model-result-actions {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.model-adopt-btn {
+		min-height: 28px;
+		font-size: 11px;
+		padding: 5px 9px;
+	}
+	.model-result-star {
+		width: 30px;
+		height: 30px;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		color: var(--fg3);
+		font-size: 17px;
+		cursor: pointer;
+	}
+	.model-result-star.starred {
+		color: #d59b21;
+		border-color: rgba(213,155,33,0.55);
+		background: #fff7dc;
+	}
+	.model-result-star:disabled { opacity: 0.45; cursor: not-allowed; }
 	.model-inspection-card pre {
 		margin: 8px 0 0;
 		max-height: 120px;

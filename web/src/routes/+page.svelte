@@ -2066,7 +2066,7 @@
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string): Promise<{
 		score: Score;
 		svg: string;
 		stage2_model?: string | null;
@@ -2093,7 +2093,7 @@
 		tokens_out: number | null;
 	}> {
 		const uiLang = getLang();
-		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
+		const resolvedStage2Model = modelOverride ?? qualifiedModelId(stage2Provider, stage2Model);
 		const r = await apiFetch('/api/compose', {
 			method: 'POST',
 			signal,
@@ -3044,7 +3044,7 @@
 				try {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, undefined, model);
-					const composed = await composeOne(interpreted.ddl, source);
+					const composed = await composeOne(interpreted.ddl, source, undefined, model);
 					successful.push({
 						id: model,
 						model,
@@ -3053,7 +3053,7 @@
 						ddl: interpreted.ddl,
 						svg: composed.svg,
 						score: composed.score,
-						stage2Model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
+						stage2Model: composed.stage2_model ?? model,
 						renderBuildNumber: composed.render_build_number ?? null,
 						renderColorProfile: composed.render_color_profile ?? null,
 						renderEngineId: composed.render_engine_id ?? null,

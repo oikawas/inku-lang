@@ -364,50 +364,65 @@
 						</div>
 						{#if result}<span class="seed-summary refine-seed">{seedSummary}</span>{/if}
 					</div>
-					<div class="refine-actions">
-						<Tooltip text={t().tooltipCanvasVaryPerformance}>
-							<button class="ghost-btn variation-btn" onclick={onVaryPerformance} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryPerformance}</button>
-						</Tooltip>
-						<Tooltip text={t().tooltipCanvasVaryComposition}>
-							<button class="ghost-btn variation-btn" onclick={onVaryComposition} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryComposition}</button>
-						</Tooltip>
-						<Tooltip text={t().tooltipCanvasVaryInterpretation}>
-							<button class="ghost-btn variation-btn" onclick={onVaryInterpretation} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryInterpretation}</button>
-						</Tooltip>
-					</div>
-					<div class="refine-actions refine-grid-actions">
-						<Tooltip placement="top-right" text={t().tooltipVariationGridDefault}>
-							<button class="ghost-btn" onclick={() => onGenerateVariationGrid(false)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridDefault}</button>
-						</Tooltip>
-						<Tooltip placement="top" text={t().tooltipVariationGridWithInterpretation}>
-							<button class="ghost-btn" onclick={() => onGenerateVariationGrid(true)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridWithInterpretation}</button>
-						</Tooltip>
-						<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
-							<button class="ghost-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
-						</Tooltip>
-					</div>
-					{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
-					{#if variationGridBusy}
-						<div class="variation-grid-status">{t().refineGenerating}</div>
-					{/if}
-					{#if variationCandidates.length > 0}
-						<div class="variation-grid">
-							{#each variationCandidates as candidate (candidate.id)}
-								<div class="variation-card-wrap">
-									<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
-										<span class="variation-card-art">{@html candidate.result.svg}</span>
-										<span class="variation-card-meta">
-											<span>{candidate.label}</span>
-											<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
-										</span>
-									</button>
-									<button class="variation-select" class:selected={candidate.selected} onclick={() => onToggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
-								</div>
-							{/each}
+					<div class="refine-stage">
+						<div class="refine-target-card">
+							<div class="comparison-label">{t().refineTargetTitle}</div>
+							<div class="comparison-art">{#if result}{@html result.svg}{/if}</div>
+							{#if result}<div class="model-target-meta">{seedSummary}</div>{/if}
 						</div>
-					{:else if !variationGridBusy}
-						<div class="refine-empty">{t().refineEmpty}</div>
-					{/if}
+						<div class="refine-workspace">
+							<div class="refine-actions refine-paint-actions">
+								<Tooltip text={t().tooltipCanvasVaryPerformance}>
+									<div class="refine-action-wrap"><PaintButton onclick={onVaryPerformance} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryPerformance}</PaintButton></div>
+								</Tooltip>
+								<Tooltip text={t().tooltipCanvasVaryComposition}>
+									<div class="refine-action-wrap"><PaintButton onclick={onVaryComposition} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryComposition}</PaintButton></div>
+								</Tooltip>
+								<Tooltip text={t().tooltipCanvasVaryInterpretation}>
+									<div class="refine-action-wrap"><PaintButton onclick={onVaryInterpretation} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryInterpretation}</PaintButton></div>
+								</Tooltip>
+							</div>
+							<div class="refine-actions refine-grid-actions refine-paint-actions">
+								<Tooltip placement="top-right" text={t().tooltipVariationGridDefault}>
+									<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(false)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridDefault}</PaintButton></div>
+								</Tooltip>
+								<Tooltip placement="top" text={t().tooltipVariationGridWithInterpretation}>
+									<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(true)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridWithInterpretation}</PaintButton></div>
+								</Tooltip>
+								<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
+									<button class="ghost-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
+								</Tooltip>
+							</div>
+							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
+							{#if variationBusy || variationGridBusy}
+								<div class="model-drawing-animation" aria-live="polite">
+									<div class="model-drawing-spinner" aria-hidden="true"></div>
+									<div>
+										<strong>{t().refineGenerating}</strong>
+										<span>{t().refineGeneratingBody}</span>
+									</div>
+								</div>
+							{/if}
+							{#if variationCandidates.length > 0}
+								<div class="variation-grid">
+									{#each variationCandidates as candidate (candidate.id)}
+										<div class="variation-card-wrap">
+											<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
+												<span class="variation-card-art">{@html candidate.result.svg}</span>
+												<span class="variation-card-meta">
+													<span>{candidate.label}</span>
+													<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
+												</span>
+											</button>
+											<button class="variation-select" class:selected={candidate.selected} onclick={() => onToggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
+										</div>
+									{/each}
+								</div>
+							{:else if !variationBusy && !variationGridBusy}
+								<div class="refine-empty">{t().refineEmpty}</div>
+							{/if}
+						</div>
+					</div>
 				</div>
 			{:else if outputTab === 'compare'}
 				<div class="compare-panel">
@@ -817,14 +832,36 @@
 		line-height: 1.5;
 	}
 	.refine-seed { margin: 0; }
+	.refine-stage {
+		display: grid;
+		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+		gap: 14px;
+		align-items: start;
+	}
+	.refine-target-card {
+		position: sticky;
+		top: 0;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		padding: 8px;
+		min-width: 0;
+	}
+	.refine-workspace {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
 	.refine-actions {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
 	}
-	.refine-actions .variation-btn {
-		min-width: 112px;
-	}
+	.refine-paint-actions { align-items: stretch; }
+	.refine-action-wrap { width: min(210px, 100%); }
+	.refine-action-wrap :global(.tooltip-wrap),
+	.refine-action-wrap :global(.paint-btn) { width: 100%; }
+	.refine-action-wrap :global(.paint-btn) { margin-top: 0; min-height: 34px; font-size: 12px; letter-spacing: 0.03em; }
 	.refine-grid-actions {
 		padding-top: 4px;
 		border-top: 1px solid var(--border);

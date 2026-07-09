@@ -202,7 +202,9 @@ export interface LangPack {
 	canvasSeedSummary: string;
 	refineTitle: string;
 	refineSubtitle: string;
+	refineTargetTitle: string;
 	refineGenerating: string;
+	refineGeneratingBody: string;
 	refineEmpty: string;
 	canvasPresentationOpen: string;
 	canvasPresentationClose: string;

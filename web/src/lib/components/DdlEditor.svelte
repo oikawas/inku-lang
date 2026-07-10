@@ -2,6 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import DdlEditPanel from './DdlEditPanel.svelte';
 	import PaintButton from './PaintButton.svelte';
+	import Tooltip from './Tooltip.svelte';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -86,12 +87,15 @@
 		onReplay={onReplay}
 	/>
 	{#if !reloading && !loading}
-		<PaintButton onclick={onReplay} disabled={!ddl.trim()}>{t().ddlPaintButton}</PaintButton>
+		<Tooltip placement="top" text={t().tooltipDdlPaint}>
+			<PaintButton onclick={onReplay} disabled={!ddl.trim()}>{t().ddlPaintButton}</PaintButton>
+		</Tooltip>
 	{/if}
 </section>
 
 <style>
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
+	.panel-section > :global(.tooltip-wrap) { width: 100%; }
 	.section-head {
 		display: flex;
 		justify-content: space-between;

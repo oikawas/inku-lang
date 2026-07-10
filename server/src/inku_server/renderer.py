@@ -17,7 +17,7 @@ from xml.sax.saxutils import escape
 import svgwrite
 
 from .plugins import CanvasSize, canvas_size_for_aspect
-from .schema import Instruction, Score, Variation
+from .schema import CanvasGroundSpec, CanvasSpec, Instruction, Score, SurfaceSpec, Variation
 
 CANVAS_PX = 1000
 
@@ -713,6 +713,225 @@ def _inject_texture_filters(svg: str, filters: set[str]) -> str:
     return svg.replace("<defs>", f"<defs>{filter_xml}", 1)
 
 
+
+def _score_canvas_aspect(score: Score) -> str:
+    if isinstance(score.canvas, CanvasSpec):
+        return score.canvas.aspect
+    return str(score.canvas or "square")
+
+
+def _score_canvas_ground(score: Score) -> CanvasGroundSpec | None:
+    if isinstance(score.canvas, CanvasSpec):
+        ground = score.canvas.ground
+        if ground is not None and ground.material != "plain":
+            return ground
+    return None
+
+
+def _texture_seed(score: Score, kind: str, render_seed: int | None, index: int = 0) -> int:
+    payload = score.model_dump(mode="json", by_alias=True)
+    key = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if render_seed is not None:
+        key += f":render:{render_seed}"
+    key += f":texture:{kind}:{index}"
+    return struct.unpack("<Q", hashlib.sha256(key.encode("utf-8")).digest()[:8])[0]
+
+
+def _ground_tone_color(ground: CanvasGroundSpec, bg: str) -> str:
+    return {
+        "white": bg,
+        "off_white": "#f7f3e8",
+        "warm": "#f3ead8",
+        "cool": "#eef3f4",
+        "gray": "#e4e2dc",
+        "black": "#151515",
+    }.get(ground.tone, bg)
+
+
+def _ground_dot_count(ground: CanvasGroundSpec, profile: str) -> int:
+    base = {"fine": 70, "medium": 45, "coarse": 28, "none": 18}.get(ground.grain, 45)
+    count = max(4, int(base * max(0.05, ground.density)))
+    if profile == "compat":
+        return min(18, count)
+    if profile == "editable":
+        return min(90, count)
+    return min(140, count)
+
+
+def _ground_filter_xml(ground: CanvasGroundSpec, seed: int, filter_id: str) -> str:
+    freq = {"fine": "0.95", "medium": "0.55", "coarse": "0.28", "none": "0.45"}.get(ground.grain, "0.55")
+    opacity = min(0.18, max(0.02, ground.opacity))
+    return (
+        f'<filter id="{filter_id}" x="0" y="0" width="100%" height="100%">'
+        f'<feTurbulence type="fractalNoise" baseFrequency="{freq}" numOctaves="2" seed="{seed % 9973}" result="noise"/>'
+        '<feColorMatrix in="noise" type="saturate" values="0" result="mono"/>'
+        f'<feComponentTransfer in="mono"><feFuncA type="table" tableValues="0 {opacity:.3f}"/></feComponentTransfer>'
+        '</filter>'
+    )
+
+
+def _render_canvas_ground(dwg: svgwrite.Drawing, score: Score, canvas: CanvasSize, bg: str, *, profile: str, render_seed: int | None):
+    ground = _score_canvas_ground(score)
+    if ground is None:
+        return None, None
+    seed = int(ground.seed if ground.seed is not None else _texture_seed(score, "canvas-ground", render_seed))
+    tone = _ground_tone_color(ground, bg)
+    group = dwg.g(id="layer_01_canvas_ground")
+    group.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=tone, opacity=0.98))
+    if profile == "display":
+        fid = _safe_svg_id(f"ground_texture_{seed % 100000}")
+        group.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill="#777777", opacity=1.0, filter=f"url(#{fid})"))
+        return group, _ground_filter_xml(ground, seed, fid)
+    color = "#777777" if ground.material != "charcoal_ground" else "#222222"
+    count = _ground_dot_count(ground, profile)
+    radius = {"fine": 0.7, "medium": 1.1, "coarse": 1.8, "none": 0.6}.get(ground.grain, 1.0)
+    for i in range(count):
+        x = _hash01(i, seed, "ground-x") * canvas.width
+        y = _hash01(i, seed, "ground-y") * canvas.height
+        if ground.grain == "coarse" and i % 3 == 0:
+            group.add(dwg.line(start=(x - radius * 2.4, y), end=(x + radius * 2.4, y + _hash_to_unit(i, seed) * radius), stroke=color, stroke_width=max(0.4, radius * 0.45), stroke_opacity=min(0.18, ground.opacity), stroke_linecap="round"))
+        else:
+            group.add(dwg.circle(center=(x, y), r=radius * (0.55 + _hash01(i, seed, "ground-r") * 0.8), fill=color, opacity=min(0.18, ground.opacity)))
+    return group, None
+
+
+def _surface_seed(ins: Instruction, ins_idx: int, mark_idx: int, render_seed: int | None) -> int:
+    if ins.surface is not None and ins.surface.seed is not None:
+        return int(ins.surface.seed)
+    key = ins.model_dump_json(by_alias=True) + f":surface:{ins_idx}:{mark_idx}:{render_seed}"
+    return struct.unpack("<Q", hashlib.sha256(key.encode("utf-8")).digest()[:8])[0]
+
+
+def _shape_bbox(ins: Instruction, canvas: CanvasSize) -> tuple[float, float, float, float] | None:
+    if ins.primitive == "circle" and ins.center is not None and ins.radius is not None:
+        cx, cy = _px(ins.center, canvas)
+        r = ins.radius * canvas.unit
+        return cx - r, cy - r, r * 2, r * 2
+    if ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
+        cx, cy = _px(ins.center, canvas)
+        w = ins.size[0] * canvas.width
+        h = ins.size[1] * canvas.height
+        return cx - w / 2, cy - h / 2, w, h
+    if ins.primitive in ("square", "triangle") and ins.position is not None and ins.size is not None:
+        x, y = _px(ins.position, canvas)
+        return x, y, ins.size[0] * canvas.width, ins.size[1] * canvas.height
+    if ins.primitive == "polygon" and ins.center is not None and ins.radius is not None:
+        cx, cy = _px(ins.center, canvas)
+        r = ins.radius * canvas.unit
+        return cx - r, cy - r, r * 2, r * 2
+    return None
+
+
+def _add_shape_to_clip(dwg: svgwrite.Drawing, clip, ins: Instruction, canvas: CanvasSize) -> None:
+    if ins.primitive == "circle" and ins.center is not None and ins.radius is not None:
+        cx, cy = _px(ins.center, canvas)
+        clip.add(dwg.circle(center=(cx, cy), r=ins.radius * canvas.unit))
+    elif ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
+        cx, cy = _px(ins.center, canvas)
+        clip.add(dwg.ellipse(center=(cx, cy), r=(ins.size[0] * canvas.width / 2, ins.size[1] * canvas.height / 2)))
+    elif ins.primitive == "square" and ins.position is not None and ins.size is not None:
+        x, y = _px(ins.position, canvas)
+        clip.add(dwg.rect(insert=(x, y), size=(ins.size[0] * canvas.width, ins.size[1] * canvas.height)))
+    elif ins.primitive == "triangle" and ins.position is not None and ins.size is not None:
+        x, y = _px(ins.position, canvas)
+        w = ins.size[0] * canvas.width
+        h = ins.size[1] * canvas.height
+        clip.add(dwg.polygon(points=[(x + w / 2, y), (x, y + h), (x + w, y + h)]))
+    elif ins.primitive == "polygon" and ins.center is not None and ins.radius is not None:
+        cx, cy = _px(ins.center, canvas)
+        clip.add(dwg.polygon(points=_polygon_points(cx, cy, ins.radius * canvas.unit, ins.sides or 5, ins.rotation or 0.0)))
+
+
+def _surface_color(ins: Instruction, cmap: dict[str, str]) -> str:
+    return _resolve_color(ins.color, ins.color_hint, cmap)
+
+
+def _surface_line_angle(surface: SurfaceSpec) -> float:
+    return {"horizontal": 0.0, "vertical": math.pi / 2, "diagonal_rising": -math.pi / 4, "diagonal_falling": math.pi / 4, "none": math.pi / 4}.get(surface.direction, math.pi / 4)
+
+
+def _render_surface_vectors(dwg: svgwrite.Drawing, group, ins: Instruction, canvas: CanvasSize, cmap: dict[str, str], *, seed: int, clipped: bool) -> None:
+    surface = ins.surface
+    bbox = _shape_bbox(ins, canvas)
+    if surface is None or surface.texture == "none" or bbox is None:
+        return
+    x, y, w, h = bbox
+    color = _surface_color(ins, cmap)
+    opacity = min(0.75, surface.opacity)
+    density = max(0.02, surface.density)
+    scale = max(0.04, surface.scale)
+    area_factor = max(0.2, min(1.8, (w * h) / (canvas.unit * canvas.unit * 0.18)))
+    if surface.texture in {"stipple", "grain", "paper_grain", "wash"}:
+        count = int((22 + density * 120) * area_factor)
+        radius = max(0.45, canvas.unit * (0.002 + scale * 0.004))
+        if surface.texture == "wash":
+            count = max(8, int(count * 0.28))
+            radius *= 3.5
+            opacity *= 0.42
+        for i in range(min(count, 180 if clipped else 90)):
+            px = x + _hash01(i, seed, "surface-x") * w
+            py = y + _hash01(i, seed, "surface-y") * h
+            group.add(dwg.circle(center=(px, py), r=radius * (0.55 + _hash01(i, seed, "surface-r") * 1.1), fill=color, opacity=opacity * (0.45 + _hash01(i, seed, "surface-o") * 0.55), stroke="none"))
+    elif surface.texture == "hatch":
+        angle = _surface_line_angle(surface)
+        spacing = max(5.0, canvas.unit * (0.010 + (1.0 - density) * 0.025))
+        span = math.hypot(w, h) * 1.3
+        cx = x + w / 2
+        cy = y + h / 2
+        ux, uy = math.cos(angle), math.sin(angle)
+        nx, ny = -uy, ux
+        count = min(80, max(3, int(span / spacing)))
+        for i in range(-count // 2, count // 2 + 1):
+            jitter = _hash_to_unit(i + 500, seed) * spacing * 0.16
+            ox = nx * (i * spacing + jitter)
+            oy = ny * (i * spacing + jitter)
+            group.add(dwg.line(start=(cx + ox - ux * span / 2, cy + oy - uy * span / 2), end=(cx + ox + ux * span / 2, cy + oy + uy * span / 2), stroke=color, stroke_width=max(0.45, canvas.unit * 0.0016), stroke_opacity=opacity, stroke_linecap="round"))
+    elif surface.texture == "bleed":
+        blur = max(1.0, canvas.unit * (0.006 + surface.bleed * 0.018))
+        group.add(dwg.ellipse(center=(x + w / 2, y + h / 2), r=(w / 2 + blur, h / 2 + blur), fill=color, opacity=min(0.26, opacity * 0.42), stroke="none"))
+
+
+def _render_surface_texture(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str, str], canvas: CanvasSize, *, profile: str, render_seed: int | None, ins_idx: int, mark_idx: int):
+    surface = ins.surface
+    if surface is None or surface.texture == "none" or ins.primitive not in _CLOSED_SHAPES:
+        return None, None
+    seed = _surface_seed(ins, ins_idx, mark_idx, render_seed)
+    gid = _safe_svg_id(f"surface_{ins_idx:03d}_{mark_idx:03d}_{surface.texture}")
+    group = dwg.g(id=gid)
+    if profile == "display":
+        clip_id = _safe_svg_id(f"clip_{gid}_{seed % 100000}")
+        clip = dwg.defs.add(dwg.clipPath(id=clip_id))
+        _add_shape_to_clip(dwg, clip, ins, canvas)
+        group["clip-path"] = f"url(#{clip_id})"
+        if surface.texture in {"wash", "bleed"}:
+            fid = _safe_svg_id(f"surface_filter_{gid}_{seed % 100000}")
+            bbox = _shape_bbox(ins, canvas)
+            if bbox is not None:
+                x, y, w, h = bbox
+                color = _surface_color(ins, cmap)
+                rect = dwg.rect(insert=(x, y), size=(w, h), fill=color, opacity=min(0.55, surface.opacity), filter=f"url(#{fid})")
+                group.add(rect)
+                return group, f'<filter id="{fid}" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="0.18" numOctaves="2" seed="{seed % 9973}" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="{1.5 + surface.bleed * 9:.2f}"/><feGaussianBlur stdDeviation="{surface.bleed * 5:.2f}"/></filter>'
+        _render_surface_vectors(dwg, group, ins, canvas, cmap, seed=seed, clipped=True)
+        return group, None
+    _render_surface_vectors(dwg, group, ins, canvas, cmap, seed=seed, clipped=False)
+    return group, None
+
+
+def build_texture_metadata(score: Score, *, svg_profile: str | None = None) -> dict:
+    profile = _normalize_svg_profile(svg_profile)
+    ground = _score_canvas_ground(score)
+    surfaces = []
+    for idx, ins in enumerate(score.instructions):
+        if ins.surface is not None and ins.surface.texture != "none":
+            surfaces.append({"instruction_index": idx, "texture": ins.surface.texture, "density": ins.surface.density, "opacity": ins.surface.opacity})
+    metadata = {"render_texture_version": "1", "render_texture_profile": profile, "texture_degraded": profile == "compat" and bool(surfaces)}
+    if ground is not None:
+        metadata["render_canvas_ground"] = ground.model_dump(mode="json", exclude_none=True)
+    if surfaces:
+        metadata["render_surface_textures"] = surfaces
+    return metadata
+
 def _normalize_svg_profile(svg_profile: str | None) -> str:
     profile = (svg_profile or "display").strip().lower()
     if profile not in SVG_PROFILES:
@@ -765,12 +984,16 @@ def render(
     structured = profile != "display"
     use_filters = profile == "display"
     cmap = {**COLOR_MAP, **(color_map or {})}
-    canvas = canvas_size_for_aspect(canvas_aspect or score.canvas)
+    canvas = canvas_size_for_aspect(canvas_aspect or _score_canvas_aspect(score))
     dwg = svgwrite.Drawing(
         size=(canvas.width, canvas.height),
         viewBox=f"0 0 {canvas.width} {canvas.height}",
     )
     bg = cmap.get(score.background, BACKGROUND)
+    ground_layer, ground_filter_xml = _render_canvas_ground(
+        dwg, score, canvas, bg, profile=profile, render_seed=render_seed
+    )
+    surface_filter_xml: list[str] = []
     if structured:
         artboard = dwg.g(id="inku_artboard")
         background = dwg.g(id="layer_00_background")
@@ -778,10 +1001,14 @@ def render(
         content = dwg.g(id="layer_10_content")
         presence_content = dwg.g(id="layer_20_presence")
         artboard.add(background)
+        if ground_layer is not None:
+            artboard.add(ground_layer)
         artboard.add(content)
         artboard.add(presence_content)
     else:
         dwg.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=bg))
+        if ground_layer is not None:
+            dwg.add(ground_layer)
         clip_id = "canvas-clip"
         clip = dwg.defs.add(dwg.clipPath(id=clip_id))
         clip.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height)))
@@ -809,6 +1036,14 @@ def render(
                     element["id"] = eid
                     blur_elems.append((eid, v.amplitude))
                 instruction_group.add(element)
+            surface_group, surface_filter = _render_surface_texture(
+                dwg, single, cmap, canvas, profile=profile, render_seed=render_seed,
+                ins_idx=ins_idx, mark_idx=mark_idx,
+            )
+            if surface_group is not None:
+                instruction_group.add(surface_group)
+            if surface_filter is not None:
+                surface_filter_xml.append(surface_filter)
             elem_idx += 1
         if structured:
             content.add(instruction_group)
@@ -822,6 +1057,14 @@ def render(
     else:
         dwg.add(content)
     svg = dwg.tostring()
+    if ground_filter_xml or surface_filter_xml:
+        extra_filter_xml = (ground_filter_xml or "") + "".join(surface_filter_xml)
+        if "<defs />" in svg:
+            svg = svg.replace("<defs />", f"<defs>{extra_filter_xml}</defs>", 1)
+        elif "<defs/>" in svg:
+            svg = svg.replace("<defs/>", f"<defs>{extra_filter_xml}</defs>", 1)
+        else:
+            svg = svg.replace("<defs>", f"<defs>{extra_filter_xml}", 1)
     svg = _inject_texture_filters(svg, texture_filters)
     if blur_elems:
         svg = _inject_blur_filters(svg, blur_needed, blur_elems)

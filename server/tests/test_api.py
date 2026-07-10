@@ -391,10 +391,40 @@ def test_current_user_model_selection_is_persisted(auth_context):
     assert updated.status_code == 200
     assert updated.json()["model_settings"]["stage1_provider"] == "openai"
     assert updated.json()["model_settings"]["stage2_model"] == "gemini:gemini-2.5-flash"
+    assert updated.json()["model_settings"]["model_inspection_selected_models"] == []
+
+    comparison_models = [
+        "nvidia:google/gemma-4-31b-it",
+        "nvidia:google/gemma-4-31b-it",
+        "",
+        123,
+        "openai:gpt-5.1",
+        "gemini:gemini-2.5-pro",
+        "anthropic:claude-sonnet-4-6",
+        "ollama:llama3.2",
+    ]
+    selected = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"model_settings": {"model_inspection_selected_models": comparison_models}},
+    )
+    assert selected.status_code == 200
+    assert selected.json()["model_settings"]["model_inspection_selected_models"] == [
+        "nvidia:google/gemma-4-31b-it",
+        "openai:gpt-5.1",
+        "gemini:gemini-2.5-pro",
+        "anthropic:claude-sonnet-4-6",
+    ]
 
     me = client.get("/api/auth/me", headers=headers)
     assert me.status_code == 200
     assert me.json()["model_settings"]["stage1_model"] == "openai:gpt-5.1-mini"
+    assert me.json()["model_settings"]["model_inspection_selected_models"] == [
+        "nvidia:google/gemma-4-31b-it",
+        "openai:gpt-5.1",
+        "gemini:gemini-2.5-pro",
+        "anthropic:claude-sonnet-4-6",
+    ]
 
 
 def test_current_user_profile_can_be_updated(auth_context):

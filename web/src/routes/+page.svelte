@@ -183,6 +183,7 @@
 		stage1_model: string;
 		stage2_provider: Provider;
 		stage2_model: string;
+		model_inspection_selected_models?: string[];
 	};
 	type ModelProviderSetting = {
 		label?: string;
@@ -296,7 +297,38 @@
 	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
-	type ModelInspectionResult = { id: string; model: string; ddl: string; svg: string; tokensIn: number | null; tokensOut: number | null; elapsedMs: number };
+	type ModelInspectionResult = {
+		id: string;
+		model: string;
+		label: string;
+		input: string;
+		ddl: string;
+		svg: string;
+		score: Score;
+		stage2Model?: string | null;
+		renderBuildNumber?: string | null;
+		renderColorProfile?: Record<string, string> | null;
+		renderEngineId?: string | null;
+		renderEngineVersion?: string | null;
+		renderColorCatalogId?: string | null;
+		renderColorCatalogName?: string | null;
+		renderColorCatalogSub?: string | null;
+		renderColorMap?: Record<string, string> | null;
+		renderCanvasAspect?: string | null;
+		renderCanvasAspectId?: string | null;
+		renderCanvasAspectRatio?: number | null;
+		renderSeed?: number | null;
+		varySeed?: number | null;
+		tokensIn: number | null;
+		tokensOut: number | null;
+		tokensInStage2: number | null;
+		tokensOutStage2: number | null;
+		elapsedMs: number;
+		savedHistoryId?: string | null;
+		starred?: boolean;
+		saving?: boolean;
+	};
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
@@ -305,6 +337,8 @@
 	let modelInspectionBusy = $state(false);
 	let modelInspectionStatus = $state<string | null>(null);
 	let modelInspectionResults = $state<ModelInspectionResult[]>([]);
+	let modelInspectionSelectedModels = $state<string[]>([]);
+	let modelInspectionFailedModels = $state<Record<string, string>>({});
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -324,7 +358,7 @@
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
-	let outputTab    = $state<'canvas' | 'prompts' | 'score'>('canvas');
+	let outputTab    = $state<'canvas' | 'refine' | 'compare' | 'prompts' | 'score'>('canvas');
 	let zoom         = $state(1);
 	let canvasFitZoom = $state(1);
 	let panX         = $state(0);
@@ -534,6 +568,9 @@
 		stage1Model = settings.stage1_model;
 		stage2Provider = settings.stage2_provider;
 		stage2Model = settings.stage2_model;
+		modelInspectionSelectedModels = Array.isArray(settings.model_inspection_selected_models)
+			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
+			: [];
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
@@ -857,6 +894,7 @@
 			stage1_model: stage1Model,
 			stage2_provider: stage2Provider,
 			stage2_model: stage2Model,
+			model_inspection_selected_models: modelInspectionSelectedModels,
 		};
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
@@ -2028,7 +2066,7 @@
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string): Promise<{
 		score: Score;
 		svg: string;
 		stage2_model?: string | null;
@@ -2055,7 +2093,7 @@
 		tokens_out: number | null;
 	}> {
 		const uiLang = getLang();
-		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
+		const resolvedStage2Model = modelOverride ?? qualifiedModelId(stage2Provider, stage2Model);
 		const r = await apiFetch('/api/compose', {
 			method: 'POST',
 			signal,
@@ -2914,89 +2952,206 @@
 		};
 	}
 
-	const previousComparisonItem = $derived.by(() => {
-		if (historyCursor >= 0 && historyCursor + 1 < historyItems.length) return historyItems[historyCursor + 1];
-		if (!displayedHistoryItem && result && historyItems.length > 0) return historyItems[0];
-		return null;
-	});
 	const activeComparisonItem = $derived(currentComparisonItem());
-	const comparisonDiffParts = $derived(activeComparisonItem && previousComparisonItem
-		? buildPromptDiffParts(previousComparisonItem.input, activeComparisonItem.input)
-		: []);
 
-	function buildPromptDiffParts(beforeText: string, afterText: string): TextDiffPart[] {
-		const tokenize = (value: string) => {
-			const trimmed = value.trim();
-			if (!trimmed) return [];
-			if (/\s/.test(trimmed)) return trimmed.split(/(\s+)/).filter(Boolean);
-			return Array.from(trimmed);
-		};
-		const before = tokenize(beforeText);
-		const after = tokenize(afterText);
-		let prefix = 0;
-		while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;
-		let suffix = 0;
-		while (suffix + prefix < before.length && suffix + prefix < after.length && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix += 1;
-		const parts: TextDiffPart[] = [];
-		if (prefix > 0) parts.push({ kind: "same", text: before.slice(0, prefix).join("") });
-		const removed = before.slice(prefix, before.length - suffix).join("");
-		const added = after.slice(prefix, after.length - suffix).join("");
-		if (removed) parts.push({ kind: "removed", text: removed });
-		if (added) parts.push({ kind: "added", text: added });
-		if (suffix > 0) parts.push({ kind: "same", text: before.slice(before.length - suffix).join("") });
-		return parts;
-	}
 
-	function alternateStage1Model(): string | null {
-		const current = qualifiedModelId(stage1Provider, stage1Model);
-		const currentProviderGroup = availableModelCatalog.find((group) => group.id === stage1Provider);
-		const sameProviderGroups = availableModelCatalog.filter((group) => group.id === stage1Provider);
-		const localProviderGroups = availableModelCatalog.filter((group) => group.id !== stage1Provider && group.requires_api_key === false);
-		const remainingProviderGroups = availableModelCatalog.filter(
-			(group) => group.id !== stage1Provider && group.requires_api_key !== false,
-		);
-		const providerGroups = currentProviderGroup?.requires_api_key === false
-			? [...sameProviderGroups, ...localProviderGroups, ...remainingProviderGroups]
-			: [...localProviderGroups, ...sameProviderGroups, ...remainingProviderGroups];
-		for (const group of providerGroups) {
+	function modelInspectionModelChoices(): ModelInspectionChoice[] {
+		const seen = new Set<string>();
+		const choices: ModelInspectionChoice[] = [];
+		for (const group of availableModelCatalog) {
 			for (const model of group.models) {
-				const candidate = qualifiedModelId(group.id as Provider, model.id);
-				if (candidate !== current) return candidate;
+				const id = qualifiedModelId(group.id as Provider, model.id);
+				if (seen.has(id)) continue;
+				seen.add(id);
+				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id) });
 			}
 		}
-		return null;
+		return choices;
+	}
+
+	const modelInspectionChoices = $derived(modelInspectionModelChoices());
+
+	const modelInspectionTargetModel = $derived(result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model));
+
+	async function persistModelInspectionSelection(models: string[]) {
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					model_settings: {
+						model_inspection_selected_models: models.slice(0, 4),
+					},
+				}),
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			console.warn('failed to save model comparison selection', e);
+		}
+	}
+
+	$effect(() => {
+		const available = new Set(modelInspectionChoices.map((choice) => choice.id));
+		const target = modelInspectionTargetModel;
+		const next = modelInspectionSelectedModels.filter((id) => available.has(id) && id !== target).slice(0, 4);
+		if (next.join("\n") !== modelInspectionSelectedModels.join("\n")) {
+			modelInspectionSelectedModels = next;
+			void persistModelInspectionSelection(next);
+		}
+	});
+
+	function toggleModelInspectionModel(modelId: string) {
+		if (modelInspectionBusy || modelId === modelInspectionTargetModel) return;
+		if (modelInspectionSelectedModels.includes(modelId)) {
+			const next = modelInspectionSelectedModels.filter((id) => id !== modelId);
+			modelInspectionSelectedModels = next;
+			void persistModelInspectionSelection(next);
+			return;
+		}
+		if (modelInspectionSelectedModels.length >= 4) {
+			modelInspectionStatus = t().modelCompareMaxSelected;
+			return;
+		}
+		const next = [...modelInspectionSelectedModels, modelId];
+		modelInspectionSelectedModels = next;
+		if (modelInspectionFailedModels[modelId]) {
+			const { [modelId]: _failed, ...rest } = modelInspectionFailedModels;
+			modelInspectionFailedModels = rest;
+		}
+		void persistModelInspectionSelection(next);
+		modelInspectionStatus = null;
 	}
 
 	async function runModelInspection() {
 		if (modelInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const currentModel = qualifiedModelId(stage1Provider, stage1Model);
-		const altModel = alternateStage1Model();
-		const models = altModel ? [currentModel, altModel] : [currentModel];
+		const selectedModels = modelInspectionSelectedModels.slice(0, 4);
+		if (selectedModels.length === 0) {
+			modelInspectionStatus = t().modelCompareSelectPrompt;
+			return;
+		}
+		const renderedModels = new Set(modelInspectionResults.map((item) => item.model));
+		const models = selectedModels.filter((model) => !renderedModels.has(model));
+		if (models.length === 0) {
+			modelInspectionStatus = t().modelCompareAllRendered;
+			return;
+		}
 		modelInspectionBusy = true;
 		modelInspectionStatus = null;
+		modelInspectionFailedModels = Object.fromEntries(Object.entries(modelInspectionFailedModels).filter(([id]) => !models.includes(id)));
+		const successful = [...modelInspectionResults];
+		const failed: Record<string, string> = {};
 		try {
-			modelInspectionResults = await Promise.all(models.map(async (model) => {
-				const started = Date.now();
-				const interpreted = await interpretOne(source, undefined, model);
-				const composed = await composeOne(interpreted.ddl, source);
-				return {
-					id: model,
-					model,
-					ddl: interpreted.ddl,
-					svg: composed.svg,
-					tokensIn: interpreted.tokens_in,
-					tokensOut: interpreted.tokens_out,
-					elapsedMs: Date.now() - started,
-				};
-			}));
-		} catch (e) {
-			modelInspectionStatus = e instanceof Error ? e.message : String(e);
+			for (const model of models) {
+				try {
+					const started = Date.now();
+					const interpreted = await interpretOne(source, undefined, model);
+					const composed = await composeOne(interpreted.ddl, source, undefined, model);
+					successful.push({
+						id: model,
+						model,
+						label: statusModelName(model),
+						input: source,
+						ddl: interpreted.ddl,
+						svg: composed.svg,
+						score: composed.score,
+						stage2Model: composed.stage2_model ?? model,
+						renderBuildNumber: composed.render_build_number ?? null,
+						renderColorProfile: composed.render_color_profile ?? null,
+						renderEngineId: composed.render_engine_id ?? null,
+						renderEngineVersion: composed.render_engine_version ?? null,
+						renderColorCatalogId: composed.render_color_catalog_id ?? null,
+						renderColorCatalogName: composed.render_color_catalog_name ?? null,
+						renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
+						renderColorMap: composed.render_color_map ?? null,
+						renderCanvasAspect: composed.render_canvas_aspect ?? null,
+						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
+						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
+						renderSeed: composed.render_seed ?? null,
+						varySeed: composed.vary_seed ?? null,
+						tokensIn: interpreted.tokens_in,
+						tokensOut: interpreted.tokens_out,
+						tokensInStage2: composed.tokens_in,
+						tokensOutStage2: composed.tokens_out,
+						elapsedMs: Date.now() - started,
+						savedHistoryId: null,
+						starred: false,
+						saving: false,
+					});
+					modelInspectionResults = [...successful];
+				} catch (e) {
+					failed[model] = e instanceof Error ? e.message : String(e);
+					modelInspectionFailedModels = { ...modelInspectionFailedModels, [model]: failed[model] };
+					const next = modelInspectionSelectedModels.filter((id) => id !== model);
+					modelInspectionSelectedModels = next;
+					void persistModelInspectionSelection(next);
+				}
+			}
+			if (Object.keys(failed).length > 0) {
+				modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
+			}
 		} finally {
 			modelInspectionBusy = false;
 		}
 	}
+
+	function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
+		modelInspectionResults = modelInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
+	}
+
+	async function saveModelInspectionResult(item: ModelInspectionResult, options: { star?: boolean } = {}) {
+		if (item.saving) return;
+		if (item.savedHistoryId) {
+			if (options.star) {
+				await toggleHistoryStar({ id: item.savedHistoryId, starred: !!item.starred });
+				updateModelInspectionResult(item.id, { starred: !item.starred });
+			}
+			return;
+		}
+		updateModelInspectionResult(item.id, { saving: true });
+		modelInspectionStatus = null;
+		try {
+			const saved = await pushHistory({
+				input: item.input,
+				ddl: item.ddl,
+				score: item.score,
+				svg: item.svg,
+				at: Date.now(),
+				elapsed_ms: item.elapsedMs,
+				stage1_model: item.model,
+				stage2_model: item.stage2Model ?? null,
+				tokens_in: (item.tokensIn ?? 0) + (item.tokensInStage2 ?? 0) || null,
+				tokens_out: (item.tokensOut ?? 0) + (item.tokensOutStage2 ?? 0) || null,
+				catalog_id: item.renderColorCatalogId ?? selectedCatalog,
+				render_build_number: item.renderBuildNumber ?? null,
+				render_color_profile: item.renderColorProfile ?? null,
+				render_engine_id: item.renderEngineId ?? null,
+				render_engine_version: item.renderEngineVersion ?? null,
+				render_color_catalog_id: item.renderColorCatalogId ?? null,
+				render_color_catalog_name: item.renderColorCatalogName ?? null,
+				render_color_catalog_sub: item.renderColorCatalogSub ?? null,
+				render_color_map: item.renderColorMap ?? null,
+				render_canvas_aspect: item.renderCanvasAspect ?? item.renderCanvasAspectId ?? effectiveCanvasAspectId(),
+				render_canvas_aspect_id: item.renderCanvasAspectId ?? item.renderCanvasAspect ?? effectiveCanvasAspectId(),
+				render_canvas_aspect_ratio: item.renderCanvasAspectRatio ?? null,
+				render_seed: item.renderSeed ?? null,
+				vary_seed: item.varySeed ?? null,
+			}, { countGeneration: true });
+			if (!saved?.id) throw new Error('failed to save comparison result');
+			updateModelInspectionResult(item.id, { savedHistoryId: saved.id, starred: !!saved.starred, saving: false });
+			if (options.star) {
+				await toggleHistoryStar({ id: saved.id, starred: !!saved.starred, note: saved.note });
+				updateModelInspectionResult(item.id, { starred: !saved.starred });
+			}
+		} catch (e) {
+			updateModelInspectionResult(item.id, { saving: false });
+			modelInspectionStatus = e instanceof Error ? e.message : String(e);
+		}
+	}
+
 
 	async function replayHistoryItem(it: Iteration) {
 		if (demoRunning || reloading) return;
@@ -4155,38 +4310,6 @@
 						/>
 					{/if}
 
-					{#if result && inputMode === "single"}
-						<section class="panel-section variation-grid-section">
-							<div class="variation-grid-actions">
-								<Tooltip text={t().tooltipVariationGridDefault}>
-									<button class="ghost-btn" onclick={() => generateVariationGrid(false)} disabled={variationGridBusy}>{t().variationGridDefault}</button>
-								</Tooltip>
-								<Tooltip text={t().tooltipVariationGridWithInterpretation}>
-									<button class="ghost-btn" onclick={() => generateVariationGrid(true)} disabled={variationGridBusy}>{t().variationGridWithInterpretation}</button>
-								</Tooltip>
-								<Tooltip text={t().tooltipVariationGridSaveSelected}>
-									<button class="ghost-btn" onclick={saveSelectedVariationCandidates} disabled={variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
-								</Tooltip>
-							</div>
-							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
-							{#if variationCandidates.length > 0}
-								<div class="variation-grid">
-									{#each variationCandidates as candidate (candidate.id)}
-										<div class="variation-card-wrap">
-											<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => showVariationCandidate(candidate)} type="button">
-												<span class="variation-card-art">{@html candidate.result.svg}</span>
-												<span class="variation-card-meta">
-													<span>{candidate.label}</span>
-													<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
-												</span>
-											</button>
-											<button class="variation-select" class:selected={candidate.selected} onclick={() => toggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</section>
-					{/if}
 
 					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
 						<section class="panel-section interpretation-diff">
@@ -4196,44 +4319,6 @@
 						</section>
 					{/if}
 
-					{#if result && inputMode === "single"}
-						<section class="panel-section comparison-section">
-							<div class="comparison-actions">
-								<Tooltip text={t().tooltipModelCompare}>
-									<button class="ghost-btn" onclick={runModelInspection} disabled={modelInspectionBusy}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</button>
-								</Tooltip>
-							</div>
-							{#if previousComparisonItem && activeComparisonItem}
-								<div class="comparison-pair">
-									<div class="comparison-card">
-										<div class="comparison-label">{t().comparisonPrev}</div>
-										<div class="comparison-art">{@html previousComparisonItem.svg}</div>
-									</div>
-									<div class="comparison-card">
-										<div class="comparison-label">{t().comparisonCurrent}</div>
-										<div class="comparison-art">{@html activeComparisonItem.svg}</div>
-									</div>
-								</div>
-								<div class="prompt-diff">
-									{#each comparisonDiffParts as part}
-										<span class:removed={part.kind === "removed"} class:added={part.kind === "added"}>{part.text}</span>
-									{/each}
-								</div>
-							{/if}
-							{#if modelInspectionStatus}<div class="variation-grid-status">{modelInspectionStatus}</div>{/if}
-							{#if modelInspectionResults.length > 0}
-								<div class="model-inspection-grid">
-									{#each modelInspectionResults as item (item.id)}
-										<div class="model-inspection-card">
-											<div class="comparison-label">{statusModelName(item.model)}</div>
-											<div class="comparison-art">{@html item.svg}</div>
-											<pre>{item.ddl}</pre>
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</section>
-					{/if}
 
 					<!-- 統計 -->
 					{#if result && elapsedTotalMs > 0}
@@ -4333,6 +4418,25 @@
 				onVaryComposition={varyComposition}
 				onVaryInterpretation={varyInterpretation}
 				{variationBusy}
+				{variationCandidates}
+				{variationGridBusy}
+				{variationGridStatus}
+				onGenerateVariationGrid={generateVariationGrid}
+				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
+				onShowVariationCandidate={showVariationCandidate}
+				onToggleVariationCandidate={toggleVariationCandidate}
+				{activeComparisonItem}
+				modelInspectionTargetModel={modelInspectionTargetModel}
+				{modelInspectionChoices}
+				{modelInspectionSelectedModels}
+				{modelInspectionFailedModels}
+				{modelInspectionBusy}
+				{modelInspectionStatus}
+				{modelInspectionResults}
+				onToggleModelInspectionModel={toggleModelInspectionModel}
+				onRunModelInspection={runModelInspection}
+				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
+				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->
@@ -4863,87 +4967,6 @@
 		text-decoration: underline;
 	}
 
-	.variation-grid-section {
-		gap: 8px;
-	}
-	.variation-grid-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
-	.variation-grid-status {
-		font-size: 11px;
-		color: var(--fg3);
-	}
-	.variation-grid {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 8px;
-	}
-	.variation-card-wrap {
-		position: relative;
-		min-width: 0;
-	}
-	.variation-card {
-		display: grid;
-		grid-template-rows: minmax(0, 1fr) auto;
-		width: 100%;
-		aspect-ratio: 1 / 1.12;
-		padding: 0;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg);
-		overflow: hidden;
-		cursor: pointer;
-	}
-	.variation-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-	.variation-card.saved { opacity: 0.62; }
-	.variation-card-art {
-		display: block;
-		min-height: 0;
-		background: var(--bg2);
-	}
-	.variation-card-art :global(svg) {
-		display: block;
-		width: 100%;
-		height: 100%;
-	}
-	.variation-card-meta {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		gap: 1px;
-		padding: 5px 7px;
-		font-size: 10px;
-		line-height: 1.25;
-		text-align: left;
-		color: var(--fg3);
-	}
-	.variation-card-meta span {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.variation-select {
-		position: absolute;
-		top: 6px;
-		right: 6px;
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		border: 1px solid var(--border2);
-		background: color-mix(in srgb, var(--panel) 88%, transparent);
-		color: var(--fg2);
-		font-size: 15px;
-		line-height: 1;
-		cursor: pointer;
-	}
-	.variation-select.selected {
-		border-color: var(--accent);
-		background: var(--accent);
-		color: white;
-	}
-
 
 	.interpretation-diff {
 		gap: 2px;
@@ -4960,19 +4983,6 @@
 	}
 	.interpretation-diff .removed { color: color-mix(in srgb, #a2342a 78%, var(--fg3)); }
 	.interpretation-diff .added { color: color-mix(in srgb, #2f6b3a 78%, var(--fg3)); }
-	.comparison-section { gap: 8px; }
-	.comparison-actions { display: flex; justify-content: flex-end; }
-	.comparison-pair,
-	.model-inspection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-	.comparison-card,
-	.model-inspection-card { border: 1px solid var(--border); background: var(--panel); padding: 6px; min-width: 0; }
-	.comparison-label { font-size: 10px; color: var(--fg3); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.comparison-art { aspect-ratio: 1 / 1; background: var(--canvas-paper); overflow: hidden; }
-	.comparison-art :global(svg) { width: 100%; height: 100%; display: block; }
-	.prompt-diff { font-size: 12px; line-height: 1.6; color: var(--fg2); background: var(--bg2); border: 1px solid var(--border); padding: 6px 8px; }
-	.prompt-diff .removed { color: #9a3d3d; background: rgba(154, 61, 61, 0.08); text-decoration: line-through; }
-	.prompt-diff .added { color: #2f6b3a; background: rgba(47, 107, 58, 0.09); }
-	.model-inspection-card pre { margin: 6px 0 0; max-height: 96px; overflow: auto; white-space: pre-wrap; font-size: 10px; line-height: 1.45; color: var(--fg3); }
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {

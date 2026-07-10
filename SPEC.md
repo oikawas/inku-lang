@@ -456,6 +456,8 @@ The writing surface carries only a non-blocking length hint. Japanese input uses
 
 The web app is the current reference interface. v1.70 adds post-selection and comparison as first-class authoring surfaces. A variation grid can generate several candidates from one instruction, let the writer select more than one result, and save the selected works to history with optional star notes. Explicit interpretation variation bypasses the Stage 1 cache, records an `interpretation_seed` identifier, and shows the normalized-DDL diff so interpretation drift is visible. The comparison area can juxtapose the current render with the previous history item, show a subdued prompt diff, and run an LLM Model Inspection view that compares two Stage 1 models side by side without judge scores. When the current Stage 1 provider is cloud-based, the inspection view prefers an API-key-free local provider as the alternate model before trying other cloud providers, so the viewing tool is less dependent on quota or provider availability. Key controls use localized tooltips that follow the main UI language, including the variation grid, interpretation variation, selected-work saving, model comparison, and DDL auto-repair controls.
 
+The web UI labeling policy keeps the musical metaphor in the specification and internal model: a written description becomes a score, and the renderer performs it. The web UI labels, however, favor direct action words so first-time users can predict what each control will do. In UI copy, performance is presented as touch, composition as layout, and interpretation as reading. The main labels use `Generate`, `Render from Code`, `Make 4 Variations`, `Vary Reading Too`, and `Save Selected`; the variation controls use `Vary Touch`, `Vary Layout`, and `Vary Reading`. Tooltips explain the same actions in plain terms: generate one work from the input text, redraw edited DDL code, create touch/layout variants from the same reading, or mix in candidates that start from a fresh reading. Candidate exploration from the current image is separated from the writing tab and collected in the Canvas-side `Refine` tab. The Refine tab shows the target work being refined and clearly separates single-generation actions from four-candidate generation in labeled groups. Long-running touch, layout, reading, and variation-grid actions use the same strong action-button treatment and busy state as the Compare tab. Model comparison is collected in the Canvas-side `Compare` tab. The tab does not show previous/current history comparison; it uses only the target work as the reference. Model comparison places drawings made by different inference models to the right of the target work, labeled by model name. Each selected model is used for both reading and drawing. The model used by the target work is visually highlighted in the chooser and is not selectable. Compared models must be explicitly selected by the user, and the default state selects no comparison models. The selection is saved per user in the database as part of model settings and restored on later visits. Each comparison result card includes an `Adopt` action that saves the result to history and a star action that saves it with a star or toggles the star on an already saved result. If a selected model returns an error during comparison, the chooser marks that model with an NG color, unchecks it, removes it from the user-saved comparison selection, and continues only with the remaining user-selected models. When the comparison button is pressed again, already rendered selected models are skipped, and only checked models without rendered results are drawn. The UI must not auto-select or run an unselected model as a fallback. The initial comparison limit is four models. Tooltips must state that the feature compares drawings made through different inference models. This separates the product's poetic metaphor from the operational vocabulary needed for a clear web tool.
+
 Major UI areas:
 
 - App rail: compact navigation with an explicit expand/collapse toggle, user
@@ -1190,6 +1192,19 @@ because relation is again reserved for fixed previous-object phrases. Version
 1.52 is therefore accepted for vary, repair-fingerprint suppression, the quality
 guard, and the relation-drop blocking item.
 
+
+### v1.60 (2026-07-07)
+
+Version 1.60 moves the project from quality-loop closure to a one-person playable 1.0 candidate: another person should be able to set up inku from the README, write a visual tanka, consult Saijiki, read interpretation feedback, choose with vary, save, and replay a result.
+
+- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `vary_seed`, `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
+- History now stores `vary_seed`, and the history manager can replay a saved Score with its saved seed.
+- The input panel shows approximate post-processing interpretation feedback using ink-density shading. This does not change the Stage 1 schema or prompt.
+- The canvas displays the input text as a caption by default, treating the relation between words and image as part of the work.
+- The English and Japanese READMEs now include Quick Start setup, provider/API-key guidance, two-stage regeneration, the six-color Saijiki constraint, and history replay.
+- Final gallery selection is deferred to v1.70 or later. Version 1.60 is complete once the candidates are recorded; selecting works for publication belongs to the next evaluation and release cycle.
+- Phase E sparse-output handling adopts the E-2 policy: use the existing `visual_event` / `negative_space_pressure` metrics and visual review only, without adding a dedicated metric or marker. Sparse outputs are not a blocking implementation target for v1.60.
+
 ### v1.70 (2026-07-08)
 
 Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics out of the acceptance gate and instead makes form, post-selection, and comparison visible in the product.
@@ -1206,18 +1221,13 @@ Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics ou
 - The left app rail no longer expands on mouse hover. Its width is controlled by an explicit top-left expand/collapse toggle, so the working area can remain stable while editing.
 - Build 458 was verified on pentala for D-1/D-2; screenshots are stored under `no-git-sync/screen-cap/` and the local verification note is recorded in `cli/tune_bench.md`.
 
-### v1.60 (2026-07-07)
+### v1.71 (2026-07-08)
 
-Version 1.60 moves the project from quality-loop closure to a one-person playable 1.0 candidate: another person should be able to set up inku from the README, write a visual tanka, consult Saijiki, read interpretation feedback, choose with vary, save, and replay a result.
-
-- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `vary_seed`, `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
-- History now stores `vary_seed`, and the history manager can replay a saved Score with its saved seed.
-- The input panel shows approximate post-processing interpretation feedback using ink-density shading. This does not change the Stage 1 schema or prompt.
-- The canvas displays the input text as a caption by default, treating the relation between words and image as part of the work.
-- The English and Japanese READMEs now include Quick Start setup, provider/API-key guidance, two-stage regeneration, the six-color Saijiki constraint, and history replay.
-- Build 448 gallery candidates are recorded in `docs/gallery-candidates-build448.md`; final gallery selection remains a human post-selection step.
-- Final gallery selection is deferred to v1.70 or later. Version 1.60 is complete once the candidates are recorded; selecting works for publication belongs to the next evaluation and release cycle.
-- Phase E sparse-output handling adopts the E-2 policy: use the existing `visual_event` / `negative_space_pressure` metrics and visual review only, without adding a dedicated metric or marker. Sparse outputs are not a blocking implementation target for v1.60.
+- Added `instruction.surface` and `canvas.ground` to JSON Score for object-surface and canvas-ground texture.
+- Added renderer support for display, editable, and compat texture profiles, including texture metadata and deterministic seed handling.
+- Updated Stage 1 and Stage 2 prompts so texture words become score attributes instead of hidden helper shapes.
+- Preserved backward compatibility: existing scores without surface or ground render as before.
+- Expanded Svelte tooltip coverage across AppRail icons, Input panel tabs/buttons, and Canvas panel controls (zoom, vary, downloads, navigation) to improve usability.
 
 ---
 

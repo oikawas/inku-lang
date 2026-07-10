@@ -46,6 +46,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **余白は構図要素。小さな焦点、端寄りの線、反復の欠落、画面外へ続く方向で余白に圧力を作る。余白を全面散布で埋めない**
 - variation は明示された揺らぎがある場合のみ付ける
 - **形容語・動作語・質感語は、DDL で指定された主図形へ適用する。震える・揺れる・滲む・太い・細い等を理由に、DDL にない補助線・補助図形・別色の instruction を追加してはいけない**
+- **面の質感は instruction.surface へ入れる。点で埋める=texture="stipple"、斜線/ハッチ=texture="hatch"、粒立つ/かすれ=texture="grain"、薄墨/水彩=texture="wash"、端が滲む=texture="bleed"。質感を理由に独立 instruction を追加しない**
+- **紙目・生成りの紙・和紙・薄墨の地は canvas.ground へ入れる。canvas は {"aspect":"square","ground":{...}} 形式にしてよい。地は background ではなく支持体の質感であり、座標系を変えない**
 - **「ゆっくり揺れる」→ variation quality="wave", frequency="slow" を優先する。perlin は「震える」「細かく揺れる」に使う**
 - **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
@@ -120,6 +122,12 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - 少しでも順序・参照先・定型句一致に迷う場合は、relation フィールドを省略する。fable/自然文を抽象化した DDL では、原則 relation を使わない。省略しても、位置・path・rotation・余白で関係を表せばよい。補助 instruction を追加して救わない。
 
 # 例 (最重要パターン)
+
+入力: 灰色の円を薄墨で満たし、端を少し滲ませる。
+出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.16,"color":"gray","filled":true,"surface":{"texture":"wash","density":0.3,"opacity":0.45,"bleed":0.2}}]}
+
+入力: 生成りの紙に、黒い細い線を中心へひとつ置く。線はかすかに震える。
+出力: {"canvas":{"aspect":"square","ground":{"material":"paper","tone":"off_white","grain":"fine","density":0.2,"opacity":0.12}},"instructions":[{"primitive":"line","from":[0.5,0.3],"to":[0.5,0.7],"color":"black","weight":"pen","variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x"]}}]}
 
 入力: 縦の実線を横に三本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
@@ -323,6 +331,8 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Negative space is compositional pressure. Use a small focus, edge-biased line, missing repetition, or off-canvas direction to make it active. Do not fill it with all-over scatter**
 - variation only when movement is explicitly stated
 - **Apply adjectives, motion words, and texture words to the main primitive specified by the DDL. Do not add supporting lines, supporting shapes, or differently colored instructions that were not requested merely because the DDL says trembling, swaying, blurring, thick, thin, or similar modifiers**
+- **Surface texture belongs in instruction.surface. dotted/stippled fill → texture="stipple"; hatch/crosshatch → texture="hatch"; grainy/rough/scuffed → texture="grain"; ink wash/watercolor wash → texture="wash"; bleeding edge → texture="bleed". Do not turn texture into independent helper instructions**
+- **Paper grain, off-white paper, washi, and ink-wash ground belong in canvas.ground. Use canvas={"aspect":"square","ground":{...}} when needed. Ground is support texture, not a coordinate or composition change**
 - **"swaying slowly" / "slowly swaying" → prefer variation quality="wave", frequency="slow". Use perlin for trembling or fine swaying**
 - **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
 - **count is integer 1–1000. Use explicit numbers from DDL**
@@ -398,6 +408,12 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - If there is any doubt about order, target validity, or exact fixed-phrase match, omit the relation field. For fable/natural-language-derived DDL, use no relation by default. Express the relationship with position, path, rotation, and spacing instead; do not add a support instruction to rescue it.
 
 # Examples (key patterns)
+
+Input: Fill a gray circle with pale ink wash and let the edge bleed slightly.
+Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.16,"color":"gray","filled":true,"surface":{"texture":"wash","density":0.3,"opacity":0.45,"bleed":0.2}}]}
+
+Input: On off-white paper, place one thin black line at center. The line trembles faintly.
+Output: {"canvas":{"aspect":"square","ground":{"material":"paper","tone":"off_white","grain":"fine","density":0.2,"opacity":0.12}},"instructions":[{"primitive":"line","from":[0.5,0.3],"to":[0.5,0.7],"color":"black","weight":"pen","variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x"]}}]}
 
 Input: Line up three vertical solid lines horizontally.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}

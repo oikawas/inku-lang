@@ -44,7 +44,7 @@ from .plugins import (
 )
 from .renderer import SVG_PROFILES, new_render_seed
 from .render_engines import current_render_engine
-from .schema import Score
+from .schema import CanvasSpec, Score
 from .model_settings import (
     connection_for,
     model_provider_catalog,
@@ -502,6 +502,12 @@ def _catalog_render_color_map(catalog_id: str | None) -> dict[str, str]:
         raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
     return color_map
 
+
+
+def _score_canvas_aspect_value(score: Score) -> str:
+    if isinstance(score.canvas, CanvasSpec):
+        return score.canvas.aspect
+    return str(score.canvas or "square")
 
 def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None) -> dict:
     catalog = get_color_catalog(catalog_id)
@@ -2041,7 +2047,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
     render_metadata = {
-        **_render_metadata(req.catalog_id, canvas_aspect=score.canvas),
+        **_render_metadata(req.catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
@@ -2395,7 +2401,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
     render_metadata = {
-        **_render_metadata(catalog_id, canvas_aspect=score.canvas),
+        **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
@@ -2673,7 +2679,7 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         if canvas_aspect is not None:
             score = _score_with_canvas(score, canvas_aspect)
         render_metadata = {
-            **_render_metadata(catalog_id, canvas_aspect=score.canvas),
+            **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,

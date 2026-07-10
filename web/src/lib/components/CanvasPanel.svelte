@@ -2,13 +2,19 @@
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
+	import type { Score } from '$lib/historyManagerState.svelte';
 	import OutputTabsContent from './OutputTabsContent.svelte';
+	import PaintButton from './PaintButton.svelte';
+	import Tooltip from './Tooltip.svelte';
 
-	type OutputTab = 'canvas' | 'prompts' | 'score';
+	type OutputTab = 'canvas' | 'refine' | 'compare' | 'prompts' | 'score';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: { instructions: unknown[]; canvas?: string | null }; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null };
+	type PaintResult = { svg: string; score: Score; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean };
+	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
+	type ModelInspectionResult = { id: string; model: string; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
 		outputTab: OutputTab;
@@ -67,6 +73,25 @@
 		onVaryComposition: () => void | Promise<void>;
 		onVaryInterpretation: () => void | Promise<void>;
 		variationBusy: boolean;
+		variationCandidates: VariationCandidate[];
+		variationGridBusy: boolean;
+		variationGridStatus: string | null;
+		onGenerateVariationGrid: (includeInterpretation?: boolean) => void | Promise<void>;
+		onSaveSelectedVariationCandidates: () => void | Promise<void>;
+		onShowVariationCandidate: (candidate: VariationCandidate) => void;
+		onToggleVariationCandidate: (id: string) => void;
+		activeComparisonItem: { svg: string } | null;
+		modelInspectionTargetModel: string;
+		modelInspectionChoices: ModelInspectionChoice[];
+		modelInspectionSelectedModels: string[];
+		modelInspectionFailedModels: Record<string, string>;
+		modelInspectionBusy: boolean;
+		modelInspectionStatus: string | null;
+		modelInspectionResults: ModelInspectionResult[];
+		onToggleModelInspectionModel: (modelId: string) => void;
+		onRunModelInspection: () => void | Promise<void>;
+		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
+		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
 	};
 
 	let {
@@ -125,7 +150,26 @@
 		onVaryPerformance,
 		onVaryComposition,
 		onVaryInterpretation,
-		variationBusy = false
+		variationBusy = false,
+		variationCandidates = [],
+		variationGridBusy = false,
+		variationGridStatus = null,
+		onGenerateVariationGrid,
+		onSaveSelectedVariationCandidates,
+		onShowVariationCandidate,
+		onToggleVariationCandidate,
+		activeComparisonItem,
+		modelInspectionTargetModel,
+		modelInspectionChoices = [],
+		modelInspectionSelectedModels = [],
+		modelInspectionFailedModels = {},
+		modelInspectionBusy = false,
+		modelInspectionStatus = null,
+		modelInspectionResults = [],
+		onToggleModelInspectionModel,
+		onRunModelInspection,
+		onAdoptModelInspectionResult,
+		onToggleModelInspectionStar
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
@@ -192,9 +236,21 @@
 
 <div class="right-panel">
 	<div class="right-tabs">
-		<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
-		<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
-		<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
+		<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
+			<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
+		</Tooltip>
+		<Tooltip placement="bottom" text={t().tooltipCanvasTabRefine}>
+			<button class="rtab" class:active={outputTab === 'refine'} onclick={() => (outputTab = 'refine')} disabled={!result}>{t().tabRefine}</button>
+		</Tooltip>
+		<Tooltip placement="bottom" text={t().tooltipCanvasTabCompare}>
+			<button class="rtab" class:active={outputTab === 'compare'} onclick={() => (outputTab = 'compare')} disabled={!result}>{t().tabCompare}</button>
+		</Tooltip>
+		<Tooltip placement="bottom" text={t().tooltipCanvasTabPrompts}>
+			<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
+		</Tooltip>
+		<Tooltip placement="bottom" text={t().tooltipCanvasTabScore}>
+			<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
+		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if currentRenderedAt}
 			<div class="render-meta-strip">
@@ -216,7 +272,9 @@
 
 	<div class="canvas-area">
 		<div class="nav-left">
-			<button class="nav-circle" onclick={onGotoNext} disabled={nextDisabled}>‹</button>
+			<Tooltip placement="right" text={t().tooltipCanvasNavPrev}>
+				<button class="nav-circle" onclick={onGotoNext} disabled={nextDisabled}>‹</button>
+			</Tooltip>
 		</div>
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -256,45 +314,197 @@
 					</div>
 				</div>
 				<div class="canvas-corner-controls canvas-corner-left" onpointerdown={(event) => event.stopPropagation()}>
-					<button
-						type="button"
-						class="canvas-icon-btn"
-						class:active={instructionCaptionVisible}
-						disabled={!canShowInstructionCaption}
-						title={t().canvasCaptionToggle}
-						aria-label={t().canvasCaptionToggle}
-						onclick={(event) => {
-							event.stopPropagation();
-							instructionCaptionVisible = !instructionCaptionVisible;
-						}}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true">
-							<rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
-							<path d="M7.5 10.5h4.5M14.5 10.5h2M7.5 14h3M13 14h3.5" />
-						</svg>
-					</button>
+					<Tooltip placement="top-right" text={t().tooltipCanvasCaption}>
+						<button
+							type="button"
+							class="canvas-icon-btn"
+							class:active={instructionCaptionVisible}
+							disabled={!canShowInstructionCaption}
+							aria-label={t().canvasCaptionToggle}
+							onclick={(event) => {
+								event.stopPropagation();
+								instructionCaptionVisible = !instructionCaptionVisible;
+							}}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+								<path d="M7.5 10.5h4.5M14.5 10.5h2M7.5 14h3M13 14h3.5" />
+							</svg>
+						</button>
+					</Tooltip>
 				</div>
 				<div class="canvas-corner-controls canvas-corner-right" onpointerdown={(event) => event.stopPropagation()}>
-					<button
-						type="button"
-						class="canvas-icon-btn"
-						disabled={!result}
-						title={t().canvasPresentationOpen}
-						aria-label={t().canvasPresentationOpen}
-						onclick={(event) => {
-							event.stopPropagation();
-							presentationMode = true;
-						}}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true">
-							<path d="M8.5 4.5h-4v4M15.5 4.5h4v4M8.5 19.5h-4v-4M15.5 19.5h4v-4" />
-							<path d="M8 8 4.5 4.5M16 8l3.5-3.5M8 16l-3.5 3.5M16 16l3.5 3.5" />
-						</svg>
-					</button>
+					<Tooltip placement="top-left" text={t().tooltipCanvasPresentation}>
+						<button
+							type="button"
+							class="canvas-icon-btn"
+							disabled={!result}
+							aria-label={t().canvasPresentationOpen}
+							onclick={(event) => {
+								event.stopPropagation();
+								presentationMode = true;
+							}}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M8.5 4.5h-4v4M15.5 4.5h4v4M8.5 19.5h-4v-4M15.5 19.5h4v-4" />
+								<path d="M8 8 4.5 4.5M16 8l3.5-3.5M8 16l-3.5 3.5M16 16l3.5 3.5" />
+							</svg>
+						</button>
+					</Tooltip>
 				</div>
 				{#if instructionCaptionVisible && canShowInstructionCaption}
 					<div class="instruction-caption" aria-live="polite">{displayInstructionText}</div>
 				{/if}
+			{:else if outputTab === 'refine'}
+				<div class="refine-panel">
+					<div class="refine-head">
+						<div>
+							<div class="refine-title">{t().refineTitle}</div>
+							<div class="refine-sub">{t().refineSubtitle}</div>
+						</div>
+						{#if result}<span class="seed-summary refine-seed">{seedSummary}</span>{/if}
+					</div>
+					<div class="refine-stage">
+						<div class="refine-target-card">
+							<div class="comparison-label">{t().refineTargetTitle}</div>
+							<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if result}{@html result.svg}{/if}</div>
+							{#if result}<div class="model-target-meta">{seedSummary}</div>{/if}
+						</div>
+						<div class="refine-workspace">
+							<section class="refine-action-section">
+								<div class="refine-section-head">
+									<div class="refine-section-title">{t().refineSingleTitle}</div>
+									<div class="refine-section-sub">{t().refineSingleSubtitle}</div>
+								</div>
+								<div class="refine-actions refine-paint-actions">
+									<Tooltip text={t().tooltipCanvasVaryPerformance}>
+										<div class="refine-action-wrap"><PaintButton onclick={onVaryPerformance} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryPerformance}</PaintButton></div>
+									</Tooltip>
+									<Tooltip text={t().tooltipCanvasVaryComposition}>
+										<div class="refine-action-wrap"><PaintButton onclick={onVaryComposition} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryComposition}</PaintButton></div>
+									</Tooltip>
+									<Tooltip text={t().tooltipCanvasVaryInterpretation}>
+										<div class="refine-action-wrap"><PaintButton onclick={onVaryInterpretation} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryInterpretation}</PaintButton></div>
+									</Tooltip>
+								</div>
+							</section>
+							<section class="refine-action-section refine-action-section-grid">
+								<div class="refine-section-head">
+									<div class="refine-section-title">{t().refineGridTitle}</div>
+									<div class="refine-section-sub">{t().refineGridSubtitle}</div>
+								</div>
+								<div class="refine-actions refine-grid-actions refine-paint-actions">
+									<Tooltip placement="top-right" text={t().tooltipVariationGridDefault}>
+										<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(false)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridDefault}</PaintButton></div>
+									</Tooltip>
+									<Tooltip placement="top" text={t().tooltipVariationGridWithInterpretation}>
+										<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(true)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridWithInterpretation}</PaintButton></div>
+									</Tooltip>
+									<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
+										<button class="ghost-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
+									</Tooltip>
+								</div>
+							</section>
+							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
+							{#if variationBusy || variationGridBusy}
+								<div class="model-drawing-animation" aria-live="polite">
+									<div class="model-drawing-spinner" aria-hidden="true"></div>
+									<div>
+										<strong>{t().refineGenerating}</strong>
+										<span>{t().refineGeneratingBody}</span>
+									</div>
+								</div>
+							{/if}
+							{#if variationCandidates.length > 0}
+								<div class="variation-grid">
+									{#each variationCandidates as candidate (candidate.id)}
+										<div class="variation-card-wrap">
+											<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
+												<span class="variation-card-art">{@html candidate.result.svg}</span>
+												<span class="variation-card-meta">
+													<span>{candidate.label}</span>
+													<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
+												</span>
+											</button>
+											<button class="variation-select" class:selected={candidate.selected} onclick={() => onToggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
+										</div>
+									{/each}
+								</div>
+							{:else if !variationBusy && !variationGridBusy}
+								<div class="refine-empty">{t().refineEmpty}</div>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{:else if outputTab === 'compare'}
+				<div class="compare-panel">
+					<div class="compare-head">
+						<div>
+							<div class="refine-title">{t().modelCompareTitle}</div>
+							<div class="refine-sub">{t().modelCompareSubtitle}</div>
+						</div>
+						<div class="compare-action-wrap">
+							<Tooltip text={t().tooltipModelCompare}>
+								<PaintButton onclick={onRunModelInspection} disabled={!result || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</PaintButton>
+							</Tooltip>
+						</div>
+					</div>
+					<div class="model-choice-grid" aria-label={t().modelCompareModelSelectLabel}>
+						{#each modelInspectionChoices as choice (choice.id)}
+							{@const isTarget = choice.id === modelInspectionTargetModel}
+							{@const checked = modelInspectionSelectedModels.includes(choice.id)}
+							{@const failed = !!modelInspectionFailedModels[choice.id]}
+							<label class="model-choice" class:checked={checked} class:target={isTarget} class:failed={failed} class:disabled={!checked && !isTarget && modelInspectionSelectedModels.length >= 4}>
+								<input type="checkbox" checked={checked} disabled={modelInspectionBusy || isTarget || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
+								<span>
+									<strong>{choice.label}</strong>
+									<small>{choice.providerLabel}{isTarget ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small>
+								</span>
+							</label>
+						{/each}
+					</div>
+					<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspectionSelectedModels.length, 4)}</div>
+					{#if modelInspectionStatus}<div class="variation-grid-status">{modelInspectionStatus}</div>{/if}
+					<div class="model-compare-stage" class:busy={modelInspectionBusy}>
+						<div class="model-target-card">
+							<div class="comparison-label">{t().modelCompareTargetTitle}</div>
+							<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div>
+							<div class="model-target-meta">{t().modelCompareTargetModelLabel}: {statusStage1Model}</div>
+						</div>
+						<div class="model-results-column">
+							{#if modelInspectionBusy}
+								<div class="model-drawing-animation" aria-live="polite">
+									<div class="model-drawing-spinner" aria-hidden="true"></div>
+									<div>
+										<strong>{t().modelCompareDrawingTitle}</strong>
+										<span>{t().modelCompareDrawingBody}</span>
+									</div>
+								</div>
+							{/if}
+							{#if modelInspectionResults.length > 0}
+								<div class="model-inspection-grid">
+									{#each modelInspectionResults as item (item.id)}
+										<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
+											<div class="comparison-label">{item.label}</div>
+											<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div>
+											<div class="model-result-actions">
+												<Tooltip text={item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}>
+													<button class="ghost-btn model-adopt-btn" type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptModelInspectionResult(item)}>{item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdopt}</button>
+												</Tooltip>
+												<Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}>
+													<button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button>
+												</Tooltip>
+											</div>
+											<pre>{item.ddl}</pre>
+										</div>
+									{/each}
+								</div>
+							{:else if !modelInspectionBusy}
+								<div class="refine-empty">{t().modelCompareEmpty}</div>
+							{/if}
+						</div>
+					</div>
+				</div>
 			{:else if outputTab === 'prompts'}
 				<OutputTabsContent
 					outputTab="prompts"
@@ -330,24 +540,28 @@
 
 		{#if outputTab === 'canvas'}
 			<div class="zoom-controls">
-				<button onclick={() => onSetZoom(zoom - 0.25)}>−</button>
+				<Tooltip text={t().tooltipCanvasZoomOut}>
+					<button onclick={() => onSetZoom(zoom - 0.25)}>−</button>
+				</Tooltip>
 				<span class="zoom-pct">{Math.round(zoom * 100)}%</span>
-				<button onclick={() => onSetZoom(zoom + 0.25)}>＋</button>
-				<button class="zoom-reset" onclick={onResetZoom}>⊙</button>
+				<Tooltip text={t().tooltipCanvasZoomIn}>
+					<button onclick={() => onSetZoom(zoom + 0.25)}>＋</button>
+				</Tooltip>
+				<Tooltip text={t().tooltipCanvasZoomReset}>
+					<button class="zoom-reset" onclick={onResetZoom}>⊙</button>
+				</Tooltip>
 			</div>
 		{/if}
 
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="variation-controls" onpointerdown={(event) => event.stopPropagation()}>
-			<button class="ghost-btn variation-btn" onclick={onVaryPerformance} disabled={!result || variationBusy}>{t().canvasVaryPerformance}</button>
-			<button class="ghost-btn variation-btn" onclick={onVaryComposition} disabled={!result || variationBusy}>{t().canvasVaryComposition}</button>
-			<button class="ghost-btn variation-btn" onclick={onVaryInterpretation} disabled={!result || variationBusy}>{t().canvasVaryInterpretation}</button>
-			{#if result}<span class="seed-summary">{seedSummary}</span>{/if}
-		</div>
+
 
 		<div class="nav-right">
-			<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
-			<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
+			<Tooltip placement="left" text={t().tooltipCanvasNavLatest}>
+				<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
+			</Tooltip>
+			<Tooltip placement="left" text={t().tooltipCanvasNavNext}>
+				<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
+			</Tooltip>
 			{#if historyTotal > 0}
 				<span class="nav-counter">{navPos} / {historyTotal}</span>
 			{/if}
@@ -372,30 +586,36 @@
 				<span class="status-v">{statusCanvasName}</span>
 			</span>
 		</div>
-		<button
-			class="star-btn status-star"
-			class:starred={!!statusHistoryItem?.starred}
-			disabled={!statusHistoryItem?.id}
-			onclick={(event) => onToggleStar(statusHistoryItem, event)}
-			title={statusHistoryItem?.starred ? t().starOn : t().starOff}
-			aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
-		>★</button>
-		<button
-			class="hash-copy-btn"
-			class:copied={statusHashCopied}
-			disabled={!result || !statusHashLabel}
-			onclick={onCopyStatusHash}
-			title={statusHashCopyTitle}
-			aria-label={statusHashCopyTitle}
-		>{statusHashCopied ? t().promptCopied : statusHashLabel || '----'}</button>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		{#if result}<span class="seed-summary status-seed-summary">{seedSummary}</span>{/if}
+		<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
+			<button
+				class="star-btn status-star"
+				class:starred={!!statusHistoryItem?.starred}
+				disabled={!statusHistoryItem?.id}
+				onclick={(event) => onToggleStar(statusHistoryItem, event)}
+				aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
+			>★</button>
+		</Tooltip>
+		<Tooltip text={statusHashCopyTitle}>
+			<button
+				class="hash-copy-btn"
+				class:copied={statusHashCopied}
+				disabled={!result || !statusHashLabel}
+				onclick={onCopyStatusHash}
+				aria-label={statusHashCopyTitle}
+			>{statusHashCopied ? t().promptCopied : statusHashLabel || '----'}</button>
+		</Tooltip>
 		<div class="png-wrap">
-			<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); svgMenuOpen = !svgMenuOpen; }} disabled={!result}>
-				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-				</svg>
-				<span>SVG</span>
-				<span class="menu-caret">▾</span>
-			</button>
+			<Tooltip placement="left" text={t().tooltipCanvasDownloadSvg}>
+				<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); svgMenuOpen = !svgMenuOpen; }} disabled={!result}>
+					<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+					</svg>
+					<span>SVG</span>
+					<span class="menu-caret">▾</span>
+				</button>
+			</Tooltip>
 			{#if svgMenuOpen}
 				<div class="png-menu">
 					<div class="svg-menu-head">
@@ -437,13 +657,15 @@
 			{/if}
 		</div>
 		<div class="png-wrap" bind:this={pngWrapEl}>
-			<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>
-				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-				</svg>
-				<span>PNG</span>
-				<span class="menu-caret">▾</span>
-			</button>
+			<Tooltip placement="left" text={t().tooltipCanvasDownloadPng}>
+				<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>
+					<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+					</svg>
+					<span>PNG</span>
+					<span class="menu-caret">▾</span>
+				</button>
+			</Tooltip>
 			{#if pngMenuOpen}
 				<div class="png-menu">
 					{#each pngTemplates as template (template.id)}
@@ -469,44 +691,54 @@
 			{/if}
 		</div>
 		<div class="presentation-controls" aria-label={t().canvasPresentationControls}>
-			<button type="button" class="presentation-icon-btn" onclick={onGotoNext} disabled={nextDisabled} title={t().historyOlderPage(1)} aria-label={t().historyOlderPage(1)}>
-				‹
-			</button>
-			<button type="button" class="presentation-text-btn" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
-			<button type="button" class="presentation-icon-btn" onclick={onGotoPrev} disabled={prevDisabled} title={t().historyNewerPage(1)} aria-label={t().historyNewerPage(1)}>
-				›
-			</button>
+			<Tooltip text={t().tooltipCanvasNavPrev}>
+				<button type="button" class="presentation-icon-btn" onclick={onGotoNext} disabled={nextDisabled} aria-label={t().historyOlderPage(1)}>
+					‹
+				</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasNavLatest}>
+				<button type="button" class="presentation-text-btn" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipCanvasNavNext}>
+				<button type="button" class="presentation-icon-btn" onclick={onGotoPrev} disabled={prevDisabled} aria-label={t().historyNewerPage(1)}>
+					›
+				</button>
+			</Tooltip>
 			<span class="presentation-counter">{historyTotal > 0 ? `${navPos} / ${historyTotal}` : ''}</span>
-			<button
-				type="button"
-				class="presentation-icon-btn presentation-star-btn"
-				class:starred={!!statusHistoryItem?.starred}
-				disabled={!statusHistoryItem?.id}
-				onclick={(event) => onToggleStar(statusHistoryItem, event)}
-				title={statusHistoryItem?.starred ? t().starOn : t().starOff}
-				aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
-			>
-				★
-			</button>
-			<button
-				type="button"
-				class="presentation-icon-btn"
-				class:active={instructionCaptionVisible}
-				disabled={!canShowInstructionCaption}
-				onclick={() => (instructionCaptionVisible = !instructionCaptionVisible)}
-				title={t().canvasCaptionToggle}
-				aria-label={t().canvasCaptionToggle}
-			>
-				<svg viewBox="0 0 24 24" aria-hidden="true">
-					<rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
-					<path d="M7.5 10.5h4.5M14.5 10.5h2M7.5 14h3M13 14h3.5" />
-				</svg>
-			</button>
-			<button type="button" class="presentation-icon-btn" onclick={closePresentationMode} title={t().canvasPresentationClose} aria-label={t().canvasPresentationClose}>
-				<svg viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M6 6l12 12M18 6 6 18" />
-				</svg>
-			</button>
+			<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
+				<button
+					type="button"
+					class="presentation-icon-btn presentation-star-btn"
+					class:starred={!!statusHistoryItem?.starred}
+					disabled={!statusHistoryItem?.id}
+					onclick={(event) => onToggleStar(statusHistoryItem, event)}
+					aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
+				>
+					★
+				</button>
+			</Tooltip>
+			<Tooltip text={t().canvasCaptionToggle}>
+				<button
+					type="button"
+					class="presentation-icon-btn"
+					class:active={instructionCaptionVisible}
+					disabled={!canShowInstructionCaption}
+					onclick={() => (instructionCaptionVisible = !instructionCaptionVisible)}
+					aria-label={t().canvasCaptionToggle}
+				>
+					<svg viewBox="0 0 24 24" aria-hidden="true">
+						<rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+						<path d="M7.5 10.5h4.5M14.5 10.5h2M7.5 14h3M13 14h3.5" />
+					</svg>
+				</button>
+			</Tooltip>
+			<Tooltip text={t().canvasPresentationClose}>
+				<button type="button" class="presentation-icon-btn" onclick={closePresentationMode} aria-label={t().canvasPresentationClose}>
+					<svg viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M6 6l12 12M18 6 6 18" />
+					</svg>
+				</button>
+			</Tooltip>
 		</div>
 	</div>
 {/if}
@@ -582,37 +814,339 @@
 		position: relative;
 		overflow: hidden;
 	}
-	.nav-left,
-	.variation-controls {
-		position: absolute;
-		left: 50%;
-		bottom: 18px;
-		transform: translateX(-50%);
+	.refine-panel {
+		align-self: stretch;
+		width: min(980px, calc(100% - 136px));
+		max-height: calc(100% - 28px);
+		overflow: auto;
 		display: flex;
-		align-items: center;
-		gap: 8px;
-		z-index: 12;
-		background: color-mix(in srgb, var(--bg) 88%, transparent);
-		border: 1px solid var(--border);
-		padding: 6px 8px;
-		box-shadow: var(--shadow-sm);
+		flex-direction: column;
+		gap: 12px;
+		padding: 16px;
+		box-sizing: border-box;
 	}
-	.variation-btn { min-width: 88px; }
-	.seed-summary {
-		font-size: 11px;
+	.refine-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 16px;
+	}
+	.refine-title {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--fg);
+	}
+	.refine-sub,
+	.refine-empty,
+	.variation-grid-status {
+		font-size: 12px;
 		color: var(--fg3);
+		line-height: 1.5;
+	}
+	.refine-seed { margin: 0; }
+	.refine-stage {
+		display: grid;
+		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+		gap: 14px;
+		align-items: start;
+	}
+	.refine-target-card {
+		position: sticky;
+		top: 0;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		padding: 8px;
+		min-width: 0;
+	}
+	.refine-workspace {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+	.refine-action-section {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-bottom: 2px;
+	}
+	.refine-action-section-grid {
+		padding-top: 10px;
+		border-top: 1px solid var(--border);
+	}
+	.refine-section-head {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.refine-section-title {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--fg);
+	}
+	.refine-section-sub {
+		font-size: 11px;
+		line-height: 1.45;
+		color: var(--fg3);
+	}
+	.refine-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.refine-paint-actions { align-items: stretch; }
+	.refine-action-wrap { width: min(210px, 100%); }
+	.refine-action-wrap :global(.tooltip-wrap),
+	.refine-action-wrap :global(.paint-btn) { width: 100%; }
+	.refine-action-wrap :global(.paint-btn) { margin-top: 0; min-height: 34px; font-size: 12px; letter-spacing: 0.03em; }
+	.refine-grid-actions { padding-top: 0; }
+	.variation-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+		gap: 10px;
+	}
+	.variation-card-wrap {
+		position: relative;
+		min-width: 0;
+	}
+	.variation-card {
+		display: grid;
+		grid-template-rows: minmax(0, 1fr) auto;
+		width: 100%;
+		aspect-ratio: 1 / 1.1;
+		padding: 0;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		overflow: hidden;
+		cursor: pointer;
+	}
+	.variation-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+	.variation-card.saved { opacity: 0.62; }
+	.variation-card-art {
+		display: block;
+		min-height: 0;
+		background: var(--bg2);
+	}
+	.variation-card-art :global(svg) {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+	.variation-card-meta {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1px;
+		padding: 6px 8px;
+		font-size: 10px;
+		line-height: 1.25;
+		text-align: left;
+		color: var(--fg3);
+	}
+	.variation-card-meta span {
+		overflow: hidden;
+		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	@media (max-width: 720px) {
-		.variation-controls {
-			left: 12px;
-			right: 12px;
-			transform: none;
-			justify-content: center;
-			flex-wrap: wrap;
-		}
+	.variation-select {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		width: 30px;
+		height: 30px;
+		border-radius: 50%;
+		border: 1px solid var(--border2);
+		background: color-mix(in srgb, var(--panel) 88%, transparent);
+		color: var(--fg2);
+		font-size: 15px;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.variation-select.selected {
+		border-color: var(--accent);
+		background: var(--accent);
+		color: white;
 	}
 
+	.compare-panel {
+		align-self: stretch;
+		width: min(1120px, calc(100% - 136px));
+		max-height: calc(100% - 28px);
+		overflow: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 16px;
+		box-sizing: border-box;
+	}
+	.compare-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 16px;
+	}
+	.compare-action-wrap {
+		width: min(260px, 34%);
+		min-width: 210px;
+	}
+	.compare-action-wrap :global(.tooltip-wrap) { width: 100%; }
+	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
+	.model-choice-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+		gap: 8px;
+	}
+	.model-choice {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		gap: 8px;
+		align-items: start;
+		padding: 8px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg2);
+		font-size: 11px;
+	}
+	.model-choice.checked { border-color: var(--accent); color: var(--fg); }
+	.model-choice.target {
+		border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+		border-left-width: 4px;
+		background: color-mix(in srgb, var(--accent) 13%, var(--panel));
+		color: var(--fg);
+	}
+	.model-choice.target small { color: color-mix(in srgb, var(--accent) 72%, var(--fg3)); }
+	.model-choice.failed {
+		border-color: color-mix(in srgb, #cf3f35 70%, var(--border));
+		background: color-mix(in srgb, #cf3f35 12%, var(--panel));
+		color: var(--fg);
+	}
+	.model-choice.failed small { color: #b8332d; }
+	.model-choice.disabled { opacity: 0.48; }
+	.model-choice strong,
+	.model-choice small {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.model-choice small { color: var(--fg3); margin-top: 2px; }
+	.model-choice-count,
+	.model-target-meta {
+		font-size: 11px;
+		color: var(--fg3);
+	}
+	.model-compare-stage {
+		display: grid;
+		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+		gap: 14px;
+		align-items: start;
+	}
+	.model-target-card,
+	.model-inspection-card {
+		border: 1px solid var(--border);
+		background: var(--panel);
+		padding: 8px;
+		min-width: 0;
+	}
+	.model-target-card {
+		position: sticky;
+		top: 0;
+	}
+	.comparison-label {
+		font-size: 11px;
+		color: var(--fg3);
+		margin-bottom: 5px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.comparison-art {
+		background: var(--bg2);
+		overflow: hidden;
+	}
+	.comparison-art :global(> svg) { width: 100%; height: 100%; display: block; }
+	.model-target-meta { margin-top: 7px; }
+	.model-results-column {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+	.model-inspection-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 10px;
+	}
+	.model-inspection-card.saved {
+		border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+	}
+	.model-result-actions {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.model-adopt-btn {
+		min-height: 28px;
+		font-size: 11px;
+		padding: 5px 9px;
+	}
+	.model-result-star {
+		width: 30px;
+		height: 30px;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		color: var(--fg3);
+		font-size: 17px;
+		cursor: pointer;
+	}
+	.model-result-star.starred {
+		color: #d59b21;
+		border-color: rgba(213,155,33,0.55);
+		background: #fff7dc;
+	}
+	.model-result-star:disabled { opacity: 0.45; cursor: not-allowed; }
+	.model-inspection-card pre {
+		margin: 8px 0 0;
+		max-height: 120px;
+		overflow: auto;
+		white-space: pre-wrap;
+		font-size: 10px;
+		line-height: 1.45;
+		color: var(--fg3);
+	}
+	.model-drawing-animation {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 12px;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		color: var(--fg2);
+	}
+	.model-drawing-animation strong,
+	.model-drawing-animation span { display: block; }
+	.model-drawing-animation span {
+		font-size: 11px;
+		color: var(--fg3);
+		margin-top: 2px;
+	}
+	.model-drawing-spinner {
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		border: 2px solid var(--border2);
+		border-top-color: var(--accent);
+		animation: spin 0.85s linear infinite;
+		flex: 0 0 auto;
+	}
+
+
+
+	.nav-left,
 	.nav-right {
 		position: absolute;
 		z-index: 10;
@@ -623,6 +1157,13 @@
 	}
 	.nav-left { left: 14px; }
 	.nav-right { right: 14px; }
+
+	.status-seed-summary {
+		font-size: 11px;
+		color: var(--fg3);
+		white-space: nowrap;
+		margin-right: 12px;
+	}
 	.nav-circle {
 		width: 38px;
 		height: 38px;
@@ -698,7 +1239,7 @@
 		overflow: hidden;
 		flex-shrink: 0;
 	}
-	.canvas-box :global(svg) { width: 100%; height: 100%; display: block; }
+	.canvas-box :global(> svg) { width: 100%; height: 100%; display: block; }
 	.canvas-placeholder-art {
 		width: 100%;
 		height: 100%;
@@ -1189,4 +1730,5 @@
 			flex-wrap: wrap;
 		}
 	}
+	@keyframes spin { to { transform: rotate(360deg); } }
 </style>

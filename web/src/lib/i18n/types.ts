@@ -136,6 +136,11 @@ export interface LangPack {
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;
 	variationGridSaveSelected: string;
+	refineSingleButton: string;
+	tooltipRefineSingle: string;
+	refineCostTouch: string;
+	refineCostLayout: string;
+	refineCostReading: string;
 	variationGridEmpty: string;
 	tooltipVariationGridDefault: string;
 	tooltipVariationGridWithInterpretation: string;
@@ -178,6 +183,13 @@ export interface LangPack {
 	comparisonPrev: string;
 	comparisonCurrent: string;
 	modelCompareButton: string;
+	modelCompareModeLabel: string;
+	modelCompareModeCommon: string;
+	modelCompareModeStage1Fixed: string;
+	modelCompareModeStage2Fixed: string;
+	modelCompareFixedStage1: string;
+	modelCompareFixedStage2: string;
+	modelCompareTargetDisabledTooltip: string;
 	modelCompareBusy: string;
 	modelCompareTitle: string;
 	modelCompareSubtitle: string;
@@ -200,8 +212,7 @@ export interface LangPack {
 	modelCompareAdoptTooltip: string;
 	modelCompareStarTooltip: string;
 	canvasSeedSummary: string;
-	refineTitle: string;
-	refineSubtitle: string;
+	seedBaseLabel: string;
 	refineTargetTitle: string;
 	refineSingleTitle: string;
 	refineSingleSubtitle: string;
@@ -209,7 +220,8 @@ export interface LangPack {
 	refineGridSubtitle: string;
 	refineGenerating: string;
 	refineGeneratingBody: string;
-	refineEmpty: string;
+	refineGeneratingTask: (task: string) => string;
+	refineAbortButton: string;
 	canvasPresentationOpen: string;
 	canvasPresentationClose: string;
 	canvasPresentationTitle: string;

@@ -2,8 +2,14 @@ import math
 from xml.etree import ElementTree
 
 from inku_server.render_engines import current_render_engine
-from inku_server.renderer import _clustered_pos, _resolve_performance_score, render
+from inku_server.renderer import _clustered_pos, _resolve_performance_score, new_render_seed, render
 from inku_server.schema import Instruction, Score
+
+
+def test_new_render_seed_is_javascript_safe_integer():
+    for _ in range(100):
+        seed = new_render_seed()
+        assert 0 <= seed <= 2**53 - 1
 
 
 def test_render_empty_score_has_background():
@@ -11,6 +17,44 @@ def test_render_empty_score_has_background():
     assert "<svg" in svg
     assert 'viewBox="0 0 1000 1000"' in svg
     assert "#ffffff" in svg
+
+
+def test_render_seed_changes_touch_for_fixed_shapes_without_moving_geometry():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.2,
+                    "filled": True,
+                    "color": "red",
+                }
+            ]
+        }
+    )
+
+    first = render(score, render_seed=29)
+    replay = render(score, render_seed=29)
+    alternate = render(score, render_seed=30)
+
+    assert first == replay
+    assert first != alternate
+    assert 'id="performance_touch_29"' in first
+    assert 'id="performance_touch_30"' in alternate
+    assert 'cx="500.0"' in first and 'cx="500.0"' in alternate
+    assert 'cy="500.0"' in first and 'cy="500.0"' in alternate
+
+
+def test_render_seed_does_not_add_touch_filter_to_editable_profile():
+    score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2}]}
+    )
+
+    svg = render(score, render_seed=29, svg_profile="editable")
+
+    assert "performance_touch" not in svg
+    assert "feDisplacementMap" not in svg
 
 
 def test_render_canvas_aspect_plugin_changes_viewbox_without_stretching_circle():

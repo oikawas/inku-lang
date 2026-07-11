@@ -40,6 +40,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
 - **正規化DDL に図形・線・弧の指示がある場合、instructions を空配列にしてはいけない。変換不能なら最も近い線・楕円・四角へ落とし込む**
+- **疎で最小限の作品も有効。単一の方向線・地平線・端寄りの焦点だけの DDL も、少なくとも1つの描画可能な instruction にする**
 - **出力は 1〜5 instructions に圧縮する。DDL 全文を説明し直さず、主題を成立させる主要な視覚関係だけを JSON 化する**
 - **作品ごとに主技法は一つだけ。DDL に複数の技法語があっても、最も主題に合うものを一つ選び、残りは必要な場合だけ小さな補助層にする**
 - **圧縮しすぎない。光・香り・温度・音・待つ時間・五感などの感覚語が DDL にある場合、主題を壊さない範囲で 1〜2 個の薄い補助層として残す。削りすぎて作品の情報量や楽しさを失わせない**
@@ -48,6 +49,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **形容語・動作語・質感語は、DDL で指定された主図形へ適用する。震える・揺れる・滲む・太い・細い等を理由に、DDL にない補助線・補助図形・別色の instruction を追加してはいけない**
 - **面の質感は instruction.surface へ入れる。点で埋める=texture="stipple"、斜線/ハッチ=texture="hatch"、粒立つ/かすれ=texture="grain"、薄墨/水彩=texture="wash"、端が滲む=texture="bleed"。質感を理由に独立 instruction を追加しない**
 - **紙目・生成りの紙・和紙・薄墨の地は canvas.ground へ入れる。canvas は {"aspect":"square","ground":{...}} 形式にしてよい。地は background ではなく支持体の質感であり、座標系を変えない**
+- **「地: ...」の文は canvas.ground へだけ変換し、その文から instruction を追加しない。「面: ...」の文は直前に指定された主図形の surface に入れる。一つの質感要求を複数の質感付き instruction に複製しない**
 - **「ゆっくり揺れる」→ variation quality="wave", frequency="slow" を優先する。perlin は「震える」「細かく揺れる」に使う**
 - **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
@@ -80,10 +82,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「画面全体に点々」「全面に細かく」は layout=scatter でよいが、意味は無秩序ではなく全面分布として扱う**
 - **scatter は均一な乱数ではない。密度勾配、端部の薄れ、斜めの帯、右半分、上から下など、DDL の配置語に沿った偏りを持つものとして扱う**
 - **「波打つ軌跡に沿って」→ arrangement.path="wave"。「斜めの帯」→ path="diagonal"。「右半分」→ path="right_half"**
-- **「上から下への縦の帯」→ layout="vertical", path="top_to_bottom"。「左から右への横の帯」→ layout="horizontal", path="left_to_right"。「画面全体へ」→ layout="scatter"。**
+- **「上から下へ散らす」「上から下への縦の帯」→ layout="vertical", path="top_to_bottom"。「左から右へ」「横に」「左から右への横の帯」→ layout="horizontal", path="left_to_right"。「放射状」「同心円状」→ layout="radial"。「画面全体へ」→ layout="scatter"**
 - **「中央静止の周囲」→ at={"region":[0.42,0.42,0.58,0.58]}。固定 center ではなく狭い中央領域として扱う**
 - **「リズム」「跳ねる」「踊る」「輪唱のずれ」「ほどける反復」→ count を増やさず arrangement.rhythm_spacing を使う。楽しい/跳ねる=syncopated、加速/流れ=accelerando、ゆるい揺れ=loose**
-- **「上から下へ散らす」は layout=vertical, path="top_to_bottom"。「左から右へ」「横に」は layout=horizontal, path="left_to_right"。「放射状」「同心円状」は layout=radial**
 - **「右上の黄金比の位置」→ at={"region":[0.56,0.32,0.68,0.44]}。左下なら [0.32,0.56,0.44,0.68]。焦点は固定座標ではなく領域として扱う**
 - **「左上の三分割の交点」→ at={"region":[0.273,0.273,0.393,0.393]}。「右下の三分割の交点」→ at={"region":[0.607,0.607,0.727,0.727]}。三分割構図として扱う。焦点座標をハードコードしない**
 - **「左下の白銀比の位置」→ at={"region":[0.354,0.526,0.474,0.646]}。「右上の白銀比の位置」→ at={"region":[0.526,0.354,0.646,0.474]}。白銀比の余白として扱う。焦点座標をハードコードしない**
@@ -126,8 +127,11 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 灰色の円を薄墨で満たし、端を少し滲ませる。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.16,"color":"gray","filled":true,"surface":{"texture":"wash","density":0.3,"opacity":0.45,"bleed":0.2}}]}
 
-入力: 生成りの紙に、黒い細い線を中心へひとつ置く。線はかすかに震える。
+入力: 黒い細い線を中心へひとつ置く。かすかに震える。地: 生成りの紙、細かい紙目。
 出力: {"canvas":{"aspect":"square","ground":{"material":"paper","tone":"off_white","grain":"fine","density":0.2,"opacity":0.12}},"instructions":[{"primitive":"line","from":[0.5,0.3],"to":[0.5,0.7],"color":"black","weight":"pen","variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x"]}}]}
+
+入力: 黒い縦線を横に三本並べる。地: 薄墨。
+出力: {"canvas":{"aspect":"square","ground":{"material":"ink_wash","tone":"gray","density":0.25,"opacity":0.14}},"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"black","arrangement":{"count":3,"layout":"horizontal"}}]}
 
 入力: 縦の実線を横に三本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
@@ -333,6 +337,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Apply adjectives, motion words, and texture words to the main primitive specified by the DDL. Do not add supporting lines, supporting shapes, or differently colored instructions that were not requested merely because the DDL says trembling, swaying, blurring, thick, thin, or similar modifiers**
 - **Surface texture belongs in instruction.surface. dotted/stippled fill → texture="stipple"; hatch/crosshatch → texture="hatch"; grainy/rough/scuffed → texture="grain"; ink wash/watercolor wash → texture="wash"; bleeding edge → texture="bleed". Do not turn texture into independent helper instructions**
 - **Paper grain, off-white paper, washi, and ink-wash ground belong in canvas.ground. Use canvas={"aspect":"square","ground":{...}} when needed. Ground is support texture, not a coordinate or composition change**
+- **A "Ground: ..." sentence maps only to canvas.ground; do not add any instruction from it. A "Surface: ..." sentence goes into the surface of the main shape it follows. Never duplicate one texture request across multiple textured instructions**
 - **"swaying slowly" / "slowly swaying" → prefer variation quality="wave", frequency="slow". Use perlin for trembling or fine swaying**
 - **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
 - **count is integer 1–1000. Use explicit numbers from DDL**
@@ -365,10 +370,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"dotted across the whole canvas" / "finely across the whole canvas" may use layout=scatter, but treat it as all-over distribution, not disorder**
 - **scatter is not uniform noise. Treat it as biased by density gradient, fading edges, diagonal band, right half, or top-to-bottom placement from the DDL**
 - **"undulating trace" → arrangement.path="wave". "diagonal band" → path="diagonal". "right half" → path="right_half"**
-- **"vertical band" / "from top to bottom" → layout="vertical", path="top_to_bottom". "horizontal strata" / "left to right" → layout="horizontal", path="left_to_right". "across the whole canvas" → layout="scatter"**
+- **"from top to bottom" / "vertical band" → layout="vertical", path="top_to_bottom". "left to right" / "horizontal" / "horizontal strata" → layout="horizontal", path="left_to_right". "radial" / "concentric" → layout="radial". "across the whole canvas" → layout="scatter"**
 - **"central stillness" → at={"region":[0.42,0.42,0.58,0.58]}. Treat it as a narrow central region, not a fixed center coordinate**
 - **"rhythm", "bounce", "dance", "canon-like offset", or "unraveling repetition" → use arrangement.rhythm_spacing without increasing count. playful/bouncing=syncopated, accelerating/flowing=accelerando, loose swaying=loose**
-- **"top to bottom" → layout=vertical, path="top_to_bottom". "left to right" / "horizontal" → layout=horizontal, path="left_to_right". "radial" / "concentric" → layout=radial**
 - **"upper-right golden-ratio position" → at={"region":[0.56,0.32,0.68,0.44]}. Lower-left uses at={"region":[0.32,0.56,0.44,0.68]}. Treat focus as a region, not a hard-coded coordinate**
 - **"upper-left rule-of-thirds point" → at={"region":[0.273,0.273,0.393,0.393]}. "lower-right rule-of-thirds point" → at={"region":[0.607,0.607,0.727,0.727]}. Treat it as rule-of-thirds composition. Do not hard-code focus coordinates**
 - **"lower-left silver-ratio position" → at={"region":[0.354,0.526,0.474,0.646]}. "upper-right silver-ratio position" → at={"region":[0.526,0.354,0.646,0.474]}. Treat it as silver-ratio spacing. Do not hard-code focus coordinates**
@@ -412,8 +416,11 @@ If "original text" is provided, use normalized DDL as primary; use original text
 Input: Fill a gray circle with pale ink wash and let the edge bleed slightly.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.16,"color":"gray","filled":true,"surface":{"texture":"wash","density":0.3,"opacity":0.45,"bleed":0.2}}]}
 
-Input: On off-white paper, place one thin black line at center. The line trembles faintly.
+Input: Place one thin black line at center. Trembling faintly. Ground: off-white paper, fine paper grain.
 Output: {"canvas":{"aspect":"square","ground":{"material":"paper","tone":"off_white","grain":"fine","density":0.2,"opacity":0.12}},"instructions":[{"primitive":"line","from":[0.5,0.3],"to":[0.5,0.7],"color":"black","weight":"pen","variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x"]}}]}
+
+Input: Line up three vertical black lines horizontally. Ground: ink wash.
+Output: {"canvas":{"aspect":"square","ground":{"material":"ink_wash","tone":"gray","density":0.25,"opacity":0.14}},"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"black","arrangement":{"count":3,"layout":"horizontal"}}]}
 
 Input: Line up three vertical solid lines horizontally.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}

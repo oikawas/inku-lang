@@ -178,6 +178,7 @@ def default_user_model_settings() -> dict[str, Any]:
         "stage2_provider": "nvidia",
         "stage2_model": "google/gemma-4-31b-it",
         "model_inspection_selected_models": [],
+        "instruction_caption_visible": True,
     }
 
 
@@ -289,6 +290,7 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = settings[key].strip()
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
+    clean["instruction_caption_visible"] = settings.get("instruction_caption_visible") is not False
     return clean
 
 
@@ -300,6 +302,8 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
     for key in ("stage1_model", "stage2_model"):
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = patch[key].strip()
+    if "instruction_caption_visible" in patch:
+        clean["instruction_caption_visible"] = bool(patch["instruction_caption_visible"])
     if "model_inspection_selected_models" in patch:
         clean["model_inspection_selected_models"] = _normalize_selected_model_ids(patch.get("model_inspection_selected_models"))
     return normalize_user_model_settings(clean)

@@ -42,6 +42,7 @@
 		liveMs: number;
 		batchFailureReport: BatchFailureReport | null;
 		canSubmit: boolean;
+		generationDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
 		batchRandomColorCatalog: boolean;
@@ -106,6 +107,7 @@
 		liveMs,
 		batchFailureReport,
 		canSubmit,
+		generationDisabled,
 		error,
 		batchPromptHistory,
 		batchRandomColorCatalog = $bindable(false),
@@ -266,7 +268,7 @@
 			<div class="progress-stage-text">{stageLabel}</div>
 		{:else if !singleRunning}
 			<Tooltip placement="top" text={t().tooltipSubmit}>
-				<PaintButton onclick={onSubmit} disabled={!canSubmit}>{t().submitBtn}</PaintButton>
+				<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
 			</Tooltip>
 		{/if}
 
@@ -288,7 +290,7 @@
 			{liveMs}
 			{batchFailureReport}
 			{canSubmit}
-			actionDisabled={singleRunning}
+			actionDisabled={singleRunning || generationDisabled}
 			{error}
 			{batchPromptHistory}
 			bind:randomColorCatalog={batchRandomColorCatalog}
@@ -315,7 +317,7 @@
 			generatedDdlHighlighted={demoGeneratedDdlHighlighted}
 			canSaveCurrent={demoCanSaveCurrent}
 			savingCurrent={demoSavingCurrent}
-			actionDisabled={singleRunning}
+			actionDisabled={singleRunning || generationDisabled}
 			saveStatus={demoSaveStatus}
 			error={demoError}
 			onSettingsChange={onDemoSettingsChange}

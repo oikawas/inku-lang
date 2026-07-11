@@ -5,16 +5,19 @@
 	import type { Score } from '$lib/historyManagerState.svelte';
 	import OutputTabsContent from './OutputTabsContent.svelte';
 	import PaintButton from './PaintButton.svelte';
+	import StopButton from './StopButton.svelte';
 	import Tooltip from './Tooltip.svelte';
 
+	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'compare' | 'prompts' | 'score';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 	type PaintResult = { svg: string; score: Score; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
+	type RefineChanges = { touch: boolean; layout: boolean; reading: boolean };
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
-	type ModelInspectionResult = { id: string; model: string; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
+	type ModelInspectionResult = { id: string; model: string; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
 		outputTab: OutputTab;
@@ -72,16 +75,26 @@
 		onVaryPerformance: () => void | Promise<void>;
 		onVaryComposition: () => void | Promise<void>;
 		onVaryInterpretation: () => void | Promise<void>;
+		instructionCaptionVisible: boolean;
+		onInstructionCaptionVisibleChange: (visible: boolean) => void | Promise<void>;
 		variationBusy: boolean;
 		variationCandidates: VariationCandidate[];
 		variationGridBusy: boolean;
+		variationGridCanAbort: boolean;
+		variationGridIncludesReading: boolean;
+		variationGridTaskLabel: string;
 		variationGridStatus: string | null;
-		onGenerateVariationGrid: (includeInterpretation?: boolean) => void | Promise<void>;
+		onGenerateVariationCandidates: (changes: RefineChanges, count: 1 | 4) => void | Promise<void>;
+		onAbortVariationCandidates: () => void;
 		onSaveSelectedVariationCandidates: () => void | Promise<void>;
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
 		onToggleVariationCandidate: (id: string) => void;
 		activeComparisonItem: { svg: string } | null;
 		modelInspectionTargetModel: string;
+		modelInspectionTargetStage1Model: string;
+		modelInspectionTargetStage2Model: string;
+		modelCompareMode: ModelCompareMode;
+		modelCompareFixedModel: string;
 		modelInspectionChoices: ModelInspectionChoice[];
 		modelInspectionSelectedModels: string[];
 		modelInspectionFailedModels: Record<string, string>;
@@ -89,6 +102,9 @@
 		modelInspectionStatus: string | null;
 		modelInspectionResults: ModelInspectionResult[];
 		onToggleModelInspectionModel: (modelId: string) => void;
+		onSetModelCompareMode: (mode: ModelCompareMode) => void;
+		onSetModelCompareFixedModel: (model: string) => void;
+		isModelInspectionChoiceBlocked: (model: string) => boolean;
 		onRunModelInspection: () => void | Promise<void>;
 		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
 		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
@@ -150,16 +166,26 @@
 		onVaryPerformance,
 		onVaryComposition,
 		onVaryInterpretation,
+		instructionCaptionVisible = $bindable(true),
+		onInstructionCaptionVisibleChange,
 		variationBusy = false,
 		variationCandidates = [],
 		variationGridBusy = false,
+		variationGridCanAbort = false,
+		variationGridIncludesReading = false,
+		variationGridTaskLabel = '',
 		variationGridStatus = null,
-		onGenerateVariationGrid,
+		onGenerateVariationCandidates,
+		onAbortVariationCandidates,
 		onSaveSelectedVariationCandidates,
 		onShowVariationCandidate,
 		onToggleVariationCandidate,
 		activeComparisonItem,
 		modelInspectionTargetModel,
+		modelInspectionTargetStage1Model,
+		modelInspectionTargetStage2Model,
+		modelCompareMode = 'common',
+		modelCompareFixedModel = '',
 		modelInspectionChoices = [],
 		modelInspectionSelectedModels = [],
 		modelInspectionFailedModels = {},
@@ -167,6 +193,9 @@
 		modelInspectionStatus = null,
 		modelInspectionResults = [],
 		onToggleModelInspectionModel,
+		onSetModelCompareMode,
+		onSetModelCompareFixedModel,
+		isModelInspectionChoiceBlocked,
 		onRunModelInspection,
 		onAdoptModelInspectionResult,
 		onToggleModelInspectionStar
@@ -175,8 +204,19 @@
 	let canvasContentEl: HTMLDivElement | null = null;
 	let svgMenuOpen = $state(false);
 	let svgHelpOpen = $state(false);
-	let instructionCaptionVisible = $state(true);
 	let presentationMode = $state(false);
+	let changeTouch = $state(false);
+	let changeLayout = $state(false);
+	let changeReading = $state(false);
+	const refineCostLabel = $derived(
+		changeReading
+			? t().refineCostReading
+			: changeLayout
+				? t().refineCostLayout
+				: changeTouch
+					? t().refineCostTouch
+					: ''
+	);
 	const canvasMaxRatio = $derived(Math.max(canvasAspectWidth, canvasAspectHeight, 1));
 	const canvasBaseWidth = $derived(400 * canvasAspectWidth / canvasMaxRatio);
 	const canvasBaseHeight = $derived(400 * canvasAspectHeight / canvasMaxRatio);
@@ -185,6 +225,11 @@
 	const placeholderHeight = $derived(Math.round(1000 * canvasAspectHeight / placeholderUnit));
 	const displayInstructionText = $derived((instructionText || '').trim());
 	const canShowInstructionCaption = $derived(!!displayInstructionText);
+
+	function toggleInstructionCaption() {
+		instructionCaptionVisible = !instructionCaptionVisible;
+		void onInstructionCaptionVisibleChange(instructionCaptionVisible);
+	}
 
 	function updateFitZoom() {
 		if (!canvasContentEl) return;
@@ -225,7 +270,7 @@
 		result
 			? t().canvasSeedSummary
 				.replace('{render}', result.render_seed == null ? '-' : String(result.render_seed))
-				.replace('{vary}', result.vary_seed == null ? '-' : String(result.vary_seed))
+				.replace('{vary}', result.vary_seed == null ? t().seedBaseLabel : String(result.vary_seed))
 			: ''
 	);
 </script>
@@ -323,7 +368,7 @@
 							aria-label={t().canvasCaptionToggle}
 							onclick={(event) => {
 								event.stopPropagation();
-								instructionCaptionVisible = !instructionCaptionVisible;
+								toggleInstructionCaption();
 							}}
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -357,151 +402,159 @@
 				{/if}
 			{:else if outputTab === 'refine'}
 				<div class="refine-panel">
-					<div class="refine-head">
-						<div>
-							<div class="refine-title">{t().refineTitle}</div>
-							<div class="refine-sub">{t().refineSubtitle}</div>
-						</div>
-						{#if result}<span class="seed-summary refine-seed">{seedSummary}</span>{/if}
-					</div>
 					<div class="refine-stage">
-						<div class="refine-target-card">
-							<div class="comparison-label">{t().refineTargetTitle}</div>
-							<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if result}{@html result.svg}{/if}</div>
-							{#if result}<div class="model-target-meta">{seedSummary}</div>{/if}
+						<div class="refine-target-column">
+							<div class="refine-target-card">
+								<div class="comparison-label">{t().refineTargetTitle}</div>
+								<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if result}{@html result.svg}{/if}</div>
+								{#if result}<div class="model-target-meta">{seedSummary}</div>{/if}
+							</div>
+							<div class="refine-target-controls">
+								<section class="refine-action-section">
+									<div class="refine-section-head">
+										<div class="refine-section-title">{t().refineSingleTitle}</div>
+									</div>
+									<div class="model-choice-grid">
+										<label class="model-choice" class:checked={changeTouch}>
+											<input type="checkbox" bind:checked={changeTouch} disabled={changeReading || variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryPerformance}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
+										<label class="model-choice" class:checked={changeLayout}>
+											<input type="checkbox" bind:checked={changeLayout} disabled={changeReading || variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryComposition}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
+										<label class="model-choice" class:checked={changeReading}>
+											<input type="checkbox" bind:checked={changeReading} onchange={() => { changeTouch = changeReading; changeLayout = changeReading; }} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryInterpretation}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
+									</div>
+								</section>
+								<section class="refine-action-section">
+									<div class="refine-section-head">
+										<div class="refine-section-title">{t().refineGridTitle}</div>
+									</div>
+									<div class="refine-actions refine-paint-actions">
+										<Tooltip text={t().tooltipRefineSingle}>
+											<div class="refine-action-wrap">
+												<PaintButton
+													onclick={() => onGenerateVariationCandidates({ touch: changeTouch, layout: changeLayout, reading: changeReading }, 1)}
+													disabled={!result || variationBusy || variationGridBusy || (!changeTouch && !changeLayout && !changeReading)}
+												>
+													{t().refineSingleButton}
+												</PaintButton>
+											</div>
+										</Tooltip>
+										<Tooltip text={t().tooltipVariationGridDefault}>
+											<div class="refine-action-wrap">
+												<PaintButton
+													onclick={() => onGenerateVariationCandidates({ touch: changeTouch, layout: changeLayout, reading: changeReading }, 4)}
+													disabled={!result || variationBusy || variationGridBusy || (!changeTouch && !changeLayout && !changeReading)}
+												>
+													{t().variationGridDefault}
+												</PaintButton>
+											</div>
+										</Tooltip>
+										{#if variationGridBusy && variationGridCanAbort}<div class="refine-stop-wrap"><StopButton onclick={onAbortVariationCandidates}>{t().refineAbortButton}</StopButton></div>{/if}
+										{#if refineCostLabel}
+											<div class="refine-cost-indicator" aria-live="polite">
+												<svg viewBox="0 0 24 24" aria-hidden="true">
+													<circle cx="12" cy="12" r="8.5" />
+													<path d="M12 7.5v5l3 2" />
+												</svg>
+												<span>{refineCostLabel}</span>
+											</div>
+										{/if}
+
+									{#if variationBusy || variationGridBusy}
+										<div class="model-drawing-animation refine-drawing-animation" aria-live="polite">
+											<div class="model-drawing-spinner" aria-hidden="true"></div>
+											<div><strong>{t().refineGenerating}</strong><span>{t().refineGeneratingTask(variationGridTaskLabel)}</span></div>
+										</div>
+									{/if}
+									</div>
+								</section>
+							</div>
 						</div>
 						<div class="refine-workspace">
-							<section class="refine-action-section">
-								<div class="refine-section-head">
-									<div class="refine-section-title">{t().refineSingleTitle}</div>
-									<div class="refine-section-sub">{t().refineSingleSubtitle}</div>
-								</div>
-								<div class="refine-actions refine-paint-actions">
-									<Tooltip text={t().tooltipCanvasVaryPerformance}>
-										<div class="refine-action-wrap"><PaintButton onclick={onVaryPerformance} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryPerformance}</PaintButton></div>
-									</Tooltip>
-									<Tooltip text={t().tooltipCanvasVaryComposition}>
-										<div class="refine-action-wrap"><PaintButton onclick={onVaryComposition} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryComposition}</PaintButton></div>
-									</Tooltip>
-									<Tooltip text={t().tooltipCanvasVaryInterpretation}>
-										<div class="refine-action-wrap"><PaintButton onclick={onVaryInterpretation} disabled={!result || variationBusy || variationGridBusy}>{t().canvasVaryInterpretation}</PaintButton></div>
-									</Tooltip>
-								</div>
-							</section>
-							<section class="refine-action-section refine-action-section-grid">
-								<div class="refine-section-head">
-									<div class="refine-section-title">{t().refineGridTitle}</div>
-									<div class="refine-section-sub">{t().refineGridSubtitle}</div>
-								</div>
-								<div class="refine-actions refine-grid-actions refine-paint-actions">
-									<Tooltip placement="top-right" text={t().tooltipVariationGridDefault}>
-										<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(false)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridDefault}</PaintButton></div>
-									</Tooltip>
-									<Tooltip placement="top" text={t().tooltipVariationGridWithInterpretation}>
-										<div class="refine-action-wrap"><PaintButton onclick={() => onGenerateVariationGrid(true)} disabled={!result || variationBusy || variationGridBusy}>{t().variationGridWithInterpretation}</PaintButton></div>
-									</Tooltip>
-									<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
-										<button class="ghost-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>{t().variationGridSaveSelected}</button>
-									</Tooltip>
-								</div>
-							</section>
-							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
-							{#if variationBusy || variationGridBusy}
-								<div class="model-drawing-animation" aria-live="polite">
-									<div class="model-drawing-spinner" aria-hidden="true"></div>
-									<div>
-										<strong>{t().refineGenerating}</strong>
-										<span>{t().refineGeneratingBody}</span>
-									</div>
-								</div>
-							{/if}
 							{#if variationCandidates.length > 0}
-								<div class="variation-grid">
-									{#each variationCandidates as candidate (candidate.id)}
-										<div class="variation-card-wrap">
-											<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
-												<span class="variation-card-art">{@html candidate.result.svg}</span>
-												<span class="variation-card-meta">
-													<span>{candidate.label}</span>
-													<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? "-"}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
-												</span>
+								<section class="refine-action-section refine-candidates-section">
+									<div class="refine-actions refine-save-actions">
+										<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
+											<button class="refine-save-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>
+												{t().variationGridSaveSelected}
 											</button>
-											<button class="variation-select" class:selected={candidate.selected} onclick={() => onToggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
-										</div>
-									{/each}
-								</div>
-							{:else if !variationBusy && !variationGridBusy}
-								<div class="refine-empty">{t().refineEmpty}</div>
+										</Tooltip>
+									</div>
+									<div class="variation-grid">
+										{#each variationCandidates as candidate (candidate.id)}
+											<div class="variation-card-wrap">
+												<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
+													<span class="variation-card-art">{@html candidate.result.svg}</span>
+													<span class="variation-card-meta">
+														<span>{candidate.label}</span>
+														<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? t().seedBaseLabel}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
+													</span>
+												</button>
+											{#if variationGridIncludesReading}<pre class="variation-ddl-popup">{candidate.result.ddl}</pre>{/if}
+												<button class="variation-select" class:selected={candidate.selected} onclick={() => onToggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
+											</div>
+										{/each}
+									</div>
+								</section>
 							{/if}
+							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
 						</div>
 					</div>
 				</div>
 			{:else if outputTab === 'compare'}
 				<div class="compare-panel">
 					<div class="compare-head">
-						<div>
-							<div class="refine-title">{t().modelCompareTitle}</div>
-							<div class="refine-sub">{t().modelCompareSubtitle}</div>
-						</div>
-						<div class="compare-action-wrap">
-							<Tooltip text={t().tooltipModelCompare}>
-								<PaintButton onclick={onRunModelInspection} disabled={!result || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</PaintButton>
-							</Tooltip>
-						</div>
+						<div class="refine-title">{t().modelCompareTitle}</div>
+						<div class="compare-action-wrap"><Tooltip text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</PaintButton></Tooltip></div>
 					</div>
+					<div class="compare-mode-tabs" role="tablist" aria-label={t().modelCompareModeLabel}>
+						<button class:active={modelCompareMode === 'common'} onclick={() => onSetModelCompareMode('common')}>{t().modelCompareModeCommon}</button>
+						<button class:active={modelCompareMode === 'stage1_fixed'} onclick={() => onSetModelCompareMode('stage1_fixed')}>{t().modelCompareModeStage1Fixed}</button>
+						<button class:active={modelCompareMode === 'stage2_fixed'} onclick={() => onSetModelCompareMode('stage2_fixed')}>{t().modelCompareModeStage2Fixed}</button>
+					</div>
+					{#if modelCompareMode !== 'common'}
+						<label class="compare-fixed-model"><span>{modelCompareMode === 'stage1_fixed' ? t().modelCompareFixedStage1 : t().modelCompareFixedStage2}</span><select value={modelCompareFixedModel} disabled={modelInspectionBusy} onchange={(event) => onSetModelCompareFixedModel(event.currentTarget.value)}>{#each modelInspectionChoices as choice (choice.id)}<option value={choice.id}>{choice.label} · {choice.providerLabel}</option>{/each}</select></label>
+					{/if}
 					<div class="model-choice-grid" aria-label={t().modelCompareModelSelectLabel}>
 						{#each modelInspectionChoices as choice (choice.id)}
-							{@const isTarget = choice.id === modelInspectionTargetModel}
+							{@const blocked = isModelInspectionChoiceBlocked(choice.id)}
 							{@const checked = modelInspectionSelectedModels.includes(choice.id)}
 							{@const failed = !!modelInspectionFailedModels[choice.id]}
-							<label class="model-choice" class:checked={checked} class:target={isTarget} class:failed={failed} class:disabled={!checked && !isTarget && modelInspectionSelectedModels.length >= 4}>
-								<input type="checkbox" checked={checked} disabled={modelInspectionBusy || isTarget || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
-								<span>
-									<strong>{choice.label}</strong>
-									<small>{choice.providerLabel}{isTarget ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small>
-								</span>
-							</label>
+							<Tooltip text={blocked ? t().modelCompareTargetDisabledTooltip : ''}>
+								<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || (!checked && modelInspectionSelectedModels.length >= 4)}>
+									<input type="checkbox" checked={checked} disabled={modelInspectionBusy || blocked || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
+									<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
+								</label>
+							</Tooltip>
 						{/each}
 					</div>
 					<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspectionSelectedModels.length, 4)}</div>
 					{#if modelInspectionStatus}<div class="variation-grid-status">{modelInspectionStatus}</div>{/if}
 					<div class="model-compare-stage" class:busy={modelInspectionBusy}>
-						<div class="model-target-card">
-							<div class="comparison-label">{t().modelCompareTargetTitle}</div>
-							<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div>
-							<div class="model-target-meta">{t().modelCompareTargetModelLabel}: {statusStage1Model}</div>
-						</div>
+						<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {modelInspectionTargetStage1Model}<br />Stage 2: {modelInspectionTargetStage2Model}</div></div>
 						<div class="model-results-column">
-							{#if modelInspectionBusy}
-								<div class="model-drawing-animation" aria-live="polite">
-									<div class="model-drawing-spinner" aria-hidden="true"></div>
-									<div>
-										<strong>{t().modelCompareDrawingTitle}</strong>
-										<span>{t().modelCompareDrawingBody}</span>
-									</div>
-								</div>
-							{/if}
-							{#if modelInspectionResults.length > 0}
-								<div class="model-inspection-grid">
-									{#each modelInspectionResults as item (item.id)}
-										<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
-											<div class="comparison-label">{item.label}</div>
-											<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div>
-											<div class="model-result-actions">
-												<Tooltip text={item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}>
-													<button class="ghost-btn model-adopt-btn" type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptModelInspectionResult(item)}>{item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdopt}</button>
-												</Tooltip>
-												<Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}>
-													<button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button>
-												</Tooltip>
-											</div>
-											<pre>{item.ddl}</pre>
-										</div>
-									{/each}
-								</div>
-							{:else if !modelInspectionBusy}
-								<div class="refine-empty">{t().modelCompareEmpty}</div>
-							{/if}
+							{#if modelInspectionBusy}<div class="model-drawing-animation" aria-live="polite"><div class="model-drawing-spinner" aria-hidden="true"></div><div><strong>{t().modelCompareDrawingTitle}</strong><span>{t().modelCompareDrawingBody}</span></div></div>{/if}
+							{#if modelInspectionResults.length > 0}<div class="model-inspection-grid">{#each modelInspectionResults as item (item.id)}<div class="model-inspection-card" class:saved={!!item.savedHistoryId}><div class="comparison-label">{item.label}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div><div class="model-result-actions"><Tooltip text={item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}><button class="ghost-btn model-adopt-btn" type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptModelInspectionResult(item)}>{item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdopt}</button></Tooltip><Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}><button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button></Tooltip></div><pre>{item.ddl}</pre></div>{/each}</div>{/if}
 						</div>
 					</div>
 				</div>
@@ -723,7 +776,7 @@
 					class="presentation-icon-btn"
 					class:active={instructionCaptionVisible}
 					disabled={!canShowInstructionCaption}
-					onclick={() => (instructionCaptionVisible = !instructionCaptionVisible)}
+					onclick={toggleInstructionCaption}
 					aria-label={t().canvasCaptionToggle}
 				>
 					<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -825,34 +878,37 @@
 		padding: 16px;
 		box-sizing: border-box;
 	}
-	.refine-head {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 16px;
-	}
 	.refine-title {
 		font-size: 14px;
 		font-weight: 600;
 		color: var(--fg);
 	}
-	.refine-sub,
-	.refine-empty,
 	.variation-grid-status {
 		font-size: 12px;
 		color: var(--fg3);
 		line-height: 1.5;
 	}
-	.refine-seed { margin: 0; }
 	.refine-stage {
 		display: grid;
 		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
 		gap: 14px;
 		align-items: start;
 	}
-	.refine-target-card {
+	.refine-target-column {
 		position: sticky;
 		top: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		min-width: 0;
+	}
+	.refine-target-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+	.refine-target-card {
 		border: 1px solid var(--border);
 		background: var(--panel);
 		padding: 8px;
@@ -870,10 +926,6 @@
 		gap: 8px;
 		padding-bottom: 2px;
 	}
-	.refine-action-section-grid {
-		padding-top: 10px;
-		border-top: 1px solid var(--border);
-	}
 	.refine-section-head {
 		display: flex;
 		flex-direction: column;
@@ -884,25 +936,80 @@
 		font-weight: 600;
 		color: var(--fg);
 	}
-	.refine-section-sub {
-		font-size: 11px;
-		line-height: 1.45;
-		color: var(--fg3);
-	}
 	.refine-actions {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
 	}
+	.refine-choice-label {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+	}
+	.refine-info-mark {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		border: 1px solid var(--border2);
+		border-radius: 50%;
+		color: var(--fg3);
+		font-size: 10px;
+		font-weight: 600;
+		font-style: normal;
+		flex: 0 0 auto;
+	}
+	.refine-cost-indicator {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-height: 34px;
+		color: var(--fg3);
+		font-size: 11px;
+		white-space: nowrap;
+	}
+	.refine-cost-indicator svg {
+		width: 15px;
+		height: 15px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.7;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
 	.refine-paint-actions { align-items: stretch; }
+	.refine-stop-wrap { width: min(210px, 100%); display: flex; }
+	.refine-stop-wrap :global(.stop-btn) { width: 100%; min-width: 0; flex: 1; padding: 9px 12px; font-size: 12px; }
+	.refine-drawing-animation { margin-top: 2px; }
 	.refine-action-wrap { width: min(210px, 100%); }
 	.refine-action-wrap :global(.tooltip-wrap),
 	.refine-action-wrap :global(.paint-btn) { width: 100%; }
 	.refine-action-wrap :global(.paint-btn) { margin-top: 0; min-height: 34px; font-size: 12px; letter-spacing: 0.03em; }
-	.refine-grid-actions { padding-top: 0; }
+	.refine-save-actions {
+		margin-bottom: 12px;
+		display: flex;
+	}
+	.refine-save-actions :global(.tooltip-wrap) { width: fit-content; max-width: 100%; }
+	.refine-save-actions button {
+		width: auto;
+		max-width: 100%;
+		padding: 10px 16px;
+		font-weight: 500;
+	}
+	.refine-candidates-section {
+		border-top: 1px dashed var(--border);
+	}
+
+	.refine-save-btn { border: 1px solid var(--action-bg); border-radius: var(--r); background: var(--action-bg); color: var(--action-fg); cursor: pointer; }
+	.refine-save-btn:hover:not(:disabled) { background: var(--action-hover); }
+	.refine-save-btn:disabled { border-color: var(--border); background: var(--bg2); color: var(--fg3); cursor: not-allowed; }
+	.variation-ddl-popup { position: absolute; z-index: 8; left: 10px; right: 10px; bottom: calc(100% - 10px); display: none; max-height: 220px; overflow: auto; padding: 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--tooltip-bg); color: #fff; font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; box-shadow: 0 8px 24px rgba(0,0,0,.24); pointer-events: none; }
+	.variation-card-wrap:hover .variation-ddl-popup { display: block; }
 	.variation-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 10px;
 	}
 	.variation-card-wrap {
@@ -992,6 +1099,12 @@
 	}
 	.compare-action-wrap :global(.tooltip-wrap) { width: 100%; }
 	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
+
+	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+	.compare-mode-tabs button { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg3); font: inherit; cursor: pointer; }
+	.compare-mode-tabs button.active { border-bottom-color: var(--accent); color: var(--fg); font-weight: 600; }
+	.compare-fixed-model { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--fg2); }
+	.compare-fixed-model select { min-width: 240px; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; }
 	.model-choice-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));

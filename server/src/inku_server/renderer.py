@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import os
+import secrets
 import re
 import struct
 from xml.sax.saxutils import escape
@@ -126,7 +126,24 @@ def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None)
 
 def new_render_seed() -> int:
     """演奏ごとのマクロ揺らぎ seed。明示 seed 指定時は再現可能。"""
-    return struct.unpack("<Q", os.urandom(8))[0]
+    return secrets.randbits(53)
+
+
+def _performance_touch_filter(render_seed: int) -> tuple[str, str]:
+    """固定図形にも seed ごとの微細な輪郭差を与える display 用 filter。"""
+    seed = int(render_seed)
+    filter_id = _safe_svg_id(f"performance_touch_{seed % 100000}")
+    frequency = 0.012 + _hash01(0, seed, "performance-touch-frequency") * 0.008
+    scale = 1.6 + _hash01(1, seed, "performance-touch-scale") * 1.4
+    xml = (
+        f'<filter id="{filter_id}" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">'
+        f'<feTurbulence type="fractalNoise" baseFrequency="{frequency:.5f}" numOctaves="2" '
+        f'seed="{seed % 9973}" result="touchNoise"/>'
+        f'<feDisplacementMap in="SourceGraphic" in2="touchNoise" scale="{scale:.2f}" '
+        'xChannelSelector="R" yChannelSelector="G"/>'
+        '</filter>'
+    )
+    return filter_id, xml
 
 
 def _hash_to_unit(i: int, seed: int) -> float:
@@ -994,6 +1011,7 @@ def render(
         dwg, score, canvas, bg, profile=profile, render_seed=render_seed
     )
     surface_filter_xml: list[str] = []
+    performance_filter_xml: str | None = None
     if structured:
         artboard = dwg.g(id="inku_artboard")
         background = dwg.g(id="layer_00_background")
@@ -1014,6 +1032,10 @@ def render(
         clip.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height)))
         content = dwg.g(clip_path=f"url(#{clip_id})")
         presence_content = content
+
+    if use_filters and render_seed is not None:
+        performance_filter_id, performance_filter_xml = _performance_touch_filter(render_seed)
+        content["filter"] = f"url(#{performance_filter_id})"
 
     blur_needed: dict[str, float] = {}
     texture_filters = _texture_filter_weights(score) if use_filters else set()
@@ -1057,8 +1079,8 @@ def render(
     else:
         dwg.add(content)
     svg = dwg.tostring()
-    if ground_filter_xml or surface_filter_xml:
-        extra_filter_xml = (ground_filter_xml or "") + "".join(surface_filter_xml)
+    if ground_filter_xml or surface_filter_xml or performance_filter_xml:
+        extra_filter_xml = (ground_filter_xml or "") + "".join(surface_filter_xml) + (performance_filter_xml or "")
         if "<defs />" in svg:
             svg = svg.replace("<defs />", f"<defs>{extra_filter_xml}</defs>", 1)
         elif "<defs/>" in svg:

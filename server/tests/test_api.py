@@ -498,6 +498,16 @@ def test_current_user_batch_prompt_history_is_persisted(auth_context):
         db.delete_user(other_user["id"])
 
 
+def test_current_user_instruction_caption_setting_is_persisted(auth_context):
+    headers, _, _ = auth_context
+    updated = client.patch("/api/auth/me/settings", headers=headers, json={"model_settings": {"instruction_caption_visible": False}})
+    assert updated.status_code == 200
+    assert updated.json()["model_settings"]["instruction_caption_visible"] is False
+    current = client.get("/api/auth/me", headers=headers)
+    assert current.status_code == 200
+    assert current.json()["model_settings"]["instruction_caption_visible"] is False
+
+
 def test_current_user_demo_settings_are_persisted(auth_context):
     headers, _, _ = auth_context
 
@@ -1158,7 +1168,7 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
         "standard": "IEC 61966-2-1:1999",
     }
     assert r.json()["render_engine_id"] == "default"
-    assert r.json()["render_engine_version"] == "2"
+    assert r.json()["render_engine_version"] == "3"
     assert r.json()["render_canvas_aspect"] == "square"
     assert r.json()["render_canvas_aspect_id"] == "square"
     assert r.json()["render_canvas_aspect_ratio"] == 1.0
@@ -1193,7 +1203,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
         "standard": "IEC 61966-2-1:1999",
     }
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "2"
+    assert data["render_engine_version"] == "3"
     assert data["render_canvas_aspect"] == "square"
     assert data["render_canvas_aspect_id"] == "square"
     assert data["render_canvas_aspect_ratio"] == 1.0
@@ -1362,7 +1372,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_build_number"] == data["render_build_number"]
     assert item["render_color_profile"]["id"] == "srgb"
     assert item["render_engine_id"] == "default"
-    assert item["render_engine_version"] == "2"
+    assert item["render_engine_version"] == "3"
     assert item["render_canvas_aspect"] == "wide"
     assert item["render_canvas_aspect_id"] == "wide"
     assert item["render_canvas_aspect_ratio"] == 2.35

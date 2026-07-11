@@ -22,6 +22,7 @@
 		reloading: boolean;
 		reloadError: string | null;
 		loading: boolean;
+		generationDisabled: boolean;
 		liveMs: number;
 		tokenSummary: string;
 		showKiwi: boolean;
@@ -45,6 +46,7 @@
 		reloading,
 		reloadError,
 		loading,
+		generationDisabled,
 		liveMs,
 		tokenSummary,
 		showKiwi,
@@ -88,7 +90,7 @@
 	/>
 	{#if !reloading && !loading}
 		<Tooltip placement="top" text={t().tooltipDdlPaint}>
-			<PaintButton onclick={onReplay} disabled={!ddl.trim()}>{t().ddlPaintButton}</PaintButton>
+			<PaintButton onclick={onReplay} disabled={!ddl.trim() || generationDisabled}>{t().ddlPaintButton}</PaintButton>
 		</Tooltip>
 	{/if}
 </section>

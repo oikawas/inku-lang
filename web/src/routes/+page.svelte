@@ -59,7 +59,7 @@
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const INSTRUCTION_LANG_KEY = 'inku-instruction-lang';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.70';
+	const APP_VERSION = 'v1.72';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -184,6 +184,7 @@
 		stage2_provider: Provider;
 		stage2_model: string;
 		model_inspection_selected_models?: string[];
+		instruction_caption_visible?: boolean;
 	};
 	type ModelProviderSetting = {
 		label?: string;
@@ -300,6 +301,7 @@
 	type ModelInspectionResult = {
 		id: string;
 		model: string;
+		stage1Model?: string | null;
 		label: string;
 		input: string;
 		ddl: string;
@@ -333,7 +335,14 @@
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
 	let variationGridBusy = $state(false);
+	let variationGridCanAbort = $state(false);
+	let variationGridIncludesReading = $state(false);
+	let variationGridTaskLabel = $state('');
+	let variationGridAbortController: AbortController | null = null;
 	let variationGridStatus = $state<string | null>(null);
+	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
+	let modelCompareMode = $state<ModelCompareMode>('common');
+	let modelCompareFixedModel = $state('');
 	let modelInspectionBusy = $state(false);
 	let modelInspectionStatus = $state<string | null>(null);
 	let modelInspectionResults = $state<ModelInspectionResult[]>([]);
@@ -358,6 +367,7 @@
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
+	let instructionCaptionVisible = $state(true);
 	let outputTab    = $state<'canvas' | 'refine' | 'compare' | 'prompts' | 'score'>('canvas');
 	let zoom         = $state(1);
 	let canvasFitZoom = $state(1);
@@ -568,9 +578,20 @@
 		stage1Model = settings.stage1_model;
 		stage2Provider = settings.stage2_provider;
 		stage2Model = settings.stage2_model;
+		instructionCaptionVisible = settings.instruction_caption_visible !== false;
 		modelInspectionSelectedModels = Array.isArray(settings.model_inspection_selected_models)
 			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
 			: [];
+	}
+
+	async function persistInstructionCaptionVisible(visible: boolean) {
+		instructionCaptionVisible = visible;
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { instruction_caption_visible: visible } }) });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) { console.warn('failed to save instruction caption setting', e); }
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
@@ -895,6 +916,7 @@
 			stage2_provider: stage2Provider,
 			stage2_model: stage2Model,
 			model_inspection_selected_models: modelInspectionSelectedModels,
+			instruction_caption_visible: instructionCaptionVisible,
 		};
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
@@ -2238,7 +2260,7 @@
 	}
 
 	async function startDemo() {
-		if (loading) return;
+		if (loading || variationGridBusy) return;
 		clearInput();
 		demoError = null;
 		demoSaveStatus = null;
@@ -2289,7 +2311,7 @@
 	}
 
 	async function submit() {
-		if (!canSubmit || loading) return;
+		if (!canSubmit || loading || variationGridBusy) return;
 		const submittedMode = inputMode;
 		const abortController = new AbortController();
 		submitAbortController = abortController;
@@ -2793,7 +2815,7 @@
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed ?? null, vary_seed: it.vary_seed ?? null, interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang() })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang() })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -2971,7 +2993,27 @@
 
 	const modelInspectionChoices = $derived(modelInspectionModelChoices());
 
-	const modelInspectionTargetModel = $derived(result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model));
+	const modelInspectionTargetStage1Model = $derived(result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model));
+	const modelInspectionTargetStage2Model = $derived(result?.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model));
+	const modelInspectionTargetModel = $derived(modelInspectionTargetStage1Model);
+
+	function setModelCompareMode(mode: ModelCompareMode) {
+		if (modelInspectionBusy) return;
+		modelCompareMode = mode;
+		modelCompareFixedModel = mode === 'stage1_fixed' ? modelInspectionTargetStage1Model : mode === 'stage2_fixed' ? modelInspectionTargetStage2Model : '';
+		modelInspectionSelectedModels = []; modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null;
+	}
+
+	function setModelCompareFixedModel(model: string) {
+		if (modelInspectionBusy) return;
+		modelCompareFixedModel = model; modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null;
+	}
+
+	function isModelInspectionChoiceBlocked(model: string) {
+		if (modelCompareMode === 'common') return model === modelInspectionTargetStage1Model || model === modelInspectionTargetStage2Model;
+		if (modelCompareMode === 'stage1_fixed') return modelCompareFixedModel === modelInspectionTargetStage1Model && model === modelInspectionTargetStage2Model;
+		return model === modelInspectionTargetStage1Model && modelCompareFixedModel === modelInspectionTargetStage2Model;
+	}
 
 	async function persistModelInspectionSelection(models: string[]) {
 		if (!currentUser) return;
@@ -2994,8 +3036,7 @@
 
 	$effect(() => {
 		const available = new Set(modelInspectionChoices.map((choice) => choice.id));
-		const target = modelInspectionTargetModel;
-		const next = modelInspectionSelectedModels.filter((id) => available.has(id) && id !== target).slice(0, 4);
+		const next = modelInspectionSelectedModels.filter((id) => available.has(id) && !isModelInspectionChoiceBlocked(id)).slice(0, 4);
 		if (next.join("\n") !== modelInspectionSelectedModels.join("\n")) {
 			modelInspectionSelectedModels = next;
 			void persistModelInspectionSelection(next);
@@ -3003,7 +3044,7 @@
 	});
 
 	function toggleModelInspectionModel(modelId: string) {
-		if (modelInspectionBusy || modelId === modelInspectionTargetModel) return;
+		if (modelInspectionBusy || isModelInspectionChoiceBlocked(modelId)) return;
 		if (modelInspectionSelectedModels.includes(modelId)) {
 			const next = modelInspectionSelectedModels.filter((id) => id !== modelId);
 			modelInspectionSelectedModels = next;
@@ -3028,74 +3069,30 @@
 		if (modelInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const selectedModels = modelInspectionSelectedModels.slice(0, 4);
-		if (selectedModels.length === 0) {
-			modelInspectionStatus = t().modelCompareSelectPrompt;
-			return;
-		}
-		const renderedModels = new Set(modelInspectionResults.map((item) => item.model));
-		const models = selectedModels.filter((model) => !renderedModels.has(model));
-		if (models.length === 0) {
-			modelInspectionStatus = t().modelCompareAllRendered;
-			return;
-		}
-		modelInspectionBusy = true;
-		modelInspectionStatus = null;
-		modelInspectionFailedModels = Object.fromEntries(Object.entries(modelInspectionFailedModels).filter(([id]) => !models.includes(id)));
-		const successful = [...modelInspectionResults];
-		const failed: Record<string, string> = {};
+		const selectedModels = modelInspectionSelectedModels.slice(0, 4).filter((model) => !isModelInspectionChoiceBlocked(model));
+		if (selectedModels.length === 0) { modelInspectionStatus = t().modelCompareSelectPrompt; return; }
+		const jobs = selectedModels.map((model) => {
+			const stage1 = modelCompareMode === 'stage1_fixed' ? modelCompareFixedModel : model;
+			const stage2 = modelCompareMode === 'stage2_fixed' ? modelCompareFixedModel : model;
+			return { model, stage1, stage2, id: `${modelCompareMode}:${stage1}:${stage2}` };
+		});
+		const rendered = new Set(modelInspectionResults.map((item) => item.id));
+		const pending = jobs.filter((job) => !rendered.has(job.id));
+		if (pending.length === 0) { modelInspectionStatus = t().modelCompareAllRendered; return; }
+		modelInspectionBusy = true; modelInspectionStatus = null;
+		const successful = [...modelInspectionResults]; const failed: Record<string, string> = {};
 		try {
-			for (const model of models) {
+			for (const job of pending) {
 				try {
 					const started = Date.now();
-					const interpreted = await interpretOne(source, undefined, model);
-					const composed = await composeOne(interpreted.ddl, source, undefined, model);
-					successful.push({
-						id: model,
-						model,
-						label: statusModelName(model),
-						input: source,
-						ddl: interpreted.ddl,
-						svg: composed.svg,
-						score: composed.score,
-						stage2Model: composed.stage2_model ?? model,
-						renderBuildNumber: composed.render_build_number ?? null,
-						renderColorProfile: composed.render_color_profile ?? null,
-						renderEngineId: composed.render_engine_id ?? null,
-						renderEngineVersion: composed.render_engine_version ?? null,
-						renderColorCatalogId: composed.render_color_catalog_id ?? null,
-						renderColorCatalogName: composed.render_color_catalog_name ?? null,
-						renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
-						renderColorMap: composed.render_color_map ?? null,
-						renderCanvasAspect: composed.render_canvas_aspect ?? null,
-						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
-						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
-						renderSeed: composed.render_seed ?? null,
-						varySeed: composed.vary_seed ?? null,
-						tokensIn: interpreted.tokens_in,
-						tokensOut: interpreted.tokens_out,
-						tokensInStage2: composed.tokens_in,
-						tokensOutStage2: composed.tokens_out,
-						elapsedMs: Date.now() - started,
-						savedHistoryId: null,
-						starred: false,
-						saving: false,
-					});
+					const interpreted = await interpretOne(source, undefined, job.stage1);
+					const composed = await composeOne(interpreted.ddl, source, undefined, job.stage2);
+					successful.push({ id: job.id, model: job.model, stage1Model: job.stage1, label: `${statusModelName(job.stage1)} / ${statusModelName(job.stage2)}`, input: source, ddl: interpreted.ddl, svg: composed.svg, score: composed.score, stage2Model: composed.stage2_model ?? job.stage2, renderBuildNumber: composed.render_build_number ?? null, renderColorProfile: composed.render_color_profile ?? null, renderEngineId: composed.render_engine_id ?? null, renderEngineVersion: composed.render_engine_version ?? null, renderColorCatalogId: composed.render_color_catalog_id ?? null, renderColorCatalogName: composed.render_color_catalog_name ?? null, renderColorCatalogSub: composed.render_color_catalog_sub ?? null, renderColorMap: composed.render_color_map ?? null, renderCanvasAspect: composed.render_canvas_aspect ?? null, renderCanvasAspectId: composed.render_canvas_aspect_id ?? null, renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null, renderSeed: composed.render_seed ?? null, varySeed: composed.vary_seed ?? null, tokensIn: interpreted.tokens_in, tokensOut: interpreted.tokens_out, tokensInStage2: composed.tokens_in, tokensOutStage2: composed.tokens_out, elapsedMs: Date.now() - started, savedHistoryId: null, starred: false, saving: false });
 					modelInspectionResults = [...successful];
-				} catch (e) {
-					failed[model] = e instanceof Error ? e.message : String(e);
-					modelInspectionFailedModels = { ...modelInspectionFailedModels, [model]: failed[model] };
-					const next = modelInspectionSelectedModels.filter((id) => id !== model);
-					modelInspectionSelectedModels = next;
-					void persistModelInspectionSelection(next);
-				}
+				} catch (e) { failed[job.model] = e instanceof Error ? e.message : String(e); modelInspectionFailedModels = { ...modelInspectionFailedModels, [job.model]: failed[job.model] }; }
 			}
-			if (Object.keys(failed).length > 0) {
-				modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
-			}
-		} finally {
-			modelInspectionBusy = false;
-		}
+			if (Object.keys(failed).length > 0) modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
+		} finally { modelInspectionBusy = false; }
 	}
 
 	function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
@@ -3121,7 +3118,7 @@
 				svg: item.svg,
 				at: Date.now(),
 				elapsed_ms: item.elapsedMs,
-				stage1_model: item.model,
+				stage1_model: item.stage1Model ?? item.model,
 				stage2_model: item.stage2Model ?? null,
 				tokens_in: (item.tokensIn ?? 0) + (item.tokensInStage2 ?? 0) || null,
 				tokens_out: (item.tokensOut ?? 0) + (item.tokensOutStage2 ?? 0) || null,
@@ -3229,6 +3226,9 @@
 			ui_lang: it.ui_lang,
 			render_hash: it.render_hash,
 			render_hash_short: it.render_hash_short,
+			render_seed: it.render_seed == null ? null : Number(it.render_seed),
+			vary_seed: it.vary_seed == null ? null : Number(it.vary_seed),
+			interpretation_seed: it.interpretation_seed ?? null,
 			elapsed_stage1_ms: 0,
 			elapsed_stage2_ms: 0,
 			elapsed_total_ms: it.elapsed_ms ?? 0,
@@ -3248,14 +3248,24 @@
 			: null
 	);
 
+	function prepareContextTargetChange() {
+		if (outputTab === 'compare') { modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null; }
+	}
+
 	async function gotoPrev() {
+		const preservedTab = outputTab; prepareContextTargetChange();
 		if (historyCursor < historyItems.length - 1) { loadIteration(historyCursor + 1); }
 		else if (historyOffset + historyWindowSize < historyTotal) { await fetchHistoryOffset(historyOffset + historyWindowSize); loadIteration(0); }
+		outputTab = preservedTab;
 	}
+
 	async function gotoNext() {
+		const preservedTab = outputTab; prepareContextTargetChange();
 		if (historyCursor > 0) { loadIteration(historyCursor - 1); }
 		else if (historyOffset > 0) { await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize)); loadIteration(historyItems.length - 1); }
+		outputTab = preservedTab;
 	}
+
 	async function gotoLatest() {
 		if (historyTotal <= 0) return;
 		await fetchHistoryOffset(0);
@@ -3352,6 +3362,45 @@
 		stage2Model = v;
 	}
 
+	function createSafeIntegerSeed(excluded: Set<number> = new Set()): number {
+		for (let attempt = 0; attempt < 32; attempt += 1) {
+			let seed: number;
+			if (typeof globalThis.crypto?.getRandomValues === 'function') {
+				const words = new Uint32Array(2);
+				globalThis.crypto.getRandomValues(words);
+				seed = ((words[0] ?? 0) & 0x1fffff) * 0x100000000 + (words[1] ?? 0);
+			} else {
+				seed = Math.floor(Math.random() * (Number.MAX_SAFE_INTEGER + 1));
+			}
+			if (!excluded.has(seed)) return seed;
+		}
+		throw new Error('Could not allocate a unique seed');
+	}
+
+	function createInterpretationSeed(): string {
+		if (typeof globalThis.crypto?.randomUUID === 'function') {
+			return globalThis.crypto.randomUUID();
+		}
+		const bytes = new Uint8Array(16);
+		if (typeof globalThis.crypto?.getRandomValues === 'function') {
+			globalThis.crypto.getRandomValues(bytes);
+		} else {
+			for (let index = 0; index < bytes.length; index += 1) {
+				bytes[index] = Math.floor(Math.random() * 256);
+			}
+		}
+		bytes[6] = (bytes[6] & 0x0f) | 0x40;
+		bytes[8] = (bytes[8] & 0x3f) | 0x80;
+		const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+		return [
+			hex.slice(0, 8),
+			hex.slice(8, 12),
+			hex.slice(12, 16),
+			hex.slice(16, 20),
+			hex.slice(20),
+		].join('-');
+	}
+
 	function buildDdlDiffParts(before: string | null, after: string | null): DdlDiffPart[] {
 		const oldLines = (before ?? "").split(/\n+/).map((line) => line.trim()).filter(Boolean);
 		const newLines = (after ?? "").split(/\n+/).map((line) => line.trim()).filter(Boolean);
@@ -3377,7 +3426,9 @@
 		reloading = true;
 		reloadError = null;
 		try {
-			const nextSeed = Number.isFinite(result.render_seed ?? NaN) ? Number(result.render_seed) + 1 : 1;
+			const usedSeeds = new Set<number>();
+			if (Number.isFinite(result.render_seed ?? NaN)) usedSeeds.add(Number(result.render_seed));
+			const nextSeed = createSafeIntegerSeed(usedSeeds);
 			const r = await apiFetch('/api/render-svg', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -3410,7 +3461,9 @@
 		loading = true;
 		error = null;
 		try {
-			const nextVarySeed = Number.isFinite(result.vary_seed ?? NaN) ? Number(result.vary_seed) + 1 : 0;
+			const usedSeeds = new Set<number>();
+			if (Number.isFinite(result.vary_seed ?? NaN)) usedSeeds.add(Number(result.vary_seed));
+			const nextVarySeed = createSafeIntegerSeed(usedSeeds);
 			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source });
 			ddl = r.ddl;
 			ddlGeneratedBaseline = r.ddl;
@@ -3446,7 +3499,7 @@
 		error = null;
 		const previousDdl = ddl;
 		try {
-			const interpretationSeed = crypto.randomUUID();
+			const interpretationSeed = createInterpretationSeed();
 			const r = await paintOne(source, { historyInput: source, interpretationSeed });
 			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
 			ddl = r.ddl;
@@ -3492,10 +3545,11 @@
 		};
 	}
 
-	async function renderPerformanceCandidate(seed: number, label: string): Promise<VariationCandidate> {
+	async function renderPerformanceCandidate(seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		if (!result) throw new Error("missing result");
 		const r = await apiFetch("/api/render-svg", {
 			method: "POST",
+			signal,
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				score: result.score,
@@ -3514,11 +3568,12 @@
 		};
 	}
 
-	async function composeVariationCandidate(varySeed: number, label: string): Promise<VariationCandidate> {
+	async function composeVariationCandidate(varySeed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
 		const baseDdl = ddl ?? "";
 		const r = await apiFetch("/api/compose", {
 			method: "POST",
+			signal,
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				ddl: baseDdl,
@@ -3537,35 +3592,74 @@
 		return { id: `comp-${varySeed}`, label, selected: false, result: composeCandidateResult(source, baseDdl, data) };
 	}
 
-	async function interpretationVariationCandidate(): Promise<VariationCandidate> {
+	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
-		const r = await paintOne(source, { historyInput: source, saveHistory: false, saveArtifacts: false, countGeneration: false, interpretationSeed: crypto.randomUUID() });
-		return { id: `interp-${Date.now()}`, label: t().canvasVaryInterpretation, selected: false, result: r };
+		const interpretationSeed = createInterpretationSeed();
+		const r = await paintOne(source, { historyInput: source, saveHistory: false, saveArtifacts: false, countGeneration: false, interpretationSeed, signal });
+		return { id: `interp-${interpretationSeed}`, label, selected: false, result: r };
 	}
 
-	async function generateVariationGrid(includeInterpretation = false) {
+	type RefineChanges = { touch: boolean; layout: boolean; reading: boolean };
+
+	async function generateVariationCandidates(changes: RefineChanges, count: 1 | 4) {
 		if (!result || variationGridBusy || loading) return;
 		const source = input.trim();
 		if (!source || !ddl) return;
+		const selectedKinds: Array<keyof RefineChanges> = changes.reading
+			? ['reading']
+			: count === 1
+				? (['layout', 'touch'] as const).filter((kind) => changes[kind]).slice(0, 1)
+				: (['touch', 'layout'] as const).filter((kind) => changes[kind]);
+		if (selectedKinds.length === 0) return;
+		const abortController = new AbortController();
+		variationGridAbortController = abortController;
 		variationGridBusy = true;
+		variationGridCanAbort = false;
+		variationGridIncludesReading = selectedKinds.includes('reading');
+		variationGridTaskLabel = selectedKinds.map((kind) => kind === 'touch' ? t().canvasVaryPerformance : kind === 'layout' ? t().canvasVaryComposition : t().canvasVaryInterpretation).join('・');
 		variationGridStatus = null;
+		const abortTimer = window.setTimeout(() => {
+			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
+		}, 3000);
 		try {
-			const baseRenderSeed = Number.isFinite(result.render_seed ?? NaN) ? Number(result.render_seed) : 0;
-			const baseVarySeed = Number.isFinite(result.vary_seed ?? NaN) ? Number(result.vary_seed) : -1;
-			const jobs: Promise<VariationCandidate>[] = [
-				renderPerformanceCandidate(baseRenderSeed + 1, `${t().canvasVaryPerformance} 1`),
-				renderPerformanceCandidate(baseRenderSeed + 2, `${t().canvasVaryPerformance} 2`),
-				composeVariationCandidate(baseVarySeed + 1, `${t().canvasVaryComposition} 1`),
-				composeVariationCandidate(baseVarySeed + 2, `${t().canvasVaryComposition} 2`),
-			];
-			if (includeInterpretation) jobs.push(interpretationVariationCandidate());
+			const usedRenderSeeds = new Set<number>();
+			const usedVarySeeds = new Set<number>();
+			if (Number.isFinite(result.render_seed ?? NaN)) usedRenderSeeds.add(Number(result.render_seed));
+			if (Number.isFinite(result.vary_seed ?? NaN)) usedVarySeeds.add(Number(result.vary_seed));
+			for (const candidate of variationCandidates) {
+				if (Number.isFinite(candidate.result.render_seed ?? NaN)) usedRenderSeeds.add(Number(candidate.result.render_seed));
+				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
+			}
+			const counts = { touch: 0, layout: 0, reading: 0 };
+			const jobs = Array.from({ length: count }, (_, index) => {
+				const kind = selectedKinds[index % selectedKinds.length];
+				const sequence = ++counts[kind];
+				if (kind === 'touch') {
+					const renderSeed = createSafeIntegerSeed(usedRenderSeeds);
+					usedRenderSeeds.add(renderSeed);
+					return renderPerformanceCandidate(renderSeed, `${t().canvasVaryPerformance} ${sequence}`, abortController.signal);
+				}
+				if (kind === 'layout') {
+					const varySeed = createSafeIntegerSeed(usedVarySeeds);
+					usedVarySeeds.add(varySeed);
+					return composeVariationCandidate(varySeed, `${t().canvasVaryComposition} ${sequence}`, abortController.signal);
+				}
+				return interpretationVariationCandidate(`${t().canvasVaryInterpretation} ${sequence}`, abortController.signal);
+			});
 			variationCandidates = await Promise.all(jobs);
 		} catch (e) {
-			variationGridStatus = e instanceof Error ? e.message : String(e);
+			if (!(e instanceof DOMException && e.name === 'AbortError')) variationGridStatus = e instanceof Error ? e.message : String(e);
 		} finally {
-			variationGridBusy = false;
+			window.clearTimeout(abortTimer);
+			if (variationGridAbortController === abortController) {
+				variationGridAbortController = null;
+				variationGridBusy = false;
+				variationGridCanAbort = false;
+			}
 		}
 	}
+
+	function abortVariationCandidates() { variationGridAbortController?.abort(); }
 
 	function toggleVariationCandidate(id: string) {
 		variationCandidates = variationCandidates.map((candidate) => candidate.id === id ? { ...candidate, selected: !candidate.selected } : candidate);
@@ -4252,6 +4346,7 @@
 						{demoError}
 						lockNonDemo={demoRunning}
 						{canSubmit}
+						generationDisabled={variationGridBusy}
 						{error}
 						{stageLabel}
 						{showKiwi}
@@ -4295,6 +4390,7 @@
 							{reloading}
 							{reloadError}
 							{loading}
+							generationDisabled={variationGridBusy}
 							{liveMs}
 							{tokenSummary}
 							{showKiwi}
@@ -4417,16 +4513,26 @@
 				onVaryPerformance={varyPerformance}
 				onVaryComposition={varyComposition}
 				onVaryInterpretation={varyInterpretation}
+				bind:instructionCaptionVisible
+				onInstructionCaptionVisibleChange={persistInstructionCaptionVisible}
 				{variationBusy}
 				{variationCandidates}
 				{variationGridBusy}
+				{variationGridCanAbort}
+				{variationGridIncludesReading}
+				{variationGridTaskLabel}
 				{variationGridStatus}
-				onGenerateVariationGrid={generateVariationGrid}
+				onGenerateVariationCandidates={generateVariationCandidates}
+				onAbortVariationCandidates={abortVariationCandidates}
 				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
 				onShowVariationCandidate={showVariationCandidate}
 				onToggleVariationCandidate={toggleVariationCandidate}
 				{activeComparisonItem}
 				modelInspectionTargetModel={modelInspectionTargetModel}
+				modelInspectionTargetStage1Model={modelInspectionTargetStage1Model}
+				modelInspectionTargetStage2Model={modelInspectionTargetStage2Model}
+				{modelCompareMode}
+				{modelCompareFixedModel}
 				{modelInspectionChoices}
 				{modelInspectionSelectedModels}
 				{modelInspectionFailedModels}
@@ -4434,6 +4540,9 @@
 				{modelInspectionStatus}
 				{modelInspectionResults}
 				onToggleModelInspectionModel={toggleModelInspectionModel}
+				onSetModelCompareMode={setModelCompareMode}
+				onSetModelCompareFixedModel={setModelCompareFixedModel}
+				isModelInspectionChoiceBlocked={isModelInspectionChoiceBlocked}
 				onRunModelInspection={runModelInspection}
 				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}

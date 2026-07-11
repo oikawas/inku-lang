@@ -567,7 +567,11 @@ def _validated_canvas_aspect_override(value: str | None) -> str | None:
 
 def _score_with_canvas(score: Score, canvas_aspect: str) -> Score:
     data = score.model_dump(by_alias=True)
-    data["canvas"] = canvas_aspect
+    existing = data.get("canvas")
+    if isinstance(existing, dict) and existing.get("ground") is not None:
+        existing["aspect"] = canvas_aspect
+    else:
+        data["canvas"] = canvas_aspect
     return Score.model_validate(data)
 
 

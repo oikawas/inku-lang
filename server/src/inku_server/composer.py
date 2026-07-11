@@ -35,6 +35,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 # 変換ルール (厳守)
 
+## 図形と圧縮
+
 - 座標: 0.0-1.0 比率 (左上=(0,0) 右下=(1,1))
 - circle/ellipse/arc/polygon → center フィールド。square/triangle → position フィールド (bbox 左上)
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
@@ -44,6 +46,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **出力は 1〜5 instructions に圧縮する。DDL 全文を説明し直さず、主題を成立させる主要な視覚関係だけを JSON 化する**
 - **作品ごとに主技法は一つだけ。DDL に複数の技法語があっても、最も主題に合うものを一つ選び、残りは必要な場合だけ小さな補助層にする**
 - **圧縮しすぎない。光・香り・温度・音・待つ時間・五感などの感覚語が DDL にある場合、主題を壊さない範囲で 1〜2 個の薄い補助層として残す。削りすぎて作品の情報量や楽しさを失わせない**
+
+## 余白・揺らぎ・質感
+
 - **余白は構図要素。小さな焦点、端寄りの線、反復の欠落、画面外へ続く方向で余白に圧力を作る。余白を全面散布で埋めない**
 - variation は明示された揺らぎがある場合のみ付ける
 - **形容語・動作語・質感語は、DDL で指定された主図形へ適用する。震える・揺れる・滲む・太い・細い等を理由に、DDL にない補助線・補助図形・別色の instruction を追加してはいけない**
@@ -52,10 +57,16 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「地: ...」の文は canvas.ground へだけ変換し、その文から instruction を追加しない。「面: ...」の文は直前に指定された主図形の surface に入れる。一つの質感要求を複数の質感付き instruction に複製しない**
 - **「ゆっくり揺れる」→ variation quality="wave", frequency="slow" を優先する。perlin は「震える」「細かく揺れる」に使う**
 - **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
+
+## 数量と密度
+
 - **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
 - **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
 - **余白を残す。小さな scatter が 120 個を超える場合は、全面密度ではなく arrangement.density, cluster_count, fade, preserve_space を使い、斜めの帯・上から下・右半分などの配置語を尊重する。要素サイズを小さくしすぎない**
 - **大数量は「数の忠実さ」より「群の見え方」を優先する。300 個以上は count を 80〜120 個へ代表化し、density="high", cluster_count=5〜9, fade="outward" または "directional", preserve_space=true で原意を保持する**
+
+## 対象物化の禁止と抽象化
+
 - **膜・霞・霧・透明・気配・余韻 → 薄い ellipse/square/line に fade を付け、preserve_space=true。説明だけで終わらせず、透明な面・薄い反射・消える線として JSON 化する**
 - **人・顔・動物を対象物として描かない。目鼻口・頭身・四肢・耳・尻尾を instruction にしない。存在感、重心、左右対称性、視線の圧力、群れ、輪郭密度として Score.presence に変換する**
 - **Score.presence は固定の人型記号ではない。symmetry="bilateral" は「正面・対称・顔」など明示がある時だけ使い、通常は symmetry="none" を選ぶ。gaze_pressure も視線・顔・見つめる等が明示された時だけ none 以外にする**
@@ -70,6 +81,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **多角形語彙は polygon だけを使い、sides=5-8 に限る。結晶、鉱物、硬い欠片、人工物の硬さ、都市的構造にだけ使う。五角形/六角形などを個別 primitive にしない**
 - **山・鋭い先端 → triangle を使える。屋根は triangle として対象物化せず、低い重心・斜めの圧・上部密度差として扱う。葉・花びら・羽・紙片 → thin ellipse / rotated square / small polygon として扱い、自然プリミティブ plugin が無い現在も抽象化された自然/物質形として残す**
 - **楽しい形・複雑な形は、単体 primitive ではなく 2〜5 個の primitive の局所 motif として作る。例: 葉=細い ellipse + arc、紙片=rotated square + 細線、種=ellipse + 小粒、山=triangle + 余白を切る line、波紋=arc + 小 ellipse**
+
+## 塗り・背景・色
+
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
 - **背景色と描画色が同じで、実質的に見えない instruction を作ってはいけない。background と同色なら面積の少ない側を変更する。通常は線・小図形・点の color を黒・白・青・赤・緑などの文脈に合う可視色へ寄せる。大きな主題図形が同色の場合だけ background 側を変更してよい**
@@ -78,6 +92,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
 - **色とりどり・多色配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
 - **明示色が少ない場合は場のトーンで palette を選ぶ。春・花・温かい光は red/green/white、水・夜・冷気は blue/white/gray、森・葉・香りは green/white/gray。抽象色に収まらないニュアンスは color_hint に保持する**
+- **強い単色背景 (black/red/blue/green) は DDL が明示する、または夜・炎・標識・海など主題に必要な場合だけ使う。迷ったら white を使う**
+
+## 配置と焦点
+
 - **正規化DDL は必ず配置語を含む。正規化DDL が「中央付近」「上から下」「縦に」「右半分」「放射状」「同心円状」「画面全体に点々」「波打つ軌跡」を含む場合は、その配置語を優先する**
 - **「画面全体に点々」「全面に細かく」は layout=scatter でよいが、意味は無秩序ではなく全面分布として扱う**
 - **scatter は均一な乱数ではない。密度勾配、端部の薄れ、斜めの帯、右半分、上から下など、DDL の配置語に沿った偏りを持つものとして扱う**
@@ -90,6 +108,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「左下の白銀比の位置」→ at={"region":[0.354,0.526,0.474,0.646]}。「右上の白銀比の位置」→ at={"region":[0.526,0.354,0.646,0.474]}。白銀比の余白として扱う。焦点座標をハードコードしない**
 - **「右上の焦点」→ at={"region":[0.60,0.18,0.82,0.40]}。「左上の焦点」→ [0.18,0.18,0.40,0.40]。「右下の焦点」→ [0.60,0.60,0.82,0.82]。「左下の焦点」→ [0.18,0.60,0.40,0.82]。焦点座標をハードコードしない**
 - **「上端寄りの焦点」→ at={"region":[0.39,0.07,0.61,0.29]}。「右半分の焦点」→ at={"region":[0.61,0.39,0.83,0.61]}。焦点座標をハードコードしない**
+
+## 数理・音楽・遠近の構図語
+
 - **「正五角形の頂点に五個」→ arrangement count=5 layout=radial。五芒星的な均衡の点列として扱う**
 - **「フィボナッチ」「十三」「二十一」などの数量はそのまま使い、意外性のある規則的な層として扱う**
 - **数学的均衡は中央対称ではない。golden offset、三分割、白銀比、prime spacing、fibonacci count、counterweight を使い、主焦点と反対側の小要素で釣り合いを作る**
@@ -98,6 +119,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「輪唱のずれ」→ 同形を少しずつ横方向に並べる反復。layout=horizontal、count は DDL の数を使う**
 - **「一点透視法」→ DDL の焦点語へ向かう細線層。右上の焦点なら右上へ向かう補助線として扱う**
 - **「遠近法の奥行き」→ 横線を上方向に複数並べ、奥へ狭まる構図として扱う**
+
+## 画材と技法語
+
 - **「明暗」「濃淡」→ 黒/灰/白の対比層。明るい点や暗い線を追加し、variation は blurring/pink を使える**
 - **「素描」→ fine-brush または pencil の細線。下線・補助線として count を保つ**
 - **「点描」→ 小さな square または ellipse の scatter。真円を連発せず、rotation を付けて水平/垂直対称を崩す**
@@ -106,7 +130,6 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「パッチワーク」→ square の反復。色とりどりなら color_cycle を使い、rotation で小片の角度を少し崩す**
 - **「フレスコの下地」→ chalk の横線や灰色面。blurring で古い壁面として扱う**
 - **「水墨」→ brush_thin/brush_thick の黒/灰線。濃淡は blurring または細太の対比で扱う**
-- **強い単色背景 (black/red/blue/green) は DDL が明示する、または夜・炎・標識・海など主題に必要な場合だけ使う。迷ったら white を使う**
 
 # 関係（あいだ）
 
@@ -323,6 +346,8 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 # Conversion Rules (strict)
 
+## Shapes and compression
+
 - Coordinates: 0.0-1.0 ratio (top-left=(0,0) bottom-right=(1,1))
 - circle/ellipse/arc/polygon → center field. square/triangle → position field (bbox top-left)
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
@@ -332,6 +357,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Compress the output to 1–5 instructions. Do not restate the whole DDL; convert only the main visual relationship that makes the work readable**
 - **Use one dominant technique per work. If the DDL contains multiple technique words, choose the one that best fits the subject and keep the others only as small supporting layers when needed**
 - **Do not over-compress. If the DDL contains sensory words such as light, scent, temperature, sound, waiting time, or bodily senses, keep 1–2 of them as faint supporting layers when they do not break the subject. Do not remove so much information that the work loses richness or playfulness**
+
+## Negative space, variation, texture
+
 - **Negative space is compositional pressure. Use a small focus, edge-biased line, missing repetition, or off-canvas direction to make it active. Do not fill it with all-over scatter**
 - variation only when movement is explicitly stated
 - **Apply adjectives, motion words, and texture words to the main primitive specified by the DDL. Do not add supporting lines, supporting shapes, or differently colored instructions that were not requested merely because the DDL says trembling, swaying, blurring, thick, thin, or similar modifiers**
@@ -340,10 +368,16 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **A "Ground: ..." sentence maps only to canvas.ground; do not add any instruction from it. A "Surface: ..." sentence goes into the surface of the main shape it follows. Never duplicate one texture request across multiple textured instructions**
 - **"swaying slowly" / "slowly swaying" → prefer variation quality="wave", frequency="slow". Use perlin for trembling or fine swaying**
 - **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
+
+## Count and density
+
 - **count is integer 1–1000. Use explicit numbers from DDL**
 - **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
 - **Preserve negative space. When tiny scatter exceeds 120 items, do not turn it into uniform full-canvas density; use arrangement.density, cluster_count, fade, and preserve_space while respecting placement phrases such as diagonal band, top to bottom, or right half**
 - **For very large quantities, prioritize the visible group behavior over literal item count. For 300+ items, represent them with count around 80–120 plus density="high", cluster_count=5–9, fade="outward" or "directional", and preserve_space=true**
+
+## De-objectification and abstraction
+
 - **Membrane, haze, fog, transparency, atmosphere, or lingering presence → thin ellipse/square/line with fade and preserve_space=true. Do not omit them as mere explanation; convert them into transparent planes, faint reflections, or fading lines**
 - **Do not draw humans, faces, or animals as objects. Do not make eyes, mouth, body proportions, limbs, ears, or tails into instructions. Convert them into Score.presence as presence, weight, bilateral symmetry, gaze pressure, group behavior, and contour density**
 - **Score.presence is not a fixed human-symbol overlay. Use symmetry="bilateral" only when frontality, symmetry, or a face is explicit; otherwise prefer symmetry="none". Use gaze_pressure other than none only when gaze, face, looking, or staring is explicit**
@@ -358,6 +392,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Use only polygon for polygonal vocabulary, with sides=5-8. Use it only for crystals, minerals, hard shards, artificial hardness, or urban structure. Do not add separate pentagon/hexagon primitives**
 - **Mountain / sharp peak → triangle is allowed. Do not objectify roof as a triangle; treat it as low weight, diagonal pressure, or upper density contrast. Leaf / petal / feather / paper fragment → use thin ellipse, rotated square, or small polygon so abstract natural/material forms survive until natural primitive plugins exist**
 - **Playful or complex shapes should be local motifs made from 2-5 primitives, not a single primitive. Examples: leaf=thin ellipse + arc, paper shard=rotated square + thin line, seed pod=ellipse + small particles, mountain=triangle + a line cutting negative space, ripple=arc + small ellipse**
+
+## Fill, background, and color
+
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
 - **Do not create effectively invisible instructions whose drawing color matches the background. If they match, change the smaller visual area. Usually change line/small-shape/dot color to a context-fitting visible color such as black, white, blue, red, or green. Change the background only when the matching subject is large and dominant**
@@ -366,6 +403,10 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
 - **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
 - **When explicit colors are sparse, choose palette by scene tone. Spring/flowers/warm light → red/green/white; water/night/cold air → blue/white/gray; forest/leaves/fragrance → green/white/gray. Preserve unavailable nuance in color_hint**
+- **Strong solid backgrounds (black/red/blue/green) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
+
+## Placement and focus
+
 - **Normalized DDL must include placement words. If normalized DDL says "near the center", "top to bottom", "vertical", "right half", "radial", "concentric", "dotted across the whole canvas", or "undulating trace", prioritize that placement phrase**
 - **"dotted across the whole canvas" / "finely across the whole canvas" may use layout=scatter, but treat it as all-over distribution, not disorder**
 - **scatter is not uniform noise. Treat it as biased by density gradient, fading edges, diagonal band, right half, or top-to-bottom placement from the DDL**
@@ -378,6 +419,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"lower-left silver-ratio position" → at={"region":[0.354,0.526,0.474,0.646]}. "upper-right silver-ratio position" → at={"region":[0.526,0.354,0.646,0.474]}. Treat it as silver-ratio spacing. Do not hard-code focus coordinates**
 - **"upper-right focus" → at={"region":[0.60,0.18,0.82,0.40]}. "upper-left focus" → [0.18,0.18,0.40,0.40]. "lower-right focus" → [0.60,0.60,0.82,0.82]. "lower-left focus" → [0.18,0.60,0.40,0.82]. Do not hard-code focus coordinates**
 - **"upper-edge focus" → at={"region":[0.39,0.07,0.61,0.29]}. "right-half focus" → at={"region":[0.61,0.39,0.83,0.61]}. Do not hard-code focus coordinates**
+
+## Mathematical, musical, and perspective composition
+
 - **"regular pentagon vertices" → arrangement count=5 layout=radial. Treat it as a pentagonal balance layer**
 - **Fibonacci-like counts such as thirteen and twenty-one are intentional; keep them as explicit counts**
 - **Mathematical balance is not central symmetry. Use golden offset, rule-of-thirds, silver ratio, prime spacing, fibonacci count, and counterweight; balance the main focus with smaller elements on the opposite side**
@@ -386,6 +430,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"canon offset" → repeated same shape with slight horizontal delay. Use layout=horizontal and the explicit count**
 - **"one-point perspective" → thin guide lines toward the DDL focus. If the focus is upper right, use guide lines converging there**
 - **"perspective depth" → repeated horizontal lines upward, preserving count**
+
+## Materials and technique words
+
 - **"value" / "light and shade" → black/gray/white contrast layers; blurring may express soft value transitions**
 - **"drawing underlines" → fine-brush or pencil thin lines; preserve count**
 - **"pointillism" → small square or ellipse scatter; avoid repeated true circles and add rotation to break axis symmetry**
@@ -395,7 +442,6 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"fresco ground" → chalk gray horizontal lines or ground plane with blurring**
 - **"ink-wash value" → black/gray brush lines with blurring or weight contrast**
 - **English idiom and cultural texture are compositional signals, not objects. "syncopated city rhythm" / "blue-note value" → short line or arc rhythm with rhythm_spacing="syncopated"; "quilt-like patchwork" → rotated square color_cycle; "subway-map pressure" → rotring line convergence; "billboard edge pressure" → cropped rectangle/diagonal edge tension; "prairie horizon" → low horizontal negative-space pressure; "coastal fog plane" → pale watercolor ellipse layers with blurring; "warehouse grid cuts" → sparse rotated square/line grid fragments**
-- **Strong solid backgrounds (black/red/blue/green) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
 
 # Relations
 

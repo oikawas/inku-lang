@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.72**
+**Version: v1.73**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -3766,3 +3766,11 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - seedを独立したJavaScript safe integer乱数へ変更し、固定形状にもタッチ差が現れるdisplay rendererを追加した。履歴からキャンバスへseedを復元する。
 - 詞書の表示状態をユーザー設定として永続化した。
 - 推敲・比較タブの前後作品移動でタブを維持し、モデル比較を3モードへ拡張した。
+
+### v1.73 — システムプロンプト最適化 (2026-07-12)
+
+- Stage 1 / Stage 2 prompt の誤謬を修正した。例の自己矛盾（曖昧数量「数本」/"several" を含む変換例、半径表記の不統一）を正し、JA Saijiki 一覧に欠けていた「うごき」カテゴリと、JA Stage 2 に欠けていた sparse 有効ルール（EN は Build 415 で導入済み）を補完した。
+- 「地: ...」/「Ground: ...」文の canvas.ground 到達経路を安定化した。Stage 1 EXAMPLE_POOL に地の保持例を追加し、Stage 2 に「地:→canvas.ground / 面:→直前主図形の surface」のルーティングルールと質感 instruction 複製禁止を明記し、ground 例の入力を Stage 1 実出力形式に正規化した。
+- api.py の `_score_with_canvas` が canvas_aspect 指定時に Stage 2 の生成した canvas.ground を破壊していた誤謬を修正した（v1.71 で記録した ground 採用 0/12 の真因）。ターゲット12件で ground 到達 0/12 → 5/12。
+- Stage 2 変換ルールの重複バレットを統合し、約70連のルール列に8つの小節見出しを導入した（内容・順序は実質不変）。
+- JP/EN 30+30 回帰ベンチ（Build 448 同一プロンプト）: JP は visual_event 89.7→94.9 など全指標で改善、EN は main ベースライン測定により対448低下が v1.70/v1.71 由来の既存ドリフトであることを確定し、本変更は main を全品質指標で改善。fingerprint gates 全 pass。詳細は cli/tune_bench.md「v1.73 Build504/505」。

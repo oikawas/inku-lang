@@ -188,6 +188,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 いろ: 白、黒(既定)、青、赤、緑、灰
 ゆらぎ: 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む
 ばしょ: 上、下、中央、左端、右端、上端、下端、中心、隅
+うごき: 置く、並べる、引く、描く、散らす、埋める
 わりあい: 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月
 
 # わりあい (比率・描画範囲)
@@ -244,7 +245,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["月", "昇", "空", "夜", "星", "天"],
         "input": "山の向こうに月が昇る",
-        "output": "画面下1/3に灰色の横線を引く。右上に黒い円を置く。半径は画面の1割。",
+        "output": "画面下1/3に灰色の横線を引く。右上に黒い円を置く。半径は0.1。",
     },
     {
         "keywords": ["嵐", "激しい", "激しく", "荒れ", "風", "速"],
@@ -284,7 +285,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["光", "放射", "差す", "太陽", "輝", "レイ"],
         "input": "光が差す",
-        "output": "放射状に細い線を数本引く。",
+        "output": "放射状に細い線を八本引く。",
     },
     {
         "keywords": ["波", "海", "川", "同心円", "広がる"],
@@ -534,6 +535,12 @@ EXAMPLE_POOL: list[dict] = [
         "input": "三日月が夜空に浮かぶ",
         "output": "背景を黒で塗りつぶす。三日月の弧を右上に置く。半径は0.12。",
     },
+    # 地の質感: 「地: ...」の別文として保持する (canvas.ground 経路)
+    {
+        "keywords": ["和紙", "紙目", "生成り", "薄墨の地", "紙に", "支持体"],
+        "input": "生成りの紙に、墨の細い横線を一本引く",
+        "output": "細筆の細い横線を中央に引く。地: 生成りの紙、細かい紙目。",
+    },
 ]
 
 EXAMPLE_POOL_EN: list[dict] = [
@@ -580,7 +587,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["light", "radial", "sun", "ray", "glow", "spreading"],
         "input": "Light rays spreading out",
-        "output": "Draw several thin lines radially from center.",
+        "output": "Draw eight thin lines radially from center.",
     },
     {
         "keywords": ["wave", "sea", "river", "concentric", "ripple", "spread"],
@@ -736,6 +743,12 @@ EXAMPLE_POOL_EN: list[dict] = [
         "keywords": ["crescent", "moon", "thin arc", "sliver", "waning"],
         "input": "A crescent moon in the night sky",
         "output": "Fill background with black. Place a crescent arc in the upper right. Radius 0.12.",
+    },
+    # Ground texture: keep as a separate "Ground: ..." sentence (canvas.ground route)
+    {
+        "keywords": ["washi", "paper grain", "off-white paper", "ink-wash ground", "on paper", "support"],
+        "input": "A thin ink line on off-white paper",
+        "output": "Draw a thin fine-brush horizontal line at center. Ground: off-white paper, fine paper grain.",
     },
 ]
 

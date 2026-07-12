@@ -805,6 +805,29 @@ def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
     assert 'viewBox="0 0 200 1000"' in data["svg"]
 
 
+def test_compose_canvas_aspect_override_preserves_ground(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    fake_score = Score.model_validate(
+        {
+            "canvas": {
+                "aspect": "square",
+                "ground": {"material": "paper", "tone": "off_white", "grain": "fine"},
+            },
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}
+            ],
+        }
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post("/api/compose", json={"ddl": "横線", "canvas_aspect": "pillar"}, headers=headers)
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["score"]["canvas"]["aspect"] == "pillar"
+    assert data["score"]["canvas"]["ground"]["material"] == "paper"
+
+
 def test_compose_accepts_byobu_canvas_with_multiline_ddl(monkeypatch, auth_context):
     headers, _, _ = auth_context
     fake_score = Score.model_validate(

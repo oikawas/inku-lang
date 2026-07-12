@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.73**
+**Version: v1.74**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。

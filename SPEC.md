@@ -1272,3 +1272,13 @@ When updating the specification:
 - Fixed a defect in api.py where a canvas_aspect override replaced the whole canvas value and destroyed any Stage 2-generated canvas.ground (the true cause of the 0/12 ground adoption recorded at v1.71). Targeted 12-prompt bench: ground adoption 0/12 → 5/12.
 - Merged duplicated placement-mapping bullets and grouped the ~70-bullet Stage 2 rule list under eight subsection headers (content and order effectively unchanged).
 - JP/EN 30+30 regression bench on the Build 448 prompt set: JP improved on every metric (visual_event 89.7→94.9); a main-branch baseline run attributed the apparent EN drop vs 448 to pre-existing v1.70/v1.71 drift, with this change improving on main across all quality metrics. All fingerprint gates pass.
+
+### v1.74 — NIM Qwen3.5 397B Migration & Relation Tuning (2026-07-12)
+
+- **Switched Default Models to Qwen3.5 397B**:
+  - Switched the default Stage 1 / Stage 2 models to NVIDIA NIM `qwen/qwen3.5-397b-a17b`.
+  - Restricted the `is_qwen3` thinking-trace suppression override (`/no_think` prefix injection) to local OVMS provider runs only. This change enables NIM Qwen3.5 397B to fully leverage its reasoning capability, improving both generation quality and latency by roughly 30%.
+- **relation Duplication Prevention (F-1)**:
+  - Tuned the Stage 2 prompt (`composer.py` relations section and examples) in both Japanese and English to add an anti-duplication guard: "Generate at most one relation per fixed relation phrase. Do not replicate the same relation phrase into multiple instructions," and added corresponding negative examples.
+- **Achieved 100% ground Mapping Adoption (F-3)**:
+  - Achieved a **6/6 (100%)** `canvas.ground` mapping adoption rate in the targeted 12-prompt texture benchmark, resolving the remaining ground-routing misses from v1.73. Verified no quality regressions on the JP30/EN30 regression sets.

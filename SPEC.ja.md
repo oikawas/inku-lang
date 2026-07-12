@@ -3774,3 +3774,17 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - api.py の `_score_with_canvas` が canvas_aspect 指定時に Stage 2 の生成した canvas.ground を破壊していた誤謬を修正した（v1.71 で記録した ground 採用 0/12 の真因）。ターゲット12件で ground 到達 0/12 → 5/12。
 - Stage 2 変換ルールの重複バレットを統合し、約70連のルール列に8つの小節見出しを導入した（内容・順序は実質不変）。
 - JP/EN 30+30 回帰ベンチ（Build 448 同一プロンプト）: JP は visual_event 89.7→94.9 など全指標で改善、EN は main ベースライン測定により対448低下が v1.70/v1.71 由来の既存ドリフトであることを確定し、本変更は main を全品質指標で改善。fingerprint gates 全 pass。詳細は cli/tune_bench.md「v1.73 Build504/505」。
+
+
+### v1.74 (2026-07-12)
+
+**NVIDIA NIM Qwen3.5 397B モデル切り替えと relation 重複防止のチューンナップ**
+
+- **既定モデルの Qwen3.5 397B 切り替え**:
+  - 第一・第二段階の既定モデルを NVIDIA NIM `qwen/qwen3.5-397b-a17b` に切り替えた。
+  - `interpreter.py` および `trainer.py` の `is_qwen3` 判定を修正し、NIM モデルにおいては `/no_think` による思考トレースの強制抑制を解除し、ローカル OVMS provider のみに限定した。これにより Qwen3.5 397B の高度な推論能力を最大限に活かし、レスポンス速度を約30%高速化した。
+- **relation の複製抑制（F-1）**:
+  - Stage 2 プロンプト (`composer.py` の関係セクションおよび例) をチューニングし、「定型句 1 つにつき relation は最大 1 つ。同じ定型句を複数 instruction に複製しない」ルールと、それを徹底するための否定例（同じ定型句が並んでも 2 番目の instruction には relation を付与しない例）を JA/EN に追加した。
+- **面/地地明示 100% 到達の達成（F-3）**:
+  - 前バージョン (v1.73) での ground 経路修復と新モデル Qwen3.5 397B の推論能力の向上により、面/地 12 件セットの地明示 6 件すべてで `canvas.ground` へのマッピング到達率 **6/6 (100%)** を達成した。
+

@@ -143,6 +143,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - relation は必ず「既に出力済みの輪郭 instruction」だけを参照する。background、filled 面、presence、fade だけの補助層、色補修用の小要素、arrangement だけの密度層は relation の参照先にしない。
 - **between は直前2つの JSON instruction がどちらも輪郭を持つ時だけ使う。直前が1つしかない、または直前/前々が補助層なら relation を省略する。**
 - 「前の線に沿って」「前の形に触れない」「前の線を切る」を1つの instruction にまとめない。定型句が複数あっても、出力順に成立するものだけを最大1つ付ける。
+- 定型句 1 つにつき relation は最大 1 つ。同じ定型句を複数 instruction に複製しない。
 - 少しでも順序・参照先・定型句一致に迷う場合は、relation フィールドを省略する。fable/自然文を抽象化した DDL では、原則 relation を使わない。省略しても、位置・path・rotation・余白で関係を表せばよい。補助 instruction を追加して救わない。
 
 # 例 (最重要パターン)
@@ -264,6 +265,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 入力: 黒い線を二本置く。赤い小さな円を前の二つの間に置く。
 出力: {"instructions":[{"primitive":"line","from":[0.18,0.36],"to":[0.55,0.36],"color":"black"},{"primitive":"line","from":[0.45,0.64],"to":[0.82,0.64],"color":"black"},{"primitive":"circle","center":[0.5,0.5],"radius":0.035,"color":"red","relation":{"type":"between","gap":"medium"}}]}
+
+入力: 黒い横線を一本引く。赤い小さな円を前の線に沿って置く。青い小さな四角を前の線に沿って置く。
+出力: {"instructions":[{"primitive":"line","from":[0.12,0.5],"to":[0.88,0.5],"color":"black"},{"primitive":"circle","center":[0.5,0.42],"radius":0.035,"color":"red","relation":{"type":"along","gap":"narrow"}},{"primitive":"square","position":[0.5,0.58],"size":[0.06,0.06],"color":"blue"}]}
 
 # わりあい (比率・描画範囲)
 
@@ -455,6 +459,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - Relations may refer only to already emitted drawable outline instructions. Do not use background, filled planes, presence, fade-only support layers, small color-repair marks, or arrangement-only density layers as relation targets.
 - **Use between only when the previous two JSON instructions both have outlines. If only one previous drawable exists, or if either previous item is a support layer, omit the relation.**
 - Do not combine "along", "not touching", and "cutting" on one instruction. If several fixed phrases appear, keep only the one that is valid in output order.
+- Generate at most one relation per fixed relation phrase. Do not replicate the same relation phrase into multiple instructions.
 - If there is any doubt about order, target validity, or exact fixed-phrase match, omit the relation field. For fable/natural-language-derived DDL, use no relation by default. Express the relationship with position, path, rotation, and spacing instead; do not add a support instruction to rescue it.
 
 # Examples (key patterns)
@@ -543,6 +548,9 @@ Output: {"instructions":[{"primitive":"circle","center":[0.42,0.5],"radius":0.04
 
 Input: Draw two black lines. Place a small red circle between the previous two.
 Output: {"instructions":[{"primitive":"line","from":[0.18,0.36],"to":[0.55,0.36],"color":"black"},{"primitive":"line","from":[0.45,0.64],"to":[0.82,0.64],"color":"black"},{"primitive":"circle","center":[0.5,0.5],"radius":0.035,"color":"red","relation":{"type":"between","gap":"medium"}}]}
+
+Input: Draw one black horizontal line. Place one small red circle along the previous line. Place one small blue square along the previous line.
+Output: {"instructions":[{"primitive":"line","from":[0.12,0.5],"to":[0.88,0.5],"color":"black"},{"primitive":"circle","center":[0.5,0.42],"radius":0.035,"color":"red","relation":{"type":"along","gap":"narrow"}},{"primitive":"square","position":[0.5,0.58],"size":[0.06,0.06],"color":"blue"}]}
 
 Input: Draw five thin rotring lines toward an upper-right focus as subway-map pressure.
 Output: {"instructions":[{"primitive":"line","from":[0.14,0.82],"to":[0.72,0.28],"color":"black","weight":"rotring","arrangement":{"count":5,"layout":"vertical","margin":0.08}}]}

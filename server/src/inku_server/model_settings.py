@@ -65,6 +65,7 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         "default_base_url": "https://integrate.api.nvidia.com/v1",
         "requires_api_key": True,
         "models": [
+            {"id": "qwen/qwen3.5-397b-a17b", "label": "Qwen3.5 397B A17B"},
             {"id": "google/gemma-4-31b-it", "label": "Google Gemma 4 31B Instruct"},
             {"id": "meta/llama-3.3-70b-instruct", "label": "Meta Llama 3.3 70B Instruct"},
             {"id": "mistralai/mistral-large-2-instruct", "label": "Mistral AI Mistral Large 2 Instruct"},

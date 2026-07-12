@@ -1178,7 +1178,7 @@ def _interpret_openai_detail(
     timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
     client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=0)
 
-    is_qwen3 = "qwen3" in model.lower()
+    is_qwen3 = "qwen3" in model.lower() and provider == "ovms"
     if is_qwen3 and not include_thinking:
         user_content = f"/no_think {text}"
     else:

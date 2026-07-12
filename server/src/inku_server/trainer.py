@@ -132,7 +132,7 @@ def _generate_openai(style: str, model: str) -> str:
         api_key = os.getenv("OPENAI_API_KEY") or "none"
 
     client = OpenAI(base_url=base_url, api_key=api_key)
-    is_qwen3 = "qwen3" in model.lower()
+    is_qwen3 = "qwen3" in model.lower() and "/" not in model
     user_content = (
         f"/no_think 以下のスタイルで記述サンプルを 1 つ生成してください。\nスタイル: {style}"
         if is_qwen3

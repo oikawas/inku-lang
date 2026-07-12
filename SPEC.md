@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.72**
+**Version: v1.73**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -1264,3 +1264,11 @@ When updating the specification:
 - Replaced sequential variation counters with independent JavaScript-safe random seeds, made touch changes visible for fixed shapes, and restored seeds when loading history into the canvas.
 - Persisted caption visibility per user.
 - Preserved tab context during previous/next navigation and expanded model comparison to three Stage 1/2 modes.
+
+### v1.73 — System prompt optimization (2026-07-12)
+
+- Fixed self-contradictions in the Stage 1 / Stage 2 prompts: conversion examples that used vague counts ("several"/「数本」) against the prompts' own concrete-count rule, and inconsistent radius notation. Added the missing motions category to the ja Saijiki list and the missing sparse-validity rule to the ja Stage 2 prompt (the en prompt has had it since Build 415).
+- Stabilized the "Ground: ..." / 「地: ...」 route to canvas.ground: added ground-retention examples to the Stage 1 example pool, added an explicit Ground→canvas.ground / Surface→main-shape routing rule with an anti-duplication guard to Stage 2, and canonicalized the Stage 2 ground example inputs to the actual Stage 1 output form.
+- Fixed a defect in api.py where a canvas_aspect override replaced the whole canvas value and destroyed any Stage 2-generated canvas.ground (the true cause of the 0/12 ground adoption recorded at v1.71). Targeted 12-prompt bench: ground adoption 0/12 → 5/12.
+- Merged duplicated placement-mapping bullets and grouped the ~70-bullet Stage 2 rule list under eight subsection headers (content and order effectively unchanged).
+- JP/EN 30+30 regression bench on the Build 448 prompt set: JP improved on every metric (visual_event 89.7→94.9); a main-branch baseline run attributed the apparent EN drop vs 448 to pre-existing v1.70/v1.71 drift, with this change improving on main across all quality metrics. All fingerprint gates pass.

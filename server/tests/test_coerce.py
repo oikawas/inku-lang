@@ -2894,6 +2894,65 @@ def test_coerce_restores_literal_grid_count_and_full_field_margin():
     assert arr.preserve_space is False
 
 
+def test_coerce_restores_missing_literal_grid_arrangement():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.49, 0.49],
+                    "size": [0.02, 0.02],
+                    "color": "red",
+                },
+                {
+                    "primitive": "arc",
+                    "center": [0.72, 0.68],
+                    "radius": 0.07,
+                    "color": "black",
+                    "arrangement": {"count": 3, "layout": "radial"},
+                },
+            ]
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="赤い小さな四角を回転させて画面全体に六百個敷き詰める。黒い弧を三つ並べる。",
+    )
+    grid = fixed.instructions[0].arrangement
+    assert grid is not None
+    assert grid.layout == "grid"
+    assert grid.count == 600
+    assert grid.margin == 0.08
+    assert grid.path == "none"
+    assert grid.density == "none"
+    assert grid.fade == "none"
+    assert grid.preserve_space is False
+    assert fixed.instructions[1].arrangement is not None
+    assert fixed.instructions[1].arrangement.layout == "radial"
+
+
+def test_coerce_restores_missing_literal_grid_with_default_count():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.46, 0.5],
+                    "to": [0.54, 0.5],
+                    "color": "black",
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Tile thin black lines in four directions across the whole wall.")
+    grid = fixed.instructions[0].arrangement
+    assert grid is not None
+    assert grid.layout == "grid"
+    assert grid.count == 400
+
+
 def test_coerce_preserves_literal_grid_against_style_and_density_interventions():
     score = Score.model_validate(
         {

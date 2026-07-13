@@ -3695,6 +3695,41 @@ def _with_literal_grid_fidelity(
     if not _is_literal_grid_request(ddl):
         return instructions
     count_hint = count_hint_from_ddl(ddl or "")
+    if instructions and not any(
+        ins.arrangement is not None and ins.arrangement.layout == "grid"
+        for ins in instructions
+    ):
+        lower = (ddl or "").lower()
+        requested_primitive: str | None = None
+        if any(marker in lower for marker in ("四角", "square", "squares", "brick", "bricks")):
+            requested_primitive = "square"
+        elif any(marker in lower for marker in ("線", "雨脚", "line", "stroke")):
+            requested_primitive = "line"
+        target_index = next(
+            (
+                index
+                for index, ins in enumerate(instructions)
+                if requested_primitive is None or ins.primitive == requested_primitive
+            ),
+            0,
+        )
+        data = instructions[target_index].model_dump(by_alias=True)
+        arr_data = dict(data.get("arrangement") or {})
+        arr_data.update(
+            {
+                "count": count_hint or 400,
+                "layout": "grid",
+                "path": "none",
+                "margin": 0.08,
+                "density": "none",
+                "cluster_count": None,
+                "fade": "none",
+                "preserve_space": False,
+            }
+        )
+        data["arrangement"] = arr_data
+        instructions = list(instructions)
+        instructions[target_index] = Instruction.model_validate(data)
     adjusted: list[Instruction] = []
     for ins in instructions:
         arr = ins.arrangement

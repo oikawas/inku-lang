@@ -3486,14 +3486,19 @@ def _is_literal_grid_request(ddl: str | None) -> bool:
 
 def count_hint_from_ddl(ddl: str) -> int | None:
     """Extract a conservative count hint from a normalized DDL fragment."""
-    match = re.search(r"(\d{1,4}|[一二三四五六七八九十百]{1,8})(?:本|個|つ|点|枚)", ddl)
-    if not match:
-        return None
-    value = _parse_small_japanese_number(match.group(1))
-    if value is None:
-        return None
-    maximum = 2000 if _is_literal_grid_request(ddl) else 1000
-    return min(max(value, 1), maximum)
+    literal_grid = _is_literal_grid_request(ddl)
+    clauses = re.split(r"[。.!?]+", ddl)
+    candidates = [clause for clause in clauses if _is_literal_grid_request(clause)] if literal_grid else [ddl]
+    pattern = r"(\d{1,4}|[一二三四五六七八九十百]{1,8})(?:本|個|つ(?!の方向)|点|枚)"
+    for candidate in candidates:
+        match = re.search(pattern, candidate)
+        if not match:
+            continue
+        value = _parse_small_japanese_number(match.group(1))
+        if value is not None:
+            maximum = 2000 if literal_grid else 1000
+            return min(max(value, 1), maximum)
+    return _english_count_hint(ddl)
 
 
 ENGLISH_SMALL_NUMBERS: dict[str, int] = {
@@ -3508,6 +3513,66 @@ ENGLISH_SMALL_NUMBERS: dict[str, int] = {
     "nine": 9,
     "ten": 10,
 }
+
+ENGLISH_COUNT_UNITS: dict[str, int] = {
+    **ENGLISH_SMALL_NUMBERS,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+}
+
+
+def _english_count_hint(ddl: str) -> int | None:
+    literal_grid = _is_literal_grid_request(ddl)
+    clauses = re.split(r"[.!?]+", ddl)
+    candidates = [clause for clause in clauses if _is_literal_grid_request(clause)] if literal_grid else [ddl]
+    words = re.findall(r"[a-z]+", " ".join(candidates).lower().replace("-", " "))
+    count_nouns = {
+        "line", "lines", "stroke", "strokes", "square", "squares",
+        "tile", "tiles", "brick", "bricks",
+    }
+    number_words = set(ENGLISH_COUNT_UNITS) | {"hundred", "thousand", "and"}
+    for start, word in enumerate(words):
+        if word not in number_words or word == "and":
+            continue
+        end = start
+        phrase: list[str] = []
+        while end < len(words) and words[end] in number_words:
+            phrase.append(words[end])
+            end += 1
+        if not any(noun in count_nouns for noun in words[end : end + 9]):
+            continue
+        total = 0
+        current = 0
+        for token in phrase:
+            if token == "and":
+                continue
+            if token == "hundred":
+                current = max(current, 1) * 100
+            elif token == "thousand":
+                total += max(current, 1) * 1000
+                current = 0
+            else:
+                current += ENGLISH_COUNT_UNITS[token]
+        value = total + current
+        if value:
+            maximum = 2000 if _is_literal_grid_request(ddl) else 1000
+            return min(max(value, 1), maximum)
+    return None
 
 
 def _parse_count_token(token: str) -> int | None:
@@ -3611,6 +3676,38 @@ def _as_circle_instruction(ins: Instruction, note: str) -> Instruction:
     }
     _append_hint(converted, note)
     return Instruction.model_validate(converted)
+
+
+def _with_literal_grid_fidelity(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+) -> list[Instruction]:
+    """Preserve explicit literal-tiling count and full-field coverage."""
+    if not _is_literal_grid_request(ddl):
+        return instructions
+    count_hint = count_hint_from_ddl(ddl or "")
+    adjusted: list[Instruction] = []
+    for ins in instructions:
+        arr = ins.arrangement
+        if arr is None or arr.layout != "grid":
+            adjusted.append(ins)
+            continue
+        data = ins.model_dump(by_alias=True)
+        arr_data = dict(data["arrangement"])
+        if count_hint is not None:
+            if arr.rows is not None and arr.cols is not None and arr.rows * arr.cols != count_hint:
+                arr_data["rows"] = None
+                arr_data["cols"] = None
+            arr_data["count"] = count_hint
+        arr_data["margin"] = min(float(arr_data.get("margin") or 0.1), 0.08)
+        arr_data["density"] = "none"
+        arr_data["cluster_count"] = None
+        arr_data["fade"] = "none"
+        arr_data["preserve_space"] = False
+        data["arrangement"] = arr_data
+        adjusted.append(Instruction.model_validate(data))
+    return adjusted
 
 
 def _with_explicit_constraint_enforcement(
@@ -3776,7 +3873,9 @@ def _style_coerce_disabled() -> bool:
 def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。"""
     if _style_coerce_disabled():
-        instructions = _drop_invalid_relations([_coerce_instruction(ins) for ins in score.instructions])
+        instructions = [_coerce_instruction(ins) for ins in score.instructions]
+        instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
+        instructions = _drop_invalid_relations(instructions)
         data = score.model_dump(by_alias=True)
         data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
         return Score.model_validate(data)
@@ -3813,6 +3912,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     instructions = _with_per_instruction_density_budget(instructions)
     instructions = _with_total_density_budget(instructions)
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
+    instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
     instructions = _drop_invalid_relations(instructions)
     data = score.model_dump(by_alias=True)
     data["background"] = background

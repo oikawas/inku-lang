@@ -2847,6 +2847,50 @@ def test_coerce_score_varies_repair_part_coordinates_by_input():
 def test_count_hint_allows_2000_only_for_literal_grid_request():
     assert count_hint_from_ddl("黒い線を2000本格子状に敷き詰める。") == 2000
     assert count_hint_from_ddl("黒い線を2000本散らす。") == 1000
+    assert count_hint_from_ddl("Tile two thousand short gray pencil vertical lines across the canvas.") == 2000
+    assert count_hint_from_ddl("Tile six hundred small rotated red squares across the canvas.") == 600
+    assert count_hint_from_ddl("Tile thin black lines in four directions across the wall.") is None
+    assert count_hint_from_ddl("黒い線を四つの方向で一面に敷き詰める。黒い線を三本並べる。") is None
+    assert count_hint_from_ddl("Tile gray lines across the canvas. Line up three black lines.") is None
+
+
+def test_coerce_restores_literal_grid_count_and_full_field_margin():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.48, 0.45],
+                    "to": [0.52, 0.55],
+                    "arrangement": {
+                        "count": 120,
+                        "layout": "grid",
+                        "rows": 12,
+                        "cols": 10,
+                        "margin": 0.45,
+                        "density": "high",
+                        "cluster_count": 5,
+                        "fade": "outward",
+                        "preserve_space": True,
+                    },
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="Tile two thousand short gray pencil vertical lines across the whole canvas.",
+    )
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.count == 2000
+    assert arr.rows is None and arr.cols is None
+    assert arr.margin == 0.08
+    assert arr.density == "none"
+    assert arr.cluster_count is None
+    assert arr.fade == "none"
+    assert arr.preserve_space is False
 
 
 def test_coerce_preserves_literal_grid_against_style_and_density_interventions():

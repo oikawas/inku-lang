@@ -129,6 +129,9 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 # 配置選択 — 必ず配置ガイダンスを与える
 
+- 壁紙、模様、織物、タイル、煉瓦、畳、簾、雨脚、木立の連なりなど、規則的な反復の質感が主題として文字どおり指定された時だけ、正規化DDLに「（要素）を一面に敷き詰める」と書く。数量は200〜2000を使ってよく、「細かく震える」または「かすかに揺れる」を別文で必ず添える
+- 敷き詰めは規則的反復が主題の場合だけ使う。単に「たくさん」「無数」は従来どおり偏りのある「散らす」とし、「敷き詰める」を自発的に追加しない。通常経路の数量・余白規則は変更しない
+
 「散らす」は無配置ではない。常に **ばしょ・うごき・ゆらぎの軌跡** を使って配置を決める。
 出力では「どこに」「どの方向へ」「どんな軌跡で」を明示する。
 「ランダム」は正規化DDLの禁止語。入力に「ランダム」が含まれていても出力には書かない。
@@ -189,7 +192,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 いろ: 白、黒(既定)、青、赤、緑、灰
 ゆらぎ: 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む
 ばしょ: 上、下、中央、左端、右端、上端、下端、中心、隅
-うごき: 置く、並べる、引く、描く、散らす、埋める
+うごき: 置く、並べる、引く、描く、散らす、埋める、敷き詰める
 わりあい: 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月
 
 # わりあい (比率・描画範囲)
@@ -482,6 +485,21 @@ EXAMPLE_POOL: list[dict] = [
         "input": "都市のシルエット",
         "output": "黒い四角を横に五つ並べる。高さを変えて。",
     },
+    {
+        "keywords": ["壁紙", "縦縞", "色褪せ", "模様"],
+        "input": "色褪せた青い縦縞の壁紙",
+        "output": "色褪せた青い鉛筆の短い縦線を壁一面に四百本敷き詰める。かすかに揺れる。",
+    },
+    {
+        "keywords": ["四つの方向", "四方向", "壁一面", "重なる線"],
+        "input": "四つの方向の線を壁一面に重ねる",
+        "output": "黒い細い短線を四つの方向で壁一面に重ねて敷き詰める。かすかに揺れる。",
+    },
+    {
+        "keywords": ["篠突く雨", "雨脚", "雨簾", "視界を覆う"],
+        "input": "篠突く雨が雨簾となって視界を覆う",
+        "output": "灰色の鉛筆の短い縦線を画面全体に二千本敷き詰める。間隔をゆるく揺らす。",
+    },
     # 非 Saijiki 語の展開: 動作→配置
     {
         "keywords": ["散る", "舞う", "飛ぶ", "漂う", "漂い"],
@@ -545,6 +563,21 @@ EXAMPLE_POOL: list[dict] = [
 ]
 
 EXAMPLE_POOL_EN: list[dict] = [
+    {
+        "keywords": ["wallpaper", "faded stripes", "vertical stripes"],
+        "input": "Faded blue striped wallpaper",
+        "output": "Tile four hundred short faded blue pencil vertical lines across the wall. Swaying faintly.",
+    },
+    {
+        "keywords": ["four directions", "superimposed lines", "wall-wide"],
+        "input": "Lines in four directions superimposed across a wall",
+        "output": "Tile thin short black lines in four directions, superimposed across the whole wall. Swaying faintly.",
+    },
+    {
+        "keywords": ["rain curtain", "driving rain", "sheets of rain"],
+        "input": "Driving rain becomes a curtain across the view",
+        "output": "Tile two thousand short gray pencil vertical lines across the whole canvas. Loosely varied spacing.",
+    },
     {
         "keywords": ["moon", "mountain", "sky", "night", "star", "rises"],
         "input": "A moon rises beyond the mountains",
@@ -856,6 +889,9 @@ Never output vague words such as "many" or "countless"; always convert them to a
 
 # Arrangement Choice — always provide placement guidance
 
+- Use "tile" only when a literal wallpaper, pattern, textile, tile, brick, mat, blind, rain-curtain, or tree-row surface makes regular repetition the subject. Use a concrete count from 200 to 2000 and always add a separate fine-trembling or faint-swaying sentence
+- Tiling is only for regular repetition as the subject. Mere "many" or "countless" keeps the existing biased scatter path; never introduce "tile" spontaneously, and do not change ordinary count or negative-space rules
+
 "scatter" is not placement by itself. Always choose placement from **place words, motion words, and movement traces**, and specify where, in which direction, or along what trace the objects are distributed.
 The words "random" and "randomly" are forbidden in normalized DDL. Do not write them in the output.
 
@@ -924,7 +960,7 @@ continuity: solid (default), dashed, dotted, dash-dot
 colors: white, black (default), blue, red, green, gray
 movements: fine, large, slowly, quickly, swaying, undulating, trembling, blurring
 places: top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner
-motions: place, line-up, fill, scatter, draw
+motions: place, line-up, fill, scatter, draw, tile
 proportions: tall, wide, full-width, half-width, semicircle, waxing, waning, crescent
 
 # Proportions

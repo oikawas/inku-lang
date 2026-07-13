@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.74.1**
+**Version: v1.75**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -79,7 +79,7 @@ DDLは絵を記述する言語ではなく、**視覚的な短歌を書く言語
 |---|---|
 | **Color** | 白、黒、青、赤、緑、灰 |
 | **Canvas** | 正方形（Option: A4, B4, Letter） |
-| **Action** | 置く、描く、並べる、埋める、塗りつぶす |
+| **Action** | 置く、描く、並べる、埋める、敷き詰める、塗りつぶす |
 | **Pen** | ペン、筆太、筆細、ロトリング、クレヨン |
 | **Line** | 直線、波線、ひっかき、ドット |
 | **Object** | 線、円、だ円、三角、四角 |
@@ -431,7 +431,7 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 | かたち | 円、楕円、三角、四角、線、弧 |
 | かたむき | 水平、垂直、斜め、右上がり、右下がり、回転 |
 | てざわり | ペン、筆、クレヨン、チョーク、縄 |
-| うごき | 置く、並べる、埋める、散らす |
+| うごき | 置く、並べる、埋める、散らす、敷き詰める |
 | ばしょ | 上、下、中心、端、隅 |
 
 **カテゴリ構造（英語版）**
@@ -441,7 +441,7 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 | forms | circle, ellipse, triangle, square, line, arc |
 | angles | horizontal, vertical, diagonal, rising, falling, rotated |
 | touches | pen, brush, crayon, chalk, rope |
-| motions | place, align, fill, scatter |
+| motions | place, align, fill, scatter, tile |
 | places | top, bottom, center, edge, corner |
 
 **配置方針**
@@ -1139,6 +1139,8 @@ JSON Score は「楽譜」であり、演奏そのものは含まない。楽譜
 
 楽譜は「前の線に触れない、狭い間隔で」と関係を記し、演奏がその都度の位置を決める。これにより「同じ楽譜から毎回違う演奏」が、数px級の震えではなく構図レベルで成立する。従来の実装はミクロのみを実現しており、マクロの揺らぎがどの層にも割り当てられていなかった。これが出力の均質化（Build 436 で観測）の一次原因である。
 
+**敷き詰め演奏の三層（v1.75）:** 書き手が「敷き詰める」と明示した `layout="grid"` は、(1) performance seed 由来の決定的 hash によるセル内位置の微小ずれ、(2) 各要素で位相が異なる既存 `variation`、(3) pencil / brush / chalk 等の既存 weight 素材固有の揺らぎ、の三層で演奏する。同一 Score + 同一 render seed は bit 同一であり、seed が変わると秩序を保ったまま手の差が変わる。grid は全面反復そのものが書き手の意図なので、scatter 用の偏り・fade・cluster・preserve-space・数量代表化を適用しない。
+
 ### 13.9 JSON Score の variation スキーマ
 
 JSON Score の `variation` フィールドは、次元ごとに分離した構造を持つ。
@@ -1193,8 +1195,10 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 
 | フィールド | 値 | 説明 |
 |---|---|---|
-| `layout` | `horizontal` / `vertical` / `radial` / `scatter` | 基本配置 |
+| `layout` | `horizontal` / `vertical` / `radial` / `scatter` / `grid` | 基本配置。`grid` は明示された敷き詰め |
 | `path` | `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` | 配置軌跡 |
+| `rows` / `cols` | 1〜64 または省略 | grid の行列数。両方明示時は `rows×cols` を優先 |
+| `jitter` | 0.0〜1.0（既定0.12） | grid セル内の決定的な位置ずれ |
 
 対応関係:
 
@@ -1204,6 +1208,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 - 「左から右へ」「横に」→ `layout="horizontal"`, `path="left_to_right"`
 - 「右半分」→ `path="right_half"`
 - 「放射状」「同心円状」→ `layout="radial"`
+- 「敷き詰める」「格子状に敷く」→ `layout="grid"`（この明示語がある場合だけ。countは2000まで、通常配置は1000まで）
 
 `path` が `none` の場合は従来どおり `layout` だけで配置する。`path` が指定された場合、Renderer は決定的な hash と連番を使い、同じ JSON Score から同じ軌跡配置を再現する。
 
@@ -3798,3 +3803,12 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - display SVGのground質感rect自身へ0.02〜0.18のopacityを持たせ、filterのalpha tableを `0 1` に変更した。filter対応ブラウザの合成アルファを保ちながら、filter非対応PNGラスタライザでも不透明な灰色壁にならない。
 - rendererの全filter使用箇所を監査し、同じく広域図形の透過をfilterだけへ依存する箇所が他にないことを確認した。
 - Build 508。Mac・pentalaともに314 passed / 30 skipped、ruff・web check/build green。Qwen3 Next固定ベンチは面/地12件12/12（地明示6/6、自発ground 0、灰色壁なし）、JP30/EN30各30/30（自発ground 0、品質急落なし、fingerprint全pass、502/timeout/fallback 0）。詳細は `cli/tune_bench.md` の「v1.74.1: ground hotfix」に記録した。
+
+
+### v1.75 — 敷き詰め（pattern field） (2026-07-13)
+
+- 物理動作語彙として「敷き詰める」/ `tile` をSaijikiの「うごき」に追加した。規則的反復が主題として文字どおり書かれた場合だけ使用し、「たくさん」「無数」から自発的に選ばない。
+- JSON Scoreのarrangementに `layout="grid"`、`rows`、`cols`、`jitter` を追加した。gridは `at.region` またはmargin内をセルで覆い、明示rows×colsをcountより優先する。schema上限は2000へ拡張したが、非pattern経路は従来の1〜1000を維持する。
+- Rendererはセル位置jitter、要素別variation位相、weight素材固有の揺らぎを重ね、同一Score + seedのbit決定性を保つ。gridはcoerceのfade / cluster / preserve-space / count縮小から除外する。
+- Stage 1 / Stage 2へ日英同等のliteral-only規則と壁紙・四方向・格子の例を追加した。四方向は最大4 instructionの既存重ねで表現し、新primitiveは追加しない。
+- Build 509。

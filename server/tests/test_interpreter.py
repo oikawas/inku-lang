@@ -233,3 +233,21 @@ def test_relation_examples_are_included_in_stage1_prompt_en():
     lower_prompt = prompt.lower()
     assert "riverbank" in lower_prompt
     assert "are not relations" in lower_prompt
+
+
+def test_literal_tiling_prompt_uses_saijiki_term_and_examples():
+    prompt = _build_system_prompt("色褪せた青い縦縞の壁紙")
+
+    assert "規則的な反復の質感が主題として文字どおり指定された時だけ" in prompt
+    assert "自発的に追加しない" in prompt
+    assert "敷き詰める" in prompt
+    assert "壁一面に四百本敷き詰める" in prompt
+
+
+def test_literal_tiling_prompt_en_uses_saijiki_term_and_examples():
+    prompt = _build_system_prompt("faded blue striped wallpaper", lang="en")
+
+    assert "Use \"tile\" only when a literal wallpaper" in prompt
+    assert 'never introduce "tile" spontaneously' in prompt
+    assert "motions: place, line-up, fill, scatter, draw, tile" in prompt
+    assert "Tile four hundred short faded blue pencil vertical lines" in prompt

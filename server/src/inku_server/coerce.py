@@ -737,6 +737,9 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
 
     adjusted: list[Instruction] = []
     for index, ins in enumerate(instructions):
+        if ins.arrangement is not None and ins.arrangement.layout == "grid":
+            adjusted.append(ins)
+            continue
         data = ins.model_dump(by_alias=True)
         changed = False
         if ins.arrangement is not None:
@@ -774,7 +777,9 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
 
 def _has_motion_path(instructions: list[Instruction]) -> bool:
     return any(
-        ins.arrangement is not None and ins.arrangement.path != "none" and _expanded_count(ins) >= 3
+        ins.arrangement is not None
+        and (ins.arrangement.layout == "grid" or ins.arrangement.path != "none")
+        and _expanded_count(ins) >= 3
         for ins in instructions
     )
 
@@ -832,6 +837,9 @@ def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) 
 
     adjusted: list[Instruction] = []
     for index, ins in enumerate(instructions):
+        if ins.arrangement is not None and ins.arrangement.layout == "grid":
+            adjusted.append(ins)
+            continue
         data = ins.model_dump(by_alias=True)
         changed = False
         if ins.arrangement is not None:
@@ -920,6 +928,9 @@ def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: st
 
     adjusted: list[Instruction] = []
     for index, ins in enumerate(instructions):
+        if ins.arrangement is not None and ins.arrangement.layout == "grid":
+            adjusted.append(ins)
+            continue
         if ins.primitive != "line" or ins.arrangement is None or _expanded_count(ins) < 6:
             adjusted.append(ins)
             continue
@@ -1682,7 +1693,7 @@ def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> li
 
     adjusted: list[Instruction] = []
     for ins in instructions:
-        if ins.arrangement is None:
+        if ins.arrangement is None or ins.arrangement.layout == "grid":
             adjusted.append(ins)
             continue
         data = ins.model_dump(by_alias=True)
@@ -1846,6 +1857,9 @@ def _with_existing_event_counterweight(
 
     adjusted: list[Instruction] = []
     for index, ins in enumerate(instructions):
+        if ins.arrangement is not None and ins.arrangement.layout == "grid":
+            adjusted.append(ins)
+            continue
         hint = (ins.color_hint or "").lower()
         compact_mark = "small focal mark kept compact" in hint or "circle focal mark kept compact" in hint
         focal_event = _has_focal_event_hint(ins)
@@ -2315,6 +2329,9 @@ def _with_context_density_governor(
     adjusted: list[Instruction] = []
     governed_count = 0
     for ins in instructions:
+        if ins.arrangement is not None and ins.arrangement.layout == "grid":
+            adjusted.append(ins)
+            continue
         ins = _with_quiet_symbolic_shape_tempering(ins, ddl=ddl)
         ins = _with_quiet_single_shape_tempering(ins, ddl=ddl)
         ins = _with_unintentional_filled_shape_tempering(ins, ddl=ddl)
@@ -2409,7 +2426,7 @@ def _clustered_visual_count(original_count: int) -> int:
 
 def _with_clustered_density(ins: Instruction, note: str) -> Instruction:
     arr = ins.arrangement
-    if arr is None:
+    if arr is None or arr.layout == "grid":
         return ins
     original_count = arr.count
     data = ins.model_dump(by_alias=True)
@@ -2432,7 +2449,11 @@ def _with_clustered_density(ins: Instruction, note: str) -> Instruction:
 def _with_per_instruction_density_budget(instructions: list[Instruction]) -> list[Instruction]:
     adjusted: list[Instruction] = []
     for ins in instructions:
-        if ins.arrangement is None or ins.arrangement.count <= MAX_EXPANDED_PER_INSTRUCTION:
+        if (
+            ins.arrangement is None
+            or ins.arrangement.layout == "grid"
+            or ins.arrangement.count <= MAX_EXPANDED_PER_INSTRUCTION
+        ):
             adjusted.append(ins)
             continue
         adjusted.append(_with_clustered_density(ins, "single arrangement density clustered to preserve negative space"))
@@ -2440,7 +2461,10 @@ def _with_per_instruction_density_budget(instructions: list[Instruction]) -> lis
 
 
 def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruction]:
-    total = sum(_expanded_count(ins) for ins in instructions)
+    def is_grid(ins: Instruction) -> bool:
+        return ins.arrangement is not None and ins.arrangement.layout == "grid"
+
+    total = sum(_expanded_count(ins) for ins in instructions if not is_grid(ins))
     if total <= MAX_EXPANDED_PRIMITIVES:
         return instructions
 
@@ -2448,8 +2472,11 @@ def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruct
     remaining = list(instructions)
     adjusted: list[Instruction] = []
     for index, ins in enumerate(remaining):
+        if is_grid(ins):
+            adjusted.append(ins)
+            continue
         count = _expanded_count(ins)
-        rest_minimum = len(remaining) - index - 1
+        rest_minimum = sum(1 for item in remaining[index + 1:] if not is_grid(item))
         if ins.arrangement is None:
             adjusted.append(ins)
             remaining_budget -= 1
@@ -2457,7 +2484,11 @@ def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruct
         if remaining_budget <= rest_minimum + 1:
             allowed = 1
         else:
-            remaining_total = sum(_expanded_count(item) for item in remaining[index:])
+            remaining_total = sum(
+                _expanded_count(item)
+                for item in remaining[index:]
+                if not is_grid(item)
+            )
             share = count / remaining_total if remaining_total > 0 else 0
             allowed = max(1, int((remaining_budget - rest_minimum) * share))
         if allowed < count and count > 80:
@@ -3241,7 +3272,14 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
 
     count = count_hint_from_ddl(clause)
     cycle = _color_cycle_from_clause(clause, background)
-    if count and (("散らす" in clause) or ("scatter" in lower)):
+    if count and _is_literal_grid_request(clause):
+        common["arrangement"] = {
+            "count": min(count, 2000),
+            "layout": "grid",
+            "jitter": 0.12,
+            "margin": 0.08,
+        }
+    elif count and (("散らす" in clause) or ("scatter" in lower)):
         common["arrangement"] = {"count": min(count, 120), "layout": "scatter", "margin": 0.18}
     elif count and (("並べる" in clause) or ("line up" in lower)):
         common["arrangement"] = {"count": min(count, 80), "layout": "horizontal", "margin": 0.1}
@@ -3437,6 +3475,15 @@ def _parse_small_japanese_number(text: str) -> int | None:
     return None
 
 
+def _is_literal_grid_request(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    lower = ddl.lower()
+    if any(marker in ddl for marker in ("敷き詰め", "格子状", "格子に", "一面に並", "全面に並")):
+        return True
+    return re.search(r"\b(?:tile|tiled|tiling|grid)\b", lower) is not None
+
+
 def count_hint_from_ddl(ddl: str) -> int | None:
     """Extract a conservative count hint from a normalized DDL fragment."""
     match = re.search(r"(\d{1,4}|[一二三四五六七八九十百]{1,8})(?:本|個|つ|点|枚)", ddl)
@@ -3445,7 +3492,8 @@ def count_hint_from_ddl(ddl: str) -> int | None:
     value = _parse_small_japanese_number(match.group(1))
     if value is None:
         return None
-    return min(max(value, 1), 1000)
+    maximum = 2000 if _is_literal_grid_request(ddl) else 1000
+    return min(max(value, 1), maximum)
 
 
 ENGLISH_SMALL_NUMBERS: dict[str, int] = {

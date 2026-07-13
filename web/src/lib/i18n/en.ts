@@ -507,7 +507,7 @@ export const en: LangPack = {
 		iro: ['white', 'black', 'blue', 'red', 'green', 'gray'],
 		yuragi: ['fine', 'large', 'slowly', 'quickly', 'swaying', 'undulating', 'trembling', 'blurring'],
 		basho: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'middle', 'corner'],
-		ugoki: ['place', 'line-up', 'fill', 'scatter', 'draw'],
+		ugoki: ['place', 'line-up', 'fill', 'scatter', 'draw', 'tile'],
 		wariai: ['tall', 'wide', 'full-width', 'half-width', 'semicircle', 'waxing', 'waning', 'crescent'],
 		'plugin-nature': ['Nature.wind', 'Nature.undulation', 'Nature.stillness'],
 	},

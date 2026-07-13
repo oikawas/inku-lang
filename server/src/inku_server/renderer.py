@@ -579,8 +579,13 @@ def _resolve_performance_score(score: Score, performance_seed: int | None) -> Sc
     seed = int(performance_seed)
     for index, original in enumerate(score.instructions):
         ins = _ensure_line_coords(original)
-        ins = _resolve_at_region(ins, seed, index)
-        ins = _resolve_relation(ins, resolved, seed, index)
+        if ins.arrangement and ins.arrangement.layout == "grid":
+            data = ins.model_dump(by_alias=True)
+            data.pop("relation", None)
+            ins = Instruction.model_validate(data)
+        else:
+            ins = _resolve_at_region(ins, seed, index)
+            ins = _resolve_relation(ins, resolved, seed, index)
         resolved.append(ins)
     data = score.model_dump(by_alias=True)
     data["instructions"] = [ins.model_dump(by_alias=True) for ins in resolved]
@@ -605,12 +610,16 @@ def _render_effect_hint(color_hint: str | None) -> str | None:
     return "; ".join(kept) if kept else None
 
 
-def _expand_arrangement(ins: Instruction, performance_seed: int | None = None) -> list[Instruction]:
+def _expand_arrangement(
+    ins: Instruction,
+    performance_seed: int | None = None,
+    canvas: CanvasSize | None = None,
+) -> list[Instruction]:
     """arrangement を展開して N 個の Instruction を返す。"""
     arr = ins.arrangement
     assert arr is not None
     ins = _ensure_line_coords(ins)
-    if arr.count == 1:
+    if arr.count == 1 and arr.layout != "grid":
         data = ins.model_dump(by_alias=True)
         data.pop("arrangement", None)
         return _apply_color_cycle([Instruction.model_validate(data)], arr.color_cycle)
@@ -619,6 +628,53 @@ def _expand_arrangement(ins: Instruction, performance_seed: int | None = None) -
     ax, ay = _anchor(ins)
     seed = _seed_for_instruction(ins, performance_seed)
     cluster_count = arr.cluster_count or 0
+
+    if arr.layout == "grid":
+        if ins.at is not None:
+            x0, y0, x1, y1 = ins.at.region
+        else:
+            x0 = y0 = margin
+            x1 = y1 = 1.0 - margin
+        region_width = max(x1 - x0, 1e-9)
+        region_height = max(y1 - y0, 1e-9)
+        rows = arr.rows
+        cols = arr.cols
+        if rows is not None and cols is not None:
+            pass
+        elif rows is not None:
+            cols = min(64, max(1, math.ceil(n / rows)))
+        elif cols is not None:
+            rows = min(64, max(1, math.ceil(n / cols)))
+        else:
+            physical_aspect = region_width / region_height
+            if canvas is not None:
+                physical_aspect *= canvas.width / canvas.height
+            cols = min(64, max(1, math.ceil(math.sqrt(n * physical_aspect))))
+            rows = min(64, max(1, math.ceil(n / cols)))
+        assert rows is not None and cols is not None
+        cell_width = region_width / cols
+        cell_height = region_height / rows
+        targets: list[tuple[float, float]] = []
+        for row in range(rows):
+            row_t = _rhythm_t(row, rows, seed ^ 0xA53C, arr.rhythm_spacing)
+            cy = y0 + (0.5 + row_t * (rows - 1)) * cell_height
+            for col in range(cols):
+                col_t = _rhythm_t(col, cols, seed ^ 0xC3A5, arr.rhythm_spacing)
+                cx = x0 + (0.5 + col_t * (cols - 1)) * cell_width
+                dx = (_hash01(row * cols + col, seed, "grid-jitter-x") - 0.5) * arr.jitter * cell_width
+                dy = (_hash01(row * cols + col, seed, "grid-jitter-y") - 0.5) * arr.jitter * cell_height
+                targets.append((
+                    min(x1, max(x0, cx + dx)),
+                    min(y1, max(y0, cy + dy)),
+                ))
+        result: list[Instruction] = []
+        for tx, ty in targets:
+            shifted = _shift(ins, tx - ax, ty - ay)
+            data = shifted.model_dump(by_alias=True)
+            data.pop("at", None)
+            data.pop("relation", None)
+            result.append(Instruction.model_validate(data))
+        return _apply_color_cycle(result, arr.color_cycle)
 
     if cluster_count > 0 and arr.layout in ("scatter", "horizontal", "vertical"):
         path = arr.path
@@ -1043,7 +1099,7 @@ def render(
     elem_idx = 0
 
     for ins_idx, ins in enumerate(score.instructions):
-        expanded = _expand_arrangement(ins, render_seed) if ins.arrangement else [ins]
+        expanded = _expand_arrangement(ins, render_seed, canvas) if ins.arrangement else [ins]
         instruction_group = dwg.g(id=_instruction_svg_id(ins, ins_idx)) if structured else content
         for mark_idx, single in enumerate(expanded):
             element = _render_instruction(dwg, single, cmap, canvas, use_filters=use_filters, render_seed=render_seed)

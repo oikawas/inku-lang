@@ -59,7 +59,7 @@
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const INSTRUCTION_LANG_KEY = 'inku-instruction-lang';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.74.1';
+	const APP_VERSION = 'v1.75';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;

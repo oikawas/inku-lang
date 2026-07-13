@@ -2842,3 +2842,95 @@ def test_coerce_score_varies_repair_part_coordinates_by_input():
     assert mark_b.from_ is not None and mark_b.to is not None
     assert mark_a.from_ != mark_b.from_
     assert mark_a.to != mark_b.to
+
+
+def test_count_hint_allows_2000_only_for_literal_grid_request():
+    assert count_hint_from_ddl("黒い線を2000本格子状に敷き詰める。") == 2000
+    assert count_hint_from_ddl("黒い線を2000本散らす。") == 1000
+
+
+def test_coerce_preserves_literal_grid_against_style_and_density_interventions():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.48, 0.45],
+                    "to": [0.52, 0.55],
+                    "color": "black",
+                    "arrangement": {
+                        "count": 2000,
+                        "layout": "grid",
+                        "rows": 40,
+                        "cols": 50,
+                        "jitter": 0.2,
+                        "path": "none",
+                        "margin": 0.08,
+                        "density": "none",
+                        "cluster_count": None,
+                        "fade": "none",
+                        "preserve_space": False,
+                        "rhythm_spacing": "none",
+                    },
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="静かな余白の中で、楽しく動く黒い線を2000本格子状に敷き詰める。",
+    )
+    grid = next(
+        ins for ins in fixed.instructions
+        if ins.arrangement is not None and ins.arrangement.layout == "grid"
+    )
+    arr = grid.arrangement
+    assert arr is not None
+    assert arr.count == 2000
+    assert arr.rows == 40
+    assert arr.cols == 50
+    assert arr.jitter == 0.2
+    assert arr.path == "none"
+    assert arr.margin == 0.08
+    assert arr.density == "none"
+    assert arr.cluster_count is None
+    assert arr.fade == "none"
+    assert arr.preserve_space is False
+    assert arr.rhythm_spacing == "none"
+
+
+def test_total_density_budget_does_not_charge_or_shrink_grid():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.49, 0.45],
+                    "to": [0.51, 0.55],
+                    "arrangement": {
+                        "count": 2000,
+                        "layout": "grid",
+                        "rows": 40,
+                        "cols": 50,
+                    },
+                },
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.005,
+                    "filled": True,
+                    "arrangement": {"count": 500, "layout": "scatter"},
+                },
+            ]
+        }
+    )
+
+    fixed = coerce_score(score)
+    grid = next(ins for ins in fixed.instructions if ins.arrangement and ins.arrangement.layout == "grid")
+    scatter = next(ins for ins in fixed.instructions if ins.arrangement and ins.arrangement.layout == "scatter")
+
+    assert grid.arrangement is not None and grid.arrangement.count == 2000
+    assert grid.arrangement.rows == 40 and grid.arrangement.cols == 50
+    assert scatter.arrangement is not None
+    assert scatter.arrangement.count < 500

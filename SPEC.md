@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.74.1**
+**Version: v1.75**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -207,6 +207,8 @@ resolution of regions and relations).  Each render may carry a `render_seed`;
 providing the same seed makes replay reproducible while leaving the canonical
 Score stable.
 
+For literal `layout="grid"` tiling, performance composes three controlled layers: a deterministic seed-derived within-cell position jitter, the existing per-element `variation` with a distinct phase for every mark, and the existing material behavior of weights such as pencil, brush, and chalk. The same Score and render seed remain bit-identical. Because full-field repetition is explicit author intent, grid bypasses scatter-oriented bias, fade, clustering, preserved-space injection, and representative count reduction.
+
 inku exposes this as the first half of two-step regeneration: **another
 performance** rerenders the same JSON Score with a new explicit performance
 seed. It does not call an LLM and does not change the interpretation or Score.
@@ -283,7 +285,7 @@ Current core categories include:
 | shape | かたち | circle, ellipse, triangle, square, line, arc |
 | touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
 | line continuity | つらなり | solid, dashed, dotted, dot-dashed |
-| motion | うごき | place, align, scatter, fill, tremble, undulate |
+| motion | うごき | place, align, scatter, fill, tile, tremble, undulate |
 | relations | あいだ | along, not touching, cutting, between, with examples such as `along the previous line` |
 | place | ばしょ | top, bottom, edge, corner, near, across |
 | angle | かたむき | horizontal, vertical, diagonal, rotated |
@@ -1292,3 +1294,12 @@ When updating the specification:
 - Moved display ground texture opacity (clamped to 0.02–0.18) onto the texture rect itself and changed the filter alpha table to `0 1`. Filter-capable browsers retain the same effective alpha, while filter-free PNG rasterizers now degrade to a faint veil instead of an opaque gray wall.
 - Audited every renderer filter use and found no other wide filtered shape whose transparency depended entirely on its filter.
 - Build 508 passed 314 tests with 30 skipped on both Mac and pentala; ruff, web check, and web build were green. Fixed-model Qwen3 Next benchmarks completed 12/12 surface/ground prompts (6/6 explicit ground, zero inferred ground, no gray wall) and 30/30 prompts in both Japanese and English (zero inferred ground, no quality drop beyond the threshold, all fingerprint gates passed, and zero 502s, timeouts, or fallbacks). Full results are recorded under “v1.74.1: ground hotfix” in the local benchmark log.
+
+
+### v1.75 — Literal tiling pattern field (2026-07-13)
+
+- Added the physical motion word `tile` / 「敷き詰める」 to Saijiki. It is selected only for a literally requested regular repeated surface, never inferred from merely “many” or “countless.”
+- Added `layout="grid"` with optional `rows`, `cols`, and `jitter`. Grid fills `at.region` or the margin-bounded canvas; explicit rows×cols take priority over count. The schema limit is 2000 for literal tiling while ordinary arrangements keep the existing 1–1000 prompt contract.
+- Grid performance layers seeded cell jitter, distinct per-element variation phase, and material-specific weight behavior while preserving bit-identical replay for the same Score and seed. Coerce does not add fade, clustering, preserved space, or count reduction to grid.
+- Added matched Japanese and English Stage 1 / Stage 2 rules and wallpaper, four-direction, and square-grid examples. Four directions remain a maximum of four overlaid instructions; no new primitive was introduced.
+- Build 509.

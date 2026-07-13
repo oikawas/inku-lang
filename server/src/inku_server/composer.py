@@ -113,6 +113,12 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「右上の焦点」→ at={"region":[0.60,0.18,0.82,0.40]}。「左上の焦点」→ [0.18,0.18,0.40,0.40]。「右下の焦点」→ [0.60,0.60,0.82,0.82]。「左下の焦点」→ [0.18,0.60,0.40,0.82]。焦点座標をハードコードしない**
 - **「上端寄りの焦点」→ at={"region":[0.39,0.07,0.61,0.29]}。「右半分の焦点」→ at={"region":[0.61,0.39,0.83,0.61]}。焦点座標をハードコードしない**
 
+- **「敷き詰める」「格子状に敷き詰める」「壁一面に並べる」と文字どおり指定された時だけ layout="grid" を使う。通常の「並べる」「散らす」「全面」は grid にしない**
+- **grid は指定領域全体をセルで覆う。at.region があればその領域、なければ margin 内を使う。rows/cols が明示されれば rows×cols を count より優先し、省略時は count を目安に行列数を推定する**
+- **grid の count だけは1〜2000を許可し、代表数への縮小、cluster_count、fade、preserve_space を適用しない。通常配置の count は従来どおり1〜1000**
+- **grid の jitter はセル内のわずかな位置差で、0=厳密格子、0.05〜0.2=手作業の揺れ、0.2〜0.5=雨や壁紙の不均一さ。間隔のリズムは rhythm_spacing を使う**
+- **「四つの方向を壁一面に重ねる」は方向ごとに最大4 instructions とし、各 instruction を grid にする。同じ方向を要素ごとに複製しない。この場合に限り「主技法は一つ」の圧縮規則より明示された層を優先する**
+
 ## 数理・音楽・遠近の構図語
 
 - **「正五角形の頂点に五個」→ arrangement count=5 layout=radial。五芒星的な均衡の点列として扱う**
@@ -151,6 +157,15 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - 少しでも順序・参照先・定型句一致に迷う場合は、relation フィールドを省略する。fable/自然文を抽象化した DDL では、原則 relation を使わない。省略しても、位置・path・rotation・余白で関係を表せばよい。補助 instruction を追加して救わない。
 
 # 例 (最重要パターン)
+
+入力: 鉛筆の細い縦線を一面に四百本敷き詰める。細かく震える。
+出力: {"instructions":[{"primitive":"line","from":[0.5,0.46],"to":[0.5,0.54],"color":"black","weight":"pencil","arrangement":{"count":400,"layout":"grid","rows":20,"cols":20,"jitter":0.15,"margin":0.04},"variation":{"amplitude":"fine","frequency":"high","quality":"perlin","dimensions":["position_x","position_y"]}}]}
+
+入力: 細い実線を四つの方向に一面に敷き詰める。かすかに揺れる。
+出力: {"instructions":[{"primitive":"line","from":[0.46,0.5],"to":[0.54,0.5],"color":"black","weight":"hair","rotation":0,"arrangement":{"count":144,"layout":"grid","rows":12,"cols":12,"jitter":0.08,"margin":0.05},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.46,0.5],"to":[0.54,0.5],"color":"black","weight":"hair","rotation":90,"arrangement":{"count":144,"layout":"grid","rows":12,"cols":12,"jitter":0.08,"margin":0.05},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.46,0.5],"to":[0.54,0.5],"color":"black","weight":"hair","rotation":-45,"arrangement":{"count":144,"layout":"grid","rows":12,"cols":12,"jitter":0.08,"margin":0.05},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.46,0.5],"to":[0.54,0.5],"color":"black","weight":"hair","rotation":45,"arrangement":{"count":144,"layout":"grid","rows":12,"cols":12,"jitter":0.08,"margin":0.05},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+入力: 小さな四角を格子状に二百五十六個敷き詰める。ゆっくり揺れる。
+出力: {"instructions":[{"primitive":"square","position":[0.485,0.485],"size":[0.03,0.03],"color":"gray","rotation":12,"arrangement":{"count":256,"layout":"grid","rows":16,"cols":16,"jitter":0.15,"margin":0.04,"rhythm_spacing":"loose"},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y","rotation"]}}]}
 
 入力: 灰色の円を薄墨で満たし、端を少し滲ませる。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.16,"color":"gray","filled":true,"surface":{"texture":"wash","density":0.3,"opacity":0.45,"bleed":0.2}}]}
@@ -429,6 +444,12 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"upper-right focus" → at={"region":[0.60,0.18,0.82,0.40]}. "upper-left focus" → [0.18,0.18,0.40,0.40]. "lower-right focus" → [0.60,0.60,0.82,0.82]. "lower-left focus" → [0.18,0.60,0.40,0.82]. Do not hard-code focus coordinates**
 - **"upper-edge focus" → at={"region":[0.39,0.07,0.61,0.29]}. "right-half focus" → at={"region":[0.61,0.39,0.83,0.61]}. Do not hard-code focus coordinates**
 
+- **Use layout="grid" only for literal tiling instructions such as "tile", "tiled in a grid", or "cover the wall with a grid". Ordinary "line up", "scatter", or "all-over" does not imply grid**
+- **A grid covers its requested region with cells: use at.region when present, otherwise the area inside margin. Explicit rows/cols take priority as rows×cols; otherwise estimate rows and columns from count**
+- **Only grid may use count 1–2000. Do not reduce it to a representative count and do not add cluster_count, fade, or preserve_space. Ordinary arrangements remain limited to 1–1000**
+- **grid jitter is a within-cell offset: 0=strict grid, 0.05–0.2=handmade variation, 0.2–0.5=uneven rain or wallpaper. Use rhythm_spacing for spacing rhythm**
+- **For "four directions superimposed across the wall", emit at most four instructions, one grid per direction. Do not duplicate each direction into separate element instructions. Only here, explicit directional layers take priority over the one-dominant-technique compression rule**
+
 ## Mathematical, musical, and perspective composition
 
 - **"regular pentagon vertices" → arrangement count=5 layout=radial. Treat it as a pentagonal balance layer**
@@ -468,6 +489,15 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - If there is any doubt about order, target validity, or exact fixed-phrase match, omit the relation field. For fable/natural-language-derived DDL, use no relation by default. Express the relationship with position, path, rotation, and spacing instead; do not add a support instruction to rescue it.
 
 # Examples (key patterns)
+
+Input: Tile four hundred thin pencil vertical lines across the whole canvas. Trembling fine.
+Output: {"instructions":[{"primitive":"line","from":[0.5,0.46],"to":[0.5,0.54],"color":"black","weight":"pencil","arrangement":{"count":400,"layout":"grid","rows":20,"cols":20,"jitter":0.15,"margin":0.04},"variation":{"amplitude":"fine","frequency":"high","quality":"perlin","dimensions":["position_x","position_y"]}}]}
+
+Input: Tile thin solid lines in four directions across the whole canvas. Swaying faintly.
+Output: {"instructions":[{"primitive":"line","from":[0.46,0.5],"to":[0.54,0.5],"color":"black","weight":"hair","rotation":0,"arrangement":{"count":144,"layout":"grid","rows":12,"cols":12,"jitter":0.08,"margin":0.05},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.46,0.5],"to":[0.54,0.5],"color":"black","weight":"hair","rotation":90,"arrangement":{"count":144,"layout":"grid","rows":12,"cols":12,"jitter":0.08,"margin":0.05},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.46,0.5],"to":[0.54,0.5],"color":"black","weight":"hair","rotation":-45,"arrangement":{"count":144,"layout":"grid","rows":12,"cols":12,"jitter":0.08,"margin":0.05},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}},{"primitive":"line","from":[0.46,0.5],"to":[0.54,0.5],"color":"black","weight":"hair","rotation":45,"arrangement":{"count":144,"layout":"grid","rows":12,"cols":12,"jitter":0.08,"margin":0.05},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+
+Input: Tile two hundred fifty-six small squares in a grid. Swaying slowly.
+Output: {"instructions":[{"primitive":"square","position":[0.485,0.485],"size":[0.03,0.03],"color":"gray","rotation":12,"arrangement":{"count":256,"layout":"grid","rows":16,"cols":16,"jitter":0.15,"margin":0.04,"rhythm_spacing":"loose"},"variation":{"amplitude":"fine","frequency":"slow","quality":"wave","dimensions":["position_x","position_y","rotation"]}}]}
 
 Input: Fill a gray circle with pale ink wash and let the edge bleed slightly.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.16,"color":"gray","filled":true,"surface":{"texture":"wash","density":0.3,"opacity":0.45,"bleed":0.2}}]}

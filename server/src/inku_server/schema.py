@@ -36,7 +36,7 @@ Dimension = Literal[
     "rotation",
     "radius",
 ]
-Layout = Literal["horizontal", "vertical", "radial", "scatter"]
+Layout = Literal["horizontal", "vertical", "radial", "scatter", "grid"]
 Path = Literal["none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"]
 Density = Literal["none", "low", "medium", "high"]
 Fade = Literal["none", "outward", "directional"]
@@ -175,23 +175,56 @@ class Arrangement(BaseModel):
 
     count: int = Field(
         ge=1,
-        le=1000,
-        description="配置数。2以上の同一図形には必ず使う。複数 instruction 生成は禁止",
+        le=2000,
+        description="配置数。通常配置は1-1000、gridは1-2000。2以上の同一図形には必ず使う。複数 instruction 生成は禁止",
     )
 
     @field_validator("count", mode="before")
     @classmethod
     def _clamp_count(cls, v: object) -> object:
         if isinstance(v, (int, float)):
-            return min(max(int(v), 1), 1000)
+            return min(max(int(v), 1), 2000)
         return v
+
     layout: Layout = Field(
         default="horizontal",
         description=(
             "horizontal=x軸等間隔 / vertical=y軸等間隔"
             " / radial=指定中心周囲に円状 / scatter=決定的ランダム散布"
+            " / grid=等間隔の全面反復（敷き詰め）。scatter と違い偏り・薄れを持たない"
         ),
     )
+    rows: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=64,
+        description="gridの行数 1-64。rowsとcolsの両方を指定した場合はrows×colsを優先",
+    )
+    cols: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=64,
+        description="gridの列数 1-64。省略時はcountと領域比率から推定",
+    )
+    jitter: float = Field(
+        default=0.12,
+        ge=0.0,
+        le=1.0,
+        description="gridセル内の決定的な位置揺らぎ 0.0-1.0 (省略=0.12)",
+    )
+
+    @field_validator("rows", "cols", mode="before")
+    @classmethod
+    def _clamp_grid_size(cls, v: object) -> object:
+        if isinstance(v, (int, float)):
+            return min(max(int(v), 1), 64)
+        return v
+
+    @field_validator("jitter", mode="before")
+    @classmethod
+    def _clamp_jitter(cls, v: object) -> object:
+        return _clamp_unit_value(v, default=0.12)
+
     path: Path = Field(
         default="none",
         description=(

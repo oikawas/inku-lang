@@ -65,7 +65,7 @@ export const SAIJIKI: SaijikiCategory[] = [
 		key: 'ugoki',
 		label: 'うごき',
 		en: 'motions',
-		words: ['置く', '並べる', '埋める', '散らす', '引く']
+		words: ['置く', '並べる', '埋める', '散らす', '引く', '敷き詰める']
 	},
 	{
 		key: 'katamuki',

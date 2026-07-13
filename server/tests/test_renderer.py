@@ -1,8 +1,15 @@
+import hashlib
 import math
 from xml.etree import ElementTree
 
 from inku_server.render_engines import current_render_engine
-from inku_server.renderer import _clustered_pos, _resolve_performance_score, new_render_seed, render
+from inku_server.renderer import (
+    _clustered_pos,
+    _expand_arrangement,
+    _resolve_performance_score,
+    new_render_seed,
+    render,
+)
 from inku_server.schema import Instruction, Score
 
 
@@ -1385,3 +1392,172 @@ def test_render_engine_reports_texture_metadata():
     assert result.metadata["texture_degraded"] is True
     assert result.metadata["render_canvas_ground"]["material"] == "paper"
     assert result.metadata["render_surface_textures"][0]["texture"] == "wash"
+
+
+def _assert_centers(items: list[Instruction], expected: list[tuple[float, float]]) -> None:
+    centers = [item.center for item in items]
+    assert all(center is not None for center in centers)
+    assert len(centers) == len(expected)
+    for center, target in zip(centers, expected):
+        assert center is not None
+        assert math.isclose(center[0], target[0])
+        assert math.isclose(center[1], target[1])
+
+
+def _grid_circle(**arrangement: object) -> Instruction:
+    return Instruction.model_validate(
+        {
+            "primitive": "circle",
+            "center": [0.5, 0.5],
+            "radius": 0.01,
+            "arrangement": {"count": 1, "layout": "grid", "jitter": 0, **arrangement},
+        }
+    )
+
+
+def test_grid_explicit_rows_and_cols_override_count():
+    expanded = _expand_arrangement(_grid_circle(rows=2, cols=3), performance_seed=123)
+
+    assert len(expanded) == 6
+    _assert_centers(expanded, [
+        (7 / 30, 0.3),
+        (0.5, 0.3),
+        (23 / 30, 0.3),
+        (7 / 30, 0.7),
+        (0.5, 0.7),
+        (23 / 30, 0.7),
+    ])
+
+
+def test_grid_count_estimates_rows_and_cols_and_honors_margin():
+    instruction = _grid_circle(count=5, margin=0.2)
+    expanded = _expand_arrangement(instruction, performance_seed=123)
+
+    assert len(expanded) == 6
+    assert all(0.2 <= item.center[0] <= 0.8 for item in expanded if item.center)
+    assert all(0.2 <= item.center[1] <= 0.8 for item in expanded if item.center)
+
+
+def test_grid_uses_at_region_instead_of_margin():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    **_grid_circle(rows=2, cols=2, margin=0.4).model_dump(by_alias=True),
+                    "at": {"region": [0.1, 0.2, 0.5, 0.8]},
+                }
+            ]
+        }
+    )
+
+    resolved = _resolve_performance_score(score, 123)
+    expanded = _expand_arrangement(resolved.instructions[0], performance_seed=123)
+
+    _assert_centers(expanded, [
+        (0.2, 0.35),
+        (0.4, 0.35),
+        (0.2, 0.65),
+        (0.4, 0.65),
+    ])
+    assert all(item.at is None for item in expanded)
+
+
+def test_grid_jitter_is_deterministic_and_seed_sensitive():
+    instruction = _grid_circle(count=16, jitter=0.8)
+
+    first = _expand_arrangement(instruction, performance_seed=123)
+    replay = _expand_arrangement(instruction, performance_seed=123)
+    alternate = _expand_arrangement(instruction, performance_seed=456)
+
+    assert [item.center for item in first] == [item.center for item in replay]
+    assert [item.center for item in first] != [item.center for item in alternate]
+
+
+def test_grid_rhythm_changes_both_axis_spacing():
+    regular = _expand_arrangement(_grid_circle(rows=3, cols=3), performance_seed=123)
+    loose = _expand_arrangement(
+        _grid_circle(rows=3, cols=3, rhythm_spacing="loose"),
+        performance_seed=123,
+    )
+
+    assert [item.center for item in regular] != [item.center for item in loose]
+    assert len({item.center[0] for item in loose if item.center}) == 3
+    assert len({item.center[1] for item in loose if item.center}) == 3
+
+
+def test_grid_variation_uses_distinct_per_element_phases():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.45, 0.48],
+                    "to": [0.55, 0.52],
+                    "variation": {
+                        "amplitude": "fine",
+                        "frequency": "high",
+                        "quality": "wave",
+                        "dimensions": ["position_y"],
+                    },
+                    "arrangement": {
+                        "count": 4,
+                        "layout": "grid",
+                        "rows": 2,
+                        "cols": 2,
+                        "jitter": 0,
+                    },
+                }
+            ]
+        }
+    )
+
+    root = ElementTree.fromstring(render(score, svg_profile="compat", render_seed=123))
+    polylines = [node.attrib["points"] for node in root.iter() if node.tag.endswith("polyline")]
+
+    assert len(polylines) == 4
+    assert len(set(polylines)) == 4
+
+
+def test_legacy_arrangement_layouts_keep_golden_output():
+    layouts = ("horizontal", "vertical", "radial", "scatter")
+    rendered = []
+    for layout in layouts:
+        score = Score.model_validate(
+            {
+                "instructions": [
+                    {
+                        "primitive": "circle",
+                        "center": [0.5, 0.5],
+                        "radius": 0.05,
+                        "arrangement": {"count": 5, "layout": layout},
+                    }
+                ]
+            }
+        )
+        rendered.append(render(score, svg_profile="compat", render_seed=123))
+
+    digest = hashlib.sha256("".join(rendered).encode()).hexdigest()
+    assert digest == "79e08066fd91cab3e6e608f7349236d9957456728f9adf7bd7f26186db0d25b3"
+
+
+def test_grid_render_is_bit_deterministic_for_same_score_and_seed():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.48, 0.45],
+                    "to": [0.52, 0.55],
+                    "arrangement": {
+                        "count": 100,
+                        "layout": "grid",
+                        "rows": 10,
+                        "cols": 10,
+                        "jitter": 0.3,
+                    },
+                }
+            ]
+        }
+    )
+
+    assert render(score, render_seed=987) == render(score, render_seed=987)

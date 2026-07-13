@@ -485,3 +485,59 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert '"layout":"vertical"' in SYSTEM_PROMPT_EN
     assert "random" not in SYSTEM_PROMPT_EN.lower()
     assert "≈ 20" not in SYSTEM_PROMPT_EN
+
+
+def test_grid_schema_and_prompts_expose_literal_tiling_contract():
+    from inku_server.composer import SYSTEM_PROMPT, SYSTEM_PROMPT_EN
+
+    arrangement = Score.model_json_schema()["$defs"]["Arrangement"]
+    properties = arrangement["properties"]
+
+    assert "grid" in properties["layout"]["enum"]
+    assert properties["count"]["maximum"] == 2000
+    assert properties["rows"]["anyOf"][0]["minimum"] == 1
+    assert properties["rows"]["anyOf"][0]["maximum"] == 64
+    assert properties["cols"]["anyOf"][0]["minimum"] == 1
+    assert properties["cols"]["anyOf"][0]["maximum"] == 64
+    assert properties["jitter"]["minimum"] == 0
+    assert properties["jitter"]["maximum"] == 1
+    assert properties["jitter"]["default"] == 0.12
+
+    assert 'layout="grid"' in SYSTEM_PROMPT
+    assert "文字どおり指定された時だけ" in SYSTEM_PROMPT
+    assert "grid の count だけは1〜2000" in SYSTEM_PROMPT
+    assert "代表数への縮小" in SYSTEM_PROMPT
+    assert "最大4 instructions" in SYSTEM_PROMPT
+    assert '"count":400,"layout":"grid","rows":20,"cols":20' in SYSTEM_PROMPT
+
+    assert 'layout="grid"' in SYSTEM_PROMPT_EN
+    assert "only for literal tiling instructions" in SYSTEM_PROMPT_EN
+    assert "Only grid may use count 1–2000" in SYSTEM_PROMPT_EN
+    assert "at most four instructions" in SYSTEM_PROMPT_EN
+    assert '"count":400,"layout":"grid","rows":20,"cols":20' in SYSTEM_PROMPT_EN
+
+
+def test_arrangement_grid_fields_clamp_to_schema_bounds():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "arrangement": {
+                        "count": 9999,
+                        "layout": "grid",
+                        "rows": 999,
+                        "cols": 0,
+                        "jitter": 3,
+                    },
+                }
+            ]
+        }
+    )
+    arrangement = score.instructions[0].arrangement
+
+    assert arrangement is not None
+    assert arrangement.count == 2000
+    assert arrangement.rows == 64
+    assert arrangement.cols == 1
+    assert arrangement.jitter == 1

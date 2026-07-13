@@ -108,7 +108,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 |---|---|---|
 | forms | かたち | circle, ellipse, triangle, square, line, arc |
 | touches | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
-| motions | うごき | place, align, fill, scatter |
+| motions | うごき | place, align, fill, scatter, tile |
 | places | ばしょ | top, bottom, center, edge, corner |
 | continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | movements | ゆらぎ | fine, broad, quick, slow, wobble, undulate, tremble, blur |
@@ -216,7 +216,7 @@ uv run inku-cli paint "A blue line slowly loosens across the night water." --bas
 
 - **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with model, token, and elapsed-time metadata per stage
 - **Three-tier regeneration** — another performance (no LLM call), another composition (vary seed), another interpretation (Stage 1 re-reading), plus grid generation with multiple selection and notes on why a work was chosen
-- **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle; horizontal, vertical, radial, and scatter layouts with paths such as waves and diagonal bands
+- **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle; horizontal, vertical, radial, scatter, and literal tiling grid layouts with paths such as waves and diagonal bands
 - **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
 - **Material rendering** — pencil, rotring, crayon, chalk, brushes, and rope rendered with texture filters, particles, secondary strokes, and twist marks, not just stroke width
 - **Plugins** — namespaced vocabulary macros such as `Nature.wind`; they expand into core vocabulary only and cannot modify the core

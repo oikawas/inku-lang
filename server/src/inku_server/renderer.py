@@ -777,12 +777,11 @@ def _ground_dot_count(ground: CanvasGroundSpec, profile: str) -> int:
 
 def _ground_filter_xml(ground: CanvasGroundSpec, seed: int, filter_id: str) -> str:
     freq = {"fine": "0.95", "medium": "0.55", "coarse": "0.28", "none": "0.45"}.get(ground.grain, "0.55")
-    opacity = min(0.18, max(0.02, ground.opacity))
     return (
         f'<filter id="{filter_id}" x="0" y="0" width="100%" height="100%">'
         f'<feTurbulence type="fractalNoise" baseFrequency="{freq}" numOctaves="2" seed="{seed % 9973}" result="noise"/>'
         '<feColorMatrix in="noise" type="saturate" values="0" result="mono"/>'
-        f'<feComponentTransfer in="mono"><feFuncA type="table" tableValues="0 {opacity:.3f}"/></feComponentTransfer>'
+        '<feComponentTransfer in="mono"><feFuncA type="table" tableValues="0 1"/></feComponentTransfer>'
         '</filter>'
     )
 
@@ -797,7 +796,8 @@ def _render_canvas_ground(dwg: svgwrite.Drawing, score: Score, canvas: CanvasSiz
     group.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=tone, opacity=0.98))
     if profile == "display":
         fid = _safe_svg_id(f"ground_texture_{seed % 100000}")
-        group.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill="#777777", opacity=1.0, filter=f"url(#{fid})"))
+        texture_opacity = min(0.18, max(0.02, ground.opacity))
+        group.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill="#777777", opacity=texture_opacity, filter=f"url(#{fid})"))
         return group, _ground_filter_xml(ground, seed, fid)
     color = "#777777" if ground.material != "charcoal_ground" else "#222222"
     count = _ground_dot_count(ground, profile)

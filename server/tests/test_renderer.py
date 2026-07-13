@@ -1222,7 +1222,50 @@ def test_render_display_canvas_ground_uses_filter_behind_content():
 
     assert 'id="ground_texture_' in svg
     assert '<feTurbulence' in svg
+    root = ElementTree.fromstring(svg)
+    texture_rects = [
+        element
+        for element in root.iter()
+        if element.tag.endswith("rect")
+        and element.attrib.get("fill") == "#777777"
+        and "ground_texture_" in element.attrib.get("filter", "")
+    ]
+    assert len(texture_rects) == 1
+    assert 0.02 <= float(texture_rects[0].attrib["opacity"]) <= 0.18
+    assert 'tableValues="0 1"' in svg
+    assert any(
+        element.tag.endswith("rect")
+        and element.attrib.get("fill") == "#f7f3e8"
+        and element.attrib.get("opacity") == "0.98"
+        for element in root.iter()
+    )
     assert svg.index('id="layer_01_canvas_ground"') < svg.index('<g clip-path="url(#canvas-clip)"')
+
+
+def test_canvas_ground_non_display_profiles_remain_filter_free():
+    score = Score.model_validate(
+        {
+            "canvas": {
+                "aspect": "square",
+                "ground": {"material": "paper", "tone": "off_white", "grain": "fine"},
+            },
+            "instructions": [],
+        }
+    )
+
+    editable = render(score, svg_profile="editable", render_seed=123)
+    compat = render(score, svg_profile="compat", render_seed=123)
+
+    assert '<filter id="ground_texture_' not in editable
+    assert '<filter id="ground_texture_' not in compat
+    for svg in (editable, compat):
+        root = ElementTree.fromstring(svg)
+        assert any(
+            element.tag.endswith("rect")
+            and element.attrib.get("fill") == "#f7f3e8"
+            and element.attrib.get("opacity") == "0.98"
+            for element in root.iter()
+        )
 
 
 def test_render_display_surface_stipple_is_clipped_to_shape():

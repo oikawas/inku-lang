@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.74**
+**Version: v1.74.1**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -3788,3 +3788,12 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - **面/地地明示 100% 到達の達成（F-3）**:
   - 前バージョン (v1.73) での ground 経路修復と新モデル Qwen3.5 397B の推論能力の向上により、面/地 12 件セットの地明示 6 件すべてで `canvas.ground` へのマッピング到達率 **6/6 (100%)** を達成した。
 
+
+
+### v1.74.1 — ground ホットフィックス (2026-07-13)
+
+- 正規化DDLに「地: ...」/ "Ground: ..." がない場合、Stage 2が雰囲気や情景から `canvas.ground` を自発付与しない規則を日英プロンプトへ追加した。
+- composer後段へdrop-onlyのground literal gateを追加した。明示マーカーがない場合だけgroundを除去し、canvas aspectは保持する。明示マーカーがあるgroundの補完・修復・置換は行わない。drop発生はwarningログで観測できる。
+- display SVGのground質感rect自身へ0.02〜0.18のopacityを持たせ、filterのalpha tableを `0 1` に変更した。filter対応ブラウザの合成アルファを保ちながら、filter非対応PNGラスタライザでも不透明な灰色壁にならない。
+- rendererの全filter使用箇所を監査し、同じく広域図形の透過をfilterだけへ依存する箇所が他にないことを確認した。
+- Build 507。Mac・pentalaテスト、面/地12件とJP/EN各30件の回帰結果は `cli/tune_bench.md` の「v1.74.1: ground hotfix」に記録する。

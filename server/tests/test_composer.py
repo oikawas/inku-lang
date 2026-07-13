@@ -273,6 +273,58 @@ def test_relation_literal_gate_keeps_exact_previous_phrase():
     assert repaired.instructions[1].relation.type == "along"
 
 
+def test_ground_literal_gate_drops_ground_without_marker_and_keeps_aspect(caplog):
+    from inku_server.composer import _enforce_ground_literal_gate
+
+    score = Score.model_validate(
+        {
+            "canvas": {"aspect": "wide", "ground": {"material": "paper", "tone": "off_white"}},
+            "instructions": [],
+        }
+    )
+
+    repaired = _enforce_ground_literal_gate(score, "生成りの紙のような静かな情景。")
+
+    assert repaired.canvas == "wide"
+    assert "canvas ground dropped by literal gate" in caplog.text
+
+
+def test_ground_literal_gate_keeps_japanese_ground_marker():
+    from inku_server.composer import _enforce_ground_literal_gate
+
+    score = Score.model_validate(
+        {"canvas": {"aspect": "square", "ground": {"material": "ink_wash"}}, "instructions": []}
+    )
+
+    repaired = _enforce_ground_literal_gate(score, "地: 薄墨。")
+
+    assert not isinstance(repaired.canvas, str)
+    assert repaired.canvas.ground == score.canvas.ground
+
+
+def test_ground_literal_gate_handles_english_marker_case_insensitively():
+    from inku_server.composer import _enforce_ground_literal_gate
+
+    score = Score.model_validate(
+        {"canvas": {"aspect": "golden", "ground": {"material": "ink_wash"}}, "instructions": []}
+    )
+
+    kept = _enforce_ground_literal_gate(score, "GROUND: ink wash.")
+    dropped = _enforce_ground_literal_gate(score, "An ink-wash mood.")
+
+    assert not isinstance(kept.canvas, str)
+    assert kept.canvas.ground == score.canvas.ground
+    assert dropped.canvas == "golden"
+
+
+def test_ground_literal_gate_leaves_string_canvas_unchanged():
+    from inku_server.composer import _enforce_ground_literal_gate
+
+    score = Score.model_validate({"canvas": "square", "instructions": []})
+
+    assert _enforce_ground_literal_gate(score, "No ground marker.") is score
+
+
 def test_composer_prompt_keeps_dynamic_quantity_guidance():
     from inku_server.composer import SYSTEM_PROMPT, SYSTEM_PROMPT_EN
 

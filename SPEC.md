@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.74**
+**Version: v1.74.1**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -1282,3 +1282,12 @@ When updating the specification:
   - Tuned the Stage 2 prompt (`composer.py` relations section and examples) in both Japanese and English to add an anti-duplication guard: "Generate at most one relation per fixed relation phrase. Do not replicate the same relation phrase into multiple instructions," and added corresponding negative examples.
 - **Achieved 100% ground Mapping Adoption (F-3)**:
   - Achieved a **6/6 (100%)** `canvas.ground` mapping adoption rate in the targeted 12-prompt texture benchmark, resolving the remaining ground-routing misses from v1.73. Verified no quality regressions on the JP30/EN30 regression sets.
+
+
+### v1.74.1 — ground hotfix (2026-07-13)
+
+- Added Japanese and English Stage 2 rules that prohibit inferred `canvas.ground` unless normalized DDL contains an explicit 「地: ...」 / "Ground: ..." sentence.
+- Added a drop-only ground literal gate after composition. It removes only unmarked ground while preserving canvas aspect; it never creates, repairs, or replaces ground when a marker is present. Drops remain observable through a warning log.
+- Moved display ground texture opacity (clamped to 0.02–0.18) onto the texture rect itself and changed the filter alpha table to `0 1`. Filter-capable browsers retain the same effective alpha, while filter-free PNG rasterizers now degrade to a faint veil instead of an opaque gray wall.
+- Audited every renderer filter use and found no other wide filtered shape whose transparency depended entirely on its filter.
+- Build 507. Mac and pentala tests plus the 12-prompt surface/ground and JP/EN 30-prompt regression results are recorded under “v1.74.1: ground hotfix” in the local benchmark log.

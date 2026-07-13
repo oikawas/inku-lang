@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import urllib.request
@@ -25,6 +26,7 @@ from .schema import Score, Variation
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 2048
+_logger = logging.getLogger(__name__)
 
 # 手順のみ。フィールド仕様は submit_score スキーマの description を参照。
 # 例は「最も非自明なパターン」に絞る — 追加は EXAMPLE_POOL (interpreter.py) と同じ方針で。
@@ -55,6 +57,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **面の質感は instruction.surface へ入れる。点で埋める=texture="stipple"、斜線/ハッチ=texture="hatch"、粒立つ/かすれ=texture="grain"、薄墨/水彩=texture="wash"、端が滲む=texture="bleed"。質感を理由に独立 instruction を追加しない**
 - **紙目・生成りの紙・和紙・薄墨の地は canvas.ground へ入れる。canvas は {"aspect":"square","ground":{...}} 形式にしてよい。地は background ではなく支持体の質感であり、座標系を変えない**
 - **「地: ...」の文は canvas.ground へだけ変換し、その文から instruction を追加しない。「面: ...」の文は直前に指定された主図形の surface に入れる。一つの質感要求を複数の質感付き instruction に複製しない**
+- **正規化DDL に「地: ...」の文が無い場合、canvas.ground を出力しない。雰囲気や情景からの推測で ground を追加しない**
 - **「ゆっくり揺れる」→ variation quality="wave", frequency="slow" を優先する。perlin は「震える」「細かく揺れる」に使う**
 - **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
 
@@ -370,6 +373,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Surface texture belongs in instruction.surface. dotted/stippled fill → texture="stipple"; hatch/crosshatch → texture="hatch"; grainy/rough/scuffed → texture="grain"; ink wash/watercolor wash → texture="wash"; bleeding edge → texture="bleed". Do not turn texture into independent helper instructions**
 - **Paper grain, off-white paper, washi, and ink-wash ground belong in canvas.ground. Use canvas={"aspect":"square","ground":{...}} when needed. Ground is support texture, not a coordinate or composition change**
 - **A "Ground: ..." sentence maps only to canvas.ground; do not add any instruction from it. A "Surface: ..." sentence goes into the surface of the main shape it follows. Never duplicate one texture request across multiple textured instructions**
+- **Do not emit canvas.ground unless the normalized DDL contains a "Ground: ..." sentence. Never add ground from mood or scene inference**
 - **"swaying slowly" / "slowly swaying" → prefer variation quality="wave", frequency="slow". Use perlin for trembling or fine swaying**
 - **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
 
@@ -807,9 +811,25 @@ def _enforce_relation_literal_gate(score: Score, ddl: str) -> Score:
     return Score.model_validate(data)
 
 
+def _enforce_ground_literal_gate(score: Score, ddl: str) -> Score:
+    """Drop model-inferred canvas ground unless the DDL contains its exact marker."""
+
+    lower = ddl.lower()
+    if "地:" in ddl or "ground:" in lower:
+        return score
+    if isinstance(score.canvas, str) or score.canvas.ground is None:
+        return score
+
+    data = score.model_dump(by_alias=True)
+    data["canvas"] = score.canvas.aspect
+    _logger.warning("canvas ground dropped by literal gate")
+    return Score.model_validate(data)
+
+
 def _finalize_score(score: Score, ddl: str) -> Score:
     score = _enforce_modifier_targeting(score, ddl)
-    return _enforce_relation_literal_gate(score, ddl)
+    score = _enforce_relation_literal_gate(score, ddl)
+    return _enforce_ground_literal_gate(score, ddl)
 
 
 def _enforce_modifier_targeting(score: Score, ddl: str) -> Score:

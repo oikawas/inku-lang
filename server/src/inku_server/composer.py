@@ -114,7 +114,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **「上端寄りの焦点」→ at={"region":[0.39,0.07,0.61,0.29]}。「右半分の焦点」→ at={"region":[0.61,0.39,0.83,0.61]}。焦点座標をハードコードしない**
 
 - **「敷き詰める」「格子状に敷き詰める」「壁一面に並べる」と文字どおり指定された時だけ layout="grid" を使う。通常の「並べる」「散らす」「全面」は grid にしない**
-- **grid は指定領域全体をセルで覆う。at.region があればその領域、なければ margin 内を使う。rows/cols が明示されれば rows×cols を count より優先し、省略時は count を目安に行列数を推定する**
+- **grid は指定領域全体をセルで覆う。at.region があればその領域、なければ margin 内を使う。壁一面・画面全体では margin=0.02〜0.08 とし、0.12を超えるmarginを使わない。部分領域は大きいmarginではなく at.region で指定する。rows/cols が明示されれば rows×cols を count より優先し、省略時は count を目安に行列数を推定する**
 - **grid の count だけは1〜2000を許可し、代表数への縮小、cluster_count、fade、preserve_space を適用しない。通常配置の count は従来どおり1〜1000**
 - **grid の jitter はセル内のわずかな位置差で、0=厳密格子、0.05〜0.2=手作業の揺れ、0.2〜0.5=雨や壁紙の不均一さ。間隔のリズムは rhythm_spacing を使う**
 - **「四つの方向を壁一面に重ねる」は方向ごとに最大4 instructions とし、各 instruction を grid にする。同じ方向を要素ごとに複製しない。この場合に限り「主技法は一つ」の圧縮規則より明示された層を優先する**
@@ -445,7 +445,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"upper-edge focus" → at={"region":[0.39,0.07,0.61,0.29]}. "right-half focus" → at={"region":[0.61,0.39,0.83,0.61]}. Do not hard-code focus coordinates**
 
 - **Use layout="grid" only for literal tiling instructions such as "tile", "tiled in a grid", or "cover the wall with a grid". Ordinary "line up", "scatter", or "all-over" does not imply grid**
-- **A grid covers its requested region with cells: use at.region when present, otherwise the area inside margin. Explicit rows/cols take priority as rows×cols; otherwise estimate rows and columns from count**
+- **A grid covers its requested region with cells: use at.region when present, otherwise the area inside margin. For a whole wall or whole canvas use margin=0.02–0.08 and never a margin above 0.12; use at.region, not a large margin, for a smaller region. Explicit rows/cols take priority as rows×cols; otherwise estimate rows and columns from count**
 - **Only grid may use count 1–2000. Do not reduce it to a representative count and do not add cluster_count, fade, or preserve_space. Ordinary arrangements remain limited to 1–1000**
 - **grid jitter is a within-cell offset: 0=strict grid, 0.05–0.2=handmade variation, 0.2–0.5=uneven rain or wallpaper. Use rhythm_spacing for spacing rhythm**
 - **For "four directions superimposed across the wall", emit at most four instructions, one grid per direction. Do not duplicate each direction into separate element instructions. Only here, explicit directional layers take priority over the one-dominant-technique compression rule**

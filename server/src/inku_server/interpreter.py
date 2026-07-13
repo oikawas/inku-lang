@@ -129,7 +129,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 # 配置選択 — 必ず配置ガイダンスを与える
 
-- 壁紙、模様、織物、タイル、煉瓦、畳、簾、雨脚、木立の連なりなど、規則的な反復の質感が主題として文字どおり指定された時だけ、正規化DDLに「（要素）を一面に敷き詰める」と書く。数量は200〜2000を使ってよく、「細かく震える」または「かすかに揺れる」を別文で必ず添える
+- 壁紙、模様、織物、タイル、煉瓦、畳、簾、雨脚、木立の連なりなど、規則的な反復の質感が主題として文字どおり指定された時だけ、正規化DDLに「（要素）を一面に敷き詰める」と書く。数量は200〜2000を使ってよく、「細かく震える」または「かすかに揺れる」を別文で必ず添える。原文にない補助線・別配置・関係文を追加しない（四方向の明示だけは四方向を保持する）
 - 敷き詰めは規則的反復が主題の場合だけ使う。単に「たくさん」「無数」は従来どおり偏りのある「散らす」とし、「敷き詰める」を自発的に追加しない。通常経路の数量・余白規則は変更しない
 
 「散らす」は無配置ではない。常に **ばしょ・うごき・ゆらぎの軌跡** を使って配置を決める。
@@ -889,7 +889,7 @@ Never output vague words such as "many" or "countless"; always convert them to a
 
 # Arrangement Choice — always provide placement guidance
 
-- Use "tile" only when a literal wallpaper, pattern, textile, tile, brick, mat, blind, rain-curtain, or tree-row surface makes regular repetition the subject. Use a concrete count from 200 to 2000 and always add a separate fine-trembling or faint-swaying sentence
+- Use "tile" only when a literal wallpaper, pattern, textile, tile, brick, mat, blind, rain-curtain, or tree-row surface makes regular repetition the subject. Use a concrete count from 200 to 2000 and always add a separate fine-trembling or faint-swaying sentence. Add no unrequested support line, alternate arrangement, or relation sentence (except preserving explicitly requested four directions)
 - Tiling is only for regular repetition as the subject. Mere "many" or "countless" keeps the existing biased scatter path; never introduce "tile" spontaneously, and do not change ordinary count or negative-space rules
 
 "scatter" is not placement by itself. Always choose placement from **place words, motion words, and movement traces**, and specify where, in which direction, or along what trace the objects are distributed.

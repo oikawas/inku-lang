@@ -245,7 +245,7 @@ class Arrangement(BaseModel):
         default=0.1,
         ge=0.0,
         le=0.45,
-        description="端余白 0.0-0.45 (省略=0.1)",
+        description="端余白 0.0-0.45 (省略=0.1)。grid全面敷き詰めでは0.02-0.08を使い、部分領域はat.regionで指定",
     )
     center: Optional[Coord] = Field(
         default=None,

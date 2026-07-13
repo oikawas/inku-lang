@@ -508,12 +508,16 @@ def test_grid_schema_and_prompts_expose_literal_tiling_contract():
     assert "grid の count だけは1〜2000" in SYSTEM_PROMPT
     assert "代表数への縮小" in SYSTEM_PROMPT
     assert "最大4 instructions" in SYSTEM_PROMPT
+    assert "margin=0.02〜0.08" in SYSTEM_PROMPT
+    assert "0.12を超えるmarginを使わない" in SYSTEM_PROMPT
     assert '"count":400,"layout":"grid","rows":20,"cols":20' in SYSTEM_PROMPT
 
     assert 'layout="grid"' in SYSTEM_PROMPT_EN
     assert "only for literal tiling instructions" in SYSTEM_PROMPT_EN
     assert "Only grid may use count 1–2000" in SYSTEM_PROMPT_EN
     assert "at most four instructions" in SYSTEM_PROMPT_EN
+    assert "margin=0.02–0.08" in SYSTEM_PROMPT_EN
+    assert "never a margin above 0.12" in SYSTEM_PROMPT_EN
     assert '"count":400,"layout":"grid","rows":20,"cols":20' in SYSTEM_PROMPT_EN
 
 

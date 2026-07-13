@@ -3811,4 +3811,4 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - JSON Scoreのarrangementに `layout="grid"`、`rows`、`cols`、`jitter` を追加した。gridは `at.region` またはmargin内をセルで覆い、明示rows×colsをcountより優先する。schema上限は2000へ拡張したが、非pattern経路は従来の1〜1000を維持する。
 - Rendererはセル位置jitter、要素別variation位相、weight素材固有の揺らぎを重ね、同一Score + seedのbit決定性を保つ。gridはcoerceのfade / cluster / preserve-space / count縮小から除外する。
 - Stage 1 / Stage 2へ日英同等のliteral-only規則と壁紙・四方向・格子の例を追加した。四方向は最大4 instructionの既存重ねで表現し、新primitiveは追加しない。
-- Build 509。
+- Build 510。

@@ -297,9 +297,11 @@ def test_ground_literal_gate_keeps_japanese_ground_marker():
     )
 
     repaired = _enforce_ground_literal_gate(score, "地: 薄墨。")
+    fullwidth = _enforce_ground_literal_gate(score, "地：生成りの紙、細かい紙目。")
 
     assert not isinstance(repaired.canvas, str)
     assert repaired.canvas.ground == score.canvas.ground
+    assert fullwidth.canvas.ground == score.canvas.ground
 
 
 def test_ground_literal_gate_handles_english_marker_case_insensitively():

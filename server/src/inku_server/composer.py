@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 import urllib.request
 from copy import deepcopy
 from typing import Any
@@ -814,8 +815,8 @@ def _enforce_relation_literal_gate(score: Score, ddl: str) -> Score:
 def _enforce_ground_literal_gate(score: Score, ddl: str) -> Score:
     """Drop model-inferred canvas ground unless the DDL contains its exact marker."""
 
-    lower = ddl.lower()
-    if "地:" in ddl or "ground:" in lower:
+    normalized = unicodedata.normalize("NFKC", ddl)
+    if "地:" in normalized or "ground:" in normalized.lower():
         return score
     if isinstance(score.canvas, str) or score.canvas.ground is None:
         return score

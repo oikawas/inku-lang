@@ -3797,4 +3797,4 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - composer後段へdrop-onlyのground literal gateを追加した。明示マーカーがない場合だけgroundを除去し、canvas aspectは保持する。明示マーカーがあるgroundの補完・修復・置換は行わない。drop発生はwarningログで観測できる。
 - display SVGのground質感rect自身へ0.02〜0.18のopacityを持たせ、filterのalpha tableを `0 1` に変更した。filter対応ブラウザの合成アルファを保ちながら、filter非対応PNGラスタライザでも不透明な灰色壁にならない。
 - rendererの全filter使用箇所を監査し、同じく広域図形の透過をfilterだけへ依存する箇所が他にないことを確認した。
-- Build 508。Mac・pentalaテスト、面/地12件とJP/EN各30件の回帰結果は `cli/tune_bench.md` の「v1.74.1: ground hotfix」に記録する。
+- Build 508。Mac・pentalaともに314 passed / 30 skipped、ruff・web check/build green。Qwen3 Next固定ベンチは面/地12件12/12（地明示6/6、自発ground 0、灰色壁なし）、JP30/EN30各30/30（自発ground 0、品質急落なし、fingerprint全pass、502/timeout/fallback 0）。詳細は `cli/tune_bench.md` の「v1.74.1: ground hotfix」に記録した。

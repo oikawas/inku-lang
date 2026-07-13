@@ -1302,4 +1302,4 @@ When updating the specification:
 - Added `layout="grid"` with optional `rows`, `cols`, and `jitter`. Grid fills `at.region` or the margin-bounded canvas; explicit rows×cols take priority over count. The schema limit is 2000 for literal tiling while ordinary arrangements keep the existing 1–1000 prompt contract.
 - Grid performance layers seeded cell jitter, distinct per-element variation phase, and material-specific weight behavior while preserving bit-identical replay for the same Score and seed. Coerce does not add fade, clustering, preserved space, or count reduction to grid.
 - Added matched Japanese and English Stage 1 / Stage 2 rules and wallpaper, four-direction, and square-grid examples. Four directions remain a maximum of four overlaid instructions; no new primitive was introduced.
-- Build 512.
+- Build 513.

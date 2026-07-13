@@ -3445,6 +3445,7 @@ _KANJI_NUMBERS: dict[str, int] = {
     "九": 9,
     "十": 10,
     "百": 100,
+    "千": 1000,
 }
 
 
@@ -3453,6 +3454,13 @@ def _parse_small_japanese_number(text: str) -> int | None:
         return None
     if text.isdigit():
         return int(text)
+    if text == "千":
+        return 1000
+    if "千" in text:
+        head, tail = text.split("千", 1)
+        value = (_KANJI_NUMBERS.get(head, 1) if head else 1) * 1000
+        rest = _parse_small_japanese_number(tail)
+        return value + (rest or 0)
     if text == "百":
         return 100
     if text.endswith("百") and len(text) == 2:
@@ -3489,7 +3497,7 @@ def count_hint_from_ddl(ddl: str) -> int | None:
     literal_grid = _is_literal_grid_request(ddl)
     clauses = re.split(r"[。.!?]+", ddl)
     candidates = [clause for clause in clauses if _is_literal_grid_request(clause)] if literal_grid else [ddl]
-    pattern = r"(\d{1,4}|[一二三四五六七八九十百]{1,8})(?:本|個|つ(?!の方向)|点|枚)"
+    pattern = r"(\d{1,4}|[一二三四五六七八九十百千]{1,8})(?:本|個|つ(?!の方向)|点|枚)"
     for candidate in candidates:
         match = re.search(pattern, candidate)
         if not match:

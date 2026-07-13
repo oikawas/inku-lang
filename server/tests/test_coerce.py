@@ -2846,6 +2846,7 @@ def test_coerce_score_varies_repair_part_coordinates_by_input():
 
 def test_count_hint_allows_2000_only_for_literal_grid_request():
     assert count_hint_from_ddl("黒い線を2000本格子状に敷き詰める。") == 2000
+    assert count_hint_from_ddl("灰色の線を二千本、一面に敷き詰める。") == 2000
     assert count_hint_from_ddl("黒い線を2000本散らす。") == 1000
     assert count_hint_from_ddl("Tile two thousand short gray pencil vertical lines across the canvas.") == 2000
     assert count_hint_from_ddl("Tile six hundred small rotated red squares across the canvas.") == 600

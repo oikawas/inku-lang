@@ -142,6 +142,22 @@ def test_quantity_prompt_en_uses_dynamic_range():
     assert "eight hundred ninety small gray circles randomly" not in prompt
 
 
+def test_ground_support_prompt_preserves_literal_marker():
+    prompt = _build_system_prompt("薄墨の地に、白い細筆の弧を置く")
+
+    assert "〜の地" in prompt
+    assert "必ず「地: ...」として残し" in prompt
+    assert "「背景...」へ言い換えない" in prompt
+
+
+def test_ground_support_prompt_en_preserves_literal_marker():
+    prompt = _build_system_prompt("Place white arcs on an ink-wash ground", lang="en")
+
+    assert '\"... ground\"' in prompt
+    assert 'always preserve it as "Ground: ..."' in prompt
+    assert 'never rewrite it as "Fill background ..."' in prompt
+
+
 def test_sanitize_placement_words_removes_random_terms():
     assert _sanitize_placement_words("赤い円をランダムに五つ散らす。") == "赤い円を画面全体に点々と五つ散らす。"
     assert "random" not in _sanitize_placement_words(

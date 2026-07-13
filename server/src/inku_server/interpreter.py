@@ -71,6 +71,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 - 紙目を残す、生成りの紙、和紙 → 「地: 生成りの紙、細かい紙目。」
 - 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」
+- 入力が支持体を「〜の地」「〜を地に」「〜の紙に」と明示した場合は、必ず「地: ...」として残し、「背景...」へ言い換えない。
 - 点で埋める、点描の面 → 「面: 点で埋める。」
 - 斜線で埋める、ハッチ → 「面: 斜めに埋める。」
 - 粒立つ、かすれ → 「面: 粒立つ。」
@@ -797,6 +798,7 @@ Texture must not create extra helper shapes. If it belongs to a shape interior, 
 
 - paper grain, off-white paper, washi → "Ground: off-white paper, fine paper grain."
 - ink-wash ground → "Ground: ink wash."
+- If the input explicitly names the support as "... ground", "on ... paper", or "with ... as the ground", always preserve it as "Ground: ..."; never rewrite it as "Fill background ...".
 - stippled or dotted fill → "Surface: stippled."
 - hatch or crosshatch → "Surface: hatched diagonally."
 - grainy, rough, scuffed → "Surface: grain."

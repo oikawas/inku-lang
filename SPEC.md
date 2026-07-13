@@ -1287,7 +1287,8 @@ When updating the specification:
 ### v1.74.1 — ground hotfix (2026-07-13)
 
 - Added Japanese and English Stage 2 rules that prohibit inferred `canvas.ground` unless normalized DDL contains an explicit 「地: ...」 / "Ground: ..." sentence.
+- Added a general Stage 1 support-preservation rule for Qwen3 Next: explicit 「〜の地」「〜の紙に」 / "... ground" / "on ... paper" wording must remain a `地:` / `Ground:` sentence and must not be rewritten as a background fill.
 - Added a drop-only ground literal gate after composition. It removes only unmarked ground while preserving canvas aspect; it never creates, repairs, or replaces ground when a marker is present. Drops remain observable through a warning log.
 - Moved display ground texture opacity (clamped to 0.02–0.18) onto the texture rect itself and changed the filter alpha table to `0 1`. Filter-capable browsers retain the same effective alpha, while filter-free PNG rasterizers now degrade to a faint veil instead of an opaque gray wall.
 - Audited every renderer filter use and found no other wide filtered shape whose transparency depended entirely on its filter.
-- Build 507. Mac and pentala tests plus the 12-prompt surface/ground and JP/EN 30-prompt regression results are recorded under “v1.74.1: ground hotfix” in the local benchmark log.
+- Build 508. Mac and pentala tests plus the 12-prompt surface/ground and JP/EN 30-prompt regression results are recorded under “v1.74.1: ground hotfix” in the local benchmark log.

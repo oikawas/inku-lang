@@ -1,0 +1,20 @@
+Concept
+
+inku is the reference implementation of DDL (Drawing Description
+Language) — a drawing language that turns a short written line
+into an abstract vector graphic.
+
+The description itself is the work, rooted in three traditions:
+Sol LeWitt's instruction art, the concentration of bonsai, and
+the form of tanka.
+
+Your sentence persists as a score; each picture is a one-time
+performance of it. The same sentence returns a slightly different
+picture each time — and choosing from what appears is part of
+the work, alongside writing.
+
+Creator
+
+Shinichiro Oikawa
+Designs and implements the Japanese and English specifications,
+the reference implementation, the web UI, and the CLI.

@@ -470,6 +470,7 @@ export const ja: LangPack = {
 	historyTrashButton: (n) => `ごみ箱 (${n})`,
 	historyThumbsTab: 'サムネイル',
 	historyListTab: 'リスト',
+	historySelectItem: (selected) => selected ? '作品の選択を解除' : '作品を選択',
 	historySelectAll: 'すべて選択',
 	historyMoveToTrash: '選択削除',
 	historyRestoreSelected: '選択復元',

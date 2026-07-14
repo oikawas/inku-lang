@@ -470,6 +470,7 @@ export const en: LangPack = {
 	historyTrashButton: (n) => `trash (${n})`,
 	historyThumbsTab: 'thumbnails',
 	historyListTab: 'list',
+	historySelectItem: (selected) => selected ? 'deselect artwork' : 'select artwork',
 	historySelectAll: 'select all',
 	historyMoveToTrash: 'move to trash',
 	historyRestoreSelected: 'restore selected',

@@ -306,9 +306,15 @@
 			<div class="history-thumb-grid">
 				{#each managedHistoryItems as it, i (it.id ?? it.at)}
 					<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
-						<label class="manager-check">
-							<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onclick={(event) => event.stopPropagation()} onchange={() => it.id && onToggleSelection(it.id)} />
-						</label>
+<button
+	type="button"
+	class="manager-check selection-checkbox"
+	class:checked={!!it.id && selectedHistoryIds.includes(it.id)}
+	role="checkbox"
+	aria-checked={!!it.id && selectedHistoryIds.includes(it.id)}
+	aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))}
+	onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}
+><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 						<div
 							class="thumb manager-thumb"
 							onclick={() => loadItemAndClose(it)}
@@ -364,7 +370,7 @@
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
 						<tr>
-							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onclick={(event) => event.stopPropagation()} onpointerdown={(event) => event.stopPropagation()} onchange={() => it.id && onToggleSelection(it.id)} /></td>
+							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button></td>
 							<td class="table-thumb-cell">
 								<button
 									class="table-thumb-select"
@@ -584,24 +590,32 @@
 		border-color: var(--accent);
 		box-shadow: 0 0 0 2px var(--accent-light);
 	}
-	.manager-check {
-		position: absolute;
-		top: 6px;
-		left: 6px;
-		z-index: 30;
-		background: rgba(255,255,255,0.86);
-		border-radius: 2px;
-		line-height: 1;
-		padding: 1px;
-	}
-	.manager-check input {
-		width: 12px;
-		height: 12px;
-		margin: 0;
-		accent-color: var(--accent);
-		outline: 0.5px solid rgba(40,36,30,0.32);
-		outline-offset: -1px;
-	}
+.manager-check {
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	z-index: 30;
+}
+.selection-checkbox {
+	box-sizing: border-box;
+	width: 28px;
+	height: 28px;
+	display: inline-grid;
+	place-items: center;
+	margin: 0;
+	padding: 0;
+	border: 1px solid color-mix(in srgb, var(--fg) 32%, var(--border));
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--panel) 92%, transparent);
+	color: #fff;
+	cursor: pointer;
+	font: 700 17px/1 system-ui, sans-serif;
+	box-shadow: 0 1px 3px rgba(0,0,0,.16);
+}
+.selection-checkbox:hover { border-color: var(--accent); }
+.selection-checkbox:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.selection-checkbox.checked { border-color: var(--accent); background: var(--accent); }
+.table-check { position: static; width: 24px; height: 24px; font-size: 15px; box-shadow: none; }
 	.thumb-star {
 		position: absolute;
 		top: 5px;

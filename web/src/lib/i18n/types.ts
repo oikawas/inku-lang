@@ -484,6 +484,7 @@ export interface LangPack {
 	historyTrashButton: (n: number) => string;
 	historyThumbsTab: string;
 	historyListTab: string;
+	historySelectItem: (selected: boolean) => string;
 	historySelectAll: string;
 	historyMoveToTrash: string;
 	historyRestoreSelected: string;

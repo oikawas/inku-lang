@@ -3826,7 +3826,6 @@ async function ensureLineageParentId(): Promise<string | null> {
 					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
 					catalog_id: candidate.result.render_color_catalog_id ?? selectedCatalog,
 				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {} });
-				if (saved) await toggleHistoryStar({ id: saved.id, starred: false, note: saved.note });
 				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
 			}
 		} finally {

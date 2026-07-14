@@ -2,10 +2,11 @@
 	type Props = {
 		text: string;
 		placement?: 'top' | 'bottom' | 'left' | 'right' | 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right';
+		wide?: boolean;
 		children: import('svelte').Snippet;
 	};
 
-	let { text, placement = 'top', children }: Props = $props();
+	let { text, placement = 'top', wide = false, children }: Props = $props();
 </script>
 
 <span class="tooltip-wrap">
@@ -19,6 +20,7 @@
 		class:bottom-right={placement === 'bottom-right'}
 		class:top-left={placement === 'top-left'}
 		class:top-right={placement === 'top-right'}
+		class:wide
 		role="tooltip"
 	>{text}</span>
 </span>
@@ -57,6 +59,10 @@
 		pointer-events: none;
 		transform: translate(-50%, 2px);
 		transition: opacity 0.12s ease, transform 0.12s ease;
+	}
+	.tooltip-bubble.wide {
+		max-width: min(440px, calc(100vw - 48px));
+		white-space: pre-line;
 	}
 	.tooltip-bubble::after {
 		content: "";

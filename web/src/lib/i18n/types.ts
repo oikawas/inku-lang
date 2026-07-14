@@ -312,6 +312,8 @@ export interface LangPack {
 	settingsTabUnreadWords: string;
 	settingsUnreadWordsTitle: string;
 	settingsUnreadWordsDescription: string;
+	settingsUnreadWordsPurposeLabel: string;
+	settingsUnreadWordsPurposeTooltip: string;
 	settingsUnreadWordsScope: string;
 	settingsUnreadWordsMine: string;
 	settingsUnreadWordsAll: string;

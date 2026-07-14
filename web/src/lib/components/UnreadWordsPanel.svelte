@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import Tooltip from './Tooltip.svelte';
 
 	type UnreadWord = { word: string; frequency: number; first_at: number; last_at: number; contexts: string[]; user_count?: number };
 	type Scope = 'mine' | 'all';
@@ -42,7 +43,12 @@
 <div class="popover-group unread-ledger">
 	<div class="unread-head">
 		<div>
-			<div class="popover-group-label">{t().settingsUnreadWordsTitle}</div>
+			<div class="unread-title-row">
+				<div class="popover-group-label">{t().settingsUnreadWordsTitle}</div>
+				<Tooltip placement="bottom-right" wide text={t().settingsUnreadWordsPurposeTooltip}>
+					<button type="button" class="purpose-help" aria-label={t().settingsUnreadWordsPurposeLabel}>?</button>
+				</Tooltip>
+			</div>
 			<div class="unread-note">{t().settingsUnreadWordsDescription}</div>
 		</div>
 		<div class="unread-actions">
@@ -94,7 +100,10 @@
 <style>
 	.unread-ledger { min-height: 260px; }
 	.unread-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
-	.popover-group-label { font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; margin-bottom: 7px; }
+	.unread-title-row { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+	.popover-group-label { font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; margin-bottom: 0; }
+	.purpose-help { width: 17px; height: 17px; padding: 0; border: 1px solid var(--border2); border-radius: 50%; background: transparent; color: var(--fg3); font: 600 10px/1 inherit; cursor: help; }
+	.purpose-help:hover, .purpose-help:focus-visible { color: var(--fg); border-color: var(--fg2); outline: none; }
 	.unread-note { color: var(--fg2); font-size: 12px; line-height: 1.55; }
 	.unread-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 	.scope-toggle { display: inline-flex; border: 1px solid var(--border2); border-radius: var(--r); overflow: hidden; }

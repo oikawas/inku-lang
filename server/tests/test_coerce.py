@@ -2855,6 +2855,59 @@ def test_count_hint_allows_2000_only_for_literal_grid_request():
     assert count_hint_from_ddl("Tile gray lines across the canvas. Line up three black lines.") is None
 
 
+def test_coerce_rejects_spontaneous_grid_from_non_tiling_motif_label():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.75, 0.5],
+                    "size": [0.03, 0.03],
+                    "arrangement": {
+                        "count": 4,
+                        "layout": "grid",
+                        "rows": 2,
+                        "cols": 2,
+                        "jitter": 0.12,
+                    },
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl="Scatter four thin rotated gray squares in the right half as warehouse grid cuts.",
+    )
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.layout == "scatter"
+    assert arr.count == 4
+    assert arr.rows is None
+    assert arr.cols is None
+
+
+def test_coerce_keeps_grid_for_literal_english_tiling_request():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "square",
+                    "position": [0.5, 0.5],
+                    "size": [0.03, 0.03],
+                    "arrangement": {"count": 400, "layout": "grid"},
+                }
+            ]
+        }
+    )
+
+    fixed = coerce_score(score, ddl="Tile four hundred small gray squares across the whole canvas.")
+    arr = fixed.instructions[0].arrangement
+    assert arr is not None
+    assert arr.layout == "grid"
+    assert arr.count == 400
+
+
 def test_coerce_restores_literal_grid_count_and_full_field_margin():
     score = Score.model_validate(
         {

@@ -3489,7 +3489,32 @@ def _is_literal_grid_request(ddl: str | None) -> bool:
     lower = ddl.lower()
     if any(marker in ddl for marker in ("敷き詰め", "格子状", "格子に", "一面に並", "全面に並")):
         return True
-    return re.search(r"\b(?:tile|tiled|tiling|grid)\b", lower) is not None
+    return re.search(r"\b(?:tile|tiled|tiling)\b", lower) is not None
+
+
+def _without_spontaneous_grid(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+) -> list[Instruction]:
+    """Keep grid behind an explicit literal-tiling request boundary."""
+    if not ddl or _is_literal_grid_request(ddl):
+        return instructions
+    adjusted: list[Instruction] = []
+    for ins in instructions:
+        arr = ins.arrangement
+        if arr is None or arr.layout != "grid":
+            adjusted.append(ins)
+            continue
+        data = ins.model_dump(by_alias=True)
+        arr_data = dict(data["arrangement"])
+        arr_data["layout"] = "scatter"
+        arr_data["rows"] = None
+        arr_data["cols"] = None
+        arr_data["jitter"] = None
+        data["arrangement"] = arr_data
+        adjusted.append(Instruction.model_validate(data))
+    return adjusted
 
 
 def count_hint_from_ddl(ddl: str) -> int | None:
@@ -3917,6 +3942,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。"""
     if _style_coerce_disabled():
         instructions = [_coerce_instruction(ins) for ins in score.instructions]
+        instructions = _without_spontaneous_grid(instructions, ddl=ddl)
         instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
         instructions = _drop_invalid_relations(instructions)
         data = score.model_dump(by_alias=True)
@@ -3927,6 +3953,7 @@ def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
         _coerce_and_repair_instruction(ins, original_background=score.background, background=background, ddl=ddl)
         for ins in score.instructions
     ]
+    instructions = _without_spontaneous_grid(instructions, ddl=ddl)
     instructions = _dedupe_instructions(instructions)
     instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
     instructions = _with_primary_color_delivery(instructions, ddl=ddl, background=background)

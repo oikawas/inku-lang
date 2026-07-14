@@ -1313,4 +1313,4 @@ When updating the specification:
 - Added a focused Canvas lineage view showing nearby generations as artwork thumbnails connected by lines and labeled with the operation that produced each child. Trash preserves lineage; permanent deletion removes content and hashes while leaving a content-free tombstone to preserve the path.
 - Users can explicitly start a new root. Ordinary DRAW actions are not automatically attached to the latest history item.
 - Lineage depth and branching are not quality scores, achievements, or generation controls. The graph records the creative process; it does not choose a best branch.
-- Build 518.
+- Build 519.

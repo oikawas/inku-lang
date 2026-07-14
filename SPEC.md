@@ -1315,4 +1315,5 @@ When updating the specification:
 - Lineage depth and branching are not quality scores, achievements, or generation controls. The graph records the creative process; it does not choose a best branch.
 - History-manager artwork selection uses a compact, dedicated check control independent from opening an artwork, with exactly one state change per activation. Thumbnails do not show enlarged hover previews.
 - Stars toggle immediately without a confirmation dialog. Artwork comments are stored independently from star state and are edited in lineage-card details; removing a star does not erase an existing comment.
-- Build 522.
+- Generated works in the Compare tab use the same circular image-corner `+` adoption control as Refine candidates and show `✓` after being saved to history. Starring remains independent from adoption.
+- Build 523.

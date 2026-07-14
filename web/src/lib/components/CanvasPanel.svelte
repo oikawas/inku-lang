@@ -576,7 +576,33 @@
 						<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {modelInspectionTargetStage1Model}<br />Stage 2: {modelInspectionTargetStage2Model}</div></div>
 						<div class="model-results-column">
 							{#if modelInspectionBusy}<div class="model-drawing-animation" aria-live="polite"><div class="model-drawing-spinner" aria-hidden="true"></div><div><strong>{t().modelCompareDrawingTitle}</strong><span>{t().modelCompareDrawingBody}</span></div></div>{/if}
-							{#if modelInspectionResults.length > 0}<div class="model-inspection-grid">{#each modelInspectionResults as item (item.id)}<div class="model-inspection-card" class:saved={!!item.savedHistoryId}><div class="comparison-label">{item.label}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div><div class="model-result-actions"><Tooltip text={item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}><button class="ghost-btn model-adopt-btn" type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptModelInspectionResult(item)}>{item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdopt}</button></Tooltip><Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}><button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button></Tooltip></div><pre>{item.ddl}</pre></div>{/each}</div>{/if}
+							{#if modelInspectionResults.length > 0}
+								<div class="model-inspection-grid">
+									{#each modelInspectionResults as item (item.id)}
+										<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
+											<div class="comparison-label">{item.label}</div>
+											<div class="model-comparison-art-wrap">
+												<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div>
+												<button
+													class="variation-select model-adopt-select"
+													class:selected={!!item.savedHistoryId}
+													type="button"
+													disabled={item.saving || !!item.savedHistoryId}
+													onclick={() => onAdoptModelInspectionResult(item)}
+													title={item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}
+													aria-label={item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}
+												>{item.saving ? '…' : item.savedHistoryId ? '✓' : '+'}</button>
+											</div>
+											<div class="model-result-actions">
+												<Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}>
+													<button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button>
+												</Tooltip>
+											</div>
+											<pre>{item.ddl}</pre>
+										</div>
+									{/each}
+								</div>
+							{/if}
 						</div>
 					</div>
 				</div>
@@ -1216,20 +1242,18 @@
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 10px;
 	}
+	.model-inspection-card { position: relative; }
 	.model-inspection-card.saved {
 		border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 	}
+	.model-comparison-art-wrap { position: relative; }
+	.model-adopt-select:disabled { cursor: default; opacity: 1; }
 	.model-result-actions {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-end;
 		gap: 8px;
 		margin-top: 8px;
-	}
-	.model-adopt-btn {
-		min-height: 28px;
-		font-size: 11px;
-		padding: 5px 9px;
 	}
 	.model-result-star {
 		width: 30px;

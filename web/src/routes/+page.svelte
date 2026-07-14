@@ -2758,10 +2758,12 @@
 				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
 				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
 			}
-			if (resolvedOffset === 0 && !historyStarredOnly) {
-				historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
-			} else {
-				preloadHistoryManagerFirstPage();
+			if (!historyManager.open) {
+				if (resolvedOffset === 0 && !historyStarredOnly) {
+					historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
+				} else {
+					preloadHistoryManagerFirstPage();
+				}
 			}
 			return options.anchorId ? historyCursor >= 0 && historyItems[historyCursor]?.id === options.anchorId : true;
 		} catch {
@@ -2798,7 +2800,7 @@
 	}
 
 	async function refreshHistoryForExternalSave(force = false): Promise<void> {
-		if (!authToken || historyStarredOnly || historyOffset !== 0 || loading) return;
+		if (!authToken || historyManager.open || historyStarredOnly || historyOffset !== 0 || loading) return;
 		if (document.visibilityState !== 'visible') return;
 		const now = Date.now();
 		if (!force && now - lastExternalHistoryRefreshAt < EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS) return;

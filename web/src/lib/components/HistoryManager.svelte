@@ -177,8 +177,8 @@
 		const gap = computed ? Number.parseFloat(computed.rowGap || computed.gap || '8') || 8 : 8;
 		const minCardWidth = 104;
 		const columns = Math.max(1, Math.floor((width + gap) / (minCardWidth + gap)));
-		const firstCard = element.querySelector('.manager-thumb-wrap');
-		let cardHeight = firstCard instanceof HTMLElement ? firstCard.getBoundingClientRect().height : 0;
+		const cards = [...element.querySelectorAll('.manager-thumb-wrap')].filter((card): card is HTMLElement => card instanceof HTMLElement);
+		let cardHeight = cards.reduce((height, card) => Math.max(height, card.getBoundingClientRect().height), 0);
 		if (cardHeight <= 0) {
 			const cardWidth = Math.max(minCardWidth, (width - gap * (columns - 1)) / columns);
 			const imageHeight = cardWidth * 58 / 82;
@@ -190,7 +190,6 @@
 
 	$effect(() => {
 		const element = thumbGridWrapEl;
-		managedHistoryItems.length;
 		if (!element || historyManagerTab !== 'thumbs') return;
 		let frame = 0;
 		const update = () => {
@@ -610,6 +609,8 @@
 		font-size: 11px;
 		line-height: 1.25;
 	}
+	.thumb-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg3); font-size: 10px; line-height: 1.25; }
+	.thumb-note span { margin-right: 4px; font-weight: 600; }
 	.thumb-action-row {
 		display: flex;
 		align-items: flex-end;
@@ -618,6 +619,7 @@
 		min-width: 0;
 		position: relative;
 		z-index: 40;
+		margin-top: auto;
 	}
 	.hash-row-star {
 		flex: 0 0 auto;
@@ -680,6 +682,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+		height: 58px;
+		overflow: hidden;
 		margin-top: 5px;
 		min-width: 0;
 		position: relative;

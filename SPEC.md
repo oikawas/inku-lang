@@ -1317,4 +1317,5 @@ When updating the specification:
 - Stars toggle immediately without a confirmation dialog. Artwork comments are stored independently from star state and are edited in lineage-card details; removing a star does not erase an existing comment.
 - Generated works in the Compare tab use the same circular image-corner `+` adoption control as Refine candidates and show `✓` after being saved to history. Starring remains independent from adoption.
 - The displayed artwork and the bottom-history current marker stay synchronized by history ID. Opening an off-page work from lineage, History Manager, or replay uses `anchor_id` to load the page containing that work. Background Compare/Refine saves do not steal the marker, and unsaved candidate previews do not leave a different history work marked current.
-- Build 524.
+- While History Manager is open, external-history polling does not replace its items or page size. Thumbnail action areas use a uniform height, and the page row count is calculated once from the maximum measured card height, preventing clipped final rows and the refresh loop that replaced roughly 90 items with the bottom strip's smaller item count.
+- Build 525.

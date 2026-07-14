@@ -694,6 +694,14 @@ class PaintRequest(BaseModel):
     count_generation: bool = Field(default=True, description="完了した描画をユーザーの累積生成数に加算するか")
     history_input: str | None = Field(default=None, description="履歴に表示するユーザー記述")
     history_at: int | None = Field(default=None, description="履歴保存時刻")
+    history_source_text: str | None = Field(default=None, description="作者が書いたラベルなしの履歴本文")
+    history_display_label: str | None = Field(default=None, description="バッチ番号やdemoなどの表示ラベル")
+    batch_line_number: int | None = None
+    batch_run_id: str | None = None
+    history_visibility: str = "normal"
+    lineage_parent_node_id: str | None = None
+    derivation_kind: str | None = None
+    derivation_metadata: dict[str, object] = Field(default_factory=dict)
     catalog_id: str | None = Field(default=None, description="使用した色カタログID")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
@@ -730,6 +738,10 @@ class PaintResponse(BaseModel):
     render_hash_short: str | None = None
     history_id: str | None = None
     history_at: int | None = None
+    description_hash: str | None = None
+    lineage_node_id: str | None = None
+    lineage_parent_node_id: str | None = None
+    derivation_kind: str | None = None
     elapsed_stage1_ms: int = 0
     elapsed_stage2_ms: int = 0
     elapsed_total_ms: int = 0
@@ -822,6 +834,14 @@ class HistoryPostBody(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     interpretation_seed: str | None = None
+    source_text: str | None = None
+    display_label: str | None = None
+    batch_line_number: int | None = None
+    batch_run_id: str | None = None
+    history_visibility: str = "normal"
+    lineage_parent_node_id: str | None = None
+    derivation_kind: str | None = None
+    derivation_metadata: dict[str, object] = Field(default_factory=dict)
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -839,6 +859,8 @@ class HistoryItem(HistoryPostBody):
     trashed: bool = False
     starred: bool = False
     note: str | None = None
+    description_hash: str | None = None
+    lineage_node_id: str | None = None
 
 
 class HistoryListResponse(BaseModel):
@@ -2317,6 +2339,14 @@ def _add_history_item(
     catalog_id: str | None = None,
     save_artifacts: bool = True,
     render_metadata: dict | None = None,
+    source_text: str | None = None,
+    display_label: str | None = None,
+    batch_line_number: int | None = None,
+    batch_run_id: str | None = None,
+    history_visibility: str = "normal",
+    lineage_parent_node_id: str | None = None,
+    derivation_kind: str | None = None,
+    derivation_metadata: dict[str, object] | None = None,
 ) -> dict:
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
@@ -2333,7 +2363,8 @@ def _add_history_item(
                 render_metadata=metadata,
             )
         )
-    item_dict = _db.add_item({
+    try:
+        item_dict = _db.add_item({
         "id": item_id,
         "user_id": actor["id"],
         "output_path": str(prefix),
@@ -2347,9 +2378,20 @@ def _add_history_item(
         "stage2_model": stage2_model,
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
-        "catalog_id": catalog_id,
-        **metadata,
+"catalog_id": catalog_id,
+"source_text": source_text if source_text is not None else input_text,
+"display_label": display_label,
+"batch_line_number": batch_line_number,
+"batch_run_id": batch_run_id,
+"history_visibility": history_visibility,
+"lineage_parent_node_id": lineage_parent_node_id,
+"derivation_kind": derivation_kind,
+"derivation_metadata": derivation_metadata or {},
+**metadata,
     })
+    except ValueError as exc:
+        status_code = 404 if str(exc) == "lineage parent not found" else 422
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     if save_artifacts:
         item_dict.update(metadata)
         item_dict["render_metadata"] = metadata
@@ -2436,6 +2478,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
     history_id = None
     history_at = None
+    saved_identity: dict[str, object] = {}
     save_artifacts = req.save_artifacts if req.save_artifacts is not None else req.save_history
     if req.save_history:
         history_at = req.history_at or int(time.time() * 1000)
@@ -2454,8 +2497,22 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             catalog_id=artifact_catalog_id,
             save_artifacts=save_artifacts,
             render_metadata=render_metadata,
+            source_text=req.history_source_text or source_text,
+            display_label=req.history_display_label,
+            batch_line_number=req.batch_line_number,
+            batch_run_id=req.batch_run_id,
+            history_visibility=req.history_visibility,
+            lineage_parent_node_id=req.lineage_parent_node_id,
+            derivation_kind=req.derivation_kind,
+            derivation_metadata=req.derivation_metadata,
         )
         history_id = item["id"]
+        saved_identity = {
+            "description_hash": item.get("description_hash"),
+            "lineage_node_id": item.get("lineage_node_id"),
+            "lineage_parent_node_id": item.get("lineage_parent_node_id"),
+            "derivation_kind": item.get("derivation_kind"),
+        }
     elif save_artifacts:
         history_at = req.history_at or int(time.time() * 1000)
         item_id = str(uuid.uuid4())
@@ -2489,6 +2546,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         **render_metadata,
         history_id=history_id,
         history_at=history_at,
+        **saved_identity,
         elapsed_stage1_ms=elapsed_stage1_ms,
         elapsed_stage2_ms=elapsed_stage2_ms,
         elapsed_total_ms=elapsed_total_ms,
@@ -2647,6 +2705,49 @@ def api_history_get(
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
+
+@app.get("/api/history/{item_id}/lineage")
+def api_history_lineage(
+    item_id: str,
+    descendant_depth: int = Query(default=2, ge=0, le=5),
+    node_limit: int = Query(default=200, ge=1, le=200),
+    actor: dict = Depends(_current_user),
+) -> dict:
+    items = _db.get_items(actor["id"], [item_id])
+    if not items or not items[0].get("lineage_node_id"):
+        raise HTTPException(status_code=404, detail="history item not found")
+    lineage = _db.get_lineage(
+        actor["id"],
+        items[0]["lineage_node_id"],
+        descendant_depth=descendant_depth,
+        node_limit=node_limit,
+    )
+    if lineage is None:
+        raise HTTPException(status_code=404, detail="lineage not found")
+    return lineage
+
+
+@app.get("/api/lineage/{node_id}")
+def api_lineage(
+    node_id: str,
+    descendant_depth: int = Query(default=2, ge=0, le=5),
+    node_limit: int = Query(default=200, ge=1, le=200),
+    actor: dict = Depends(_current_user),
+) -> dict:
+    lineage = _db.get_lineage(actor["id"], node_id, descendant_depth=descendant_depth, node_limit=node_limit)
+    if lineage is None:
+        raise HTTPException(status_code=404, detail="lineage not found")
+    return lineage
+
+
+@app.post("/api/lineage/{node_id}/promote", response_model=HistoryItem, response_model_exclude_none=True)
+def api_lineage_promote(node_id: str, actor: dict = Depends(_current_user)) -> HistoryItem:
+    item = _db.promote_lineage_node(actor["id"], node_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="lineage item not found")
+    return HistoryItem(**item)
+
+
 @app.get("/api/history/{item_id}/svg")
 def api_history_svg(
     item_id: str,
@@ -2710,7 +2811,15 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         tokens_out=body.tokens_out,
         catalog_id=None if catalog_id == "default" else catalog_id,
         save_artifacts=body.save_artifacts,
-        render_metadata=render_metadata,
+            render_metadata=render_metadata,
+            source_text=body.source_text,
+            display_label=body.display_label,
+            batch_line_number=body.batch_line_number,
+            batch_run_id=body.batch_run_id,
+            history_visibility=body.history_visibility,
+            lineage_parent_node_id=body.lineage_parent_node_id,
+            derivation_kind=body.derivation_kind,
+            derivation_metadata=body.derivation_metadata,
     )
     if body.count_generation:
         if _db.increment_user_generation_count(actor["id"]) is None:

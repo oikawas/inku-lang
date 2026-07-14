@@ -5,6 +5,8 @@
 	type HistoryItem = {
 		id?: string;
 		input: string;
+		source_text?: string | null;
+		display_label?: string | null;
 		ddl: string | null;
 		thinking?: string | null;
 		score: { instructions: unknown[] };
@@ -321,7 +323,7 @@
 							<HistoryThumbnail item={it} scope="manager" size="manager" />
 						</div>
 						<div class="manager-thumb-actions">
-							<div class="thumb-catalog" title={it.input}>{thumbnailPromptText(it.input)}</div>
+							<div class="thumb-catalog" title={it.source_text ?? it.input}>{#if it.display_label}<span class="history-display-label">{it.display_label}</span>{/if}<span>{thumbnailPromptText(it.source_text ?? it.input)}</span></div>
 							{#if it.note}<div class="thumb-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 							<div class="thumb-action-row">
 								<button
@@ -426,7 +428,7 @@
 		<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(tooltipState.item.catalog_id)}</strong></div>
 		{#if hashLabel(tooltipState.item)}<div class="tooltip-row"><span>{t().historyHashHeader}</span><strong>#{hashLabel(tooltipState.item)}</strong></div>{/if}
 		<div class="tooltip-row"><span>{t().historyTooltipTokens}</span><strong>{historyTokenSummary(tooltipState.item)}</strong></div>
-		<div class="tooltip-date">{historyPreviewText(tooltipState.item.input)}</div>
+		<div class="tooltip-date">{historyPreviewText(tooltipState.item.source_text ?? tooltipState.item.input)}</div>
 		{#if tooltipState.item.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{tooltipState.item.note}</div>{/if}
 	</div>
 {/if}
@@ -858,4 +860,5 @@
 		font-family: inherit;
 	}
 	.danger-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+	.history-display-label { margin-right: 5px; color: var(--fg3); font-weight: 600; }
 </style>

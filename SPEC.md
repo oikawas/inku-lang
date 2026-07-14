@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.75**
+**Version: v1.76**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -1303,3 +1303,14 @@ When updating the specification:
 - Grid performance layers seeded cell jitter, distinct per-element variation phase, and material-specific weight behavior while preserving bit-identical replay for the same Score and seed. Coerce does not add fade, clustering, preserved space, or count reduction to grid. Build 515 limits English literal markers to tile/tiled/tiling and adds a drop-only boundary so a motif label containing grid alone cannot create a spontaneous grid.
 - Added matched Japanese and English Stage 1 / Stage 2 rules and wallpaper, four-direction, and square-grid examples. Four directions remain a maximum of four overlaid instructions; no new primitive was introduced.
 - Build 515.
+
+
+### v1.76 — Artwork lineage (2026-07-14)
+
+- Added `dh1:<sha256>` as description identity over NFC-normalized text with LF line endings and trimmed outer whitespace. Batch labels such as `#1` are presentation metadata and do not affect `dh1`. Description identity, the existing `rh2` edition identity, history IDs, and lineage node IDs remain separate concepts.
+- Added independent lineage nodes and edges. Parentage is recorded only by explicit touch, layout, interpretation, model, DDL-edit, description-edit, or replay operations; it is never inferred from hashes, timestamps, or visual similarity. Existing history rows are backfilled as separate roots.
+- When a saved child derives from an unsaved candidate, only that direct ancestor is retained as `lineage_only`. These hidden ancestors do not affect ordinary history counts or starred views and can be promoted from the lineage view.
+- Added a focused Canvas lineage view showing nearby generations as artwork thumbnails connected by lines and labeled with the operation that produced each child. Trash preserves lineage; permanent deletion removes content and hashes while leaving a content-free tombstone to preserve the path.
+- Users can explicitly start a new root. Ordinary DRAW actions are not automatically attached to the latest history item.
+- Lineage depth and branching are not quality scores, achievements, or generation controls. The graph records the creative process; it does not choose a best branch.
+- Build 517.

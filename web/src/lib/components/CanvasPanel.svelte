@@ -4,12 +4,13 @@
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { Score } from '$lib/historyManagerState.svelte';
 	import OutputTabsContent from './OutputTabsContent.svelte';
+	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
-	type OutputTab = 'canvas' | 'refine' | 'compare' | 'prompts' | 'score';
+	type OutputTab = 'canvas' | 'refine' | 'compare' | 'lineage' | 'prompts' | 'score';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 	type PaintResult = { svg: string; score: Score; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
@@ -17,7 +18,7 @@
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineChanges = { touch: boolean; layout: boolean; reading: boolean };
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
-	type ModelInspectionResult = { id: string; model: string; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
+	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
 		outputTab: OutputTab;
@@ -108,6 +109,13 @@
 		onRunModelInspection: () => void | Promise<void>;
 		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
 		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
+		lineageGraph: LineageGraph | null;
+		lineageLoading: boolean;
+		lineageError: string | null;
+		isJapanese: boolean;
+		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
+		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
+		onDetachLineage: () => void;
 	};
 
 	let {
@@ -198,7 +206,14 @@
 		isModelInspectionChoiceBlocked,
 		onRunModelInspection,
 		onAdoptModelInspectionResult,
-		onToggleModelInspectionStar
+		onToggleModelInspectionStar,
+		lineageGraph = null,
+		lineageLoading = false,
+		lineageError = null,
+		isJapanese = true,
+		onOpenLineageNode,
+		onPromoteLineageNode,
+		onDetachLineage
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
@@ -289,6 +304,9 @@
 		</Tooltip>
 		<Tooltip placement="bottom" text={t().tooltipCanvasTabCompare}>
 			<button class="rtab" class:active={outputTab === 'compare'} onclick={() => (outputTab = 'compare')} disabled={!result}>{t().tabCompare}</button>
+		</Tooltip>
+		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show artwork derivations'}>
+			<button class="rtab" class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
 		</Tooltip>
 		<Tooltip placement="bottom" text={t().tooltipCanvasTabPrompts}>
 			<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
@@ -558,6 +576,8 @@
 						</div>
 					</div>
 				</div>
+			{:else if outputTab === 'lineage'}
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onDetach={onDetachLineage} />
 			{:else if outputTab === 'prompts'}
 				<OutputTabsContent
 					outputTab="prompts"

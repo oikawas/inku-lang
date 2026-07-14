@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.75**
+**Version: v1.76**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -3812,3 +3812,14 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - Rendererはセル位置jitter、要素別variation位相、weight素材固有の揺らぎを重ね、同一Score + seedのbit決定性を保つ。gridはcoerceのfade / cluster / preserve-space / count縮小から除外する。Build 515では英語の literal marker を tile/tiled/tiling に限定し、単なるモチーフ名の grid から自発gridを作らないdrop-only境界を追加した。
 - Stage 1 / Stage 2へ日英同等のliteral-only規則と壁紙・四方向・格子の例を追加した。四方向は最大4 instructionの既存重ねで表現し、新primitiveは追加しない。
 - Build 515。
+
+
+### v1.76 — 作品の系譜（記述同一性と派生過程） (2026-07-14)
+
+- 記述の同一性を `dh1:<sha256>` で表す。入力を Unicode NFC、改行を LF、前後空白を除去した本文を正規形とし、バッチ表示用の `#1` 等は `display_label` として分離してhashへ含めない。`dh1` は記述の同一性、既存 `rh2` は作品エディションの同一性であり、履歴IDや系譜ノードIDとは統合しない。
+- 履歴とは独立した lineage node / edge を導入した。親子関係はタッチ、構図、解釈、モデル変更、DDL編集、記述編集、再描画という実際の操作時にだけ明示記録し、hash一致、時刻、見た目の近さから推測しない。既存履歴はそれぞれ独立したrootとしてbackfillする。
+- 保存前の候補からさらに派生するときは、その直接祖先だけを `lineage_only` として保存する。通常履歴・件数・スター一覧には混ぜず、系譜ビューから明示的に通常履歴へ昇格できる。
+- Canvasにfocused lineageビューを追加した。選択作品の祖先と近傍の子孫を、作品サムネイル、世代列、接続線、派生操作ラベルで表示する。ノードから過去作品を開け、通常履歴をゴミ箱へ移しても関係を保つ。完全削除では本文・SVG・hashを消したtombstoneを残し、中間作品が存在した事実だけで線を保つ。
+- 「新しい起点にする」でactive lineage contextを明示的に切れる。DRAWのたびに無条件で直前作品へ接続することはない。
+- 系譜の深さ・枝数・継続回数は評価値や生成制御に使わない。系譜は制作の記憶を辿るための表示であり、最良枝を決めるgovernorではない。
+- Build 517。

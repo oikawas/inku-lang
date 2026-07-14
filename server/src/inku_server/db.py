@@ -16,9 +16,10 @@ from datetime import datetime
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Column, Float, ForeignKey, Integer, String, Text, create_engine, func, inspect, or_, text
+from sqlalchemy import BigInteger, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, func, inspect, or_, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+from .identity import description_hash
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 
 _DEFAULT_DB = "sqlite:///" + str(Path.home() / ".local" / "share" / "inku" / "inku.db")
@@ -30,7 +31,20 @@ engine = create_engine(_DB_URL, echo=False, future=True, connect_args=_connect_a
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 _logger = logging.getLogger(__name__)
 _HISTORY_FTS_ENABLED = False
-
+LINEAGE_DERIVATION_KINDS = {
+    "touch_variation",
+    "layout_variation",
+    "reinterpretation",
+    "model_variation",
+    "ddl_edit",
+    "description_edit",
+    "replay",
+    "render_engine_variation",
+    "age_variation",
+    "hacho_variation",
+    "renga_reply",
+    "external_seed_variation",
+}
 
 class Base(DeclarativeBase):
     pass
@@ -75,9 +89,46 @@ class HistoryRow(Base):
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
     note         = Column(Text,       nullable=True)
+    source_text = Column(Text, nullable=True)
+    display_label = Column(String, nullable=True)
+    batch_line_number = Column(Integer, nullable=True)
+    batch_run_id = Column(String, nullable=True, index=True)
+    description_hash = Column(String, nullable=True, index=True)
+    history_visibility = Column(String, nullable=False, default="normal", index=True)
+    lineage_node_id = Column(String, nullable=True, unique=True, index=True)
+
+
+class LineageNodeRow(Base):
+    __tablename__ = "lineage_nodes"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_accounts.id"), nullable=False, index=True)
+    history_id = Column(String, nullable=True, unique=True, index=True)
+    state = Column(String, nullable=False, default="active", index=True)
+    description_hash = Column(String, nullable=True, index=True)
+    render_hash = Column(String, nullable=True, index=True)
+    at = Column(BigInteger, nullable=False, index=True)
+    deleted_at = Column(BigInteger, nullable=True)
+
+
+class LineageEdgeRow(Base):
+    __tablename__ = "lineage_edges"
+    __table_args__ = (
+        UniqueConstraint("child_node_id", name="uq_lineage_primary_parent"),
+        CheckConstraint("parent_node_id <> child_node_id", name="ck_lineage_no_self_edge"),
+    )
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_accounts.id"), nullable=False, index=True)
+    parent_node_id = Column(String, ForeignKey("lineage_nodes.id"), nullable=False, index=True)
+    child_node_id = Column(String, ForeignKey("lineage_nodes.id"), nullable=False, index=True)
+    derivation_kind = Column(String, nullable=False, index=True)
+    metadata_json = Column(Text, nullable=False, default="{}")
+    at = Column(BigInteger, nullable=False, index=True)
 
 
 class UserGroupRow(Base):
+
     __tablename__ = "user_groups"
 
     id   = Column(String, primary_key=True)
@@ -153,6 +204,13 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
     "note": "ALTER TABLE history ADD COLUMN note TEXT",
+    "source_text": "ALTER TABLE history ADD COLUMN source_text TEXT",
+    "display_label": "ALTER TABLE history ADD COLUMN display_label VARCHAR",
+    "batch_line_number": "ALTER TABLE history ADD COLUMN batch_line_number INTEGER",
+    "batch_run_id": "ALTER TABLE history ADD COLUMN batch_run_id VARCHAR",
+    "description_hash": "ALTER TABLE history ADD COLUMN description_hash VARCHAR",
+    "history_visibility": "ALTER TABLE history ADD COLUMN history_visibility VARCHAR NOT NULL DEFAULT 'normal'",
+    "lineage_node_id": "ALTER TABLE history ADD COLUMN lineage_node_id VARCHAR",
 }
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
@@ -232,6 +290,9 @@ _HISTORY_INDEX_MIGRATIONS = (
         "CREATE INDEX IF NOT EXISTS ix_history_user_starred_trashed_at ON history (user_id, starred, trashed, at)",
     ),
     ("ix_history_render_hash", "CREATE INDEX IF NOT EXISTS ix_history_render_hash ON history (render_hash)"),
+    ("ix_history_user_description_hash", "CREATE INDEX IF NOT EXISTS ix_history_user_description_hash ON history (user_id, description_hash)"),
+    ("ix_history_visibility", "CREATE INDEX IF NOT EXISTS ix_history_visibility ON history (history_visibility)"),
+    ("ix_history_lineage_node_id", "CREATE UNIQUE INDEX IF NOT EXISTS ix_history_lineage_node_id ON history (lineage_node_id)"),
 )
 
 
@@ -244,6 +305,7 @@ def init_db() -> None:
     _ensure_default_user_group()
     _ensure_bootstrap_admin()
     _assign_unowned_history_to_admin()
+    _backfill_history_identity_and_lineage()
 
 
 def _migrate_columns() -> None:
@@ -527,6 +589,163 @@ def _ensure_bootstrap_admin() -> None:
             )
         )
         session.commit()
+
+
+def _backfill_history_identity_and_lineage() -> None:
+    with SessionLocal() as session:
+        rows = session.query(HistoryRow).filter(
+            or_(
+                HistoryRow.source_text.is_(None),
+                HistoryRow.description_hash.is_(None),
+                HistoryRow.lineage_node_id.is_(None),
+            )
+        ).all()
+        changed = False
+        for row in rows:
+            source_text = row.source_text if row.source_text is not None else row.input
+            if row.source_text is None:
+                row.source_text = source_text
+                changed = True
+            expected_hash = description_hash(source_text)
+            if not row.description_hash:
+                row.description_hash = expected_hash
+                changed = True
+            if not row.history_visibility:
+                row.history_visibility = "normal"
+                changed = True
+            node = None
+            if row.lineage_node_id:
+                node = session.get(LineageNodeRow, row.lineage_node_id)
+            if node is None:
+                node = session.query(LineageNodeRow).filter(LineageNodeRow.history_id == row.id).first()
+            if node is None and row.user_id:
+                node = LineageNodeRow(
+                    id=str(uuid.uuid4()),
+                    user_id=row.user_id,
+                    history_id=row.id,
+                    state="lineage_only" if row.history_visibility == "lineage_only" else "active",
+                    description_hash=row.description_hash,
+                    render_hash=row.render_hash,
+                    at=row.at,
+                )
+                session.add(node)
+                changed = True
+            if node is not None and row.lineage_node_id != node.id:
+                row.lineage_node_id = node.id
+                changed = True
+        if changed:
+            session.commit()
+
+
+def _lineage_edge_to_dict(row: LineageEdgeRow) -> dict:
+    try:
+        metadata = json.loads(row.metadata_json or "{}")
+    except json.JSONDecodeError:
+        metadata = {}
+    return {
+        "id": row.id,
+        "parent_node_id": row.parent_node_id,
+        "child_node_id": row.child_node_id,
+        "derivation_kind": row.derivation_kind,
+        "metadata": metadata if isinstance(metadata, dict) else {},
+        "at": row.at,
+    }
+
+
+def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, node_limit: int = 200) -> dict | None:
+    descendant_depth = max(0, min(descendant_depth, 5))
+    node_limit = max(1, min(node_limit, 200))
+    with SessionLocal() as session:
+        focus = session.query(LineageNodeRow).filter(
+            LineageNodeRow.id == focus_node_id,
+            LineageNodeRow.user_id == user_id,
+        ).first()
+        if focus is None:
+            return None
+
+        node_ids = {focus.id}
+        edges: dict[str, LineageEdgeRow] = {}
+        current = focus.id
+        while len(node_ids) < node_limit:
+            edge = session.query(LineageEdgeRow).filter(
+                LineageEdgeRow.user_id == user_id,
+                LineageEdgeRow.child_node_id == current,
+            ).first()
+            if edge is None or edge.parent_node_id in node_ids:
+                break
+            edges[edge.id] = edge
+            node_ids.add(edge.parent_node_id)
+            current = edge.parent_node_id
+
+        frontier = {focus.id}
+        for _ in range(descendant_depth):
+            if not frontier or len(node_ids) >= node_limit:
+                break
+            child_edges = session.query(LineageEdgeRow).filter(
+                LineageEdgeRow.user_id == user_id,
+                LineageEdgeRow.parent_node_id.in_(frontier),
+            ).order_by(LineageEdgeRow.at.asc()).all()
+            next_frontier: set[str] = set()
+            for edge in child_edges:
+                if len(node_ids) >= node_limit and edge.child_node_id not in node_ids:
+                    break
+                edges[edge.id] = edge
+                node_ids.add(edge.child_node_id)
+                next_frontier.add(edge.child_node_id)
+            frontier = next_frontier
+
+        nodes = session.query(LineageNodeRow).filter(
+            LineageNodeRow.user_id == user_id,
+            LineageNodeRow.id.in_(node_ids),
+        ).all()
+        history_ids = [node.history_id for node in nodes if node.history_id]
+        history_by_id = {
+            row.id: row
+            for row in session.query(HistoryRow).filter(
+                HistoryRow.user_id == user_id,
+                HistoryRow.id.in_(history_ids),
+            ).all()
+        }
+        node_payloads = []
+        for node in nodes:
+            payload = {
+                "id": node.id,
+                "state": node.state,
+                "at": node.at,
+                "deleted_at": node.deleted_at,
+            }
+            if node.state != "tombstone":
+                payload["description_hash"] = node.description_hash
+                payload["render_hash"] = node.render_hash
+                history = history_by_id.get(node.history_id or "")
+                if history is not None:
+                    payload["history"] = _row_to_dict(history)
+            node_payloads.append(payload)
+        return {
+            "focus_node_id": focus.id,
+            "nodes": sorted(node_payloads, key=lambda item: (item["at"], item["id"])),
+            "edges": [_lineage_edge_to_dict(edge) for edge in sorted(edges.values(), key=lambda item: (item.at, item.id))],
+        }
+
+
+def promote_lineage_node(user_id: str, node_id: str) -> dict | None:
+    with SessionLocal() as session:
+        node = session.query(LineageNodeRow).filter(
+            LineageNodeRow.id == node_id,
+            LineageNodeRow.user_id == user_id,
+            LineageNodeRow.state == "lineage_only",
+        ).first()
+        if node is None or not node.history_id:
+            return None
+        row = session.get(HistoryRow, node.history_id)
+        if row is None:
+            return None
+        node.state = "active"
+        row.history_visibility = "normal"
+        session.commit()
+        session.refresh(row)
+        return _row_to_dict(row)
+
 
 
 def _history_owner_user_id() -> str | None:
@@ -828,8 +1047,15 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "render_hash_short": render_hash_short(row.render_hash),
         "trashed":      bool(row.trashed),
         "starred":      bool(row.starred),
-        "note":         row.note,
-    }
+    "note":         row.note,
+    "source_text": row.source_text if row.source_text is not None else row.input,
+    "display_label": row.display_label,
+    "batch_line_number": row.batch_line_number,
+    "batch_run_id": row.batch_run_id,
+    "description_hash": row.description_hash,
+    "history_visibility": row.history_visibility or "normal",
+    "lineage_node_id": row.lineage_node_id,
+}
     if row.render_build_number is not None:
         item["render_build_number"] = row.render_build_number
     if row.render_color_profile is not None:
@@ -894,6 +1120,24 @@ def _row_to_dict(row: HistoryRow) -> dict:
     return item
 
 
+def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow]) -> list[dict]:
+    """Attach edge provenance while keeping lineage_edges as the source of truth."""
+    items = [_row_to_dict(row) for row in rows]
+    node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
+    if not node_ids:
+        return items
+    edges = session.query(LineageEdgeRow).filter(LineageEdgeRow.child_node_id.in_(node_ids)).all()
+    edge_by_child = {edge.child_node_id: edge for edge in edges}
+    for row, item in zip(rows, items, strict=True):
+        edge = edge_by_child.get(row.lineage_node_id)
+        if edge is None or edge.user_id != row.user_id:
+            continue
+        item["lineage_parent_node_id"] = edge.parent_node_id
+        item["derivation_kind"] = edge.derivation_kind
+        item["derivation_metadata"] = _lineage_edge_to_dict(edge)["metadata"]
+    return items
+
+
 def _group_to_dict(row: UserGroupRow) -> dict:
     return {"id": row.id, "name": row.name, "at": row.at}
 
@@ -928,26 +1172,34 @@ def add_item(item: dict) -> dict:
         item.setdefault("render_canvas_aspect", canvas_aspect_id)
         item["render_canvas_aspect_id"] = canvas_aspect_id
         item.setdefault("render_canvas_aspect_ratio", canvas_aspect_ratio_for_aspect(canvas_aspect_id))
-    render_hash = item.get("render_hash") or render_hash_for_item(item)
+    render_hash = render_hash_for_item(item)
+    source_text = item.get("source_text")
+    if source_text is None:
+        source_text = item.get("input", "")
+    desc_hash = description_hash(source_text)
+    visibility = item.get("history_visibility") or "normal"
+    if visibility not in {"normal", "lineage_only"}:
+        raise ValueError("invalid history visibility")
+    parent_node_id = item.get("lineage_parent_node_id")
+    derivation_kind = item.get("derivation_kind")
+    derivation_metadata = item.get("derivation_metadata") or {}
+    if parent_node_id and derivation_kind not in LINEAGE_DERIVATION_KINDS:
+        raise ValueError("invalid lineage derivation kind")
+    if not parent_node_id and derivation_kind:
+        raise ValueError("lineage parent is required for a derivation")
+    if not isinstance(derivation_metadata, dict):
+        raise ValueError("lineage derivation metadata must be an object")
+
+    node_id = str(uuid.uuid4())
     row = HistoryRow(
-        id=item["id"],
-        user_id=item["user_id"],
-        at=item["at"],
-        input=item.get("input", ""),
-        ddl=item.get("ddl"),
-        score=json.dumps(item.get("score", {})),
-        svg=item.get("svg", ""),
-        output_path=item.get("output_path"),
-        elapsed_ms=item.get("elapsed_ms", 0),
-        stage1_model=item.get("stage1_model"),
-        stage2_model=item.get("stage2_model"),
-        tokens_in=item.get("tokens_in"),
-        tokens_out=item.get("tokens_out"),
-        catalog_id=item.get("catalog_id"),
+        id=item["id"], user_id=item["user_id"], at=item["at"], input=item.get("input", ""),
+        ddl=item.get("ddl"), score=json.dumps(item.get("score", {})), svg=item.get("svg", ""),
+        output_path=item.get("output_path"), elapsed_ms=item.get("elapsed_ms", 0),
+        stage1_model=item.get("stage1_model"), stage2_model=item.get("stage2_model"),
+        tokens_in=item.get("tokens_in"), tokens_out=item.get("tokens_out"), catalog_id=item.get("catalog_id"),
         render_build_number=item.get("render_build_number"),
         render_color_profile=json.dumps(item.get("render_color_profile"), ensure_ascii=False) if item.get("render_color_profile") is not None else None,
-        render_engine_id=item.get("render_engine_id"),
-        render_engine_version=item.get("render_engine_version"),
+        render_engine_id=item.get("render_engine_id"), render_engine_version=item.get("render_engine_version"),
         render_color_catalog_id=item.get("render_color_catalog_id"),
         render_color_catalog_name=item.get("render_color_catalog_name"),
         render_color_catalog_sub=item.get("render_color_catalog_sub"),
@@ -956,21 +1208,45 @@ def add_item(item: dict) -> dict:
         render_canvas_aspect_id=item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect"),
         render_canvas_aspect_ratio=item.get("render_canvas_aspect_ratio"),
         instruction_lang_requested=item.get("instruction_lang_requested"),
-        instruction_lang_resolved=item.get("instruction_lang_resolved"),
-        ui_lang=item.get("ui_lang"),
+        instruction_lang_resolved=item.get("instruction_lang_resolved"), ui_lang=item.get("ui_lang"),
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
         vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
         interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
-        render_hash=render_hash,
-        trashed=0,
-        starred=0,
-        note=item.get("note"),
+        render_hash=render_hash, trashed=0, starred=0, note=item.get("note"),
+        source_text=source_text, display_label=item.get("display_label"),
+        batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),
+        description_hash=desc_hash, history_visibility=visibility, lineage_node_id=node_id,
+    )
+    node = LineageNodeRow(
+        id=node_id, user_id=item["user_id"], history_id=item["id"],
+        state="lineage_only" if visibility == "lineage_only" else "active",
+        description_hash=desc_hash, render_hash=render_hash, at=item["at"],
     )
     with SessionLocal() as session:
+        if parent_node_id:
+            parent = session.query(LineageNodeRow).filter(
+                LineageNodeRow.id == parent_node_id,
+                LineageNodeRow.user_id == item["user_id"],
+                LineageNodeRow.state != "tombstone",
+            ).first()
+            if parent is None:
+                raise ValueError("lineage parent not found")
         session.add(row)
+        session.add(node)
+        if parent_node_id:
+            session.add(LineageEdgeRow(
+                id=str(uuid.uuid4()), user_id=item["user_id"], parent_node_id=parent_node_id,
+                child_node_id=node_id, derivation_kind=derivation_kind,
+                metadata_json=_canonical_json(derivation_metadata), at=item["at"],
+            ))
         session.commit()
         session.refresh(row)
-        return _row_to_dict(row)
+        result = _row_to_dict(row)
+        if parent_node_id:
+            result["lineage_parent_node_id"] = parent_node_id
+            result["derivation_kind"] = derivation_kind
+            result["derivation_metadata"] = derivation_metadata
+        return result
 
 
 def list_user_groups() -> list[dict]:
@@ -1533,6 +1809,8 @@ def delete_user(user_id: str) -> bool:
             return False
         if session.query(HistoryRow).filter(HistoryRow.user_id == user_id).first():
             raise ValueError("user has history")
+        session.query(LineageEdgeRow).filter(LineageEdgeRow.user_id == user_id).delete()
+        session.query(LineageNodeRow).filter(LineageNodeRow.user_id == user_id).delete()
         session.delete(row)
         session.commit()
         return True
@@ -1571,6 +1849,7 @@ def _list_items_with_fts(
             JOIN history_fts ON history_fts.rowid = h.rowid
             WHERE h.user_id = :user_id
               AND h.trashed = :trashed
+              AND h.history_visibility = 'normal'
               {starred_clause}
               AND history_fts MATCH :match
             """
@@ -1587,6 +1866,7 @@ def _list_items_with_fts(
                 JOIN history_fts ON history_fts.rowid = h.rowid
                 WHERE h.user_id = :user_id
                   AND h.trashed = :trashed
+                  AND h.history_visibility = 'normal'
                   {starred_clause}
                   AND history_fts MATCH :match
                 ORDER BY h.at DESC
@@ -1600,7 +1880,8 @@ def _list_items_with_fts(
         return [], int(total)
     order = {item_id: index for index, item_id in enumerate(ids)}
     rows = session.query(HistoryRow).filter(HistoryRow.id.in_(ids)).all()
-    return sorted((_row_to_dict(row) for row in rows), key=lambda item: order[item["id"]]), int(total)
+    items = _rows_to_dicts_with_lineage(session, rows)
+    return sorted(items, key=lambda item: order[item["id"]]), int(total)
 
 
 def list_items(
@@ -1615,6 +1896,7 @@ def list_items(
         query = session.query(HistoryRow).filter(
             HistoryRow.user_id == user_id,
             HistoryRow.trashed == (1 if trashed else 0),
+            HistoryRow.history_visibility == "normal",
         )
         if starred:
             query = query.filter(HistoryRow.starred == 1)
@@ -1638,7 +1920,7 @@ def list_items(
             .limit(limit)
             .all()
         )
-        return [_row_to_dict(r) for r in rows], total
+        return _rows_to_dicts_with_lineage(session, rows), total
 
 
 def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None = None) -> dict | None:
@@ -1671,11 +1953,14 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
             .filter(HistoryRow.user_id == user_id, HistoryRow.id.in_(ids))
             .all()
         )
-        return sorted((_row_to_dict(row) for row in rows), key=lambda item: order.get(item["id"], len(order)))
+        items = _rows_to_dicts_with_lineage(session, rows)
+        return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
 
 def delete_all(user_id: str) -> None:
     with SessionLocal() as session:
+        session.query(LineageEdgeRow).filter(LineageEdgeRow.user_id == user_id).delete()
+        session.query(LineageNodeRow).filter(LineageNodeRow.user_id == user_id).delete()
         session.query(HistoryRow).filter(HistoryRow.user_id == user_id).delete()
         session.commit()
 
@@ -1710,9 +1995,30 @@ def delete_items(user_id: str, ids: list[str]) -> int:
     if not ids:
         return 0
     with SessionLocal() as session:
-        count = session.query(HistoryRow).filter(
+        rows = session.query(HistoryRow).filter(
             HistoryRow.user_id == user_id,
             HistoryRow.id.in_(ids),
-        ).delete(synchronize_session=False)
+        ).all()
+        now = _now_ms()
+        node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
+        if node_ids:
+            nodes = session.query(LineageNodeRow).filter(
+                LineageNodeRow.user_id == user_id,
+                LineageNodeRow.id.in_(node_ids),
+            ).all()
+            for node in nodes:
+                node.state = "tombstone"
+                node.history_id = None
+                node.description_hash = None
+                node.render_hash = None
+                node.deleted_at = now
+            touching = session.query(LineageEdgeRow).filter(
+                LineageEdgeRow.user_id == user_id,
+                or_(LineageEdgeRow.parent_node_id.in_(node_ids), LineageEdgeRow.child_node_id.in_(node_ids)),
+            ).all()
+            for edge in touching:
+                edge.metadata_json = "{}"
+        for row in rows:
+            session.delete(row)
         session.commit()
-        return count
+        return len(rows)

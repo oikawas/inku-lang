@@ -64,6 +64,7 @@ function shortHash(value?: string | null): string {
 	return digest ? `${prefix}:${digest.slice(0, 10)}…` : `${value.slice(0, 12)}…`;
 }
 
+
 	function operationLabel(kind?: string): string {
 		const ja: Record<string, string> = { touch_variation: 'タッチ', layout_variation: '構図', reinterpretation: '解釈', model_variation: 'モデル', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画' };
 		const en: Record<string, string> = { touch_variation: 'Touch', layout_variation: 'Layout', reinterpretation: 'Reading', model_variation: 'Model', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay' };
@@ -104,11 +105,12 @@ function shortHash(value?: string | null): string {
 </button>
 {#if node.history?.display_label}<div class="display-label">{node.history.display_label}</div>{/if}
 {#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ゴミ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}
-<div class="meta" title={node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || (isJapanese ? '削除された作品' : 'Deleted artwork')}</div>
+<div class="meta" title={node.history?.source_text ?? node.history?.input ?? node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || (isJapanese ? '削除された作品' : 'Deleted artwork')}</div>
 {#if node.history}
 	<details class="node-details">
 		<summary>{isJapanese ? '詳細' : 'Details'}</summary>
 		<dl>
+			<dt>{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{node.history.source_text ?? node.history.input}</dd>
 			<dt>dh1</dt><dd>{shortHash(node.description_hash)}</dd>
 			<dt>rh2</dt><dd>{shortHash(node.render_hash)}</dd>
 			<dt>Stage 1</dt><dd>{node.history.stage1_model ?? '—'}</dd>
@@ -117,6 +119,11 @@ function shortHash(value?: string | null): string {
 			<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(edge?.derivation_kind)}</dd>
 		</dl>
 	</details>
+{/if}
+{#if node.history}
+	<button class="select-target" class:current-target={node.id === graph.focus_node_id} type="button" onclick={() => onOpenNode(node)}>
+		{node.id === graph.focus_node_id ? (isJapanese ? '編集対象として選択中' : 'Selected for editing') : (isJapanese ? 'この作品を編集対象にする' : 'Edit from this artwork')}
+	</button>
 {/if}
 {#if node.state === 'lineage_only'}<button class="promote" type="button" onclick={() => onPromoteNode(node)}>{isJapanese ? '履歴に残す' : 'Keep in history'}</button>{/if}
 							</article>
@@ -143,9 +150,9 @@ function shortHash(value?: string | null): string {
 	.lineage-message { margin: auto; color: var(--fg3); } .lineage-message.error { color: var(--danger, #9b3d32); }
 	.lineage-scroll { min-height: 0; overflow: auto; padding: 8px 18px 24px 8px; }
 	.lineage-columns { display: flex; align-items: flex-start; gap: 58px; min-width: max-content; }
-	.lineage-column { width: 188px; display: grid; gap: 14px; position: relative; }
+	.lineage-column { width: 210px; min-width: 210px; max-width: 210px; display: grid; gap: 14px; position: relative; }
 	.generation { color: var(--fg3); font-size: .72rem; text-align: center; }
-	.lineage-card { position: relative; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); }
+	.lineage-card { position: relative; box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); }
 	.lineage-card.focus { border-color: #8c6447; box-shadow: 0 0 0 2px #8c64472a; }
 	.lineage-card.tombstone { border-style: dashed; opacity: .72; }
 	.lineage-card.trashed { opacity: .62; filter: grayscale(.35); }
@@ -162,12 +169,14 @@ function shortHash(value?: string | null): string {
 	.preview span { height: 100%; display: grid; place-items: center; color: #81786c; }
 	.trash-state { margin-top: 6px; color: var(--fg3); font-size: .64rem; }
 	.display-label { margin-top: 7px; color: var(--muted, #756d62); font-size: .65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.meta { margin-top: 4px; font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.meta { margin-top: 4px; min-width: 0; height: 2.7em; overflow: hidden; font-size: .72rem; line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 	.node-details { margin-top: 7px; font-size: .66rem; }
 	.node-details summary { cursor: pointer; color: var(--muted, #756d62); }
 	.node-details dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; margin: 6px 0 0; }
 	.node-details dt { color: var(--muted, #756d62); }
-	.node-details dd { margin: 0; overflow-wrap: anywhere; }
+	.node-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+	.full-source { max-height: 7em; overflow: auto; white-space: pre-wrap; }
 	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-	.promote { width: 100%; margin-top: 7px; font-size: .72rem; }
+	.select-target, .promote { width: 100%; margin-top: 7px; border: 1px solid var(--border2); border-radius: 7px; padding: 7px 8px; background: var(--panel); color: var(--fg); cursor: pointer; font-size: .68rem; }
+	.select-target.current-target { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); color: var(--accent); font-weight: 650; }
 </style>

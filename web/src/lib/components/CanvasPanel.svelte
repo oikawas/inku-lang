@@ -25,6 +25,7 @@
 		outputTab: OutputTab;
 		result: PaintResult | null;
 		nearbyHistory: NearbyHistory[];
+		onOpenNearbyHistory: (id: string) => void;
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
 		nextDisabled: boolean;
@@ -126,6 +127,7 @@
 		outputTab = $bindable('canvas'),
 		result,
 		nearbyHistory = [],
+		onOpenNearbyHistory,
 		allowEmptyOutputTabs,
 		currentRenderedAt,
 		nextDisabled,
@@ -387,7 +389,14 @@
 	<div class="nearby-mirror" onpointerdown={(event) => event.stopPropagation()}>
 		<span>{isJapanese ? '近い作品' : 'Nearby works'}</span>
 		{#each nearbyHistory as item (item.id)}
-			<div class="nearby-thumb" title={item.input}>{@html item.svg}</div>
+			<button
+				type="button"
+				class="nearby-thumb"
+				title={item.input}
+				aria-label={`${isJapanese ? '近い作品を開く' : 'Open nearby work'}: ${item.input}`}
+				disabled={!item.id}
+				onclick={() => { if (item.id) onOpenNearbyHistory(item.id); }}
+			>{@html item.svg}</button>
 		{/each}
 	</div>
 {/if}
@@ -1382,7 +1391,10 @@
 	}
 	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 	.nearby-mirror { position: absolute; right: 64px; bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); box-shadow: 0 2px 10px #0002; color: var(--fg3); font-size: 0.68rem; z-index: 4; }
-	.nearby-thumb { width: 32px; height: 32px; overflow: hidden; background: white; border: 1px solid var(--border); }
+	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: white; border: 1px solid var(--border); cursor: pointer; }
+	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }
+	.nearby-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.nearby-thumb:disabled { cursor: default; opacity: 0.65; }
 	.nearby-thumb :global(svg) { width: 100%; height: 100%; }
 	.canvas-content {
 		position: relative;

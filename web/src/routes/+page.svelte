@@ -184,7 +184,7 @@
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc' | 'server_misc' | 'logs';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs';
 	type UserModelSettings = {
 		stage1_provider: Provider;
 		stage1_model: string;
@@ -344,7 +344,7 @@
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
-	let nearbyHistory = $state<Array<{ id?: string; svg: string; input: string }>>([]);
+	let nearbyHistory = $state<Iteration[]>([]);
 	let variationGridBusy = $state(false);
 	let variationGridCanAbort = $state(false);
 	let variationGridIncludesReading = $state(false);
@@ -633,7 +633,7 @@
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
-		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
+		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
 	}
 
 	function canAccessSettingsTab(tab: SettingsTab) {
@@ -3470,6 +3470,11 @@ $effect(() => {
 		fitCanvasZoom();
 	}
 
+	function openNearbyHistory(id: string): void {
+		const item = nearbyHistory.find((candidate) => candidate.id === id);
+		if (item) loadIterationItem(item);
+	}
+
 	const currentRenderedAt = $derived(
 		historyCursor >= 0 && historyItems[historyCursor]
 			? new Date(historyItems[historyCursor].at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US')
@@ -4734,6 +4739,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 				bind:pngWrapEl
 				{result}
 				{nearbyHistory}
+				onOpenNearbyHistory={openNearbyHistory}
 				allowEmptyOutputTabs={inputMode === 'demo' || activeRunMode === 'demo'}
 				{currentRenderedAt}
 				{nextDisabled}

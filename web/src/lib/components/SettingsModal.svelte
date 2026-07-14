@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { Provider, ProviderGroup } from '$lib/models';
 
@@ -77,7 +78,7 @@
 		at: number;
 	};
 	type SettingsMode = 'model' | 'settings';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc' | 'server_misc' | 'logs';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs';
 	type HistorySelectionBehavior = 'history' | 'current';
 	type ModelProviderSetting = {
 		label?: string;
@@ -491,6 +492,7 @@
 				<button class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
 				<button class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
 			{/if}
+			<button class:active={settingsTab === 'unread'} onclick={() => onSelectSettingsTab('unread')}>{t().settingsTabUnreadWords}</button>
 			<button class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
 			<button class:active={settingsTab === 'misc'} onclick={() => onSelectSettingsTab('misc')}>{t().settingsTabMisc}</button>
 		</div>
@@ -1035,6 +1037,8 @@
 					</div>
 				</div>
 			{/if}
+		{:else if settingsTab === 'unread'}
+			<UnreadWordsPanel {isAdmin} />
 		{:else if settingsTab === 'export'}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsExportTemplatesTitle}</div>
@@ -1307,7 +1311,7 @@
 		background: var(--panel2); border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
-		width: min(860px, calc(100vw - 32px)); max-height: 88vh;
+		width: min(1120px, calc(100vw - 48px)); max-height: 88vh;
 		height: min(760px, 88vh);
 	}
 	.settings-modal.model-modal {
@@ -1316,10 +1320,10 @@
 	}
 	.settings-modal.model-modal .form-row label { width: 82px; }
 	.settings-tabs {
-		display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg);
+		display: flex; flex: 0 0 auto; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg);
 	}
 	.settings-tabs button {
-		padding: 9px 16px; border: none; border-bottom: 2px solid transparent;
+		flex: 0 0 auto; white-space: nowrap; padding: 9px 16px; border: none; border-bottom: 2px solid transparent;
 		background: none; color: var(--fg2); font-size: 13px; cursor: pointer; font-family: inherit;
 	}
 	.settings-tabs button.active { color: var(--fg); border-bottom-color: var(--fg); font-weight: 500; }

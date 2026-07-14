@@ -1300,6 +1300,6 @@ When updating the specification:
 
 - Added the physical motion word `tile` / 「敷き詰める」 to Saijiki. It is selected only for a literally requested regular repeated surface, never inferred from merely “many” or “countless.”
 - Added `layout="grid"` with optional `rows`, `cols`, and `jitter`. Grid fills `at.region` or the margin-bounded canvas; explicit rows×cols take priority over count. The schema limit is 2000 for literal tiling while ordinary arrangements keep the existing 1–1000 prompt contract.
-- Grid performance layers seeded cell jitter, distinct per-element variation phase, and material-specific weight behavior while preserving bit-identical replay for the same Score and seed. Coerce does not add fade, clustering, preserved space, or count reduction to grid.
+- Grid performance layers seeded cell jitter, distinct per-element variation phase, and material-specific weight behavior while preserving bit-identical replay for the same Score and seed. Coerce does not add fade, clustering, preserved space, or count reduction to grid. Build 515 limits English literal markers to tile/tiled/tiling and adds a drop-only boundary so a motif label containing grid alone cannot create a spontaneous grid.
 - Added matched Japanese and English Stage 1 / Stage 2 rules and wallpaper, four-direction, and square-grid examples. Four directions remain a maximum of four overlaid instructions; no new primitive was introduced.
-- Build 514.
+- Build 515.

@@ -3809,6 +3809,6 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 
 - 物理動作語彙として「敷き詰める」/ `tile` をSaijikiの「うごき」に追加した。規則的反復が主題として文字どおり書かれた場合だけ使用し、「たくさん」「無数」から自発的に選ばない。
 - JSON Scoreのarrangementに `layout="grid"`、`rows`、`cols`、`jitter` を追加した。gridは `at.region` またはmargin内をセルで覆い、明示rows×colsをcountより優先する。schema上限は2000へ拡張したが、非pattern経路は従来の1〜1000を維持する。
-- Rendererはセル位置jitter、要素別variation位相、weight素材固有の揺らぎを重ね、同一Score + seedのbit決定性を保つ。gridはcoerceのfade / cluster / preserve-space / count縮小から除外する。
+- Rendererはセル位置jitter、要素別variation位相、weight素材固有の揺らぎを重ね、同一Score + seedのbit決定性を保つ。gridはcoerceのfade / cluster / preserve-space / count縮小から除外する。Build 515では英語の literal marker を tile/tiled/tiling に限定し、単なるモチーフ名の grid から自発gridを作らないdrop-only境界を追加した。
 - Stage 1 / Stage 2へ日英同等のliteral-only規則と壁紙・四方向・格子の例を追加した。四方向は最大4 instructionの既存重ねで表現し、新primitiveは追加しない。
-- Build 514。
+- Build 515。

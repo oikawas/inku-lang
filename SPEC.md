@@ -1310,7 +1310,7 @@ When updating the specification:
 - Added `dh1:<sha256>` as description identity over NFC-normalized text with LF line endings and trimmed outer whitespace. Batch labels such as `#1` are presentation metadata and do not affect `dh1`. Description identity, the existing `rh2` edition identity, history IDs, and lineage node IDs remain separate concepts.
 - Added independent lineage nodes and edges. Parentage is recorded only by explicit touch, layout, interpretation, model, DDL-edit, description-edit, or replay operations; it is never inferred from hashes, timestamps, or visual similarity. Existing history rows are backfilled as separate roots.
 - When a saved child derives from an unsaved candidate, only that direct ancestor is retained as `lineage_only`. These hidden ancestors do not affect ordinary history counts or starred views and can be promoted from the lineage view.
-- Added a focused Canvas lineage view showing nearby generations as artwork thumbnails connected by lines and labeled with the operation that produced each child. Trash preserves lineage; permanent deletion removes content and hashes while leaving a content-free tombstone to preserve the path.
+- Added a focused Canvas lineage view showing nearby generations as artwork thumbnails with arrows between parent and child cards and labels for the operation that produced each child. Opening a card changes both the displayed artwork and the parent for the next refinement. Card checkboxes support confirmation-gated bulk moves to trash. Trash preserves lineage; permanent deletion removes content and hashes while leaving a content-free tombstone to preserve the path.
 - Users can explicitly start a new root. Ordinary DRAW actions are not automatically attached to the latest history item.
 - Lineage depth and branching are not quality scores, achievements, or generation controls. The graph records the creative process; it does not choose a best branch.
-- Build 519.
+- Build 520.

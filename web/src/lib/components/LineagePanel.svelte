@@ -28,15 +28,17 @@
 		isJapanese: boolean;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
+		onAskTrash: (historyIds: string[]) => void;
 		onDetach: () => void;
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onDetach }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onAskTrash, onDetach }: Props = $props();
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
 	let arrowPaths = $state<ArrowPath[]>([]);
+	let checkedHistoryIds = $state<string[]>([]);
 	const cardElements = new Map<string, HTMLElement>();
 
 	const nodeById = $derived(new Map((graph?.nodes ?? []).map((node) => [node.id, node])));
@@ -76,6 +78,16 @@
 		const en: Record<string, string> = { touch_variation: 'Touch', layout_variation: 'Layout', reinterpretation: 'Reading', model_variation: 'Model', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay' };
 		return (isJapanese ? ja : en)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Root'));
 	}
+
+function toggleCheckedHistory(historyId: string): void {
+	checkedHistoryIds = checkedHistoryIds.includes(historyId)
+		? checkedHistoryIds.filter((id) => id !== historyId)
+		: [...checkedHistoryIds, historyId];
+}
+
+function askTrashChecked(): void {
+	if (checkedHistoryIds.length > 0) onAskTrash([...checkedHistoryIds]);
+}
 
 	function updateArrowPaths(): void {
 		if (!lineageColumnsEl || !graph) {
@@ -150,6 +162,14 @@
 		columns;
 		void tick().then(scheduleArrowUpdate);
 	});
+$effect(() => {
+	const available = new Set((graph?.nodes ?? [])
+		.filter((node) => node.history?.id && !node.history.trashed)
+		.map((node) => node.history?.id as string));
+	const next = checkedHistoryIds.filter((id) => available.has(id));
+	if (next.join('\n') !== checkedHistoryIds.join('\n')) checkedHistoryIds = next;
+});
+
 </script>
 
 <section class="lineage-panel">
@@ -159,7 +179,13 @@
 			<p>{isJapanese ? '派生の流れを辿り、任意の作品へ戻れます。' : 'Trace derivations and return to any artwork.'}</p>
 			{#if graph}<p class="lineage-context">{isJapanese ? '表示中の作品が、次の推敲の親になります。' : 'The displayed artwork will be the parent of your next refinement.'}</p>{/if}
 		</div>
-		<button type="button" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
+<div class="lineage-actions">
+	<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked artworks to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked artworks to trash'} onclick={askTrashChecked}>
+		<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
+		{#if checkedHistoryIds.length > 0}<span>{checkedHistoryIds.length}</span>{/if}
+	</button>
+	<button type="button" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
+</div>
 	</header>
 	{#if loading}
 		<div class="lineage-message">{isJapanese ? '系譜を読み込み中…' : 'Loading lineage…'}</div>
@@ -186,6 +212,12 @@
 						{#each nodes as node (node.id)}
 							{@const edge = edgeByChild.get(node.id)}
 							<article use:registerCard={node.id} class="lineage-card" class:focus={node.id === graph.focus_node_id} class:tombstone={node.state === 'tombstone'} class:trashed={!!node.history?.trashed}>
+{#if node.history?.id && !node.history.trashed}
+	<label class="card-check" aria-label={isJapanese ? '一括操作の対象にする' : 'Check for bulk actions'}>
+		<input type="checkbox" checked={checkedHistoryIds.includes(node.history.id)} onclick={(event) => event.stopPropagation()} onpointerdown={(event) => event.stopPropagation()} onchange={() => toggleCheckedHistory(node.history?.id as string)} />
+	</label>
+{/if}
+
 								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted artwork')} onclick={() => onOpenNode(node)}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
@@ -238,7 +270,11 @@
 	h2 { margin: 0 0 4px; font-size: 1.05rem; }
 	p { margin: 0; color: var(--fg3); font-size: .82rem; }
 	.lineage-context { margin-top: 5px; color: var(--fg2); font-weight: 600; }
+	.lineage-actions { display: flex; align-items: center; gap: 8px; }
 	header button, .promote { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: 7px; padding: 7px 10px; cursor: pointer; }
+	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+	.bulk-trash:disabled { opacity: .4; cursor: default; }
 	.lineage-message { margin: auto; color: var(--fg3); }
 	.lineage-message.error { color: var(--danger, #9b3d32); }
 	.lineage-scroll { min-height: 0; overflow: auto; padding: 8px 18px 24px 8px; }
@@ -249,14 +285,16 @@
 	.lineage-arrows marker path { fill: var(--fg2); }
 	.lineage-column { position: relative; z-index: 1; width: 210px; min-width: 210px; max-width: 210px; display: grid; gap: 14px; }
 	.generation { color: var(--fg3); font-size: .72rem; text-align: center; }
-	.lineage-card { box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); }
+	.lineage-card { position: relative; box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); }
 	.lineage-card.focus { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 	.lineage-card.tombstone { border-style: dashed; opacity: .72; }
 	.lineage-card.trashed { opacity: .62; filter: grayscale(.35); }
+	.card-check { position: absolute; z-index: 3; top: 8px; right: 8px; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
+	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
 	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-	.operation { min-height: 18px; margin-bottom: 6px; display: flex; justify-content: space-between; gap: 5px; color: var(--fg2); font-size: .7rem; }
+	.operation { padding-right: 22px; min-height: 18px; margin-bottom: 6px; display: flex; justify-content: space-between; gap: 5px; color: var(--fg2); font-size: .7rem; }
 	.identity-marks { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
 	.identity-mark, .active-mark { border-radius: 999px; padding: 1px 5px; font-size: .62rem; }
 	.identity-mark { color: var(--fg3); background: var(--bg2); }

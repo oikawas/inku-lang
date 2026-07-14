@@ -307,7 +307,7 @@
 				{#each managedHistoryItems as it, i (it.id ?? it.at)}
 					<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 						<label class="manager-check">
-							<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && onToggleSelection(it.id)} />
+							<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onclick={(event) => event.stopPropagation()} onchange={() => it.id && onToggleSelection(it.id)} />
 						</label>
 						<div
 							class="thumb manager-thumb"
@@ -364,7 +364,7 @@
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
 						<tr>
-							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && onToggleSelection(it.id)} /></td>
+							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onclick={(event) => event.stopPropagation()} onpointerdown={(event) => event.stopPropagation()} onchange={() => it.id && onToggleSelection(it.id)} /></td>
 							<td class="table-thumb-cell">
 								<button
 									class="table-thumb-select"

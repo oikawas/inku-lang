@@ -2973,6 +2973,7 @@
 		});
 		historyManager.selectedIds = [];
 		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), historyManager.fetch()]);
+		if (lineageGraph?.focus_node_id) await fetchLineage(lineageGraph.focus_node_id, true);
 		if (historyItems.length === 0 && historyOffset > 0) await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize));
 	}
 
@@ -4678,6 +4679,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 				isJapanese={getLang() === 'ja'}
 				onOpenLineageNode={openLineageNode}
 				onPromoteLineageNode={promoteLineageNode}
+				onAskTrashLineage={askTrash}
 				onDetachLineage={detachLineage}
 				pngTemplates={exportTemplates}
 			/>

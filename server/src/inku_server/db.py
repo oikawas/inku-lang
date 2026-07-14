@@ -85,6 +85,7 @@ class HistoryRow(Base):
     render_seed = Column(String, nullable=True)
     vary_seed = Column(String, nullable=True)
     interpretation_seed = Column(String, nullable=True)
+    seed_text = Column(Text, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -125,6 +126,19 @@ class LineageEdgeRow(Base):
     derivation_kind = Column(String, nullable=False, index=True)
     metadata_json = Column(Text, nullable=False, default="{}")
     at = Column(BigInteger, nullable=False, index=True)
+
+
+class UnreadWordRow(Base):
+    __tablename__ = "unread_words"
+    __table_args__ = (UniqueConstraint("user_id", "word", "context", name="uq_unread_word_context"),)
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_accounts.id"), nullable=False, index=True)
+    word = Column(String, nullable=False, index=True)
+    context = Column(Text, nullable=False, default="")
+    frequency = Column(Integer, nullable=False, default=1)
+    first_at = Column(BigInteger, nullable=False, index=True)
+    last_at = Column(BigInteger, nullable=False, index=True)
 
 
 class UserGroupRow(Base):
@@ -200,6 +214,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "render_seed": "ALTER TABLE history ADD COLUMN render_seed VARCHAR",
     "vary_seed": "ALTER TABLE history ADD COLUMN vary_seed VARCHAR",
     "interpretation_seed": "ALTER TABLE history ADD COLUMN interpretation_seed VARCHAR",
+    "seed_text": "ALTER TABLE history ADD COLUMN seed_text TEXT",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
@@ -1117,6 +1132,8 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["vary_seed"] = row.vary_seed
     if row.interpretation_seed is not None:
         item["interpretation_seed"] = row.interpretation_seed
+    if row.seed_text is not None:
+        item["seed_text"] = row.seed_text
     return item
 
 
@@ -1212,6 +1229,7 @@ def add_item(item: dict) -> dict:
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
         vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
         interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
+        seed_text=item.get("seed_text"),
         render_hash=render_hash, trashed=0, starred=0, note=item.get("note"),
         source_text=source_text, display_label=item.get("display_label"),
         batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),
@@ -1247,6 +1265,59 @@ def add_item(item: dict) -> dict:
             result["derivation_kind"] = derivation_kind
             result["derivation_metadata"] = derivation_metadata
         return result
+
+
+def record_unread_words(user_id: str, words: list[str], context: str, *, at: int) -> None:
+    clean_words = sorted({word.strip()[:120] for word in words if word and word.strip()})
+    clean_context = context.strip()[:1000]
+    if not clean_words:
+        return
+    with SessionLocal() as session:
+        for word in clean_words:
+            row = session.query(UnreadWordRow).filter(
+                UnreadWordRow.user_id == user_id,
+                UnreadWordRow.word == word,
+                UnreadWordRow.context == clean_context,
+            ).first()
+            if row is None:
+                session.add(UnreadWordRow(
+                    id=str(uuid.uuid4()), user_id=user_id, word=word, context=clean_context,
+                    frequency=1, first_at=at, last_at=at,
+                ))
+            else:
+                row.frequency += 1
+                row.last_at = at
+        session.commit()
+
+
+def list_unread_words(user_id: str | None = None, *, limit: int = 100) -> list[dict]:
+    with SessionLocal() as session:
+        query = session.query(UnreadWordRow)
+        if user_id is not None:
+            query = query.filter(UnreadWordRow.user_id == user_id)
+        rows = query.all()
+        aggregate: dict[str, dict] = {}
+        users_by_word: dict[str, set[str]] = {}
+        for row in rows:
+            item = aggregate.setdefault(row.word, {
+                "word": row.word,
+                "frequency": 0,
+                "first_at": row.first_at,
+                "last_at": row.last_at,
+                "contexts": [],
+            })
+            item["frequency"] += row.frequency
+            item["first_at"] = min(item["first_at"], row.first_at)
+            item["last_at"] = max(item["last_at"], row.last_at)
+            if row.context and row.context not in item["contexts"] and len(item["contexts"]) < 3:
+                item["contexts"].append(row.context)
+            users_by_word.setdefault(row.word, set()).add(row.user_id)
+        items = sorted(aggregate.values(), key=lambda item: (-item["frequency"], -item["last_at"], item["word"]))
+        for item in items:
+            item["context"] = item["contexts"][0] if item["contexts"] else ""
+            if user_id is None:
+                item["user_count"] = len(users_by_word[item["word"]])
+        return items[:limit]
 
 
 def list_user_groups() -> list[dict]:

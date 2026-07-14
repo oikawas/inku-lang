@@ -25,6 +25,7 @@
 	type Props = {
 		inputMode: 'single' | 'batch' | 'demo';
 		input: string;
+		seedText: string;
 		batchInput: string;
 		lineNumbersText: string;
 		batchNonEmpty: number;
@@ -90,6 +91,7 @@
 	let {
 		inputMode = $bindable('single'),
 		input = $bindable(''),
+		seedText = $bindable(''),
 		batchInput = $bindable(''),
 		lineNumbersText,
 		batchNonEmpty,
@@ -237,6 +239,11 @@
 		></textarea>
 		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide}</div>
 
+<label class="seed-text-field">
+	<span>{instructionLang === 'ja' ? '今日の言葉を種にする' : 'Seed the performance with a phrase'}</span>
+	<input bind:value={seedText} placeholder={instructionLang === 'ja' ? '空欄なら通常の演奏' : 'Blank uses the normal performance'} />
+</label>
+
 		{#if interpretationFeedbackParts.length > 0}
 			<div class="interpret-feedback" aria-label={t().interpretationFeedbackLabel}>
 				{#each interpretationFeedbackParts as part}
@@ -358,6 +365,8 @@
 	}
 	.panel-tab.active.running::before { background: var(--accent); animation: none; }
 	.panel-tab:disabled { opacity: 0.38; cursor: not-allowed; }
+	.seed-text-field { display: grid; gap: 4px; margin-top: 10px; color: var(--fg3); font-size: 0.78rem; }
+	.seed-text-field input { width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; color: var(--fg); background: var(--bg); }
 	.interpret-feedback {
 		display: flex;
 		flex-wrap: wrap;

@@ -15,6 +15,7 @@
 	type PaintResult = { svg: string; score: Score; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean };
+	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineChanges = { touch: boolean; layout: boolean; reading: boolean };
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
@@ -23,6 +24,7 @@
 	type Props = {
 		outputTab: OutputTab;
 		result: PaintResult | null;
+		nearbyHistory: NearbyHistory[];
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
 		nextDisabled: boolean;
@@ -123,6 +125,7 @@
 	let {
 		outputTab = $bindable('canvas'),
 		result,
+		nearbyHistory = [],
 		allowEmptyOutputTabs,
 		currentRenderedAt,
 		nextDisabled,
@@ -380,6 +383,14 @@
 						{/if}
 					</div>
 				</div>
+{#if nearbyHistory.length > 0}
+	<div class="nearby-mirror" onpointerdown={(event) => event.stopPropagation()}>
+		<span>{isJapanese ? '近い作品' : 'Nearby works'}</span>
+		{#each nearbyHistory as item (item.id)}
+			<div class="nearby-thumb" title={item.input}>{@html item.svg}</div>
+		{/each}
+	</div>
+{/if}
 				<div class="canvas-corner-controls canvas-corner-left" onpointerdown={(event) => event.stopPropagation()}>
 					<Tooltip placement="top-right" text={t().tooltipCanvasCaption}>
 						<button
@@ -1370,6 +1381,9 @@
 		cursor: not-allowed;
 	}
 	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.nearby-mirror { position: absolute; right: 64px; bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); box-shadow: 0 2px 10px #0002; color: var(--fg3); font-size: 0.68rem; z-index: 4; }
+	.nearby-thumb { width: 32px; height: 32px; overflow: hidden; background: white; border: 1px solid var(--border); }
+	.nearby-thumb :global(svg) { width: 100%; height: 100%; }
 	.canvas-content {
 		position: relative;
 		width: 100%;

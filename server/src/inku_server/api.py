@@ -6,6 +6,7 @@ GET  /health      : liveness
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -26,6 +27,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Resp
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .feature_analysis import composition_distance
 from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import compose
@@ -559,6 +561,14 @@ def _validated_canvas_aspect(value: str | None) -> str:
     return value
 
 
+def _render_seed_from_text(seed_text: str | None, render_seed: int | None) -> tuple[int | None, str | None]:
+    normalized = (seed_text or "").strip()
+    if not normalized:
+        return render_seed, None
+    digest = hashlib.sha256(normalized.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big", signed=False), normalized
+
+
 def _validated_canvas_aspect_override(value: str | None) -> str | None:
     if value is None:
         return None
@@ -619,6 +629,7 @@ class ComposeRequest(BaseModel):
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
+    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
 
 class ComposeResponse(BaseModel):
@@ -642,6 +653,7 @@ class ComposeResponse(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     interpretation_seed: str | None = None
+    seed_text: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -656,6 +668,7 @@ class ComposeResponse(BaseModel):
     coerce_relation_dropped_count: int = 0
     coerce_relation_drop_rate: float | None = None
     coerce_warnings: list[str] = Field(default_factory=list)
+    coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class InterpretRequest(BaseModel):
@@ -707,6 +720,7 @@ class PaintRequest(BaseModel):
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
+    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
 
 class PaintResponse(BaseModel):
@@ -731,6 +745,7 @@ class PaintResponse(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     interpretation_seed: str | None = None
+    seed_text: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -761,6 +776,12 @@ class PaintResponse(BaseModel):
     coerce_relation_dropped_count: int = 0
     coerce_relation_drop_rate: float | None = None
     coerce_warnings: list[str] = Field(default_factory=list)
+    coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class UnreadWordsBody(BaseModel):
+    words: list[str] = Field(default_factory=list, max_length=100)
+    context: str = Field(default="", max_length=1000)
 
 
 class RenderSvgRequest(BaseModel):
@@ -769,6 +790,7 @@ class RenderSvgRequest(BaseModel):
     canvas_aspect: str | None = None
     svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
+    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
 
 @dataclass
@@ -834,6 +856,7 @@ class HistoryPostBody(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     interpretation_seed: str | None = None
+    seed_text: str | None = None
     source_text: str | None = None
     display_label: str | None = None
     batch_line_number: int | None = None
@@ -2042,6 +2065,7 @@ def _call_interpret_detail(
 
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
 def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> ComposeResponse:
+    render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     t0 = time.perf_counter()
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     instruction_lang_resolved = _resolve_instruction_lang(req.original_text or req.ddl, instruction_lang_requested)
@@ -2065,8 +2089,9 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         ensure_renderable_score(score)
         if req.auto_repair:
             before_coerce = score
-            score = coerce_score(score, ddl=_coerce_context(compose_detail.ddl, req.original_text))
-            coerce_report = _coerce_relation_report(before_coerce, score)
+            branch_counts: dict[str, int] = {}
+            score = coerce_score(score, branch_report=branch_counts, ddl=_coerce_context(compose_detail.ddl, req.original_text))
+            coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -2077,8 +2102,9 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
-        "render_seed": req.render_seed,
+        "render_seed": render_seed,
         "vary_seed": req.vary_seed,
+        "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
     try:
@@ -2308,13 +2334,14 @@ def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_curre
 
 @app.post("/api/render-svg")
 def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user)) -> Response:
+    render_seed, _ = _render_seed_from_text(req.seed_text, req.render_seed)
     try:
         svg = _render_score_svg(
             req.score,
             catalog_id=req.catalog_id,
             canvas_aspect=req.canvas_aspect,
             svg_profile=req.svg_profile,
-            render_seed=req.render_seed,
+            render_seed=render_seed,
         )
     except HTTPException:
         raise
@@ -2411,6 +2438,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     catalog_id = _resolved_catalog_id(req.catalog_id)
     resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
+    render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     try:
         interpret_detail_result = _call_interpret_detail(
             req.text,
@@ -2439,8 +2467,9 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         ensure_renderable_score(score)
         if req.auto_repair:
             before_coerce = score
-            score = coerce_score(score, ddl=_coerce_context(ddl, source_text))
-            coerce_report = _coerce_relation_report(before_coerce, score)
+            branch_counts: dict[str, int] = {}
+            score = coerce_score(score, branch_report=branch_counts, ddl=_coerce_context(ddl, source_text))
+            coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -2451,8 +2480,9 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
-        "render_seed": req.render_seed,
+        "render_seed": render_seed,
         "vary_seed": req.vary_seed,
+        "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
     t2 = time.perf_counter()
@@ -2711,6 +2741,37 @@ def api_history_get(
 
 
 
+@app.get("/api/history/{item_id}/neighbors", response_model=list[HistoryItem], response_model_exclude_none=True)
+def api_history_neighbors(item_id: str, actor: dict = Depends(_current_user)) -> list[HistoryItem]:
+    focus = _db.get_items(actor["id"], [item_id])
+    if not focus:
+        raise HTTPException(status_code=404, detail="history item not found")
+    candidates, _ = _db.list_items(actor["id"], offset=0, limit=10_000)
+    ranked = sorted(
+        (item for item in candidates if item.get("id") != item_id),
+        key=lambda item: (composition_distance(focus[0].get("score") or {}, item.get("score") or {}), -int(item.get("at") or 0)),
+    )[:3]
+    return [HistoryItem(**item) for item in ranked]
+
+
+@app.post("/api/feedback/unread-words")
+def api_record_unread_words(body: UnreadWordsBody, actor: dict = Depends(_current_user)) -> dict:
+    _db.record_unread_words(actor["id"], body.words, body.context, at=int(time.time() * 1000))
+    return {"ok": True}
+
+
+@app.get("/api/feedback/unread-words")
+def api_my_unread_words(limit: int = Query(default=100, ge=1, le=500), actor: dict = Depends(_current_user)) -> list[dict]:
+    return _db.list_unread_words(actor["id"], limit=limit)
+
+
+@app.get("/api/admin/unread-words")
+def api_admin_unread_words(limit: int = Query(default=500, ge=1, le=2000), actor: dict = Depends(_current_user)) -> list[dict]:
+    if actor.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="admin role required")
+    return _db.list_unread_words(None, limit=limit)
+
+
 @app.get("/api/history/{item_id}/lineage")
 def api_history_lineage(
     item_id: str,
@@ -2782,6 +2843,7 @@ def api_history_svg(
 
 @app.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
+    render_seed, seed_text = _render_seed_from_text(body.seed_text, body.render_seed)
     try:
         score = coerce_score(Score.model_validate(body.score))
         catalog_id = _resolved_catalog_id(body.catalog_id)
@@ -2793,8 +2855,9 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
-            "render_seed": body.render_seed,
+            "render_seed": render_seed,
             "vary_seed": body.vary_seed,
+            "seed_text": seed_text,
             "interpretation_seed": body.interpretation_seed,
         }
         svg, render_metadata = _render_with_metadata(score, render_metadata)

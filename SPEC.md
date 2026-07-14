@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.76**
+**Version: v1.80**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -1232,6 +1232,19 @@ Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics ou
 - Expanded Svelte tooltip coverage across AppRail icons, Input panel tabs/buttons, and Canvas panel controls (zoom, vary, downloads, navigation) to improve usability.
 
 ---
+
+## 15.8 Accounting for Refinement
+
+inku treats convergence caused by accumulated quality repairs as part of its implementation history. Countermeasures belong only in human-facing mirrors, explicit user actions, and development practice; they must not become automatic control in the default generation path.
+
+- Every minor release records at least one branch, word, component, or rule it removed, or explicitly says that nothing could be removed. This is an account, not a deletion KPI.
+- Every release records what it made less likely, so the cost of refinement remains visible.
+- Release review places the new JP30/EN30 contact sheets beside the preceding two releases and records any newly increased repetition together with the motif-census delta. Finding no increase is also recorded.
+- Similarity features, motif frequency, vision observations, and coerce firing rates are audit mirrors only. They are never generation inputs, suppression controls, acceptance gates, or optimization objectives.
+
+v1.80 adds a deterministic Score-derived composition mirror shared by server and CLI, three unranked nearby history thumbnails, similarity ordering for contact sheets, a mechanical motif census over artifact sets or the current user's history, explicit renderer-only `seed_text`, a private unread-word ledger with `unread-words` and admin-only `unread-words --all` reporting, per-branch coerce observation, and an on-demand NIM vision review. Similarity never implies lineage: lineage remains the record of explicit creative causation.
+
+Refinement account for v1.80: the proposed automatic statistics-to-generation “unexplored” path was removed from this release, and vision review remains manual rather than release-automatic. Existing default-path repair branches could not yet be removed. The release makes unnoticed self-repetition, unrecorded external performance seeds, and privacy-losing unread-word aggregation less likely; it deliberately does not make dissimilarity a goal.
 
 ## 16. Licensing
 

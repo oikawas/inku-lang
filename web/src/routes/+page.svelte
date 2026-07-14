@@ -60,7 +60,7 @@
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const INSTRUCTION_LANG_KEY = 'inku-instruction-lang';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.76';
+	const APP_VERSION = 'v1.80';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -233,6 +233,7 @@
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
 	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
 	let input       = $state(DEFAULT_INPUT);
+	let seedText    = $state('');
 	let batchInput  = $state('');
 	let instructionLang = $state<InstructionLang>('auto');
 	let stage1UserPrompt = $state('');
@@ -343,6 +344,7 @@
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
+	let nearbyHistory = $state<Array<{ id?: string; svg: string; input: string }>>([]);
 	let variationGridBusy = $state(false);
 	let variationGridCanAbort = $state(false);
 	let variationGridIncludesReading = $state(false);
@@ -575,6 +577,28 @@
 	function apiFetch(path: string, init: RequestInit = {}) {
 		const headers = new Headers(init.headers);
 		return fetch(path, { ...init, headers, credentials: 'same-origin' });
+	}
+
+	let nearbyHistoryRequestId = 0;
+	let nearbyHistoryLoadedId: string | null = null;
+
+	async function loadNearbyHistory(historyId: string | null | undefined) {
+		const normalizedHistoryId = historyId ?? null;
+		if (normalizedHistoryId === nearbyHistoryLoadedId) return;
+		nearbyHistoryLoadedId = normalizedHistoryId;
+		const requestId = ++nearbyHistoryRequestId;
+		nearbyHistory = [];
+		if (!historyId) return;
+		try {
+			const response = await apiFetch(`/api/history/${historyId}/neighbors`, { cache: 'no-store' });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			const items = await response.json();
+			if (requestId === nearbyHistoryRequestId) {
+				nearbyHistory = Array.isArray(items) ? items : [];
+			}
+		} catch {
+			if (requestId === nearbyHistoryRequestId) nearbyHistory = [];
+		}
 	}
 
 	function applyUserTheme(user: UserItem | null) {
@@ -1904,6 +1928,10 @@
 	let historyOffset = $state(0);
 	let historyCursor = $state(-1);
 	let displayedHistoryItem = $state<Iteration | null>(null);
+	$effect(() => {
+		const historyId = displayedHistoryItem?.id ?? result?.history_id ?? null;
+		void loadNearbyHistory(historyId);
+	});
 	let historySelectionSyncRequest = 0;
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 	const historyWindowSize = $derived(visibleThumbCount);
@@ -2011,6 +2039,7 @@
 		renderSeed?: number;
 		varySeed?: number;
 		interpretationSeed?: string;
+		seedText?: string;
 		signal?: AbortSignal;
 		sourceText?: string;
 		displayLabel?: string;
@@ -2047,6 +2076,7 @@
 				render_seed: options.renderSeed,
 				vary_seed: options.varySeed,
 				interpretation_seed: options.interpretationSeed,
+				seed_text: options.seedText ?? seedText,
 				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
@@ -2069,6 +2099,16 @@
 		}
 		stageLabel = t().stageStructuring('');
 		const data = await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+		await loadNearbyHistory(data.history_id);
+const unreadWords = interpretationFeedback(text, data.ddl)
+	.filter((part) => part.tone === 'weak')
+	.flatMap((part) => part.text.match(/[一-龯々ぁ-んァ-ヶー]{2,}|[A-Za-z][A-Za-z'-]+/g) ?? []);
+if (unreadWords.length > 0) {
+	void apiFetch('/api/feedback/unread-words', {
+		method: 'POST', headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ words: unreadWords, context: text })
+	}).catch(() => undefined);
+}
 		if ((options.saveHistory ?? true) && data.lineage_node_id) lineageDetached = false;
 		if (currentUser && typeof data.user_generation_count === 'number') {
 			currentUser = { ...currentUser, image_generation_count: data.user_generation_count };
@@ -2441,7 +2481,7 @@
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
 					catalog_id: selectedCatalog,
 				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind });
-				if (savedHistory && result === r) {
+				if (savedHistory && submitAbortController === abortController && !submitStopRequested) {
 					lineageDetached = false;
 					displayedHistoryItem = savedHistory;
 					result = {
@@ -2453,6 +2493,7 @@
 						description_hash: savedHistory.description_hash,
 						lineage_node_id: savedHistory.lineage_node_id,
 					};
+					await loadNearbyHistory(savedHistory.id);
 				}
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
@@ -3092,7 +3133,6 @@
 
 	const activeComparisonItem = $derived(currentComparisonItem());
 
-
 	function modelInspectionModelChoices(): ModelInspectionChoice[] {
 		const seen = new Set<string>();
 		const choices: ModelInspectionChoice[] = [];
@@ -3265,7 +3305,6 @@
 			modelInspectionStatus = e instanceof Error ? e.message : String(e);
 		}
 	}
-
 
 	async function replayHistoryItem(it: Iteration) {
 		if (demoRunning || reloading) return;
@@ -3638,7 +3677,6 @@ async function ensureLineageParentId(): Promise<string | null> {
 		selectedCatalog = id;
 	}
 
-
 	async function varyPerformance() {
 		if (!result || variationBusy) return;
 		const parentNodeId = await ensureLineageParentId();
@@ -3943,7 +3981,6 @@ async function ensureLineageParentId(): Promise<string | null> {
 			variationGridBusy = false;
 		}
 	}
-
 
 	// ── Download ────────────────────────────────────────────
 	function escapeXml(s: string): string {
@@ -4539,6 +4576,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 					<InputPanel
 						bind:inputMode
 						bind:input
+						bind:seedText
 						bind:batchInput
 						{lineNumbersText}
 						{batchNonEmpty}
@@ -4638,7 +4676,6 @@ async function ensureLineageParentId(): Promise<string | null> {
 						/>
 					{/if}
 
-
 					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
 						<section class="panel-section interpretation-diff">
 							{#each interpretationDiffParts as part}
@@ -4646,7 +4683,6 @@ async function ensureLineageParentId(): Promise<string | null> {
 							{/each}
 						</section>
 					{/if}
-
 
 					<!-- 統計 -->
 					{#if result && elapsedTotalMs > 0}
@@ -4697,6 +4733,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 				bind:pngMenuOpen
 				bind:pngWrapEl
 				{result}
+				{nearbyHistory}
 				allowEmptyOutputTabs={inputMode === 'demo' || activeRunMode === 'demo'}
 				{currentRenderedAt}
 				{nextDisabled}
@@ -5319,7 +5356,6 @@ async function ensureLineageParentId(): Promise<string | null> {
 	.app-info-meta a:hover {
 		text-decoration: underline;
 	}
-
 
 	.interpretation-diff {
 		gap: 2px;

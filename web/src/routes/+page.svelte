@@ -4992,6 +4992,8 @@
 		width: min(520px, calc(100vw - 32px));
 		max-height: min(720px, calc(100vh - 32px));
 		transform: translate(-50%, -50%);
+		display: flex;
+		flex-direction: column;
 		background: var(--panel2);
 		border: 1px solid var(--border);
 		border-radius: var(--r-lg);
@@ -5026,6 +5028,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 18px;
+		overflow-y: auto;
 		padding: 18px 18px 20px;
 		color: var(--fg2);
 		font-size: 13px;
@@ -5040,6 +5043,7 @@
 	}
 	.app-info-body p {
 		margin: 0;
+		white-space: pre-line;
 	}
 	.app-info-creator {
 		margin-bottom: 4px;

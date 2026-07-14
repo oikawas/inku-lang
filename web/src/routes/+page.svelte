@@ -1904,6 +1904,7 @@
 	let historyOffset = $state(0);
 	let historyCursor = $state(-1);
 	let displayedHistoryItem = $state<Iteration | null>(null);
+	let historySelectionSyncRequest = 0;
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 	const historyWindowSize = $derived(visibleThumbCount);
 	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
@@ -2356,6 +2357,7 @@
 		activeRunMode = submittedMode;
 		ddl = null; ddlGeneratedBaseline = null; thinking = null; ddlSelection = { start: 0, end: 0 };
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
@@ -2438,9 +2440,10 @@
 					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
 					catalog_id: selectedCatalog,
-				}, { countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind });
+				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind });
 				if (savedHistory && result === r) {
 					lineageDetached = false;
+					displayedHistoryItem = savedHistory;
 					result = {
 						...r,
 						history_id: savedHistory.id,
@@ -2560,6 +2563,7 @@
 		replayStopRequested = false;
 		reloading = true; reloadError = null;
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		const uiLang = getLang();
 		const replayInput = input;
 		const startedAt = Date.now();
@@ -2657,9 +2661,10 @@
 					tokens_in: d.tokens_in,
 					tokens_out: d.tokens_out,
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
-				}, { sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind });
+				}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind });
 				if (savedHistory && result) {
 					lineageDetached = false;
+					displayedHistoryItem = savedHistory;
 					result = {
 						...result,
 						history_id: savedHistory.id,
@@ -2709,52 +2714,87 @@
 		);
 	}
 
-	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean } = {}): Promise<void> {
+	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean; anchorId?: string } = {}): Promise<boolean> {
 		if (!authToken) {
 			historyItems = [];
 			historyTotal = 0;
 			historyOffset = 0;
-			return;
+			return false;
 		}
 		const safeOffset = Math.max(0, offset);
-		const selectedHistoryId = options.preserveSelection
-			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? null
-			: null;
+		const selectedHistoryId = options.anchorId ?? (options.preserveSelection
+			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? result?.history_id ?? null
+			: null);
 		try {
-			const listLimit = safeOffset === 0 && !historyStarredOnly
-				? estimatedHistoryManagerPageSize()
-				: historyWindowSize;
+			const listLimit = options.anchorId
+				? historyWindowSize
+				: safeOffset === 0 && !historyStarredOnly
+					? estimatedHistoryManagerPageSize()
+					: historyWindowSize;
 			const params = new URLSearchParams({
 				offset: String(safeOffset),
 				limit: String(listLimit),
 			});
 			if (historyStarredOnly) params.set('starred', 'true');
+			if (options.anchorId) params.set('anchor_id', options.anchorId);
 			const r = await apiFetch(`/api/history?${params.toString()}`);
-			if (!r.ok) return;
+			if (!r.ok) return false;
 			const data = await r.json();
-			if (data.items.length === 0 && data.total > 0 && safeOffset > 0) {
+			const resolvedOffset = Number.isFinite(data.offset) ? Number(data.offset) : safeOffset;
+			if (data.items.length === 0 && data.total > 0 && resolvedOffset > 0 && !options.anchorId) {
 				const lastOffset = Math.floor((data.total - 1) / historyWindowSize) * historyWindowSize;
-				await fetchHistoryOffset(lastOffset);
-				return;
+				return await fetchHistoryOffset(lastOffset);
 			}
-			const stripItems = safeOffset === 0 && !historyStarredOnly
+			const stripItems = resolvedOffset === 0 && !historyStarredOnly
 				? data.items.slice(0, historyWindowSize)
 				: data.items;
-			historyItems = stripItems; historyTotal = data.total; historyOffset = safeOffset;
+			historyItems = stripItems; historyTotal = data.total; historyOffset = resolvedOffset;
 			if (selectedHistoryId) {
 				const selectedIndex = stripItems.findIndex((item: Iteration) => item.id === selectedHistoryId);
 				if (selectedIndex >= 0) historyCursor = selectedIndex;
+				else if (options.anchorId || options.preserveSelection) historyCursor = -1;
 				else if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
 			} else {
 				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
 				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
 			}
-			if (safeOffset === 0 && !historyStarredOnly) {
+			if (resolvedOffset === 0 && !historyStarredOnly) {
 				historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
 			} else {
 				preloadHistoryManagerFirstPage();
 			}
-		} catch { /* ignore */ }
+			return options.anchorId ? historyCursor >= 0 && historyItems[historyCursor]?.id === options.anchorId : true;
+		} catch {
+			return false;
+		}
+	}
+
+	async function syncHistoryStripToItem(item: Pick<Iteration, 'id' | 'trashed' | 'history_visibility'>): Promise<void> {
+		const requestId = ++historySelectionSyncRequest;
+		if (!item.id || item.trashed || item.history_visibility === 'lineage_only') {
+			historyCursor = -1;
+			return;
+		}
+		const localIndex = historyItems.findIndex((candidate) => candidate.id === item.id);
+		if (localIndex >= 0) {
+			historyCursor = localIndex;
+			return;
+		}
+		historyCursor = -1;
+		let found = await fetchHistoryOffset(0, { anchorId: item.id });
+		if (requestId !== historySelectionSyncRequest) {
+			if (displayedHistoryItem) void syncHistoryStripToItem(displayedHistoryItem);
+			return;
+		}
+		if (!found && historyStarredOnly) {
+			historyStarredOnly = false;
+			found = await fetchHistoryOffset(0, { anchorId: item.id });
+		}
+		if (requestId !== historySelectionSyncRequest) {
+			if (displayedHistoryItem) void syncHistoryStripToItem(displayedHistoryItem);
+			return;
+		}
+		if (!found) historyCursor = -1;
 	}
 
 	async function refreshHistoryForExternalSave(force = false): Promise<void> {
@@ -2766,7 +2806,9 @@
 		externalHistoryRefreshInFlight = true;
 		lastExternalHistoryRefreshAt = now;
 		try {
-			await fetchHistoryOffset(0, { preserveSelection: true });
+			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
+			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
+			else await fetchHistoryOffset(0, { preserveSelection: true });
 			if (historyManager.open && historyManager.view === 'active' && historyManager.page === 0 && !historyManager.search.trim() && !historyManager.starredOnly) {
 				await historyManager.fetch({ view: 'active', page: 0, search: '', starredOnly: false, silent: true });
 			}
@@ -2833,9 +2875,13 @@
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const updated = await r.json() as Iteration;
 			updateHistoryStarState(updated);
-			if (historyStarredOnly || historyManager.starredOnly) {
-				await Promise.all([fetchHistoryOffset(historyOffset), historyManager.fetch()]);
+			const refreshes: Promise<unknown>[] = [];
+			if (historyStarredOnly) {
+				if (!updated.starred) historyStarredOnly = false;
+				refreshes.push(fetchHistoryOffset(0, { anchorId: updated.id }));
 			}
+			if (historyManager.starredOnly) refreshes.push(historyManager.fetch());
+			if (refreshes.length > 0) await Promise.all(refreshes);
 		} catch (e) {
 			updateHistoryStarState(item);
 			console.warn('failed to update history star', e);
@@ -2853,7 +2899,7 @@
 		}
 	}
 
-	async function pushHistory(it: Iteration, options: { countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown> } = {}): Promise<Iteration | null> {
+	async function pushHistory(it: Iteration, options: { selectSaved?: boolean; countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown> } = {}): Promise<Iteration | null> {
 		if (!authToken) return null;
 		let saved: Iteration | null = null;
 		try {
@@ -2865,8 +2911,16 @@
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
 		if (options.countGeneration) await refreshCurrentUserOnly();
-		await fetchHistoryOffset(0);
-		historyCursor = 0;
+		if (options.selectSaved && saved?.id && options.historyVisibility !== 'lineage_only') {
+			await fetchHistoryOffset(0, { anchorId: saved.id });
+		} else {
+			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
+			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
+			else {
+				await fetchHistoryOffset(historyOffset, { preserveSelection: true });
+				historyCursor = -1;
+			}
+		}
 		return saved;
 	}
 
@@ -2969,6 +3023,18 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ids })
 		});
+		if (displayedHistoryItem?.id && ids.includes(displayedHistoryItem.id)) {
+			if (path === '/api/history/trash') {
+				displayedHistoryItem = { ...displayedHistoryItem, trashed: true };
+				historyCursor = -1;
+			} else if (path === '/api/history/restore') {
+				displayedHistoryItem = { ...displayedHistoryItem, trashed: false };
+				void syncHistoryStripToItem(displayedHistoryItem);
+			} else if (path === '/api/history/permanent-delete') {
+				displayedHistoryItem = null;
+				historyCursor = -1;
+			}
+		}
 		historyManager.selectedIds = [];
 		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), historyManager.fetch()]);
 		if (lineageGraph?.focus_node_id) await fetchLineage(lineageGraph.focus_node_id, true);
@@ -3260,7 +3326,17 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 async function promoteLineageNode(node: LineageNode): Promise<void> {
 	const r = await apiFetch(`/api/lineage/${encodeURIComponent(node.id)}/promote`, { method: 'POST' });
 	if (!r.ok) return;
-	await Promise.all([fetchLineage(node.id, true), fetchHistoryOffset(0)]);
+	const promoted = await r.json() as Iteration;
+	if (displayedHistoryItem?.id === promoted.id) {
+		displayedHistoryItem = promoted;
+		await Promise.all([fetchLineage(node.id, true), syncHistoryStripToItem(promoted)]);
+	} else {
+		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
+		await Promise.all([
+			fetchLineage(node.id, true),
+			activeHistoryId ? fetchHistoryOffset(0, { anchorId: activeHistoryId }) : fetchHistoryOffset(historyOffset, { preserveSelection: true }),
+		]);
+	}
 }
 
 async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
@@ -3279,6 +3355,7 @@ async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 function detachLineage(): void {
 	lineageDetached = true;
 	displayedHistoryItem = null;
+	historyCursor = -1;
 	lineageGraph = null;
 	lineageLoadedFocus = null;
 	outputTab = 'canvas';
@@ -3293,6 +3370,7 @@ $effect(() => {
 		if (demoRunning) return;
 		inputMode = 'single';
 		displayedHistoryItem = it;
+		void syncHistoryStripToItem(it);
 		lineageDetached = false;
 		if (historySelectionCatalog === 'history') {
 			const catalogId = it.render_color_catalog_id ?? it.catalog_id;
@@ -3456,18 +3534,22 @@ $effect(() => {
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		stage1Provider = v; stage1Model = modelsFor(v)[0]?.id ?? stage1Model;
 	}
 	function setStage1Model(v: string) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		stage1Model = v;
 	}
 	function setStage2Provider(v: Provider) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		stage2Provider = v; stage2Model = modelsFor(v)[0]?.id ?? stage2Model;
 	}
 	function setStage2Model(v: string) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		stage2Model = v;
 	}
 
@@ -3550,6 +3632,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 
 	function setSelectedCatalog(id: string) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		selectedCatalog = id;
 	}
 
@@ -3578,6 +3661,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 			const svg = await r.text();
 			result = { ...result, svg, render_seed: nextSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_variation' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
 			displayedHistoryItem = null;
+			historyCursor = -1;
 			outputTab = 'canvas';
 			fitCanvasZoom();
 		} catch (e) {
@@ -3614,8 +3698,12 @@ async function ensureLineageParentId(): Promise<string | null> {
 			tokensInStage2 = r.tokens_in_stage2;
 			tokensOutStage2 = r.tokens_out_stage2;
 			outputTab = 'canvas';
-			await fetchHistoryOffset(0);
-			historyCursor = 0;
+			if (r.history_id) {
+				await fetchHistoryOffset(0, { anchorId: r.history_id });
+				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
+			} else {
+				historyCursor = -1;
+			}
 			fitCanvasZoom();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -3652,8 +3740,12 @@ async function ensureLineageParentId(): Promise<string | null> {
 			tokensInStage2 = r.tokens_in_stage2;
 			tokensOutStage2 = r.tokens_out_stage2;
 			outputTab = "canvas";
-			await fetchHistoryOffset(0);
-			historyCursor = 0;
+			if (r.history_id) {
+				await fetchHistoryOffset(0, { anchorId: r.history_id });
+				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
+			} else {
+				historyCursor = -1;
+			}
 			fitCanvasZoom();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -3804,6 +3896,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 	}
 
 	function showVariationCandidate(candidate: VariationCandidate) {
+		historyCursor = -1;
 		ddl = candidate.result.ddl;
 		ddlGeneratedBaseline = candidate.result.ddl;
 		thinking = candidate.result.thinking;
@@ -3838,6 +3931,11 @@ async function ensureLineageParentId(): Promise<string | null> {
 					catalog_id: candidate.result.render_color_catalog_id ?? selectedCatalog,
 				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {} });
 				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
+				if (saved?.id && result === candidate.result) {
+					result = { ...result, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
+					displayedHistoryItem = saved;
+					void syncHistoryStripToItem(saved);
+				}
 			}
 		} finally {
 			variationGridBusy = false;

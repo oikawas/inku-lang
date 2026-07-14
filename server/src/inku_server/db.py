@@ -1923,6 +1923,22 @@ def list_items(
         return _rows_to_dicts_with_lineage(session, rows), total
 
 
+def item_position(user_id: str, item_id: str, trashed: bool = False, starred: bool = False) -> int | None:
+    with SessionLocal() as session:
+        query = session.query(HistoryRow).filter(
+            HistoryRow.user_id == user_id,
+            HistoryRow.trashed == (1 if trashed else 0),
+            HistoryRow.history_visibility == "normal",
+        )
+        if starred:
+            query = query.filter(HistoryRow.starred == 1)
+        ids = [row[0] for row in query.with_entities(HistoryRow.id).order_by(HistoryRow.at.desc()).all()]
+        try:
+            return ids.index(item_id)
+        except ValueError:
+            return None
+
+
 def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None = None) -> dict | None:
     with SessionLocal() as session:
         row = (

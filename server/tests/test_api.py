@@ -1953,6 +1953,16 @@ def test_history_is_scoped_to_authenticated_user():
     assert page_a.json()["total"] == 2
     assert page_a.json()["items"][0]["id"] == item_a["id"]
 
+    anchored_a = client.get(f"/api/history?anchor_id={item_a['id']}&limit=1", headers=headers_a)
+    assert anchored_a.status_code == 200
+    assert anchored_a.json()["offset"] == 1
+    assert anchored_a.json()["items"][0]["id"] == item_a["id"]
+
+    anchored_other_user = client.get(f"/api/history?anchor_id={item_a['id']}&limit=1", headers=headers_b)
+    assert anchored_other_user.status_code == 200
+    assert anchored_other_user.json()["total"] == 0
+    assert anchored_other_user.json()["items"] == []
+
     search_a = client.get("/api/history?q=crayon", headers=headers_a)
     assert search_a.status_code == 200
     assert search_a.json()["total"] == 1

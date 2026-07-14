@@ -2692,8 +2692,13 @@ def api_history_get(
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
+    anchor_id: str | None = Query(default=None, max_length=100),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
+    if anchor_id:
+        position = _db.item_position(actor["id"], anchor_id, trashed=trashed, starred=starred)
+        if position is not None:
+            offset = (position // limit) * limit
     items, total = _db.list_items(
         actor["id"],
         offset=offset,

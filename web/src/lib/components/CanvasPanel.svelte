@@ -115,6 +115,7 @@
 		isJapanese: boolean;
 		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
 		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
+		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrashLineage: (historyIds: string[]) => void;
 		onDetachLineage: () => void;
 	};
@@ -214,6 +215,7 @@
 		isJapanese = true,
 		onOpenLineageNode,
 		onPromoteLineageNode,
+		onSaveLineageNote,
 		onAskTrashLineage,
 		onDetachLineage
 	}: Props = $props();
@@ -579,7 +581,7 @@
 					</div>
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} />
 			{:else if outputTab === 'prompts'}
 				<OutputTabsContent
 					outputTab="prompts"

@@ -1971,6 +1971,32 @@ def test_history_is_scoped_to_authenticated_user():
     assert starred_a.json()["total"] == 1
     assert starred_a.json()["items"][0]["id"] == item_a_second["id"]
 
+    unstar_a = client.patch(
+        "/api/history/{}/star".format(item_a_second["id"]),
+        json={"starred": False},
+        headers=headers_a,
+    )
+    assert unstar_a.status_code == 200
+    assert unstar_a.json()["starred"] is False
+    assert unstar_a.json()["note"] == "quiet hinge"
+
+    update_note_a = client.patch(
+        "/api/history/{}/star".format(item_a_second["id"]),
+        json={"starred": False, "note": "lineage comment"},
+        headers=headers_a,
+    )
+    assert update_note_a.status_code == 200
+    assert update_note_a.json()["starred"] is False
+    assert update_note_a.json()["note"] == "lineage comment"
+
+    restar_a = client.patch(
+        "/api/history/{}/star".format(item_a_second["id"]),
+        json={"starred": True},
+        headers=headers_a,
+    )
+    assert restar_a.status_code == 200
+    assert restar_a.json()["note"] == "lineage comment"
+
     list_b = client.get("/api/history", headers=headers_b)
     assert list_b.status_code == 200
     assert list_b.json()["total"] == 0

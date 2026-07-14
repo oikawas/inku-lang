@@ -2823,14 +2823,12 @@
 		event?.stopPropagation();
 		if (!item?.id) return;
 		const nextStarred = !item.starred;
-		const rawNote = nextStarred ? window.prompt(t().selectionNotePrompt, item.note ?? "") : null;
-		const nextNote = nextStarred ? (rawNote ?? "").trim().slice(0, 240) || null : null;
-		updateHistoryStarState({ ...item, starred: nextStarred, note: nextNote });
+		updateHistoryStarState({ ...item, starred: nextStarred });
 		try {
 			const r = await apiFetch(`/api/history/${item.id}/star`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ starred: nextStarred, note: nextNote })
+				body: JSON.stringify({ starred: nextStarred })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const updated = await r.json() as Iteration;
@@ -3263,6 +3261,19 @@ async function promoteLineageNode(node: LineageNode): Promise<void> {
 	const r = await apiFetch(`/api/lineage/${encodeURIComponent(node.id)}/promote`, { method: 'POST' });
 	if (!r.ok) return;
 	await Promise.all([fetchLineage(node.id, true), fetchHistoryOffset(0)]);
+}
+
+async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
+	if (!node.history?.id) return;
+	const r = await apiFetch(`/api/history/${encodeURIComponent(node.history.id)}/star`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ starred: !!node.history.starred, note: note.trim().slice(0, 240) })
+	});
+	if (!r.ok) throw new Error(`HTTP ${r.status}`);
+	const updated = await r.json() as Iteration;
+	updateHistoryStarState(updated);
+	await fetchLineage(node.id, true);
 }
 
 function detachLineage(): void {
@@ -4060,11 +4071,6 @@ async function ensureLineageParentId(): Promise<string | null> {
 		return `${s1} → ${s2}`;
 	}
 
-	function historyTokenSummary(it: Iteration): string {
-		if (it.tokens_in == null && it.tokens_out == null) return '-';
-		return `${it.tokens_in ?? '?'} → ${it.tokens_out ?? '?'} tok`;
-	}
-
 	function historyPreviewText(text: string): string {
 		return text.length > 42 ? `${text.slice(0, 42)}...` : text;
 	}
@@ -4678,6 +4684,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 				isJapanese={getLang() === 'ja'}
 				onOpenLineageNode={openLineageNode}
 				onPromoteLineageNode={promoteLineageNode}
+				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
 				onDetachLineage={detachLineage}
 				pngTemplates={exportTemplates}
@@ -4911,7 +4918,6 @@ async function ensureLineageParentId(): Promise<string | null> {
 		{formatHistoryDate}
 		{formatElapsed}
 		{catalogName}
-		{historyTokenSummary}
 		{historyPreviewText}
 		{shortModel}
 	/>

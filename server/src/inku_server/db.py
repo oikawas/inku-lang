@@ -1936,8 +1936,6 @@ def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None
         if note is not None:
             clean_note = note.strip()[:240]
             row.note = clean_note or None
-        elif not starred:
-            row.note = None
         session.commit()
         session.refresh(row)
         return _row_to_dict(row)

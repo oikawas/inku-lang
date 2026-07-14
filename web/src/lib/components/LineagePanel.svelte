@@ -28,17 +28,20 @@
 		isJapanese: boolean;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
+		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrash: (historyIds: string[]) => void;
 		onDetach: () => void;
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onAskTrash, onDetach }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onSaveNote, onAskTrash, onDetach }: Props = $props();
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
 	let arrowPaths = $state<ArrowPath[]>([]);
 	let checkedHistoryIds = $state<string[]>([]);
+	let noteDrafts = $state<Record<string, string>>({});
+	let savingNoteIds = $state<string[]>([]);
 	const cardElements = new Map<string, HTMLElement>();
 
 	const nodeById = $derived(new Map((graph?.nodes ?? []).map((node) => [node.id, node])));
@@ -87,6 +90,27 @@ function toggleCheckedHistory(historyId: string): void {
 
 function askTrashChecked(): void {
 	if (checkedHistoryIds.length > 0) onAskTrash([...checkedHistoryIds]);
+}
+
+function noteValue(node: LineageNode): string {
+	return noteDrafts[node.id] ?? node.history?.note ?? '';
+}
+
+function updateNoteDraft(nodeId: string, value: string): void {
+	noteDrafts = { ...noteDrafts, [nodeId]: value };
+}
+
+async function saveNodeNote(node: LineageNode): Promise<void> {
+	if (!node.history?.id || savingNoteIds.includes(node.id)) return;
+	savingNoteIds = [...savingNoteIds, node.id];
+	try {
+		await onSaveNote(node, noteValue(node));
+		const next = { ...noteDrafts };
+		delete next[node.id];
+		noteDrafts = next;
+	} finally {
+		savingNoteIds = savingNoteIds.filter((id) => id !== node.id);
+	}
 }
 
 	function updateArrowPaths(): void {
@@ -246,6 +270,11 @@ $effect(() => {
 											<dt>seed</dt><dd>{node.history.render_seed ?? '—'} / {node.history.vary_seed ?? '—'} / {node.history.interpretation_seed ?? '—'}</dd>
 											<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(edge?.derivation_kind)}</dd>
 										</dl>
+										<div class="note-editor">
+											<label for={`lineage-note-${node.id}`}>{isJapanese ? '作品へのコメント' : 'Artwork comment'}</label>
+											<textarea id={`lineage-note-${node.id}`} maxlength="240" rows="3" value={noteValue(node)} disabled={savingNoteIds.includes(node.id)} oninput={(event) => updateNoteDraft(node.id, event.currentTarget.value)}></textarea>
+											<button type="button" disabled={savingNoteIds.includes(node.id) || noteValue(node).trim() === (node.history?.note ?? '').trim()} onclick={() => saveNodeNote(node)}>{savingNoteIds.includes(node.id) ? (isJapanese ? '保存中…' : 'Saving…') : (isJapanese ? '保存' : 'Save')}</button>
+										</div>
 									</details>
 								{/if}
 								{#if node.state === 'lineage_only'}<button class="promote" type="button" onclick={() => onPromoteNode(node)}>{isJapanese ? '履歴に残す' : 'Keep in history'}</button>{/if}
@@ -312,6 +341,11 @@ $effect(() => {
 	.node-details dt { color: var(--fg3); }
 	.node-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 	.full-source { max-height: 7em; overflow: auto; white-space: pre-wrap; }
+	.note-editor { display: grid; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+	.note-editor label { color: var(--fg3); }
+	.note-editor textarea { box-sizing: border-box; width: 100%; min-height: 4.5em; resize: vertical; border: 1px solid var(--border2); border-radius: 5px; padding: 5px 6px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.35; }
+	.note-editor button { justify-self: end; border: 1px solid var(--border2); border-radius: 5px; padding: 4px 9px; background: var(--panel); color: var(--fg); cursor: pointer; }
+	.note-editor button:disabled { opacity: .45; cursor: default; }
 	.promote { width: 100%; margin-top: 7px; font-size: .68rem; }
 	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>

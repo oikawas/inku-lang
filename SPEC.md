@@ -943,7 +943,7 @@ measured card height to reduce unused space at the bottom of the dialog.
 The thumbnail action row places the star at the lower left, shows hash labels
 without `#`, and aligns hash button typography with the delete action.
 Starred thumbnails keep an explicit highlighted star state in dark mode.
-The thumbnail hover tooltip includes a larger image preview above the metadata.
+History-manager thumbnails do not open an enlarged hover preview, keeping the grid and selection interaction stable.
 The history manager header is compressed into two rows: title/view/count/pager
 on the first row and selection/filter/search controls on the second row.
 When thumbnail page size is recalculated from measured card dimensions, the
@@ -1313,5 +1313,6 @@ When updating the specification:
 - Added a focused Canvas lineage view showing nearby generations as artwork thumbnails with arrows between parent and child cards and labels for the operation that produced each child. Opening a card changes both the displayed artwork and the parent for the next refinement. Card checkboxes support confirmation-gated bulk moves to trash. Trash preserves lineage; permanent deletion removes content and hashes while leaving a content-free tombstone to preserve the path.
 - Users can explicitly start a new root. Ordinary DRAW actions are not automatically attached to the latest history item.
 - Lineage depth and branching are not quality scores, achievements, or generation controls. The graph records the creative process; it does not choose a best branch.
-- History-manager artwork selection uses a large, dedicated check control independent from opening an artwork, with exactly one state change per activation.
-- Build 521.
+- History-manager artwork selection uses a compact, dedicated check control independent from opening an artwork, with exactly one state change per activation. Thumbnails do not show enlarged hover previews.
+- Stars toggle immediately without a confirmation dialog. Artwork comments are stored independently from star state and are edited in lineage-card details; removing a star does not erase an existing comment.
+- Build 522.

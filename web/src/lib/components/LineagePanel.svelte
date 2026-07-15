@@ -119,8 +119,8 @@
 	}
 
 	function operationLabel(kind?: string): string {
-		const ja: Record<string, string> = { touch_variation: 'タッチ', layout_variation: '構図', catalog_change: '色', reinterpretation: '解釈', model_variation: 'モデル', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画', canvas_aspect_change: 'キャンバス変更' };
-		const en: Record<string, string> = { touch_variation: 'Touch', layout_variation: 'Layout', catalog_change: 'Color', reinterpretation: 'Reading', model_variation: 'Model', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay', canvas_aspect_change: 'Canvas change' };
+		const ja: Record<string, string> = { touch_variation: 'タッチ', layout_variation: '構図', catalog_change: '色', reinterpretation: '解釈', model_variation: 'モデル', language_variation: '言語', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画', canvas_aspect_change: 'キャンバス変更' };
+		const en: Record<string, string> = { touch_variation: 'Touch', layout_variation: 'Layout', catalog_change: 'Color', reinterpretation: 'Reading', model_variation: 'Model', language_variation: 'Language', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay', canvas_aspect_change: 'Canvas change' };
 		return (isJapanese ? ja : en)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Root'));
 	}
 

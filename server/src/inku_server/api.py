@@ -34,6 +34,7 @@ from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import compose
 from .interpreter import _sanitize_placement_words, interpret_detail
 from .languages import (
+    SUPPORTED_INSTRUCTION_LANGS,
     expand_intermediate_for_lang,
     normalize_instruction_lang,
     resolve_instruction_lang,
@@ -110,8 +111,9 @@ def _normalize_instruction_lang(value: str | None, *, default: str = "ja") -> st
         raise HTTPException(status_code=422, detail=f"unsupported instruction language: {value}")
 
 
-def _resolve_instruction_lang(text: str, requested: str) -> str:
-    return resolve_instruction_lang(text, requested)
+def _resolve_instruction_lang(text: str, requested: str, *, ui_lang: str | None = None) -> str:
+    fallback = ui_lang if ui_lang in SUPPORTED_INSTRUCTION_LANGS else "ja"
+    return resolve_instruction_lang(text, requested, fallback=fallback)
 
 
 def _normalize_ui_lang(value: str | None) -> str | None:
@@ -929,10 +931,26 @@ class HistoryItem(HistoryPostBody):
     note: str | None = None
     description_hash: str | None = None
     lineage_node_id: str | None = None
+    lineage_root_node_id: str | None = None
 
 
 class HistoryListResponse(BaseModel):
     items: list[HistoryItem]
+    total: int
+    offset: int
+    limit: int
+
+
+class HistoryLineageGroup(BaseModel):
+    root_node_id: str
+    representative: HistoryItem
+    item_count: int
+    starred_count: int
+    latest_at: int
+
+
+class HistoryLineageGroupListResponse(BaseModel):
+    groups: list[HistoryLineageGroup]
     total: int
     offset: int
     limit: int
@@ -2113,8 +2131,12 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     t0 = time.perf_counter()
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
-    instruction_lang_resolved = _resolve_instruction_lang(req.original_text or req.ddl, instruction_lang_requested)
     ui_lang = _normalize_ui_lang(req.ui_lang)
+    instruction_lang_resolved = _resolve_instruction_lang(
+        req.original_text or req.ddl,
+        instruction_lang_requested,
+        ui_lang=ui_lang,
+    )
     resolved_stage2_model = _resolved_stage2_model(req.model, actor)
     try:
         compose_detail = _call_compose_detail(
@@ -2189,8 +2211,10 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     source_text = req.original_text or req.text
-    instruction_lang_resolved = _resolve_instruction_lang(source_text, instruction_lang_requested)
     ui_lang = _normalize_ui_lang(req.ui_lang)
+    instruction_lang_resolved = _resolve_instruction_lang(
+        source_text, instruction_lang_requested, ui_lang=ui_lang
+    )
     try:
         detail = _call_interpret_detail(
             req.text,
@@ -2369,7 +2393,11 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
 
 @app.post("/api/demo/instruction", response_model=DemoInstructionResponse)
 def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_current_user)) -> DemoInstructionResponse:
-    instruction_lang = _resolve_instruction_lang(req.seed_phrase, _normalize_instruction_lang(req.instruction_lang))
+    instruction_lang = _resolve_instruction_lang(
+        req.seed_phrase,
+        _normalize_instruction_lang(req.instruction_lang),
+        ui_lang=_normalize_ui_lang(req.ui_lang),
+    )
     try:
         instruction = _generate_demo_instruction(req.seed_phrase, model=req.model, lang=instruction_lang)
     except Exception as e:  # noqa: BLE001
@@ -2513,8 +2541,10 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
-    instruction_lang_resolved = _resolve_instruction_lang(source_text, instruction_lang_requested)
     ui_lang = _normalize_ui_lang(req.ui_lang)
+    instruction_lang_resolved = _resolve_instruction_lang(
+        source_text, instruction_lang_requested, ui_lang=ui_lang
+    )
     catalog_id = _resolved_paint_catalog_id(req.catalog_id, random_catalog=req.random_color_catalog)
     resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
@@ -2795,6 +2825,41 @@ def api_users_delete(user_id: str, actor: dict = Depends(_user_manager)) -> dict
     return {"ok": True}
 
 
+@app.get("/api/history/lineage-groups", response_model=HistoryLineageGroupListResponse, response_model_exclude_none=True)
+def api_history_lineage_groups(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=12, ge=1, le=100),
+    trashed: bool = Query(default=False),
+    starred: bool = Query(default=False),
+    q: str = Query(default="", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> HistoryLineageGroupListResponse:
+    groups, total = _db.list_lineage_groups(
+        actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred
+    )
+    return HistoryLineageGroupListResponse(groups=groups, total=total, offset=offset, limit=limit)
+
+
+@app.get("/api/history/lineage-groups/{root_node_id}/items", response_model=HistoryListResponse, response_model_exclude_none=True)
+def api_history_lineage_group_items(
+    root_node_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=10_000),
+    trashed: bool = Query(default=False),
+    starred: bool = Query(default=False),
+    q: str = Query(default="", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> HistoryListResponse:
+    items, total = _db.list_lineage_group_items(
+        actor["id"], root_node_id, offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred
+    )
+    if total == 0:
+        root = _db.get_lineage(actor["id"], root_node_id, descendant_depth=0, node_limit=1)
+        if root is None:
+            raise HTTPException(status_code=404, detail="lineage not found")
+    return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
+
+
 @app.get("/api/history", response_model=HistoryListResponse, response_model_exclude_none=True)
 def api_history_get(
     offset: int = Query(default=0, ge=0),
@@ -2923,7 +2988,11 @@ def api_history_svg(
 
 @app.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
-    render_seed, seed_text = _render_seed_from_text(body.seed_text, body.render_seed)
+    metadata_seed_text = body.derivation_metadata.get("seed_text")
+    requested_seed_text = body.seed_text
+    if requested_seed_text is None and isinstance(metadata_seed_text, str):
+        requested_seed_text = metadata_seed_text
+    render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
     try:
         score = coerce_score(Score.model_validate(body.score))
         catalog_id = _resolved_catalog_id(body.catalog_id)

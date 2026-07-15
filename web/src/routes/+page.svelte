@@ -58,9 +58,8 @@
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
-	const INSTRUCTION_LANG_KEY = 'inku-instruction-lang';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.80';
+	const APP_VERSION = 'v1.82';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -92,6 +91,7 @@
 		render_seed?: number | null;
 		vary_seed?: number | null;
 		interpretation_seed?: string | null;
+		seed_text?: string | null;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
 		ui_lang?: string | null;
@@ -111,7 +111,7 @@
 		tokens_out_stage2: number | null;
 		user_generation_count?: number | null;
 	};
-	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
+	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'language_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
@@ -234,9 +234,9 @@
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
 	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
 	let input       = $state(DEFAULT_INPUT);
-	let seedText    = $state('');
+	let touchSeedText = $state('');
 	let batchInput  = $state('');
-	let instructionLang = $state<InstructionLang>('auto');
+	const instructionLang: InstructionLang = 'auto';
 	let stage1UserPrompt = $state('');
 	let ddlTextareaEl = $state<HTMLTextAreaElement | null>(null);
 	let ddlHighlightEl = $state<HTMLDivElement | null>(null);
@@ -337,6 +337,9 @@
 		elapsedMs: number;
 		lineageParentNodeId?: string | null;
 		compareMode: ModelCompareMode;
+		comparisonKind?: 'model' | 'language';
+		stage1Lang?: 'ja' | 'en';
+		stage2Lang?: 'ja' | 'en';
 		savedHistoryId?: string | null;
 		starred?: boolean;
 		saving?: boolean;
@@ -365,6 +368,14 @@
 	let modelInspectionRunId = 0;
 	let targetContextVersion = 0;
 	let modelInspectionAbortController: AbortController | null = null;
+	let languageCompareMode = $state<ModelCompareMode>('common');
+	let languageCompareFixedLang = $state<'ja' | 'en'>('ja');
+	let languageInspectionSelectedLangs = $state<Array<'ja' | 'en'>>([]);
+	let languageInspectionBusy = $state(false);
+	let languageInspectionStatus = $state<string | null>(null);
+	let languageInspectionResults = $state<ModelInspectionResult[]>([]);
+	let languageInspectionRunId = 0;
+	let languageInspectionAbortController: AbortController | null = null;
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -1884,16 +1895,11 @@
 			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
 			localStorage.setItem(HISTORY_SELECTION_CANVAS_KEY, historySelectionCanvas);
 			localStorage.setItem(HISTORY_SELECTION_CATALOG_KEY, historySelectionCatalog);
-			localStorage.setItem(INSTRUCTION_LANG_KEY, instructionLang);
 		} catch {}
 	}
 
 	function normalizeHistorySelectionBehavior(value: string | null): HistorySelectionBehavior {
 		return value === 'history' ? 'history' : 'current';
-	}
-
-	function normalizeInstructionLang(value: string | null): InstructionLang {
-		return value === 'ja' || value === 'en' ? value : 'auto';
 	}
 
 	// ── 感情語 → DDL ヒント ──────────────────────────────────
@@ -2112,7 +2118,7 @@
 				render_seed: options.renderSeed,
 				vary_seed: options.varySeed,
 				interpretation_seed: options.interpretationSeed,
-				seed_text: options.seedText ?? seedText,
+				seed_text: options.seedText,
 				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
@@ -2160,7 +2166,7 @@ if (unreadWords.length > 0) {
 		tokens_out: number | null;
 	};
 
-	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string): Promise<InterpretResult> {
+	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<InterpretResult> {
 		const uiLang = getLang();
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
@@ -2174,7 +2180,7 @@ if (unreadWords.length > 0) {
 				original_text: text,
 				model: resolvedStage1Model,
 				include_thinking: includeThinking,
-				instruction_lang: instructionLang,
+				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				expand_intermediate: true,
 			})
@@ -2197,7 +2203,7 @@ if (unreadWords.length > 0) {
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<{
 		score: Score;
 		svg: string;
 		stage2_model?: string | null;
@@ -2233,7 +2239,7 @@ if (unreadWords.length > 0) {
 				ddl: currentDdl,
 				model: resolvedStage2Model,
 				original_text: originalText,
-				instruction_lang: instructionLang,
+				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				catalog_id: selectedCatalog,
 				canvas_aspect: effectiveCanvasAspectId(),
@@ -3378,9 +3384,133 @@ if (unreadWords.length > 0) {
 		}
 	}
 
+	const languageInspectionTargetLang = $derived(
+		(result?.instruction_lang_resolved === 'en' ? 'en' : result?.instruction_lang_resolved === 'ja' ? 'ja' : getLang()) as 'ja' | 'en'
+	);
+
+	function setLanguageCompareMode(mode: ModelCompareMode) {
+		if (languageInspectionBusy) return;
+		languageCompareMode = mode;
+		languageCompareFixedLang = languageInspectionTargetLang;
+		languageInspectionSelectedLangs = [];
+		languageInspectionResults = [];
+		languageInspectionStatus = null;
+	}
+
+	function setLanguageCompareFixedLang(lang: 'ja' | 'en') {
+		if (languageInspectionBusy) return;
+		languageCompareFixedLang = lang;
+		languageInspectionResults = [];
+		languageInspectionStatus = null;
+	}
+
+	function isLanguageInspectionChoiceBlocked(lang: 'ja' | 'en') {
+		if (languageCompareMode === 'common') return lang === languageInspectionTargetLang;
+		if (languageCompareMode === 'stage1_fixed') return languageCompareFixedLang === languageInspectionTargetLang && lang === languageInspectionTargetLang;
+		return lang === languageInspectionTargetLang && languageCompareFixedLang === languageInspectionTargetLang;
+	}
+
+	function toggleLanguageInspectionLang(lang: 'ja' | 'en') {
+		if (languageInspectionBusy || isLanguageInspectionChoiceBlocked(lang)) return;
+		languageInspectionSelectedLangs = languageInspectionSelectedLangs.includes(lang)
+			? languageInspectionSelectedLangs.filter((value) => value !== lang)
+			: [...languageInspectionSelectedLangs, lang];
+		languageInspectionStatus = null;
+	}
+
+	async function runLanguageInspection() {
+		if (languageInspectionBusy || loading) return;
+		const source = input.trim();
+		if (!source) return;
+		const selected = languageInspectionSelectedLangs.filter((lang) => !isLanguageInspectionChoiceBlocked(lang));
+		if (selected.length === 0) {
+			languageInspectionStatus = getLang() === 'ja' ? '比較する言語を1つ以上選択してください。' : 'Select at least one language to compare.';
+			return;
+		}
+		const contextVersion = targetContextVersion;
+		const parentNodeId = await ensureVisibleLineageParentId();
+		if (contextVersion !== targetContextVersion) return;
+		const jobs = selected.map((lang) => {
+			const stage1Lang = languageCompareMode === 'stage1_fixed' ? languageCompareFixedLang : lang;
+			const stage2Lang = languageCompareMode === 'stage2_fixed' ? languageCompareFixedLang : lang;
+			return { lang, stage1Lang, stage2Lang, id: `${languageCompareMode}:${stage1Lang}:${stage2Lang}` };
+		});
+		const rendered = new Set(languageInspectionResults.map((item) => item.id));
+		const pending = jobs.filter((job) => !rendered.has(job.id));
+		if (pending.length === 0) {
+			languageInspectionStatus = getLang() === 'ja' ? '選択済みの言語構成はすべて描画済みです。' : 'All selected language combinations are rendered.';
+			return;
+		}
+		const runId = ++languageInspectionRunId;
+		const abortController = new AbortController();
+		languageInspectionAbortController = abortController;
+		languageInspectionBusy = true;
+		languageInspectionStatus = null;
+		const successful = [...languageInspectionResults];
+		try {
+			for (const job of pending) {
+				if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
+				try {
+					const started = Date.now();
+					const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang);
+					const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang);
+					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
+					const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
+					successful.push({
+						id: job.id,
+						model: qualifiedModelId(stage1Provider, stage1Model),
+						stage1Model: qualifiedModelId(stage1Provider, stage1Model),
+						stage2Model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
+						label: `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`,
+						input: source,
+						ddl: interpreted.ddl,
+						svg: composed.svg,
+						score: composed.score,
+						renderBuildNumber: composed.render_build_number ?? null,
+						renderColorProfile: composed.render_color_profile ?? null,
+						renderEngineId: composed.render_engine_id ?? null,
+						renderEngineVersion: composed.render_engine_version ?? null,
+						renderColorCatalogId: composed.render_color_catalog_id ?? null,
+						renderColorCatalogName: composed.render_color_catalog_name ?? null,
+						renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
+						renderColorMap: composed.render_color_map ?? null,
+						renderCanvasAspect: composed.render_canvas_aspect ?? null,
+						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
+						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
+						renderSeed: composed.render_seed ?? null,
+						varySeed: composed.vary_seed ?? null,
+						tokensIn: interpreted.tokens_in,
+						tokensOut: interpreted.tokens_out,
+						tokensInStage2: composed.tokens_in,
+						tokensOutStage2: composed.tokens_out,
+						elapsedMs: Date.now() - started,
+						lineageParentNodeId: parentNodeId,
+						compareMode: languageCompareMode,
+						comparisonKind: 'language',
+						stage1Lang: job.stage1Lang,
+						stage2Lang: job.stage2Lang,
+						savedHistoryId: null,
+						starred: false,
+						saving: false,
+					});
+					languageInspectionResults = [...successful];
+				} catch (cause) {
+					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
+					languageInspectionStatus = cause instanceof Error ? cause.message : String(cause);
+				}
+			}
+		} finally {
+			if (languageInspectionRunId === runId) {
+				languageInspectionAbortController = null;
+				languageInspectionBusy = false;
+			}
+		}
+	}
+
 
 	function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
 		modelInspectionResults = modelInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
+		languageInspectionResults = languageInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
 	}
 
 	async function saveModelInspectionResult(item: ModelInspectionResult, options: { star?: boolean } = {}) {
@@ -3394,7 +3524,8 @@ if (unreadWords.length > 0) {
 			return;
 		}
 		updateModelInspectionResult(item.id, { saving: true });
-		modelInspectionStatus = null;
+		if (item.comparisonKind === 'language') languageInspectionStatus = null;
+		else modelInspectionStatus = null;
 		try {
 			const saved = await pushHistory({
 				input: item.input,
@@ -3421,7 +3552,18 @@ if (unreadWords.length > 0) {
 				render_canvas_aspect_ratio: item.renderCanvasAspectRatio ?? null,
 				render_seed: item.renderSeed ?? null,
 				vary_seed: item.varySeed ?? null,
-			}, { countGeneration: true, sourceText: item.input, lineageParentNodeId: item.lineageParentNodeId ?? null, derivationKind: item.lineageParentNodeId ? 'model_variation' : null, derivationMetadata: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model } });
+				instruction_lang_requested: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
+				instruction_lang_resolved: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
+				ui_lang: getLang(),
+			}, {
+				countGeneration: true,
+				sourceText: item.input,
+				lineageParentNodeId: item.lineageParentNodeId ?? null,
+				derivationKind: item.lineageParentNodeId ? (item.comparisonKind === 'language' ? 'language_variation' : 'model_variation') : null,
+				derivationMetadata: item.comparisonKind === 'language'
+					? { comparison_mode: item.compareMode, stage1_language: item.stage1Lang, stage2_language: item.stage2Lang }
+					: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model },
+			});
 			if (!saved?.id) throw new Error('failed to save comparison result');
 			if (contextVersion !== targetContextVersion) return;
 			updateModelInspectionResult(item.id, { savedHistoryId: saved.id, starred: !!saved.starred, saving: false });
@@ -3432,7 +3574,8 @@ if (unreadWords.length > 0) {
 		} catch (e) {
 			if (contextVersion === targetContextVersion) {
 				updateModelInspectionResult(item.id, { saving: false });
-				modelInspectionStatus = e instanceof Error ? e.message : String(e);
+				if (item.comparisonKind === 'language') languageInspectionStatus = e instanceof Error ? e.message : String(e);
+				else modelInspectionStatus = e instanceof Error ? e.message : String(e);
 			}
 		}
 	}
@@ -3457,6 +3600,7 @@ if (unreadWords.length > 0) {
 					catalog_id: catalogId,
 					canvas_aspect: canvasId,
 					render_seed: Number(it.render_seed),
+					seed_text: it.seed_text,
 				})
 			});
 			if (!r.ok) throw new Error(await r.text());
@@ -3619,6 +3763,12 @@ $effect(() => {
 		modelInspectionResults = [];
 		modelInspectionFailedModels = {};
 		modelInspectionStatus = null;
+		if (languageInspectionAbortController) languageInspectionAbortController.abort();
+		languageInspectionAbortController = null;
+		languageInspectionRunId += 1;
+		languageInspectionBusy = false;
+		languageInspectionResults = [];
+		languageInspectionStatus = null;
 
 		interpretationDiffParts = [];
 		reloadError = null;
@@ -3680,10 +3830,14 @@ $effect(() => {
 			instruction_lang_requested: it.instruction_lang_requested,
 			instruction_lang_resolved: it.instruction_lang_resolved,
 			ui_lang: it.ui_lang,
+			seed_text: it.seed_text ?? null,
 			render_hash: it.render_hash,
 			render_hash_short: it.render_hash_short,
 			description_hash: it.description_hash,
 			lineage_node_id: it.lineage_node_id,
+			lineage_parent_node_id: it.lineage_parent_node_id,
+			derivation_kind: it.derivation_kind as DerivationKind | null | undefined,
+			derivation_metadata: it.derivation_metadata,
 			render_seed: it.render_seed == null ? null : Number(it.render_seed),
 			vary_seed: it.vary_seed == null ? null : Number(it.vary_seed),
 			interpretation_seed: it.interpretation_seed ?? null,
@@ -4075,26 +4229,43 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return normalizeCanvasAspectId(result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? effectiveCanvasAspectId());
 	}
 
-	async function renderPerformanceCandidate(seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+	async function renderWordTouchCandidate(seedText: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		if (!result) throw new Error("missing result");
-		const r = await apiFetch("/api/render-svg", {
-			method: "POST",
+		const normalizedSeedText = seedText.trim();
+		if (!normalizedSeedText) throw new Error(getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.');
+		const r = await apiFetch('/api/render-score', {
+			method: 'POST',
 			signal,
-			headers: { "Content-Type": "application/json" },
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				score: result.score,
+				input: input.trim(),
+				ddl: ddl ?? '',
 				catalog_id: refinementCatalogId(),
 				canvas_aspect: refinementCanvasAspectId(),
-				render_seed: seed,
-			})
+				vary_seed: result.vary_seed,
+				interpretation_seed: result.interpretation_seed,
+				seed_text: normalizedSeedText,
+			}),
 		});
 		if (!r.ok) throw new Error(await r.text());
-		const svg = await r.text();
+		const data = await r.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score' | 'render_seed'>;
 		return {
-			id: `perf-${seed}`,
+			id: `word-touch-${String(data.render_seed)}`,
 			label,
 			selected: false,
-			result: { ...result, ddl: ddl ?? "", thinking, svg, render_seed: seed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'touch_variation' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: seed } },
+			result: {
+				...result,
+				...data,
+				ddl: ddl ?? '',
+				thinking,
+				history_id: null,
+				history_at: null,
+				lineage_node_id: null,
+				lineage_parent_node_id: currentLineageParentId(),
+				derivation_kind: currentLineageParentId() ? 'touch_variation' : null,
+				derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: data.render_seed, seed_text: normalizedSeedText },
+			},
 		};
 	}
 
@@ -4190,10 +4361,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		};
 	}
 
-	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4) {
+	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string) {
 		if (!result || variationGridBusy || loading) return;
 		const source = input.trim();
 		if (!source || !ddl) return;
+		const normalizedTouchWords = touchWords?.trim() ?? '';
+		if (kind === 'touch' && !normalizedTouchWords) {
+			variationGridStatus = getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.';
+			return;
+		}
+		if (kind === 'touch' && count === 4) {
+			variationGridStatus = getLang() === 'ja' ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be generated.';
+			return;
+		}
 		const contextVersion = targetContextVersion;
 		await ensureVisibleLineageParentId();
 		if (contextVersion !== targetContextVersion) return;
@@ -4214,21 +4394,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
 		}, 3000);
 		try {
-			const usedRenderSeeds = new Set<number>();
 			const usedVarySeeds = new Set<number>();
-			if (Number.isFinite(result.render_seed ?? NaN)) usedRenderSeeds.add(Number(result.render_seed));
 			if (Number.isFinite(result.vary_seed ?? NaN)) usedVarySeeds.add(Number(result.vary_seed));
 			for (const candidate of variationCandidates) {
-				if (Number.isFinite(candidate.result.render_seed ?? NaN)) usedRenderSeeds.add(Number(candidate.result.render_seed));
 				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
 			}
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
 			const jobs = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
-					const renderSeed = createSafeIntegerSeed(usedRenderSeeds);
-					usedRenderSeeds.add(renderSeed);
-					return renderPerformanceCandidate(renderSeed, t().canvasVaryPerformance + " " + sequence, abortController.signal);
+					return renderWordTouchCandidate(normalizedTouchWords, t().canvasVaryPerformance, abortController.signal);
 				}
 				if (kind === "layout") {
 					const varySeed = createSafeIntegerSeed(usedVarySeeds);
@@ -4604,6 +4779,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (result.render_canvas_aspect_ratio !== undefined) payload.render_canvas_aspect_ratio = result.render_canvas_aspect_ratio;
 		if (result.instruction_lang_requested !== undefined) payload.instruction_lang_requested = result.instruction_lang_requested;
 		if (result.instruction_lang_resolved !== undefined) payload.instruction_lang_resolved = result.instruction_lang_resolved;
+		if (result.seed_text !== undefined) payload.seed_text = result.seed_text;
+		const derivationMetadata = result.derivation_metadata ?? {};
+		const resolvedLang = result.instruction_lang_resolved ?? null;
+		payload.stage1_instruction_lang = typeof derivationMetadata.stage1_language === 'string' ? derivationMetadata.stage1_language : resolvedLang;
+		payload.stage2_instruction_lang = typeof derivationMetadata.stage2_language === 'string' ? derivationMetadata.stage2_language : resolvedLang;
 		if (result.ui_lang !== undefined) payload.ui_lang = result.ui_lang;
 		if (result.render_hash !== undefined) payload.render_hash = result.render_hash;
 		if (result.render_hash_short !== undefined) payload.render_hash_short = result.render_hash_short;
@@ -4611,13 +4791,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (result.render_color_catalog_name !== undefined) payload.render_color_catalog_name = result.render_color_catalog_name;
 		if (result.render_color_catalog_sub !== undefined) payload.render_color_catalog_sub = result.render_color_catalog_sub;
 		if (result.render_color_map !== undefined) payload.render_color_map = result.render_color_map;
+		if (result.render_seed !== undefined) payload.render_seed = result.render_seed;
+		if (result.vary_seed !== undefined) payload.vary_seed = result.vary_seed;
+		if (result.interpretation_seed !== undefined) payload.interpretation_seed = result.interpretation_seed;
+		if (result.description_hash !== undefined) payload.description_hash = result.description_hash;
+		payload.elapsed_ms = displayedHistoryItem?.elapsed_ms ?? result.elapsed_total_ms;
+		payload.tokens_in = displayedHistoryItem?.tokens_in ?? ((result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null);
+		payload.tokens_out = displayedHistoryItem?.tokens_out ?? ((result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null);
+		if (result.derivation_kind !== undefined) payload.derivation_kind = result.derivation_kind;
+		if (result.derivation_metadata !== undefined) payload.derivation_metadata = result.derivation_metadata;
 		payload.score = result.score;
 		return payload;
 	});
 	const scoreJsonText = $derived(scoreJsonPayload ? JSON.stringify(scoreJsonPayload, null, 2) : '');
 	const scoreJsonLines = $derived(scoreJsonText ? scoreJsonText.split('\n') : []);
 	const scoreJsonHighlightedLines = $derived(scoreJsonLines.map(highlightJsonLine));
-	const interpretationFeedbackParts = $derived(interpretationFeedback(input, ddl));
 	const scoreJsonHighlighted = $derived(scoreJsonHighlightedLines.join('\n'));
 	const scoreJsonSeparatorLine = $derived.by(() => {
 		const index = scoreJsonLines.findIndex((line) => line.startsWith('  "score"'));
@@ -4831,7 +5019,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			historySelectionCanvas = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CANVAS_KEY));
 			historySelectionCatalog = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CATALOG_KEY));
-			instructionLang = normalizeInstructionLang(localStorage.getItem(INSTRUCTION_LANG_KEY));
 			const savedBatchFailureReport = loadBatchFailureReport();
 			setBatchFailureReport(savedBatchFailureReport);
 			miscSettingsLoaded = true;
@@ -4851,7 +5038,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog; instructionLang;
+		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -4910,7 +5097,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<InputPanel
 						bind:inputMode
 						bind:input
-						bind:seedText
 						bind:batchInput
 						{lineNumbersText}
 						{batchNonEmpty}
@@ -4929,8 +5115,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{batchFailureReport}
 						{batchPromptHistory}
 						bind:batchRandomColorCatalog
-						bind:instructionLang
-						{interpretationFeedbackParts}
 						bind:demoSettings
 						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}
@@ -4956,7 +5140,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{stageLabel}
 						{showKiwi}
 						{showCrab}
-						selectedCatalogName={currentCatalog.name}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -5133,6 +5316,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{variationGridIncludesReading}
 				{variationGridTaskLabel}
 				{variationGridStatus}
+				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
 				onAbortVariationCandidates={abortVariationCandidates}
 				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
@@ -5157,6 +5341,20 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onRunModelInspection={runModelInspection}
 				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
+				{languageInspectionTargetLang}
+				{languageCompareMode}
+				{languageCompareFixedLang}
+				{languageInspectionSelectedLangs}
+				{languageInspectionBusy}
+				{languageInspectionStatus}
+				{languageInspectionResults}
+				onSetLanguageCompareMode={setLanguageCompareMode}
+				onSetLanguageCompareFixedLang={setLanguageCompareFixedLang}
+				onToggleLanguageInspectionLang={toggleLanguageInspectionLang}
+				{isLanguageInspectionChoiceBlocked}
+				onRunLanguageInspection={runLanguageInspection}
+				onAdoptLanguageInspectionResult={(item) => saveModelInspectionResult(item)}
+				onToggleLanguageInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				{lineageGraph}
 				{lineageLoading}
 				{lineageError}
@@ -5402,6 +5600,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{catalogName}
 		{historyPreviewText}
 		{shortModel}
+		{apiFetch}
+		currentHistoryId={displayedHistoryItem?.id ?? result?.history_id ?? null}
+		currentLineageRootId={displayedHistoryItem?.lineage_root_node_id ?? null}
 	/>
 {/if}
 

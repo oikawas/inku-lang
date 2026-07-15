@@ -2,7 +2,6 @@
 	import { getLang, t } from '$lib/i18n/index.svelte';
 	import {
 		CANVAS_ASPECT_OPTIONS,
-		getCanvasAspectOption,
 		type CanvasAspectId,
 	} from '$lib/plugins/system/canvas-aspect';
 
@@ -15,7 +14,6 @@
 
 	let { selected, open = false, onToggle, onSelect }: Props = $props();
 
-	const current = $derived(getCanvasAspectOption(selected));
 	const isJa = $derived(getLang() === 'ja');
 </script>
 
@@ -31,8 +29,7 @@
 		aria-haspopup="menu"
 		aria-expanded={open}
 	>
-		<span class="aspect-icon" aria-hidden="true"></span>
-		<span>{current.label}</span>
+		<span>{t().canvasAspectButton}</span>
 	</button>
 	{#if open}
 		<div class="aspect-menu" role="menu">
@@ -62,19 +59,19 @@
 		position: relative;
 		display: inline-flex;
 	}
-	.aspect-trigger {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
+	.aspect-trigger { display: inline-flex; align-items: center; }
+	.ghost-btn {
+		padding: 4px 10px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg2);
+		font-size: 11px;
+		cursor: pointer;
+		font-family: inherit;
+		white-space: nowrap;
 	}
-	.aspect-icon {
-		width: 13px;
-		height: 13px;
-		border: 1px solid currentColor;
-		border-radius: 2px;
-		box-shadow: inset 0 0 0 2px var(--panel);
-		opacity: 0.82;
-	}
+	.ghost-btn:hover { background: var(--bg2); }
 	.aspect-menu {
 		position: absolute;
 		top: calc(100% + 6px);

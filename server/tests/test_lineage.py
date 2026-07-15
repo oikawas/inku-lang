@@ -67,6 +67,20 @@ def test_lineage_records_explicit_derivation_and_tombstone():
             child["lineage_node_id"],
         }
         assert lineage["edges"][0]["derivation_kind"] == "touch_variation"
+        assert next(node for node in lineage["nodes"] if node["id"] == root["lineage_node_id"])["child_count"] == 1
+        assert next(node for node in lineage["nodes"] if node["id"] == child["lineage_node_id"])["child_count"] == 0
+
+        sibling = db.add_item(_item(
+            user["id"],
+            "\u5225\u306e\u5b50",
+            1002,
+            lineage_parent_node_id=root["lineage_node_id"],
+            derivation_kind="layout_variation",
+        ))
+        partial = db.get_lineage(user["id"], child["lineage_node_id"], descendant_depth=0)
+        assert partial is not None
+        assert sibling["lineage_node_id"] not in {node["id"] for node in partial["nodes"]}
+        assert next(node for node in partial["nodes"] if node["id"] == root["lineage_node_id"])["child_count"] == 2
 
         assert db.delete_items(user["id"], [root["id"]]) == 1
         after_delete = db.get_lineage(user["id"], child["lineage_node_id"])

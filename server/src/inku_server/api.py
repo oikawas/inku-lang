@@ -2775,7 +2775,7 @@ def api_admin_unread_words(limit: int = Query(default=500, ge=1, le=2000), actor
 @app.get("/api/history/{item_id}/lineage")
 def api_history_lineage(
     item_id: str,
-    descendant_depth: int = Query(default=2, ge=0, le=5),
+    descendant_depth: int = Query(default=2, ge=0, le=200),
     node_limit: int = Query(default=200, ge=1, le=200),
     actor: dict = Depends(_current_user),
 ) -> dict:
@@ -2796,7 +2796,7 @@ def api_history_lineage(
 @app.get("/api/lineage/{node_id}")
 def api_lineage(
     node_id: str,
-    descendant_depth: int = Query(default=2, ge=0, le=5),
+    descendant_depth: int = Query(default=2, ge=0, le=200),
     node_limit: int = Query(default=200, ge=1, le=200),
     actor: dict = Depends(_current_user),
 ) -> dict:

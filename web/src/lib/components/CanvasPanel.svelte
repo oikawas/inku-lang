@@ -123,6 +123,8 @@
 		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrashLineage: (historyIds: string[]) => void;
 		onDetachLineage: () => void;
+		onLoadLineageOverview: () => void | Promise<void>;
+		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
 	};
 
 	let {
@@ -226,7 +228,9 @@
 		onPromoteLineageNode,
 		onSaveLineageNote,
 		onAskTrashLineage,
-		onDetachLineage
+		onDetachLineage,
+		onLoadLineageOverview,
+		onLoadLineageBranch
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
@@ -637,7 +641,7 @@
 					</div>
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} />
 			{:else if outputTab === 'prompts'}
 				<OutputTabsContent
 					outputTab="prompts"

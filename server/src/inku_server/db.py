@@ -669,7 +669,7 @@ def _lineage_edge_to_dict(row: LineageEdgeRow) -> dict:
 
 
 def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, node_limit: int = 200) -> dict | None:
-    descendant_depth = max(0, min(descendant_depth, 5))
+    descendant_depth = max(0, min(descendant_depth, 200))
     node_limit = max(1, min(node_limit, 200))
     with SessionLocal() as session:
         focus = session.query(LineageNodeRow).filter(
@@ -722,6 +722,15 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
                 HistoryRow.id.in_(history_ids),
             ).all()
         }
+        child_counts = dict(
+            session.query(LineageEdgeRow.parent_node_id, func.count(LineageEdgeRow.id))
+            .filter(
+                LineageEdgeRow.user_id == user_id,
+                LineageEdgeRow.parent_node_id.in_(node_ids),
+            )
+            .group_by(LineageEdgeRow.parent_node_id)
+            .all()
+        )
         node_payloads = []
         for node in nodes:
             payload = {
@@ -729,6 +738,7 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
                 "state": node.state,
                 "at": node.at,
                 "deleted_at": node.deleted_at,
+                "child_count": int(child_counts.get(node.id, 0)),
             }
             if node.state != "tombstone":
                 payload["description_hash"] = node.description_hash

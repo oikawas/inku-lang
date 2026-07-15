@@ -3381,15 +3381,48 @@ if (unreadWords.length > 0) {
 		}
 	}
 
-async function fetchLineage(nodeId: string, force = false): Promise<void> {
+async function fetchLineage(nodeId: string, force = false, descendantDepth = 3): Promise<void> {
 	if (!nodeId || lineageLoading || (!force && lineageLoadedFocus === nodeId)) return;
 	lineageLoading = true;
 	lineageError = null;
 	try {
-		const r = await apiFetch(`/api/lineage/${encodeURIComponent(nodeId)}?descendant_depth=3&node_limit=200`, { cache: 'no-store' });
+		const r = await apiFetch(`/api/lineage/${encodeURIComponent(nodeId)}?descendant_depth=${descendantDepth}&node_limit=200`, { cache: 'no-store' });
 		if (!r.ok) throw new Error(`HTTP ${r.status}`);
 		lineageGraph = await r.json() as LineageGraph;
 		lineageLoadedFocus = nodeId;
+	} catch (e) {
+		lineageError = e instanceof Error ? e.message : String(e);
+	} finally {
+		lineageLoading = false;
+	}
+}
+
+async function loadLineageBranch(nodeId: string): Promise<void> {
+	if (!lineageGraph) return;
+	const r = await apiFetch('/api/lineage/' + encodeURIComponent(nodeId) + '?descendant_depth=1&node_limit=200', { cache: 'no-store' });
+	if (!r.ok) throw new Error('HTTP ' + r.status);
+	const branch = await r.json() as LineageGraph;
+	const nodes = new Map(lineageGraph.nodes.map((node) => [node.id, node]));
+	const edges = new Map(lineageGraph.edges.map((edge) => [edge.id, edge]));
+	for (const node of branch.nodes) nodes.set(node.id, node);
+	for (const edge of branch.edges) edges.set(edge.id, edge);
+	lineageGraph = { ...lineageGraph, nodes: [...nodes.values()], edges: [...edges.values()] };
+}
+
+async function loadLineageOverview(): Promise<void> {
+	const focusNodeId = lineageGraph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
+	if (!focusNodeId || !lineageGraph) return;
+	const childIds = new Set(lineageGraph.edges.map((edge) => edge.child_node_id));
+	const rootNodeId = lineageGraph.nodes.find((node) => !childIds.has(node.id))?.id ?? focusNodeId;
+	lineageLoading = true;
+	lineageError = null;
+	try {
+		const url = '/api/lineage/' + encodeURIComponent(rootNodeId) + '?descendant_depth=200&node_limit=200';
+		const r = await apiFetch(url, { cache: 'no-store' });
+		if (!r.ok) throw new Error('HTTP ' + r.status);
+		const overview = await r.json() as LineageGraph;
+		lineageGraph = { ...overview, focus_node_id: focusNodeId };
+		lineageLoadedFocus = focusNodeId;
 	} catch (e) {
 		lineageError = e instanceof Error ? e.message : String(e);
 	} finally {
@@ -4897,6 +4930,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
 				onDetachLineage={detachLineage}
+				onLoadLineageOverview={loadLineageOverview}
+				onLoadLineageBranch={loadLineageBranch}
 				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->

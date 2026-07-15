@@ -144,6 +144,7 @@ def test_lineage_only_trash_restore_tombstone_and_limits():
             "state": "tombstone",
             "at": 301,
             "deleted_at": tombstone["deleted_at"],
+            "child_count": 1,
         }
         assert len(graph["edges"]) == 2
         assert all(edge["metadata"] == {} for edge in graph["edges"])

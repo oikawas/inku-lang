@@ -511,6 +511,16 @@ export interface LangPack {
 	historyTrashButton: (n: number) => string;
 	historyThumbsTab: string;
 	historyListTab: string;
+	historyChronologicalMode: string;
+	historyLineageMode: string;
+	historyLineageGroups: string;
+	historyLineageEmpty: string;
+	historyLineageWorkCount: (n: number) => string;
+	historyLineageStarCount: (n: number) => string;
+	historyCurrentLineage: string;
+	historyLineageExpand: string;
+	historyLineageCollapse: string;
+	historySelectLineage: string;
 	historySelectItem: (selected: boolean) => string;
 	historySelectAll: string;
 	historyMoveToTrash: string;

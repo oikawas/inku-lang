@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 
@@ -26,10 +27,15 @@
 		render_seed?: number | string | null;
 		vary_seed?: number | string | null;
 	interpretation_seed?: string | null;
+	lineage_node_id?: string | null;
+	lineage_root_node_id?: string | null;
 		trashed?: boolean;
 		starred?: boolean;
 	note?: string | null;
 	};
+
+	type LineageHistoryGroup = { root_node_id: string; representative: HistoryItem; item_count: number; starred_count: number; latest_at: number };
+	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
 	type Props = {
 		historyManagerView: 'active' | 'trash';
@@ -67,6 +73,9 @@
 		catalogName: (id: string | null | undefined) => string;
 		historyPreviewText: (text: string) => string;
 		shortModel: (model: string | null | undefined) => string;
+		apiFetch: ApiFetch;
+		currentHistoryId?: string | null;
+		currentLineageRootId?: string | null;
 	};
 
 	let {
@@ -104,10 +113,99 @@
 		formatElapsed,
 		catalogName,
 		historyPreviewText,
-		shortModel
+		shortModel,
+		apiFetch,
+		currentHistoryId = null,
+		currentLineageRootId = null
 	}: Props = $props();
 
 	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
+	let historyDisplayMode = $state<'chronological' | 'lineage'>('chronological');
+	let lineageGroups = $state<LineageHistoryGroup[]>([]);
+	let lineageGroupTotal = $state(0);
+	let lineageGroupPage = $state(0);
+	let lineageGroupLoading = $state(false);
+	let expandedRootIds = $state<string[]>([]);
+	let lineageGroupItems = $state<Record<string, HistoryItem[]>>({});
+	let lineageMemberLoadingIds = $state<string[]>([]);
+	let lineageRequestId = 0;
+	const lineageGroupPageSize = 8;
+	const lineageGroupTotalPages = $derived(Math.max(1, Math.ceil(lineageGroupTotal / lineageGroupPageSize)));
+
+	onMount(() => {
+		try {
+			if (localStorage.getItem('inku-history-display-mode') === 'lineage') historyDisplayMode = 'lineage';
+		} catch {}
+	});
+
+	function setHistoryDisplayMode(mode: 'chronological' | 'lineage') {
+		historyDisplayMode = mode;
+		lineageGroupPage = 0;
+		expandedRootIds = [];
+		try { localStorage.setItem('inku-history-display-mode', mode); } catch {}
+	}
+
+	async function fetchLineageGroups(): Promise<void> {
+		const requestId = ++lineageRequestId;
+		lineageGroupLoading = true;
+		const params = new URLSearchParams({ offset: String(lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim() });
+		if (historyManagerView === 'trash') params.set('trashed', 'true');
+		if (historyManagerStarredOnly) params.set('starred', 'true');
+		try {
+			const response = await apiFetch('/api/history/lineage-groups?' + params.toString(), { cache: 'no-store' });
+			if (!response.ok) throw new Error('HTTP ' + response.status);
+			const data = await response.json() as { groups: LineageHistoryGroup[]; total: number };
+			if (requestId !== lineageRequestId) return;
+			lineageGroups = data.groups;
+			lineageGroupTotal = data.total;
+			lineageGroupItems = {};
+			expandedRootIds = [];
+		} finally {
+			if (requestId === lineageRequestId) lineageGroupLoading = false;
+		}
+	}
+
+	async function toggleLineageGroup(rootNodeId: string): Promise<void> {
+		if (expandedRootIds.includes(rootNodeId)) {
+			expandedRootIds = expandedRootIds.filter((id) => id !== rootNodeId);
+			return;
+		}
+		expandedRootIds = [...expandedRootIds, rootNodeId];
+		if (lineageGroupItems[rootNodeId]) return;
+		lineageMemberLoadingIds = [...lineageMemberLoadingIds, rootNodeId];
+		const params = new URLSearchParams({ limit: '10000', q: historySearch.trim() });
+		if (historyManagerView === 'trash') params.set('trashed', 'true');
+		if (historyManagerStarredOnly) params.set('starred', 'true');
+		try {
+			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store' });
+			if (!response.ok) throw new Error('HTTP ' + response.status);
+			const data = await response.json() as { items: HistoryItem[] };
+			lineageGroupItems = { ...lineageGroupItems, [rootNodeId]: data.items };
+		} finally {
+			lineageMemberLoadingIds = lineageMemberLoadingIds.filter((id) => id !== rootNodeId);
+		}
+	}
+
+	async function toggleLineageMemberStar(item: HistoryItem, event: MouseEvent): Promise<void> {
+		event.preventDefault();
+		event.stopPropagation();
+		const nextStarred = !item.starred;
+		await onToggleStar(item, event);
+		for (const [rootId, members] of Object.entries(lineageGroupItems)) {
+			if (!members.some((member) => member.id === item.id)) continue;
+			lineageGroupItems = { ...lineageGroupItems, [rootId]: members.map((member) => member.id === item.id ? { ...member, starred: nextStarred } : member) };
+			lineageGroups = lineageGroups.map((group) => group.root_node_id === rootId ? { ...group, starred_count: Math.max(0, group.starred_count + (nextStarred ? 1 : -1)), representative: group.representative.id === item.id ? { ...group.representative, starred: nextStarred } : group.representative } : group);
+		}
+	}
+
+	function setLineageGroupPage(page: number): void {
+		lineageGroupPage = Math.max(0, Math.min(page, lineageGroupTotalPages - 1));
+	}
+
+	function selectLineageGroup(rootNodeId: string): void {
+		const ids = (lineageGroupItems[rootNodeId] ?? []).flatMap((item) => item.id ? [item.id] : []);
+		for (const id of ids) if (!selectedHistoryIds.includes(id)) onToggleSelection(id);
+	}
 
 	function loadItemAndClose(item: HistoryItem) {
 		if (historyManagerView !== 'active') return;
@@ -195,8 +293,14 @@
 	}
 
 	$effect(() => {
+		if (historyDisplayMode !== 'lineage') return;
+		historyManagerView; historySearch; historyManagerStarredOnly; lineageGroupPage; managedHistoryTotal; managerTrashTotal;
+		void fetchLineageGroups();
+	});
+
+	$effect(() => {
 		const element = thumbGridWrapEl;
-		if (!element || historyManagerTab !== 'thumbs') return;
+		if (!element || historyManagerTab !== 'thumbs' || historyDisplayMode !== 'chronological') return;
 		let frame = 0;
 		const update = () => {
 			cancelAnimationFrame(frame);
@@ -221,8 +325,14 @@
 				<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
 				<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
 			</div>
+			<div class="settings-tabs history-group-tabs">
+				<button class:active={historyDisplayMode === 'chronological'} onclick={() => setHistoryDisplayMode('chronological')}>{t().historyChronologicalMode}</button>
+				<button class:active={historyDisplayMode === 'lineage'} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
+			</div>
 			<span class="history-manager-count">
-				{#if managedHistoryTotal === 0}
+				{#if historyDisplayMode === 'lineage'}
+					{lineageGroupTotal} {t().historyLineageGroups}
+				{:else if managedHistoryTotal === 0}
 					0 / 0
 				{:else}
 					{historyManagerOffset + 1}-{historyManagerShownTo} / {managedHistoryTotal}
@@ -231,11 +341,19 @@
 		</div>
 		<div class="history-head-actions">
 			<div class="history-manager-pager">
-				<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyLatest}</button>
-				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
-				<span>{historyManagerLoading ? t().historyLoading : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
-				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
-				<button class="ghost-btn history-latest-btn" onclick={onSetFirstPage} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyFirst}</button>
+				{#if historyDisplayMode === 'lineage'}
+					<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(0)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyLatest}</button>
+					<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyPrev}</button>
+					<span>{lineageGroupLoading ? t().historyLoading : (lineageGroupPage + 1) + ' / ' + lineageGroupTotalPages}</span>
+					<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage + 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyNext}</button>
+					<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(lineageGroupTotalPages - 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyFirst}</button>
+				{:else}
+					<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyLatest}</button>
+					<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
+					<span>{historyManagerLoading ? t().historyLoading : (historyManagerPage + 1) + ' / ' + historyManagerTotalPages}</span>
+					<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
+					<button class="ghost-btn history-latest-btn" onclick={onSetFirstPage} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyFirst}</button>
+				{/if}
 			</div>
 			<button class="catalog-close" onclick={onClose}>×</button>
 		</div>
@@ -272,7 +390,61 @@
 		</div>
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
 	</div>
-	{#if historyManagerTab === 'thumbs'}
+	{#if historyDisplayMode === 'lineage'}
+		<div class="lineage-history-list" class:list-mode={historyManagerTab === 'list'}>
+			{#if lineageGroupLoading}
+				<div class="lineage-history-message">{t().historyLoading}</div>
+			{:else if lineageGroups.length === 0}
+				<div class="lineage-history-message">{t().historyLineageEmpty}</div>
+			{:else}
+				{#each lineageGroups as group (group.root_node_id)}
+					<article class="lineage-history-group" class:current-lineage={currentLineageRootId === group.root_node_id}>
+						<div class="lineage-group-head">
+							<button class="lineage-representative" type="button" onclick={() => loadItemAndClose(group.representative)}>
+								<HistoryThumbnail item={group.representative} scope={'lineage-group-' + group.root_node_id} size="mini" />
+							</button>
+							<div class="lineage-group-summary">
+								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input)}</strong>
+								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {formatHistoryDate(group.latest_at)}</span>
+								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
+							</div>
+							<button class="ghost-btn" type="button" onclick={() => toggleLineageGroup(group.root_node_id)} aria-expanded={expandedRootIds.includes(group.root_node_id)}>
+								{expandedRootIds.includes(group.root_node_id) ? t().historyLineageCollapse : t().historyLineageExpand}
+							</button>
+						</div>
+						{#if expandedRootIds.includes(group.root_node_id)}
+							<div class="lineage-group-tools"><button class="ghost-btn" type="button" disabled={!lineageGroupItems[group.root_node_id]} onclick={() => selectLineageGroup(group.root_node_id)}>{t().historySelectLineage}</button></div>
+							{#if lineageMemberLoadingIds.includes(group.root_node_id)}
+								<div class="lineage-history-message">{t().historyLoading}</div>
+							{:else}
+								<div class="lineage-member-grid">
+									{#each lineageGroupItems[group.root_node_id] ?? [] as it (it.id ?? it.at)}
+										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
+											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} onclick={() => it.id && onToggleSelection(it.id)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
+											<button class="lineage-member-main" type="button" onclick={() => loadItemAndClose(it)}>
+												<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
+												<span>{thumbnailPromptText(it.source_text ?? it.input)}</span>
+											</button>
+											<div class="lineage-member-actions">
+												<button class="hash-row-star" class:starred={!!it.starred} onclick={(event) => toggleLineageMemberStar(it, event)}>★</button>
+												{#if historyManagerView === 'active'}
+													<button class="ghost-btn" onclick={(event) => replayItemAndClose(it, event)}>{t().historyReplay}</button>
+													<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} aria-label={t().deleteButton}>⌫</button>
+												{:else}
+													<button class="ghost-btn" onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
+													<button class="danger-btn" onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						{/if}
+					</article>
+				{/each}
+			{/if}
+		</div>
+	{:else if historyManagerTab === 'thumbs'}
 		<div class="history-thumb-grid-wrap" bind:this={thumbGridWrapEl}>
 			<div class="history-thumb-grid">
 				{#each managedHistoryItems as it (it.id ?? it.at)}
@@ -387,6 +559,34 @@
 </div>
 
 <style>
+	.lineage-history-list { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+	.lineage-history-message { margin: auto; padding: 30px; color: var(--fg3); text-align: center; }
+	.lineage-history-group { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; }
+	.lineage-history-group.current-lineage { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
+	.lineage-group-head { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--panel); }
+	.lineage-representative { flex: 0 0 56px; width: 56px; height: 56px; padding: 0; border: 0; border-radius: var(--r); overflow: hidden; background: var(--bg); cursor: pointer; }
+	.lineage-representative :global(svg) { width: 100%; height: 100%; }
+	.lineage-group-summary { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+	.lineage-group-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+	.lineage-group-summary > span { color: var(--fg3); font-size: 10px; }
+	.current-lineage-badge { align-self: flex-start; padding: 2px 6px; border-radius: 999px; background: var(--accent-light); color: var(--accent) !important; }
+	.lineage-group-tools { display: flex; justify-content: flex-end; padding: 6px 10px; border-top: 1px solid var(--border); background: var(--bg); }
+	.lineage-member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; padding: 8px 10px 12px; border-top: 1px solid var(--border); background: var(--bg); }
+	.lineage-member { position: relative; min-width: 0; padding: 5px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+	.lineage-member.selected, .lineage-member.current-work { border-color: var(--accent); }
+	.lineage-member > .selection-checkbox { position: absolute; top: 8px; left: 8px; z-index: 5; }
+	.lineage-member-main { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--fg2); cursor: pointer; text-align: left; }
+	.lineage-member-main :global(svg) { width: 100%; max-height: 110px; }
+	.lineage-member-main span { display: block; overflow: hidden; margin-top: 4px; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+	.lineage-member-actions { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+	.lineage-member-actions .ghost-btn, .lineage-member-actions .danger-btn { margin-left: 0; padding: 3px 6px; font-size: 9px; }
+	.lineage-history-list.list-mode .lineage-member-grid { display: flex; flex-direction: column; }
+	.lineage-history-list.list-mode .lineage-member { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+	.lineage-history-list.list-mode .lineage-member > .selection-checkbox { position: static; }
+	.lineage-history-list.list-mode .lineage-member-main { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px; }
+	.lineage-history-list.list-mode .lineage-member-main :global(svg) { width: 48px; height: 48px; }
+	.lineage-history-list.list-mode .lineage-member-main span { margin-top: 0; }
+	.history-group-tabs { flex-shrink: 0; }
 	.modal-backdrop {
 		position: fixed;
 		inset: 0;

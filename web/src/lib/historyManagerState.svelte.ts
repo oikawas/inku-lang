@@ -15,6 +15,7 @@ export type HistoryItem = {
 	description_hash?: string | null;
 	history_visibility?: 'normal' | 'lineage_only';
 	lineage_node_id?: string | null;
+	lineage_root_node_id?: string | null;
 	lineage_parent_node_id?: string | null;
 	derivation_kind?: string | null;
 	derivation_metadata?: Record<string, unknown>;

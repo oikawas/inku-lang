@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.80**
+**Version: v1.81**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -1249,6 +1249,16 @@ v1.80 adds a deterministic Score-derived composition mirror shared by server and
 The Canvas UI separates artwork facts from pending generation settings. The top row labels the models, color catalog, canvas, and creation time actually used by the displayed artwork as `Displayed`; the bottom status bar labels the currently selected models, color catalog, and canvas for the next run as `Next generation`. When Stage 1 and Stage 2 use the same model, the UI combines them as `Interpretation / rendering`. The generation-information inspector has `Details`, `Prompts`, and `JSON` views. Details contains the two stage models, color catalog, canvas, render/layout/interpretation seeds, render and description hashes, render engine and version, build, elapsed time, and input/output token counts. In the Prompts view, the initial heights of Stage 1 user input and Stage 2 system prompt are reduced by half without changing their content; Stage 1 system prompt and Stage 2 user input retain their existing heights.
 
 Refinement account for v1.80: the proposed automatic statistics-to-generation “unexplored” path was removed from this release, and vision review remains manual rather than release-automatic. Existing default-path repair branches could not yet be removed. The release makes unnoticed self-repetition, unrecorded external performance seeds, and privacy-losing unread-word aggregation less likely; it deliberately does not make dissimilarity a goal.
+
+### v1.81 Lineage-grouped history
+
+History Manager offers `Timeline` and `By lineage` as an independent display choice alongside the thumbnail/list layout choice, and stores the display preference in the browser. The bottom history strip remains chronological because it serves rapid previous/next navigation.
+
+A history group is based only on persisted lineage nodes and edges, never similarity, identical text, or timestamps. Every lineage node has an immutable `root_node_id`: a root points to itself and a child inherits its parent's root. Existing nodes are backfilled by following persisted edges toward their ancestor. Groups are ordered by the latest matching regular-history artwork and paginated by group, so one lineage is never split merely by an artwork-page boundary.
+
+Each group header shows a representative artwork, the regular-history artwork count under the current filter, starred count, and latest save time. Members are fetched only when expanded and retain the existing display, star, replay, individual/group selection, and trash operations. Search, starred-only, and active/trash filters include only matching artworks in group summaries and expanded members. `lineage_only` and tombstones remain outside regular history and its counts. An independent artwork forms a one-work lineage, and no root, artwork, or count may cross user boundaries.
+
+Build 557 establishes the v1.81 foundation with lineage-root migration/backfill, lineage group/member APIs, and the Timeline/By lineage History Manager UI with lazy expansion.
 
 Build 545 reorganizes the Canvas artwork facts and next-generation settings into separate groups and consolidates generation metadata into the Details / Prompts / JSON inspector. It changes only the visible height, not the content, of the Stage 1 user input and Stage 2 system prompt fields.
 

@@ -112,6 +112,7 @@ class LineageNodeRow(Base):
     render_hash = Column(String, nullable=True, index=True)
     at = Column(BigInteger, nullable=False, index=True)
     deleted_at = Column(BigInteger, nullable=True)
+    root_node_id = Column(String, nullable=True, index=True)
 
 
 class LineageEdgeRow(Base):
@@ -229,6 +230,9 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "history_visibility": "ALTER TABLE history ADD COLUMN history_visibility VARCHAR NOT NULL DEFAULT 'normal'",
     "lineage_node_id": "ALTER TABLE history ADD COLUMN lineage_node_id VARCHAR",
 }
+_LINEAGE_NODE_COLUMN_MIGRATIONS = {
+    "root_node_id": "ALTER TABLE lineage_nodes ADD COLUMN root_node_id VARCHAR",
+}
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
     "settings_tab": "ALTER TABLE user_accounts ADD COLUMN settings_tab VARCHAR NOT NULL DEFAULT 'db'",
@@ -311,6 +315,9 @@ _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_visibility", "CREATE INDEX IF NOT EXISTS ix_history_visibility ON history (history_visibility)"),
     ("ix_history_lineage_node_id", "CREATE UNIQUE INDEX IF NOT EXISTS ix_history_lineage_node_id ON history (lineage_node_id)"),
 )
+_LINEAGE_NODE_INDEX_MIGRATIONS = (
+    ("ix_lineage_nodes_root_node_id", "CREATE INDEX IF NOT EXISTS ix_lineage_nodes_root_node_id ON lineage_nodes (root_node_id)"),
+)
 
 
 def init_db() -> None:
@@ -346,6 +353,20 @@ def _migrate_columns() -> None:
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError("failed to inspect user_accounts table columns for migration") from exc
 
+        has_lineage_nodes = inspector.has_table("lineage_nodes")
+        existing_lineage_node_columns = (
+            {col["name"] for col in inspector.get_columns("lineage_nodes")}
+            if has_lineage_nodes else set()
+        )
+        if has_lineage_nodes:
+            for column, ddl in _LINEAGE_NODE_COLUMN_MIGRATIONS.items():
+                if column in existing_lineage_node_columns:
+                    continue
+                try:
+                    conn.execute(text(ddl))
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(f"failed to migrate lineage_nodes.{column}") from exc
+
         for column, ddl in _USER_ACCOUNT_COLUMN_MIGRATIONS.items():
             if column in existing_user_columns:
                 continue
@@ -359,6 +380,12 @@ def _migrate_columns() -> None:
                 conn.execute(text(ddl))
             except Exception as exc:  # noqa: BLE001
                 raise RuntimeError(f"failed to create migration index {index_name}") from exc
+        if has_lineage_nodes:
+            for index_name, ddl in _LINEAGE_NODE_INDEX_MIGRATIONS:
+                try:
+                    conn.execute(text(ddl))
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(f"failed to create migration index {index_name}") from exc
         _backfill_render_hashes(conn)
         _migrate_history_search(conn)
 
@@ -644,11 +671,33 @@ def _backfill_history_identity_and_lineage() -> None:
                     description_hash=row.description_hash,
                     render_hash=row.render_hash,
                     at=row.at,
+                    root_node_id=None,
                 )
                 session.add(node)
                 changed = True
             if node is not None and row.lineage_node_id != node.id:
                 row.lineage_node_id = node.id
+                changed = True
+        session.flush()
+        nodes = session.query(LineageNodeRow).all()
+        parent_by_child = {edge.child_node_id: edge.parent_node_id for edge in session.query(LineageEdgeRow).all()}
+        node_by_id = {node.id: node for node in nodes}
+
+        def resolve_root(node_id: str) -> str:
+            seen: set[str] = set()
+            current = node_id
+            while current in parent_by_child and current not in seen:
+                seen.add(current)
+                parent_id = parent_by_child[current]
+                if parent_id not in node_by_id:
+                    break
+                current = parent_id
+            return current
+
+        for node in nodes:
+            expected_root = resolve_root(node.id)
+            if node.root_node_id != expected_root:
+                node.root_node_id = expected_root
                 changed = True
         if changed:
             session.commit()
@@ -1155,9 +1204,14 @@ def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow]) -> list[dict]:
     node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
     if not node_ids:
         return items
+    nodes = session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(node_ids)).all()
+    node_by_id = {node.id: node for node in nodes}
     edges = session.query(LineageEdgeRow).filter(LineageEdgeRow.child_node_id.in_(node_ids)).all()
     edge_by_child = {edge.child_node_id: edge for edge in edges}
     for row, item in zip(rows, items, strict=True):
+        node = node_by_id.get(row.lineage_node_id)
+        if node is not None and node.user_id == row.user_id:
+            item["lineage_root_node_id"] = node.root_node_id or node.id
         edge = edge_by_child.get(row.lineage_node_id)
         if edge is None or edge.user_id != row.user_id:
             continue
@@ -1251,6 +1305,7 @@ def add_item(item: dict) -> dict:
         id=node_id, user_id=item["user_id"], history_id=item["id"],
         state="lineage_only" if visibility == "lineage_only" else "active",
         description_hash=desc_hash, render_hash=render_hash, at=item["at"],
+        root_node_id=node_id,
     )
     with SessionLocal() as session:
         if parent_node_id:
@@ -1261,6 +1316,7 @@ def add_item(item: dict) -> dict:
             ).first()
             if parent is None:
                 raise ValueError("lineage parent not found")
+            node.root_node_id = parent.root_node_id or parent.id
         session.add(row)
         session.add(node)
         if parent_node_id:
@@ -2003,6 +2059,105 @@ def list_items(
             .limit(limit)
             .all()
         )
+        return _rows_to_dicts_with_lineage(session, rows), total
+
+
+def list_lineage_groups(
+    user_id: str,
+    offset: int = 0,
+    limit: int = 12,
+    trashed: bool = False,
+    query_text: str = "",
+    starred: bool = False,
+) -> tuple[list[dict], int]:
+    """List deterministic history groups, paginated by lineage rather than artwork."""
+    with SessionLocal() as session:
+        query = (
+            session.query(HistoryRow)
+            .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
+            .filter(
+                HistoryRow.user_id == user_id,
+                LineageNodeRow.user_id == user_id,
+                HistoryRow.trashed == (1 if trashed else 0),
+                HistoryRow.history_visibility == "normal",
+            )
+        )
+        if starred:
+            query = query.filter(HistoryRow.starred == 1)
+        search = query_text.strip()
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(or_(
+                HistoryRow.input.ilike(pattern),
+                HistoryRow.ddl.ilike(pattern),
+                HistoryRow.stage1_model.ilike(pattern),
+                HistoryRow.stage2_model.ilike(pattern),
+                HistoryRow.catalog_id.ilike(pattern),
+            ))
+        rows = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).all()
+        items = _rows_to_dicts_with_lineage(session, rows)
+        grouped: dict[str, list[dict]] = {}
+        for item in items:
+            root_id = item.get("lineage_root_node_id") or item.get("lineage_node_id")
+            if not root_id:
+                continue
+            grouped.setdefault(root_id, []).append(item)
+        groups = [
+            {
+                "root_node_id": root_id,
+                "representative": members[0],
+                "item_count": len(members),
+                "starred_count": sum(1 for member in members if member.get("starred")),
+                "latest_at": int(members[0].get("at") or 0),
+            }
+            for root_id, members in grouped.items()
+        ]
+        groups.sort(key=lambda group: (-group["latest_at"], group["root_node_id"]))
+        total = len(groups)
+        return groups[offset:offset + limit], total
+
+
+def list_lineage_group_items(
+    user_id: str,
+    root_node_id: str,
+    offset: int = 0,
+    limit: int = 100,
+    trashed: bool = False,
+    query_text: str = "",
+    starred: bool = False,
+) -> tuple[list[dict], int]:
+    with SessionLocal() as session:
+        root = session.query(LineageNodeRow).filter(
+            LineageNodeRow.id == root_node_id,
+            LineageNodeRow.user_id == user_id,
+        ).first()
+        if root is None or (root.root_node_id or root.id) != root_node_id:
+            return [], 0
+        query = (
+            session.query(HistoryRow)
+            .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
+            .filter(
+                HistoryRow.user_id == user_id,
+                LineageNodeRow.user_id == user_id,
+                LineageNodeRow.root_node_id == root_node_id,
+                HistoryRow.trashed == (1 if trashed else 0),
+                HistoryRow.history_visibility == "normal",
+            )
+        )
+        if starred:
+            query = query.filter(HistoryRow.starred == 1)
+        search = query_text.strip()
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(or_(
+                HistoryRow.input.ilike(pattern),
+                HistoryRow.ddl.ilike(pattern),
+                HistoryRow.stage1_model.ilike(pattern),
+                HistoryRow.stage2_model.ilike(pattern),
+                HistoryRow.catalog_id.ilike(pattern),
+            ))
+        total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
+        rows = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit).all()
         return _rows_to_dicts_with_lineage(session, rows), total
 
 

@@ -76,10 +76,12 @@ with db.SessionLocal() as session:
     row = session.get(db.HistoryRow, 'history-1')
     payload = {
         'columns': sorted(column['name'] for column in inspect(db.engine).get_columns('history')),
+        'lineage_columns': sorted(column['name'] for column in inspect(db.engine).get_columns('lineage_nodes')),
         'source_text': row.source_text,
         'description_hash': row.description_hash,
         'lineage_node_id': row.lineage_node_id,
         'first_node': first_node,
+        'root_node_id': session.query(db.LineageNodeRow).one().root_node_id,
         'node_count': session.query(db.LineageNodeRow).count(),
         'edge_count': session.query(db.LineageEdgeRow).count(),
     }
@@ -109,5 +111,7 @@ print(json.dumps(payload, ensure_ascii=False))
     assert payload["source_text"] == "#1 作者が意図した本文"
     assert payload["description_hash"] == description_hash("#1 作者が意図した本文")
     assert payload["lineage_node_id"] == payload["first_node"]
+    assert "root_node_id" in payload["lineage_columns"]
+    assert payload["root_node_id"] == payload["first_node"]
     assert payload["node_count"] == 1
     assert payload["edge_count"] == 0

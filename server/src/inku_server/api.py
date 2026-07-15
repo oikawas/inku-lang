@@ -929,10 +929,26 @@ class HistoryItem(HistoryPostBody):
     note: str | None = None
     description_hash: str | None = None
     lineage_node_id: str | None = None
+    lineage_root_node_id: str | None = None
 
 
 class HistoryListResponse(BaseModel):
     items: list[HistoryItem]
+    total: int
+    offset: int
+    limit: int
+
+
+class HistoryLineageGroup(BaseModel):
+    root_node_id: str
+    representative: HistoryItem
+    item_count: int
+    starred_count: int
+    latest_at: int
+
+
+class HistoryLineageGroupListResponse(BaseModel):
+    groups: list[HistoryLineageGroup]
     total: int
     offset: int
     limit: int
@@ -2793,6 +2809,41 @@ def api_users_delete(user_id: str, actor: dict = Depends(_user_manager)) -> dict
     if not found:
         raise HTTPException(status_code=404, detail="user not found")
     return {"ok": True}
+
+
+@app.get("/api/history/lineage-groups", response_model=HistoryLineageGroupListResponse, response_model_exclude_none=True)
+def api_history_lineage_groups(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=12, ge=1, le=100),
+    trashed: bool = Query(default=False),
+    starred: bool = Query(default=False),
+    q: str = Query(default="", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> HistoryLineageGroupListResponse:
+    groups, total = _db.list_lineage_groups(
+        actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred
+    )
+    return HistoryLineageGroupListResponse(groups=groups, total=total, offset=offset, limit=limit)
+
+
+@app.get("/api/history/lineage-groups/{root_node_id}/items", response_model=HistoryListResponse, response_model_exclude_none=True)
+def api_history_lineage_group_items(
+    root_node_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=10_000),
+    trashed: bool = Query(default=False),
+    starred: bool = Query(default=False),
+    q: str = Query(default="", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> HistoryListResponse:
+    items, total = _db.list_lineage_group_items(
+        actor["id"], root_node_id, offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred
+    )
+    if total == 0:
+        root = _db.get_lineage(actor["id"], root_node_id, descendant_depth=0, node_limit=1)
+        if root is None:
+            raise HTTPException(status_code=404, detail="lineage not found")
+    return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
 @app.get("/api/history", response_model=HistoryListResponse, response_model_exclude_none=True)

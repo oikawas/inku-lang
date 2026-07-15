@@ -194,6 +194,12 @@
 	<div class="section-head">
 		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
+			<Tooltip text={t().tooltipInputCatalog}>
+				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
+			</Tooltip>
+			<Tooltip text={t().tooltipInputModel}>
+				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
+			</Tooltip>
 			{#if canvasAspectEnabled}
 				<CanvasAspectPlugin
 					selected={canvasAspectId}
@@ -202,12 +208,6 @@
 					onSelect={onSelectCanvasAspect}
 				/>
 			{/if}
-			<Tooltip text={t().tooltipInputCatalog}>
-				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
-			</Tooltip>
-			<Tooltip text={t().tooltipInputModel}>
-				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
-			</Tooltip>
 			{#if inputMode !== 'demo'}
 				<Tooltip placement="left" text={t().tooltipInputClear}>
 					<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
@@ -356,8 +356,8 @@
 		align-items: center;
 	}
 	.section-label {
-		font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
-		color: var(--fg3); text-transform: uppercase;
+		font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+		color: var(--fg2);
 	}
 	.section-actions { display: flex; gap: 5px; min-width: 0; }
 	.ghost-btn {

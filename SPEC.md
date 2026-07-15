@@ -1278,6 +1278,8 @@ Build 561 removes the former “Use today's word as a seed” control from the w
 
 Build 562 removes the duplicated instruction preview below the writing field and places the normalized-DDL heading on the same row as Saijiki, DDL edit, and automatic repair. “Vary Touch with Words” moves to the end of the refinement choices; selecting it alone reveals an unlabeled input and copy explaining deterministic Seed behavior and the one-option limit. Writing-tab selectors now use action-target labels, “Canvas” and “Color catalog,” in both languages instead of showing the current values, and the canvas button no longer has a leading square icon.
 
+Build 563 orders writing-tab actions as Color catalog, Model selection, Canvas, and New, and gives the Canvas selector the same outlined styling as the other ordinary buttons. The Prompt and Interpretation (normalized DDL) headings use a clearer 12px semibold treatment without increasing their row height.
+
 Build 545 reorganizes the Canvas artwork facts and next-generation settings into separate groups and consolidates generation metadata into the Details / Prompts / JSON inspector. It changes only the visible height, not the content, of the Stage 1 user input and Stage 2 system prompt fields.
 
 Build 546 moves the former top-level Compare tab into Refine and presents Adjust and Model comparison as sibling subviews. Switching subviews preserves their candidates and comparison results; changing the target artwork clears stale comparison results.

@@ -233,11 +233,10 @@
 	}
 	.ddl-inline-label {
 		margin-right: auto;
-		font-size: 10px;
-		font-weight: 500;
-		letter-spacing: 0.08em;
-		color: var(--fg3);
-		text-transform: uppercase;
+		font-size: 12px;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		color: var(--fg2);
 	}
 	.ddl-inline-btn {
 		padding: 4px 10px;

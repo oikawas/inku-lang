@@ -10,7 +10,7 @@
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
-	type OutputTab = 'canvas' | 'refine' | 'compare' | 'lineage';
+	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 	type PaintResult = { svg: string; score: Score; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
@@ -247,6 +247,7 @@
 	let presentationMode = $state(false);
 	let generationInfoOpen = $state(false);
 	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
+	let refineView = $state<'adjust' | 'compare'>('adjust');
 	let changeTouch = $state(false);
 	let changeLayout = $state(false);
 	let changeReading = $state(false);
@@ -344,9 +345,6 @@
 		</Tooltip>
 		<Tooltip placement="bottom" text={t().tooltipCanvasTabRefine}>
 			<button class="rtab" class:active={outputTab === 'refine'} onclick={() => (outputTab = 'refine')} disabled={!result}>{t().tabRefine}</button>
-		</Tooltip>
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabCompare}>
-			<button class="rtab" class:active={outputTab === 'compare'} onclick={() => (outputTab = 'compare')} disabled={!result}>{t().tabCompare}</button>
 		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if result}
@@ -485,7 +483,13 @@
 					<div class="instruction-caption" aria-live="polite">{displayInstructionText}</div>
 				{/if}
 			{:else if outputTab === 'refine'}
-				<div class="refine-panel">
+				<div class="refine-shell">
+					<div class="refine-mode-tabs" role="tablist" aria-label={isJapanese ? '推敲方法' : 'Refinement method'}>
+						<button type="button" role="tab" aria-selected={refineView === 'adjust'} class:active={refineView === 'adjust'} onclick={() => (refineView = 'adjust')}>{isJapanese ? '調整' : 'Adjust'}</button>
+						<button type="button" role="tab" aria-selected={refineView === 'compare'} class:active={refineView === 'compare'} onclick={() => (refineView = 'compare')}>{isJapanese ? 'モデル比較' : 'Model comparison'}</button>
+					</div>
+					{#if refineView === 'adjust'}
+						<div class="refine-panel">
 					<div class="refine-stage">
 						<div class="refine-target-column">
 							<div class="refine-target-card">
@@ -605,8 +609,8 @@
 						</div>
 					</div>
 				</div>
-			{:else if outputTab === 'compare'}
-				<div class="compare-panel">
+					{:else}
+					<div class="compare-panel">
 					<div class="compare-head">
 						<div class="refine-title">{t().modelCompareTitle}</div>
 						<div class="compare-action-wrap"><Tooltip text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</PaintButton></Tooltip></div>
@@ -667,6 +671,8 @@
 							{/if}
 						</div>
 					</div>
+					</div>
+					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
 				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} />
@@ -1007,6 +1013,43 @@
 		background: var(--bg2);
 		position: relative;
 		overflow: hidden;
+	}
+	.refine-shell {
+		align-self: stretch;
+		width: min(1120px, calc(100% - 136px));
+		max-height: calc(100% - 28px);
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.refine-mode-tabs {
+		flex: 0 0 auto;
+		display: flex;
+		gap: 0;
+		border-bottom: 1px solid var(--border);
+		padding: 0 16px;
+	}
+	.refine-mode-tabs button {
+		padding: 9px 14px;
+		border: 0;
+		border-bottom: 2px solid transparent;
+		background: transparent;
+		color: var(--fg3);
+		font: inherit;
+		cursor: pointer;
+	}
+	.refine-mode-tabs button.active {
+		border-bottom-color: var(--accent);
+		color: var(--fg);
+		font-weight: 600;
+	}
+	.refine-shell .refine-panel,
+	.refine-shell .compare-panel {
+		align-self: auto;
+		width: 100%;
+		max-height: none;
+		min-height: 0;
+		flex: 1;
 	}
 	.refine-panel {
 		align-self: stretch;

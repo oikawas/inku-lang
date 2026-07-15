@@ -26,6 +26,8 @@
 		result: PaintResult | null;
 		nearbyHistory: NearbyHistory[];
 		onOpenNearbyHistory: (id: string) => void;
+		unsavedRefinementPreview: boolean;
+		lineageIntermediateNotice: string | null;
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
 		nextDisabled: boolean;
@@ -128,6 +130,8 @@
 		result,
 		nearbyHistory = [],
 		onOpenNearbyHistory,
+		unsavedRefinementPreview = false,
+		lineageIntermediateNotice = null,
 		allowEmptyOutputTabs,
 		currentRenderedAt,
 		nextDisabled,
@@ -385,6 +389,12 @@
 						{/if}
 					</div>
 				</div>
+{#if unsavedRefinementPreview}
+	<div class="unsaved-refinement-badge" role="status">{t().unsavedRefinementPreviewLabel}</div>
+{/if}
+{#if lineageIntermediateNotice}
+	<div class="lineage-intermediate-notice" role="status">{lineageIntermediateNotice}</div>
+{/if}
 {#if nearbyHistory.length > 0}
 	<div class="nearby-mirror" onpointerdown={(event) => event.stopPropagation()}>
 		<span>{isJapanese ? '近い作品' : 'Nearby works'}</span>
@@ -1390,6 +1400,8 @@
 		cursor: not-allowed;
 	}
 	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
+	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: white; box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
 	.nearby-mirror { position: absolute; right: 64px; bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); box-shadow: 0 2px 10px #0002; color: var(--fg3); font-size: 0.68rem; z-index: 4; }
 	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: white; border: 1px solid var(--border); cursor: pointer; }
 	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }

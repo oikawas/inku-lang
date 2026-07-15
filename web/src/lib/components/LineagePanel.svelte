@@ -77,8 +77,8 @@
 	}
 
 	function operationLabel(kind?: string): string {
-		const ja: Record<string, string> = { touch_variation: 'タッチ', layout_variation: '構図', reinterpretation: '解釈', model_variation: 'モデル', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画' };
-		const en: Record<string, string> = { touch_variation: 'Touch', layout_variation: 'Layout', reinterpretation: 'Reading', model_variation: 'Model', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay' };
+		const ja: Record<string, string> = { touch_variation: 'タッチ', layout_variation: '構図', reinterpretation: '解釈', model_variation: 'モデル', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画', canvas_aspect_change: 'キャンバス変更' };
+		const en: Record<string, string> = { touch_variation: 'Touch', layout_variation: 'Layout', reinterpretation: 'Reading', model_variation: 'Model', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay', canvas_aspect_change: 'Canvas change' };
 		return (isJapanese ? ja : en)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Root'));
 	}
 
@@ -247,6 +247,7 @@ $effect(() => {
 										<span>{operationLabel(edge?.derivation_kind)}</span>
 										<span class="identity-marks">
 											{#if node.id === graph.focus_node_id}<span class="active-mark">{isJapanese ? '表示中' : 'Displayed'}</span>{/if}
+									{#if node.state === 'lineage_only'}<span class="identity-mark">{isJapanese ? '中間作品・履歴非表示' : 'Intermediate · hidden from history'}</span>{/if}
 											{#if node.id !== graph.focus_node_id && node.description_hash && node.description_hash === focusNode?.description_hash}<span class="identity-mark">{isJapanese ? '同じ記述' : 'Same text'}</span>{/if}
 											{#if node.id !== graph.focus_node_id && node.render_hash && node.render_hash === focusNode?.render_hash}<span class="identity-mark">{isJapanese ? '同じ版' : 'Same edition'}</span>{/if}
 										</span>
@@ -277,7 +278,7 @@ $effect(() => {
 										</div>
 									</details>
 								{/if}
-								{#if node.state === 'lineage_only'}<button class="promote" type="button" onclick={() => onPromoteNode(node)}>{isJapanese ? '履歴に残す' : 'Keep in history'}</button>{/if}
+								{#if node.state === 'lineage_only'}<button class="promote" type="button" onclick={() => onPromoteNode(node)}>{isJapanese ? '通常履歴に保存' : 'Save to regular history'}</button>{/if}
 							</article>
 						{/each}
 					</div>

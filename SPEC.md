@@ -392,8 +392,10 @@ files, PNG files, and other artifacts are derived outputs.
 
 ## 7. Canvas Model
 
-Coordinates remain normalized from `0.0` to `1.0`.  Canvas aspect changes do not
-change DDL coordinates.
+Coordinates remain normalized from `0.0` to `1.0`. Canvas aspect changes do not
+change DDL coordinates. Changing the aspect clears the rendered display and shows
+a placeholder for the new aspect, but retains the displayed work as lineage context.
+The next saved work is recorded as its child with `canvas_aspect_change`.
 
 The built-in `canvas-aspect` plugin currently supports:
 
@@ -1242,7 +1244,7 @@ inku treats convergence caused by accumulated quality repairs as part of its imp
 - Release review places the new JP30/EN30 contact sheets beside the preceding two releases and records any newly increased repetition together with the motif-census delta. Finding no increase is also recorded.
 - Similarity features, motif frequency, vision observations, and coerce firing rates are audit mirrors only. They are never generation inputs, suppression controls, acceptance gates, or optimization objectives.
 
-v1.80 adds a deterministic Score-derived composition mirror shared by server and CLI, three unranked nearby history thumbnails, similarity ordering for contact sheets, a mechanical motif census over artifact sets or the current user's history, explicit renderer-only `seed_text`, a private unread-word ledger with `unread-words` and admin-only `unread-words --all` reporting, per-branch coerce observation, and an on-demand NIM vision review. Similarity never implies lineage: lineage remains the record of explicit creative causation.
+v1.80 adds a deterministic Score-derived composition mirror shared by server and CLI, three unranked nearby history thumbnails, similarity ordering for contact sheets, a mechanical motif census over artifact sets or the current user's history, explicit renderer-only `seed_text`, a private unread-word ledger with `unread-words` and admin-only `unread-words --all` reporting, per-branch coerce observation, and an on-demand NIM vision review. Similarity never implies lineage: lineage remains the record of explicit creative causation. When drawing continues from an unsaved refinement candidate, that candidate is automatically materialized as the direct `lineage_only` ancestor without entering regular history; it can later be promoted explicitly from the lineage view.
 
 Refinement account for v1.80: the proposed automatic statistics-to-generation “unexplored” path was removed from this release, and vision review remains manual rather than release-automatic. Existing default-path repair branches could not yet be removed. The release makes unnoticed self-repetition, unrecorded external performance seeds, and privacy-losing unread-word aggregation less likely; it deliberately does not make dissimilarity a goal.
 
@@ -1321,8 +1323,8 @@ When updating the specification:
 ### v1.76 — Artwork lineage (2026-07-14)
 
 - Added `dh1:<sha256>` as description identity over NFC-normalized text with LF line endings and trimmed outer whitespace. Batch labels such as `#1` are presentation metadata and do not affect `dh1`. Description identity, the existing `rh2` edition identity, history IDs, and lineage node IDs remain separate concepts.
-- Added independent lineage nodes and edges. Parentage is recorded only by explicit touch, layout, interpretation, model, DDL-edit, description-edit, or replay operations; it is never inferred from hashes, timestamps, or visual similarity. Existing history rows are backfilled as separate roots.
-- When a saved child derives from an unsaved candidate, only that direct ancestor is retained as `lineage_only`. These hidden ancestors do not affect ordinary history counts or starred views and can be promoted from the lineage view.
+- Added independent lineage nodes and edges. Parentage is recorded only by explicit touch, layout, interpretation, model, DDL-edit, description-edit, replay, or canvas-aspect-change operations; it is never inferred from hashes, timestamps, or visual similarity. Existing history rows are backfilled as separate roots.
+- When generation, DDL drawing, or further refinement continues from an unsaved refinement candidate, only that direct ancestor is automatically retained as an intermediate `lineage_only` work. The Canvas labels the preview as unsaved and reports that automatic intermediate retention is hidden from regular history. If retention fails, drawing does not silently continue as a new root. Intermediate cards are labeled as hidden from history; they do not affect regular history counts or starred views, and the user can promote the same node and edges with “Save to regular history” from the lineage view.
 - Added a focused Canvas lineage view showing nearby generations as artwork thumbnails with arrows between parent and child cards and labels for the operation that produced each child. Opening a card changes both the displayed artwork and the parent for the next refinement. Card checkboxes support confirmation-gated bulk moves to trash. Trash preserves lineage; permanent deletion removes content and hashes while leaving a content-free tombstone to preserve the path.
 - Users can explicitly start a new root. Ordinary DRAW actions are not automatically attached to the latest history item.
 - Lineage depth and branching are not quality scores, achievements, or generation controls. The graph records the creative process; it does not choose a best branch.

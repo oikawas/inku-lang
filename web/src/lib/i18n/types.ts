@@ -300,6 +300,10 @@ export interface LangPack {
 	historyRenderedAtLabel: string;
 
 	// Settings / catalog
+	unsavedRefinementPreviewLabel: string;
+	lineageIntermediateSavedNotice: string;
+	lineageIntermediateSaveFailed: string;
+
 	settingsTitle: string;
 	settingsTabModels: string;
 	settingsTabDb: string;

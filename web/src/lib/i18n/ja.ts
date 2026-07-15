@@ -286,6 +286,10 @@ export const ja: LangPack = {
 	navNewerBtn: '▶',
 	historyRenderedAtLabel: 'レンダリング日時：',
 
+	unsavedRefinementPreviewLabel: '未保存の推敲候補',
+	lineageIntermediateSavedNotice: '未保存の推敲候補を中間作品として系譜に記録しました。通常履歴には表示されません。',
+	lineageIntermediateSaveFailed: '推敲候補を系譜へ保存できなかったため、描画を開始しませんでした。',
+
 	settingsTitle: '設定',
 	settingsTabModels: 'モデル設定',
 	settingsTabDb: 'DB設定',

@@ -44,6 +44,7 @@ LINEAGE_DERIVATION_KINDS = {
     "hacho_variation",
     "renga_reply",
     "external_seed_variation",
+    "canvas_aspect_change",
 }
 
 class Base(DeclarativeBase):

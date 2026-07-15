@@ -111,7 +111,7 @@
 		tokens_out_stage2: number | null;
 		user_generation_count?: number | null;
 	};
-	type DerivationKind = 'touch_variation' | 'layout_variation' | 'reinterpretation' | 'model_variation' | 'ddl_edit' | 'description_edit' | 'replay';
+	type DerivationKind = 'touch_variation' | 'layout_variation' | 'reinterpretation' | 'model_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
@@ -344,6 +344,8 @@
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
+	let lineageIntermediateNotice = $state<string | null>(null);
+	let lineageIntermediateNoticeTimer: number | null = null;
 	let nearbyHistory = $state<Iteration[]>([]);
 	let variationGridBusy = $state(false);
 	let variationGridCanAbort = $state(false);
@@ -376,6 +378,7 @@
 	let canvasAspectMenuOpen = $state(false);
 	let canvasAspectEnabled = $state(true);
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
+	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId } | null>(null);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
 	let instructionCaptionVisible = $state(true);
@@ -745,8 +748,19 @@
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
 		if (currentUser?.role !== 'admin') return;
-		canvasAspectId = normalizeCanvasAspectId(id);
+		const nextAspectId = normalizeCanvasAspectId(id);
+		const currentAspectId = effectiveCanvasAspectId();
 		canvasAspectMenuOpen = false;
+		if (nextAspectId === currentAspectId) {
+			await saveCanvasAspectPluginValue();
+			return;
+		}
+		const existingPending = pendingCanvasAspectDerivation;
+		const parentNodeId = existingPending?.parentNodeId ?? await ensureVisibleLineageParentId();
+		pendingCanvasAspectDerivation = parentNodeId
+			? { parentNodeId, fromAspectId: existingPending?.fromAspectId ?? currentAspectId, toAspectId: nextAspectId }
+			: null;
+		canvasAspectId = nextAspectId;
 		result = null;
 		displayedHistoryItem = null;
 		historyCursor = -1;
@@ -2386,13 +2400,25 @@ if (unreadWords.length > 0) {
 
 	async function submit() {
 		if (!canSubmit || loading || variationGridBusy) return;
+		try {
+			await ensureVisibleLineageParentId();
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : String(cause);
+			return;
+		}
 		const submittedMode = inputMode;
 		const abortController = new AbortController();
 		submitAbortController = abortController;
 		submitStopRequested = false;
-		const submitParentNodeId = lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null);
+		const canvasAspectDerivation = submittedMode === 'single' ? pendingCanvasAspectDerivation : null;
+		const submitParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
 		const submitSource = displayedHistoryItem?.source_text ?? displayedHistoryItem?.input ?? input;
-		const submitDerivationKind: DerivationKind | null = submitParentNodeId ? (input.trim() === submitSource.trim() ? 'replay' : 'description_edit') : null;
+		const submitDerivationKind: DerivationKind | null = canvasAspectDerivation
+			? 'canvas_aspect_change'
+			: submitParentNodeId ? (input.trim() === submitSource.trim() ? 'replay' : 'description_edit') : null;
+		const submitDerivationMetadata = canvasAspectDerivation
+			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
+			: {};
 		loading = true; error = null;
 		activeRunMode = submittedMode;
 		ddl = null; ddlGeneratedBaseline = null; thinking = null; ddlSelection = { start: 0, end: 0 };
@@ -2480,8 +2506,9 @@ if (unreadWords.length > 0) {
 					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
 					catalog_id: selectedCatalog,
-				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind });
+				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind, derivationMetadata: submitDerivationMetadata });
 				if (savedHistory && submitAbortController === abortController && !submitStopRequested) {
+					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 					lineageDetached = false;
 					displayedHistoryItem = savedHistory;
 					result = {
@@ -2597,8 +2624,20 @@ if (unreadWords.length > 0) {
 	// ── Replay (Stage 2 のみ) ────────────────────────────────
 	async function replay() {
 		if (!ddl || reloading) return;
-		const replayParentNodeId = lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null);
-		const replayKind: DerivationKind | null = replayParentNodeId ? (ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline ? 'ddl_edit' : 'replay') : null;
+		try {
+			await ensureVisibleLineageParentId();
+		} catch (cause) {
+			reloadError = cause instanceof Error ? cause.message : String(cause);
+			return;
+		}
+		const canvasAspectDerivation = pendingCanvasAspectDerivation;
+		const replayParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
+		const replayKind: DerivationKind | null = canvasAspectDerivation
+			? 'canvas_aspect_change'
+			: replayParentNodeId ? (ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline ? 'ddl_edit' : 'replay') : null;
+		const replayDerivationMetadata = canvasAspectDerivation
+			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
+			: {};
 		const abortController = new AbortController();
 		replayAbortController = abortController;
 		replayStopRequested = false;
@@ -2702,8 +2741,9 @@ if (unreadWords.length > 0) {
 					tokens_in: d.tokens_in,
 					tokens_out: d.tokens_out,
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
-				}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind });
+				}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind, derivationMetadata: replayDerivationMetadata });
 				if (savedHistory && result) {
+					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 					lineageDetached = false;
 					displayedHistoryItem = savedHistory;
 					result = {
@@ -3015,6 +3055,7 @@ if (unreadWords.length > 0) {
 	}
 
 	function clearInput() {
+		pendingCanvasAspectDerivation = null;
 		if (inputMode === 'single') input = '';
 		if (inputMode === 'batch') batchInput = '';
 		if (inputMode === 'demo') {
@@ -3225,7 +3266,7 @@ if (unreadWords.length > 0) {
 		if (modelInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const modelParentNodeId = await ensureLineageParentId();
+		const modelParentNodeId = await ensureVisibleLineageParentId();
 		const selectedModels = modelInspectionSelectedModels.slice(0, 4).filter((model) => !isModelInspectionChoiceBlocked(model));
 		if (selectedModels.length === 0) { modelInspectionStatus = t().modelCompareSelectPrompt; return; }
 		const jobs = selectedModels.map((model) => {
@@ -3394,6 +3435,7 @@ async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 }
 
 function detachLineage(): void {
+	pendingCanvasAspectDerivation = null;
 	lineageDetached = true;
 	displayedHistoryItem = null;
 	historyCursor = -1;
@@ -3409,6 +3451,7 @@ $effect(() => {
 
 	function loadIterationItem(it: Iteration) {
 		if (demoRunning) return;
+		pendingCanvasAspectDerivation = null;
 		inputMode = 'single';
 		displayedHistoryItem = it;
 		void syncHistoryStripToItem(it);
@@ -3651,6 +3694,17 @@ $effect(() => {
 		return parts;
 	}
 
+	const unsavedRefinementPreview = $derived(!!result && !result.lineage_node_id && !!result.lineage_parent_node_id && !!result.derivation_kind);
+
+	function showLineageIntermediateNotice(): void {
+		lineageIntermediateNotice = t().lineageIntermediateSavedNotice;
+		if (lineageIntermediateNoticeTimer !== null) window.clearTimeout(lineageIntermediateNoticeTimer);
+		lineageIntermediateNoticeTimer = window.setTimeout(() => {
+			lineageIntermediateNotice = null;
+			lineageIntermediateNoticeTimer = null;
+		}, 5000);
+	}
+
 	function currentLineageParentId(): string | null {
 		if (lineageDetached) return null;
 		return displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
@@ -3676,6 +3730,17 @@ async function ensureLineageParentId(): Promise<string | null> {
 	return saved.lineage_node_id;
 }
 
+async function ensureVisibleLineageParentId(): Promise<string | null> {
+	const materializingIntermediate = unsavedRefinementPreview;
+	const nodeId = await ensureLineageParentId();
+	if (materializingIntermediate && !nodeId) {
+		error = t().lineageIntermediateSaveFailed;
+		throw new Error(error);
+	}
+	if (materializingIntermediate) showLineageIntermediateNotice();
+	return nodeId;
+}
+
 	function setSelectedCatalog(id: string) {
 		displayedHistoryItem = null;
 		historyCursor = -1;
@@ -3684,7 +3749,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 
 	async function varyPerformance() {
 		if (!result || variationBusy) return;
-		const parentNodeId = await ensureLineageParentId();
+		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		reloading = true;
 		reloadError = null;
@@ -3721,7 +3786,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 		if (!result || variationBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const parentNodeId = await ensureLineageParentId();
+		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		loading = true;
 		error = null;
@@ -3763,7 +3828,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 		if (!result || variationBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const parentNodeId = await ensureLineageParentId();
+		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		loading = true;
 		error = null;
@@ -3879,7 +3944,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 		if (!result || variationGridBusy || loading) return;
 		const source = input.trim();
 		if (!source || !ddl) return;
-		await ensureLineageParentId();
+		await ensureVisibleLineageParentId();
 		const selectedKinds: Array<keyof RefineChanges> = changes.reading
 			? ['reading']
 			: count === 1
@@ -4740,6 +4805,8 @@ async function ensureLineageParentId(): Promise<string | null> {
 				{result}
 				{nearbyHistory}
 				onOpenNearbyHistory={openNearbyHistory}
+				{unsavedRefinementPreview}
+				{lineageIntermediateNotice}
 				allowEmptyOutputTabs={inputMode === 'demo' || activeRunMode === 'demo'}
 				{currentRenderedAt}
 				{nextDisabled}

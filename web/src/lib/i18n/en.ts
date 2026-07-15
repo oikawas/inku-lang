@@ -286,6 +286,10 @@ export const en: LangPack = {
 	navNewerBtn: '▶',
 	historyRenderedAtLabel: 'rendered:',
 
+	unsavedRefinementPreviewLabel: 'Unsaved refinement candidate',
+	lineageIntermediateSavedNotice: 'The unsaved refinement candidate was recorded as an intermediate lineage work. It is hidden from regular history.',
+	lineageIntermediateSaveFailed: 'Drawing was not started because the refinement candidate could not be saved to lineage.',
+
 	settingsTitle: 'settings',
 	settingsTabModels: 'models',
 	settingsTabDb: 'DB settings',

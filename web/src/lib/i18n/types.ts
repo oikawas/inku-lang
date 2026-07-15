@@ -133,15 +133,19 @@ export interface LangPack {
 	canvasVaryPerformance: string;
 	canvasVaryComposition: string;
 	canvasVaryInterpretation: string;
+	canvasVaryColor: string;
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;
 	variationGridSaveSelected: string;
 	refineSingleButton: string;
 	tooltipRefineSingle: string;
+	refineSingleSelectionHint: string;
 	refineCostTouch: string;
 	refineCostLayout: string;
 	refineCostReading: string;
+	refineCostColor: string;
 	variationGridEmpty: string;
+	refineNoAlternateCatalog: string;
 	tooltipVariationGridDefault: string;
 	tooltipVariationGridWithInterpretation: string;
 	tooltipVariationGridSaveSelected: string;
@@ -170,6 +174,7 @@ export interface LangPack {
 	tooltipCanvasVaryPerformance: string;
 	tooltipCanvasVaryComposition: string;
 	tooltipCanvasVaryInterpretation: string;
+	tooltipCanvasVaryColor: string;
 	tooltipCanvasNavPrev: string;
 	tooltipCanvasNavNext: string;
 	tooltipCanvasNavLatest: string;
@@ -300,6 +305,10 @@ export interface LangPack {
 	historyRenderedAtLabel: string;
 
 	// Settings / catalog
+	unsavedRefinementPreviewLabel: string;
+	lineageIntermediateSavedNotice: string;
+	lineageIntermediateSaveFailed: string;
+
 	settingsTitle: string;
 	settingsTabModels: string;
 	settingsTabDb: string;
@@ -309,6 +318,24 @@ export interface LangPack {
 	settingsTabMisc: string;
 	settingsTabServerMisc: string;
 	settingsTabLogs: string;
+	settingsTabUnreadWords: string;
+	settingsUnreadWordsTitle: string;
+	settingsUnreadWordsDescription: string;
+	settingsUnreadWordsPurposeLabel: string;
+	settingsUnreadWordsPurposeTooltip: string;
+	settingsUnreadWordsScope: string;
+	settingsUnreadWordsMine: string;
+	settingsUnreadWordsAll: string;
+	settingsUnreadWordsReload: string;
+	settingsUnreadWordsLoadFailed: string;
+	settingsUnreadWordsEmpty: string;
+	settingsUnreadWordsCount: (n: number) => string;
+	settingsUnreadWordsWord: string;
+	settingsUnreadWordsFrequency: string;
+	settingsUnreadWordsUsers: string;
+	settingsUnreadWordsLastSeen: string;
+	settingsUnreadWordsFirstSeen: string;
+	settingsUnreadWordsContexts: string;
 	settingsCurrentDb: string;
 	settingsDbFileSize: string;
 	settingsDbBackupTitle: string;
@@ -484,6 +511,7 @@ export interface LangPack {
 	historyTrashButton: (n: number) => string;
 	historyThumbsTab: string;
 	historyListTab: string;
+	historySelectItem: (selected: boolean) => string;
 	historySelectAll: string;
 	historyMoveToTrash: string;
 	historyRestoreSelected: string;
@@ -491,6 +519,7 @@ export interface LangPack {
 	historySearchLabel: string;
 	historyPrev: string;
 	historyNext: string;
+	historyFirst: string;
 	historyLoading: string;
 	historyRestore: string;
 	historyImageHeader: string;

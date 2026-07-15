@@ -5,6 +5,8 @@
 	type HistoryItem = {
 		id?: string;
 		input: string;
+		source_text?: string | null;
+		display_label?: string | null;
 		ddl: string | null;
 		thinking?: string | null;
 		score: { instructions: unknown[] };
@@ -48,6 +50,7 @@
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
 		onSetLatestPage: () => void | Promise<void>;
+		onSetFirstPage: () => void | Promise<void>;
 		onSetPageSize: (pageSize: number) => void;
 		onSetStarredOnly: (value: boolean) => void;
 		onSelectAll: () => void;
@@ -62,7 +65,6 @@
 		formatHistoryDate: (at: number) => string;
 		formatElapsed: (ms: number | null | undefined) => string;
 		catalogName: (id: string | null | undefined) => string;
-		historyTokenSummary: (item: HistoryItem) => string;
 		historyPreviewText: (text: string) => string;
 		shortModel: (model: string | null | undefined) => string;
 	};
@@ -86,6 +88,7 @@
 		onSetView,
 		onSetPage,
 		onSetLatestPage,
+		onSetFirstPage,
 		onSetPageSize,
 		onSetStarredOnly,
 		onSelectAll,
@@ -100,26 +103,14 @@
 		formatHistoryDate,
 		formatElapsed,
 		catalogName,
-		historyTokenSummary,
 		historyPreviewText,
 		shortModel
 	}: Props = $props();
 
-	type TooltipState = {
-		item: HistoryItem;
-		index: number;
-		x: number;
-		y: number;
-		placement: 'below' | 'above';
-	};
-
-	let tooltipState = $state<TooltipState | null>(null);
-	let tooltipTimer: ReturnType<typeof setTimeout> | null = null;
 	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
 
 	function loadItemAndClose(item: HistoryItem) {
 		if (historyManagerView !== 'active') return;
-		hideTooltip();
 		onLoadItem(item);
 		onClose();
 	}
@@ -127,7 +118,6 @@
 	async function replayItemAndClose(item: HistoryItem, event?: Event) {
 		event?.stopPropagation();
 		if (historyManagerView !== 'active') return;
-		hideTooltip();
 		await onReplayItem(item);
 		onClose();
 	}
@@ -136,37 +126,6 @@
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
 		loadItemAndClose(item);
-	}
-
-	function hideTooltip() {
-		if (tooltipTimer !== null) {
-			clearTimeout(tooltipTimer);
-			tooltipTimer = null;
-		}
-		tooltipState = null;
-	}
-
-	function scheduleTooltip(target: HTMLElement, item: HistoryItem, index: number) {
-		hideTooltip();
-		tooltipTimer = setTimeout(() => {
-			const rect = target.getBoundingClientRect();
-			const tooltipWidth = Math.min(440, window.innerWidth - 28);
-			const tooltipHeight = 430;
-			const margin = 14;
-			const x = Math.max(
-				margin + tooltipWidth / 2,
-				Math.min(window.innerWidth - margin - tooltipWidth / 2, rect.left + rect.width / 2)
-			);
-			const belowY = rect.bottom + 10;
-			const fitsBelow = belowY + tooltipHeight <= window.innerHeight - margin;
-			tooltipState = {
-				item,
-				index,
-				x,
-				y: fitsBelow ? belowY : Math.max(margin, rect.top - 10),
-				placement: fitsBelow ? 'below' : 'above',
-			};
-		}, 700);
 	}
 
 	function hashLabel(item: HistoryItem): string {
@@ -212,16 +171,20 @@
 	}
 
 	function calculatePageSize(element: HTMLElement): number {
-		const width = element.clientWidth;
-		const height = element.clientHeight;
-		if (width <= 0 || height <= 0) return 1;
 		const grid = element.querySelector('.history-thumb-grid');
+		const elementStyle = getComputedStyle(element);
+		const cssPixels = (value: string): number => Number.parseFloat(value) || 0;
+		const width = grid instanceof HTMLElement
+			? grid.clientWidth
+			: Math.max(0, element.clientWidth - cssPixels(elementStyle.paddingLeft) - cssPixels(elementStyle.paddingRight));
+		const height = Math.max(0, element.clientHeight - cssPixels(elementStyle.paddingTop) - cssPixels(elementStyle.paddingBottom));
+		if (width <= 0 || height <= 0) return 1;
 		const computed = grid ? getComputedStyle(grid) : null;
 		const gap = computed ? Number.parseFloat(computed.rowGap || computed.gap || '8') || 8 : 8;
 		const minCardWidth = 104;
 		const columns = Math.max(1, Math.floor((width + gap) / (minCardWidth + gap)));
-		const firstCard = element.querySelector('.manager-thumb-wrap');
-		let cardHeight = firstCard instanceof HTMLElement ? firstCard.getBoundingClientRect().height : 0;
+		const cards = [...element.querySelectorAll('.manager-thumb-wrap')].filter((card): card is HTMLElement => card instanceof HTMLElement);
+		let cardHeight = cards.reduce((height, card) => Math.max(height, card.getBoundingClientRect().height), 0);
 		if (cardHeight <= 0) {
 			const cardWidth = Math.max(minCardWidth, (width - gap * (columns - 1)) / columns);
 			const imageHeight = cardWidth * 58 / 82;
@@ -233,7 +196,6 @@
 
 	$effect(() => {
 		const element = thumbGridWrapEl;
-		managedHistoryItems.length;
 		if (!element || historyManagerTab !== 'thumbs') return;
 		let frame = 0;
 		const update = () => {
@@ -273,6 +235,7 @@
 				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
 				<span>{historyManagerLoading ? t().historyLoading : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
 				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
+				<button class="ghost-btn history-latest-btn" onclick={onSetFirstPage} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyFirst}</button>
 			</div>
 			<button class="catalog-close" onclick={onClose}>×</button>
 		</div>
@@ -291,7 +254,17 @@
 				onclick={() => onSetView(historyManagerView === 'trash' ? 'active' : 'trash')}
 			>{t().historyTrashButton(managerTrashTotal || trashTotal)}</button>
 			{#if historyManagerView === 'active'}
-				<button class="ghost-btn" onclick={() => onAskTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyMoveToTrash}</button>
+				<button
+					class="ghost-btn bulk-trash"
+					type="button"
+					onclick={() => onAskTrash(selectedHistoryIds)}
+					disabled={selectedHistoryIds.length === 0}
+					title={t().historyMoveToTrash}
+					aria-label={t().historyMoveToTrash}
+				>
+					<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
+					{#if selectedHistoryIds.length > 0}<span>{selectedHistoryIds.length}</span>{/if}
+				</button>
 			{:else}
 				<button class="ghost-btn" onclick={() => onAskRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
 				<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
@@ -302,26 +275,28 @@
 	{#if historyManagerTab === 'thumbs'}
 		<div class="history-thumb-grid-wrap" bind:this={thumbGridWrapEl}>
 			<div class="history-thumb-grid">
-				{#each managedHistoryItems as it, i (it.id ?? it.at)}
+				{#each managedHistoryItems as it (it.id ?? it.at)}
 					<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
-						<label class="manager-check">
-							<input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && onToggleSelection(it.id)} />
-						</label>
+<button
+	type="button"
+	class="manager-check selection-checkbox"
+	class:checked={!!it.id && selectedHistoryIds.includes(it.id)}
+	role="checkbox"
+	aria-checked={!!it.id && selectedHistoryIds.includes(it.id)}
+	aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))}
+	onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}
+><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 						<div
 							class="thumb manager-thumb"
 							onclick={() => loadItemAndClose(it)}
 							onkeydown={(event) => handleThumbKeydown(event, it)}
-							onmouseenter={(event) => scheduleTooltip(event.currentTarget as HTMLElement, it, i)}
-							onmouseleave={hideTooltip}
-							onfocus={(event) => scheduleTooltip(event.currentTarget as HTMLElement, it, i)}
-							onblur={hideTooltip}
 							role="button"
 							tabindex={historyManagerView === 'active' ? 0 : -1}
 						>
 							<HistoryThumbnail item={it} scope="manager" size="manager" />
 						</div>
 						<div class="manager-thumb-actions">
-							<div class="thumb-catalog" title={it.input}>{thumbnailPromptText(it.input)}</div>
+							<div class="thumb-catalog" title={it.source_text ?? it.input}>{#if it.display_label}<span class="history-display-label">{it.display_label}</span>{/if}<span>{thumbnailPromptText(it.source_text ?? it.input)}</span></div>
 							{#if it.note}<div class="thumb-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 							<div class="thumb-action-row">
 								<button
@@ -362,7 +337,7 @@
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
 						<tr>
-							<td><input type="checkbox" checked={!!it.id && selectedHistoryIds.includes(it.id)} onchange={() => it.id && onToggleSelection(it.id)} /></td>
+							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button></td>
 							<td class="table-thumb-cell">
 								<button
 									class="table-thumb-select"
@@ -410,26 +385,6 @@
 		</div>
 	{/if}
 </div>
-{#if tooltipState}
-	<div
-		class="manager-tooltip"
-		class:above={tooltipState.placement === 'above'}
-		style="left: {tooltipState.x}px; top: {tooltipState.y}px;"
-	>
-		<div class="tooltip-preview">
-			<HistoryThumbnail item={tooltipState.item} scope="tooltip" size="manager" />
-		</div>
-		<div class="tooltip-title">#{historyManagerOffset + tooltipState.index + 1}</div>
-		<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(tooltipState.item)}</strong></div>
-		<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(tooltipState.item.at)}</strong></div>
-		<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(tooltipState.item.elapsed_ms)}</strong></div>
-		<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(tooltipState.item.catalog_id)}</strong></div>
-		{#if hashLabel(tooltipState.item)}<div class="tooltip-row"><span>{t().historyHashHeader}</span><strong>#{hashLabel(tooltipState.item)}</strong></div>{/if}
-		<div class="tooltip-row"><span>{t().historyTooltipTokens}</span><strong>{historyTokenSummary(tooltipState.item)}</strong></div>
-		<div class="tooltip-date">{historyPreviewText(tooltipState.item.input)}</div>
-		{#if tooltipState.item.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{tooltipState.item.note}</div>{/if}
-	</div>
-{/if}
 
 <style>
 	.modal-backdrop {
@@ -582,24 +537,32 @@
 		border-color: var(--accent);
 		box-shadow: 0 0 0 2px var(--accent-light);
 	}
-	.manager-check {
-		position: absolute;
-		top: 6px;
-		left: 6px;
-		z-index: 30;
-		background: rgba(255,255,255,0.86);
-		border-radius: 2px;
-		line-height: 1;
-		padding: 1px;
-	}
-	.manager-check input {
-		width: 12px;
-		height: 12px;
-		margin: 0;
-		accent-color: var(--accent);
-		outline: 0.5px solid rgba(40,36,30,0.32);
-		outline-offset: -1px;
-	}
+.manager-check {
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	z-index: 30;
+}
+.selection-checkbox {
+	box-sizing: border-box;
+	width: 16px;
+	height: 16px;
+	display: inline-grid;
+	place-items: center;
+	margin: 0;
+	padding: 0;
+	border: 1px solid color-mix(in srgb, var(--fg) 32%, var(--border));
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--panel) 92%, transparent);
+	color: #fff;
+	cursor: pointer;
+	font: 700 11px/1 system-ui, sans-serif;
+	box-shadow: 0 1px 3px rgba(0,0,0,.16);
+}
+.selection-checkbox:hover { border-color: var(--accent); }
+.selection-checkbox:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.selection-checkbox.checked { border-color: var(--accent); background: var(--accent); }
+.table-check { position: static; box-shadow: none; }
 	.thumb-star {
 		position: absolute;
 		top: 5px;
@@ -654,62 +617,6 @@
 		position: relative;
 		transition: border-color 0.1s;
 	}
-	.thumb:hover { overflow: visible; z-index: 2000; }
-	.manager-tooltip {
-		position: fixed;
-		transform: translateX(-50%);
-		pointer-events: none;
-		background: var(--panel);
-		color: var(--fg);
-		font-size: 11px;
-		border-radius: var(--r);
-		border: 1px solid var(--border2);
-		padding: 9px 11px;
-		text-align: left;
-		width: min(440px, calc(100vw - 28px));
-		z-index: 5000;
-		line-height: 1.7;
-		box-shadow: 0 12px 36px rgba(0,0,0,0.22);
-	}
-	.manager-tooltip.above {
-		transform: translateX(-50%) translateY(-100%);
-	}
-	.tooltip-title { font-weight: 500; margin-bottom: 3px; }
-	.tooltip-preview {
-		width: 100%;
-		max-height: min(300px, 48vh);
-		margin-bottom: 8px;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		overflow: hidden;
-		background: var(--panel);
-	}
-	.tooltip-preview :global(.history-thumbnail.manager) {
-		width: 100%;
-		height: auto;
-	}
-	.tooltip-row {
-		display: grid;
-		grid-template-columns: 70px minmax(0, 1fr);
-		gap: 8px;
-		align-items: baseline;
-	}
-	.tooltip-row span { color: var(--fg3); }
-	.tooltip-row strong {
-		font-weight: 500;
-		color: var(--fg);
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.tooltip-date {
-		color: var(--fg2);
-		margin-top: 3px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
 	.thumb-catalog {
 		min-width: 0;
 		overflow: hidden;
@@ -719,6 +626,8 @@
 		font-size: 11px;
 		line-height: 1.25;
 	}
+	.thumb-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg3); font-size: 10px; line-height: 1.25; }
+	.thumb-note span { margin-right: 4px; font-weight: 600; }
 	.thumb-action-row {
 		display: flex;
 		align-items: flex-end;
@@ -727,6 +636,7 @@
 		min-width: 0;
 		position: relative;
 		z-index: 40;
+		margin-top: auto;
 	}
 	.hash-row-star {
 		flex: 0 0 auto;
@@ -789,6 +699,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+		height: 58px;
+		overflow: hidden;
 		margin-top: 5px;
 		min-width: 0;
 		position: relative;
@@ -828,6 +740,9 @@
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
+	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+	.bulk-trash:disabled { opacity: .4; cursor: default; }
 	.icon-trash-btn {
 		width: 24px;
 		height: 22px;
@@ -858,4 +773,5 @@
 		font-family: inherit;
 	}
 	.danger-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+	.history-display-label { margin-right: 5px; color: var(--fg3); font-weight: 600; }
 </style>

@@ -1343,6 +1343,55 @@ def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
     assert r.json()["ddl"] == captured["ddl"]
 
 
+def test_paint_random_catalog_excludes_current_and_uses_effective_map(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.1,
+                    "color": "black",
+                }
+            ]
+        }
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    captured_candidates: list[str] = []
+
+    def choose_first(candidates: list[str]) -> str:
+        captured_candidates.extend(candidates)
+        return candidates[0]
+
+    monkeypatch.setattr(api_module.secrets, "choice", choose_first)
+
+    response = client.post(
+        "/api/paint",
+        json={
+            "text": "一滴の墨",
+            "catalog_id": "ink_season",
+            "random_color_catalog": True,
+            "count_generation": False,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert captured_candidates
+    assert "ink_season" not in captured_candidates
+    assert data["render_color_catalog_id"] == captured_candidates[0]
+    assert data["render_color_catalog_id"] != "ink_season"
+    assert data["catalog_id"] == data["render_color_catalog_id"]
+    assert data["render_color_map"] == api_module._catalog_render_color_map(data["render_color_catalog_id"])
+
+
 def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     headers, user, _ = auth_context
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
@@ -1409,6 +1458,63 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["svg"] == data["svg"]
 
     db.delete_items(user["id"], [data["history_id"]])
+
+
+def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
+    headers, _, _ = auth_context
+    payload = {
+        "input": "緑の円",
+        "ddl": "中央に緑の円を置く。",
+        "score": {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.1,
+                    "color": "green",
+                }
+            ]
+        },
+        "catalog_id": "vivid_material",
+        "canvas_aspect": "square",
+        "render_seed": 123,
+        "vary_seed": 456,
+        "interpretation_seed": "reading-seed",
+    }
+
+    response = client.post("/api/render-score", json=payload, headers=headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["catalog_id"] == "vivid_material"
+    assert data["render_color_catalog_id"] == "vivid_material"
+    assert data["render_color_catalog_name"] == "Vivid Material"
+    assert data["render_color_map"]["green"] == "#008f39"
+    assert data["render_canvas_aspect_id"] == "square"
+    assert data["render_seed"] == 123
+    assert data["vary_seed"] == 456
+    assert data["interpretation_seed"] == "reading-seed"
+    assert data["score"]["instructions"][0]["primitive"] == "circle"
+    assert data["score"]["instructions"][0]["center"] == [0.5, 0.5]
+    assert data["score"]["instructions"][0]["radius"] == 0.1
+    assert data["score"]["instructions"][0]["color"] == "green"
+    assert data["render_hash"].startswith("rh2:")
+    assert data["render_hash_short"]
+
+    alternate = client.post(
+        "/api/render-score",
+        json={**payload, "catalog_id": "ink_season"},
+        headers=headers,
+    )
+    assert alternate.status_code == 200
+    alternate_data = alternate.json()
+    assert alternate_data["score"] == data["score"]
+    assert alternate_data["render_seed"] == data["render_seed"]
+    assert alternate_data["vary_seed"] == data["vary_seed"]
+    assert alternate_data["interpretation_seed"] == data["interpretation_seed"]
+    assert alternate_data["render_color_catalog_id"] == "ink_season"
+    assert alternate_data["render_hash"] != data["render_hash"]
+    assert alternate_data["svg"] != data["svg"]
 
 
 def test_render_svg_endpoint_generates_editable_profile(auth_context):
@@ -1953,6 +2059,16 @@ def test_history_is_scoped_to_authenticated_user():
     assert page_a.json()["total"] == 2
     assert page_a.json()["items"][0]["id"] == item_a["id"]
 
+    anchored_a = client.get(f"/api/history?anchor_id={item_a['id']}&limit=1", headers=headers_a)
+    assert anchored_a.status_code == 200
+    assert anchored_a.json()["offset"] == 1
+    assert anchored_a.json()["items"][0]["id"] == item_a["id"]
+
+    anchored_other_user = client.get(f"/api/history?anchor_id={item_a['id']}&limit=1", headers=headers_b)
+    assert anchored_other_user.status_code == 200
+    assert anchored_other_user.json()["total"] == 0
+    assert anchored_other_user.json()["items"] == []
+
     search_a = client.get("/api/history?q=crayon", headers=headers_a)
     assert search_a.status_code == 200
     assert search_a.json()["total"] == 1
@@ -1970,6 +2086,32 @@ def test_history_is_scoped_to_authenticated_user():
     assert starred_a.status_code == 200
     assert starred_a.json()["total"] == 1
     assert starred_a.json()["items"][0]["id"] == item_a_second["id"]
+
+    unstar_a = client.patch(
+        "/api/history/{}/star".format(item_a_second["id"]),
+        json={"starred": False},
+        headers=headers_a,
+    )
+    assert unstar_a.status_code == 200
+    assert unstar_a.json()["starred"] is False
+    assert unstar_a.json()["note"] == "quiet hinge"
+
+    update_note_a = client.patch(
+        "/api/history/{}/star".format(item_a_second["id"]),
+        json={"starred": False, "note": "lineage comment"},
+        headers=headers_a,
+    )
+    assert update_note_a.status_code == 200
+    assert update_note_a.json()["starred"] is False
+    assert update_note_a.json()["note"] == "lineage comment"
+
+    restar_a = client.patch(
+        "/api/history/{}/star".format(item_a_second["id"]),
+        json={"starred": True},
+        headers=headers_a,
+    )
+    assert restar_a.status_code == 200
+    assert restar_a.json()["note"] == "lineage comment"
 
     list_b = client.get("/api/history", headers=headers_b)
     assert list_b.status_code == 200

@@ -6,11 +6,13 @@ GET  /health      : liveness
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import platform
 import re
+import secrets
 import time
 import urllib.error
 import urllib.parse
@@ -26,7 +28,8 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Resp
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
+from .feature_analysis import composition_distance
+from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import compose
 from .interpreter import _sanitize_placement_words, interpret_detail
@@ -551,12 +554,28 @@ def _resolved_catalog_id(catalog_id: str | None) -> str:
     return str(catalog["id"])
 
 
+def _resolved_paint_catalog_id(catalog_id: str | None, *, random_catalog: bool) -> str:
+    resolved = _resolved_catalog_id(catalog_id)
+    if not random_catalog:
+        return resolved
+    candidates = [candidate for candidate in color_catalog_ids() if candidate != resolved]
+    return secrets.choice(candidates) if candidates else resolved
+
+
 def _validated_canvas_aspect(value: str | None) -> str:
     if value is None:
         return normalize_canvas_aspect_id(None)
     if value not in canvas_aspect_ids():
         raise HTTPException(status_code=422, detail=f"unsupported canvas aspect: {value}")
     return value
+
+
+def _render_seed_from_text(seed_text: str | None, render_seed: int | None) -> tuple[int | None, str | None]:
+    normalized = (seed_text or "").strip()
+    if not normalized:
+        return render_seed, None
+    digest = hashlib.sha256(normalized.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big", signed=False), normalized
 
 
 def _validated_canvas_aspect_override(value: str | None) -> str | None:
@@ -619,6 +638,7 @@ class ComposeRequest(BaseModel):
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
+    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
 
 class ComposeResponse(BaseModel):
@@ -642,6 +662,7 @@ class ComposeResponse(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     interpretation_seed: str | None = None
+    seed_text: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -656,6 +677,7 @@ class ComposeResponse(BaseModel):
     coerce_relation_dropped_count: int = 0
     coerce_relation_drop_rate: float | None = None
     coerce_warnings: list[str] = Field(default_factory=list)
+    coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class InterpretRequest(BaseModel):
@@ -694,11 +716,21 @@ class PaintRequest(BaseModel):
     count_generation: bool = Field(default=True, description="完了した描画をユーザーの累積生成数に加算するか")
     history_input: str | None = Field(default=None, description="履歴に表示するユーザー記述")
     history_at: int | None = Field(default=None, description="履歴保存時刻")
-    catalog_id: str | None = Field(default=None, description="使用した色カタログID")
+    history_source_text: str | None = Field(default=None, description="作者が書いたラベルなしの履歴本文")
+    history_display_label: str | None = Field(default=None, description="バッチ番号やdemoなどの表示ラベル")
+    batch_line_number: int | None = None
+    batch_run_id: str | None = None
+    history_visibility: str = "normal"
+    lineage_parent_node_id: str | None = None
+    derivation_kind: str | None = None
+    derivation_metadata: dict[str, object] = Field(default_factory=dict)
+    catalog_id: str | None = Field(default=None, description="使用する色カタログID。ランダム選択時は直前IDとして除外する")
+    random_color_catalog: bool = Field(default=False, description="現在のcatalog_idを除外してサーバー側で色カタログを選ぶか")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
+    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
 
 class PaintResponse(BaseModel):
@@ -723,6 +755,7 @@ class PaintResponse(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     interpretation_seed: str | None = None
+    seed_text: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -730,6 +763,10 @@ class PaintResponse(BaseModel):
     render_hash_short: str | None = None
     history_id: str | None = None
     history_at: int | None = None
+    description_hash: str | None = None
+    lineage_node_id: str | None = None
+    lineage_parent_node_id: str | None = None
+    derivation_kind: str | None = None
     elapsed_stage1_ms: int = 0
     elapsed_stage2_ms: int = 0
     elapsed_total_ms: int = 0
@@ -749,6 +786,12 @@ class PaintResponse(BaseModel):
     coerce_relation_dropped_count: int = 0
     coerce_relation_drop_rate: float | None = None
     coerce_warnings: list[str] = Field(default_factory=list)
+    coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class UnreadWordsBody(BaseModel):
+    words: list[str] = Field(default_factory=list, max_length=100)
+    context: str = Field(default="", max_length=1000)
 
 
 class RenderSvgRequest(BaseModel):
@@ -757,6 +800,42 @@ class RenderSvgRequest(BaseModel):
     canvas_aspect: str | None = None
     svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
+    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
+
+
+class RenderScoreRequest(BaseModel):
+    score: dict
+    input: str = ""
+    ddl: str | None = None
+    catalog_id: str | None = None
+    canvas_aspect: str | None = None
+    render_seed: int | None = None
+    vary_seed: int | None = None
+    interpretation_seed: str | None = None
+    seed_text: str | None = None
+
+
+class RenderScoreResponse(BaseModel):
+    score: Score
+    svg: str
+    catalog_id: str
+    render_build_number: str
+    render_color_profile: dict[str, str]
+    render_engine_id: str
+    render_engine_version: str
+    render_color_catalog_id: str
+    render_color_catalog_name: str
+    render_color_catalog_sub: str
+    render_color_map: dict[str, str]
+    render_canvas_aspect: str
+    render_canvas_aspect_id: str
+    render_canvas_aspect_ratio: float
+    render_seed: int
+    vary_seed: int | None = None
+    interpretation_seed: str | None = None
+    seed_text: str | None = None
+    render_hash: str
+    render_hash_short: str
 
 
 @dataclass
@@ -822,6 +901,15 @@ class HistoryPostBody(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     interpretation_seed: str | None = None
+    seed_text: str | None = None
+    source_text: str | None = None
+    display_label: str | None = None
+    batch_line_number: int | None = None
+    batch_run_id: str | None = None
+    history_visibility: str = "normal"
+    lineage_parent_node_id: str | None = None
+    derivation_kind: str | None = None
+    derivation_metadata: dict[str, object] = Field(default_factory=dict)
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -839,6 +927,8 @@ class HistoryItem(HistoryPostBody):
     trashed: bool = False
     starred: bool = False
     note: str | None = None
+    description_hash: str | None = None
+    lineage_node_id: str | None = None
 
 
 class HistoryListResponse(BaseModel):
@@ -2020,6 +2110,7 @@ def _call_interpret_detail(
 
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
 def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> ComposeResponse:
+    render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     t0 = time.perf_counter()
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     instruction_lang_resolved = _resolve_instruction_lang(req.original_text or req.ddl, instruction_lang_requested)
@@ -2043,8 +2134,9 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         ensure_renderable_score(score)
         if req.auto_repair:
             before_coerce = score
-            score = coerce_score(score, ddl=_coerce_context(compose_detail.ddl, req.original_text))
-            coerce_report = _coerce_relation_report(before_coerce, score)
+            branch_counts: dict[str, int] = {}
+            score = coerce_score(score, branch_report=branch_counts, ddl=_coerce_context(compose_detail.ddl, req.original_text))
+            coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -2055,8 +2147,9 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
-        "render_seed": req.render_seed,
+        "render_seed": render_seed,
         "vary_seed": req.vary_seed,
+        "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
     try:
@@ -2284,15 +2377,51 @@ def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_curre
     return DemoInstructionResponse(instruction=instruction)
 
 
+@app.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
+def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_user)) -> RenderScoreResponse:
+    render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
+    try:
+        score = coerce_score(Score.model_validate(req.score))
+        canvas_aspect = _validated_canvas_aspect_override(req.canvas_aspect)
+        if canvas_aspect is not None:
+            score = _score_with_canvas(score, canvas_aspect)
+        catalog_id = _resolved_catalog_id(req.catalog_id)
+        render_metadata = {
+            **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+            "render_seed": render_seed,
+            "vary_seed": req.vary_seed,
+            "interpretation_seed": req.interpretation_seed,
+            "seed_text": seed_text,
+        }
+        svg, render_metadata = _render_with_metadata(score, render_metadata)
+        render_metadata = {
+            **render_metadata,
+            **_render_hash_metadata(
+                input_text=req.input,
+                ddl=req.ddl,
+                score=score,
+                svg=svg,
+                catalog_id=catalog_id,
+                render_metadata=render_metadata,
+            ),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"score render failed: {e}") from e
+    return RenderScoreResponse(score=score, svg=svg, catalog_id=catalog_id, **render_metadata)
+
+
 @app.post("/api/render-svg")
 def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user)) -> Response:
+    render_seed, _ = _render_seed_from_text(req.seed_text, req.render_seed)
     try:
         svg = _render_score_svg(
             req.score,
             catalog_id=req.catalog_id,
             canvas_aspect=req.canvas_aspect,
             svg_profile=req.svg_profile,
-            render_seed=req.render_seed,
+            render_seed=render_seed,
         )
     except HTTPException:
         raise
@@ -2317,6 +2446,14 @@ def _add_history_item(
     catalog_id: str | None = None,
     save_artifacts: bool = True,
     render_metadata: dict | None = None,
+    source_text: str | None = None,
+    display_label: str | None = None,
+    batch_line_number: int | None = None,
+    batch_run_id: str | None = None,
+    history_visibility: str = "normal",
+    lineage_parent_node_id: str | None = None,
+    derivation_kind: str | None = None,
+    derivation_metadata: dict[str, object] | None = None,
 ) -> dict:
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
@@ -2333,7 +2470,8 @@ def _add_history_item(
                 render_metadata=metadata,
             )
         )
-    item_dict = _db.add_item({
+    try:
+        item_dict = _db.add_item({
         "id": item_id,
         "user_id": actor["id"],
         "output_path": str(prefix),
@@ -2347,9 +2485,20 @@ def _add_history_item(
         "stage2_model": stage2_model,
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
-        "catalog_id": catalog_id,
-        **metadata,
+"catalog_id": catalog_id,
+"source_text": source_text if source_text is not None else input_text,
+"display_label": display_label,
+"batch_line_number": batch_line_number,
+"batch_run_id": batch_run_id,
+"history_visibility": history_visibility,
+"lineage_parent_node_id": lineage_parent_node_id,
+"derivation_kind": derivation_kind,
+"derivation_metadata": derivation_metadata or {},
+**metadata,
     })
+    except ValueError as exc:
+        status_code = 404 if str(exc) == "lineage parent not found" else 422
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     if save_artifacts:
         item_dict.update(metadata)
         item_dict["render_metadata"] = metadata
@@ -2366,9 +2515,10 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     instruction_lang_resolved = _resolve_instruction_lang(source_text, instruction_lang_requested)
     ui_lang = _normalize_ui_lang(req.ui_lang)
-    catalog_id = _resolved_catalog_id(req.catalog_id)
+    catalog_id = _resolved_paint_catalog_id(req.catalog_id, random_catalog=req.random_color_catalog)
     resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
+    render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     try:
         interpret_detail_result = _call_interpret_detail(
             req.text,
@@ -2397,8 +2547,9 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         ensure_renderable_score(score)
         if req.auto_repair:
             before_coerce = score
-            score = coerce_score(score, ddl=_coerce_context(ddl, source_text))
-            coerce_report = _coerce_relation_report(before_coerce, score)
+            branch_counts: dict[str, int] = {}
+            score = coerce_score(score, branch_report=branch_counts, ddl=_coerce_context(ddl, source_text))
+            coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
 
@@ -2409,8 +2560,9 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
-        "render_seed": req.render_seed,
+        "render_seed": render_seed,
         "vary_seed": req.vary_seed,
+        "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
     t2 = time.perf_counter()
@@ -2436,6 +2588,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
     history_id = None
     history_at = None
+    saved_identity: dict[str, object] = {}
     save_artifacts = req.save_artifacts if req.save_artifacts is not None else req.save_history
     if req.save_history:
         history_at = req.history_at or int(time.time() * 1000)
@@ -2454,8 +2607,22 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             catalog_id=artifact_catalog_id,
             save_artifacts=save_artifacts,
             render_metadata=render_metadata,
+            source_text=req.history_source_text or source_text,
+            display_label=req.history_display_label,
+            batch_line_number=req.batch_line_number,
+            batch_run_id=req.batch_run_id,
+            history_visibility=req.history_visibility,
+            lineage_parent_node_id=req.lineage_parent_node_id,
+            derivation_kind=req.derivation_kind,
+            derivation_metadata=req.derivation_metadata,
         )
         history_id = item["id"]
+        saved_identity = {
+            "description_hash": item.get("description_hash"),
+            "lineage_node_id": item.get("lineage_node_id"),
+            "lineage_parent_node_id": item.get("lineage_parent_node_id"),
+            "derivation_kind": item.get("derivation_kind"),
+        }
     elif save_artifacts:
         history_at = req.history_at or int(time.time() * 1000)
         item_id = str(uuid.uuid4())
@@ -2489,6 +2656,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
         **render_metadata,
         history_id=history_id,
         history_at=history_at,
+        **saved_identity,
         elapsed_stage1_ms=elapsed_stage1_ms,
         elapsed_stage2_ms=elapsed_stage2_ms,
         elapsed_total_ms=elapsed_total_ms,
@@ -2634,8 +2802,13 @@ def api_history_get(
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
+    anchor_id: str | None = Query(default=None, max_length=100),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
+    if anchor_id:
+        position = _db.item_position(actor["id"], anchor_id, trashed=trashed, starred=starred)
+        if position is not None:
+            offset = (position // limit) * limit
     items, total = _db.list_items(
         actor["id"],
         offset=offset,
@@ -2645,6 +2818,80 @@ def api_history_get(
         starred=starred,
     )
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
+
+
+
+@app.get("/api/history/{item_id}/neighbors", response_model=list[HistoryItem], response_model_exclude_none=True)
+def api_history_neighbors(item_id: str, actor: dict = Depends(_current_user)) -> list[HistoryItem]:
+    focus = _db.get_items(actor["id"], [item_id])
+    if not focus:
+        raise HTTPException(status_code=404, detail="history item not found")
+    candidates, _ = _db.list_items(actor["id"], offset=0, limit=10_000)
+    ranked = sorted(
+        (item for item in candidates if item.get("id") != item_id),
+        key=lambda item: (composition_distance(focus[0].get("score") or {}, item.get("score") or {}), -int(item.get("at") or 0)),
+    )[:3]
+    return [HistoryItem(**item) for item in ranked]
+
+
+@app.post("/api/feedback/unread-words")
+def api_record_unread_words(body: UnreadWordsBody, actor: dict = Depends(_current_user)) -> dict:
+    _db.record_unread_words(actor["id"], body.words, body.context, at=int(time.time() * 1000))
+    return {"ok": True}
+
+
+@app.get("/api/feedback/unread-words")
+def api_my_unread_words(limit: int = Query(default=100, ge=1, le=500), actor: dict = Depends(_current_user)) -> list[dict]:
+    return _db.list_unread_words(actor["id"], limit=limit)
+
+
+@app.get("/api/admin/unread-words")
+def api_admin_unread_words(limit: int = Query(default=500, ge=1, le=2000), actor: dict = Depends(_current_user)) -> list[dict]:
+    if actor.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="admin role required")
+    return _db.list_unread_words(None, limit=limit)
+
+
+@app.get("/api/history/{item_id}/lineage")
+def api_history_lineage(
+    item_id: str,
+    descendant_depth: int = Query(default=2, ge=0, le=200),
+    node_limit: int = Query(default=200, ge=1, le=200),
+    actor: dict = Depends(_current_user),
+) -> dict:
+    items = _db.get_items(actor["id"], [item_id])
+    if not items or not items[0].get("lineage_node_id"):
+        raise HTTPException(status_code=404, detail="history item not found")
+    lineage = _db.get_lineage(
+        actor["id"],
+        items[0]["lineage_node_id"],
+        descendant_depth=descendant_depth,
+        node_limit=node_limit,
+    )
+    if lineage is None:
+        raise HTTPException(status_code=404, detail="lineage not found")
+    return lineage
+
+
+@app.get("/api/lineage/{node_id}")
+def api_lineage(
+    node_id: str,
+    descendant_depth: int = Query(default=2, ge=0, le=200),
+    node_limit: int = Query(default=200, ge=1, le=200),
+    actor: dict = Depends(_current_user),
+) -> dict:
+    lineage = _db.get_lineage(actor["id"], node_id, descendant_depth=descendant_depth, node_limit=node_limit)
+    if lineage is None:
+        raise HTTPException(status_code=404, detail="lineage not found")
+    return lineage
+
+
+@app.post("/api/lineage/{node_id}/promote", response_model=HistoryItem, response_model_exclude_none=True)
+def api_lineage_promote(node_id: str, actor: dict = Depends(_current_user)) -> HistoryItem:
+    item = _db.promote_lineage_node(actor["id"], node_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="lineage item not found")
+    return HistoryItem(**item)
 
 
 @app.get("/api/history/{item_id}/svg")
@@ -2676,6 +2923,7 @@ def api_history_svg(
 
 @app.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
+    render_seed, seed_text = _render_seed_from_text(body.seed_text, body.render_seed)
     try:
         score = coerce_score(Score.model_validate(body.score))
         catalog_id = _resolved_catalog_id(body.catalog_id)
@@ -2687,8 +2935,9 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
-            "render_seed": body.render_seed,
+            "render_seed": render_seed,
             "vary_seed": body.vary_seed,
+            "seed_text": seed_text,
             "interpretation_seed": body.interpretation_seed,
         }
         svg, render_metadata = _render_with_metadata(score, render_metadata)
@@ -2710,7 +2959,15 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         tokens_out=body.tokens_out,
         catalog_id=None if catalog_id == "default" else catalog_id,
         save_artifacts=body.save_artifacts,
-        render_metadata=render_metadata,
+            render_metadata=render_metadata,
+            source_text=body.source_text,
+            display_label=body.display_label,
+            batch_line_number=body.batch_line_number,
+            batch_run_id=body.batch_run_id,
+            history_visibility=body.history_visibility,
+            lineage_parent_node_id=body.lineage_parent_node_id,
+            derivation_kind=body.derivation_kind,
+            derivation_metadata=body.derivation_metadata,
     )
     if body.count_generation:
         if _db.increment_user_generation_count(actor["id"]) is None:

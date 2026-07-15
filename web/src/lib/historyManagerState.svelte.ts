@@ -8,6 +8,16 @@ export type Score = { instructions: unknown[]; canvas?: string | null };
 export type HistoryItem = {
 	id?: string;
 	input: string;
+	source_text?: string | null;
+	display_label?: string | null;
+	batch_line_number?: number | null;
+	batch_run_id?: string | null;
+	description_hash?: string | null;
+	history_visibility?: 'normal' | 'lineage_only';
+	lineage_node_id?: string | null;
+	lineage_parent_node_id?: string | null;
+	derivation_kind?: string | null;
+	derivation_metadata?: Record<string, unknown>;
 	ddl: string | null;
 	thinking?: string | null;
 	score: Score;

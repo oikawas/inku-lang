@@ -4,24 +4,30 @@
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { Score } from '$lib/historyManagerState.svelte';
 	import OutputTabsContent from './OutputTabsContent.svelte';
+	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
-	type OutputTab = 'canvas' | 'refine' | 'compare' | 'prompts' | 'score';
+	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: Score; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
+	type PaintResult = { svg: string; score: Score; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean };
+	type HistoryItem = { id?: string; starred?: boolean; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	type RefineChanges = { touch: boolean; layout: boolean; reading: boolean };
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
-	type ModelInspectionResult = { id: string; model: string; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
+	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
 		outputTab: OutputTab;
 		result: PaintResult | null;
+		nearbyHistory: NearbyHistory[];
+		onOpenNearbyHistory: (id: string) => void;
+		unsavedRefinementPreview: boolean;
+		lineageIntermediateNotice: string | null;
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
 		nextDisabled: boolean;
@@ -51,6 +57,10 @@
 		statusStage2Model: string;
 		statusCatalogName: string;
 		statusCanvasName: string;
+		nextStage1Model: string;
+		nextStage2Model: string;
+		nextCatalogName: string;
+		nextCanvasName: string;
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopyTitle: string;
@@ -84,7 +94,7 @@
 		variationGridIncludesReading: boolean;
 		variationGridTaskLabel: string;
 		variationGridStatus: string | null;
-		onGenerateVariationCandidates: (changes: RefineChanges, count: 1 | 4) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
 		onAbortVariationCandidates: () => void;
 		onSaveSelectedVariationCandidates: () => void | Promise<void>;
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
@@ -108,11 +118,26 @@
 		onRunModelInspection: () => void | Promise<void>;
 		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
 		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
+		lineageGraph: LineageGraph | null;
+		lineageLoading: boolean;
+		lineageError: string | null;
+		isJapanese: boolean;
+		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
+		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
+		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;
+		onAskTrashLineage: (historyIds: string[]) => void;
+		onDetachLineage: () => void;
+		onLoadLineageOverview: () => void | Promise<void>;
+		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
 	};
 
 	let {
 		outputTab = $bindable('canvas'),
 		result,
+		nearbyHistory = [],
+		onOpenNearbyHistory,
+		unsavedRefinementPreview = false,
+		lineageIntermediateNotice = null,
 		allowEmptyOutputTabs,
 		currentRenderedAt,
 		nextDisabled,
@@ -142,6 +167,10 @@
 		statusStage2Model,
 		statusCatalogName,
 		statusCanvasName,
+		nextStage1Model,
+		nextStage2Model,
+		nextCatalogName,
+		nextCanvasName,
 		statusHistoryItem,
 		statusHashLabel,
 		statusHashCopyTitle,
@@ -198,24 +227,36 @@
 		isModelInspectionChoiceBlocked,
 		onRunModelInspection,
 		onAdoptModelInspectionResult,
-		onToggleModelInspectionStar
+		onToggleModelInspectionStar,
+		lineageGraph = null,
+		lineageLoading = false,
+		lineageError = null,
+		isJapanese = true,
+		onOpenLineageNode,
+		onPromoteLineageNode,
+		onSaveLineageNote,
+		onAskTrashLineage,
+		onDetachLineage,
+		onLoadLineageOverview,
+		onLoadLineageBranch
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
 	let svgMenuOpen = $state(false);
 	let svgHelpOpen = $state(false);
 	let presentationMode = $state(false);
-	let changeTouch = $state(false);
-	let changeLayout = $state(false);
-	let changeReading = $state(false);
+	let generationInfoOpen = $state(false);
+	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
+	let refineView = $state<'adjust' | 'compare'>('adjust');
+	let refineKind = $state<RefineKind>('touch');
 	const refineCostLabel = $derived(
-		changeReading
+		refineKind === 'reading'
 			? t().refineCostReading
-			: changeLayout
+			: refineKind === 'layout'
 				? t().refineCostLayout
-				: changeTouch
-					? t().refineCostTouch
-					: ''
+				: refineKind === 'color'
+					? t().refineCostColor
+					: t().refineCostTouch
 	);
 	const canvasMaxRatio = $derived(Math.max(canvasAspectWidth, canvasAspectHeight, 1));
 	const canvasBaseWidth = $derived(400 * canvasAspectWidth / canvasMaxRatio);
@@ -273,10 +314,23 @@
 				.replace('{vary}', result.vary_seed == null ? t().seedBaseLabel : String(result.vary_seed))
 			: ''
 	);
+	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
+	const detailVarySeed = $derived(statusHistoryItem?.vary_seed ?? result?.vary_seed ?? null);
+	const detailInterpretationSeed = $derived(statusHistoryItem?.interpretation_seed ?? result?.interpretation_seed ?? null);
+	const detailDescriptionHash = $derived(statusHistoryItem?.description_hash ?? result?.description_hash ?? '');
+	const detailRenderHash = $derived(statusHistoryItem?.render_hash ?? result?.render_hash ?? '');
+	const detailEngine = $derived(statusHistoryItem?.render_engine_id ?? result?.render_engine_id ?? '');
+	const detailEngineVersion = $derived(statusHistoryItem?.render_engine_version ?? result?.render_engine_version ?? '');
+	const detailBuild = $derived(statusHistoryItem?.render_build_number ?? result?.render_build_number ?? '');
+	const detailElapsedMs = $derived(statusHistoryItem?.elapsed_ms ?? result?.elapsed_total_ms ?? null);
+	const detailTokensIn = $derived(statusHistoryItem?.tokens_in ?? ((result?.tokens_in_stage1 ?? 0) + (result?.tokens_in_stage2 ?? 0) || null));
+	const detailTokensOut = $derived(statusHistoryItem?.tokens_out ?? ((result?.tokens_out_stage1 ?? 0) + (result?.tokens_out_stage2 ?? 0) || null));
 </script>
 
 <svelte:window onkeydown={(event) => {
-	if (event.key === 'Escape' && presentationMode) closePresentationMode();
+	if (event.key !== 'Escape') return;
+	if (generationInfoOpen) generationInfoOpen = false;
+	else if (presentationMode) closePresentationMode();
 }} />
 
 <div class="right-panel">
@@ -284,32 +338,37 @@
 		<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
 			<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
 		</Tooltip>
+		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show artwork derivations'}>
+			<button class="rtab" class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
+		</Tooltip>
 		<Tooltip placement="bottom" text={t().tooltipCanvasTabRefine}>
 			<button class="rtab" class:active={outputTab === 'refine'} onclick={() => (outputTab = 'refine')} disabled={!result}>{t().tabRefine}</button>
 		</Tooltip>
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabCompare}>
-			<button class="rtab" class:active={outputTab === 'compare'} onclick={() => (outputTab = 'compare')} disabled={!result}>{t().tabCompare}</button>
-		</Tooltip>
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabPrompts}>
-			<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
-		</Tooltip>
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabScore}>
-			<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
-		</Tooltip>
 		<div class="rtab-spacer"></div>
-		{#if currentRenderedAt}
-			<div class="render-meta-strip">
+		{#if result}
+			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Displayed artwork information'}>
+				<span class="render-meta-scope">{isJapanese ? '\u8868\u793a\u4e2d' : 'Displayed'}</span>
+				<span class="render-meta-item render-meta-model">
+					<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
+					<strong title={statusStage1Model + ' / ' + statusStage2Model}>
+						{#if statusStage1Model === statusStage2Model}
+							{isJapanese ? '\u89e3\u91c8\uff0f\u63cf\u753b' : 'Interpretation / rendering'} {statusStage1Model}
+						{:else}
+							{isJapanese ? '\u89e3\u91c8' : 'Interpretation'} {statusStage1Model} / {isJapanese ? '\u63cf\u753b' : 'Rendering'} {statusStage2Model}
+						{/if}
+					</strong>
+				</span>
 				<span class="render-meta-item render-meta-catalog">
-					<span class="render-meta-label">{t().historyCatalogHeader}</span>
-					<strong>{statusCatalogName}</strong>
+					<span class="render-meta-label">{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</span>
+					<strong title={statusCatalogName}>{statusCatalogName}</strong>
 				</span>
 				<span class="render-meta-item render-meta-canvas">
-					<span class="render-meta-label">{t().historyCanvasHeader}</span>
-					<strong>{statusCanvasName}</strong>
+					<span class="render-meta-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
+					<strong title={statusCanvasName}>{statusCanvasName}</strong>
 				</span>
 				<span class="render-meta-item render-meta-created">
-					<span class="render-meta-label">{t().historyCreatedAtHeader}</span>
-					<strong>{currentRenderedAt}</strong>
+					<span class="render-meta-label">{isJapanese ? '\u4f5c\u6210' : 'Created'}</span>
+					<strong>{currentRenderedAt ?? '-'}</strong>
 				</span>
 			</div>
 		{/if}
@@ -358,6 +417,27 @@
 						{/if}
 					</div>
 				</div>
+{#if unsavedRefinementPreview}
+	<div class="unsaved-refinement-badge" role="status">{t().unsavedRefinementPreviewLabel}</div>
+{/if}
+{#if lineageIntermediateNotice}
+	<div class="lineage-intermediate-notice" role="status">{lineageIntermediateNotice}</div>
+{/if}
+{#if nearbyHistory.length > 0}
+	<div class="nearby-mirror" onpointerdown={(event) => event.stopPropagation()}>
+		<span>{isJapanese ? '近い作品' : 'Nearby works'}</span>
+		{#each nearbyHistory as item (item.id)}
+			<button
+				type="button"
+				class="nearby-thumb"
+				title={item.input}
+				aria-label={`${isJapanese ? '近い作品を開く' : 'Open nearby work'}: ${item.input}`}
+				disabled={!item.id}
+				onclick={() => { if (item.id) onOpenNearbyHistory(item.id); }}
+			>{@html item.svg}</button>
+		{/each}
+	</div>
+{/if}
 				<div class="canvas-corner-controls canvas-corner-left" onpointerdown={(event) => event.stopPropagation()}>
 					<Tooltip placement="top-right" text={t().tooltipCanvasCaption}>
 						<button
@@ -401,7 +481,13 @@
 					<div class="instruction-caption" aria-live="polite">{displayInstructionText}</div>
 				{/if}
 			{:else if outputTab === 'refine'}
-				<div class="refine-panel">
+				<div class="refine-shell">
+					<div class="refine-mode-tabs" role="tablist" aria-label={isJapanese ? '推敲方法' : 'Refinement method'}>
+						<button type="button" role="tab" aria-selected={refineView === 'adjust'} class:active={refineView === 'adjust'} onclick={() => (refineView = 'adjust')}>{isJapanese ? '調整' : 'Adjust'}</button>
+						<button type="button" role="tab" aria-selected={refineView === 'compare'} class:active={refineView === 'compare'} onclick={() => (refineView = 'compare')}>{isJapanese ? 'モデル比較' : 'Model comparison'}</button>
+					</div>
+					{#if refineView === 'adjust'}
+						<div class="refine-panel">
 					<div class="refine-stage">
 						<div class="refine-target-column">
 							<div class="refine-target-card">
@@ -413,10 +499,11 @@
 								<section class="refine-action-section">
 									<div class="refine-section-head">
 										<div class="refine-section-title">{t().refineSingleTitle}</div>
+										<div class="refine-selection-hint">{t().refineSingleSelectionHint}</div>
 									</div>
-									<div class="model-choice-grid">
-										<label class="model-choice" class:checked={changeTouch}>
-											<input type="checkbox" bind:checked={changeTouch} disabled={changeReading || variationBusy || variationGridBusy} />
+									<div class="model-choice-grid" role="radiogroup" aria-label={t().refineSingleSelectionHint}>
+										<label class="model-choice" class:checked={refineKind === 'touch'}>
+											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryPerformance}</strong>
@@ -424,8 +511,8 @@
 												</span>
 											</Tooltip>
 										</label>
-										<label class="model-choice" class:checked={changeLayout}>
-											<input type="checkbox" bind:checked={changeLayout} disabled={changeReading || variationBusy || variationGridBusy} />
+										<label class="model-choice" class:checked={refineKind === 'layout'}>
+											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => (refineKind = 'layout')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryComposition}</strong>
@@ -433,11 +520,20 @@
 												</span>
 											</Tooltip>
 										</label>
-										<label class="model-choice" class:checked={changeReading}>
-											<input type="checkbox" bind:checked={changeReading} onchange={() => { changeTouch = changeReading; changeLayout = changeReading; }} disabled={variationBusy || variationGridBusy} />
+										<label class="model-choice" class:checked={refineKind === 'reading'}>
+											<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => (refineKind = 'reading')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryInterpretation}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
+										<label class="model-choice" class:checked={refineKind === 'color'}>
+											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => (refineKind = 'color')} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryColor}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryColor}</strong>
 													<span class="refine-info-mark" aria-hidden="true">i</span>
 												</span>
 											</Tooltip>
@@ -452,8 +548,8 @@
 										<Tooltip text={t().tooltipRefineSingle}>
 											<div class="refine-action-wrap">
 												<PaintButton
-													onclick={() => onGenerateVariationCandidates({ touch: changeTouch, layout: changeLayout, reading: changeReading }, 1)}
-													disabled={!result || variationBusy || variationGridBusy || (!changeTouch && !changeLayout && !changeReading)}
+													onclick={() => onGenerateVariationCandidates(refineKind, 1)}
+													disabled={!result || variationBusy || variationGridBusy}
 												>
 													{t().refineSingleButton}
 												</PaintButton>
@@ -462,8 +558,8 @@
 										<Tooltip text={t().tooltipVariationGridDefault}>
 											<div class="refine-action-wrap">
 												<PaintButton
-													onclick={() => onGenerateVariationCandidates({ touch: changeTouch, layout: changeLayout, reading: changeReading }, 4)}
-													disabled={!result || variationBusy || variationGridBusy || (!changeTouch && !changeLayout && !changeReading)}
+													onclick={() => onGenerateVariationCandidates(refineKind, 4)}
+													disabled={!result || variationBusy || variationGridBusy}
 												>
 													{t().variationGridDefault}
 												</PaintButton>
@@ -521,8 +617,8 @@
 						</div>
 					</div>
 				</div>
-			{:else if outputTab === 'compare'}
-				<div class="compare-panel">
+					{:else}
+					<div class="compare-panel">
 					<div class="compare-head">
 						<div class="refine-title">{t().modelCompareTitle}</div>
 						<div class="compare-action-wrap"><Tooltip text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</PaintButton></Tooltip></div>
@@ -554,40 +650,40 @@
 						<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {modelInspectionTargetStage1Model}<br />Stage 2: {modelInspectionTargetStage2Model}</div></div>
 						<div class="model-results-column">
 							{#if modelInspectionBusy}<div class="model-drawing-animation" aria-live="polite"><div class="model-drawing-spinner" aria-hidden="true"></div><div><strong>{t().modelCompareDrawingTitle}</strong><span>{t().modelCompareDrawingBody}</span></div></div>{/if}
-							{#if modelInspectionResults.length > 0}<div class="model-inspection-grid">{#each modelInspectionResults as item (item.id)}<div class="model-inspection-card" class:saved={!!item.savedHistoryId}><div class="comparison-label">{item.label}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div><div class="model-result-actions"><Tooltip text={item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}><button class="ghost-btn model-adopt-btn" type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptModelInspectionResult(item)}>{item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdopt}</button></Tooltip><Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}><button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button></Tooltip></div><pre>{item.ddl}</pre></div>{/each}</div>{/if}
+							{#if modelInspectionResults.length > 0}
+								<div class="model-inspection-grid">
+									{#each modelInspectionResults as item (item.id)}
+										<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
+											<div class="comparison-label">{item.label}</div>
+											<div class="model-comparison-art-wrap">
+												<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div>
+												<button
+													class="variation-select model-adopt-select"
+													class:selected={!!item.savedHistoryId}
+													type="button"
+													disabled={item.saving || !!item.savedHistoryId}
+													onclick={() => onAdoptModelInspectionResult(item)}
+													title={item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}
+													aria-label={item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}
+												>{item.saving ? '…' : item.savedHistoryId ? '✓' : '+'}</button>
+											</div>
+											<div class="model-result-actions">
+												<Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}>
+													<button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button>
+												</Tooltip>
+											</div>
+											<pre>{item.ddl}</pre>
+										</div>
+									{/each}
+								</div>
+							{/if}
 						</div>
 					</div>
+					</div>
+					{/if}
 				</div>
-			{:else if outputTab === 'prompts'}
-				<OutputTabsContent
-					outputTab="prompts"
-					{promptsData}
-					{stage1PromptText}
-					{ddl}
-					bind:promptStage1Expanded
-					bind:promptStage2Expanded
-					{copiedPrompt}
-					{scoreJsonText}
-					{scoreJsonLines}
-					{scoreJsonHighlighted}
-					{scoreJsonSeparatorLine}
-					{onCopyPromptText}
-				/>
-			{:else if outputTab === 'score'}
-				<OutputTabsContent
-					outputTab="score"
-					{promptsData}
-					{stage1PromptText}
-					{ddl}
-					bind:promptStage1Expanded
-					bind:promptStage2Expanded
-					{copiedPrompt}
-					{scoreJsonText}
-					{scoreJsonLines}
-					{scoreJsonHighlighted}
-					{scoreJsonSeparatorLine}
-					{onCopyPromptText}
-				/>
+			{:else if outputTab === 'lineage'}
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} />
 			{/if}
 		</div>
 
@@ -621,26 +717,79 @@
 		</div>
 	</div>
 
+	{#if generationInfoOpen}
+		<aside class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}>
+			<header class="generation-info-head">
+				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}</strong>
+				<button type="button" class="generation-info-close" onclick={() => (generationInfoOpen = false)} aria-label="Close">&times;</button>
+			</header>
+			<div class="generation-info-tabs" role="tablist">
+				<button type="button" role="tab" aria-selected={generationInfoTab === 'details'} class:active={generationInfoTab === 'details'} onclick={() => (generationInfoTab = 'details')}>{isJapanese ? '\u8a73\u7d30' : 'Details'}</button>
+				<button type="button" role="tab" aria-selected={generationInfoTab === 'prompts'} class:active={generationInfoTab === 'prompts'} onclick={() => (generationInfoTab = 'prompts')}>{t().tabPrompts}</button>
+				<button type="button" role="tab" aria-selected={generationInfoTab === 'score'} class:active={generationInfoTab === 'score'} onclick={() => (generationInfoTab = 'score')}>{t().tabScore}</button>
+			</div>
+			<div class="generation-info-content">
+				{#if generationInfoTab === 'details'}
+					<div class="generation-details">
+						<dl>
+							<dt>Stage 1 ({isJapanese ? '\u89e3\u91c8' : 'interpretation'})</dt><dd>{statusStage1Model}</dd>
+							<dt>Stage 2 ({isJapanese ? '\u63cf\u753b' : 'rendering'})</dt><dd>{statusStage2Model}</dd>
+							<dt>{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</dt><dd>{statusCatalogName}</dd>
+							<dt>{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</dt><dd>{statusCanvasName}</dd>
+							<dt>render seed</dt><dd>{detailRenderSeed ?? '-'}</dd>
+							<dt>{isJapanese ? '\u914d\u7f6e seed' : 'layout seed'}</dt><dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
+							<dt>{isJapanese ? '\u89e3\u91c8 seed' : 'interpretation seed'}</dt><dd>{detailInterpretationSeed ?? '-'}</dd>
+							<dt>render hash</dt><dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
+							<dt>description hash</dt><dd><code>{detailDescriptionHash || '-'}</code></dd>
+							<dt>render engine</dt><dd>{detailEngine || '-'}{detailEngineVersion ? ' / ' + detailEngineVersion : ''}</dd>
+							<dt>Build</dt><dd>{detailBuild || '-'}</dd>
+							<dt>{isJapanese ? '\u51e6\u7406\u6642\u9593' : 'Elapsed'}</dt><dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
+							<dt>tokens in / out</dt><dd>{detailTokensIn ?? '-'} / {detailTokensOut ?? '-'}</dd>
+						</dl>
+					</div>
+				{:else}
+					<OutputTabsContent
+						outputTab={generationInfoTab}
+						{promptsData}
+						{stage1PromptText}
+						{ddl}
+						bind:promptStage1Expanded
+						bind:promptStage2Expanded
+						{copiedPrompt}
+						{scoreJsonText}
+						{scoreJsonLines}
+						{scoreJsonHighlighted}
+						{scoreJsonSeparatorLine}
+						{onCopyPromptText}
+					/>
+				{/if}
+			</div>
+		</aside>
+	{/if}
+
 	<div class="status-bar">
-		<div class="status-summary" aria-label="current render status">
+		<div class="status-summary" aria-label={isJapanese ? '\u6b21\u306e\u63cf\u753b\u8a2d\u5b9a' : 'Next generation settings'}>
+			<span class="status-scope">{isJapanese ? '\u6b21\u306e\u63cf\u753b' : 'Next generation'}</span>
 			<span class="status-group">
-				<span class="status-label">LLM</span>
-				<span class="status-k">Stage1</span><span class="status-v">{statusStage1Model}</span>
-				<span class="status-k">Stage2</span><span class="status-v">{statusStage2Model}</span>
+				<span class="status-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
+				{#if nextStage1Model === nextStage2Model}
+					<span class="status-k">{isJapanese ? '\u89e3\u91c8\uff0f\u63cf\u753b' : 'Interpretation / rendering'}</span><span class="status-v" title={nextStage1Model}>{nextStage1Model}</span>
+				{:else}
+					<span class="status-k">{isJapanese ? '\u89e3\u91c8' : 'Interpretation'}</span><span class="status-v" title={nextStage1Model}>{nextStage1Model}</span>
+					<span class="status-k">{isJapanese ? '\u63cf\u753b' : 'Rendering'}</span><span class="status-v" title={nextStage2Model}>{nextStage2Model}</span>
+				{/if}
 			</span>
 			<span class="status-divider"></span>
 			<span class="status-group">
-				<span class="status-label">Color</span>
-				<span class="status-v">{statusCatalogName}</span>
+				<span class="status-label">{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</span>
+				<span class="status-v" title={nextCatalogName}>{nextCatalogName}</span>
 			</span>
 			<span class="status-divider"></span>
 			<span class="status-group">
-				<span class="status-label">Canvas</span>
-				<span class="status-v">{statusCanvasName}</span>
+				<span class="status-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
+				<span class="status-v" title={nextCanvasName}>{nextCanvasName}</span>
 			</span>
 		</div>
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		{#if result}<span class="seed-summary status-seed-summary">{seedSummary}</span>{/if}
 		<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
 			<button
 				class="star-btn status-star"
@@ -650,14 +799,15 @@
 				aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
 			>★</button>
 		</Tooltip>
-		<Tooltip text={statusHashCopyTitle}>
+		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show generation details, prompts, and JSON for the selected artwork'}>
 			<button
-				class="hash-copy-btn"
-				class:copied={statusHashCopied}
-				disabled={!result || !statusHashLabel}
-				onclick={onCopyStatusHash}
-				aria-label={statusHashCopyTitle}
-			>{statusHashCopied ? t().promptCopied : statusHashLabel || '----'}</button>
+				type="button"
+				class="generation-info-button"
+				class:active={generationInfoOpen}
+				disabled={!result && !allowEmptyOutputTabs}
+				aria-expanded={generationInfoOpen}
+				onclick={() => (generationInfoOpen = !generationInfoOpen)}
+			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}</button>
 		</Tooltip>
 		<div class="png-wrap">
 			<Tooltip placement="left" text={t().tooltipCanvasDownloadSvg}>
@@ -798,6 +948,7 @@
 
 <style>
 	.right-panel {
+		position: relative;
 		flex: 1;
 		min-width: 0;
 		display: flex;
@@ -838,6 +989,7 @@
 		font-size: 11px;
 		color: var(--fg3);
 	}
+	.render-meta-scope, .status-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
 	.render-meta-item {
 		display: inline-flex;
 		align-items: baseline;
@@ -854,6 +1006,9 @@
 		color: var(--fg2);
 		font-weight: 400;
 	}
+	.render-meta-model strong { max-width: 220px; }
+	.render-meta-catalog strong { max-width: 130px; }
+	.render-meta-canvas strong { max-width: 100px; }
 	.render-meta-created strong {
 		max-width: none;
 		font-variant-numeric: tabular-nums;
@@ -866,6 +1021,43 @@
 		background: var(--bg2);
 		position: relative;
 		overflow: hidden;
+	}
+	.refine-shell {
+		align-self: stretch;
+		width: min(1120px, calc(100% - 136px));
+		max-height: calc(100% - 28px);
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.refine-mode-tabs {
+		flex: 0 0 auto;
+		display: flex;
+		gap: 0;
+		border-bottom: 1px solid var(--border);
+		padding: 0 16px;
+	}
+	.refine-mode-tabs button {
+		padding: 9px 14px;
+		border: 0;
+		border-bottom: 2px solid transparent;
+		background: transparent;
+		color: var(--fg3);
+		font: inherit;
+		cursor: pointer;
+	}
+	.refine-mode-tabs button.active {
+		border-bottom-color: var(--accent);
+		color: var(--fg);
+		font-weight: 600;
+	}
+	.refine-shell .refine-panel,
+	.refine-shell .compare-panel {
+		align-self: auto;
+		width: 100%;
+		max-height: none;
+		min-height: 0;
+		flex: 1;
 	}
 	.refine-panel {
 		align-self: stretch;
@@ -935,6 +1127,10 @@
 		font-size: 12px;
 		font-weight: 600;
 		color: var(--fg);
+	}
+	.refine-selection-hint {
+		font-size: 11px;
+		color: var(--fg3);
 	}
 	.refine-actions {
 		display: flex;
@@ -1192,20 +1388,18 @@
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 10px;
 	}
+	.model-inspection-card { position: relative; }
 	.model-inspection-card.saved {
 		border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 	}
+	.model-comparison-art-wrap { position: relative; }
+	.model-adopt-select:disabled { cursor: default; opacity: 1; }
 	.model-result-actions {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-end;
 		gap: 8px;
 		margin-top: 8px;
-	}
-	.model-adopt-btn {
-		min-height: 28px;
-		font-size: 11px;
-		padding: 5px 9px;
 	}
 	.model-result-star {
 		width: 30px;
@@ -1271,12 +1465,6 @@
 	.nav-left { left: 14px; }
 	.nav-right { right: 14px; }
 
-	.status-seed-summary {
-		font-size: 11px;
-		color: var(--fg3);
-		white-space: nowrap;
-		margin-right: 12px;
-	}
 	.nav-circle {
 		width: 38px;
 		height: 38px;
@@ -1322,6 +1510,14 @@
 		cursor: not-allowed;
 	}
 	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
+	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: white; box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
+	.nearby-mirror { position: absolute; right: 64px; bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); box-shadow: 0 2px 10px #0002; color: var(--fg3); font-size: 0.68rem; z-index: 4; }
+	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: white; border: 1px solid var(--border); cursor: pointer; }
+	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }
+	.nearby-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.nearby-thumb:disabled { cursor: default; opacity: 0.65; }
+	.nearby-thumb :global(svg) { width: 100%; height: 100%; }
 	.canvas-content {
 		position: relative;
 		width: 100%;
@@ -1469,6 +1665,82 @@
 		user-select: none;
 	}
 	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: 11px !important; color: var(--floating-control-muted) !important; }
+	.generation-info {
+		position: absolute;
+		z-index: 90;
+		top: 41px;
+		right: 0;
+		bottom: 49px;
+		box-sizing: border-box;
+		width: min(760px, calc(100% - 72px));
+		display: flex;
+		flex-direction: column;
+		background: var(--bg);
+		border-left: 1px solid var(--border2);
+		box-shadow: -14px 0 34px rgba(0, 0, 0, .18);
+	}
+	.generation-info-head {
+		height: 44px;
+		flex: 0 0 auto;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 12px 0 16px;
+		border-bottom: 1px solid var(--border);
+	}
+	.generation-info-head strong { font-size: 13px; font-weight: 600; }
+	.generation-info-close {
+		width: 30px;
+		height: 30px;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--fg2);
+		font-size: 20px;
+		cursor: pointer;
+	}
+	.generation-info-close:hover { background: var(--bg2); color: var(--fg); }
+	.generation-info-tabs {
+		flex: 0 0 auto;
+		display: flex;
+		padding: 0 12px;
+		border-bottom: 1px solid var(--border);
+	}
+	.generation-info-tabs button {
+		padding: 9px 14px 8px;
+		border: 0;
+		border-bottom: 2px solid transparent;
+		background: transparent;
+		color: var(--fg2);
+		font: inherit;
+		font-size: 12px;
+		cursor: pointer;
+	}
+	.generation-info-tabs button.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 600; }
+	.generation-info-content { min-height: 0; flex: 1; display: flex; padding: 10px; overflow: hidden; }
+	.generation-details { width: 100%; overflow: auto; padding: 8px 10px; }
+	.generation-details dl { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 10px 16px; margin: 0; font-size: 12px; }
+	.generation-details dt { color: var(--fg3); }
+	.generation-details dd { min-width: 0; margin: 0; color: var(--fg); overflow-wrap: anywhere; }
+	.generation-details code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+	.detail-copy-row { display: flex; align-items: flex-start; gap: 8px; }
+	.detail-copy-row code { min-width: 0; flex: 1; }
+	.detail-copy-row button { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: 5px; padding: 3px 7px; background: var(--panel); color: var(--fg2); font: inherit; font-size: 10px; cursor: pointer; }
+	.generation-info-button {
+		flex: 0 0 auto;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		padding: 5px 9px;
+		background: var(--panel);
+		color: var(--fg2);
+		font: inherit;
+		font-size: 11px;
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.generation-info-button:hover, .generation-info-button.active { background: var(--bg2); color: var(--fg); border-color: var(--fg3); }
+	.generation-info-button:disabled { opacity: .4; cursor: default; }
+
 	.status-bar {
 		display: flex;
 		align-items: center;
@@ -1518,6 +1790,7 @@
 		font-size: 11px;
 		font-weight: 400;
 	}
+	.status-summary .status-v { max-width: 130px; }
 	.status-divider {
 		width: 1px;
 		height: 16px;
@@ -1566,37 +1839,6 @@
 	.star-btn.starred { color: #d59b21; border-color: rgba(213,155,33,0.55); background: #fff7dc; }
 	.star-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 	.status-star { flex-shrink: 0; }
-	.hash-copy-btn {
-		height: 24px;
-		min-width: 48px;
-		padding: 0 8px;
-		border: 1px solid var(--border2);
-		border-radius: 999px;
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: 11px;
-		line-height: 1;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-		font-weight: 600;
-		letter-spacing: 0;
-		cursor: pointer;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-	.hash-copy-btn:hover:not(:disabled) {
-		border-color: rgba(77,95,134,0.45);
-		background: var(--bg2);
-	}
-	.hash-copy-btn.copied {
-		border-color: rgba(70,130,90,0.45);
-		color: #2f6b3a;
-		background: rgba(47,107,58,0.10);
-		font-family: inherit;
-		font-weight: 600;
-	}
-	.hash-copy-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 	.png-wrap { position: relative; }
 	.png-menu {
 		position: absolute;

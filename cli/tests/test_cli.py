@@ -989,3 +989,47 @@ def test_diversity_summary_replay_requires_client(tmp_path):
         assert "--replay requires API access" in str(exc)
     else:
         raise AssertionError("expected replay without client to fail")
+
+
+def test_v180_report_parsers_accept_history_census_and_unread_scopes():
+    parser = cli.build_parser()
+
+    census = parser.parse_args(["analyze", "--census", "--history"])
+    unread = parser.parse_args(["unread-words", "--all", "--limit", "25"])
+
+    assert census.input_dir is None
+    assert census.census is True
+    assert census.history is True
+    assert unread.all_users is True
+    assert unread.limit == 25
+
+
+def test_v180_history_census_has_thumbnail_references_without_scores():
+    summary = cli._motif_census_from_history([
+        {
+            "id": "history-1",
+            "input": "赤い円",
+            "score": {
+                "instructions": [
+                    {"primitive": "circle", "color": "red", "center": [0.5, 0.5], "radius": 0.2}
+                ]
+            },
+        }
+    ], base_url="http://example.test")
+
+    assert summary["history_count"] == 1
+    assert summary["motifs"][0]["frequency"] == 1
+    example = summary["motifs"][0]["thumbnail_examples"][0]
+    assert example["history_id"] == "history-1"
+    assert example["thumbnail_url"] == "http://example.test/api/history/history-1/svg"
+    assert "score" not in example
+
+
+def test_v180_http_502_cost_ledger_counts_existing_failures():
+    failures = [
+        {"message": "HTTP 502: upstream failed"},
+        {"message": "final retry failed: HTTP 502: upstream failed"},
+        {"message": "HTTP 422: invalid"},
+    ]
+
+    assert cli._http_502_count(failures) == 2

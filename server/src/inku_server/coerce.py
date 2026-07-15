@@ -3934,56 +3934,170 @@ def _coerce_instruction(ins: Instruction) -> Instruction:
     return Instruction.model_validate(data)
 
 
+def _record_branch_fire(
+    report: dict[str, int] | None,
+    name: str,
+    before: list[Instruction],
+    after: list[Instruction],
+) -> None:
+    if report is None:
+        return
+    report.setdefault(name, 0)
+    changed = abs(len(before) - len(after))
+    changed += sum(
+        first.model_dump(by_alias=True) != second.model_dump(by_alias=True)
+        for first, second in zip(before, after)
+    )
+    if changed:
+        report[name] += changed
+
+
+def _record_value_branch_fire(
+    report: dict[str, int] | None,
+    name: str,
+    before: object,
+    after: object,
+) -> None:
+    if report is None:
+        return
+    report.setdefault(name, 0)
+    if before != after:
+        report[name] += 1
+
+
 def _style_coerce_disabled() -> bool:
     return os.getenv("INKU_COERCE_DISABLE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def coerce_score(score: Score, *, ddl: str | None = None) -> Score:
+def coerce_score(score: Score, *, ddl: str | None = None, branch_report: dict[str, int] | None = None) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。"""
     if _style_coerce_disabled():
+        _branch_before = score.instructions
         instructions = [_coerce_instruction(ins) for ins in score.instructions]
+        _record_branch_fire(branch_report, "coerce_instruction", _branch_before, instructions)
+        _branch_before = instructions
         instructions = _without_spontaneous_grid(instructions, ddl=ddl)
+        _record_branch_fire(branch_report, "without_spontaneous_grid", _branch_before, instructions)
+        _branch_before = instructions
         instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
+        _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)
+        _branch_before = instructions
         instructions = _drop_invalid_relations(instructions)
+        _record_branch_fire(branch_report, "drop_invalid_relations", _branch_before, instructions)
         data = score.model_dump(by_alias=True)
         data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
         return Score.model_validate(data)
-    background = _with_background_dominance_governor(_visible_background(score.background), ddl=ddl)
+    visible_background = _visible_background(score.background)
+    background = _with_background_dominance_governor(visible_background, ddl=ddl)
+    _record_value_branch_fire(
+        branch_report,
+        "with_background_dominance_governor",
+        visible_background,
+        background,
+    )
+    _branch_before = score.instructions
     instructions = [
         _coerce_and_repair_instruction(ins, original_background=score.background, background=background, ddl=ddl)
         for ins in score.instructions
     ]
+    _record_branch_fire(branch_report, "coerce_and_repair_instruction", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _without_spontaneous_grid(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "without_spontaneous_grid", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _dedupe_instructions(instructions)
+    _record_branch_fire(branch_report, "dedupe_instructions", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_ddl_coverage", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_primary_color_delivery(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_primary_color_delivery", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_color_delivery_repair(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_color_delivery_repair", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_shape_delivery_repair", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_complex_motif_repair(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_complex_motif_repair", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_composition_diversity_repair(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_composition_diversity_repair", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_structural_duplicate_repair(instructions)
+    _record_branch_fire(branch_report, "with_structural_duplicate_repair", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_context_energy_repair(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_context_energy_repair", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_surface_tension(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_surface_tension", _branch_before, instructions)
     effective_presence = score.presence or _presence_from_ddl(ddl)
+    _record_value_branch_fire(
+        branch_report,
+        "presence_from_ddl",
+        score.presence,
+        effective_presence,
+    )
+    _branch_before = instructions
     instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
+    _record_branch_fire(branch_report, "with_presence_auxiliary_shape_repair", _branch_before, instructions)
+    _branch_before = instructions
     instructions = [_with_unintentional_filled_shape_tempering(ins, ddl=ddl) for ins in instructions]
+    _record_branch_fire(branch_report, "with_unintentional_filled_shape_tempering", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_context_density_governor", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_motion_energy(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_motion_energy", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_motion_floor(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_motion_floor", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_rhythm_variation(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_rhythm_variation", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_repetition_event_variation(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_repetition_event_variation", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_visual_event(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_visual_event", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_crescent_sensory_suppression(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_crescent_sensory_suppression", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_ma_pressure(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_ma_pressure", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_semantic_visual_event_hints(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_semantic_visual_event_hints", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_visual_event_type_hints(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_visual_event_type_hints", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_existing_event_counterweight(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_existing_event_counterweight", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_focal_event_floor(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_focal_event_floor", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_per_instruction_density_budget(instructions)
+    _record_branch_fire(branch_report, "with_per_instruction_density_budget", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_total_density_budget(instructions)
+    _record_branch_fire(branch_report, "with_total_density_budget", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_explicit_constraint_enforcement", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)
+    _branch_before = instructions
     instructions = _drop_invalid_relations(instructions)
+    _record_branch_fire(branch_report, "drop_invalid_relations", _branch_before, instructions)
     data = score.model_dump(by_alias=True)
     data["background"] = background
     if score.presence is None and effective_presence is not None:

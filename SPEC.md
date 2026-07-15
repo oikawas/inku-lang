@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.75**
+**Version: v1.80**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -392,8 +392,10 @@ files, PNG files, and other artifacts are derived outputs.
 
 ## 7. Canvas Model
 
-Coordinates remain normalized from `0.0` to `1.0`.  Canvas aspect changes do not
-change DDL coordinates.
+Coordinates remain normalized from `0.0` to `1.0`. Canvas aspect changes do not
+change DDL coordinates. Changing the aspect clears the rendered display and shows
+a placeholder for the new aspect, but retains the displayed work as lineage context.
+The next saved work is recorded as its child with `canvas_aspect_change`.
 
 The built-in `canvas-aspect` plugin currently supports:
 
@@ -456,9 +458,9 @@ The writing surface carries only a non-blocking length hint. Japanese input uses
 
 ## 9. Web Application
 
-The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab lets the writer select touch, layout, and reading changes. Reading includes both layout and touch: selecting it marks all three as selected, and clearing it clears all three. One or four candidates use the same selection-and-save workflow and are displayed in a two-column grid. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. The caption visibility choice is persisted per user. Previous/next navigation preserves the Refine or Compare tab and changes only its target work.
+The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, and color-catalog changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid. Saving selected refinement candidates keeps them in ordinary history without automatically starring them. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
-The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives in the Canvas-side `Compare` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
+The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
 
 Major UI areas:
 
@@ -943,7 +945,7 @@ measured card height to reduce unused space at the bottom of the dialog.
 The thumbnail action row places the star at the lower left, shows hash labels
 without `#`, and aligns hash button typography with the delete action.
 Starred thumbnails keep an explicit highlighted star state in dark mode.
-The thumbnail hover tooltip includes a larger image preview above the metadata.
+History-manager thumbnails do not open an enlarged hover preview, keeping the grid and selection interaction stable.
 The history manager header is compressed into two rows: title/view/count/pager
 on the first row and selection/filter/search controls on the second row.
 When thumbnail page size is recalculated from measured card dimensions, the
@@ -1233,6 +1235,45 @@ Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics ou
 
 ---
 
+## 15.8 Accounting for Refinement
+
+inku treats convergence caused by accumulated quality repairs as part of its implementation history. Countermeasures belong only in human-facing mirrors, explicit user actions, and development practice; they must not become automatic control in the default generation path.
+
+- Every minor release records at least one branch, word, component, or rule it removed, or explicitly says that nothing could be removed. This is an account, not a deletion KPI.
+- Every release records what it made less likely, so the cost of refinement remains visible.
+- Release review places the new JP30/EN30 contact sheets beside the preceding two releases and records any newly increased repetition together with the motif-census delta. Finding no increase is also recorded.
+- Similarity features, motif frequency, vision observations, and coerce firing rates are audit mirrors only. They are never generation inputs, suppression controls, acceptance gates, or optimization objectives.
+
+v1.80 adds a deterministic Score-derived composition mirror shared by server and CLI, three unranked nearby history thumbnails, similarity ordering for contact sheets, a mechanical motif census over artifact sets or the current user's history, explicit renderer-only `seed_text`, a private unread-word ledger with `unread-words` and admin-only `unread-words --all` reporting, per-branch coerce observation, and an on-demand NIM vision review. Similarity never implies lineage: lineage remains the record of explicit creative causation. When drawing continues from an unsaved refinement candidate, that candidate is automatically materialized as the direct `lineage_only` ancestor without entering regular history; it can later be promoted explicitly from the lineage view.
+
+The Canvas UI separates artwork facts from pending generation settings. The top row labels the models, color catalog, canvas, and creation time actually used by the displayed artwork as `Displayed`; the bottom status bar labels the currently selected models, color catalog, and canvas for the next run as `Next generation`. When Stage 1 and Stage 2 use the same model, the UI combines them as `Interpretation / rendering`. The generation-information inspector has `Details`, `Prompts`, and `JSON` views. Details contains the two stage models, color catalog, canvas, render/layout/interpretation seeds, render and description hashes, render engine and version, build, elapsed time, and input/output token counts. In the Prompts view, the initial heights of Stage 1 user input and Stage 2 system prompt are reduced by half without changing their content; Stage 1 system prompt and Stage 2 user input retain their existing heights.
+
+Refinement account for v1.80: the proposed automatic statistics-to-generation “unexplored” path was removed from this release, and vision review remains manual rather than release-automatic. Existing default-path repair branches could not yet be removed. The release makes unnoticed self-repetition, unrecorded external performance seeds, and privacy-losing unread-word aggregation less likely; it deliberately does not make dissimilarity a goal.
+
+Build 545 reorganizes the Canvas artwork facts and next-generation settings into separate groups and consolidates generation metadata into the Details / Prompts / JSON inspector. It changes only the visible height, not the content, of the Stage 1 user input and Stage 2 system prompt fields.
+
+Build 546 moves the former top-level Compare tab into Refine and presents Adjust and Model comparison as sibling subviews. Switching subviews preserves their candidates and comparison results; changing the target artwork clears stale comparison results.
+
+Build 547 adds a `First` button to the right of `Next` in History Manager. It jumps directly to the oldest page containing the earliest saved artwork and is disabled while loading or already on that page.
+
+Build 548 fixes a History Manager page-size boundary where wrapper padding was counted as usable thumbnail space, making the calculated column count one larger than the actual CSS Grid. Columns now use the Grid's rendered width and rows use the wrapper height minus vertical padding, so only fully visible rows are fetched.
+
+Build 549 aligns History Manager's bulk delete action with the lineage view: both use the same trash icon followed by the selected count. The action is disabled with no selection, while its name remains available through the tooltip and aria-label.
+
+Build 550 stops using the fixed model catalog for Demo prompt generation. Its provider and model dropdowns now follow the configured, enabled list returned by `/api/models`; empty providers are omitted, a disabled saved choice is replaced and persisted with the first enabled model, and Demo start is disabled when no enabled model exists.
+
+Build 551 fixes Demo random color catalogs updating only the paint request while leaving the visible catalog selection unchanged. Each draw now updates the UI selection, avoids the immediately previous catalog when at least two choices exist, and reconciles the selection with the catalog ID actually reported by the response.
+
+Build 552 moves the authoritative Demo catalog draw into `/api/paint` after an observed run still rendered with `Ink & Season`. The backward-compatible `random_color_catalog` flag makes the server exclude the submitted current catalog ID, choose another catalog, and carry that one ID through render metadata, the color map, Renderer, history, and response. Demo updates its UI from the returned effective ID; ordinary paint requests keep their explicit catalog behavior.
+
+Build 553 makes refinement a radio-style single intervention so every lineage edge corresponds to one kind of change, and adds color catalog as the fourth kind. Color candidates use a metadata-bearing rerender that fixes the parent's DDL, Score, seeds, and canvas, while `catalog_change` records before/after IDs. Touch, layout, and reading candidates now also inherit the displayed parent's effective catalog and canvas.
+
+Build 554 fixes stale candidates from the previous source work remaining after a saved candidate or another work becomes the explicit refinement target. History, lineage, nearby-work and previous/next selection, new generation, and DDL rendering now reset candidate and progress state, while switching Refine subviews preserves it.
+
+Build 555 unifies reset of target-owned transient UI state, including model-comparison results, reading diffs, replay errors, intermediate-lineage notices, and lineage fetch state. Model comparison uses request abortion plus a run ID, lineage fetching uses a latest-request ID, and comparison/refinement saves and replay rendering verify the target generation so delayed responses from an old work cannot populate the current one.
+
+Build 556 fixes the stacking order that placed the lineage overview above its delete confirmation, making the trash action appear unresponsive. Confirmation dialogs now occupy the top interaction layer above full-screen overlays, so deletion can be confirmed or cancelled without closing the overview.
+
 ## 16. Licensing
 
 The intended license direction is:
@@ -1303,3 +1344,21 @@ When updating the specification:
 - Grid performance layers seeded cell jitter, distinct per-element variation phase, and material-specific weight behavior while preserving bit-identical replay for the same Score and seed. Coerce does not add fade, clustering, preserved space, or count reduction to grid. Build 515 limits English literal markers to tile/tiled/tiling and adds a drop-only boundary so a motif label containing grid alone cannot create a spontaneous grid.
 - Added matched Japanese and English Stage 1 / Stage 2 rules and wallpaper, four-direction, and square-grid examples. Four directions remain a maximum of four overlaid instructions; no new primitive was introduced.
 - Build 515.
+
+
+### v1.76 — Artwork lineage (2026-07-14)
+
+- Added `dh1:<sha256>` as description identity over NFC-normalized text with LF line endings and trimmed outer whitespace. Batch labels such as `#1` are presentation metadata and do not affect `dh1`. Description identity, the existing `rh2` edition identity, history IDs, and lineage node IDs remain separate concepts.
+- Added independent lineage nodes and edges. Parentage is recorded only by explicit touch, layout, interpretation, model, DDL-edit, description-edit, replay, or canvas-aspect-change operations; it is never inferred from hashes, timestamps, or visual similarity. Existing history rows are backfilled as separate roots.
+- When generation, DDL drawing, or further refinement continues from an unsaved refinement candidate, only that direct ancestor is automatically retained as an intermediate `lineage_only` work. The Canvas labels the preview as unsaved and reports that automatic intermediate retention is hidden from regular history. If retention fails, drawing does not silently continue as a new root. Intermediate cards are labeled as hidden from history; they do not affect regular history counts or starred views, and the user can promote the same node and edges with “Save to regular history” from the lineage view.
+- Added a focused Canvas lineage view showing nearby generations as artwork thumbnails with arrows between parent and child cards and labels for the operation that produced each child. Opening a card changes both the displayed artwork and the parent for the next refinement. Card checkboxes support confirmation-gated bulk moves to trash. Trash preserves lineage; permanent deletion removes content and hashes while leaving a content-free tombstone to preserve the path.
+- Users can explicitly start a new root. Ordinary DRAW actions are not automatically attached to the latest history item.
+- Lineage depth and branching are not quality scores, achievements, or generation controls. The graph records the creative process; it does not choose a best branch.
+- History-manager artwork selection uses a compact, dedicated check control independent from opening an artwork, with exactly one state change per activation. Thumbnails do not show enlarged hover previews.
+- Stars toggle immediately without a confirmation dialog. Artwork comments are stored independently from star state and are edited in lineage-card details; removing a star does not erase an existing comment.
+- Works generated in Refine's Model comparison subview use the same circular image-corner `+` adoption control as Adjust candidates and show `✓` after being saved to history. Starring remains independent from adoption.
+- The displayed artwork and the bottom-history current marker stay synchronized by history ID. Opening an off-page work from lineage, History Manager, or replay uses `anchor_id` to load the page containing that work. Background Compare/Refine saves do not steal the marker, and unsaved candidate previews do not leave a different history work marked current.
+- While History Manager is open, external-history polling does not replace its items or page size. Thumbnail action areas use a uniform height, and the page row count is calculated once from the maximum measured card height, preventing clipped final rows and the refresh loop that replaced roughly 90 items with the bottom strip's smaller item count.
+- Build 525.
+
+**v1.76 closure (2026-07-15):** Build 525 is the accepted v1.76 release. Successive real-browser reviews confirmed that any lineage work can become the next derivation source, parent-child paths remain traceable through generation arrows, the displayed work stays synchronized with bottom history, and History Manager selection, bulk deletion, and page sizing remain stable. Feedback was incorporated across Builds 518–525. Subsequent work, beginning with v1.80, uses this lineage contract and the separation of the four identities as its foundation.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import io
 import getpass
 import hashlib
@@ -23,6 +24,12 @@ from importlib.metadata import PackageNotFoundError, version
 from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Any, TypeVar
+
+from inku_analysis import (
+    composition_distance as _composition_distance,
+    composition_family as _composition_family_from_score,
+    motif_signatures as _motif_signatures,
+)
 
 SESSION_COOKIE_NAME = "inku_session"
 DEFAULT_BASE_URL = "http://127.0.0.1:8100"
@@ -80,13 +87,11 @@ COLOR_MARKERS: dict[str, tuple[str, ...]] = {
     "gray": ("gray", "grey", "silver", "ash", "stone", "灰", "銀", "石", "埃"),
 }
 
-
 def _marker_in_text(marker: str, text: str, lower: str) -> bool:
     marker_lower = marker.lower()
     if marker.isascii() and any(ch.isalpha() for ch in marker):
         return re.search(rf"(?<![a-z]){re.escape(marker_lower)}(?![a-z])", lower) is not None
     return marker in text or marker_lower in lower
-
 
 def _canvas_aspect_ratio(canvas_aspect: str | None) -> float:
     return CANVAS_ASPECT_RATIOS.get(canvas_aspect or "square", CANVAS_ASPECT_RATIOS["square"])
@@ -114,10 +119,8 @@ SCORE_REPAIR_PART_MARKERS = (
 )
 T = TypeVar("T")
 
-
 class CliError(RuntimeError):
     """Expected command-line failure."""
-
 
 @dataclass(frozen=True)
 class CliConfig:
@@ -131,14 +134,12 @@ class CliConfig:
     timeout_seconds: int | None = None
     color_catalog: str | None = None
 
-
 def _config_path() -> Path:
     env_path = os.getenv("INKU_CLI_CONFIG")
     if env_path:
         return Path(env_path).expanduser()
     config_home = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config")).expanduser()
     return config_home / "inku-cli" / "config.json"
-
 
 def load_config(path: Path | None = None) -> CliConfig:
     path = path or _config_path()
@@ -166,7 +167,6 @@ def load_config(path: Path | None = None) -> CliConfig:
         color_catalog=raw.get("color_catalog") or None,
     )
 
-
 def save_config(config: CliConfig, path: Path | None = None) -> None:
     path = path or _config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -187,7 +187,6 @@ def save_config(config: CliConfig, path: Path | None = None) -> None:
     except OSError:
         pass
 
-
 def clear_config(path: Path | None = None) -> None:
     path = path or _config_path()
     try:
@@ -195,10 +194,8 @@ def clear_config(path: Path | None = None) -> None:
     except FileNotFoundError:
         pass
 
-
 def _join_url(base_url: str, path: str) -> str:
     return urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
-
 
 def _extract_session_token(set_cookie: str | None) -> str | None:
     if not set_cookie:
@@ -207,7 +204,6 @@ def _extract_session_token(set_cookie: str | None) -> str | None:
     cookie.load(set_cookie)
     morsel = cookie.get(SESSION_COOKIE_NAME)
     return morsel.value if morsel else None
-
 
 class ApiClient:
     def __init__(
@@ -299,13 +295,11 @@ class ApiClient:
         except urllib.error.URLError as exc:
             raise CliError(f"failed to connect to {self.base_url}: {exc.reason}") from exc
 
-
 def _cli_version() -> str:
     try:
         return version("inku-cli")
     except PackageNotFoundError:
         return "0.1.0"
-
 
 def _cli_build_number() -> str | None:
     for parent in Path(__file__).resolve().parents:
@@ -316,10 +310,8 @@ def _cli_build_number() -> str | None:
             continue
     return None
 
-
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
 
 def _render_hash_for_score(
     score: dict[str, Any],
@@ -343,7 +335,6 @@ def _render_hash_for_score(
     }
     return "rh2:" + hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
-
 def _render_color_map(catalog: dict[str, Any]) -> dict[str, str]:
     base = catalog.get("map")
     if not isinstance(base, dict):
@@ -355,7 +346,6 @@ def _render_color_map(catalog: dict[str, Any]) -> dict[str, str]:
             if isinstance(item, dict) and isinstance(item.get("name"), str) and isinstance(item.get("code"), str):
                 color_map[f"palette:{item['name']}"] = item["code"]
     return color_map
-
 
 def _fetch_color_catalogs(client: ApiClient) -> dict[str, Any]:
     data, _ = client.request("GET", "/api/color-catalogs", auth=False)
@@ -371,11 +361,9 @@ def _fetch_color_catalogs(client: ApiClient) -> dict[str, Any]:
         raise CliError("server color catalog list does not include default catalog")
     return {"default_catalog_id": default_id, "catalogs": by_id}
 
-
 def _catalog_choices(catalog_data: dict[str, Any]) -> tuple[str, ...]:
     catalogs = catalog_data.get("catalogs")
     return tuple(catalogs.keys()) if isinstance(catalogs, dict) else ()
-
 
 def _catalog_by_id(catalog_data: dict[str, Any], catalog_id: str) -> dict[str, Any]:
     catalogs = catalog_data.get("catalogs")
@@ -387,50 +375,39 @@ def _catalog_by_id(catalog_data: dict[str, Any], catalog_id: str) -> dict[str, A
         raise CliError(f"invalid color catalog from server: {catalog_id}")
     return catalog
 
-
 def _print_json(data: Any) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
-
 
 def _write_json_file(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-
 def _display_model(model: str | None) -> str:
     return model or SERVER_DEFAULT_MODEL_LABEL
-
 
 def _display_provider(provider: str | None) -> str:
     return provider or SERVER_DEFAULT_PROVIDER_LABEL
 
-
 def _resolved_stage1_provider(args: argparse.Namespace, config: CliConfig) -> str | None:
     return args.stage1_provider or config.stage1_provider
-
 
 def _resolved_stage2_provider(args: argparse.Namespace, config: CliConfig) -> str | None:
     return args.stage2_provider or config.stage2_provider
 
-
 def _resolved_stage1_model(args: argparse.Namespace, config: CliConfig) -> str | None:
     return args.stage1_model or config.stage1_model
-
 
 def _resolved_stage2_model(args: argparse.Namespace, config: CliConfig) -> str | None:
     return args.stage2_model or config.stage2_model
 
-
 def _resolved_timeout_seconds(args: argparse.Namespace, config: CliConfig) -> int:
     return args.timeout_seconds or config.timeout_seconds or DEFAULT_REQUEST_TIMEOUT_SECONDS
-
 
 def _resolved_color_catalog(args: argparse.Namespace, config: CliConfig, catalog_data: dict[str, Any]) -> str:
     requested = getattr(args, "color_catalog", None) or getattr(args, "catalog_id", None) or config.color_catalog
     catalog = requested or str(catalog_data.get("default_catalog_id") or DEFAULT_COLOR_CATALOG_ID)
     _catalog_by_id(catalog_data, catalog)
     return catalog
-
 
 def _color_catalog_summary(catalog_id: str, catalog_data: dict[str, Any]) -> dict[str, Any]:
     catalog = _catalog_by_id(catalog_data, catalog_id)
@@ -441,7 +418,6 @@ def _color_catalog_summary(catalog_id: str, catalog_data: dict[str, Any]) -> dic
         "color_catalog_name": catalog.get("name"),
         "color_map": dict(color_map),
     }
-
 
 def _render_response_summary(result: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -458,8 +434,8 @@ def _render_response_summary(result: dict[str, Any]) -> dict[str, Any]:
         "coerce_relation_dropped_count": result.get("coerce_relation_dropped_count"),
         "coerce_relation_drop_rate": result.get("coerce_relation_drop_rate"),
         "coerce_warnings": result.get("coerce_warnings") or [],
+        "coerce_branch_counts": result.get("coerce_branch_counts") or {},
     }
-
 
 def _model_summary(
     stage1_model: str | None,
@@ -479,7 +455,6 @@ def _model_summary(
         "stage2_model_display": _display_model(stage2_model),
     }
 
-
 def _print_model_summary(
     stage1_model: str | None,
     stage2_model: str | None,
@@ -492,11 +467,9 @@ def _print_model_summary(
     print(f"Stage2 provider: {_display_provider(stage2_provider)}", file=sys.stderr)
     print(f"Stage2 model: {_display_model(stage2_model)}", file=sys.stderr)
 
-
 def _print_color_catalog_summary(catalog_id: str, catalog_data: dict[str, Any]) -> None:
     catalog = _catalog_by_id(catalog_data, catalog_id)
     print(f"Color catalog: {catalog['id']} ({catalog.get('name') or catalog['id']})", file=sys.stderr)
-
 
 def _run_with_progress(
     label: str,
@@ -532,7 +505,6 @@ def _run_with_progress(
         raise errors[0]
     return result[0]
 
-
 def _read_text_argument(text: str | None, file_path: str | None) -> str:
     if file_path:
         if file_path == "-":
@@ -541,7 +513,6 @@ def _read_text_argument(text: str | None, file_path: str | None) -> str:
     if text:
         return text.strip()
     raise CliError("text is required")
-
 
 def _write_paint_outputs(
     result: dict[str, Any],
@@ -570,7 +541,6 @@ def _write_paint_outputs(
         paths["png"] = str(png_path)
     return paths
 
-
 def _result_with_svg_profile(
     client: ApiClient,
     result: dict[str, Any],
@@ -593,7 +563,6 @@ def _result_with_svg_profile(
         },
     )
     return output
-
 
 def _review_sets(results: list[dict[str, Any]], *, slow_ms: int = 100_000) -> dict[str, list[int]]:
     fallback: list[int] = []
@@ -618,7 +587,6 @@ def _review_sets(results: list[dict[str, Any]], *, slow_ms: int = 100_000) -> di
         "normal_samples": normal,
     }
 
-
 def _server_timeout_reasons(result: dict[str, Any]) -> list[str]:
     reasons: list[str] = []
     for key in ("interpret_fallback_reasons", "compose_retry_reasons"):
@@ -630,14 +598,28 @@ def _server_timeout_reasons(result: dict[str, Any]) -> list[str]:
                 reasons.append(value)
     return reasons
 
-
-def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thumb_size: int) -> None:
+def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thumb_size: int, order: str = "name") -> None:
     try:
         from PIL import Image, ImageDraw
     except ImportError as exc:
         raise CliError("contact-sheet requires Pillow") from exc
 
     pngs = sorted(path for path in input_dir.glob("*.png") if path.name != output_path.name)
+    if order == "similarity":
+        artifact_scores = {Path(item["path"]).stem: item["score"] for item in _iter_score_artifacts(input_dir)}
+        remaining = list(pngs)
+        ordered: list[Path] = []
+        if remaining:
+            ordered.append(remaining.pop(0))
+        while remaining:
+            previous = artifact_scores.get(ordered[-1].stem, {})
+            next_path = min(
+                remaining,
+                key=lambda candidate: (_composition_distance(previous, artifact_scores.get(candidate.stem, {})), candidate.name),
+            )
+            remaining.remove(next_path)
+            ordered.append(next_path)
+        pngs = ordered
     if not pngs:
         raise CliError(f"no PNG files found in {input_dir}")
 
@@ -651,22 +633,20 @@ def _make_contact_sheet(input_dir: Path, output_path: Path, *, columns: int, thu
     sheet = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(sheet)
 
-    for index, path in enumerate(pngs):
+    for index, image_path in enumerate(pngs):
         row, col = divmod(index, columns)
         x = gap + col * (thumb_size + gap)
         y = gap + row * (thumb_size + label_h + gap)
-        with Image.open(path) as image:
+        with Image.open(image_path) as image:
             image = image.convert("RGB")
             image.thumbnail((thumb_size, thumb_size))
             px = x + (thumb_size - image.width) // 2
             py = y + (thumb_size - image.height) // 2
             sheet.paste(image, (px, py))
-        draw.text((x, y + thumb_size + 4), path.stem, fill=(40, 40, 40))
+        draw.text((x, y + thumb_size + 4), image_path.stem, fill=(40, 40, 40))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(output_path)
-
-
 
 def _png_occupancy_grid(path: Path, *, cells: int = 16) -> list[float]:
     try:
@@ -677,8 +657,6 @@ def _png_occupancy_grid(path: Path, *, cells: int = 16) -> list[float]:
         image = image.convert("L").resize((cells, cells))
         pixels = list(image.getdata())
     return [1.0 - (float(pixel) / 255.0) for pixel in pixels]
-
-
 
 def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
     try:
@@ -704,7 +682,6 @@ def _cosine_distance(a: list[float], b: list[float]) -> float:
         return 1.0
     return max(0.0, min(1.0, 1.0 - dot / (na * nb)))
 
-
 def _mean_pair_distance(vectors: list[list[float]]) -> float | None:
     if len(vectors) < 2:
         return None
@@ -715,7 +692,6 @@ def _mean_pair_distance(vectors: list[list[float]]) -> float | None:
             total += _cosine_distance(first, second)
             count += 1
     return round(total / count, 6) if count else None
-
 
 def _entropy_bits(counter: Counter[str]) -> float:
     total = sum(counter.values())
@@ -729,7 +705,6 @@ def _entropy_bits(counter: Counter[str]) -> float:
         entropy -= p * math.log2(p)
     return entropy
 
-
 def _normalized_entropy(counter: Counter[str]) -> float | None:
     if not counter:
         return None
@@ -738,7 +713,6 @@ def _normalized_entropy(counter: Counter[str]) -> float | None:
         return 0.0
     return round(_entropy_bits(counter) / math.log2(k), 6)
 
-
 def _score_from_artifact(data: dict[str, Any]) -> dict[str, Any] | None:
     score = data.get("score") if isinstance(data, dict) else None
     if isinstance(score, dict):
@@ -746,7 +720,6 @@ def _score_from_artifact(data: dict[str, Any]) -> dict[str, Any] | None:
     if isinstance(data.get("instructions"), list):
         return data
     return None
-
 
 def _iter_score_artifacts(input_dir: Path) -> list[dict[str, Any]]:
     artifacts: list[dict[str, Any]] = []
@@ -764,7 +737,6 @@ def _iter_score_artifacts(input_dir: Path) -> list[dict[str, Any]]:
             continue
         artifacts.append({"path": str(path), "score": score, "artifact": data})
     return artifacts
-
 
 def _dominant_angle_bin(score: dict[str, Any]) -> int | None:
     bins: Counter[int] = Counter()
@@ -797,60 +769,152 @@ def _dominant_angle_bin(score: dict[str, Any]) -> int | None:
         return None
     return bins.most_common(1)[0][0]
 
+def _motif_census(input_dir: Path) -> dict[str, Any]:
+    counts: Counter[str] = Counter()
+    examples: dict[str, list[str]] = {}
+    for artifact in _iter_score_artifacts(input_dir):
+        stem = Path(artifact["path"]).stem
+        for signature in _motif_signatures(artifact["score"]):
+            counts[signature] += 1
+            examples.setdefault(signature, [])
+            png = input_dir / f"{stem}.png"
+            if png.exists() and len(examples[signature]) < 3:
+                examples[signature].append(str(png))
+    return {
+        "input_dir": str(input_dir),
+        "motifs": [{"signature": signature, "frequency": frequency, "thumbnail_examples": examples.get(signature, [])} for signature, frequency in counts.most_common()],
+        "note": "This census is a human mirror. It is not connected to generation or suppression.",
+    }
 
-def _composition_family_from_score(score: dict[str, Any]) -> str:
-    instructions = score.get("instructions")
-    if not isinstance(instructions, list):
-        return "unknown"
-    votes: Counter[str] = Counter()
-    centers: list[tuple[float, float]] = []
-    relations: Counter[str] = Counter()
-    for instruction in instructions:
-        if not isinstance(instruction, dict):
+def _motif_census_from_history(items: list[dict[str, Any]], *, base_url: str) -> dict[str, Any]:
+    counts: Counter[str] = Counter()
+    examples: dict[str, list[dict[str, Any]]] = {}
+    for item in items:
+        score = item.get("score")
+        if not isinstance(score, dict):
             continue
-        center = _instruction_center(instruction)
-        if center is not None:
-            centers.append(center)
-        relation = instruction.get("relation")
-        if isinstance(relation, dict) and isinstance(relation.get("type"), str):
-            relations[relation["type"]] += 1
-        arrangement = instruction.get("arrangement")
-        if isinstance(arrangement, dict):
-            path = arrangement.get("path")
-            layout = arrangement.get("layout")
-            if path == "diagonal":
-                votes["diagonal_band"] += 2
-            elif path == "right_half":
-                votes["one_sided_focus"] += 2
-            elif path == "top_to_bottom":
-                votes["vertical_rhythm"] += 2
-            elif path == "left_to_right":
-                votes["horizontal_strata"] += 2
-            elif path == "wave":
-                votes["dispersal"] += 1
-            if layout == "vertical":
-                votes["vertical_rhythm"] += 1
-            elif layout == "horizontal":
-                votes["horizontal_strata"] += 1
-            elif layout == "radial":
-                votes["radial_concentric"] += 2
-            elif layout == "scatter":
-                votes["dispersal"] += 1
-    if centers:
-        avg_x = sum(x for x, _ in centers) / len(centers)
-        avg_y = sum(y for _, y in centers) / len(centers)
-        if 0.42 <= avg_x <= 0.58 and 0.42 <= avg_y <= 0.58:
-            votes["central_stillness"] += 2
-        if avg_x < 0.25 or avg_x > 0.75 or avg_y < 0.25 or avg_y > 0.75:
-            votes["edge_retreat"] += 2
-        elif avg_x < 0.40 or avg_x > 0.60:
-            votes["one_sided_focus"] += 2
-    if votes:
-        return votes.most_common(1)[0][0]
-    if relations:
-        return f"relation_{relations.most_common(1)[0][0]}"
-    return "dispersal"
+        for signature in _motif_signatures(score):
+            counts[signature] += 1
+            examples.setdefault(signature, [])
+            item_id = str(item.get("id") or "")
+            if item_id and len(examples[signature]) < 3:
+                examples[signature].append({
+                    "history_id": item_id,
+                    "input": item.get("input"),
+                    "thumbnail_url": _join_url(base_url, f"/api/history/{item_id}/svg"),
+                })
+    return {
+        "source": "history",
+        "history_count": len(items),
+        "motifs": [
+            {
+                "signature": signature,
+                "frequency": frequency,
+                "thumbnail_examples": examples.get(signature, []),
+            }
+            for signature, frequency in counts.most_common()
+        ],
+        "note": "This census is a human mirror. It is not connected to generation or suppression.",
+    }
 
+def _nim_vision_chat(image_path: Path, prompt: str, *, api_key: str, model: str) -> str:
+    mime = "image/png" if image_path.suffix.lower() == ".png" else "image/jpeg"
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    body = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{encoded}"}},
+        ]}],
+        "temperature": 0.2,
+        "max_tokens": 300,
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        "https://integrate.api.nvidia.com/v1/chat/completions", data=body, method="POST",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=180) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise CliError(f"vision request failed: {exc}") from exc
+    return str(payload["choices"][0]["message"]["content"]).strip()
+
+def _ddl_relation_present(ddl: str) -> bool:
+    lower = ddl.lower()
+    return any(marker in lower for marker in ("前の", "直前", "沿って", "触れない", "切る", "between", "along", "not touching", "cutting"))
+
+def _ddl_unknown_terms(ddl: str) -> list[str]:
+    # A conservative lexical sensor: only report unknown ASCII terms. Japanese
+    # remains visible verbatim in the side-by-side table for human inspection.
+    allowed = {
+        "line", "lines", "circle", "circles", "ellipse", "ellipses", "triangle", "triangles",
+        "square", "squares", "polygon", "arc", "black", "white", "blue", "red", "green", "gray",
+        "thin", "thick", "small", "large", "horizontal", "vertical", "diagonal", "scatter", "grid",
+        "place", "draw", "arrange", "fill", "solid", "dashed", "dotted", "along", "between", "not",
+        "touching", "cutting", "top", "bottom", "left", "right", "center", "canvas", "with", "and",
+        "from", "to", "in", "on", "of", "the", "a", "an", "one", "two", "three", "four", "five",
+    }
+    tokens = re.findall(r"[a-z][a-z_-]+", ddl.lower())
+    return sorted({token for token in tokens if token not in allowed})
+
+def command_ddl_compare(args: argparse.Namespace) -> int:
+    directories = [Path(value) for value in args.input_dirs]
+    collections = []
+    for directory in directories:
+        artifacts = _iter_score_artifacts(directory)
+        by_key = {}
+        for artifact in artifacts:
+            payload = artifact["artifact"]
+            key = str(payload.get("line") or Path(artifact["path"]).stem)
+            by_key[key] = payload
+        collections.append(by_key)
+    keys = sorted(set().union(*(items.keys() for items in collections)))
+    rows = []
+    for key in keys:
+        variants = []
+        original = None
+        for directory, items in zip(directories, collections):
+            payload = items.get(key) or {}
+            ddl = str(payload.get("ddl") or "")
+            original = original or payload.get("text") or payload.get("input") or payload.get("original_text")
+            variants.append({
+                "artifact_set": str(directory), "ddl": ddl,
+                "saijiki_outside_ascii_terms": _ddl_unknown_terms(ddl),
+                "relation_phrase_present": _ddl_relation_present(ddl),
+            })
+        rows.append({"key": key, "input": original, "variants": variants})
+    report = {"artifact_sets": [str(item) for item in directories], "rows": rows, "note": "Side-by-side diagnostic only; no score or automatic winner."}
+    output = Path(args.output) if args.output else Path("ddl-comparison.json")
+    _write_json_file(output, report)
+    _print_json(report)
+    return 0
+
+def command_vision_review(args: argparse.Namespace) -> int:
+    input_dir = Path(args.input_dir)
+    api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("NVIDIA_NIM_API_KEY")
+    if not api_key:
+        raise CliError("NVIDIA_API_KEY is required for vision-review")
+    pngs = sorted(path for path in input_dir.glob("*.png") if path.name != "contact-sheet.png")
+    rows = []
+    artifacts = {Path(item["path"]).stem: item["artifact"] for item in _iter_score_artifacts(input_dir)}
+    for image_path in pngs:
+        artifact = artifacts.get(image_path.stem, {})
+        rows.append({
+            "image": str(image_path),
+            "original": artifact.get("text") or artifact.get("input") or artifact.get("original_text"),
+            "blind_back_translation_ja": _nim_vision_chat(image_path, "入力文を推測せず、この抽象画に実際に見えるものだけを日本語一文で記述してください。", api_key=api_key, model=args.model),
+            "blind_back_translation_en": _nim_vision_chat(image_path, "Describe only what is visibly present in this abstract image in one English sentence. Do not infer its prompt.", api_key=api_key, model=args.model),
+        })
+    sheet = input_dir / "contact-sheet.png"
+    step_back = None
+    if sheet.exists():
+        step_back = _nim_vision_chat(sheet, "番号付き作品のうち最も似て見える組を3組、番号で挙げ、共通して見える部品を言葉で記述してください。点数は付けないでください。", api_key=api_key, model=args.model)
+    summary = {"model": args.model, "role": "regression sensor and audit aid; never an acceptance gate or generation objective", "back_translations": rows, "tabletop_step_back": step_back}
+    output = Path(args.output) if args.output else input_dir / "vision-review-summary.json"
+    _write_json_file(output, summary)
+    print(str(output))
+    return 0
 
 def _diversity_summary(
     input_dir: Path,
@@ -977,13 +1041,11 @@ def _history_hash_label(item: dict[str, Any]) -> str:
     value = item.get("render_hash_short") or str(item.get("render_hash") or "")[-4:]
     return str(value).upper()
 
-
 def _history_hash_matches(item: dict[str, Any], ref: str) -> bool:
     needle = ref.strip().lower().removeprefix("#")
     render_hash = str(item.get("render_hash") or "").lower()
     short_hash = str(item.get("render_hash_short") or "").lower()
     return bool(needle) and (render_hash.endswith(needle) or short_hash == needle)
-
 
 def _resolve_history_hash(items: list[dict[str, Any]], ref: str) -> dict[str, Any]:
     matches = [item for item in items if _history_hash_matches(item, ref)]
@@ -996,7 +1058,6 @@ def _resolve_history_hash(items: list[dict[str, Any]], ref: str) -> dict[str, An
         )
         raise CliError(f"history hash is ambiguous: {ref}. candidates: {candidates}. Use more digits.")
     return matches[0]
-
 
 def _select_history_items(
     items: list[dict[str, Any]],
@@ -1030,7 +1091,6 @@ def _select_history_items(
         raise CliError("no history hashes were specified")
     return selected
 
-
 def _fetch_all_history(client: ApiClient, *, starred: bool = False, query: str | None = None) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     offset = 0
@@ -1051,7 +1111,6 @@ def _fetch_all_history(client: ApiClient, *, starred: bool = False, query: str |
             break
         offset += len(page)
     return items
-
 
 def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
@@ -1145,14 +1204,12 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
         "results": results,
     }
 
-
 def _clear_history_export_items_dir(item_dir: Path) -> None:
     if not item_dir.exists():
         return
     for path in item_dir.iterdir():
         if path.is_file() and path.suffix.lower() in {".json", ".svg", ".png"}:
             path.unlink()
-
 
 def _write_history_export(
     items: list[dict[str, Any]],
@@ -1202,7 +1259,6 @@ def _write_history_export(
     _write_json_file(summary_path, summary)
     return summary
 
-
 def _coord_pair(value: Any) -> tuple[float, float] | None:
     if not isinstance(value, (list, tuple)) or len(value) != 2:
         return None
@@ -1210,7 +1266,6 @@ def _coord_pair(value: Any) -> tuple[float, float] | None:
     if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
         return None
     return float(x), float(y)
-
 
 def _instruction_center(instruction: dict[str, Any]) -> tuple[float, float] | None:
     center = _coord_pair(instruction.get("center"))
@@ -1226,10 +1281,8 @@ def _instruction_center(instruction: dict[str, Any]) -> tuple[float, float] | No
         return (position[0] + size[0] / 2, position[1] + size[1] / 2)
     return None
 
-
 def _near_any(value: float, targets: tuple[float, ...], *, tolerance: float = 0.035) -> bool:
     return any(abs(value - target) <= tolerance for target in targets)
-
 
 def _math_balance_markers(instructions: list[dict[str, Any]]) -> dict[str, int]:
     centers: list[tuple[float, float]] = []
@@ -1274,7 +1327,6 @@ def _math_balance_markers(instructions: list[dict[str, Any]]) -> dict[str, int]:
         "rule_of_thirds_like_centers": rule_of_thirds_like_centers,
         "counterweight_like_opposite_placements": counterweight_like_opposite_placements,
     }
-
 
 def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, Any]]) -> dict[str, Any]:
     expanded_count = 0
@@ -1428,7 +1480,6 @@ def _score_quality_metrics(score: dict[str, Any], instructions: list[dict[str, A
         "fallback_quality": int(fallback_quality) if fallback_quality is not None else None,
     }
 
-
 def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(score, dict):
         return {}
@@ -1536,7 +1587,6 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         ]),
     }
 
-
 def _marker_colors(text: str | None) -> list[str]:
     if not text:
         return []
@@ -1548,7 +1598,6 @@ def _marker_colors(text: str | None) -> list[str]:
     ]
     return sorted(found)
 
-
 def _negated_marker_colors(text: str | None) -> list[str]:
     if not text:
         return []
@@ -1559,7 +1608,6 @@ def _negated_marker_colors(text: str | None) -> list[str]:
         if any(_marker_in_text(marker, text, lower) for marker in markers)
     ]
     return sorted(found)
-
 
 def _score_color_details(score: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(score, dict):
@@ -1592,7 +1640,6 @@ def _score_color_details(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_color_cycle_colors": dict(sorted(cycle_colors.items())),
         "score_color_hints": hints[:20],
     }
-
 
 def _color_trace(
     result: dict[str, Any],
@@ -1635,7 +1682,6 @@ def _color_trace(
         "warnings": warnings,
     }
 
-
 def _aggregate_color_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
     requested: Counter[str] = Counter()
     in_score: Counter[str] = Counter()
@@ -1666,7 +1712,6 @@ def _aggregate_color_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
         "green_delivery_rate": (green_in_score / green_requested) if green_requested else None,
     }
 
-
 def _aggregate_marker_lines(results: list[dict[str, Any]], key: str) -> dict[str, list[int]]:
     lines: dict[str, list[int]] = {}
     for result in results:
@@ -1680,7 +1725,6 @@ def _aggregate_marker_lines(results: list[dict[str, Any]], key: str) -> dict[str
             if isinstance(marker, str) and int(count or 0) > 0:
                 lines.setdefault(marker, []).append(line)
     return dict(sorted(lines.items()))
-
 
 def _aggregate_quality_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
     values: dict[str, list[int]] = {}
@@ -1719,7 +1763,6 @@ def _aggregate_quality_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
         "fallback_quality_samples": len(fallback_values),
     }
 
-
 def _paint_payload(
     args: argparse.Namespace,
     text: str,
@@ -1749,9 +1792,9 @@ def _paint_payload(
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
         "vary_seed": getattr(args, "vary_seed", None),
+        "seed_text": getattr(args, "seed_text", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
-
 
 def _compose_payload(
     args: argparse.Namespace,
@@ -1779,7 +1822,6 @@ def _compose_payload(
         "vary_seed": getattr(args, "vary_seed", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
-
 
 def _compose_response_as_paint_result(
     result: dict[str, Any],
@@ -1826,7 +1868,6 @@ def _compose_response_as_paint_result(
         "catalog_id": result.get("render_color_catalog_id"),
     }
 
-
 def _history_payload_from_result(
     args: argparse.Namespace,
     result: dict[str, Any],
@@ -1866,7 +1907,6 @@ def _history_payload_from_result(
         "count_generation": True,
     }
     return {k: v for k, v in payload.items() if v is not None}
-
 
 def _save_history_for_result(
     client: ApiClient,
@@ -1911,7 +1951,6 @@ def _save_history_for_result(
             updated[key] = item.get(key)
     return updated
 
-
 def command_login(args: argparse.Namespace) -> int:
     password = args.password or getpass.getpass("Password: ")
     existing = load_config()
@@ -1942,7 +1981,6 @@ def command_login(args: argparse.Namespace) -> int:
     print(f"logged in as {username}")
     return 0
 
-
 def command_logout(args: argparse.Namespace) -> int:
     config = load_config()
     if config.token:
@@ -1959,7 +1997,6 @@ def command_logout(args: argparse.Namespace) -> int:
     print("logged out")
     return 0
 
-
 def command_me(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -1970,7 +2007,6 @@ def command_me(args: argparse.Namespace) -> int:
     data, _ = client.request("GET", "/api/auth/me")
     _print_json(data)
     return 0
-
 
 def command_models(args: argparse.Namespace) -> int:
     config = load_config()
@@ -2015,7 +2051,6 @@ def command_models(args: argparse.Namespace) -> int:
     }
     _print_json(data)
     return 0
-
 
 def command_paint(args: argparse.Namespace) -> int:
     config = load_config()
@@ -2127,6 +2162,8 @@ def command_paint(args: argparse.Namespace) -> int:
         _print_json(summary)
     return 0
 
+def _http_502_count(failures: list[dict[str, Any]]) -> int:
+    return sum(str(item.get("message") or "").count("HTTP 502") for item in failures)
 
 def command_batch(args: argparse.Namespace) -> int:
     config = load_config()
@@ -2320,6 +2357,8 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_coerce_relation_input = 0
     aggregate_coerce_relation_output = 0
     aggregate_coerce_relation_dropped = 0
+    aggregate_coerce_branches: Counter[str] = Counter()
+    aggregate_coerce_branch_samples: Counter[str] = Counter()
     aggregate_clustered = 0
     aggregate_preserve_space = 0
     aggregate_color_cycle = 0
@@ -2344,6 +2383,12 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_coerce_relation_input += int(result.get("coerce_relation_input_count") or 0)
         aggregate_coerce_relation_output += int(result.get("coerce_relation_output_count") or 0)
         aggregate_coerce_relation_dropped += int(result.get("coerce_relation_dropped_count") or 0)
+        branch_counts = result.get("coerce_branch_counts") or {}
+        aggregate_coerce_branches.update(branch_counts)
+        for branch_name, branch_count in branch_counts.items():
+            aggregate_coerce_branch_samples.setdefault(branch_name, 0)
+            if int(branch_count or 0) > 0:
+                aggregate_coerce_branch_samples[branch_name] += 1
         aggregate_math_balance.update(result.get("math_balance_markers") or {})
         aggregate_clustered += int(result.get("score_clustered_arrangements") or 0)
         aggregate_preserve_space += int(result.get("score_preserve_space_count") or 0)
@@ -2382,6 +2427,7 @@ def command_batch(args: argparse.Namespace) -> int:
         "elapsed_total_ms": total_elapsed,
         "tokens_in": total_in or None,
         "tokens_out": total_out or None,
+        "http_502_count": _http_502_count(failures),
         "score_expanded_count": aggregate_expanded or None,
         "score_clustered_arrangements": aggregate_clustered,
         "score_preserve_space_count": aggregate_preserve_space,
@@ -2414,6 +2460,16 @@ def command_batch(args: argparse.Namespace) -> int:
             if aggregate_coerce_relation_input
             else None
         ),
+"coerce_branch_counts": dict(sorted(aggregate_coerce_branches.items())),
+"coerce_branch_sample_counts": dict(sorted(aggregate_coerce_branch_samples.items())),
+"coerce_branch_sample_rates": {
+    key: round(value / len(results), 6)
+    for key, value in sorted(aggregate_coerce_branch_samples.items())
+} if results else {},
+"coerce_removal_candidates": [
+    key for key in sorted(aggregate_coerce_branches)
+    if aggregate_coerce_branch_samples.get(key, 0) <= 1
+],
         "coerce_warning_lines": [
             int(result["line"])
             for result in results
@@ -2443,22 +2499,46 @@ def command_batch(args: argparse.Namespace) -> int:
     _print_json(summary)
     return 1 if failures else 0
 
-
 def command_contact_sheet(args: argparse.Namespace) -> int:
     input_dir = Path(args.input_dir)
     output_path = Path(args.output) if args.output else input_dir / "contact-sheet.png"
-    _make_contact_sheet(input_dir, output_path, columns=args.columns, thumb_size=args.thumb_size)
+    _make_contact_sheet(input_dir, output_path, columns=args.columns, thumb_size=args.thumb_size, order=args.order)
     print(str(output_path))
     return 0
 
-
-
 def command_analyze(args: argparse.Namespace) -> int:
+    if args.census and args.history:
+        if args.input_dir:
+            raise CliError("INPUT_DIR cannot be combined with --history")
+        config = load_config()
+        client = ApiClient(
+            args.base_url or config.base_url,
+            config.token,
+            timeout_seconds=_resolved_timeout_seconds(args, config),
+        )
+        summary = _motif_census_from_history(
+            _fetch_all_history(client),
+            base_url=client.base_url,
+        )
+        if args.output:
+            _write_json_file(Path(args.output), summary)
+        _print_json(summary)
+        return 0
+    if not args.input_dir:
+        raise CliError("INPUT_DIR is required unless --census --history is used")
     input_dir = Path(args.input_dir)
     if not input_dir.exists() or not input_dir.is_dir():
         raise CliError(f"input directory not found: {input_dir}")
+    if args.census:
+        summary = _motif_census(input_dir)
+        output_path = Path(args.output) if args.output else input_dir / "motif-census.json"
+        _write_json_file(output_path, summary)
+        _print_json(summary)
+        return 0
+    if args.history:
+        raise CliError("--history requires --census")
     if not args.diversity:
-        raise CliError("only --diversity analysis is currently supported")
+        raise CliError("choose --diversity or --census")
     config = load_config()
     client = None
     catalog_data = None
@@ -2484,7 +2564,6 @@ def command_analyze(args: argparse.Namespace) -> int:
     print(f"summary: {output_path}", file=sys.stderr)
     _print_json(summary)
     return 0
-
 
 def command_render_score(args: argparse.Namespace) -> int:
     config = load_config()
@@ -2545,7 +2624,6 @@ def command_render_score(args: argparse.Namespace) -> int:
     _print_json(result if args.full_json else {key: value for key, value in result.items() if key not in {"svg", "score"}})
     return 0
 
-
 def command_demo_instruction(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -2566,7 +2644,6 @@ def command_demo_instruction(args: argparse.Namespace) -> int:
     print(data["instruction"])
     return 0
 
-
 def command_history(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -2582,6 +2659,21 @@ def command_history(args: argparse.Namespace) -> int:
     _print_json(data)
     return 0
 
+def command_unread_words(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    path = "/api/admin/unread-words" if args.all_users else "/api/feedback/unread-words"
+    data, _ = client.request("GET", path, query={"limit": args.limit})
+    _print_json({
+        "scope": "all_users" if args.all_users else "current_user",
+        "words": data,
+        "note": "Candidate ledger only. Vocabulary promotion is decided by a human after bilingual review.",
+    })
+    return 0
 
 def command_history_export(args: argparse.Namespace) -> int:
     config = load_config()
@@ -2606,7 +2698,6 @@ def command_history_export(args: argparse.Namespace) -> int:
     _print_json(summary)
     return 0
 
-
 def command_version(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -2629,7 +2720,6 @@ def command_version(args: argparse.Namespace) -> int:
     })
     return 0
 
-
 def _add_common_server_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--base-url", default=None, help=f"inku API base URL (default: {DEFAULT_BASE_URL})")
     parser.add_argument(
@@ -2638,7 +2728,6 @@ def _add_common_server_args(parser: argparse.ArgumentParser) -> None:
         default=None,
         help=f"HTTP timeout in seconds (default: {DEFAULT_REQUEST_TIMEOUT_SECONDS})",
     )
-
 
 def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> None:
     _add_common_server_args(parser)
@@ -2668,6 +2757,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     parser.add_argument("--vary-seed", type=int, help="Stage 1.5 composition variation seed")
+    parser.add_argument("--seed-text", help="explicit text used only to derive the renderer performance seed")
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
     parser.add_argument("--ui-lang")
     parser.add_argument("--include-thinking", action="store_true")
@@ -2680,7 +2770,6 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         parser.add_argument("--vary", type=int, default=1, help="generate N Stage 1.5 variations per prompt")
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="inku-cli", description="Control an inku API server from the command line")
@@ -2722,12 +2811,15 @@ def build_parser() -> argparse.ArgumentParser:
     contact_sheet.add_argument("--output", "-o", help="output PNG path (default: INPUT_DIR/contact-sheet.png)")
     contact_sheet.add_argument("--columns", type=int, default=5)
     contact_sheet.add_argument("--thumb-size", type=int, default=220)
+    contact_sheet.add_argument("--order", choices=["name", "similarity"], default="name")
     contact_sheet.set_defaults(func=command_contact_sheet)
 
     analyze = subparsers.add_parser("analyze", help="analyze generated PNG/JSON outputs")
     _add_common_server_args(analyze)
-    analyze.add_argument("input_dir", help="directory containing PNG and JSON outputs")
+    analyze.add_argument("input_dir", nargs="?", help="directory containing PNG and JSON outputs")
     analyze.add_argument("--diversity", action="store_true", help="compute diversity metrics and write diversity-summary.json")
+    analyze.add_argument("--census", action="store_true", help="report frequent mechanical motif signatures with thumbnail examples")
+    analyze.add_argument("--history", action="store_true", help="run --census over the current user history instead of a directory")
     analyze.add_argument("--output", "-o", help="summary JSON path (default: INPUT_DIR/diversity-summary.json)")
     analyze.add_argument("--replay", type=int, default=0, help="render each sampled score N times and compute replay divergence")
     analyze.add_argument("--replay-limit", type=int, default=5, help="maximum score artifacts to replay")
@@ -2735,6 +2827,17 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     analyze.add_argument("--color-catalog", help="server color catalog id for replay rendering")
     analyze.set_defaults(func=command_analyze)
+
+    ddl_compare = subparsers.add_parser("ddl-compare", help="compare normalized DDL artifacts side by side")
+    ddl_compare.add_argument("input_dirs", nargs="+", help="two or more artifact directories")
+    ddl_compare.add_argument("--output", "-o")
+    ddl_compare.set_defaults(func=command_ddl_compare)
+
+    vision_review = subparsers.add_parser("vision-review", help="use the configured NIM vision model as a read-only visual mirror")
+    vision_review.add_argument("input_dir")
+    vision_review.add_argument("--model", default="meta/llama-3.2-90b-vision-instruct")
+    vision_review.add_argument("--output", "-o")
+    vision_review.set_defaults(func=command_vision_review)
 
     render_score = subparsers.add_parser("render-score", help="render a Score JSON object without Stage 1 or Stage 2")
     _add_common_server_args(render_score)
@@ -2768,6 +2871,12 @@ def build_parser() -> argparse.ArgumentParser:
     history.add_argument("--starred", action="store_true")
     history.set_defaults(func=command_history)
 
+    unread_words = subparsers.add_parser("unread-words", help="report words the interpreter could not confidently read")
+    _add_common_server_args(unread_words)
+    unread_words.add_argument("--all", dest="all_users", action="store_true", help="admin-only aggregate across users")
+    unread_words.add_argument("--limit", type=int, default=100)
+    unread_words.set_defaults(func=command_unread_words)
+
     history_export = subparsers.add_parser("history-export", help="export history items by hash for benchmark review")
     _add_common_server_args(history_export)
     history_export.add_argument("hashes", nargs="*", help="individual 4+ character history hash suffixes")
@@ -2786,7 +2895,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -2795,7 +2903,6 @@ def main(argv: list[str] | None = None) -> int:
     except CliError as exc:
         print(f"inku-cli: {exc}", file=sys.stderr)
         return 2
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

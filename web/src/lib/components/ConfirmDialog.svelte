@@ -38,7 +38,7 @@ type ConfirmAction = {
 
 <style>
 	.confirm-layer {
-		position: fixed; inset: 0; z-index: 600;
+		position: fixed; inset: 0; z-index: 5000;
 		display: flex; align-items: center; justify-content: center;
 	}
 	.confirm-backdrop {

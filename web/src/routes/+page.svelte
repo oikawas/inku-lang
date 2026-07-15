@@ -8,6 +8,7 @@
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
+	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
 	import DdlEditor from '$lib/components/DdlEditor.svelte';
@@ -59,7 +60,7 @@
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const INSTRUCTION_LANG_KEY = 'inku-instruction-lang';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.75';
+	const APP_VERSION = 'v1.80';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -96,6 +97,11 @@
 		ui_lang?: string | null;
 		history_id?: string | null;
 		history_at?: number | null;
+		description_hash?: string | null;
+		lineage_node_id?: string | null;
+		lineage_parent_node_id?: string | null;
+		derivation_kind?: DerivationKind | null;
+		derivation_metadata?: Record<string, unknown>;
 		elapsed_stage1_ms: number;
 		elapsed_stage2_ms: number;
 		elapsed_total_ms: number;
@@ -105,6 +111,8 @@
 		tokens_out_stage2: number | null;
 		user_generation_count?: number | null;
 	};
+	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
@@ -177,7 +185,7 @@
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'export' | 'misc' | 'server_misc' | 'logs';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs';
 	type UserModelSettings = {
 		stage1_provider: Provider;
 		stage1_model: string;
@@ -226,6 +234,7 @@
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
 	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
 	let input       = $state(DEFAULT_INPUT);
+	let seedText    = $state('');
 	let batchInput  = $state('');
 	let instructionLang = $state<InstructionLang>('auto');
 	let stage1UserPrompt = $state('');
@@ -326,6 +335,8 @@
 		tokensInStage2: number | null;
 		tokensOutStage2: number | null;
 		elapsedMs: number;
+		lineageParentNodeId?: string | null;
+		compareMode: ModelCompareMode;
 		savedHistoryId?: string | null;
 		starred?: boolean;
 		saving?: boolean;
@@ -334,6 +345,9 @@
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
+	let lineageIntermediateNotice = $state<string | null>(null);
+	let lineageIntermediateNoticeTimer: number | null = null;
+	let nearbyHistory = $state<Iteration[]>([]);
 	let variationGridBusy = $state(false);
 	let variationGridCanAbort = $state(false);
 	let variationGridIncludesReading = $state(false);
@@ -348,6 +362,9 @@
 	let modelInspectionResults = $state<ModelInspectionResult[]>([]);
 	let modelInspectionSelectedModels = $state<string[]>([]);
 	let modelInspectionFailedModels = $state<Record<string, string>>({});
+	let modelInspectionRunId = 0;
+	let targetContextVersion = 0;
+	let modelInspectionAbortController: AbortController | null = null;
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -365,10 +382,17 @@
 	let canvasAspectMenuOpen = $state(false);
 	let canvasAspectEnabled = $state(true);
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
+	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId } | null>(null);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
 	let instructionCaptionVisible = $state(true);
-	let outputTab    = $state<'canvas' | 'refine' | 'compare' | 'prompts' | 'score'>('canvas');
+	let outputTab    = $state<'canvas' | 'refine' | 'lineage'>('canvas');
+	let lineageGraph = $state<LineageGraph | null>(null);
+	let lineageLoading = $state(false);
+	let lineageError = $state<string | null>(null);
+	let lineageLoadedFocus = $state<string | null>(null);
+	let lineageRequestId = 0;
+	let lineageDetached = $state(false);
 	let zoom         = $state(1);
 	let canvasFitZoom = $state(1);
 	let panX         = $state(0);
@@ -523,6 +547,7 @@
 	let modelSettingsLoading = $state(false);
 	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
+	let availableModelsLoaded = $state(false);
 	let dbBackupStatus = $state<string | null>(null);
 	let outputSaveStatus = $state<string | null>(null);
 	let logRetentionStatus = $state<string | null>(null);
@@ -563,12 +588,43 @@
 		return fetch(path, { ...init, headers, credentials: 'same-origin' });
 	}
 
+	let nearbyHistoryRequestId = 0;
+	let nearbyHistoryLoadedId: string | null = null;
+
+	async function loadNearbyHistory(historyId: string | null | undefined) {
+		const normalizedHistoryId = historyId ?? null;
+		if (normalizedHistoryId === nearbyHistoryLoadedId) return;
+		nearbyHistoryLoadedId = normalizedHistoryId;
+		const requestId = ++nearbyHistoryRequestId;
+		nearbyHistory = [];
+		if (!historyId) return;
+		try {
+			const response = await apiFetch(`/api/history/${historyId}/neighbors`, { cache: 'no-store' });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			const items = await response.json();
+			if (requestId === nearbyHistoryRequestId) {
+				nearbyHistory = Array.isArray(items) ? items : [];
+			}
+		} catch {
+			if (requestId === nearbyHistoryRequestId) nearbyHistory = [];
+		}
+	}
+
 	function applyUserTheme(user: UserItem | null) {
 		darkMode = user?.ui_theme === 'dark';
 	}
 
 	function modelsFor(provider: Provider) {
 		return availableModelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
+	}
+
+	function reconcileDemoPromptModel() {
+		if (!availableModelsLoaded || !demoSettingsLoaded) return;
+		const configuredModels = availableModelCatalog.flatMap((group) => group.models);
+		if (configuredModels.some((model) => model.id === demoSettings.prompt_model)) return;
+		const fallbackModel = configuredModels[0]?.id;
+		if (!fallbackModel) return;
+		void saveDemoSettings({ ...demoSettings, prompt_model: fallbackModel });
 	}
 
 	function applyUserModelSettings(user: UserItem | null) {
@@ -595,7 +651,7 @@
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
-		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
+		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
 	}
 
 	function canAccessSettingsTab(tab: SettingsTab) {
@@ -707,8 +763,19 @@
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
 		if (currentUser?.role !== 'admin') return;
-		canvasAspectId = normalizeCanvasAspectId(id);
+		const nextAspectId = normalizeCanvasAspectId(id);
+		const currentAspectId = effectiveCanvasAspectId();
 		canvasAspectMenuOpen = false;
+		if (nextAspectId === currentAspectId) {
+			await saveCanvasAspectPluginValue();
+			return;
+		}
+		const existingPending = pendingCanvasAspectDerivation;
+		const parentNodeId = existingPending?.parentNodeId ?? await ensureVisibleLineageParentId();
+		pendingCanvasAspectDerivation = parentNodeId
+			? { parentNodeId, fromAspectId: existingPending?.fromAspectId ?? currentAspectId, toAspectId: nextAspectId }
+			: null;
+		canvasAspectId = nextAspectId;
 		result = null;
 		displayedHistoryItem = null;
 		historyCursor = -1;
@@ -729,6 +796,7 @@
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			demoSettings = normalizeDemoSettings(await r.json() as DemoSettings);
 			demoSettingsLoaded = true;
+			reconcileDemoPromptModel();
 		} catch (e) {
 			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 			demoSettingsLoaded = false;
@@ -1028,12 +1096,16 @@
 	}
 
 	async function loadAvailableModels() {
-		if (!currentUser) return;
+		if (!currentUser) {
+			availableModelsLoaded = false;
+			return;
+		}
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const data = await r.json() as { catalog: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
-			availableModelCatalog = data.catalog.length ? data.catalog : PROVIDER_GROUPS;
+			availableModelCatalog = data.catalog;
+			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
 				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
 			}
@@ -1043,6 +1115,7 @@
 			if (!modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
 				stage2Model = modelsFor(stage2Provider)[0]?.id ?? stage2Model;
 			}
+			reconcileDemoPromptModel();
 		} catch (e) {
 			console.warn('failed to load model catalog', e);
 		}
@@ -1890,6 +1963,11 @@
 	let historyOffset = $state(0);
 	let historyCursor = $state(-1);
 	let displayedHistoryItem = $state<Iteration | null>(null);
+	$effect(() => {
+		const historyId = displayedHistoryItem?.id ?? result?.history_id ?? null;
+		void loadNearbyHistory(historyId);
+	});
+	let historySelectionSyncRequest = 0;
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 	const historyWindowSize = $derived(visibleThumbCount);
 	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
@@ -1992,11 +2070,21 @@
 		saveArtifacts?: boolean;
 		countGeneration?: boolean;
 		catalogId?: string;
+		randomColorCatalog?: boolean;
 		canvasAspectId?: CanvasAspectId;
 		renderSeed?: number;
 		varySeed?: number;
 		interpretationSeed?: string;
+		seedText?: string;
 		signal?: AbortSignal;
+		sourceText?: string;
+		displayLabel?: string;
+		batchLineNumber?: number;
+		batchRunId?: string;
+		historyVisibility?: 'normal' | 'lineage_only';
+		lineageParentNodeId?: string | null;
+		derivationKind?: DerivationKind | null;
+		derivationMetadata?: Record<string, unknown>;
 	};
 
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
@@ -2024,12 +2112,22 @@
 				render_seed: options.renderSeed,
 				vary_seed: options.varySeed,
 				interpretation_seed: options.interpretationSeed,
+				seed_text: options.seedText ?? seedText,
 				auto_repair: ddlAutoRepairEnabled,
 				save_history: options.saveHistory ?? true,
 				save_artifacts: options.saveArtifacts ?? true,
 				count_generation: options.countGeneration ?? true,
 				history_input: historyInput,
-				catalog_id: options.catalogId ?? selectedCatalog
+				history_source_text: options.sourceText ?? text,
+				history_display_label: options.displayLabel ?? null,
+				batch_line_number: options.batchLineNumber ?? null,
+				batch_run_id: options.batchRunId ?? null,
+				history_visibility: options.historyVisibility ?? 'normal',
+				lineage_parent_node_id: options.lineageParentNodeId ?? null,
+				derivation_kind: options.derivationKind ?? null,
+				derivation_metadata: options.derivationMetadata ?? {},
+				catalog_id: options.catalogId ?? selectedCatalog,
+				random_color_catalog: options.randomColorCatalog ?? false
 			})
 		});
 		if (!r.ok) {
@@ -2038,6 +2136,17 @@
 		}
 		stageLabel = t().stageStructuring('');
 		const data = await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+		await loadNearbyHistory(data.history_id);
+const unreadWords = interpretationFeedback(text, data.ddl)
+	.filter((part) => part.tone === 'weak')
+	.flatMap((part) => part.text.match(/[一-龯々ぁ-んァ-ヶー]{2,}|[A-Za-z][A-Za-z'-]+/g) ?? []);
+if (unreadWords.length > 0) {
+	void apiFetch('/api/feedback/unread-words', {
+		method: 'POST', headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ words: unreadWords, context: text })
+	}).catch(() => undefined);
+}
+		if ((options.saveHistory ?? true) && data.lineage_node_id) lineageDetached = false;
 		if (currentUser && typeof data.user_generation_count === 'number') {
 			currentUser = { ...currentUser, image_generation_count: data.user_generation_count };
 		}
@@ -2170,10 +2279,11 @@
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
-	function randomColorCatalogId(): string {
+	function randomColorCatalogId(excludeId?: string): string {
 		const ids = colorCatalogs.map((catalog) => catalog.id).filter((id): id is string => !!id);
 		if (ids.length === 0) return selectedCatalog;
-		return ids[Math.floor(Math.random() * ids.length)] ?? selectedCatalog;
+		const candidates = ids.length > 1 && excludeId ? ids.filter((id) => id !== excludeId) : ids;
+		return candidates[Math.floor(Math.random() * candidates.length)] ?? selectedCatalog;
 	}
 
 	async function generateDemoInstruction(settings: DemoSettings): Promise<string> {
@@ -2210,15 +2320,20 @@
 				await saveDemoSettings(settings);
 				demoGeneratedPrompt = await generateDemoInstruction(settings);
 				if (demoRunId !== runId || !loading) break;
+				const demoCatalogId = selectedCatalog;
 				const r = await paintOne(demoGeneratedPrompt, {
 					saveHistory: settings.save_db,
 					saveArtifacts: settings.save_files,
 					countGeneration: false,
 					historyInput: `[demo] ${demoGeneratedPrompt}`,
-					catalogId: settings.random_color_catalog ? randomColorCatalogId() : selectedCatalog,
+					sourceText: demoGeneratedPrompt,
+					displayLabel: '[demo]',
+					catalogId: demoCatalogId,
+					randomColorCatalog: settings.random_color_catalog,
 				});
 				if (demoRunId !== runId || !loading) break;
 				demoGeneratedDdl = r.ddl;
+				if (settings.random_color_catalog && r.render_color_catalog_id) selectedCatalog = r.render_color_catalog_id;
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
 				ddl = r.ddl; ddlGeneratedBaseline = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
@@ -2312,14 +2427,31 @@
 
 	async function submit() {
 		if (!canSubmit || loading || variationGridBusy) return;
+		resetTargetScopedState();
+		try {
+			await ensureVisibleLineageParentId();
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : String(cause);
+			return;
+		}
 		const submittedMode = inputMode;
 		const abortController = new AbortController();
 		submitAbortController = abortController;
 		submitStopRequested = false;
+		const canvasAspectDerivation = submittedMode === 'single' ? pendingCanvasAspectDerivation : null;
+		const submitParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
+		const submitSource = displayedHistoryItem?.source_text ?? displayedHistoryItem?.input ?? input;
+		const submitDerivationKind: DerivationKind | null = canvasAspectDerivation
+			? 'canvas_aspect_change'
+			: submitParentNodeId ? (input.trim() === submitSource.trim() ? 'replay' : 'description_edit') : null;
+		const submitDerivationMetadata = canvasAspectDerivation
+			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
+			: {};
 		loading = true; error = null;
 		activeRunMode = submittedMode;
 		ddl = null; ddlGeneratedBaseline = null; thinking = null; ddlSelection = { start: 0, end: 0 };
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
@@ -2402,21 +2534,28 @@
 					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
 					catalog_id: selectedCatalog,
-				}, { countGeneration: true });
-				if (savedHistory && result === r) {
+				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind, derivationMetadata: submitDerivationMetadata });
+				if (savedHistory && submitAbortController === abortController && !submitStopRequested) {
+					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
+					lineageDetached = false;
+					displayedHistoryItem = savedHistory;
 					result = {
 						...r,
 						history_id: savedHistory.id,
 						history_at: savedHistory.at,
 						render_hash: savedHistory.render_hash,
 						render_hash_short: savedHistory.render_hash_short,
+						description_hash: savedHistory.description_hash,
+						lineage_node_id: savedHistory.lineage_node_id,
 					};
+					await loadNearbyHistory(savedHistory.id);
 				}
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
 				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 				const batchCanvasAspectId = effectiveCanvasAspectId();
 				const batchCatalogId = selectedCatalog;
+				const batchRunId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
 					.filter((item) => item.input);
@@ -2430,6 +2569,10 @@
 					try {
 						const r = await paintOne(lines[i].input, {
 							historyInput: `#${lines[i].line} ${lines[i].input}`,
+							sourceText: lines[i].input,
+							displayLabel: `#${lines[i].line}`,
+							batchLineNumber: lines[i].line,
+							batchRunId,
 							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : batchCatalogId,
 							canvasAspectId: batchCanvasAspectId,
 							signal: abortController.signal,
@@ -2509,11 +2652,27 @@
 	// ── Replay (Stage 2 のみ) ────────────────────────────────
 	async function replay() {
 		if (!ddl || reloading) return;
+		resetTargetScopedState();
+		try {
+			await ensureVisibleLineageParentId();
+		} catch (cause) {
+			reloadError = cause instanceof Error ? cause.message : String(cause);
+			return;
+		}
+		const canvasAspectDerivation = pendingCanvasAspectDerivation;
+		const replayParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
+		const replayKind: DerivationKind | null = canvasAspectDerivation
+			? 'canvas_aspect_change'
+			: replayParentNodeId ? (ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline ? 'ddl_edit' : 'replay') : null;
+		const replayDerivationMetadata = canvasAspectDerivation
+			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
+			: {};
 		const abortController = new AbortController();
 		replayAbortController = abortController;
 		replayStopRequested = false;
 		reloading = true; reloadError = null;
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		const uiLang = getLang();
 		const replayInput = input;
 		const startedAt = Date.now();
@@ -2611,8 +2770,11 @@
 					tokens_in: d.tokens_in,
 					tokens_out: d.tokens_out,
 					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
-				});
+				}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind, derivationMetadata: replayDerivationMetadata });
 				if (savedHistory && result) {
+					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
+					lineageDetached = false;
+					displayedHistoryItem = savedHistory;
 					result = {
 						...result,
 						history_id: savedHistory.id,
@@ -2662,56 +2824,93 @@
 		);
 	}
 
-	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean } = {}): Promise<void> {
+	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean; anchorId?: string } = {}): Promise<boolean> {
 		if (!authToken) {
 			historyItems = [];
 			historyTotal = 0;
 			historyOffset = 0;
-			return;
+			return false;
 		}
 		const safeOffset = Math.max(0, offset);
-		const selectedHistoryId = options.preserveSelection
-			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? null
-			: null;
+		const selectedHistoryId = options.anchorId ?? (options.preserveSelection
+			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? result?.history_id ?? null
+			: null);
 		try {
-			const listLimit = safeOffset === 0 && !historyStarredOnly
-				? estimatedHistoryManagerPageSize()
-				: historyWindowSize;
+			const listLimit = options.anchorId
+				? historyWindowSize
+				: safeOffset === 0 && !historyStarredOnly
+					? estimatedHistoryManagerPageSize()
+					: historyWindowSize;
 			const params = new URLSearchParams({
 				offset: String(safeOffset),
 				limit: String(listLimit),
 			});
 			if (historyStarredOnly) params.set('starred', 'true');
+			if (options.anchorId) params.set('anchor_id', options.anchorId);
 			const r = await apiFetch(`/api/history?${params.toString()}`);
-			if (!r.ok) return;
+			if (!r.ok) return false;
 			const data = await r.json();
-			if (data.items.length === 0 && data.total > 0 && safeOffset > 0) {
+			const resolvedOffset = Number.isFinite(data.offset) ? Number(data.offset) : safeOffset;
+			if (data.items.length === 0 && data.total > 0 && resolvedOffset > 0 && !options.anchorId) {
 				const lastOffset = Math.floor((data.total - 1) / historyWindowSize) * historyWindowSize;
-				await fetchHistoryOffset(lastOffset);
-				return;
+				return await fetchHistoryOffset(lastOffset);
 			}
-			const stripItems = safeOffset === 0 && !historyStarredOnly
+			const stripItems = resolvedOffset === 0 && !historyStarredOnly
 				? data.items.slice(0, historyWindowSize)
 				: data.items;
-			historyItems = stripItems; historyTotal = data.total; historyOffset = safeOffset;
+			historyItems = stripItems; historyTotal = data.total; historyOffset = resolvedOffset;
 			if (selectedHistoryId) {
 				const selectedIndex = stripItems.findIndex((item: Iteration) => item.id === selectedHistoryId);
 				if (selectedIndex >= 0) historyCursor = selectedIndex;
+				else if (options.anchorId || options.preserveSelection) historyCursor = -1;
 				else if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
 			} else {
 				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
 				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
 			}
-			if (safeOffset === 0 && !historyStarredOnly) {
-				historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
-			} else {
-				preloadHistoryManagerFirstPage();
+			if (!historyManager.open) {
+				if (resolvedOffset === 0 && !historyStarredOnly) {
+					historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
+				} else {
+					preloadHistoryManagerFirstPage();
+				}
 			}
-		} catch { /* ignore */ }
+			return options.anchorId ? historyCursor >= 0 && historyItems[historyCursor]?.id === options.anchorId : true;
+		} catch {
+			return false;
+		}
+	}
+
+	async function syncHistoryStripToItem(item: Pick<Iteration, 'id' | 'trashed' | 'history_visibility'>): Promise<void> {
+		const requestId = ++historySelectionSyncRequest;
+		if (!item.id || item.trashed || item.history_visibility === 'lineage_only') {
+			historyCursor = -1;
+			return;
+		}
+		const localIndex = historyItems.findIndex((candidate) => candidate.id === item.id);
+		if (localIndex >= 0) {
+			historyCursor = localIndex;
+			return;
+		}
+		historyCursor = -1;
+		let found = await fetchHistoryOffset(0, { anchorId: item.id });
+		if (requestId !== historySelectionSyncRequest) {
+			if (displayedHistoryItem) void syncHistoryStripToItem(displayedHistoryItem);
+			return;
+		}
+		if (!found && historyStarredOnly) {
+			historyStarredOnly = false;
+			found = await fetchHistoryOffset(0, { anchorId: item.id });
+		}
+		if (requestId !== historySelectionSyncRequest) {
+			if (displayedHistoryItem) void syncHistoryStripToItem(displayedHistoryItem);
+			return;
+		}
+		if (!found) historyCursor = -1;
 	}
 
 	async function refreshHistoryForExternalSave(force = false): Promise<void> {
-		if (!authToken || historyStarredOnly || historyOffset !== 0 || loading) return;
+		if (!authToken || historyManager.open || historyStarredOnly || historyOffset !== 0 || loading) return;
 		if (document.visibilityState !== 'visible') return;
 		const now = Date.now();
 		if (!force && now - lastExternalHistoryRefreshAt < EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS) return;
@@ -2719,7 +2918,9 @@
 		externalHistoryRefreshInFlight = true;
 		lastExternalHistoryRefreshAt = now;
 		try {
-			await fetchHistoryOffset(0, { preserveSelection: true });
+			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
+			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
+			else await fetchHistoryOffset(0, { preserveSelection: true });
 			if (historyManager.open && historyManager.view === 'active' && historyManager.page === 0 && !historyManager.search.trim() && !historyManager.starredOnly) {
 				await historyManager.fetch({ view: 'active', page: 0, search: '', starredOnly: false, silent: true });
 			}
@@ -2776,21 +2977,23 @@
 		event?.stopPropagation();
 		if (!item?.id) return;
 		const nextStarred = !item.starred;
-		const rawNote = nextStarred ? window.prompt(t().selectionNotePrompt, item.note ?? "") : null;
-		const nextNote = nextStarred ? (rawNote ?? "").trim().slice(0, 240) || null : null;
-		updateHistoryStarState({ ...item, starred: nextStarred, note: nextNote });
+		updateHistoryStarState({ ...item, starred: nextStarred });
 		try {
 			const r = await apiFetch(`/api/history/${item.id}/star`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ starred: nextStarred, note: nextNote })
+				body: JSON.stringify({ starred: nextStarred })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const updated = await r.json() as Iteration;
 			updateHistoryStarState(updated);
-			if (historyStarredOnly || historyManager.starredOnly) {
-				await Promise.all([fetchHistoryOffset(historyOffset), historyManager.fetch()]);
+			const refreshes: Promise<unknown>[] = [];
+			if (historyStarredOnly) {
+				if (!updated.starred) historyStarredOnly = false;
+				refreshes.push(fetchHistoryOffset(0, { anchorId: updated.id }));
 			}
+			if (historyManager.starredOnly) refreshes.push(historyManager.fetch());
+			if (refreshes.length > 0) await Promise.all(refreshes);
 		} catch (e) {
 			updateHistoryStarState(item);
 			console.warn('failed to update history star', e);
@@ -2808,20 +3011,28 @@
 		}
 	}
 
-	async function pushHistory(it: Iteration, options: { countGeneration?: boolean } = {}): Promise<Iteration | null> {
+	async function pushHistory(it: Iteration, options: { selectSaved?: boolean; countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown> } = {}): Promise<Iteration | null> {
 		if (!authToken) return null;
 		let saved: Iteration | null = null;
 		try {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang() })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {} })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
 		if (options.countGeneration) await refreshCurrentUserOnly();
-		await fetchHistoryOffset(0);
-		historyCursor = 0;
+		if (options.selectSaved && saved?.id && options.historyVisibility !== 'lineage_only') {
+			await fetchHistoryOffset(0, { anchorId: saved.id });
+		} else {
+			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
+			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
+			else {
+				await fetchHistoryOffset(historyOffset, { preserveSelection: true });
+				historyCursor = -1;
+			}
+		}
 		return saved;
 	}
 
@@ -2835,6 +3046,8 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					input: `[demo] ${demoGeneratedPrompt}`,
+					source_text: demoGeneratedPrompt,
+					display_label: '[demo]',
 					ddl: demoGeneratedDdl,
 					score: result.score,
 					at: Date.now(),
@@ -2871,6 +3084,8 @@
 	}
 
 	function clearInput() {
+		resetTargetScopedState();
+		pendingCanvasAspectDerivation = null;
 		if (inputMode === 'single') input = '';
 		if (inputMode === 'batch') batchInput = '';
 		if (inputMode === 'demo') {
@@ -2922,8 +3137,21 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ids })
 		});
+		if (displayedHistoryItem?.id && ids.includes(displayedHistoryItem.id)) {
+			if (path === '/api/history/trash') {
+				displayedHistoryItem = { ...displayedHistoryItem, trashed: true };
+				historyCursor = -1;
+			} else if (path === '/api/history/restore') {
+				displayedHistoryItem = { ...displayedHistoryItem, trashed: false };
+				void syncHistoryStripToItem(displayedHistoryItem);
+			} else if (path === '/api/history/permanent-delete') {
+				displayedHistoryItem = null;
+				historyCursor = -1;
+			}
+		}
 		historyManager.selectedIds = [];
 		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), historyManager.fetch()]);
+		if (lineageGraph?.focus_node_id) await fetchLineage(lineageGraph.focus_node_id, true);
 		if (historyItems.length === 0 && historyOffset > 0) await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize));
 	}
 
@@ -2975,7 +3203,6 @@
 	}
 
 	const activeComparisonItem = $derived(currentComparisonItem());
-
 
 	function modelInspectionModelChoices(): ModelInspectionChoice[] {
 		const seen = new Set<string>();
@@ -3069,31 +3296,88 @@
 		if (modelInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
+		const contextVersion = targetContextVersion;
+		const modelParentNodeId = await ensureVisibleLineageParentId();
+		if (contextVersion !== targetContextVersion) return;
 		const selectedModels = modelInspectionSelectedModels.slice(0, 4).filter((model) => !isModelInspectionChoiceBlocked(model));
 		if (selectedModels.length === 0) { modelInspectionStatus = t().modelCompareSelectPrompt; return; }
 		const jobs = selectedModels.map((model) => {
-			const stage1 = modelCompareMode === 'stage1_fixed' ? modelCompareFixedModel : model;
-			const stage2 = modelCompareMode === 'stage2_fixed' ? modelCompareFixedModel : model;
-			return { model, stage1, stage2, id: `${modelCompareMode}:${stage1}:${stage2}` };
+			const stage1 = modelCompareMode === "stage1_fixed" ? modelCompareFixedModel : model;
+			const stage2 = modelCompareMode === "stage2_fixed" ? modelCompareFixedModel : model;
+			return { model, stage1, stage2, id: modelCompareMode + ":" + stage1 + ":" + stage2 };
 		});
 		const rendered = new Set(modelInspectionResults.map((item) => item.id));
 		const pending = jobs.filter((job) => !rendered.has(job.id));
 		if (pending.length === 0) { modelInspectionStatus = t().modelCompareAllRendered; return; }
-		modelInspectionBusy = true; modelInspectionStatus = null;
-		const successful = [...modelInspectionResults]; const failed: Record<string, string> = {};
+
+		const runId = ++modelInspectionRunId;
+		const abortController = new AbortController();
+		modelInspectionAbortController = abortController;
+		modelInspectionBusy = true;
+		modelInspectionStatus = null;
+		const successful = [...modelInspectionResults];
+		const failed: Record<string, string> = {};
 		try {
 			for (const job of pending) {
+				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
 				try {
 					const started = Date.now();
-					const interpreted = await interpretOne(source, undefined, job.stage1);
-					const composed = await composeOne(interpreted.ddl, source, undefined, job.stage2);
-					successful.push({ id: job.id, model: job.model, stage1Model: job.stage1, label: `${statusModelName(job.stage1)} / ${statusModelName(job.stage2)}`, input: source, ddl: interpreted.ddl, svg: composed.svg, score: composed.score, stage2Model: composed.stage2_model ?? job.stage2, renderBuildNumber: composed.render_build_number ?? null, renderColorProfile: composed.render_color_profile ?? null, renderEngineId: composed.render_engine_id ?? null, renderEngineVersion: composed.render_engine_version ?? null, renderColorCatalogId: composed.render_color_catalog_id ?? null, renderColorCatalogName: composed.render_color_catalog_name ?? null, renderColorCatalogSub: composed.render_color_catalog_sub ?? null, renderColorMap: composed.render_color_map ?? null, renderCanvasAspect: composed.render_canvas_aspect ?? null, renderCanvasAspectId: composed.render_canvas_aspect_id ?? null, renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null, renderSeed: composed.render_seed ?? null, varySeed: composed.vary_seed ?? null, tokensIn: interpreted.tokens_in, tokensOut: interpreted.tokens_out, tokensInStage2: composed.tokens_in, tokensOutStage2: composed.tokens_out, elapsedMs: Date.now() - started, savedHistoryId: null, starred: false, saving: false });
+					const interpreted = await interpretOne(source, abortController.signal, job.stage1);
+					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2);
+					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					successful.push({
+						id: job.id,
+						model: job.model,
+						stage1Model: job.stage1,
+						label: statusModelName(job.stage1) + " / " + statusModelName(job.stage2),
+						input: source,
+						ddl: interpreted.ddl,
+						svg: composed.svg,
+						score: composed.score,
+						stage2Model: composed.stage2_model ?? job.stage2,
+						renderBuildNumber: composed.render_build_number ?? null,
+						renderColorProfile: composed.render_color_profile ?? null,
+						renderEngineId: composed.render_engine_id ?? null,
+						renderEngineVersion: composed.render_engine_version ?? null,
+						renderColorCatalogId: composed.render_color_catalog_id ?? null,
+						renderColorCatalogName: composed.render_color_catalog_name ?? null,
+						renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
+						renderColorMap: composed.render_color_map ?? null,
+						renderCanvasAspect: composed.render_canvas_aspect ?? null,
+						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
+						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
+						renderSeed: composed.render_seed ?? null,
+						varySeed: composed.vary_seed ?? null,
+						tokensIn: interpreted.tokens_in,
+						tokensOut: interpreted.tokens_out,
+						tokensInStage2: composed.tokens_in,
+						tokensOutStage2: composed.tokens_out,
+						elapsedMs: Date.now() - started,
+						lineageParentNodeId: modelParentNodeId,
+						compareMode: modelCompareMode,
+						savedHistoryId: null,
+						starred: false,
+						saving: false,
+					});
 					modelInspectionResults = [...successful];
-				} catch (e) { failed[job.model] = e instanceof Error ? e.message : String(e); modelInspectionFailedModels = { ...modelInspectionFailedModels, [job.model]: failed[job.model] }; }
+				} catch (cause) {
+					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					failed[job.model] = cause instanceof Error ? cause.message : String(cause);
+					modelInspectionFailedModels = { ...modelInspectionFailedModels, [job.model]: failed[job.model] };
+				}
 			}
-			if (Object.keys(failed).length > 0) modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
-		} finally { modelInspectionBusy = false; }
+			if (Object.keys(failed).length > 0 && modelInspectionRunId === runId) {
+				modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
+			}
+		} finally {
+			if (modelInspectionRunId === runId) {
+				modelInspectionAbortController = null;
+				modelInspectionBusy = false;
+			}
+		}
 	}
+
 
 	function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
 		modelInspectionResults = modelInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
@@ -3101,10 +3385,11 @@
 
 	async function saveModelInspectionResult(item: ModelInspectionResult, options: { star?: boolean } = {}) {
 		if (item.saving) return;
+		const contextVersion = targetContextVersion;
 		if (item.savedHistoryId) {
 			if (options.star) {
 				await toggleHistoryStar({ id: item.savedHistoryId, starred: !!item.starred });
-				updateModelInspectionResult(item.id, { starred: !item.starred });
+				if (contextVersion === targetContextVersion) updateModelInspectionResult(item.id, { starred: !item.starred });
 			}
 			return;
 		}
@@ -3136,22 +3421,25 @@
 				render_canvas_aspect_ratio: item.renderCanvasAspectRatio ?? null,
 				render_seed: item.renderSeed ?? null,
 				vary_seed: item.varySeed ?? null,
-			}, { countGeneration: true });
+			}, { countGeneration: true, sourceText: item.input, lineageParentNodeId: item.lineageParentNodeId ?? null, derivationKind: item.lineageParentNodeId ? 'model_variation' : null, derivationMetadata: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model } });
 			if (!saved?.id) throw new Error('failed to save comparison result');
+			if (contextVersion !== targetContextVersion) return;
 			updateModelInspectionResult(item.id, { savedHistoryId: saved.id, starred: !!saved.starred, saving: false });
 			if (options.star) {
 				await toggleHistoryStar({ id: saved.id, starred: !!saved.starred, note: saved.note });
-				updateModelInspectionResult(item.id, { starred: !saved.starred });
+				if (contextVersion === targetContextVersion) updateModelInspectionResult(item.id, { starred: !saved.starred });
 			}
 		} catch (e) {
-			updateModelInspectionResult(item.id, { saving: false });
-			modelInspectionStatus = e instanceof Error ? e.message : String(e);
+			if (contextVersion === targetContextVersion) {
+				updateModelInspectionResult(item.id, { saving: false });
+				modelInspectionStatus = e instanceof Error ? e.message : String(e);
+			}
 		}
 	}
 
-
 	async function replayHistoryItem(it: Iteration) {
 		if (demoRunning || reloading) return;
+		const contextVersion = targetContextVersion;
 		if (it.render_seed == null) {
 			reloadError = t().historyReplayMissingSeed;
 			return;
@@ -3173,21 +3461,188 @@
 			});
 			if (!r.ok) throw new Error(await r.text());
 			const svg = await r.text();
+			if (contextVersion !== targetContextVersion) return;
 			loadIterationItem({ ...it, svg });
 			result = result ? { ...result, svg, render_hash: it.render_hash, render_hash_short: it.render_hash_short } : result;
 			outputTab = 'canvas';
 			fitCanvasZoom();
 		} catch (e) {
-			reloadError = e instanceof Error ? e.message : String(e);
+			if (contextVersion === targetContextVersion) reloadError = e instanceof Error ? e.message : String(e);
 		} finally {
 			reloading = false;
 		}
 	}
 
+async function fetchLineage(nodeId: string, force = false, descendantDepth = 3): Promise<void> {
+	if (!nodeId || (!force && lineageLoadedFocus === nodeId)) return;
+	const requestId = ++lineageRequestId;
+	lineageLoading = true;
+	lineageError = null;
+	try {
+		const url = "/api/lineage/" + encodeURIComponent(nodeId) + "?descendant_depth=" + descendantDepth + "&node_limit=200";
+		const r = await apiFetch(url, { cache: "no-store" });
+		if (!r.ok) throw new Error("HTTP " + r.status);
+		const graph = await r.json() as LineageGraph;
+		if (requestId !== lineageRequestId) return;
+		lineageGraph = graph;
+		lineageLoadedFocus = nodeId;
+	} catch (cause) {
+		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
+	} finally {
+		if (requestId === lineageRequestId) lineageLoading = false;
+	}
+}
+
+
+async function loadLineageBranch(nodeId: string): Promise<void> {
+	if (!lineageGraph) return;
+	const focusNodeId = lineageGraph.focus_node_id;
+	const requestId = ++lineageRequestId;
+	lineageLoading = true;
+	lineageError = null;
+	try {
+		const r = await apiFetch("/api/lineage/" + encodeURIComponent(nodeId) + "?descendant_depth=1&node_limit=200", { cache: "no-store" });
+		if (!r.ok) throw new Error("HTTP " + r.status);
+		const branch = await r.json() as LineageGraph;
+		if (requestId !== lineageRequestId || lineageGraph?.focus_node_id !== focusNodeId) return;
+		const nodes = new Map(lineageGraph.nodes.map((node) => [node.id, node]));
+		const edges = new Map(lineageGraph.edges.map((edge) => [edge.id, edge]));
+		for (const node of branch.nodes) nodes.set(node.id, node);
+		for (const edge of branch.edges) edges.set(edge.id, edge);
+		lineageGraph = { ...lineageGraph, nodes: [...nodes.values()], edges: [...edges.values()] };
+	} catch (cause) {
+		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
+	} finally {
+		if (requestId === lineageRequestId) lineageLoading = false;
+	}
+}
+
+
+async function loadLineageOverview(): Promise<void> {
+	const focusNodeId = lineageGraph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
+	if (!focusNodeId || !lineageGraph) return;
+	const childIds = new Set(lineageGraph.edges.map((edge) => edge.child_node_id));
+	const rootNodeId = lineageGraph.nodes.find((node) => !childIds.has(node.id))?.id ?? focusNodeId;
+	const requestId = ++lineageRequestId;
+	lineageLoading = true;
+	lineageError = null;
+	try {
+		const url = "/api/lineage/" + encodeURIComponent(rootNodeId) + "?descendant_depth=200&node_limit=200";
+		const r = await apiFetch(url, { cache: "no-store" });
+		if (!r.ok) throw new Error("HTTP " + r.status);
+		const overview = await r.json() as LineageGraph;
+		if (requestId !== lineageRequestId) return;
+		lineageGraph = { ...overview, focus_node_id: focusNodeId };
+		lineageLoadedFocus = focusNodeId;
+	} catch (cause) {
+		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
+	} finally {
+		if (requestId === lineageRequestId) lineageLoading = false;
+	}
+}
+
+
+async function openLineageNode(node: LineageNode): Promise<void> {
+	if (!node.history) return;
+	loadIterationItem(node.history);
+	outputTab = 'lineage';
+	lineageDetached = false;
+	await fetchLineage(node.id, true);
+}
+
+async function promoteLineageNode(node: LineageNode): Promise<void> {
+	const contextVersion = targetContextVersion;
+	const r = await apiFetch(`/api/lineage/${encodeURIComponent(node.id)}/promote`, { method: 'POST' });
+	if (!r.ok) return;
+	const promoted = await r.json() as Iteration;
+	if (contextVersion !== targetContextVersion) return;
+	if (displayedHistoryItem?.id === promoted.id) {
+		displayedHistoryItem = promoted;
+		await Promise.all([fetchLineage(node.id, true), syncHistoryStripToItem(promoted)]);
+	} else {
+		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
+		await Promise.all([
+			fetchLineage(node.id, true),
+			activeHistoryId ? fetchHistoryOffset(0, { anchorId: activeHistoryId }) : fetchHistoryOffset(historyOffset, { preserveSelection: true }),
+		]);
+	}
+}
+
+async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
+	if (!node.history?.id) return;
+	const contextVersion = targetContextVersion;
+	const r = await apiFetch(`/api/history/${encodeURIComponent(node.history.id)}/star`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ starred: !!node.history.starred, note: note.trim().slice(0, 240) })
+	});
+	if (!r.ok) throw new Error(`HTTP ${r.status}`);
+	const updated = await r.json() as Iteration;
+	if (contextVersion !== targetContextVersion) return;
+	updateHistoryStarState(updated);
+	await fetchLineage(node.id, true);
+}
+
+function detachLineage(): void {
+	resetTargetScopedState();
+	pendingCanvasAspectDerivation = null;
+	lineageDetached = true;
+	displayedHistoryItem = null;
+	historyCursor = -1;
+	lineageGraph = null;
+	lineageLoadedFocus = null;
+	outputTab = 'canvas';
+}
+
+$effect(() => {
+	const nodeId = displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
+	if (outputTab === 'lineage' && nodeId) void fetchLineage(nodeId);
+});
+
+	function resetTargetScopedState(options: { preserveVariationCandidates?: boolean } = {}): void {
+		targetContextVersion += 1;
+		if (!options.preserveVariationCandidates) {
+			if (variationGridAbortController) variationGridAbortController.abort();
+			variationGridAbortController = null;
+			variationGridBusy = false;
+			variationGridCanAbort = false;
+			variationCandidates = [];
+			variationGridIncludesReading = false;
+			variationGridTaskLabel = '';
+			variationGridStatus = null;
+		}
+
+		if (modelInspectionAbortController) modelInspectionAbortController.abort();
+		modelInspectionAbortController = null;
+		modelInspectionRunId += 1;
+		modelInspectionBusy = false;
+		modelInspectionResults = [];
+		modelInspectionFailedModels = {};
+		modelInspectionStatus = null;
+
+		interpretationDiffParts = [];
+		reloadError = null;
+		if (lineageIntermediateNoticeTimer !== null) {
+			window.clearTimeout(lineageIntermediateNoticeTimer);
+			lineageIntermediateNoticeTimer = null;
+		}
+		lineageIntermediateNotice = null;
+
+		lineageRequestId += 1;
+		lineageLoading = false;
+		lineageError = null;
+		lineageGraph = null;
+		lineageLoadedFocus = null;
+	}
+
 	function loadIterationItem(it: Iteration) {
 		if (demoRunning) return;
+		resetTargetScopedState();
+		pendingCanvasAspectDerivation = null;
 		inputMode = 'single';
 		displayedHistoryItem = it;
+		void syncHistoryStripToItem(it);
+		lineageDetached = false;
 		if (historySelectionCatalog === 'history') {
 			const catalogId = it.render_color_catalog_id ?? it.catalog_id;
 			if (catalogId && catalogById(colorCatalogs, catalogId)) {
@@ -3203,8 +3658,9 @@
 			}
 		}
 		const itemDDL = it.ddl ?? '';
-		input = it.input; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
-		stage1UserPrompt = it.input ? it.input + buildEmotionHint(it.input) : '';
+		const sourceText = it.source_text ?? it.input;
+		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
+		stage1UserPrompt = sourceText ? sourceText + buildEmotionHint(sourceText) : '';
 		result = {
 			score: it.score,
 			svg: it.svg,
@@ -3226,6 +3682,8 @@
 			ui_lang: it.ui_lang,
 			render_hash: it.render_hash,
 			render_hash_short: it.render_hash_short,
+			description_hash: it.description_hash,
+			lineage_node_id: it.lineage_node_id,
 			render_seed: it.render_seed == null ? null : Number(it.render_seed),
 			vary_seed: it.vary_seed == null ? null : Number(it.vary_seed),
 			interpretation_seed: it.interpretation_seed ?? null,
@@ -3242,25 +3700,26 @@
 		fitCanvasZoom();
 	}
 
-	const currentRenderedAt = $derived(
-		historyCursor >= 0 && historyItems[historyCursor]
-			? new Date(historyItems[historyCursor].at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US')
-			: null
-	);
-
-	function prepareContextTargetChange() {
-		if (outputTab === 'compare') { modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null; }
+	function openNearbyHistory(id: string): void {
+		const item = nearbyHistory.find((candidate) => candidate.id === id);
+		if (item) loadIterationItem(item);
 	}
 
+	const currentRenderedAt = $derived.by(() => {
+		const at = displayedHistoryItem?.at ?? result?.history_at ?? null;
+		return at == null ? null : new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
+	});
+
+
 	async function gotoPrev() {
-		const preservedTab = outputTab; prepareContextTargetChange();
+		const preservedTab = outputTab;
 		if (historyCursor < historyItems.length - 1) { loadIteration(historyCursor + 1); }
 		else if (historyOffset + historyWindowSize < historyTotal) { await fetchHistoryOffset(historyOffset + historyWindowSize); loadIteration(0); }
 		outputTab = preservedTab;
 	}
 
 	async function gotoNext() {
-		const preservedTab = outputTab; prepareContextTargetChange();
+		const preservedTab = outputTab;
 		if (historyCursor > 0) { loadIteration(historyCursor - 1); }
 		else if (historyOffset > 0) { await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize)); loadIteration(historyItems.length - 1); }
 		outputTab = preservedTab;
@@ -3347,18 +3806,22 @@
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		stage1Provider = v; stage1Model = modelsFor(v)[0]?.id ?? stage1Model;
 	}
 	function setStage1Model(v: string) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		stage1Model = v;
 	}
 	function setStage2Provider(v: Provider) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		stage2Provider = v; stage2Model = modelsFor(v)[0]?.id ?? stage2Model;
 	}
 	function setStage2Model(v: string) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		stage2Model = v;
 	}
 
@@ -3414,14 +3877,62 @@
 		return parts;
 	}
 
+	const unsavedRefinementPreview = $derived(!!result && !result.lineage_node_id && !!result.lineage_parent_node_id && !!result.derivation_kind);
+
+	function showLineageIntermediateNotice(): void {
+		lineageIntermediateNotice = t().lineageIntermediateSavedNotice;
+		if (lineageIntermediateNoticeTimer !== null) window.clearTimeout(lineageIntermediateNoticeTimer);
+		lineageIntermediateNoticeTimer = window.setTimeout(() => {
+			lineageIntermediateNotice = null;
+			lineageIntermediateNoticeTimer = null;
+		}, 5000);
+	}
+
+	function currentLineageParentId(): string | null {
+		if (lineageDetached) return null;
+		return displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
+	}
+
+async function ensureLineageParentId(): Promise<string | null> {
+	const existing = currentLineageParentId();
+	if (existing || !result || !ddl || !result.lineage_parent_node_id || !result.derivation_kind) return existing;
+	const saved = await pushHistory({
+		...result,
+		input: input.trim(), ddl, score: result.score, svg: result.svg, at: Date.now(),
+		elapsed_ms: result.elapsed_total_ms ?? 0,
+		tokens_in: (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null,
+		tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
+	}, {
+		sourceText: input.trim(), historyVisibility: 'lineage_only',
+		lineageParentNodeId: result.lineage_parent_node_id,
+		derivationKind: result.derivation_kind,
+		derivationMetadata: result.derivation_metadata ?? {},
+	});
+	if (!saved?.lineage_node_id) return null;
+	result = { ...result, history_id: saved.id, history_at: saved.at, lineage_node_id: saved.lineage_node_id, description_hash: saved.description_hash };
+	return saved.lineage_node_id;
+}
+
+async function ensureVisibleLineageParentId(): Promise<string | null> {
+	const materializingIntermediate = unsavedRefinementPreview;
+	const nodeId = await ensureLineageParentId();
+	if (materializingIntermediate && !nodeId) {
+		error = t().lineageIntermediateSaveFailed;
+		throw new Error(error);
+	}
+	if (materializingIntermediate) showLineageIntermediateNotice();
+	return nodeId;
+}
+
 	function setSelectedCatalog(id: string) {
 		displayedHistoryItem = null;
+		historyCursor = -1;
 		selectedCatalog = id;
 	}
 
-
 	async function varyPerformance() {
 		if (!result || variationBusy) return;
+		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		reloading = true;
 		reloadError = null;
@@ -3434,15 +3945,16 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					score: result.score,
-					catalog_id: result.render_color_catalog_id ?? selectedCatalog,
-					canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+					catalog_id: refinementCatalogId(),
+					canvas_aspect: refinementCanvasAspectId(),
 					render_seed: nextSeed,
 				})
 			});
 			if (!r.ok) throw new Error(await r.text());
 			const svg = await r.text();
-			result = { ...result, svg, render_seed: nextSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null };
+			result = { ...result, svg, render_seed: nextSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_variation' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
 			displayedHistoryItem = null;
+			historyCursor = -1;
 			outputTab = 'canvas';
 			fitCanvasZoom();
 		} catch (e) {
@@ -3457,6 +3969,7 @@
 		if (!result || variationBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
+		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		loading = true;
 		error = null;
@@ -3464,7 +3977,7 @@
 			const usedSeeds = new Set<number>();
 			if (Number.isFinite(result.vary_seed ?? NaN)) usedSeeds.add(Number(result.vary_seed));
 			const nextVarySeed = createSafeIntegerSeed(usedSeeds);
-			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source });
+			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_variation' : null, derivationMetadata: { vary_seed: nextVarySeed } });
 			ddl = r.ddl;
 			ddlGeneratedBaseline = r.ddl;
 			thinking = r.thinking;
@@ -3478,8 +3991,12 @@
 			tokensInStage2 = r.tokens_in_stage2;
 			tokensOutStage2 = r.tokens_out_stage2;
 			outputTab = 'canvas';
-			await fetchHistoryOffset(0);
-			historyCursor = 0;
+			if (r.history_id) {
+				await fetchHistoryOffset(0, { anchorId: r.history_id });
+				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
+			} else {
+				historyCursor = -1;
+			}
 			fitCanvasZoom();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -3494,13 +4011,14 @@
 		if (!result || variationBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
+		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		loading = true;
 		error = null;
 		const previousDdl = ddl;
 		try {
 			const interpretationSeed = createInterpretationSeed();
-			const r = await paintOne(source, { historyInput: source, interpretationSeed });
+			const r = await paintOne(source, { historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), interpretationSeed, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'reinterpretation' : null, derivationMetadata: { interpretation_seed: interpretationSeed } });
 			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
 			ddl = r.ddl;
 			ddlGeneratedBaseline = r.ddl;
@@ -3515,8 +4033,12 @@
 			tokensInStage2 = r.tokens_in_stage2;
 			tokensOutStage2 = r.tokens_out_stage2;
 			outputTab = "canvas";
-			await fetchHistoryOffset(0);
-			historyCursor = 0;
+			if (r.history_id) {
+				await fetchHistoryOffset(0, { anchorId: r.history_id });
+				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
+			} else {
+				historyCursor = -1;
+			}
 			fitCanvasZoom();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -3545,6 +4067,14 @@
 		};
 	}
 
+	function refinementCatalogId(): string {
+		return result?.render_color_catalog_id ?? displayedHistoryItem?.catalog_id ?? defaultCatalogId;
+	}
+
+	function refinementCanvasAspectId(): CanvasAspectId {
+		return normalizeCanvasAspectId(result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? effectiveCanvasAspectId());
+	}
+
 	async function renderPerformanceCandidate(seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		if (!result) throw new Error("missing result");
 		const r = await apiFetch("/api/render-svg", {
@@ -3553,8 +4083,8 @@
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				score: result.score,
-				catalog_id: result.render_color_catalog_id ?? selectedCatalog,
-				canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+				catalog_id: refinementCatalogId(),
+				canvas_aspect: refinementCanvasAspectId(),
 				render_seed: seed,
 			})
 		});
@@ -3564,7 +4094,7 @@
 			id: `perf-${seed}`,
 			label,
 			selected: false,
-			result: { ...result, ddl: ddl ?? "", thinking, svg, render_seed: seed, render_hash: null, render_hash_short: null, history_id: null, history_at: null },
+			result: { ...result, ddl: ddl ?? "", thinking, svg, render_seed: seed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'touch_variation' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: seed } },
 		};
 	}
 
@@ -3581,42 +4111,104 @@
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
-				catalog_id: selectedCatalog,
-				canvas_aspect: effectiveCanvasAspectId(),
+				catalog_id: refinementCatalogId(),
+				canvas_aspect: refinementCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				vary_seed: varySeed,
 			})
 		});
 		if (!r.ok) throw new Error(await r.text());
 		const data = await r.json();
-		return { id: `comp-${varySeed}`, label, selected: false, result: composeCandidateResult(source, baseDdl, data) };
+		return { id: `comp-${varySeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { vary_seed: varySeed } } };
 	}
 
 	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
 		const interpretationSeed = createInterpretationSeed();
-		const r = await paintOne(source, { historyInput: source, saveHistory: false, saveArtifacts: false, countGeneration: false, interpretationSeed, signal });
-		return { id: `interp-${interpretationSeed}`, label, selected: false, result: r };
+		const r = await paintOne(source, {
+			historyInput: source,
+			sourceText: source,
+			saveHistory: false,
+			saveArtifacts: false,
+			countGeneration: false,
+			catalogId: refinementCatalogId(),
+			canvasAspectId: refinementCanvasAspectId(),
+			interpretationSeed,
+			signal,
+		});
+		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
 	}
 
-	type RefineChanges = { touch: boolean; layout: boolean; reading: boolean };
+	function colorCatalogCandidateIds(count: 1 | 4): string[] {
+		const currentId = refinementCatalogId();
+		const candidates = colorCatalogs.map((catalog) => catalog.id).filter((id) => id && id !== currentId);
+		for (let index = candidates.length - 1; index > 0; index -= 1) {
+			const swapIndex = Math.floor(Math.random() * (index + 1));
+			[candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
+		}
+		if (candidates.length === 0) throw new Error(t().refineNoAlternateCatalog);
+		return Array.from({ length: count }, (_, index) => candidates[index % candidates.length]);
+	}
 
-	async function generateVariationCandidates(changes: RefineChanges, count: 1 | 4) {
+	async function renderColorCatalogCandidate(catalogId: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+		if (!result) throw new Error("missing result");
+		const source = input.trim();
+		const fromCatalogId = refinementCatalogId();
+		const r = await apiFetch("/api/render-score", {
+			method: "POST",
+			signal,
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				score: result.score,
+				input: source,
+				ddl: ddl ?? "",
+				catalog_id: catalogId,
+				canvas_aspect: refinementCanvasAspectId(),
+				render_seed: result.render_seed,
+				vary_seed: result.vary_seed,
+				interpretation_seed: result.interpretation_seed,
+			}),
+		});
+		if (!r.ok) throw new Error(await r.text());
+		const data = await r.json() as Partial<PaintResult> & Pick<PaintResult, "svg" | "score">;
+		return {
+			id: "catalog-" + catalogId + "-" + label,
+			label,
+			selected: false,
+			result: {
+				...result,
+				...data,
+				ddl: ddl ?? "",
+				thinking,
+				history_id: null,
+				history_at: null,
+				lineage_node_id: null,
+				lineage_parent_node_id: currentLineageParentId(),
+				derivation_kind: currentLineageParentId() ? "catalog_change" : null,
+				derivation_metadata: { catalog_id_from: fromCatalogId, catalog_id_to: catalogId },
+			},
+		};
+	}
+
+	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4) {
 		if (!result || variationGridBusy || loading) return;
 		const source = input.trim();
 		if (!source || !ddl) return;
-		const selectedKinds: Array<keyof RefineChanges> = changes.reading
-			? ['reading']
-			: count === 1
-				? (['layout', 'touch'] as const).filter((kind) => changes[kind]).slice(0, 1)
-				: (['touch', 'layout'] as const).filter((kind) => changes[kind]);
-		if (selectedKinds.length === 0) return;
+		const contextVersion = targetContextVersion;
+		await ensureVisibleLineageParentId();
+		if (contextVersion !== targetContextVersion) return;
 		const abortController = new AbortController();
 		variationGridAbortController = abortController;
 		variationGridBusy = true;
 		variationGridCanAbort = false;
-		variationGridIncludesReading = selectedKinds.includes('reading');
-		variationGridTaskLabel = selectedKinds.map((kind) => kind === 'touch' ? t().canvasVaryPerformance : kind === 'layout' ? t().canvasVaryComposition : t().canvasVaryInterpretation).join('・');
+		variationGridIncludesReading = kind === "reading";
+		variationGridTaskLabel = kind === "touch"
+			? t().canvasVaryPerformance
+			: kind === "layout"
+				? t().canvasVaryComposition
+				: kind === "reading"
+					? t().canvasVaryInterpretation
+					: t().canvasVaryColor;
 		variationGridStatus = null;
 		const abortTimer = window.setTimeout(() => {
 			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
@@ -3630,25 +4222,28 @@
 				if (Number.isFinite(candidate.result.render_seed ?? NaN)) usedRenderSeeds.add(Number(candidate.result.render_seed));
 				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
 			}
-			const counts = { touch: 0, layout: 0, reading: 0 };
+			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
 			const jobs = Array.from({ length: count }, (_, index) => {
-				const kind = selectedKinds[index % selectedKinds.length];
-				const sequence = ++counts[kind];
-				if (kind === 'touch') {
+				const sequence = index + 1;
+				if (kind === "touch") {
 					const renderSeed = createSafeIntegerSeed(usedRenderSeeds);
 					usedRenderSeeds.add(renderSeed);
-					return renderPerformanceCandidate(renderSeed, `${t().canvasVaryPerformance} ${sequence}`, abortController.signal);
+					return renderPerformanceCandidate(renderSeed, t().canvasVaryPerformance + " " + sequence, abortController.signal);
 				}
-				if (kind === 'layout') {
+				if (kind === "layout") {
 					const varySeed = createSafeIntegerSeed(usedVarySeeds);
 					usedVarySeeds.add(varySeed);
-					return composeVariationCandidate(varySeed, `${t().canvasVaryComposition} ${sequence}`, abortController.signal);
+					return composeVariationCandidate(varySeed, t().canvasVaryComposition + " " + sequence, abortController.signal);
 				}
-				return interpretationVariationCandidate(`${t().canvasVaryInterpretation} ${sequence}`, abortController.signal);
+				if (kind === "reading") {
+					return interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
+				}
+				const catalogId = catalogIds[index];
+				return renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
 			});
 			variationCandidates = await Promise.all(jobs);
 		} catch (e) {
-			if (!(e instanceof DOMException && e.name === 'AbortError')) variationGridStatus = e instanceof Error ? e.message : String(e);
+			if (!(e instanceof DOMException && e.name === "AbortError")) variationGridStatus = e instanceof Error ? e.message : String(e);
 		} finally {
 			window.clearTimeout(abortTimer);
 			if (variationGridAbortController === abortController) {
@@ -3666,6 +4261,8 @@
 	}
 
 	function showVariationCandidate(candidate: VariationCandidate) {
+		resetTargetScopedState({ preserveVariationCandidates: true });
+		historyCursor = -1;
 		ddl = candidate.result.ddl;
 		ddlGeneratedBaseline = candidate.result.ddl;
 		thinking = candidate.result.thinking;
@@ -3676,6 +4273,7 @@
 	}
 
 	async function saveSelectedVariationCandidates() {
+		const contextVersion = targetContextVersion;
 		const selected = variationCandidates.filter((candidate) => candidate.selected && !candidate.saved);
 		if (selected.length === 0) {
 			variationGridStatus = t().variationGridEmpty;
@@ -3698,15 +4296,19 @@
 					tokens_in: (candidate.result.tokens_in_stage1 ?? 0) + (candidate.result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
 					catalog_id: candidate.result.render_color_catalog_id ?? selectedCatalog,
-				}, { countGeneration: true });
-				if (saved) await toggleHistoryStar({ id: saved.id, starred: false, note: saved.note });
+				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {} });
+				if (contextVersion !== targetContextVersion) return;
 				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
+				if (saved?.id && result === candidate.result) {
+					result = { ...result, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
+					displayedHistoryItem = saved;
+					void syncHistoryStripToItem(saved);
+				}
 			}
 		} finally {
-			variationGridBusy = false;
+			if (contextVersion === targetContextVersion) variationGridBusy = false;
 		}
 	}
-
 
 	// ── Download ────────────────────────────────────────────
 	function escapeXml(s: string): string {
@@ -3733,8 +4335,8 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					score: result.score,
-					catalog_id: result.render_color_catalog_id ?? selectedCatalog,
-					canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+					catalog_id: refinementCatalogId(),
+					canvas_aspect: refinementCanvasAspectId(),
 					svg_profile: profile
 				})
 			});
@@ -3836,6 +4438,7 @@
 	}
 
 	function resumeBatchLatestFollow(): void {
+		resetTargetScopedState();
 		batchAutoFollowLatest = true;
 		displayedHistoryItem = null;
 		historyCursor = -1;
@@ -3881,18 +4484,23 @@
 
 	const statusStage1Model = $derived(displayedHistoryItem
 		? (displayedHistoryItem.stage1_model ? statusModelName(displayedHistoryItem.stage1_model) : '-')
-		: statusModelName(stage1Model));
+		: (result?.stage1_model ? statusModelName(result.stage1_model) : '-'));
 	const statusStage2Model = $derived(displayedHistoryItem
 		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
-		: statusModelName(stage2Model));
+		: (result?.stage2_model ? statusModelName(result.stage2_model) : '-'));
+	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
+	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
+	const nextCatalogName = $derived(currentCatalog.name);
 	const statusCatalogName = $derived(displayedHistoryItem
 		? (displayedHistoryItem.render_color_catalog_name ?? catalogName(displayedHistoryItem.render_color_catalog_id ?? displayedHistoryItem.catalog_id))
-		: (result?.render_color_catalog_name ?? catalogName(result?.render_color_catalog_id ?? selectedCatalog)));
+		: (result?.render_color_catalog_name ?? (result?.render_color_catalog_id ? catalogName(result.render_color_catalog_id) : '-')));
 	const currentCanvasAspect = $derived(getCanvasAspectOption(effectiveCanvasAspectId()));
+	const nextCanvasName = $derived(currentCanvasAspect.label);
 	const displayCanvasAspect = $derived(svgAspect(result?.svg) ?? currentCanvasAspect);
-	const statusCanvasName = $derived(getCanvasAspectOption(
-		displayedHistoryItem?.score?.canvas ?? result?.score?.canvas ?? effectiveCanvasAspectId()
-	).label);
+	const statusCanvasName = $derived.by(() => {
+		const canvasId = displayedHistoryItem?.render_canvas_aspect_id ?? displayedHistoryItem?.render_canvas_aspect ?? displayedHistoryItem?.score?.canvas ?? result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? null;
+		return canvasId ? getCanvasAspectOption(canvasId).label : '-';
+	});
 	const statusHashFull = $derived(
 		displayedHistoryItem?.render_hash
 			?? result?.render_hash
@@ -3932,11 +4540,6 @@
 		const s1 = it.stage1_model ? shortModel(it.stage1_model) : '-';
 		const s2 = it.stage2_model ? shortModel(it.stage2_model) : '-';
 		return `${s1} → ${s2}`;
-	}
-
-	function historyTokenSummary(it: Iteration): string {
-		if (it.tokens_in == null && it.tokens_out == null) return '-';
-		return `${it.tokens_in ?? '?'} → ${it.tokens_out ?? '?'} tok`;
 	}
 
 	function historyPreviewText(text: string): string {
@@ -4307,6 +4910,7 @@
 					<InputPanel
 						bind:inputMode
 						bind:input
+						bind:seedText
 						bind:batchInput
 						{lineNumbersText}
 						{batchNonEmpty}
@@ -4328,6 +4932,7 @@
 						bind:instructionLang
 						{interpretationFeedbackParts}
 						bind:demoSettings
+						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}
 						{demoWaitingSeconds}
 						{demoCurrentLiveMs}
@@ -4406,7 +5011,6 @@
 						/>
 					{/if}
 
-
 					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
 						<section class="panel-section interpretation-diff">
 							{#each interpretationDiffParts as part}
@@ -4414,7 +5018,6 @@
 							{/each}
 						</section>
 					{/if}
-
 
 					<!-- 統計 -->
 					{#if result && elapsedTotalMs > 0}
@@ -4465,6 +5068,10 @@
 				bind:pngMenuOpen
 				bind:pngWrapEl
 				{result}
+				{nearbyHistory}
+				onOpenNearbyHistory={openNearbyHistory}
+				{unsavedRefinementPreview}
+				{lineageIntermediateNotice}
 				allowEmptyOutputTabs={inputMode === 'demo' || activeRunMode === 'demo'}
 				{currentRenderedAt}
 				{nextDisabled}
@@ -4492,6 +5099,10 @@
 				{statusStage2Model}
 				{statusCatalogName}
 				{statusCanvasName}
+				{nextStage1Model}
+				{nextStage2Model}
+				{nextCatalogName}
+				{nextCanvasName}
 				{statusHistoryItem}
 				{statusHashLabel}
 				{statusHashCopyTitle}
@@ -4546,6 +5157,17 @@
 				onRunModelInspection={runModelInspection}
 				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
+				{lineageGraph}
+				{lineageLoading}
+				{lineageError}
+				isJapanese={getLang() === 'ja'}
+				onOpenLineageNode={openLineageNode}
+				onPromoteLineageNode={promoteLineageNode}
+				onSaveLineageNote={saveLineageNote}
+				onAskTrashLineage={askTrash}
+				onDetachLineage={detachLineage}
+				onLoadLineageOverview={loadLineageOverview}
+				onLoadLineageBranch={loadLineageBranch}
 				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->
@@ -4763,6 +5385,7 @@
 		onSetView={historyManager.setView}
 		onSetPage={historyManager.setPage}
 		onSetLatestPage={() => historyManager.setPage(0)}
+		onSetFirstPage={() => historyManager.setPage(historyManager.totalPages - 1)}
 		onSetPageSize={historyManager.setPageSize}
 		onSetStarredOnly={historyManager.setStarredOnly}
 		onSelectAll={selectAllManagedHistory}
@@ -4777,7 +5400,6 @@
 		{formatHistoryDate}
 		{formatElapsed}
 		{catalogName}
-		{historyTokenSummary}
 		{historyPreviewText}
 		{shortModel}
 	/>
@@ -5079,7 +5701,6 @@
 	.app-info-meta a:hover {
 		text-decoration: underline;
 	}
-
 
 	.interpretation-diff {
 		gap: 2px;

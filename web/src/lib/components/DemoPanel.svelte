@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import { PROVIDER_GROUPS, modelsForProvider, providerOfModel, type Provider } from '$lib/models';
+	import { providerOfModel, type Provider, type ProviderGroup } from '$lib/models';
 	import type { DemoSettings } from '$lib/demo';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 
 	type Props = {
 		settings: DemoSettings;
+		providerGroups: ProviderGroup[];
 		running: boolean;
 		liveMs: number;
 		waitingSeconds: number | null;
@@ -33,6 +34,7 @@
 
 	let {
 		settings = $bindable(),
+		providerGroups,
 		running,
 		liveMs,
 		waitingSeconds,
@@ -57,7 +59,13 @@
 		onStop,
 	}: Props = $props();
 
-	const promptProvider = $derived(providerOfModel(settings.prompt_model));
+	const configuredProviderGroups = $derived(providerGroups.filter((group) => group.models.length > 0));
+	const promptProvider = $derived(
+		configuredProviderGroups.find((group) => group.models.some((model) => model.id === settings.prompt_model))?.id
+			?? configuredProviderGroups[0]?.id
+			?? providerOfModel(settings.prompt_model)
+	);
+	const promptModels = $derived(configuredProviderGroups.find((group) => group.id === promptProvider)?.models ?? []);
 
 	function updateSettings(patch: Partial<DemoSettings>) {
 		settings = { ...settings, ...patch };
@@ -65,7 +73,7 @@
 	}
 
 	function setPromptProvider(provider: Provider) {
-		const model = modelsForProvider(provider)[0]?.id ?? settings.prompt_model;
+		const model = configuredProviderGroups.find((group) => group.id === provider)?.models[0]?.id ?? settings.prompt_model;
 		updateSettings({ prompt_model: model });
 	}
 
@@ -119,7 +127,7 @@
 		<label>
 			<span>{t().providerLabel}</span>
 			<select value={promptProvider} disabled={running} onchange={(event) => setPromptProvider((event.currentTarget as HTMLSelectElement).value as Provider)}>
-				{#each PROVIDER_GROUPS as group (group.id)}
+				{#each configuredProviderGroups as group (group.id)}
 					<option value={group.id}>{group.label}</option>
 				{/each}
 			</select>
@@ -127,7 +135,7 @@
 		<label>
 			<span>{t().demoPromptModel}</span>
 			<select value={settings.prompt_model} disabled={running} onchange={(event) => updateSettings({ prompt_model: (event.currentTarget as HTMLSelectElement).value })}>
-				{#each modelsForProvider(promptProvider) as model (model.id)}
+				{#each promptModels as model (model.id)}
 					<option value={model.id}>{model.label}</option>
 				{/each}
 			</select>
@@ -169,7 +177,7 @@
 			</div>
 			<StopButton onclick={onStop}>{t().demoStop}</StopButton>
 		{:else}
-			<PaintButton onclick={onStart} disabled={!settings.seed_phrase.trim() || actionDisabled}>{t().demoStart}</PaintButton>
+			<PaintButton onclick={onStart} disabled={!settings.seed_phrase.trim() || promptModels.length === 0 || actionDisabled}>{t().demoStart}</PaintButton>
 		{/if}
 	</div>
 

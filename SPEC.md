@@ -1260,6 +1260,12 @@ Build 548 fixes a History Manager page-size boundary where wrapper padding was c
 
 Build 549 aligns History Manager's bulk delete action with the lineage view: both use the same trash icon followed by the selected count. The action is disabled with no selection, while its name remains available through the tooltip and aria-label.
 
+Build 550 stops using the fixed model catalog for Demo prompt generation. Its provider and model dropdowns now follow the configured, enabled list returned by `/api/models`; empty providers are omitted, a disabled saved choice is replaced and persisted with the first enabled model, and Demo start is disabled when no enabled model exists.
+
+Build 551 fixes Demo random color catalogs updating only the paint request while leaving the visible catalog selection unchanged. Each draw now updates the UI selection, avoids the immediately previous catalog when at least two choices exist, and reconciles the selection with the catalog ID actually reported by the response.
+
+Build 552 moves the authoritative Demo catalog draw into `/api/paint` after an observed run still rendered with `Ink & Season`. The backward-compatible `random_color_catalog` flag makes the server exclude the submitted current catalog ID, choose another catalog, and carry that one ID through render metadata, the color map, Renderer, history, and response. Demo updates its UI from the returned effective ID; ordinary paint requests keep their explicit catalog behavior.
+
 ## 16. Licensing
 
 The intended license direction is:

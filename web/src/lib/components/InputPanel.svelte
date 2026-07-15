@@ -8,6 +8,7 @@
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 	import type { DemoSettings } from '$lib/demo';
+	import type { ProviderGroup } from '$lib/models';
 	import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 
 	type BatchFailure = {
@@ -50,6 +51,7 @@
 		instructionLang: InstructionLang;
 		interpretationFeedbackParts: InterpretationFeedbackPart[];
 		demoSettings: DemoSettings;
+		demoModelProviderGroups: ProviderGroup[];
 		demoRunning: boolean;
 		demoWaitingSeconds: number | null;
 		demoCurrentLiveMs: number | null;
@@ -116,6 +118,7 @@
 		instructionLang = $bindable('auto'),
 		interpretationFeedbackParts,
 		demoSettings = $bindable(),
+		demoModelProviderGroups,
 		demoRunning,
 		demoWaitingSeconds,
 		demoCurrentLiveMs,
@@ -309,6 +312,7 @@
 	{:else}
 		<DemoPanel
 			bind:settings={demoSettings}
+			providerGroups={demoModelProviderGroups}
 			running={demoRunning}
 			{liveMs}
 			waitingSeconds={demoWaitingSeconds}

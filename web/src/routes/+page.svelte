@@ -542,6 +542,7 @@
 	let modelSettingsLoading = $state(false);
 	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
+	let availableModelsLoaded = $state(false);
 	let dbBackupStatus = $state<string | null>(null);
 	let outputSaveStatus = $state<string | null>(null);
 	let logRetentionStatus = $state<string | null>(null);
@@ -610,6 +611,15 @@
 
 	function modelsFor(provider: Provider) {
 		return availableModelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
+	}
+
+	function reconcileDemoPromptModel() {
+		if (!availableModelsLoaded || !demoSettingsLoaded) return;
+		const configuredModels = availableModelCatalog.flatMap((group) => group.models);
+		if (configuredModels.some((model) => model.id === demoSettings.prompt_model)) return;
+		const fallbackModel = configuredModels[0]?.id;
+		if (!fallbackModel) return;
+		void saveDemoSettings({ ...demoSettings, prompt_model: fallbackModel });
 	}
 
 	function applyUserModelSettings(user: UserItem | null) {
@@ -781,6 +791,7 @@
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			demoSettings = normalizeDemoSettings(await r.json() as DemoSettings);
 			demoSettingsLoaded = true;
+			reconcileDemoPromptModel();
 		} catch (e) {
 			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 			demoSettingsLoaded = false;
@@ -1080,12 +1091,16 @@
 	}
 
 	async function loadAvailableModels() {
-		if (!currentUser) return;
+		if (!currentUser) {
+			availableModelsLoaded = false;
+			return;
+		}
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const data = await r.json() as { catalog: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
-			availableModelCatalog = data.catalog.length ? data.catalog : PROVIDER_GROUPS;
+			availableModelCatalog = data.catalog;
+			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
 				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
 			}
@@ -1095,6 +1110,7 @@
 			if (!modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
 				stage2Model = modelsFor(stage2Provider)[0]?.id ?? stage2Model;
 			}
+			reconcileDemoPromptModel();
 		} catch (e) {
 			console.warn('failed to load model catalog', e);
 		}
@@ -2049,6 +2065,7 @@
 		saveArtifacts?: boolean;
 		countGeneration?: boolean;
 		catalogId?: string;
+		randomColorCatalog?: boolean;
 		canvasAspectId?: CanvasAspectId;
 		renderSeed?: number;
 		varySeed?: number;
@@ -2104,7 +2121,8 @@
 				lineage_parent_node_id: options.lineageParentNodeId ?? null,
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},
-				catalog_id: options.catalogId ?? selectedCatalog
+				catalog_id: options.catalogId ?? selectedCatalog,
+				random_color_catalog: options.randomColorCatalog ?? false
 			})
 		});
 		if (!r.ok) {
@@ -2256,10 +2274,11 @@ if (unreadWords.length > 0) {
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
-	function randomColorCatalogId(): string {
+	function randomColorCatalogId(excludeId?: string): string {
 		const ids = colorCatalogs.map((catalog) => catalog.id).filter((id): id is string => !!id);
 		if (ids.length === 0) return selectedCatalog;
-		return ids[Math.floor(Math.random() * ids.length)] ?? selectedCatalog;
+		const candidates = ids.length > 1 && excludeId ? ids.filter((id) => id !== excludeId) : ids;
+		return candidates[Math.floor(Math.random() * candidates.length)] ?? selectedCatalog;
 	}
 
 	async function generateDemoInstruction(settings: DemoSettings): Promise<string> {
@@ -2296,6 +2315,7 @@ if (unreadWords.length > 0) {
 				await saveDemoSettings(settings);
 				demoGeneratedPrompt = await generateDemoInstruction(settings);
 				if (demoRunId !== runId || !loading) break;
+				const demoCatalogId = selectedCatalog;
 				const r = await paintOne(demoGeneratedPrompt, {
 					saveHistory: settings.save_db,
 					saveArtifacts: settings.save_files,
@@ -2303,10 +2323,12 @@ if (unreadWords.length > 0) {
 					historyInput: `[demo] ${demoGeneratedPrompt}`,
 					sourceText: demoGeneratedPrompt,
 					displayLabel: '[demo]',
-					catalogId: settings.random_color_catalog ? randomColorCatalogId() : selectedCatalog,
+					catalogId: demoCatalogId,
+					randomColorCatalog: settings.random_color_catalog,
 				});
 				if (demoRunId !== runId || !loading) break;
 				demoGeneratedDdl = r.ddl;
+				if (settings.random_color_catalog && r.render_color_catalog_id) selectedCatalog = r.render_color_catalog_id;
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
 				ddl = r.ddl; ddlGeneratedBaseline = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
@@ -4707,6 +4729,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						bind:instructionLang
 						{interpretationFeedbackParts}
 						bind:demoSettings
+						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}
 						{demoWaitingSeconds}
 						{demoCurrentLiveMs}

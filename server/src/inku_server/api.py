@@ -12,6 +12,7 @@ import logging
 import os
 import platform
 import re
+import secrets
 import time
 import urllib.error
 import urllib.parse
@@ -28,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .feature_analysis import composition_distance
-from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
+from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import compose
 from .interpreter import _sanitize_placement_words, interpret_detail
@@ -553,6 +554,14 @@ def _resolved_catalog_id(catalog_id: str | None) -> str:
     return str(catalog["id"])
 
 
+def _resolved_paint_catalog_id(catalog_id: str | None, *, random_catalog: bool) -> str:
+    resolved = _resolved_catalog_id(catalog_id)
+    if not random_catalog:
+        return resolved
+    candidates = [candidate for candidate in color_catalog_ids() if candidate != resolved]
+    return secrets.choice(candidates) if candidates else resolved
+
+
 def _validated_canvas_aspect(value: str | None) -> str:
     if value is None:
         return normalize_canvas_aspect_id(None)
@@ -715,7 +724,8 @@ class PaintRequest(BaseModel):
     lineage_parent_node_id: str | None = None
     derivation_kind: str | None = None
     derivation_metadata: dict[str, object] = Field(default_factory=dict)
-    catalog_id: str | None = Field(default=None, description="使用した色カタログID")
+    catalog_id: str | None = Field(default=None, description="使用する色カタログID。ランダム選択時は直前IDとして除外する")
+    random_color_catalog: bool = Field(default=False, description="現在のcatalog_idを除外してサーバー側で色カタログを選ぶか")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
@@ -2435,7 +2445,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     instruction_lang_resolved = _resolve_instruction_lang(source_text, instruction_lang_requested)
     ui_lang = _normalize_ui_lang(req.ui_lang)
-    catalog_id = _resolved_catalog_id(req.catalog_id)
+    catalog_id = _resolved_paint_catalog_id(req.catalog_id, random_catalog=req.random_color_catalog)
     resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)

@@ -1343,6 +1343,55 @@ def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
     assert r.json()["ddl"] == captured["ddl"]
 
 
+def test_paint_random_catalog_excludes_current_and_uses_effective_map(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.1,
+                    "color": "black",
+                }
+            ]
+        }
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    captured_candidates: list[str] = []
+
+    def choose_first(candidates: list[str]) -> str:
+        captured_candidates.extend(candidates)
+        return candidates[0]
+
+    monkeypatch.setattr(api_module.secrets, "choice", choose_first)
+
+    response = client.post(
+        "/api/paint",
+        json={
+            "text": "一滴の墨",
+            "catalog_id": "ink_season",
+            "random_color_catalog": True,
+            "count_generation": False,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert captured_candidates
+    assert "ink_season" not in captured_candidates
+    assert data["render_color_catalog_id"] == captured_candidates[0]
+    assert data["render_color_catalog_id"] != "ink_season"
+    assert data["catalog_id"] == data["render_color_catalog_id"]
+    assert data["render_color_map"] == api_module._catalog_render_color_map(data["render_color_catalog_id"])
+
+
 def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     headers, user, _ = auth_context
     monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))

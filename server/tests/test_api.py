@@ -704,6 +704,28 @@ def test_compose_resolves_english_instruction_language(monkeypatch, auth_context
     assert data["ui_lang"] == "ja"
 
 
+def test_compose_uses_ui_language_when_text_has_no_language_signal(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    captured: dict[str, str] = {}
+
+    def fake_compose(ddl: str, model=None, original_text=None, system_prompt=None, lang="ja"):
+        captured["lang"] = lang
+        return Score.model_validate(
+            {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+    r = client.post(
+        "/api/compose",
+        json={"ddl": "12345", "instruction_lang": "auto", "ui_lang": "en"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200
+    assert captured["lang"] == "en"
+    assert r.json()["instruction_lang_resolved"] == "en"
+
+
 def test_language_metadata_does_not_change_render_hash():
     item = {
         "input": "one black line",
@@ -2034,6 +2056,7 @@ def test_history_is_scoped_to_authenticated_user():
         "score": {"instructions": []},
         "svg": "<svg><script>alert(1)</script></svg>",
         "at": 1_700_000_000_000,
+        "derivation_metadata": {"seed_text": "夕立"},
     }
     post_a = client.post("/api/history", json=payload, headers=headers_a)
     assert post_a.status_code == 200
@@ -2041,6 +2064,8 @@ def test_history_is_scoped_to_authenticated_user():
     assert item_a["svg"] != payload["svg"]
     assert "<script" not in item_a["svg"]
     assert "<svg" in item_a["svg"]
+    assert item_a["seed_text"] == "夕立"
+    assert item_a["render_seed"] == api_module._render_seed_from_text("夕立", None)[0]
     post_a_second = client.post(
         "/api/history",
         json={**payload, "input": "blue crayon search target", "ddl": "青い線", "at": payload["at"] + 1},

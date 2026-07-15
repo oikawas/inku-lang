@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.81**
+**Version: v1.82**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -56,13 +56,15 @@ Variation is intentional.  DDL does not attempt to eliminate all model or
 renderer variation.  It uses variation as part of the medium, while keeping the
 score, schema, and renderer boundaries explicit.
 
-The UI display language and the instruction language are separate concerns.
-Users may run the Japanese UI while writing English instructions, or use the
-English UI while writing Japanese instructions.  API requests use
-`instruction_lang` (`auto`, `ja`, or `en`) for interpretation and `ui_lang` for
-display context.  When `instruction_lang` is `auto`, the server lightly detects
-Japanese or English from the input text and passes the resolved language to
-Stage 1, Stage 1.5, Stage 2, and demo-instruction generation.  Render metadata
+The UI display language and the instruction language are separate metadata.
+The writing tab does not ask users to choose a language: normal generation
+always sends `instruction_lang: auto`. Users may run the Japanese UI while
+writing English instructions, or use the English UI while writing Japanese
+instructions. API requests retain explicit `ja` and `en` values for compatibility
+and comparison runs, while `ui_lang` provides display context. With `auto`, the
+server lightly detects Japanese or English from the input text and uses the UI
+language only when the text itself has no language signal. The resolved language
+is passed to Stage 1, Stage 1.5, Stage 2, and demo-instruction generation. Render metadata
 records `instruction_lang_requested`, `instruction_lang_resolved`, and
 `ui_lang` for audit and replay context.  These language metadata fields are not
 part of the current canonical `render_hash` payload, so existing history hashes
@@ -1259,6 +1261,22 @@ A history group is based only on persisted lineage nodes and edges, never simila
 Each group header shows a representative artwork, the regular-history artwork count under the current filter, starred count, and latest save time. Members are fetched only when expanded and retain the existing display, star, replay, individual/group selection, and trash operations. Search, starred-only, and active/trash filters include only matching artworks in group summaries and expanded members. `lineage_only` and tombstones remain outside regular history and its counts. An independent artwork forms a one-work lineage, and no root, artwork, or count may cross user boundaries.
 
 Build 557 establishes the v1.81 foundation with lineage-root migration/backfill, lineage group/member APIs, and the Timeline/By lineage History Manager UI with lazy expansion.
+
+### v1.82 Automatic instruction language and language comparison
+
+The writing tab no longer asks the author to choose an instruction language. Normal generation always requests automatic detection from the entered text; when the text has no Japanese or Latin language signal, the UI display language is the fallback. Japanese UI with English writing, and English UI with Japanese writing, remain supported.
+
+Refine adds Language comparison beside Adjust and Model comparison. It uses the same three comparison modes: shared Stage 1/2 language, fixed Stage 1 with Stage 2 comparison, and Stage 1 comparison with fixed Stage 2. Japanese and English can be assigned per stage only for an explicit comparison run, without changing automatic detection for normal generation. The target's identical language combination is excluded, results show the Stage 1/2 language pair and normalized DDL, and an adopted result records the pair in lineage metadata. Changing the target clears results and aborts an in-flight language comparison.
+
+Build 558 implements this boundary and the UI-language fallback. Adopted comparisons use a dedicated `language_variation` lineage edge.
+
+Build 559 adds the effective Stage 1 and Stage 2 languages to Generation info / Details. Normal works show their shared resolved language, while adopted language comparisons show the per-stage values recorded in lineage metadata.
+
+Build 560 aligns Generation info / JSON with Details by adding per-stage instruction languages, render/layout/interpretation seeds, description hash, elapsed time, input/output token counts, and derivation kind/metadata at the top level. The JSON Score, API and database schemas, and canonical render-hash payload remain unchanged.
+
+Build 561 removes the former “Use today's word as a seed” control from the writing tab and first generation, and moves it to Refine / Adjust as “Vary Touch with Words.” The entered words affect only the Renderer's deterministic performance seed, never the interpretation, DDL, JSON Score, or layout. Because the same words reproduce the same touch, this operation generates one candidate at a time. History, Generation info / JSON, and replay retain both the words and resolved seed. The first artwork remains the source work and never applies this word-based touch variation.
+
+Build 562 removes the duplicated instruction preview below the writing field and places the normalized-DDL heading on the same row as Saijiki, DDL edit, and automatic repair. “Vary Touch with Words” moves to the end of the refinement choices; selecting it alone reveals an unlabeled input and copy explaining deterministic Seed behavior and the one-option limit. Writing-tab selectors now use action-target labels, “Canvas” and “Color catalog,” in both languages instead of showing the current values, and the canvas button no longer has a leading square icon.
 
 Build 545 reorganizes the Canvas artwork facts and next-generation settings into separate groups and consolidates generation metadata into the Details / Prompts / JSON inspector. It changes only the visible height, not the content, of the Stage 1 user input and Stage 2 system prompt fields.
 

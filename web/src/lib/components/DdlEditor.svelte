@@ -63,9 +63,6 @@
 </script>
 
 <section class="panel-section">
-	<div class="section-head">
-		<span class="section-label">{t().ddlLabel}</span>
-	</div>
 	<DdlEditPanel
 		bind:ddl
 		{ddlHighlighted}
@@ -96,18 +93,6 @@
 </section>
 
 <style>
-	.panel-section { display: flex; flex-direction: column; gap: 6px; }
+	.panel-section { display: flex; flex-direction: column; gap: 6px; margin-top: -8px; }
 	.panel-section > :global(.tooltip-wrap) { width: 100%; }
-	.section-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-	.section-label {
-		font-size: 10px;
-		font-weight: 500;
-		letter-spacing: 0.08em;
-		color: var(--fg3);
-		text-transform: uppercase;
-	}
 </style>

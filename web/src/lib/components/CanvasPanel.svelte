@@ -12,14 +12,14 @@
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: Score; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
+	type PaintResult = { svg: string; score: Score; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
-	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
+	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
 		outputTab: OutputTab;
@@ -94,7 +94,8 @@
 		variationGridIncludesReading: boolean;
 		variationGridTaskLabel: string;
 		variationGridStatus: string | null;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
+		touchSeedText: string;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
 		onAbortVariationCandidates: () => void;
 		onSaveSelectedVariationCandidates: () => void | Promise<void>;
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
@@ -118,6 +119,20 @@
 		onRunModelInspection: () => void | Promise<void>;
 		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
 		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
+		languageInspectionTargetLang: 'ja' | 'en';
+		languageCompareMode: ModelCompareMode;
+		languageCompareFixedLang: 'ja' | 'en';
+		languageInspectionSelectedLangs: Array<'ja' | 'en'>;
+		languageInspectionBusy: boolean;
+		languageInspectionStatus: string | null;
+		languageInspectionResults: ModelInspectionResult[];
+		onSetLanguageCompareMode: (mode: ModelCompareMode) => void;
+		onSetLanguageCompareFixedLang: (lang: 'ja' | 'en') => void;
+		onToggleLanguageInspectionLang: (lang: 'ja' | 'en') => void;
+		isLanguageInspectionChoiceBlocked: (lang: 'ja' | 'en') => boolean;
+		onRunLanguageInspection: () => void | Promise<void>;
+		onAdoptLanguageInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
+		onToggleLanguageInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
 		lineageGraph: LineageGraph | null;
 		lineageLoading: boolean;
 		lineageError: string | null;
@@ -204,6 +219,7 @@
 		variationGridIncludesReading = false,
 		variationGridTaskLabel = '',
 		variationGridStatus = null,
+		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
 		onAbortVariationCandidates,
 		onSaveSelectedVariationCandidates,
@@ -228,6 +244,20 @@
 		onRunModelInspection,
 		onAdoptModelInspectionResult,
 		onToggleModelInspectionStar,
+		languageInspectionTargetLang,
+		languageCompareMode = 'common',
+		languageCompareFixedLang = 'ja',
+		languageInspectionSelectedLangs = [],
+		languageInspectionBusy = false,
+		languageInspectionStatus = null,
+		languageInspectionResults = [],
+		onSetLanguageCompareMode,
+		onSetLanguageCompareFixedLang,
+		onToggleLanguageInspectionLang,
+		isLanguageInspectionChoiceBlocked,
+		onRunLanguageInspection,
+		onAdoptLanguageInspectionResult,
+		onToggleLanguageInspectionStar,
 		lineageGraph = null,
 		lineageLoading = false,
 		lineageError = null,
@@ -247,7 +277,7 @@
 	let presentationMode = $state(false);
 	let generationInfoOpen = $state(false);
 	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
-	let refineView = $state<'adjust' | 'compare'>('adjust');
+	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
 	let refineKind = $state<RefineKind>('touch');
 	const refineCostLabel = $derived(
 		refineKind === 'reading'
@@ -322,6 +352,11 @@
 	const detailEngine = $derived(statusHistoryItem?.render_engine_id ?? result?.render_engine_id ?? '');
 	const detailEngineVersion = $derived(statusHistoryItem?.render_engine_version ?? result?.render_engine_version ?? '');
 	const detailBuild = $derived(statusHistoryItem?.render_build_number ?? result?.render_build_number ?? '');
+	const detailDerivationMetadata = $derived(statusHistoryItem?.derivation_metadata ?? result?.derivation_metadata ?? {});
+	const detailResolvedLang = $derived(statusHistoryItem?.instruction_lang_resolved ?? result?.instruction_lang_resolved ?? '');
+	const detailStage1Lang = $derived(typeof detailDerivationMetadata.stage1_language === 'string' ? detailDerivationMetadata.stage1_language : detailResolvedLang);
+	const detailStage2Lang = $derived(typeof detailDerivationMetadata.stage2_language === 'string' ? detailDerivationMetadata.stage2_language : detailResolvedLang);
+	const displayLanguageName = (lang: string) => lang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : lang === 'en' ? 'English' : lang || '-';
 	const detailElapsedMs = $derived(statusHistoryItem?.elapsed_ms ?? result?.elapsed_total_ms ?? null);
 	const detailTokensIn = $derived(statusHistoryItem?.tokens_in ?? ((result?.tokens_in_stage1 ?? 0) + (result?.tokens_in_stage2 ?? 0) || null));
 	const detailTokensOut = $derived(statusHistoryItem?.tokens_out ?? ((result?.tokens_out_stage1 ?? 0) + (result?.tokens_out_stage2 ?? 0) || null));
@@ -485,6 +520,7 @@
 					<div class="refine-mode-tabs" role="tablist" aria-label={isJapanese ? '推敲方法' : 'Refinement method'}>
 						<button type="button" role="tab" aria-selected={refineView === 'adjust'} class:active={refineView === 'adjust'} onclick={() => (refineView = 'adjust')}>{isJapanese ? '調整' : 'Adjust'}</button>
 						<button type="button" role="tab" aria-selected={refineView === 'compare'} class:active={refineView === 'compare'} onclick={() => (refineView = 'compare')}>{isJapanese ? 'モデル比較' : 'Model comparison'}</button>
+						<button type="button" role="tab" aria-selected={refineView === 'language'} class:active={refineView === 'language'} onclick={() => (refineView = 'language')}>{isJapanese ? '言語比較' : 'Language comparison'}</button>
 					</div>
 					{#if refineView === 'adjust'}
 						<div class="refine-panel">
@@ -502,15 +538,6 @@
 										<div class="refine-selection-hint">{t().refineSingleSelectionHint}</div>
 									</div>
 									<div class="model-choice-grid" role="radiogroup" aria-label={t().refineSingleSelectionHint}>
-										<label class="model-choice" class:checked={refineKind === 'touch'}>
-											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
-											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
-												<span class="refine-choice-label">
-													<strong>{t().canvasVaryPerformance}</strong>
-													<span class="refine-info-mark" aria-hidden="true">i</span>
-												</span>
-											</Tooltip>
-										</label>
 										<label class="model-choice" class:checked={refineKind === 'layout'}>
 											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => (refineKind = 'layout')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
@@ -538,7 +565,22 @@
 												</span>
 											</Tooltip>
 										</label>
+										<label class="model-choice" class:checked={refineKind === 'touch'}>
+											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryPerformance}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
 									</div>
+									{#if refineKind === 'touch'}
+										<label class="touch-seed-field">
+											<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={variationBusy || variationGridBusy} />
+											<small>{isJapanese ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be generated.'}</small>
+										</label>
+									{/if}
 								</section>
 								<section class="refine-action-section">
 									<div class="refine-section-head">
@@ -548,8 +590,8 @@
 										<Tooltip text={t().tooltipRefineSingle}>
 											<div class="refine-action-wrap">
 												<PaintButton
-													onclick={() => onGenerateVariationCandidates(refineKind, 1)}
-													disabled={!result || variationBusy || variationGridBusy}
+												onclick={() => onGenerateVariationCandidates(refineKind, 1, refineKind === 'touch' ? touchSeedText : undefined)}
+												disabled={!result || variationBusy || variationGridBusy || (refineKind === 'touch' && !touchSeedText.trim())}
 												>
 													{t().refineSingleButton}
 												</PaintButton>
@@ -558,8 +600,8 @@
 										<Tooltip text={t().tooltipVariationGridDefault}>
 											<div class="refine-action-wrap">
 												<PaintButton
-													onclick={() => onGenerateVariationCandidates(refineKind, 4)}
-													disabled={!result || variationBusy || variationGridBusy}
+												onclick={() => onGenerateVariationCandidates(refineKind, 4)}
+												disabled={!result || variationBusy || variationGridBusy || refineKind === 'touch'}
 												>
 													{t().variationGridDefault}
 												</PaintButton>
@@ -617,7 +659,7 @@
 						</div>
 					</div>
 				</div>
-					{:else}
+					{:else if refineView === 'compare'}
 					<div class="compare-panel">
 					<div class="compare-head">
 						<div class="refine-title">{t().modelCompareTitle}</div>
@@ -680,6 +722,42 @@
 						</div>
 					</div>
 					</div>
+					{:else}
+					<div class="compare-panel">
+						<div class="compare-head">
+							<div class="refine-title">{isJapanese ? '指示文言語を比較する' : 'Compare instruction languages'}</div>
+							<div class="compare-action-wrap"><PaintButton onclick={onRunLanguageInspection} disabled={!result || variationGridBusy || languageInspectionBusy || languageInspectionSelectedLangs.length === 0}>{languageInspectionBusy ? (isJapanese ? '比較中' : 'Comparing') : (isJapanese ? '選んだ言語で比較' : 'Compare selected languages')}</PaintButton></div>
+						</div>
+						<div class="compare-mode-tabs" role="tablist" aria-label={isJapanese ? '言語比較モード' : 'Language comparison mode'}>
+							<button class:active={languageCompareMode === 'common'} onclick={() => onSetLanguageCompareMode('common')}>{t().modelCompareModeCommon}</button>
+							<button class:active={languageCompareMode === 'stage1_fixed'} onclick={() => onSetLanguageCompareMode('stage1_fixed')}>{t().modelCompareModeStage1Fixed}</button>
+							<button class:active={languageCompareMode === 'stage2_fixed'} onclick={() => onSetLanguageCompareMode('stage2_fixed')}>{t().modelCompareModeStage2Fixed}</button>
+						</div>
+						{#if languageCompareMode !== 'common'}
+							<label class="compare-fixed-model"><span>{languageCompareMode === 'stage1_fixed' ? (isJapanese ? '固定するStage 1言語' : 'Fixed Stage 1 language') : (isJapanese ? '固定するStage 2言語' : 'Fixed Stage 2 language')}</span><select value={languageCompareFixedLang} disabled={languageInspectionBusy} onchange={(event) => onSetLanguageCompareFixedLang(event.currentTarget.value as 'ja' | 'en')}><option value="ja">{isJapanese ? '日本語' : 'Japanese'}</option><option value="en">English</option></select></label>
+						{/if}
+						<div class="model-choice-grid" aria-label={isJapanese ? '比較する言語' : 'Languages to compare'}>
+							{#each ['ja', 'en'] as lang}
+								{@const typedLang = lang as 'ja' | 'en'}
+								{@const blocked = isLanguageInspectionChoiceBlocked(typedLang)}
+								{@const checked = languageInspectionSelectedLangs.includes(typedLang)}
+								<Tooltip text={blocked ? (isJapanese ? '対象作品と同じ言語構成です' : 'Same language combination as the target') : ''}>
+									<label class="model-choice" class:checked={checked} class:target={blocked} class:disabled={blocked}>
+										<input type="checkbox" checked={checked} disabled={languageInspectionBusy || blocked} onchange={() => onToggleLanguageInspectionLang(typedLang)} />
+										<span><strong>{typedLang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : 'English'}</strong><small>{blocked ? (isJapanese ? '対象作品で使用中' : 'used by target') : ''}</small></span>
+									</label>
+								</Tooltip>
+							{/each}
+						</div>
+						{#if languageInspectionStatus}<div class="variation-grid-status">{languageInspectionStatus}</div>{/if}
+						<div class="model-compare-stage" class:busy={languageInspectionBusy}>
+							<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {languageInspectionTargetLang}<br />Stage 2: {languageInspectionTargetLang}</div></div>
+							<div class="model-results-column">
+								{#if languageInspectionBusy}<div class="model-drawing-animation" aria-live="polite"><div class="model-drawing-spinner" aria-hidden="true"></div><div><strong>{isJapanese ? '言語比較用の描画を生成中…' : 'Generating language comparisons…'}</strong></div></div>{/if}
+								{#if languageInspectionResults.length > 0}<div class="model-inspection-grid">{#each languageInspectionResults as item (item.id)}<div class="model-inspection-card" class:saved={!!item.savedHistoryId}><div class="comparison-label">{item.label}</div><div class="model-comparison-art-wrap"><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div><button class="variation-select model-adopt-select" class:selected={!!item.savedHistoryId} type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptLanguageInspectionResult(item)}>{item.saving ? '…' : item.savedHistoryId ? '✓' : '+'}</button></div><div class="model-result-actions"><button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleLanguageInspectionStar(item)}>{item.starred ? '★' : '☆'}</button></div><pre>{item.ddl}</pre></div>{/each}</div>{/if}
+							</div>
+						</div>
+					</div>
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
@@ -734,6 +812,8 @@
 						<dl>
 							<dt>Stage 1 ({isJapanese ? '\u89e3\u91c8' : 'interpretation'})</dt><dd>{statusStage1Model}</dd>
 							<dt>Stage 2 ({isJapanese ? '\u63cf\u753b' : 'rendering'})</dt><dd>{statusStage2Model}</dd>
+							<dt>Stage 1 {isJapanese ? '\u8a00\u8a9e' : 'language'}</dt><dd>{displayLanguageName(detailStage1Lang)}</dd>
+							<dt>Stage 2 {isJapanese ? '\u8a00\u8a9e' : 'language'}</dt><dd>{displayLanguageName(detailStage2Lang)}</dd>
 							<dt>{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</dt><dd>{statusCatalogName}</dd>
 							<dt>{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</dt><dd>{statusCanvasName}</dd>
 							<dt>render seed</dt><dd>{detailRenderSeed ?? '-'}</dd>
@@ -1132,6 +1212,9 @@
 		font-size: 11px;
 		color: var(--fg3);
 	}
+	.touch-seed-field { display: grid; gap: 5px; color: var(--fg2); font-size: 12px; }
+	.touch-seed-field input { width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--r); padding: 8px 9px; color: var(--fg); background: var(--bg); font: inherit; }
+	.touch-seed-field small { color: var(--fg3); font-size: 11px; line-height: 1.4; }
 	.refine-actions {
 		display: flex;
 		flex-wrap: wrap;

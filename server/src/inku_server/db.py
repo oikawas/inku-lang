@@ -37,6 +37,7 @@ LINEAGE_DERIVATION_KINDS = {
     "catalog_change",
     "reinterpretation",
     "model_variation",
+    "language_variation",
     "ddl_edit",
     "description_edit",
     "replay",

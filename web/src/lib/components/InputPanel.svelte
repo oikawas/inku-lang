@@ -21,12 +21,9 @@
 		total: number;
 		failures: BatchFailure[];
 	};
-	type InstructionLang = 'auto' | 'ja' | 'en';
-	type InterpretationFeedbackPart = { text: string; tone: 'strong' | 'medium' | 'weak' };
 	type Props = {
 		inputMode: 'single' | 'batch' | 'demo';
 		input: string;
-		seedText: string;
 		batchInput: string;
 		lineNumbersText: string;
 		batchNonEmpty: number;
@@ -48,8 +45,6 @@
 		error: string | null;
 		batchPromptHistory: string[];
 		batchRandomColorCatalog: boolean;
-		instructionLang: InstructionLang;
-		interpretationFeedbackParts: InterpretationFeedbackPart[];
 		demoSettings: DemoSettings;
 		demoModelProviderGroups: ProviderGroup[];
 		demoRunning: boolean;
@@ -72,7 +67,6 @@
 		stageLabel: string;
 		showKiwi: boolean;
 		showCrab: boolean;
-		selectedCatalogName: string;
 		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
@@ -93,7 +87,6 @@
 	let {
 		inputMode = $bindable('single'),
 		input = $bindable(''),
-		seedText = $bindable(''),
 		batchInput = $bindable(''),
 		lineNumbersText,
 		batchNonEmpty,
@@ -115,8 +108,6 @@
 		error,
 		batchPromptHistory,
 		batchRandomColorCatalog = $bindable(false),
-		instructionLang = $bindable('auto'),
-		interpretationFeedbackParts,
 		demoSettings = $bindable(),
 		demoModelProviderGroups,
 		demoRunning,
@@ -139,7 +130,6 @@
 		stageLabel,
 		showKiwi,
 		showCrab,
-		selectedCatalogName,
 		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
@@ -166,7 +156,8 @@
 	const singleInputStats = $derived.by(() => {
 		const source = input.trim();
 		const asciiMostly = source.length > 0 && /^[\x00-\x7F\s.,;:!?()"-]+$/.test(source);
-		const useWords = instructionLang === "en" || (instructionLang === "auto" && asciiMostly);
+		const hasJapanese = /[\u3040-\u30ff\u3400-\u9fff]/.test(source);
+		const useWords = !hasJapanese && (asciiMostly || (!source && t().code === 'en'));
 		const guide = useWords ? 12 : 31;
 		const count = useWords
 			? (source.match(/[A-Za-z0-9]+(?:[-][A-Za-z0-9]+)*/g) ?? []).length
@@ -212,14 +203,7 @@
 				/>
 			{/if}
 			<Tooltip text={t().tooltipInputCatalog}>
-				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{selectedCatalogName}</button>
-			</Tooltip>
-			<Tooltip text={t().tooltipInputLang}>
-				<select class="ghost-select" bind:value={instructionLang} aria-label={t().instructionLangLabel}>
-					<option value="auto">{t().instructionLangAuto}</option>
-					<option value="ja">{t().instructionLangJapanese}</option>
-					<option value="en">{t().instructionLangEnglish}</option>
-				</select>
+				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			</Tooltip>
 			<Tooltip text={t().tooltipInputModel}>
 				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
@@ -241,19 +225,6 @@
 			class="input-ta"
 		></textarea>
 		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide}</div>
-
-<label class="seed-text-field">
-	<span>{instructionLang === 'ja' ? '今日の言葉を種にする' : 'Seed the performance with a phrase'}</span>
-	<input bind:value={seedText} placeholder={instructionLang === 'ja' ? '空欄なら通常の演奏' : 'Blank uses the normal performance'} />
-</label>
-
-		{#if interpretationFeedbackParts.length > 0}
-			<div class="interpret-feedback" aria-label={t().interpretationFeedbackLabel}>
-				{#each interpretationFeedbackParts as part}
-					<span class:strong={part.tone === 'strong'} class:medium={part.tone === 'medium'} class:weak={part.tone === 'weak'}>{part.text}</span>
-				{/each}
-			</div>
-		{/if}
 
 		{#if singleRunning && !singleDdlReady}
 			<div class="progress-wrap">
@@ -369,24 +340,6 @@
 	}
 	.panel-tab.active.running::before { background: var(--accent); animation: none; }
 	.panel-tab:disabled { opacity: 0.38; cursor: not-allowed; }
-	.seed-text-field { display: grid; gap: 4px; margin-top: 10px; color: var(--fg3); font-size: 0.78rem; }
-	.seed-text-field input { width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; color: var(--fg); background: var(--bg); }
-	.interpret-feedback {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 3px 0;
-		min-height: 24px;
-		padding: 6px 8px;
-		border: 1px solid var(--border);
-		border-top: 0;
-		background: color-mix(in srgb, var(--bg2) 62%, transparent);
-		font-size: 12px;
-		line-height: 1.7;
-	}
-	.interpret-feedback span { white-space: pre-wrap; color: color-mix(in srgb, var(--fg) 28%, transparent); }
-	.interpret-feedback span.medium { color: color-mix(in srgb, var(--fg) 58%, transparent); }
-	.interpret-feedback span.strong { color: var(--fg); font-weight: 600; }
-	.interpret-feedback span.weak { color: color-mix(in srgb, var(--fg) 24%, transparent); }
 	.tab-label { line-height: 1; }
 	.tab-running-dot {
 		width: 6px;
@@ -419,18 +372,6 @@
 		white-space: nowrap;
 	}
 	.ghost-btn:hover { background: var(--bg2); }
-	.ghost-select {
-		height: 25px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: 11px;
-		font-family: inherit;
-		padding: 0 22px 0 8px;
-		cursor: pointer;
-		max-width: 92px;
-	}
 	.catalog-btn {
 		display: inline-block;
 		max-width: 128px;

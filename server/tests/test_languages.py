@@ -53,3 +53,4 @@ def test_auto_instruction_language_resolution_remains_stable():
     assert resolve_instruction_lang("一滴の墨", "auto") == "ja"
     assert resolve_instruction_lang("one black line", "auto") == "en"
     assert resolve_instruction_lang("12345", "auto") == "ja"
+    assert resolve_instruction_lang("12345", "auto", fallback="en") == "en"

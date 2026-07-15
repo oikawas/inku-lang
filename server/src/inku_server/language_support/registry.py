@@ -28,7 +28,7 @@ def normalize_instruction_lang(value: str | None, *, default: str = "ja") -> str
     return lang
 
 
-def resolve_instruction_lang(text: str, requested: str) -> str:
+def resolve_instruction_lang(text: str, requested: str, *, fallback: str = "ja") -> str:
     lang = normalize_instruction_lang(requested)
     if lang != "auto":
         return lang
@@ -36,7 +36,8 @@ def resolve_instruction_lang(text: str, requested: str) -> str:
         return "ja"
     if _LATIN_TEXT_RE.search(text):
         return "en"
-    return "ja"
+    normalized_fallback = normalize_instruction_lang(fallback)
+    return "ja" if normalized_fallback == "auto" else normalized_fallback
 
 
 def instruction_language(lang: str) -> InstructionLanguageSupport:

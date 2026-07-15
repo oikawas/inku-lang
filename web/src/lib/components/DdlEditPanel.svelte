@@ -91,6 +91,7 @@
 <div class="ddl-edit-layout">
 	<div class="ddl-edit-main">
 		<div class="ddl-inline-head">
+			<span class="ddl-inline-label">{t().ddlLabel}</span>
 			<button class="ddl-inline-btn" type="button" onclick={onToggleSaijiki}>
 				{t().saijikiToggleBtn}
 			</button>
@@ -229,6 +230,14 @@
 		justify-content: flex-end;
 		align-items: center;
 		gap: 5px;
+	}
+	.ddl-inline-label {
+		margin-right: auto;
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		color: var(--fg3);
+		text-transform: uppercase;
 	}
 	.ddl-inline-btn {
 		padding: 4px 10px;

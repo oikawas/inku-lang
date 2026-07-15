@@ -3551,11 +3551,10 @@ $effect(() => {
 		if (item) loadIterationItem(item);
 	}
 
-	const currentRenderedAt = $derived(
-		historyCursor >= 0 && historyItems[historyCursor]
-			? new Date(historyItems[historyCursor].at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US')
-			: null
-	);
+	const currentRenderedAt = $derived.by(() => {
+		const at = displayedHistoryItem?.at ?? result?.history_at ?? null;
+		return at == null ? null : new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
+	});
 
 	function prepareContextTargetChange() {
 		if (outputTab === 'compare') { modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null; }
@@ -4258,18 +4257,23 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	const statusStage1Model = $derived(displayedHistoryItem
 		? (displayedHistoryItem.stage1_model ? statusModelName(displayedHistoryItem.stage1_model) : '-')
-		: statusModelName(stage1Model));
+		: (result?.stage1_model ? statusModelName(result.stage1_model) : '-'));
 	const statusStage2Model = $derived(displayedHistoryItem
 		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
-		: statusModelName(stage2Model));
+		: (result?.stage2_model ? statusModelName(result.stage2_model) : '-'));
+	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
+	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
+	const nextCatalogName = $derived(currentCatalog.name);
 	const statusCatalogName = $derived(displayedHistoryItem
 		? (displayedHistoryItem.render_color_catalog_name ?? catalogName(displayedHistoryItem.render_color_catalog_id ?? displayedHistoryItem.catalog_id))
-		: (result?.render_color_catalog_name ?? catalogName(result?.render_color_catalog_id ?? selectedCatalog)));
+		: (result?.render_color_catalog_name ?? (result?.render_color_catalog_id ? catalogName(result.render_color_catalog_id) : '-')));
 	const currentCanvasAspect = $derived(getCanvasAspectOption(effectiveCanvasAspectId()));
+	const nextCanvasName = $derived(currentCanvasAspect.label);
 	const displayCanvasAspect = $derived(svgAspect(result?.svg) ?? currentCanvasAspect);
-	const statusCanvasName = $derived(getCanvasAspectOption(
-		displayedHistoryItem?.score?.canvas ?? result?.score?.canvas ?? effectiveCanvasAspectId()
-	).label);
+	const statusCanvasName = $derived.by(() => {
+		const canvasId = displayedHistoryItem?.render_canvas_aspect_id ?? displayedHistoryItem?.render_canvas_aspect ?? displayedHistoryItem?.score?.canvas ?? result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? null;
+		return canvasId ? getCanvasAspectOption(canvasId).label : '-';
+	});
 	const statusHashFull = $derived(
 		displayedHistoryItem?.render_hash
 			?? result?.render_hash
@@ -4867,6 +4871,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusStage2Model}
 				{statusCatalogName}
 				{statusCanvasName}
+				{nextStage1Model}
+				{nextStage2Model}
+				{nextCatalogName}
+				{nextCanvasName}
 				{statusHistoryItem}
 				{statusHashLabel}
 				{statusHashCopyTitle}

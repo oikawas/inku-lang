@@ -54,7 +54,7 @@
 				</svg>
 			</button>
 		</div>
-		<textarea class="prompt-textarea prompt-user" readonly value={stage1PromptText}></textarea>
+		<textarea class="prompt-textarea prompt-user stage1-user" readonly value={stage1PromptText}></textarea>
 		<div class="prompt-collapsible-head">
 			<p class="prompt-label">{t().promptStage1System}</p>
 			<button class="ghost-btn" onclick={() => (promptStage1Expanded = !promptStage1Expanded)}>{promptStage1Expanded ? t().promptCollapse : t().promptExpand}</button>
@@ -87,7 +87,7 @@
 			<button class="ghost-btn" onclick={() => (promptStage2Expanded = !promptStage2Expanded)}>{promptStage2Expanded ? t().promptCollapse : t().promptExpand}</button>
 		</div>
 		<div class="prompt-collapse" class:expanded={promptStage2Expanded}>
-			<textarea class="prompt-textarea prompt-system" readonly value={promptsData.stage2_system}></textarea>
+			<textarea class="prompt-textarea prompt-system stage2-system" readonly value={promptsData.stage2_system}></textarea>
 			{#if !promptStage2Expanded}<div class="prompt-fade"></div>{/if}
 		</div>
 	</div>
@@ -203,7 +203,9 @@
 		resize: vertical;
 	}
 	.prompt-user { min-height: 120px; }
+	.stage1-user { min-height: 60px; height: 60px; }
 	.prompt-system { min-height: 120px; height: 220px; }
+	.stage2-system { min-height: 60px; height: 110px; }
 	.prompt-collapse {
 		position: relative;
 		max-height: 80px;
@@ -217,6 +219,7 @@
 		height: 120px;
 		resize: none;
 	}
+	.prompt-collapse:not(.expanded) .stage2-system { min-height: 60px; height: 60px; }
 	.prompt-fade {
 		position: absolute;
 		left: 0;

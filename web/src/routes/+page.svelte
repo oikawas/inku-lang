@@ -382,7 +382,7 @@
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let statsOpen    = $state(false);
 	let instructionCaptionVisible = $state(true);
-	let outputTab    = $state<'canvas' | 'refine' | 'compare' | 'lineage' | 'prompts' | 'score'>('canvas');
+	let outputTab    = $state<'canvas' | 'refine' | 'compare' | 'lineage'>('canvas');
 	let lineageGraph = $state<LineageGraph | null>(null);
 	let lineageLoading = $state(false);
 	let lineageError = $state<string | null>(null);

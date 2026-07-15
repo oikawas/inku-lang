@@ -10,7 +10,7 @@
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
-	type OutputTab = 'canvas' | 'refine' | 'compare' | 'lineage' | 'prompts' | 'score';
+	type OutputTab = 'canvas' | 'refine' | 'compare' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 	type PaintResult = { svg: string; score: Score; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
@@ -237,6 +237,8 @@
 	let svgMenuOpen = $state(false);
 	let svgHelpOpen = $state(false);
 	let presentationMode = $state(false);
+	let generationInfoOpen = $state(false);
+	let generationInfoTab = $state<'prompts' | 'score'>('prompts');
 	let changeTouch = $state(false);
 	let changeLayout = $state(false);
 	let changeReading = $state(false);
@@ -308,7 +310,9 @@
 </script>
 
 <svelte:window onkeydown={(event) => {
-	if (event.key === 'Escape' && presentationMode) closePresentationMode();
+	if (event.key !== 'Escape') return;
+	if (generationInfoOpen) generationInfoOpen = false;
+	else if (presentationMode) closePresentationMode();
 }} />
 
 <div class="right-panel">
@@ -324,12 +328,6 @@
 		</Tooltip>
 		<Tooltip placement="bottom" text={t().tooltipCanvasTabCompare}>
 			<button class="rtab" class:active={outputTab === 'compare'} onclick={() => (outputTab = 'compare')} disabled={!result}>{t().tabCompare}</button>
-		</Tooltip>
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabPrompts}>
-			<button class="rtab" class:active={outputTab === 'prompts'} onclick={() => (outputTab = 'prompts')} disabled={!result && !allowEmptyOutputTabs}>{t().tabPrompts}</button>
-		</Tooltip>
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabScore}>
-			<button class="rtab" class:active={outputTab === 'score'} onclick={() => (outputTab = 'score')} disabled={!result && !allowEmptyOutputTabs}>{t().tabScore}</button>
 		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if currentRenderedAt}
@@ -642,36 +640,6 @@
 				</div>
 			{:else if outputTab === 'lineage'}
 				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} />
-			{:else if outputTab === 'prompts'}
-				<OutputTabsContent
-					outputTab="prompts"
-					{promptsData}
-					{stage1PromptText}
-					{ddl}
-					bind:promptStage1Expanded
-					bind:promptStage2Expanded
-					{copiedPrompt}
-					{scoreJsonText}
-					{scoreJsonLines}
-					{scoreJsonHighlighted}
-					{scoreJsonSeparatorLine}
-					{onCopyPromptText}
-				/>
-			{:else if outputTab === 'score'}
-				<OutputTabsContent
-					outputTab="score"
-					{promptsData}
-					{stage1PromptText}
-					{ddl}
-					bind:promptStage1Expanded
-					bind:promptStage2Expanded
-					{copiedPrompt}
-					{scoreJsonText}
-					{scoreJsonLines}
-					{scoreJsonHighlighted}
-					{scoreJsonSeparatorLine}
-					{onCopyPromptText}
-				/>
 			{/if}
 		</div>
 
@@ -704,6 +672,35 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if generationInfoOpen}
+		<aside class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}>
+			<header class="generation-info-head">
+				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}</strong>
+				<button type="button" class="generation-info-close" onclick={() => (generationInfoOpen = false)} aria-label="Close">&times;</button>
+			</header>
+			<div class="generation-info-tabs" role="tablist">
+				<button type="button" role="tab" aria-selected={generationInfoTab === 'prompts'} class:active={generationInfoTab === 'prompts'} onclick={() => (generationInfoTab = 'prompts')}>{t().tabPrompts}</button>
+				<button type="button" role="tab" aria-selected={generationInfoTab === 'score'} class:active={generationInfoTab === 'score'} onclick={() => (generationInfoTab = 'score')}>{t().tabScore}</button>
+			</div>
+			<div class="generation-info-content">
+				<OutputTabsContent
+					outputTab={generationInfoTab}
+					{promptsData}
+					{stage1PromptText}
+					{ddl}
+					bind:promptStage1Expanded
+					bind:promptStage2Expanded
+					{copiedPrompt}
+					{scoreJsonText}
+					{scoreJsonLines}
+					{scoreJsonHighlighted}
+					{scoreJsonSeparatorLine}
+					{onCopyPromptText}
+				/>
+			</div>
+		</aside>
+	{/if}
 
 	<div class="status-bar">
 		<div class="status-summary" aria-label="current render status">
@@ -742,6 +739,16 @@
 				onclick={onCopyStatusHash}
 				aria-label={statusHashCopyTitle}
 			>{statusHashCopied ? t().promptCopied : statusHashLabel || '----'}</button>
+		</Tooltip>
+		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u30d7\u30ed\u30f3\u30d7\u30c8\u3068JSON\u3092\u8868\u793a' : 'Show prompts and JSON for the selected artwork'}>
+			<button
+				type="button"
+				class="generation-info-button"
+				class:active={generationInfoOpen}
+				disabled={!result && !allowEmptyOutputTabs}
+				aria-expanded={generationInfoOpen}
+				onclick={() => (generationInfoOpen = !generationInfoOpen)}
+			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}</button>
 		</Tooltip>
 		<div class="png-wrap">
 			<Tooltip placement="left" text={t().tooltipCanvasDownloadSvg}>
@@ -882,6 +889,7 @@
 
 <style>
 	.right-panel {
+		position: relative;
 		flex: 1;
 		min-width: 0;
 		display: flex;
@@ -1559,6 +1567,74 @@
 		user-select: none;
 	}
 	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: 11px !important; color: var(--floating-control-muted) !important; }
+	.generation-info {
+		position: absolute;
+		z-index: 90;
+		top: 41px;
+		right: 0;
+		bottom: 49px;
+		box-sizing: border-box;
+		width: min(760px, calc(100% - 72px));
+		display: flex;
+		flex-direction: column;
+		background: var(--bg);
+		border-left: 1px solid var(--border2);
+		box-shadow: -14px 0 34px rgba(0, 0, 0, .18);
+	}
+	.generation-info-head {
+		height: 44px;
+		flex: 0 0 auto;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 12px 0 16px;
+		border-bottom: 1px solid var(--border);
+	}
+	.generation-info-head strong { font-size: 13px; font-weight: 600; }
+	.generation-info-close {
+		width: 30px;
+		height: 30px;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--fg2);
+		font-size: 20px;
+		cursor: pointer;
+	}
+	.generation-info-close:hover { background: var(--bg2); color: var(--fg); }
+	.generation-info-tabs {
+		flex: 0 0 auto;
+		display: flex;
+		padding: 0 12px;
+		border-bottom: 1px solid var(--border);
+	}
+	.generation-info-tabs button {
+		padding: 9px 14px 8px;
+		border: 0;
+		border-bottom: 2px solid transparent;
+		background: transparent;
+		color: var(--fg2);
+		font: inherit;
+		font-size: 12px;
+		cursor: pointer;
+	}
+	.generation-info-tabs button.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 600; }
+	.generation-info-content { min-height: 0; flex: 1; display: flex; padding: 10px; overflow: hidden; }
+	.generation-info-button {
+		flex: 0 0 auto;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		padding: 5px 9px;
+		background: var(--panel);
+		color: var(--fg2);
+		font: inherit;
+		font-size: 11px;
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.generation-info-button:hover, .generation-info-button.active { background: var(--bg2); color: var(--fg); border-color: var(--fg3); }
+	.generation-info-button:disabled { opacity: .4; cursor: default; }
+
 	.status-bar {
 		display: flex;
 		align-items: center;

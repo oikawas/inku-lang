@@ -1,6 +1,6 @@
 # inku User and Operations Manual
 
-This manual explains how to use and operate inku. It is intended for people who have never used the application before, and for system administrators who need to deploy and maintain it.
+This manual explains how to use and operate the unreleased inku v1.82 baseline (Web Build 563). It is intended for first-time creators and system administrators who deploy and maintain the application. The canonical product specification is `SPEC.ja.md` at the repository root.
 
 ## Audience
 
@@ -12,6 +12,7 @@ This manual explains how to use and operate inku. It is intended for people who 
 1. [Creating Images](./image-creation.md)
 2. [Application Installation](./application-install.md)
 3. [Server Configuration](./server-configuration.md)
+4. [Revision History](./revision-history.md)
 
 ## Templates
 
@@ -21,3 +22,5 @@ This manual explains how to use and operate inku. It is intended for people who 
 - [logrotate example](./templates/logrotate/inku)
 
 The templates are generic examples. Keep real hostnames, user names, paths, and secrets in server-side configuration files, not in Git-tracked documentation.
+
+The Japanese and English manuals preserve the same feature boundaries and chapter structure. The Japanese manual is updated first, then the same intent is reflected here.

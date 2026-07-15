@@ -1,31 +1,35 @@
 # アプリケーションインストール
 
-この文書は、inku を新しいサーバーへ展開するための標準手順です。OS は Linux、サービス管理は systemd、DB はまず SQLite を前提にします。必要に応じて PostgreSQL へ変更できます。
+この文書は、未リリース版inku v1.82をLinuxサーバーへ新規導入または更新するための標準手順です。参照構成はsystemd、SQLite、Vite開発サーバーです。公衆インターネットへ公開する場合は、TLS reverse proxyとproduction向けSvelteKit adapterを別途設計してください。
 
 ## 1. 構成
 
-inku は 2 つのプロセスで動きます。
-
-| プロセス | 役割 | 既定ポート |
+| コンポーネント | 役割 | 既定ポート |
 |---|---|---|
-| inku-api | FastAPI backend。認証、LLM 呼び出し、履歴 DB、SVG レンダリング | 8100 |
-| inku-server | SvelteKit / Vite frontend。ブラウザ UI | 5173 |
+| `inku-api` | FastAPI。認証、LLM pipeline、履歴・系譜DB、Renderer、設定API | 8100 |
+| `inku-server` | SvelteKit／Vite Web UI。`/api`をbackendへproxy | 5173 |
+| `inku-cli` | 同じHTTP APIを使う任意のCLI client | - |
 
-Web UI は `/api` を backend へプロキシします。開発・参照運用では Vite server が `127.0.0.1:8100` の API へ接続します。
+主要ディレクトリ:
 
-## 2. 前提ソフトウェア
+```text
+inku-lang/
+  server/   FastAPI backend
+  web/      SvelteKit frontend
+  cli/      HTTP API client
+  shared/   server/CLI共通解析コード
+  manual/   利用・運用マニュアル
+```
 
-サーバーへ以下をインストールします。
+## 2. 前提条件
 
-- Python 3.10 以上
+- Linuxとsystemd
+- Python 3.10以上
 - uv
-- Node.js と npm
-- Git または rsync などの配置手段
-- systemd
-- 任意: Cairo / PNG 変換に必要な OS パッケージ
-- 任意: PostgreSQL
-
-例:
+- Node.jsとnpm
+- Gitまたはrsyncなどの配置手段
+- CairoSVGが必要とするOSライブラリ
+- 任意: PostgreSQL、reverse proxy、TLS証明書
 
 ```sh
 python3 --version
@@ -34,111 +38,61 @@ node --version
 npm --version
 ```
 
-## 3. アプリケーションを配置する
-
-専用ユーザーを作成します。
+## 3. 専用ユーザーと永続領域
 
 ```sh
 sudo useradd --system --create-home --home-dir /var/lib/inku --shell /usr/sbin/nologin inku
-sudo mkdir -p /var/lib/inku /var/log/inku /etc/inku
-sudo chown -R inku:inku /var/lib/inku /var/log/inku
-sudo chmod 0750 /var/lib/inku /var/log/inku
+sudo mkdir -p /opt/inku /var/lib/inku /var/lib/inku/outputs /var/log/inku /etc/inku
+sudo chown -R inku:inku /opt/inku /var/lib/inku /var/log/inku
+sudo chmod 0750 /opt/inku /var/lib/inku /var/log/inku
 ```
 
-例として `/opt/inku/inku-lang` に配置します。
+環境に既存の`inku`ユーザーがいる場合は再作成しません。
+
+## 4. コードを配置する
+
+Gitを使う例:
 
 ```sh
-sudo mkdir -p /opt/inku
-sudo chown inku:inku /opt/inku
 cd /opt/inku
-git clone <repository-url> inku-lang
-cd inku-lang
+sudo -u inku git clone <repository-url> inku-lang
+cd /opt/inku/inku-lang
 ```
 
-rsync で配置する場合も、最終的なディレクトリ構成は同じにします。
+rsyncを使う場合も、最終配置先を`/opt/inku/inku-lang/`とし、`.venv`、`node_modules`、build cacheを転送しません。本番サーバーのファイル交換方式とGit履歴管理を混同しないでください。
 
-```text
-/opt/inku/inku-lang/
-  server/
-  web/
-  cli/
-  SPEC.ja.md
-```
+## 5. backendを準備する
 
-## 4. backend をセットアップする
+lockfileに従って依存関係を同期します。
 
 ```sh
 cd /opt/inku/inku-lang/server
-UV_CACHE_DIR=/tmp/inku-uv-cache uv sync
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
 ```
 
-初回起動時に SQLite DB を作る場合は、管理者アカウント作成用の環境変数を設定します。
+SQLite DBのschema migrationと既存データbackfillは、backend初期化時に現行コードが実行します。更新前には必ずDBをバックアップしてください。
 
-```sh
-export INKU_BOOTSTRAP_ADMIN_USERNAME=admin
-export INKU_BOOTSTRAP_ADMIN_EMAIL=admin@example.local
-export INKU_BOOTSTRAP_ADMIN_PASSWORD='change-this-password'
-```
-
-`INKU_BOOTSTRAP_ADMIN_PASSWORD` は 8 文字以上が必要です。この変数が設定された新規 DB の場合だけ初期管理者が作られます。既存 DB にユーザーがいる場合は作成されません。
-
-起動確認:
-
-```sh
-cd /opt/inku/inku-lang/server
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-server
-```
-
-別端末で確認:
-
-```sh
-curl -i http://127.0.0.1:8100/health
-```
-
-## 5. frontend をセットアップする
+## 6. frontendを準備する
 
 ```sh
 cd /opt/inku/inku-lang/web
-npm install
-npm run check
-npm run build
+sudo -u inku npm ci
+sudo -u inku npm run check
+sudo -u inku npm run build
 ```
 
-開発・参照運用として Vite server を使う場合:
+参照systemd templateはVite開発サーバーを起動します。`npm run build`は配布物の型・production build検証であり、このtemplateの起動コマンドそのものではありません。
+
+## 7. 環境変数を設定する
 
 ```sh
-npm run dev -- --host 0.0.0.0 --port 5173
-```
-
-確認:
-
-```sh
-curl -i http://127.0.0.1:5173/
-```
-
-## 6. CLI をセットアップする
-
-CLI は任意です。サーバーの API を操作するために使います。
-
-```sh
-cd /opt/inku/inku-lang/cli
-uv sync
-uv run inku-cli --base-url http://127.0.0.1:8100 login -u admin
-uv run inku-cli me
-```
-
-## 7. 環境変数ファイルを作る
-
-テンプレートをコピーします。
-
-```sh
-sudo mkdir -p /etc/inku
-sudo cp manual/ja/templates/inku-api.env.example /etc/inku/inku-api.env
-sudo chmod 0600 /etc/inku/inku-api.env
+sudo cp /opt/inku/inku-lang/manual/ja/templates/inku-api.env.example /etc/inku/inku-api.env
+sudo chown root:inku /etc/inku/inku-api.env
+sudo chmod 0640 /etc/inku/inku-api.env
 sudo editor /etc/inku/inku-api.env
 ```
 
-最低限必要な設定:
+最低限確認する項目:
 
 ```sh
 INKU_SERVER_HOST=127.0.0.1
@@ -148,7 +102,7 @@ INKU_SECRET_KEY_FILE=/var/lib/inku/secret.key
 INKU_BOOTSTRAP_ADMIN_PASSWORD=change-this-password
 ```
 
-AI provider を使う場合は、少なくとも 1 つの API key を設定します。
+少なくとも一つのprovider keyを設定するか、初回ログイン後に管理UIから接続を登録します。
 
 ```sh
 OPENAI_API_KEY=
@@ -157,105 +111,139 @@ GEMINI_API_KEY=
 NVIDIA_API_KEY=
 ```
 
-API key は環境変数で初期値として読み込まれます。管理者は Web UI の `設定` -> `モデル設定` から接続先、Base URL、API key、公開モデルを管理できます。DB に保存される API key は暗号化されます。
+`INKU_BOOTSTRAP_ADMIN_PASSWORD`は8文字以上です。新規DBにユーザーがいない場合だけbootstrap adminを作成します。初回作成後は環境ファイルから削除するか、秘密管理システムへ移します。
 
-## 8. systemd サービスを登録する
+## 8. 手動起動で確認する
 
-テンプレートをコピーし、ユーザー名とパスを環境に合わせて編集します。
+backend:
 
 ```sh
-sudo cp manual/ja/templates/systemd/inku-api.service /etc/systemd/system/inku-api.service
-sudo cp manual/ja/templates/systemd/inku-server.service /etc/systemd/system/inku-server.service
-sudo editor /etc/systemd/system/inku-api.service
-sudo editor /etc/systemd/system/inku-server.service
+cd /opt/inku/inku-lang/server
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-server
+```
+
+別端末:
+
+```sh
+curl -sS -i --max-time 5 http://127.0.0.1:8100/health
+```
+
+frontend:
+
+```sh
+cd /opt/inku/inku-lang/web
+sudo -u inku npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+```sh
+curl -sS -I --max-time 5 http://127.0.0.1:5173/
+```
+
+確認後、手動プロセスを停止します。
+
+## 9. systemdへ登録する
+
+```sh
+sudo cp /opt/inku/inku-lang/manual/ja/templates/systemd/inku-api.service /etc/systemd/system/inku-api.service
+sudo cp /opt/inku/inku-lang/manual/ja/templates/systemd/inku-server.service /etc/systemd/system/inku-server.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now inku-api.service
 sudo systemctl enable --now inku-server.service
 ```
 
-確認:
+templateの`User`、`Group`、`WorkingDirectory`、`ExecStart`、`EnvironmentFile`は実環境に合わせます。`uv`と`npm`は絶対パスを確認してください。
 
 ```sh
+command -v uv
+command -v npm
 systemctl status inku-api.service --no-pager
 systemctl status inku-server.service --no-pager
-curl -i http://127.0.0.1:8100/health
-curl -i http://127.0.0.1:5173/
 ```
 
-## 9. 初回ログインとモデル設定
+## 10. 初回ログイン
 
-1. ブラウザで `http://<server>:5173/` を開きます。
-2. 初期管理者でログインします。
-3. `設定` -> `モデル設定` を開きます。
-4. AI サービス接続で API key と Base URL を確認します。
-5. 公開するモデルを選びます。
-6. `モデル選択` から Stage 1 と Stage 2 のモデルを選びます。
+1. `http://<server>:5173/`を開きます。
+2. bootstrap adminでログインします。
+3. `設定`からprovider接続、API key、公開モデルを確認します。
+4. ユーザーとグループを作成します。
+5. `モデル選択`でStage 1とStage 2を選びます。
+6. 日本語と英語の短い記述をそれぞれ生成し、自動言語判定、履歴保存、SVG／PNG出力を確認します。
 
-Stage 1 は自由な記述を読む段階、Stage 2 は正規化DDLを JSON Score へ構造化する段階です。運用上は Stage 1 に高性能モデル、Stage 2 に軽量で安定したモデルを選ぶ構成が扱いやすいです。
+通常生成に指示文言語の手動選択はありません。入力から自動判定し、判定材料がない場合だけUI表示言語へfallbackします。
 
-## 10. 動作確認
-
-Web UI で確認:
-
-1. ログインします。
-2. `山の向こうに月が昇る` と入力します。
-3. `描画する` を押します。
-4. SVG が表示され、履歴に追加されることを確認します。
-5. SVG または PNG をエクスポートします。
-
-API で確認:
-
-```sh
-curl -i http://127.0.0.1:8100/health
-```
-
-CLI で確認:
+## 11. CLIを準備する
 
 ```sh
 cd /opt/inku/inku-lang/cli
-uv run inku-cli --base-url http://127.0.0.1:8100 paint "青い線を中央に三本置く" -o out --png --save-history
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli --base-url http://127.0.0.1:8100 login -u admin
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-cli --base-url http://127.0.0.1:8100 me
 ```
 
-## 11. 更新手順
+## 12. 受け入れ確認
 
-1. 新しいコードを配置します。
-2. backend 変更がある場合:
+```sh
+curl -sS -i --max-time 5 http://127.0.0.1:8100/health
+curl -sS -I --max-time 5 http://127.0.0.1:5173/
+```
+
+Web UIでは次を確認します。
+
+- ログインとログアウト
+- 日本語／英語記述の生成
+- 色カタログ、モデル、キャンバス選択
+- 推敲の調整、モデル比較、言語比較
+- 生成情報の詳細／プロンプト／JSON
+- 履歴の時系列／系譜ごと表示
+- SVG／PNG書き出し
+
+## 13. 更新手順
+
+1. maintenance windowを確保し、DBと暗号化鍵をバックアップします。
+2. 新しいコードを配置します。
+3. backendとfrontendを検証します。
 
 ```sh
 cd /opt/inku/inku-lang/server
-UV_CACHE_DIR=/tmp/inku-uv-cache uv sync
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest
-UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
-sudo systemctl restart inku-api.service
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
 ```
-
-3. frontend 変更がある場合:
 
 ```sh
 cd /opt/inku/inku-lang/web
-npm install
-npm run check
-npm run build
+sudo -u inku npm ci
+sudo -u inku npm run check
+sudo -u inku npm run build
+```
+
+4. 変更対象サービスを再起動します。frontendとbackendの両方を更新した場合は両方を再起動します。
+
+```sh
+sudo systemctl restart inku-api.service
 sudo systemctl restart inku-server.service
 ```
 
-4. health check とブラウザ確認を実施します。
+5. health check、ログ、実画面を確認します。migration失敗時に新旧コードを混在させないでください。
 
-```sh
-curl -i http://127.0.0.1:8100/health
-curl -i http://127.0.0.1:5173/
-```
+## 14. rollback
 
-## 12. アンインストール
+rollback前に、更新後DBが旧コードと互換かを確認します。schemaが進んだDBを無条件に古いコードへ戻さないでください。
 
-停止:
+1. サービスを停止します。
+2. 更新前コードとDB backupを復元します。
+3. `INKU_SECRET_KEY_FILE`を同じものへ戻します。
+4. 依存関係を同期し、サービスを起動します。
+5. health checkと履歴再現を確認します。
+
+## 15. アンインストール
 
 ```sh
 sudo systemctl disable --now inku-server.service
 sudo systemctl disable --now inku-api.service
 ```
 
-削除対象の例:
+削除候補:
 
 ```text
 /etc/systemd/system/inku-api.service
@@ -266,4 +254,4 @@ sudo systemctl disable --now inku-api.service
 /var/log/inku
 ```
 
-DB と出力ファイルを消すと履歴は復元できません。削除前にバックアップしてください。
+DB、暗号化鍵、出力artifactを削除すると復旧できません。保持期限とbackup確認後に削除してください。

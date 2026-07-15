@@ -1,30 +1,30 @@
 # Creating Images
 
-inku creates abstract vector images from short written descriptions. A prompt is processed through interpretation, intermediate expansion, structuring, and rendering.
+This guide covers artwork creation with the Web UI and CLI in inku v1.82 (Web Build 563). A description passes through interpretation, deterministic intermediate expansion, structuring, and rendering.
 
 ```text
-description  ->  normalized DDL  ->  expanded DDL  ->  JSON Score  ->  SVG
+description -> normalized DDL -> expanded DDL -> JSON Score -> SVG
 ```
 
-The same description may produce slightly different output depending on the selected models and rendering variation. inku treats this as part of the work, like a new performance of the same score.
+The description is the artwork's score; the SVG is one performance. The same description may produce a different work when its models, layout seed, or render seed change.
 
-## 1. Sign In
+## 1. Sign In and Choose the Display Language
 
-1. Open the inku Web UI in your browser.
+1. Open the inku Web UI.
 2. Enter your user name and password.
 3. Press `Sign in`.
 
-After signing in, use the left app rail to open settings, switch language, switch theme, edit your profile, or sign out.
+The left app rail provides settings, profile, theme, UI display language, and sign-out controls. The UI language and instruction language are separate. Normal generation detects the instruction language from the entered text, including English text in the Japanese UI and Japanese text in the English UI. Only text with no usable language signal falls back to the UI language.
 
-## 2. Create Your First Image
+## 2. Generate the First Artwork
 
-1. Open the `description` tab.
-2. Type a short prompt into the input box.
-3. Optionally choose a canvas aspect, model selection, and color catalog.
-4. Press `draw`.
-5. When rendering finishes, the image appears on the canvas.
+1. Open the `describe` tab.
+2. Enter a short sentence in `prompt`.
+3. If needed, set `color catalog`, `model selection`, and `canvas`.
+4. Press `Generate`.
+5. Confirm that the artwork appears in `drawing` and is saved to regular history.
 
-Start with what you notice or care about, rather than trying to specify every detail.
+The first artwork is the source work. The Refine action “Vary Touch with Words” is never applied to this first generation.
 
 Examples:
 
@@ -40,11 +40,9 @@ Blue crayon lines drift in slow waves
 Place three small red circles in the upper right, leaving white space
 ```
 
-## 3. Prompt Writing Basics
+## 3. Write a Description
 
-For stable results, write one visual instruction per line.
-
-Basic form:
+For stable results, use physical, observable instructions, one sentence at a time.
 
 ```text
 color + size + form + count + place + motion
@@ -58,169 +56,169 @@ Draw three thin blue lines from lower left to upper right.
 Place three small red circles in the upper right.
 ```
 
-Useful vocabulary:
-
 | Type | Examples |
 |---|---|
 | forms | circle, ellipse, triangle, square, line, arc |
 | colors | white, black, blue, red, green, gray |
 | places | top, bottom, center, left edge, right edge, upper edge, lower edge, corner |
-| motions | place, align, fill, scatter, draw |
+| motions | place, align, fill, scatter, draw, tile |
 | touches | pencil, pen, rotring, crayon, chalk, fine brush, thick brush, rope |
 | continuity | solid, dashed, dotted, dot-dashed |
 | movements | fine, broad, slow, quick, wobble, undulate, tremble, blur |
 
-## 4. Use Saijiki
+## 4. Consult Saijiki
 
-`Saijiki` is the inku vocabulary dictionary.
+`Saijiki` is inku's vocabulary dictionary.
 
-1. Press the `Saijiki` button.
-2. Find the word you want to use.
-3. Click a word to insert it at the cursor position.
+1. After the first generation, press `Saijiki` on the `Interpretation (normalized DDL)` row.
+2. Point to a word to preview how it affects drawing.
+3. Select a word to insert it at the DDL caret.
 
-Saijiki is intentionally not autocomplete. It is a dictionary you choose to consult when needed.
+Saijiki is not autocomplete. It is consulted only when requested and does not automatically narrow a description to known vocabulary.
 
-## 5. Check the Interpretation
+## 5. Inspect and Edit the Interpretation
 
-After drawing, the `normalized DDL` area shows how inku interpreted your prompt.
+After generation, `Interpretation (normalized DDL)` shows how Stage 1 read the input.
 
-- Input text: your original words
-- Normalized DDL: the prompt rewritten into core drawing vocabulary
-- JSON: the machine-readable score for the renderer
-- Canvas: the SVG performance of that score
+- Description: the author's original words
+- Normalized DDL: drawing instructions rewritten in core vocabulary
+- JSON Score: the machine-readable score created by Stage 2
+- Drawing: the SVG created by the Renderer
 
-If the result is different from what you intended, inspect the interpretation first. Then rewrite the prompt with more specific place, count, form, material, or movement words.
+Use `DDL edit` for an expanded editor. `auto repair` enables or disables deterministic repair for invisible colors, excessive density, and contract violations. Press `Render from Code` to draw from the edited DDL.
 
-## 6. Edit DDL Directly
+## 6. Choose Color, Models, and Canvas
 
-1. After drawing, press `edit` in the DDL area.
-2. Modify the DDL.
-3. Press `done`.
-4. Press `draw from DDL`.
+The controls at the top of the Describe tab configure the next generation.
 
-Use this when the interpretation is close and you want to adjust only the drawing instructions.
-
-## 7. Choose a Canvas Aspect
-
-Use `canvas aspect` to render to non-square canvases.
-
-| ID | Typical use |
+| Control | Meaning |
 |---|---|
-| square | square |
-| golden | golden ratio |
-| a4 | A4 |
-| b4 | B4 |
-| wide | wide canvas |
-| vertical | vertical canvas |
-| byobu | folding-screen-like wide canvas |
+| color catalog | Maps abstract color names such as red, blue, and gray to concrete colors |
+| model selection | Selects inference models for Stage 1 (interpretation) and Stage 2 (drawing) |
+| canvas | Selects Square, Golden, A4, Wide, Vertical, Byobu, or another aspect |
 
-Coordinates remain normalized from 0.0 to 1.0, so the writing style stays the same across aspect ratios.
+Canvas coordinates remain normalized from 0.0 to 1.0. The effective settings of the displayed artwork are different from settings for the next generation. Distinguish `displayed` at the top of Canvas from `next drawing` at the bottom.
 
-## 8. Choose a Color Catalog
+## 7. Refine an Artwork
 
-The color catalog maps abstract color words to concrete colors.
+The `Refine` tab contains `Adjust`, `Model comparison`, and `Language comparison`. Changing the target artwork clears unsaved candidates owned by the previous target. Merely switching Refine subviews preserves candidates.
 
-In prompts, write words such as `red`, `blue`, or `gray`. The server resolves those words to actual `#RRGGBB` values using the selected catalog. History records the selected catalog and resolved color map.
+### 7.1 Adjust
 
-## 9. Export Images
+Select exactly one intervention at a time.
 
-After rendering, use `export`.
+| Refinement | Scope of change |
+|---|---|
+| Vary Layout | Keeps the reading and uses Stage 2 to reconstruct coordinates, sizes, and layout balance |
+| Vary Reading | Restarts at Stage 1 and regenerates normalized DDL, layout, and touch |
+| Vary Color Catalog | Keeps DDL, JSON Score, layout, and touch, changing only the catalog |
+| Vary Touch with Words | Derives only the Renderer performance seed from entered words, changing texture, weight variation, and bleed |
+
+Ordinary adjustments can create one or four candidates. “Vary Touch with Words” creates exactly one because the same words deterministically produce the same touch (Seed). Those words never affect meaning, interpretation, DDL, JSON Score, or layout.
+
+Candidates are unsaved. Select candidates with the image-corner control and save them to history. Saving and starring are separate actions.
+
+### 7.2 Model Comparison
+
+Generate the same description with different Stage 1 and Stage 2 model combinations, then compare artwork and normalized DDL.
+
+- `Shared Stage 1/2`
+- `Fixed Stage 1 + compare Stage 2`
+- `Compare Stage 1 + fixed Stage 2`
+
+The target's identical model pair is excluded. Results are not saved automatically. Use `+` to adopt one, or the star action to save it as starred history.
+
+### 7.3 Language Comparison
+
+Normal automatic detection remains unchanged. Only the comparison run explicitly assigns Japanese or English per stage. It uses the same three modes as Model comparison. Results show the effective Stage 1 and Stage 2 languages and normalized DDL. Adoption records a `language_variation` lineage operation.
+
+## 8. Inspect Generation Information
+
+Open `Generation info` at the bottom of Canvas to inspect the selected artwork.
+
+| Tab | Contents |
+|---|---|
+| Details | Stage 1/2 models and languages, catalog, canvas, seeds, hashes, render engine, Build, elapsed time, and token counts |
+| Prompts | Stage 1/2 system and user prompts |
+| JSON | Machine-readable top-level generation metadata plus JSON Score |
+
+JSON includes fields such as `stage1_instruction_lang`, `stage2_instruction_lang`, `render_seed`, `vary_seed`, `interpretation_seed`, `description_hash`, `derivation_kind`, and `derivation_metadata`. Keep top-level generation metadata distinct from the JSON Score itself.
+
+## 9. Follow Lineage
+
+The `lineage` tab shows which explicit operation derived each artwork. Touch, layout, reading, model, language, DDL edit, description edit, replay, and canvas changes can form parent-child relationships.
+
+- Parentage is never inferred from similarity, identical descriptions, or timestamps.
+- Continuing from an unsaved candidate stores only that direct candidate as an `intermediate · hidden from history` lineage work.
+- `Start a new root` makes the next creation independent.
+- Lineage cards support promotion to regular history, comments, stars, and trash operations.
+
+## 10. Manage History
+
+Use the bottom history strip for fast chronological navigation. History Manager switches between `timeline` and `by lineage`.
+
+- Search, starred-only, regular-history, and trash filters
+- Thumbnail and list layouts
+- Individual or multiple selection for trash and restore
+- Lineage expansion and lineage-wide selection
+- Synchronization with the displayed artwork and jumps to first or latest pages
+
+`by lineage` groups only persisted lineage nodes and edges. `lineage_only` intermediate works and tombstones are excluded from regular-history counts.
+
+Canvas `Nearby works` shows up to three structurally similar history works without scores or ranking. Similarity is not lineage and never controls generation or quality decisions.
+
+## 11. Export Images
+
+Use `SVG` or `PNG` at the bottom of Canvas.
 
 | Format | Use |
 |---|---|
 | Display SVG | Web display and PNG source |
-| Editable SVG | Layered output for Illustrator / Affinity |
-| Compatible SVG | General-purpose SVG transfer |
-| PNG | Raster output at a selected size |
+| Editable SVG | Structure intended for editing in Illustrator or Affinity |
+| Compat SVG | General-purpose transfer compatibility |
+| PNG | Raster output at a selected resolution |
 
-SVG is vector data, so it can be scaled for paper, screens, or wall-sized output.
+## 12. Batch Generation
 
-## 10. Use History
+1. Open `batch`.
+2. Enter one description per line.
+3. Optionally enable random color catalog selection per drawing.
+4. Press `Generate`.
 
-Generated images are saved to history.
+The UI shows the active line, progress, elapsed time, token counts, and current interpretation. Failed lines appear in the failure report; successful works are saved to history.
 
-- Select previous images from the history strip.
-- Mark important images with a star.
-- Use history manager for search, starred filtering, trash, restore, and deletion.
-- A history item includes the input, interpretation, JSON, SVG, models, color catalog, and canvas aspect.
+## 13. Demo
 
-The history database is the source of truth. Exported files are rebuildable artifacts.
+The `demo` tab generates a short description from a seed phrase and repeatedly draws it. Configure DB saving, artifact saving, prompt model, display interval, and random color catalogs. When automatic DB saving is disabled, the current artwork can still be saved explicitly.
 
-## 11. Batch Generation
+## 14. Generate from the CLI
 
-1. Open the `batch` tab.
-2. Enter one prompt per line.
-3. Optionally enable random color catalog selection for each render.
-4. Press `draw`.
-
-Example:
-
-```text
-A moon rises beyond the mountains
-Mist spreads at night
-Blue crayon lines drift in slow waves
-```
-
-During processing, the UI shows the active line, progress, elapsed time, token counts, and current interpretation.
-
-## 12. Demo Mode
-
-The `demo` tab repeatedly generates a short prompt from a seed phrase and draws it.
-
-Settings:
-
-| Setting | Meaning |
-|---|---|
-| Save to DB | Save demo outputs to history |
-| Save files | Save SVG / JSON / PNG artifacts |
-| Prompt model | Model used to create demo prompts |
-| Seed phrase | Source phrase for prompt generation |
-| Interval | Seconds before the next render |
-| Random color catalog | Choose a different color catalog per render |
-
-If you like a demo image, use `Save current drawing to DB` to add it to history.
-
-## 13. Create Images from the CLI
-
-The CLI uses the same API as the Web UI.
+The CLI uses the same HTTP API as the Web UI.
 
 ```sh
 cd cli
 uv run inku-cli --base-url http://127.0.0.1:8100 login -u admin
-uv run inku-cli paint "A blue line slowly undulates from lower left to upper right" -o out --png --save-history
+uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue line slowly undulates from lower left to upper right" -o out --png --save-history
 ```
-
-Batch from a text file:
 
 ```sh
-uv run inku-cli batch -f prompts.txt -o out --png --continue-on-error
+uv run inku-cli --base-url http://127.0.0.1:8100 batch -f prompts.txt -o out --png --continue-on-error
+uv run inku-cli --base-url http://127.0.0.1:8100 history --limit 20
 ```
 
-List history:
-
-```sh
-uv run inku-cli history --limit 20
-```
-
-## 14. Troubleshooting Image Creation
+## 15. Troubleshooting Creation
 
 | Symptom | Action |
 |---|---|
-| The image differs from the intent | Check the interpretation and specify place, count, form, or material |
-| The image is too plain | Add one material, movement, placement, or color instruction |
-| Too many elements appear | Specify counts such as `three lines` or `twelve circles` |
-| Generation is slow | Select a lighter model or wait for the provider queue |
-| An error occurs | Shorten the prompt and split it into one instruction per line |
+| The artwork differs from the intent | Inspect normalized DDL and specify place, count, form, or material |
+| The artwork is too plain | Add exactly one touch, movement, placement, or color instruction |
+| Too many elements appear | Use explicit counts such as `three lines` or `twelve circles` |
+| Generation is slow | Wait for the provider queue or select a lighter model |
+| Generation fails | Shorten the description and separate it into one instruction per sentence |
+| A comparison result disappears | Adopt it with `+` or save it with the star action |
+| Refinement candidates disappear | Save them before changing the refinement target |
 
-Physical and observable words are more stable than emotional evaluation words.
-
-Avoid:
-
-```text
-Draw a beautiful, elegant, powerful image
-```
-
-Prefer:
+Prefer physical, observable language over evaluation alone.
 
 ```text
 Place one black thick-brush line at the center.

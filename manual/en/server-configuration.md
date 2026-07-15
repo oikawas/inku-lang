@@ -1,259 +1,223 @@
 # Server Configuration
 
-This document describes the settings a system administrator needs to run inku reliably.
+This guide defines the administration baseline for the unreleased inku v1.82. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
-## 1. Main Environment Variables
+## 1. Configuration Boundaries
+
+Settings belong to three boundaries.
+
+1. OS and service: `/etc/inku/inku-api.env`, systemd, reverse proxy, and filesystem permissions
+2. Administrator: provider connections, published models, DB backups, artifacts, log policy, and users
+3. User: Stage 1/2 models, UI language, theme, canvas, color catalog, and history-selection behavior
+
+Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
+
+## 2. Backend Environment Variables
+
+### 2.1 Listen, Database, and Session
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `INKU_SERVER_HOST` | FastAPI listen host | `127.0.0.1` |
-| `INKU_SERVER_PORT` | FastAPI listen port | `8100` |
-| `INKU_SERVER_RELOAD` | Enable uvicorn reload | disabled |
-| `INKU_DB_URL` | Database connection URL | `sqlite:///$HOME/.local/share/inku/inku.db` |
-| `INKU_SECRET_KEY` | Key material for API key encryption | unset |
-| `INKU_SECRET_KEY_FILE` | Encryption key file | `$HOME/.local/share/inku/secret.key` |
-| `INKU_BOOTSTRAP_ADMIN_USERNAME` | Initial admin user name | `admin` |
-| `INKU_BOOTSTRAP_ADMIN_EMAIL` | Initial admin email | `admin@local` |
-| `INKU_BOOTSTRAP_ADMIN_PASSWORD` | Initial admin password | unset |
-| `INKU_SESSION_COOKIE_MAX_AGE` | Session lifetime in seconds | 30 days |
-| `INKU_SESSION_COOKIE_SECURE` | Secure cookie flag | disabled |
-| `INKU_OUTPUT_DIR` | Artifact output directory | `$HOME/.local/share/inku/outputs` |
-| `INKU_OUTPUT_PNG_SIZE` | Auto-saved PNG size | `2160` |
-| `INKU_OUTPUT_SAVE_WORKERS` | File save worker count | `2` |
-| `INKU_OUTPUT_SAVE_QUEUE_LIMIT` | File save queue limit | `32` |
-| `INKU_STAGE_WORKERS` | Drawing pipeline worker count | `4` |
-| `INKU_STAGE_QUEUE_LIMIT` | Drawing pipeline queue limit | twice the worker count |
-| `INKU_LOG_RETENTION_DAYS` | Log retention days | `90` |
-| `INKU_LOG_ROTATE` | Log rotation interval | `daily` |
+| `INKU_SERVER_HOST` | Listen host for the `inku-server` CLI | `127.0.0.1` |
+| `INKU_SERVER_PORT` | FastAPI port | `8100` |
+| `INKU_SERVER_RELOAD` | uvicorn reload | `0` |
+| `INKU_DB_URL` | SQLAlchemy DB URL | SQLite in the user data directory |
+| `INKU_SECRET_KEY` | Direct key material for provider-key encryption | unset |
+| `INKU_SECRET_KEY_FILE` | Encryption key file | `secret.key` in the user data directory |
+| `INKU_SESSION_COOKIE_MAX_AGE` | Session lifetime in seconds | 2592000 |
+| `INKU_SESSION_COOKIE_SECURE` | Secure cookie | `0` |
 
-LLM retry variables:
+When both encryption variables are set, direct key material has priority. A persistent key file is recommended for production.
+
+### 2.2 Bootstrap Administrator
 
 | Variable | Purpose |
 |---|---|
-| `INKU_LLM_RETRY_ATTEMPTS` | Retry count for transient LLM failures |
-| `INKU_LLM_RETRY_BASE_DELAY` | Initial retry delay |
-| `INKU_LLM_RETRY_MAX_DELAY` | Maximum retry delay |
-| `INKU_LLM_RETRY_JITTER` | Retry jitter |
-| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | LLM API request timeout |
-| `INKU_STAGE1_HARD_TIMEOUT_SECONDS` | Stage 1 hard timeout |
-| `INKU_STAGE2_HARD_TIMEOUT_SECONDS` | Stage 2 hard timeout |
+| `INKU_BOOTSTRAP_ADMIN_USERNAME` | Initial administrator name |
+| `INKU_BOOTSTRAP_ADMIN_EMAIL` | Initial administrator email |
+| `INKU_BOOTSTRAP_ADMIN_PASSWORD` | Initial administrator password |
 
-AI provider variables:
+The account is created only when a password is set and the DB contains no users. Passwords shorter than eight characters are rejected. Remove the secret from the environment after initial creation.
+
+### 2.3 Artifacts and Concurrency
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `INKU_OUTPUT_DIR` | SVG/JSON/PNG artifact directory | `outputs` in the user data directory |
+| `INKU_OUTPUT_PNG_SIZE` | Auto-saved PNG edge size | `2160` |
+| `INKU_OUTPUT_SAVE_WORKERS` | Artifact save workers | `2` |
+| `INKU_OUTPUT_SAVE_QUEUE_LIMIT` | Artifact queue limit | `32` |
+| `INKU_STAGE_WORKERS` | LLM pipeline workers | `4` |
+| `INKU_STAGE_QUEUE_LIMIT` | Pipeline queue limit | twice the worker count |
+
+When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
+
+### 2.4 LLM Retry and Timeout
+
+| Variable | Purpose | Implementation default |
+|---|---|---|
+| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Provider HTTP timeout | `120` |
+| `INKU_LLM_RETRY_ATTEMPTS` | Total attempts | `4` |
+| `INKU_LLM_RETRY_BASE_DELAY` | Initial delay in seconds | `2.0` |
+| `INKU_LLM_RETRY_MAX_DELAY` | Maximum delay | `20.0` |
+| `INKU_LLM_RETRY_JITTER` | Jitter | `0.25` |
+| `INKU_STAGE1_HARD_TIMEOUT_SECONDS` | Stage 1 hard timeout | endpoint default |
+| `INKU_STAGE2_HARD_TIMEOUT_SECONDS` | Stage 2 hard timeout | endpoint default |
+
+The distributed environment template explicitly sets operational example values. Be aware of the difference between template values and implementation defaults.
+
+### 2.5 Providers
 
 | Provider | API key | Base URL |
 |---|---|---|
 | OpenAI API Platform | `OPENAI_API_KEY` | `OPENAI_BASE_URL` |
-| Claude API | `ANTHROPIC_API_KEY` | `ANTHROPIC_BASE_URL` |
-| Gemini API | `GEMINI_API_KEY` | `GEMINI_BASE_URL` |
+| Anthropic | `ANTHROPIC_API_KEY` | `ANTHROPIC_BASE_URL` |
+| Gemini | `GEMINI_API_KEY` | `GEMINI_BASE_URL` |
 | NVIDIA NIM | `NVIDIA_API_KEY` | `NVIDIA_BASE_URL` |
 | Ollama | `OLLAMA_API_KEY` | `OLLAMA_BASE_URL` |
 | Intel OVMS | `OVMS_API_KEY` | `OVMS_BASE_URL` |
 
-## 2. Database
+Base URLs, keys, and published models can also be managed from the admin UI. Keys stored in the DB use the encrypted `enc:v1:` format.
 
-Prepare the service user and persistent directories.
+## 3. Database and Migrations
 
-```sh
-sudo useradd --system --create-home --home-dir /var/lib/inku --shell /usr/sbin/nologin inku
-sudo mkdir -p /var/lib/inku /var/log/inku /etc/inku
-sudo chown -R inku:inku /var/lib/inku /var/log/inku
-sudo chmod 0750 /var/lib/inku /var/log/inku
-```
-
-### SQLite
-
-SQLite is the simplest option for small or single-server deployments.
+### 3.1 SQLite
 
 ```sh
 INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 ```
 
-inku uses SQLite FTS5 for history search when available. If FTS5 is unavailable, it falls back to `LIKE` search.
+SQLite is the reference single-server setup. History search uses FTS5 when available and falls back to `LIKE` otherwise.
 
-### PostgreSQL
+At backend startup, current code runs column, index, FTS, lineage-root, and related migrations and backfills. Create a DB backup before startup and do not run multiple backend versions against the same DB during migration.
 
-Use PostgreSQL when you want to separate database operations or support larger deployments.
+### 3.2 PostgreSQL
 
 ```sh
 INKU_DB_URL=postgresql://inku:<password>@127.0.0.1/inku
 ```
 
-The DB URL may contain a password. Keep the environment file mode at `0600`.
+Restrict the environment file containing the DB URL to root and the service group. Use database-native backup procedures; SQLite-specific Web backup is not available for PostgreSQL.
 
-## 3. Authentication and Users
+### 3.3 History, Lineage, and Identity
 
-The bootstrap admin is created only when the database is new and `INKU_BOOTSTRAP_ADMIN_PASSWORD` is set.
+The DB keeps these identities separate.
 
-```sh
-INKU_BOOTSTRAP_ADMIN_USERNAME=admin
-INKU_BOOTSTRAP_ADMIN_EMAIL=admin@example.local
-INKU_BOOTSTRAP_ADMIN_PASSWORD=change-this-password
-```
+- Description hash: identity of the normalized description (`dh1:`)
+- Render hash: identity of a Renderer output edition (`rh2:`)
+- History ID: regular-history item
+- Lineage node ID: node in the creative process
 
-After signing in, administrators manage users, roles, and groups from `settings` -> `user management`.
+Lineage connects only explicit creation operations. It is never inferred from similarity, identical descriptions, or timestamps. Permanent removal of a regular-history work may leave a content-free tombstone so the lineage path remains recorded.
 
-| Role | Permission scope |
+## 4. Authentication, Roles, and Scope
+
+| Role | Permissions |
 |---|---|
-| admin | Models, DB settings, users, logs, and server settings |
-| group_lead | User management within the group scope |
-| user | Image creation and own history |
+| `admin` | Providers, server, DB, logs, users, and groups |
+| `group_lead` | User administration within assigned scope |
+| `user` | Generation and management of own history and settings |
 
-`/api/interpret`, `/api/compose`, and `/api/paint` require authentication. Unauthenticated requests return 401.
+Generation, history, lineage, and settings APIs enforce authentication and user scope. Acceptance testing must verify that roots, artworks, and counts never cross user boundaries.
 
-## 4. AI Provider Connections
+## 5. Models and Languages
 
-Administrators manage AI provider connections from `settings` -> `model settings`.
+| Stage | Role |
+|---|---|
+| Stage 1 | Interpret free-form text as normalized DDL |
+| Stage 1.5 | Deterministically expand DDL; not an LLM |
+| Stage 2 | Structure DDL as JSON Score |
+| Renderer | Draw Score as SVG |
 
-Configurable items:
+The Web UI always sends `instruction_lang: auto` for normal generation. The server detects Japanese or English from the text and falls back to `ui_lang` only when no language signal is present. The API retains `auto`, `ja`, and `en` for compatibility and explicit comparison runs.
 
-- Service name
-- Connection kind
-- Base URL
-- API key
-- Published models
-- Memo
-- Model list fetching
+Resolved values are recorded as `instruction_lang_requested`, `instruction_lang_resolved`, and `ui_lang`. Works using different per-stage languages through Language comparison store them in lineage metadata. These language fields are not part of the current canonical render-hash payload.
 
-API keys saved in the DB are encrypted with the `enc:v1:` format. Key material is resolved in this order:
+## 6. Renderer and Replay
 
-1. `INKU_SECRET_KEY`
-2. `INKU_SECRET_KEY_FILE`
-3. `$HOME/.local/share/inku/secret.key`
+`render_seed` controls touch, `vary_seed` supports layout variation, and `interpretation_seed` supports reading variation. `seed_text` deterministically hashes explicit words into only the Renderer performance seed. It never changes interpretation, DDL, JSON Score, or layout.
 
-For production, store `INKU_SECRET_KEY_FILE` on persistent storage and include it in backups. If the key is lost, encrypted API keys in the DB cannot be decrypted.
+History replay uses the saved Score, color catalog, canvas, seeds, and render-engine version. Engine version is recorded for audit; bit-identical output across different engine versions is not assumed.
 
-## 5. Stage 1 / Stage 2 Models
+## 7. Artifact Saving
 
-inku uses a two-stage LLM pipeline.
-
-| Stage | Role | Model choice |
-|---|---|---|
-| Stage 1 interpretation | Reads free-form text and creates normalized DDL | Strong interpretation model |
-| Stage 1.5 intermediate filter | Deterministically expands normalized DDL | Server-side code, not LLM |
-| Stage 2 structuring | Converts DDL to JSON Score | Schema-following model |
-| Renderer | Converts JSON Score to SVG | Server-side code |
-
-Per-user Stage 1 / Stage 2 choices are stored in `user_accounts.model_settings`. These choices are separate from global provider settings.
-
-## 6. Output Artifact Saving
-
-The history DB is the source of truth. SVG / JSON / PNG files are artifacts.
-
-Recommended output directory:
-
-```sh
-INKU_OUTPUT_DIR=/var/lib/inku/outputs
-```
-
-Directory layout:
+The history DB is the source of truth. Artifacts are rebuildable outputs.
 
 ```text
 <output_dir>/<user_id>/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history_id>...
 ```
 
-Administrators can change these from `settings` -> `server misc`.
+Administrators can change artifact targets and queue settings from server settings. Verify write permission for the service user after changing the output path.
 
-- Enable / disable automatic artifact saving
-- Output directory
-- PNG size
-- Save worker and queue limits
-
-If the artifact save queue is full, inku prioritizes DB history saving and skips only artifact saving.
-
-## 7. Logs
-
-Recommended log directory:
-
-```sh
-/var/log/inku
-```
-
-Create it:
-
-```sh
-sudo mkdir -p /var/log/inku
-sudo chown inku:inku /var/log/inku
-sudo chmod 0750 /var/log/inku
-```
-
-The `settings` -> `log retention` tab shows the retention policy, rotation interval, systemd drop-in preview, and logrotate preview. Applying those settings to the OS is still an administrator task.
-
-See [templates/logrotate/inku](./templates/logrotate/inku).
-
-## 8. systemd Operation
-
-Service examples:
-
-- [inku-api.service](./templates/systemd/inku-api.service)
-- [inku-server.service](./templates/systemd/inku-server.service)
-
-Register services:
-
-```sh
-sudo systemctl daemon-reload
-sudo systemctl enable --now inku-api.service
-sudo systemctl enable --now inku-server.service
-```
-
-Check status and logs:
-
-```sh
-systemctl status inku-api.service --no-pager
-systemctl status inku-server.service --no-pager
-journalctl -u inku-api.service -n 100 --no-pager
-journalctl -u inku-server.service -n 100 --no-pager
-```
-
-Restart:
-
-```sh
-sudo systemctl restart inku-api.service
-sudo systemctl restart inku-server.service
-```
-
-## 9. Reverse Proxy
-
-For public deployments, put nginx, Caddy, or another reverse proxy in front and terminate HTTPS there.
-
-Minimum routing:
-
-- `/` -> `http://127.0.0.1:5173/`
-- `/api/` -> `http://127.0.0.1:8100/api/`
-- `/health` -> optionally `http://127.0.0.1:8100/health`
-- Enable HTTPS
-- Set `INKU_SESSION_COOKIE_SECURE=1`
-
-The Vite dev server setup is a reference deployment style. For public internet exposure, consider a production SvelteKit adapter and a reverse proxy.
-
-## 10. Backups
+## 8. Backup and Recovery
 
 Back up at least:
 
 | Target | Reason |
 |---|---|
-| DB | Source of truth for history, users, and settings |
-| `INKU_SECRET_KEY_FILE` | Required to decrypt provider API keys |
-| Output files | Rebuildable, but operationally useful |
+| DB | Source of truth for history, lineage, users, and settings |
+| `INKU_SECRET_KEY_FILE` | Required to decrypt provider keys |
 | `/etc/inku/inku-api.env` | Runtime configuration |
-| systemd / logrotate configuration | Service recovery |
+| systemd, reverse proxy, and logrotate | Service recovery |
+| Artifacts | Rebuildable, but potentially required operationally |
 
-For SQLite, the Web UI DB settings page can configure and run backups. Include those backups in your external backup plan.
+Change the SQLite backup directory with `INKU_DB_BACKUP_DIR`. The Web admin UI supports manual and scheduled backups with generation retention. Use external backups as well, keeping the DB and encryption key at the same recovery point.
 
-## 11. Health Checks
+Recovery tests should verify sign-in, provider-key decryption, history display, lineage edges, and SVG replay.
 
-API:
+## 9. Logs
+
+Reference files:
+
+```text
+/var/log/inku/inku-api.log
+/var/log/inku/inku-server.log
+```
+
+The templates write to both the systemd journal and append files.
+
+```sh
+journalctl -u inku-api.service -n 100 --no-pager
+journalctl -u inku-server.service -n 100 --no-pager
+```
+
+`manual/en/templates/logrotate/inku` is an example using daily rotation, 90 generations, compression, and `copytruncate`. Log policy in the admin UI is a preview and stored policy; applying OS configuration remains an administrator task.
+
+## 10. systemd
+
+Reference templates:
+
+- [inku-api.service](./templates/systemd/inku-api.service)
+- [inku-server.service](./templates/systemd/inku-server.service)
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now inku-api.service
+sudo systemctl enable --now inku-server.service
+sudo systemctl status inku-api.service --no-pager
+sudo systemctl status inku-server.service --no-pager
+```
+
+The reference frontend service starts Vite with `NODE_ENV=development`. Do not use it unchanged for public production service. Design a production adapter, process command, static assets, and proxy timeouts.
+
+## 11. Reverse Proxy and Cookies
+
+Minimum routes:
+
+- `/` -> `http://127.0.0.1:5173/`
+- `/api/` -> `http://127.0.0.1:8100/api/`
+- Optional `/health` -> `http://127.0.0.1:8100/health`
+
+Terminate HTTPS and set `INKU_SESSION_COOKIE_SECURE=1` for public deployment. LLM generation may be long-running, so do not configure proxy timeouts shorter than provider timeouts without intent.
+
+## 12. Health Checks and Monitoring
 
 ```sh
 curl -sS -i --max-time 5 http://127.0.0.1:8100/health
+curl -sS -I --max-time 5 http://127.0.0.1:5173/
 ```
 
-Web:
-
-```sh
-curl -sS -i --max-time 5 http://127.0.0.1:5173/ | head -n 20
-```
-
-Authentication path through the Web proxy:
+Authentication through the Web proxy:
 
 ```sh
 curl -sS -i --max-time 5 \
@@ -262,25 +226,27 @@ curl -sS -i --max-time 5 \
   --data '{"username":"admin","password":"wrong"}'
 ```
 
-A 401 response for the wrong password means the Web proxy reached the API.
+A 401 response for the wrong password confirms the path from Web to API. Monitor HTTP status, service restarts, worker queues, provider errors, artifact queue skips, and DB backup success. Provider wait duration is not a quality metric.
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| Cannot sign in | Confirm users exist and bootstrap admin conditions were met |
-| Image generation fails | Check AI provider API key, Base URL, published models, and logs |
-| Generation is slow | Check provider queue, retries, timeouts, and Stage worker queue |
-| Image appears but no files are saved | Check output queue skip and output directory permissions |
-| Web opens but drawing fails | Check `/api/paint` proxy, auth cookie, and API service |
-| API key no longer works | Confirm `INKU_SECRET_KEY_FILE` has not changed |
-| DB is large | Review history retention, backups, and artifact policy |
+| Cannot sign in | Bootstrap conditions, user state, secure-cookie setting, and DB connection |
+| Cannot generate | Provider key, Base URL, published models, and Stage logs |
+| Japanese or English is misdetected | Language signal in input, `ui_lang` fallback, and effective languages in Generation info |
+| History is missing | User scope, regular/trash mode, and timeline/lineage filter |
+| Lineage appears broken | Parent-candidate save failure, lineage migration, and tombstones |
+| Artwork appears but artifacts do not | Queue skip, output permissions, and worker count |
+| Provider key cannot decrypt | Confirm the same recovery-point `INKU_SECRET_KEY_FILE` |
+| DB fails after startup | Migration logs, DB backup, and concurrent mixed backend versions |
 
-## 13. Security Notes
+## 14. Security Baseline
 
-- After first setup, remove or securely manage `INKU_BOOTSTRAP_ADMIN_PASSWORD`.
-- Keep `/etc/inku/inku-api.env` at mode `0600`.
-- Store `INKU_SECRET_KEY_FILE` persistently and restrict permissions.
-- Use HTTPS for public deployments and set `INKU_SESSION_COOKIE_SECURE=1`.
-- Do not commit API keys, DB URLs, host-specific operations, or local service details to Git.
-- Treat systemd, sudoers, and reverse proxy settings as server-side operations.
+- Never commit provider keys, DB passwords, or bootstrap passwords.
+- Restrict the environment file to root and the service group.
+- Persist the encryption key and back it up on separate media from the DB.
+- Use HTTPS, Secure cookies, and reverse-proxy request-size and timeout limits for public service.
+- Do not grant the service user unnecessary shell, sudo, or access to other users' data.
+- Apply access control to backups and logs because they may contain descriptions and metadata.
+- Prepare recovery procedures before user deletion, permanent history deletion, or key rotation.

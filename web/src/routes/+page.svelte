@@ -111,7 +111,8 @@
 		tokens_out_stage2: number | null;
 		user_generation_count?: number | null;
 	};
-	type DerivationKind = 'touch_variation' | 'layout_variation' | 'reinterpretation' | 'model_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
+	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
@@ -361,6 +362,9 @@
 	let modelInspectionResults = $state<ModelInspectionResult[]>([]);
 	let modelInspectionSelectedModels = $state<string[]>([]);
 	let modelInspectionFailedModels = $state<Record<string, string>>({});
+	let modelInspectionRunId = 0;
+	let targetContextVersion = 0;
+	let modelInspectionAbortController: AbortController | null = null;
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -387,6 +391,7 @@
 	let lineageLoading = $state(false);
 	let lineageError = $state<string | null>(null);
 	let lineageLoadedFocus = $state<string | null>(null);
+	let lineageRequestId = 0;
 	let lineageDetached = $state(false);
 	let zoom         = $state(1);
 	let canvasFitZoom = $state(1);
@@ -2422,6 +2427,7 @@ if (unreadWords.length > 0) {
 
 	async function submit() {
 		if (!canSubmit || loading || variationGridBusy) return;
+		resetTargetScopedState();
 		try {
 			await ensureVisibleLineageParentId();
 		} catch (cause) {
@@ -2646,6 +2652,7 @@ if (unreadWords.length > 0) {
 	// ── Replay (Stage 2 のみ) ────────────────────────────────
 	async function replay() {
 		if (!ddl || reloading) return;
+		resetTargetScopedState();
 		try {
 			await ensureVisibleLineageParentId();
 		} catch (cause) {
@@ -3077,6 +3084,7 @@ if (unreadWords.length > 0) {
 	}
 
 	function clearInput() {
+		resetTargetScopedState();
 		pendingCanvasAspectDerivation = null;
 		if (inputMode === 'single') input = '';
 		if (inputMode === 'batch') batchInput = '';
@@ -3288,32 +3296,88 @@ if (unreadWords.length > 0) {
 		if (modelInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
+		const contextVersion = targetContextVersion;
 		const modelParentNodeId = await ensureVisibleLineageParentId();
+		if (contextVersion !== targetContextVersion) return;
 		const selectedModels = modelInspectionSelectedModels.slice(0, 4).filter((model) => !isModelInspectionChoiceBlocked(model));
 		if (selectedModels.length === 0) { modelInspectionStatus = t().modelCompareSelectPrompt; return; }
 		const jobs = selectedModels.map((model) => {
-			const stage1 = modelCompareMode === 'stage1_fixed' ? modelCompareFixedModel : model;
-			const stage2 = modelCompareMode === 'stage2_fixed' ? modelCompareFixedModel : model;
-			return { model, stage1, stage2, id: `${modelCompareMode}:${stage1}:${stage2}` };
+			const stage1 = modelCompareMode === "stage1_fixed" ? modelCompareFixedModel : model;
+			const stage2 = modelCompareMode === "stage2_fixed" ? modelCompareFixedModel : model;
+			return { model, stage1, stage2, id: modelCompareMode + ":" + stage1 + ":" + stage2 };
 		});
 		const rendered = new Set(modelInspectionResults.map((item) => item.id));
 		const pending = jobs.filter((job) => !rendered.has(job.id));
 		if (pending.length === 0) { modelInspectionStatus = t().modelCompareAllRendered; return; }
-		modelInspectionBusy = true; modelInspectionStatus = null;
-		const successful = [...modelInspectionResults]; const failed: Record<string, string> = {};
+
+		const runId = ++modelInspectionRunId;
+		const abortController = new AbortController();
+		modelInspectionAbortController = abortController;
+		modelInspectionBusy = true;
+		modelInspectionStatus = null;
+		const successful = [...modelInspectionResults];
+		const failed: Record<string, string> = {};
 		try {
 			for (const job of pending) {
+				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
 				try {
 					const started = Date.now();
-					const interpreted = await interpretOne(source, undefined, job.stage1);
-					const composed = await composeOne(interpreted.ddl, source, undefined, job.stage2);
-					successful.push({ id: job.id, model: job.model, stage1Model: job.stage1, label: `${statusModelName(job.stage1)} / ${statusModelName(job.stage2)}`, input: source, ddl: interpreted.ddl, svg: composed.svg, score: composed.score, stage2Model: composed.stage2_model ?? job.stage2, renderBuildNumber: composed.render_build_number ?? null, renderColorProfile: composed.render_color_profile ?? null, renderEngineId: composed.render_engine_id ?? null, renderEngineVersion: composed.render_engine_version ?? null, renderColorCatalogId: composed.render_color_catalog_id ?? null, renderColorCatalogName: composed.render_color_catalog_name ?? null, renderColorCatalogSub: composed.render_color_catalog_sub ?? null, renderColorMap: composed.render_color_map ?? null, renderCanvasAspect: composed.render_canvas_aspect ?? null, renderCanvasAspectId: composed.render_canvas_aspect_id ?? null, renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null, renderSeed: composed.render_seed ?? null, varySeed: composed.vary_seed ?? null, tokensIn: interpreted.tokens_in, tokensOut: interpreted.tokens_out, tokensInStage2: composed.tokens_in, tokensOutStage2: composed.tokens_out, elapsedMs: Date.now() - started, lineageParentNodeId: modelParentNodeId, compareMode: modelCompareMode, savedHistoryId: null, starred: false, saving: false });
+					const interpreted = await interpretOne(source, abortController.signal, job.stage1);
+					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2);
+					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					successful.push({
+						id: job.id,
+						model: job.model,
+						stage1Model: job.stage1,
+						label: statusModelName(job.stage1) + " / " + statusModelName(job.stage2),
+						input: source,
+						ddl: interpreted.ddl,
+						svg: composed.svg,
+						score: composed.score,
+						stage2Model: composed.stage2_model ?? job.stage2,
+						renderBuildNumber: composed.render_build_number ?? null,
+						renderColorProfile: composed.render_color_profile ?? null,
+						renderEngineId: composed.render_engine_id ?? null,
+						renderEngineVersion: composed.render_engine_version ?? null,
+						renderColorCatalogId: composed.render_color_catalog_id ?? null,
+						renderColorCatalogName: composed.render_color_catalog_name ?? null,
+						renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
+						renderColorMap: composed.render_color_map ?? null,
+						renderCanvasAspect: composed.render_canvas_aspect ?? null,
+						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
+						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
+						renderSeed: composed.render_seed ?? null,
+						varySeed: composed.vary_seed ?? null,
+						tokensIn: interpreted.tokens_in,
+						tokensOut: interpreted.tokens_out,
+						tokensInStage2: composed.tokens_in,
+						tokensOutStage2: composed.tokens_out,
+						elapsedMs: Date.now() - started,
+						lineageParentNodeId: modelParentNodeId,
+						compareMode: modelCompareMode,
+						savedHistoryId: null,
+						starred: false,
+						saving: false,
+					});
 					modelInspectionResults = [...successful];
-				} catch (e) { failed[job.model] = e instanceof Error ? e.message : String(e); modelInspectionFailedModels = { ...modelInspectionFailedModels, [job.model]: failed[job.model] }; }
+				} catch (cause) {
+					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					failed[job.model] = cause instanceof Error ? cause.message : String(cause);
+					modelInspectionFailedModels = { ...modelInspectionFailedModels, [job.model]: failed[job.model] };
+				}
 			}
-			if (Object.keys(failed).length > 0) modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
-		} finally { modelInspectionBusy = false; }
+			if (Object.keys(failed).length > 0 && modelInspectionRunId === runId) {
+				modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
+			}
+		} finally {
+			if (modelInspectionRunId === runId) {
+				modelInspectionAbortController = null;
+				modelInspectionBusy = false;
+			}
+		}
 	}
+
 
 	function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
 		modelInspectionResults = modelInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
@@ -3321,10 +3385,11 @@ if (unreadWords.length > 0) {
 
 	async function saveModelInspectionResult(item: ModelInspectionResult, options: { star?: boolean } = {}) {
 		if (item.saving) return;
+		const contextVersion = targetContextVersion;
 		if (item.savedHistoryId) {
 			if (options.star) {
 				await toggleHistoryStar({ id: item.savedHistoryId, starred: !!item.starred });
-				updateModelInspectionResult(item.id, { starred: !item.starred });
+				if (contextVersion === targetContextVersion) updateModelInspectionResult(item.id, { starred: !item.starred });
 			}
 			return;
 		}
@@ -3358,19 +3423,23 @@ if (unreadWords.length > 0) {
 				vary_seed: item.varySeed ?? null,
 			}, { countGeneration: true, sourceText: item.input, lineageParentNodeId: item.lineageParentNodeId ?? null, derivationKind: item.lineageParentNodeId ? 'model_variation' : null, derivationMetadata: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model } });
 			if (!saved?.id) throw new Error('failed to save comparison result');
+			if (contextVersion !== targetContextVersion) return;
 			updateModelInspectionResult(item.id, { savedHistoryId: saved.id, starred: !!saved.starred, saving: false });
 			if (options.star) {
 				await toggleHistoryStar({ id: saved.id, starred: !!saved.starred, note: saved.note });
-				updateModelInspectionResult(item.id, { starred: !saved.starred });
+				if (contextVersion === targetContextVersion) updateModelInspectionResult(item.id, { starred: !saved.starred });
 			}
 		} catch (e) {
-			updateModelInspectionResult(item.id, { saving: false });
-			modelInspectionStatus = e instanceof Error ? e.message : String(e);
+			if (contextVersion === targetContextVersion) {
+				updateModelInspectionResult(item.id, { saving: false });
+				modelInspectionStatus = e instanceof Error ? e.message : String(e);
+			}
 		}
 	}
 
 	async function replayHistoryItem(it: Iteration) {
 		if (demoRunning || reloading) return;
+		const contextVersion = targetContextVersion;
 		if (it.render_seed == null) {
 			reloadError = t().historyReplayMissingSeed;
 			return;
@@ -3392,65 +3461,86 @@ if (unreadWords.length > 0) {
 			});
 			if (!r.ok) throw new Error(await r.text());
 			const svg = await r.text();
+			if (contextVersion !== targetContextVersion) return;
 			loadIterationItem({ ...it, svg });
 			result = result ? { ...result, svg, render_hash: it.render_hash, render_hash_short: it.render_hash_short } : result;
 			outputTab = 'canvas';
 			fitCanvasZoom();
 		} catch (e) {
-			reloadError = e instanceof Error ? e.message : String(e);
+			if (contextVersion === targetContextVersion) reloadError = e instanceof Error ? e.message : String(e);
 		} finally {
 			reloading = false;
 		}
 	}
 
 async function fetchLineage(nodeId: string, force = false, descendantDepth = 3): Promise<void> {
-	if (!nodeId || lineageLoading || (!force && lineageLoadedFocus === nodeId)) return;
+	if (!nodeId || (!force && lineageLoadedFocus === nodeId)) return;
+	const requestId = ++lineageRequestId;
 	lineageLoading = true;
 	lineageError = null;
 	try {
-		const r = await apiFetch(`/api/lineage/${encodeURIComponent(nodeId)}?descendant_depth=${descendantDepth}&node_limit=200`, { cache: 'no-store' });
-		if (!r.ok) throw new Error(`HTTP ${r.status}`);
-		lineageGraph = await r.json() as LineageGraph;
+		const url = "/api/lineage/" + encodeURIComponent(nodeId) + "?descendant_depth=" + descendantDepth + "&node_limit=200";
+		const r = await apiFetch(url, { cache: "no-store" });
+		if (!r.ok) throw new Error("HTTP " + r.status);
+		const graph = await r.json() as LineageGraph;
+		if (requestId !== lineageRequestId) return;
+		lineageGraph = graph;
 		lineageLoadedFocus = nodeId;
-	} catch (e) {
-		lineageError = e instanceof Error ? e.message : String(e);
+	} catch (cause) {
+		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
 	} finally {
-		lineageLoading = false;
+		if (requestId === lineageRequestId) lineageLoading = false;
 	}
 }
 
+
 async function loadLineageBranch(nodeId: string): Promise<void> {
 	if (!lineageGraph) return;
-	const r = await apiFetch('/api/lineage/' + encodeURIComponent(nodeId) + '?descendant_depth=1&node_limit=200', { cache: 'no-store' });
-	if (!r.ok) throw new Error('HTTP ' + r.status);
-	const branch = await r.json() as LineageGraph;
-	const nodes = new Map(lineageGraph.nodes.map((node) => [node.id, node]));
-	const edges = new Map(lineageGraph.edges.map((edge) => [edge.id, edge]));
-	for (const node of branch.nodes) nodes.set(node.id, node);
-	for (const edge of branch.edges) edges.set(edge.id, edge);
-	lineageGraph = { ...lineageGraph, nodes: [...nodes.values()], edges: [...edges.values()] };
+	const focusNodeId = lineageGraph.focus_node_id;
+	const requestId = ++lineageRequestId;
+	lineageLoading = true;
+	lineageError = null;
+	try {
+		const r = await apiFetch("/api/lineage/" + encodeURIComponent(nodeId) + "?descendant_depth=1&node_limit=200", { cache: "no-store" });
+		if (!r.ok) throw new Error("HTTP " + r.status);
+		const branch = await r.json() as LineageGraph;
+		if (requestId !== lineageRequestId || lineageGraph?.focus_node_id !== focusNodeId) return;
+		const nodes = new Map(lineageGraph.nodes.map((node) => [node.id, node]));
+		const edges = new Map(lineageGraph.edges.map((edge) => [edge.id, edge]));
+		for (const node of branch.nodes) nodes.set(node.id, node);
+		for (const edge of branch.edges) edges.set(edge.id, edge);
+		lineageGraph = { ...lineageGraph, nodes: [...nodes.values()], edges: [...edges.values()] };
+	} catch (cause) {
+		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
+	} finally {
+		if (requestId === lineageRequestId) lineageLoading = false;
+	}
 }
+
 
 async function loadLineageOverview(): Promise<void> {
 	const focusNodeId = lineageGraph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
 	if (!focusNodeId || !lineageGraph) return;
 	const childIds = new Set(lineageGraph.edges.map((edge) => edge.child_node_id));
 	const rootNodeId = lineageGraph.nodes.find((node) => !childIds.has(node.id))?.id ?? focusNodeId;
+	const requestId = ++lineageRequestId;
 	lineageLoading = true;
 	lineageError = null;
 	try {
-		const url = '/api/lineage/' + encodeURIComponent(rootNodeId) + '?descendant_depth=200&node_limit=200';
-		const r = await apiFetch(url, { cache: 'no-store' });
-		if (!r.ok) throw new Error('HTTP ' + r.status);
+		const url = "/api/lineage/" + encodeURIComponent(rootNodeId) + "?descendant_depth=200&node_limit=200";
+		const r = await apiFetch(url, { cache: "no-store" });
+		if (!r.ok) throw new Error("HTTP " + r.status);
 		const overview = await r.json() as LineageGraph;
+		if (requestId !== lineageRequestId) return;
 		lineageGraph = { ...overview, focus_node_id: focusNodeId };
 		lineageLoadedFocus = focusNodeId;
-	} catch (e) {
-		lineageError = e instanceof Error ? e.message : String(e);
+	} catch (cause) {
+		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
 	} finally {
-		lineageLoading = false;
+		if (requestId === lineageRequestId) lineageLoading = false;
 	}
 }
+
 
 async function openLineageNode(node: LineageNode): Promise<void> {
 	if (!node.history) return;
@@ -3461,9 +3551,11 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 }
 
 async function promoteLineageNode(node: LineageNode): Promise<void> {
+	const contextVersion = targetContextVersion;
 	const r = await apiFetch(`/api/lineage/${encodeURIComponent(node.id)}/promote`, { method: 'POST' });
 	if (!r.ok) return;
 	const promoted = await r.json() as Iteration;
+	if (contextVersion !== targetContextVersion) return;
 	if (displayedHistoryItem?.id === promoted.id) {
 		displayedHistoryItem = promoted;
 		await Promise.all([fetchLineage(node.id, true), syncHistoryStripToItem(promoted)]);
@@ -3478,6 +3570,7 @@ async function promoteLineageNode(node: LineageNode): Promise<void> {
 
 async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 	if (!node.history?.id) return;
+	const contextVersion = targetContextVersion;
 	const r = await apiFetch(`/api/history/${encodeURIComponent(node.history.id)}/star`, {
 		method: 'PATCH',
 		headers: { 'Content-Type': 'application/json' },
@@ -3485,11 +3578,13 @@ async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 	});
 	if (!r.ok) throw new Error(`HTTP ${r.status}`);
 	const updated = await r.json() as Iteration;
+	if (contextVersion !== targetContextVersion) return;
 	updateHistoryStarState(updated);
 	await fetchLineage(node.id, true);
 }
 
 function detachLineage(): void {
+	resetTargetScopedState();
 	pendingCanvasAspectDerivation = null;
 	lineageDetached = true;
 	displayedHistoryItem = null;
@@ -3504,8 +3599,45 @@ $effect(() => {
 	if (outputTab === 'lineage' && nodeId) void fetchLineage(nodeId);
 });
 
+	function resetTargetScopedState(options: { preserveVariationCandidates?: boolean } = {}): void {
+		targetContextVersion += 1;
+		if (!options.preserveVariationCandidates) {
+			if (variationGridAbortController) variationGridAbortController.abort();
+			variationGridAbortController = null;
+			variationGridBusy = false;
+			variationGridCanAbort = false;
+			variationCandidates = [];
+			variationGridIncludesReading = false;
+			variationGridTaskLabel = '';
+			variationGridStatus = null;
+		}
+
+		if (modelInspectionAbortController) modelInspectionAbortController.abort();
+		modelInspectionAbortController = null;
+		modelInspectionRunId += 1;
+		modelInspectionBusy = false;
+		modelInspectionResults = [];
+		modelInspectionFailedModels = {};
+		modelInspectionStatus = null;
+
+		interpretationDiffParts = [];
+		reloadError = null;
+		if (lineageIntermediateNoticeTimer !== null) {
+			window.clearTimeout(lineageIntermediateNoticeTimer);
+			lineageIntermediateNoticeTimer = null;
+		}
+		lineageIntermediateNotice = null;
+
+		lineageRequestId += 1;
+		lineageLoading = false;
+		lineageError = null;
+		lineageGraph = null;
+		lineageLoadedFocus = null;
+	}
+
 	function loadIterationItem(it: Iteration) {
 		if (demoRunning) return;
+		resetTargetScopedState();
 		pendingCanvasAspectDerivation = null;
 		inputMode = 'single';
 		displayedHistoryItem = it;
@@ -3578,21 +3710,16 @@ $effect(() => {
 		return at == null ? null : new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
 	});
 
-	function prepareContextTargetChange() {
-		modelInspectionResults = [];
-		modelInspectionFailedModels = {};
-		modelInspectionStatus = null;
-	}
 
 	async function gotoPrev() {
-		const preservedTab = outputTab; prepareContextTargetChange();
+		const preservedTab = outputTab;
 		if (historyCursor < historyItems.length - 1) { loadIteration(historyCursor + 1); }
 		else if (historyOffset + historyWindowSize < historyTotal) { await fetchHistoryOffset(historyOffset + historyWindowSize); loadIteration(0); }
 		outputTab = preservedTab;
 	}
 
 	async function gotoNext() {
-		const preservedTab = outputTab; prepareContextTargetChange();
+		const preservedTab = outputTab;
 		if (historyCursor > 0) { loadIteration(historyCursor - 1); }
 		else if (historyOffset > 0) { await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize)); loadIteration(historyItems.length - 1); }
 		outputTab = preservedTab;
@@ -3818,8 +3945,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					score: result.score,
-					catalog_id: result.render_color_catalog_id ?? selectedCatalog,
-					canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+					catalog_id: refinementCatalogId(),
+					canvas_aspect: refinementCanvasAspectId(),
 					render_seed: nextSeed,
 				})
 			});
@@ -3850,7 +3977,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const usedSeeds = new Set<number>();
 			if (Number.isFinite(result.vary_seed ?? NaN)) usedSeeds.add(Number(result.vary_seed));
 			const nextVarySeed = createSafeIntegerSeed(usedSeeds);
-			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source, sourceText: source, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_variation' : null, derivationMetadata: { vary_seed: nextVarySeed } });
+			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_variation' : null, derivationMetadata: { vary_seed: nextVarySeed } });
 			ddl = r.ddl;
 			ddlGeneratedBaseline = r.ddl;
 			thinking = r.thinking;
@@ -3891,7 +4018,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const previousDdl = ddl;
 		try {
 			const interpretationSeed = createInterpretationSeed();
-			const r = await paintOne(source, { historyInput: source, sourceText: source, interpretationSeed, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'reinterpretation' : null, derivationMetadata: { interpretation_seed: interpretationSeed } });
+			const r = await paintOne(source, { historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), interpretationSeed, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'reinterpretation' : null, derivationMetadata: { interpretation_seed: interpretationSeed } });
 			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
 			ddl = r.ddl;
 			ddlGeneratedBaseline = r.ddl;
@@ -3940,6 +4067,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		};
 	}
 
+	function refinementCatalogId(): string {
+		return result?.render_color_catalog_id ?? displayedHistoryItem?.catalog_id ?? defaultCatalogId;
+	}
+
+	function refinementCanvasAspectId(): CanvasAspectId {
+		return normalizeCanvasAspectId(result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? effectiveCanvasAspectId());
+	}
+
 	async function renderPerformanceCandidate(seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		if (!result) throw new Error("missing result");
 		const r = await apiFetch("/api/render-svg", {
@@ -3948,8 +4083,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				score: result.score,
-				catalog_id: result.render_color_catalog_id ?? selectedCatalog,
-				canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+				catalog_id: refinementCatalogId(),
+				canvas_aspect: refinementCanvasAspectId(),
 				render_seed: seed,
 			})
 		});
@@ -3976,8 +4111,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
-				catalog_id: selectedCatalog,
-				canvas_aspect: effectiveCanvasAspectId(),
+				catalog_id: refinementCatalogId(),
+				canvas_aspect: refinementCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				vary_seed: varySeed,
 			})
@@ -3990,29 +4125,90 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
 		const interpretationSeed = createInterpretationSeed();
-		const r = await paintOne(source, { historyInput: source, sourceText: source, saveHistory: false, saveArtifacts: false, countGeneration: false, interpretationSeed, signal });
-		return { id: `interp-${interpretationSeed}`, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'reinterpretation' : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
+		const r = await paintOne(source, {
+			historyInput: source,
+			sourceText: source,
+			saveHistory: false,
+			saveArtifacts: false,
+			countGeneration: false,
+			catalogId: refinementCatalogId(),
+			canvasAspectId: refinementCanvasAspectId(),
+			interpretationSeed,
+			signal,
+		});
+		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
 	}
 
-	type RefineChanges = { touch: boolean; layout: boolean; reading: boolean };
+	function colorCatalogCandidateIds(count: 1 | 4): string[] {
+		const currentId = refinementCatalogId();
+		const candidates = colorCatalogs.map((catalog) => catalog.id).filter((id) => id && id !== currentId);
+		for (let index = candidates.length - 1; index > 0; index -= 1) {
+			const swapIndex = Math.floor(Math.random() * (index + 1));
+			[candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
+		}
+		if (candidates.length === 0) throw new Error(t().refineNoAlternateCatalog);
+		return Array.from({ length: count }, (_, index) => candidates[index % candidates.length]);
+	}
 
-	async function generateVariationCandidates(changes: RefineChanges, count: 1 | 4) {
+	async function renderColorCatalogCandidate(catalogId: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+		if (!result) throw new Error("missing result");
+		const source = input.trim();
+		const fromCatalogId = refinementCatalogId();
+		const r = await apiFetch("/api/render-score", {
+			method: "POST",
+			signal,
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				score: result.score,
+				input: source,
+				ddl: ddl ?? "",
+				catalog_id: catalogId,
+				canvas_aspect: refinementCanvasAspectId(),
+				render_seed: result.render_seed,
+				vary_seed: result.vary_seed,
+				interpretation_seed: result.interpretation_seed,
+			}),
+		});
+		if (!r.ok) throw new Error(await r.text());
+		const data = await r.json() as Partial<PaintResult> & Pick<PaintResult, "svg" | "score">;
+		return {
+			id: "catalog-" + catalogId + "-" + label,
+			label,
+			selected: false,
+			result: {
+				...result,
+				...data,
+				ddl: ddl ?? "",
+				thinking,
+				history_id: null,
+				history_at: null,
+				lineage_node_id: null,
+				lineage_parent_node_id: currentLineageParentId(),
+				derivation_kind: currentLineageParentId() ? "catalog_change" : null,
+				derivation_metadata: { catalog_id_from: fromCatalogId, catalog_id_to: catalogId },
+			},
+		};
+	}
+
+	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4) {
 		if (!result || variationGridBusy || loading) return;
 		const source = input.trim();
 		if (!source || !ddl) return;
+		const contextVersion = targetContextVersion;
 		await ensureVisibleLineageParentId();
-		const selectedKinds: Array<keyof RefineChanges> = changes.reading
-			? ['reading']
-			: count === 1
-				? (['layout', 'touch'] as const).filter((kind) => changes[kind]).slice(0, 1)
-				: (['touch', 'layout'] as const).filter((kind) => changes[kind]);
-		if (selectedKinds.length === 0) return;
+		if (contextVersion !== targetContextVersion) return;
 		const abortController = new AbortController();
 		variationGridAbortController = abortController;
 		variationGridBusy = true;
 		variationGridCanAbort = false;
-		variationGridIncludesReading = selectedKinds.includes('reading');
-		variationGridTaskLabel = selectedKinds.map((kind) => kind === 'touch' ? t().canvasVaryPerformance : kind === 'layout' ? t().canvasVaryComposition : t().canvasVaryInterpretation).join('・');
+		variationGridIncludesReading = kind === "reading";
+		variationGridTaskLabel = kind === "touch"
+			? t().canvasVaryPerformance
+			: kind === "layout"
+				? t().canvasVaryComposition
+				: kind === "reading"
+					? t().canvasVaryInterpretation
+					: t().canvasVaryColor;
 		variationGridStatus = null;
 		const abortTimer = window.setTimeout(() => {
 			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
@@ -4026,25 +4222,28 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				if (Number.isFinite(candidate.result.render_seed ?? NaN)) usedRenderSeeds.add(Number(candidate.result.render_seed));
 				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
 			}
-			const counts = { touch: 0, layout: 0, reading: 0 };
+			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
 			const jobs = Array.from({ length: count }, (_, index) => {
-				const kind = selectedKinds[index % selectedKinds.length];
-				const sequence = ++counts[kind];
-				if (kind === 'touch') {
+				const sequence = index + 1;
+				if (kind === "touch") {
 					const renderSeed = createSafeIntegerSeed(usedRenderSeeds);
 					usedRenderSeeds.add(renderSeed);
-					return renderPerformanceCandidate(renderSeed, `${t().canvasVaryPerformance} ${sequence}`, abortController.signal);
+					return renderPerformanceCandidate(renderSeed, t().canvasVaryPerformance + " " + sequence, abortController.signal);
 				}
-				if (kind === 'layout') {
+				if (kind === "layout") {
 					const varySeed = createSafeIntegerSeed(usedVarySeeds);
 					usedVarySeeds.add(varySeed);
-					return composeVariationCandidate(varySeed, `${t().canvasVaryComposition} ${sequence}`, abortController.signal);
+					return composeVariationCandidate(varySeed, t().canvasVaryComposition + " " + sequence, abortController.signal);
 				}
-				return interpretationVariationCandidate(`${t().canvasVaryInterpretation} ${sequence}`, abortController.signal);
+				if (kind === "reading") {
+					return interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
+				}
+				const catalogId = catalogIds[index];
+				return renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
 			});
 			variationCandidates = await Promise.all(jobs);
 		} catch (e) {
-			if (!(e instanceof DOMException && e.name === 'AbortError')) variationGridStatus = e instanceof Error ? e.message : String(e);
+			if (!(e instanceof DOMException && e.name === "AbortError")) variationGridStatus = e instanceof Error ? e.message : String(e);
 		} finally {
 			window.clearTimeout(abortTimer);
 			if (variationGridAbortController === abortController) {
@@ -4062,6 +4261,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	function showVariationCandidate(candidate: VariationCandidate) {
+		resetTargetScopedState({ preserveVariationCandidates: true });
 		historyCursor = -1;
 		ddl = candidate.result.ddl;
 		ddlGeneratedBaseline = candidate.result.ddl;
@@ -4073,6 +4273,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	async function saveSelectedVariationCandidates() {
+		const contextVersion = targetContextVersion;
 		const selected = variationCandidates.filter((candidate) => candidate.selected && !candidate.saved);
 		if (selected.length === 0) {
 			variationGridStatus = t().variationGridEmpty;
@@ -4096,6 +4297,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
 					catalog_id: candidate.result.render_color_catalog_id ?? selectedCatalog,
 				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {} });
+				if (contextVersion !== targetContextVersion) return;
 				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
 				if (saved?.id && result === candidate.result) {
 					result = { ...result, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
@@ -4104,7 +4306,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				}
 			}
 		} finally {
-			variationGridBusy = false;
+			if (contextVersion === targetContextVersion) variationGridBusy = false;
 		}
 	}
 
@@ -4133,8 +4335,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					score: result.score,
-					catalog_id: result.render_color_catalog_id ?? selectedCatalog,
-					canvas_aspect: result.score?.canvas ?? effectiveCanvasAspectId(),
+					catalog_id: refinementCatalogId(),
+					canvas_aspect: refinementCanvasAspectId(),
 					svg_profile: profile
 				})
 			});
@@ -4236,6 +4438,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	function resumeBatchLatestFollow(): void {
+		resetTargetScopedState();
 		batchAutoFollowLatest = true;
 		displayedHistoryItem = null;
 		historyCursor = -1;

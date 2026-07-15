@@ -133,15 +133,19 @@ export interface LangPack {
 	canvasVaryPerformance: string;
 	canvasVaryComposition: string;
 	canvasVaryInterpretation: string;
+	canvasVaryColor: string;
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;
 	variationGridSaveSelected: string;
 	refineSingleButton: string;
 	tooltipRefineSingle: string;
+	refineSingleSelectionHint: string;
 	refineCostTouch: string;
 	refineCostLayout: string;
 	refineCostReading: string;
+	refineCostColor: string;
 	variationGridEmpty: string;
+	refineNoAlternateCatalog: string;
 	tooltipVariationGridDefault: string;
 	tooltipVariationGridWithInterpretation: string;
 	tooltipVariationGridSaveSelected: string;
@@ -170,6 +174,7 @@ export interface LangPack {
 	tooltipCanvasVaryPerformance: string;
 	tooltipCanvasVaryComposition: string;
 	tooltipCanvasVaryInterpretation: string;
+	tooltipCanvasVaryColor: string;
 	tooltipCanvasNavPrev: string;
 	tooltipCanvasNavNext: string;
 	tooltipCanvasNavLatest: string;

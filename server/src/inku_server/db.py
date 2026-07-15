@@ -34,6 +34,7 @@ _HISTORY_FTS_ENABLED = False
 LINEAGE_DERIVATION_KINDS = {
     "touch_variation",
     "layout_variation",
+    "catalog_change",
     "reinterpretation",
     "model_variation",
     "ddl_edit",

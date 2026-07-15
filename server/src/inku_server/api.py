@@ -803,6 +803,41 @@ class RenderSvgRequest(BaseModel):
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
 
+class RenderScoreRequest(BaseModel):
+    score: dict
+    input: str = ""
+    ddl: str | None = None
+    catalog_id: str | None = None
+    canvas_aspect: str | None = None
+    render_seed: int | None = None
+    vary_seed: int | None = None
+    interpretation_seed: str | None = None
+    seed_text: str | None = None
+
+
+class RenderScoreResponse(BaseModel):
+    score: Score
+    svg: str
+    catalog_id: str
+    render_build_number: str
+    render_color_profile: dict[str, str]
+    render_engine_id: str
+    render_engine_version: str
+    render_color_catalog_id: str
+    render_color_catalog_name: str
+    render_color_catalog_sub: str
+    render_color_map: dict[str, str]
+    render_canvas_aspect: str
+    render_canvas_aspect_id: str
+    render_canvas_aspect_ratio: float
+    render_seed: int
+    vary_seed: int | None = None
+    interpretation_seed: str | None = None
+    seed_text: str | None = None
+    render_hash: str
+    render_hash_short: str
+
+
 @dataclass
 class InterpretDetail:
     ddl: str
@@ -2340,6 +2375,41 @@ def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_curre
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"demo instruction failed: {e}") from e
     return DemoInstructionResponse(instruction=instruction)
+
+
+@app.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
+def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_user)) -> RenderScoreResponse:
+    render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
+    try:
+        score = coerce_score(Score.model_validate(req.score))
+        canvas_aspect = _validated_canvas_aspect_override(req.canvas_aspect)
+        if canvas_aspect is not None:
+            score = _score_with_canvas(score, canvas_aspect)
+        catalog_id = _resolved_catalog_id(req.catalog_id)
+        render_metadata = {
+            **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+            "render_seed": render_seed,
+            "vary_seed": req.vary_seed,
+            "interpretation_seed": req.interpretation_seed,
+            "seed_text": seed_text,
+        }
+        svg, render_metadata = _render_with_metadata(score, render_metadata)
+        render_metadata = {
+            **render_metadata,
+            **_render_hash_metadata(
+                input_text=req.input,
+                ddl=req.ddl,
+                score=score,
+                svg=svg,
+                catalog_id=catalog_id,
+                render_metadata=render_metadata,
+            ),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"score render failed: {e}") from e
+    return RenderScoreResponse(score=score, svg=svg, catalog_id=catalog_id, **render_metadata)
 
 
 @app.post("/api/render-svg")

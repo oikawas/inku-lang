@@ -17,7 +17,7 @@
 	type HistoryItem = { id?: string; starred?: boolean; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	type RefineChanges = { touch: boolean; layout: boolean; reading: boolean };
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
@@ -94,7 +94,7 @@
 		variationGridIncludesReading: boolean;
 		variationGridTaskLabel: string;
 		variationGridStatus: string | null;
-		onGenerateVariationCandidates: (changes: RefineChanges, count: 1 | 4) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
 		onAbortVariationCandidates: () => void;
 		onSaveSelectedVariationCandidates: () => void | Promise<void>;
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
@@ -248,17 +248,15 @@
 	let generationInfoOpen = $state(false);
 	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
 	let refineView = $state<'adjust' | 'compare'>('adjust');
-	let changeTouch = $state(false);
-	let changeLayout = $state(false);
-	let changeReading = $state(false);
+	let refineKind = $state<RefineKind>('touch');
 	const refineCostLabel = $derived(
-		changeReading
+		refineKind === 'reading'
 			? t().refineCostReading
-			: changeLayout
+			: refineKind === 'layout'
 				? t().refineCostLayout
-				: changeTouch
-					? t().refineCostTouch
-					: ''
+				: refineKind === 'color'
+					? t().refineCostColor
+					: t().refineCostTouch
 	);
 	const canvasMaxRatio = $derived(Math.max(canvasAspectWidth, canvasAspectHeight, 1));
 	const canvasBaseWidth = $derived(400 * canvasAspectWidth / canvasMaxRatio);
@@ -501,10 +499,11 @@
 								<section class="refine-action-section">
 									<div class="refine-section-head">
 										<div class="refine-section-title">{t().refineSingleTitle}</div>
+										<div class="refine-selection-hint">{t().refineSingleSelectionHint}</div>
 									</div>
-									<div class="model-choice-grid">
-										<label class="model-choice" class:checked={changeTouch}>
-											<input type="checkbox" bind:checked={changeTouch} disabled={changeReading || variationBusy || variationGridBusy} />
+									<div class="model-choice-grid" role="radiogroup" aria-label={t().refineSingleSelectionHint}>
+										<label class="model-choice" class:checked={refineKind === 'touch'}>
+											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryPerformance}</strong>
@@ -512,8 +511,8 @@
 												</span>
 											</Tooltip>
 										</label>
-										<label class="model-choice" class:checked={changeLayout}>
-											<input type="checkbox" bind:checked={changeLayout} disabled={changeReading || variationBusy || variationGridBusy} />
+										<label class="model-choice" class:checked={refineKind === 'layout'}>
+											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => (refineKind = 'layout')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryComposition}</strong>
@@ -521,11 +520,20 @@
 												</span>
 											</Tooltip>
 										</label>
-										<label class="model-choice" class:checked={changeReading}>
-											<input type="checkbox" bind:checked={changeReading} onchange={() => { changeTouch = changeReading; changeLayout = changeReading; }} disabled={variationBusy || variationGridBusy} />
+										<label class="model-choice" class:checked={refineKind === 'reading'}>
+											<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => (refineKind = 'reading')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryInterpretation}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
+										<label class="model-choice" class:checked={refineKind === 'color'}>
+											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => (refineKind = 'color')} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryColor}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryColor}</strong>
 													<span class="refine-info-mark" aria-hidden="true">i</span>
 												</span>
 											</Tooltip>
@@ -540,8 +548,8 @@
 										<Tooltip text={t().tooltipRefineSingle}>
 											<div class="refine-action-wrap">
 												<PaintButton
-													onclick={() => onGenerateVariationCandidates({ touch: changeTouch, layout: changeLayout, reading: changeReading }, 1)}
-													disabled={!result || variationBusy || variationGridBusy || (!changeTouch && !changeLayout && !changeReading)}
+													onclick={() => onGenerateVariationCandidates(refineKind, 1)}
+													disabled={!result || variationBusy || variationGridBusy}
 												>
 													{t().refineSingleButton}
 												</PaintButton>
@@ -550,8 +558,8 @@
 										<Tooltip text={t().tooltipVariationGridDefault}>
 											<div class="refine-action-wrap">
 												<PaintButton
-													onclick={() => onGenerateVariationCandidates({ touch: changeTouch, layout: changeLayout, reading: changeReading }, 4)}
-													disabled={!result || variationBusy || variationGridBusy || (!changeTouch && !changeLayout && !changeReading)}
+													onclick={() => onGenerateVariationCandidates(refineKind, 4)}
+													disabled={!result || variationBusy || variationGridBusy}
 												>
 													{t().variationGridDefault}
 												</PaintButton>
@@ -1119,6 +1127,10 @@
 		font-size: 12px;
 		font-weight: 600;
 		color: var(--fg);
+	}
+	.refine-selection-hint {
+		font-size: 11px;
+		color: var(--fg3);
 	}
 	.refine-actions {
 		display: flex;

@@ -1460,6 +1460,63 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     db.delete_items(user["id"], [data["history_id"]])
 
 
+def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
+    headers, _, _ = auth_context
+    payload = {
+        "input": "緑の円",
+        "ddl": "中央に緑の円を置く。",
+        "score": {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.1,
+                    "color": "green",
+                }
+            ]
+        },
+        "catalog_id": "vivid_material",
+        "canvas_aspect": "square",
+        "render_seed": 123,
+        "vary_seed": 456,
+        "interpretation_seed": "reading-seed",
+    }
+
+    response = client.post("/api/render-score", json=payload, headers=headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["catalog_id"] == "vivid_material"
+    assert data["render_color_catalog_id"] == "vivid_material"
+    assert data["render_color_catalog_name"] == "Vivid Material"
+    assert data["render_color_map"]["green"] == "#008f39"
+    assert data["render_canvas_aspect_id"] == "square"
+    assert data["render_seed"] == 123
+    assert data["vary_seed"] == 456
+    assert data["interpretation_seed"] == "reading-seed"
+    assert data["score"]["instructions"][0]["primitive"] == "circle"
+    assert data["score"]["instructions"][0]["center"] == [0.5, 0.5]
+    assert data["score"]["instructions"][0]["radius"] == 0.1
+    assert data["score"]["instructions"][0]["color"] == "green"
+    assert data["render_hash"].startswith("rh2:")
+    assert data["render_hash_short"]
+
+    alternate = client.post(
+        "/api/render-score",
+        json={**payload, "catalog_id": "ink_season"},
+        headers=headers,
+    )
+    assert alternate.status_code == 200
+    alternate_data = alternate.json()
+    assert alternate_data["score"] == data["score"]
+    assert alternate_data["render_seed"] == data["render_seed"]
+    assert alternate_data["vary_seed"] == data["vary_seed"]
+    assert alternate_data["interpretation_seed"] == data["interpretation_seed"]
+    assert alternate_data["render_color_catalog_id"] == "ink_season"
+    assert alternate_data["render_hash"] != data["render_hash"]
+    assert alternate_data["svg"] != data["svg"]
+
+
 def test_render_svg_endpoint_generates_editable_profile(auth_context):
     headers, _, _ = auth_context
     r = client.post(

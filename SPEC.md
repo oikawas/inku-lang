@@ -1254,6 +1254,12 @@ Build 545 reorganizes the Canvas artwork facts and next-generation settings into
 
 Build 546 moves the former top-level Compare tab into Refine and presents Adjust and Model comparison as sibling subviews. Switching subviews preserves their candidates and comparison results; changing the target artwork clears stale comparison results.
 
+Build 547 adds a `First` button to the right of `Next` in History Manager. It jumps directly to the oldest page containing the earliest saved artwork and is disabled while loading or already on that page.
+
+Build 548 fixes a History Manager page-size boundary where wrapper padding was counted as usable thumbnail space, making the calculated column count one larger than the actual CSS Grid. Columns now use the Grid's rendered width and rows use the wrapper height minus vertical padding, so only fully visible rows are fetched.
+
+Build 549 aligns History Manager's bulk delete action with the lineage view: both use the same trash icon followed by the selected count. The action is disabled with no selection, while its name remains available through the tooltip and aria-label.
+
 ## 16. Licensing
 
 The intended license direction is:

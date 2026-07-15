@@ -514,6 +514,7 @@ export interface LangPack {
 	historySearchLabel: string;
 	historyPrev: string;
 	historyNext: string;
+	historyFirst: string;
 	historyLoading: string;
 	historyRestore: string;
 	historyImageHeader: string;

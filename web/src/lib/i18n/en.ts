@@ -500,6 +500,7 @@ export const en: LangPack = {
 	historySearchLabel: 'search:',
 	historyPrev: '← prev',
 	historyNext: 'next →',
+	historyFirst: 'first',
 	historyLoading: 'loading',
 	historyRestore: 'restore',
 	historyImageHeader: 'image',

@@ -5159,6 +5159,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onSetView={historyManager.setView}
 		onSetPage={historyManager.setPage}
 		onSetLatestPage={() => historyManager.setPage(0)}
+		onSetFirstPage={() => historyManager.setPage(historyManager.totalPages - 1)}
 		onSetPageSize={historyManager.setPageSize}
 		onSetStarredOnly={historyManager.setStarredOnly}
 		onSelectAll={selectAllManagedHistory}

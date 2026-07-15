@@ -50,6 +50,7 @@
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
 		onSetLatestPage: () => void | Promise<void>;
+		onSetFirstPage: () => void | Promise<void>;
 		onSetPageSize: (pageSize: number) => void;
 		onSetStarredOnly: (value: boolean) => void;
 		onSelectAll: () => void;
@@ -87,6 +88,7 @@
 		onSetView,
 		onSetPage,
 		onSetLatestPage,
+		onSetFirstPage,
 		onSetPageSize,
 		onSetStarredOnly,
 		onSelectAll,
@@ -169,10 +171,14 @@
 	}
 
 	function calculatePageSize(element: HTMLElement): number {
-		const width = element.clientWidth;
-		const height = element.clientHeight;
-		if (width <= 0 || height <= 0) return 1;
 		const grid = element.querySelector('.history-thumb-grid');
+		const elementStyle = getComputedStyle(element);
+		const cssPixels = (value: string): number => Number.parseFloat(value) || 0;
+		const width = grid instanceof HTMLElement
+			? grid.clientWidth
+			: Math.max(0, element.clientWidth - cssPixels(elementStyle.paddingLeft) - cssPixels(elementStyle.paddingRight));
+		const height = Math.max(0, element.clientHeight - cssPixels(elementStyle.paddingTop) - cssPixels(elementStyle.paddingBottom));
+		if (width <= 0 || height <= 0) return 1;
 		const computed = grid ? getComputedStyle(grid) : null;
 		const gap = computed ? Number.parseFloat(computed.rowGap || computed.gap || '8') || 8 : 8;
 		const minCardWidth = 104;
@@ -229,6 +235,7 @@
 				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
 				<span>{historyManagerLoading ? t().historyLoading : `${historyManagerPage + 1} / ${historyManagerTotalPages}`}</span>
 				<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
+				<button class="ghost-btn history-latest-btn" onclick={onSetFirstPage} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyFirst}</button>
 			</div>
 			<button class="catalog-close" onclick={onClose}>×</button>
 		</div>
@@ -247,7 +254,17 @@
 				onclick={() => onSetView(historyManagerView === 'trash' ? 'active' : 'trash')}
 			>{t().historyTrashButton(managerTrashTotal || trashTotal)}</button>
 			{#if historyManagerView === 'active'}
-				<button class="ghost-btn" onclick={() => onAskTrash(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyMoveToTrash}</button>
+				<button
+					class="ghost-btn bulk-trash"
+					type="button"
+					onclick={() => onAskTrash(selectedHistoryIds)}
+					disabled={selectedHistoryIds.length === 0}
+					title={t().historyMoveToTrash}
+					aria-label={t().historyMoveToTrash}
+				>
+					<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
+					{#if selectedHistoryIds.length > 0}<span>{selectedHistoryIds.length}</span>{/if}
+				</button>
 			{:else}
 				<button class="ghost-btn" onclick={() => onAskRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
 				<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
@@ -723,6 +740,9 @@
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
+	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+	.bulk-trash:disabled { opacity: .4; cursor: default; }
 	.icon-trash-btn {
 		width: 24px;
 		height: 22px;

@@ -500,6 +500,7 @@ export const ja: LangPack = {
 	historySearchLabel: '検索:',
 	historyPrev: '← 前',
 	historyNext: '次 →',
+	historyFirst: '最初',
 	historyLoading: '読み込み中',
 	historyRestore: '復元',
 	historyImageHeader: '画像',

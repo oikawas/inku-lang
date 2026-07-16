@@ -560,7 +560,7 @@ export const en: LangPack = {
 	saijikiWords: {
 		katachi: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc'],
 		katamuki: ['horizontal', 'vertical', 'diagonal', 'rising', 'falling', 'rotated'],
-		tezawari: ['hair', 'pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'rope'],
+		tezawari: ['hair', 'pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'burin', 'drypoint'],
 		tsuranari: ['solid', 'dashed', 'dotted', 'dash-dot'],
 		iro: ['white', 'black', 'blue', 'red', 'green', 'gray'],
 		yuragi: ['fine', 'large', 'slowly', 'quickly', 'swaying', 'undulating', 'trembling', 'blurring'],

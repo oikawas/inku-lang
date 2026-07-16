@@ -62,7 +62,7 @@ Place three small red circles in the upper right.
 | colors | white, black, blue, red, green, gray |
 | places | top, bottom, center, left edge, right edge, upper edge, lower edge, corner |
 | motions | place, align, fill, scatter, draw, tile |
-| touches | pencil, pen, rotring, crayon, chalk, fine brush, thick brush, rope |
+| touches | pencil, pen, rotring, crayon, chalk, fine brush, thick brush, burin, drypoint |
 | continuity | solid, dashed, dotted, dot-dashed |
 | movements | fine, broad, slow, quick, wobble, undulate, tremble, blur |
 

@@ -30,7 +30,6 @@ COERCE_MARKERS = {
         (("fine-brush", "fine brush"), "brush_thin"),
         (("thick-brush", "thick brush"), "brush_thick"),
         (("ink-wash", "ink wash"), "brush_thin"),
-        (("rope",), "rope"),
     ),
     "color_markers": (
         (("white",), "white"),

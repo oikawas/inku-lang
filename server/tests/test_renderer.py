@@ -94,12 +94,15 @@ def test_render_uses_score_canvas_when_no_explicit_aspect():
 
 def test_render_single_line_solid_pen_black():
     score = Score.model_validate(
-        {"instructions": [{"primitive": "line", "from": [0.0, 0.33], "to": [1.0, 0.33]}]}
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.33], "to": [1.0, 0.33]}
+            ]
+        }
     )
     svg = render(score)
-    assert "<line" in svg
-    assert 'x1="0.0"' in svg and 'y1="330' in svg
-    assert 'x2="1000.0"' in svg and 'y2="330' in svg
+    assert "stroke-engine-v1" in svg
+    assert "<path" in svg
     assert "#111111" in svg
     assert "stroke-dasharray" not in svg
 
@@ -156,7 +159,11 @@ def test_render_compat_svg_is_portable_and_filter_free():
                     "center": [0.5, 0.5],
                     "radius": 0.12,
                     "weight": "chalk",
-                    "variation": {"quality": "pink", "dimensions": ["position_x"], "amplitude": "fine"},
+                    "variation": {
+                        "quality": "pink",
+                        "dimensions": ["position_x"],
+                        "amplitude": "fine",
+                    },
                 }
             ]
         }
@@ -224,8 +231,8 @@ def test_render_pencil_line_uses_material_texture():
         }
     )
     svg = render(score)
-    assert 'stroke-opacity="0.66"' in svg
-    assert 'stroke-dasharray="1,3"' in svg
+    assert 'fill-opacity="0.66"' in svg
+    assert 'stroke-dasharray="1,7"' in svg
     assert 'id="texture-pencil"' in svg
     assert 'filter="url(#texture-pencil)"' in svg
     assert svg.count("<circle") >= 18
@@ -247,30 +254,10 @@ def test_render_chalk_line_uses_blurred_powder_texture():
     svg = render(score)
     assert 'id="texture-chalk"' in svg
     assert 'filter="url(#texture-chalk)"' in svg
-    assert 'stroke-dasharray="7,5,1,4"' in svg
+    assert 'stroke-dasharray="8,12,1,8"' in svg
     assert "<feTurbulence" in svg
     assert "<feDisplacementMap" in svg
     assert svg.count("<circle") >= 34
-
-
-def test_render_rope_line_adds_twist_layers():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.0, 0.5],
-                    "to": [1.0, 0.5],
-                    "weight": "rope",
-                }
-            ]
-        }
-    )
-    svg = render(score)
-    assert svg.count("<line") >= 16
-    assert 'stroke-dasharray="14,5"' in svg
-    assert 'stroke-dasharray="4,8"' in svg
-    assert 'stroke-opacity="0.42"' in svg
 
 
 def test_render_crayon_line_adds_rubbed_layers():
@@ -287,8 +274,8 @@ def test_render_crayon_line_adds_rubbed_layers():
         }
     )
     svg = render(score)
-    assert svg.count("<line") >= 5
-    assert 'stroke-dasharray="10,3,2,3"' in svg
+    assert svg.count("<line") >= 4
+    assert "stroke-engine-v1" in svg
     assert 'stroke-dasharray="2,5,9,7"' in svg
     assert 'id="texture-crayon"' in svg
     assert svg.count("<circle") >= 26
@@ -342,7 +329,11 @@ def test_render_rhythm_spacing_breaks_equal_repetition():
 
     svg = render(score)
     root = ElementTree.fromstring(svg)
-    xs = [float(node.attrib["cx"]) for node in root.iter() if node.tag.endswith("circle") and "cx" in node.attrib]
+    xs = [
+        float(node.attrib["cx"])
+        for node in root.iter()
+        if node.tag.endswith("circle") and "cx" in node.attrib
+    ]
     gaps = [round(xs[index + 1] - xs[index], 3) for index in range(len(xs) - 1)]
     assert len(xs) == 5
     assert len(set(gaps)) > 1
@@ -472,7 +463,8 @@ def test_render_brush_lines_use_layered_material_texture():
         }
     )
     svg = render(score)
-    assert svg.count("<line") >= 7
+    assert svg.count("<line") >= 5
+    assert svg.count("stroke-engine-v1") == 2
     assert 'stroke-dasharray="22,9"' in svg
     assert 'stroke-dasharray="18,7,3,11"' in svg
     assert 'id="texture-brush_thick"' in svg
@@ -495,27 +487,6 @@ def test_render_circle_material_applies_outline_texture():
     assert svg.count("<circle") >= 38
     assert 'id="texture-chalk"' in svg
     assert 'stroke-dasharray="8,12,1,8"' in svg
-
-
-def test_render_rope_circle_applies_twist_texture():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "circle",
-                    "center": [0.5, 0.5],
-                    "radius": 0.18,
-                    "weight": "rope",
-                }
-            ]
-        }
-    )
-
-    svg = render(score)
-
-    assert "<circle" in svg
-    assert svg.count("<line") >= 16
-    assert 'stroke-dasharray="4,8"' in svg
 
 
 def test_render_ellipse_material_applies_outline_texture():
@@ -556,26 +527,6 @@ def test_render_square_material_applies_outline_texture():
     assert svg.count("<circle") >= 18
     assert 'id="texture-pencil"' in svg
     assert 'stroke-dasharray="1,7"' in svg
-
-
-def test_render_arc_material_applies_outline_texture():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "arc",
-                    "center": [0.5, 0.5],
-                    "radius": 0.25,
-                    "angle_start": 0,
-                    "angle_end": 180,
-                    "weight": "rope",
-                }
-            ]
-        }
-    )
-    svg = render(score)
-    assert svg.count("<path") >= 3
-    assert 'stroke-dasharray="4,8"' in svg
 
 
 def test_render_circle():
@@ -693,7 +644,7 @@ def test_render_line_rotation_applies_midpoint_transform():
         }
     )
     svg = render(score)
-    assert "<line" in svg
+    assert "<path" in svg
     assert 'transform="rotate(45.0,500.0,500.0)"' in svg
 
 
@@ -782,9 +733,9 @@ def test_render_arc_quarter():
     svg = render(score)
     assert "<path" in svg
     # 始点: center + r east = (0.8*1000, 0.5*1000) = (800, 500)
-    assert 'M 800.000 500.000' in svg
+    assert "M 800.000 500.000" in svg
     # 終点: center + r north (y-flip) = (500, 0.5*1000 - 300) = (500, 200)
-    assert 'A 300.000 300.000 0 0 0 500.000 200.000' in svg
+    assert "A 300.000 300.000 0 0 0 500.000 200.000" in svg
 
 
 def test_render_arc_half_upper():
@@ -810,15 +761,13 @@ def test_arc_missing_angles_raises():
     import pytest
 
     score = Score(
-        instructions=[
-            Instruction(primitive="arc", center=(0.5, 0.5), radius=0.3)
-        ]
+        instructions=[Instruction(primitive="arc", center=(0.5, 0.5), radius=0.3)]
     )
     with pytest.raises(ValueError, match="angle_start"):
         render(score)
 
 
-def test_render_line_with_perlin_variation_emits_polyline():
+def test_render_line_with_perlin_variation_emits_variable_width_path():
     score = Score.model_validate(
         {
             "instructions": [
@@ -837,11 +786,11 @@ def test_render_line_with_perlin_variation_emits_polyline():
         }
     )
     svg = render(score)
-    assert "<polyline" in svg
-    assert "<line" not in svg
+    assert "<path" in svg
+    assert "<polyline" not in svg
 
 
-def test_render_line_with_wave_variation_emits_polyline():
+def test_render_line_with_wave_variation_emits_variable_width_path():
     score = Score.model_validate(
         {
             "instructions": [
@@ -860,7 +809,8 @@ def test_render_line_with_wave_variation_emits_polyline():
         }
     )
     svg = render(score)
-    assert "<polyline" in svg
+    assert "<path" in svg
+    assert "<polyline" not in svg
 
 
 def test_render_line_variation_is_deterministic():
@@ -903,14 +853,14 @@ def test_render_line_quality_none_still_straight():
         }
     )
     svg = render(score)
-    assert "<line" in svg
+    assert "<path" in svg
     assert "<polyline" not in svg
 
 
 def test_line_missing_endpoints_uses_default():
     score = Score(instructions=[Instruction(primitive="line")])
     svg = render(score)
-    assert "<line" in svg
+    assert "<path" in svg
 
 
 def test_render_circle_with_pink_variation_emits_blur_filter():
@@ -972,7 +922,7 @@ def test_render_line_with_pink_variation_emits_blur_not_polyline():
     )
     svg = render(score)
     assert "feGaussianBlur" in svg
-    assert "<line" in svg
+    assert "<path" in svg
     assert "<polyline" not in svg
 
 
@@ -1004,7 +954,12 @@ def test_render_presence_layer_is_abstract_and_filter_free():
                 "contour_density": "medium",
             },
             "instructions": [
-                {"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.3, 0.12], "color": "blue"}
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.3, 0.12],
+                    "color": "blue",
+                }
             ],
         }
     )
@@ -1029,13 +984,23 @@ def test_render_omits_presence_layer_when_absent():
 def test_render_presence_layer_gets_subtler_when_scene_is_dense():
     sparse = Score.model_validate(
         {
-            "presence": {"kind": "figure_like", "intensity": "medium", "symmetry": "bilateral"},
-            "instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}],
+            "presence": {
+                "kind": "figure_like",
+                "intensity": "medium",
+                "symmetry": "bilateral",
+            },
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}
+            ],
         }
     )
     dense = Score.model_validate(
         {
-            "presence": {"kind": "figure_like", "intensity": "medium", "symmetry": "bilateral"},
+            "presence": {
+                "kind": "figure_like",
+                "intensity": "medium",
+                "symmetry": "bilateral",
+            },
             "instructions": [
                 {
                     "primitive": "line",
@@ -1082,11 +1047,17 @@ def test_render_color_cycle_preserves_effect_hint_opacity():
 
 
 def test_render_region_uses_seed_for_reproducible_macro_variation():
-    score = Score.model_validate({
-        "instructions": [
-            {"primitive": "circle", "at": {"region": [0.2, 0.2, 0.8, 0.8]}, "radius": 0.04}
-        ]
-    })
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "at": {"region": [0.2, 0.2, 0.8, 0.8]},
+                    "radius": 0.04,
+                }
+            ]
+        }
+    )
 
     svg_a = render(score, render_seed=101)
     svg_b = render(score, render_seed=101)
@@ -1097,12 +1068,19 @@ def test_render_region_uses_seed_for_reproducible_macro_variation():
 
 
 def test_render_not_touching_relation_moves_second_mark_away_from_previous():
-    score = Score.model_validate({
-        "instructions": [
-            {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.08},
-            {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.03, "relation": {"type": "not_touching", "gap": "narrow"}},
-        ]
-    })
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.08},
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.03,
+                    "relation": {"type": "not_touching", "gap": "narrow"},
+                },
+            ]
+        }
+    )
 
     svg = render(score, render_seed=5)
 
@@ -1111,18 +1089,27 @@ def test_render_not_touching_relation_moves_second_mark_away_from_previous():
 
 
 def test_render_cutting_relation_crosses_previous_line_center():
-    score = Score.model_validate({
-        "instructions": [
-            {"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5]},
-            {"primitive": "line", "from": [0.1, 0.1], "to": [0.2, 0.1], "relation": {"type": "cutting"}},
-        ]
-    })
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5]},
+                {
+                    "primitive": "line",
+                    "from": [0.1, 0.1],
+                    "to": [0.2, 0.1],
+                    "relation": {"type": "cutting"},
+                },
+            ]
+        }
+    )
 
-    svg = render(score, render_seed=7)
+    resolved = _resolve_performance_score(score, 7)
+    first, second = resolved.instructions
 
-    assert 'x1="200.0"' in svg
-    assert 'x2="800.0"' in svg
-    assert '500.0' in svg
+    assert first.from_ == (0.2, 0.5)
+    assert first.to == (0.8, 0.5)
+    assert second.from_ is not None and second.to is not None
+    assert _segments_intersect(first.from_, first.to, second.from_, second.to)
 
 
 def _segments_intersect(p1, p2, p3, p4) -> bool:
@@ -1133,57 +1120,87 @@ def _segments_intersect(p1, p2, p3, p4) -> bool:
     d2 = ccw(p3, p4, p2)
     d3 = ccw(p1, p2, p3)
     d4 = ccw(p1, p2, p4)
-    if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
+    if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and (
+        (d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)
+    ):
         return True
     return False
 
 
 def test_not_touching_relation_never_overlaps_across_seeds():
     for seed in range(1, 101):
-        score = Score.model_validate({
-            "instructions": [
-                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.08},
-                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.05, "relation": {"type": "not_touching", "gap": "narrow"}},
-            ]
-        })
+        score = Score.model_validate(
+            {
+                "instructions": [
+                    {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.08},
+                    {
+                        "primitive": "circle",
+                        "center": [0.5, 0.5],
+                        "radius": 0.05,
+                        "relation": {"type": "not_touching", "gap": "narrow"},
+                    },
+                ]
+            }
+        )
         resolved = _resolve_performance_score(score, seed)
         first, second = resolved.instructions
-        distance = math.hypot(first.center[0] - second.center[0], first.center[1] - second.center[1])
-        assert distance >= first.radius + second.radius, f"seed={seed} overlapped: distance={distance}"
+        distance = math.hypot(
+            first.center[0] - second.center[0], first.center[1] - second.center[1]
+        )
+        assert distance >= first.radius + second.radius, (
+            f"seed={seed} overlapped: distance={distance}"
+        )
 
 
 def test_cutting_relation_always_crosses_previous_line_across_seeds():
     for seed in range(1, 101):
-        score = Score.model_validate({
-            "instructions": [
-                {"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5]},
-                {"primitive": "line", "from": [0.1, 0.1], "to": [0.2, 0.1], "relation": {"type": "cutting"}},
-            ]
-        })
+        score = Score.model_validate(
+            {
+                "instructions": [
+                    {"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5]},
+                    {
+                        "primitive": "line",
+                        "from": [0.1, 0.1],
+                        "to": [0.2, 0.1],
+                        "relation": {"type": "cutting"},
+                    },
+                ]
+            }
+        )
         resolved = _resolve_performance_score(score, seed)
         first, second = resolved.instructions
-        assert _segments_intersect(tuple(first.from_), tuple(first.to), tuple(second.from_), tuple(second.to)), (
-            f"seed={seed} did not cross"
-        )
+        assert _segments_intersect(
+            tuple(first.from_), tuple(first.to), tuple(second.from_), tuple(second.to)
+        ), f"seed={seed} did not cross"
 
 
 def test_between_relation_places_within_previous_pair_neighborhood_across_seeds():
     for seed in range(1, 101):
-        score = Score.model_validate({
-            "instructions": [
-                {"primitive": "circle", "center": [0.3, 0.3], "radius": 0.04},
-                {"primitive": "circle", "center": [0.7, 0.7], "radius": 0.04},
-                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.03, "relation": {"type": "between", "gap": "medium"}},
-            ]
-        })
+        score = Score.model_validate(
+            {
+                "instructions": [
+                    {"primitive": "circle", "center": [0.3, 0.3], "radius": 0.04},
+                    {"primitive": "circle", "center": [0.7, 0.7], "radius": 0.04},
+                    {
+                        "primitive": "circle",
+                        "center": [0.5, 0.5],
+                        "radius": 0.03,
+                        "relation": {"type": "between", "gap": "medium"},
+                    },
+                ]
+            }
+        )
         resolved = _resolve_performance_score(score, seed)
         first, second, third = resolved.instructions
         margin = 0.15
         x0, x1 = sorted((first.center[0], second.center[0]))
         y0, y1 = sorted((first.center[1], second.center[1]))
-        assert x0 - margin <= third.center[0] <= x1 + margin, f"seed={seed} x out of neighborhood: {third.center}"
-        assert y0 - margin <= third.center[1] <= y1 + margin, f"seed={seed} y out of neighborhood: {third.center}"
-
+        assert x0 - margin <= third.center[0] <= x1 + margin, (
+            f"seed={seed} x out of neighborhood: {third.center}"
+        )
+        assert y0 - margin <= third.center[1] <= y1 + margin, (
+            f"seed={seed} y out of neighborhood: {third.center}"
+        )
 
 
 def test_surface_schema_accepts_canvas_ground_and_clamps_units():
@@ -1205,7 +1222,12 @@ def test_surface_schema_accepts_canvas_ground_and_clamps_units():
                     "center": [0.5, 0.5],
                     "radius": 0.16,
                     "filled": True,
-                    "surface": {"texture": "wash", "density": 1.5, "opacity": 0.45, "bleed": -0.3},
+                    "surface": {
+                        "texture": "wash",
+                        "density": 1.5,
+                        "opacity": 0.45,
+                        "bleed": -0.3,
+                    },
                 }
             ],
         }
@@ -1220,15 +1242,20 @@ def test_surface_schema_accepts_canvas_ground_and_clamps_units():
 def test_render_display_canvas_ground_uses_filter_behind_content():
     score = Score.model_validate(
         {
-            "canvas": {"aspect": "square", "ground": {"material": "paper", "tone": "off_white", "grain": "fine"}},
-            "instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}],
+            "canvas": {
+                "aspect": "square",
+                "ground": {"material": "paper", "tone": "off_white", "grain": "fine"},
+            },
+            "instructions": [
+                {"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}
+            ],
         }
     )
 
     svg = render(score, render_seed=123)
 
     assert 'id="ground_texture_' in svg
-    assert '<feTurbulence' in svg
+    assert "<feTurbulence" in svg
     root = ElementTree.fromstring(svg)
     texture_rects = [
         element
@@ -1246,7 +1273,9 @@ def test_render_display_canvas_ground_uses_filter_behind_content():
         and element.attrib.get("opacity") == "0.98"
         for element in root.iter()
     )
-    assert svg.index('id="layer_01_canvas_ground"') < svg.index('<g clip-path="url(#canvas-clip)"')
+    assert svg.index('id="layer_01_canvas_ground"') < svg.index(
+        '<g clip-path="url(#canvas-clip)"'
+    )
 
 
 def test_canvas_ground_non_display_profiles_remain_filter_free():
@@ -1293,9 +1322,9 @@ def test_render_display_surface_stipple_is_clipped_to_shape():
     svg = render(score, render_seed=123)
 
     assert 'id="surface_000_000_stipple"' in svg
-    assert '<clipPath' in svg
+    assert "<clipPath" in svg
     assert 'clip-path="url(#clip_surface_000_000_stipple_' in svg
-    assert svg.count('<circle') > 10
+    assert svg.count("<circle") > 10
 
 
 def test_render_editable_surface_has_stable_group_id_without_filters():
@@ -1316,9 +1345,9 @@ def test_render_editable_surface_has_stable_group_id_without_filters():
     svg = render(score, svg_profile="editable", render_seed=123)
 
     assert 'id="surface_000_000_hatch"' in svg
-    assert '<line' in svg
-    assert '<filter' not in svg
-    assert 'clip-path' not in svg
+    assert "<line" in svg
+    assert "<filter" not in svg
+    assert "clip-path" not in svg
 
 
 def test_render_compat_surface_degrades_without_filter_or_clip_path():
@@ -1339,14 +1368,17 @@ def test_render_compat_surface_degrades_without_filter_or_clip_path():
     svg = render(score, svg_profile="compat", render_seed=123)
 
     assert 'id="surface_000_000_wash"' in svg
-    assert '<filter' not in svg
-    assert 'clip-path' not in svg
+    assert "<filter" not in svg
+    assert "clip-path" not in svg
 
 
 def test_surface_texture_seed_is_deterministic_and_performance_seed_sensitive():
     score = Score.model_validate(
         {
-            "canvas": {"aspect": "square", "ground": {"material": "paper", "grain": "fine"}},
+            "canvas": {
+                "aspect": "square",
+                "ground": {"material": "paper", "grain": "fine"},
+            },
             "instructions": [
                 {
                     "primitive": "circle",
@@ -1365,14 +1397,16 @@ def test_surface_texture_seed_is_deterministic_and_performance_seed_sensitive():
 
     assert svg_a == svg_b
     assert svg_a != svg_c
-    assert 'surface_000_000_grain' in svg_c
-
+    assert "surface_000_000_grain" in svg_c
 
 
 def test_render_engine_reports_texture_metadata():
     score = Score.model_validate(
         {
-            "canvas": {"aspect": "square", "ground": {"material": "paper", "tone": "warm", "grain": "medium"}},
+            "canvas": {
+                "aspect": "square",
+                "ground": {"material": "paper", "tone": "warm", "grain": "medium"},
+            },
             "instructions": [
                 {
                     "primitive": "circle",
@@ -1385,7 +1419,9 @@ def test_render_engine_reports_texture_metadata():
         }
     )
 
-    result = current_render_engine().render(score, svg_profile="compat", render_seed=123)
+    result = current_render_engine().render(
+        score, svg_profile="compat", render_seed=123
+    )
 
     assert result.metadata["render_texture_version"] == "1"
     assert result.metadata["render_texture_profile"] == "compat"
@@ -1394,7 +1430,9 @@ def test_render_engine_reports_texture_metadata():
     assert result.metadata["render_surface_textures"][0]["texture"] == "wash"
 
 
-def _assert_centers(items: list[Instruction], expected: list[tuple[float, float]]) -> None:
+def _assert_centers(
+    items: list[Instruction], expected: list[tuple[float, float]]
+) -> None:
     centers = [item.center for item in items]
     assert all(center is not None for center in centers)
     assert len(centers) == len(expected)
@@ -1419,14 +1457,17 @@ def test_grid_explicit_rows_and_cols_override_count():
     expanded = _expand_arrangement(_grid_circle(rows=2, cols=3), performance_seed=123)
 
     assert len(expanded) == 6
-    _assert_centers(expanded, [
-        (7 / 30, 0.3),
-        (0.5, 0.3),
-        (23 / 30, 0.3),
-        (7 / 30, 0.7),
-        (0.5, 0.7),
-        (23 / 30, 0.7),
-    ])
+    _assert_centers(
+        expanded,
+        [
+            (7 / 30, 0.3),
+            (0.5, 0.3),
+            (23 / 30, 0.3),
+            (7 / 30, 0.7),
+            (0.5, 0.7),
+            (23 / 30, 0.7),
+        ],
+    )
 
 
 def test_grid_count_estimates_rows_and_cols_and_honors_margin():
@@ -1443,7 +1484,9 @@ def test_grid_uses_at_region_instead_of_margin():
         {
             "instructions": [
                 {
-                    **_grid_circle(rows=2, cols=2, margin=0.4).model_dump(by_alias=True),
+                    **_grid_circle(rows=2, cols=2, margin=0.4).model_dump(
+                        by_alias=True
+                    ),
                     "at": {"region": [0.1, 0.2, 0.5, 0.8]},
                 }
             ]
@@ -1453,12 +1496,15 @@ def test_grid_uses_at_region_instead_of_margin():
     resolved = _resolve_performance_score(score, 123)
     expanded = _expand_arrangement(resolved.instructions[0], performance_seed=123)
 
-    _assert_centers(expanded, [
-        (0.2, 0.35),
-        (0.4, 0.35),
-        (0.2, 0.65),
-        (0.4, 0.65),
-    ])
+    _assert_centers(
+        expanded,
+        [
+            (0.2, 0.35),
+            (0.4, 0.35),
+            (0.2, 0.65),
+            (0.4, 0.65),
+        ],
+    )
     assert all(item.at is None for item in expanded)
 
 
@@ -1512,10 +1558,14 @@ def test_grid_variation_uses_distinct_per_element_phases():
     )
 
     root = ElementTree.fromstring(render(score, svg_profile="compat", render_seed=123))
-    polylines = [node.attrib["points"] for node in root.iter() if node.tag.endswith("polyline")]
+    paths = [
+        node.attrib["d"]
+        for node in root.iter()
+        if node.tag.endswith("path") and node.attrib.get("fill") == "#111111"
+    ]
 
-    assert len(polylines) == 4
-    assert len(set(polylines)) == 4
+    assert len(paths) == 4
+    assert len(set(paths)) == 4
 
 
 def test_legacy_arrangement_layouts_keep_golden_output():

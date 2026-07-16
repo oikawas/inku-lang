@@ -30,6 +30,7 @@ _JA_EXPANSION_MARKERS = (
     "左下から右上へ",
     "波打つ軌跡に沿って",
     "左下の焦点から三つ",
+    "右下の焦点から三つ",
     "黄金比の位置",
     "三分割の交点",
     "白銀比の位置",
@@ -49,7 +50,6 @@ _JA_EXPANSION_MARKERS = (
     "鉛筆の余白線",
     "クレヨンの擦れ",
     "ロットリングの均一線",
-    "縄の撚り",
     "透明な膜",
     "薄い反射",
     "消える線",
@@ -91,7 +91,6 @@ _EN_EXPANSION_MARKERS = (
     "pencil negative-space line",
     "crayon rubbing",
     "rotring uniform lines",
-    "rope twist",
     "transparent membrane",
     "faint reflection",
     "fading lines",
@@ -596,19 +595,29 @@ def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | No
     context = f"{context_text or ''}\n{ddl}"
     seed_context = _vary_context(context, vary_seed)
     profile = _profile_ja(context)
+    if "geometry" in profile.tags:
+        touch = "ロットリングの"
+    elif "dense" in profile.tags:
+        touch = "クレヨンの"
+    elif profile.tags & {"water", "soft", "sensory", "atmosphere"}:
+        touch = "細筆の"
+    elif "contrast" in profile.tags:
+        touch = "ペンの"
+    else:
+        touch = "鉛筆の"
 
     if any(token in ddl for token in ("円", "点", "粒", "星", "楕円", "四角")):
         structural.append(f"{main_color}右上がりの小さな楕円を右半分の斜めの帯に三個並べる。横長にする。")
-        structural.append(f"{main_color}短い線を左下から右上へ三本散らす。細かく震える。")
+        structural.append(f"{main_color}{touch}短い線を左下から右上へ三本散らす。細かく震える。")
 
     if any(token in ddl for token in ("散らす", "点々", "舞", "漂", "雪", "雨")):
         structural.append(f"{main_color}右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。")
 
     if "線" in ddl:
-        structural.append(f"{contrast_color}細い斜め線を右上がりに三本並べる。細かく震える。")
+        structural.append(f"{contrast_color}{touch}細い斜め線を右上がりに三本並べる。細かく震える。")
 
     if any(token in ddl for token in ("弧", "円", "波", "水", "月", "中心")):
-        structural.append(f"{contrast_color}細い弧を左下の焦点から三つ広げる。半径は0.11。")
+        structural.append(f"{contrast_color}{touch}細い弧を左下の焦点から三つ広げる。半径は0.11。")
     roof_pressure_context = any(token in context for token in ("低い雲", "押し沈", "屋根"))
     if any(token in context for token in ("山", "尖", "針葉樹", "頂", "鋭")):
         structural.append(f"{main_color}細い三角を上端寄りの焦点に二つ置く。少し傾ける。")
@@ -617,13 +626,13 @@ def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | No
     if not roof_pressure_context and any(token in context for token in ("扉", "窓", "箱", "街", "部屋", "格子")):
         structural.append(f"{contrast_color}回転した細い四角を余白の切片として右半分に三つ散らす。")
     if roof_pressure_context:
-        structural.append(f"{contrast_color}薄い斜め線を上端から下へ三本置く。低い重さとしてゆっくり揺れる。")
+        structural.append(f"{contrast_color}{touch}薄い斜め線を上端から下へ三本置く。低い重さとしてゆっくり揺れる。")
     if any(token in context for token in ("膜", "透明", "霞", "霧", "靄", "気配", "余韻")):
         structural.append(f"{main_color}薄い水彩の楕円を透明な膜として右半分に三つ重ねる。境界が滲む。")
     if any(token in context for token in ("反射", "映り")):
-        structural.append(f"{contrast_color}薄い反射の線を波打つ軌跡に沿って五本散らす。ゆっくり揺れる。")
+        structural.append(f"{contrast_color}{touch}薄い反射の線を波打つ軌跡に沿って五本散らす。ゆっくり揺れる。")
     if any(token in context for token in ("消え", "薄れ", "遠ざか")):
-        structural.append(f"{contrast_color}消える線を左下から右上へ五本散らす。細かく震える。")
+        structural.append(f"{contrast_color}{touch}消える線を左下から右上へ五本散らす。細かく震える。")
     if any(token in context for token in ("陽光", "光", "日差し", "温", "柔ら")):
         structural.append("白い薄い水彩の横長の楕円を柔らかな光として上端寄りに三つ重ねる。境界が滲む。")
     if any(token in context for token in ("香", "匂", "沈丁花")):
@@ -631,24 +640,23 @@ def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | No
     if any(token in context for token in ("蕾", "つぼみ", "開花", "春")):
         structural.append("赤い右上がりの小さな楕円を開花を待つ蕾として右半分の斜めの帯に五個散らす。")
     if any(token in context for token in ("五感", "気配", "訪れ")):
-        structural.append("白い薄い弧を五感の気配として左下の焦点から三つ広げる。半径は0.14。")
+        structural.append("白い細筆の薄い弧を五感の気配として左下の焦点から三つ広げる。半径は0.14。")
     if any(token in context for token in ("人", "人物", "村人", "老人", "顔", "視線", "動物", "鳥", "魚", "熊", "群れ")):
-        structural.append(f"{contrast_color}細い余白線を存在の重心として右上の焦点へ二本引く。細かく震える。")
-        structural.append(f"{main_color}薄い弧を輪郭の密度として左下の焦点から二つ置く。半径は0.09。")
+        structural.append(f"{contrast_color}{touch}細い余白線を存在の重心として右上の焦点へ二本引く。細かく震える。")
+        structural.append(f"{main_color}{touch}薄い弧を輪郭の密度として左下の焦点から二つ置く。半径は0.09。")
 
     music = [
-        _FilterCandidate(f"{contrast_color}細い線を前の線を切るように二本置く。細かく震える。", frozenset(("line", "music", "contrast"))),
-        _FilterCandidate(f"{contrast_color}細い弧を倍音列として右下の焦点から三つ並べる。半径は0.07。", frozenset(("music", "water", "soft"))),
-        _FilterCandidate(f"{main_color}短い線を前の線に沿って左から右へ四本並べる。ゆっくり揺れる。", frozenset(("particle", "music", "line"))),
+        _FilterCandidate(f"{contrast_color}{touch}細い線を前の線を切るように二本置く。細かく震える。", frozenset(("line", "music", "contrast"))),
+        _FilterCandidate(f"{contrast_color}{touch}細い弧を倍音列として右下の焦点から三つ並べる。半径は0.07。", frozenset(("music", "water", "soft"))),
+        _FilterCandidate(f"{main_color}{touch}短い線を前の線に沿って左から右へ四本並べる。ゆっくり揺れる。", frozenset(("particle", "music", "line"))),
     ]
     painting = [
-        _FilterCandidate(f"{contrast_color}細い線を前の線に沿って右上の焦点へ三本引く。", frozenset(("space", "line", "geometry"))),
-        _FilterCandidate(f"{contrast_color}細い横線を遠近法の奥行きとして上へ細かく三本並べる。", frozenset(("space", "line"))),
+        _FilterCandidate(f"{contrast_color}{touch}細い線を前の線に沿って右上の焦点へ三本引く。", frozenset(("space", "line", "geometry"))),
+        _FilterCandidate(f"{contrast_color}{touch}細い横線を遠近法の奥行きとして上へ細かく三本並べる。", frozenset(("space", "line"))),
         _FilterCandidate("黒い細筆の細い線を素描の下線として左から右へ三本並べる。細かく震える。", frozenset(("line", "quiet"))),
         _FilterCandidate(f"{contrast_color}鉛筆の細い線を余白線として上端寄りに二本並べる。細かく震える。", frozenset(("line", "quiet", "soft"))),
         _FilterCandidate(f"{main_color}クレヨンの短い線を擦れとして右半分の斜めの帯に七本散らす。", frozenset(("particle", "dense", "soft"))),
         _FilterCandidate(f"{contrast_color}ロットリングの細い線を均一線として左から右へ五本並べる。", frozenset(("line", "geometry", "contrast"))),
-        _FilterCandidate(f"{contrast_color}縄の横線を撚りとして下端寄りに一本引く。ゆっくり揺れる。", frozenset(("line", "dense", "contrast"))),
         _FilterCandidate(f"{main_color}回転した小さな四角を前の形に触れないように右半分の斜めの帯に十三個散らす。", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"{main_color}太筆の短い線を油絵の厚塗りとして横に三本並べる。", frozenset(("dense", "contrast"))),
         _FilterCandidate(f"{contrast_color}薄い水彩の楕円を左上に二つ重ねる。境界が滲む。", frozenset(("water", "soft", "quiet"))),
@@ -685,10 +693,20 @@ def _expand_en(ddl: str, *, context_text: str | None = None, vary_seed: int | No
     context = f"{context_text or ''}\n{ddl}"
     seed_context = _vary_context(context, vary_seed)
     profile = _profile_en(context)
+    if "geometry" in profile.tags:
+        touch = "rotring"
+    elif "dense" in profile.tags:
+        touch = "crayon"
+    elif profile.tags & {"water", "soft", "sensory", "atmosphere"}:
+        touch = "fine-brush"
+    elif "contrast" in profile.tags:
+        touch = "pen"
+    else:
+        touch = "pencil"
 
     if any(token in lower for token in ("circle", "dot", "particle", "star", "ellipse", "square")):
         structural.append(f"Line up three small {main_color} ellipses rising to the right along a diagonal band in the right half. Make them wide.")
-        structural.append(f"Scatter three short {main_color} lines from lower left to upper right. Fine trembling.")
+        structural.append(f"Scatter three short {main_color} {touch} lines from lower left to upper right. Fine trembling.")
 
     if any(token in lower for token in ("scatter", "dotted", "drift", "snow", "rain")):
         structural.append(
@@ -696,10 +714,10 @@ def _expand_en(ddl: str, *, context_text: str | None = None, vary_seed: int | No
         )
 
     if "line" in lower:
-        structural.append(f"Line up three thin {contrast_color} diagonal lines rising to the right. Fine trembling.")
+        structural.append(f"Line up three thin {contrast_color} {touch} diagonal lines rising to the right. Fine trembling.")
 
     if any(token in lower for token in ("arc", "circle", "wave", "water", "moon", "center")):
-        structural.append(f"Line up three thin {contrast_color} arcs spreading from a lower-left focus. Radius 0.11.")
+        structural.append(f"Line up three thin {contrast_color} {touch} arcs spreading from a lower-left focus. Radius 0.11.")
     roof_pressure_context = any(token in context.lower() for token in ("low cloud", "pressing down", "roof"))
     if any(token in context.lower() for token in ("mountain", "sharp", "pine", "peak", "needle")):
         structural.append(f"Place two thin {main_color} triangles near the upper-edge focus. Tilt them slightly.")
@@ -708,13 +726,13 @@ def _expand_en(ddl: str, *, context_text: str | None = None, vary_seed: int | No
     if not roof_pressure_context and any(token in context.lower() for token in ("door", "window", "box", "city", "room", "grid")):
         structural.append(f"Scatter three thin rotated {contrast_color} squares in the right half as visual cuts.")
     if roof_pressure_context:
-        structural.append(f"Place three pale {contrast_color} diagonal lines from the upper edge downward as slow overhead weight.")
+        structural.append(f"Place three pale {contrast_color} {touch} diagonal lines from the upper edge downward as slow overhead weight.")
     if any(token in context.lower() for token in ("membrane", "transparent", "haze", "fog", "mist", "atmosphere", "presence")):
         structural.append(f"Layer three pale {main_color} watercolor ellipses in the right half as a transparent membrane. Edges blurring.")
     if any(token in context.lower() for token in ("reflection", "reflected")):
-        structural.append(f"Scatter five thin {contrast_color} faint reflection lines along an undulating trace. Swaying slowly.")
+        structural.append(f"Scatter five thin {contrast_color} {touch} faint reflection lines along an undulating trace. Swaying slowly.")
     if any(token in context.lower() for token in ("fade", "fading", "vanish", "dissolve")):
-        structural.append(f"Scatter five thin {contrast_color} fading lines from lower left to upper right. Fine trembling.")
+        structural.append(f"Scatter five thin {contrast_color} {touch} fading lines from lower left to upper right. Fine trembling.")
     if any(token in context.lower() for token in ("sunlight", "light", "warm", "soft")):
         structural.append("Layer three pale white watercolor ellipses near the upper edge as soft light. Edges blurring.")
     if _has_en_terms(context.lower(), ("scent", "fragrance")):
@@ -722,24 +740,23 @@ def _expand_en(ddl: str, *, context_text: str | None = None, vary_seed: int | No
     if any(token in context.lower() for token in ("spring", "bud", "bloom", "waiting")):
         structural.append("Scatter five small red ellipses rising to the right along a diagonal band in the right half as waiting buds.")
     if any(token in context.lower() for token in ("sense", "presence", "arrival")):
-        structural.append("Line up three pale white arcs from a lower-left focus as five-sense presence. Radius 0.14.")
+        structural.append("Line up three pale white fine-brush arcs from a lower-left focus as five-sense presence. Radius 0.14.")
     if any(token in context.lower() for token in ("human", "person", "people", "figure", "face", "gaze", "animal", "bird", "fish", "bear", "flock", "herd")):
-        structural.append(f"Draw two thin {contrast_color} negative-space lines toward an upper-right focus as presence weight. Fine trembling.")
-        structural.append(f"Place two pale {main_color} arcs from a lower-left focus as contour density. Radius 0.09.")
+        structural.append(f"Draw two thin {contrast_color} {touch} negative-space lines toward an upper-right focus as presence weight. Fine trembling.")
+        structural.append(f"Place two pale {main_color} {touch} arcs from a lower-left focus as contour density. Radius 0.09.")
 
     music = [
-        _FilterCandidate(f"Place two thin {contrast_color} lines cutting the previous line. Fine trembling.", frozenset(("line", "music", "contrast"))),
-        _FilterCandidate(f"Line up three thin {contrast_color} arcs from a lower-right focus as a harmonic overtone series. Radius 0.07.", frozenset(("music", "water", "soft"))),
-        _FilterCandidate(f"Line up four short {main_color} lines left to right along the previous line. Swaying slowly.", frozenset(("particle", "music", "line"))),
+        _FilterCandidate(f"Place two thin {contrast_color} {touch} lines cutting the previous line. Fine trembling.", frozenset(("line", "music", "contrast"))),
+        _FilterCandidate(f"Line up three thin {contrast_color} {touch} arcs from a lower-right focus as a harmonic overtone series. Radius 0.07.", frozenset(("music", "water", "soft"))),
+        _FilterCandidate(f"Line up four short {main_color} {touch} lines left to right along the previous line. Swaying slowly.", frozenset(("particle", "music", "line"))),
     ]
     painting = [
-        _FilterCandidate(f"Draw three thin {contrast_color} lines toward an upper-right focus along the previous line.", frozenset(("space", "line", "geometry"))),
-        _FilterCandidate(f"Line up three thin {contrast_color} horizontal lines upward as perspective depth.", frozenset(("space", "line"))),
+        _FilterCandidate(f"Draw three thin {contrast_color} {touch} lines toward an upper-right focus along the previous line.", frozenset(("space", "line", "geometry"))),
+        _FilterCandidate(f"Line up three thin {contrast_color} {touch} horizontal lines upward as perspective depth.", frozenset(("space", "line"))),
         _FilterCandidate("Line up three thin black fine-brush lines left to right as drawing underlines. Fine trembling.", frozenset(("line", "quiet"))),
         _FilterCandidate(f"Line up two thin {contrast_color} pencil lines near the top edge as pencil negative-space line. Fine trembling.", frozenset(("line", "quiet", "soft"))),
         _FilterCandidate(f"Scatter seven short {main_color} crayon lines along a diagonal band in the right half as crayon rubbing.", frozenset(("particle", "dense", "soft"))),
         _FilterCandidate(f"Line up five thin {contrast_color} rotring uniform lines left to right.", frozenset(("line", "geometry", "contrast"))),
-        _FilterCandidate(f"Draw one {contrast_color} rope horizontal line near the bottom edge as rope twist. Swaying slowly.", frozenset(("line", "dense", "contrast"))),
         _FilterCandidate(f"Scatter thirteen small rotated {main_color} squares not touching the previous shape along a diagonal band in the right half.", frozenset(("particle", "dense", "geometry"))),
         _FilterCandidate(f"Line up three short {main_color} thick-brush lines horizontally as oil impasto.", frozenset(("dense", "contrast"))),
         _FilterCandidate("Layer two pale watercolor ellipses in the upper left. Edges blurring.", frozenset(("water", "soft", "quiet"))),

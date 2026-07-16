@@ -59,7 +59,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.86.1';
+	const APP_VERSION = 'v1.87';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -454,6 +454,22 @@
 		};
 		const lineSvg = (attrs = '', strokeWidth = 5, lineCap = 'round', stroke = '#2b2b2b') => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M22 56 C56 26 95 76 158 38" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="${lineCap}" ${attrs}/></svg>`;
 		const shapeSvg = (shape: string) => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/>${shape}</svg>`;
+		const touchSvg = (kind: string) => {
+			const defs = '<defs><filter id="touch-soft"><feGaussianBlur stdDeviation="1.8"/></filter></defs>';
+			const paths: Record<string, string> = {
+				hair: '<path d="M22 54 C58 37 106 58 158 39" fill="none" stroke="#2b2b2b" stroke-width="1.2" stroke-linecap="round" opacity="0.72"/>',
+				pencil: '<path d="M22 54 C58 37 106 58 158 39" fill="none" stroke="#2b2b2b" stroke-width="2.4" opacity="0.58"/><path d="M22 56 C62 39 108 59 158 41" fill="none" stroke="#2b2b2b" stroke-width="0.8" stroke-dasharray="1 6" opacity="0.42"/><g fill="#2b2b2b" opacity="0.22"><circle cx="49" cy="48" r="1"/><circle cx="82" cy="51" r="0.8"/><circle cx="121" cy="47" r="1.1"/></g>',
+				pen: '<path d="M22 54 C58 37 106 58 158 39 L158 41 C106 60 58 39 22 55 Z" fill="#2b2b2b"/>',
+				rotring: '<path d="M22 52 L158 40" fill="none" stroke="#2b2b2b" stroke-width="2.4" stroke-linecap="butt"/>',
+				crayon: '<path d="M22 57 C58 35 108 62 158 38" fill="none" stroke="#2b2b2b" stroke-width="8" opacity="0.66" stroke-dasharray="12 2 3 2"/><path d="M22 52 C65 40 110 56 158 42" fill="none" stroke="#2b2b2b" stroke-width="2" opacity="0.35"/>',
+				chalk: '<path d="M22 56 C58 35 105 61 158 39" fill="none" stroke="#2b2b2b" stroke-width="7" opacity="0.38" stroke-dasharray="8 4 2 5"/><g fill="#2b2b2b" opacity="0.22"><circle cx="39" cy="53" r="1.8"/><circle cx="70" cy="47" r="1.3"/><circle cx="111" cy="51" r="1.6"/><circle cx="145" cy="43" r="1.4"/></g>',
+				brush_thin: '<path d="M22 55 C54 31 108 63 158 38 C126 53 67 48 22 55 Z" fill="#2b2b2b" opacity="0.9"/>',
+				brush_thick: '<path d="M22 56 C47 25 105 68 158 37 C128 60 62 54 22 56 Z" fill="#2b2b2b" opacity="0.84"/><path d="M35 54 C72 42 112 58 151 41" fill="none" stroke="#fffdf8" stroke-width="1.2" opacity="0.45"/>',
+				burin: '<path d="M22 55 C56 42 106 57 158 39 C119 55 67 51 22 55 Z" fill="#2b2b2b"/>',
+				drypoint: `${defs}<path d="M22 55 C56 40 107 58 158 39 C118 54 67 52 22 55 Z" fill="#2b2b2b"/><path d="M23 59 C58 44 108 62 159 43" fill="none" stroke="#2b2b2b" stroke-width="5" opacity="0.28" filter="url(#touch-soft)"/>`,
+			};
+			return shapeSvg(paths[kind] ?? paths.pen);
+		};
 		if (categoryKey === "plugin-nature") {
 			const natureSvg = shapeSvg("<path d=\"M32 48 C52 28 74 68 94 48 S132 28 150 48\" stroke=\"#b95845\" stroke-width=\"5\" fill=\"none\" stroke-linecap=\"round\"/><path d=\"M34 62 C58 50 78 76 102 62 S134 50 150 62\" stroke=\"#d39a7b\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/>");
 			const naturePreviews: Record<string, Omit<SaijikiPreview, "categoryKey" | "word" | "canonicalWord">> = {
@@ -483,15 +499,16 @@
 			右上がり: { effect: '左下から右上へ向かう傾き。', example: '右上がりの線', svg: angleSvg(-30, true) },
 			右下がり: { effect: '左上から右下へ向かう傾き。', example: '右下がりの線', svg: angleSvg(30, true) },
 			回転: { effect: '図形全体を中心まわりに回転させる。', example: '回転した横長の四角', svg: angleSvg(30) },
-			髪: { effect: '非常に細い線。繊細な輪郭に向く。', example: '髪のように細い線', svg: lineSvg('', 1.5) },
-			鉛筆: { effect: '細めで軽い線。素描のような質感。', example: '鉛筆の線を引く', svg: lineSvg('opacity="0.82"', 3) },
-			ペン: { effect: '標準的な太さの明瞭な線。', example: 'ペンの線を引く', svg: lineSvg('', 4) },
-			ロットリング: { effect: '均一で硬い製図ペン風の線。', example: 'ロットリングの円', svg: lineSvg('', 3, 'butt') },
-			クレヨン: { effect: '太く柔らかい描き味。色面にも向く。', example: '青いクレヨンの線', svg: lineSvg('opacity="0.72"', 9) },
-			チョーク: { effect: 'かすれを含む淡い線。', example: '白いチョークの線', svg: lineSvg('opacity="0.46"', 8) },
-			細筆: { effect: '筆圧のある細い筆線。', example: '細筆で弧を引く', svg: lineSvg('', 4) },
-			太筆: { effect: '太く存在感のある筆線。', example: '太筆で黒い線を引く', svg: lineSvg('', 11) },
-			縄: { effect: '太く荒い線。結び目や束の印象を作る。', example: '縄のような線', svg: lineSvg('stroke-dasharray="10 5"', 10) },
+			髪: { effect: '非常に細く、筆致の変化をほぼ抑えた線。', example: '髪のように細い線', svg: touchSvg('hair') },
+			鉛筆: { effect: '幅と横揺れが連動し、細かな副線と紙目の粒を伴う。', example: '鉛筆の線を引く', svg: touchSvg('pencil') },
+			ペン: { effect: '明瞭さを保ちながら、わずかな幅と軌道の変化を持つ。', example: 'ペンの線を引く', svg: touchSvg('pen') },
+			ロットリング: { effect: '共有筆致を遮断した、均一で硬い製図線。', example: 'ロットリングの線', svg: touchSvg('rotring') },
+			クレヨン: { effect: '太い主線に擦れた副線と粒を重ねる。', example: '青いクレヨンの線', svg: touchSvg('crayon') },
+			チョーク: { effect: '幅の崩れ、途切れ、粉状の粒を含む淡い線。', example: '白いチョークの線', svg: touchSvg('chalk') },
+			細筆: { effect: '入りと抜きが細く、筆圧で幅が大きく変わる。', example: '細筆で線を引く', svg: touchSvg('brush_thin') },
+			太筆: { effect: '大きな幅変化と穂先の筋を持つ太い筆線。', example: '太筆で黒い線を引く', svg: touchSvg('brush_thick') },
+			ビュラン: { effect: '入りと抜きが細く、中央に彫りの勢いが集まる硬い線。', example: 'ビュランで線を彫る', svg: touchSvg('burin') },
+			ドライポイント: { effect: '緩い中膨らみと、片側だけの柔らかなburrを伴う線。', example: 'ドライポイントの線', svg: touchSvg('drypoint') },
 			実線: { effect: '切れ目のない線。', example: '実線で引く', svg: lineSvg() },
 			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', svg: lineSvg('stroke-dasharray="14 9"') },
 			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', svg: lineSvg('stroke-dasharray="1 12"') },

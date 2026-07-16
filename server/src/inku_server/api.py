@@ -1793,7 +1793,11 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         color = "white" if background in {"black", "blue"} else "black"
 
     weight = "pen"
-    if ("ロットリング" in ddl) or ("rotring" in lower):
+    if ("ビュラン" in ddl) or ("burin" in lower):
+        weight = "burin"
+    elif ("ドライポイント" in ddl) or ("drypoint" in lower):
+        weight = "drypoint"
+    elif ("ロットリング" in ddl) or ("rotring" in lower):
         weight = "rotring"
     elif ("鉛筆" in ddl) or ("pencil" in lower):
         weight = "pencil"
@@ -1805,8 +1809,6 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         weight = "brush_thick"
     elif ("細筆" in ddl) or ("水墨" in ddl) or ("墨" in ddl) or ("fine-brush" in lower) or ("ink" in lower):
         weight = "brush_thin"
-    elif ("縄" in ddl) or ("rope" in lower):
-        weight = "rope"
 
     if any(marker in ddl for marker in ("色とりどり", "多色", "赤・青", "赤、青")) or any(
         marker in lower for marker in ("colorful", "multi-color", "multicolor", "red, blue")

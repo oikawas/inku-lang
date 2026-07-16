@@ -59,7 +59,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 入力に明示された以下の属性は必ず出力に含める:
 
 - **いろ**: 青い・赤い・白い・灰色の → 省かない (「青いクレヨン線」→「青い」を落とさない)
-- **てざわり**: クレヨン・筆・鉛筆・チョーク・縄 → 省かない
+- **てざわり**: クレヨン・筆・鉛筆・チョーク → 省かない
 - **太さ・サイズ**: 細い・太い・小さな・大きな → 保持
 - **方向・ばしょ**: 縦・横・放射状・中央・右端・右半分など → 保持
 - **ゆらぎ**: 震える・波打つ・滲む・細かく → 数量文の後に別文で記述
@@ -77,22 +77,28 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - 粒立つ、かすれ → 「面: 粒立つ。」
 - 薄墨で満たす、水彩の面 → 「面: 薄墨。」
 - 端が滲む → 「面: 滲む。」
+- ビュラン、ドライポイントは入力にその技法名がある場合だけ同名のてざわりとして残す。
+- メゾチント地は「地: 黒いメゾチント地。」、平行線・交差線・アクアチントは「面: 平行線（粗から密）。」「面: 交差線。」「面: アクアチント三段。」と固定する。
+- 暗い地から光を彫る明示は「黒地から光を彫り出す（半明）。」または「黒地から光を彫り出す（明るく）。」とする。版画語のない入力へこれらを追加しない。
 
 複数属性を持つ図形は 1 文に収める: 「青いクレヨンの太い縦線を横に三十本並べる。」
 
-# てざわり選択 — 素材未指定でも物理感を選ぶ
+# てざわり選択 — 線と弧には物理感を必ず選ぶ
 
-入力に明示的な素材がなくても、質感・文脈から最も近いてざわりを選んでよい。毎回ペンに寄せない。
+線・弧・輪郭線を描く文には、髪・鉛筆・ペン・ロットリング・クレヨン・チョーク・細筆・太筆・ビュラン・ドライポイントのいずれか一つを必ず明記する。
+入力に明示的な素材がなくても、質感・文脈から最も近いてざわりを選ぶ。毎回ペンに寄せない。
+塗りつぶされた円・楕円・三角・四角など、線として見えない面だけの文へは機械的に付けない。
+ビュランとドライポイントは入力がその技法を明示した場合だけ選ぶ。
 
 - 薄い、淡い、繊細、かすかな、下書き、素描 → 鉛筆 または 細筆
 - 粉、粉っぽい、かすれ、白亜、黒板、壁、乾いた → チョーク
 - 子供、手描き、こすれ、塗り、柔らかい色面、蝋 → クレヨン
 - 墨、にじみ、書、筆跡、流麗、濃淡 → 細筆 または 太筆
 - 精密、設計、硬い、機械的、均一、図面 → ロットリング
-- 太い、荒い、撚り、重い、結び、綱 → 縄
 - 素材手がかりがない短い線・点列は、ペン固定にせず、鉛筆・細筆・クレヨン・チョークから文脈に合うものを選ぶ
 
 てざわりは DDL に明示する: 「鉛筆の細い線」「チョークの横線」「クレヨンの短い線」「細筆の縦線」。
+「黒い細線」「白い横線」「放射状に線を引く」のような、てざわりのない線・弧の文を出力してはいけない。
 
 # 数量表現
 
@@ -187,7 +193,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 かたち: 円、楕円、三角、四角、線、弧
 かたむき: 水平、垂直、斜め、右上がり、右下がり、回転
-てざわり: 髪、鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、縄
+てざわり: 髪、鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、ビュラン、ドライポイント
 つらなり: 実線(既定)、破線、点線、一点鎖線
 いろ: 白、黒(既定)、青、赤、緑、灰
 ゆらぎ: 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む
@@ -247,14 +253,25 @@ Saijiki にない語が入力にあるとき、その語のイメージ・形・
 # 例を増やしても推論プロンプトは増えない (k 件固定)。
 EXAMPLE_POOL: list[dict] = [
     {
+        "keywords": ["ビュラン", "彫版"],
+        "input": "ビュランで交差する線を彫る",
+        "output": "ビュランの斜線を交差するように二本引く。",
+    },
+    {
+        "keywords": ["ドライポイント"],
+        "input": "ドライポイントで滲む一本の線を引く",
+        "output": "ドライポイントの横線を中央に引く。",
+    },
+
+    {
         "keywords": ["月", "昇", "空", "夜", "星", "天"],
         "input": "山の向こうに月が昇る",
-        "output": "画面下1/3に灰色の横線を引く。右上に黒い円を置く。半径は0.1。",
+        "output": "画面下1/3に灰色の鉛筆の横線を引く。右上に黒い円を置く。半径は0.1。",
     },
     {
         "keywords": ["嵐", "激しい", "激しく", "荒れ", "風", "速"],
         "input": "激しい嵐の中で",
-        "output": "画面全体に黒い線を速く揺れるように散らす。",
+        "output": "画面全体に黒い太筆の線を速く揺れるように散らす。",
     },
     {
         "keywords": ["水", "滴", "雨", "波紋", "落ちる", "雫"],
@@ -264,12 +281,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["冬", "結晶", "放射", "氷", "雪", "霜"],
         "input": "冬の朝、窓ガラスの結晶",
-        "output": "画面中央に白い細い線を放射状に六本引く。端が細かく震える。",
+        "output": "画面中央に白い鉛筆の細い線を放射状に六本引く。端が細かく震える。",
     },
     {
         "keywords": ["本", "竹", "縦", "並べ", "個", "つ", "複数"],
         "input": "三本の竹を縦に並べる",
-        "output": "縦の実線を横に三本並べる。",
+        "output": "細筆の縦の実線を横に三本並べる。",
     },
     {
         "keywords": ["点", "散ら", "バラバラ", "撒く", "無秩序"],
@@ -279,7 +296,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["横線", "本", "引く", "並べ", "青", "二", "水平"],
         "input": "二本の青い横線を引く",
-        "output": "青い横線を縦に二本並べる。",
+        "output": "青いペンの横線を縦に二本並べる。",
     },
     {
         "keywords": ["花", "散る", "散", "桜", "春", "花びら"],
@@ -289,7 +306,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["光", "放射", "差す", "太陽", "輝", "レイ"],
         "input": "光が差す",
-        "output": "放射状に細い線を八本引く。",
+        "output": "放射状に細筆の細い線を八本引く。",
     },
     {
         "keywords": ["波", "海", "川", "同心円", "広がる"],
@@ -324,7 +341,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["格子", "網", "交差", "縦横", "マス"],
         "input": "格子を描く",
-        "output": "横線を縦に四本並べる。縦線を横に四本並べる。",
+        "output": "ロットリングの横線を縦に四本並べる。ロットリングの縦線を横に四本並べる。",
     },
     {
         "keywords": ["たくさん", "多数", "無数", "いっぱい", "沢山", "大量"],
@@ -334,12 +351,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["100", "200", "500", "1000", "百", "千", "本"],
         "input": "100本の細い線を画面全体に並べる",
-        "output": "黒い細い縦線を画面全体に百本散らす。",
+        "output": "黒い鉛筆の細い縦線を画面全体に百本散らす。",
     },
     {
         "keywords": ["沿う", "触れない", "切る", "間", "交差", "そば", "近く"],
         "input": "黒い線に沿う赤い点、ただし触れない",
-        "output": "黒い細い横線を左から右へ一本引く。赤い小さな楕円を前の線に沿って三つ置く。前の形に触れない。",
+        "output": "黒いペンの細い横線を左から右へ一本引く。赤い小さな楕円を前の線に沿って三つ置く。前の形に触れない。",
     },
     {
         "keywords": ["川沿い", "道沿い", "海沿い", "沿岸", "岸", "縁", "軌跡"],
@@ -364,12 +381,6 @@ EXAMPLE_POOL: list[dict] = [
         "input": "太筆で横線を五本引く",
         "output": "太筆の横線を縦に五本並べる。",
     },
-    # てざわり保持: 縄
-    {
-        "keywords": ["縄", "ロープ", "太い", "麻", "荒い"],
-        "input": "縄のような太い線を引く",
-        "output": "縄の横線を中央に引く。",
-    },
     # てざわり保持: ロットリング + 精密
     {
         "keywords": ["ロットリング", "精密", "製図", "設計", "0.3mm", "細"],
@@ -380,7 +391,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["震え", "震える", "揺れ", "揺らぐ", "波打つ", "ぶれ"],
         "input": "細かく震える縦線を三本並べる",
-        "output": "縦の実線を横に三本並べる。細かく震える。",
+        "output": "鉛筆の縦の実線を横に三本並べる。細かく震える。",
     },
     # 属性保持: 色 + ばしょ + 数量
     {
@@ -410,7 +421,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["背景", "塗りつぶす", "黒板", "暗い", "暗く", "ダーク", "黒い背景"],
         "input": "黒い背景に白い線を引く",
-        "output": "背景を黒で塗りつぶす。白い横線を中央に引く。",
+        "output": "背景を黒で塗りつぶす。白いチョークの横線を中央に引く。",
     },
     {
         "keywords": ["背景", "赤", "青", "緑", "灰", "空色", "地色"],
@@ -420,7 +431,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["白", "背景", "線", "見えない", "同じ色", "同化"],
         "input": "白い背景に白い線を引く",
-        "output": "背景を白で塗りつぶす。黒い横線を中央に引く。",
+        "output": "背景を白で塗りつぶす。黒いペンの横線を中央に引く。",
     },
     {
         "keywords": ["白", "雪", "星", "月", "背景", "夜"],
@@ -526,12 +537,12 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["全幅", "端から端", "全体", "画面全体", "全部", "左から右"],
         "input": "画面端から端まで線を引く",
-        "output": "全幅の横線を中央に引く。",
+        "output": "ペンの全幅の横線を中央に引く。",
     },
     {
         "keywords": ["半分", "半幅", "50%", "中央半分", "短い"],
         "input": "画面の半分だけ線を引く",
-        "output": "半幅の横線を中央に引く。",
+        "output": "ペンの半幅の横線を中央に引く。",
     },
     # わりあい: 弧・月の形
     {
@@ -564,6 +575,17 @@ EXAMPLE_POOL: list[dict] = [
 
 EXAMPLE_POOL_EN: list[dict] = [
     {
+        "keywords": ["burin", "engraved"],
+        "input": "Engrave two crossing lines with a burin",
+        "output": "Draw two crossing diagonal burin lines.",
+    },
+    {
+        "keywords": ["drypoint"],
+        "input": "Draw one velvety line in drypoint",
+        "output": "Draw one drypoint horizontal line at center.",
+    },
+
+    {
         "keywords": ["wallpaper", "faded stripes", "vertical stripes"],
         "input": "Faded blue striped wallpaper",
         "output": "Tile four hundred short faded blue pencil vertical lines across the wall. Swaying faintly.",
@@ -571,7 +593,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["four directions", "superimposed lines", "wall-wide"],
         "input": "Lines in four directions superimposed across a wall",
-        "output": "Tile thin short black lines in four directions, superimposed across the whole wall. Swaying faintly.",
+        "output": "Tile thin short black rotring lines in four directions, superimposed across the whole wall. Swaying faintly.",
     },
     {
         "keywords": ["rain curtain", "driving rain", "sheets of rain"],
@@ -581,12 +603,12 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["moon", "mountain", "sky", "night", "star", "rises"],
         "input": "A moon rises beyond the mountains",
-        "output": "Draw a gray horizontal line in the lower third. Place a black circle in the upper right. Radius 0.1.",
+        "output": "Draw a gray pencil horizontal line in the lower third. Place a black circle in the upper right. Radius 0.1.",
     },
     {
         "keywords": ["storm", "fierce", "wind", "fast", "turbulent", "intense"],
         "input": "In the middle of a fierce storm",
-        "output": "Scatter black lines quickly across the entire canvas.",
+        "output": "Scatter black thick-brush lines quickly across the entire canvas.",
     },
     {
         "keywords": ["water", "drop", "rain", "ripple", "falls", "drip"],
@@ -596,12 +618,12 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["winter", "crystal", "radial", "ice", "snow", "frost"],
         "input": "Ice crystals on a winter window",
-        "output": "Draw six thin white lines radially from center. Ends trembling fine.",
+        "output": "Draw six thin white pencil lines radially from center. Ends trembling fine.",
     },
     {
         "keywords": ["vertical", "lines", "arrange", "multiple", "three", "bamboo"],
         "input": "Three vertical lines",
-        "output": "Line up three vertical solid lines horizontally.",
+        "output": "Line up three vertical fine-brush solid lines horizontally.",
     },
     {
         "keywords": ["dots", "scatter", "red", "five", "circles"],
@@ -611,7 +633,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["horizontal", "lines", "blue", "two", "draw", "parallel"],
         "input": "Draw two blue horizontal lines",
-        "output": "Line up two blue horizontal lines vertically.",
+        "output": "Line up two blue pen horizontal lines vertically.",
     },
     {
         "keywords": ["petals", "fall", "cherry", "spring", "blossom", "scatter"],
@@ -621,7 +643,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["light", "radial", "sun", "ray", "glow", "spreading"],
         "input": "Light rays spreading out",
-        "output": "Draw eight thin lines radially from center.",
+        "output": "Draw eight thin fine-brush lines radially from center.",
     },
     {
         "keywords": ["wave", "sea", "river", "concentric", "ripple", "spread"],
@@ -656,7 +678,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["grid", "crosshatch", "intersect", "lattice", "cross"],
         "input": "Draw a grid",
-        "output": "Line up five vertical lines horizontally. Line up five horizontal lines vertically.",
+        "output": "Line up five rotring vertical lines horizontally. Line up five rotring horizontal lines vertically.",
     },
     {
         "keywords": ["many", "numerous", "countless", "lots", "scattered", "small"],
@@ -666,12 +688,12 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["100", "200", "500", "hundred", "fill", "dense"],
         "input": "100 thin lines arranged across the canvas",
-        "output": "Scatter one hundred thin vertical black lines across the whole canvas.",
+        "output": "Scatter one hundred thin vertical black pencil lines across the whole canvas.",
     },
     {
         "keywords": ["along", "not touching", "cutting", "between", "cross", "near"],
         "input": "Red dots along a black line but not touching it",
-        "output": "Draw one thin black horizontal line left to right. Place three small red ellipses along the previous line. Not touching the previous shape.",
+        "output": "Draw one thin black pen horizontal line left to right. Place three small red ellipses along the previous line. Not touching the previous shape.",
     },
     {
         "keywords": ["riverbank", "roadside", "coast", "edge", "trace", "path"],
@@ -699,14 +721,9 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Fill background with black. Place a white chalk circle at center. Edges blurring.",
     },
     {
-        "keywords": ["rope", "thick", "coarse", "heavy"],
-        "input": "A thick rope-like line across the center",
-        "output": "Draw a rope horizontal line at center.",
-    },
-    {
         "keywords": ["trembling", "trembles", "shaking", "vibrate", "quivering"],
         "input": "Three trembling vertical lines",
-        "output": "Line up three vertical solid lines horizontally. Fine trembling.",
+        "output": "Line up three vertical pencil solid lines horizontally. Fine trembling.",
     },
     {
         "keywords": ["right", "left", "half", "edge", "corner", "twenty"],
@@ -731,12 +748,12 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["dark", "black background", "night", "shadow", "white"],
         "input": "White lines on a black background",
-        "output": "Fill background with black. Draw a white horizontal line at center.",
+        "output": "Fill background with black. Draw a white chalk horizontal line at center.",
     },
     {
         "keywords": ["white", "background", "line", "invisible", "same color", "contrast"],
         "input": "White lines on a white background",
-        "output": "Fill background with white. Draw a black horizontal line at center.",
+        "output": "Fill background with white. Draw a black pen horizontal line at center.",
     },
     {
         "keywords": ["white", "snow", "stars", "moon", "background", "night"],
@@ -761,12 +778,12 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["full", "full-width", "edge", "end", "entire", "across"],
         "input": "Draw a line from edge to edge",
-        "output": "Draw a full-width horizontal line at center.",
+        "output": "Draw a full-width pen horizontal line at center.",
     },
     {
         "keywords": ["half", "half-width", "middle", "shorter", "partial"],
         "input": "Draw a half-width line",
-        "output": "Draw a half-width horizontal line at center.",
+        "output": "Draw a half-width pen horizontal line at center.",
     },
     {
         "keywords": ["semicircle", "half circle", "dome", "arch", "semi"],
@@ -819,7 +836,7 @@ Emotional language removal is the only normalization. **Dropping attributes is a
 Preserve all explicitly stated attributes in the input:
 
 - **colors**: blue, red, white, gray → never omit ("blue crayon line" → keep "blue")
-- **touches**: crayon, brush, pencil, chalk, rope → never omit
+- **touches**: crayon, brush, pencil, chalk → never omit
 - **weight/size**: thin, thick, small, large → preserve
 - **direction/places**: vertical, horizontal, radial, center, right-half → preserve
 - **movements**: trembling, undulating, blurring, fine → add as separate sentence after count
@@ -837,22 +854,28 @@ Texture must not create extra helper shapes. If it belongs to a shape interior, 
 - grainy, rough, scuffed → "Surface: grain."
 - ink wash or watercolor fill → "Surface: pale ink wash."
 - bleeding edge → "Surface: bleeding."
+- Preserve burin and drypoint only when the input literally names them.
+- Normalize print fields to fixed phrases: "Ground: black mezzotint.", "Surface: hatching (coarse to dense).", "Surface: crosshatching.", and "Surface: three-step aquatint."
+- Normalize explicit subtraction as "Carve light from the dark ground (half)." or "Carve light from the dark ground (bright)." Never add these phrases to non-print input.
 
 Multiple attributes in one shape go in one sentence: "Line up thirty thick vertical blue crayon lines."
 
-# Touch Choice — choose physical material even when implicit
+# Touch Choice — every line and arc chooses physical material
 
+Every sentence that draws a visible line, arc, or outline must explicitly name exactly one of these touches: hair, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, burin, or drypoint.
 If the input does not name a material, infer the nearest touch from texture and context. Do not default everything to pen.
+Do not mechanically attach a touch to a filled circle, ellipse, triangle, or square that has no visible outline.
+Choose burin or drypoint only when the input explicitly names that technique.
 
 - pale, delicate, faint, sketch, draft, drawing underline → pencil or fine-brush
 - powder, dusty, chalky, blackboard, wall, dry, rubbed → chalk
 - childlike, hand-drawn, waxy, rubbed color, soft color field → crayon
 - ink, wash, calligraphy, stroke, value, bleeding → fine-brush or thick-brush
 - precise, technical, mechanical, uniform, blueprint, diagram → rotring
-- thick, coarse, twisted, heavy, knot, cord → rope
 - If a short line or dotted layer has no material clue, choose from pencil, fine-brush, crayon, or chalk by context instead of always using pen
 
 Write the touch explicitly in normalized DDL: "thin pencil line", "chalk horizontal line", "short crayon line", "fine-brush vertical line".
+Never output a touchless line or arc such as "thin black line", "white horizontal line", or "draw radial lines".
 
 # Quantity
 
@@ -955,7 +978,7 @@ Do not normalize to the same foreground and background color. Invisible output i
 
 forms: circle, ellipse, triangle, square, line, arc
 angles: horizontal, vertical, diagonal, rising, falling, rotated
-touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, rope
+touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint
 continuity: solid (default), dashed, dotted, dash-dot
 colors: white, black (default), blue, red, green, gray
 movements: fine, large, slowly, quickly, swaying, undulating, trembling, blurring
@@ -1025,6 +1048,22 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
     top = scored[:k]
     if all(s == 0 for s, _ in top):
         top = [(0, ex) for ex in pool[:k]]
+    touch_markers = (
+        ("pencil", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint")
+        if lang == "en"
+        else ("鉛筆", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント")
+    )
+    if not any(any(marker in ex["output"] for marker in touch_markers) for _, ex in top):
+        touch_example = next(
+            (
+                item
+                for item in scored
+                if any(marker in item[1]["output"] for marker in touch_markers)
+            ),
+            None,
+        )
+        if touch_example is not None and top:
+            top[-1] = touch_example
     relation_markers = (
         ("along the previous line", "not touching the previous shape", "cutting the previous line", "between the previous two")
         if lang == "en"
@@ -1036,7 +1075,15 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
             None,
         )
         if relation_example is not None and top:
-            top[-1] = (0, relation_example)
+            replace_index = next(
+                (
+                    index
+                    for index in range(len(top) - 1, -1, -1)
+                    if not any(marker in top[index][1]["output"] for marker in touch_markers)
+                ),
+                len(top) - 1,
+            )
+            top[replace_index] = (0, relation_example)
     if lang == "en":
         return "\n\n".join(f"Input: {ex['input']}\nOutput: {ex['output']}" for _, ex in top)
     return "\n\n".join(

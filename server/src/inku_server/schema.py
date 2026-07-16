@@ -14,13 +14,35 @@ Coord = tuple[float, float]
 Primitive = Literal["line", "circle", "ellipse", "triangle", "square", "polygon", "arc"]
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 Weight = Literal[
-    "hair", "pencil", "pen", "rotring", "crayon", "chalk",
-    "brush_thin", "brush_thick", "rope",
+    "hair",
+    "pencil",
+    "pen",
+    "rotring",
+    "crayon",
+    "chalk",
+    "brush_thin",
+    "brush_thick",
+    "burin",
+    "drypoint",
 ]
 Color = Literal["white", "black", "blue", "red", "green", "gray"]
-SurfaceTexture = Literal["none", "stipple", "hatch", "grain", "wash", "bleed", "paper_grain"]
-SurfaceDirection = Literal["none", "horizontal", "vertical", "diagonal_rising", "diagonal_falling"]
-GroundMaterial = Literal["plain", "paper", "washi", "ink_wash", "charcoal_ground"]
+SurfaceTexture = Literal[
+    "none",
+    "stipple",
+    "hatch",
+    "crosshatch",
+    "aquatint",
+    "grain",
+    "wash",
+    "bleed",
+    "paper_grain",
+]
+SurfaceDirection = Literal[
+    "none", "horizontal", "vertical", "diagonal_rising", "diagonal_falling"
+]
+GroundMaterial = Literal[
+    "plain", "paper", "washi", "ink_wash", "charcoal_ground", "mezzotint"
+]
 GroundTone = Literal["white", "off_white", "warm", "cool", "gray", "black"]
 GroundGrain = Literal["none", "fine", "medium", "coarse"]
 
@@ -37,7 +59,9 @@ Dimension = Literal[
     "radius",
 ]
 Layout = Literal["horizontal", "vertical", "radial", "scatter", "grid"]
-Path = Literal["none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"]
+Path = Literal[
+    "none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half"
+]
 Density = Literal["none", "low", "medium", "high"]
 Fade = Literal["none", "outward", "directional"]
 RhythmSpacing = Literal["none", "syncopated", "accelerando", "loose"]
@@ -48,6 +72,9 @@ GazePressure = Literal["none", "low", "medium", "high"]
 ContourDensity = Literal["low", "medium", "high"]
 RelationType = Literal["along", "not_touching", "cutting", "between"]
 RelationGap = Literal["narrow", "medium", "wide"]
+InstructionMode = Literal["additive", "carve"]
+CarveDepth = Literal["light", "half", "bright"]
+SurfaceSpacingGradient = Literal["none", "coarse_to_dense", "dense_to_coarse"]
 
 
 def _clamp_unit_value(v: object, default: float | None = None) -> object:
@@ -67,19 +94,34 @@ class SurfaceSpec(BaseModel):
     texture: SurfaceTexture = Field(
         default="none",
         description=(
-            "面の質感: none=なし / stipple=点で埋める / hatch=線で埋める / grain=粒立つ"
-            " / wash=薄墨・水彩 / bleed=端が滲む / paper_grain=紙目"
+            "面の質感: none=なし / stipple=点 / hatch=平行線 / crosshatch=交差線"
+            " / aquatint=段階的な粒 / grain=粒立つ / wash=薄墨・水彩 / bleed=端が滲む / paper_grain=紙目"
         ),
     )
     density: float = Field(default=0.35, ge=0.0, le=1.0, description="質感密度 0.0-1.0")
-    scale: float = Field(default=0.35, ge=0.0, le=1.0, description="質感粒度・間隔 0.0-1.0")
-    opacity: float = Field(default=0.28, ge=0.0, le=1.0, description="質感の不透明度 0.0-1.0")
-    bleed: float = Field(default=0.0, ge=0.0, le=1.0, description="滲み・広がり量 0.0-1.0")
+    scale: float = Field(
+        default=0.35, ge=0.0, le=1.0, description="質感粒度・間隔 0.0-1.0"
+    )
+    opacity: float = Field(
+        default=0.28, ge=0.0, le=1.0, description="質感の不透明度 0.0-1.0"
+    )
+    bleed: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="滲み・広がり量 0.0-1.0"
+    )
     direction: SurfaceDirection = Field(
         default="none",
         description="線状質感の向き: none / horizontal / vertical / diagonal_rising / diagonal_falling",
     )
-    seed: Optional[int] = Field(default=None, description="任意の質感 seed。省略時は Renderer が演奏 seed から導出")
+    spacing_gradient: SurfaceSpacingGradient = Field(
+        default="none", description="ハッチ間隔の勾配"
+    )
+    tone_steps: int = Field(
+        default=3, ge=2, le=4, description="aquatint の離散調子段数 2-4"
+    )
+    seed: Optional[int] = Field(
+        default=None,
+        description="任意の質感 seed。省略時は Renderer が演奏 seed から導出",
+    )
 
     @field_validator("density", "scale", "opacity", "bleed", mode="before")
     @classmethod
@@ -94,14 +136,23 @@ class CanvasGroundSpec(BaseModel):
 
     material: GroundMaterial = Field(
         default="plain",
-        description="地の素材: plain=無地 / paper=紙 / washi=和紙 / ink_wash=薄墨地 / charcoal_ground=木炭地",
+        description="地の素材: plain=無地 / paper=紙 / washi=和紙 / ink_wash=薄墨地 / charcoal_ground=木炭地 / mezzotint=目立てした黒地",
     )
     tone: GroundTone = Field(default="white", description="地の色調")
     grain: GroundGrain = Field(default="none", description="紙目・粒の粗さ")
-    density: float = Field(default=0.20, ge=0.0, le=1.0, description="地の粒密度 0.0-1.0")
-    opacity: float = Field(default=0.12, ge=0.0, le=1.0, description="地の質感不透明度 0.0-1.0")
-    absorbency: float = Field(default=0.0, ge=0.0, le=1.0, description="吸い込みやすさ 0.0-1.0")
-    seed: Optional[int] = Field(default=None, description="任意の地 texture seed。省略時は Renderer が演奏 seed から導出")
+    density: float = Field(
+        default=0.20, ge=0.0, le=1.0, description="地の粒密度 0.0-1.0"
+    )
+    opacity: float = Field(
+        default=0.12, ge=0.0, le=1.0, description="地の質感不透明度 0.0-1.0"
+    )
+    absorbency: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="吸い込みやすさ 0.0-1.0"
+    )
+    seed: Optional[int] = Field(
+        default=None,
+        description="任意の地 texture seed。省略時は Renderer が演奏 seed から導出",
+    )
 
     @field_validator("density", "opacity", "absorbency", mode="before")
     @classmethod
@@ -115,7 +166,9 @@ class CanvasSpec(BaseModel):
     """キャンバス比率と地の指定。旧形式の文字列 canvas も互換で受ける。"""
 
     aspect: str = Field(default="square", description="キャンバス比率ID")
-    ground: Optional[CanvasGroundSpec] = Field(default=None, description="キャンバス地の質感")
+    ground: Optional[CanvasGroundSpec] = Field(
+        default=None, description="キャンバス地の質感"
+    )
 
 
 Canvas = str | CanvasSpec
@@ -371,8 +424,15 @@ class Instruction(BaseModel):
         default="pen",
         description=(
             "hair=髪 / pencil=鉛筆 / pen=ペン / rotring=ロットリング"
-            " / crayon=クレヨン / chalk=チョーク / brush_thin=細筆 / brush_thick=太筆 / rope=縄"
+            " / crayon=クレヨン / chalk=チョーク / brush_thin=細筆 / brush_thick=太筆"
+            " / burin=ビュラン / drypoint=ドライポイント"
         ),
+    )
+    mode: InstructionMode = Field(
+        default="additive", description="additive=地へ加える / carve=暗い地から光を彫る"
+    )
+    carve_depth: Optional[CarveDepth] = Field(
+        default=None, description="carve の明るさ: light / half / bright"
     )
     color: Color = Field(
         default="black",
@@ -395,7 +455,7 @@ class Instruction(BaseModel):
     )
     at: Optional[AtRegion] = Field(
         default=None,
-        description="演奏時配置領域。例: {\"region\":[0.56,0.32,0.68,0.44]}。固定座標より弱い指定",
+        description='演奏時配置領域。例: {"region":[0.56,0.32,0.68,0.44]}。固定座標より弱い指定',
     )
     relation: Optional[Relation] = Field(
         default=None,

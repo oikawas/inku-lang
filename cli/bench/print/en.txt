@@ -1,0 +1,12 @@
+Engrave one energetic diagonal line with a burin.
+Draw two crossing engraved burin lines.
+Draw one velvety horizontal line in drypoint.
+Draw one dashed drypoint line.
+Fill a circle with hatching from coarse to dense.
+Fill a square with crosshatching from dense to coarse.
+Fill a circle with three-step aquatint.
+Ground: black mezzotint. Carve one bright circle from the dark ground.
+Ground: black mezzotint. Carve one half-light ellipse from the dark ground.
+Ground: black mezzotint. Carve two lights. The latter is not touching the previous shape.
+Ground: black mezzotint. Draw one burin line over the plate tone.
+Ground: black mezzotint. Carve a half-light and add one drypoint line.

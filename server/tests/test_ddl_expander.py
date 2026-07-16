@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from inku_server.ddl_expander import expand_intermediate_ddl
 
 
@@ -95,7 +97,7 @@ def test_expand_intermediate_ddl_selects_focused_layers():
     assert len(selected) < len(JA_TECHNIQUE_MARKERS)
     assert expanded.count("。") <= ddl.count("。") + 8
     assert expanded.count("小さな円") <= ddl.count("小さな円")
-    assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角", "細い弧"))
+    assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角", "斜め線", "細い弧"))
     assert any(word in expanded for word in ("右上がり", "右下がり", "回転した", "焦点"))
 
 
@@ -166,7 +168,7 @@ def test_expand_intermediate_ddl_does_not_add_true_circles_for_particles():
 
     assert "小さな円" not in expanded
     assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角"))
-    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した"))
+    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した", "画面全体へ"))
 
 
 def test_expand_intermediate_ddl_abstracts_presence_without_body_symbols():
@@ -223,6 +225,32 @@ def test_expand_intermediate_ddl_en_reframes_center():
 
     assert "center" not in expanded.lower()
     assert "focus" in expanded.lower()
+
+
+def test_stage15_added_lines_and_arcs_always_name_a_touch():
+    expanded = expand_intermediate_ddl(
+        "青い鉛筆の円を中央に置く。黒い鉛筆の横線を三本引く。",
+        context_text="静かな水面の反射と細い波",
+    )
+    touches = ("髪", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント")
+
+    for sentence in expanded.split("。"):
+        if "線" in sentence or "弧" in sentence:
+            assert any(touch in sentence for touch in touches), sentence
+
+
+def test_stage15_added_lines_and_arcs_always_name_a_touch_en():
+    expanded = expand_intermediate_ddl(
+        "Place a blue pencil circle at center. Draw three black pencil horizontal lines.",
+        lang="en",
+        context_text="quiet water reflections and fine waves",
+    )
+    touches = ("hair", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint")
+
+    for sentence in re.split(r"(?<=[.!?])\s+", expanded):
+        lower = sentence.lower()
+        if "line" in lower or "arc" in lower:
+            assert any(touch in lower for touch in touches), sentence
 
 
 def test_expand_intermediate_ddl_en_does_not_read_crescent_as_scent():

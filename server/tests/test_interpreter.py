@@ -15,7 +15,12 @@ import os
 
 import pytest
 
-from inku_server.interpreter import _build_system_prompt, _sanitize_placement_words, interpret
+from inku_server.interpreter import (
+    _build_system_prompt,
+    _sanitize_placement_words,
+    _select_examples,
+    interpret,
+)
 
 FORMS = ["円", "楕円", "三角", "四角", "線", "弧"]
 EMOTION_WORDS = [
@@ -172,7 +177,7 @@ def test_contrast_prompt_selects_invisible_examples():
     assert "背景を灰で塗りつぶす" in prompt
     assert "出力してはいけない" in prompt
     assert "白い背景に白い線" in prompt
-    assert "黒い横線" in prompt
+    assert "黒いペンの横線" in prompt
     assert "青い短い線" in _build_system_prompt("白い雪を白い背景に散らす")
 
 
@@ -183,7 +188,7 @@ def test_contrast_prompt_en_selects_invisible_examples():
     assert "Fill background with gray" in prompt
     assert "Do not output" in prompt
     assert "White lines on a white background" in prompt
-    assert "black horizontal line" in prompt
+    assert "black pen horizontal line" in prompt
     assert "short blue lines" in _build_system_prompt("white snow on a white background", lang="en")
 
 
@@ -197,6 +202,8 @@ def test_touch_choice_prompt_selects_material_variations():
     assert "クレヨン" in prompt
     assert "ロットリング" in prompt
     assert "チョークの横線" in prompt
+    assert "いずれか一つを必ず明記する" in prompt
+    assert "てざわりのない線・弧の文を出力してはいけない" in prompt
 
 
 def test_touch_choice_prompt_en_selects_material_variations():
@@ -209,6 +216,26 @@ def test_touch_choice_prompt_en_selects_material_variations():
     assert "crayon" in prompt
     assert "rotring" in prompt
     assert "chalk horizontal lines" in prompt
+    assert "must explicitly name exactly one" in prompt
+    assert "Never output a touchless line or arc" in prompt
+
+
+def test_dynamic_examples_always_include_non_pen_touch_example():
+    examples = _select_examples("静かな余白に短い線を置く")
+
+    assert any(
+        marker in examples
+        for marker in ("鉛筆", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆")
+    )
+
+
+def test_dynamic_examples_en_always_include_non_pen_touch_example():
+    examples = _select_examples("place a short line in quiet negative space", lang="en")
+
+    assert any(
+        marker in examples
+        for marker in ("pencil", "rotring", "crayon", "chalk", "fine-brush", "thick-brush")
+    )
 
 
 

@@ -2,6 +2,8 @@
 	import { onMount, tick } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
+	import AIRefineModal from './AIRefineModal.svelte';
+	import ManualRefineModal from './ManualRefineModal.svelte';
 
 	export type LineageNode = {
 		id: string;
@@ -34,10 +36,12 @@
 		onDetach: () => void;
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
+		onPaintOne: (text: string, options: any) => Promise<any>;
+		selectedCatalogId: string;
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, selectedCatalogId }: Props = $props();
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
@@ -50,6 +54,9 @@
 	let overviewOpen = $state(false);
 	let overviewLoading = $state(false);
 	let overviewScale = $state(1);
+	let activeMenuNodeId = $state<string | null>(null);
+	let activeAIRefineNode = $state<LineageNode | null>(null);
+	let activeManualRefineNode = $state<LineageNode | null>(null);
 	const cardElements = new Map<string, HTMLElement>();
 
 	const nodeById = $derived(new Map((graph?.nodes ?? []).map((node) => [node.id, node])));
@@ -236,16 +243,22 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		};
 	}
 
+	function handleGlobalClick() {
+		activeMenuNodeId = null;
+	}
+
 	onMount(() => {
 		resizeObserver = new ResizeObserver(scheduleArrowUpdate);
 		if (lineageColumnsEl) resizeObserver.observe(lineageColumnsEl);
 		for (const element of cardElements.values()) resizeObserver.observe(element);
 		window.addEventListener('resize', scheduleArrowUpdate);
+		window.addEventListener('click', handleGlobalClick);
 		scheduleArrowUpdate();
 		return () => {
 			resizeObserver?.disconnect();
 			resizeObserver = null;
 			window.removeEventListener('resize', scheduleArrowUpdate);
+			window.removeEventListener('click', handleGlobalClick);
 			if (arrowFrame !== null) window.cancelAnimationFrame(arrowFrame);
 		};
 	});
@@ -318,6 +331,22 @@ $effect(() => {
 	<label class="card-check" aria-label={isJapanese ? '一括操作の対象にする' : 'Check for bulk actions'}>
 		<input type="checkbox" checked={checkedHistoryIds.includes(node.history.id)} onclick={(event) => event.stopPropagation()} onpointerdown={(event) => event.stopPropagation()} onchange={() => toggleCheckedHistory(node.history?.id as string)} />
 	</label>
+	<button type="button" class="card-menu-trigger" onclick={(event) => { event.stopPropagation(); activeMenuNodeId = activeMenuNodeId === node.id ? null : node.id; }} aria-label={isJapanese ? 'メニューを開く' : 'Open menu'}>
+		<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+	</button>
+	{#if activeMenuNodeId === node.id}
+		<div class="card-dropdown-menu" role="menu">
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
+				🤖 {isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
+			</button>
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeManualRefineNode = node; activeMenuNodeId = null; }}>
+				✍️ {isJapanese ? '手動で推敲する...' : 'Manual Refine...'}
+			</button>
+			<button type="button" class="menu-danger" role="menuitem" onclick={(event) => { event.stopPropagation(); onAskTrash([node.history?.id as string]); activeMenuNodeId = null; }}>
+				🗑️ {isJapanese ? '作品を削除' : 'Delete'}
+			</button>
+		</div>
+	{/if}
 {/if}
 
 								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted artwork')} onclick={() => openNode(node)}>
@@ -375,6 +404,27 @@ $effect(() => {
 	{/if}
 </section>
 
+{#if activeAIRefineNode}
+	<AIRefineModal
+		node={activeAIRefineNode}
+		{isJapanese}
+		onClose={() => (activeAIRefineNode = null)}
+		{onPaintOne}
+		onLoadBranch={onLoadBranch}
+	/>
+{/if}
+
+{#if activeManualRefineNode}
+	<ManualRefineModal
+		node={activeManualRefineNode}
+		{isJapanese}
+		onClose={() => (activeManualRefineNode = null)}
+		{onPaintOne}
+		onLoadBranch={onLoadBranch}
+		{selectedCatalogId}
+	/>
+{/if}
+
 <style>
 	.lineage-panel { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; padding: 22px; overflow: hidden; display: flex; flex-direction: column; color: var(--fg); background: var(--bg); }
 	.lineage-panel.overview { position: fixed; inset: 14px; z-index: 1300; width: auto; height: auto; border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 18px 70px #000a; }
@@ -404,7 +454,14 @@ $effect(() => {
 	.lineage-card.tombstone { border-style: dashed; opacity: .72; }
 	.lineage-card.trashed { opacity: .62; filter: grayscale(.35); }
 	.card-check { position: absolute; z-index: 3; top: 8px; right: 8px; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
-	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
+	.card-menu-trigger { position: absolute; z-index: 3; top: 8px; left: 8px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--fg3); cursor: pointer; }
+	.card-menu-trigger:hover { background: var(--bg2); color: var(--fg); }
+	.card-dropdown-menu { position: absolute; z-index: 10; top: 32px; left: 8px; min-width: 150px; border: 1px solid var(--border2); border-radius: 6px; padding: 4px 0; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
+	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 7px 12px; font-size: 0.72rem; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: inherit; width: 100%; box-sizing: border-box; }
+	.card-dropdown-menu button:hover { background: var(--bg2); }
+	.card-dropdown-menu button.menu-danger { color: var(--danger, #9b3d32); }
+	.card-dropdown-menu button.menu-danger:hover { background: color-mix(in srgb, var(--danger, #9b3d32) 8%, var(--panel)); }
 	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }

@@ -1,0 +1,174 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import type { LineageNode } from './LineagePanel.svelte';
+
+	type Props = {
+		node: LineageNode;
+		isJapanese: boolean;
+		onClose: () => void;
+		onPaintOne: (text: string, options: any) => Promise<any>;
+		onLoadBranch: (nodeId: string) => void | Promise<void>;
+		selectedCatalogId: string;
+	};
+
+	let { node, isJapanese, onClose, onPaintOne, onLoadBranch, selectedCatalogId }: Props = $props();
+
+	type ColorCatalog = { id: string; name: string; name_ja: string; sub?: string; sub_ja?: string };
+	let colorCatalogs = $state<ColorCatalog[]>([]);
+	let selectedCatalog = $state(selectedCatalogId);
+
+	let derivationKind = $state<string>('touch_variation');
+	let ddlText = $state('');
+	let saijikiText = $state('');
+
+	let running = $state(false);
+	let errorText = $state('');
+
+	const kinds = [
+		{ id: 'touch_variation', labelJa: 'タッチ変動', labelEn: 'Touch variation' },
+		{ id: 'layout_variation', labelJa: '構図変動', labelEn: 'Layout variation' },
+		{ id: 'catalog_change', labelJa: '配色カタログ変動', labelEn: 'Color catalog change' },
+		{ id: 'reinterpretation', labelJa: '解釈変動 (Saijiki等の再反映)', labelEn: 'Reinterpretation' }
+	];
+
+	onMount(async () => {
+		// 親の DDL を初期表示
+		ddlText = node.history?.ddl ?? '';
+		
+		try {
+			const res = await fetch('/api/color-catalogs');
+			if (res.ok) {
+				const data = await res.json() as { catalogs: ColorCatalog[] };
+				colorCatalogs = data.catalogs || [];
+			}
+		} catch (e) {
+			console.error('Failed to fetch color catalogs:', e);
+		}
+	});
+
+	async function executeRefinement() {
+		running = true;
+		errorText = '';
+
+		let paintText = node.history?.source_text ?? node.history?.input ?? '';
+		if (derivationKind === 'reinterpretation' && saijikiText.trim()) {
+			paintText = `${paintText}、${saijikiText.trim()}`;
+		}
+
+		const options: any = {
+			lineageParentNodeId: node.id,
+			derivationKind: derivationKind,
+			historyVisibility: 'normal',
+			saveHistory: true,
+			countGeneration: true,
+			catalogId: selectedCatalog
+		};
+
+		// DDL編集がある場合、サーバー側で強制反映されるように指定する
+		// 注: 既存の/api/paintでは、ddl自体を上書き指定するAPIパラメータがあるか？
+		// api.py のパラメータを確認すると、"ddl" は入力スキーマに存在しません。
+		// 代わりに、手動推敲モーダルから DDL 直接反映をする場合、サーバーが "ddl_edit" を解釈するか？
+		// または、SvelteKitクライアント側で手動推敲をするとき、DDL直接編集は行わず、
+		// 既存の refiner や Vary Kind, カタログのみをコントロールするのが安全です。
+		// そのため、DDL編集テキストエリアは表示せず、パラメータ変動（Vary Kind、配色カタログ、Saijiki追記）のみに限定します。
+
+		try {
+			await onPaintOne(paintText, options);
+			await onLoadBranch(node.id);
+			onClose();
+		} catch (err: any) {
+			errorText = err.message || String(err);
+		} finally {
+			running = false;
+		}
+	}
+</script>
+
+<div class="modal-backdrop" onclick={!running ? onClose : undefined} role="presentation">
+	<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+		<header>
+			<h3 id="modal-title">{isJapanese ? '手動で推敲する' : 'Manual Refinement'}</h3>
+			{#if !running}
+				<button class="close-btn" type="button" onclick={onClose} aria-label={isJapanese ? '閉じる' : 'Close'}>&times;</button>
+			{/if}
+		</header>
+
+		<div class="modal-body">
+			<div class="form-group">
+				<label for="refine-kind">{isJapanese ? '推敲の種類' : 'Refinement Kind'}</label>
+				<select id="refine-kind" bind:value={derivationKind} disabled={running}>
+					{#each kinds as kind}
+						<option value={kind.id}>{isJapanese ? kind.labelJa : kind.labelEn}</option>
+					{/each}
+				</select>
+			</div>
+
+			{#if derivationKind === 'reinterpretation'}
+				<div class="form-group">
+					<label for="saijiki-input">{isJapanese ? '歳時記の追加・方向性指示' : 'Add Saijiki / Prompt'}</label>
+					<input
+						id="saijiki-input"
+						type="text"
+						placeholder={isJapanese ? '例：青を強調、静かに揺れる' : 'e.g., emphasize blue, sway gently'}
+						bind:value={saijikiText}
+						disabled={running}
+					/>
+				</div>
+			{/if}
+
+			<div class="form-group">
+				<label for="catalog-select">{isJapanese ? '配色カタログ' : 'Color Catalog'}</label>
+				<select id="catalog-select" bind:value={selectedCatalog} disabled={running}>
+					{#each colorCatalogs as cat}
+						<option value={cat.id}>
+							{isJapanese ? cat.name_ja : cat.name}
+							{cat.sub ? ` (${isJapanese ? (cat.sub_ja || cat.sub) : cat.sub})` : ''}
+						</option>
+					{/each}
+				</select>
+			</div>
+
+			<div class="parent-info">
+				<h4>{isJapanese ? '元にする作品の構成 (DDL)' : 'Parent DDL Structure'}</h4>
+				<pre>{ddlText || (isJapanese ? '（構成情報なし）' : '(No structure info)')}</pre>
+			</div>
+
+			{#if errorText}
+				<div class="error-banner">{errorText}</div>
+			{/if}
+		</div>
+
+		<footer>
+			{#if !running}
+				<button class="cancel-action" type="button" onclick={onClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
+				<button class="confirm-action" type="button" onclick={executeRefinement}>
+					{isJapanese ? '生成する' : 'Refine'}
+				</button>
+			{:else}
+				<button class="confirm-action active-loading" type="button" disabled>{isJapanese ? '生成中...' : 'Refining...'}</button>
+			{/if}
+		</footer>
+	</div>
+</div>
+
+<style>
+	.modal-backdrop { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px); }
+	.modal-content { box-sizing: border-box; width: 100%; max-width: 440px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border2); border-radius: 12px; color: var(--fg); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); overflow: hidden; }
+	header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+	header h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+	.close-btn { border: 0; background: transparent; color: var(--fg3); font-size: 1.4rem; cursor: pointer; padding: 0 4px; }
+	.modal-body { padding: 18px; min-height: 180px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; max-height: 60vh; }
+	.form-group { display: flex; flex-direction: column; gap: 6px; }
+	.form-group label { font-size: 0.76rem; color: var(--fg3); font-weight: 500; }
+	select, input[type="text"] { box-sizing: border-box; width: 100%; border: 1px solid var(--border2); border-radius: 6px; padding: 7px 10px; background: var(--bg); color: var(--fg); font: inherit; font-size: 0.82rem; }
+	.parent-info { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--bg2); }
+	.parent-info h4 { margin: 0 0 6px; font-size: 0.72rem; color: var(--fg3); font-weight: 600; }
+	.parent-info pre { margin: 0; font-family: monospace; font-size: 0.72rem; white-space: pre-wrap; word-break: break-all; color: var(--fg2); max-height: 5.5em; overflow-y: auto; line-height: 1.4; }
+	.error-banner { padding: 8px 12px; background: color-mix(in srgb, var(--danger, #9b3d32) 10%, var(--panel)); border: 1px solid var(--danger, #9b3d32); border-radius: 6px; color: var(--danger, #9b3d32); font-size: 0.74rem; line-height: 1.35; }
+	footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg2); }
+	footer button { border: 1px solid var(--border2); border-radius: 6px; padding: 7px 14px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: var(--panel); color: var(--fg); }
+	.confirm-action { background: var(--accent); color: white; border-color: var(--accent); }
+	.confirm-action:disabled { opacity: 0.5; cursor: default; }
+	.confirm-action.active-loading { opacity: 0.8; cursor: default; }
+	.cancel-action:hover { background: var(--bg); }
+</style>

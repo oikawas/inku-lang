@@ -131,6 +131,8 @@ class CliConfig:
     stage1_model: str | None = None
     stage2_provider: str | None = None
     stage2_model: str | None = None
+    vision_provider: str | None = None
+    vision_model: str | None = None
     timeout_seconds: int | None = None
     color_catalog: str | None = None
 
@@ -163,6 +165,8 @@ def load_config(path: Path | None = None) -> CliConfig:
         stage1_model=raw.get("stage1_model") or None,
         stage2_provider=raw.get("stage2_provider") or None,
         stage2_model=raw.get("stage2_model") or None,
+        vision_provider=raw.get("vision_provider") or None,
+        vision_model=raw.get("vision_model") or None,
         timeout_seconds=int(raw["timeout_seconds"]) if raw.get("timeout_seconds") is not None else None,
         color_catalog=raw.get("color_catalog") or None,
     )
@@ -178,6 +182,8 @@ def save_config(config: CliConfig, path: Path | None = None) -> None:
         "stage1_model": config.stage1_model,
         "stage2_provider": config.stage2_provider,
         "stage2_model": config.stage2_model,
+        "vision_provider": config.vision_provider,
+        "vision_model": config.vision_model,
         "timeout_seconds": config.timeout_seconds,
         "color_catalog": config.color_catalog,
     }
@@ -902,6 +908,9 @@ def command_ddl_compare(args: argparse.Namespace) -> int:
     return 0
 
 def command_vision_review(args: argparse.Namespace) -> int:
+    config = load_config()
+    vision_model = args.vision_model or args.model or config.vision_model or "meta/llama-3.2-90b-vision-instruct"
+    vision_model = vision_model.removeprefix("nvidia:")
     input_dir = Path(args.input_dir)
     api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("NVIDIA_NIM_API_KEY")
     if not api_key:
@@ -914,14 +923,14 @@ def command_vision_review(args: argparse.Namespace) -> int:
         rows.append({
             "image": str(image_path),
             "original": artifact.get("text") or artifact.get("input") or artifact.get("original_text"),
-            "blind_back_translation_ja": _nim_vision_chat(image_path, "入力文を推測せず、この抽象画に実際に見えるものだけを日本語一文で記述してください。", api_key=api_key, model=args.model),
-            "blind_back_translation_en": _nim_vision_chat(image_path, "Describe only what is visibly present in this abstract image in one English sentence. Do not infer its prompt.", api_key=api_key, model=args.model),
+            "blind_back_translation_ja": _nim_vision_chat(image_path, "入力文を推測せず、この抽象画に実際に見えるものだけを日本語一文で記述してください。", api_key=api_key, model=vision_model),
+            "blind_back_translation_en": _nim_vision_chat(image_path, "Describe only what is visibly present in this abstract image in one English sentence. Do not infer its prompt.", api_key=api_key, model=vision_model),
         })
     sheet = input_dir / "contact-sheet.png"
     step_back = None
     if sheet.exists():
-        step_back = _nim_vision_chat(sheet, "番号付き作品のうち最も似て見える組を3組、番号で挙げ、共通して見える部品を言葉で記述してください。点数は付けないでください。", api_key=api_key, model=args.model)
-    summary = {"model": args.model, "role": "regression sensor and audit aid; never an acceptance gate or generation objective", "back_translations": rows, "tabletop_step_back": step_back}
+        step_back = _nim_vision_chat(sheet, "番号付き作品のうち最も似て見える組を3組、番号で挙げ、共通して見える部品を言葉で記述してください。点数は付けないでください。", api_key=api_key, model=vision_model)
+    summary = {"model": vision_model, "role": "regression sensor and audit aid; never an acceptance gate or generation objective", "back_translations": rows, "tabletop_step_back": step_back}
     output = Path(args.output) if args.output else input_dir / "vision-review-summary.json"
     _write_json_file(output, summary)
     print(str(output))
@@ -1986,6 +1995,8 @@ def command_login(args: argparse.Namespace) -> int:
         stage1_model=existing.stage1_model,
         stage2_provider=existing.stage2_provider,
         stage2_model=existing.stage2_model,
+        vision_provider=existing.vision_provider,
+        vision_model=existing.vision_model,
         timeout_seconds=timeout_seconds,
         color_catalog=existing.color_catalog,
     ))
@@ -2029,6 +2040,8 @@ def command_models(args: argparse.Namespace) -> int:
         or args.stage1_model is not None
         or args.stage2_provider is not None
         or args.stage2_model is not None
+        or args.vision_provider is not None
+        or args.vision_model is not None
         or args.timeout_seconds is not None
         or args.color_catalog is not None
     ):
@@ -2043,6 +2056,8 @@ def command_models(args: argparse.Namespace) -> int:
             stage1_model=args.stage1_model if args.stage1_model is not None else config.stage1_model,
             stage2_provider=args.stage2_provider if args.stage2_provider is not None else config.stage2_provider,
             stage2_model=args.stage2_model if args.stage2_model is not None else config.stage2_model,
+            vision_provider=args.vision_provider if args.vision_provider is not None else config.vision_provider,
+            vision_model=args.vision_model if args.vision_model is not None else config.vision_model,
             timeout_seconds=timeout_seconds,
             color_catalog=color_catalog,
         )
@@ -2053,6 +2068,10 @@ def command_models(args: argparse.Namespace) -> int:
         "timeout_seconds": config.timeout_seconds or DEFAULT_REQUEST_TIMEOUT_SECONDS,
         "color_catalog": config.color_catalog or catalog_data["default_catalog_id"],
         "available_color_catalogs": list(_catalog_choices(catalog_data)),
+        "vision_provider": config.vision_provider,
+        "vision_model": config.vision_model,
+        "vision_provider_display": _display_model(config.vision_provider),
+        "vision_model_display": _display_model(config.vision_model),
         **_model_summary(
             config.stage1_model,
             config.stage2_model,
@@ -2787,10 +2806,14 @@ def command_okugaki(args: argparse.Namespace) -> int:
         node_id = str(lineage["focus_node_id"])
     except CliError:
         pass
+    vision_model = args.vision_model or args.model or config.vision_model
+    payload = {"language": args.language, "save": not args.dry_run}
+    if vision_model:
+        payload["model"] = vision_model
     data, _ = client.request(
         "POST",
         f"/api/lineage/{node_id}/okugaki",
-        data={"model": args.model, "language": args.language, "save": not args.dry_run},
+        data=payload,
         headers={"Idempotency-Key": str(uuid.uuid4())},
     )
     if args.output:
@@ -2984,11 +3007,12 @@ def command_review(args: argparse.Namespace) -> int:
             "Provide a score from 0 to 100 for each metric, and summarize your feedback in one sentence."
         )
         
+        vision_model = (args.vision_model or args.model or config.vision_model or "nvidia/neva-22b").removeprefix("nvidia:")
         print(f"Sending vision NIM evaluation for {image_path.name}...")
-        feedback = _nim_vision_chat(image_path, prompt, api_key=api_key, model=args.model)
+        feedback = _nim_vision_chat(image_path, prompt, api_key=api_key, model=vision_model)
         _print_json({
             "image": image_path.name,
-            "model": args.model,
+            "model": vision_model,
             "evaluation": feedback
         })
     elif args.review_cmd == "unread":
@@ -3294,12 +3318,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_server_args(me)
     me.set_defaults(func=command_me)
 
-    models = subparsers.add_parser("models", help="show or set CLI default Stage 1 / Stage 2 models")
+    models = subparsers.add_parser("models", help="show or set CLI default LLM and Vision models")
     _add_common_server_args(models)
     models.add_argument("--stage1-provider", choices=PROVIDERS, help="save the default Stage 1 provider")
     models.add_argument("--stage1-model", help="save the default Stage 1 model for paint and batch")
     models.add_argument("--stage2-provider", choices=PROVIDERS, help="save the default Stage 2 provider")
-    models.add_argument("--stage2-model", help="save the default Stage 2 model for paint and batch")
+    models.add_argument("--stage2-model", help="save the default Stage 2 LLM model for paint and batch")
+    models.add_argument("--vision-provider", choices=PROVIDERS, help="save the default Vision provider")
+    models.add_argument("--vision-model", help="save the default Vision model for image-reading operations")
     models.add_argument("--color-catalog", help="save the default server color catalog for paint and batch")
     models.set_defaults(func=command_models)
 
@@ -3340,7 +3366,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     vision_review = subparsers.add_parser("vision-review", help="use the configured NIM vision model as a read-only visual mirror")
     vision_review.add_argument("input_dir")
-    vision_review.add_argument("--model", default="meta/llama-3.2-90b-vision-instruct")
+    vision_review.add_argument("--vision-model", help="Vision model (defaults to the CLI Vision setting)")
+    vision_review.add_argument("--model", help="compatibility alias for --vision-model")
     vision_review.add_argument("--output", "-o")
     vision_review.set_defaults(func=command_vision_review)
 
@@ -3433,7 +3460,8 @@ def build_parser() -> argparse.ArgumentParser:
     okugaki = subparsers.add_parser("okugaki", help="recite one root-to-target lineage branch as an append-only reading")
     _add_common_server_args(okugaki)
     okugaki.add_argument("target", help="history item ID or lineage node ID")
-    okugaki.add_argument("--model", default="meta/llama-3.2-90b-vision-instruct", help="vision-capable reader model")
+    okugaki.add_argument("--vision-model", help="Vision reader model (defaults to CLI/server Vision setting)")
+    okugaki.add_argument("--model", help="compatibility alias for --vision-model")
     okugaki.add_argument("--language", choices=("ja", "en"), default="ja")
     okugaki.add_argument("--dry-run", action="store_true", help="generate and print without saving")
     okugaki.add_argument("--json", action="store_true", help="print the complete response as JSON")
@@ -3482,7 +3510,8 @@ def build_parser() -> argparse.ArgumentParser:
     
     review_eval = review_sub.add_parser("evaluate", help="evaluate drawing visual quality via Vision NIM")
     review_eval.add_argument("png_file", help="path to PNG image file of the drawing")
-    review_eval.add_argument("--model", default="nvidia/neva-22b", help="NVIDIA NIM vision model name")
+    review_eval.add_argument("--vision-model", help="Vision model (defaults to the CLI Vision setting)")
+    review_eval.add_argument("--model", help="compatibility alias for --vision-model")
     review_eval.add_argument("--prompt", help="override vision review prompt")
     
     review_unread = review_sub.add_parser("unread", help="submit an unread word feedback to server")

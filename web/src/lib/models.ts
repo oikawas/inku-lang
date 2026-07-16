@@ -4,6 +4,7 @@ export type ModelOption = {
 	id: string;
 	label: string;
 	notes?: string;
+	purposes?: ('llm' | 'vision')[];
 	enabled?: boolean;
 };
 

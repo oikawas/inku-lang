@@ -40,10 +40,11 @@
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
 		selectedCatalogId: string;
+		visionModel: string;
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, selectedCatalogId }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, selectedCatalogId, visionModel }: Props = $props();
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
@@ -60,7 +61,6 @@
 	let activeAIRefineNode = $state<LineageNode | null>(null);
 	let activeManualRefineNode = $state<LineageNode | null>(null);
 	let okugakiOpen = $state(false);
-	let okugakiModel = $state('meta/llama-3.2-90b-vision-instruct');
 	let okugakiItems = $state<OkugakiItem[]>([]);
 	let okugakiLoading = $state(false);
 	let okugakiGenerating = $state(false);
@@ -209,13 +209,13 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	async function generateOkugaki(): Promise<void> {
 		const nodeId = graph?.focus_node_id;
-		if (!nodeId || !okugakiModel.trim() || okugakiGenerating) return;
+		if (!nodeId || !visionModel.trim() || okugakiGenerating) return;
 		okugakiGenerating = true;
 		okugakiError = null;
 		try {
 			const response = await fetch(`/api/lineage/${encodeURIComponent(nodeId)}/okugaki`, {
 				method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': createIdempotencyKey() },
-				body: JSON.stringify({ model: okugakiModel.trim(), language: isJapanese ? 'ja' : 'en', save: true })
+				body: JSON.stringify({ model: visionModel.trim(), language: isJapanese ? 'ja' : 'en', save: true })
 			});
 			if (!response.ok) throw new Error((await response.text()) || `HTTP ${response.status}`);
 			okugakiItems = [...okugakiItems, await response.json()];
@@ -497,9 +497,8 @@ $effect(() => {
 			<header><div><h2 id="okugaki-title">{t().okugakiTitle}</h2><p>{t().okugakiDescription}</p></div><button type="button" disabled={okugakiGenerating} onclick={() => (okugakiOpen = false)}>×</button></header>
 			<div class="okugaki-controls">
 				<p>{t().okugakiBranchConfirm.replace('{count}', String(ancestorIds.size))}</p>
-				<label>{t().okugakiModel}<input bind:value={okugakiModel} list="okugaki-models" disabled={okugakiGenerating} /></label>
-				<datalist id="okugaki-models"><option value="meta/llama-3.2-90b-vision-instruct"></option><option value="openai:gpt-4.1"></option></datalist>
-				<button class="okugaki-generate" type="button" disabled={okugakiGenerating || !okugakiModel.trim()} onclick={generateOkugaki}>{okugakiGenerating ? t().okugakiReading : t().okugakiAppend}</button>
+				<div class="okugaki-model-display"><span>{t().okugakiModel}</span><code>{visionModel}</code></div>
+				<button class="okugaki-generate" type="button" disabled={okugakiGenerating || !visionModel.trim()} onclick={generateOkugaki}>{okugakiGenerating ? t().okugakiReading : t().okugakiAppend}</button>
 				{#if okugakiGenerating}<div class="okugaki-progress" aria-live="polite"><span></span>{t().okugakiProgress}</div>{/if}
 				{#if okugakiError}<div class="lineage-message error">{okugakiError}</div>{/if}
 			</div>
@@ -568,8 +567,8 @@ $effect(() => {
 	.okugaki-dialog > header { padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }
 	.okugaki-dialog > header button, .okugaki-record-head button { border: 0; background: transparent; color: var(--fg3); font-size: 1.2rem; cursor: pointer; }
 	.okugaki-controls { display: grid; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
-	.okugaki-controls label { display: grid; gap: 5px; color: var(--fg2); font-size: .78rem; }
-	.okugaki-controls input { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 10px; background: var(--bg); color: var(--fg); }
+	.okugaki-model-display { display: grid; gap: 5px; color: var(--fg2); font-size: .78rem; }
+	.okugaki-model-display code { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 10px; background: var(--bg); color: var(--fg); overflow-wrap: anywhere; }
 	.okugaki-generate { justify-self: start; border: 1px solid var(--accent); border-radius: 7px; padding: 9px 14px; background: var(--accent); color: var(--accent-fg, #111); cursor: pointer; }
 	.okugaki-progress { display: flex; align-items: center; gap: 8px; color: var(--fg2); font-size: .8rem; }
 	.okugaki-progress span { width: 13px; height: 13px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: okugaki-spin .8s linear infinite; }

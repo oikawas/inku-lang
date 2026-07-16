@@ -69,6 +69,8 @@ def test_resolved_stage_models_qualify_current_user_provider():
             "stage1_model": "gpt-5.2",
             "stage2_provider": "anthropic",
             "stage2_model": "claude-sonnet-4-6",
+            "vision_provider": "nvidia",
+            "vision_model": "meta/llama-3.2-90b-vision-instruct",
         }
     }
 
@@ -76,6 +78,8 @@ def test_resolved_stage_models_qualify_current_user_provider():
     assert api_module._resolved_stage1_model("gpt-5.2", actor) == "openai:gpt-5.2"
     assert api_module._resolved_stage2_model(None, actor) == "anthropic:claude-sonnet-4-6"
     assert api_module._resolved_stage2_model("claude-sonnet-4-6", actor) == "anthropic:claude-sonnet-4-6"
+    assert api_module._resolved_vision_model(None, actor) == "nvidia:meta/llama-3.2-90b-vision-instruct"
+    assert api_module._resolved_vision_model("openai:gpt-4.1", actor) == "openai:gpt-4.1"
     assert api_module._resolved_stage1_model("ovms:qwen-api", actor) == "ovms:qwen-api"
     assert api_module._resolved_stage1_model("qwen-api", actor) == "qwen-api"
 
@@ -386,12 +390,15 @@ def test_current_user_model_selection_is_persisted(auth_context):
                 "stage1_model": "openai:gpt-5.1-mini",
                 "stage2_provider": "gemini",
                 "stage2_model": "gemini:gemini-2.5-flash",
+                "vision_provider": "nvidia",
+                "vision_model": "meta/llama-3.2-90b-vision-instruct",
             }
         },
     )
     assert updated.status_code == 200
     assert updated.json()["model_settings"]["stage1_provider"] == "openai"
     assert updated.json()["model_settings"]["stage2_model"] == "gemini:gemini-2.5-flash"
+    assert updated.json()["model_settings"]["vision_model"] == "meta/llama-3.2-90b-vision-instruct"
     assert updated.json()["model_settings"]["model_inspection_selected_models"] == []
 
     comparison_models = [
@@ -420,6 +427,7 @@ def test_current_user_model_selection_is_persisted(auth_context):
     me = client.get("/api/auth/me", headers=headers)
     assert me.status_code == 200
     assert me.json()["model_settings"]["stage1_model"] == "openai:gpt-5.1-mini"
+    assert me.json()["model_settings"]["vision_provider"] == "nvidia"
     assert me.json()["model_settings"]["model_inspection_selected_models"] == [
         "nvidia:google/gemma-4-31b-it",
         "openai:gpt-5.1",
@@ -2349,6 +2357,10 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     openai_catalog = next(provider for provider in public_models.json()["catalog"] if provider["id"] == "openai")
     assert "memo" not in openai_catalog
     assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
+    nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
+    nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
+    assert all("vision" not in model["purposes"] for model in nvidia_llm["models"])
+    assert [model["id"] for model in nvidia_vision["models"]] == ["meta/llama-3.2-90b-vision-instruct"]
 
     r = client.put(
         "/api/settings/models",
@@ -2443,8 +2455,8 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     assert seen["url"] == "https://api.openai.com/v1/models"
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
     assert openai_catalog["models"] == [
-        {"id": "fetched-model", "label": "Fetched Model", "enabled": True},
-        {"id": "new-fetched-model", "label": "New Fetched Model", "enabled": False},
+        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": True},
+        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False},
     ]
 
     class NewFakeResponse(FakeResponse):
@@ -2458,7 +2470,7 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     r = client.post("/api/settings/models/openai/fetch-models", headers=headers)
     assert r.status_code == 200
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
-    assert openai_catalog["models"] == [{"id": "new-model", "label": "New Model", "enabled": False}]
+    assert openai_catalog["models"] == [{"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False}]
 
     db.update_model_settings(default_model_settings())
     db.delete_session(token)

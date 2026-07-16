@@ -128,8 +128,8 @@ def _normalize_provider_kind(value: Any) -> str:
     return str(value) if value in {"openai_compatible", "anthropic", "gemini"} else "openai_compatible"
 
 
-def _normalize_models(models: Any) -> list[dict[str, str]]:
-    normalized: list[dict[str, str]] = []
+def _normalize_models(models: Any) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
     seen: set[str] = set()
     if isinstance(models, list):
         for model in models:
@@ -142,6 +142,15 @@ def _normalize_models(models: Any) -> list[dict[str, str]]:
             item = {"id": model_id, "label": str(model.get("label") or model_id).strip() or model_id}
             if isinstance(model.get("notes"), str) and model["notes"].strip():
                 item["notes"] = model["notes"].strip()
+            purposes = model.get("purposes")
+            if isinstance(purposes, list):
+                clean_purposes = [purpose for purpose in ("llm", "vision") if purpose in purposes]
+            else:
+                marker = f"{model_id} {item.get('notes', '')}".lower()
+                clean_purposes = ["vision"] if "vision" in marker else ["llm"]
+            if not clean_purposes:
+                clean_purposes = ["llm"]
+            item["purposes"] = clean_purposes
             normalized.append(item)
     return normalized
 
@@ -158,7 +167,7 @@ def default_model_settings() -> dict[str, Any]:
                 "default_base_url": provider["default_base_url"],
                 "requires_api_key": provider["requires_api_key"],
                 "memo": "",
-                "models": deepcopy(provider["models"]),
+                "models": _normalize_models(deepcopy(provider["models"])),
                 "builtin": True,
                 "active": True,
                 "base_url": _normalize_provider_base_url(
@@ -179,6 +188,8 @@ def default_user_model_settings() -> dict[str, Any]:
         "stage1_model": "google/gemma-4-31b-it",
         "stage2_provider": "nvidia",
         "stage2_model": "google/gemma-4-31b-it",
+        "vision_provider": "nvidia",
+        "vision_model": "meta/llama-3.2-90b-vision-instruct",
         "model_inspection_selected_models": [],
         "instruction_caption_visible": True,
     }
@@ -285,10 +296,10 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     if not isinstance(settings, dict):
         return default
     clean = dict(default)
-    for key in ("stage1_provider", "stage2_provider"):
+    for key in ("stage1_provider", "stage2_provider", "vision_provider"):
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = str(settings[key])
-    for key in ("stage1_model", "stage2_model"):
+    for key in ("stage1_model", "stage2_model", "vision_model"):
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = settings[key].strip()
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
@@ -298,10 +309,10 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
 
 def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, Any]:
     clean = normalize_user_model_settings(current)
-    for key in ("stage1_provider", "stage2_provider"):
+    for key in ("stage1_provider", "stage2_provider", "vision_provider"):
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = str(patch[key])
-    for key in ("stage1_model", "stage2_model"):
+    for key in ("stage1_model", "stage2_model", "vision_model"):
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = patch[key].strip()
     if "instruction_caption_visible" in patch:
@@ -311,7 +322,12 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
     return normalize_user_model_settings(clean)
 
 
-def model_provider_catalog(settings: dict[str, Any] | None = None, *, include_disabled: bool = True) -> list[dict[str, Any]]:
+def model_provider_catalog(
+    settings: dict[str, Any] | None = None,
+    *,
+    include_disabled: bool = True,
+    purpose: str | None = None,
+) -> list[dict[str, Any]]:
     clean = normalize_model_settings(settings)
     catalog: list[dict[str, Any]] = []
     for provider_id, provider in clean["providers"].items():
@@ -321,6 +337,8 @@ def model_provider_catalog(settings: dict[str, Any] | None = None, *, include_di
         models = []
         for model in provider["models"]:
             enabled = bool(enabled_models.get(str(model["id"]), True))
+            if purpose and purpose not in model.get("purposes", ["llm"]):
+                continue
             if include_disabled or enabled:
                 models.append({**model, "enabled": enabled})
         catalog.append({

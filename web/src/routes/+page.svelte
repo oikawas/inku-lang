@@ -50,6 +50,7 @@
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
+	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	const CATALOG_KEY         = 'inku-color-catalog';
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
 	const SHOW_KIWI_KEY       = 'inku-show-kiwi';
@@ -191,6 +192,8 @@
 		stage1_model: string;
 		stage2_provider: Provider;
 		stage2_model: string;
+		vision_provider: Provider;
+		vision_model: string;
 		model_inspection_selected_models?: string[];
 		instruction_caption_visible?: boolean;
 	};
@@ -420,6 +423,8 @@
 		stage1Model: string;
 		stage2Provider: Provider;
 		stage2Model: string;
+		visionProvider: Provider;
+		visionModel: string;
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
 	let showKiwi = $state(true);
@@ -575,6 +580,7 @@
 	let modelSettingsLoading = $state(false);
 	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
+	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
 	let dbBackupStatus = $state<string | null>(null);
 	let outputSaveStatus = $state<string | null>(null);
@@ -646,6 +652,10 @@
 		return availableModelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
 	}
 
+	function visionModelsFor(provider: Provider) {
+		return availableVisionModelCatalog.find((group) => group.id === provider)?.models ?? [];
+	}
+
 	function reconcileDemoPromptModel() {
 		if (!availableModelsLoaded || !demoSettingsLoaded) return;
 		const configuredModels = availableModelCatalog.flatMap((group) => group.models);
@@ -662,6 +672,8 @@
 		stage1Model = settings.stage1_model;
 		stage2Provider = settings.stage2_provider;
 		stage2Model = settings.stage2_model;
+		visionProvider = settings.vision_provider;
+		visionModel = settings.vision_model;
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
 		modelInspectionSelectedModels = Array.isArray(settings.model_inspection_selected_models)
 			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
@@ -996,7 +1008,7 @@
 	}
 
 	function openModelSelection() {
-		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model };
+		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
 		settingsMode = 'model';
 		settingsTab = 'connection';
 		settingsOpen = true;
@@ -1011,6 +1023,8 @@
 			stage1_model: stage1Model,
 			stage2_provider: stage2Provider,
 			stage2_model: stage2Model,
+			vision_provider: visionProvider,
+			vision_model: visionModel,
 			model_inspection_selected_models: modelInspectionSelectedModels,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
@@ -1044,6 +1058,8 @@
 			stage1Model = modelSelectionSnapshot.stage1Model;
 			stage2Provider = modelSelectionSnapshot.stage2Provider;
 			stage2Model = modelSelectionSnapshot.stage2Model;
+			visionProvider = modelSelectionSnapshot.visionProvider;
+			visionModel = modelSelectionSnapshot.visionModel;
 		}
 		modelSelectionSnapshot = null;
 		settingsOpen = false;
@@ -1131,8 +1147,9 @@
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
-			availableModelCatalog = data.catalog;
+			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
+			availableModelCatalog = data.llm_catalog ?? data.catalog;
+			availableVisionModelCatalog = data.vision_catalog ?? data.catalog.filter((group) => group.models.some((model) => model.purposes?.includes('vision')));
 			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
 				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
@@ -1142,6 +1159,11 @@
 			}
 			if (!modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
 				stage2Model = modelsFor(stage2Provider)[0]?.id ?? stage2Model;
+			}
+			if (!visionModelsFor(visionProvider).some((model) => model.id === visionModel)) {
+				const fallbackGroup = availableVisionModelCatalog.find((group) => group.models.length > 0);
+				visionProvider = fallbackGroup?.id ?? visionProvider;
+				visionModel = fallbackGroup?.models[0]?.id ?? visionModel;
 			}
 			reconcileDemoPromptModel();
 		} catch (e) {
@@ -1964,6 +1986,8 @@
 	let stage1Model     = $state<string>(DEFAULT_MODEL);
 	let stage2Provider  = $state<Provider>(DEFAULT_PROVIDER);
 	let stage2Model     = $state<string>(DEFAULT_MODEL);
+	let visionProvider  = $state<Provider>(DEFAULT_PROVIDER);
+	let visionModel     = $state<string>(DEFAULT_VISION_MODEL);
 	let includeThinking = $state(false);
 
 	// ── Timer ───────────────────────────────────────────────
@@ -3996,6 +4020,13 @@ $effect(() => {
 		historyCursor = -1;
 		stage2Model = v;
 	}
+	function setVisionProvider(v: Provider) {
+		visionProvider = v;
+		visionModel = visionModelsFor(v)[0]?.id ?? visionModel;
+	}
+	function setVisionModel(v: string) {
+		visionModel = v;
+	}
 
 	function createSafeIntegerSeed(excluded: Set<number> = new Set()): number {
 		for (let attempt = 0; attempt < 32; attempt += 1) {
@@ -5298,6 +5329,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{scoreJsonSeparatorLine}
 				{statusStage1Model}
 				{statusStage2Model}
+				visionModel={qualifiedModelId(visionProvider, visionModel)}
 				{statusCatalogName}
 				{statusCanvasName}
 				{nextStage1Model}
@@ -5434,7 +5466,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{stage1Model}
 		{stage2Provider}
 		{stage2Model}
+		{visionProvider}
+		{visionModel}
 		providerGroups={settingsMode === 'model' ? availableModelCatalog : modelCatalog}
+		visionProviderGroups={availableVisionModelCatalog}
 		bind:includeThinking
 		{settingsStatus}
 		{settingsStatusError}
@@ -5484,6 +5519,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onSetStage1Model={setStage1Model}
 		onSetStage2Provider={setStage2Provider}
 		onSetStage2Model={setStage2Model}
+		onSetVisionProvider={setVisionProvider}
+		onSetVisionModel={setVisionModel}
 		onUpdateModelProvider={updateModelProvider}
 		onAddModelProvider={addModelProvider}
 		onAskDeleteModelProvider={askDeleteModelProvider}

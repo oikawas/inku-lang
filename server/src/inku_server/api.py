@@ -231,6 +231,20 @@ def _resolved_stage_model(model: str | None, actor: dict | None, *, stage: str) 
     return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
 
 
+def _resolved_vision_model(model: str | None, actor: dict | None = None) -> str:
+    settings = (actor or {}).get("model_settings") or {}
+    provider = str(settings.get("vision_provider", "nvidia") or "nvidia")
+    model_id = str(settings.get("vision_model", DEFAULT_OKUGAKI_MODEL) or DEFAULT_OKUGAKI_MODEL)
+    if model:
+        requested = str(model).strip()
+        if _is_qualified_model_id(requested):
+            return requested
+        if requested == model_id:
+            return f"{provider}:{requested}"
+        return requested
+    return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
+
+
 def _resolved_stage1_model(model: str | None, actor: dict | None = None) -> str:
     return _resolved_stage_model(model, actor, stage="stage1")
 
@@ -1003,7 +1017,7 @@ class HistoryLineageGroupListResponse(BaseModel):
 
 
 class OkugakiGenerateBody(BaseModel):
-    model: str = Field(default=DEFAULT_OKUGAKI_MODEL, min_length=1, max_length=200)
+    model: str | None = Field(default=None, min_length=1, max_length=200)
     language: str = Field(default="ja", pattern="^(ja|en)$")
     save: bool = True
 
@@ -1234,6 +1248,8 @@ class StageExecutionStatus(BaseModel):
 
 class ModelSettingsResponse(BaseModel):
     catalog: list[dict] = Field(default_factory=list)
+    llm_catalog: list[dict] = Field(default_factory=list)
+    vision_catalog: list[dict] = Field(default_factory=list)
     settings: dict = Field(default_factory=dict)
 
 
@@ -1419,7 +1435,9 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
 def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
     settings = _db.get_model_settings()
     return ModelSettingsResponse(
-        catalog=model_provider_catalog(settings, include_disabled=False),
+        catalog=model_provider_catalog(settings, include_disabled=False, purpose="llm"),
+        llm_catalog=model_provider_catalog(settings, include_disabled=False, purpose="llm"),
+        vision_catalog=model_provider_catalog(settings, include_disabled=False, purpose="vision"),
         settings={"model_settings": actor.get("model_settings") or {}},
     )
 
@@ -1672,6 +1690,14 @@ def api_settings_fetch_provider_models(
         raise HTTPException(status_code=502, detail=str(e)) from e
     clean = normalize_model_settings(current)
     previous_provider = clean.get("providers", {}).get(provider_id, {})
+    previous_models = {
+        str(model.get("id")): model
+        for model in previous_provider.get("models", [])
+    }
+    for model in models:
+        previous = previous_models.get(str(model["id"]))
+        if previous:
+            model["purposes"] = previous.get("purposes", ["llm"])
     previous_model_ids = {str(model.get("id")) for model in previous_provider.get("models", [])}
     previous_enabled_models = previous_provider.get("enabled_models") or {}
     enabled_models = {
@@ -3086,7 +3112,7 @@ def api_okugaki_generate(
     try:
         item = generate_okugaki(
             branch,
-            model=body.model,
+            model=_resolved_vision_model(body.model, actor),
             language=body.language,
             settings=_db.get_model_settings(),
             at=at,

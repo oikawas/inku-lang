@@ -138,6 +138,8 @@ usage: inku-cli models [-h] [--base-url BASE_URL]
                        [--stage1-model STAGE1_MODEL]
                        [--stage2-provider {nvidia,anthropic,local}]
                        [--stage2-model STAGE2_MODEL]
+                       [--vision-provider {nvidia,anthropic,local}]
+                       [--vision-model VISION_MODEL]
                        [--color-catalog COLOR_CATALOG]
 
 options:
@@ -152,7 +154,11 @@ options:
   --stage2-provider {nvidia,anthropic,local}
                         save the default Stage 2 provider
   --stage2-model STAGE2_MODEL
-                        save the default Stage 2 model for paint and batch
+                        save the default Stage 2 LLM model for paint and batch
+  --vision-provider {nvidia,anthropic,local}
+                        save the default Vision provider
+  --vision-model VISION_MODEL
+                        save the default Vision model for image-reading operations
   --color-catalog COLOR_CATALOG
                         save the default server color catalog for paint and
                         batch
@@ -385,14 +391,16 @@ options:
 ### `inku-cli vision-review`
 
 ```
-usage: inku-cli vision-review [-h] [--model MODEL] [--output OUTPUT] input_dir
+usage: inku-cli vision-review [-h] [--vision-model VISION_MODEL] [--model MODEL] [--output OUTPUT] input_dir
 
 positional arguments:
   input_dir
 
 options:
   -h, --help            show this help message and exit
-  --model MODEL
+  --vision-model VISION_MODEL
+                        Vision model (defaults to the CLI Vision setting)
+  --model MODEL         compatibility alias for --vision-model
   --output OUTPUT, -o OUTPUT
 
 ```

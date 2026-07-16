@@ -55,6 +55,7 @@
 		scoreJsonSeparatorLine: number | null;
 		statusStage1Model: string;
 		statusStage2Model: string;
+		visionModel: string;
 		statusCatalogName: string;
 		statusCanvasName: string;
 		nextStage1Model: string;
@@ -182,6 +183,7 @@
 		scoreJsonSeparatorLine,
 		statusStage1Model,
 		statusStage2Model,
+		visionModel,
 		statusCatalogName,
 		statusCanvasName,
 		nextStage1Model,
@@ -765,7 +767,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {selectedCatalogId} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {selectedCatalogId} {visionModel} />
 			{/if}
 		</div>
 

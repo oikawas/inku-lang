@@ -86,7 +86,7 @@
 		default_base_url?: string;
 		requires_api_key?: boolean;
 		memo?: string;
-		models?: { id: string; label: string; notes?: string }[];
+		models?: { id: string; label: string; notes?: string; purposes?: ('llm' | 'vision')[] }[];
 		delete?: boolean;
 		base_url: string;
 		api_key_set: boolean;
@@ -110,7 +110,10 @@
 		stage1Model: string;
 		stage2Provider: Provider;
 		stage2Model: string;
+		visionProvider: Provider;
+		visionModel: string;
 		providerGroups: ProviderGroup[];
+		visionProviderGroups: ProviderGroup[];
 		includeThinking: boolean;
 		settingsStatus: SettingsStatus | null;
 		settingsStatusError: string | null;
@@ -159,6 +162,8 @@
 		onSetStage1Model: (model: string) => void;
 		onSetStage2Provider: (provider: Provider) => void;
 		onSetStage2Model: (model: string) => void;
+		onSetVisionProvider: (provider: Provider) => void;
+		onSetVisionModel: (model: string) => void;
 		onUpdateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
 		onAddModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void | Promise<void>;
 		onAskDeleteModelProvider: (provider: Provider) => void;
@@ -202,7 +207,10 @@
 		stage1Model,
 		stage2Provider,
 		stage2Model,
+		visionProvider,
+		visionModel,
 		providerGroups,
+		visionProviderGroups,
 		includeThinking = $bindable(),
 		settingsStatus,
 		settingsStatusError,
@@ -251,6 +259,8 @@
 		onSetStage1Model,
 		onSetStage2Provider,
 		onSetStage2Model,
+		onSetVisionProvider,
+		onSetVisionModel,
 		onUpdateModelProvider,
 		onAddModelProvider,
 		onAskDeleteModelProvider,
@@ -289,7 +299,7 @@
 
 	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
 	const isAdmin = $derived(currentUser?.role === 'admin');
-	type ModelSelectionTab = 'shared' | 'stage1' | 'stage2';
+	type ModelSelectionTab = 'shared' | 'stage1' | 'stage2' | 'vision';
 	let modelSelectionTab = $state<ModelSelectionTab>('shared');
 	let newProviderId = $state('');
 	let newProviderLabel = $state('');
@@ -300,6 +310,7 @@
 	let modelPickerProviderId = $state<Provider | null>(null);
 	let modelPickerSearch = $state('');
 	let modelPickerEnabledDraft = $state<Record<string, boolean>>({});
+	let modelPickerPurposeDraft = $state<Record<string, ('llm' | 'vision')[]>>({});
 	let editProviderId = $state<Provider | null>(null);
 	let editProviderLabel = $state('');
 	let memoProviderId = $state<Provider | null>(null);
@@ -308,6 +319,7 @@
 	let baseUrlDrafts = $state<Record<string, string>>({});
 
 	function modelSelected(provider: Provider, model: string): boolean {
+		if (modelSelectionTab === 'vision') return visionProvider === provider && visionModel === model;
 		if (modelSelectionTab === 'shared') {
 			return stage1Provider === provider && stage1Model === model && stage2Provider === provider && stage2Model === model;
 		}
@@ -317,6 +329,11 @@
 	}
 
 	function selectGenerationModel(provider: Provider, model: string): void {
+		if (modelSelectionTab === 'vision') {
+			onSetVisionProvider(provider);
+			onSetVisionModel(model);
+			return;
+		}
 		if (modelSelectionTab === 'shared' || modelSelectionTab === 'stage1') {
 			onSetStage1Provider(provider);
 			onSetStage1Model(model);
@@ -407,6 +424,8 @@
 		const setting = modelSettings?.providers[provider];
 		modelPickerSearch = '';
 		modelPickerEnabledDraft = { ...(setting?.enabled_models ?? {}) };
+		const catalogProvider = providerGroups.find((group) => group.id === provider);
+		modelPickerPurposeDraft = Object.fromEntries((catalogProvider?.models ?? []).map((model) => [model.id, model.purposes ?? ['llm']]));
 		modelPickerProviderId = provider;
 	}
 
@@ -414,6 +433,7 @@
 		modelPickerProviderId = null;
 		modelPickerSearch = '';
 		modelPickerEnabledDraft = {};
+		modelPickerPurposeDraft = {};
 	}
 
 	function modelEnabled(setting: ModelProviderSetting, modelId: string): boolean {
@@ -424,13 +444,25 @@
 		return modelPickerEnabledDraft[modelId] !== false;
 	}
 
+	function modelPurposeSelected(modelId: string, purpose: 'llm' | 'vision'): boolean {
+		return (modelPickerPurposeDraft[modelId] ?? ['llm']).includes(purpose);
+	}
+
+	function toggleModelPurpose(modelId: string, purpose: 'llm' | 'vision'): void {
+		const current = modelPickerPurposeDraft[modelId] ?? ['llm'];
+		const next = current.includes(purpose) ? current.filter((item) => item !== purpose) : [...current, purpose];
+		modelPickerPurposeDraft = { ...modelPickerPurposeDraft, [modelId]: next };
+		modelPickerEnabledDraft = { ...modelPickerEnabledDraft, [modelId]: next.length > 0 };
+	}
+
 	function serviceIdLabel(provider: Provider): string {
 		return `${t().settingsModelServiceId}: ${provider}`;
 	}
 
 	async function saveModelPicker() {
 		if (!modelPickerProvider) return;
-		await onSaveModelProvider(modelPickerProvider.id, { enabled_models: modelPickerEnabledDraft });
+		const models = modelPickerProvider.models.map((model) => ({ ...model, purposes: modelPickerPurposeDraft[model.id] ?? model.purposes ?? ['llm'] }));
+		await onSaveModelProvider(modelPickerProvider.id, { models, enabled_models: modelPickerEnabledDraft });
 		closeModelPicker();
 	}
 
@@ -440,6 +472,8 @@
 		await onFetchModelList(providerId);
 		const setting = modelSettings?.providers[providerId];
 		modelPickerEnabledDraft = { ...(setting?.enabled_models ?? {}) };
+		const provider = providerGroups.find((group) => group.id === providerId);
+		modelPickerPurposeDraft = Object.fromEntries((provider?.models ?? []).map((model) => [model.id, model.purposes ?? ['llm']]));
 	}
 
 	function hasPendingApiKey(setting: ModelProviderSetting): boolean {
@@ -450,8 +484,8 @@
 		return setting.api_key_set ? t().settingsModelKeepApiKey : (setting.api_key ?? '');
 	}
 
-	function selectedModels(provider: ProviderGroup, setting: ModelProviderSetting) {
-		return provider.models.filter((model) => modelEnabled(setting, model.id));
+	function selectedModels(provider: ProviderGroup, setting: ModelProviderSetting, purpose: 'llm' | 'vision') {
+		return provider.models.filter((model) => modelEnabled(setting, model.id) && (model.purposes ?? ['llm']).includes(purpose));
 	}
 
 	const modelPickerProvider = $derived(providerGroups.find((provider) => provider.id === modelPickerProviderId) ?? null);
@@ -503,6 +537,7 @@
 			<button role="tab" aria-selected={modelSelectionTab === 'shared'} class:active={modelSelectionTab === 'shared'} onclick={() => (modelSelectionTab = 'shared')}>Stage 1/2</button>
 			<button role="tab" aria-selected={modelSelectionTab === 'stage1'} class:active={modelSelectionTab === 'stage1'} onclick={() => (modelSelectionTab = 'stage1')}>Stage 1</button>
 			<button role="tab" aria-selected={modelSelectionTab === 'stage2'} class:active={modelSelectionTab === 'stage2'} onclick={() => (modelSelectionTab = 'stage2')}>Stage 2</button>
+			<button role="tab" aria-selected={modelSelectionTab === 'vision'} class:active={modelSelectionTab === 'vision'} onclick={() => (modelSelectionTab = 'vision')}>Vision</button>
 		</div>
 	{:else}
 		<div class="settings-tabs">
@@ -526,10 +561,11 @@
 			<div class="model-selection-summary">
 				<span><strong>Stage 1</strong>{providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}</span>
 				<span><strong>Stage 2</strong>{providerGroups.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}</span>
+				<span><strong>Vision</strong>{visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel}</span>
 			</div>
-			<p class="model-selection-hint">{modelSelectionTab === 'shared' ? t().modelSelectionSharedHint : t().modelSelectionSeparateHint}</p>
+			<p class="model-selection-hint">{modelSelectionTab === 'shared' ? t().modelSelectionSharedHint : modelSelectionTab === 'vision' ? t().modelSelectionVisionHint : t().modelSelectionSeparateHint}</p>
 			<div class="generation-model-groups">
-				{#each providerGroups as provider (provider.id)}
+				{#each (modelSelectionTab === 'vision' ? visionProviderGroups : providerGroups) as provider (provider.id)}
 					{#if provider.models.length > 0}
 						<section class="generation-model-provider">
 							<h3>{provider.label}</h3>
@@ -629,15 +665,16 @@
 										<div class="model-publish-title">{t().settingsModelPublishedModels}</div>
 										<button class="ghost-btn model-fetch-btn" onclick={() => openModelPicker(provider.id)} disabled={modelSettingsLoading}>{t().settingsModelSelectModels}</button>
 									</div>
-									{#if selectedModels(provider, setting).length}
-										<div class="model-publish-selected">
-											{#each selectedModels(provider, setting) as model, modelIndex (`${model.id}:${modelIndex}`)}
-												<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
-											{/each}
-										</div>
-									{:else}
-										<div class="model-publish-empty">{t().settingsModelNoPublishedModels}</div>
-									{/if}
+									{#each ['llm', 'vision'] as purpose}
+										<div class="model-publish-title">{purpose === 'llm' ? 'LLM' : 'Vision'}</div>
+										{#if selectedModels(provider, setting, purpose as 'llm' | 'vision').length}
+											<div class="model-publish-selected">
+												{#each selectedModels(provider, setting, purpose as 'llm' | 'vision') as model, modelIndex (`${purpose}:${model.id}:${modelIndex}`)}
+													<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
+												{/each}
+											</div>
+										{:else}<div class="model-publish-empty">{t().settingsModelNoPublishedModels}</div>{/if}
+									{/each}
 								</div>
 								<div class="model-provider-actions">
 									<button class="ghost-btn model-service-memo" onclick={() => openMemoProvider(provider)} disabled={modelSettingsLoading}>{t().settingsModelServiceMemoButton}</button>
@@ -1296,6 +1333,10 @@
 							}}
 						/>
 						<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
+						<span class="model-purpose-label">
+							<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'llm'); }}>LLM</button>
+							<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'vision'); }}>Vision</button>
+						</span>
 					</label>
 				{/each}
 			</div>
@@ -1932,6 +1973,9 @@
 	.model-picker-result.error {
 		color: var(--danger, #b42318);
 	}
+	.model-purpose-label { margin-left: auto; display: inline-flex; gap: 4px; }
+	.model-purpose-label button { border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; background: transparent; color: var(--fg3); font-size: .7rem; }
+	.model-purpose-label button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--fg); }
 	.inline-message {
 		padding: 7px 9px;
 		border: 1px solid var(--border);

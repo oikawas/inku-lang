@@ -289,6 +289,8 @@
 
 	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
 	const isAdmin = $derived(currentUser?.role === 'admin');
+	type ModelSelectionTab = 'shared' | 'stage1' | 'stage2';
+	let modelSelectionTab = $state<ModelSelectionTab>('shared');
 	let newProviderId = $state('');
 	let newProviderLabel = $state('');
 	let newProviderKind = $state('openai_compatible');
@@ -305,8 +307,24 @@
 	let memoProviderText = $state('');
 	let baseUrlDrafts = $state<Record<string, string>>({});
 
-	function modelsFor(provider: Provider) {
-		return providerGroups.find((group) => group.id === provider)?.models ?? [];
+	function modelSelected(provider: Provider, model: string): boolean {
+		if (modelSelectionTab === 'shared') {
+			return stage1Provider === provider && stage1Model === model && stage2Provider === provider && stage2Model === model;
+		}
+		return modelSelectionTab === 'stage1'
+			? stage1Provider === provider && stage1Model === model
+			: stage2Provider === provider && stage2Model === model;
+	}
+
+	function selectGenerationModel(provider: Provider, model: string): void {
+		if (modelSelectionTab === 'shared' || modelSelectionTab === 'stage1') {
+			onSetStage1Provider(provider);
+			onSetStage1Model(model);
+		}
+		if (modelSelectionTab === 'shared' || modelSelectionTab === 'stage2') {
+			onSetStage2Provider(provider);
+			onSetStage2Model(model);
+		}
 	}
 
 	async function addModelProvider() {
@@ -480,7 +498,13 @@
 			<button class="catalog-close" onclick={onCloseSettings}>×</button>
 		{/if}
 	</div>
-	{#if settingsMode === 'settings'}
+	{#if settingsMode === 'model'}
+		<div class="settings-tabs model-selection-tabs" role="tablist" aria-label={t().modelSelectButton}>
+			<button role="tab" aria-selected={modelSelectionTab === 'shared'} class:active={modelSelectionTab === 'shared'} onclick={() => (modelSelectionTab = 'shared')}>Stage 1/2</button>
+			<button role="tab" aria-selected={modelSelectionTab === 'stage1'} class:active={modelSelectionTab === 'stage1'} onclick={() => (modelSelectionTab = 'stage1')}>Stage 1</button>
+			<button role="tab" aria-selected={modelSelectionTab === 'stage2'} class:active={modelSelectionTab === 'stage2'} onclick={() => (modelSelectionTab = 'stage2')}>Stage 2</button>
+		</div>
+	{:else}
 		<div class="settings-tabs">
 			{#if isAdmin}
 				<button class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
@@ -499,43 +523,41 @@
 	{/if}
 	<div class="settings-body">
 		{#if settingsMode === 'model'}
-			<div class="popover-group">
-				<div class="popover-group-label">{t().stage1Label}</div>
-				<div class="form-row">
-					<label for="settings-stage1-provider">{t().providerLabel}</label>
-					<select id="settings-stage1-provider" value={stage1Provider} onchange={(e) => onSetStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-						{#each providerGroups as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-					</select>
-				</div>
-				<div class="form-row">
-					<label for="settings-stage1-model">{t().modelLabel}</label>
-					<select id="settings-stage1-model" value={stage1Model} onchange={(e) => onSetStage1Model((e.currentTarget as HTMLSelectElement).value)}>
-						{#each modelsFor(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` - ${m.notes}` : ''}</option>{/each}
-					</select>
-				</div>
-				{#if stage1Model.includes('qwen3')}
-					<label class="check-row">
-						<input type="checkbox" bind:checked={includeThinking} />
-						<span>{t().showThinkingLabel}</span>
-					</label>
-				{/if}
+			<div class="model-selection-summary">
+				<span><strong>Stage 1</strong>{providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}</span>
+				<span><strong>Stage 2</strong>{providerGroups.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}</span>
 			</div>
-			<div class="popover-group">
-				<div class="popover-group-label">{t().stage2Label}</div>
-				<div class="form-row">
-					<label for="settings-stage2-provider">{t().providerLabel}</label>
-					<select id="settings-stage2-provider" value={stage2Provider} onchange={(e) => onSetStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-						{#each providerGroups as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-					</select>
-				</div>
-				<div class="form-row">
-					<label for="settings-stage2-model">{t().modelLabel}</label>
-					<select id="settings-stage2-model" value={stage2Model} onchange={(e) => onSetStage2Model((e.currentTarget as HTMLSelectElement).value)}>
-						{#each modelsFor(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` - ${m.notes}` : ''}</option>{/each}
-					</select>
-				</div>
+			<p class="model-selection-hint">{modelSelectionTab === 'shared' ? t().modelSelectionSharedHint : t().modelSelectionSeparateHint}</p>
+			<div class="generation-model-groups">
+				{#each providerGroups as provider (provider.id)}
+					{#if provider.models.length > 0}
+						<section class="generation-model-provider">
+							<h3>{provider.label}</h3>
+							<div class="generation-model-grid">
+								{#each provider.models as model (model.id)}
+									<button
+										type="button"
+										class:selected={modelSelected(provider.id, model.id)}
+										aria-pressed={modelSelected(provider.id, model.id)}
+										onclick={() => selectGenerationModel(provider.id, model.id)}
+									>
+										<strong>{model.label}</strong>
+										{#if model.notes}<span>{model.notes}</span>{/if}
+									</button>
+								{/each}
+							</div>
+						</section>
+					{/if}
+				{/each}
 			</div>
+			{#if modelSelectionTab !== 'stage2' && stage1Model.includes('qwen3')}
+				<label class="check-row model-thinking-row">
+					<input type="checkbox" bind:checked={includeThinking} />
+					<span>{t().showThinkingLabel}</span>
+				</label>
+			{/if}
 		{:else if settingsTab === 'models'}
+
 			{#if modelSettingsLoading}
 				<div class="popover-group"><div class="inline-message">{t().settingsLoading}</div></div>
 			{:else if !modelSettings}
@@ -1315,10 +1337,31 @@
 		height: min(760px, 88vh);
 	}
 	.settings-modal.model-modal {
-		width: min(calc(35ch + 190px), calc(100vw - 32px));
-		height: auto;
+		width: min(820px, calc(100vw - 32px));
+		height: min(760px, 88vh);
 	}
-	.settings-modal.model-modal .form-row label { width: 82px; }
+	.settings-tabs.model-selection-tabs button { flex: 1 1 0; text-align: center; }
+	.model-selection-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+	.model-selection-summary span {
+		display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 8px 10px;
+		border: 1px solid var(--border); border-radius: var(--r); background: var(--panel);
+		color: var(--fg2); font-size: 11px; overflow-wrap: anywhere;
+	}
+	.model-selection-summary strong { color: var(--fg3); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+	.model-selection-hint { margin: 0; color: var(--fg3); font-size: 11px; line-height: 1.5; }
+	.generation-model-groups { display: flex; flex-direction: column; gap: 12px; }
+	.generation-model-provider h3 { margin: 0 0 6px; color: var(--fg3); font-size: 10px; font-weight: 500; letter-spacing: .06em; }
+	.generation-model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 7px; }
+	.generation-model-grid button {
+		display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0;
+		padding: 9px 10px; border: 1px solid var(--border2); border-radius: var(--r);
+		background: var(--panel); color: var(--fg2); cursor: pointer; text-align: left; font-family: inherit;
+	}
+	.generation-model-grid button:hover { border-color: var(--accent); background: var(--bg2); }
+	.generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
+	.generation-model-grid strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+	.generation-model-grid span { color: var(--fg3); font-size: 10px; }
+	.model-thinking-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
 	.settings-tabs {
 		display: flex; flex: 0 0 auto; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg);
 	}
@@ -1361,11 +1404,7 @@
 		letter-spacing: 0;
 		overflow-wrap: anywhere;
 	}
-	.form-row {
-		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
-	}
-	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
-	.form-row select, .plugin-add input, .login-grid input, .group-edit-input {
+	.plugin-add input, .login-grid input, .group-edit-input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: var(--panel); color: var(--fg); font-size: 12px; font-family: inherit;

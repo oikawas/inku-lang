@@ -34,6 +34,8 @@ export const en: LangPack = {
 	providerLabel: 'Provider:',
 	modelLabel: 'Model:',
 	showThinkingLabel: 'Show Thinking',
+	modelSelectionSharedHint: 'Use the selected model for both Stage 1 and Stage 2.',
+	modelSelectionSeparateHint: 'Choose the model for this stage only. Stage 1 and Stage 2 can use different models.',
 
 	saijikiLabel: 'saijiki:',
 	saijikiToggleBtn: 'Saijiki',

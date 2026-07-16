@@ -34,6 +34,8 @@ export const ja: LangPack = {
 	providerLabel: '接続先：',
 	modelLabel: 'モデル：',
 	showThinkingLabel: '思考を表示',
+	modelSelectionSharedHint: '選んだモデルを Stage 1 と Stage 2 の両方に設定します。',
+	modelSelectionSeparateHint: 'このStageだけに使用するモデルを選びます。Stage 1とStage 2には別々のモデルを設定できます。',
 
 	saijikiLabel: '歳時記:',
 	saijikiToggleBtn: '歳時記',

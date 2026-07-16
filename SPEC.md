@@ -1481,3 +1481,7 @@ When updating the specification:
 - Build 570.
 - **Build 571:** Okugaki Idempotency-Key generation now uses a UUID fallback based on `getRandomValues()` (with a final compatibility fallback), so appending works in LAN HTTP browser contexts where `crypto.randomUUID()` is unavailable.
 - **Build 572:** History Manager thumbnail capacity is now derived from a stable layout contract instead of measuring partially painted cards. Removing per-card `content-visibility` prevents missing thumbnails, page-size oscillation, and flicker inside the modal.
+
+### v1.89 — UI Refinement (2026-07-17)
+
+- **Model selection (Build 573):** Replaced provider/model dropdowns with a dialog that presents available model names grouped by provider. The `Stage 1/2` tab assigns one model to both stages, while the `Stage 1` and `Stage 2` tabs allow separate choices. Existing confirm, cancel, and per-user persistence behavior remains intact.

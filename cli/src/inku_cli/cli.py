@@ -2794,11 +2794,21 @@ def command_refine(args: argparse.Namespace) -> int:
         if not parent_node_id:
             raise CliError(f"lineage node ID is missing on item {args.item_id}")
         
+        derivation_kind = "touch_variation"
+        if args.kind == "touch":
+            derivation_kind = "touch_variation"
+        elif args.kind == "layout":
+            derivation_kind = "layout_variation"
+        elif args.kind == "reading":
+            derivation_kind = "reinterpretation"
+        elif args.kind == "color":
+            derivation_kind = "catalog_change"
+
         params = {
             "text": args.text or target.get("source_text") or target.get("input") or "",
             "save_history": args.save_history,
             "lineage_parent_node_id": parent_node_id,
-            "derivation_kind": f"{args.kind}_variation",
+            "derivation_kind": derivation_kind,
         }
         
         if args.kind == "touch":

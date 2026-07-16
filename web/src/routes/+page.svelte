@@ -2832,7 +2832,8 @@ if (unreadWords.length > 0) {
 		const minCardWidth = 104;
 		const columns = Math.max(1, Math.floor((gridWidth + gap) / (minCardWidth + gap)));
 		const cardWidth = Math.max(minCardWidth, (gridWidth - gap * (columns - 1)) / columns);
-		const cardHeight = cardWidth * 58 / 82 + 48;
+		const imageWidth = Math.max(1, cardWidth - 12);
+		const cardHeight = imageWidth * 58 / 82 + 75;
 		const rows = Math.max(1, Math.floor((gridHeight + gap) / (cardHeight + gap)));
 		return Math.max(historyWindowSize, Math.min(100, columns * rows));
 	}

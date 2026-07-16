@@ -1480,3 +1480,4 @@ When updating the specification:
 - Added the explicit Lineage UI action and `inku-cli okugaki` with `--dry-run`. The feature remains disconnected from dh1/rh2 and every generation or refinement decision.
 - Build 570.
 - **Build 571:** Okugaki Idempotency-Key generation now uses a UUID fallback based on `getRandomValues()` (with a final compatibility fallback), so appending works in LAN HTTP browser contexts where `crypto.randomUUID()` is unavailable.
+- **Build 572:** History Manager thumbnail capacity is now derived from a stable layout contract instead of measuring partially painted cards. Removing per-card `content-visibility` prevents missing thumbnails, page-size oscillation, and flicker inside the modal.

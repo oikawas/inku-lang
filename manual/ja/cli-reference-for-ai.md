@@ -1,0 +1,103 @@
+# inku-cli AI自律運転・テスト用リファレンス
+
+本ドキュメントは、AIエージェント（CodexやAntigravity等）が `inku-server` をコマンドラインから操作し、自律的に作品の生成、評価、および「系譜（Lineage）」を駆使した「推敲（Refine/Vary）」の品質向上プロセスをテスト・実行するためのガイドラインです。
+
+---
+
+## AI自律・品質向上ワークフロー（テスト手順）
+
+AIエージェントが作品を漸近的に改善していくための標準的な実行手順です。
+
+### ステップ 1: セッションの確立と接続確認
+API接続が正常に行えるか、現在ログインしているユーザーの権限を確認します。
+
+```sh
+uv run inku-cli me
+```
+* **期待される出力 (JSON)**: `role` が `admin` または `user` であるオブジェクト。
+* **AIの判断ロジック**: 応答に `id` と `username` が含まれていれば接続成功。
+
+### ステップ 2: 新規作品の作成（起点 / Root）
+指示文（詞書）をもとに最初の作品を生成し、サーバーの履歴に保存します。
+
+```sh
+uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。" -o ./test_output --png --save-history
+```
+* **期待される出力 (JSON)**:
+  生成された作品のメタデータを含む JSON オブジェクト。
+  * `history_id`: `"d5989732-9f3a-4dd2-82df-c49c50761119"` (例)
+  * `render_hash`: 作品固有のレンダリングハッシュ
+  * `paths.json`, `paths.svg`, `paths.png`: 各種出力ファイルのローカルパス
+* **AIの判断ロジック**: 出力から `"history_id"` を抽出して `PARENT_ID` として変数に保持します。
+
+### ステップ 3: 派生作品の自動生成（推敲 / Refine）
+作成した作品を親ノードとし、特定の要素（タッチ・構図・解釈・色）を変動させた推敲作品を生成して系譜に繋げます。
+
+```sh
+# 親ID: PARENT_ID (例: d5989732-9f3a-4dd2-82df-c49c50761119) に対して構図のバリエーションを生成
+uv run inku-cli refine generate PARENT_ID --kind layout -o ./test_output --png
+```
+* **パラメータ `--kind` の選択基準**:
+  * `touch`: 画の質感（筆圧や掠れ）のみを変更したいとき（LLM呼び出しなし / 高速）
+  * `layout`: 線の位置や大きさを再構築したいとき（Stage 2 LLMが再配置を実行）
+  * `reading`: 指示文のテキスト解釈からやり直したいとき（Stage 1.5 LLMが再構成）
+  * `color`: 他のカラーカタログを適用したいとき（LLM呼び出しなし）
+* **期待される出力**: 新しい派生作品の JSON メタデータ。
+
+### ステップ 4: 作品系譜の探索と状態確認
+追加した派生作品が、親作品のツリーに対して正しくエッジ（派生タイプ）で連結されているかをコンソール上で探索します。
+
+```sh
+uv run inku-cli lineage show PARENT_ID
+```
+* **期待される出力 (ツリー表示の例)**:
+  ```text
+  Artwork Lineage:
+  - (Root) dfced380 [Displayed] : 白い余白に、黒い太筆の波線を一本引く。
+    - (layout_variation) b91ae625  : 白い余白に、黒い太筆の波線を一本引く。
+  ```
+* **AIの判断ロジック**: 親ノード（`dfced380`）の配下に、指定した `derivation_kind`（例: `layout_variation`）のエッジで子ノード（`b91ae625`）がネストされていることをパースし、系譜が正しく成長していることを検証します。
+
+### ステップ 5: 視覚的評価（review）による選定
+生成された派生作品の画像（PNG）を Vision LLM に送信し、画の出来栄えや美的整合性を評価させます。
+
+```sh
+uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvidia/neva-22b
+```
+* **期待される出力 (JSON)**:
+  ```json
+  {
+    "image": "refine-layout-xxxx.png",
+    "model": "nvidia/neva-22b",
+    "evaluation": "The drawing exhibits high color resonance... (評価文)"
+  }
+  ```
+* **AIの判断ロジック**: 評価テキストをパースし、美的スコアが向上しているかを判定します。品質が不十分な場合、ステップ 3 に戻り、別の `--kind` を試すか、過去の祖先ノード（親やルート）まで遡って別のブランチを成長させます（系譜のフォーク）。
+
+---
+
+## コマンド API リファレンス（AI高速参照用）
+
+### 1. `lineage`
+* **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
+  * 指定したIDを基点とする系譜ツリーを表示します。
+  * `--json` を指定すると、ツリーに含まれる全ノードとエッジの接続情報（`parent_node_id`, `child_node_id`）を取得できます。
+* **`lineage promote <NODE_ID>`**
+  * 中間ノード（通常履歴に表示されない `lineage_only`）を通常履歴に昇格させます。
+
+### 2. `refine`
+* **`refine generate <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png]`**
+  * ターゲットID of the work from局所変種を自動生成し、系譜を繋いで履歴に保存します。
+* **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
+  * ローカルで編集・生成した Score JSON を、任意の親ノードに接続する子ノードとして直接インポートします。
+
+### 3. `inspect`
+* **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
+  * 同一の入力テキストに対して、複数の LLM モデルを並行して実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。
+  * どの LLM モデルが最も表現力に富む出力を生み出せるかを AI が検証・比較する際に使用します。
+
+### 4. `review`
+* **`review evaluate <PNG_FILE> [--model M] [--prompt P]`**
+  * Vision NIM モデルを使い、画像の視覚的評価（美的スコアやコメント）を行います。
+* **`review unread <WORD> --context <CONTEXT>`**
+  * Stage 1 (解釈) で AI が自信を持って読み取れなかった語彙（未読語）を、サーバーの未読語フィードバック台帳へ直接登録します。

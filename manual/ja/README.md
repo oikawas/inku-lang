@@ -11,6 +11,7 @@
 
 1. [画像の作成方法](./image-creation.md)
 2. [inku-cliリファレンス](./cli-reference.md)
+   * [AI自律運転・テスト用リファレンス](./cli-reference-for-ai.md)
 3. [アプリケーションインストール](./application-install.md)
 4. [サーバー設定方法](./server-configuration.md)
 5. [改訂履歴](./revision-history.md)

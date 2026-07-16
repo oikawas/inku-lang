@@ -11,6 +11,7 @@ This manual explains how to use and operate the unreleased inku v1.85 baseline. 
 
 1. [Creating Images](./image-creation.md)
 2. [inku-cli Reference](./cli-reference.md)
+   * [AI Autonomous Operation & Testing Reference](./cli-reference-for-ai.md)
 3. [Application Installation](./application-install.md)
 4. [Server Configuration](./server-configuration.md)
 5. [Revision History](./revision-history.md)

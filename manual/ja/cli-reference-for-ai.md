@@ -91,6 +91,13 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * ローカルで編集・生成した Score JSON を、任意の親ノードに接続する子ノードとして直接インポートします。
 
+### 2.5 `okugaki`
+
+* **`okugaki <ITEM_ID|NODE_ID> [--model M] [--language ja|en] [--dry-run] [--json] [-o FILE]`**
+  * rootから対象作品までの一本の枝を、vision対応モデルが世代順に一人称で読みます。
+  * 通常は署名付き奥書を追記保存します。`--dry-run`は保存せず標準出力だけを行います。
+  * 奥書は評価・選別コマンドではなく、生成、推敲、枝選択へ接続してはいけません。
+
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
   * 同一の入力テキストに対して、複数の LLM モデルを並行して実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。

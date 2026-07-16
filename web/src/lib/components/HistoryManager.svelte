@@ -299,13 +299,13 @@
 		const gap = computed ? Number.parseFloat(computed.rowGap || computed.gap || '8') || 8 : 8;
 		const minCardWidth = 104;
 		const columns = Math.max(1, Math.floor((width + gap) / (minCardWidth + gap)));
-		const cards = [...element.querySelectorAll('.manager-thumb-wrap')].filter((card): card is HTMLElement => card instanceof HTMLElement);
-		let cardHeight = cards.reduce((height, card) => Math.max(height, card.getBoundingClientRect().height), 0);
-		if (cardHeight <= 0) {
-			const cardWidth = Math.max(minCardWidth, (width - gap * (columns - 1)) / columns);
-			const imageHeight = cardWidth * 58 / 82;
-			cardHeight = imageHeight + 48;
-		}
+		// Derive the card height from the fixed CSS contract instead of measuring
+		// rendered cards. Measuring content-visibility placeholders caused the
+		// page size to alternate while thumbnails were being painted.
+		const cardWidth = Math.max(minCardWidth, (width - gap * (columns - 1)) / columns);
+		const cardChromeHeight = 75; // borders + padding + margin + 58px action area
+		const imageWidth = Math.max(1, cardWidth - 12); // 5px padding and 1px border on both sides
+		const cardHeight = imageWidth * 58 / 82 + cardChromeHeight;
 		const rows = Math.max(1, Math.floor((height + gap) / (cardHeight + gap)));
 		return Math.max(1, columns * rows);
 	}
@@ -755,8 +755,7 @@
 		background: var(--panel);
 		padding: 5px;
 		transition: border-color 0.12s, box-shadow 0.12s;
-		content-visibility: auto;
-		contain-intrinsic-size: 150px 164px;
+		contain: layout paint;
 	}
 	.manager-thumb-wrap.selected {
 		border-color: var(--accent);
@@ -819,8 +818,7 @@
 	}
 	.table-thumb-select:disabled { cursor: default; }
 	.table-thumb-cell :global(svg) {
-		content-visibility: auto;
-		contain-intrinsic-size: 48px 48px;
+		contain: paint;
 	}
 	.table-thumb-cell .mini-star {
 		top: 2px;

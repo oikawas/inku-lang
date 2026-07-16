@@ -91,6 +91,13 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * Manually imports a Score JSON as a child node connected to a parent.
 
+### 2.5 `okugaki`
+
+* **`okugaki <ITEM_ID|NODE_ID> [--model M] [--language ja|en] [--dry-run] [--json] [-o FILE]`**
+  * Reads one root-to-target branch sequentially through a vision-capable model and writes a first-person recitation.
+  * By default it appends a signed record. `--dry-run` prints without saving.
+  * This is an observational mirror, not an evaluation or selection command, and must not feed generation, refinement, or branch choice.
+
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
   * Runs multiple LLM backends in parallel to inspect and compare DDL interpretations and drawings for the same prompt.

@@ -59,7 +59,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.87';
+	const APP_VERSION = 'v1.88';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -2832,7 +2832,8 @@ if (unreadWords.length > 0) {
 		const minCardWidth = 104;
 		const columns = Math.max(1, Math.floor((gridWidth + gap) / (minCardWidth + gap)));
 		const cardWidth = Math.max(minCardWidth, (gridWidth - gap * (columns - 1)) / columns);
-		const cardHeight = cardWidth * 58 / 82 + 48;
+		const imageWidth = Math.max(1, cardWidth - 12);
+		const cardHeight = imageWidth * 58 / 82 + 75;
 		const rows = Math.max(1, Math.floor((gridHeight + gap) / (cardHeight + gap)));
 		return Math.max(historyWindowSize, Math.min(100, columns * rows));
 	}

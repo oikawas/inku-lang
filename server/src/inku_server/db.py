@@ -149,6 +149,23 @@ class LineageEdgeRow(Base):
     at = Column(BigInteger, nullable=False, index=True)
 
 
+class OkugakiRow(Base):
+    __tablename__ = "okugaki"
+    __table_args__ = (UniqueConstraint("user_id", "idempotency_key", name="uq_okugaki_user_idempotency"),)
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_accounts.id"), nullable=False, index=True)
+    target_node_id = Column(String, ForeignKey("lineage_nodes.id"), nullable=False, index=True)
+    branch_snapshot_json = Column(Text, nullable=False, default="[]")
+    model = Column(String, nullable=False)
+    at = Column(BigInteger, nullable=False, index=True)
+    language = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    warnings_json = Column(Text, nullable=False, default="[]")
+    fact_sheet_json = Column(Text, nullable=False, default="{}")
+    idempotency_key = Column(String, nullable=True)
+
+
 class UnreadWordRow(Base):
     __tablename__ = "unread_words"
     __table_args__ = (UniqueConstraint("user_id", "word", "context", name="uq_unread_word_context"),)
@@ -933,6 +950,176 @@ def promote_lineage_node(user_id: str, node_id: str) -> dict | None:
         session.commit()
         session.refresh(row)
         return _row_to_dict(row)
+
+
+def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
+    """Return the single primary-parent path from root through target."""
+    with SessionLocal() as session:
+        target = session.query(LineageNodeRow).filter(
+            LineageNodeRow.id == target_node_id,
+            LineageNodeRow.user_id == user_id,
+        ).first()
+        if target is None:
+            return None
+        reversed_nodes = [target]
+        reversed_edges: list[LineageEdgeRow] = []
+        seen = {target.id}
+        current = target
+        while True:
+            edge = session.query(LineageEdgeRow).filter(
+                LineageEdgeRow.user_id == user_id,
+                LineageEdgeRow.child_node_id == current.id,
+            ).first()
+            if edge is None or edge.parent_node_id in seen:
+                break
+            parent = session.query(LineageNodeRow).filter(
+                LineageNodeRow.user_id == user_id,
+                LineageNodeRow.id == edge.parent_node_id,
+            ).first()
+            if parent is None:
+                break
+            reversed_edges.append(edge)
+            reversed_nodes.append(parent)
+            seen.add(parent.id)
+            current = parent
+        nodes = list(reversed(reversed_nodes))
+        edges = list(reversed(reversed_edges))
+        history_ids = [node.history_id for node in nodes if node.history_id]
+        histories = {
+            row.id: row
+            for row in session.query(HistoryRow).filter(
+                HistoryRow.user_id == user_id,
+                HistoryRow.id.in_(history_ids),
+            ).all()
+        } if history_ids else {}
+        child_counts = dict(
+            session.query(LineageEdgeRow.parent_node_id, func.count(LineageEdgeRow.id))
+            .filter(
+                LineageEdgeRow.user_id == user_id,
+                LineageEdgeRow.parent_node_id.in_([node.id for node in nodes]),
+            )
+            .group_by(LineageEdgeRow.parent_node_id)
+            .all()
+        )
+        payload_nodes = []
+        for node in nodes:
+            payload = {
+                "id": node.id,
+                "state": node.state,
+                "at": node.at,
+                "deleted_at": node.deleted_at,
+                "child_count": int(child_counts.get(node.id, 0)),
+            }
+            history = histories.get(node.history_id or "")
+            if node.state != "tombstone" and history is not None:
+                payload["history"] = _row_to_dict(history)
+            payload_nodes.append(payload)
+        return {
+            "target_node_id": target.id,
+            "nodes": payload_nodes,
+            "edges": [_lineage_edge_to_dict(edge) for edge in edges],
+        }
+
+
+def _okugaki_to_dict(row: OkugakiRow) -> dict:
+    def load(value: str, fallback):
+        try:
+            return json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            return fallback
+
+    return {
+        "id": row.id,
+        "target_node_id": row.target_node_id,
+        "branch_snapshot": load(row.branch_snapshot_json, []),
+        "model": row.model,
+        "at": row.at,
+        "language": row.language,
+        "body": row.body,
+        "warnings": load(row.warnings_json, []),
+        "fact_sheet": load(row.fact_sheet_json, {}),
+    }
+
+
+def add_okugaki(user_id: str, item: dict, *, idempotency_key: str | None = None) -> dict:
+    with SessionLocal() as session:
+        if idempotency_key:
+            existing = session.query(OkugakiRow).filter(
+                OkugakiRow.user_id == user_id,
+                OkugakiRow.idempotency_key == idempotency_key,
+            ).first()
+            if existing is not None:
+                result = _okugaki_to_dict(existing)
+                result["_idempotent_replay"] = True
+                return result
+        target = session.query(LineageNodeRow).filter(
+            LineageNodeRow.user_id == user_id,
+            LineageNodeRow.id == item["target_node_id"],
+        ).first()
+        if target is None:
+            raise ValueError("lineage target not found")
+        row = OkugakiRow(
+            id=item.get("id") or str(uuid.uuid4()),
+            user_id=user_id,
+            target_node_id=item["target_node_id"],
+            branch_snapshot_json=_canonical_json(item["branch_snapshot"]),
+            model=item["model"],
+            at=item["at"],
+            language=item["language"],
+            body=item["body"],
+            warnings_json=_canonical_json(item.get("warnings") or []),
+            fact_sheet_json=_canonical_json(item.get("fact_sheet") or {}),
+            idempotency_key=idempotency_key,
+        )
+        session.add(row)
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            if not idempotency_key:
+                raise
+            existing = session.query(OkugakiRow).filter(
+                OkugakiRow.user_id == user_id,
+                OkugakiRow.idempotency_key == idempotency_key,
+            ).first()
+            if existing is None:
+                raise
+            result = _okugaki_to_dict(existing)
+            result["_idempotent_replay"] = True
+            return result
+        session.refresh(row)
+        return _okugaki_to_dict(row)
+
+
+def list_okugaki(user_id: str, target_node_id: str) -> list[dict]:
+    with SessionLocal() as session:
+        rows = session.query(OkugakiRow).filter(
+            OkugakiRow.user_id == user_id,
+            OkugakiRow.target_node_id == target_node_id,
+        ).order_by(OkugakiRow.at.asc(), OkugakiRow.id.asc()).all()
+        return [_okugaki_to_dict(row) for row in rows]
+
+
+def get_okugaki_by_idempotency(user_id: str, idempotency_key: str) -> dict | None:
+    with SessionLocal() as session:
+        row = session.query(OkugakiRow).filter(
+            OkugakiRow.user_id == user_id,
+            OkugakiRow.idempotency_key == idempotency_key,
+        ).first()
+        return _okugaki_to_dict(row) if row is not None else None
+
+
+def delete_okugaki(user_id: str, okugaki_id: str) -> bool:
+    with SessionLocal() as session:
+        row = session.query(OkugakiRow).filter(
+            OkugakiRow.id == okugaki_id,
+            OkugakiRow.user_id == user_id,
+        ).first()
+        if row is None:
+            return False
+        session.delete(row)
+        session.commit()
+        return True
 
 
 
@@ -2221,6 +2408,7 @@ def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = Non
                 raise ValueError("user has history")
         else:
             session.query(HistoryRow).filter(HistoryRow.user_id == user_id).delete()
+        session.query(OkugakiRow).filter(OkugakiRow.user_id == user_id).delete()
         session.query(UserSessionRow).filter(UserSessionRow.user_id == user_id).delete()
         session.query(ExternalIdentityRow).filter(ExternalIdentityRow.user_id == user_id).delete()
         session.query(UnreadWordRow).filter(UnreadWordRow.user_id == user_id).delete()
@@ -2552,6 +2740,7 @@ def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000)
 
 def delete_all(user_id: str) -> None:
     with SessionLocal() as session:
+        session.query(OkugakiRow).filter(OkugakiRow.user_id == user_id).delete()
         session.query(LineageEdgeRow).filter(LineageEdgeRow.user_id == user_id).delete()
         session.query(LineageNodeRow).filter(LineageNodeRow.user_id == user_id).delete()
         session.query(HistoryRow).filter(HistoryRow.user_id == user_id).delete()

@@ -1293,6 +1293,15 @@ Short English tabs, buttons, and labels use Title Case. At iPad-class widths the
 
 JSON Score remains a strict, versioned schema so unknown fields are never silently discarded. Additive database migrations remain idempotent and do not destructively rewrite existing render hashes, description hashes, or lineage identities. Build 564 (New CLI commands and AI testing guidelines are implemented in Build 565).
 
+### v1.86 Lineage UI menu integration and autonomous AI refinement (2026-07-16)
+
+- Added a contextual menu trigger (`...` button) to each card in the Lineage tab, letting users execute individual actions (AI Refine, Manual Refine, and Delete) directly from the card.
+- Implemented the AI Refine modal, enabling users to enter a direction prompt, choose a generation depth (1 to 10), and select which elements (Reading, Colors, Composition, and Texture) to vary. Svelte drives an asynchronous, sequential generation loop (`paintOne` calls) in the frontend, providing real-time feedback including step progress, stage-resolved statuses, and previews of intermediate generated graphics. The lineage tree auto-refreshes to show the newly grown branch once completed.
+- Implemented the Manual Refine modal, carrying over the displayed parent DDL structure and color catalog as defaults, and allowing fast, single-generation variations by specifying a derivation kind, color catalog, or additional Saijiki/prompt.
+- Integrated individual deletion to instantly trash selected artworks directly from their card menu.
+- Build 565.
+
+
 Build 561 removes the former “Use today's word as a seed” control from the writing tab and first generation, and moves it to Refine / Adjust as “Vary Touch with Words.” The entered words affect only the Renderer's deterministic performance seed, never the interpretation, DDL, JSON Score, or layout. Because the same words reproduce the same touch, this operation generates one candidate at a time. History, Generation info / JSON, and replay retain both the words and resolved seed. The first artwork remains the source work and never applies this word-based touch variation.
 
 Build 562 removes the duplicated instruction preview below the writing field and places the normalized-DDL heading on the same row as Saijiki, DDL edit, and automatic repair. “Vary Touch with Words” moves to the end of the refinement choices; selecting it alone reveals an unlabeled input and copy explaining deterministic Seed behavior and the one-option limit. Writing-tab selectors now use action-target labels, “Canvas” and “Color catalog,” in both languages instead of showing the current values, and the canvas button no longer has a leading square icon.

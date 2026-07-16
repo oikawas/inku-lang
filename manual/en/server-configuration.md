@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v1.82. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v1.85. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -26,6 +26,11 @@ Provider API key environment variables are initial values. A provider key saved 
 | `INKU_SECRET_KEY_FILE` | Encryption key file | `secret.key` in the user data directory |
 | `INKU_SESSION_COOKIE_MAX_AGE` | Session lifetime in seconds | 2592000 |
 | `INKU_SESSION_COOKIE_SECURE` | Secure cookie | `0` |
+| `INKU_MAX_REQUEST_BODY_BYTES` | Maximum request body size | 16777216 |
+| `INKU_MAX_CONCURRENT_REQUESTS` | Concurrent HTTP request limit | 64 |
+| `INKU_LOGIN_RATE_ATTEMPTS` | Login failures allowed per window | 10 |
+| `INKU_LOGIN_RATE_WINDOW_SECONDS` | Login rate window in seconds | 60 |
+| `INKU_CORS_ORIGINS` | Comma-separated allowed origins | localhost only |
 
 When both encryption variables are set, direct key material has priority. A persistent key file is recommended for production.
 
@@ -49,6 +54,7 @@ The account is created only when a password is set and the DB contains no users.
 | `INKU_OUTPUT_SAVE_QUEUE_LIMIT` | Artifact queue limit | `32` |
 | `INKU_STAGE_WORKERS` | LLM pipeline workers | `4` |
 | `INKU_STAGE_QUEUE_LIMIT` | Pipeline queue limit | twice the worker count |
+| `INKU_RENDER_CONCURRENCY` | Concurrent renderer limit | 2 |
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
 

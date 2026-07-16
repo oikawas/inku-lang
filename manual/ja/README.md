@@ -1,6 +1,6 @@
 # inku 運用・利用マニュアル
 
-このディレクトリは、未リリース版inku v1.82（Web Build 563）を初めて使う人が作品を作成できることと、システム管理者がアプリケーションを安全に展開・運用できることを目的にしたマニュアルです。製品仕様の正本はリポジトリ直下の`SPEC.ja.md`です。
+このディレクトリは、未リリース版inku v1.85を初めて使う人が作品を作成できることと、システム管理者がアプリケーションを安全に展開・運用できることを目的にしたマニュアルです。製品仕様の正本はリポジトリ直下の`SPEC.ja.md`です。
 
 ## 対象読者
 
@@ -10,9 +10,11 @@
 ## ドキュメント構成
 
 1. [画像の作成方法](./image-creation.md)
-2. [アプリケーションインストール](./application-install.md)
-3. [サーバー設定方法](./server-configuration.md)
-4. [改訂履歴](./revision-history.md)
+2. [inku-cliリファレンス](./cli-reference.md)
+   * [AI自律運転・テスト用リファレンス](./cli-reference-for-ai.md)
+3. [アプリケーションインストール](./application-install.md)
+4. [サーバー設定方法](./server-configuration.md)
+5. [改訂履歴](./revision-history.md)
 
 ## 付属テンプレート
 

@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade of the unreleased inku v1.82 on Linux. The reference deployment uses systemd, SQLite, and the Vite development server. For public internet service, design a TLS reverse proxy and a production SvelteKit adapter separately.
+This guide describes a standard new installation or upgrade of the unreleased inku v1.85 on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
 
 ## 1. Components
 
@@ -255,3 +255,19 @@ Typical removal targets:
 ```
 
 Deleting the DB, encryption key, or artifacts can make recovery impossible. Confirm retention and backups before removal.
+
+## 16. Container Deployment
+
+The existing uv, npm, and systemd development and operating procedures remain supported. Container deployment is an additional path driven by the root compose.yaml.
+
+    export INKU_ORIGIN=http://localhost:5173
+    export INKU_BOOTSTRAP_ADMIN_PASSWORD='replace-with-a-long-secret'
+    docker compose build
+    docker compose up -d
+    docker compose ps
+
+The Web service publishes port 5173. Its Node server proxies same-origin /api requests to the internal FastAPI container. SQLite, backups, and artifacts persist in the inku-data volume. The API container runs as a non-root user.
+
+Do not leave bootstrap credentials or provider keys in shell history. In production, supply them through Compose secrets or a permission-restricted environment file. At a TLS endpoint, set INKU_ORIGIN to the public HTTPS URL and INKU_SESSION_COOKIE_SECURE to 1.
+
+Use docker compose down to stop services and docker compose up -d --build to rebuild while retaining data. Never run docker compose down -v without a verified backup because it destroys the data volume.

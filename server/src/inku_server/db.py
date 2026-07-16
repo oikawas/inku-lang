@@ -16,7 +16,8 @@ from datetime import datetime
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, func, inspect, or_, text
+from sqlalchemy import BigInteger, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, create_engine, event, func, inspect, or_, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .identity import description_hash
@@ -28,6 +29,19 @@ _SESSION_MAX_AGE_SECONDS = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 *
 
 _connect_args = {"check_same_thread": False} if _DB_URL.startswith("sqlite") else {}
 engine = create_engine(_DB_URL, echo=False, future=True, connect_args=_connect_args)
+
+
+if _DB_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_integrity(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA busy_timeout=5000")
+        finally:
+            cursor.close()
+
+
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 _logger = logging.getLogger(__name__)
 _HISTORY_FTS_ENABLED = False
@@ -55,6 +69,7 @@ class Base(DeclarativeBase):
 
 class HistoryRow(Base):
     __tablename__ = "history"
+    __table_args__ = (UniqueConstraint("user_id", "idempotency_key", name="uq_history_user_idempotency"),)
 
     id           = Column(String,     primary_key=True)
     user_id      = Column(String,     ForeignKey("user_accounts.id"), nullable=True, index=True)
@@ -100,6 +115,7 @@ class HistoryRow(Base):
     description_hash = Column(String, nullable=True, index=True)
     history_visibility = Column(String, nullable=False, default="normal", index=True)
     lineage_node_id = Column(String, nullable=True, unique=True, index=True)
+    idempotency_key = Column(String, nullable=True)
 
 
 class LineageNodeRow(Base):
@@ -182,6 +198,23 @@ class UserSessionRow(Base):
     at         = Column(BigInteger, nullable=False, index=True)
 
 
+class ExternalIdentityRow(Base):
+    """Provider-neutral identity link; OAuth/OIDC token handling stays outside the DB layer."""
+
+    __tablename__ = "external_identities"
+    __table_args__ = (
+        UniqueConstraint("provider", "subject", name="uq_external_identity_provider_subject"),
+        UniqueConstraint("user_id", "provider", name="uq_external_identity_user_provider"),
+    )
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_accounts.id"), nullable=False, index=True)
+    provider = Column(String, nullable=False, index=True)
+    subject = Column(String, nullable=False)
+    email = Column(String, nullable=True)
+    at = Column(BigInteger, nullable=False, index=True)
+
+
 class AppSettingRow(Base):
     __tablename__ = "app_settings"
 
@@ -230,6 +263,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "description_hash": "ALTER TABLE history ADD COLUMN description_hash VARCHAR",
     "history_visibility": "ALTER TABLE history ADD COLUMN history_visibility VARCHAR NOT NULL DEFAULT 'normal'",
     "lineage_node_id": "ALTER TABLE history ADD COLUMN lineage_node_id VARCHAR",
+    "idempotency_key": "ALTER TABLE history ADD COLUMN idempotency_key VARCHAR",
 }
 _LINEAGE_NODE_COLUMN_MIGRATIONS = {
     "root_node_id": "ALTER TABLE lineage_nodes ADD COLUMN root_node_id VARCHAR",
@@ -315,6 +349,11 @@ _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_user_description_hash", "CREATE INDEX IF NOT EXISTS ix_history_user_description_hash ON history (user_id, description_hash)"),
     ("ix_history_visibility", "CREATE INDEX IF NOT EXISTS ix_history_visibility ON history (history_visibility)"),
     ("ix_history_lineage_node_id", "CREATE UNIQUE INDEX IF NOT EXISTS ix_history_lineage_node_id ON history (lineage_node_id)"),
+    (
+        "uq_history_user_idempotency",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_history_user_idempotency "
+        "ON history (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL",
+    ),
 )
 _LINEAGE_NODE_INDEX_MIGRATIONS = (
     ("ix_lineage_nodes_root_node_id", "CREATE INDEX IF NOT EXISTS ix_lineage_nodes_root_node_id ON lineage_nodes (root_node_id)"),
@@ -536,10 +575,18 @@ def _backfill_render_hashes(conn) -> None:
         """
     ))
     for row in rows.mappings():
+        try:
+            score = json.loads(row["score"]) if row["score"] else {}
+        except (json.JSONDecodeError, TypeError):
+            _logger.error("skipping render-hash backfill for corrupt score JSON: history_id=%s", row["id"])
+            continue
+        if not isinstance(score, dict):
+            _logger.error("skipping render-hash backfill for non-object score JSON: history_id=%s", row["id"])
+            continue
         item = {
             "input": row["input"],
             "ddl": row["ddl"],
-            "score": json.loads(row["score"]) if row["score"] else {},
+            "score": score,
             "svg": row["svg"],
             "catalog_id": row["catalog_id"],
             "render_build_number": row["render_build_number"],
@@ -590,6 +637,9 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return False
     actual = pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
     return secrets.compare_digest(actual, expected)
+
+
+_DUMMY_PASSWORD_HASH = _hash_password("inku-nonexistent-account-timing-guard")
 
 
 def _ensure_default_user_group() -> None:
@@ -719,6 +769,68 @@ def _lineage_edge_to_dict(row: LineageEdgeRow) -> dict:
     }
 
 
+def _ancestor_edge_ids(session, user_id: str, focus_node_id: str, limit: int) -> list[str]:
+    if limit <= 0:
+        return []
+    return list(session.execute(
+        text(
+            """
+            WITH RECURSIVE ancestor_edges(id, parent_node_id, child_node_id) AS (
+                SELECT id, parent_node_id, child_node_id
+                FROM lineage_edges
+                WHERE user_id = :user_id AND child_node_id = :focus_node_id
+                UNION
+                SELECT edge.id, edge.parent_node_id, edge.child_node_id
+                FROM lineage_edges edge
+                JOIN ancestor_edges ancestor
+                  ON edge.child_node_id = ancestor.parent_node_id
+                WHERE edge.user_id = :user_id
+            )
+            SELECT id FROM ancestor_edges LIMIT :limit
+            """
+        ),
+        {"user_id": user_id, "focus_node_id": focus_node_id, "limit": limit},
+    ).scalars())
+
+
+def _descendant_edge_ids(
+    session,
+    user_id: str,
+    focus_node_id: str,
+    depth: int,
+    limit: int,
+) -> list[str]:
+    if depth <= 0 or limit <= 0:
+        return []
+    return list(session.execute(
+        text(
+            """
+            WITH RECURSIVE descendant_edges(id, parent_node_id, child_node_id, depth) AS (
+                SELECT id, parent_node_id, child_node_id, 1
+                FROM lineage_edges
+                WHERE user_id = :user_id AND parent_node_id = :focus_node_id
+                UNION ALL
+                SELECT edge.id, edge.parent_node_id, edge.child_node_id, descendant.depth + 1
+                FROM lineage_edges edge
+                JOIN descendant_edges descendant
+                  ON edge.parent_node_id = descendant.child_node_id
+                WHERE edge.user_id = :user_id AND descendant.depth < :depth
+            )
+            SELECT id
+            FROM descendant_edges
+            ORDER BY depth ASC, id ASC
+            LIMIT :limit
+            """
+        ),
+        {
+            "user_id": user_id,
+            "focus_node_id": focus_node_id,
+            "depth": depth,
+            "limit": limit,
+        },
+    ).scalars())
+
+
 def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, node_limit: int = 200) -> dict | None:
     descendant_depth = max(0, min(descendant_depth, 200))
     node_limit = max(1, min(node_limit, 200))
@@ -730,36 +842,31 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
         if focus is None:
             return None
 
+        ancestor_ids = _ancestor_edge_ids(session, user_id, focus.id, node_limit - 1)
+        remaining = max(0, node_limit - 1 - len(ancestor_ids))
+        descendant_ids = _descendant_edge_ids(
+            session,
+            user_id,
+            focus.id,
+            descendant_depth,
+            remaining,
+        )
+        selected_edge_ids = list(dict.fromkeys([*ancestor_ids, *descendant_ids]))
+        selected_edges = (
+            session.query(LineageEdgeRow)
+            .filter(
+                LineageEdgeRow.user_id == user_id,
+                LineageEdgeRow.id.in_(selected_edge_ids),
+            )
+            .all()
+            if selected_edge_ids
+            else []
+        )
+        edges = {edge.id: edge for edge in selected_edges}
         node_ids = {focus.id}
-        edges: dict[str, LineageEdgeRow] = {}
-        current = focus.id
-        while len(node_ids) < node_limit:
-            edge = session.query(LineageEdgeRow).filter(
-                LineageEdgeRow.user_id == user_id,
-                LineageEdgeRow.child_node_id == current,
-            ).first()
-            if edge is None or edge.parent_node_id in node_ids:
-                break
-            edges[edge.id] = edge
+        for edge in selected_edges:
             node_ids.add(edge.parent_node_id)
-            current = edge.parent_node_id
-
-        frontier = {focus.id}
-        for _ in range(descendant_depth):
-            if not frontier or len(node_ids) >= node_limit:
-                break
-            child_edges = session.query(LineageEdgeRow).filter(
-                LineageEdgeRow.user_id == user_id,
-                LineageEdgeRow.parent_node_id.in_(frontier),
-            ).order_by(LineageEdgeRow.at.asc()).all()
-            next_frontier: set[str] = set()
-            for edge in child_edges:
-                if len(node_ids) >= node_limit and edge.child_node_id not in node_ids:
-                    break
-                edges[edge.id] = edge
-                node_ids.add(edge.child_node_id)
-                next_frontier.add(edge.child_node_id)
-            frontier = next_frontier
+            node_ids.add(edge.child_node_id)
 
         nodes = session.query(LineageNodeRow).filter(
             LineageNodeRow.user_id == user_id,
@@ -814,7 +921,10 @@ def promote_lineage_node(user_id: str, node_id: str) -> dict | None:
         ).first()
         if node is None or not node.history_id:
             return None
-        row = session.get(HistoryRow, node.history_id)
+        row = session.query(HistoryRow).filter(
+            HistoryRow.id == node.history_id,
+            HistoryRow.user_id == user_id,
+        ).first()
         if row is None:
             return None
         node.state = "active"
@@ -1105,13 +1215,24 @@ def _assign_unowned_history_to_admin() -> None:
 
 
 def _row_to_dict(row: HistoryRow) -> dict:
+    data_warnings: list[str] = []
+    try:
+        score = json.loads(row.score) if row.score else {}
+    except (json.JSONDecodeError, TypeError):
+        score = {}
+        data_warnings.append("score_json_invalid")
+        _logger.error("history score JSON is corrupt: history_id=%s", row.id)
+    if not isinstance(score, dict):
+        score = {}
+        data_warnings.append("score_json_not_object")
+        _logger.error("history score JSON is not an object: history_id=%s", row.id)
     item = {
         "id":           row.id,
         "user_id":      row.user_id,
         "at":           row.at,
         "input":        row.input,
         "ddl":          row.ddl,
-        "score":        json.loads(row.score) if row.score else {},
+        "score":        score,
         "svg":          row.svg,
         "output_path":  row.output_path,
         "elapsed_ms":   row.elapsed_ms,
@@ -1133,6 +1254,8 @@ def _row_to_dict(row: HistoryRow) -> dict:
     "history_visibility": row.history_visibility or "normal",
     "lineage_node_id": row.lineage_node_id,
 }
+    if data_warnings:
+        item["data_warnings"] = data_warnings
     if row.render_build_number is not None:
         item["render_build_number"] = row.render_build_number
     if row.render_color_profile is not None:
@@ -1309,6 +1432,16 @@ def add_item(item: dict) -> dict:
         root_node_id=node_id,
     )
     with SessionLocal() as session:
+        idempotency_key = item.get("idempotency_key")
+        if idempotency_key:
+            existing = session.query(HistoryRow).filter(
+                HistoryRow.user_id == item["user_id"],
+                HistoryRow.idempotency_key == idempotency_key,
+            ).first()
+            if existing is not None:
+                result = _row_to_dict(existing)
+                result["_idempotent_replay"] = True
+                return result
         if parent_node_id:
             parent = session.query(LineageNodeRow).filter(
                 LineageNodeRow.id == parent_node_id,
@@ -1318,8 +1451,26 @@ def add_item(item: dict) -> dict:
             if parent is None:
                 raise ValueError("lineage parent not found")
             node.root_node_id = parent.root_node_id or parent.id
+        row.idempotency_key = idempotency_key
         session.add(row)
         session.add(node)
+        # SQLite foreign-key enforcement requires the new child node to exist
+        # before its edge is inserted. Both writes remain in one transaction.
+        try:
+            session.flush()
+        except IntegrityError:
+            session.rollback()
+            if not idempotency_key:
+                raise
+            existing = session.query(HistoryRow).filter(
+                HistoryRow.user_id == item["user_id"],
+                HistoryRow.idempotency_key == idempotency_key,
+            ).first()
+            if existing is None:
+                raise
+            result = _row_to_dict(existing)
+            result["_idempotent_replay"] = True
+            return result
         if parent_node_id:
             session.add(LineageEdgeRow(
                 id=str(uuid.uuid4()), user_id=item["user_id"], parent_node_id=parent_node_id,
@@ -1457,7 +1608,9 @@ def get_user(user_id: str) -> dict | None:
 def authenticate_user(username: str, password: str) -> dict | None:
     with SessionLocal() as session:
         row = session.query(UserAccountRow).filter(UserAccountRow.username == username.strip()).first()
-        if not row or not verify_password(password, row.password_hash):
+        stored_hash = row.password_hash if row is not None else _DUMMY_PASSWORD_HASH
+        password_matches = verify_password(password, stored_hash)
+        if row is None or not password_matches:
             return None
         group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
         return _user_to_dict(row, group_name)
@@ -1521,6 +1674,57 @@ def delete_session(token: str) -> bool:
         return True
 
 
+def link_external_identity(
+    user_id: str,
+    *,
+    provider: str,
+    subject: str,
+    email: str | None = None,
+) -> dict:
+    clean_provider = provider.strip().lower()
+    clean_subject = subject.strip()
+    if not clean_provider or len(clean_provider) > 64:
+        raise ValueError("invalid identity provider")
+    if not clean_subject or len(clean_subject) > 512:
+        raise ValueError("invalid external subject")
+    with SessionLocal() as session:
+        if session.get(UserAccountRow, user_id) is None:
+            raise ValueError("user not found")
+        row = ExternalIdentityRow(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            provider=clean_provider,
+            subject=clean_subject,
+            email=(email or "").strip() or None,
+            at=_now_ms(),
+        )
+        session.add(row)
+        session.commit()
+        return {
+            "id": row.id,
+            "user_id": row.user_id,
+            "provider": row.provider,
+            "subject": row.subject,
+            "email": row.email,
+            "at": row.at,
+        }
+
+
+def get_user_by_external_identity(provider: str, subject: str) -> dict | None:
+    with SessionLocal() as session:
+        identity = session.query(ExternalIdentityRow).filter(
+            ExternalIdentityRow.provider == provider.strip().lower(),
+            ExternalIdentityRow.subject == subject.strip(),
+        ).first()
+        if identity is None:
+            return None
+        row = session.get(UserAccountRow, identity.user_id)
+        if row is None:
+            return None
+        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+        return _user_to_dict(row, group_name)
+
+
 def list_users_for_actor(actor: dict) -> list[dict]:
     if actor["role"] == "admin":
         return list_users()
@@ -1573,9 +1777,18 @@ def update_user(
     password: str | None = None,
     role: str | None = None,
     group_id: str | None | object = _UNSET,
+    actor: dict | None = None,
 ) -> dict | None:
     with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
+        query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
+        if actor is not None and actor.get("role") != "admin":
+            if actor.get("role") != "group_lead" or not actor.get("group_id"):
+                return None
+            query = query.filter(
+                UserAccountRow.group_id == actor["group_id"],
+                UserAccountRow.role == "user",
+            )
+        row = query.first()
         if not row:
             return None
         if username is not None:
@@ -1942,13 +2155,24 @@ def update_user_plugin_value(user_id: str, plugin_id: str, value: dict) -> dict 
     return update_user_plugin_storage(user_id, current)
 
 
-def delete_user(user_id: str) -> bool:
+def delete_user(user_id: str, *, actor: dict | None = None) -> bool:
     with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
+        query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
+        if actor is not None and actor.get("role") != "admin":
+            if actor.get("role") != "group_lead" or not actor.get("group_id"):
+                return False
+            query = query.filter(
+                UserAccountRow.group_id == actor["group_id"],
+                UserAccountRow.role == "user",
+            )
+        row = query.first()
         if not row:
             return False
         if session.query(HistoryRow).filter(HistoryRow.user_id == user_id).first():
             raise ValueError("user has history")
+        session.query(UserSessionRow).filter(UserSessionRow.user_id == user_id).delete()
+        session.query(ExternalIdentityRow).filter(ExternalIdentityRow.user_id == user_id).delete()
+        session.query(UnreadWordRow).filter(UnreadWordRow.user_id == user_id).delete()
         session.query(LineageEdgeRow).filter(LineageEdgeRow.user_id == user_id).delete()
         session.query(LineageNodeRow).filter(LineageNodeRow.user_id == user_id).delete()
         session.delete(row)
@@ -2055,7 +2279,7 @@ def list_items(
         total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
         rows = (
             query
-            .order_by(HistoryRow.at.desc())
+            .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -2095,27 +2319,66 @@ def list_lineage_groups(
                 HistoryRow.stage2_model.ilike(pattern),
                 HistoryRow.catalog_id.ilike(pattern),
             ))
-        rows = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).all()
-        items = _rows_to_dicts_with_lineage(session, rows)
-        grouped: dict[str, list[dict]] = {}
-        for item in items:
-            root_id = item.get("lineage_root_node_id") or item.get("lineage_node_id")
-            if not root_id:
+        root_id = func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id)
+        aggregates = (
+            query.with_entities(
+                root_id.label("root_node_id"),
+                func.count(HistoryRow.id).label("item_count"),
+                func.sum(case((HistoryRow.starred == 1, 1), else_=0)).label("starred_count"),
+                func.max(HistoryRow.at).label("latest_at"),
+            )
+            .group_by(root_id)
+            .subquery()
+        )
+        total = int(session.query(func.count()).select_from(aggregates).scalar() or 0)
+        page_rows = (
+            session.query(aggregates)
+            .order_by(aggregates.c.latest_at.desc(), aggregates.c.root_node_id.asc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        if not page_rows:
+            return [], total
+
+        ranked = (
+            query.with_entities(
+                HistoryRow.id.label("history_id"),
+                root_id.label("root_node_id"),
+                func.row_number().over(
+                    partition_by=root_id,
+                    order_by=(HistoryRow.at.desc(), HistoryRow.id.asc()),
+                ).label("row_number"),
+            )
+            .subquery()
+        )
+        selected_roots = [row.root_node_id for row in page_rows]
+        representative_pairs = (
+            session.query(ranked.c.root_node_id, ranked.c.history_id)
+            .filter(ranked.c.root_node_id.in_(selected_roots), ranked.c.row_number == 1)
+            .all()
+        )
+        representative_id_by_root = {root: history_id for root, history_id in representative_pairs}
+        representative_ids = list(representative_id_by_root.values())
+        representative_rows = session.query(HistoryRow).filter(HistoryRow.id.in_(representative_ids)).all()
+        representative_by_id = {
+            item["id"]: item
+            for item in _rows_to_dicts_with_lineage(session, representative_rows)
+        }
+        groups = []
+        for row in page_rows:
+            representative_id = representative_id_by_root.get(row.root_node_id)
+            representative = representative_by_id.get(representative_id or "")
+            if representative is None:
                 continue
-            grouped.setdefault(root_id, []).append(item)
-        groups = [
-            {
-                "root_node_id": root_id,
-                "representative": members[0],
-                "item_count": len(members),
-                "starred_count": sum(1 for member in members if member.get("starred")),
-                "latest_at": int(members[0].get("at") or 0),
-            }
-            for root_id, members in grouped.items()
-        ]
-        groups.sort(key=lambda group: (-group["latest_at"], group["root_node_id"]))
-        total = len(groups)
-        return groups[offset:offset + limit], total
+            groups.append({
+                "root_node_id": row.root_node_id,
+                "representative": representative,
+                "item_count": int(row.item_count or 0),
+                "starred_count": int(row.starred_count or 0),
+                "latest_at": int(row.latest_at or 0),
+            })
+        return groups, total
 
 
 def list_lineage_group_items(
@@ -2164,18 +2427,26 @@ def list_lineage_group_items(
 
 def item_position(user_id: str, item_id: str, trashed: bool = False, starred: bool = False) -> int | None:
     with SessionLocal() as session:
-        query = session.query(HistoryRow).filter(
+        target = session.query(HistoryRow).filter(
+            HistoryRow.user_id == user_id,
+            HistoryRow.id == item_id,
+            HistoryRow.trashed == (1 if trashed else 0),
+            HistoryRow.history_visibility == "normal",
+        ).first()
+        if target is None or (starred and not target.starred):
+            return None
+        query = session.query(func.count(HistoryRow.id)).filter(
             HistoryRow.user_id == user_id,
             HistoryRow.trashed == (1 if trashed else 0),
             HistoryRow.history_visibility == "normal",
+            or_(
+                HistoryRow.at > target.at,
+                and_(HistoryRow.at == target.at, HistoryRow.id < target.id),
+            ),
         )
         if starred:
             query = query.filter(HistoryRow.starred == 1)
-        ids = [row[0] for row in query.with_entities(HistoryRow.id).order_by(HistoryRow.at.desc()).all()]
-        try:
-            return ids.index(item_id)
-        except ValueError:
-            return None
+        return int(query.scalar() or 0)
 
 
 def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None = None) -> dict | None:
@@ -2208,6 +2479,24 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
         )
         items = _rows_to_dicts_with_lineage(session, rows)
         return sorted(items, key=lambda item: order.get(item["id"], len(order)))
+
+
+def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000) -> list[dict]:
+    """Load only fields used by similarity ranking, avoiding SVG and lineage hydration."""
+    with SessionLocal() as session:
+        rows = (
+            session.query(HistoryRow.id, HistoryRow.at, HistoryRow.score)
+            .filter(
+                HistoryRow.user_id == user_id,
+                HistoryRow.id != item_id,
+                HistoryRow.trashed == 0,
+                HistoryRow.history_visibility == "normal",
+            )
+            .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
+            .limit(limit)
+            .all()
+        )
+        return [{"id": row.id, "at": row.at, "score": row.score or {}} for row in rows]
 
 
 def delete_all(user_id: str) -> None:
@@ -2244,14 +2533,17 @@ def restore_items(user_id: str, ids: list[str]) -> int:
         return count
 
 
-def delete_items(user_id: str, ids: list[str]) -> int:
+def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False) -> int:
     if not ids:
         return 0
     with SessionLocal() as session:
-        rows = session.query(HistoryRow).filter(
+        query = session.query(HistoryRow).filter(
             HistoryRow.user_id == user_id,
             HistoryRow.id.in_(ids),
-        ).all()
+        )
+        if require_trashed:
+            query = query.filter(HistoryRow.trashed == 1)
+        rows = query.all()
         now = _now_ms()
         node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
         if node_ids:
@@ -2275,3 +2567,15 @@ def delete_items(user_id: str, ids: list[str]) -> int:
             session.delete(row)
         session.commit()
         return len(rows)
+
+
+def delete_all_trashed_items(user_id: str) -> int:
+    with SessionLocal() as session:
+        ids = [
+            item_id
+            for item_id, in session.query(HistoryRow.id).filter(
+                HistoryRow.user_id == user_id,
+                HistoryRow.trashed == 1,
+            )
+        ]
+    return delete_items(user_id, ids, require_trashed=True)

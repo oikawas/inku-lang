@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は、未リリース版inku v1.82を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
+この文書は、未リリース版inku v1.85を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
 
 ## 1. 設定の優先境界
 
@@ -26,6 +26,11 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 | `INKU_SECRET_KEY_FILE` | 暗号化鍵ファイル | user data dir内`secret.key` |
 | `INKU_SESSION_COOKIE_MAX_AGE` | session有効秒数 | 2592000 |
 | `INKU_SESSION_COOKIE_SECURE` | Secure cookie | `0` |
+| `INKU_MAX_REQUEST_BODY_BYTES` | request body上限 | 16777216 |
+| `INKU_MAX_CONCURRENT_REQUESTS` | 同時HTTP request上限 | 64 |
+| `INKU_LOGIN_RATE_ATTEMPTS` | login失敗許容回数／window | 10 |
+| `INKU_LOGIN_RATE_WINDOW_SECONDS` | login rate window秒 | 60 |
+| `INKU_CORS_ORIGINS` | 許可originのcomma区切り | localhostのみ |
 
 `INKU_SECRET_KEY`と`INKU_SECRET_KEY_FILE`を同時に設定した場合は直接鍵を優先します。本番では永続的な鍵ファイルを推奨します。
 
@@ -49,6 +54,7 @@ passwordが設定され、DBにユーザーがいない場合だけ作成しま�
 | `INKU_OUTPUT_SAVE_QUEUE_LIMIT` | artifact保存queue上限 | `32` |
 | `INKU_STAGE_WORKERS` | LLM pipeline worker数 | `4` |
 | `INKU_STAGE_QUEUE_LIMIT` | pipeline queue上限 | worker数の2倍 |
+| `INKU_RENDER_CONCURRENCY` | 同時Renderer実行上限 | 2 |
 
 queue上限時も履歴DB保存を優先し、artifact保存だけをskipします。providerの無料queueによる遅延と、server worker不足を区別してください。
 

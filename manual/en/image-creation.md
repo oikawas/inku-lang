@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers artwork creation with the Web UI and CLI in inku v1.82 (Web Build 563). A description passes through interpretation, deterministic intermediate expansion, structuring, and rendering.
+This guide covers artwork creation with the Web UI and CLI in inku v1.85 (Web Build 564). A description passes through interpretation, deterministic intermediate expansion, structuring, and rendering.
 
 ```text
 description -> normalized DDL -> expanded DDL -> JSON Score -> SVG

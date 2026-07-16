@@ -744,7 +744,7 @@
 								<Tooltip text={blocked ? (isJapanese ? '対象作品と同じ言語構成です' : 'Same language combination as the target') : ''}>
 									<label class="model-choice" class:checked={checked} class:target={blocked} class:disabled={blocked}>
 										<input type="checkbox" checked={checked} disabled={languageInspectionBusy || blocked} onchange={() => onToggleLanguageInspectionLang(typedLang)} />
-										<span><strong>{typedLang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : 'English'}</strong><small>{blocked ? (isJapanese ? '対象作品で使用中' : 'used by target') : ''}</small></span>
+										<span><strong>{typedLang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : 'English'}</strong><small>{blocked ? (isJapanese ? '対象作品で使用中' : 'Used by Target') : ''}</small></span>
 									</label>
 								</Tooltip>
 							{/each}
@@ -796,9 +796,9 @@
 	</div>
 
 	{#if generationInfoOpen}
-		<aside class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}>
+		<aside class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation Info'}>
 			<header class="generation-info-head">
-				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}</strong>
+				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation Info'}</strong>
 				<button type="button" class="generation-info-close" onclick={() => (generationInfoOpen = false)} aria-label="Close">&times;</button>
 			</header>
 			<div class="generation-info-tabs" role="tablist">
@@ -810,15 +810,15 @@
 				{#if generationInfoTab === 'details'}
 					<div class="generation-details">
 						<dl>
-							<dt>Stage 1 ({isJapanese ? '\u89e3\u91c8' : 'interpretation'})</dt><dd>{statusStage1Model}</dd>
-							<dt>Stage 2 ({isJapanese ? '\u63cf\u753b' : 'rendering'})</dt><dd>{statusStage2Model}</dd>
-							<dt>Stage 1 {isJapanese ? '\u8a00\u8a9e' : 'language'}</dt><dd>{displayLanguageName(detailStage1Lang)}</dd>
-							<dt>Stage 2 {isJapanese ? '\u8a00\u8a9e' : 'language'}</dt><dd>{displayLanguageName(detailStage2Lang)}</dd>
+							<dt>Stage 1 ({isJapanese ? '\u89e3\u91c8' : 'Interpretation'})</dt><dd>{statusStage1Model}</dd>
+							<dt>Stage 2 ({isJapanese ? '\u63cf\u753b' : 'Rendering'})</dt><dd>{statusStage2Model}</dd>
+							<dt>Stage 1 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage1Lang)}</dd>
+							<dt>Stage 2 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage2Lang)}</dd>
 							<dt>{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</dt><dd>{statusCatalogName}</dd>
 							<dt>{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</dt><dd>{statusCanvasName}</dd>
 							<dt>render seed</dt><dd>{detailRenderSeed ?? '-'}</dd>
-							<dt>{isJapanese ? '\u914d\u7f6e seed' : 'layout seed'}</dt><dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
-							<dt>{isJapanese ? '\u89e3\u91c8 seed' : 'interpretation seed'}</dt><dd>{detailInterpretationSeed ?? '-'}</dd>
+							<dt>{isJapanese ? '\u914d\u7f6e seed' : 'Layout Seed'}</dt><dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
+							<dt>{isJapanese ? '\u89e3\u91c8 seed' : 'Interpretation Seed'}</dt><dd>{detailInterpretationSeed ?? '-'}</dd>
 							<dt>render hash</dt><dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
 							<dt>description hash</dt><dd><code>{detailDescriptionHash || '-'}</code></dd>
 							<dt>render engine</dt><dd>{detailEngine || '-'}{detailEngineVersion ? ' / ' + detailEngineVersion : ''}</dd>
@@ -887,7 +887,7 @@
 				disabled={!result && !allowEmptyOutputTabs}
 				aria-expanded={generationInfoOpen}
 				onclick={() => (generationInfoOpen = !generationInfoOpen)}
-			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation info'}</button>
+			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation Info'}</button>
 		</Tooltip>
 		<div class="png-wrap">
 			<Tooltip placement="left" text={t().tooltipCanvasDownloadSvg}>
@@ -1057,14 +1057,15 @@
 	.rtab.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 500; }
 	.rtab:hover:not(.active):not(:disabled) { color: var(--fg); }
 	.rtab:disabled { opacity: 0.35; cursor: not-allowed; }
-	.rtab-spacer { flex: 1; min-width: 12px; }
+	.rtab-spacer { flex: 0 0 12px; }
 	.render-meta-strip {
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
 		gap: 10px;
 		min-width: 0;
-		max-width: min(68vw, 760px);
+		flex: 1 1 auto;
+		max-width: none;
 		overflow: hidden;
 		font-size: 11px;
 		color: var(--fg3);
@@ -1092,6 +1093,24 @@
 	.render-meta-created strong {
 		max-width: none;
 		font-variant-numeric: tabular-nums;
+	}
+	@media (max-width: 1180px) {
+		.right-tabs { flex-wrap: wrap; padding-inline: 10px; }
+		.rtab { padding-inline: 12px; }
+		.rtab-spacer { display: none; }
+		.render-meta-strip {
+			order: 2;
+			flex: 1 0 100%;
+			justify-content: flex-start;
+			gap: 12px;
+			padding: 4px 0 6px;
+			overflow-x: auto;
+			overflow-y: hidden;
+			scrollbar-width: thin;
+		}
+		.render-meta-item { flex: 0 0 auto; }
+		.render-meta-item strong { max-width: none; }
+		.generation-info { top: 68px; }
 	}
 	.canvas-area {
 		flex: 1;

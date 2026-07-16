@@ -917,7 +917,8 @@ def test_compose_composer_failure_returns_502(monkeypatch, auth_context):
     monkeypatch.setattr(api_module, "compose", boom)
     r = client.post("/api/compose", json={"ddl": "中心に円"}, headers=headers)
     assert r.status_code == 502
-    assert "haiku unavailable" in r.json()["detail"]
+    assert r.json()["detail"] == "compose failed"
+    assert "haiku unavailable" not in r.text
 
 
 def test_compose_empty_instruction_result_is_retried(monkeypatch, auth_context):

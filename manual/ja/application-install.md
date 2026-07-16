@@ -1,6 +1,6 @@
 # アプリケーションインストール
 
-この文書は、未リリース版inku v1.82をLinuxサーバーへ新規導入または更新するための標準手順です。参照構成はsystemd、SQLite、Vite開発サーバーです。公衆インターネットへ公開する場合は、TLS reverse proxyとproduction向けSvelteKit adapterを別途設計してください。
+この文書は、未リリース版inku v1.85をLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。
 
 ## 1. 構成
 
@@ -255,3 +255,19 @@ sudo systemctl disable --now inku-api.service
 ```
 
 DB、暗号化鍵、出力artifactを削除すると復旧できません。保持期限とbackup確認後に削除してください。
+
+## 16. コンテナ実行
+
+従来のuv、npm、systemd開発・運用手順は維持されています。コンテナ実行はrootの compose.yaml を使う追加経路です。
+
+    export INKU_ORIGIN=http://localhost:5173
+    export INKU_BOOTSTRAP_ADMIN_PASSWORD='replace-with-a-long-secret'
+    docker compose build
+    docker compose up -d
+    docker compose ps
+
+Webは5173番portで公開し、Node serverが同一originの /api requestを内部FastAPI containerへproxyします。SQLite、backup、artifactは inku-data volumeに永続化されます。API containerは非root userで動作します。
+
+初回admin作成に必要な環境変数やprovider keyはshell historyへ残さず、productionではCompose secretsまたは権限制限したenv fileから渡してください。TLS終端時は INKU_ORIGIN を公開HTTPS URLへ、INKU_SESSION_COOKIE_SECURE を1へ設定します。
+
+停止は docker compose down、volumeを残した再作成は docker compose up -d --build です。docker compose down -v はDBを含むvolumeを破棄するため、backup確認なしに実行しないでください。

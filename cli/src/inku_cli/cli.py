@@ -195,7 +195,12 @@ def clear_config(path: Path | None = None) -> None:
         pass
 
 def _join_url(base_url: str, path: str) -> str:
-    return urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
+    parsed = urllib.parse.urlsplit(path)
+    if parsed.scheme or parsed.netloc:
+        raise CliError("API path must be relative to the configured inku server")
+    if parsed.query or parsed.fragment:
+        raise CliError("put query parameters in --query and omit URL fragments")
+    return urllib.parse.urljoin(base_url.rstrip("/") + "/", parsed.path.lstrip("/"))
 
 def _extract_session_token(set_cookie: str | None) -> str | None:
     if not set_cookie:
@@ -222,30 +227,55 @@ class ApiClient:
         method: str,
         path: str,
         *,
-        data: dict[str, Any] | None = None,
+        data: Any = None,
         query: dict[str, Any] | None = None,
         auth: bool = True,
-    ) -> tuple[dict[str, Any], urllib.response.addinfourl]:
+        headers: dict[str, str] | None = None,
+    ) -> tuple[Any, urllib.response.addinfourl]:
+        raw, response = self.request_raw(
+            method,
+            path,
+            data=data,
+            query=query,
+            auth=auth,
+            headers=headers,
+        )
+        try:
+            parsed = json.loads(raw.decode("utf-8")) if raw else {}
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise CliError("server returned a non-JSON response; use `inku-cli api --output`") from exc
+        return parsed, response
+
+    def request_raw(
+        self,
+        method: str,
+        path: str,
+        *,
+        data: Any = None,
+        query: dict[str, Any] | None = None,
+        auth: bool = True,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[bytes, urllib.response.addinfourl]:
         url = _join_url(self.base_url, path)
         if query:
             clean_query = {k: v for k, v in query.items() if v is not None}
             if clean_query:
                 url += "?" + urllib.parse.urlencode(clean_query)
         body = None
-        headers = {"Accept": "application/json"}
+        request_headers = {"Accept": "application/json"}
+        request_headers.update(headers or {})
         if data is not None:
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-            headers["Content-Type"] = "application/json"
+            request_headers.setdefault("Content-Type", "application/json")
         if auth:
             if not self.token:
                 raise CliError("not logged in; run `inku-cli login` first")
-            headers["Authorization"] = f"Bearer {self.token}"
-        req = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
+            request_headers["Authorization"] = f"Bearer {self.token}"
+        req = urllib.request.Request(url, data=body, headers=request_headers, method=method.upper())
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
                 raw = response.read()
-                parsed = json.loads(raw.decode("utf-8")) if raw else {}
-                return parsed, response
+                return raw, response
         except urllib.error.HTTPError as exc:
             message = exc.reason
             try:
@@ -262,38 +292,19 @@ class ApiClient:
         method: str,
         path: str,
         *,
-        data: dict[str, Any] | None = None,
+        data: Any = None,
         query: dict[str, Any] | None = None,
         auth: bool = True,
     ) -> str:
-        url = _join_url(self.base_url, path)
-        if query:
-            clean_query = {k: v for k, v in query.items() if v is not None}
-            if clean_query:
-                url += "?" + urllib.parse.urlencode(clean_query)
-        body = None
-        headers = {"Accept": "image/svg+xml,text/plain,*/*"}
-        if data is not None:
-            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-            headers["Content-Type"] = "application/json"
-        if auth:
-            if not self.token:
-                raise CliError("not logged in; run `inku-cli login` first")
-            headers["Authorization"] = f"Bearer {self.token}"
-        req = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
-                return response.read().decode("utf-8")
-        except urllib.error.HTTPError as exc:
-            message = exc.reason
-            try:
-                parsed_error = json.loads(exc.read().decode("utf-8"))
-                message = parsed_error.get("detail") or parsed_error.get("message") or str(parsed_error)
-            except Exception:
-                pass
-            raise CliError(f"HTTP {exc.code}: {message}") from exc
-        except urllib.error.URLError as exc:
-            raise CliError(f"failed to connect to {self.base_url}: {exc.reason}") from exc
+        raw, _ = self.request_raw(
+            method,
+            path,
+            data=data,
+            query=query,
+            auth=auth,
+            headers={"Accept": "image/svg+xml,text/plain,*/*"},
+        )
+        return raw.decode("utf-8")
 
 def _cli_version() -> str:
     try:
@@ -655,7 +666,7 @@ def _png_occupancy_grid(path: Path, *, cells: int = 16) -> list[float]:
         raise CliError("analyze --diversity requires Pillow") from exc
     with Image.open(path) as image:
         image = image.convert("L").resize((cells, cells))
-        pixels = list(image.getdata())
+        pixels = list(image.get_flattened_data())
     return [1.0 - (float(pixel) / 255.0) for pixel in pixels]
 
 def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
@@ -2698,6 +2709,335 @@ def command_history_export(args: argparse.Namespace) -> int:
     _print_json(summary)
     return 0
 
+
+def command_lineage(args: argparse.Namespace) -> int:
+    import uuid
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.lineage_cmd == "show":
+        try:
+            data, _ = client.request(
+                "GET",
+                f"/api/history/{args.item_id}/lineage",
+                query={"descendant_depth": args.depth, "node_limit": args.limit}
+            )
+        except CliError:
+            data, _ = client.request(
+                "GET",
+                f"/api/lineage/{args.item_id}",
+                query={"descendant_depth": args.depth, "node_limit": args.limit}
+            )
+        if args.json:
+            _print_json(data)
+        else:
+            focus_id = data.get("focus_node_id")
+            nodes = {n["id"]: n for n in data.get("nodes", [])}
+            edges_by_parent = {}
+            edges_by_child = {}
+            for edge in data.get("edges", []):
+                edges_by_parent.setdefault(edge["parent_node_id"], []).append(edge)
+                edges_by_child[edge["child_node_id"]] = edge
+            
+            roots = [n for n in nodes.values() if n["id"] not in edges_by_child]
+            
+            def print_tree(node_id, indent=0):
+                node = nodes.get(node_id)
+                if not node:
+                    return
+                is_focus = "[Displayed]" if node_id == focus_id else ""
+                edge = edges_by_child.get(node_id)
+                op = f"({edge['derivation_kind']})" if edge else "(Root)"
+                text = ""
+                if node.get("history"):
+                    text = node["history"].get("source_text") or node["history"].get("input") or ""
+                elif node.get("state") == "tombstone":
+                    text = "[Deleted]"
+                elif node.get("state") == "lineage_only":
+                    text = "[Intermediate]"
+                
+                print("  " * indent + f"- {op} {node_id[:8]} {is_focus} : {text}")
+                for child_edge in sorted(edges_by_parent.get(node_id, []), key=lambda e: e.get("at", 0)):
+                    print_tree(child_edge["child_node_id"], indent + 1)
+
+            print("Artwork Lineage:")
+            for root in roots:
+                print_tree(root["id"])
+    elif args.lineage_cmd == "promote":
+        data, _ = client.request("POST", f"/api/lineage/{args.node_id}/promote")
+        _print_json(data)
+    return 0
+
+
+def command_refine(args: argparse.Namespace) -> int:
+    import uuid
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.refine_cmd == "generate":
+        history_data, _ = client.request("GET", "/api/history", query={"limit": 100})
+        items = history_data.get("items", [])
+        target = next((item for item in items if item["id"] == args.item_id), None)
+        if not target:
+            target_list = client.request("GET", "/api/history", query={"q": args.item_id})[0].get("items", [])
+            target = next((item for item in target_list if item["id"] == args.item_id), None)
+            if not target:
+                raise CliError(f"history item {args.item_id} not found")
+        
+        parent_node_id = target.get("lineage_node_id")
+        if not parent_node_id:
+            raise CliError(f"lineage node ID is missing on item {args.item_id}")
+        
+        derivation_kind = "touch_variation"
+        if args.kind == "touch":
+            derivation_kind = "touch_variation"
+        elif args.kind == "layout":
+            derivation_kind = "layout_variation"
+        elif args.kind == "reading":
+            derivation_kind = "reinterpretation"
+        elif args.kind == "color":
+            derivation_kind = "catalog_change"
+
+        params = {
+            "text": args.text or target.get("source_text") or target.get("input") or "",
+            "save_history": args.save_history,
+            "lineage_parent_node_id": parent_node_id,
+            "derivation_kind": derivation_kind,
+        }
+        
+        if args.kind == "touch":
+            params["render_seed"] = int(time.time() * 1000) & 0x7fffffff
+            params["vary_seed"] = target.get("vary_seed")
+            params["interpretation_seed"] = target.get("interpretation_seed")
+            params["catalog_id"] = target.get("render_color_catalog_id")
+        elif args.kind == "layout":
+            params["render_seed"] = target.get("render_seed")
+            params["vary_seed"] = int(time.time() * 1000) & 0x7fffffff
+            params["interpretation_seed"] = target.get("interpretation_seed")
+            params["catalog_id"] = target.get("render_color_catalog_id")
+        elif args.kind == "reading":
+            params["render_seed"] = target.get("render_seed")
+            params["vary_seed"] = target.get("vary_seed")
+            params["interpretation_seed"] = str(uuid.uuid4())
+            params["catalog_id"] = target.get("render_color_catalog_id")
+        elif args.kind == "color":
+            params["render_seed"] = target.get("render_seed")
+            params["vary_seed"] = target.get("vary_seed")
+            params["interpretation_seed"] = target.get("interpretation_seed")
+            params["random_color_catalog"] = True
+            
+        data, _ = client.request("POST", "/api/paint", data=params)
+        
+        if args.out_dir:
+            out_dir = Path(args.out_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            stem = f"refine-{args.kind}-{data.get('render_hash_short', 'item')}"
+            _write_json_file(out_dir / f"{stem}.json", data)
+            (out_dir / f"{stem}.svg").write_text(data["svg"], encoding="utf-8")
+            print(f"Saved: {out_dir}/{stem}.[json|svg]")
+            if args.png:
+                try:
+                    import cairosvg
+                    cairosvg.svg2png(bytestring=data["svg"].encode("utf-8"), write_to=str(out_dir / f"{stem}.png"))
+                except ImportError:
+                    pass
+        else:
+            _print_json(data)
+
+    elif args.refine_cmd == "save":
+        try:
+            score = json.loads(Path(args.file).read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise CliError(f"failed to read score file: {args.file}") from exc
+        
+        svg = ""
+        if args.svg_file:
+            try:
+                svg = Path(args.svg_file).read_text(encoding="utf-8")
+            except Exception as exc:
+                raise CliError(f"failed to read svg file: {args.svg_file}") from exc
+        
+        params = {
+            "id": str(uuid.uuid4()),
+            "user_id": "",
+            "at": int(time.time() * 1000),
+            "input": args.input_text,
+            "ddl": args.ddl_text or "",
+            "score": score,
+            "svg": svg,
+            "lineage_parent_node_id": args.parent_node_id,
+            "derivation_kind": args.kind,
+            "history_visibility": args.visibility,
+        }
+        data, _ = client.request("POST", "/api/history", data=params)
+        _print_json(data)
+    return 0
+
+
+def command_inspect(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    models = [m.strip() for m in args.models.split(",") if m.strip()]
+    if not models:
+        raise CliError("at least one model is required for inspection")
+        
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
+    results = {}
+    for model in models:
+        print(f"Running inspection with model: {model}...")
+        params = {
+            "text": args.text,
+            "stage1_model": model,
+            "stage2_model": model,
+            "save_history": False,
+            "count_generation": False,
+        }
+        try:
+            data, _ = client.request("POST", "/api/paint", data=params)
+            results[model] = {
+                "success": True,
+                "ddl": data.get("ddl"),
+                "render_hash": data.get("render_hash_short"),
+            }
+            safe_model_name = model.replace("/", "_").replace(":", "_")
+            _write_json_file(out_dir / f"inspect-{safe_model_name}.json", data)
+            (out_dir / f"inspect-{safe_model_name}.svg").write_text(data["svg"], encoding="utf-8")
+            
+            if args.png:
+                try:
+                    import cairosvg
+                    cairosvg.svg2png(bytestring=data["svg"].encode("utf-8"), write_to=str(out_dir / f"inspect-{safe_model_name}.png"))
+                except ImportError:
+                    pass
+        except Exception as exc:
+            print(f"Model {model} failed: {exc}", file=sys.stderr)
+            results[model] = {"success": False, "error": str(exc)}
+            
+    _write_json_file(out_dir / "inspection-summary.json", results)
+    _print_json(results)
+    return 0
+
+
+def command_review(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.review_cmd == "evaluate":
+        api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("NVIDIA_NIM_API_KEY")
+        if not api_key:
+            raise CliError("NVIDIA_API_KEY is required for vision evaluation")
+        
+        image_path = Path(args.png_file)
+        if not image_path.exists():
+            raise CliError(f"image file not found: {args.png_file}")
+            
+        prompt = args.prompt or (
+            "Evaluate this abstract vector drawing. Analyze the color harmony, composition "
+            "balance, negative space pressure, and overall visual eventfulness. "
+            "Provide a score from 0 to 100 for each metric, and summarize your feedback in one sentence."
+        )
+        
+        print(f"Sending vision NIM evaluation for {image_path.name}...")
+        feedback = _nim_vision_chat(image_path, prompt, api_key=api_key, model=args.model)
+        _print_json({
+            "image": image_path.name,
+            "model": args.model,
+            "evaluation": feedback
+        })
+    elif args.review_cmd == "unread":
+        params = {
+            "word": args.word,
+            "context": args.context,
+        }
+        data, _ = client.request("POST", "/api/feedback/unread-words", data=params)
+        _print_json({
+            "ok": True,
+            "word": args.word,
+            "context": args.context,
+            "message": "Unread word successfully reported to server."
+        })
+    return 0
+
+
+def _key_value_pairs(values: list[str], *, option: str) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for value in values:
+        key, separator, item_value = value.partition("=")
+        key = key.strip()
+        if not separator or not key:
+            raise CliError(f"{option} values must use KEY=VALUE")
+        parsed[key] = item_value
+    return parsed
+
+
+def _api_json_body(args: argparse.Namespace) -> Any:
+    if args.data is not None and args.file is not None:
+        raise CliError("--data and --file are mutually exclusive")
+    if args.file is not None:
+        raw = sys.stdin.read() if args.file == "-" else Path(args.file).read_text(encoding="utf-8")
+    else:
+        raw = args.data
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise CliError(f"invalid JSON request body: {exc}") from exc
+
+
+def command_api(args: argparse.Namespace) -> int:
+    path = args.path if args.path.startswith("/") else f"/{args.path}"
+    if path != "/health" and not path.startswith("/api/"):
+        raise CliError("path must be /health or start with /api/")
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    raw, response = client.request_raw(
+        args.method,
+        path,
+        data=_api_json_body(args),
+        query=_key_value_pairs(args.query, option="--query"),
+        auth=not args.no_auth,
+        headers=_key_value_pairs(args.header, option="--header"),
+    )
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(raw)
+        print(output_path)
+        return 0
+    content_type = response.headers.get("content-type", "")
+    if "json" in content_type:
+        try:
+            _print_json(json.loads(raw.decode("utf-8")) if raw else {})
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise CliError("server declared JSON but returned an invalid body") from exc
+    else:
+        text_value = raw.decode("utf-8")
+        sys.stdout.write(text_value)
+        if text_value and not text_value.endswith("\n"):
+            sys.stdout.write("\n")
+    return 0
+
+
 def command_version(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -2889,9 +3229,93 @@ def build_parser() -> argparse.ArgumentParser:
     history_export.add_argument("--starred", action="store_true", help="filter history to starred items before resolving hashes")
     history_export.set_defaults(func=command_history_export)
 
+    api_command = subparsers.add_parser(
+        "api",
+        help="call any public inku HTTP API endpoint with the stored session",
+    )
+    _add_common_server_args(api_command)
+    api_command.add_argument("method", type=str.upper, choices=["GET", "POST", "PUT", "PATCH", "DELETE"])
+    api_command.add_argument("path", help="relative endpoint path, for example /api/lineage/NODE_ID")
+    api_command.add_argument("--data", help="JSON request body")
+    api_command.add_argument("--file", "-f", help="read JSON request body from a UTF-8 file, or '-'")
+    api_command.add_argument("--query", action="append", default=[], metavar="KEY=VALUE")
+    api_command.add_argument("--header", action="append", default=[], metavar="KEY=VALUE")
+    api_command.add_argument("--no-auth", action="store_true", help="omit the stored session for public endpoints")
+    api_command.add_argument("--output", "-o", help="write the raw response body to a file")
+    api_command.set_defaults(func=command_api)
+
     version_cmd = subparsers.add_parser("version", help="show CLI and server version/build information")
     _add_common_server_args(version_cmd)
     version_cmd.set_defaults(func=command_version)
+
+    # lineage
+    lineage = subparsers.add_parser("lineage", help="show or control artwork lineage")
+    _add_common_server_args(lineage)
+    lineage_sub = lineage.add_subparsers(dest="lineage_cmd", required=True)
+    
+    lineage_show = lineage_sub.add_parser("show", help="show lineage tree for a work")
+    lineage_show.add_argument("item_id", help="history item ID or lineage node ID")
+    lineage_show.add_argument("--depth", type=int, default=2, help="descendant search depth")
+    lineage_show.add_argument("--limit", type=int, default=200, help="max nodes to load")
+    lineage_show.add_argument("--json", action="store_true", help="output raw JSON")
+    
+    lineage_promote = lineage_sub.add_parser("promote", help="promote a lineage-only node to regular history")
+    lineage_promote.add_argument("node_id", help="lineage node ID to promote")
+    
+    lineage_show.set_defaults(func=command_lineage)
+    lineage_promote.set_defaults(func=command_lineage)
+
+    # refine
+    refine = subparsers.add_parser("refine", help="generate refined options from an existing work")
+    _add_common_server_args(refine)
+    refine_sub = refine.add_subparsers(dest="refine_cmd", required=True)
+    
+    refine_gen = refine_sub.add_parser("generate", help="generate a variation option from a work")
+    refine_gen.add_argument("item_id", help="target history item ID to refine")
+    refine_gen.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
+    refine_gen.add_argument("--text", help="override input text for layout/reading variations")
+    refine_gen.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
+    refine_gen.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
+    refine_gen.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")
+    refine_gen.add_argument("--png", action="store_true", help="generate PNG rendering in output directory")
+    
+    refine_save = refine_sub.add_parser("save", help="save a candidate score into history connected to a parent")
+    refine_save.add_argument("parent_node_id", help="parent lineage node ID")
+    refine_save.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="derivation kind")
+    refine_save.add_argument("--file", required=True, help="path to Score JSON file")
+    refine_save.add_argument("--svg-file", help="path to SVG file")
+    refine_save.add_argument("--input-text", required=True, help="original user text")
+    refine_save.add_argument("--ddl-text", help="normalized DDL text")
+    refine_save.add_argument("--visibility", choices=("normal", "lineage_only"), default="normal", help="history visibility")
+    
+    refine_gen.set_defaults(func=command_refine)
+    refine_save.set_defaults(func=command_refine)
+
+    # inspect
+    inspect_cmd = subparsers.add_parser("inspect", help="parallel model inspection comparison")
+    _add_common_server_args(inspect_cmd)
+    inspect_cmd.add_argument("text", help="input text to translate and draw")
+    inspect_cmd.add_argument("--models", required=True, help="comma-separated list of models to inspect")
+    inspect_cmd.add_argument("-o", "--out-dir", required=True, help="directory to save comparison files")
+    inspect_cmd.add_argument("--png", action="store_true", help="generate PNG renderings")
+    inspect_cmd.set_defaults(func=command_inspect)
+
+    # review
+    review = subparsers.add_parser("review", help="evaluate drawings and submit feedback")
+    _add_common_server_args(review)
+    review_sub = review.add_subparsers(dest="review_cmd", required=True)
+    
+    review_eval = review_sub.add_parser("evaluate", help="evaluate drawing visual quality via Vision NIM")
+    review_eval.add_argument("png_file", help="path to PNG image file of the drawing")
+    review_eval.add_argument("--model", default="nvidia/neva-22b", help="NVIDIA NIM vision model name")
+    review_eval.add_argument("--prompt", help="override vision review prompt")
+    
+    review_unread = review_sub.add_parser("unread", help="submit an unread word feedback to server")
+    review_unread.add_argument("word", help="the word that failed interpretation")
+    review_unread.add_argument("--context", required=True, help="surrounding sentence or prompt context")
+    
+    review_eval.set_defaults(func=command_review)
+    review_unread.set_defaults(func=command_review)
 
     return parser
 

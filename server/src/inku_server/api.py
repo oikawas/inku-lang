@@ -19,12 +19,13 @@ import urllib.parse
 import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import BoundedSemaphore, Lock
 
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -48,6 +49,7 @@ from .plugins import (
 )
 from .renderer import SVG_PROFILES, new_render_seed
 from .render_engines import current_render_engine
+from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware, SlidingWindowRateLimiter
 from .schema import CanvasSpec, Score
 from .model_settings import (
     connection_for,
@@ -92,16 +94,41 @@ _stage_stats = {
     "timed_out": 0,
     "rejected": 0,
 }
+_RENDER_CONCURRENCY = max(1, int(os.getenv("INKU_RENDER_CONCURRENCY", "2")))
+_render_slots = BoundedSemaphore(_RENDER_CONCURRENCY)
 _logger = logging.getLogger(__name__)
 _HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 _SESSION_COOKIE_NAME = "inku_session"
 _SESSION_COOKIE_MAX_AGE = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
 _SESSION_COOKIE_SECURE = os.getenv("INKU_SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
+_MAX_REQUEST_BODY_BYTES = max(1024, int(os.getenv("INKU_MAX_REQUEST_BODY_BYTES", str(16 * 1024 * 1024))))
+_MAX_CONCURRENT_REQUESTS = max(1, int(os.getenv("INKU_MAX_CONCURRENT_REQUESTS", "64")))
+_LOGIN_RATE_ATTEMPTS = max(1, int(os.getenv("INKU_LOGIN_RATE_ATTEMPTS", "10")))
+_LOGIN_RATE_WINDOW_SECONDS = max(1, int(os.getenv("INKU_LOGIN_RATE_WINDOW_SECONDS", "60")))
+_login_rate_limiter = SlidingWindowRateLimiter(
+    attempts=_LOGIN_RATE_ATTEMPTS,
+    window_seconds=_LOGIN_RATE_WINDOW_SECONDS,
+)
 _SRGB_COLOR_PROFILE = {
     "id": "srgb",
     "name": "sRGB IEC61966-2.1",
     "standard": "IEC 61966-2-1:1999",
 }
+
+
+def _unexpected_http_error(operation: str, status_code: int) -> HTTPException:
+    _logger.exception("%s failed", operation)
+    return HTTPException(status_code=status_code, detail=f"{operation} failed")
+
+
+@contextmanager
+def _render_capacity():
+    if not _render_slots.acquire(blocking=False):
+        raise HTTPException(status_code=503, detail="render capacity is full", headers={"Retry-After": "1"})
+    try:
+        yield
+    finally:
+        _render_slots.release()
 
 
 def _normalize_instruction_lang(value: str | None, *, default: str = "ja") -> str:
@@ -370,12 +397,13 @@ def _render_score_svg(
     if canvas is not None:
         score = _score_with_canvas(score, canvas)
     render_metadata = _render_metadata(_resolved_catalog_id(catalog_id))
-    return current_render_engine().render(
-        score,
-        color_map=render_metadata["render_color_map"],
-        svg_profile=_validated_svg_profile(svg_profile),
-        render_seed=render_seed,
-    ).svg
+    with _render_capacity():
+        return current_render_engine().render(
+            score,
+            color_map=render_metadata["render_color_map"],
+            svg_profile=_validated_svg_profile(svg_profile),
+            render_seed=render_seed,
+        ).svg
 
 
 def _history_output_prefix(item: dict) -> Path:
@@ -540,12 +568,13 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
 def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: str | None = None) -> tuple[str, dict]:
     effective_seed = int(render_metadata.get("render_seed") or new_render_seed())
     render_metadata = {**render_metadata, "render_seed": effective_seed}
-    result = current_render_engine().render(
-        score,
-        color_map=render_metadata["render_color_map"],
-        svg_profile=_validated_svg_profile(svg_profile),
-        render_seed=effective_seed,
-    )
+    with _render_capacity():
+        result = current_render_engine().render(
+            score,
+            color_map=render_metadata["render_color_map"],
+            svg_profile=_validated_svg_profile(svg_profile),
+            render_seed=effective_seed,
+        )
     return result.svg, {**render_metadata, **result.metadata}
 
 
@@ -616,21 +645,29 @@ def _coerce_relation_report(before: Score | None, after: Score | None) -> dict[s
     }
 
 
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("INKU_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=_cors_origins,
     allow_origin_regex=r"http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestBodyLimitMiddleware, max_bytes=_MAX_REQUEST_BODY_BYTES)
+app.add_middleware(ConcurrencyLimitMiddleware, max_requests=_MAX_CONCURRENT_REQUESTS)
 
 
 class ComposeRequest(BaseModel):
-    ddl: str = Field(..., min_length=1, description="正規化DDL テキスト")
+    ddl: str = Field(..., min_length=1, max_length=100_000, description="正規化DDL テキスト")
     model: str | None = Field(
         default=None, description="Stage 2 モデル名 (未指定時は OPENAI_MODEL 既定)"
     )
-    original_text: str | None = Field(default=None, description="元のユーザー記述 (省略可)")
+    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述 (省略可)")
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
     ui_lang: str | None = Field(default=None, description="UI表示言語")
     color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
@@ -683,8 +720,8 @@ class ComposeResponse(BaseModel):
 
 
 class InterpretRequest(BaseModel):
-    text: str = Field(..., min_length=1, description="自由な自然言語の記述")
-    original_text: str | None = Field(default=None, description="元のユーザー記述")
+    text: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
+    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
     model: str | None = Field(
         default=None, description="Stage 1 モデル名 (未指定時は OPENAI_MODEL_STAGE1 既定)"
     )
@@ -704,8 +741,8 @@ class InterpretResponse(BaseModel):
 
 
 class PaintRequest(BaseModel):
-    text: str = Field(..., min_length=1, description="自由な自然言語の記述")
-    original_text: str | None = Field(default=None, description="元のユーザー記述")
+    text: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
+    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
@@ -932,6 +969,7 @@ class HistoryItem(HistoryPostBody):
     description_hash: str | None = None
     lineage_node_id: str | None = None
     lineage_root_node_id: str | None = None
+    data_warnings: list[str] = Field(default_factory=list)
 
 
 class HistoryListResponse(BaseModel):
@@ -957,7 +995,7 @@ class HistoryLineageGroupListResponse(BaseModel):
 
 
 class HistoryIdsBody(BaseModel):
-    ids: list[str] = Field(default_factory=list)
+    ids: list[str] = Field(default_factory=list, max_length=1000)
 
 
 class HistoryStarBody(BaseModel):
@@ -1017,8 +1055,8 @@ class UserProfileUpdateBody(BaseModel):
 
 
 class LoginBody(BaseModel):
-    username: str = Field(..., min_length=1)
-    password: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=1, max_length=320)
+    password: str = Field(..., min_length=1, max_length=1024)
 
 
 class LoginResponse(BaseModel):
@@ -1293,10 +1331,20 @@ def api_color_catalogs() -> ColorCatalogsResponse:
 
 
 @app.post("/api/auth/login", response_model=LoginResponse)
-def api_auth_login(body: LoginBody, response: Response) -> LoginResponse:
+def api_auth_login(body: LoginBody, response: Response, request: Request) -> LoginResponse:
+    client_host = request.client.host if request.client else "unknown"
+    rate_key = f"{client_host}:{body.username.strip().casefold()}"
+    rate_result = _login_rate_limiter.check(rate_key)
+    if not rate_result.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="too many login attempts",
+            headers={"Retry-After": str(rate_result.retry_after)},
+        )
     user = _db.authenticate_user(body.username, body.password)
     if not user:
         raise HTTPException(status_code=401, detail="invalid username or password")
+    _login_rate_limiter.reset(rate_key)
     token = _db.create_session(user["id"])
     _set_session_cookie(response, token)
     return LoginResponse(user=UserAccountItem(**user))
@@ -1344,7 +1392,7 @@ def api_auth_me_profile(body: UserProfileUpdateBody, actor: dict = Depends(_curr
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=409, detail=f"profile update failed: {e}") from e
+        raise _unexpected_http_error("profile update", 409) from e
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)
@@ -2148,7 +2196,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             vary_seed=req.vary_seed,
         )
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
+        raise _unexpected_http_error("compose", 502) from e
 
     coerce_report: dict[str, object] = _coerce_relation_report(None, None)
     try:
@@ -2160,7 +2208,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             score = coerce_score(score, branch_report=branch_counts, ddl=_coerce_context(compose_detail.ddl, req.original_text))
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
+        raise _unexpected_http_error("compose", 502) from e
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
@@ -2176,8 +2224,10 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     }
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
+    except HTTPException:
+        raise
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
+        raise _unexpected_http_error("render", 500) from e
     render_metadata = {
         **render_metadata,
         **_render_hash_metadata(
@@ -2224,7 +2274,7 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
             lang=instruction_lang_resolved,
         )
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
+        raise _unexpected_http_error("interpret", 502) from e
     if req.expand_intermediate:
         detail.ddl = expand_intermediate_for_lang(detail.ddl, lang=instruction_lang_resolved, context_text=source_text)
     data: dict = {
@@ -2401,7 +2451,7 @@ def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_curre
     try:
         instruction = _generate_demo_instruction(req.seed_phrase, model=req.model, lang=instruction_lang)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"demo instruction failed: {e}") from e
+        raise _unexpected_http_error("demo instruction", 502) from e
     return DemoInstructionResponse(instruction=instruction)
 
 
@@ -2436,7 +2486,7 @@ def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_us
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=422, detail=f"score render failed: {e}") from e
+        raise _unexpected_http_error("score render", 422) from e
     return RenderScoreResponse(score=score, svg=svg, catalog_id=catalog_id, **render_metadata)
 
 
@@ -2454,7 +2504,7 @@ def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user))
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=422, detail=f"svg render failed: {e}") from e
+        raise _unexpected_http_error("svg render", 422) from e
     return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
 
 
@@ -2482,6 +2532,7 @@ def _add_history_item(
     lineage_parent_node_id: str | None = None,
     derivation_kind: str | None = None,
     derivation_metadata: dict[str, object] | None = None,
+    idempotency_key: str | None = None,
 ) -> dict:
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
@@ -2522,6 +2573,7 @@ def _add_history_item(
 "lineage_parent_node_id": lineage_parent_node_id,
 "derivation_kind": derivation_kind,
 "derivation_metadata": derivation_metadata or {},
+"idempotency_key": idempotency_key,
 **metadata,
     })
     except ValueError as exc:
@@ -2537,7 +2589,11 @@ def _add_history_item(
 
 
 @app.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
-def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintResponse:
+def api_paint(
+    req: PaintRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> PaintResponse:
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
@@ -2557,7 +2613,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             lang=instruction_lang_resolved,
         )
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"interpret failed: {e}") from e
+        raise _unexpected_http_error("interpret", 502) from e
     ddl = interpret_detail_result.ddl
     ddl = expand_intermediate_for_lang(ddl, lang=instruction_lang_resolved, context_text=source_text, vary_seed=req.vary_seed)
     t1 = time.perf_counter()
@@ -2569,7 +2625,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             lang=instruction_lang_resolved,
         )
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
+        raise _unexpected_http_error("compose", 502) from e
 
     coerce_report: dict[str, object] = _coerce_relation_report(None, None)
     try:
@@ -2581,7 +2637,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             score = coerce_score(score, branch_report=branch_counts, ddl=_coerce_context(ddl, source_text))
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"compose failed: {e}") from e
+        raise _unexpected_http_error("compose", 502) from e
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
@@ -2598,8 +2654,10 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     t2 = time.perf_counter()
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
+    except HTTPException:
+        raise
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"render failed: {e}") from e
+        raise _unexpected_http_error("render", 500) from e
     artifact_input = req.history_input or source_text
     artifact_catalog_id = None if catalog_id == "default" else catalog_id
     render_metadata = {
@@ -2619,6 +2677,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
     history_id = None
     history_at = None
     saved_identity: dict[str, object] = {}
+    idempotent_replay = False
     save_artifacts = req.save_artifacts if req.save_artifacts is not None else req.save_history
     if req.save_history:
         history_at = req.history_at or int(time.time() * 1000)
@@ -2645,8 +2704,10 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             lineage_parent_node_id=req.lineage_parent_node_id,
             derivation_kind=req.derivation_kind,
             derivation_metadata=req.derivation_metadata,
+            idempotency_key=idempotency_key,
         )
         history_id = item["id"]
+        idempotent_replay = bool(item.get("_idempotent_replay"))
         saved_identity = {
             "description_hash": item.get("description_hash"),
             "lineage_node_id": item.get("lineage_node_id"),
@@ -2671,7 +2732,7 @@ def api_paint(req: PaintRequest, actor: dict = Depends(_current_user)) -> PaintR
             "render_metadata": render_metadata,
         })
     user_generation_count = None
-    if req.count_generation:
+    if req.count_generation and not idempotent_replay:
         user_generation_count = _db.increment_user_generation_count(actor["id"])
         if user_generation_count is None:
             raise HTTPException(status_code=404, detail="user not found")
@@ -2722,7 +2783,7 @@ def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_use
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=409, detail=f"group create failed: {e}") from e
+        raise _unexpected_http_error("group create", 409) from e
 
 
 @app.patch("/api/user-groups/{group_id}", response_model=UserGroupItem)
@@ -2738,7 +2799,7 @@ def api_user_groups_update(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=409, detail=f"group update failed: {e}") from e
+        raise _unexpected_http_error("group update", 409) from e
     if not group:
         raise HTTPException(status_code=404, detail="group not found")
     return UserGroupItem(**group)
@@ -2778,7 +2839,7 @@ def api_users_create(body: UserAccountCreateBody, actor: dict = Depends(_user_ma
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=409, detail=f"user create failed: {e}") from e
+        raise _unexpected_http_error("user create", 409) from e
     return UserAccountItem(**user)
 
 
@@ -2788,22 +2849,17 @@ def api_users_update(
     body: UserAccountUpdateBody,
     actor: dict = Depends(_user_manager),
 ) -> UserAccountItem:
-    target = _db.get_user(user_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="user not found")
-    if not _can_manage_user(actor, target):
-        raise HTTPException(status_code=403, detail="user update is not permitted")
     if actor["role"] == "group_lead":
         if body.role and body.role != "user":
             raise HTTPException(status_code=403, detail="group leads cannot change user roles")
         if body.group_id is not None and body.group_id != actor.get("group_id"):
             raise HTTPException(status_code=403, detail="group leads cannot move users outside their group")
     try:
-        user = _db.update_user(user_id, **body.model_dump(exclude_unset=True))
+        user = _db.update_user(user_id, actor=actor, **body.model_dump(exclude_unset=True))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=409, detail=f"user update failed: {e}") from e
+        raise _unexpected_http_error("user update", 409) from e
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return UserAccountItem(**user)
@@ -2811,13 +2867,8 @@ def api_users_update(
 
 @app.delete("/api/users/{user_id}")
 def api_users_delete(user_id: str, actor: dict = Depends(_user_manager)) -> dict[str, bool]:
-    target = _db.get_user(user_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="user not found")
-    if not _can_manage_user(actor, target):
-        raise HTTPException(status_code=403, detail="user delete is not permitted")
     try:
-        found = _db.delete_user(user_id)
+        found = _db.delete_user(user_id, actor=actor)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     if not found:
@@ -2891,12 +2942,12 @@ def api_history_neighbors(item_id: str, actor: dict = Depends(_current_user)) ->
     focus = _db.get_items(actor["id"], [item_id])
     if not focus:
         raise HTTPException(status_code=404, detail="history item not found")
-    candidates, _ = _db.list_items(actor["id"], offset=0, limit=10_000)
+    candidates = _db.list_neighbor_candidates(actor["id"], item_id)
     ranked = sorted(
-        (item for item in candidates if item.get("id") != item_id),
+        candidates,
         key=lambda item: (composition_distance(focus[0].get("score") or {}, item.get("score") or {}), -int(item.get("at") or 0)),
     )[:3]
-    return [HistoryItem(**item) for item in ranked]
+    return [HistoryItem(**item) for item in _db.get_items(actor["id"], [item["id"] for item in ranked])]
 
 
 @app.post("/api/feedback/unread-words")
@@ -2982,12 +3033,16 @@ def api_history_svg(
         except HTTPException:
             raise
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(status_code=422, detail=f"history svg render failed: {e}") from e
+            raise _unexpected_http_error("history svg render", 422) from e
     return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
 
 
 @app.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
-def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)) -> HistoryItem:
+def api_history_post(
+    body: HistoryPostBody,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> HistoryItem:
     metadata_seed_text = body.derivation_metadata.get("seed_text")
     requested_seed_text = body.seed_text
     if requested_seed_text is None and isinstance(metadata_seed_text, str):
@@ -3013,7 +3068,7 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=422, detail=f"history score render failed: {e}") from e
+        raise _unexpected_http_error("history score render", 422) from e
     item_dict = _add_history_item(
         actor=actor,
         input_text=body.input,
@@ -3028,26 +3083,35 @@ def api_history_post(body: HistoryPostBody, actor: dict = Depends(_current_user)
         tokens_out=body.tokens_out,
         catalog_id=None if catalog_id == "default" else catalog_id,
         save_artifacts=body.save_artifacts,
-            render_metadata=render_metadata,
-            source_text=body.source_text,
-            display_label=body.display_label,
-            batch_line_number=body.batch_line_number,
-            batch_run_id=body.batch_run_id,
-            history_visibility=body.history_visibility,
-            lineage_parent_node_id=body.lineage_parent_node_id,
-            derivation_kind=body.derivation_kind,
-            derivation_metadata=body.derivation_metadata,
+        render_metadata=render_metadata,
+        source_text=body.source_text,
+        display_label=body.display_label,
+        batch_line_number=body.batch_line_number,
+        batch_run_id=body.batch_run_id,
+        history_visibility=body.history_visibility,
+        lineage_parent_node_id=body.lineage_parent_node_id,
+        derivation_kind=body.derivation_kind,
+        derivation_metadata=body.derivation_metadata,
+        idempotency_key=idempotency_key,
     )
-    if body.count_generation:
+    if body.count_generation and not item_dict.get("_idempotent_replay"):
         if _db.increment_user_generation_count(actor["id"]) is None:
             raise HTTPException(status_code=404, detail="user not found")
     return HistoryItem(**item_dict)
 
 
 @app.delete("/api/history")
-def api_history_delete(actor: dict = Depends(_current_user)) -> dict[str, bool]:
-    _db.delete_all(actor["id"])
-    return {"ok": True}
+def api_history_delete(
+    x_inku_confirm: str | None = Header(default=None, alias="X-Inku-Confirm"),
+    actor: dict = Depends(_current_user),
+) -> dict[str, int | bool]:
+    if x_inku_confirm != "permanent-delete-trash":
+        raise HTTPException(
+            status_code=409,
+            detail="X-Inku-Confirm: permanent-delete-trash is required",
+        )
+    count = _db.delete_all_trashed_items(actor["id"])
+    return {"ok": True, "count": count}
 
 
 @app.post("/api/history/trash")
@@ -3080,7 +3144,7 @@ def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends
 
 @app.post("/api/history/permanent-delete")
 def api_history_permanent_delete(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
-    count = _db.delete_items(actor["id"], body.ids)
+    count = _db.delete_items(actor["id"], body.ids, require_trashed=True)
     return {"ok": True, "count": count}
 
 

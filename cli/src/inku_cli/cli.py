@@ -2710,6 +2710,260 @@ def command_history_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_lineage(args: argparse.Namespace) -> int:
+    import uuid
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.lineage_cmd == "show":
+        try:
+            data, _ = client.request(
+                "GET",
+                f"/api/history/{args.item_id}/lineage",
+                query={"descendant_depth": args.depth, "node_limit": args.limit}
+            )
+        except CliError:
+            data, _ = client.request(
+                "GET",
+                f"/api/lineage/{args.item_id}",
+                query={"descendant_depth": args.depth, "node_limit": args.limit}
+            )
+        if args.json:
+            _print_json(data)
+        else:
+            focus_id = data.get("focus_node_id")
+            nodes = {n["id"]: n for n in data.get("nodes", [])}
+            edges_by_parent = {}
+            edges_by_child = {}
+            for edge in data.get("edges", []):
+                edges_by_parent.setdefault(edge["parent_node_id"], []).append(edge)
+                edges_by_child[edge["child_node_id"]] = edge
+            
+            roots = [n for n in nodes.values() if n["id"] not in edges_by_child]
+            
+            def print_tree(node_id, indent=0):
+                node = nodes.get(node_id)
+                if not node:
+                    return
+                is_focus = "[Displayed]" if node_id == focus_id else ""
+                edge = edges_by_child.get(node_id)
+                op = f"({edge['derivation_kind']})" if edge else "(Root)"
+                text = ""
+                if node.get("history"):
+                    text = node["history"].get("source_text") or node["history"].get("input") or ""
+                elif node.get("state") == "tombstone":
+                    text = "[Deleted]"
+                elif node.get("state") == "lineage_only":
+                    text = "[Intermediate]"
+                
+                print("  " * indent + f"- {op} {node_id[:8]} {is_focus} : {text}")
+                for child_edge in sorted(edges_by_parent.get(node_id, []), key=lambda e: e.get("at", 0)):
+                    print_tree(child_edge["child_node_id"], indent + 1)
+
+            print("Artwork Lineage:")
+            for root in roots:
+                print_tree(root["id"])
+    elif args.lineage_cmd == "promote":
+        data, _ = client.request("POST", f"/api/lineage/{args.node_id}/promote")
+        _print_json(data)
+    return 0
+
+
+def command_refine(args: argparse.Namespace) -> int:
+    import uuid
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.refine_cmd == "generate":
+        history_data, _ = client.request("GET", "/api/history", query={"limit": 100})
+        items = history_data.get("items", [])
+        target = next((item for item in items if item["id"] == args.item_id), None)
+        if not target:
+            target_list = client.request("GET", "/api/history", query={"q": args.item_id})[0].get("items", [])
+            target = next((item for item in target_list if item["id"] == args.item_id), None)
+            if not target:
+                raise CliError(f"history item {args.item_id} not found")
+        
+        parent_node_id = target.get("lineage_node_id")
+        if not parent_node_id:
+            raise CliError(f"lineage node ID is missing on item {args.item_id}")
+        
+        params = {
+            "text": args.text or target.get("source_text") or target.get("input") or "",
+            "save_history": args.save_history,
+            "lineage_parent_node_id": parent_node_id,
+            "derivation_kind": f"{args.kind}_variation",
+        }
+        
+        if args.kind == "touch":
+            params["render_seed"] = int(time.time() * 1000) & 0x7fffffff
+            params["vary_seed"] = target.get("vary_seed")
+            params["interpretation_seed"] = target.get("interpretation_seed")
+            params["catalog_id"] = target.get("render_color_catalog_id")
+        elif args.kind == "layout":
+            params["render_seed"] = target.get("render_seed")
+            params["vary_seed"] = int(time.time() * 1000) & 0x7fffffff
+            params["interpretation_seed"] = target.get("interpretation_seed")
+            params["catalog_id"] = target.get("render_color_catalog_id")
+        elif args.kind == "reading":
+            params["render_seed"] = target.get("render_seed")
+            params["vary_seed"] = target.get("vary_seed")
+            params["interpretation_seed"] = str(uuid.uuid4())
+            params["catalog_id"] = target.get("render_color_catalog_id")
+        elif args.kind == "color":
+            params["render_seed"] = target.get("render_seed")
+            params["vary_seed"] = target.get("vary_seed")
+            params["interpretation_seed"] = target.get("interpretation_seed")
+            params["random_color_catalog"] = True
+            
+        data, _ = client.request("POST", "/api/paint", data=params)
+        
+        if args.out_dir:
+            out_dir = Path(args.out_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            stem = f"refine-{args.kind}-{data.get('render_hash_short', 'item')}"
+            _write_json_file(out_dir / f"{stem}.json", data)
+            (out_dir / f"{stem}.svg").write_text(data["svg"], encoding="utf-8")
+            print(f"Saved: {out_dir}/{stem}.[json|svg]")
+            if args.png:
+                try:
+                    import cairosvg
+                    cairosvg.svg2png(bytestring=data["svg"].encode("utf-8"), write_to=str(out_dir / f"{stem}.png"))
+                except ImportError:
+                    pass
+        else:
+            _print_json(data)
+
+    elif args.refine_cmd == "save":
+        try:
+            score = json.loads(Path(args.file).read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise CliError(f"failed to read score file: {args.file}") from exc
+        
+        svg = ""
+        if args.svg_file:
+            try:
+                svg = Path(args.svg_file).read_text(encoding="utf-8")
+            except Exception as exc:
+                raise CliError(f"failed to read svg file: {args.svg_file}") from exc
+        
+        params = {
+            "id": str(uuid.uuid4()),
+            "user_id": "",
+            "at": int(time.time() * 1000),
+            "input": args.input_text,
+            "ddl": args.ddl_text or "",
+            "score": score,
+            "svg": svg,
+            "lineage_parent_node_id": args.parent_node_id,
+            "derivation_kind": args.kind,
+            "history_visibility": args.visibility,
+        }
+        data, _ = client.request("POST", "/api/history", data=params)
+        _print_json(data)
+    return 0
+
+
+def command_inspect(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    models = [m.strip() for m in args.models.split(",") if m.strip()]
+    if not models:
+        raise CliError("at least one model is required for inspection")
+        
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
+    results = {}
+    for model in models:
+        print(f"Running inspection with model: {model}...")
+        params = {
+            "text": args.text,
+            "stage1_model": model,
+            "stage2_model": model,
+            "save_history": False,
+            "count_generation": False,
+        }
+        try:
+            data, _ = client.request("POST", "/api/paint", data=params)
+            results[model] = {
+                "success": True,
+                "ddl": data.get("ddl"),
+                "render_hash": data.get("render_hash_short"),
+            }
+            safe_model_name = model.replace("/", "_").replace(":", "_")
+            _write_json_file(out_dir / f"inspect-{safe_model_name}.json", data)
+            (out_dir / f"inspect-{safe_model_name}.svg").write_text(data["svg"], encoding="utf-8")
+            
+            if args.png:
+                try:
+                    import cairosvg
+                    cairosvg.svg2png(bytestring=data["svg"].encode("utf-8"), write_to=str(out_dir / f"inspect-{safe_model_name}.png"))
+                except ImportError:
+                    pass
+        except Exception as exc:
+            print(f"Model {model} failed: {exc}", file=sys.stderr)
+            results[model] = {"success": False, "error": str(exc)}
+            
+    _write_json_file(out_dir / "inspection-summary.json", results)
+    _print_json(results)
+    return 0
+
+
+def command_review(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.review_cmd == "evaluate":
+        api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("NVIDIA_NIM_API_KEY")
+        if not api_key:
+            raise CliError("NVIDIA_API_KEY is required for vision evaluation")
+        
+        image_path = Path(args.png_file)
+        if not image_path.exists():
+            raise CliError(f"image file not found: {args.png_file}")
+            
+        prompt = args.prompt or (
+            "Evaluate this abstract vector drawing. Analyze the color harmony, composition "
+            "balance, negative space pressure, and overall visual eventfulness. "
+            "Provide a score from 0 to 100 for each metric, and summarize your feedback in one sentence."
+        )
+        
+        print(f"Sending vision NIM evaluation for {image_path.name}...")
+        feedback = _nim_vision_chat(image_path, prompt, api_key=api_key, model=args.model)
+        _print_json({
+            "image": image_path.name,
+            "model": args.model,
+            "evaluation": feedback
+        })
+    elif args.review_cmd == "unread":
+        params = {
+            "word": args.word,
+            "context": args.context,
+        }
+        data, _ = client.request("POST", "/api/feedback/unread-words", data=params)
+        _print_json({
+            "ok": True,
+            "word": args.word,
+            "context": args.context,
+            "message": "Unread word successfully reported to server."
+        })
+    return 0
+
+
 def _key_value_pairs(values: list[str], *, option: str) -> dict[str, str]:
     parsed: dict[str, str] = {}
     for value in values:
@@ -2983,6 +3237,75 @@ def build_parser() -> argparse.ArgumentParser:
     version_cmd = subparsers.add_parser("version", help="show CLI and server version/build information")
     _add_common_server_args(version_cmd)
     version_cmd.set_defaults(func=command_version)
+
+    # lineage
+    lineage = subparsers.add_parser("lineage", help="show or control artwork lineage")
+    _add_common_server_args(lineage)
+    lineage_sub = lineage.add_subparsers(dest="lineage_cmd", required=True)
+    
+    lineage_show = lineage_sub.add_parser("show", help="show lineage tree for a work")
+    lineage_show.add_argument("item_id", help="history item ID or lineage node ID")
+    lineage_show.add_argument("--depth", type=int, default=2, help="descendant search depth")
+    lineage_show.add_argument("--limit", type=int, default=200, help="max nodes to load")
+    lineage_show.add_argument("--json", action="store_true", help="output raw JSON")
+    
+    lineage_promote = lineage_sub.add_parser("promote", help="promote a lineage-only node to regular history")
+    lineage_promote.add_argument("node_id", help="lineage node ID to promote")
+    
+    lineage_show.set_defaults(func=command_lineage)
+    lineage_promote.set_defaults(func=command_lineage)
+
+    # refine
+    refine = subparsers.add_parser("refine", help="generate refined options from an existing work")
+    _add_common_server_args(refine)
+    refine_sub = refine.add_subparsers(dest="refine_cmd", required=True)
+    
+    refine_gen = refine_sub.add_parser("generate", help="generate a variation option from a work")
+    refine_gen.add_argument("item_id", help="target history item ID to refine")
+    refine_gen.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
+    refine_gen.add_argument("--text", help="override input text for layout/reading variations")
+    refine_gen.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
+    refine_gen.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
+    refine_gen.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")
+    refine_gen.add_argument("--png", action="store_true", help="generate PNG rendering in output directory")
+    
+    refine_save = refine_sub.add_parser("save", help="save a candidate score into history connected to a parent")
+    refine_save.add_argument("parent_node_id", help="parent lineage node ID")
+    refine_save.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="derivation kind")
+    refine_save.add_argument("--file", required=True, help="path to Score JSON file")
+    refine_save.add_argument("--svg-file", help="path to SVG file")
+    refine_save.add_argument("--input-text", required=True, help="original user text")
+    refine_save.add_argument("--ddl-text", help="normalized DDL text")
+    refine_save.add_argument("--visibility", choices=("normal", "lineage_only"), default="normal", help="history visibility")
+    
+    refine_gen.set_defaults(func=command_refine)
+    refine_save.set_defaults(func=command_refine)
+
+    # inspect
+    inspect_cmd = subparsers.add_parser("inspect", help="parallel model inspection comparison")
+    _add_common_server_args(inspect_cmd)
+    inspect_cmd.add_argument("text", help="input text to translate and draw")
+    inspect_cmd.add_argument("--models", required=True, help="comma-separated list of models to inspect")
+    inspect_cmd.add_argument("-o", "--out-dir", required=True, help="directory to save comparison files")
+    inspect_cmd.add_argument("--png", action="store_true", help="generate PNG renderings")
+    inspect_cmd.set_defaults(func=command_inspect)
+
+    # review
+    review = subparsers.add_parser("review", help="evaluate drawings and submit feedback")
+    _add_common_server_args(review)
+    review_sub = review.add_subparsers(dest="review_cmd", required=True)
+    
+    review_eval = review_sub.add_parser("evaluate", help="evaluate drawing visual quality via Vision NIM")
+    review_eval.add_argument("png_file", help="path to PNG image file of the drawing")
+    review_eval.add_argument("--model", default="nvidia/neva-22b", help="NVIDIA NIM vision model name")
+    review_eval.add_argument("--prompt", help="override vision review prompt")
+    
+    review_unread = review_sub.add_parser("unread", help="submit an unread word feedback to server")
+    review_unread.add_argument("word", help="the word that failed interpretation")
+    review_unread.add_argument("--context", required=True, help="surrounding sentence or prompt context")
+    
+    review_eval.set_defaults(func=command_review)
+    review_unread.set_defaults(func=command_review)
 
     return parser
 

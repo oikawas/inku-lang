@@ -181,3 +181,24 @@ def polygon_path(points: tuple[tuple[float, float], ...]) -> str:
     if not points:
         return ""
     return "M " + " L ".join(f"{x:.3f} {y:.3f}" for x, y in points) + " Z"
+
+
+def outline_for_centerline(
+    points: list[tuple[float, float]], widths: list[float]
+) -> tuple[tuple[float, float], ...]:
+    """Build one variable-width polygon around an arbitrary intended centerline."""
+    if len(points) < 2:
+        return tuple(points)
+    left: list[tuple[float, float]] = []
+    right: list[tuple[float, float]] = []
+    last = len(points) - 1
+    for index, (x, y) in enumerate(points):
+        before = points[max(0, index - 1)]
+        after = points[min(last, index + 1)]
+        dx, dy = after[0] - before[0], after[1] - before[1]
+        length = max(1e-6, math.hypot(dx, dy))
+        nx, ny = -dy / length, dx / length
+        width = widths[min(index, len(widths) - 1)]
+        left.append((x + nx * width / 2, y + ny * width / 2))
+        right.append((x - nx * width / 2, y - ny * width / 2))
+    return tuple(left + list(reversed(right)))

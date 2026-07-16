@@ -25,7 +25,7 @@ from .schema import (
     SurfaceSpec,
     Variation,
 )
-from .stroke_engine import polygon_path, synthesize_stroke
+from .stroke_engine import outline_for_centerline, polygon_path, synthesize_stroke
 
 CANVAS_PX = 1000
 
@@ -236,6 +236,11 @@ TEXTURE_FILTERS: dict[str, str] = {
         '<feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="2" seed="31" result="noise"/>'
         '<feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4"/>'
         '<feGaussianBlur stdDeviation="0.6"/>'
+        "</filter>"
+    ),
+    "drypoint": (
+        '<filter id="texture-drypoint" x="-35%" y="-35%" width="170%" height="170%">'
+        '<feGaussianBlur stdDeviation="1.8"/>'
         "</filter>"
     ),
 }
@@ -1988,7 +1993,7 @@ def _stroke_attrs(
     }
     if "stroke_opacity" in weight_style:
         attrs["stroke_opacity"] = weight_style["stroke_opacity"]
-    if use_filters and ins.weight in TEXTURE_FILTERS:
+    if use_filters and ins.weight in TEXTURE_FILTERS and ins.weight != "drypoint":
         attrs["filter"] = f"url(#texture-{ins.weight})"
     if any(
         token in hint
@@ -2401,13 +2406,15 @@ def _material_line_group(
     canvas: CanvasSize,
     *,
     use_filters: bool = True,
+    include_base: bool = True,
 ):
     if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick"):
         return None
 
     group = dwg.g()
-    base = _copy_attrs(attrs)
-    group.add(dwg.line(start=start, end=end, **base))
+    if include_base:
+        base = _copy_attrs(attrs)
+        group.add(dwg.line(start=start, end=end, **base))
     seed = _seed_for_instruction(ins)
 
     if ins.weight == "pencil":
@@ -2564,6 +2571,8 @@ def _render_hand_stroke(
     attrs: dict,
     canvas: CanvasSize,
     render_seed: int | None,
+    *,
+    use_filters: bool,
 ):
     stroke = synthesize_stroke(
         start,
@@ -2577,28 +2586,53 @@ def _render_hand_stroke(
     )
     color = attrs.get("stroke", "#111111")
     opacity = float(attrs.get("stroke_opacity", 1.0))
-    group.add(
-        dwg.path(
-            d=polygon_path(stroke.outline),
-            fill=color,
-            fill_opacity=min(opacity, 0.72),
-            stroke="none",
-        )
-    )
+    outline = stroke.outline
     if _needs_path_variation(ins.variation):
         assert ins.variation is not None
-        points = _line_with_variation(
+        centerline = _line_with_variation(
             start, end, ins.variation, _seed_for_instruction(ins, render_seed)
         )
-        group.add(dwg.polyline(points=points, **attrs))
-    else:
-        material = _material_line_group(
-            dwg, ins, start, end, attrs, canvas, use_filters=False
+        varied = synthesize_stroke(
+            start,
+            end,
+            WEIGHT_TO_STROKE_WIDTH[ins.weight],
+            ins.weight,
+            _seed_for_instruction(ins, render_seed),
+            samples=len(centerline),
         )
-        if material is not None:
-            group.add(material)
-        else:
-            group.add(dwg.line(start=start, end=end, **attrs))
+        outline = outline_for_centerline(
+            centerline, [sample.width for sample in varied.samples]
+        )
+    path_attrs = {
+        "d": polygon_path(outline),
+        "fill": color,
+        "fill_opacity": opacity,
+        "stroke": "none",
+    }
+    if use_filters and ins.weight in TEXTURE_FILTERS and ins.weight != "drypoint":
+        path_attrs["filter"] = f"url(#texture-{ins.weight})"
+    group.add(dwg.path(**path_attrs))
+
+    material = _material_line_group(
+        dwg,
+        ins,
+        start,
+        end,
+        attrs,
+        canvas,
+        use_filters=False,
+        include_base=False,
+    )
+    if material is not None:
+        group.add(material)
+    if ins.style != "solid":
+        styled_attrs = _copy_attrs(attrs)
+        styled_attrs["stroke_width"] = max(
+            0.45, WEIGHT_TO_STROKE_WIDTH[ins.weight] * 0.42
+        )
+        styled_attrs.pop("filter", None)
+        group.add(dwg.line(start=start, end=end, **styled_attrs))
+
     if ins.weight == "drypoint":
         dx, dy = end[0] - start[0], end[1] - start[1]
         length = max(1e-6, math.hypot(dx, dy))
@@ -2608,16 +2642,17 @@ def _render_hand_stroke(
             (sample.x + nx * offset, sample.y + ny * offset)
             for sample in stroke.samples
         ]
-        group.add(
-            dwg.polyline(
-                points=points,
-                fill="none",
-                stroke=color,
-                stroke_width=WEIGHT_TO_STROKE_WIDTH[ins.weight] * 1.25,
-                stroke_opacity=stroke.burr_opacity,
-                stroke_linecap="round",
-            )
-        )
+        burr_attrs = {
+            "points": points,
+            "fill": "none",
+            "stroke": color,
+            "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight] * 1.25,
+            "stroke_opacity": stroke.burr_opacity,
+            "stroke_linecap": "round",
+        }
+        if use_filters:
+            burr_attrs["filter"] = "url(#texture-drypoint)"
+        group.add(dwg.polyline(**burr_attrs))
     return _apply_rotation(group, ins, canvas)
 
 
@@ -2644,7 +2679,16 @@ def _render_instruction(
         start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0), canvas)
         end = _px(ins.to if ins.to is not None else (0.5, 1.0), canvas)
         if ins.weight != "rotring":
-            return _render_hand_stroke(dwg, ins, start, end, attrs, canvas, render_seed)
+            return _render_hand_stroke(
+                dwg,
+                ins,
+                start,
+                end,
+                attrs,
+                canvas,
+                render_seed,
+                use_filters=use_filters,
+            )
         return _apply_rotation(dwg.line(start=start, end=end, **attrs), ins, canvas)
 
     if ins.primitive == "circle":

@@ -77,6 +77,20 @@ def test_stroke_render_is_seed_deterministic_and_budgeted():
     assert "controls-49" in a
 
 
+def test_burin_cut_is_not_masked_by_a_fixed_width_line():
+    svg = render(_line("burin"), render_seed=31)
+    assert "stroke-engine-v1" in svg
+    assert "<line" not in svg
+    assert "<path" in svg
+
+
+def test_drypoint_uses_one_shared_burr_filter():
+    svg = render(_line("drypoint"), render_seed=31)
+    assert svg.count('id="texture-drypoint"') == 1
+    assert svg.count('filter="url(#texture-drypoint)"') == 1
+    assert "<polyline" in svg
+
+
 def test_surface_tone_and_mezzotint_carve_profiles():
     score = Score.model_validate(
         {

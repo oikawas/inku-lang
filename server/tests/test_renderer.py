@@ -101,9 +101,8 @@ def test_render_single_line_solid_pen_black():
         }
     )
     svg = render(score)
-    assert "<line" in svg
-    assert 'x1="0.0"' in svg and 'y1="330' in svg
-    assert 'x2="1000.0"' in svg and 'y2="330' in svg
+    assert "stroke-engine-v1" in svg
+    assert "<path" in svg
     assert "#111111" in svg
     assert "stroke-dasharray" not in svg
 
@@ -232,8 +231,8 @@ def test_render_pencil_line_uses_material_texture():
         }
     )
     svg = render(score)
-    assert 'stroke-opacity="0.66"' in svg
-    assert 'stroke-dasharray="1,3"' in svg
+    assert 'fill-opacity="0.66"' in svg
+    assert 'stroke-dasharray="1,7"' in svg
     assert 'id="texture-pencil"' in svg
     assert 'filter="url(#texture-pencil)"' in svg
     assert svg.count("<circle") >= 18
@@ -255,7 +254,7 @@ def test_render_chalk_line_uses_blurred_powder_texture():
     svg = render(score)
     assert 'id="texture-chalk"' in svg
     assert 'filter="url(#texture-chalk)"' in svg
-    assert 'stroke-dasharray="7,5,1,4"' in svg
+    assert 'stroke-dasharray="8,12,1,8"' in svg
     assert "<feTurbulence" in svg
     assert "<feDisplacementMap" in svg
     assert svg.count("<circle") >= 34
@@ -275,8 +274,8 @@ def test_render_crayon_line_adds_rubbed_layers():
         }
     )
     svg = render(score)
-    assert svg.count("<line") >= 5
-    assert 'stroke-dasharray="10,3,2,3"' in svg
+    assert svg.count("<line") >= 4
+    assert "stroke-engine-v1" in svg
     assert 'stroke-dasharray="2,5,9,7"' in svg
     assert 'id="texture-crayon"' in svg
     assert svg.count("<circle") >= 26
@@ -464,7 +463,8 @@ def test_render_brush_lines_use_layered_material_texture():
         }
     )
     svg = render(score)
-    assert svg.count("<line") >= 7
+    assert svg.count("<line") >= 5
+    assert svg.count("stroke-engine-v1") == 2
     assert 'stroke-dasharray="22,9"' in svg
     assert 'stroke-dasharray="18,7,3,11"' in svg
     assert 'id="texture-brush_thick"' in svg
@@ -644,7 +644,7 @@ def test_render_line_rotation_applies_midpoint_transform():
         }
     )
     svg = render(score)
-    assert "<line" in svg
+    assert "<path" in svg
     assert 'transform="rotate(45.0,500.0,500.0)"' in svg
 
 
@@ -767,7 +767,7 @@ def test_arc_missing_angles_raises():
         render(score)
 
 
-def test_render_line_with_perlin_variation_emits_polyline():
+def test_render_line_with_perlin_variation_emits_variable_width_path():
     score = Score.model_validate(
         {
             "instructions": [
@@ -786,11 +786,11 @@ def test_render_line_with_perlin_variation_emits_polyline():
         }
     )
     svg = render(score)
-    assert "<polyline" in svg
-    assert "<line" not in svg
+    assert "<path" in svg
+    assert "<polyline" not in svg
 
 
-def test_render_line_with_wave_variation_emits_polyline():
+def test_render_line_with_wave_variation_emits_variable_width_path():
     score = Score.model_validate(
         {
             "instructions": [
@@ -809,7 +809,8 @@ def test_render_line_with_wave_variation_emits_polyline():
         }
     )
     svg = render(score)
-    assert "<polyline" in svg
+    assert "<path" in svg
+    assert "<polyline" not in svg
 
 
 def test_render_line_variation_is_deterministic():
@@ -852,14 +853,14 @@ def test_render_line_quality_none_still_straight():
         }
     )
     svg = render(score)
-    assert "<line" in svg
+    assert "<path" in svg
     assert "<polyline" not in svg
 
 
 def test_line_missing_endpoints_uses_default():
     score = Score(instructions=[Instruction(primitive="line")])
     svg = render(score)
-    assert "<line" in svg
+    assert "<path" in svg
 
 
 def test_render_circle_with_pink_variation_emits_blur_filter():
@@ -921,7 +922,7 @@ def test_render_line_with_pink_variation_emits_blur_not_polyline():
     )
     svg = render(score)
     assert "feGaussianBlur" in svg
-    assert "<line" in svg
+    assert "<path" in svg
     assert "<polyline" not in svg
 
 
@@ -1102,11 +1103,13 @@ def test_render_cutting_relation_crosses_previous_line_center():
         }
     )
 
-    svg = render(score, render_seed=7)
+    resolved = _resolve_performance_score(score, 7)
+    first, second = resolved.instructions
 
-    assert 'x1="200.0"' in svg
-    assert 'x2="800.0"' in svg
-    assert "500.0" in svg
+    assert first.from_ == (0.2, 0.5)
+    assert first.to == (0.8, 0.5)
+    assert second.from_ is not None and second.to is not None
+    assert _segments_intersect(first.from_, first.to, second.from_, second.to)
 
 
 def _segments_intersect(p1, p2, p3, p4) -> bool:
@@ -1555,12 +1558,14 @@ def test_grid_variation_uses_distinct_per_element_phases():
     )
 
     root = ElementTree.fromstring(render(score, svg_profile="compat", render_seed=123))
-    polylines = [
-        node.attrib["points"] for node in root.iter() if node.tag.endswith("polyline")
+    paths = [
+        node.attrib["d"]
+        for node in root.iter()
+        if node.tag.endswith("path") and node.attrib.get("fill") == "#111111"
     ]
 
-    assert len(polylines) == 4
-    assert len(set(polylines)) == 4
+    assert len(paths) == 4
+    assert len(set(paths)) == 4
 
 
 def test_legacy_arrangement_layouts_keep_golden_output():

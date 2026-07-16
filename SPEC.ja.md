@@ -3979,3 +3979,4 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - 奥書は本人別の追記専用レコードとして保存し、古い順に表示する。編集APIはなく、削除とIdempotency-Keyによる二重保存防止だけを持つ。
 - 系譜タブの明示操作と`inku-cli okugaki`（`--dry-run`対応）を追加した。dh1/rh2および生成・推敲・候補選別には接続しない。
 - Build 570。
+- **Build 571:** LAN内のHTTP表示など、Web Cryptoの`randomUUID()`を提供しないブラウザでも奥書を追記できるよう、Idempotency-Key生成を`getRandomValues()`と最終フォールバックを持つUUID生成へ変更した。

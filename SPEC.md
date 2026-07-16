@@ -143,6 +143,14 @@ It should not simply extract nouns.  A quiet sentence, a ceremonial sentence,
 and a turbulent sentence should lead to different density, focus, motion, and
 material choices.
 
+Every visible line, arc, or outline in normalized DDL names exactly one core
+touch. Explicit material is preserved; otherwise Stage 1 chooses from texture
+and context. A filled shape with no visible outline is not assigned a touch
+mechanically. Burin and drypoint remain literal-input-only techniques. DDL must
+not leave touchless phrases such as “thin black line” or “white horizontal
+line.” Dynamic few-shot selection always includes at least one non-pen material
+example.
+
 ### Stage 1.5: Deterministic Expansion Filter
 
 Stage 1.5 sits between natural interpretation and strict JSON generation.  It
@@ -167,6 +175,10 @@ as counterpoint, pointillist backgrounds, perspective lines, and canon-like
 repetition should primarily become relations on existing instructions; separate
 fixed auxiliary layers are used only when relation encoding cannot carry the
 intent.
+
+Any line or arc introduced by Stage 1.5 must also name one context-selected
+touch. Composition-family rewrites must preserve expansion markers so the same
+DDL is not expanded twice.
 
 ### Stage 2: Structuring
 
@@ -1442,4 +1454,6 @@ When updating the specification:
 - Printmaking fields are literal-input only. Stage 1.5 cannot inject them, and invalid carve without a dark ground is dropped without repair.
 - Removed `rope` from the core vocabulary, Score schema, renderer, prompts, and Saijiki. Because inku is unreleased, v1.87 uses the opportunity to remove an ambiguous object-metaphor touch instead of carrying compatibility debt. The resulting touch vocabulary has ten entries.
 - SVG transfers the grammar of engraved line and tone; it does not claim to reproduce physical plate indentation or raised ink.
-- Build 567.
+- **Build 568:** Fixed the rendering order that allowed legacy fixed-width lines to cover variable-width stroke outlines. Burin taper and swell, drypoint's one-sided burr, and the existing writing-tool gestures now remain visible in the primary mark. All ten Saijiki touch previews were aligned with those observable renderer differences.
+- **Build 569:** Normalized DDL now names one touch for every visible line, arc, or outline. Japanese and English Stage 1 rules and examples were updated, dynamic few-shot selection guarantees a non-pen material example, and Stage 1.5 applies the same rule to its added marks. Filled shapes are not assigned material mechanically, and post-rewrite double expansion is prevented.
+- Builds 567–569.

@@ -60,7 +60,5 @@ cli/out/
 server/out/
 
 # Review and Task reports
-v1.85.md
-v1.85-agy.md
-v1.85*.md
+v1.8*.md
 

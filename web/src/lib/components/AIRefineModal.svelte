@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import type { LineageNode } from './LineagePanel.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 
@@ -24,6 +25,13 @@
 	let statusText = $state('');
 	let errorText = $state('');
 	let lastGeneratedItem = $state<any>(null);
+	let abortController: AbortController | null = null;
+
+	onDestroy(() => {
+		if (abortController) {
+			abortController.abort();
+		}
+	});
 
 	const activeKinds = $derived.by(() => {
 		const kinds: string[] = [];
@@ -50,6 +58,7 @@
 		errorText = '';
 		currentStep = 0;
 		lastGeneratedItem = null;
+		abortController = new AbortController();
 
 		let parentNodeId = node.id;
 		let currentText = node.history?.source_text ?? node.history?.input ?? '';
@@ -81,7 +90,8 @@
 					// 最後の世代だけを通常履歴（normal）にし、途中世代は中間系譜（lineage_only）として作成
 					historyVisibility: i === generations - 1 ? 'normal' : 'lineage_only',
 					saveHistory: true,
-					countGeneration: true
+					countGeneration: true,
+					signal: abortController.signal
 				};
 
 				if (kind === 'catalog_change') {
@@ -100,15 +110,19 @@
 			statusText = isJapanese ? '自律推敲が完了しました！' : 'Autonomous refinement completed successfully!';
 			await onLoadBranch(node.id);
 		} catch (err: any) {
+			if (err.name === 'AbortError') {
+				return;
+			}
 			errorText = err.message || String(err);
 		} finally {
 			running = false;
+			abortController = null;
 		}
 	}
 </script>
 
-<div class="modal-backdrop" onclick={!running ? onClose : undefined} role="presentation">
-	<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+<div class="modal-backdrop" onclick={!running ? onClose : undefined} onkeydown={(e) => { if (e.key === 'Escape' && !running) onClose(); }} role="presentation">
+	<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
 		<header>
 			<h3 id="modal-title">{isJapanese ? 'AIに自律推敲させる' : 'Autonomous AI Refinement'}</h3>
 			{#if !running}

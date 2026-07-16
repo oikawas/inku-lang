@@ -84,8 +84,8 @@
 	}
 </script>
 
-<div class="modal-backdrop" onclick={!running ? onClose : undefined} role="presentation">
-	<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+<div class="modal-backdrop" onclick={!running ? onClose : undefined} onkeydown={(e) => { if (e.key === 'Escape' && !running) onClose(); }} role="presentation">
+	<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
 		<header>
 			<h3 id="modal-title">{isJapanese ? '手動で推敲する' : 'Manual Refinement'}</h3>
 			{#if !running}

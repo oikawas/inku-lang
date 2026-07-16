@@ -2,6 +2,14 @@
 
 この履歴は`manual/`配下の利用・運用文書の改訂を記録します。製品機能そのものの詳細な変更履歴は`SPEC.ja.md`を参照してください。
 
+## 2026-07-15 — v1.85未リリース基準（Web Build 564）
+
+- 全公開APIを権限に応じて操作できる inku-cli api と全コマンド一覧を追加した。
+- Composeによる非root API、production Node Web、永続data volumeの導入手順を追加した。従来の開発構成は維持する。
+- request body上限、login rate制限、CORS、Renderer同時実行上限、Idempotency-Keyを管理者向け設定へ追加した。
+- 履歴のtrash確認、系譜tombstone、再送時の二重保存防止、user scopeを明記した。
+- 英語UIのTitle Case統一とiPad幅の表示基準を反映した。
+
 ## 2026-07-15 — v1.82未リリース基準（Web Build 563）
 
 全面改定。

@@ -3908,3 +3908,16 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - Build 525。
 
 **v1.76 クローズ（2026-07-15）**: Build 525をv1.76の受け入れ版として確定する。系譜上の任意作品を次の派生元として選べること、親子関係を世代間の矢印で追跡できること、表示作品と下部履歴が同期すること、履歴管理の選択・一括削除・表示件数が安定することを実機で段階的に確認し、指摘事項をBuild 518〜525で反映した。以後の開発はこのlineage contractと四つの同一性の分離を基盤とし、v1.80へ進む。
+
+### v1.85 — 運用安全性、CLI完全操作、コンテナ構成 (2026-07-15)
+
+- 従来の非コンテナ開発構成を維持したまま、rootのCompose構成から非root FastAPI container、production SvelteKit Node container、永続data volumeを起動できる。Webは同一originのAPI requestだけを内部API serviceへproxyする。
+- 全HTTP request bodyに設定可能な上限を設け、loginにuser/IP単位のrate limit、Rendererに同時実行上限を設ける。CORSの追加originは環境変数で明示し、予期しない内部例外の本文はclientへ返さずserver logへ記録する。
+- SQLite connectionはforeign keyを常時有効化する。作品、lineage node、lineage edgeは一transactionで保存し、親または保存に失敗した場合は部分的な系譜を残さない。完全削除はtrash内の作品だけを対象とし、系譜nodeはcontent-free tombstoneへ移行する。
+- 保存APIはuserごとのIdempotency-Keyを受け入れる。同じkeyの再送は既存作品を返し、history、lineage node、edge、生成回数を重複させない。
+- user／group管理のscope条件は更新・削除transaction内でも検査する。group leadは同一groupの一般userだけを管理でき、他userの履歴、系譜、件数は取得できない。外部認証連携は将来実装とし、現行session／role／scope境界を連携後も正本とする。
+- 履歴管理の系譜group集計、現在位置、focused lineageの祖先／子孫はDB側でpage／recursive queryを行う。類似作品計算はSVGや不要metadataを全件hydrateせず、score候補だけを読み、選ばれた作品だけを復元する。UIは不要になったgroup requestをabortする。
+- inku-cliはhelpを常備し、専用commandに加えて api commandからGET／POST／PUT／PATCH／DELETE、query、JSON file/body、header、binary outputを扱う。pathは設定済みserver内の /api/... と /health に限定し、serverと同じ認証・role権限で全公開APIを操作する。
+- 英語UIのtab、button、短いlabelはTitle Caseへ統一する。iPad相当幅ではCanvas上部のModels／Color／Canvas／作成情報を二段化し、左panel幅をviewport比で縮め、情報を切り捨てない。
+- JSON Scoreはversion付きstrict schemaを維持し、未知fieldを黙って破棄しない。DB migrationはcolumn／indexの追加を冪等に行い、既存render hash、description hash、lineage identityを破壊的に書き換えない。
+- Build 564。

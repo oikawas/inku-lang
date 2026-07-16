@@ -1274,6 +1274,22 @@ Build 559 adds the effective Stage 1 and Stage 2 languages to Generation info / 
 
 Build 560 aligns Generation info / JSON with Details by adding per-stage instruction languages, render/layout/interpretation seeds, description hash, elapsed time, input/output token counts, and derivation kind/metadata at the top level. The JSON Score, API and database schemas, and canonical render-hash payload remain unchanged.
 
+### v1.85 Operational safety, complete CLI access, and containers
+
+The existing non-container development setup remains supported. A root Compose configuration additionally runs a non-root FastAPI container, a production SvelteKit Node container, and a persistent data volume. The Web service proxies only same-origin API requests to the internal API service.
+
+The server enforces a configurable request-body limit, per-user/IP login rate limiting, renderer concurrency, explicit additional CORS origins, and sanitized unexpected errors. SQLite foreign keys are enabled on every connection. Artwork, lineage node, and lineage edge writes remain atomic; permanent deletion is limited to trash and preserves content-free lineage tombstones.
+
+Save endpoints accept a per-user Idempotency-Key. A retry with the same key returns the existing work without duplicating history, lineage nodes or edges, or generation counts. User-management scope is also enforced inside update and delete transactions. Group leads can manage only regular users in their own group, and no history, lineage root, or count crosses user scope. External identity providers remain future work and must preserve the current session, role, and scope boundary.
+
+History lineage groups, item positions, and focused ancestor/descendant graphs use paginated or recursive database queries. Similarity ranking loads score candidates without hydrating every SVG and restores only the selected works. The UI aborts stale group requests.
+
+inku-cli always provides help. Its api command supports GET, POST, PUT, PATCH, DELETE, query parameters, JSON body/file input, headers, and binary output, restricted to /api/... and /health on the configured server. It therefore exposes every public API under the same authentication and role permissions as the GUI.
+
+Short English tabs, buttons, and labels use Title Case. At iPad-class widths the Canvas tabs and displayed Models/Color/Canvas/creation metadata wrap into two rows, and the left panel scales with the viewport rather than clipping the artwork metadata.
+
+JSON Score remains a strict, versioned schema so unknown fields are never silently discarded. Additive database migrations remain idempotent and do not destructively rewrite existing render hashes, description hashes, or lineage identities. Build 564.
+
 Build 561 removes the former “Use today's word as a seed” control from the writing tab and first generation, and moves it to Refine / Adjust as “Vary Touch with Words.” The entered words affect only the Renderer's deterministic performance seed, never the interpretation, DDL, JSON Score, or layout. Because the same words reproduce the same touch, this operation generates one candidate at a time. History, Generation info / JSON, and replay retain both the words and resolved seed. The first artwork remains the source work and never applies this word-based touch variation.
 
 Build 562 removes the duplicated instruction preview below the writing field and places the normalized-DDL heading on the same row as Saijiki, DDL edit, and automatic repair. “Vary Touch with Words” moves to the end of the refinement choices; selecting it alone reveals an unlabeled input and copy explaining deterministic Seed behavior and the one-option limit. Writing-tab selectors now use action-target labels, “Canvas” and “Color catalog,” in both languages instead of showing the current values, and the canvas button no longer has a leading square icon.

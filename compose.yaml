@@ -1,0 +1,39 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      INKU_ENV: production
+      INKU_SESSION_COOKIE_SECURE: ${INKU_SESSION_COOKIE_SECURE:-0}
+      INKU_CORS_ORIGINS: ${INKU_CORS_ORIGINS:-}
+      INKU_BOOTSTRAP_ADMIN_USERNAME: ${INKU_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      INKU_BOOTSTRAP_ADMIN_EMAIL: ${INKU_BOOTSTRAP_ADMIN_EMAIL:-admin@localhost}
+      INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - inku-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    environment:
+      INKU_API_BASE_URL: http://api:8100
+      ORIGIN: ${INKU_ORIGIN:-http://localhost:5173}
+    ports:
+      - "${INKU_WEB_PORT:-5173}:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  inku-data:

@@ -195,7 +195,12 @@ def clear_config(path: Path | None = None) -> None:
         pass
 
 def _join_url(base_url: str, path: str) -> str:
-    return urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
+    parsed = urllib.parse.urlsplit(path)
+    if parsed.scheme or parsed.netloc:
+        raise CliError("API path must be relative to the configured inku server")
+    if parsed.query or parsed.fragment:
+        raise CliError("put query parameters in --query and omit URL fragments")
+    return urllib.parse.urljoin(base_url.rstrip("/") + "/", parsed.path.lstrip("/"))
 
 def _extract_session_token(set_cookie: str | None) -> str | None:
     if not set_cookie:
@@ -222,30 +227,55 @@ class ApiClient:
         method: str,
         path: str,
         *,
-        data: dict[str, Any] | None = None,
+        data: Any = None,
         query: dict[str, Any] | None = None,
         auth: bool = True,
-    ) -> tuple[dict[str, Any], urllib.response.addinfourl]:
+        headers: dict[str, str] | None = None,
+    ) -> tuple[Any, urllib.response.addinfourl]:
+        raw, response = self.request_raw(
+            method,
+            path,
+            data=data,
+            query=query,
+            auth=auth,
+            headers=headers,
+        )
+        try:
+            parsed = json.loads(raw.decode("utf-8")) if raw else {}
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise CliError("server returned a non-JSON response; use `inku-cli api --output`") from exc
+        return parsed, response
+
+    def request_raw(
+        self,
+        method: str,
+        path: str,
+        *,
+        data: Any = None,
+        query: dict[str, Any] | None = None,
+        auth: bool = True,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[bytes, urllib.response.addinfourl]:
         url = _join_url(self.base_url, path)
         if query:
             clean_query = {k: v for k, v in query.items() if v is not None}
             if clean_query:
                 url += "?" + urllib.parse.urlencode(clean_query)
         body = None
-        headers = {"Accept": "application/json"}
+        request_headers = {"Accept": "application/json"}
+        request_headers.update(headers or {})
         if data is not None:
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-            headers["Content-Type"] = "application/json"
+            request_headers.setdefault("Content-Type", "application/json")
         if auth:
             if not self.token:
                 raise CliError("not logged in; run `inku-cli login` first")
-            headers["Authorization"] = f"Bearer {self.token}"
-        req = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
+            request_headers["Authorization"] = f"Bearer {self.token}"
+        req = urllib.request.Request(url, data=body, headers=request_headers, method=method.upper())
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
                 raw = response.read()
-                parsed = json.loads(raw.decode("utf-8")) if raw else {}
-                return parsed, response
+                return raw, response
         except urllib.error.HTTPError as exc:
             message = exc.reason
             try:
@@ -262,38 +292,19 @@ class ApiClient:
         method: str,
         path: str,
         *,
-        data: dict[str, Any] | None = None,
+        data: Any = None,
         query: dict[str, Any] | None = None,
         auth: bool = True,
     ) -> str:
-        url = _join_url(self.base_url, path)
-        if query:
-            clean_query = {k: v for k, v in query.items() if v is not None}
-            if clean_query:
-                url += "?" + urllib.parse.urlencode(clean_query)
-        body = None
-        headers = {"Accept": "image/svg+xml,text/plain,*/*"}
-        if data is not None:
-            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-            headers["Content-Type"] = "application/json"
-        if auth:
-            if not self.token:
-                raise CliError("not logged in; run `inku-cli login` first")
-            headers["Authorization"] = f"Bearer {self.token}"
-        req = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
-                return response.read().decode("utf-8")
-        except urllib.error.HTTPError as exc:
-            message = exc.reason
-            try:
-                parsed_error = json.loads(exc.read().decode("utf-8"))
-                message = parsed_error.get("detail") or parsed_error.get("message") or str(parsed_error)
-            except Exception:
-                pass
-            raise CliError(f"HTTP {exc.code}: {message}") from exc
-        except urllib.error.URLError as exc:
-            raise CliError(f"failed to connect to {self.base_url}: {exc.reason}") from exc
+        raw, _ = self.request_raw(
+            method,
+            path,
+            data=data,
+            query=query,
+            auth=auth,
+            headers={"Accept": "image/svg+xml,text/plain,*/*"},
+        )
+        return raw.decode("utf-8")
 
 def _cli_version() -> str:
     try:
@@ -655,7 +666,7 @@ def _png_occupancy_grid(path: Path, *, cells: int = 16) -> list[float]:
         raise CliError("analyze --diversity requires Pillow") from exc
     with Image.open(path) as image:
         image = image.convert("L").resize((cells, cells))
-        pixels = list(image.getdata())
+        pixels = list(image.get_flattened_data())
     return [1.0 - (float(pixel) / 255.0) for pixel in pixels]
 
 def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
@@ -2698,6 +2709,71 @@ def command_history_export(args: argparse.Namespace) -> int:
     _print_json(summary)
     return 0
 
+
+def _key_value_pairs(values: list[str], *, option: str) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for value in values:
+        key, separator, item_value = value.partition("=")
+        key = key.strip()
+        if not separator or not key:
+            raise CliError(f"{option} values must use KEY=VALUE")
+        parsed[key] = item_value
+    return parsed
+
+
+def _api_json_body(args: argparse.Namespace) -> Any:
+    if args.data is not None and args.file is not None:
+        raise CliError("--data and --file are mutually exclusive")
+    if args.file is not None:
+        raw = sys.stdin.read() if args.file == "-" else Path(args.file).read_text(encoding="utf-8")
+    else:
+        raw = args.data
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise CliError(f"invalid JSON request body: {exc}") from exc
+
+
+def command_api(args: argparse.Namespace) -> int:
+    path = args.path if args.path.startswith("/") else f"/{args.path}"
+    if path != "/health" and not path.startswith("/api/"):
+        raise CliError("path must be /health or start with /api/")
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    raw, response = client.request_raw(
+        args.method,
+        path,
+        data=_api_json_body(args),
+        query=_key_value_pairs(args.query, option="--query"),
+        auth=not args.no_auth,
+        headers=_key_value_pairs(args.header, option="--header"),
+    )
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(raw)
+        print(output_path)
+        return 0
+    content_type = response.headers.get("content-type", "")
+    if "json" in content_type:
+        try:
+            _print_json(json.loads(raw.decode("utf-8")) if raw else {})
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise CliError("server declared JSON but returned an invalid body") from exc
+    else:
+        text_value = raw.decode("utf-8")
+        sys.stdout.write(text_value)
+        if text_value and not text_value.endswith("\n"):
+            sys.stdout.write("\n")
+    return 0
+
+
 def command_version(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -2888,6 +2964,21 @@ def build_parser() -> argparse.ArgumentParser:
     history_export.add_argument("--query", "-q", help="filter history before resolving hashes")
     history_export.add_argument("--starred", action="store_true", help="filter history to starred items before resolving hashes")
     history_export.set_defaults(func=command_history_export)
+
+    api_command = subparsers.add_parser(
+        "api",
+        help="call any public inku HTTP API endpoint with the stored session",
+    )
+    _add_common_server_args(api_command)
+    api_command.add_argument("method", type=str.upper, choices=["GET", "POST", "PUT", "PATCH", "DELETE"])
+    api_command.add_argument("path", help="relative endpoint path, for example /api/lineage/NODE_ID")
+    api_command.add_argument("--data", help="JSON request body")
+    api_command.add_argument("--file", "-f", help="read JSON request body from a UTF-8 file, or '-'")
+    api_command.add_argument("--query", action="append", default=[], metavar="KEY=VALUE")
+    api_command.add_argument("--header", action="append", default=[], metavar="KEY=VALUE")
+    api_command.add_argument("--no-auth", action="store_true", help="omit the stored session for public endpoints")
+    api_command.add_argument("--output", "-o", help="write the raw response body to a file")
+    api_command.set_defaults(func=command_api)
 
     version_cmd = subparsers.add_parser("version", help="show CLI and server version/build information")
     _add_common_server_args(version_cmd)

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
+
+import pytest
 
 from inku_cli import cli
 
@@ -29,6 +32,32 @@ CATALOG_DATA = {
 def test_extract_session_token_from_login_cookie():
     token = cli._extract_session_token("inku_session=abc123; HttpOnly; Path=/; SameSite=lax")
     assert token == "abc123"
+
+
+def test_join_url_rejects_absolute_or_embedded_query_paths():
+    with pytest.raises(cli.CliError):
+        cli._join_url("http://127.0.0.1:8100", "https://example.test/api/info")
+    with pytest.raises(cli.CliError):
+        cli._join_url("http://127.0.0.1:8100", "/api/history?limit=10")
+
+
+def test_api_parser_supports_all_public_http_methods():
+    parser = cli.build_parser()
+    for method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+        args = parser.parse_args(["api", method, "/api/info"])
+        assert args.method == method
+        assert args.func is cli.command_api
+
+
+def test_api_json_body_accepts_inline_and_rejects_conflicting_sources(tmp_path):
+    inline = argparse.Namespace(data='{"ok":true}', file=None)
+    assert cli._api_json_body(inline) == {"ok": True}
+    body_file = tmp_path / "body.json"
+    body_file.write_text('["one","two"]', encoding="utf-8")
+    from_file = argparse.Namespace(data=None, file=str(body_file))
+    assert cli._api_json_body(from_file) == ["one", "two"]
+    with pytest.raises(cli.CliError):
+        cli._api_json_body(argparse.Namespace(data="{}", file=str(body_file)))
 
 
 def test_config_roundtrip(tmp_path):

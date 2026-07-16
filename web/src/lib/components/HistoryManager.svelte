@@ -129,6 +129,8 @@
 	let lineageGroupItems = $state<Record<string, HistoryItem[]>>({});
 	let lineageMemberLoadingIds = $state<string[]>([]);
 	let lineageRequestId = 0;
+	let lineageGroupController: AbortController | null = null;
+	const lineageMemberControllers = new Map<string, AbortController>();
 	const lineageGroupPageSize = 8;
 	const lineageGroupTotalPages = $derived(Math.max(1, Math.ceil(lineageGroupTotal / lineageGroupPageSize)));
 
@@ -136,6 +138,10 @@
 		try {
 			if (localStorage.getItem('inku-history-display-mode') === 'lineage') historyDisplayMode = 'lineage';
 		} catch {}
+		return () => {
+			lineageGroupController?.abort();
+			for (const controller of lineageMemberControllers.values()) controller.abort();
+		};
 	});
 
 	function setHistoryDisplayMode(mode: 'chronological' | 'lineage') {
@@ -147,12 +153,15 @@
 
 	async function fetchLineageGroups(): Promise<void> {
 		const requestId = ++lineageRequestId;
+		lineageGroupController?.abort();
+		const controller = new AbortController();
+		lineageGroupController = controller;
 		lineageGroupLoading = true;
 		const params = new URLSearchParams({ offset: String(lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim() });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
 		try {
-			const response = await apiFetch('/api/history/lineage-groups?' + params.toString(), { cache: 'no-store' });
+			const response = await apiFetch('/api/history/lineage-groups?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
 			const data = await response.json() as { groups: LineageHistoryGroup[]; total: number };
 			if (requestId !== lineageRequestId) return;
@@ -160,8 +169,11 @@
 			lineageGroupTotal = data.total;
 			lineageGroupItems = {};
 			expandedRootIds = [];
+		} catch (error) {
+			if (!(error instanceof DOMException && error.name === 'AbortError')) throw error;
 		} finally {
 			if (requestId === lineageRequestId) lineageGroupLoading = false;
+			if (lineageGroupController === controller) lineageGroupController = null;
 		}
 	}
 
@@ -173,16 +185,22 @@
 		expandedRootIds = [...expandedRootIds, rootNodeId];
 		if (lineageGroupItems[rootNodeId]) return;
 		lineageMemberLoadingIds = [...lineageMemberLoadingIds, rootNodeId];
+		lineageMemberControllers.get(rootNodeId)?.abort();
+		const controller = new AbortController();
+		lineageMemberControllers.set(rootNodeId, controller);
 		const params = new URLSearchParams({ limit: '10000', q: historySearch.trim() });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
 		try {
-			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store' });
+			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
 			const data = await response.json() as { items: HistoryItem[] };
 			lineageGroupItems = { ...lineageGroupItems, [rootNodeId]: data.items };
+		} catch (error) {
+			if (!(error instanceof DOMException && error.name === 'AbortError')) throw error;
 		} finally {
 			lineageMemberLoadingIds = lineageMemberLoadingIds.filter((id) => id !== rootNodeId);
+			if (lineageMemberControllers.get(rootNodeId) === controller) lineageMemberControllers.delete(rootNodeId);
 		}
 	}
 

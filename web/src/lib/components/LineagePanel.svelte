@@ -270,7 +270,7 @@ $effect(() => {
 <section class="lineage-panel" class:overview={overviewOpen}>
 	<header>
 		<div>
-			<h2>{isJapanese ? '作品の系譜' : 'Artwork lineage'}</h2>
+			<h2>{isJapanese ? '作品の系譜' : 'Artwork Lineage'}</h2>
 			<p>{overviewOpen ? (isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.') : (isJapanese ? '表示中の作品を中心に、祖先から子作品へ上から下に辿れます。' : 'Trace ancestors and descendants from top to bottom.')}</p>
 			{#if graph}<p class="lineage-context">{isJapanese ? '表示中の作品が、次の推敲の親になります。' : 'The displayed artwork will be the parent of your next refinement.'}</p>{/if}
 		</div>
@@ -353,7 +353,7 @@ $effect(() => {
 											<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(edge?.derivation_kind)}</dd>
 										</dl>
 										<div class="note-editor">
-											<label for={`lineage-note-${node.id}`}>{isJapanese ? '作品へのコメント' : 'Artwork comment'}</label>
+										<label for={`lineage-note-${node.id}`}>{isJapanese ? '作品へのコメント' : 'Artwork Comment'}</label>
 											<textarea id={`lineage-note-${node.id}`} maxlength="240" rows="3" value={noteValue(node)} disabled={savingNoteIds.includes(node.id)} oninput={(event) => updateNoteDraft(node.id, event.currentTarget.value)}></textarea>
 											<button type="button" disabled={savingNoteIds.includes(node.id) || noteValue(node).trim() === (node.history?.note ?? '').trim()} onclick={() => saveNodeNote(node)}>{savingNoteIds.includes(node.id) ? (isJapanese ? '保存中…' : 'Saving…') : (isJapanese ? '保存' : 'Save')}</button>
 										</div>

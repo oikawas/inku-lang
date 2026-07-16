@@ -59,7 +59,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.82';
+	const APP_VERSION = 'v1.85';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -5720,6 +5720,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		flex-direction: column;
 		border-right: 1px solid var(--border);
 		overflow: hidden;
+	}
+
+	@media (max-width: 1180px) {
+		.left-panel { width: min(400px, 42vw); }
+		.panel-scroll { padding-inline: 12px; }
 	}
 
 	.panel-scroll {

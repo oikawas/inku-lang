@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-07-15 — Unreleased v1.85 Baseline (Web Build 564)
+
+- Added inku-cli api for permission-aware access to every public API and documented every CLI command.
+- Added Compose deployment for a non-root API, production Node Web service, and persistent data volume while retaining the existing development setup.
+- Documented request-body limits, login rate limiting, CORS, renderer concurrency, and Idempotency-Key.
+- Clarified trash confirmation, lineage tombstones, retry deduplication, and user scope.
+- Reflected English Title Case consistency and the iPad-width layout baseline.
+
 ## 2026-07-15 — Unreleased v1.82 Baseline (Web Build 563)
 
 Full revision.

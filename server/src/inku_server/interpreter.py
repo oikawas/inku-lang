@@ -59,7 +59,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 入力に明示された以下の属性は必ず出力に含める:
 
 - **いろ**: 青い・赤い・白い・灰色の → 省かない (「青いクレヨン線」→「青い」を落とさない)
-- **てざわり**: クレヨン・筆・鉛筆・チョーク・縄 → 省かない
+- **てざわり**: クレヨン・筆・鉛筆・チョーク → 省かない
 - **太さ・サイズ**: 細い・太い・小さな・大きな → 保持
 - **方向・ばしょ**: 縦・横・放射状・中央・右端・右半分など → 保持
 - **ゆらぎ**: 震える・波打つ・滲む・細かく → 数量文の後に別文で記述
@@ -77,6 +77,9 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - 粒立つ、かすれ → 「面: 粒立つ。」
 - 薄墨で満たす、水彩の面 → 「面: 薄墨。」
 - 端が滲む → 「面: 滲む。」
+- ビュラン、ドライポイントは入力にその技法名がある場合だけ同名のてざわりとして残す。
+- メゾチント地は「地: 黒いメゾチント地。」、平行線・交差線・アクアチントは「面: 平行線（粗から密）。」「面: 交差線。」「面: アクアチント三段。」と固定する。
+- 暗い地から光を彫る明示は「黒地から光を彫り出す（半明）。」または「黒地から光を彫り出す（明るく）。」とする。版画語のない入力へこれらを追加しない。
 
 複数属性を持つ図形は 1 文に収める: 「青いクレヨンの太い縦線を横に三十本並べる。」
 
@@ -89,7 +92,6 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 - 子供、手描き、こすれ、塗り、柔らかい色面、蝋 → クレヨン
 - 墨、にじみ、書、筆跡、流麗、濃淡 → 細筆 または 太筆
 - 精密、設計、硬い、機械的、均一、図面 → ロットリング
-- 太い、荒い、撚り、重い、結び、綱 → 縄
 - 素材手がかりがない短い線・点列は、ペン固定にせず、鉛筆・細筆・クレヨン・チョークから文脈に合うものを選ぶ
 
 てざわりは DDL に明示する: 「鉛筆の細い線」「チョークの横線」「クレヨンの短い線」「細筆の縦線」。
@@ -187,7 +189,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 かたち: 円、楕円、三角、四角、線、弧
 かたむき: 水平、垂直、斜め、右上がり、右下がり、回転
-てざわり: 髪、鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、縄
+てざわり: 髪、鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、ビュラン、ドライポイント
 つらなり: 実線(既定)、破線、点線、一点鎖線
 いろ: 白、黒(既定)、青、赤、緑、灰
 ゆらぎ: 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む
@@ -246,6 +248,17 @@ Saijiki にない語が入力にあるとき、その語のイメージ・形・
 # 変換例プール。推論時に入力と関連性の高い k 件を選択して使う。
 # 例を増やしても推論プロンプトは増えない (k 件固定)。
 EXAMPLE_POOL: list[dict] = [
+    {
+        "keywords": ["ビュラン", "彫版"],
+        "input": "ビュランで交差する線を彫る",
+        "output": "ビュランの斜線を交差するように二本引く。",
+    },
+    {
+        "keywords": ["ドライポイント"],
+        "input": "ドライポイントで滲む一本の線を引く",
+        "output": "ドライポイントの横線を中央に引く。",
+    },
+
     {
         "keywords": ["月", "昇", "空", "夜", "星", "天"],
         "input": "山の向こうに月が昇る",
@@ -363,12 +376,6 @@ EXAMPLE_POOL: list[dict] = [
         "keywords": ["筆", "太筆", "細筆", "毛筆", "墨", "にじむ", "にじみ"],
         "input": "太筆で横線を五本引く",
         "output": "太筆の横線を縦に五本並べる。",
-    },
-    # てざわり保持: 縄
-    {
-        "keywords": ["縄", "ロープ", "太い", "麻", "荒い"],
-        "input": "縄のような太い線を引く",
-        "output": "縄の横線を中央に引く。",
     },
     # てざわり保持: ロットリング + 精密
     {
@@ -564,6 +571,17 @@ EXAMPLE_POOL: list[dict] = [
 
 EXAMPLE_POOL_EN: list[dict] = [
     {
+        "keywords": ["burin", "engraved"],
+        "input": "Engrave two crossing lines with a burin",
+        "output": "Draw two crossing diagonal burin lines.",
+    },
+    {
+        "keywords": ["drypoint"],
+        "input": "Draw one velvety line in drypoint",
+        "output": "Draw one drypoint horizontal line at center.",
+    },
+
+    {
         "keywords": ["wallpaper", "faded stripes", "vertical stripes"],
         "input": "Faded blue striped wallpaper",
         "output": "Tile four hundred short faded blue pencil vertical lines across the wall. Swaying faintly.",
@@ -699,11 +717,6 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Fill background with black. Place a white chalk circle at center. Edges blurring.",
     },
     {
-        "keywords": ["rope", "thick", "coarse", "heavy"],
-        "input": "A thick rope-like line across the center",
-        "output": "Draw a rope horizontal line at center.",
-    },
-    {
         "keywords": ["trembling", "trembles", "shaking", "vibrate", "quivering"],
         "input": "Three trembling vertical lines",
         "output": "Line up three vertical solid lines horizontally. Fine trembling.",
@@ -819,7 +832,7 @@ Emotional language removal is the only normalization. **Dropping attributes is a
 Preserve all explicitly stated attributes in the input:
 
 - **colors**: blue, red, white, gray → never omit ("blue crayon line" → keep "blue")
-- **touches**: crayon, brush, pencil, chalk, rope → never omit
+- **touches**: crayon, brush, pencil, chalk → never omit
 - **weight/size**: thin, thick, small, large → preserve
 - **direction/places**: vertical, horizontal, radial, center, right-half → preserve
 - **movements**: trembling, undulating, blurring, fine → add as separate sentence after count
@@ -837,6 +850,9 @@ Texture must not create extra helper shapes. If it belongs to a shape interior, 
 - grainy, rough, scuffed → "Surface: grain."
 - ink wash or watercolor fill → "Surface: pale ink wash."
 - bleeding edge → "Surface: bleeding."
+- Preserve burin and drypoint only when the input literally names them.
+- Normalize print fields to fixed phrases: "Ground: black mezzotint.", "Surface: hatching (coarse to dense).", "Surface: crosshatching.", and "Surface: three-step aquatint."
+- Normalize explicit subtraction as "Carve light from the dark ground (half)." or "Carve light from the dark ground (bright)." Never add these phrases to non-print input.
 
 Multiple attributes in one shape go in one sentence: "Line up thirty thick vertical blue crayon lines."
 
@@ -849,7 +865,6 @@ If the input does not name a material, infer the nearest touch from texture and 
 - childlike, hand-drawn, waxy, rubbed color, soft color field → crayon
 - ink, wash, calligraphy, stroke, value, bleeding → fine-brush or thick-brush
 - precise, technical, mechanical, uniform, blueprint, diagram → rotring
-- thick, coarse, twisted, heavy, knot, cord → rope
 - If a short line or dotted layer has no material clue, choose from pencil, fine-brush, crayon, or chalk by context instead of always using pen
 
 Write the touch explicitly in normalized DDL: "thin pencil line", "chalk horizontal line", "short crayon line", "fine-brush vertical line".
@@ -955,7 +970,7 @@ Do not normalize to the same foreground and background color. Invisible output i
 
 forms: circle, ellipse, triangle, square, line, arc
 angles: horizontal, vertical, diagonal, rising, falling, rotated
-touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, rope
+touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint
 continuity: solid (default), dashed, dotted, dash-dot
 colors: white, black (default), blue, red, green, gray
 movements: fine, large, slowly, quickly, swaying, undulating, trembling, blurring

@@ -25,7 +25,8 @@ export const SAIJIKI: SaijikiCategory[] = [
 			'チョーク',
 			'細筆',
 			'太筆',
-			'縄'
+			'ビュラン',
+			'ドライポイント'
 		]
 	},
 	{
@@ -65,7 +66,7 @@ export const SAIJIKI: SaijikiCategory[] = [
 		key: 'ugoki',
 		label: 'うごき',
 		en: 'motions',
-		words: ['置く', '並べる', '埋める', '散らす', '引く', '敷き詰める']
+		words: ['置く', '並べる', '埋める', '散らす', '引く', '敷き詰める', '彫る']
 	},
 	{
 		key: 'katamuki',

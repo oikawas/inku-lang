@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.86.1**
+**Version: v1.87**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -429,7 +429,7 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 |---|---|
 | かたち | 円、楕円、三角、四角、線、弧 |
 | かたむき | 水平、垂直、斜め、右上がり、右下がり、回転 |
-| てざわり | ペン、筆、クレヨン、チョーク、縄 |
+| てざわり | ペン、筆、クレヨン、チョーク、ビュラン、ドライポイント |
 | うごき | 置く、並べる、埋める、散らす、敷き詰める |
 | ばしょ | 上、下、中心、端、隅 |
 
@@ -439,7 +439,7 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 |---|---|
 | forms | circle, ellipse, triangle, square, line, arc |
 | angles | horizontal, vertical, diagonal, rising, falling, rotated |
-| touches | pen, brush, crayon, chalk, rope |
+| touches | pen, brush, crayon, chalk, burin, drypoint |
 | motions | place, align, fill, scatter, tile |
 | places | top, bottom, center, edge, corner |
 
@@ -782,7 +782,7 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
 
 かたち: 円、楕円、三角、四角、線、弧
 かたむき: 水平、垂直、斜め、右上がり、右下がり、回転
-てざわり: ペン、筆、クレヨン、チョーク、縄
+てざわり: ペン、筆、クレヨン、チョーク、ビュラン、ドライポイント
 うごき: 置く、並べる、埋める、散らす
 ばしょ: 上、下、中心、端、隅
 太さ: 細、中、太
@@ -1035,7 +1035,6 @@ DDLの揺らぎは、この意味での揺らぎである。
 | chalk | perlin_plus_noise | パーリン + 粉っぽいかすれ、blur |
 | brush_thin | perlin_strong | 細い筆跡、副線、濃淡 |
 | brush_thick | pressure_blur | 太い筆圧、擦れ副線、軽い blur |
-| rope | slow_wave | 大きな波、撚り線、斜めの短い撚り |
 
 **揺らぎのノイズ種別:**
 - **ホワイトノイズ**: 各点独立・相関なし・ギザギザ
@@ -1044,7 +1043,6 @@ DDLの揺らぎは、この意味での揺らぎである。
 
 手描きの線は手の慣性から連続性を持つため、パーリンノイズ寄りが自然。
 
-現行 Renderer は `weight` を単なる線幅ではなく SVG 構造として描き分ける。`pencil` / `crayon` / `chalk` / `brush_thick` は `feTurbulence` + `feDisplacementMap` などの texture filter を持ち、`crayon` / `chalk` は粒状の副要素、`rope` は撚りを示す斜め短線を追加する。line だけでなく circle / ellipse / square / arc の輪郭にも同じ素材処理を適用する。JSON Score では `weight` を保持し、物理的な質感差は SVG レンダリング時に演奏される。
 
 ### 13.6 運動語彙のカテゴリ
 
@@ -1733,7 +1731,7 @@ Build 556では、系譜の全体図が削除確認ダイアログより前面�
 - **Renderer MVP (svgwrite, 1000x1000 viewBox)**
   - 実装済 primitive: line, circle, ellipse, triangle (等辺二等辺), square (矩形)
   - 座標変換: `0.0-1.0` 比率 × `CANVAS_PX=1000` で px 化
-  - weight → `stroke-width` マッピング (hair 0.5 〜 rope 10.0)
+  - weight → `stroke-width` マッピング (hair 0.5 〜 brush_thick 8.0)
   - color → HEX パレット (黒=#111111, 青=#2c3e91, 赤=#a2342a, 緑=#2f6b3a, 灰=#888888, 白=#ffffff)
   - style → `stroke-dasharray` (solid=なし, dashed=12,8, dotted=2,6, dash_dot=12,6,2,6)
   - 背景色: `#f7f5ef` (墨が映える薄黄、和紙を想起)
@@ -2320,9 +2318,9 @@ Stage 1 解釈時に感情語を検出し、DDL語彙への変換ヒントを入
 
 **修正内容**:
 - `SYSTEM_PROMPT` / `SYSTEM_PROMPT_EN` に「てざわり → weight 変換 (必須)」セクションを追加
-  - 素材語9種 (髪・鉛筆・ペン・ロットリング・クレヨン・チョーク・細筆・太筆・縄) と対応 weight 値の対応表
+  - 素材語10種 (髪・鉛筆・ペン・ロットリング・クレヨン・チョーク・細筆・太筆・ビュラン・ドライポイント) と対応 weight 値の対応表
   - 4 つの変換例: クレヨン/鉛筆/チョーク+滲む/太筆
-- `EXAMPLE_POOL` に てざわり例を追加: 太筆・縄・ロットリング・チョーク (日本語)、thick-brush・chalk・rope (英語)
+- `EXAMPLE_POOL` に てざわり例を追加: 太筆・ロットリング・チョーク・ビュラン・ドライポイント (日本語)、thick-brush・chalk・burin・drypoint (英語)
 
 **影響範囲**: `server/src/inku_server/composer.py`, `server/src/inku_server/interpreter.py`
 
@@ -2704,7 +2702,6 @@ Renderer の `weight` 表現を線幅差だけに留めず、SVG 属性・フィ
 - `chalk`: 破線と軽い blur filter で粉っぽいチョーク線を表現する
 - `crayon`: 主線に擦れた副線を重ね、クレヨンのざらつきを表現する
 - `brush_thick`: 太い主線、薄い副線、軽い blur で筆跡の厚みを出す
-- `rope`: 主線の両側に撚りを示す破線レイヤーを追加する
 - `rotring`: 角張った線端で製図線寄りにする
 - `hair`: 極細・低 opacity で繊細な線にする
 
@@ -3014,7 +3011,6 @@ NVIDIA NIM は開発用の Free API 接続先として扱う。SLA は保証さ�
   - チョーク -> `chalk`
   - 細筆 / 水墨 / 墨 -> `brush_thin`
   - 太筆 / 油絵 / 厚塗り -> `brush_thick`
-  - 縄 / ロープ -> `rope`
 - DDL の揺れ・滲み語から `variation` を補完する:
   - `ゆっくり揺れる` / `ゆっくり波打つ` -> `quality=wave`, `frequency=slow`
   - `細かく揺れる` / `細かく震える` / `震える` -> `quality=perlin`
@@ -3144,13 +3140,10 @@ DDL の「てざわり」が線幅差だけに見えないよう、Stage 1 / Sta
   - 手描き / こすれ / 蝋 / 柔らかい色面 → クレヨン
   - 墨 / 書 / 筆跡 / 濃淡 → 細筆または太筆
   - 精密 / 機械的 / 均一 / 図面 → ロットリング
-  - 太い / 荒い / 撚り / 重い / 綱 → 縄
 - Stage 1 の few-shot に鉛筆、チョーク、クレヨン、ロットリングの質感例を追加した
-- Stage 1.5 の拡張DDL候補に `鉛筆の余白線`、`クレヨンの擦れ`、`ロットリングの均一線`、`縄の撚り` を追加した
 - Renderer は `weight` ごとに SVG 属性・texture filter・副線・粒・撚り短線を生成する
 - line に加えて circle / ellipse / square / arc の輪郭にも素材処理を適用する
 - `pencil` / `crayon` / `chalk` / `brush_thick` は `feTurbulence` / `feDisplacementMap` を使い、線幅だけではない質感差を出す
-- `rope` は平行な撚り線に加え、周期的な斜め短線で撚りを表現する
 
 ### v1.25 (2026-05-03)
 
@@ -3944,3 +3937,15 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - **多言語化とレスポンシブ崩れ対策**: AI自律推敲および手動推敲モーダルの表示文字列をすべて共通 i18n 辞書オブジェクト `t()` による出力に移行。キャンバス上部メタデータ部分の `flex-wrap: wrap` や `text-overflow: ellipsis` 制限により、中間解像度・モバイル幅でのレイアウト破綻を防止した。
 - **Build 566**。
 
+
+### v1.87 — 版画の線と調子、語彙の整理 (2026-07-16)
+
+- **筆致の設計**: 線を、L0 意図経路、L1 手の二次系追従、L2 1/f 傾斜の共通潜在エネルギー、L3 疎な引っかかり・かすれ・修正、L4 道具文法の五層で演奏する。幅・横偏差・濃さは同じ潜在信号に従い、ロットリングは均一性を守るためこの作用を明示的に遮断する。出力は可変幅輪郭へまとめ、線ごとのfilterを増やさない。
+- **版画の線**: てざわりにビュラン / `burin` とドライポイント / `drypoint` を追加した。ビュランは端が細く中央が膨らむ硬い彫線、ドライポイントはseedで左右が決まる片側burrを持つ。特定作家の模倣ではなく、道具と手の一般的な文法だけを移植する。
+- **調子と地**: `surface.texture` に `hatch`、`crosshatch`、`aquatint` を置き、間隔勾配と2〜4段の離散調子を扱う。`canvas.ground.material="mezzotint"` は暗い目立て地を表す。`instruction.mode="carve"` と `carve_depth=light|half|bright` は暗地から光を掬う減算の手であり、合成順は ground → additive → carve → plate tone とする。
+- **刷りの演奏**: プレートトーン、メゾチント粒理、drypoint burr、groundと描画の見当差を既存texture seed規約と `render_seed` から決定的に導出する。rh2 canonical payloadは変更せず、同じScoreとseedは同じ刷りを再現する。
+- **入力駆動とdrop-only**: 版画部品は正規化DDLの定型句がある場合だけ到達する。Stage 1.5は注入しない。暗地のないcarveや定型句のない版画fieldは落とすだけで、ground・mode・版画weightを補修しない。
+- **語彙追加の正当化**: ビュランとドライポイントは既存素材では観察可能なエッジ差を表せないため追加し、彫るは加算ではない手を得るため追加した。代償は歳時記の暗記負荷と、暗地が必要な条件付き語彙の導入である。
+- **洗練の会計**: 縄 / `rope` をコアのてざわり、Score schema、Renderer、prompt、歳時記から削除した。未releaseの段階で、線材と物体比喩の境界が曖昧な一語を互換語として残さず整理した。増えた反復は版画部品の入力時に限られ、一般入力で起きにくくしたことは、Stage 1.5による素材指紋と暗地・彫りの自発注入である。てざわりは差引10語となる。
+- **物質性の限界**: SVGが扱うのは版画の凹みやインク盛りの模倣ではなく、線と調子の文法である。
+- Build 567。

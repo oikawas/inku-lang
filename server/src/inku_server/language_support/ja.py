@@ -16,7 +16,6 @@ COERCE_MARKERS = {
         (("細筆",), "brush_thin"),
         (("太筆", "厚塗り", "油絵"), "brush_thick"),
         (("水墨", "墨"), "brush_thin"),
-        (("縄", "ロープ"), "rope"),
     ),
     "color_markers": (
         (("白",), "white"),

@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.86.1**
+**Version: v1.87**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -285,7 +285,7 @@ Current core categories include:
 | English | Japanese | Examples |
 | --- | --- | --- |
 | shape | かたち | circle, ellipse, triangle, square, line, arc |
-| touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, rope |
+| touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, burin, drypoint |
 | line continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | motion | うごき | place, align, scatter, fill, tile, tremble, undulate |
 | relations | あいだ | along, not touching, cutting, between, with examples such as `along the previous line` |
@@ -1432,3 +1432,14 @@ When updating the specification:
 - Build 525.
 
 **v1.76 closure (2026-07-15):** Build 525 is the accepted v1.76 release. Successive real-browser reviews confirmed that any lineage work can become the next derivation source, parent-child paths remain traceable through generation arrows, the displayed work stays synchronized with bottom history, and History Manager selection, bulk deletion, and page sizing remain stable. Feedback was incorporated across Builds 518–525. Subsequent work, beginning with v1.80, uses this lineage contract and the separation of the four identities as its foundation.
+
+### v1.87 — Printmaking Grammar and Vocabulary Refinement (2026-07-16)
+
+- Added a deterministic five-layer stroke performance: intended path, damped hand dynamics, one shared 1/f-like latent energy signal, sparse events, and per-tool grammar. Width, lateral deviation, and apparent density covary; rotring explicitly blocks the expressive engine to preserve uniformity.
+- Added `burin` and `drypoint`. Burin tapers at both ends and swells through the cut; drypoint adds a seed-selected one-sided burr. These model general tool behavior, not an artist or period.
+- Extended existing surfaces with `hatch`, `crosshatch`, and stepped `aquatint`; added `mezzotint` ground and `mode="carve"` with `light|half|bright`. Rendering order is ground, additive marks, carved light, then plate tone.
+- Plate tone, mezzotint grain, drypoint burr, and register shift remain deterministic under the existing texture-seed convention. The `rh2` canonical payload is unchanged.
+- Printmaking fields are literal-input only. Stage 1.5 cannot inject them, and invalid carve without a dark ground is dropped without repair.
+- Removed `rope` from the core vocabulary, Score schema, renderer, prompts, and Saijiki. Because inku is unreleased, v1.87 uses the opportunity to remove an ambiguous object-metaphor touch instead of carrying compatibility debt. The resulting touch vocabulary has ten entries.
+- SVG transfers the grammar of engraved line and tone; it does not claim to reproduce physical plate indentation or raised ink.
+- Build 567.

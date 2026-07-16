@@ -59,7 +59,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.86.1';
+	const APP_VERSION = 'v1.87';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -491,7 +491,8 @@
 			チョーク: { effect: 'かすれを含む淡い線。', example: '白いチョークの線', svg: lineSvg('opacity="0.46"', 8) },
 			細筆: { effect: '筆圧のある細い筆線。', example: '細筆で弧を引く', svg: lineSvg('', 4) },
 			太筆: { effect: '太く存在感のある筆線。', example: '太筆で黒い線を引く', svg: lineSvg('', 11) },
-			縄: { effect: '太く荒い線。結び目や束の印象を作る。', example: '縄のような線', svg: lineSvg('stroke-dasharray="10 5"', 10) },
+			ビュラン: { effect: '入りと抜きが細く、中央に彫りの勢いが集まる硬い線。', example: 'ビュランで線を彫る', svg: lineSvg('', 7, 'round') },
+			ドライポイント: { effect: '片側にまくれの柔らかな滲みを伴う線。', example: 'ドライポイントの線', svg: lineSvg('opacity="0.68"', 6) },
 			実線: { effect: '切れ目のない線。', example: '実線で引く', svg: lineSvg() },
 			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', svg: lineSvg('stroke-dasharray="14 9"') },
 			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', svg: lineSvg('stroke-dasharray="1 12"') },

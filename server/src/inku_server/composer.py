@@ -55,10 +55,14 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **余白は構図要素。小さな焦点、端寄りの線、反復の欠落、画面外へ続く方向で余白に圧力を作る。余白を全面散布で埋めない**
 - variation は明示された揺らぎがある場合のみ付ける
 - **形容語・動作語・質感語は、DDL で指定された主図形へ適用する。震える・揺れる・滲む・太い・細い等を理由に、DDL にない補助線・補助図形・別色の instruction を追加してはいけない**
-- **面の質感は instruction.surface へ入れる。点で埋める=texture="stipple"、斜線/ハッチ=texture="hatch"、粒立つ/かすれ=texture="grain"、薄墨/水彩=texture="wash"、端が滲む=texture="bleed"。質感を理由に独立 instruction を追加しない**
+- **面の質感は instruction.surface へ入れる。点で埋める=texture="stipple"、平行線=texture="hatch"、交差線=texture="crosshatch"、アクアチント=texture="aquatint"、粒立つ/かすれ=texture="grain"、薄墨/水彩=texture="wash"、端が滲む=texture="bleed"。質感を理由に独立 instruction を追加しない**
 - **紙目・生成りの紙・和紙・薄墨の地は canvas.ground へ入れる。canvas は {"aspect":"square","ground":{...}} 形式にしてよい。地は background ではなく支持体の質感であり、座標系を変えない**
 - **「地: ...」の文は canvas.ground へだけ変換し、その文から instruction を追加しない。「面: ...」の文は直前に指定された主図形の surface に入れる。一つの質感要求を複数の質感付き instruction に複製しない**
 - **正規化DDL に「地: ...」の文が無い場合、canvas.ground を出力しない。雰囲気や情景からの推測で ground を追加しない**
+- **「地: 黒いメゾチント地。」だけを canvas.ground.material="mezzotint", tone="black" へ変換する。情景から推測しない**
+- **「黒地から光を彫り出す」がある instruction だけ mode="carve" とし、半明=carve_depth="half"、明るく=carve_depth="bright"。この句がない場合は mode を出力しない**
+- **「面: 平行線」は texture="hatch"、「面: 交差線」は texture="crosshatch"、「面: アクアチント三段」は texture="aquatint", tone_steps=3。粗から密は spacing_gradient="coarse_to_dense"**
+- **版画fieldは対応する固定句が正規化DDLにある場合だけ出力する。補修・推測・複製をしない**
 - **「ゆっくり揺れる」→ variation quality="wave", frequency="slow" を優先する。perlin は「震える」「細かく揺れる」に使う**
 - **短い line に揺らぎを付ける場合は dimensions=["position_x","position_y"] を優先し、サムネイルでも見える垂直方向のうねりにする**
 
@@ -346,7 +350,8 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 | チョーク | chalk |
 | 細筆 | brush_thin |
 | 太筆 | brush_thick |
-| 縄 | rope |
+| ビュラン | burin |
+| ドライポイント | drypoint |
 
 入力: 青いクレヨンの縦線を横に三十本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"blue","weight":"crayon","arrangement":{"count":30,"layout":"horizontal"}}]}
@@ -386,10 +391,14 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Negative space is compositional pressure. Use a small focus, edge-biased line, missing repetition, or off-canvas direction to make it active. Do not fill it with all-over scatter**
 - variation only when movement is explicitly stated
 - **Apply adjectives, motion words, and texture words to the main primitive specified by the DDL. Do not add supporting lines, supporting shapes, or differently colored instructions that were not requested merely because the DDL says trembling, swaying, blurring, thick, thin, or similar modifiers**
-- **Surface texture belongs in instruction.surface. dotted/stippled fill → texture="stipple"; hatch/crosshatch → texture="hatch"; grainy/rough/scuffed → texture="grain"; ink wash/watercolor wash → texture="wash"; bleeding edge → texture="bleed". Do not turn texture into independent helper instructions**
+- **Surface texture belongs in instruction.surface. dotted/stippled fill → texture="stipple"; hatch → texture="hatch"; crosshatch → texture="crosshatch"; aquatint → texture="aquatint"; grainy/rough/scuffed → texture="grain"; ink wash/watercolor wash → texture="wash"; bleeding edge → texture="bleed". Do not turn texture into independent helper instructions**
 - **Paper grain, off-white paper, washi, and ink-wash ground belong in canvas.ground. Use canvas={"aspect":"square","ground":{...}} when needed. Ground is support texture, not a coordinate or composition change**
 - **A "Ground: ..." sentence maps only to canvas.ground; do not add any instruction from it. A "Surface: ..." sentence goes into the surface of the main shape it follows. Never duplicate one texture request across multiple textured instructions**
 - **Do not emit canvas.ground unless the normalized DDL contains a "Ground: ..." sentence. Never add ground from mood or scene inference**
+- **Only "Ground: black mezzotint." maps to canvas.ground.material="mezzotint", tone="black". Never infer it from a scene**
+- **Only an instruction with "Carve light from the dark ground" gets mode="carve"; half maps to carve_depth="half" and bright to carve_depth="bright". Omit mode otherwise**
+- **Hatching maps to texture="hatch", crosshatching to "crosshatch", and three-step aquatint to texture="aquatint", tone_steps=3. Coarse to dense maps to spacing_gradient="coarse_to_dense"**
+- **Print fields require their exact normalized phrase. Never infer, repair, or duplicate them**
 - **"swaying slowly" / "slowly swaying" → prefer variation quality="wave", frequency="slow". Use perlin for trembling or fine swaying**
 - **For short line variation, prefer dimensions=["position_x","position_y"] so the wobble stays visible even in thumbnails**
 
@@ -666,7 +675,8 @@ When the normalized DDL contains a material word, always set the weight field. O
 | chalk | chalk |
 | fine-brush | brush_thin |
 | thick-brush | brush_thick |
-| rope | rope |
+| burin | burin |
+| drypoint | drypoint |
 
 Input: Line up thirty vertical blue crayon lines horizontally.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"blue","weight":"crayon","arrangement":{"count":30,"layout":"horizontal"}}]}
@@ -808,7 +818,9 @@ def _literal_relation_types(ddl: str) -> set[str]:
     }
 
 
-def _mentioned_values(text: str, terms_by_value: dict[str, tuple[str, ...]]) -> set[str]:
+def _mentioned_values(
+    text: str, terms_by_value: dict[str, tuple[str, ...]]
+) -> set[str]:
     haystack = text.lower()
     return {
         value
@@ -857,10 +869,75 @@ def _enforce_ground_literal_gate(score: Score, ddl: str) -> Score:
     return Score.model_validate(data)
 
 
+def _enforce_print_literal_gate(score: Score, ddl: str) -> Score:
+    """Printmaking fields are input-driven and invalid carve is drop-only."""
+    normalized = unicodedata.normalize("NFKC", ddl)
+    lower = normalized.lower()
+    canvas = score.canvas
+    dark_ground = (
+        not isinstance(canvas, str)
+        and canvas.ground is not None
+        and (
+            canvas.ground.material in {"mezzotint", "charcoal_ground"}
+            or canvas.ground.tone == "black"
+        )
+    )
+    data = score.model_dump(by_alias=True)
+    changed = False
+    if (
+        not isinstance(canvas, str)
+        and canvas.ground is not None
+        and canvas.ground.material == "mezzotint"
+        and "メゾチント" not in normalized
+        and "mezzotint" not in lower
+    ):
+        data["canvas"] = canvas.aspect
+        dark_ground = False
+        changed = True
+    for item in data["instructions"]:
+        weight = item.get("weight")
+        if weight == "burin" and "ビュラン" not in normalized and "burin" not in lower:
+            item["weight"] = "pen"
+            changed = True
+        if (
+            weight == "drypoint"
+            and "ドライポイント" not in normalized
+            and "drypoint" not in lower
+        ):
+            item["weight"] = "pen"
+            changed = True
+        surface = item.get("surface") or {}
+        tokens = {
+            "hatch": ("平行線", "hatch"),
+            "crosshatch": ("交差線", "crosshatch"),
+            "aquatint": ("アクアチント", "aquatint"),
+        }.get(surface.get("texture"))
+        if tokens and not any(
+            token in normalized or token in lower for token in tokens
+        ):
+            item.pop("surface", None)
+            changed = True
+        if item.get("mode") == "carve" and (
+            not dark_ground
+            or not any(
+                token in normalized or token in lower
+                for token in ("彫り出す", "彫る", "carve light", "carve")
+            )
+        ):
+            item["mode"] = "additive"
+            item.pop("carve_depth", None)
+            changed = True
+    if changed:
+        _logger.warning("printmaking fields dropped by literal gate")
+        return Score.model_validate(data)
+    return score
+
+
 def _finalize_score(score: Score, ddl: str) -> Score:
     score = _enforce_modifier_targeting(score, ddl)
     score = _enforce_relation_literal_gate(score, ddl)
-    return _enforce_ground_literal_gate(score, ddl)
+    score = _enforce_ground_literal_gate(score, ddl)
+    return _enforce_print_literal_gate(score, ddl)
 
 
 def _enforce_modifier_targeting(score: Score, ddl: str) -> Score:
@@ -888,7 +965,9 @@ def _enforce_modifier_targeting(score: Score, ddl: str) -> Score:
     targeted = [ins for ins in score.instructions if matches_target(ins)]
     if not targeted:
         return score
-    if len(targeted) == len(score.instructions) and all(ins.variation is not None for ins in targeted):
+    if len(targeted) == len(score.instructions) and all(
+        ins.variation is not None for ins in targeted
+    ):
         return score
 
     repaired = []
@@ -932,7 +1011,9 @@ def compose(
         effective_prompt = SYSTEM_PROMPT
     settings = _current_model_settings()
     if model:
-        provider, model_id = provider_for_model(model, stage="stage2", settings=settings)
+        provider, model_id = provider_for_model(
+            model, stage="stage2", settings=settings
+        )
         if provider == "anthropic":
             score, tokens_in, tokens_out = _compose_anthropic(
                 user_msg,
@@ -958,13 +1039,23 @@ def compose(
         return _finalize_score(score, ddl), tokens_in, tokens_out
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        score, tokens_in, tokens_out = _compose_openai(user_msg, model=None, system_prompt=effective_prompt)
+        score, tokens_in, tokens_out = _compose_openai(
+            user_msg, model=None, system_prompt=effective_prompt
+        )
         return _finalize_score(score, ddl), tokens_in, tokens_out
-    score, tokens_in, tokens_out = _compose_anthropic(user_msg, system_prompt=effective_prompt)
+    score, tokens_in, tokens_out = _compose_anthropic(
+        user_msg, system_prompt=effective_prompt
+    )
     return _finalize_score(score, ddl), tokens_in, tokens_out
 
 
-def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt: str = SYSTEM_PROMPT, settings: dict | None = None) -> tuple[Score, int | None, int | None]:
+def _compose_anthropic(
+    user_msg: str,
+    *,
+    model: str | None = None,
+    system_prompt: str = SYSTEM_PROMPT,
+    settings: dict | None = None,
+) -> tuple[Score, int | None, int | None]:
     from anthropic import Anthropic
 
     connection = connection_for("anthropic", settings or _current_model_settings())
@@ -988,17 +1079,29 @@ def _compose_anthropic(user_msg: str, *, model: str | None = None, system_prompt
     raise RuntimeError("Anthropic did not return submit_score tool call")
 
 
-def _compose_gemini(user_msg: str, *, model: str, system_prompt: str = SYSTEM_PROMPT, settings: dict | None = None) -> tuple[Score, int | None, int | None]:
+def _compose_gemini(
+    user_msg: str,
+    *,
+    model: str,
+    system_prompt: str = SYSTEM_PROMPT,
+    settings: dict | None = None,
+) -> tuple[Score, int | None, int | None]:
     connection = connection_for("gemini", settings or _current_model_settings())
     api_key = connection.get("api_key") or ""
     if not api_key:
         raise RuntimeError("Gemini API key is not configured")
-    base_url = str(connection.get("base_url") or "https://generativelanguage.googleapis.com").rstrip("/")
+    base_url = str(
+        connection.get("base_url") or "https://generativelanguage.googleapis.com"
+    ).rstrip("/")
     url = f"{base_url}/v1beta/models/{model}:generateContent?key={api_key}"
     body = {
         "systemInstruction": {"parts": [{"text": system_prompt}]},
         "contents": [{"role": "user", "parts": [{"text": user_msg}]}],
-        "generationConfig": {"temperature": 0.0, "maxOutputTokens": MAX_TOKENS, "responseMimeType": "application/json"},
+        "generationConfig": {
+            "temperature": 0.0,
+            "maxOutputTokens": MAX_TOKENS,
+            "responseMimeType": "application/json",
+        },
     }
     request = urllib.request.Request(
         url,
@@ -1006,21 +1109,35 @@ def _compose_gemini(user_msg: str, *, model: str, system_prompt: str = SYSTEM_PR
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))) as response:
+    with urllib.request.urlopen(
+        request, timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
+    ) as response:
         payload = json.loads(response.read().decode("utf-8"))
     parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     text_out = "\n".join(str(part.get("text", "")) for part in parts).strip()
     usage = payload.get("usageMetadata", {})
-    return Score.model_validate(_extract_json(text_out)), usage.get("promptTokenCount"), usage.get("candidatesTokenCount")
+    return (
+        Score.model_validate(_extract_json(text_out)),
+        usage.get("promptTokenCount"),
+        usage.get("candidatesTokenCount"),
+    )
 
 
-def _compose_openai(user_msg: str, *, model: str | None = None, provider: str | None = None, system_prompt: str = SYSTEM_PROMPT) -> tuple[Score, int | None, int | None]:
+def _compose_openai(
+    user_msg: str,
+    *,
+    model: str | None = None,
+    provider: str | None = None,
+    system_prompt: str = SYSTEM_PROMPT,
+) -> tuple[Score, int | None, int | None]:
     from openai import OpenAI
 
     settings = _current_model_settings()
     if model is None:
         provider, model = provider_for_model(None, stage="stage2", settings=settings)
-    provider = provider or provider_for_model(model, stage="stage2", settings=settings)[0]
+    provider = (
+        provider or provider_for_model(model, stage="stage2", settings=settings)[0]
+    )
     connection = connection_for(provider, settings)
     base_url = connection["base_url"]
     api_key = connection.get("api_key") or "none"

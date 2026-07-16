@@ -17,7 +17,15 @@ from xml.sax.saxutils import escape
 import svgwrite
 
 from .plugins import CanvasSize, canvas_size_for_aspect
-from .schema import CanvasGroundSpec, CanvasSpec, Instruction, Score, SurfaceSpec, Variation
+from .schema import (
+    CanvasGroundSpec,
+    CanvasSpec,
+    Instruction,
+    Score,
+    SurfaceSpec,
+    Variation,
+)
+from .stroke_engine import polygon_path, synthesize_stroke
 
 CANVAS_PX = 1000
 
@@ -30,7 +38,8 @@ WEIGHT_TO_STROKE_WIDTH: dict[str, float] = {
     "chalk": 3.0,
     "brush_thin": 3.0,
     "brush_thick": 8.0,
-    "rope": 10.0,
+    "burin": 3.2,
+    "drypoint": 2.6,
 }
 
 COLOR_MAP: dict[str, str] = {
@@ -45,16 +54,132 @@ COLOR_MAP: dict[str, str] = {
 SVG_PROFILES = frozenset({"display", "editable", "compat"})
 
 HUE_HINTS: dict[str, tuple[str, ...]] = {
-    "white": ("white", "ivory", "paper", "linen", "blanc", "bianco", "aspro", "白", "胡粉", "象牙", "生成"),
-    "black": ("black", "ink", "sumi", "obsidian", "basalt", "skotadi", "黒", "墨", "玄", "暗"),
-    "blue": ("blue", "cyan", "azure", "ultramarine", "cobalt", "lapis", "bleu", "blu", "ai", "azul", "青", "藍", "水色", "空色", "瑠璃"),
-    "green": ("green", "verd", "vert", "jade", "olive", "cactus", "tall", "緑", "青緑", "翡翠", "常磐", "玉", "草"),
-    "gray": ("gray", "grey", "silver", "ash", "stone", "granit", "petra", "灰", "鼠", "銀", "石"),
-    "red": ("red", "rose", "pink", "carmine", "cinnabar", "terra", "rosa", "shu", "vermilion", "赤", "朱", "紅", "桜", "桃", "薔薇"),
-    "yellow": ("yellow", "gold", "ochre", "ocra", "giallo", "jaune", "napoli", "kesar", "haldi", "sun", "ilios", "山吹", "金", "黄", "琉璃金"),
-    "orange": ("orange", "apricot", "terracotta", "cempasuchil", "ff4d00", "橙", "蜜柑"),
+    "white": (
+        "white",
+        "ivory",
+        "paper",
+        "linen",
+        "blanc",
+        "bianco",
+        "aspro",
+        "白",
+        "胡粉",
+        "象牙",
+        "生成",
+    ),
+    "black": (
+        "black",
+        "ink",
+        "sumi",
+        "obsidian",
+        "basalt",
+        "skotadi",
+        "黒",
+        "墨",
+        "玄",
+        "暗",
+    ),
+    "blue": (
+        "blue",
+        "cyan",
+        "azure",
+        "ultramarine",
+        "cobalt",
+        "lapis",
+        "bleu",
+        "blu",
+        "ai",
+        "azul",
+        "青",
+        "藍",
+        "水色",
+        "空色",
+        "瑠璃",
+    ),
+    "green": (
+        "green",
+        "verd",
+        "vert",
+        "jade",
+        "olive",
+        "cactus",
+        "tall",
+        "緑",
+        "青緑",
+        "翡翠",
+        "常磐",
+        "玉",
+        "草",
+    ),
+    "gray": (
+        "gray",
+        "grey",
+        "silver",
+        "ash",
+        "stone",
+        "granit",
+        "petra",
+        "灰",
+        "鼠",
+        "銀",
+        "石",
+    ),
+    "red": (
+        "red",
+        "rose",
+        "pink",
+        "carmine",
+        "cinnabar",
+        "terra",
+        "rosa",
+        "shu",
+        "vermilion",
+        "赤",
+        "朱",
+        "紅",
+        "桜",
+        "桃",
+        "薔薇",
+    ),
+    "yellow": (
+        "yellow",
+        "gold",
+        "ochre",
+        "ocra",
+        "giallo",
+        "jaune",
+        "napoli",
+        "kesar",
+        "haldi",
+        "sun",
+        "ilios",
+        "山吹",
+        "金",
+        "黄",
+        "琉璃金",
+    ),
+    "orange": (
+        "orange",
+        "apricot",
+        "terracotta",
+        "cempasuchil",
+        "ff4d00",
+        "橙",
+        "蜜柑",
+    ),
     "purple": ("purple", "violet", "lilac", "murasaki", "宮廷紫", "藤", "紫"),
-    "brown": ("brown", "sienna", "umber", "ombra", "chandan", "lera", "sepia", "茶", "土", "焦"),
+    "brown": (
+        "brown",
+        "sienna",
+        "umber",
+        "ombra",
+        "chandan",
+        "lera",
+        "sepia",
+        "茶",
+        "土",
+        "焦",
+    ),
 }
 
 STYLE_TO_DASH: dict[str, str | None] = {
@@ -73,7 +198,8 @@ WEIGHT_STYLE: dict[str, dict[str, str | float]] = {
     "chalk": {"stroke_opacity": 0.7, "stroke_dasharray": "7,5,1,4"},
     "brush_thin": {"stroke_opacity": 0.9, "stroke_linecap": "round"},
     "brush_thick": {"stroke_opacity": 0.86, "stroke_linecap": "round"},
-    "rope": {"stroke_opacity": 0.88, "stroke_dasharray": "14,5"},
+    "burin": {"stroke_opacity": 0.96, "stroke_linecap": "round"},
+    "drypoint": {"stroke_opacity": 0.92, "stroke_linecap": "round"},
 }
 
 BACKGROUND = "#ffffff"
@@ -90,34 +216,45 @@ TEXTURE_FILTERS: dict[str, str] = {
         '<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%">'
         '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" result="noise"/>'
         '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/>'
-        '</filter>'
+        "</filter>"
     ),
     "crayon": (
         '<filter id="texture-crayon" x="-18%" y="-18%" width="136%" height="136%">'
         '<feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="17" result="noise"/>'
         '<feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8"/>'
-        '</filter>'
+        "</filter>"
     ),
     "chalk": (
         '<filter id="texture-chalk" x="-25%" y="-25%" width="150%" height="150%">'
         '<feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="23" result="noise"/>'
         '<feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2"/>'
         '<feGaussianBlur stdDeviation="0.9"/>'
-        '</filter>'
+        "</filter>"
     ),
     "brush_thick": (
         '<filter id="texture-brush_thick" x="-20%" y="-20%" width="140%" height="140%">'
         '<feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="2" seed="31" result="noise"/>'
         '<feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4"/>'
         '<feGaussianBlur stdDeviation="0.6"/>'
-        '</filter>'
+        "</filter>"
     ),
 }
 
 
 def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None) -> int:
     """Instruction と演奏 seed から安定した乱数 seed を作る。"""
-    key = ins.model_dump_json().encode("utf-8")
+    payload = ins.model_dump(mode="json")
+    if payload.get("mode") == "additive":
+        payload.pop("mode", None)
+    if payload.get("carve_depth") is None:
+        payload.pop("carve_depth", None)
+    surface = payload.get("surface")
+    if isinstance(surface, dict):
+        if surface.get("spacing_gradient") == "none":
+            surface.pop("spacing_gradient", None)
+        if surface.get("tone_steps") == 3:
+            surface.pop("tone_steps", None)
+    key = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if performance_seed is not None:
         key += f":render:{performance_seed}".encode("utf-8")
     digest = hashlib.sha256(key).digest()
@@ -141,7 +278,7 @@ def _performance_touch_filter(render_seed: int) -> tuple[str, str]:
         f'seed="{seed % 9973}" result="touchNoise"/>'
         f'<feDisplacementMap in="SourceGraphic" in2="touchNoise" scale="{scale:.2f}" '
         'xChannelSelector="R" yChannelSelector="G"/>'
-        '</filter>'
+        "</filter>"
     )
     return filter_id, xml
 
@@ -264,7 +401,7 @@ def _rhythm_t(i: int, n: int, seed: int, rhythm_spacing: str) -> float:
         return 0.0
     base = i / (n - 1)
     if rhythm_spacing == "accelerando":
-        return base ** 1.35
+        return base**1.35
     if rhythm_spacing == "loose":
         jitter = (_hash01(i, seed, "rhythm-loose") - 0.5) * 0.16
         return _clamp01(base + jitter)
@@ -285,8 +422,8 @@ def _path_pos(
 ) -> tuple[float, float]:
     span = 1.0 - 2 * margin
     t = _rhythm_t(i, n, seed, rhythm_spacing)
-    jitter_a = (_hash01(i, seed, "a") - 0.5)
-    jitter_b = (_hash01(i, seed, "b") - 0.5)
+    jitter_a = _hash01(i, seed, "a") - 0.5
+    jitter_b = _hash01(i, seed, "b") - 0.5
 
     if path == "diagonal":
         x = margin + t * span
@@ -346,7 +483,14 @@ def _clustered_pos(
     if path == "none":
         cx, cy = _scatter_pos(cluster_index, seed ^ 0xC1A57, center_margin)
     else:
-        cx, cy = _path_pos(cluster_index, cluster_count, seed ^ 0xC1A57, center_margin, path, rhythm_spacing)
+        cx, cy = _path_pos(
+            cluster_index,
+            cluster_count,
+            seed ^ 0xC1A57,
+            center_margin,
+            path,
+            rhythm_spacing,
+        )
 
     if path == "diagonal":
         axis_angle = -math.pi / 4
@@ -360,14 +504,27 @@ def _clustered_pos(
     nx, ny = -ty, tx
     local_t = (local_index + 0.5) / local_total
     if rhythm_spacing != "none" and local_total > 1:
-        local_t = _rhythm_t(local_index, local_total, seed ^ cluster_index, rhythm_spacing)
+        local_t = _rhythm_t(
+            local_index, local_total, seed ^ cluster_index, rhythm_spacing
+        )
     centered = (local_t - 0.5) * 2.0
     radius = _density_radius(density, preserve_space)
     long_span = radius * (1.45 + _hash01(cluster_index, seed, "cluster-long") * 0.95)
     cross_span = radius * (0.28 + _hash01(cluster_index, seed, "cluster-cross") * 0.32)
-    along = centered * long_span + (_hash01(i, seed, "cluster-along") - 0.5) * radius * 0.20
-    cross = (_hash01(i, seed, "cluster-cross-jitter") - 0.5) * cross_span * (1.25 - 0.45 * abs(centered))
-    bend = math.sin(local_t * math.pi) * (_hash01(cluster_index, seed, "cluster-bend") - 0.5) * radius * 0.55
+    along = (
+        centered * long_span + (_hash01(i, seed, "cluster-along") - 0.5) * radius * 0.20
+    )
+    cross = (
+        (_hash01(i, seed, "cluster-cross-jitter") - 0.5)
+        * cross_span
+        * (1.25 - 0.45 * abs(centered))
+    )
+    bend = (
+        math.sin(local_t * math.pi)
+        * (_hash01(cluster_index, seed, "cluster-bend") - 0.5)
+        * radius
+        * 0.55
+    )
     x = cx + tx * along + nx * (cross + bend)
     y = cy + ty * along + ny * (cross + bend)
     return _clamp01(x), _clamp01(y)
@@ -468,16 +625,25 @@ def _move_anchor_to(ins: Instruction, target: tuple[float, float]) -> Instructio
         data["to"] = [_clamp01(ins.to[0] + dx), _clamp01(ins.to[1] + dy)]
     elif ins.primitive in ("circle", "ellipse", "arc", "polygon"):
         if ins.center:
-            data["center"] = [_clamp01(ins.center[0] + dx), _clamp01(ins.center[1] + dy)]
+            data["center"] = [
+                _clamp01(ins.center[0] + dx),
+                _clamp01(ins.center[1] + dy),
+            ]
         else:
             data["center"] = [_clamp01(target[0]), _clamp01(target[1])]
     elif ins.primitive in ("square", "triangle"):
         if ins.position:
-            data["position"] = [_clamp01(ins.position[0] + dx), _clamp01(ins.position[1] + dy)]
+            data["position"] = [
+                _clamp01(ins.position[0] + dx),
+                _clamp01(ins.position[1] + dy),
+            ]
         else:
             size = ins.size or (0.2, 0.2)
             data["size"] = list(size)
-            data["position"] = [_clamp01(target[0] - size[0] / 2), _clamp01(target[1] - size[1] / 2)]
+            data["position"] = [
+                _clamp01(target[0] - size[0] / 2),
+                _clamp01(target[1] - size[1] / 2),
+            ]
     return Instruction.model_validate(data)
 
 
@@ -492,13 +658,37 @@ def _resolve_at_region(ins: Instruction, seed: int, index: int) -> Instruction:
 
 def _bbox_for_instruction(ins: Instruction) -> tuple[float, float, float, float] | None:
     if ins.primitive == "line" and ins.from_ and ins.to:
-        return (min(ins.from_[0], ins.to[0]), min(ins.from_[1], ins.to[1]), max(ins.from_[0], ins.to[0]), max(ins.from_[1], ins.to[1]))
-    if ins.primitive in ("circle", "arc", "polygon") and ins.center and ins.radius is not None:
-        return (ins.center[0] - ins.radius, ins.center[1] - ins.radius, ins.center[0] + ins.radius, ins.center[1] + ins.radius)
+        return (
+            min(ins.from_[0], ins.to[0]),
+            min(ins.from_[1], ins.to[1]),
+            max(ins.from_[0], ins.to[0]),
+            max(ins.from_[1], ins.to[1]),
+        )
+    if (
+        ins.primitive in ("circle", "arc", "polygon")
+        and ins.center
+        and ins.radius is not None
+    ):
+        return (
+            ins.center[0] - ins.radius,
+            ins.center[1] - ins.radius,
+            ins.center[0] + ins.radius,
+            ins.center[1] + ins.radius,
+        )
     if ins.primitive == "ellipse" and ins.center and ins.size:
-        return (ins.center[0] - ins.size[0] / 2, ins.center[1] - ins.size[1] / 2, ins.center[0] + ins.size[0] / 2, ins.center[1] + ins.size[1] / 2)
+        return (
+            ins.center[0] - ins.size[0] / 2,
+            ins.center[1] - ins.size[1] / 2,
+            ins.center[0] + ins.size[0] / 2,
+            ins.center[1] + ins.size[1] / 2,
+        )
     if ins.primitive in ("square", "triangle") and ins.position and ins.size:
-        return (ins.position[0], ins.position[1], ins.position[0] + ins.size[0], ins.position[1] + ins.size[1])
+        return (
+            ins.position[0],
+            ins.position[1],
+            ins.position[0] + ins.size[0],
+            ins.position[1] + ins.size[1],
+        )
     return None
 
 
@@ -520,7 +710,9 @@ def _relation_gap(seed: int, index: int, gap: str) -> float:
     return lo + (hi - lo) * _hash01(index, seed, "relation-gap")
 
 
-def _resolve_relation(ins: Instruction, previous: list[Instruction], seed: int, index: int) -> Instruction:
+def _resolve_relation(
+    ins: Instruction, previous: list[Instruction], seed: int, index: int
+) -> Instruction:
     rel = ins.relation
     if rel is None:
         return _strip_performance_fields(ins)
@@ -541,7 +733,10 @@ def _resolve_relation(ins: Instruction, previous: list[Instruction], seed: int, 
             return _strip_performance_fields(ins)
         other_center = _bbox_center(other_bbox)
         jitter = 0.08 * (_hash01(index, seed, "between-jitter") - 0.5)
-        target = (_clamp01((prev_center[0] + other_center[0]) / 2 + jitter), _clamp01((prev_center[1] + other_center[1]) / 2 - jitter))
+        target = (
+            _clamp01((prev_center[0] + other_center[0]) / 2 + jitter),
+            _clamp01((prev_center[1] + other_center[1]) / 2 - jitter),
+        )
     elif rel.type == "along":
         if previous[-1].primitive == "line" and previous[-1].from_ and previous[-1].to:
             t = 0.18 + 0.64 * _hash01(index, seed, "along-t")
@@ -551,7 +746,10 @@ def _resolve_relation(ins: Instruction, previous: list[Instruction], seed: int, 
             target = (_clamp01(x + ox * side), _clamp01(y + oy * side))
         else:
             angle = math.tau * _hash01(index, seed, "along-angle")
-            target = (_clamp01(prev_center[0] + math.cos(angle) * (prev_radius + gap)), _clamp01(prev_center[1] + math.sin(angle) * (prev_radius + gap)))
+            target = (
+                _clamp01(prev_center[0] + math.cos(angle) * (prev_radius + gap)),
+                _clamp01(prev_center[1] + math.sin(angle) * (prev_radius + gap)),
+            )
     elif rel.type == "cutting":
         target = prev_center
         if ins.primitive == "line":
@@ -560,15 +758,24 @@ def _resolve_relation(ins: Instruction, previous: list[Instruction], seed: int, 
             data = ins.model_dump(by_alias=True)
             data.pop("relation", None)
             data.pop("at", None)
-            data["from"] = [_clamp01(target[0] - math.cos(angle) * length / 2), _clamp01(target[1] - math.sin(angle) * length / 2)]
-            data["to"] = [_clamp01(target[0] + math.cos(angle) * length / 2), _clamp01(target[1] + math.sin(angle) * length / 2)]
+            data["from"] = [
+                _clamp01(target[0] - math.cos(angle) * length / 2),
+                _clamp01(target[1] - math.sin(angle) * length / 2),
+            ]
+            data["to"] = [
+                _clamp01(target[0] + math.cos(angle) * length / 2),
+                _clamp01(target[1] + math.sin(angle) * length / 2),
+            ]
             return Instruction.model_validate(data)
     else:
         own_bbox = _bbox_for_instruction(ins)
         own_radius = _bbox_radius(own_bbox) if own_bbox is not None else 0.0
         distance = prev_radius + own_radius + gap
         angle = math.tau * _hash01(index, seed, "not-touching-angle")
-        target = (_clamp01(prev_center[0] + math.cos(angle) * distance), _clamp01(prev_center[1] + math.sin(angle) * distance))
+        target = (
+            _clamp01(prev_center[0] + math.cos(angle) * distance),
+            _clamp01(prev_center[1] + math.sin(angle) * distance),
+        )
     return _move_anchor_to(ins, target)
 
 
@@ -598,13 +805,36 @@ def _render_effect_hint(color_hint: str | None) -> str | None:
         return None
     hint = _norm_label(color_hint)
     effect_tokens = (
-        "membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄",
-        "soft light", "柔らかな光", "陽光", "日差し",
-        "scent", "fragrance", "香り", "匂",
-        "waiting buds", "開花を待つ蕾", "蕾", "つぼみ",
-        "five-sense", "五感",
-        "fade directional", "fade=directional", "fade outward", "fade=outward",
-        "reflection", "反射", "映り",
+        "membrane",
+        "haze",
+        "fog",
+        "mist",
+        "atmosphere",
+        "膜",
+        "霞",
+        "霧",
+        "靄",
+        "soft light",
+        "柔らかな光",
+        "陽光",
+        "日差し",
+        "scent",
+        "fragrance",
+        "香り",
+        "匂",
+        "waiting buds",
+        "開花を待つ蕾",
+        "蕾",
+        "つぼみ",
+        "five-sense",
+        "五感",
+        "fade directional",
+        "fade=directional",
+        "fade outward",
+        "fade=outward",
+        "reflection",
+        "反射",
+        "映り",
     )
     kept = [token for token in effect_tokens if token in hint]
     return "; ".join(kept) if kept else None
@@ -661,12 +891,22 @@ def _expand_arrangement(
             for col in range(cols):
                 col_t = _rhythm_t(col, cols, seed ^ 0xC3A5, arr.rhythm_spacing)
                 cx = x0 + (0.5 + col_t * (cols - 1)) * cell_width
-                dx = (_hash01(row * cols + col, seed, "grid-jitter-x") - 0.5) * arr.jitter * cell_width
-                dy = (_hash01(row * cols + col, seed, "grid-jitter-y") - 0.5) * arr.jitter * cell_height
-                targets.append((
-                    min(x1, max(x0, cx + dx)),
-                    min(y1, max(y0, cy + dy)),
-                ))
+                dx = (
+                    (_hash01(row * cols + col, seed, "grid-jitter-x") - 0.5)
+                    * arr.jitter
+                    * cell_width
+                )
+                dy = (
+                    (_hash01(row * cols + col, seed, "grid-jitter-y") - 0.5)
+                    * arr.jitter
+                    * cell_height
+                )
+                targets.append(
+                    (
+                        min(x1, max(x0, cx + dx)),
+                        min(y1, max(y0, cy + dy)),
+                    )
+                )
         result: list[Instruction] = []
         for tx, ty in targets:
             shifted = _shift(ins, tx - ax, ty - ay)
@@ -701,21 +941,33 @@ def _expand_arrangement(
 
     if arr.layout == "horizontal":
         if arr.path != "none":
-            targets = [_path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing) for i in range(n)]
+            targets = [
+                _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing)
+                for i in range(n)
+            ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
             return _apply_color_cycle(result, arr.color_cycle)
         span = 1.0 - 2 * margin
-        targets = [(margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span, ay) for i in range(n)]
+        targets = [
+            (margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span, ay)
+            for i in range(n)
+        ]
         result = [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "vertical":
         if arr.path != "none":
-            targets = [_path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing) for i in range(n)]
+            targets = [
+                _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing)
+                for i in range(n)
+            ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
             return _apply_color_cycle(result, arr.color_cycle)
         span = 1.0 - 2 * margin
-        targets = [(ax, margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span) for i in range(n)]
+        targets = [
+            (ax, margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span)
+            for i in range(n)
+        ]
         result = [_shift(ins, 0.0, ty - ay) for _, ty in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 
@@ -725,8 +977,16 @@ def _expand_arrangement(
         r = arr.radius if arr.radius else 0.3
         targets = [
             (
-                cx + r * math.cos(math.radians(_rhythm_t(i, n, seed, arr.rhythm_spacing) * 360)),
-                cy - r * math.sin(math.radians(_rhythm_t(i, n, seed, arr.rhythm_spacing) * 360)),
+                cx
+                + r
+                * math.cos(
+                    math.radians(_rhythm_t(i, n, seed, arr.rhythm_spacing) * 360)
+                ),
+                cy
+                - r
+                * math.sin(
+                    math.radians(_rhythm_t(i, n, seed, arr.rhythm_spacing) * 360)
+                ),
             )
             for i in range(n)
         ]
@@ -734,7 +994,10 @@ def _expand_arrangement(
         return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "scatter":
-        targets = [_path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing) for i in range(n)]
+        targets = [
+            _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing)
+            for i in range(n)
+        ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
         return _apply_color_cycle(result, arr.color_cycle)
 
@@ -750,7 +1013,7 @@ def _inject_blur_filters(
     filter_xml = "".join(
         f'<filter id="blur-{amp}" x="-30%" y="-30%" width="160%" height="160%">'
         f'<feGaussianBlur in="SourceGraphic" stdDeviation="{std:.1f}"/>'
-        f'</filter>'
+        f"</filter>"
         for amp, std in sorted(blur_needed.items())
     )
     # svgwrite は "<defs />" を出力する (スペースあり)
@@ -786,7 +1049,6 @@ def _inject_texture_filters(svg: str, filters: set[str]) -> str:
     return svg.replace("<defs>", f"<defs>{filter_xml}", 1)
 
 
-
 def _score_canvas_aspect(score: Score) -> str:
     if isinstance(score.canvas, CanvasSpec):
         return score.canvas.aspect
@@ -801,7 +1063,9 @@ def _score_canvas_ground(score: Score) -> CanvasGroundSpec | None:
     return None
 
 
-def _texture_seed(score: Score, kind: str, render_seed: int | None, index: int = 0) -> int:
+def _texture_seed(
+    score: Score, kind: str, render_seed: int | None, index: int = 0
+) -> int:
     payload = score.model_dump(mode="json", by_alias=True)
     key = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     if render_seed is not None:
@@ -832,50 +1096,109 @@ def _ground_dot_count(ground: CanvasGroundSpec, profile: str) -> int:
 
 
 def _ground_filter_xml(ground: CanvasGroundSpec, seed: int, filter_id: str) -> str:
-    freq = {"fine": "0.95", "medium": "0.55", "coarse": "0.28", "none": "0.45"}.get(ground.grain, "0.55")
+    freq = {"fine": "0.95", "medium": "0.55", "coarse": "0.28", "none": "0.45"}.get(
+        ground.grain, "0.55"
+    )
     return (
         f'<filter id="{filter_id}" x="0" y="0" width="100%" height="100%">'
         f'<feTurbulence type="fractalNoise" baseFrequency="{freq}" numOctaves="2" seed="{seed % 9973}" result="noise"/>'
         '<feColorMatrix in="noise" type="saturate" values="0" result="mono"/>'
         '<feComponentTransfer in="mono"><feFuncA type="table" tableValues="0 1"/></feComponentTransfer>'
-        '</filter>'
+        "</filter>"
     )
 
 
-def _render_canvas_ground(dwg: svgwrite.Drawing, score: Score, canvas: CanvasSize, bg: str, *, profile: str, render_seed: int | None):
+def _render_canvas_ground(
+    dwg: svgwrite.Drawing,
+    score: Score,
+    canvas: CanvasSize,
+    bg: str,
+    *,
+    profile: str,
+    render_seed: int | None,
+):
     ground = _score_canvas_ground(score)
     if ground is None:
         return None, None
-    seed = int(ground.seed if ground.seed is not None else _texture_seed(score, "canvas-ground", render_seed))
+    seed = int(
+        ground.seed
+        if ground.seed is not None
+        else _texture_seed(score, "canvas-ground", render_seed)
+    )
     tone = _ground_tone_color(ground, bg)
     group = dwg.g(id="layer_01_canvas_ground")
-    group.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=tone, opacity=0.98))
+    if ground.material == "mezzotint":
+        shift = canvas.unit * (0.001 + _hash01(0, seed, "register-shift") * 0.003)
+        angle = _hash01(1, seed, "register-angle") * math.tau
+        group.translate(math.cos(angle) * shift, math.sin(angle) * shift)
+    group.add(
+        dwg.rect(
+            insert=(0, 0), size=(canvas.width, canvas.height), fill=tone, opacity=0.98
+        )
+    )
     if profile == "display":
         fid = _safe_svg_id(f"ground_texture_{seed % 100000}")
         texture_opacity = min(0.18, max(0.02, ground.opacity))
-        group.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill="#777777", opacity=texture_opacity, filter=f"url(#{fid})"))
+        group.add(
+            dwg.rect(
+                insert=(0, 0),
+                size=(canvas.width, canvas.height),
+                fill="#777777",
+                opacity=texture_opacity,
+                filter=f"url(#{fid})",
+            )
+        )
         return group, _ground_filter_xml(ground, seed, fid)
-    color = "#777777" if ground.material != "charcoal_ground" else "#222222"
+    color = (
+        "#b8b8b8"
+        if ground.material == "mezzotint"
+        else ("#777777" if ground.material != "charcoal_ground" else "#222222")
+    )
     count = _ground_dot_count(ground, profile)
-    radius = {"fine": 0.7, "medium": 1.1, "coarse": 1.8, "none": 0.6}.get(ground.grain, 1.0)
+    radius = {"fine": 0.7, "medium": 1.1, "coarse": 1.8, "none": 0.6}.get(
+        ground.grain, 1.0
+    )
     for i in range(count):
         x = _hash01(i, seed, "ground-x") * canvas.width
         y = _hash01(i, seed, "ground-y") * canvas.height
         if ground.grain == "coarse" and i % 3 == 0:
-            group.add(dwg.line(start=(x - radius * 2.4, y), end=(x + radius * 2.4, y + _hash_to_unit(i, seed) * radius), stroke=color, stroke_width=max(0.4, radius * 0.45), stroke_opacity=min(0.18, ground.opacity), stroke_linecap="round"))
+            group.add(
+                dwg.line(
+                    start=(x - radius * 2.4, y),
+                    end=(x + radius * 2.4, y + _hash_to_unit(i, seed) * radius),
+                    stroke=color,
+                    stroke_width=max(0.4, radius * 0.45),
+                    stroke_opacity=min(0.18, ground.opacity),
+                    stroke_linecap="round",
+                )
+            )
         else:
-            group.add(dwg.circle(center=(x, y), r=radius * (0.55 + _hash01(i, seed, "ground-r") * 0.8), fill=color, opacity=min(0.18, ground.opacity)))
+            group.add(
+                dwg.circle(
+                    center=(x, y),
+                    r=radius * (0.55 + _hash01(i, seed, "ground-r") * 0.8),
+                    fill=color,
+                    opacity=min(0.18, ground.opacity),
+                )
+            )
     return group, None
 
 
-def _surface_seed(ins: Instruction, ins_idx: int, mark_idx: int, render_seed: int | None) -> int:
+def _surface_seed(
+    ins: Instruction, ins_idx: int, mark_idx: int, render_seed: int | None
+) -> int:
     if ins.surface is not None and ins.surface.seed is not None:
         return int(ins.surface.seed)
-    key = ins.model_dump_json(by_alias=True) + f":surface:{ins_idx}:{mark_idx}:{render_seed}"
+    key = (
+        ins.model_dump_json(by_alias=True)
+        + f":surface:{ins_idx}:{mark_idx}:{render_seed}"
+    )
     return struct.unpack("<Q", hashlib.sha256(key.encode("utf-8")).digest()[:8])[0]
 
 
-def _shape_bbox(ins: Instruction, canvas: CanvasSize) -> tuple[float, float, float, float] | None:
+def _shape_bbox(
+    ins: Instruction, canvas: CanvasSize
+) -> tuple[float, float, float, float] | None:
     if ins.primitive == "circle" and ins.center is not None and ins.radius is not None:
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
@@ -885,7 +1208,11 @@ def _shape_bbox(ins: Instruction, canvas: CanvasSize) -> tuple[float, float, flo
         w = ins.size[0] * canvas.width
         h = ins.size[1] * canvas.height
         return cx - w / 2, cy - h / 2, w, h
-    if ins.primitive in ("square", "triangle") and ins.position is not None and ins.size is not None:
+    if (
+        ins.primitive in ("square", "triangle")
+        and ins.position is not None
+        and ins.size is not None
+    ):
         x, y = _px(ins.position, canvas)
         return x, y, ins.size[0] * canvas.width, ins.size[1] * canvas.height
     if ins.primitive == "polygon" and ins.center is not None and ins.radius is not None:
@@ -895,24 +1222,54 @@ def _shape_bbox(ins: Instruction, canvas: CanvasSize) -> tuple[float, float, flo
     return None
 
 
-def _add_shape_to_clip(dwg: svgwrite.Drawing, clip, ins: Instruction, canvas: CanvasSize) -> None:
+def _add_shape_to_clip(
+    dwg: svgwrite.Drawing, clip, ins: Instruction, canvas: CanvasSize
+) -> None:
     if ins.primitive == "circle" and ins.center is not None and ins.radius is not None:
         cx, cy = _px(ins.center, canvas)
         clip.add(dwg.circle(center=(cx, cy), r=ins.radius * canvas.unit))
     elif ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
         cx, cy = _px(ins.center, canvas)
-        clip.add(dwg.ellipse(center=(cx, cy), r=(ins.size[0] * canvas.width / 2, ins.size[1] * canvas.height / 2)))
-    elif ins.primitive == "square" and ins.position is not None and ins.size is not None:
+        clip.add(
+            dwg.ellipse(
+                center=(cx, cy),
+                r=(ins.size[0] * canvas.width / 2, ins.size[1] * canvas.height / 2),
+            )
+        )
+    elif (
+        ins.primitive == "square" and ins.position is not None and ins.size is not None
+    ):
         x, y = _px(ins.position, canvas)
-        clip.add(dwg.rect(insert=(x, y), size=(ins.size[0] * canvas.width, ins.size[1] * canvas.height)))
-    elif ins.primitive == "triangle" and ins.position is not None and ins.size is not None:
+        clip.add(
+            dwg.rect(
+                insert=(x, y),
+                size=(ins.size[0] * canvas.width, ins.size[1] * canvas.height),
+            )
+        )
+    elif (
+        ins.primitive == "triangle"
+        and ins.position is not None
+        and ins.size is not None
+    ):
         x, y = _px(ins.position, canvas)
         w = ins.size[0] * canvas.width
         h = ins.size[1] * canvas.height
         clip.add(dwg.polygon(points=[(x + w / 2, y), (x, y + h), (x + w, y + h)]))
-    elif ins.primitive == "polygon" and ins.center is not None and ins.radius is not None:
+    elif (
+        ins.primitive == "polygon" and ins.center is not None and ins.radius is not None
+    ):
         cx, cy = _px(ins.center, canvas)
-        clip.add(dwg.polygon(points=_polygon_points(cx, cy, ins.radius * canvas.unit, ins.sides or 5, ins.rotation or 0.0)))
+        clip.add(
+            dwg.polygon(
+                points=_polygon_points(
+                    cx,
+                    cy,
+                    ins.radius * canvas.unit,
+                    ins.sides or 5,
+                    ins.rotation or 0.0,
+                )
+            )
+        )
 
 
 def _surface_color(ins: Instruction, cmap: dict[str, str]) -> str:
@@ -920,10 +1277,25 @@ def _surface_color(ins: Instruction, cmap: dict[str, str]) -> str:
 
 
 def _surface_line_angle(surface: SurfaceSpec) -> float:
-    return {"horizontal": 0.0, "vertical": math.pi / 2, "diagonal_rising": -math.pi / 4, "diagonal_falling": math.pi / 4, "none": math.pi / 4}.get(surface.direction, math.pi / 4)
+    return {
+        "horizontal": 0.0,
+        "vertical": math.pi / 2,
+        "diagonal_rising": -math.pi / 4,
+        "diagonal_falling": math.pi / 4,
+        "none": math.pi / 4,
+    }.get(surface.direction, math.pi / 4)
 
 
-def _render_surface_vectors(dwg: svgwrite.Drawing, group, ins: Instruction, canvas: CanvasSize, cmap: dict[str, str], *, seed: int, clipped: bool) -> None:
+def _render_surface_vectors(
+    dwg: svgwrite.Drawing,
+    group,
+    ins: Instruction,
+    canvas: CanvasSize,
+    cmap: dict[str, str],
+    *,
+    seed: int,
+    clipped: bool,
+) -> None:
     surface = ins.surface
     bbox = _shape_bbox(ins, canvas)
     if surface is None or surface.texture == "none" or bbox is None:
@@ -944,29 +1316,112 @@ def _render_surface_vectors(dwg: svgwrite.Drawing, group, ins: Instruction, canv
         for i in range(min(count, 180 if clipped else 90)):
             px = x + _hash01(i, seed, "surface-x") * w
             py = y + _hash01(i, seed, "surface-y") * h
-            group.add(dwg.circle(center=(px, py), r=radius * (0.55 + _hash01(i, seed, "surface-r") * 1.1), fill=color, opacity=opacity * (0.45 + _hash01(i, seed, "surface-o") * 0.55), stroke="none"))
-    elif surface.texture == "hatch":
+            group.add(
+                dwg.circle(
+                    center=(px, py),
+                    r=radius * (0.55 + _hash01(i, seed, "surface-r") * 1.1),
+                    fill=color,
+                    opacity=opacity * (0.45 + _hash01(i, seed, "surface-o") * 0.55),
+                    stroke="none",
+                )
+            )
+    elif surface.texture in {"hatch", "crosshatch"}:
         angle = _surface_line_angle(surface)
         spacing = max(5.0, canvas.unit * (0.010 + (1.0 - density) * 0.025))
         span = math.hypot(w, h) * 1.3
         cx = x + w / 2
         cy = y + h / 2
-        ux, uy = math.cos(angle), math.sin(angle)
-        nx, ny = -uy, ux
         count = min(80, max(3, int(span / spacing)))
-        for i in range(-count // 2, count // 2 + 1):
-            jitter = _hash_to_unit(i + 500, seed) * spacing * 0.16
-            ox = nx * (i * spacing + jitter)
-            oy = ny * (i * spacing + jitter)
-            group.add(dwg.line(start=(cx + ox - ux * span / 2, cy + oy - uy * span / 2), end=(cx + ox + ux * span / 2, cy + oy + uy * span / 2), stroke=color, stroke_width=max(0.45, canvas.unit * 0.0016), stroke_opacity=opacity, stroke_linecap="round"))
+        angles = [angle]
+        if surface.texture == "crosshatch":
+            angles.append(
+                angle + math.radians(60 + _hash01(8, seed, "cross-angle") * 30)
+            )
+        for layer_index, layer_angle in enumerate(angles):
+            lux, luy = math.cos(layer_angle), math.sin(layer_angle)
+            lnx, lny = -luy, lux
+            for i in range(-count // 2, count // 2 + 1):
+                progress = (i + count / 2) / max(1, count)
+                gradient = 1.0
+                if surface.spacing_gradient == "coarse_to_dense":
+                    gradient = 1.35 - progress * 0.7
+                elif surface.spacing_gradient == "dense_to_coarse":
+                    gradient = 0.65 + progress * 0.7
+                offset = (
+                    i * spacing * gradient
+                    + _hash_to_unit(i + layer_index * 401 + 500, seed) * spacing * 0.12
+                )
+                ox, oy = lnx * offset, lny * offset
+                group.add(
+                    dwg.line(
+                        start=(cx + ox - lux * span / 2, cy + oy - luy * span / 2),
+                        end=(cx + ox + lux * span / 2, cy + oy + luy * span / 2),
+                        stroke=color,
+                        stroke_width=max(0.45, canvas.unit * 0.0016),
+                        stroke_opacity=opacity,
+                        stroke_linecap="round",
+                        class_=f"hatch-spacing-{spacing * gradient:.3f}",
+                    )
+                )
+    elif surface.texture == "aquatint":
+        steps = surface.tone_steps
+        band = w / steps
+        for step in range(steps):
+            step_density = density * (step + 1) / steps
+            count = min(
+                120, max(5, int((18 + step_density * 90) * area_factor / steps))
+            )
+            boundary_jitter = (
+                (_hash01(step, seed, "aquatint-boundary") - 0.5) * band * 0.08
+            )
+            for i in range(count):
+                px = (
+                    x
+                    + step * band
+                    + boundary_jitter
+                    + _hash01(i, seed + step * 101, "aquatint-x") * band
+                )
+                py = y + _hash01(i, seed + step * 101, "aquatint-y") * h
+                group.add(
+                    dwg.circle(
+                        center=(px, py),
+                        r=max(0.45, canvas.unit * (0.0015 + scale * 0.0025)),
+                        fill=color,
+                        opacity=opacity * (0.35 + 0.65 * (step + 1) / steps),
+                        stroke="none",
+                        class_=f"aquatint-step-{step + 1}",
+                    )
+                )
     elif surface.texture == "bleed":
         blur = max(1.0, canvas.unit * (0.006 + surface.bleed * 0.018))
-        group.add(dwg.ellipse(center=(x + w / 2, y + h / 2), r=(w / 2 + blur, h / 2 + blur), fill=color, opacity=min(0.26, opacity * 0.42), stroke="none"))
+        group.add(
+            dwg.ellipse(
+                center=(x + w / 2, y + h / 2),
+                r=(w / 2 + blur, h / 2 + blur),
+                fill=color,
+                opacity=min(0.26, opacity * 0.42),
+                stroke="none",
+            )
+        )
 
 
-def _render_surface_texture(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[str, str], canvas: CanvasSize, *, profile: str, render_seed: int | None, ins_idx: int, mark_idx: int):
+def _render_surface_texture(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    cmap: dict[str, str],
+    canvas: CanvasSize,
+    *,
+    profile: str,
+    render_seed: int | None,
+    ins_idx: int,
+    mark_idx: int,
+):
     surface = ins.surface
-    if surface is None or surface.texture == "none" or ins.primitive not in _CLOSED_SHAPES:
+    if (
+        surface is None
+        or surface.texture == "none"
+        or ins.primitive not in _CLOSED_SHAPES
+    ):
         return None, None
     seed = _surface_seed(ins, ins_idx, mark_idx, render_seed)
     gid = _safe_svg_id(f"surface_{ins_idx:03d}_{mark_idx:03d}_{surface.texture}")
@@ -982,9 +1437,18 @@ def _render_surface_texture(dwg: svgwrite.Drawing, ins: Instruction, cmap: dict[
             if bbox is not None:
                 x, y, w, h = bbox
                 color = _surface_color(ins, cmap)
-                rect = dwg.rect(insert=(x, y), size=(w, h), fill=color, opacity=min(0.55, surface.opacity), filter=f"url(#{fid})")
+                rect = dwg.rect(
+                    insert=(x, y),
+                    size=(w, h),
+                    fill=color,
+                    opacity=min(0.55, surface.opacity),
+                    filter=f"url(#{fid})",
+                )
                 group.add(rect)
-                return group, f'<filter id="{fid}" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="0.18" numOctaves="2" seed="{seed % 9973}" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="{1.5 + surface.bleed * 9:.2f}"/><feGaussianBlur stdDeviation="{surface.bleed * 5:.2f}"/></filter>'
+                return (
+                    group,
+                    f'<filter id="{fid}" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="0.18" numOctaves="2" seed="{seed % 9973}" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="{1.5 + surface.bleed * 9:.2f}"/><feGaussianBlur stdDeviation="{surface.bleed * 5:.2f}"/></filter>',
+                )
         _render_surface_vectors(dwg, group, ins, canvas, cmap, seed=seed, clipped=True)
         return group, None
     _render_surface_vectors(dwg, group, ins, canvas, cmap, seed=seed, clipped=False)
@@ -997,13 +1461,27 @@ def build_texture_metadata(score: Score, *, svg_profile: str | None = None) -> d
     surfaces = []
     for idx, ins in enumerate(score.instructions):
         if ins.surface is not None and ins.surface.texture != "none":
-            surfaces.append({"instruction_index": idx, "texture": ins.surface.texture, "density": ins.surface.density, "opacity": ins.surface.opacity})
-    metadata = {"render_texture_version": "1", "render_texture_profile": profile, "texture_degraded": profile == "compat" and bool(surfaces)}
+            surfaces.append(
+                {
+                    "instruction_index": idx,
+                    "texture": ins.surface.texture,
+                    "density": ins.surface.density,
+                    "opacity": ins.surface.opacity,
+                }
+            )
+    metadata = {
+        "render_texture_version": "1",
+        "render_texture_profile": profile,
+        "texture_degraded": profile == "compat" and bool(surfaces),
+    }
     if ground is not None:
-        metadata["render_canvas_ground"] = ground.model_dump(mode="json", exclude_none=True)
+        metadata["render_canvas_ground"] = ground.model_dump(
+            mode="json", exclude_none=True
+        )
     if surfaces:
         metadata["render_surface_textures"] = surfaces
     return metadata
+
 
 def _normalize_svg_profile(svg_profile: str | None) -> str:
     profile = (svg_profile or "display").strip().lower()
@@ -1034,8 +1512,16 @@ def _mark_svg_id(ins: Instruction, ins_idx: int, mark_idx: int) -> str:
 
 def _inject_svg_document_metadata(svg: str, *, profile: str) -> str:
     title = f"inku render ({profile} SVG)"
-    desc = "Generated by inku. Groups and IDs are included for vector editing." if profile == "editable" else "Generated by inku. Portable SVG output."
-    metadata = json.dumps({"generator": "inku", "svg_profile": profile}, ensure_ascii=False, separators=(",", ":"))
+    desc = (
+        "Generated by inku. Groups and IDs are included for vector editing."
+        if profile == "editable"
+        else "Generated by inku. Portable SVG output."
+    )
+    metadata = json.dumps(
+        {"generator": "inku", "svg_profile": profile},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
     document_metadata = (
         f"<title>{escape(title)}</title>"
         f"<desc>{escape(desc)}</desc>"
@@ -1071,7 +1557,14 @@ def render(
     if structured:
         artboard = dwg.g(id="inku_artboard")
         background = dwg.g(id="layer_00_background")
-        background.add(dwg.rect(insert=(0, 0), size=(canvas.width, canvas.height), fill=bg, id="background"))
+        background.add(
+            dwg.rect(
+                insert=(0, 0),
+                size=(canvas.width, canvas.height),
+                fill=bg,
+                id="background",
+            )
+        )
         content = dwg.g(id="layer_10_content")
         presence_content = dwg.g(id="layer_20_presence")
         artboard.add(background)
@@ -1090,7 +1583,9 @@ def render(
         presence_content = content
 
     if use_filters and render_seed is not None:
-        performance_filter_id, performance_filter_xml = _performance_touch_filter(render_seed)
+        performance_filter_id, performance_filter_xml = _performance_touch_filter(
+            render_seed
+        )
         content["filter"] = f"url(#{performance_filter_id})"
 
     blur_needed: dict[str, float] = {}
@@ -1098,11 +1593,25 @@ def render(
     blur_elems: list[tuple[str, str]] = []
     elem_idx = 0
 
-    for ins_idx, ins in enumerate(score.instructions):
-        expanded = _expand_arrangement(ins, render_seed, canvas) if ins.arrangement else [ins]
-        instruction_group = dwg.g(id=_instruction_svg_id(ins, ins_idx)) if structured else content
+    ordered_instructions = sorted(
+        enumerate(score.instructions), key=lambda pair: pair[1].mode == "carve"
+    )
+    for ins_idx, ins in ordered_instructions:
+        expanded = (
+            _expand_arrangement(ins, render_seed, canvas) if ins.arrangement else [ins]
+        )
+        instruction_group = (
+            dwg.g(id=_instruction_svg_id(ins, ins_idx)) if structured else content
+        )
         for mark_idx, single in enumerate(expanded):
-            element = _render_instruction(dwg, single, cmap, canvas, use_filters=use_filters, render_seed=render_seed)
+            element = _render_instruction(
+                dwg,
+                single,
+                cmap,
+                canvas,
+                use_filters=use_filters,
+                render_seed=render_seed,
+            )
             if element is not None:
                 if structured:
                     element["id"] = _mark_svg_id(single, ins_idx, mark_idx)
@@ -1115,8 +1624,14 @@ def render(
                     blur_elems.append((eid, v.amplitude))
                 instruction_group.add(element)
             surface_group, surface_filter = _render_surface_texture(
-                dwg, single, cmap, canvas, profile=profile, render_seed=render_seed,
-                ins_idx=ins_idx, mark_idx=mark_idx,
+                dwg,
+                single,
+                cmap,
+                canvas,
+                profile=profile,
+                render_seed=render_seed,
+                ins_idx=ins_idx,
+                mark_idx=mark_idx,
             )
             if surface_group is not None:
                 instruction_group.add(surface_group)
@@ -1125,6 +1640,22 @@ def render(
             elem_idx += 1
         if structured:
             content.add(instruction_group)
+
+    is_print = (
+        _score_canvas_ground(score) is not None
+        and _score_canvas_ground(score).material == "mezzotint"
+        or any(ins.weight in {"burin", "drypoint"} for ins in score.instructions)
+    )
+    if is_print and render_seed is not None:
+        plate_opacity = 0.02 + _hash01(0, int(render_seed), "plate-tone") * 0.04
+        plate = dwg.rect(
+            insert=(0, 0),
+            size=(canvas.width, canvas.height),
+            fill="#111111",
+            opacity=plate_opacity,
+            id="layer_15_plate_tone",
+        )
+        content.add(plate)
 
     presence_layer = _render_presence_layer(dwg, score, cmap, canvas)
     if presence_layer is not None:
@@ -1136,7 +1667,11 @@ def render(
         dwg.add(content)
     svg = dwg.tostring()
     if ground_filter_xml or surface_filter_xml or performance_filter_xml:
-        extra_filter_xml = (ground_filter_xml or "") + "".join(surface_filter_xml) + (performance_filter_xml or "")
+        extra_filter_xml = (
+            (ground_filter_xml or "")
+            + "".join(surface_filter_xml)
+            + (performance_filter_xml or "")
+        )
         if "<defs />" in svg:
             svg = svg.replace("<defs />", f"<defs>{extra_filter_xml}</defs>", 1)
         elif "<defs/>" in svg:
@@ -1181,16 +1716,22 @@ def _presence_center_px(score: Score, canvas: CanvasSize) -> tuple[float, float]
 
 
 def _presence_seed(score: Score) -> int:
-    presence_json = score.presence.model_dump_json() if score.presence is not None else ""
+    presence_json = (
+        score.presence.model_dump_json() if score.presence is not None else ""
+    )
     instruction_key = "|".join(
         f"{ins.primitive}:{ins.color}:{ins.weight}:{ins.arrangement.count if ins.arrangement else 1}"
         for ins in score.instructions
     )
-    digest = hashlib.sha256(f"{presence_json}|{instruction_key}".encode("utf-8")).digest()
+    digest = hashlib.sha256(
+        f"{presence_json}|{instruction_key}".encode("utf-8")
+    ).digest()
     return struct.unpack("<Q", digest[:8])[0]
 
 
-def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, str], canvas: CanvasSize):
+def _render_presence_layer(
+    dwg: svgwrite.Drawing, score: Score, cmap: dict[str, str], canvas: CanvasSize
+):
     """抽象化された存在感を描く。自然文キーワードや具象部品はここでは扱わない。"""
     presence = score.presence
     if presence is None or presence.kind == "none":
@@ -1202,8 +1743,12 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
     dark = cmap.get("black", COLOR_MAP["black"])
     visual_load = _score_visual_load(score)
     load_opacity = 0.52 if visual_load >= 120 else 0.70 if visual_load >= 60 else 1.0
-    intensity_opacity = {"low": 0.13, "medium": 0.21, "high": 0.30}[presence.intensity] * load_opacity
-    gaze_opacity = {"none": 0.0, "low": 0.11, "medium": 0.18, "high": 0.26}[presence.gaze_pressure] * load_opacity
+    intensity_opacity = {"low": 0.13, "medium": 0.21, "high": 0.30}[
+        presence.intensity
+    ] * load_opacity
+    gaze_opacity = {"none": 0.0, "low": 0.11, "medium": 0.18, "high": 0.26}[
+        presence.gaze_pressure
+    ] * load_opacity
     contour_count = {"low": 4, "medium": 7, "high": 11}[presence.contour_density]
     radius_x = unit * {"low": 0.18, "medium": 0.24, "high": 0.30}[presence.intensity]
     radius_y = unit * {"low": 0.24, "medium": 0.32, "high": 0.40}[presence.intensity]
@@ -1218,27 +1763,31 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
             y_shift = (-0.36 + i * 0.24) * radius_y
             x_outer = side * radius_x * (0.34 + 0.10 * _hash01(i, seed, "sym-x"))
             x_inner = side * radius_x * (0.10 + 0.08 * _hash01(i, seed, "sym-inner"))
-            layer.add(dwg.line(
-                start=(cx + x_outer, cy + y_shift - radius_y * 0.06),
-                end=(cx + x_inner, cy + y_shift + radius_y * (0.10 + tilt * 0.06)),
-                stroke=color,
-                stroke_width=stroke,
-                stroke_opacity=intensity_opacity * 0.58,
-                stroke_linecap="round",
-            ))
+            layer.add(
+                dwg.line(
+                    start=(cx + x_outer, cy + y_shift - radius_y * 0.06),
+                    end=(cx + x_inner, cy + y_shift + radius_y * (0.10 + tilt * 0.06)),
+                    stroke=color,
+                    stroke_width=stroke,
+                    stroke_opacity=intensity_opacity * 0.58,
+                    stroke_linecap="round",
+                )
+            )
     elif presence.symmetry == "radial":
         for i in range(6):
             angle = phase + math.tau * i / 6.0
             inner = radius_x * 0.28
             outer = radius_x * 0.86
-            layer.add(dwg.line(
-                start=(cx + math.cos(angle) * inner, cy + math.sin(angle) * inner),
-                end=(cx + math.cos(angle) * outer, cy + math.sin(angle) * outer),
-                stroke=color,
-                stroke_width=stroke,
-                stroke_opacity=intensity_opacity * 0.72,
-                stroke_linecap="round",
-            ))
+            layer.add(
+                dwg.line(
+                    start=(cx + math.cos(angle) * inner, cy + math.sin(angle) * inner),
+                    end=(cx + math.cos(angle) * outer, cy + math.sin(angle) * outer),
+                    stroke=color,
+                    stroke_width=stroke,
+                    stroke_opacity=intensity_opacity * 0.72,
+                    stroke_linecap="round",
+                )
+            )
 
     if presence.gaze_pressure != "none":
         for i, side in enumerate((-1, 1, -1, 1, -1, 1)):
@@ -1248,21 +1797,27 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
             start_y = cy + math.sin(angle) * radius_y * (0.72 + 0.08 * i)
             end_x = cx + math.cos(angle + math.pi) * radius_x * 0.12
             end_y = cy + (t - 0.5) * radius_y * 0.16
-            layer.add(dwg.line(
-                start=(start_x, start_y),
-                end=(end_x, end_y),
-                stroke=dark,
-                stroke_width=stroke * 0.8,
-                stroke_opacity=gaze_opacity,
-                stroke_linecap="round",
-            ))
+            layer.add(
+                dwg.line(
+                    start=(start_x, start_y),
+                    end=(end_x, end_y),
+                    stroke=dark,
+                    stroke_width=stroke * 0.8,
+                    stroke_opacity=gaze_opacity,
+                    stroke_linecap="round",
+                )
+            )
 
     flow_angle = phase * 0.35 + tilt
     tx, ty = math.cos(flow_angle), math.sin(flow_angle)
     nx, ny = -ty, tx
     for i in range(contour_count):
         t = (i + 0.5) / contour_count
-        along = (t - 0.5) * radius_x * (1.18 + 0.18 * _hash01(i, seed, "presence-flow-span"))
+        along = (
+            (t - 0.5)
+            * radius_x
+            * (1.18 + 0.18 * _hash01(i, seed, "presence-flow-span"))
+        )
         cross = math.sin(t * math.pi * 1.7 + phase) * radius_y * 0.32
         cross += (_hash01(i, seed, "presence-flow-cross") - 0.5) * radius_y * 0.28
         px = cx + tx * along + nx * cross
@@ -1289,25 +1844,37 @@ def _render_presence_layer(dwg: svgwrite.Drawing, score: Score, cmap: dict[str, 
     if presence.kind == "group_like":
         for i in range(7):
             t = (i - 3) / 3.5
-            px = cx + tx * t * radius_x * 0.78 + nx * (_hash01(i, seed, "group-x") - 0.5) * radius_x * 0.20
-            py = cy + ty * t * radius_x * 0.78 + ny * (_hash01(i, seed, "group-y") - 0.5) * radius_y * 0.58
-            layer.add(dwg.circle(
-                center=(px, py),
-                r=max(2.0, unit * 0.006),
-                fill=color,
-                fill_opacity=intensity_opacity * 0.72,
-            ))
+            px = (
+                cx
+                + tx * t * radius_x * 0.78
+                + nx * (_hash01(i, seed, "group-x") - 0.5) * radius_x * 0.20
+            )
+            py = (
+                cy
+                + ty * t * radius_x * 0.78
+                + ny * (_hash01(i, seed, "group-y") - 0.5) * radius_y * 0.58
+            )
+            layer.add(
+                dwg.circle(
+                    center=(px, py),
+                    r=max(2.0, unit * 0.006),
+                    fill=color,
+                    fill_opacity=intensity_opacity * 0.72,
+                )
+            )
     elif presence.kind == "creature_like":
         for i in range(3):
             t = (i - 1) * 0.34
-            layer.add(dwg.line(
-                start=(cx - radius_x * 0.30 + t * radius_x, cy + radius_y * 0.32),
-                end=(cx - radius_x * 0.05 + t * radius_x, cy + radius_y * 0.44),
-                stroke=color,
-                stroke_width=stroke,
-                stroke_opacity=intensity_opacity * 0.76,
-                stroke_linecap="round",
-            ))
+            layer.add(
+                dwg.line(
+                    start=(cx - radius_x * 0.30 + t * radius_x, cy + radius_y * 0.32),
+                    end=(cx - radius_x * 0.05 + t * radius_x, cy + radius_y * 0.44),
+                    stroke=color,
+                    stroke_width=stroke,
+                    stroke_opacity=intensity_opacity * 0.76,
+                    stroke_linecap="round",
+                )
+            )
 
     return layer
 
@@ -1406,7 +1973,9 @@ def _resolve_color(color: str, color_hint: str | None, cmap: dict[str, str]) -> 
     return best_hex
 
 
-def _stroke_attrs(ins: Instruction, cmap: dict[str, str], *, use_filters: bool = True) -> dict:
+def _stroke_attrs(
+    ins: Instruction, cmap: dict[str, str], *, use_filters: bool = True
+) -> dict:
     do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled
     color = _resolve_color(ins.color, ins.color_hint, cmap)
     weight_style = WEIGHT_STYLE.get(ins.weight, {})
@@ -1421,7 +1990,20 @@ def _stroke_attrs(ins: Instruction, cmap: dict[str, str], *, use_filters: bool =
         attrs["stroke_opacity"] = weight_style["stroke_opacity"]
     if use_filters and ins.weight in TEXTURE_FILTERS:
         attrs["filter"] = f"url(#texture-{ins.weight})"
-    if any(token in hint for token in ("membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄")):
+    if any(
+        token in hint
+        for token in (
+            "membrane",
+            "haze",
+            "fog",
+            "mist",
+            "atmosphere",
+            "膜",
+            "霞",
+            "霧",
+            "靄",
+        )
+    ):
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.26)
         if do_fill:
             attrs["fill_opacity"] = 0.12
@@ -1433,7 +2015,9 @@ def _stroke_attrs(ins: Instruction, cmap: dict[str, str], *, use_filters: bool =
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.38)
         if do_fill:
             attrs["fill_opacity"] = 0.20
-    elif any(token in hint for token in ("waiting buds", "開花を待つ蕾", "蕾", "つぼみ")):
+    elif any(
+        token in hint for token in ("waiting buds", "開花を待つ蕾", "蕾", "つぼみ")
+    ):
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.72)
         if do_fill:
             attrs["fill_opacity"] = 0.58
@@ -1464,7 +2048,9 @@ def _copy_attrs(attrs: dict) -> dict:
     return dict(attrs)
 
 
-def _line_perp_offsets(start: tuple[float, float], end: tuple[float, float], amount: float) -> tuple[float, float]:
+def _line_perp_offsets(
+    start: tuple[float, float], end: tuple[float, float], amount: float
+) -> tuple[float, float]:
     dx = end[0] - start[0]
     dy = end[1] - start[1]
     length = math.hypot(dx, dy)
@@ -1473,11 +2059,15 @@ def _line_perp_offsets(start: tuple[float, float], end: tuple[float, float], amo
     return -dy / length * amount, dx / length * amount
 
 
-def _point_on_line(start: tuple[float, float], end: tuple[float, float], t: float) -> tuple[float, float]:
+def _point_on_line(
+    start: tuple[float, float], end: tuple[float, float], t: float
+) -> tuple[float, float]:
     return (start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t)
 
 
-def _line_direction(start: tuple[float, float], end: tuple[float, float]) -> tuple[float, float]:
+def _line_direction(
+    start: tuple[float, float], end: tuple[float, float]
+) -> tuple[float, float]:
     dx = end[0] - start[0]
     dy = end[1] - start[1]
     length = math.hypot(dx, dy)
@@ -1509,7 +2099,9 @@ def _add_powder_specks(
         group.add(
             dwg.circle(
                 center=(px + ox + ux * along, py + oy + uy * along),
-                r=max(0.35, radius * (0.75 + abs(_hash_to_unit(idx + 202, seed)) * 0.7)),
+                r=max(
+                    0.35, radius * (0.75 + abs(_hash_to_unit(idx + 202, seed)) * 0.7)
+                ),
                 fill=color,
                 stroke="none",
                 opacity=opacity,
@@ -1535,7 +2127,9 @@ def _add_specks_at_points(
         group.add(
             dwg.circle(
                 center=(px + ox, py + oy),
-                r=max(0.35, radius * (0.75 + abs(_hash_to_unit(idx + 263, seed)) * 0.7)),
+                r=max(
+                    0.35, radius * (0.75 + abs(_hash_to_unit(idx + 263, seed)) * 0.7)
+                ),
                 fill=color,
                 stroke="none",
                 opacity=opacity,
@@ -1543,7 +2137,9 @@ def _add_specks_at_points(
         )
 
 
-def _circle_points(cx: float, cy: float, rx: float, ry: float, count: int) -> list[tuple[float, float]]:
+def _circle_points(
+    cx: float, cy: float, rx: float, ry: float, count: int
+) -> list[tuple[float, float]]:
     return [
         (
             cx + math.cos(i * 2 * math.pi / count) * rx,
@@ -1553,7 +2149,9 @@ def _circle_points(cx: float, cy: float, rx: float, ry: float, count: int) -> li
     ]
 
 
-def _rect_points(x: float, y: float, w: float, h: float, count: int) -> list[tuple[float, float]]:
+def _rect_points(
+    x: float, y: float, w: float, h: float, count: int
+) -> list[tuple[float, float]]:
     points: list[tuple[float, float]] = []
     perimeter = max(1.0, 2 * (w + h))
     for i in range(count):
@@ -1569,7 +2167,9 @@ def _rect_points(x: float, y: float, w: float, h: float, count: int) -> list[tup
     return points
 
 
-def _arc_points(cx: float, cy: float, r: float, start_deg: float, end_deg: float, count: int) -> list[tuple[float, float]]:
+def _arc_points(
+    cx: float, cy: float, r: float, start_deg: float, end_deg: float, count: int
+) -> list[tuple[float, float]]:
     if count <= 1:
         count = 2
     start = math.radians(start_deg)
@@ -1583,7 +2183,9 @@ def _arc_points(cx: float, cy: float, r: float, start_deg: float, end_deg: float
     ]
 
 
-def _polygon_points(cx: float, cy: float, r: float, sides: int, rotation_deg: float = 0.0) -> list[tuple[float, float]]:
+def _polygon_points(
+    cx: float, cy: float, r: float, sides: int, rotation_deg: float = 0.0
+) -> list[tuple[float, float]]:
     sides = min(max(int(sides), 5), 8)
     start = math.radians(rotation_deg - 90)
     return [
@@ -1595,7 +2197,9 @@ def _polygon_points(cx: float, cy: float, r: float, sides: int, rotation_deg: fl
     ]
 
 
-def _outline_attrs(attrs: dict, *, stroke_width: float, opacity: float, dash: str | None = None) -> dict:
+def _outline_attrs(
+    attrs: dict, *, stroke_width: float, opacity: float, dash: str | None = None
+) -> dict:
     result = _copy_attrs(attrs)
     result["fill"] = "none"
     result["stroke_width"] = stroke_width
@@ -1605,38 +2209,9 @@ def _outline_attrs(attrs: dict, *, stroke_width: float, opacity: float, dash: st
     return result
 
 
-def _add_rope_twists(
-    dwg: svgwrite.Drawing,
-    group,
-    start: tuple[float, float],
-    end: tuple[float, float],
-    attrs: dict,
-    seed: int,
-) -> None:
-    ux, uy = _line_direction(start, end)
-    px, py = -uy, ux
-    color = attrs.get("stroke", "#111111")
-    for idx in range(13):
-        t = (idx + 0.5) / 13
-        cx, cy = _point_on_line(start, end, t)
-        phase = -1 if idx % 2 else 1
-        span = 8.0 + abs(_hash_to_unit(idx, seed)) * 2.5
-        half_u = 3.0
-        p1 = (cx - ux * half_u + px * span * phase, cy - uy * half_u + py * span * phase)
-        p2 = (cx + ux * half_u - px * span * phase, cy + uy * half_u - py * span * phase)
-        group.add(
-            dwg.line(
-                start=p1,
-                end=p2,
-                stroke=color,
-                stroke_width=1.2,
-                stroke_opacity=0.42,
-                stroke_linecap="round",
-            )
-        )
-
-
-def _material_outline_profile(weight: str, base_width: float) -> list[tuple[float, float, float, str | None]]:
+def _material_outline_profile(
+    weight: str, base_width: float
+) -> list[tuple[float, float, float, str | None]]:
     if weight == "pencil":
         return [(-1.0, 0.45, 0.24, "1,7"), (1.2, 0.5, 0.20, "1,5")]
     if weight == "chalk":
@@ -1644,11 +2219,16 @@ def _material_outline_profile(weight: str, base_width: float) -> list[tuple[floa
     if weight == "brush_thin":
         return [(-1.6, 1.0, 0.32, "22,9"), (1.8, 1.4, 0.28, "14,8")]
     if weight == "brush_thick":
-        return [(-4.0, base_width * 0.28, 0.36, "18,7,3,11"), (3.2, base_width * 0.22, 0.28, "11,9")]
+        return [
+            (-4.0, base_width * 0.28, 0.36, "18,7,3,11"),
+            (3.2, base_width * 0.22, 0.28, "11,9"),
+        ]
     if weight == "crayon":
-        return [(-3.4, base_width * 0.24, 0.24, "2,5,9,7"), (-1.5, base_width * 0.20, 0.20, "4,8"), (2.4, base_width * 0.22, 0.22, "2,5,9,7")]
-    if weight == "rope":
-        return [(-5.0, base_width * 0.35, 0.46, "4,8"), (5.0, base_width * 0.35, 0.46, "4,8")]
+        return [
+            (-3.4, base_width * 0.24, 0.24, "2,5,9,7"),
+            (-1.5, base_width * 0.20, 0.20, "4,8"),
+            (2.4, base_width * 0.22, 0.22, "2,5,9,7"),
+        ]
     return []
 
 
@@ -1663,7 +2243,10 @@ def _speck_profile(weight: str) -> tuple[int, float, float, float] | None:
 
 
 def _uses_material_outline(weight: str) -> bool:
-    return bool(_material_outline_profile(weight, WEIGHT_TO_STROKE_WIDTH[weight])) or _speck_profile(weight) is not None
+    return (
+        bool(_material_outline_profile(weight, WEIGHT_TO_STROKE_WIDTH[weight]))
+        or _speck_profile(weight) is not None
+    )
 
 
 def _add_material_circle_outline(
@@ -1676,21 +2259,29 @@ def _add_material_circle_outline(
     r: float,
 ) -> None:
     seed = _seed_for_instruction(ins)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
-        group.add(dwg.circle(center=(cx, cy), r=max(0.0, r + offset), **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash)))
-    if ins.weight == "rope":
-        for idx, (px, py) in enumerate(_circle_points(cx, cy, r, r, 16)):
-            angle = math.atan2(py - cy, px - cx)
-            tangent = (-math.sin(angle), math.cos(angle))
-            normal = (math.cos(angle), math.sin(angle))
-            span = 6.0 + abs(_hash_to_unit(idx, seed)) * 2.0
-            p1 = (px + tangent[0] * 3.0 + normal[0] * span, py + tangent[1] * 3.0 + normal[1] * span)
-            p2 = (px - tangent[0] * 3.0 - normal[0] * span, py - tangent[1] * 3.0 - normal[1] * span)
-            group.add(dwg.line(start=p1, end=p2, stroke=attrs.get("stroke", "#111111"), stroke_width=1.1, stroke_opacity=0.40, stroke_linecap="round"))
+    for offset, width, opacity, dash in _material_outline_profile(
+        ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
+    ):
+        group.add(
+            dwg.circle(
+                center=(cx, cy),
+                r=max(0.0, r + offset),
+                **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash),
+            )
+        )
     specks = _speck_profile(ins.weight)
     if specks is not None:
         count, spread, radius, opacity = specks
-        _add_specks_at_points(dwg, group, _circle_points(cx, cy, r, r, count), attrs, seed, spread=spread, radius=radius, opacity=opacity)
+        _add_specks_at_points(
+            dwg,
+            group,
+            _circle_points(cx, cy, r, r, count),
+            attrs,
+            seed,
+            spread=spread,
+            radius=radius,
+            opacity=opacity,
+        )
 
 
 def _add_material_ellipse_outline(
@@ -1704,7 +2295,9 @@ def _add_material_ellipse_outline(
     ry: float,
 ) -> None:
     seed = _seed_for_instruction(ins)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
+    for offset, width, opacity, dash in _material_outline_profile(
+        ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
+    ):
         group.add(
             dwg.ellipse(
                 center=(cx, cy),
@@ -1715,7 +2308,16 @@ def _add_material_ellipse_outline(
     specks = _speck_profile(ins.weight)
     if specks is not None:
         count, spread, radius, opacity = specks
-        _add_specks_at_points(dwg, group, _circle_points(cx, cy, rx, ry, count), attrs, seed, spread=spread, radius=radius, opacity=opacity)
+        _add_specks_at_points(
+            dwg,
+            group,
+            _circle_points(cx, cy, rx, ry, count),
+            attrs,
+            seed,
+            spread=spread,
+            radius=radius,
+            opacity=opacity,
+        )
 
 
 def _add_material_rect_outline(
@@ -1729,7 +2331,9 @@ def _add_material_rect_outline(
     h: float,
 ) -> None:
     seed = _seed_for_instruction(ins)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
+    for offset, width, opacity, dash in _material_outline_profile(
+        ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
+    ):
         group.add(
             dwg.rect(
                 insert=(x - offset, y - offset),
@@ -1740,7 +2344,16 @@ def _add_material_rect_outline(
     specks = _speck_profile(ins.weight)
     if specks is not None:
         count, spread, radius, opacity = specks
-        _add_specks_at_points(dwg, group, _rect_points(x, y, w, h, count), attrs, seed, spread=spread, radius=radius, opacity=opacity)
+        _add_specks_at_points(
+            dwg,
+            group,
+            _rect_points(x, y, w, h, count),
+            attrs,
+            seed,
+            spread=spread,
+            radius=radius,
+            opacity=opacity,
+        )
 
 
 def _add_material_arc_outline(
@@ -1755,7 +2368,9 @@ def _add_material_arc_outline(
     end_deg: float,
 ) -> None:
     seed = _seed_for_instruction(ins)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]):
+    for offset, width, opacity, dash in _material_outline_profile(
+        ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
+    ):
         group.add(
             dwg.path(
                 d=_arc_path_d(cx, cy, max(0.0, r + offset), start_deg, end_deg),
@@ -1765,7 +2380,16 @@ def _add_material_arc_outline(
     specks = _speck_profile(ins.weight)
     if specks is not None:
         count, spread, radius, opacity = specks
-        _add_specks_at_points(dwg, group, _arc_points(cx, cy, r, start_deg, end_deg, count), attrs, seed, spread=spread, radius=radius, opacity=opacity)
+        _add_specks_at_points(
+            dwg,
+            group,
+            _arc_points(cx, cy, r, start_deg, end_deg, count),
+            attrs,
+            seed,
+            spread=spread,
+            radius=radius,
+            opacity=opacity,
+        )
 
 
 def _material_line_group(
@@ -1778,7 +2402,7 @@ def _material_line_group(
     *,
     use_filters: bool = True,
 ):
-    if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "rope"):
+    if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick"):
         return None
 
     group = dwg.g()
@@ -1803,7 +2427,18 @@ def _material_line_group(
                     **layer_attrs,
                 )
             )
-        _add_powder_specks(dwg, group, start, end, attrs, seed, count=18, spread=1.8, radius=0.45, opacity=0.20)
+        _add_powder_specks(
+            dwg,
+            group,
+            start,
+            end,
+            attrs,
+            seed,
+            count=18,
+            spread=1.8,
+            radius=0.45,
+            opacity=0.20,
+        )
     elif ins.weight == "chalk":
         for idx, amount in enumerate((-3.0, 3.4)):
             ox, oy = _line_perp_offsets(start, end, amount)
@@ -1819,7 +2454,18 @@ def _material_line_group(
                     **layer_attrs,
                 )
             )
-        _add_powder_specks(dwg, group, start, end, attrs, seed, count=34, spread=5.5, radius=0.9, opacity=0.26)
+        _add_powder_specks(
+            dwg,
+            group,
+            start,
+            end,
+            attrs,
+            seed,
+            count=34,
+            spread=5.5,
+            radius=0.9,
+            opacity=0.26,
+        )
     elif ins.weight == "brush_thin":
         for idx, amount in enumerate((-1.4, 1.8)):
             ox, oy = _line_perp_offsets(start, end, amount)
@@ -1835,24 +2481,21 @@ def _material_line_group(
                     **layer_attrs,
                 )
             )
-    elif ins.weight == "rope":
-        ox, oy = _line_perp_offsets(start, end, 4.0)
-        twist_attrs = _copy_attrs(attrs)
-        twist_attrs["stroke_width"] = max(1.0, WEIGHT_TO_STROKE_WIDTH[ins.weight] * 0.35)
-        twist_attrs["stroke_opacity"] = 0.55
-        twist_attrs["stroke_dasharray"] = "4,8"
-        group.add(dwg.line(start=(start[0] + ox, start[1] + oy), end=(end[0] + ox, end[1] + oy), **twist_attrs))
-        group.add(dwg.line(start=(start[0] - ox, start[1] - oy), end=(end[0] - ox, end[1] - oy), **twist_attrs))
-        _add_rope_twists(dwg, group, start, end, attrs, seed)
     else:
         amounts = (-3.2, -1.4, 2.0, 3.6) if ins.weight == "crayon" else (-3.5, 2.8, 5.0)
         for idx, amount in enumerate(amounts):
             ox, oy = _line_perp_offsets(start, end, amount)
             jitter = _hash_to_unit(idx, seed) * (2.2 if ins.weight == "crayon" else 2.8)
             layer_attrs = _copy_attrs(attrs)
-            layer_attrs["stroke_width"] = max(0.8, WEIGHT_TO_STROKE_WIDTH[ins.weight] * (0.25 if ins.weight == "crayon" else 0.30))
+            layer_attrs["stroke_width"] = max(
+                0.8,
+                WEIGHT_TO_STROKE_WIDTH[ins.weight]
+                * (0.25 if ins.weight == "crayon" else 0.30),
+            )
             layer_attrs["stroke_opacity"] = 0.24 if ins.weight == "crayon" else 0.38
-            layer_attrs["stroke_dasharray"] = "2,5,9,7" if ins.weight == "crayon" else "18,7,3,11"
+            layer_attrs["stroke_dasharray"] = (
+                "2,5,9,7" if ins.weight == "crayon" else "18,7,3,11"
+            )
             group.add(
                 dwg.line(
                     start=(start[0] + ox + jitter, start[1] + oy),
@@ -1861,7 +2504,18 @@ def _material_line_group(
                 )
             )
         if ins.weight == "crayon":
-            _add_powder_specks(dwg, group, start, end, attrs, seed, count=26, spread=4.0, radius=0.75, opacity=0.18)
+            _add_powder_specks(
+                dwg,
+                group,
+                start,
+                end,
+                attrs,
+                seed,
+                count=26,
+                spread=4.0,
+                radius=0.75,
+                opacity=0.18,
+            )
     return _apply_rotation(group, ins, canvas)
 
 
@@ -1878,7 +2532,9 @@ def _apply_rotation(element, ins: Instruction, canvas: CanvasSize):
     return element
 
 
-def _arc_path_d(cx: float, cy: float, r: float, start_deg: float, end_deg: float) -> str:
+def _arc_path_d(
+    cx: float, cy: float, r: float, start_deg: float, end_deg: float
+) -> str:
     """SVG <path d> の A コマンドで弧を描く文字列を返す。
 
     角度は度、0°=東、CCW 正 (数学慣習)。y 軸は画面下向きなので
@@ -1896,9 +2552,73 @@ def _arc_path_d(cx: float, cy: float, r: float, start_deg: float, end_deg: float
     sweep = 0 if end_deg > start_deg else 1  # math CCW → SVG 反時計回り (y 反転後)
 
     return (
-        f"M {x1:.3f} {y1:.3f} "
-        f"A {r:.3f} {r:.3f} 0 {large_arc} {sweep} {x2:.3f} {y2:.3f}"
+        f"M {x1:.3f} {y1:.3f} A {r:.3f} {r:.3f} 0 {large_arc} {sweep} {x2:.3f} {y2:.3f}"
     )
+
+
+def _render_hand_stroke(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+):
+    stroke = synthesize_stroke(
+        start,
+        end,
+        WEIGHT_TO_STROKE_WIDTH[ins.weight],
+        ins.weight,
+        _seed_for_instruction(ins, render_seed),
+    )
+    group = dwg.g(
+        class_=f"stroke-engine-v1 controls-{len(stroke.samples)} events-{stroke.event_count}"
+    )
+    color = attrs.get("stroke", "#111111")
+    opacity = float(attrs.get("stroke_opacity", 1.0))
+    group.add(
+        dwg.path(
+            d=polygon_path(stroke.outline),
+            fill=color,
+            fill_opacity=min(opacity, 0.72),
+            stroke="none",
+        )
+    )
+    if _needs_path_variation(ins.variation):
+        assert ins.variation is not None
+        points = _line_with_variation(
+            start, end, ins.variation, _seed_for_instruction(ins, render_seed)
+        )
+        group.add(dwg.polyline(points=points, **attrs))
+    else:
+        material = _material_line_group(
+            dwg, ins, start, end, attrs, canvas, use_filters=False
+        )
+        if material is not None:
+            group.add(material)
+        else:
+            group.add(dwg.line(start=start, end=end, **attrs))
+    if ins.weight == "drypoint":
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        length = max(1e-6, math.hypot(dx, dy))
+        nx, ny = -dy / length, dx / length
+        offset = stroke.burr_side * WEIGHT_TO_STROKE_WIDTH[ins.weight]
+        points = [
+            (sample.x + nx * offset, sample.y + ny * offset)
+            for sample in stroke.samples
+        ]
+        group.add(
+            dwg.polyline(
+                points=points,
+                fill="none",
+                stroke=color,
+                stroke_width=WEIGHT_TO_STROKE_WIDTH[ins.weight] * 1.25,
+                stroke_opacity=stroke.burr_opacity,
+                stroke_linecap="round",
+            )
+        )
+    return _apply_rotation(group, ins, canvas)
 
 
 def _render_instruction(
@@ -1912,19 +2632,19 @@ def _render_instruction(
 ):
     canvas = canvas or canvas_size_for_aspect(None)
     attrs = _stroke_attrs(ins, cmap, use_filters=use_filters)
+    if ins.mode == "carve":
+        depth = ins.carve_depth or "half"
+        attrs["stroke"] = {"light": "#8a8a8a", "half": "#c7c7c7", "bright": "#ffffff"}[
+            depth
+        ]
+        attrs["fill"] = attrs["stroke"] if attrs.get("fill") != "none" else "none"
+        attrs["stroke_opacity"] = {"light": 0.58, "half": 0.78, "bright": 0.96}[depth]
 
     if ins.primitive == "line":
         start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0), canvas)
         end = _px(ins.to if ins.to is not None else (0.5, 1.0), canvas)
-        if _needs_path_variation(ins.variation):
-            assert ins.variation is not None
-            points = _line_with_variation(
-                start, end, ins.variation, _seed_for_instruction(ins, render_seed)
-            )
-            return _apply_rotation(dwg.polyline(points=points, **attrs), ins, canvas)
-        textured = _material_line_group(dwg, ins, start, end, attrs, canvas, use_filters=use_filters)
-        if textured is not None:
-            return textured
+        if ins.weight != "rotring":
+            return _render_hand_stroke(dwg, ins, start, end, attrs, canvas, render_seed)
         return _apply_rotation(dwg.line(start=start, end=end, **attrs), ins, canvas)
 
     if ins.primitive == "circle":
@@ -1950,7 +2670,9 @@ def _render_instruction(
             group.add(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs))
             _add_material_ellipse_outline(dwg, group, ins, attrs, cx, cy, rx, ry)
             return _apply_rotation(group, ins, canvas)
-        return _apply_rotation(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs), ins, canvas)
+        return _apply_rotation(
+            dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs), ins, canvas
+        )
 
     if ins.primitive == "square":
         if ins.position is None or ins.size is None:
@@ -1963,7 +2685,9 @@ def _render_instruction(
             group.add(dwg.rect(insert=(x, y), size=(w, h), **attrs))
             _add_material_rect_outline(dwg, group, ins, attrs, x, y, w, h)
             return _apply_rotation(group, ins, canvas)
-        return _apply_rotation(dwg.rect(insert=(x, y), size=(w, h), **attrs), ins, canvas)
+        return _apply_rotation(
+            dwg.rect(insert=(x, y), size=(w, h), **attrs), ins, canvas
+        )
 
     if ins.primitive == "triangle":
         if ins.position is None or ins.size is None:
@@ -1997,7 +2721,9 @@ def _render_instruction(
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(dwg.path(d=path_d, **attrs))
-            _add_material_arc_outline(dwg, group, ins, attrs, cx, cy, r, ins.angle_start, ins.angle_end)
+            _add_material_arc_outline(
+                dwg, group, ins, attrs, cx, cy, r, ins.angle_start, ins.angle_end
+            )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(dwg.path(d=path_d, **attrs), ins, canvas)
 

@@ -320,15 +320,22 @@
 		const element = thumbGridWrapEl;
 		if (!element || historyManagerTab !== 'thumbs' || historyDisplayMode !== 'chronological') return;
 		let frame = 0;
+		let debounceTimeout = 0;
 		const update = () => {
 			cancelAnimationFrame(frame);
-			frame = requestAnimationFrame(() => onSetPageSize(calculatePageSize(element)));
+			clearTimeout(debounceTimeout);
+			debounceTimeout = window.setTimeout(() => {
+				frame = requestAnimationFrame(() => onSetPageSize(calculatePageSize(element)));
+			}, 200);
 		};
-		update();
+		// Initial calculation runs synchronously to avoid empty display flash
+		onSetPageSize(calculatePageSize(element));
+
 		const observer = new ResizeObserver(update);
 		observer.observe(element);
 		return () => {
 			cancelAnimationFrame(frame);
+			clearTimeout(debounceTimeout);
 			observer.disconnect();
 		};
 	});

@@ -60,6 +60,8 @@ def _clamp_unit_value(v: object, default: float | None = None) -> object:
 
 
 class SurfaceSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     """図形の面に適用する抽象的な質感指定。SVG 実装詳細は持たない。"""
 
     texture: SurfaceTexture = Field(
@@ -86,6 +88,8 @@ class SurfaceSpec(BaseModel):
 
 
 class CanvasGroundSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     """キャンバスそのものの地・支持体の抽象的な質感指定。"""
 
     material: GroundMaterial = Field(
@@ -106,6 +110,8 @@ class CanvasGroundSpec(BaseModel):
 
 
 class CanvasSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     """キャンバス比率と地の指定。旧形式の文字列 canvas も互換で受ける。"""
 
     aspect: str = Field(default="square", description="キャンバス比率ID")
@@ -116,6 +122,8 @@ Canvas = str | CanvasSpec
 
 
 class AtRegion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     """演奏時に Renderer が解決する配置領域。"""
 
     region: tuple[float, float, float, float] = Field(
@@ -138,6 +146,8 @@ class AtRegion(BaseModel):
 
 
 class Relation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     """直前 instruction との観察可能な関係。参照先は暗黙 prev のみ。"""
 
     type: RelationType = Field(
@@ -150,6 +160,8 @@ class Relation(BaseModel):
 
 
 class Variation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     """揺らぎ指定。明示された場合のみ使用する。"""
 
     amplitude: Amplitude = Field(
@@ -171,7 +183,9 @@ class Variation(BaseModel):
 
 
 class Arrangement(BaseModel):
-    """複数の同一図形を並べる指定。Renderer が展開し N 個の SVG 要素を生成する。"""
+    model_config = ConfigDict(extra="forbid")
+
+    """複数の同一図形を並べる指定。Renderer が展開し N 個 of SVG 要素を生成する。"""
 
     count: int = Field(
         ge=1,
@@ -404,6 +418,8 @@ class Instruction(BaseModel):
 
 
 class Presence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     """人・顔・動物などの具象モチーフを、抽象的な構図圧として保持する。"""
 
     kind: PresenceKind = Field(

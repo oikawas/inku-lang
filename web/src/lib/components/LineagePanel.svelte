@@ -187,24 +187,39 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		overviewScale = 1;
 		void tick().then(scheduleArrowUpdate);
 	}
+	function getRelativeCoords(el: HTMLElement, container: HTMLElement): { left: number; top: number; width: number; height: number } {
+		let left = 0;
+		let top = 0;
+		const width = el.offsetWidth;
+		const height = el.offsetHeight;
+		let curr: HTMLElement | null = el;
+		while (curr && curr !== container) {
+			left += curr.offsetLeft;
+			top += curr.offsetTop;
+			left -= curr.scrollLeft || 0;
+			top -= curr.scrollTop || 0;
+			curr = curr.offsetParent as HTMLElement | null;
+		}
+		return { left, top, width, height };
+	}
+
 	function updateArrowPaths(): void {
 		if (!lineageColumnsEl || !graph) {
 			arrowPaths = [];
 			return;
 		}
-		const container = lineageColumnsEl.getBoundingClientRect();
+		const container = lineageColumnsEl;
 		arrowPaths = graph.edges.flatMap((edge) => {
 			if (!visibleNodeIds.has(edge.parent_node_id) || !visibleNodeIds.has(edge.child_node_id)) return [];
 			const parent = cardElements.get(edge.parent_node_id);
 			const child = cardElements.get(edge.child_node_id);
 			if (!parent || !child) return [];
-			const parentRect = parent.getBoundingClientRect();
-			const childRect = child.getBoundingClientRect();
-			const scale = overviewOpen ? overviewScale : 1;
-			const x1 = (parentRect.left - container.left + parentRect.width / 2) / scale;
-			const y1 = (parentRect.bottom - container.top + 1) / scale;
-			const x2 = (childRect.left - container.left + childRect.width / 2) / scale;
-			const y2 = (childRect.top - container.top - 7) / scale;
+			const parentRect = getRelativeCoords(parent, container);
+			const childRect = getRelativeCoords(child, container);
+			const x1 = parentRect.left + parentRect.width / 2;
+			const y1 = parentRect.top + parentRect.height + 1;
+			const x2 = childRect.left + childRect.width / 2;
+			const y2 = childRect.top - 7;
 			const bend = Math.max(18, (y2 - y1) / 2);
 			return [{
 				id: edge.id,
@@ -309,7 +324,7 @@ $effect(() => {
 		<div class="lineage-message">{isJapanese ? '保存すると、ここに系譜が表示されます。' : 'Save an artwork to begin its lineage.'}</div>
 	{:else}
 		<div class="lineage-scroll" class:overview-scroll={overviewOpen}>
-			<div class="lineage-columns" bind:this={lineageColumnsEl} style={overviewOpen ? `zoom: ${overviewScale};` : undefined}>
+			<div class="lineage-columns" bind:this={lineageColumnsEl} style={overviewOpen ? `transform: scale(${overviewScale}); transform-origin: top left; width: ${100 / overviewScale}%; height: ${100 / overviewScale}%;` : undefined}>
 				<svg class="lineage-arrows" aria-hidden="true">
 					<defs>
 						<marker id="lineage-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
@@ -407,7 +422,6 @@ $effect(() => {
 {#if activeAIRefineNode}
 	<AIRefineModal
 		node={activeAIRefineNode}
-		{isJapanese}
 		onClose={() => (activeAIRefineNode = null)}
 		{onPaintOne}
 		onLoadBranch={onLoadBranch}
@@ -417,7 +431,6 @@ $effect(() => {
 {#if activeManualRefineNode}
 	<ManualRefineModal
 		node={activeManualRefineNode}
-		{isJapanese}
 		onClose={() => (activeManualRefineNode = null)}
 		{onPaintOne}
 		onLoadBranch={onLoadBranch}

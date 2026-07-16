@@ -118,7 +118,14 @@ _SRGB_COLOR_PROFILE = {
 
 def _unexpected_http_error(operation: str, status_code: int) -> HTTPException:
     _logger.exception("%s failed", operation)
-    return HTTPException(status_code=status_code, detail=f"{operation} failed")
+    detail = f"{operation} failed"
+    if os.getenv("INKU_ENV") == "development":
+        import sys
+        import traceback
+        exc_type, exc_value, _ = sys.exc_info()
+        if exc_value:
+            detail = f"{operation} failed: {exc_type.__name__}: {exc_value}\n{traceback.format_exc()}"
+    return HTTPException(status_code=status_code, detail=detail)
 
 
 @contextmanager
@@ -1330,8 +1337,26 @@ def api_color_catalogs() -> ColorCatalogsResponse:
     return ColorCatalogsResponse(default_catalog_id="default", catalogs=color_catalogs())
 
 
+@app.get("/api/auth/config")
+def api_auth_config() -> dict:
+    return _db.get_auth_settings()
+
+
+class AuthSettingsBody(BaseModel):
+    google_enabled: bool
+    local_enabled: bool
+
+
+@app.put("/api/auth/config")
+def api_auth_config_update(body: AuthSettingsBody, actor: dict = Depends(_user_manager)) -> dict:
+    return _db.update_auth_settings(body.google_enabled, body.local_enabled)
+
+
 @app.post("/api/auth/login", response_model=LoginResponse)
 def api_auth_login(body: LoginBody, response: Response, request: Request) -> LoginResponse:
+    auth_config = _db.get_auth_settings()
+    if not auth_config.get("local_enabled", True):
+        raise HTTPException(status_code=403, detail="Local authentication is disabled")
     client_host = request.client.host if request.client else "unknown"
     rate_key = f"{client_host}:{body.username.strip().casefold()}"
     rate_result = _login_rate_limiter.check(rate_key)
@@ -2866,9 +2891,13 @@ def api_users_update(
 
 
 @app.delete("/api/users/{user_id}")
-def api_users_delete(user_id: str, actor: dict = Depends(_user_manager)) -> dict[str, bool]:
+def api_users_delete(
+    user_id: str,
+    cascade: bool = Query(default=False),
+    actor: dict = Depends(_user_manager),
+) -> dict[str, bool]:
     try:
-        found = _db.delete_user(user_id, actor=actor)
+        found = _db.delete_user(user_id, cascade=cascade, actor=actor)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     if not found:

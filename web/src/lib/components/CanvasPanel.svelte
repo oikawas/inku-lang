@@ -1108,12 +1108,11 @@
 			justify-content: flex-start;
 			gap: 12px;
 			padding: 4px 0 6px;
-			overflow-x: auto;
-			overflow-y: hidden;
-			scrollbar-width: thin;
+			flex-wrap: wrap;
+			overflow: visible;
 		}
-		.render-meta-item { flex: 0 0 auto; }
-		.render-meta-item strong { max-width: none; }
+		.render-meta-item { flex: 0 1 auto; }
+		.render-meta-item strong { max-width: 180px; }
 		.generation-info { top: 68px; }
 	}
 	.canvas-area {

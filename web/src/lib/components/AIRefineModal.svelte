@@ -2,16 +2,16 @@
 	import { onDestroy } from 'svelte';
 	import type { LineageNode } from './LineagePanel.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	type Props = {
 		node: LineageNode;
-		isJapanese: boolean;
 		onClose: () => void;
 		onPaintOne: (text: string, options: any) => Promise<any>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 	};
 
-	let { node, isJapanese, onClose, onPaintOne, onLoadBranch }: Props = $props();
+	let { node, onClose, onPaintOne, onLoadBranch }: Props = $props();
 
 	let prompt = $state('');
 	let generations = $state(5);
@@ -43,14 +43,18 @@
 	});
 
 	function kindLabel(kind: string): string {
-		const ja: Record<string, string> = { touch_variation: 'タッチ', layout_variation: '構図', catalog_change: '配色', reinterpretation: '再解釈' };
-		const en: Record<string, string> = { touch_variation: 'Touch', layout_variation: 'Layout', catalog_change: 'Color', reinterpretation: 'Reading' };
-		return (isJapanese ? ja : en)[kind] ?? kind;
+		const labels: Record<string, string> = {
+			touch_variation: t().refineCostTouch,
+			layout_variation: t().refineCostLayout,
+			catalog_change: t().refineCostColor,
+			reinterpretation: t().refineCostReading
+		};
+		return labels[kind] ?? kind;
 	}
 
 	async function startRefinement() {
 		if (activeKinds.length === 0) {
-			errorText = isJapanese ? '少なくとも1つの要素を有効にしてください。' : 'Please enable at least one element.';
+			errorText = t().aiRefineMinElementsError;
 			return;
 		}
 
@@ -74,9 +78,7 @@
 					kind = 'reinterpretation';
 				}
 
-				statusText = isJapanese
-					? `${generations}世代中 ${currentStep}世代目を生成中 (${kindLabel(kind)})...`
-					: `Generating Gen ${currentStep}/${generations} (${kindLabel(kind)})...`;
+				statusText = t().aiRefineStepStatus(generations, currentStep, kindLabel(kind));
 
 				let paintText = currentText;
 				// 解釈変動の場合にのみ、プロンプト指示を反映させて DDL を再解釈させる
@@ -107,7 +109,7 @@
 				}
 			}
 
-			statusText = isJapanese ? '自律推敲が完了しました！' : 'Autonomous refinement completed successfully!';
+			statusText = t().aiRefineCompleted;
 			await onLoadBranch(node.id);
 		} catch (err: any) {
 			if (err.name === 'AbortError') {
@@ -124,9 +126,9 @@
 <div class="modal-backdrop" onclick={!running ? onClose : undefined} onkeydown={(e) => { if (e.key === 'Escape' && !running) onClose(); }} role="presentation">
 	<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
 		<header>
-			<h3 id="modal-title">{isJapanese ? 'AIに自律推敲させる' : 'Autonomous AI Refinement'}</h3>
+			<h3 id="modal-title">{t().aiRefineTitle}</h3>
 			{#if !running}
-				<button class="close-btn" type="button" onclick={onClose} aria-label={isJapanese ? '閉じる' : 'Close'}>&times;</button>
+				<button class="close-btn" type="button" onclick={onClose} aria-label={t().closeLabel}>&times;</button>
 			{/if}
 		</header>
 
@@ -143,10 +145,10 @@
 				</div>
 			{:else}
 				<div class="form-group">
-					<label for="ai-direction">{isJapanese ? 'AIに指示する方向性（プロンプト）' : 'AI Direction (Prompt)'}</label>
+					<label for="ai-direction">{t().aiRefineDirectionLabel}</label>
 					<textarea
 						id="ai-direction"
-						placeholder={isJapanese ? '例：華やかで、かつ、涼しげに' : 'e.g., vibrant and cool'}
+						placeholder={t().aiRefineDirectionPlaceholder}
 						bind:value={prompt}
 						maxlength="160"
 						rows="2"
@@ -155,29 +157,29 @@
 
 				<div class="form-row">
 					<div class="form-group select-generations">
-						<label for="ai-gens">{isJapanese ? '試行の世代数' : 'Generations to evolve'}</label>
+						<label for="ai-gens">{t().aiRefineGensLabel}</label>
 						<input id="ai-gens" type="number" min="1" max="10" bind:value={generations} />
 					</div>
 				</div>
 
 				<details class="advanced-settings" open>
-					<summary>{isJapanese ? '使用する推敲要素（詳細設定）' : 'Evolutionary Elements (Advanced)'}</summary>
+					<summary>{t().aiRefineElementsLabel}</summary>
 					<div class="checkbox-group">
 						<label>
 							<input type="checkbox" bind:checked={enableReading} />
-							<span>{isJapanese ? '解釈・概念 (Reading)' : 'Concept (Reading)'}</span>
+							<span>{t().refineCostReading} (Reading)</span>
 						</label>
 						<label>
 							<input type="checkbox" bind:checked={enableColor} />
-							<span>{isJapanese ? '配色・カタログ (Color)' : 'Colors (Catalog)'}</span>
+							<span>{t().refineCostColor} (Color)</span>
 						</label>
 						<label>
 							<input type="checkbox" bind:checked={enableLayout} />
-							<span>{isJapanese ? '構図・配置 (Layout)' : 'Composition (Layout)'}</span>
+							<span>{t().refineCostLayout} (Layout)</span>
 						</label>
 						<label>
 							<input type="checkbox" bind:checked={enableTouch} />
-							<span>{isJapanese ? 'タッチ・質感 (Touch)' : 'Texture (Touch)'}</span>
+							<span>{t().refineCostTouch} (Touch)</span>
 						</label>
 					</div>
 				</details>
@@ -190,12 +192,12 @@
 
 		<footer>
 			{#if !running}
-				<button class="cancel-action" type="button" onclick={onClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
+				<button class="cancel-action" type="button" onclick={onClose}>{t().confirmCancel}</button>
 				<button class="confirm-action" type="button" disabled={activeKinds.length === 0} onclick={startRefinement}>
-					{isJapanese ? '推敲を開始' : 'Start Evolving'}
+					{t().aiRefineStartButton}
 				</button>
 			{:else}
-				<button class="confirm-action active-loading" type="button" disabled>{isJapanese ? '推敲中...' : 'Evolving...'}</button>
+				<button class="confirm-action active-loading" type="button" disabled>{t().aiRefineRunningButton}</button>
 			{/if}
 		</footer>
 	</div>

@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.82**
+**Version: v1.86.1**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -1300,6 +1300,18 @@ JSON Score remains a strict, versioned schema so unknown fields are never silent
 - Implemented the Manual Refine modal, carrying over the displayed parent DDL structure and color catalog as defaults, and allowing fast, single-generation variations by specifying a derivation kind, color catalog, or additional Saijiki/prompt.
 - Integrated individual deletion to instantly trash selected artworks directly from their card menu.
 - Build 565.
+
+### v1.86.1 — agy review reflection, security and performance optimization (2026-07-16)
+
+- **Authentication Toggles and Guards**: Made the Google/local authentication settings dynamic and persistent in the database (`app_settings` table) and created a configuration API endpoint. Implemented a security guard to block login attempts with `403 Forbidden` if local authentication is disabled.
+- **Robust Schema Validation**: Applied `ConfigDict(extra="forbid")` to all Pydantic schemas (e.g. `SurfaceSpec`, `CanvasSpec` models) to prevent silent discarding of unknown fields with unexpected parameters.
+- **Svelte 5 Warnings & Recursion Fixes**: Introduced a 200ms debounce to ResizeObserver state updates in `HistoryManager.svelte` to prevent layout thrashing (infinite reflow loops). Also fixed reactive state bindings in `ManualRefineModal` to avoid compile warnings about copying prop values into local state.
+- **Lineage Rendering Performance**: Replaced the expensive `getBoundingClientRect()` calls with recursive layout-pixel based offset calculations (`offsetLeft`/`offsetTop`), significantly reducing rendering overhead.
+- **WebKit Layout Coordinates Fix**: Removed the non-standard CSS `zoom` property from the lineage layout (which causes arrow offset mismatches in iPad Safari/WebKit) in favor of standard `transform: scale` and `transform-origin`.
+- **Management CLI Enhancements**: Added `user` (create, list, update, cascade delete), `group` (management), and `config` (settings status and change) admin subcommands to `inku-cli`. Built an automated script to parse parser definitions, format them, and write them directly into `cli/README.md`.
+- **i18n and Responsive Upgrades**: Migrated all hardcoded strings in AI and manual refinement modals to the shared i18n dictionary `t()`. Applied `flex-wrap: wrap` and `text-overflow: ellipsis` to the canvas metadata section, preventing layout clipping at intermediate viewport widths.
+- **Build 566**.
+
 
 
 Build 561 removes the former “Use today's word as a seed” control from the writing tab and first generation, and moves it to Refine / Adjust as “Vary Touch with Words.” The entered words affect only the Renderer's deterministic performance seed, never the interpretation, DDL, JSON Score, or layout. Because the same words reproduce the same touch, this operation generates one candidate at a time. History, Generation info / JSON, and replay retain both the words and resolved seed. The first artwork remains the source work and never applies this word-based touch variation.

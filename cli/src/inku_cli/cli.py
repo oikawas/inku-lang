@@ -2998,6 +2998,139 @@ def _api_json_body(args: argparse.Namespace) -> Any:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
         raise CliError(f"invalid JSON request body: {exc}") from exc
+def command_user(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.user_action == "list":
+        data, _ = client.request("GET", "/api/users")
+        _print_json(data)
+    elif args.user_action == "create":
+        body = {
+            "username": args.username,
+            "email": args.email,
+            "password": args.password,
+            "role": args.role,
+        }
+        if args.group_id:
+            body["group_id"] = args.group_id
+        data, _ = client.request("POST", "/api/users", data=body)
+        _print_json(data)
+    elif args.user_action == "update":
+        body = {}
+        if args.username:
+            body["username"] = args.username
+        if args.email:
+            body["email"] = args.email
+        if args.password:
+            body["password"] = args.password
+        if args.role:
+            body["role"] = args.role
+        if args.group_id:
+            body["group_id"] = args.group_id
+        data, _ = client.request("PATCH", f"/api/users/{args.user_id}", data=body)
+        _print_json(data)
+    elif args.user_action == "delete":
+        query = {"cascade": "true" if args.cascade else "false"}
+        data, _ = client.request("DELETE", f"/api/users/{args.user_id}", query=query)
+        _print_json(data)
+    return 0
+
+
+def command_group(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.group_action == "list":
+        data, _ = client.request("GET", "/api/user-groups")
+        _print_json(data)
+    elif args.group_action == "create":
+        body = {"name": args.name}
+        data, _ = client.request("POST", "/api/user-groups", data=body)
+        _print_json(data)
+    elif args.group_action == "update":
+        body = {"name": args.name}
+        data, _ = client.request("PATCH", f"/api/user-groups/{args.group_id}", data=body)
+        _print_json(data)
+    elif args.group_action == "delete":
+        data, _ = client.request("DELETE", f"/api/user-groups/{args.group_id}")
+        _print_json(data)
+    return 0
+
+
+def command_config(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.config_action == "show":
+        settings, _ = client.request("GET", "/api/settings/status")
+        try:
+            auth_config, _ = client.request("GET", "/api/auth/config")
+        except Exception:
+            auth_config = {}
+        combined = {
+            "database": settings.get("database"),
+            "db_backup": settings.get("db_backup"),
+            "log_retention": settings.get("log_retention"),
+            "output_save": settings.get("output_save"),
+            "auth_settings": auth_config
+        }
+        _print_json(combined)
+    elif args.config_action == "update":
+        if args.google_auth is not None or args.local_auth is not None:
+            try:
+                auth_config, _ = client.request("GET", "/api/auth/config")
+            except Exception:
+                auth_config = {}
+            google_enabled = args.google_auth == "true" if args.google_auth is not None else auth_config.get("google_enabled", False)
+            local_enabled = args.local_auth == "true" if args.local_auth is not None else auth_config.get("local_enabled", True)
+            body = {
+                "google_enabled": google_enabled,
+                "local_enabled": local_enabled
+            }
+            auth_res, _ = client.request("PUT", "/api/auth/config", data=body)
+            print("Authentication config updated:")
+            _print_json(auth_res)
+
+        if args.backup_interval is not None or args.backup_generations is not None:
+            settings, _ = client.request("GET", "/api/settings/status")
+            current_backup = settings.get("db_backup", {})
+            interval = args.backup_interval if args.backup_interval is not None else current_backup.get("interval_days", 7)
+            generations = args.backup_generations if args.backup_generations is not None else current_backup.get("max_generations", 5)
+            body = {
+                "interval_days": interval,
+                "max_generations": generations
+            }
+            backup_res, _ = client.request("PUT", "/api/settings/db-backup", data=body)
+            print("Database backup settings updated:")
+            _print_json(backup_res)
+
+        if args.log_retention_days is not None or args.log_retention_enabled is not None or args.log_compress is not None:
+            settings, _ = client.request("GET", "/api/settings/status")
+            current_log = settings.get("log_retention", {})
+            enabled = args.log_retention_enabled == "true" if args.log_retention_enabled is not None else current_log.get("enabled", True)
+            days = args.log_retention_days if args.log_retention_days is not None else current_log.get("retention_days", 90)
+            rotate = current_log.get("rotate", "daily")
+            compress = args.log_compress == "true" if args.log_compress is not None else current_log.get("compress", True)
+            body = {
+                "enabled": enabled,
+                "retention_days": days,
+                "rotate": rotate,
+                "compress": compress
+            }
+            log_res, _ = client.request("PUT", "/api/settings/log-retention", data=body)
+            print("Log retention settings updated:")
+            _print_json(log_res)
+    return 0
 
 
 def command_api(args: argparse.Namespace) -> int:
@@ -3316,6 +3449,78 @@ def build_parser() -> argparse.ArgumentParser:
     
     review_eval.set_defaults(func=command_review)
     review_unread.set_defaults(func=command_review)
+
+    # user
+    user_cmd = subparsers.add_parser("user", help="manage user accounts")
+    _add_common_server_args(user_cmd)
+    user_sub = user_cmd.add_subparsers(dest="user_action", required=True)
+
+    user_list = user_sub.add_parser("list", help="list user accounts")
+
+    user_create = user_sub.add_parser("create", help="create a user account")
+    user_create.add_argument("username", help="new username")
+    user_create.add_argument("email", help="email address")
+    user_create.add_argument("password", help="password (min 8 chars)")
+    user_create.add_argument("--role", choices=("user", "group_lead", "admin"), default="user", help="user role")
+    user_create.add_argument("--group-id", help="assign to a group ID")
+
+    user_update = user_sub.add_parser("update", help="update a user account")
+    user_update.add_argument("user_id", help="target user ID")
+    user_update.add_argument("--username", help="update username")
+    user_update.add_argument("--email", help="update email")
+    user_update.add_argument("--password", help="update password")
+    user_update.add_argument("--role", choices=("user", "group_lead", "admin"), help="update role")
+    user_update.add_argument("--group-id", help="update group ID")
+
+    user_delete = user_sub.add_parser("delete", help="delete a user account")
+    user_delete.add_argument("user_id", help="target user ID")
+    user_delete.add_argument("--cascade", action="store_true", help="cascade delete user's generation history")
+
+    user_list.set_defaults(func=command_user)
+    user_create.set_defaults(func=command_user)
+    user_update.set_defaults(func=command_user)
+    user_delete.set_defaults(func=command_user)
+
+    # group
+    group_cmd = subparsers.add_parser("group", help="manage user groups")
+    _add_common_server_args(group_cmd)
+    group_sub = group_cmd.add_subparsers(dest="group_action", required=True)
+
+    group_list = group_sub.add_parser("list", help="list user groups")
+
+    group_create = group_sub.add_parser("create", help="create a user group")
+    group_create.add_argument("name", help="new group name")
+
+    group_update = group_sub.add_parser("update", help="update a user group")
+    group_update.add_argument("group_id", help="target group ID")
+    group_update.add_argument("name", help="new name")
+
+    group_delete = group_sub.add_parser("delete", help="delete a user group")
+    group_delete.add_argument("group_id", help="target group ID")
+
+    group_list.set_defaults(func=command_group)
+    group_create.set_defaults(func=command_group)
+    group_update.set_defaults(func=command_group)
+    group_delete.set_defaults(func=command_group)
+
+    # config
+    config_cmd = subparsers.add_parser("config", help="manage system settings")
+    _add_common_server_args(config_cmd)
+    config_sub = config_cmd.add_subparsers(dest="config_action", required=True)
+
+    config_show = config_sub.add_parser("show", help="show current system configurations")
+
+    config_update = config_sub.add_parser("update", help="update system configurations")
+    config_update.add_argument("--google-auth", choices=("true", "false"), help="enable/disable Google auth")
+    config_update.add_argument("--local-auth", choices=("true", "false"), help="enable/disable local auth")
+    config_update.add_argument("--backup-interval", type=int, help="DB backup interval in days")
+    config_update.add_argument("--backup-generations", type=int, help="DB backup retention generations")
+    config_update.add_argument("--log-retention-days", type=int, help="log retention days")
+    config_update.add_argument("--log-retention-enabled", choices=("true", "false"), help="enable/disable log retention")
+    config_update.add_argument("--log-compress", choices=("true", "false"), help="compress log files")
+
+    config_show.set_defaults(func=command_config)
+    config_update.set_defaults(func=command_config)
 
     return parser
 

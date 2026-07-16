@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { LineageNode } from './LineagePanel.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	type Props = {
 		node: LineageNode;
-		isJapanese: boolean;
 		onClose: () => void;
 		onPaintOne: (text: string, options: any) => Promise<any>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		selectedCatalogId: string;
 	};
 
-	let { node, isJapanese, onClose, onPaintOne, onLoadBranch, selectedCatalogId }: Props = $props();
+	let { node, onClose, onPaintOne, onLoadBranch, selectedCatalogId }: Props = $props();
 
 	type ColorCatalog = { id: string; name: string; name_ja: string; sub?: string; sub_ja?: string };
 	let colorCatalogs = $state<ColorCatalog[]>([]);
-	let selectedCatalog = $state(selectedCatalogId);
+	let selectedCatalog = $state('');
 
 	let derivationKind = $state<string>('touch_variation');
 	let ddlText = $state('');
@@ -24,16 +24,16 @@
 	let running = $state(false);
 	let errorText = $state('');
 
-	const kinds = [
-		{ id: 'touch_variation', labelJa: 'タッチ変動', labelEn: 'Touch variation' },
-		{ id: 'layout_variation', labelJa: '構図変動', labelEn: 'Layout variation' },
-		{ id: 'catalog_change', labelJa: '配色カタログ変動', labelEn: 'Color catalog change' },
-		{ id: 'reinterpretation', labelJa: '解釈変動 (Saijiki等の再反映)', labelEn: 'Reinterpretation' }
-	];
+	const kinds = $derived([
+		{ id: 'touch_variation', label: t().refineCostTouch },
+		{ id: 'layout_variation', label: t().refineCostLayout },
+		{ id: 'catalog_change', label: t().refineCostColor },
+		{ id: 'reinterpretation', label: t().refineCostReading }
+	]);
 
 	onMount(async () => {
-		// 親の DDL を初期表示
 		ddlText = node.history?.ddl ?? '';
+		selectedCatalog = selectedCatalogId;
 		
 		try {
 			const res = await fetch('/api/color-catalogs');
@@ -64,14 +64,6 @@
 			catalogId: selectedCatalog
 		};
 
-		// DDL編集がある場合、サーバー側で強制反映されるように指定する
-		// 注: 既存の/api/paintでは、ddl自体を上書き指定するAPIパラメータがあるか？
-		// api.py のパラメータを確認すると、"ddl" は入力スキーマに存在しません。
-		// 代わりに、手動推敲モーダルから DDL 直接反映をする場合、サーバーが "ddl_edit" を解釈するか？
-		// または、SvelteKitクライアント側で手動推敲をするとき、DDL直接編集は行わず、
-		// 既存の refiner や Vary Kind, カタログのみをコントロールするのが安全です。
-		// そのため、DDL編集テキストエリアは表示せず、パラメータ変動（Vary Kind、配色カタログ、Saijiki追記）のみに限定します。
-
 		try {
 			await onPaintOne(paintText, options);
 			await onLoadBranch(node.id);
@@ -87,29 +79,29 @@
 <div class="modal-backdrop" onclick={!running ? onClose : undefined} onkeydown={(e) => { if (e.key === 'Escape' && !running) onClose(); }} role="presentation">
 	<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
 		<header>
-			<h3 id="modal-title">{isJapanese ? '手動で推敲する' : 'Manual Refinement'}</h3>
+			<h3 id="modal-title">{t().manualRefineTitle}</h3>
 			{#if !running}
-				<button class="close-btn" type="button" onclick={onClose} aria-label={isJapanese ? '閉じる' : 'Close'}>&times;</button>
+				<button class="close-btn" type="button" onclick={onClose} aria-label={t().closeLabel}>&times;</button>
 			{/if}
 		</header>
 
 		<div class="modal-body">
 			<div class="form-group">
-				<label for="refine-kind">{isJapanese ? '推敲の種類' : 'Refinement Kind'}</label>
+				<label for="refine-kind">{t().manualRefineKindLabel}</label>
 				<select id="refine-kind" bind:value={derivationKind} disabled={running}>
 					{#each kinds as kind}
-						<option value={kind.id}>{isJapanese ? kind.labelJa : kind.labelEn}</option>
+						<option value={kind.id}>{kind.label}</option>
 					{/each}
 				</select>
 			</div>
 
 			{#if derivationKind === 'reinterpretation'}
 				<div class="form-group">
-					<label for="saijiki-input">{isJapanese ? '歳時記の追加・方向性指示' : 'Add Saijiki / Prompt'}</label>
+					<label for="saijiki-input">{t().manualRefineSaijikiLabel}</label>
 					<input
 						id="saijiki-input"
 						type="text"
-						placeholder={isJapanese ? '例：青を強調、静かに揺れる' : 'e.g., emphasize blue, sway gently'}
+						placeholder={t().manualRefineSaijikiPlaceholder}
 						bind:value={saijikiText}
 						disabled={running}
 					/>
@@ -117,20 +109,20 @@
 			{/if}
 
 			<div class="form-group">
-				<label for="catalog-select">{isJapanese ? '配色カタログ' : 'Color Catalog'}</label>
+				<label for="catalog-select">{t().manualRefineColorLabel}</label>
 				<select id="catalog-select" bind:value={selectedCatalog} disabled={running}>
 					{#each colorCatalogs as cat}
 						<option value={cat.id}>
-							{isJapanese ? cat.name_ja : cat.name}
-							{cat.sub ? ` (${isJapanese ? (cat.sub_ja || cat.sub) : cat.sub})` : ''}
+							{t().closeLabel === 'Close' ? cat.name : cat.name_ja}
+							{cat.sub ? ` (${t().closeLabel === 'Close' ? cat.sub : (cat.sub_ja || cat.sub)})` : ''}
 						</option>
 					{/each}
 				</select>
 			</div>
 
 			<div class="parent-info">
-				<h4>{isJapanese ? '元にする作品の構成 (DDL)' : 'Parent DDL Structure'}</h4>
-				<pre>{ddlText || (isJapanese ? '（構成情報なし）' : '(No structure info)')}</pre>
+				<h4>{t().manualRefineParentDdl}</h4>
+				<pre>{ddlText || t().manualRefineNoDdl}</pre>
 			</div>
 
 			{#if errorText}
@@ -140,12 +132,12 @@
 
 		<footer>
 			{#if !running}
-				<button class="cancel-action" type="button" onclick={onClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
+				<button class="cancel-action" type="button" onclick={onClose}>{t().confirmCancel}</button>
 				<button class="confirm-action" type="button" onclick={executeRefinement}>
-					{isJapanese ? '生成する' : 'Refine'}
+					{t().manualRefineGenerateButton}
 				</button>
 			{:else}
-				<button class="confirm-action active-loading" type="button" disabled>{isJapanese ? '生成中...' : 'Refining...'}</button>
+				<button class="confirm-action active-loading" type="button" disabled>{t().manualRefineGeneratingButton}</button>
 			{/if}
 		</footer>
 	</div>

@@ -30,6 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .feature_analysis import composition_distance
+from .okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL, generate_okugaki
 from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import compose
@@ -999,6 +1000,24 @@ class HistoryLineageGroupListResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+class OkugakiGenerateBody(BaseModel):
+    model: str = Field(default=DEFAULT_OKUGAKI_MODEL, min_length=1, max_length=200)
+    language: str = Field(default="ja", pattern="^(ja|en)$")
+    save: bool = True
+
+
+class OkugakiItem(BaseModel):
+    id: str | None = None
+    target_node_id: str
+    branch_snapshot: list[str]
+    model: str
+    at: int
+    language: str
+    body: str
+    warnings: list[str] = Field(default_factory=list)
+    fact_sheet: dict = Field(default_factory=dict)
 
 
 class HistoryIdsBody(BaseModel):
@@ -3039,6 +3058,53 @@ def api_lineage_promote(node_id: str, actor: dict = Depends(_current_user)) -> H
     if item is None:
         raise HTTPException(status_code=404, detail="lineage item not found")
     return HistoryItem(**item)
+
+
+@app.get("/api/lineage/{node_id}/okugaki", response_model=list[OkugakiItem], response_model_exclude_none=True)
+def api_okugaki_list(node_id: str, actor: dict = Depends(_current_user)) -> list[OkugakiItem]:
+    branch = _db.get_lineage_branch(actor["id"], node_id)
+    if branch is None:
+        raise HTTPException(status_code=404, detail="lineage not found")
+    return [OkugakiItem(**item) for item in _db.list_okugaki(actor["id"], node_id)]
+
+
+@app.post("/api/lineage/{node_id}/okugaki", response_model=OkugakiItem, response_model_exclude_none=True)
+def api_okugaki_generate(
+    node_id: str,
+    body: OkugakiGenerateBody,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> OkugakiItem:
+    if body.save and idempotency_key:
+        existing = _db.get_okugaki_by_idempotency(actor["id"], idempotency_key)
+        if existing is not None:
+            return OkugakiItem(**existing)
+    branch = _db.get_lineage_branch(actor["id"], node_id)
+    if branch is None:
+        raise HTTPException(status_code=404, detail="lineage not found")
+    at = int(time.time() * 1000)
+    try:
+        item = generate_okugaki(
+            branch,
+            model=body.model,
+            language=body.language,
+            settings=_db.get_model_settings(),
+            at=at,
+        )
+        if body.save:
+            item = _db.add_okugaki(actor["id"], item, idempotency_key=idempotency_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _unexpected_http_error("okugaki generation", 502) from exc
+    return OkugakiItem(**item)
+
+
+@app.delete("/api/okugaki/{okugaki_id}")
+def api_okugaki_delete(okugaki_id: str, actor: dict = Depends(_current_user)) -> dict[str, bool]:
+    if not _db.delete_okugaki(actor["id"], okugaki_id):
+        raise HTTPException(status_code=404, detail="okugaki not found")
+    return {"ok": True}
 
 
 @app.get("/api/history/{item_id}/svg")

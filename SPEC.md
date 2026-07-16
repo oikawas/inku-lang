@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.87**
+**Version: v1.88**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -1369,6 +1369,20 @@ the reference implementation as one concrete path.
 
 ---
 
+## Okugaki: Reciting a Lineage
+
+An okugaki is an append-only, first-person reading attached to one lineage branch from its root to the displayed artwork. It is neither a verdict nor a summary. It describes observable changes between generations and closes by verbalizing what remained invariant across the branch.
+
+- Each generation is read sequentially. The request for generation i contains only generations 0 through i, so later works cannot turn earlier choices into steps toward an alleged final form.
+- Inputs are existing lineage edge facts, captions, server-rasterized PNG pairs, and deterministic differences from the v1.80 feature mirror: composition family, primitives, colors, density, angles, and arrangement paths. No new quality metric is introduced.
+- Invariants are computed mechanically as shared feature and retained-Score elements. The LLM only verbalizes those facts and may not add causality, authorial intent, scores, ranking, praise, or condemnation.
+- Japanese and English evaluation terms are scanned as warnings only. A warning never forces rewriting, regeneration, or rejection.
+- The server appends the reader model and date as a mechanical signature. Records store the target node, branch snapshot, model, time, language, body, warnings, and fact sheet in the current user's scope.
+- Records can be appended or deleted, but never edited. Idempotency keys prevent duplicate saves, and lists are displayed oldest first.
+- Okugaki is available only through the explicit Lineage action or `inku-cli okugaki`; `--dry-run` generates without saving. It never affects dh1, rh2, generation, variation, refinement selection, acceptance, quality functions, or branch recommendation.
+
+v1.88 adds no automatic repair or generation branch. Its refinement accounting deliberately limits the new AI reading to a disconnected mirror, making teleological “best branch” narratives less likely to become application behavior.
+
 ## 17. Source of Truth
 
 `SPEC.ja.md` is canonical.  This file is the maintained English public version.
@@ -1457,3 +1471,11 @@ When updating the specification:
 - **Build 568:** Fixed the rendering order that allowed legacy fixed-width lines to cover variable-width stroke outlines. Burin taper and swell, drypoint's one-sided burr, and the existing writing-tool gestures now remain visible in the primary mark. All ten Saijiki touch previews were aligned with those observable renderer differences.
 - **Build 569:** Normalized DDL now names one touch for every visible line, arc, or outline. Japanese and English Stage 1 rules and examples were updated, dynamic few-shot selection guarantees a non-pen material example, and Stage 1.5 applies the same rule to its added marks. Filled shapes are not assigned material mechanically, and post-rewrite double expansion is prevented.
 - Builds 567–569.
+
+### v1.88 — Okugaki Lineage Recitation (2026-07-17)
+
+- Added manual first-person recitation of one root-to-target branch using structurally prefix-only generation requests.
+- Deterministic feature differences and invariants come from the existing read-only composition mirror; SVG works are rasterized to PNG for vision input, and the server adds the model/date signature.
+- Added user-scoped append-only storage, oldest-first display, deletion without editing, and Idempotency-Key handling.
+- Added the explicit Lineage UI action and `inku-cli okugaki` with `--dry-run`. The feature remains disconnected from dh1/rh2 and every generation or refinement decision.
+- Build 570.

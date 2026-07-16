@@ -4,6 +4,7 @@
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import AIRefineModal from './AIRefineModal.svelte';
 	import ManualRefineModal from './ManualRefineModal.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	export type LineageNode = {
 		id: string;
@@ -23,6 +24,7 @@
 		metadata?: Record<string, unknown>;
 	};
 	export type LineageGraph = { focus_node_id: string; nodes: LineageNode[]; edges: LineageEdge[] };
+	export type OkugakiItem = { id?: string; target_node_id: string; branch_snapshot: string[]; model: string; at: number; language: 'ja' | 'en'; body: string; warnings: string[] };
 
 	type Props = {
 		graph: LineageGraph | null;
@@ -57,6 +59,13 @@
 	let activeMenuNodeId = $state<string | null>(null);
 	let activeAIRefineNode = $state<LineageNode | null>(null);
 	let activeManualRefineNode = $state<LineageNode | null>(null);
+	let okugakiOpen = $state(false);
+	let okugakiModel = $state('meta/llama-3.2-90b-vision-instruct');
+	let okugakiItems = $state<OkugakiItem[]>([]);
+	let okugakiLoading = $state(false);
+	let okugakiGenerating = $state(false);
+	let okugakiError = $state<string | null>(null);
+	let okugakiLoadedTarget = $state<string | null>(null);
 	const cardElements = new Map<string, HTMLElement>();
 
 	const nodeById = $derived(new Map((graph?.nodes ?? []).map((node) => [node.id, node])));
@@ -165,6 +174,50 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 	async function openNode(node: LineageNode): Promise<void> {
 		if (overviewOpen) closeOverview();
 		await onOpenNode(node);
+	}
+
+	async function loadOkugaki(force = false): Promise<void> {
+		const nodeId = graph?.focus_node_id;
+		if (!nodeId || (!force && okugakiLoadedTarget === nodeId)) return;
+		okugakiLoading = true;
+		okugakiError = null;
+		try {
+			const response = await fetch(`/api/lineage/${encodeURIComponent(nodeId)}/okugaki`, { credentials: 'include', cache: 'no-store' });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			okugakiItems = await response.json();
+			okugakiLoadedTarget = nodeId;
+		} catch (cause) {
+			okugakiError = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			okugakiLoading = false;
+		}
+	}
+
+	async function generateOkugaki(): Promise<void> {
+		const nodeId = graph?.focus_node_id;
+		if (!nodeId || !okugakiModel.trim() || okugakiGenerating) return;
+		okugakiGenerating = true;
+		okugakiError = null;
+		try {
+			const response = await fetch(`/api/lineage/${encodeURIComponent(nodeId)}/okugaki`, {
+				method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+				body: JSON.stringify({ model: okugakiModel.trim(), language: isJapanese ? 'ja' : 'en', save: true })
+			});
+			if (!response.ok) throw new Error((await response.text()) || `HTTP ${response.status}`);
+			okugakiItems = [...okugakiItems, await response.json()];
+			okugakiLoadedTarget = nodeId;
+		} catch (cause) {
+			okugakiError = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			okugakiGenerating = false;
+		}
+	}
+
+	async function deleteOkugaki(item: OkugakiItem): Promise<void> {
+		if (!item.id || !confirm(t().okugakiDeleteConfirm)) return;
+		const response = await fetch(`/api/okugaki/${encodeURIComponent(item.id)}`, { method: 'DELETE', credentials: 'include' });
+		if (response.ok) okugakiItems = okugakiItems.filter((entry) => entry.id !== item.id);
+		else okugakiError = (await response.text()) || `HTTP ${response.status}`;
 	}
 
 	async function toggleBranch(node: LineageNode): Promise<void> {
@@ -292,6 +345,10 @@ $effect(() => {
 	const next = checkedHistoryIds.filter((id) => available.has(id));
 	if (next.join('\n') !== checkedHistoryIds.join('\n')) checkedHistoryIds = next;
 });
+$effect(() => {
+	const target = graph?.focus_node_id ?? null;
+	if (target && target !== okugakiLoadedTarget) void loadOkugaki();
+});
 
 </script>
 
@@ -303,6 +360,7 @@ $effect(() => {
 			{#if graph}<p class="lineage-context">{isJapanese ? '表示中の作品が、次の推敲の親になります。' : 'The displayed artwork will be the parent of your next refinement.'}</p>{/if}
 		</div>
 <div class="lineage-actions">
+	<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
 	{#if overviewOpen}
 		<div class="overview-zoom"><button type="button" onclick={() => (overviewScale = Math.max(.4, overviewScale - .1))}>−</button><span>{Math.round(overviewScale * 100)}%</span><button type="button" onclick={() => (overviewScale = Math.min(1.4, overviewScale + .1))}>＋</button></div>
 		<button type="button" onclick={closeOverview}>{isJapanese ? '通常表示へ戻る' : 'Close overview'}</button>
@@ -419,6 +477,29 @@ $effect(() => {
 	{/if}
 </section>
 
+{#if okugakiOpen}
+	<div class="okugaki-backdrop" role="presentation">
+		<div class="okugaki-dialog" role="dialog" aria-modal="true" aria-labelledby="okugaki-title" tabindex="-1">
+			<header><div><h2 id="okugaki-title">{t().okugakiTitle}</h2><p>{t().okugakiDescription}</p></div><button type="button" disabled={okugakiGenerating} onclick={() => (okugakiOpen = false)}>×</button></header>
+			<div class="okugaki-controls">
+				<p>{t().okugakiBranchConfirm.replace('{count}', String(ancestorIds.size))}</p>
+				<label>{t().okugakiModel}<input bind:value={okugakiModel} list="okugaki-models" disabled={okugakiGenerating} /></label>
+				<datalist id="okugaki-models"><option value="meta/llama-3.2-90b-vision-instruct"></option><option value="openai:gpt-4.1"></option></datalist>
+				<button class="okugaki-generate" type="button" disabled={okugakiGenerating || !okugakiModel.trim()} onclick={generateOkugaki}>{okugakiGenerating ? t().okugakiReading : t().okugakiAppend}</button>
+				{#if okugakiGenerating}<div class="okugaki-progress" aria-live="polite"><span></span>{t().okugakiProgress}</div>{/if}
+				{#if okugakiError}<div class="lineage-message error">{okugakiError}</div>{/if}
+			</div>
+			<div class="okugaki-list">
+				{#if okugakiLoading}<div class="lineage-message">{t().okugakiLoading}</div>
+				{:else if okugakiItems.length === 0}<div class="lineage-message">{t().okugakiEmpty}</div>
+				{:else}{#each okugakiItems as item (item.id ?? item.at)}
+					<article class="okugaki-record"><div class="okugaki-record-head"><time>{new Date(item.at).toLocaleString(isJapanese ? 'ja-JP' : 'en-US')}</time>{#if item.id}<button type="button" title={t().okugakiDelete} onclick={() => deleteOkugaki(item)}>×</button>{/if}</div><div class="okugaki-body">{item.body}</div>{#if item.warnings.length}<div class="okugaki-warning">{t().okugakiWarning}: {item.warnings.join(', ')}</div>{/if}</article>
+				{/each}{/if}
+			</div>
+		</div>
+	</div>
+{/if}
+
 {#if activeAIRefineNode}
 	<AIRefineModal
 		node={activeAIRefineNode}
@@ -468,6 +549,22 @@ $effect(() => {
 	.lineage-card.trashed { opacity: .62; filter: grayscale(.35); }
 	.card-check { position: absolute; z-index: 3; top: 8px; right: 8px; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
 	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
+	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
+	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
+	.okugaki-dialog > header { padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }
+	.okugaki-dialog > header button, .okugaki-record-head button { border: 0; background: transparent; color: var(--fg3); font-size: 1.2rem; cursor: pointer; }
+	.okugaki-controls { display: grid; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+	.okugaki-controls label { display: grid; gap: 5px; color: var(--fg2); font-size: .78rem; }
+	.okugaki-controls input { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 10px; background: var(--bg); color: var(--fg); }
+	.okugaki-generate { justify-self: start; border: 1px solid var(--accent); border-radius: 7px; padding: 9px 14px; background: var(--accent); color: var(--accent-fg, #111); cursor: pointer; }
+	.okugaki-progress { display: flex; align-items: center; gap: 8px; color: var(--fg2); font-size: .8rem; }
+	.okugaki-progress span { width: 13px; height: 13px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: okugaki-spin .8s linear infinite; }
+	.okugaki-list { min-height: 160px; overflow-y: auto; padding: 18px 20px 24px; display: grid; gap: 16px; }
+	.okugaki-record { border: 1px solid var(--border); border-radius: 9px; padding: 14px 16px; background: var(--bg); }
+	.okugaki-record-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--fg3); font-size: .72rem; }
+	.okugaki-body { white-space: pre-wrap; line-height: 1.85; font-family: serif; font-size: .92rem; }
+	.okugaki-warning { margin-top: 10px; color: #b98232; font-size: .72rem; }
+	@keyframes okugaki-spin { to { transform: rotate(360deg); } }
 	.card-menu-trigger { position: absolute; z-index: 3; top: 8px; left: 8px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--fg3); cursor: pointer; }
 	.card-menu-trigger:hover { background: var(--bg2); color: var(--fg); }
 	.card-dropdown-menu { position: absolute; z-index: 10; top: 32px; left: 8px; min-width: 150px; border: 1px solid var(--border2); border-radius: 6px; padding: 4px 0; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }

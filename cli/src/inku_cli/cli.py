@@ -2772,6 +2772,38 @@ def command_lineage(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_okugaki(args: argparse.Namespace) -> int:
+    import uuid
+
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    node_id = args.target
+    try:
+        lineage, _ = client.request("GET", f"/api/history/{args.target}/lineage", query={"descendant_depth": 0})
+        node_id = str(lineage["focus_node_id"])
+    except CliError:
+        pass
+    data, _ = client.request(
+        "POST",
+        f"/api/lineage/{node_id}/okugaki",
+        data={"model": args.model, "language": args.language, "save": not args.dry_run},
+        headers={"Idempotency-Key": str(uuid.uuid4())},
+    )
+    if args.output:
+        Path(args.output).write_text(str(data.get("body") or "") + "\n", encoding="utf-8")
+    if args.json:
+        _print_json(data)
+    else:
+        print(data.get("body") or "")
+        if data.get("warnings"):
+            print("\nWarnings: " + ", ".join(data["warnings"]), file=sys.stderr)
+    return 0
+
+
 def command_refine(args: argparse.Namespace) -> int:
     import uuid
     config = load_config()
@@ -3397,6 +3429,16 @@ def build_parser() -> argparse.ArgumentParser:
     
     lineage_show.set_defaults(func=command_lineage)
     lineage_promote.set_defaults(func=command_lineage)
+
+    okugaki = subparsers.add_parser("okugaki", help="recite one root-to-target lineage branch as an append-only reading")
+    _add_common_server_args(okugaki)
+    okugaki.add_argument("target", help="history item ID or lineage node ID")
+    okugaki.add_argument("--model", default="meta/llama-3.2-90b-vision-instruct", help="vision-capable reader model")
+    okugaki.add_argument("--language", choices=("ja", "en"), default="ja")
+    okugaki.add_argument("--dry-run", action="store_true", help="generate and print without saving")
+    okugaki.add_argument("--json", action="store_true", help="print the complete response as JSON")
+    okugaki.add_argument("--output", "-o", help="also write the recitation body to a UTF-8 file")
+    okugaki.set_defaults(func=command_okugaki)
 
     # refine
     refine = subparsers.add_parser("refine", help="generate refined options from an existing work")

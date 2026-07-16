@@ -1285,10 +1285,11 @@ Save endpoints accept a per-user Idempotency-Key. A retry with the same key retu
 History lineage groups, item positions, and focused ancestor/descendant graphs use paginated or recursive database queries. Similarity ranking loads score candidates without hydrating every SVG and restores only the selected works. The UI aborts stale group requests.
 
 inku-cli always provides help. Its api command supports GET, POST, PUT, PATCH, DELETE, query parameters, JSON body/file input, headers, and binary output, restricted to /api/... and /health on the configured server. It therefore exposes every public API under the same authentication and role permissions as the GUI.
+Dedicated commands (`lineage`, `refine`, `inspect`, `review`) are added to inku-cli to fully support autonomous AI testing and quality improvement workflows (generating touch/layout/reading/color variations, evaluating visual aesthetics via Vision NIM, traversing the lineage tree, and submitting unread words). A dedicated guide (`cli-reference-for-ai.md`) is provided to outline standard testing procedures for AI agents.
 
 Short English tabs, buttons, and labels use Title Case. At iPad-class widths the Canvas tabs and displayed Models/Color/Canvas/creation metadata wrap into two rows, and the left panel scales with the viewport rather than clipping the artwork metadata.
 
-JSON Score remains a strict, versioned schema so unknown fields are never silently discarded. Additive database migrations remain idempotent and do not destructively rewrite existing render hashes, description hashes, or lineage identities. Build 564.
+JSON Score remains a strict, versioned schema so unknown fields are never silently discarded. Additive database migrations remain idempotent and do not destructively rewrite existing render hashes, description hashes, or lineage identities. Build 564 (New CLI commands and AI testing guidelines are implemented in Build 565).
 
 Build 561 removes the former “Use today's word as a seed” control from the writing tab and first generation, and moves it to Refine / Adjust as “Vary Touch with Words.” The entered words affect only the Renderer's deterministic performance seed, never the interpretation, DDL, JSON Score, or layout. Because the same words reproduce the same touch, this operation generates one candidate at a time. History, Generation info / JSON, and replay retain both the words and resolved seed. The first artwork remains the source work and never applies this word-based touch variation.
 

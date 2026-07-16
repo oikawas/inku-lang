@@ -3918,6 +3918,7 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - user／group管理のscope条件は更新・削除transaction内でも検査する。group leadは同一groupの一般userだけを管理でき、他userの履歴、系譜、件数は取得できない。外部認証連携は将来実装とし、現行session／role／scope境界を連携後も正本とする。
 - 履歴管理の系譜group集計、現在位置、focused lineageの祖先／子孫はDB側でpage／recursive queryを行う。類似作品計算はSVGや不要metadataを全件hydrateせず、score候補だけを読み、選ばれた作品だけを復元する。UIは不要になったgroup requestをabortする。
 - inku-cliはhelpを常備し、専用commandに加えて api commandからGET／POST／PUT／PATCH／DELETE、query、JSON file/body、header、binary outputを扱う。pathは設定済みserver内の /api/... と /health に限定し、serverと同じ認証・role権限で全公開APIを操作する。
+- AIの自律操作による作品の品質向上プロセス（起点作成、複数モデル比較、推敲変種生成、Vision NIM評価、系譜ツリーの探索・接続保存）をコマンドラインから完全に駆動できる専用コマンド群（`lineage`, `refine`, `inspect`, `review`）を inku-cli に実装。AIがテスト時に参照する専用リファレンス（`cli-reference-for-ai.md`）を同梱し、テスト基準を明確化した。
 - 英語UIのtab、button、短いlabelはTitle Caseへ統一する。iPad相当幅ではCanvas上部のModels／Color／Canvas／作成情報を二段化し、左panel幅をviewport比で縮め、情報を切り捨てない。
 - JSON Scoreはversion付きstrict schemaを維持し、未知fieldを黙って破棄しない。DB migrationはcolumn／indexの追加を冪等に行い、既存render hash、description hash、lineage identityを破壊的に書き換えない。
-- Build 564。
+- Build 564（新規コマンドおよびAI検証手順の追加をBuild 565として完了）。

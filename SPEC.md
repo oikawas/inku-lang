@@ -743,12 +743,14 @@ users. Admin status responses include `stage_execution` with Stage worker count,
 queue limit, and submitted/completed/failed/timed_out/rejected counters.
 
 Operational details for the author's local server are intentionally not part of
-this public specification.  They belong in untracked local documents such as
-`AGENTS.md`, `LOCAL_WORK.md`, and `no-git-sync/`.
+this public specification. They are consolidated in the untracked `AGENTS.md`
+or under `no-git-sync/`.
 
 The application is developed on macOS and verified on the deployment host after
-rsync-based sync and service restart.  Git is used for source history, not as a
-file exchange mechanism with the local server.
+rsync-based sync and systemd service restart. Production Docker Compose images
+are verified at milestones such as release candidates rather than rebuilt for
+every ordinary source change. Git is used for source history, not as a file
+exchange mechanism with the local server.
 
 ---
 

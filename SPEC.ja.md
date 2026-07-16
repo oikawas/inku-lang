@@ -1516,6 +1516,8 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~FastAPI 起動が常に reload=True になっている~~ → v1.21 で `INKU_SERVER_RELOAD` が真値の場合のみ reload 起動とし、systemd 運用の既定は reload 無効に変更
 - ~~セッション Cookie の max-age と DB セッション寿命が連動していない~~ → v1.21 で DB セッションも `INKU_SESSION_COOKIE_MAX_AGE` に従って期限判定し、期限切れ行を削除する形へ変更
 
+作者のローカルサーバー固有の運用詳細は公開仕様へ含めず、Git管理外の `AGENTS.md` または `no-git-sync/` に集約する。通常開発はMacからrsyncで同期してsystemdサービスを再起動し、Docker Composeはリリース前など節目の本番構成検証に使用する。
+
 ---
 
 ## 付録: 既存ファイル構成

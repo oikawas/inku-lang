@@ -35,6 +35,9 @@
 		batchPromptHistory: string[];
 		randomColorCatalog: boolean;
 		showCrab: boolean;
+		stage1ModelLabel: string;
+		stage2ModelLabel: string;
+		onOpenModelSelection: () => void;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
@@ -61,6 +64,9 @@
 		batchPromptHistory,
 		randomColorCatalog = $bindable(false),
 		showCrab,
+		stage1ModelLabel,
+		stage2ModelLabel,
+		onOpenModelSelection,
 		onRememberBatchPrompt,
 		onSubmit,
 		onStop,
@@ -101,6 +107,11 @@
 		return `${input ?? '-'}→${output ?? '-'}tok`;
 	}
 </script>
+
+<div class="batch-model-summary">
+	<span><b>Stage 1</b>{stage1ModelLabel}</span><span><b>Stage 2</b>{stage2ModelLabel}</span>
+	<button type="button" disabled={batchRunning} onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
+</div>
 
 <div class="batch-wrap">
 	<div class="line-nums" aria-hidden="true">{displayLineNumbersText}</div>
@@ -252,6 +263,11 @@
 {/if}
 
 <style>
+	.batch-model-summary { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: stretch; gap: 6px; margin-bottom: 8px; }
+	.batch-model-summary span { display: grid; gap: 2px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: 10px; overflow-wrap: anywhere; }
+	.batch-model-summary b { color: var(--fg3); font-size: 8px; letter-spacing: .06em; }
+	.batch-model-summary button { padding: 6px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--accent); font: inherit; font-size: 10px; cursor: pointer; }
+	.batch-model-summary button:disabled { opacity: .45; cursor: not-allowed; }
 	.batch-wrap {
 		display: flex;
 		border: 1px solid var(--border2);

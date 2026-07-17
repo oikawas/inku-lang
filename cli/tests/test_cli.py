@@ -70,6 +70,8 @@ def test_config_roundtrip(tmp_path):
         stage1_model="stage1",
         stage2_provider="local",
         stage2_model="stage2",
+        vision_provider="nvidia",
+        vision_model="meta/llama-3.2-90b-vision-instruct",
         timeout_seconds=900,
         color_catalog="open_air_light",
     )
@@ -240,6 +242,10 @@ def test_models_command_accepts_providers():
         "local",
         "--stage2-model",
         "qwen-api",
+        "--vision-provider",
+        "nvidia",
+        "--vision-model",
+        "meta/llama-3.2-90b-vision-instruct",
         "--color-catalog",
         "ink_season",
     ])
@@ -248,7 +254,21 @@ def test_models_command_accepts_providers():
     assert args.stage1_model == "google/gemma-4-31b-it"
     assert args.stage2_provider == "local"
     assert args.stage2_model == "qwen-api"
+    assert args.vision_provider == "nvidia"
+    assert args.vision_model == "meta/llama-3.2-90b-vision-instruct"
     assert args.color_catalog == "ink_season"
+
+
+def test_vision_commands_keep_model_alias_and_prefer_vision_model():
+    parser = cli.build_parser()
+    legacy = parser.parse_args(["okugaki", "node-1", "--model", "legacy-vision"])
+    explicit = parser.parse_args(["okugaki", "node-1", "--vision-model", "new-vision"])
+    review = parser.parse_args(["vision-review", "out", "--vision-model", "review-vision"])
+
+    assert legacy.model == "legacy-vision"
+    assert legacy.vision_model is None
+    assert explicit.vision_model == "new-vision"
+    assert review.vision_model == "review-vision"
 
 
 def test_color_catalog_payload_sets_catalog_and_map():

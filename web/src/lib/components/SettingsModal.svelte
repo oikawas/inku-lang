@@ -2,7 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
-	import type { Provider, ProviderGroup } from '$lib/models';
+	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 
 	type PluginItem = {
 		name: string;
@@ -86,7 +86,7 @@
 		default_base_url?: string;
 		requires_api_key?: boolean;
 		memo?: string;
-		models?: { id: string; label: string; notes?: string }[];
+		models?: ModelOption[];
 		delete?: boolean;
 		base_url: string;
 		api_key_set: boolean;
@@ -110,7 +110,11 @@
 		stage1Model: string;
 		stage2Provider: Provider;
 		stage2Model: string;
+		visionProvider: Provider;
+		visionModel: string;
 		providerGroups: ProviderGroup[];
+		visionProviderGroups: ProviderGroup[];
+		allowVisionSelection: boolean;
 		includeThinking: boolean;
 		settingsStatus: SettingsStatus | null;
 		settingsStatusError: string | null;
@@ -159,6 +163,8 @@
 		onSetStage1Model: (model: string) => void;
 		onSetStage2Provider: (provider: Provider) => void;
 		onSetStage2Model: (model: string) => void;
+		onSetVisionProvider: (provider: Provider) => void;
+		onSetVisionModel: (model: string) => void;
 		onUpdateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
 		onAddModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void | Promise<void>;
 		onAskDeleteModelProvider: (provider: Provider) => void;
@@ -202,7 +208,11 @@
 		stage1Model,
 		stage2Provider,
 		stage2Model,
+		visionProvider,
+		visionModel,
 		providerGroups,
+		visionProviderGroups,
+		allowVisionSelection,
 		includeThinking = $bindable(),
 		settingsStatus,
 		settingsStatusError,
@@ -251,6 +261,8 @@
 		onSetStage1Model,
 		onSetStage2Provider,
 		onSetStage2Model,
+		onSetVisionProvider,
+		onSetVisionModel,
 		onUpdateModelProvider,
 		onAddModelProvider,
 		onAskDeleteModelProvider,
@@ -289,6 +301,8 @@
 
 	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
 	const isAdmin = $derived(currentUser?.role === 'admin');
+	type ModelSelectionTab = 'shared' | 'stage1' | 'stage2' | 'vision';
+	let modelSelectionTab = $state<ModelSelectionTab>('shared');
 	let newProviderId = $state('');
 	let newProviderLabel = $state('');
 	let newProviderKind = $state('openai_compatible');
@@ -298,6 +312,8 @@
 	let modelPickerProviderId = $state<Provider | null>(null);
 	let modelPickerSearch = $state('');
 	let modelPickerEnabledDraft = $state<Record<string, boolean>>({});
+	let modelPickerPurposeDraft = $state<Record<string, ('llm' | 'vision')[]>>({});
+	let modelPickerMetadataDraft = $state<Record<string, ModelOption>>({});
 	let editProviderId = $state<Provider | null>(null);
 	let editProviderLabel = $state('');
 	let memoProviderId = $state<Provider | null>(null);
@@ -305,8 +321,30 @@
 	let memoProviderText = $state('');
 	let baseUrlDrafts = $state<Record<string, string>>({});
 
-	function modelsFor(provider: Provider) {
-		return providerGroups.find((group) => group.id === provider)?.models ?? [];
+	function modelSelected(provider: Provider, model: string): boolean {
+		if (modelSelectionTab === 'vision') return visionProvider === provider && visionModel === model;
+		if (modelSelectionTab === 'shared') {
+			return stage1Provider === provider && stage1Model === model && stage2Provider === provider && stage2Model === model;
+		}
+		return modelSelectionTab === 'stage1'
+			? stage1Provider === provider && stage1Model === model
+			: stage2Provider === provider && stage2Model === model;
+	}
+
+	function selectGenerationModel(provider: Provider, model: string): void {
+		if (modelSelectionTab === 'vision') {
+			onSetVisionProvider(provider);
+			onSetVisionModel(model);
+			return;
+		}
+		if (modelSelectionTab === 'shared' || modelSelectionTab === 'stage1') {
+			onSetStage1Provider(provider);
+			onSetStage1Model(model);
+		}
+		if (modelSelectionTab === 'shared' || modelSelectionTab === 'stage2') {
+			onSetStage2Provider(provider);
+			onSetStage2Model(model);
+		}
 	}
 
 	async function addModelProvider() {
@@ -389,6 +427,9 @@
 		const setting = modelSettings?.providers[provider];
 		modelPickerSearch = '';
 		modelPickerEnabledDraft = { ...(setting?.enabled_models ?? {}) };
+		const catalogProvider = providerGroups.find((group) => group.id === provider);
+		modelPickerPurposeDraft = Object.fromEntries((catalogProvider?.models ?? []).map((model) => [model.id, model.purposes ?? ['llm']]));
+		modelPickerMetadataDraft = Object.fromEntries((catalogProvider?.models ?? []).map((model) => [model.id, { ...model }]));
 		modelPickerProviderId = provider;
 	}
 
@@ -396,6 +437,8 @@
 		modelPickerProviderId = null;
 		modelPickerSearch = '';
 		modelPickerEnabledDraft = {};
+		modelPickerPurposeDraft = {};
+		modelPickerMetadataDraft = {};
 	}
 
 	function modelEnabled(setting: ModelProviderSetting, modelId: string): boolean {
@@ -406,13 +449,57 @@
 		return modelPickerEnabledDraft[modelId] !== false;
 	}
 
+	function modelPurposeSelected(modelId: string, purpose: 'llm' | 'vision'): boolean {
+		return (modelPickerPurposeDraft[modelId] ?? ['llm']).includes(purpose);
+	}
+
+	function toggleModelPurpose(modelId: string, purpose: 'llm' | 'vision'): void {
+		const current = modelPickerPurposeDraft[modelId] ?? ['llm'];
+		const next = current.includes(purpose) ? current.filter((item) => item !== purpose) : [...current, purpose];
+		modelPickerPurposeDraft = { ...modelPickerPurposeDraft, [modelId]: next };
+		modelPickerEnabledDraft = { ...modelPickerEnabledDraft, [modelId]: next.length > 0 };
+	}
+
+	function modelDraft(model: ModelOption): ModelOption {
+		return {
+			...model,
+			...(modelPickerMetadataDraft[model.id] ?? {}),
+			purposes: modelPickerPurposeDraft[model.id] ?? model.purposes ?? ['llm'],
+		};
+	}
+
+	function updateModelMetadata(model: ModelOption, patch: Partial<ModelOption>): void {
+		modelPickerMetadataDraft = {
+			...modelPickerMetadataDraft,
+			[model.id]: { ...modelDraft(model), ...patch },
+		};
+	}
+
+	function modelPurposesLabel(model: ModelOption): string {
+		const purposes = model.purposes ?? ['llm'];
+		return purposes.map((purpose) => purpose === 'vision' ? 'Vision' : 'LLM').join(' / ') || '—';
+	}
+
+	function modelRecommendationLabel(model: ModelOption): string {
+		const level = Math.max(0, Math.min(5, Number(model.recommendation_level ?? 0)));
+		return level > 0 ? `${'★'.repeat(level)}${'☆'.repeat(5 - level)} (${level}/5)` : '—';
+	}
+
+	function modelComment(model: ModelOption): string {
+		return t().closeLabel === 'Close'
+			? (model.comment_en || model.comment_ja || '—')
+			: (model.comment_ja || model.comment_en || '—');
+	}
+
+
 	function serviceIdLabel(provider: Provider): string {
 		return `${t().settingsModelServiceId}: ${provider}`;
 	}
 
 	async function saveModelPicker() {
 		if (!modelPickerProvider) return;
-		await onSaveModelProvider(modelPickerProvider.id, { enabled_models: modelPickerEnabledDraft });
+		const models = modelPickerProvider.models.map((model) => modelDraft(model));
+		await onSaveModelProvider(modelPickerProvider.id, { models, enabled_models: modelPickerEnabledDraft });
 		closeModelPicker();
 	}
 
@@ -422,6 +509,9 @@
 		await onFetchModelList(providerId);
 		const setting = modelSettings?.providers[providerId];
 		modelPickerEnabledDraft = { ...(setting?.enabled_models ?? {}) };
+		const provider = providerGroups.find((group) => group.id === providerId);
+		modelPickerPurposeDraft = Object.fromEntries((provider?.models ?? []).map((model) => [model.id, model.purposes ?? ['llm']]));
+		modelPickerMetadataDraft = Object.fromEntries((provider?.models ?? []).map((model) => [model.id, { ...model }]));
 	}
 
 	function hasPendingApiKey(setting: ModelProviderSetting): boolean {
@@ -432,8 +522,8 @@
 		return setting.api_key_set ? t().settingsModelKeepApiKey : (setting.api_key ?? '');
 	}
 
-	function selectedModels(provider: ProviderGroup, setting: ModelProviderSetting) {
-		return provider.models.filter((model) => modelEnabled(setting, model.id));
+	function selectedModels(provider: ProviderGroup, setting: ModelProviderSetting, purpose: 'llm' | 'vision') {
+		return provider.models.filter((model) => modelEnabled(setting, model.id) && (model.purposes ?? ['llm']).includes(purpose));
 	}
 
 	const modelPickerProvider = $derived(providerGroups.find((provider) => provider.id === modelPickerProviderId) ?? null);
@@ -448,7 +538,7 @@
 		const query = modelPickerSearch.trim().toLowerCase();
 		if (!query) return provider.models;
 		return provider.models.filter((model) => {
-			const text = `${model.id} ${model.label ?? ''} ${model.notes ?? ''}`.toLowerCase();
+			const text = `${model.id} ${model.label ?? ''} ${model.notes ?? ''} ${model.speed_label ?? ''} ${model.comment_ja ?? ''} ${model.comment_en ?? ''}`.toLowerCase();
 			return text.includes(query);
 		});
 	});
@@ -472,6 +562,15 @@
 	}
 </script>
 
+{#snippet modelMetadataCard(model: ModelOption)}
+	<span class="model-hover-card" role="tooltip">
+		<span><strong>用途 / Use</strong>{modelPurposesLabel(model)}</span>
+		<span><strong>オススメ度 / Recommendation</strong>{modelRecommendationLabel(model)}</span>
+		<span><strong>速度 / Speed</strong>{model.speed_label || '—'}</span>
+		<span><strong>評価 / Comment</strong>{modelComment(model)}</span>
+	</span>
+{/snippet}
+
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
 <div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 	<div class="modal-head">
@@ -480,7 +579,14 @@
 			<button class="catalog-close" onclick={onCloseSettings}>×</button>
 		{/if}
 	</div>
-	{#if settingsMode === 'settings'}
+	{#if settingsMode === 'model'}
+		<div class="settings-tabs model-selection-tabs" role="tablist" aria-label={t().modelSelectButton}>
+			<button role="tab" aria-selected={modelSelectionTab === 'shared'} class:active={modelSelectionTab === 'shared'} onclick={() => (modelSelectionTab = 'shared')}>Stage 1/2</button>
+			<button role="tab" aria-selected={modelSelectionTab === 'stage1'} class:active={modelSelectionTab === 'stage1'} onclick={() => (modelSelectionTab = 'stage1')}>Stage 1</button>
+			<button role="tab" aria-selected={modelSelectionTab === 'stage2'} class:active={modelSelectionTab === 'stage2'} onclick={() => (modelSelectionTab = 'stage2')}>Stage 2</button>
+			{#if allowVisionSelection}<button role="tab" aria-selected={modelSelectionTab === 'vision'} class:active={modelSelectionTab === 'vision'} onclick={() => (modelSelectionTab = 'vision')}>Vision</button>{/if}
+		</div>
+	{:else}
 		<div class="settings-tabs">
 			{#if isAdmin}
 				<button class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
@@ -499,43 +605,44 @@
 	{/if}
 	<div class="settings-body">
 		{#if settingsMode === 'model'}
-			<div class="popover-group">
-				<div class="popover-group-label">{t().stage1Label}</div>
-				<div class="form-row">
-					<label for="settings-stage1-provider">{t().providerLabel}</label>
-					<select id="settings-stage1-provider" value={stage1Provider} onchange={(e) => onSetStage1Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-						{#each providerGroups as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-					</select>
-				</div>
-				<div class="form-row">
-					<label for="settings-stage1-model">{t().modelLabel}</label>
-					<select id="settings-stage1-model" value={stage1Model} onchange={(e) => onSetStage1Model((e.currentTarget as HTMLSelectElement).value)}>
-						{#each modelsFor(stage1Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` - ${m.notes}` : ''}</option>{/each}
-					</select>
-				</div>
-				{#if stage1Model.includes('qwen3')}
-					<label class="check-row">
-						<input type="checkbox" bind:checked={includeThinking} />
-						<span>{t().showThinkingLabel}</span>
-					</label>
-				{/if}
+			<div class="model-selection-summary">
+				<span><strong>Stage 1</strong>{providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}</span>
+				<span><strong>Stage 2</strong>{providerGroups.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}</span>
+				{#if allowVisionSelection}<span><strong>Vision</strong>{visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel}</span>{/if}
 			</div>
-			<div class="popover-group">
-				<div class="popover-group-label">{t().stage2Label}</div>
-				<div class="form-row">
-					<label for="settings-stage2-provider">{t().providerLabel}</label>
-					<select id="settings-stage2-provider" value={stage2Provider} onchange={(e) => onSetStage2Provider((e.currentTarget as HTMLSelectElement).value as Provider)}>
-						{#each providerGroups as pg (pg.id)}<option value={pg.id}>{pg.label}</option>{/each}
-					</select>
-				</div>
-				<div class="form-row">
-					<label for="settings-stage2-model">{t().modelLabel}</label>
-					<select id="settings-stage2-model" value={stage2Model} onchange={(e) => onSetStage2Model((e.currentTarget as HTMLSelectElement).value)}>
-						{#each modelsFor(stage2Provider) as m (m.id)}<option value={m.id}>{m.label}{m.notes ? ` - ${m.notes}` : ''}</option>{/each}
-					</select>
-				</div>
+			<p class="model-selection-hint">{modelSelectionTab === 'shared' ? t().modelSelectionSharedHint : modelSelectionTab === 'vision' ? t().modelSelectionVisionHint : t().modelSelectionSeparateHint}</p>
+			<div class="generation-model-groups">
+				{#each (modelSelectionTab === 'vision' ? visionProviderGroups : providerGroups) as provider (provider.id)}
+					{#if provider.models.length > 0}
+						<section class="generation-model-provider">
+							<h3>{provider.label}</h3>
+							<div class="generation-model-grid">
+								{#each provider.models as model (model.id)}
+								<button
+									type="button"
+									class="model-metadata-hover"
+									class:selected={modelSelected(provider.id, model.id)}
+									aria-pressed={modelSelected(provider.id, model.id)}
+									onclick={() => selectGenerationModel(provider.id, model.id)}
+								>
+									<strong>{model.label}</strong>
+									{#if model.notes}<span>{model.notes}</span>{/if}
+									{@render modelMetadataCard(model)}
+								</button>
+							{/each}
+							</div>
+						</section>
+					{/if}
+				{/each}
 			</div>
+			{#if modelSelectionTab !== 'stage2' && stage1Model.includes('qwen3')}
+				<label class="check-row model-thinking-row">
+					<input type="checkbox" bind:checked={includeThinking} />
+					<span>{t().showThinkingLabel}</span>
+				</label>
+			{/if}
 		{:else if settingsTab === 'models'}
+
 			{#if modelSettingsLoading}
 				<div class="popover-group"><div class="inline-message">{t().settingsLoading}</div></div>
 			{:else if !modelSettings}
@@ -607,15 +714,16 @@
 										<div class="model-publish-title">{t().settingsModelPublishedModels}</div>
 										<button class="ghost-btn model-fetch-btn" onclick={() => openModelPicker(provider.id)} disabled={modelSettingsLoading}>{t().settingsModelSelectModels}</button>
 									</div>
-									{#if selectedModels(provider, setting).length}
-										<div class="model-publish-selected">
-											{#each selectedModels(provider, setting) as model, modelIndex (`${model.id}:${modelIndex}`)}
-												<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
-											{/each}
-										</div>
-									{:else}
-										<div class="model-publish-empty">{t().settingsModelNoPublishedModels}</div>
-									{/if}
+									{#each ['llm', 'vision'] as purpose}
+										<div class="model-publish-title">{purpose === 'llm' ? 'LLM' : 'Vision'}</div>
+										{#if selectedModels(provider, setting, purpose as 'llm' | 'vision').length}
+											<div class="model-publish-selected">
+												{#each selectedModels(provider, setting, purpose as 'llm' | 'vision') as model, modelIndex (`${purpose}:${model.id}:${modelIndex}`)}
+													<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
+												{/each}
+											</div>
+										{:else}<div class="model-publish-empty">{t().settingsModelNoPublishedModels}</div>{/if}
+									{/each}
 								</div>
 								<div class="model-provider-actions">
 									<button class="ghost-btn model-service-memo" onclick={() => openMemoProvider(provider)} disabled={modelSettingsLoading}>{t().settingsModelServiceMemoButton}</button>
@@ -1262,19 +1370,36 @@
 			/>
 			<div class="model-picker-list" aria-label={t().settingsModelPublishedModels}>
 				{#each filteredModelPickerModels as model, modelIndex (`${model.id}:${modelIndex}`)}
-					<label class="check-row model-picker-row">
-						<input
-							type="checkbox"
-							checked={modelPickerDraftEnabled(model.id)}
-							onchange={(e) => {
-								modelPickerEnabledDraft = {
-									...modelPickerEnabledDraft,
-									[model.id]: (e.currentTarget as HTMLInputElement).checked,
-								};
-							}}
-						/>
-						<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
-					</label>
+					<div class="model-picker-entry">
+						<label class="check-row model-picker-row model-metadata-hover">
+							<input
+								type="checkbox"
+								checked={modelPickerDraftEnabled(model.id)}
+								onchange={(e) => {
+									modelPickerEnabledDraft = {
+										...modelPickerEnabledDraft,
+										[model.id]: (e.currentTarget as HTMLInputElement).checked,
+									};
+								}}
+							/>
+							<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
+							<span class="model-purpose-label">
+								<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'llm'); }}>LLM</button>
+								<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'vision'); }}>Vision</button>
+							</span>
+							{@render modelMetadataCard(modelDraft(model))}
+						</label>
+						<details class="model-metadata-editor">
+							<summary>評価設定 / Model metadata</summary>
+							<div class="model-metadata-fields">
+								<label><span>オススメ度 / Recommendation</span><select value={modelDraft(model).recommendation_level ?? 0} onchange={(event) => updateModelMetadata(model, { recommendation_level: Number(event.currentTarget.value) || undefined })}><option value="0">—</option>{#each [1, 2, 3, 4, 5] as level}<option value={level}>{level} / 5</option>{/each}</select></label>
+								<label><span>速度区分 / Speed class</span><select value={modelDraft(model).speed_class ?? ''} onchange={(event) => updateModelMetadata(model, { speed_class: event.currentTarget.value || undefined })}><option value="">—</option><option value="ultra-fast">ultra-fast</option><option value="fast">fast</option><option value="medium">medium</option><option value="slow">slow</option><option value="low-speed-outlier">low-speed-outlier</option></select></label>
+								<label class="wide"><span>実測値に基づく速度ラベル / Measured speed label</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
+								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
+								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
+							</div>
+						</details>
+					</div>
 				{/each}
 			</div>
 		</div>
@@ -1315,10 +1440,43 @@
 		height: min(760px, 88vh);
 	}
 	.settings-modal.model-modal {
-		width: min(calc(35ch + 190px), calc(100vw - 32px));
-		height: auto;
+		width: min(820px, calc(100vw - 32px));
+		height: min(760px, 88vh);
 	}
-	.settings-modal.model-modal .form-row label { width: 82px; }
+	.settings-tabs.model-selection-tabs button { flex: 1 1 0; text-align: center; }
+	.model-selection-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+	.model-selection-summary span {
+		display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 8px 10px;
+		border: 1px solid var(--border); border-radius: var(--r); background: var(--panel);
+		color: var(--fg2); font-size: 11px; overflow-wrap: anywhere;
+	}
+	.model-selection-summary strong { color: var(--fg3); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+	.model-selection-hint { margin: 0; color: var(--fg3); font-size: 11px; line-height: 1.5; }
+	.generation-model-groups { display: flex; flex-direction: column; gap: 12px; }
+	.generation-model-provider h3 { margin: 0 0 6px; color: var(--fg3); font-size: 10px; font-weight: 500; letter-spacing: .06em; }
+	.generation-model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 7px; }
+	.generation-model-grid button {
+		display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0;
+		padding: 9px 10px; border: 1px solid var(--border2); border-radius: var(--r);
+		background: var(--panel); color: var(--fg2); cursor: pointer; text-align: left; font-family: inherit;
+	}
+	.generation-model-grid button:hover { border-color: var(--accent); background: var(--bg2); }
+	.generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
+	.generation-model-grid strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+	.generation-model-grid span { color: var(--fg3); font-size: 10px; }
+	.model-thinking-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+	.model-metadata-hover { position: relative; }
+	.model-hover-card {
+		display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 520;
+		width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px;
+		border: 1px solid #64748b; border-radius: var(--r); background: #111820;
+		box-shadow: 0 8px 24px rgba(0,0,0,.32); color: #f8fafc; text-align: left;
+		pointer-events: none; white-space: normal;
+	}
+	.model-hover-card > span { display: grid; gap: 2px; color: #f8fafc; font-size: 11px; line-height: 1.45; }
+	.model-hover-card > span + span { margin-top: 6px; }
+	.model-hover-card strong { color: #cbd5e1; font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+	.model-metadata-hover:hover .model-hover-card, .model-metadata-hover:focus-visible .model-hover-card, .model-metadata-hover:focus-within .model-hover-card { display: block; }
 	.settings-tabs {
 		display: flex; flex: 0 0 auto; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg);
 	}
@@ -1361,11 +1519,7 @@
 		letter-spacing: 0;
 		overflow-wrap: anywhere;
 	}
-	.form-row {
-		display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
-	}
-	.form-row label { width: 90px; color: var(--fg2); font-size: 12px; flex-shrink: 0; }
-	.form-row select, .plugin-add input, .login-grid input, .group-edit-input {
+	.plugin-add input, .login-grid input, .group-edit-input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: var(--panel); color: var(--fg); font-size: 12px; font-family: inherit;
@@ -1893,6 +2047,9 @@
 	.model-picker-result.error {
 		color: var(--danger, #b42318);
 	}
+	.model-purpose-label { margin-left: auto; display: inline-flex; gap: 4px; }
+	.model-purpose-label button { border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; background: transparent; color: var(--fg3); font-size: .7rem; }
+	.model-purpose-label button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--fg); }
 	.inline-message {
 		padding: 7px 9px;
 		border: 1px solid var(--border);
@@ -2242,4 +2399,12 @@
 	}
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+	.model-picker-entry { min-width: 0; }
+	.model-metadata-editor { margin-top: 3px; padding: 0 7px 6px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+	.model-metadata-editor summary { padding: 6px 0; color: var(--fg3); font-size: 10px; cursor: pointer; }
+	.model-metadata-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+	.model-metadata-fields label { display: grid; gap: 3px; min-width: 0; color: var(--fg3); font-size: 9px; letter-spacing: .03em; }
+	.model-metadata-fields label.wide { grid-column: 1 / -1; }
+	.model-metadata-fields input, .model-metadata-fields select, .model-metadata-fields textarea { min-width: 0; width: 100%; box-sizing: border-box; padding: 6px 7px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--bg); color: var(--fg); font: inherit; font-size: 11px; }
+	.model-metadata-fields textarea { resize: vertical; line-height: 1.4; }
 </style>

@@ -59,6 +59,6 @@ cli/tune_bench.md
 cli/out/
 server/out/
 
-# Review and Task reports
-v1.8*.md
+# Local-only operational files
+no-git-sync/
 

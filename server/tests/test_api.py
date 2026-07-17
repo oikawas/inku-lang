@@ -24,7 +24,13 @@ from sqlalchemy import create_engine, inspect, text
 from inku_server import db
 from inku_server import api as api_module
 from inku_server.api import app
-from inku_server.model_settings import connection_for, default_model_settings, update_model_settings
+from inku_server.model_settings import (
+    connection_for,
+    default_model_settings,
+    model_provider_catalog,
+    normalize_model_settings,
+    update_model_settings,
+)
 from inku_server.schema import Score
 
 client = TestClient(app)
@@ -69,6 +75,8 @@ def test_resolved_stage_models_qualify_current_user_provider():
             "stage1_model": "gpt-5.2",
             "stage2_provider": "anthropic",
             "stage2_model": "claude-sonnet-4-6",
+            "vision_provider": "nvidia",
+            "vision_model": "meta/llama-3.2-90b-vision-instruct",
         }
     }
 
@@ -76,6 +84,8 @@ def test_resolved_stage_models_qualify_current_user_provider():
     assert api_module._resolved_stage1_model("gpt-5.2", actor) == "openai:gpt-5.2"
     assert api_module._resolved_stage2_model(None, actor) == "anthropic:claude-sonnet-4-6"
     assert api_module._resolved_stage2_model("claude-sonnet-4-6", actor) == "anthropic:claude-sonnet-4-6"
+    assert api_module._resolved_vision_model(None, actor) == "nvidia:meta/llama-3.2-90b-vision-instruct"
+    assert api_module._resolved_vision_model("openai:gpt-4.1", actor) == "openai:gpt-4.1"
     assert api_module._resolved_stage1_model("ovms:qwen-api", actor) == "ovms:qwen-api"
     assert api_module._resolved_stage1_model("qwen-api", actor) == "qwen-api"
 
@@ -386,12 +396,17 @@ def test_current_user_model_selection_is_persisted(auth_context):
                 "stage1_model": "openai:gpt-5.1-mini",
                 "stage2_provider": "gemini",
                 "stage2_model": "gemini:gemini-2.5-flash",
+                "vision_provider": "nvidia",
+                "vision_model": "meta/llama-3.2-90b-vision-instruct",
+                "okugaki_model": "openai:gpt-4.1-mini",
             }
         },
     )
     assert updated.status_code == 200
     assert updated.json()["model_settings"]["stage1_provider"] == "openai"
     assert updated.json()["model_settings"]["stage2_model"] == "gemini:gemini-2.5-flash"
+    assert updated.json()["model_settings"]["vision_model"] == "meta/llama-3.2-90b-vision-instruct"
+    assert updated.json()["model_settings"]["okugaki_model"] == "openai:gpt-4.1-mini"
     assert updated.json()["model_settings"]["model_inspection_selected_models"] == []
 
     comparison_models = [
@@ -420,6 +435,8 @@ def test_current_user_model_selection_is_persisted(auth_context):
     me = client.get("/api/auth/me", headers=headers)
     assert me.status_code == 200
     assert me.json()["model_settings"]["stage1_model"] == "openai:gpt-5.1-mini"
+    assert me.json()["model_settings"]["vision_provider"] == "nvidia"
+    assert me.json()["model_settings"]["okugaki_model"] == "openai:gpt-4.1-mini"
     assert me.json()["model_settings"]["model_inspection_selected_models"] == [
         "nvidia:google/gemma-4-31b-it",
         "openai:gpt-5.1",
@@ -2286,6 +2303,67 @@ def test_log_retention_settings_are_admin_only():
         db.delete_user_group(group["id"])
 
 
+def test_verified_nvidia_model_metadata_and_purpose_catalogs():
+    settings = default_model_settings()
+    nvidia_models = settings["providers"]["nvidia"]["models"]
+    assert len(nvidia_models) == 29
+
+    gemma = next(model for model in nvidia_models if model["id"] == "google/gemma-4-31b-it")
+    assert gemma["purposes"] == ["llm", "vision"]
+    assert gemma["recommendation_level"] == 5
+    assert gemma["speed_class"] == "fast"
+    assert gemma["speed_label"] == "高速 (約15〜22秒)"
+    assert "本命モデル" in gemma["comment_ja"]
+
+    llm_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="llm") if provider["id"] == "nvidia")
+    vision_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="vision") if provider["id"] == "nvidia")
+    assert len(llm_nvidia["models"]) == 22
+    assert len(vision_nvidia["models"]) == 12
+
+    normalized = normalize_model_settings({
+        "model_catalog_version": settings["model_catalog_version"],
+        "providers": {
+            "nvidia": {
+                "models": [{
+                    "id": "google/gemma-4-31b-it",
+                    "label": "Gemma custom label",
+                    "purposes": ["vision"],
+                    "recommendation_level": 2,
+                    "speed_class": "medium",
+                    "speed_label": "再計測 約30秒",
+                    "comment_ja": "管理者による再評価",
+                    "comment_en": "Administrator override",
+                }],
+            },
+        },
+    })
+    normalized_models = normalized["providers"]["nvidia"]["models"]
+    assert len(normalized_models) == 29
+    overridden = next(model for model in normalized_models if model["id"] == "google/gemma-4-31b-it")
+    assert overridden["label"] == "Gemma custom label"
+    assert overridden["purposes"] == ["vision"]
+    assert overridden["recommendation_level"] == 2
+    assert overridden["speed_label"] == "再計測 約30秒"
+    assert overridden["comment_en"] == "Administrator override"
+
+    legacy = normalize_model_settings({
+        "providers": {
+            "nvidia": {
+                "models": [{
+                    "id": "google/gemma-4-31b-it",
+                    "label": "Legacy stored label",
+                    "purposes": ["llm"],
+                }],
+            },
+        },
+    })
+    legacy_gemma = next(model for model in legacy["providers"]["nvidia"]["models"] if model["id"] == "google/gemma-4-31b-it")
+    assert legacy_gemma["label"] == "Legacy stored label"
+    assert legacy_gemma["purposes"] == ["llm", "vision"]
+    assert legacy_gemma["recommendation_level"] == 5
+    assert legacy_gemma["speed_label"] == "高速 (約15〜22秒)"
+
+
 def test_model_settings_store_keys_server_side(monkeypatch):
     monkeypatch.setenv("INKU_SECRET_KEY", "test-secret-for-model-settings")
     suffix = uuid.uuid4().hex[:8]
@@ -2349,6 +2427,12 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     openai_catalog = next(provider for provider in public_models.json()["catalog"] if provider["id"] == "openai")
     assert "memo" not in openai_catalog
     assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
+    nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
+    nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
+    assert len(nvidia_llm["models"]) == 22
+    assert len(nvidia_vision["models"]) == 12
+    assert all("llm" in model["purposes"] for model in nvidia_llm["models"])
+    assert all("vision" in model["purposes"] for model in nvidia_vision["models"])
 
     r = client.put(
         "/api/settings/models",
@@ -2443,8 +2527,8 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     assert seen["url"] == "https://api.openai.com/v1/models"
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
     assert openai_catalog["models"] == [
-        {"id": "fetched-model", "label": "Fetched Model", "enabled": True},
-        {"id": "new-fetched-model", "label": "New Fetched Model", "enabled": False},
+        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": True},
+        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False},
     ]
 
     class NewFakeResponse(FakeResponse):
@@ -2458,7 +2542,7 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     r = client.post("/api/settings/models/openai/fetch-models", headers=headers)
     assert r.status_code == 200
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
-    assert openai_catalog["models"] == [{"id": "new-model", "label": "New Model", "enabled": False}]
+    assert openai_catalog["models"] == [{"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False}]
 
     db.update_model_settings(default_model_settings())
     db.delete_session(token)

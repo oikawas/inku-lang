@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.88**
+**Version: v1.89**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -8,6 +8,11 @@ submission, and non-Japanese readers.  It is adapted from `SPEC.ja.md`, which is
 the canonical source because the author works in Japanese.  When the
 specification changes, update `SPEC.ja.md` first, then refresh this English
 version.
+
+For ordinary development, start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)
+and read only the specification sections relevant to the task. Chronological
+release history is maintained separately in [CHANGELOG.md](CHANGELOG.md), with
+more detailed canonical notes in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
 ---
 
@@ -475,6 +480,8 @@ The writing surface carries only a non-blocking length hint. Japanese input uses
 The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, and color-catalog changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid. Saving selected refinement candidates keeps them in ordinary history without automatically starring them. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
+
+Each Lineage-card artwork menu offers Edit description, Edit DDL, autonomous AI refinement, drawing-element comparison, model comparison, language comparison, and moving the work to trash. Description and DDL editing open modal dialogs initialized from the selected work. Drawing saves a `description_edit` or `ddl_edit` child, returns to Lineage, and focuses the newest child together with its ancestors. The three comparison actions target the selected card and open the corresponding existing Refine subview in a modal dialog; they do not duplicate comparison logic. Closing the dialog returns to the originating Lineage view, while the regular top-level Refine tab retains its panel layout. The former Manual Refine modal has no menu entry. Trash is visually separated from comparison actions with an explicit high-contrast result label.
 
 Major UI areas:
 
@@ -1258,7 +1265,7 @@ inku treats convergence caused by accumulated quality repairs as part of its imp
 - Every minor release records at least one branch, word, component, or rule it removed, or explicitly says that nothing could be removed. This is an account, not a deletion KPI.
 - Every release records what it made less likely, so the cost of refinement remains visible.
 - Release review places the new JP30/EN30 contact sheets beside the preceding two releases and records any newly increased repetition together with the motif-census delta. Finding no increase is also recorded.
-- Similarity features, motif frequency, vision observations, and coerce firing rates are audit mirrors only. They are never generation inputs, suppression controls, acceptance gates, or optimization objectives.
+- Similarity features, motif frequency, vision observations, and coerce firing rates are audit mirrors. They never automatically control default-generation branches or suppression, acceptance gates, or optimization objectives. As an explicit exception, a user-started finite AI Vision autonomous-refinement run may feed non-scoring observational advice into the next generation. It never ranks, accepts, rejects, or discards a generation; every generation remains in lineage and the human makes the final decision.
 
 v1.80 adds a deterministic Score-derived composition mirror shared by server and CLI, three unranked nearby history thumbnails, similarity ordering for contact sheets, a mechanical motif census over artifact sets or the current user's history, explicit renderer-only `seed_text`, a private unread-word ledger with `unread-words` and admin-only `unread-words --all` reporting, per-branch coerce observation, and an on-demand NIM vision review. Similarity never implies lineage: lineage remains the record of explicit creative causation. When drawing continues from an unsaved refinement candidate, that candidate is automatically materialized as the direct `lineage_only` ancestor without entering regular history; it can later be promoted explicitly from the lineage view.
 
@@ -1268,7 +1275,7 @@ Refinement account for v1.80: the proposed automatic statistics-to-generation �
 
 ### v1.81 Lineage-grouped history
 
-History Manager offers `Timeline` and `By lineage` as an independent display choice alongside the thumbnail/list layout choice, and stores the display preference in the browser. The bottom history strip remains chronological because it serves rapid previous/next navigation.
+History Manager offers `Timeline` and `By lineage` as an independent display choice alongside the thumbnail/list layout choice, and stores the display preference in the browser. The bottom history strip remains chronological because it serves rapid previous/next navigation. Each strip item shows its one-based generation depth, derived from saved parent edges, and its lineage-node state instead of render elapsed time. Selecting an item while the Lineage tab is open preserves that tab, reloads the selected work as the focus node, and centers it.
 
 A history group is based only on persisted lineage nodes and edges, never similarity, identical text, or timestamps. Every lineage node has an immutable `root_node_id`: a root points to itself and a child inherits its parent's root. Existing nodes are backfilled by following persisted edges toward their ancestor. Groups are ordered by the latest matching regular-history artwork and paginated by group, so one lineage is never split merely by an artwork-page boundary.
 
@@ -1279,6 +1286,10 @@ Build 557 establishes the v1.81 foundation with lineage-root migration/backfill,
 ### v1.82 Automatic instruction language and language comparison
 
 The writing tab no longer asks the author to choose an instruction language. Normal generation always requests automatic detection from the entered text; when the text has no Japanese or Latin language signal, the UI display language is the fallback. Japanese UI with English writing, and English UI with Japanese writing, remain supported.
+
+Normal Stage 1 and Stage 2 generation is LLM processing, while image-reading operations have a separate per-user Vision model setting. The model dialog separates Shared Stage 1/2, Stage 1, Stage 2, and Vision selection, and admin model settings identify whether each model is available for LLM, Vision, or both. `GET /api/models` retains the LLM `catalog` for older CLI clients and also returns `llm_catalog` and `vision_catalog`. Okugaki has its own per-user model choice, initially derived from the general Vision default and restored the next time Okugaki opens. An explicit API or CLI model remains authoritative for compatibility.
+
+Each model may carry LLM/Vision purposes, a five-level recommendation, Japanese and English evaluation comments, and a measured speed class and label. Administrators can edit this metadata, and both admin and user model selection expose it on hover. Speed values are observations from a particular measurement run, not a permanent performance guarantee or an acceptance gate for generation quality. Beyond normal generation, Batch has no image input, so it shows the current Stage 1/2 models and opens a model dialog without Vision. Demo separately selects its instruction-generation LLM and rendering Stage 1/2 models, while Okugaki selects from Vision cards grouped by provider. These cards expose the same evaluation metadata on hover using a theme-independent high-contrast tooltip.
 
 Refine adds Language comparison beside Adjust and Model comparison. It uses the same three comparison modes: shared Stage 1/2 language, fixed Stage 1 with Stage 2 comparison, and Stage 1 comparison with fixed Stage 2. Japanese and English can be assigned per stage only for an explicit comparison run, without changing automatic detection for normal generation. The target's identical language combination is excluded, results show the Stage 1/2 language pair and normalized DDL, and an adopted result records the pair in lineage metadata. Changing the target clears results and aborts an in-flight language comparison.
 
@@ -1369,12 +1380,22 @@ the reference implementation as one concrete path.
 
 ---
 
+## Autonomous Refinement Methods
+
+Lineage's autonomous refinement is a bounded run of 1–10 generations whose final judgment remains human. Before starting, the user chooses one method:
+
+- `Random automatic refinement` randomly chooses each generation's variation kind from the enabled reading, color-catalog, layout, and touch elements. It does not use Vision.
+- `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed variation kind; that advice becomes input to the next generation.
+
+The Vision method is a finite advisory loop, not quality optimization or automatic acceptance. Vision must not score, rank, accept, reject, praise, condemn, or discard a generated work. Intermediate generations remain `lineage_only`, the final generation enters regular history, and all generations remain in lineage. Derivation metadata records the method, Vision model, observation, and next direction, while the modal shows the latest advice. The model may be changed between runs but remains fixed during one run. Only the human may save, promote, star, or finally choose a work.
+
 ## Okugaki: Reciting a Lineage
 
 An okugaki is an append-only, first-person reading attached to one lineage branch from its root to the displayed artwork. It is neither a verdict nor a summary. It describes observable changes between generations and closes by verbalizing what remained invariant across the branch.
 
 - Each generation is read sequentially. The request for generation i contains only generations 0 through i, so later works cannot turn earlier choices into steps toward an alleged final form.
-- Inputs are existing lineage edge facts, captions, server-rasterized PNG pairs, and deterministic differences from the v1.80 feature mirror: composition family, primitives, colors, density, angles, and arrangement paths. No new quality metric is introduced.
+- Inputs are existing lineage edge facts, captions, server-rasterized PNG pairs, and deterministic differences from the v1.80 feature mirror: composition family, primitives, colors, density, angles, and arrangement paths. No new quality metric is introduced. Vision images are bounded to a 512px single work or an aspect-correct 768×384 before/after pair.
+- A successful generation response may be cached briefly by model, language, prefix, and image hashes so retrying after a timeout reuses completed work. Different works, models, or prefixes never share entries, and optimization must not combine all generations into one request that exposes later works to earlier observations.
 - Invariants are computed mechanically as shared feature and retained-Score elements. The LLM only verbalizes those facts and may not add causality, authorial intent, scores, ranking, praise, or condemnation.
 - Japanese and English evaluation terms are scanned as warnings only. A warning never forces rewriting, regeneration, or rejection.
 - The server appends the reader model and date as a mechanical signature. Records store the target node, branch snapshot, model, time, language, body, warnings, and fact sheet in the current user's scope.
@@ -1394,90 +1415,11 @@ When updating the specification:
 3. Keep public English wording concise and readable.
 4. Do not introduce English-only behavior that is absent from the Japanese
    source.
+5. Keep current contracts in the specification and chronological implementation
+   detail in the changelog.
 
+---
 
-### v1.72 — Refine and Compare UI
+## 18. Changelog
 
-- Unified touch, layout, and reading selection, including the hierarchy in which reading regenerates layout and touch.
-- Unified one/four-candidate selection and saving, cancellable generation, cross-panel generation exclusion, dynamic progress/cost copy, and DDL hover previews.
-- Replaced sequential variation counters with independent JavaScript-safe random seeds, made touch changes visible for fixed shapes, and restored seeds when loading history into the canvas.
-- Persisted caption visibility per user.
-- Preserved tab context during previous/next navigation and expanded model comparison to three Stage 1/2 modes.
-
-### v1.73 — System prompt optimization (2026-07-12)
-
-- Fixed self-contradictions in the Stage 1 / Stage 2 prompts: conversion examples that used vague counts ("several"/「数本」) against the prompts' own concrete-count rule, and inconsistent radius notation. Added the missing motions category to the ja Saijiki list and the missing sparse-validity rule to the ja Stage 2 prompt (the en prompt has had it since Build 415).
-- Stabilized the "Ground: ..." / 「地: ...」 route to canvas.ground: added ground-retention examples to the Stage 1 example pool, added an explicit Ground→canvas.ground / Surface→main-shape routing rule with an anti-duplication guard to Stage 2, and canonicalized the Stage 2 ground example inputs to the actual Stage 1 output form.
-- Fixed a defect in api.py where a canvas_aspect override replaced the whole canvas value and destroyed any Stage 2-generated canvas.ground (the true cause of the 0/12 ground adoption recorded at v1.71). Targeted 12-prompt bench: ground adoption 0/12 → 5/12.
-- Merged duplicated placement-mapping bullets and grouped the ~70-bullet Stage 2 rule list under eight subsection headers (content and order effectively unchanged).
-- JP/EN 30+30 regression bench on the Build 448 prompt set: JP improved on every metric (visual_event 89.7→94.9); a main-branch baseline run attributed the apparent EN drop vs 448 to pre-existing v1.70/v1.71 drift, with this change improving on main across all quality metrics. All fingerprint gates pass.
-
-### v1.74 — NIM Qwen3.5 397B Migration & Relation Tuning (2026-07-12)
-
-- **Switched Default Models to Qwen3.5 397B**:
-  - Switched the default Stage 1 / Stage 2 models to NVIDIA NIM `qwen/qwen3.5-397b-a17b`.
-  - Restricted the `is_qwen3` thinking-trace suppression override (`/no_think` prefix injection) to local OVMS provider runs only. This change enables NIM Qwen3.5 397B to fully leverage its reasoning capability, improving both generation quality and latency by roughly 30%.
-- **relation Duplication Prevention (F-1)**:
-  - Tuned the Stage 2 prompt (`composer.py` relations section and examples) in both Japanese and English to add an anti-duplication guard: "Generate at most one relation per fixed relation phrase. Do not replicate the same relation phrase into multiple instructions," and added corresponding negative examples.
-- **Achieved 100% ground Mapping Adoption (F-3)**:
-  - Achieved a **6/6 (100%)** `canvas.ground` mapping adoption rate in the targeted 12-prompt texture benchmark, resolving the remaining ground-routing misses from v1.73. Verified no quality regressions on the JP30/EN30 regression sets.
-
-
-### v1.74.1 — ground hotfix (2026-07-13)
-
-- Added Japanese and English Stage 2 rules that prohibit inferred `canvas.ground` unless normalized DDL contains an explicit 「地: ...」 / "Ground: ..." sentence.
-- Added a general Stage 1 support-preservation rule for Qwen3 Next: explicit 「〜の地」「〜の紙に」 / "... ground" / "on ... paper" wording must remain a `地:` / `Ground:` sentence and must not be rewritten as a background fill.
-- Added a drop-only ground literal gate after composition. It removes only unmarked ground while preserving canvas aspect; it never creates, repairs, or replaces ground when a marker is present. Drops remain observable through a warning log.
-- Moved display ground texture opacity (clamped to 0.02–0.18) onto the texture rect itself and changed the filter alpha table to `0 1`. Filter-capable browsers retain the same effective alpha, while filter-free PNG rasterizers now degrade to a faint veil instead of an opaque gray wall.
-- Audited every renderer filter use and found no other wide filtered shape whose transparency depended entirely on its filter.
-- Build 508 passed 314 tests with 30 skipped on both Mac and pentala; ruff, web check, and web build were green. Fixed-model Qwen3 Next benchmarks completed 12/12 surface/ground prompts (6/6 explicit ground, zero inferred ground, no gray wall) and 30/30 prompts in both Japanese and English (zero inferred ground, no quality drop beyond the threshold, all fingerprint gates passed, and zero 502s, timeouts, or fallbacks). Full results are recorded under “v1.74.1: ground hotfix” in the local benchmark log.
-
-
-### v1.75 — Literal tiling pattern field (2026-07-13)
-
-- Added the physical motion word `tile` / 「敷き詰める」 to Saijiki. It is selected only for a literally requested regular repeated surface, never inferred from merely “many” or “countless.”
-- Added `layout="grid"` with optional `rows`, `cols`, and `jitter`. Grid fills `at.region` or the margin-bounded canvas; explicit rows×cols take priority over count. The schema limit is 2000 for literal tiling while ordinary arrangements keep the existing 1–1000 prompt contract.
-- Grid performance layers seeded cell jitter, distinct per-element variation phase, and material-specific weight behavior while preserving bit-identical replay for the same Score and seed. Coerce does not add fade, clustering, preserved space, or count reduction to grid. Build 515 limits English literal markers to tile/tiled/tiling and adds a drop-only boundary so a motif label containing grid alone cannot create a spontaneous grid.
-- Added matched Japanese and English Stage 1 / Stage 2 rules and wallpaper, four-direction, and square-grid examples. Four directions remain a maximum of four overlaid instructions; no new primitive was introduced.
-- Build 515.
-
-
-### v1.76 — Artwork lineage (2026-07-14)
-
-- Added `dh1:<sha256>` as description identity over NFC-normalized text with LF line endings and trimmed outer whitespace. Batch labels such as `#1` are presentation metadata and do not affect `dh1`. Description identity, the existing `rh2` edition identity, history IDs, and lineage node IDs remain separate concepts.
-- Added independent lineage nodes and edges. Parentage is recorded only by explicit touch, layout, interpretation, model, DDL-edit, description-edit, replay, or canvas-aspect-change operations; it is never inferred from hashes, timestamps, or visual similarity. Existing history rows are backfilled as separate roots.
-- When generation, DDL drawing, or further refinement continues from an unsaved refinement candidate, only that direct ancestor is automatically retained as an intermediate `lineage_only` work. The Canvas labels the preview as unsaved and reports that automatic intermediate retention is hidden from regular history. If retention fails, drawing does not silently continue as a new root. Intermediate cards are labeled as hidden from history; they do not affect regular history counts or starred views, and the user can promote the same node and edges with “Save to regular history” from the lineage view.
-- Added a focused Canvas lineage view showing nearby generations as artwork thumbnails with arrows between parent and child cards and labels for the operation that produced each child. Opening a card changes both the displayed artwork and the parent for the next refinement. Card checkboxes support confirmation-gated bulk moves to trash. Trash preserves lineage; permanent deletion removes content and hashes while leaving a content-free tombstone to preserve the path.
-- Users can explicitly start a new root. Ordinary DRAW actions are not automatically attached to the latest history item.
-- Lineage depth and branching are not quality scores, achievements, or generation controls. The graph records the creative process; it does not choose a best branch.
-- History-manager artwork selection uses a compact, dedicated check control independent from opening an artwork, with exactly one state change per activation. Thumbnails do not show enlarged hover previews.
-- Stars toggle immediately without a confirmation dialog. Artwork comments are stored independently from star state and are edited in lineage-card details; removing a star does not erase an existing comment.
-- Works generated in Refine's Model comparison subview use the same circular image-corner `+` adoption control as Adjust candidates and show `✓` after being saved to history. Starring remains independent from adoption.
-- The displayed artwork and the bottom-history current marker stay synchronized by history ID. Opening an off-page work from lineage, History Manager, or replay uses `anchor_id` to load the page containing that work. Background Compare/Refine saves do not steal the marker, and unsaved candidate previews do not leave a different history work marked current.
-- While History Manager is open, external-history polling does not replace its items or page size. Thumbnail action areas use a uniform height, and the page row count is calculated once from the maximum measured card height, preventing clipped final rows and the refresh loop that replaced roughly 90 items with the bottom strip's smaller item count.
-- Build 525.
-
-**v1.76 closure (2026-07-15):** Build 525 is the accepted v1.76 release. Successive real-browser reviews confirmed that any lineage work can become the next derivation source, parent-child paths remain traceable through generation arrows, the displayed work stays synchronized with bottom history, and History Manager selection, bulk deletion, and page sizing remain stable. Feedback was incorporated across Builds 518–525. Subsequent work, beginning with v1.80, uses this lineage contract and the separation of the four identities as its foundation.
-
-### v1.87 — Printmaking Grammar and Vocabulary Refinement (2026-07-16)
-
-- Added a deterministic five-layer stroke performance: intended path, damped hand dynamics, one shared 1/f-like latent energy signal, sparse events, and per-tool grammar. Width, lateral deviation, and apparent density covary; rotring explicitly blocks the expressive engine to preserve uniformity.
-- Added `burin` and `drypoint`. Burin tapers at both ends and swells through the cut; drypoint adds a seed-selected one-sided burr. These model general tool behavior, not an artist or period.
-- Extended existing surfaces with `hatch`, `crosshatch`, and stepped `aquatint`; added `mezzotint` ground and `mode="carve"` with `light|half|bright`. Rendering order is ground, additive marks, carved light, then plate tone.
-- Plate tone, mezzotint grain, drypoint burr, and register shift remain deterministic under the existing texture-seed convention. The `rh2` canonical payload is unchanged.
-- Printmaking fields are literal-input only. Stage 1.5 cannot inject them, and invalid carve without a dark ground is dropped without repair.
-- Removed `rope` from the core vocabulary, Score schema, renderer, prompts, and Saijiki. Because inku is unreleased, v1.87 uses the opportunity to remove an ambiguous object-metaphor touch instead of carrying compatibility debt. The resulting touch vocabulary has ten entries.
-- SVG transfers the grammar of engraved line and tone; it does not claim to reproduce physical plate indentation or raised ink.
-- **Build 568:** Fixed the rendering order that allowed legacy fixed-width lines to cover variable-width stroke outlines. Burin taper and swell, drypoint's one-sided burr, and the existing writing-tool gestures now remain visible in the primary mark. All ten Saijiki touch previews were aligned with those observable renderer differences.
-- **Build 569:** Normalized DDL now names one touch for every visible line, arc, or outline. Japanese and English Stage 1 rules and examples were updated, dynamic few-shot selection guarantees a non-pen material example, and Stage 1.5 applies the same rule to its added marks. Filled shapes are not assigned material mechanically, and post-rewrite double expansion is prevented.
-- Builds 567–569.
-
-### v1.88 — Okugaki Lineage Recitation (2026-07-17)
-
-- Added manual first-person recitation of one root-to-target branch using structurally prefix-only generation requests.
-- Deterministic feature differences and invariants come from the existing read-only composition mirror; SVG works are rasterized to PNG for vision input, and the server adds the model/date signature.
-- Added user-scoped append-only storage, oldest-first display, deletion without editing, and Idempotency-Key handling.
-- Added the explicit Lineage UI action and `inku-cli okugaki` with `--dry-run`. The feature remains disconnected from dh1/rh2 and every generation or refinement decision.
-- Build 570.
-- **Build 571:** Okugaki Idempotency-Key generation now uses a UUID fallback based on `getRandomValues()` (with a final compatibility fallback), so appending works in LAN HTTP browser contexts where `crypto.randomUUID()` is unavailable.
-- **Build 572:** History Manager thumbnail capacity is now derived from a stable layout contract instead of measuring partially painted cards. Removing per-card `content-visibility` prevents missing thumbnails, page-size oscillation, and flicker inside the modal.
+Chronological public release notes are maintained in [CHANGELOG.md](CHANGELOG.md). The more detailed Japanese history is in [CHANGELOG.ja.md](CHANGELOG.ja.md), and [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the short developer entry point.

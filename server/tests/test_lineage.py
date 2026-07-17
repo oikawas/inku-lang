@@ -96,6 +96,37 @@ def test_lineage_records_explicit_derivation_and_tombstone():
         assert db.delete_user(user["id"])
 
 
+def test_history_lineage_metadata_reports_full_generation_depth():
+    user = _user()
+    try:
+        root = db.add_item(_item(user["id"], "根", 1500))
+        child = db.add_item(_item(
+            user["id"],
+            "枝",
+            1501,
+            lineage_parent_node_id=root["lineage_node_id"],
+            derivation_kind="description_edit",
+        ))
+        grandchild = db.add_item(_item(
+            user["id"],
+            "葉",
+            1502,
+            lineage_parent_node_id=child["lineage_node_id"],
+            derivation_kind="description_edit",
+        ))
+
+        items, total = db.list_items(user["id"])
+        assert total == 3
+        by_id = {item["id"]: item for item in items}
+        assert by_id[root["id"]]["lineage_generation"] == 1
+        assert by_id[child["id"]]["lineage_generation"] == 2
+        assert by_id[grandchild["id"]]["lineage_generation"] == 3
+        assert {item["lineage_state"] for item in items} == {"active"}
+    finally:
+        db.delete_all(user["id"])
+        assert db.delete_user(user["id"])
+
+
 def test_lineage_only_history_is_hidden_and_can_be_promoted():
     user = _user()
     try:

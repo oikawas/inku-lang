@@ -70,9 +70,12 @@
 		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
+		stage1ModelLabel: string;
+		stage2ModelLabel: string;
 		onToggleCanvasAspectMenu: () => void;
 		onSelectCanvasAspect: (id: CanvasAspectId) => void | Promise<void>;
 		onOpenModelSelection: () => void;
+		onOpenLlmModelSelection: () => void;
 		onOpenCatalogModal: () => void;
 		onClearInput: () => void;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -133,9 +136,12 @@
 		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
+		stage1ModelLabel,
+		stage2ModelLabel,
 		onToggleCanvasAspectMenu,
 		onSelectCanvasAspect,
 		onOpenModelSelection,
+		onOpenLlmModelSelection,
 		onOpenCatalogModal,
 		onClearInput,
 		onRememberBatchPrompt,
@@ -197,9 +203,11 @@
 			<Tooltip text={t().tooltipInputCatalog}>
 				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			</Tooltip>
+			{#if inputMode === 'single'}
 			<Tooltip text={t().tooltipInputModel}>
 				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			</Tooltip>
+			{/if}
 			{#if canvasAspectEnabled}
 				<CanvasAspectPlugin
 					selected={canvasAspectId}
@@ -276,6 +284,9 @@
 			{batchPromptHistory}
 			bind:randomColorCatalog={batchRandomColorCatalog}
 			{showCrab}
+			{stage1ModelLabel}
+			{stage2ModelLabel}
+			onOpenModelSelection={onOpenLlmModelSelection}
 			{onRememberBatchPrompt}
 			onSubmit={onSubmit}
 			onStop={onStop}
@@ -300,12 +311,15 @@
 			canSaveCurrent={demoCanSaveCurrent}
 			savingCurrent={demoSavingCurrent}
 			actionDisabled={singleRunning || generationDisabled}
+			drawingStage1ModelLabel={stage1ModelLabel}
+			drawingStage2ModelLabel={stage2ModelLabel}
 			saveStatus={demoSaveStatus}
 			error={demoError}
 			onSettingsChange={onDemoSettingsChange}
 			onSaveCurrent={onSaveCurrentDemo}
 			onStart={onStartDemo}
 			onStop={onStopDemo}
+			onOpenDrawingModelSelection={onOpenLlmModelSelection}
 		/>
 	{/if}
 </section>

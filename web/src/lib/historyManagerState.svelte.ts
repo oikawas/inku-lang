@@ -16,6 +16,8 @@ export type HistoryItem = {
 	history_visibility?: 'normal' | 'lineage_only';
 	lineage_node_id?: string | null;
 	lineage_root_node_id?: string | null;
+	lineage_generation?: number | null;
+	lineage_state?: 'active' | 'lineage_only' | 'tombstone' | null;
 	lineage_parent_node_id?: string | null;
 	derivation_kind?: string | null;
 	derivation_metadata?: Record<string, unknown>;

@@ -11,6 +11,7 @@ from copy import deepcopy
 from typing import Any
 
 from .secrets import decrypt_secret, encrypt_secret
+from .verified_model_catalog import MODEL_CONFIG_VERSION, VERIFIED_NVIDIA_MODELS
 
 PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
     {
@@ -64,13 +65,7 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         "base_url_env": "NVIDIA_BASE_URL",
         "default_base_url": "https://integrate.api.nvidia.com/v1",
         "requires_api_key": True,
-        "models": [
-            {"id": "meta/llama-3.2-90b-vision-instruct", "label": "Llama 3.2 90B Vision Instruct", "notes": "vision"},
-            {"id": "qwen/qwen3.5-397b-a17b", "label": "Qwen3.5 397B A17B"},
-            {"id": "google/gemma-4-31b-it", "label": "Google Gemma 4 31B Instruct"},
-            {"id": "meta/llama-3.3-70b-instruct", "label": "Meta Llama 3.3 70B Instruct"},
-            {"id": "mistralai/mistral-large-2-instruct", "label": "Mistral AI Mistral Large 2 Instruct"},
-        ],
+        "models": VERIFIED_NVIDIA_MODELS,
     },
     {
         "id": "ollama",
@@ -128,8 +123,8 @@ def _normalize_provider_kind(value: Any) -> str:
     return str(value) if value in {"openai_compatible", "anthropic", "gemini"} else "openai_compatible"
 
 
-def _normalize_models(models: Any) -> list[dict[str, str]]:
-    normalized: list[dict[str, str]] = []
+def _normalize_models(models: Any) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
     seen: set[str] = set()
     if isinstance(models, list):
         for model in models:
@@ -142,12 +137,29 @@ def _normalize_models(models: Any) -> list[dict[str, str]]:
             item = {"id": model_id, "label": str(model.get("label") or model_id).strip() or model_id}
             if isinstance(model.get("notes"), str) and model["notes"].strip():
                 item["notes"] = model["notes"].strip()
+            purposes = model.get("purposes")
+            if isinstance(purposes, list):
+                clean_purposes = [purpose for purpose in ("llm", "vision") if purpose in purposes]
+            else:
+                marker = f"{model_id} {item.get('notes', '')}".lower()
+                clean_purposes = ["vision"] if "vision" in marker else ["llm"]
+            if not clean_purposes:
+                clean_purposes = ["llm"]
+            item["purposes"] = clean_purposes
+            recommendation = model.get("recommendation_level")
+            if isinstance(recommendation, int) and not isinstance(recommendation, bool):
+                item["recommendation_level"] = max(1, min(5, recommendation))
+            for key in ("speed_class", "speed_label", "comment_ja", "comment_en"):
+                value = model.get(key)
+                if isinstance(value, str) and value.strip():
+                    item[key] = value.strip()
             normalized.append(item)
     return normalized
 
 
 def default_model_settings() -> dict[str, Any]:
     return {
+        "model_catalog_version": MODEL_CONFIG_VERSION,
         "providers": {
             str(provider["id"]): {
                 "id": provider["id"],
@@ -158,7 +170,7 @@ def default_model_settings() -> dict[str, Any]:
                 "default_base_url": provider["default_base_url"],
                 "requires_api_key": provider["requires_api_key"],
                 "memo": "",
-                "models": deepcopy(provider["models"]),
+                "models": _normalize_models(deepcopy(provider["models"])),
                 "builtin": True,
                 "active": True,
                 "base_url": _normalize_provider_base_url(
@@ -179,6 +191,9 @@ def default_user_model_settings() -> dict[str, Any]:
         "stage1_model": "google/gemma-4-31b-it",
         "stage2_provider": "nvidia",
         "stage2_model": "google/gemma-4-31b-it",
+        "vision_provider": "nvidia",
+        "vision_model": "meta/llama-3.2-90b-vision-instruct",
+        "okugaki_model": "nvidia:meta/llama-3.2-90b-vision-instruct",
         "model_inspection_selected_models": [],
         "instruction_caption_visible": True,
     }
@@ -189,6 +204,7 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(settings, dict):
         return default
     clean = deepcopy(default)
+    incoming_catalog_version = str(settings.get("model_catalog_version") or "")
     providers = settings.get("providers")
     if isinstance(providers, dict):
         for raw_provider_id, incoming in providers.items():
@@ -241,7 +257,18 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 provider["memo"] = incoming["memo"].strip()
             models = _normalize_models(incoming.get("models"))
             if models:
-                provider["models"] = models
+                if provider_id == "nvidia" and builtin:
+                    merged = {str(model["id"]): model for model in provider["models"]}
+                    metadata_keys = ("purposes", "recommendation_level", "speed_class", "speed_label", "comment_ja", "comment_en")
+                    for model in models:
+                        model_id = str(model["id"])
+                        combined = {**merged.get(model_id, {}), **model}
+                        if incoming_catalog_version != MODEL_CONFIG_VERSION and model_id in merged:
+                            combined.update({key: merged[model_id][key] for key in metadata_keys if key in merged[model_id]})
+                        merged[model_id] = combined
+                    provider["models"] = list(merged.values())
+                else:
+                    provider["models"] = models
             if not provider.get("default_base_url") and provider.get("base_url"):
                 provider["default_base_url"] = provider["base_url"]
             known_model_ids = {str(model["id"]) for model in provider["models"]}
@@ -285,10 +312,10 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     if not isinstance(settings, dict):
         return default
     clean = dict(default)
-    for key in ("stage1_provider", "stage2_provider"):
+    for key in ("stage1_provider", "stage2_provider", "vision_provider"):
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = str(settings[key])
-    for key in ("stage1_model", "stage2_model"):
+    for key in ("stage1_model", "stage2_model", "vision_model", "okugaki_model"):
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = settings[key].strip()
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
@@ -298,10 +325,10 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
 
 def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, Any]:
     clean = normalize_user_model_settings(current)
-    for key in ("stage1_provider", "stage2_provider"):
+    for key in ("stage1_provider", "stage2_provider", "vision_provider"):
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = str(patch[key])
-    for key in ("stage1_model", "stage2_model"):
+    for key in ("stage1_model", "stage2_model", "vision_model", "okugaki_model"):
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = patch[key].strip()
     if "instruction_caption_visible" in patch:
@@ -311,7 +338,12 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
     return normalize_user_model_settings(clean)
 
 
-def model_provider_catalog(settings: dict[str, Any] | None = None, *, include_disabled: bool = True) -> list[dict[str, Any]]:
+def model_provider_catalog(
+    settings: dict[str, Any] | None = None,
+    *,
+    include_disabled: bool = True,
+    purpose: str | None = None,
+) -> list[dict[str, Any]]:
     clean = normalize_model_settings(settings)
     catalog: list[dict[str, Any]] = []
     for provider_id, provider in clean["providers"].items():
@@ -321,6 +353,8 @@ def model_provider_catalog(settings: dict[str, Any] | None = None, *, include_di
         models = []
         for model in provider["models"]:
             enabled = bool(enabled_models.get(str(model["id"]), True))
+            if purpose and purpose not in model.get("purposes", ["llm"]):
+                continue
             if include_disabled or enabled:
                 models.append({**model, "enabled": enabled})
         catalog.append({

@@ -22,6 +22,19 @@ Constraints on vocabulary, primitives, and coordinates are not limits. They are 
 
 ---
 
+## Documentation
+
+Developers and AI agents should start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md). It summarizes the current architecture, contracts, and the smallest useful reading path without requiring a full specification reload.
+
+- [SPEC.md](SPEC.md) — maintained public English specification
+- [SPEC.ja.md](SPEC.ja.md) — canonical Japanese specification
+- [CHANGELOG.md](CHANGELOG.md) — public English release notes
+- [CHANGELOG.ja.md](CHANGELOG.ja.md) — detailed canonical change history
+
+Read the full specification for first-time onboarding, broad design changes, or consistency audits. For ordinary work, read the project context and only the relevant specification sections.
+
+---
+
 ## How it works — score and performance
 
 ```

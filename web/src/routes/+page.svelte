@@ -27,7 +27,8 @@
 		providerOfModel,
 		qualifiedModelId,
 		type Provider,
-		type ProviderGroup
+		type ProviderGroup,
+		type ModelOption
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
@@ -50,6 +51,7 @@
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
+	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	const CATALOG_KEY         = 'inku-color-catalog';
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
 	const SHOW_KIWI_KEY       = 'inku-show-kiwi';
@@ -59,7 +61,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.88';
+	const APP_VERSION = 'v1.89';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -191,6 +193,9 @@
 		stage1_model: string;
 		stage2_provider: Provider;
 		stage2_model: string;
+		vision_provider: Provider;
+		vision_model: string;
+		okugaki_model?: string;
 		model_inspection_selected_models?: string[];
 		instruction_caption_visible?: boolean;
 	};
@@ -200,7 +205,7 @@
 		default_base_url?: string;
 		requires_api_key?: boolean;
 		memo?: string;
-		models?: { id: string; label: string; notes?: string }[];
+		models?: ModelOption[];
 		base_url: string;
 		api_key_set: boolean;
 		api_key_hint: string | null;
@@ -420,8 +425,11 @@
 		stage1Model: string;
 		stage2Provider: Provider;
 		stage2Model: string;
+		visionProvider: Provider;
+		visionModel: string;
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
+	let modelSelectionAllowVision = $state(true);
 	let showKiwi = $state(true);
 	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
@@ -575,6 +583,7 @@
 	let modelSettingsLoading = $state(false);
 	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
+	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
 	let dbBackupStatus = $state<string | null>(null);
 	let outputSaveStatus = $state<string | null>(null);
@@ -646,6 +655,10 @@
 		return availableModelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
 	}
 
+	function visionModelsFor(provider: Provider) {
+		return availableVisionModelCatalog.find((group) => group.id === provider)?.models ?? [];
+	}
+
 	function reconcileDemoPromptModel() {
 		if (!availableModelsLoaded || !demoSettingsLoaded) return;
 		const configuredModels = availableModelCatalog.flatMap((group) => group.models);
@@ -662,6 +675,9 @@
 		stage1Model = settings.stage1_model;
 		stage2Provider = settings.stage2_provider;
 		stage2Model = settings.stage2_model;
+		visionProvider = settings.vision_provider;
+		visionModel = settings.vision_model;
+		okugakiModel = settings.okugaki_model || qualifiedModelId(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
 		modelInspectionSelectedModels = Array.isArray(settings.model_inspection_selected_models)
 			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
@@ -676,6 +692,27 @@
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			currentUser = await r.json() as UserItem;
 		} catch (e) { console.warn('failed to save instruction caption setting', e); }
+	}
+
+	async function persistOkugakiModel(model: string): Promise<void> {
+		const nextModel = model.trim();
+		if (!nextModel || nextModel === okugakiModel) return;
+		const previous = okugakiModel;
+		okugakiModel = nextModel;
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ model_settings: { okugaki_model: nextModel } })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			okugakiModel = previous;
+			console.warn('failed to save okugaki model', e);
+			throw e;
+		}
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
@@ -995,8 +1032,9 @@
 		if (nextTab === 'export') void loadExportTemplates();
 	}
 
-	function openModelSelection() {
-		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model };
+	function openModelSelection(allowVision = true) {
+		modelSelectionAllowVision = allowVision;
+		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
 		settingsMode = 'model';
 		settingsTab = 'connection';
 		settingsOpen = true;
@@ -1011,6 +1049,9 @@
 			stage1_model: stage1Model,
 			stage2_provider: stage2Provider,
 			stage2_model: stage2Model,
+			vision_provider: visionProvider,
+			vision_model: visionModel,
+			okugaki_model: okugakiModel,
 			model_inspection_selected_models: modelInspectionSelectedModels,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
@@ -1044,6 +1085,8 @@
 			stage1Model = modelSelectionSnapshot.stage1Model;
 			stage2Provider = modelSelectionSnapshot.stage2Provider;
 			stage2Model = modelSelectionSnapshot.stage2Model;
+			visionProvider = modelSelectionSnapshot.visionProvider;
+			visionModel = modelSelectionSnapshot.visionModel;
 		}
 		modelSelectionSnapshot = null;
 		settingsOpen = false;
@@ -1131,8 +1174,9 @@
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
-			availableModelCatalog = data.catalog;
+			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
+			availableModelCatalog = data.llm_catalog ?? data.catalog;
+			availableVisionModelCatalog = data.vision_catalog ?? data.catalog.filter((group) => group.models.some((model) => model.purposes?.includes('vision')));
 			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
 				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
@@ -1142,6 +1186,11 @@
 			}
 			if (!modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
 				stage2Model = modelsFor(stage2Provider)[0]?.id ?? stage2Model;
+			}
+			if (!visionModelsFor(visionProvider).some((model) => model.id === visionModel)) {
+				const fallbackGroup = availableVisionModelCatalog.find((group) => group.models.length > 0);
+				visionProvider = fallbackGroup?.id ?? visionProvider;
+				visionModel = fallbackGroup?.models[0]?.id ?? visionModel;
 			}
 			reconcileDemoPromptModel();
 		} catch (e) {
@@ -1304,7 +1353,7 @@
 			kind: catalogProvider?.kind,
 			requires_api_key: catalogProvider?.requires_api_key,
 			memo: memoOverride ?? catalogProvider?.memo,
-			models: catalogProvider?.models ?? [],
+			models: provider.models ?? catalogProvider?.models ?? [],
 			base_url: provider.base_url,
 			api_key: provider.api_key || undefined,
 			clear_api_key: !!provider.clear_api_key,
@@ -1964,6 +2013,9 @@
 	let stage1Model     = $state<string>(DEFAULT_MODEL);
 	let stage2Provider  = $state<Provider>(DEFAULT_PROVIDER);
 	let stage2Model     = $state<string>(DEFAULT_MODEL);
+	let visionProvider  = $state<Provider>(DEFAULT_PROVIDER);
+	let visionModel     = $state<string>(DEFAULT_VISION_MODEL);
+	let okugakiModel    = $state<string>(qualifiedModelId(DEFAULT_PROVIDER, DEFAULT_VISION_MODEL));
 	let includeThinking = $state(false);
 
 	// ── Timer ───────────────────────────────────────────────
@@ -2110,6 +2162,20 @@
 		derivationMetadata?: Record<string, unknown>;
 	};
 
+async function requestVisionRefineAdvice(historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) {
+	const r = await apiFetch('/api/refine/vision-advice', {
+		method: 'POST',
+		signal,
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ history_id: historyId, model, instruction, direction, enabled_kinds: enabledKinds, language: getLang() })
+	});
+	if (!r.ok) {
+		const data = await r.json().catch(() => ({})) as { detail?: string };
+		throw new Error(data.detail ?? `HTTP ${r.status}`);
+	}
+	return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string };
+}
+
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const uiLang = getLang();
 		stageLabel = t().stageInterpreting;
@@ -2220,7 +2286,7 @@ if (unreadWords.length > 0) {
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId } = {}): Promise<{
 		score: Score;
 		svg: string;
 		stage2_model?: string | null;
@@ -2258,8 +2324,8 @@ if (unreadWords.length > 0) {
 				original_text: originalText,
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
-				catalog_id: selectedCatalog,
-				canvas_aspect: effectiveCanvasAspectId(),
+				catalog_id: renderOptions.catalogId ?? selectedCatalog,
+				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 			})
 		});
@@ -3712,6 +3778,95 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 	await fetchLineage(node.id, true);
 }
 
+function lineageCatalogId(node: LineageNode): string {
+	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? selectedCatalog;
+}
+
+function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
+	return normalizeCanvasAspectId(node.history?.render_canvas_aspect_id ?? node.history?.render_canvas_aspect ?? node.history?.score?.canvas ?? effectiveCanvasAspectId());
+}
+
+async function showNewLineageChild(historyId: string | null | undefined, nodeId: string | null | undefined): Promise<void> {
+	if (!historyId || !nodeId) throw new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The rendered result could not be saved to the lineage.');
+	let found = await fetchHistoryOffset(0, { anchorId: historyId });
+	if (!found && historyStarredOnly) {
+		historyStarredOnly = false;
+		found = await fetchHistoryOffset(0, { anchorId: historyId });
+	}
+	const saved = historyItems.find((item) => item.id === historyId);
+	if (!saved) throw new Error(getLang() === 'ja' ? '保存した作品を読み込めませんでした。' : 'The saved artwork could not be loaded.');
+	outputTab = 'lineage';
+	loadIterationItem(saved);
+	await fetchLineage(nodeId, true);
+}
+
+async function drawLineageDescriptionEdit(node: LineageNode, text: string): Promise<void> {
+	const sourceText = text.trim();
+	if (!sourceText || !node.history) return;
+	const rendered = await paintOne(sourceText, {
+		sourceText,
+		historyInput: sourceText,
+		catalogId: lineageCatalogId(node),
+		canvasAspectId: lineageCanvasAspectId(node),
+		lineageParentNodeId: node.id,
+		derivationKind: 'description_edit',
+		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+	});
+	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
+}
+
+async function drawLineageDdlEdit(node: LineageNode, editedDdl: string): Promise<void> {
+	const nextDdl = editedDdl.trim();
+	if (!nextDdl || !node.history) return;
+	const sourceText = node.history.source_text ?? node.history.input ?? '';
+	const composed = await composeOne(nextDdl, sourceText, undefined, undefined, undefined, {
+		catalogId: lineageCatalogId(node),
+		canvasAspectId: lineageCanvasAspectId(node),
+	});
+	const resolvedEditStage1Model = node.history.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
+	const resolvedEditStage2Model = composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model);
+	const saved = await pushHistory({
+		input: sourceText,
+		source_text: sourceText,
+		ddl: nextDdl,
+		score: composed.score,
+		svg: composed.svg,
+		at: Date.now(),
+		elapsed_ms: composed.elapsed_ms,
+		stage1_model: resolvedEditStage1Model,
+		stage2_model: resolvedEditStage2Model,
+		tokens_in: composed.tokens_in,
+		tokens_out: composed.tokens_out,
+		catalog_id: lineageCatalogId(node),
+		render_build_number: composed.render_build_number,
+		render_color_profile: composed.render_color_profile,
+		render_engine_id: composed.render_engine_id,
+		render_engine_version: composed.render_engine_version,
+		render_color_catalog_id: composed.render_color_catalog_id,
+		render_color_catalog_name: composed.render_color_catalog_name,
+		render_color_catalog_sub: composed.render_color_catalog_sub,
+		render_color_map: composed.render_color_map,
+		render_canvas_aspect: composed.render_canvas_aspect,
+		render_canvas_aspect_id: composed.render_canvas_aspect_id,
+		render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
+		render_seed: composed.render_seed,
+		vary_seed: composed.vary_seed,
+		instruction_lang_requested: composed.instruction_lang_requested,
+		instruction_lang_resolved: composed.instruction_lang_resolved,
+		ui_lang: composed.ui_lang,
+		render_hash: composed.render_hash,
+		render_hash_short: composed.render_hash_short,
+	}, {
+		selectSaved: true,
+		countGeneration: true,
+		sourceText,
+		lineageParentNodeId: node.id,
+		derivationKind: 'ddl_edit',
+		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+	});
+	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
+}
+
 async function promoteLineageNode(node: LineageNode): Promise<void> {
 	const contextVersion = targetContextVersion;
 	const r = await apiFetch(`/api/lineage/${encodeURIComponent(node.id)}/promote`, { method: 'POST' });
@@ -3805,6 +3960,7 @@ $effect(() => {
 
 	function loadIterationItem(it: Iteration) {
 		if (demoRunning) return;
+		const preserveLineageTab = outputTab === 'lineage';
 		resetTargetScopedState();
 		pendingCanvasAspectDerivation = null;
 		inputMode = 'single';
@@ -3868,7 +4024,8 @@ $effect(() => {
 			tokens_out_stage2: null,
 		};
 		error = null;
-		outputTab = 'canvas';
+		outputTab = preserveLineageTab ? 'lineage' : 'canvas';
+		if (preserveLineageTab && it.lineage_node_id) void fetchLineage(it.lineage_node_id, true);
 		fitCanvasZoom();
 	}
 
@@ -3995,6 +4152,13 @@ $effect(() => {
 		displayedHistoryItem = null;
 		historyCursor = -1;
 		stage2Model = v;
+	}
+	function setVisionProvider(v: Provider) {
+		visionProvider = v;
+		visionModel = visionModelsFor(v)[0]?.id ?? visionModel;
+	}
+	function setVisionModel(v: string) {
+		visionModel = v;
 	}
 
 	function createSafeIntegerSeed(excluded: Set<number> = new Set()): number {
@@ -5161,9 +5325,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
+						stage1ModelLabel={availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}
+						stage2ModelLabel={availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
-						onOpenModelSelection={openModelSelection}
+						onOpenModelSelection={() => openModelSelection(true)}
+						onOpenLlmModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
 						onRememberBatchPrompt={rememberBatchPrompt}
@@ -5298,6 +5465,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{scoreJsonSeparatorLine}
 				{statusStage1Model}
 				{statusStage2Model}
+				visionModel={qualifiedModelId(visionProvider, visionModel)}
+				{okugakiModel}
+				visionProviderGroups={availableVisionModelCatalog}
 				{statusCatalogName}
 				{statusCanvasName}
 				{nextStage1Model}
@@ -5378,6 +5548,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{lineageError}
 				isJapanese={getLang() === 'ja'}
 				onOpenLineageNode={openLineageNode}
+				onDrawLineageDescription={drawLineageDescriptionEdit}
+				onDrawLineageDdl={drawLineageDdlEdit}
+				onSaveOkugakiModel={persistOkugakiModel}
 				onPromoteLineageNode={promoteLineageNode}
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
@@ -5385,7 +5558,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onLoadLineageOverview={loadLineageOverview}
 				onLoadLineageBranch={loadLineageBranch}
 				onPaintOne={paintOne}
-				selectedCatalogId={selectedCatalog}
+				onVisionAdvice={requestVisionRefineAdvice}
 				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->
@@ -5409,9 +5582,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{historyIndexLabel}
 			{historyModelSummary}
 			{formatHistoryDate}
-			{formatElapsed}
 			{catalogName}
-			{shortModel}
+			isJapanese={getLang() === 'ja'}
 		/>
 	</div><!-- /main-shell -->
 
@@ -5434,7 +5606,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{stage1Model}
 		{stage2Provider}
 		{stage2Model}
+		{visionProvider}
+		{visionModel}
 		providerGroups={settingsMode === 'model' ? availableModelCatalog : modelCatalog}
+		visionProviderGroups={availableVisionModelCatalog}
+		allowVisionSelection={modelSelectionAllowVision}
 		bind:includeThinking
 		{settingsStatus}
 		{settingsStatusError}
@@ -5484,6 +5660,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onSetStage1Model={setStage1Model}
 		onSetStage2Provider={setStage2Provider}
 		onSetStage2Model={setStage2Model}
+		onSetVisionProvider={setVisionProvider}
+		onSetVisionModel={setVisionModel}
 		onUpdateModelProvider={updateModelProvider}
 		onAddModelProvider={addModelProvider}
 		onAskDeleteModelProvider={askDeleteModelProvider}

@@ -24,11 +24,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import BoundedSemaphore, Lock
+from typing import Literal
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from .feature_analysis import composition_distance
 from .okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL, generate_okugaki
 from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
@@ -221,6 +223,20 @@ def _resolved_stage_model(model: str | None, actor: dict | None, *, stage: str) 
     default_model = "google/gemma-4-31b-it"
     provider = str(settings.get(provider_key, "nvidia") or "nvidia")
     model_id = str(settings.get(model_key, default_model) or default_model)
+    if model:
+        requested = str(model).strip()
+        if _is_qualified_model_id(requested):
+            return requested
+        if requested == model_id:
+            return f"{provider}:{requested}"
+        return requested
+    return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
+
+
+def _resolved_vision_model(model: str | None, actor: dict | None = None) -> str:
+    settings = (actor or {}).get("model_settings") or {}
+    provider = str(settings.get("vision_provider", "nvidia") or "nvidia")
+    model_id = str(settings.get("vision_model", DEFAULT_OKUGAKI_MODEL) or DEFAULT_OKUGAKI_MODEL)
     if model:
         requested = str(model).strip()
         if _is_qualified_model_id(requested):
@@ -977,6 +993,8 @@ class HistoryItem(HistoryPostBody):
     description_hash: str | None = None
     lineage_node_id: str | None = None
     lineage_root_node_id: str | None = None
+    lineage_generation: int | None = Field(default=None, ge=1)
+    lineage_state: Literal["active", "lineage_only", "tombstone"] | None = None
     data_warnings: list[str] = Field(default_factory=list)
 
 
@@ -1002,8 +1020,24 @@ class HistoryLineageGroupListResponse(BaseModel):
     limit: int
 
 
+class VisionRefineAdviceBody(BaseModel):
+    history_id: str = Field(..., min_length=1, max_length=200)
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    instruction: str = Field(..., min_length=1, max_length=100_000)
+    direction: str = Field(default="", max_length=2000)
+    enabled_kinds: list[str] = Field(..., min_length=1, max_length=4)
+    language: str = Field(default="ja", pattern="^(ja|en)$")
+
+
+class VisionRefineAdviceResponse(BaseModel):
+    observation: str
+    next_direction: str
+    suggested_kind: str
+    model: str
+
+
 class OkugakiGenerateBody(BaseModel):
-    model: str = Field(default=DEFAULT_OKUGAKI_MODEL, min_length=1, max_length=200)
+    model: str | None = Field(default=None, min_length=1, max_length=200)
     language: str = Field(default="ja", pattern="^(ja|en)$")
     save: bool = True
 
@@ -1234,6 +1268,8 @@ class StageExecutionStatus(BaseModel):
 
 class ModelSettingsResponse(BaseModel):
     catalog: list[dict] = Field(default_factory=list)
+    llm_catalog: list[dict] = Field(default_factory=list)
+    vision_catalog: list[dict] = Field(default_factory=list)
     settings: dict = Field(default_factory=dict)
 
 
@@ -1419,7 +1455,9 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
 def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
     settings = _db.get_model_settings()
     return ModelSettingsResponse(
-        catalog=model_provider_catalog(settings, include_disabled=False),
+        catalog=model_provider_catalog(settings, include_disabled=False, purpose="llm"),
+        llm_catalog=model_provider_catalog(settings, include_disabled=False, purpose="llm"),
+        vision_catalog=model_provider_catalog(settings, include_disabled=False, purpose="vision"),
         settings={"model_settings": actor.get("model_settings") or {}},
     )
 
@@ -1672,6 +1710,16 @@ def api_settings_fetch_provider_models(
         raise HTTPException(status_code=502, detail=str(e)) from e
     clean = normalize_model_settings(current)
     previous_provider = clean.get("providers", {}).get(provider_id, {})
+    previous_models = {
+        str(model.get("id")): model
+        for model in previous_provider.get("models", [])
+    }
+    for model in models:
+        previous = previous_models.get(str(model["id"]))
+        if previous:
+            for key in ("purposes", "recommendation_level", "speed_class", "speed_label", "comment_ja", "comment_en"):
+                if key in previous:
+                    model[key] = previous[key]
     previous_model_ids = {str(model.get("id")) for model in previous_provider.get("models", [])}
     previous_enabled_models = previous_provider.get("enabled_models") or {}
     enabled_models = {
@@ -3060,6 +3108,37 @@ def api_lineage_promote(node_id: str, actor: dict = Depends(_current_user)) -> H
     return HistoryItem(**item)
 
 
+@app.post("/api/refine/vision-advice", response_model=VisionRefineAdviceResponse)
+def api_vision_refine_advice(
+    body: VisionRefineAdviceBody,
+    actor: dict = Depends(_current_user),
+) -> VisionRefineAdviceResponse:
+    invalid_kinds = [kind for kind in body.enabled_kinds if kind not in AUTONOMOUS_REFINE_KINDS]
+    if invalid_kinds:
+        raise HTTPException(status_code=422, detail=f"unsupported refinement kind: {invalid_kinds[0]}")
+    items = _db.get_items(actor["id"], [body.history_id])
+    if not items:
+        raise HTTPException(status_code=404, detail="refinement source not found")
+    svg = str(items[0].get("svg") or "")
+    if not svg:
+        raise HTTPException(status_code=422, detail="refinement source has no image")
+    try:
+        advice = vision_refine_advice(
+            svg=svg,
+            instruction=body.instruction,
+            direction=body.direction,
+            enabled_kinds=body.enabled_kinds,
+            model=_resolved_vision_model(body.model, actor),
+            language=body.language,
+            settings=_db.get_model_settings(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _unexpected_http_error("Vision refinement advice", 502) from exc
+    return VisionRefineAdviceResponse(**advice)
+
+
 @app.get("/api/lineage/{node_id}/okugaki", response_model=list[OkugakiItem], response_model_exclude_none=True)
 def api_okugaki_list(node_id: str, actor: dict = Depends(_current_user)) -> list[OkugakiItem]:
     branch = _db.get_lineage_branch(actor["id"], node_id)
@@ -3086,7 +3165,7 @@ def api_okugaki_generate(
     try:
         item = generate_okugaki(
             branch,
-            model=body.model,
+            model=_resolved_vision_model(body.model, actor),
             language=body.language,
             settings=_db.get_model_settings(),
             at=at,
@@ -3095,6 +3174,13 @@ def api_okugaki_generate(
             item = _db.add_okugaki(actor["id"], item, idempotency_key=idempotency_key)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        detail = (
+            "Visionモデルがタイムアウトしました。完了済みの世代所見は一時保存されています。再度追記してください。"
+            if body.language == "ja"
+            else "The Vision model timed out. Completed generation readings are cached temporarily; retry the append."
+        )
+        raise HTTPException(status_code=504, detail=detail) from exc
     except Exception as exc:  # noqa: BLE001
         raise _unexpected_http_error("okugaki generation", 502) from exc
     return OkugakiItem(**item)

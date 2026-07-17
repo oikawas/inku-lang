@@ -94,8 +94,13 @@ def test_all_derivation_kinds_siblings_and_history_provenance():
         for child, kind in zip(children, kinds, strict=True):
             listed = by_id[child["id"]]
             assert listed["lineage_parent_node_id"] == root["lineage_node_id"]
+            assert listed["lineage_generation"] == 2
+            assert listed["lineage_state"] == "active"
             assert listed["derivation_kind"] == kind
             assert listed["derivation_metadata"]["mode"] == kind
+
+        assert by_id[root["id"]]["lineage_generation"] == 1
+        assert by_id[root["id"]]["lineage_state"] == "active"
 
         graph = db.get_lineage(user["id"], root["lineage_node_id"], descendant_depth=1)
         assert graph is not None

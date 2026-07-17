@@ -16,6 +16,9 @@
 		tokens_in?: number | null;
 		tokens_out?: number | null;
 		catalog_id?: string | null;
+		history_visibility?: 'normal' | 'lineage_only';
+		lineage_generation?: number | null;
+		lineage_state?: 'active' | 'lineage_only' | 'tombstone' | null;
 		trashed?: boolean;
 		starred?: boolean;
 	note?: string | null;
@@ -40,9 +43,8 @@
 		historyIndexLabel: (index: number) => number;
 		historyModelSummary: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
-		formatElapsed: (ms: number | null | undefined) => string;
 		catalogName: (id: string | null | undefined) => string;
-		shortModel: (model: string | null | undefined) => string;
+		isJapanese: boolean;
 	};
 
 	let {
@@ -64,12 +66,22 @@
 		historyIndexLabel,
 		historyModelSummary,
 		formatHistoryDate,
-		formatElapsed,
 		catalogName,
-		shortModel
+		isJapanese
 	}: Props = $props();
 
 	let historyCollapsed = $state(false);
+
+	function lineageGenerationLabel(item: HistoryItem): string {
+		if (!item.lineage_generation) return isJapanese ? '独立作品' : 'Standalone';
+		return isJapanese ? `第${item.lineage_generation}世代` : `Generation ${item.lineage_generation}`;
+	}
+
+	function lineageStateLabel(item: HistoryItem): string {
+		if (item.lineage_state === 'lineage_only' || item.history_visibility === 'lineage_only') return isJapanese ? '中間作品' : 'Intermediate';
+		if (item.lineage_state === 'tombstone') return isJapanese ? '削除済み' : 'Deleted';
+		return item.lineage_generation ? (isJapanese ? '通常作品' : 'Active') : (isJapanese ? '系譜なし' : 'No lineage');
+	}
 
 	function handleThumbKeydown(event: KeyboardEvent, index: number) {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -130,7 +142,8 @@
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
 							<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
-							<div class="tooltip-row"><span>{t().historyTooltipSeconds}</span><strong>{formatElapsed(it.elapsed_ms)}</strong></div>
+							<div class="tooltip-row"><span>{isJapanese ? '世代' : 'Generation'}</span><strong>{lineageGenerationLabel(it)}</strong></div>
+							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 						</div>
@@ -143,8 +156,8 @@
 							aria-label={it.starred ? t().starOn : t().starOff}
 						>★</button>
 						<div class="thumb-meta">
-							<span class="thumb-time">{formatElapsed(it.elapsed_ms) !== '-' ? formatElapsed(it.elapsed_ms) : String(historyIndexLabel(i))}</span>
-							{#if it.stage2_model}<span class="thumb-model">{shortModel(it.stage2_model)}</span>{/if}
+							<span class="thumb-generation">{lineageGenerationLabel(it)}</span>
+							<span class="thumb-state">{lineageStateLabel(it)}</span>
 						</div>
 						{#if i === historyCursor}
 							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
@@ -341,8 +354,8 @@
 		flex-direction: column;
 		gap: 1px;
 	}
-	.thumb-time { font-size: 11px; font-weight: 500; color: var(--fg2); }
-	.thumb-model { font-size: 10px; color: var(--fg3); }
+	.thumb-generation { font-size: 10px; font-weight: 650; color: var(--fg2); white-space: nowrap; }
+	.thumb-state { width: fit-content; max-width: 100%; border-radius: 999px; padding: 0 4px; background: var(--bg2); color: var(--fg3); font-size: 9px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-current-badge {
 		position: absolute;
 		bottom: 22px;

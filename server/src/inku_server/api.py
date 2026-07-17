@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import BoundedSemaphore, Lock
+from typing import Literal
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -992,6 +993,8 @@ class HistoryItem(HistoryPostBody):
     description_hash: str | None = None
     lineage_node_id: str | None = None
     lineage_root_node_id: str | None = None
+    lineage_generation: int | None = Field(default=None, ge=1)
+    lineage_state: Literal["active", "lineage_only", "tombstone"] | None = None
     data_warnings: list[str] = Field(default_factory=list)
 
 

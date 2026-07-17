@@ -3846,6 +3846,7 @@ $effect(() => {
 
 	function loadIterationItem(it: Iteration) {
 		if (demoRunning) return;
+		const preserveLineageTab = outputTab === 'lineage';
 		resetTargetScopedState();
 		pendingCanvasAspectDerivation = null;
 		inputMode = 'single';
@@ -3909,7 +3910,8 @@ $effect(() => {
 			tokens_out_stage2: null,
 		};
 		error = null;
-		outputTab = 'canvas';
+		outputTab = preserveLineageTab ? 'lineage' : 'canvas';
+		if (preserveLineageTab && it.lineage_node_id) void fetchLineage(it.lineage_node_id, true);
 		fitCanvasZoom();
 	}
 
@@ -5439,7 +5441,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onLoadLineageBranch={loadLineageBranch}
 				onPaintOne={paintOne}
 				onVisionAdvice={requestVisionRefineAdvice}
-				selectedCatalogId={selectedCatalog}
 				pngTemplates={exportTemplates}
 			/>
 		</div><!-- /body -->
@@ -5463,9 +5464,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{historyIndexLabel}
 			{historyModelSummary}
 			{formatHistoryDate}
-			{formatElapsed}
 			{catalogName}
-			{shortModel}
+			isJapanese={getLang() === 'ja'}
 		/>
 	</div><!-- /main-shell -->
 

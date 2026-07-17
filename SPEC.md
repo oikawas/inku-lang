@@ -481,6 +481,8 @@ The web app is the current reference interface. v1.72 makes refinement and model
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
 
+Each Lineage-card artwork menu offers autonomous AI refinement, drawing-element comparison, model comparison, language comparison, and moving the work to trash. The three comparison actions target the selected card and open the corresponding existing Refine subview; they do not duplicate comparison logic. The former Manual Refine modal has no menu entry. Trash is visually separated from comparison actions with an explicit high-contrast result label.
+
 Major UI areas:
 
 - App rail: compact navigation with an explicit expand/collapse toggle, user
@@ -1273,7 +1275,7 @@ Refinement account for v1.80: the proposed automatic statistics-to-generation â€
 
 ### v1.81 Lineage-grouped history
 
-History Manager offers `Timeline` and `By lineage` as an independent display choice alongside the thumbnail/list layout choice, and stores the display preference in the browser. The bottom history strip remains chronological because it serves rapid previous/next navigation.
+History Manager offers `Timeline` and `By lineage` as an independent display choice alongside the thumbnail/list layout choice, and stores the display preference in the browser. The bottom history strip remains chronological because it serves rapid previous/next navigation. Each strip item shows its one-based generation depth, derived from saved parent edges, and its lineage-node state instead of render elapsed time. Selecting an item while the Lineage tab is open preserves that tab, reloads the selected work as the focus node, and centers it.
 
 A history group is based only on persisted lineage nodes and edges, never similarity, identical text, or timestamps. Every lineage node has an immutable `root_node_id`: a root points to itself and a child inherits its parent's root. Existing nodes are backfilled by following persisted edges toward their ancestor. Groups are ordered by the latest matching regular-history artwork and paginated by group, so one lineage is never split merely by an artwork-page boundary.
 

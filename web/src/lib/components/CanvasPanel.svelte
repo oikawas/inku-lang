@@ -149,7 +149,6 @@
 		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
-		selectedCatalogId: string;
 	};
 
 	let {
@@ -278,8 +277,7 @@
 		onLoadLineageOverview,
 		onLoadLineageBranch,
 		onPaintOne,
-		onVisionAdvice,
-		selectedCatalogId
+		onVisionAdvice
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
@@ -290,6 +288,12 @@
 	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
 	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
 	let refineKind = $state<RefineKind>('touch');
+	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare' | 'language'): Promise<void> {
+		await onOpenLineageNode(node);
+		refineView = view;
+		outputTab = 'refine';
+	}
+
 	const refineCostLabel = $derived(
 		refineKind === 'reading'
 			? t().refineCostReading
@@ -772,7 +776,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {selectedCatalogId} {visionModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {visionProviderGroups} />
 			{/if}
 		</div>
 

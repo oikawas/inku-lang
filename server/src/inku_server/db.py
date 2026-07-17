@@ -1565,12 +1565,39 @@ def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow]) -> list[dict]:
         return items
     nodes = session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(node_ids)).all()
     node_by_id = {node.id: node for node in nodes}
-    edges = session.query(LineageEdgeRow).filter(LineageEdgeRow.child_node_id.in_(node_ids)).all()
+    user_ids = {row.user_id for row in rows}
+    edges = session.query(LineageEdgeRow).filter(
+        LineageEdgeRow.user_id.in_(user_ids),
+        LineageEdgeRow.child_node_id.in_(node_ids),
+    ).all()
     edge_by_child = {edge.child_node_id: edge for edge in edges}
+    generation_by_node = {node_id: 1 for node_id in node_ids}
+    ancestor_by_target = {node_id: node_id for node_id in node_ids}
+    seen_by_target = {node_id: {node_id} for node_id in node_ids}
+    frontier = set(node_ids)
+    while frontier:
+        ancestor_edges = session.query(LineageEdgeRow).filter(
+            LineageEdgeRow.user_id.in_(user_ids),
+            LineageEdgeRow.child_node_id.in_(frontier),
+        ).all()
+        parent_by_child = {edge.child_node_id: edge.parent_node_id for edge in ancestor_edges}
+        next_frontier: set[str] = set()
+        for target_id, ancestor_id in ancestor_by_target.items():
+            parent_id = parent_by_child.get(ancestor_id)
+            if parent_id is None or parent_id in seen_by_target[target_id]:
+                continue
+            seen_by_target[target_id].add(parent_id)
+            ancestor_by_target[target_id] = parent_id
+            generation_by_node[target_id] += 1
+            next_frontier.add(parent_id)
+        frontier = next_frontier
+
     for row, item in zip(rows, items, strict=True):
         node = node_by_id.get(row.lineage_node_id)
         if node is not None and node.user_id == row.user_id:
             item["lineage_root_node_id"] = node.root_node_id or node.id
+            item["lineage_generation"] = generation_by_node[node.id]
+            item["lineage_state"] = node.state
         edge = edge_by_child.get(row.lineage_node_id)
         if edge is None or edge.user_id != row.user_id:
             continue

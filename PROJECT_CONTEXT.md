@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.89 / Build 578**
+**Target version: v1.89 / Build 580**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -67,11 +67,11 @@ As of v1.89, the authenticated web application includes:
 - color catalogs, canvas aspects, and reproducible touch/layout/reading refinement;
 - user-scoped history, stars, comments, trash, search, and lineage grouping;
 - explicit lineage nodes and edges, including intermediate works hidden from regular history;
-- AI and manual refinement, lineage Okugaki, and generation/prompt/JSON inspection;
+- autonomous AI refinement, drawing-element/model/language comparison, lineage Okugaki, and generation/prompt/JSON inspection;
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-The latest v1.89 / Build 578 change lets Lineage autonomous refinement choose between Random and AI Vision methods. Vision runs use an explicitly selected model and feed non-scoring observations and one next direction into each generation without automatic rejection. Every generation remains in lineage and the human makes the final decision.
+The latest v1.89 / Build 580 change removes Manual Refine from the artwork menu and adds direct entry points for drawing-element, model, and language comparison using the selected work. Selecting bottom history while Lineage is open keeps the tab visible and centers the selected work. The strip replaces elapsed time with lineage generation and state, and the trash action now uses a high-contrast explicit label.
 
 ## Where to Look for a Change
 

@@ -3,7 +3,6 @@
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import AIRefineModal from './AIRefineModal.svelte';
-	import ManualRefineModal from './ManualRefineModal.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -34,6 +33,7 @@
 		error: string | null;
 		isJapanese: boolean;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
+		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrash: (historyIds: string[]) => void;
@@ -42,13 +42,12 @@
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
-		selectedCatalogId: string;
 		visionModel: string;
 		visionProviderGroups: ProviderGroup[];
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, selectedCatalogId, visionModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, visionModel, visionProviderGroups }: Props = $props();
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
@@ -63,7 +62,6 @@
 	let overviewScale = $state(1);
 	let activeMenuNodeId = $state<string | null>(null);
 	let activeAIRefineNode = $state<LineageNode | null>(null);
-	let activeManualRefineNode = $state<LineageNode | null>(null);
 	let okugakiOpen = $state(false);
 	let okugakiModel = $state('');
 	let okugakiItems = $state<OkugakiItem[]>([]);
@@ -352,10 +350,16 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	$effect(() => {
 		const focusId = graph?.focus_node_id ?? null;
-		if (focusId && focusId !== lastFocusNodeId) { lastFocusNodeId = focusId; expandedNodeIds = [focusId]; }
+		const focusChanged = !!focusId && focusId !== lastFocusNodeId;
+		if (focusChanged) { lastFocusNodeId = focusId; expandedNodeIds = [focusId]; }
 		columns;
 		overviewScale;
-		void tick().then(scheduleArrowUpdate);
+		void tick().then(() => {
+			scheduleArrowUpdate();
+			if (focusChanged && focusId && !overviewOpen) {
+				cardElements.get(focusId)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+			}
+		});
 	});
 $effect(() => {
 	const available = new Set((graph?.nodes ?? [])
@@ -419,37 +423,47 @@ $effect(() => {
 							{@const edge = edgeByChild.get(node.id)}
 							{@const childCount = node.child_count ?? childrenByParent.get(node.id)?.length ?? 0}
 							<article use:registerCard={node.id} class="lineage-card" class:focus={node.id === graph.focus_node_id} class:tombstone={node.state === 'tombstone'} class:trashed={!!node.history?.trashed}>
+<div class="card-toolbar">
 {#if node.history?.id && !node.history.trashed}
 	<label class="card-check" aria-label={isJapanese ? '一括操作の対象にする' : 'Check for bulk actions'}>
 		<input type="checkbox" checked={checkedHistoryIds.includes(node.history.id)} onclick={(event) => event.stopPropagation()} onpointerdown={(event) => event.stopPropagation()} onchange={() => toggleCheckedHistory(node.history?.id as string)} />
 	</label>
+	{/if}
+	<span class="identity-marks">
+		{#if node.id === graph.focus_node_id}<span class="active-mark">{isJapanese ? '表示中' : 'Displayed'}</span>{/if}
+		{#if node.state === 'lineage_only'}<span class="identity-mark">{isJapanese ? '中間作品・履歴非表示' : 'Intermediate · hidden from history'}</span>{/if}
+		{#if node.id !== graph.focus_node_id && node.description_hash && node.description_hash === focusNode?.description_hash}<span class="identity-mark">{isJapanese ? '同じ記述' : 'Same text'}</span>{/if}
+		{#if node.id !== graph.focus_node_id && node.render_hash && node.render_hash === focusNode?.render_hash}<span class="identity-mark">{isJapanese ? '同じ版' : 'Same edition'}</span>{/if}
+	</span>
+{#if node.history?.id && !node.history.trashed}
 	<button type="button" class="card-menu-trigger" onclick={(event) => { event.stopPropagation(); activeMenuNodeId = activeMenuNodeId === node.id ? null : node.id; }} aria-label={isJapanese ? 'メニューを開く' : 'Open menu'}>
 		<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
 	</button>
 	{#if activeMenuNodeId === node.id}
 		<div class="card-dropdown-menu" role="menu">
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
-				🤖 {isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
+				{isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
 			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeManualRefineNode = node; activeMenuNodeId = null; }}>
-				✍️ {isJapanese ? '手動で推敲する...' : 'Manual Refine...'}
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
+				{isJapanese ? '描画要素で比較' : 'Compare drawing elements'}
+			</button>
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
+				{isJapanese ? 'モデルで比較' : 'Compare models'}
+			</button>
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
+				{isJapanese ? '言語で比較' : 'Compare languages'}
 			</button>
 			<button type="button" class="menu-danger" role="menuitem" onclick={(event) => { event.stopPropagation(); onAskTrash([node.history?.id as string]); activeMenuNodeId = null; }}>
-				🗑️ {isJapanese ? '作品を削除' : 'Delete'}
+				{isJapanese ? '作品をゴミ箱へ移動' : 'Move artwork to trash'}
 			</button>
 		</div>
 	{/if}
 {/if}
+</div>
 
 								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted artwork')} onclick={() => openNode(node)}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
-										<span class="identity-marks">
-											{#if node.id === graph.focus_node_id}<span class="active-mark">{isJapanese ? '表示中' : 'Displayed'}</span>{/if}
-									{#if node.state === 'lineage_only'}<span class="identity-mark">{isJapanese ? '中間作品・履歴非表示' : 'Intermediate · hidden from history'}</span>{/if}
-											{#if node.id !== graph.focus_node_id && node.description_hash && node.description_hash === focusNode?.description_hash}<span class="identity-mark">{isJapanese ? '同じ記述' : 'Same text'}</span>{/if}
-											{#if node.id !== graph.focus_node_id && node.render_hash && node.render_hash === focusNode?.render_hash}<span class="identity-mark">{isJapanese ? '同じ版' : 'Same edition'}</span>{/if}
-										</span>
 									</div>
 									<div class="preview">
 										{#if node.history?.svg}<HistoryThumbnail item={node.history} scope={`lineage-${node.id}`} size="manager" />{:else}<span>{isJapanese ? '削除済み' : 'Deleted'}</span>{/if}
@@ -530,15 +544,6 @@ $effect(() => {
 	/>
 {/if}
 
-{#if activeManualRefineNode}
-	<ManualRefineModal
-		node={activeManualRefineNode}
-		onClose={() => (activeManualRefineNode = null)}
-		{onPaintOne}
-		onLoadBranch={onLoadBranch}
-		{selectedCatalogId}
-	/>
-{/if}
 
 <style>
 	.lineage-panel { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; padding: 22px; overflow: hidden; display: flex; flex-direction: column; color: var(--fg); background: var(--bg); }
@@ -568,7 +573,8 @@ $effect(() => {
 	.lineage-card.focus { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 	.lineage-card.tombstone { border-style: dashed; opacity: .72; }
 	.lineage-card.trashed { opacity: .62; filter: grayscale(.35); }
-	.card-check { position: absolute; z-index: 3; top: 8px; right: 8px; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
+	.card-toolbar { position: relative; z-index: 3; min-height: 22px; margin-bottom: 6px; padding-right: 26px; display: flex; align-items: flex-start; gap: 5px; }
+	.card-check { flex: 0 0 auto; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
 	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
 	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
@@ -584,18 +590,18 @@ $effect(() => {
 	.okugaki-body { white-space: pre-wrap; line-height: 1.85; font-family: serif; font-size: .92rem; }
 	.okugaki-warning { margin-top: 10px; color: #b98232; font-size: .72rem; }
 	@keyframes okugaki-spin { to { transform: rotate(360deg); } }
-	.card-menu-trigger { position: absolute; z-index: 3; top: 8px; left: 8px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--fg3); cursor: pointer; }
+	.card-menu-trigger { position: absolute; z-index: 3; top: 0; right: 0; display: grid; place-items: center; width: 22px; height: 22px; border: 0; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--fg3); cursor: pointer; }
 	.card-menu-trigger:hover { background: var(--bg2); color: var(--fg); }
-	.card-dropdown-menu { position: absolute; z-index: 10; top: 32px; left: 8px; min-width: 150px; border: 1px solid var(--border2); border-radius: 6px; padding: 4px 0; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
-	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 7px 12px; font-size: 0.72rem; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: inherit; width: 100%; box-sizing: border-box; }
+	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 230px; border: 1px solid var(--border2); border-radius: 6px; padding: 5px 0; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
+	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 10px 13px; font-size: 0.84rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
 	.card-dropdown-menu button:hover { background: var(--bg2); }
-	.card-dropdown-menu button.menu-danger { color: var(--danger, #9b3d32); }
-	.card-dropdown-menu button.menu-danger:hover { background: color-mix(in srgb, var(--danger, #9b3d32) 8%, var(--panel)); }
+	.card-dropdown-menu button.menu-danger { width: calc(100% - 12px); margin: 5px 6px 2px; border-radius: 5px; background: #8f302a; color: #fff; font-weight: 650; }
+	.card-dropdown-menu button.menu-danger:hover { background: #74241f; color: #fff; }
 	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-	.operation { padding-right: 22px; min-height: 18px; margin-bottom: 6px; display: flex; justify-content: space-between; gap: 5px; color: var(--fg2); font-size: .7rem; }
-	.identity-marks { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
+	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: .7rem; }
+	.identity-marks { min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 3px; }
 	.identity-mark, .active-mark { border-radius: 999px; padding: 1px 5px; font-size: .62rem; }
 	.identity-mark { color: var(--fg3); background: var(--bg2); }
 	.active-mark { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); font-weight: 700; }

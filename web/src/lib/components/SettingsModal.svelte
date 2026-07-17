@@ -114,6 +114,7 @@
 		visionModel: string;
 		providerGroups: ProviderGroup[];
 		visionProviderGroups: ProviderGroup[];
+		allowVisionSelection: boolean;
 		includeThinking: boolean;
 		settingsStatus: SettingsStatus | null;
 		settingsStatusError: string | null;
@@ -211,6 +212,7 @@
 		visionModel,
 		providerGroups,
 		visionProviderGroups,
+		allowVisionSelection,
 		includeThinking = $bindable(),
 		settingsStatus,
 		settingsStatusError,
@@ -489,14 +491,6 @@
 			: (model.comment_ja || model.comment_en || '—');
 	}
 
-	function modelTooltipText(model: ModelOption): string {
-		return [
-			`用途 / Use: ${modelPurposesLabel(model)}`,
-			`オススメ度 / Recommendation: ${modelRecommendationLabel(model)}`,
-			`速度 / Speed: ${model.speed_label || '—'}`,
-			`評価 / Comment: ${modelComment(model)}`,
-		].join('\n');
-	}
 
 	function serviceIdLabel(provider: Provider): string {
 		return `${t().settingsModelServiceId}: ${provider}`;
@@ -590,7 +584,7 @@
 			<button role="tab" aria-selected={modelSelectionTab === 'shared'} class:active={modelSelectionTab === 'shared'} onclick={() => (modelSelectionTab = 'shared')}>Stage 1/2</button>
 			<button role="tab" aria-selected={modelSelectionTab === 'stage1'} class:active={modelSelectionTab === 'stage1'} onclick={() => (modelSelectionTab = 'stage1')}>Stage 1</button>
 			<button role="tab" aria-selected={modelSelectionTab === 'stage2'} class:active={modelSelectionTab === 'stage2'} onclick={() => (modelSelectionTab = 'stage2')}>Stage 2</button>
-			<button role="tab" aria-selected={modelSelectionTab === 'vision'} class:active={modelSelectionTab === 'vision'} onclick={() => (modelSelectionTab = 'vision')}>Vision</button>
+			{#if allowVisionSelection}<button role="tab" aria-selected={modelSelectionTab === 'vision'} class:active={modelSelectionTab === 'vision'} onclick={() => (modelSelectionTab = 'vision')}>Vision</button>{/if}
 		</div>
 	{:else}
 		<div class="settings-tabs">
@@ -614,7 +608,7 @@
 			<div class="model-selection-summary">
 				<span><strong>Stage 1</strong>{providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}</span>
 				<span><strong>Stage 2</strong>{providerGroups.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}</span>
-				<span><strong>Vision</strong>{visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel}</span>
+				{#if allowVisionSelection}<span><strong>Vision</strong>{visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel}</span>{/if}
 			</div>
 			<p class="model-selection-hint">{modelSelectionTab === 'shared' ? t().modelSelectionSharedHint : modelSelectionTab === 'vision' ? t().modelSelectionVisionHint : t().modelSelectionSeparateHint}</p>
 			<div class="generation-model-groups">
@@ -629,7 +623,6 @@
 									class="model-metadata-hover"
 									class:selected={modelSelected(provider.id, model.id)}
 									aria-pressed={modelSelected(provider.id, model.id)}
-									title={modelTooltipText(model)}
 									onclick={() => selectGenerationModel(provider.id, model.id)}
 								>
 									<strong>{model.label}</strong>
@@ -1378,7 +1371,7 @@
 			<div class="model-picker-list" aria-label={t().settingsModelPublishedModels}>
 				{#each filteredModelPickerModels as model, modelIndex (`${model.id}:${modelIndex}`)}
 					<div class="model-picker-entry">
-						<label class="check-row model-picker-row model-metadata-hover" title={modelTooltipText(modelDraft(model))}>
+						<label class="check-row model-picker-row model-metadata-hover">
 							<input
 								type="checkbox"
 								checked={modelPickerDraftEnabled(model.id)}
@@ -1476,13 +1469,13 @@
 	.model-hover-card {
 		display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 520;
 		width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px;
-		border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel);
-		box-shadow: 0 8px 24px rgba(0,0,0,.2); color: var(--fg2); text-align: left;
+		border: 1px solid #64748b; border-radius: var(--r); background: #111820;
+		box-shadow: 0 8px 24px rgba(0,0,0,.32); color: #f8fafc; text-align: left;
 		pointer-events: none; white-space: normal;
 	}
-	.model-hover-card > span { display: grid; gap: 2px; font-size: 11px; line-height: 1.45; }
+	.model-hover-card > span { display: grid; gap: 2px; color: #f8fafc; font-size: 11px; line-height: 1.45; }
 	.model-hover-card > span + span { margin-top: 6px; }
-	.model-hover-card strong { color: var(--fg3); font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+	.model-hover-card strong { color: #cbd5e1; font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
 	.model-metadata-hover:hover .model-hover-card, .model-metadata-hover:focus-visible .model-hover-card, .model-metadata-hover:focus-within .model-hover-card { display: block; }
 	.settings-tabs {
 		display: flex; flex: 0 0 auto; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg);

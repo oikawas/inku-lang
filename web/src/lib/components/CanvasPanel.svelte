@@ -3,6 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { Score } from '$lib/historyManagerState.svelte';
+	import type { ProviderGroup } from '$lib/models';
 	import OutputTabsContent from './OutputTabsContent.svelte';
 	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
@@ -56,6 +57,7 @@
 		statusStage1Model: string;
 		statusStage2Model: string;
 		visionModel: string;
+		visionProviderGroups: ProviderGroup[];
 		statusCatalogName: string;
 		statusCanvasName: string;
 		nextStage1Model: string;
@@ -146,6 +148,7 @@
 		onLoadLineageOverview: () => void | Promise<void>;
 		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
+		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 		selectedCatalogId: string;
 	};
 
@@ -184,6 +187,7 @@
 		statusStage1Model,
 		statusStage2Model,
 		visionModel,
+		visionProviderGroups,
 		statusCatalogName,
 		statusCanvasName,
 		nextStage1Model,
@@ -274,6 +278,7 @@
 		onLoadLineageOverview,
 		onLoadLineageBranch,
 		onPaintOne,
+		onVisionAdvice,
 		selectedCatalogId
 	}: Props = $props();
 
@@ -767,7 +772,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {selectedCatalogId} {visionModel} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {selectedCatalogId} {visionModel} {visionProviderGroups} />
 			{/if}
 		</div>
 

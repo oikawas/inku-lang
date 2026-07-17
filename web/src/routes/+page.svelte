@@ -428,6 +428,7 @@
 		visionModel: string;
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
+	let modelSelectionAllowVision = $state(true);
 	let showKiwi = $state(true);
 	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
@@ -1008,7 +1009,8 @@
 		if (nextTab === 'export') void loadExportTemplates();
 	}
 
-	function openModelSelection() {
+	function openModelSelection(allowVision = true) {
+		modelSelectionAllowVision = allowVision;
 		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
 		settingsMode = 'model';
 		settingsTab = 'connection';
@@ -2134,6 +2136,20 @@
 		derivationKind?: DerivationKind | null;
 		derivationMetadata?: Record<string, unknown>;
 	};
+
+async function requestVisionRefineAdvice(historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) {
+	const r = await apiFetch('/api/refine/vision-advice', {
+		method: 'POST',
+		signal,
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ history_id: historyId, model, instruction, direction, enabled_kinds: enabledKinds, language: getLang() })
+	});
+	if (!r.ok) {
+		const data = await r.json().catch(() => ({})) as { detail?: string };
+		throw new Error(data.detail ?? `HTTP ${r.status}`);
+	}
+	return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string };
+}
 
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const uiLang = getLang();
@@ -5193,9 +5209,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
+						stage1ModelLabel={availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}
+						stage2ModelLabel={availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
-						onOpenModelSelection={openModelSelection}
+						onOpenModelSelection={() => openModelSelection(true)}
+						onOpenLlmModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
 						onRememberBatchPrompt={rememberBatchPrompt}
@@ -5331,6 +5350,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusStage1Model}
 				{statusStage2Model}
 				visionModel={qualifiedModelId(visionProvider, visionModel)}
+				visionProviderGroups={availableVisionModelCatalog}
 				{statusCatalogName}
 				{statusCanvasName}
 				{nextStage1Model}
@@ -5418,6 +5438,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onLoadLineageOverview={loadLineageOverview}
 				onLoadLineageBranch={loadLineageBranch}
 				onPaintOne={paintOne}
+				onVisionAdvice={requestVisionRefineAdvice}
 				selectedCatalogId={selectedCatalog}
 				pngTemplates={exportTemplates}
 			/>
@@ -5471,6 +5492,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{visionModel}
 		providerGroups={settingsMode === 'model' ? availableModelCatalog : modelCatalog}
 		visionProviderGroups={availableVisionModelCatalog}
+		allowVisionSelection={modelSelectionAllowVision}
 		bind:includeThinking
 		{settingsStatus}
 		{settingsStatusError}

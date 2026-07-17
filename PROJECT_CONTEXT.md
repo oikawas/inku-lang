@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.89 / Build 575**
+**Target version: v1.89 / Build 578**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -71,7 +71,7 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-The latest v1.89 / Build 575 change adds purposes, five-level recommendations, bilingual evaluation comments, and measured speed labels to the separate LLM/Vision catalogs. Administrators can edit the values, which appear on hover in admin and user model selection.
+The latest v1.89 / Build 578 change lets Lineage autonomous refinement choose between Random and AI Vision methods. Vision runs use an explicitly selected model and feed non-scoring observations and one next direction into each generation without automatic rejection. Every generation remains in lineage and the human makes the final decision.
 
 ## Where to Look for a Change
 

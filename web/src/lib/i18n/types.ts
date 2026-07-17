@@ -231,6 +231,17 @@ export interface LangPack {
 	refineGeneratingTask: (task: string) => string;
 	refineAbortButton: string;
 	aiRefineTitle: string;
+	aiRefineModeLabel: string;
+	aiRefineRandomMode: string;
+	aiRefineRandomModeHint: string;
+	aiRefineVisionMode: string;
+	aiRefineVisionModeHint: string;
+	aiRefineVisionModel: string;
+	aiRefineVisionReading: string;
+	aiRefineVisionObservation: string;
+	aiRefineVisionDirection: string;
+	aiRefineVisionSourceError: string;
+	aiRefineAppliedDirection: string;
 	aiRefineDirectionLabel: string;
 	aiRefineDirectionPlaceholder: string;
 	aiRefineGensLabel: string;

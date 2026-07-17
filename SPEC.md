@@ -1263,7 +1263,7 @@ inku treats convergence caused by accumulated quality repairs as part of its imp
 - Every minor release records at least one branch, word, component, or rule it removed, or explicitly says that nothing could be removed. This is an account, not a deletion KPI.
 - Every release records what it made less likely, so the cost of refinement remains visible.
 - Release review places the new JP30/EN30 contact sheets beside the preceding two releases and records any newly increased repetition together with the motif-census delta. Finding no increase is also recorded.
-- Similarity features, motif frequency, vision observations, and coerce firing rates are audit mirrors only. They are never generation inputs, suppression controls, acceptance gates, or optimization objectives.
+- Similarity features, motif frequency, vision observations, and coerce firing rates are audit mirrors. They never automatically control default-generation branches or suppression, acceptance gates, or optimization objectives. As an explicit exception, a user-started finite AI Vision autonomous-refinement run may feed non-scoring observational advice into the next generation. It never ranks, accepts, rejects, or discards a generation; every generation remains in lineage and the human makes the final decision.
 
 v1.80 adds a deterministic Score-derived composition mirror shared by server and CLI, three unranked nearby history thumbnails, similarity ordering for contact sheets, a mechanical motif census over artifact sets or the current user's history, explicit renderer-only `seed_text`, a private unread-word ledger with `unread-words` and admin-only `unread-words --all` reporting, per-branch coerce observation, and an on-demand NIM vision review. Similarity never implies lineage: lineage remains the record of explicit creative causation. When drawing continues from an unsaved refinement candidate, that candidate is automatically materialized as the direct `lineage_only` ancestor without entering regular history; it can later be promoted explicitly from the lineage view.
 
@@ -1287,7 +1287,7 @@ The writing tab no longer asks the author to choose an instruction language. Nor
 
 Normal Stage 1 and Stage 2 generation is LLM processing, while image-reading operations have a separate per-user Vision model setting. The model dialog separates Shared Stage 1/2, Stage 1, Stage 2, and Vision selection, and admin model settings identify whether each model is available for LLM, Vision, or both. `GET /api/models` retains the LLM `catalog` for older CLI clients and also returns `llm_catalog` and `vision_catalog`. Vision operations such as Okugaki use the user Vision setting by default; an explicit API or CLI model remains authoritative for compatibility.
 
-Each model may carry LLM/Vision purposes, a five-level recommendation, Japanese and English evaluation comments, and a measured speed class and label. Administrators can edit this metadata, and both admin and user model selection expose it on hover. Speed values are observations from a particular measurement run, not a permanent performance guarantee or an acceptance gate for generation quality.
+Each model may carry LLM/Vision purposes, a five-level recommendation, Japanese and English evaluation comments, and a measured speed class and label. Administrators can edit this metadata, and both admin and user model selection expose it on hover. Speed values are observations from a particular measurement run, not a permanent performance guarantee or an acceptance gate for generation quality. Beyond normal generation, Batch has no image input, so it shows the current Stage 1/2 models and opens a model dialog without Vision. Demo separately selects its instruction-generation LLM and rendering Stage 1/2 models, while Okugaki selects from Vision cards grouped by provider. These cards expose the same evaluation metadata on hover using a theme-independent high-contrast tooltip.
 
 Refine adds Language comparison beside Adjust and Model comparison. It uses the same three comparison modes: shared Stage 1/2 language, fixed Stage 1 with Stage 2 comparison, and Stage 1 comparison with fixed Stage 2. Japanese and English can be assigned per stage only for an explicit comparison run, without changing automatic detection for normal generation. The target's identical language combination is excluded, results show the Stage 1/2 language pair and normalized DDL, and an adopted result records the pair in lineage metadata. Changing the target clears results and aborts an in-flight language comparison.
 
@@ -1377,6 +1377,15 @@ The language should remain reusable by other implementations while preserving
 the reference implementation as one concrete path.
 
 ---
+
+## Autonomous Refinement Methods
+
+Lineage's autonomous refinement is a bounded run of 1–10 generations whose final judgment remains human. Before starting, the user chooses one method:
+
+- `Random automatic refinement` randomly chooses each generation's variation kind from the enabled reading, color-catalog, layout, and touch elements. It does not use Vision.
+- `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed variation kind; that advice becomes input to the next generation.
+
+The Vision method is a finite advisory loop, not quality optimization or automatic acceptance. Vision must not score, rank, accept, reject, praise, condemn, or discard a generated work. Intermediate generations remain `lineage_only`, the final generation enters regular history, and all generations remain in lineage. Derivation metadata records the method, Vision model, observation, and next direction, while the modal shows the latest advice. The model may be changed between runs but remains fixed during one run. Only the human may save, promote, star, or finally choose a work.
 
 ## Okugaki: Reciting a Lineage
 

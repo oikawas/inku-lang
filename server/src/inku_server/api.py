@@ -29,6 +29,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Requ
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from .feature_analysis import composition_distance
 from .okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL, generate_okugaki
 from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
@@ -1014,6 +1015,22 @@ class HistoryLineageGroupListResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+class VisionRefineAdviceBody(BaseModel):
+    history_id: str = Field(..., min_length=1, max_length=200)
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    instruction: str = Field(..., min_length=1, max_length=100_000)
+    direction: str = Field(default="", max_length=2000)
+    enabled_kinds: list[str] = Field(..., min_length=1, max_length=4)
+    language: str = Field(default="ja", pattern="^(ja|en)$")
+
+
+class VisionRefineAdviceResponse(BaseModel):
+    observation: str
+    next_direction: str
+    suggested_kind: str
+    model: str
 
 
 class OkugakiGenerateBody(BaseModel):
@@ -3086,6 +3103,37 @@ def api_lineage_promote(node_id: str, actor: dict = Depends(_current_user)) -> H
     if item is None:
         raise HTTPException(status_code=404, detail="lineage item not found")
     return HistoryItem(**item)
+
+
+@app.post("/api/refine/vision-advice", response_model=VisionRefineAdviceResponse)
+def api_vision_refine_advice(
+    body: VisionRefineAdviceBody,
+    actor: dict = Depends(_current_user),
+) -> VisionRefineAdviceResponse:
+    invalid_kinds = [kind for kind in body.enabled_kinds if kind not in AUTONOMOUS_REFINE_KINDS]
+    if invalid_kinds:
+        raise HTTPException(status_code=422, detail=f"unsupported refinement kind: {invalid_kinds[0]}")
+    items = _db.get_items(actor["id"], [body.history_id])
+    if not items:
+        raise HTTPException(status_code=404, detail="refinement source not found")
+    svg = str(items[0].get("svg") or "")
+    if not svg:
+        raise HTTPException(status_code=422, detail="refinement source has no image")
+    try:
+        advice = vision_refine_advice(
+            svg=svg,
+            instruction=body.instruction,
+            direction=body.direction,
+            enabled_kinds=body.enabled_kinds,
+            model=_resolved_vision_model(body.model, actor),
+            language=body.language,
+            settings=_db.get_model_settings(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _unexpected_http_error("Vision refinement advice", 502) from exc
+    return VisionRefineAdviceResponse(**advice)
 
 
 @app.get("/api/lineage/{node_id}/okugaki", response_model=list[OkugakiItem], response_model_exclude_none=True)

@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import { providerOfModel, type Provider, type ProviderGroup } from '$lib/models';
+	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { DemoSettings } from '$lib/demo';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
+	import ModelCardPicker from './ModelCardPicker.svelte';
 
 	type Props = {
 		settings: DemoSettings;
@@ -24,12 +25,15 @@
 		canSaveCurrent: boolean;
 		savingCurrent: boolean;
 		actionDisabled: boolean;
+		drawingStage1ModelLabel: string;
+		drawingStage2ModelLabel: string;
 		saveStatus: string | null;
 		error: string | null;
 		onSettingsChange: (settings: DemoSettings) => void | Promise<void>;
 		onSaveCurrent: () => void | Promise<void>;
 		onStart: () => void | Promise<void>;
 		onStop: () => void;
+		onOpenDrawingModelSelection: () => void;
 	};
 
 	let {
@@ -51,30 +55,22 @@
 		canSaveCurrent,
 		savingCurrent,
 		actionDisabled,
+		drawingStage1ModelLabel,
+		drawingStage2ModelLabel,
 		saveStatus,
 		error,
 		onSettingsChange,
 		onSaveCurrent,
 		onStart,
 		onStop,
+		onOpenDrawingModelSelection,
 	}: Props = $props();
 
-	const configuredProviderGroups = $derived(providerGroups.filter((group) => group.models.length > 0));
-	const promptProvider = $derived(
-		configuredProviderGroups.find((group) => group.models.some((model) => model.id === settings.prompt_model))?.id
-			?? configuredProviderGroups[0]?.id
-			?? providerOfModel(settings.prompt_model)
-	);
-	const promptModels = $derived(configuredProviderGroups.find((group) => group.id === promptProvider)?.models ?? []);
+	const promptModels = $derived(providerGroups.flatMap((group) => group.models));
 
 	function updateSettings(patch: Partial<DemoSettings>) {
 		settings = { ...settings, ...patch };
 		void onSettingsChange(settings);
-	}
-
-	function setPromptProvider(provider: Provider) {
-		const model = configuredProviderGroups.find((group) => group.id === provider)?.models[0]?.id ?? settings.prompt_model;
-		updateSettings({ prompt_model: model });
 	}
 
 	function stepInterval(delta: number) {
@@ -124,22 +120,11 @@
 			/>
 			<span>{t().demoRandomColorCatalog}</span>
 		</label>
-		<label>
-			<span>{t().providerLabel}</span>
-			<select value={promptProvider} disabled={running} onchange={(event) => setPromptProvider((event.currentTarget as HTMLSelectElement).value as Provider)}>
-				{#each configuredProviderGroups as group (group.id)}
-					<option value={group.id}>{group.label}</option>
-				{/each}
-			</select>
-		</label>
-		<label>
-			<span>{t().demoPromptModel}</span>
-			<select value={settings.prompt_model} disabled={running} onchange={(event) => updateSettings({ prompt_model: (event.currentTarget as HTMLSelectElement).value })}>
-				{#each promptModels as model (model.id)}
-					<option value={model.id}>{model.label}</option>
-				{/each}
-			</select>
-		</label>
+		<div class="wide"><ModelCardPicker label={t().demoPromptModel} selectedModel={settings.prompt_model} {providerGroups} disabled={running} onSelect={(_provider: Provider, model: string) => updateSettings({ prompt_model: model })} /></div>
+		<div class="drawing-model-summary wide">
+			<span class="drawing-title">描画用モデル / Drawing models</span>
+			<div><span><b>Stage 1</b>{drawingStage1ModelLabel}</span><span><b>Stage 2</b>{drawingStage2ModelLabel}</span><button type="button" disabled={running} onclick={onOpenDrawingModelSelection}>{t().modelSelectButton}</button></div>
+		</div>
 		<label class="wide">
 			<span>{t().demoSeedPhrase}</span>
 			<textarea
@@ -220,7 +205,15 @@
 
 <style>
 	.demo-panel { display: flex; flex-direction: column; gap: 10px; }
+	.drawing-model-summary { display: grid; gap: 4px; }
+	.drawing-title { color: var(--fg2); font-size: 11px; }
+	.drawing-model-summary > div { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; gap: 6px; }
+	.drawing-model-summary > div > span { display: grid; gap: 2px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: 10px; overflow-wrap: anywhere; }
+	.drawing-model-summary b { color: var(--fg3); font-size: 8px; letter-spacing: .06em; }
+	.drawing-model-summary button { padding: 6px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--accent); font: inherit; font-size: 10px; cursor: pointer; }
+	.drawing-model-summary button:disabled { opacity: .45; cursor: not-allowed; }
 	.demo-grid {
+
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 8px;
@@ -238,7 +231,6 @@
 		min-height: 30px;
 	}
 	.wide { grid-column: 1 / -1; }
-	select,
 	input,
 	textarea {
 		border: 1px solid var(--border2);

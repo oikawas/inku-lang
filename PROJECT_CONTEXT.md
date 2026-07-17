@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.89 / Build 574**
+**Target version: v1.89 / Build 575**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -71,7 +71,7 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-The latest v1.89 / Build 574 change separates per-user Stage 1/2 LLM settings from the Vision model used to read images. Model catalogs are divided by purpose, and Okugaki and CLI Vision operations use the Vision default.
+The latest v1.89 / Build 575 change adds purposes, five-level recommendations, bilingual evaluation comments, and measured speed labels to the separate LLM/Vision catalogs. Administrators can edit the values, which appear on hover in admin and user model selection.
 
 ## Where to Look for a Change
 

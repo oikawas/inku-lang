@@ -6,6 +6,11 @@ export type ModelOption = {
 	notes?: string;
 	purposes?: ('llm' | 'vision')[];
 	enabled?: boolean;
+	recommendation_level?: number;
+	speed_class?: string;
+	speed_label?: string;
+	comment_ja?: string;
+	comment_en?: string;
 };
 
 export type ProviderGroup = {

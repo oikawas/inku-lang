@@ -24,7 +24,13 @@ from sqlalchemy import create_engine, inspect, text
 from inku_server import db
 from inku_server import api as api_module
 from inku_server.api import app
-from inku_server.model_settings import connection_for, default_model_settings, update_model_settings
+from inku_server.model_settings import (
+    connection_for,
+    default_model_settings,
+    model_provider_catalog,
+    normalize_model_settings,
+    update_model_settings,
+)
 from inku_server.schema import Score
 
 client = TestClient(app)
@@ -2294,6 +2300,67 @@ def test_log_retention_settings_are_admin_only():
         db.delete_user_group(group["id"])
 
 
+def test_verified_nvidia_model_metadata_and_purpose_catalogs():
+    settings = default_model_settings()
+    nvidia_models = settings["providers"]["nvidia"]["models"]
+    assert len(nvidia_models) == 29
+
+    gemma = next(model for model in nvidia_models if model["id"] == "google/gemma-4-31b-it")
+    assert gemma["purposes"] == ["llm", "vision"]
+    assert gemma["recommendation_level"] == 5
+    assert gemma["speed_class"] == "fast"
+    assert gemma["speed_label"] == "高速 (約15〜22秒)"
+    assert "本命モデル" in gemma["comment_ja"]
+
+    llm_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="llm") if provider["id"] == "nvidia")
+    vision_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="vision") if provider["id"] == "nvidia")
+    assert len(llm_nvidia["models"]) == 22
+    assert len(vision_nvidia["models"]) == 12
+
+    normalized = normalize_model_settings({
+        "model_catalog_version": settings["model_catalog_version"],
+        "providers": {
+            "nvidia": {
+                "models": [{
+                    "id": "google/gemma-4-31b-it",
+                    "label": "Gemma custom label",
+                    "purposes": ["vision"],
+                    "recommendation_level": 2,
+                    "speed_class": "medium",
+                    "speed_label": "再計測 約30秒",
+                    "comment_ja": "管理者による再評価",
+                    "comment_en": "Administrator override",
+                }],
+            },
+        },
+    })
+    normalized_models = normalized["providers"]["nvidia"]["models"]
+    assert len(normalized_models) == 29
+    overridden = next(model for model in normalized_models if model["id"] == "google/gemma-4-31b-it")
+    assert overridden["label"] == "Gemma custom label"
+    assert overridden["purposes"] == ["vision"]
+    assert overridden["recommendation_level"] == 2
+    assert overridden["speed_label"] == "再計測 約30秒"
+    assert overridden["comment_en"] == "Administrator override"
+
+    legacy = normalize_model_settings({
+        "providers": {
+            "nvidia": {
+                "models": [{
+                    "id": "google/gemma-4-31b-it",
+                    "label": "Legacy stored label",
+                    "purposes": ["llm"],
+                }],
+            },
+        },
+    })
+    legacy_gemma = next(model for model in legacy["providers"]["nvidia"]["models"] if model["id"] == "google/gemma-4-31b-it")
+    assert legacy_gemma["label"] == "Legacy stored label"
+    assert legacy_gemma["purposes"] == ["llm", "vision"]
+    assert legacy_gemma["recommendation_level"] == 5
+    assert legacy_gemma["speed_label"] == "高速 (約15〜22秒)"
+
+
 def test_model_settings_store_keys_server_side(monkeypatch):
     monkeypatch.setenv("INKU_SECRET_KEY", "test-secret-for-model-settings")
     suffix = uuid.uuid4().hex[:8]
@@ -2359,8 +2426,10 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
     nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
     nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
-    assert all("vision" not in model["purposes"] for model in nvidia_llm["models"])
-    assert [model["id"] for model in nvidia_vision["models"]] == ["meta/llama-3.2-90b-vision-instruct"]
+    assert len(nvidia_llm["models"]) == 22
+    assert len(nvidia_vision["models"]) == 12
+    assert all("llm" in model["purposes"] for model in nvidia_llm["models"])
+    assert all("vision" in model["purposes"] for model in nvidia_vision["models"])
 
     r = client.put(
         "/api/settings/models",

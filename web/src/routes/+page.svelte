@@ -27,7 +27,8 @@
 		providerOfModel,
 		qualifiedModelId,
 		type Provider,
-		type ProviderGroup
+		type ProviderGroup,
+		type ModelOption
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
@@ -203,7 +204,7 @@
 		default_base_url?: string;
 		requires_api_key?: boolean;
 		memo?: string;
-		models?: { id: string; label: string; notes?: string }[];
+		models?: ModelOption[];
 		base_url: string;
 		api_key_set: boolean;
 		api_key_hint: string | null;
@@ -1326,7 +1327,7 @@
 			kind: catalogProvider?.kind,
 			requires_api_key: catalogProvider?.requires_api_key,
 			memo: memoOverride ?? catalogProvider?.memo,
-			models: catalogProvider?.models ?? [],
+			models: provider.models ?? catalogProvider?.models ?? [],
 			base_url: provider.base_url,
 			api_key: provider.api_key || undefined,
 			clear_api_key: !!provider.clear_api_key,

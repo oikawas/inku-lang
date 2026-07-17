@@ -1697,7 +1697,9 @@ def api_settings_fetch_provider_models(
     for model in models:
         previous = previous_models.get(str(model["id"]))
         if previous:
-            model["purposes"] = previous.get("purposes", ["llm"])
+            for key in ("purposes", "recommendation_level", "speed_class", "speed_label", "comment_ja", "comment_en"):
+                if key in previous:
+                    model[key] = previous[key]
     previous_model_ids = {str(model.get("id")) for model in previous_provider.get("models", [])}
     previous_enabled_models = previous_provider.get("enabled_models") or {}
     enabled_models = {

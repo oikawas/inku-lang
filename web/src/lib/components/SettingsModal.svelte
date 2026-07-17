@@ -2,7 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
-	import type { Provider, ProviderGroup } from '$lib/models';
+	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 
 	type PluginItem = {
 		name: string;
@@ -86,7 +86,7 @@
 		default_base_url?: string;
 		requires_api_key?: boolean;
 		memo?: string;
-		models?: { id: string; label: string; notes?: string; purposes?: ('llm' | 'vision')[] }[];
+		models?: ModelOption[];
 		delete?: boolean;
 		base_url: string;
 		api_key_set: boolean;
@@ -311,6 +311,7 @@
 	let modelPickerSearch = $state('');
 	let modelPickerEnabledDraft = $state<Record<string, boolean>>({});
 	let modelPickerPurposeDraft = $state<Record<string, ('llm' | 'vision')[]>>({});
+	let modelPickerMetadataDraft = $state<Record<string, ModelOption>>({});
 	let editProviderId = $state<Provider | null>(null);
 	let editProviderLabel = $state('');
 	let memoProviderId = $state<Provider | null>(null);
@@ -426,6 +427,7 @@
 		modelPickerEnabledDraft = { ...(setting?.enabled_models ?? {}) };
 		const catalogProvider = providerGroups.find((group) => group.id === provider);
 		modelPickerPurposeDraft = Object.fromEntries((catalogProvider?.models ?? []).map((model) => [model.id, model.purposes ?? ['llm']]));
+		modelPickerMetadataDraft = Object.fromEntries((catalogProvider?.models ?? []).map((model) => [model.id, { ...model }]));
 		modelPickerProviderId = provider;
 	}
 
@@ -434,6 +436,7 @@
 		modelPickerSearch = '';
 		modelPickerEnabledDraft = {};
 		modelPickerPurposeDraft = {};
+		modelPickerMetadataDraft = {};
 	}
 
 	function modelEnabled(setting: ModelProviderSetting, modelId: string): boolean {
@@ -455,13 +458,53 @@
 		modelPickerEnabledDraft = { ...modelPickerEnabledDraft, [modelId]: next.length > 0 };
 	}
 
+	function modelDraft(model: ModelOption): ModelOption {
+		return {
+			...model,
+			...(modelPickerMetadataDraft[model.id] ?? {}),
+			purposes: modelPickerPurposeDraft[model.id] ?? model.purposes ?? ['llm'],
+		};
+	}
+
+	function updateModelMetadata(model: ModelOption, patch: Partial<ModelOption>): void {
+		modelPickerMetadataDraft = {
+			...modelPickerMetadataDraft,
+			[model.id]: { ...modelDraft(model), ...patch },
+		};
+	}
+
+	function modelPurposesLabel(model: ModelOption): string {
+		const purposes = model.purposes ?? ['llm'];
+		return purposes.map((purpose) => purpose === 'vision' ? 'Vision' : 'LLM').join(' / ') || '—';
+	}
+
+	function modelRecommendationLabel(model: ModelOption): string {
+		const level = Math.max(0, Math.min(5, Number(model.recommendation_level ?? 0)));
+		return level > 0 ? `${'★'.repeat(level)}${'☆'.repeat(5 - level)} (${level}/5)` : '—';
+	}
+
+	function modelComment(model: ModelOption): string {
+		return t().closeLabel === 'Close'
+			? (model.comment_en || model.comment_ja || '—')
+			: (model.comment_ja || model.comment_en || '—');
+	}
+
+	function modelTooltipText(model: ModelOption): string {
+		return [
+			`用途 / Use: ${modelPurposesLabel(model)}`,
+			`オススメ度 / Recommendation: ${modelRecommendationLabel(model)}`,
+			`速度 / Speed: ${model.speed_label || '—'}`,
+			`評価 / Comment: ${modelComment(model)}`,
+		].join('\n');
+	}
+
 	function serviceIdLabel(provider: Provider): string {
 		return `${t().settingsModelServiceId}: ${provider}`;
 	}
 
 	async function saveModelPicker() {
 		if (!modelPickerProvider) return;
-		const models = modelPickerProvider.models.map((model) => ({ ...model, purposes: modelPickerPurposeDraft[model.id] ?? model.purposes ?? ['llm'] }));
+		const models = modelPickerProvider.models.map((model) => modelDraft(model));
 		await onSaveModelProvider(modelPickerProvider.id, { models, enabled_models: modelPickerEnabledDraft });
 		closeModelPicker();
 	}
@@ -474,6 +517,7 @@
 		modelPickerEnabledDraft = { ...(setting?.enabled_models ?? {}) };
 		const provider = providerGroups.find((group) => group.id === providerId);
 		modelPickerPurposeDraft = Object.fromEntries((provider?.models ?? []).map((model) => [model.id, model.purposes ?? ['llm']]));
+		modelPickerMetadataDraft = Object.fromEntries((provider?.models ?? []).map((model) => [model.id, { ...model }]));
 	}
 
 	function hasPendingApiKey(setting: ModelProviderSetting): boolean {
@@ -500,7 +544,7 @@
 		const query = modelPickerSearch.trim().toLowerCase();
 		if (!query) return provider.models;
 		return provider.models.filter((model) => {
-			const text = `${model.id} ${model.label ?? ''} ${model.notes ?? ''}`.toLowerCase();
+			const text = `${model.id} ${model.label ?? ''} ${model.notes ?? ''} ${model.speed_label ?? ''} ${model.comment_ja ?? ''} ${model.comment_en ?? ''}`.toLowerCase();
 			return text.includes(query);
 		});
 	});
@@ -523,6 +567,15 @@
 		return new Date(ms).toLocaleString();
 	}
 </script>
+
+{#snippet modelMetadataCard(model: ModelOption)}
+	<span class="model-hover-card" role="tooltip">
+		<span><strong>用途 / Use</strong>{modelPurposesLabel(model)}</span>
+		<span><strong>オススメ度 / Recommendation</strong>{modelRecommendationLabel(model)}</span>
+		<span><strong>速度 / Speed</strong>{model.speed_label || '—'}</span>
+		<span><strong>評価 / Comment</strong>{modelComment(model)}</span>
+	</span>
+{/snippet}
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
 <div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
@@ -571,16 +624,19 @@
 							<h3>{provider.label}</h3>
 							<div class="generation-model-grid">
 								{#each provider.models as model (model.id)}
-									<button
-										type="button"
-										class:selected={modelSelected(provider.id, model.id)}
-										aria-pressed={modelSelected(provider.id, model.id)}
-										onclick={() => selectGenerationModel(provider.id, model.id)}
-									>
-										<strong>{model.label}</strong>
-										{#if model.notes}<span>{model.notes}</span>{/if}
-									</button>
-								{/each}
+								<button
+									type="button"
+									class="model-metadata-hover"
+									class:selected={modelSelected(provider.id, model.id)}
+									aria-pressed={modelSelected(provider.id, model.id)}
+									title={modelTooltipText(model)}
+									onclick={() => selectGenerationModel(provider.id, model.id)}
+								>
+									<strong>{model.label}</strong>
+									{#if model.notes}<span>{model.notes}</span>{/if}
+									{@render modelMetadataCard(model)}
+								</button>
+							{/each}
 							</div>
 						</section>
 					{/if}
@@ -1321,23 +1377,36 @@
 			/>
 			<div class="model-picker-list" aria-label={t().settingsModelPublishedModels}>
 				{#each filteredModelPickerModels as model, modelIndex (`${model.id}:${modelIndex}`)}
-					<label class="check-row model-picker-row">
-						<input
-							type="checkbox"
-							checked={modelPickerDraftEnabled(model.id)}
-							onchange={(e) => {
-								modelPickerEnabledDraft = {
-									...modelPickerEnabledDraft,
-									[model.id]: (e.currentTarget as HTMLInputElement).checked,
-								};
-							}}
-						/>
-						<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
-						<span class="model-purpose-label">
-							<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'llm'); }}>LLM</button>
-							<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'vision'); }}>Vision</button>
-						</span>
-					</label>
+					<div class="model-picker-entry">
+						<label class="check-row model-picker-row model-metadata-hover" title={modelTooltipText(modelDraft(model))}>
+							<input
+								type="checkbox"
+								checked={modelPickerDraftEnabled(model.id)}
+								onchange={(e) => {
+									modelPickerEnabledDraft = {
+										...modelPickerEnabledDraft,
+										[model.id]: (e.currentTarget as HTMLInputElement).checked,
+									};
+								}}
+							/>
+							<span>{model.label}{model.notes ? ` - ${model.notes}` : ''}</span>
+							<span class="model-purpose-label">
+								<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'llm'); }}>LLM</button>
+								<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'vision'); }}>Vision</button>
+							</span>
+							{@render modelMetadataCard(modelDraft(model))}
+						</label>
+						<details class="model-metadata-editor">
+							<summary>評価設定 / Model metadata</summary>
+							<div class="model-metadata-fields">
+								<label><span>オススメ度 / Recommendation</span><select value={modelDraft(model).recommendation_level ?? 0} onchange={(event) => updateModelMetadata(model, { recommendation_level: Number(event.currentTarget.value) || undefined })}><option value="0">—</option>{#each [1, 2, 3, 4, 5] as level}<option value={level}>{level} / 5</option>{/each}</select></label>
+								<label><span>速度区分 / Speed class</span><select value={modelDraft(model).speed_class ?? ''} onchange={(event) => updateModelMetadata(model, { speed_class: event.currentTarget.value || undefined })}><option value="">—</option><option value="ultra-fast">ultra-fast</option><option value="fast">fast</option><option value="medium">medium</option><option value="slow">slow</option><option value="low-speed-outlier">low-speed-outlier</option></select></label>
+								<label class="wide"><span>実測値に基づく速度ラベル / Measured speed label</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
+								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
+								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
+							</div>
+						</details>
+					</div>
 				{/each}
 			</div>
 		</div>
@@ -1403,6 +1472,18 @@
 	.generation-model-grid strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
 	.generation-model-grid span { color: var(--fg3); font-size: 10px; }
 	.model-thinking-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+	.model-metadata-hover { position: relative; }
+	.model-hover-card {
+		display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 520;
+		width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px;
+		border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel);
+		box-shadow: 0 8px 24px rgba(0,0,0,.2); color: var(--fg2); text-align: left;
+		pointer-events: none; white-space: normal;
+	}
+	.model-hover-card > span { display: grid; gap: 2px; font-size: 11px; line-height: 1.45; }
+	.model-hover-card > span + span { margin-top: 6px; }
+	.model-hover-card strong { color: var(--fg3); font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+	.model-metadata-hover:hover .model-hover-card, .model-metadata-hover:focus-visible .model-hover-card, .model-metadata-hover:focus-within .model-hover-card { display: block; }
 	.settings-tabs {
 		display: flex; flex: 0 0 auto; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg);
 	}
@@ -2325,4 +2406,12 @@
 	}
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+	.model-picker-entry { min-width: 0; }
+	.model-metadata-editor { margin-top: 3px; padding: 0 7px 6px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+	.model-metadata-editor summary { padding: 6px 0; color: var(--fg3); font-size: 10px; cursor: pointer; }
+	.model-metadata-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+	.model-metadata-fields label { display: grid; gap: 3px; min-width: 0; color: var(--fg3); font-size: 9px; letter-spacing: .03em; }
+	.model-metadata-fields label.wide { grid-column: 1 / -1; }
+	.model-metadata-fields input, .model-metadata-fields select, .model-metadata-fields textarea { min-width: 0; width: 100%; box-sizing: border-box; padding: 6px 7px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--bg); color: var(--fg); font: inherit; font-size: 11px; }
+	.model-metadata-fields textarea { resize: vertical; line-height: 1.4; }
 </style>

@@ -11,6 +11,7 @@ from copy import deepcopy
 from typing import Any
 
 from .secrets import decrypt_secret, encrypt_secret
+from .verified_model_catalog import MODEL_CONFIG_VERSION, VERIFIED_NVIDIA_MODELS
 
 PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
     {
@@ -64,13 +65,7 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         "base_url_env": "NVIDIA_BASE_URL",
         "default_base_url": "https://integrate.api.nvidia.com/v1",
         "requires_api_key": True,
-        "models": [
-            {"id": "meta/llama-3.2-90b-vision-instruct", "label": "Llama 3.2 90B Vision Instruct", "notes": "vision"},
-            {"id": "qwen/qwen3.5-397b-a17b", "label": "Qwen3.5 397B A17B"},
-            {"id": "google/gemma-4-31b-it", "label": "Google Gemma 4 31B Instruct"},
-            {"id": "meta/llama-3.3-70b-instruct", "label": "Meta Llama 3.3 70B Instruct"},
-            {"id": "mistralai/mistral-large-2-instruct", "label": "Mistral AI Mistral Large 2 Instruct"},
-        ],
+        "models": VERIFIED_NVIDIA_MODELS,
     },
     {
         "id": "ollama",
@@ -151,12 +146,20 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             if not clean_purposes:
                 clean_purposes = ["llm"]
             item["purposes"] = clean_purposes
+            recommendation = model.get("recommendation_level")
+            if isinstance(recommendation, int) and not isinstance(recommendation, bool):
+                item["recommendation_level"] = max(1, min(5, recommendation))
+            for key in ("speed_class", "speed_label", "comment_ja", "comment_en"):
+                value = model.get(key)
+                if isinstance(value, str) and value.strip():
+                    item[key] = value.strip()
             normalized.append(item)
     return normalized
 
 
 def default_model_settings() -> dict[str, Any]:
     return {
+        "model_catalog_version": MODEL_CONFIG_VERSION,
         "providers": {
             str(provider["id"]): {
                 "id": provider["id"],
@@ -200,6 +203,7 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(settings, dict):
         return default
     clean = deepcopy(default)
+    incoming_catalog_version = str(settings.get("model_catalog_version") or "")
     providers = settings.get("providers")
     if isinstance(providers, dict):
         for raw_provider_id, incoming in providers.items():
@@ -252,7 +256,18 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 provider["memo"] = incoming["memo"].strip()
             models = _normalize_models(incoming.get("models"))
             if models:
-                provider["models"] = models
+                if provider_id == "nvidia" and builtin:
+                    merged = {str(model["id"]): model for model in provider["models"]}
+                    metadata_keys = ("purposes", "recommendation_level", "speed_class", "speed_label", "comment_ja", "comment_en")
+                    for model in models:
+                        model_id = str(model["id"])
+                        combined = {**merged.get(model_id, {}), **model}
+                        if incoming_catalog_version != MODEL_CONFIG_VERSION and model_id in merged:
+                            combined.update({key: merged[model_id][key] for key in metadata_keys if key in merged[model_id]})
+                        merged[model_id] = combined
+                    provider["models"] = list(merged.values())
+                else:
+                    provider["models"] = models
             if not provider.get("default_base_url") and provider.get("base_url"):
                 provider["default_base_url"] = provider["base_url"]
             known_model_ids = {str(model["id"]) for model in provider["models"]}

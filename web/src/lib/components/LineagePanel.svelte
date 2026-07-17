@@ -34,6 +34,9 @@
 		isJapanese: boolean;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string) => void | Promise<void>;
+		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
+		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrash: (historyIds: string[]) => void;
@@ -43,11 +46,12 @@
 		onPaintOne: (text: string, options: any) => Promise<any>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 		visionModel: string;
+		okugakiModel: string;
 		visionProviderGroups: ProviderGroup[];
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, visionModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
@@ -62,8 +66,13 @@
 	let overviewScale = $state(1);
 	let activeMenuNodeId = $state<string | null>(null);
 	let activeAIRefineNode = $state<LineageNode | null>(null);
+	let activeEditNode = $state<LineageNode | null>(null);
+	let editMode = $state<'description' | 'ddl' | null>(null);
+	let editDraft = $state('');
+	let editDrawing = $state(false);
+	let editError = $state<string | null>(null);
 	let okugakiOpen = $state(false);
-	let okugakiModel = $state('');
+	let selectedOkugakiModel = $state('');
 	let okugakiItems = $state<OkugakiItem[]>([]);
 	let okugakiLoading = $state(false);
 	let okugakiGenerating = $state(false);
@@ -212,15 +221,18 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	async function generateOkugaki(): Promise<void> {
 		const nodeId = graph?.focus_node_id;
-		if (!nodeId || !okugakiModel.trim() || okugakiGenerating) return;
+		if (!nodeId || !selectedOkugakiModel.trim() || okugakiGenerating) return;
 		okugakiGenerating = true;
 		okugakiError = null;
 		try {
 			const response = await fetch(`/api/lineage/${encodeURIComponent(nodeId)}/okugaki`, {
 				method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': createIdempotencyKey() },
-				body: JSON.stringify({ model: okugakiModel.trim(), language: isJapanese ? 'ja' : 'en', save: true })
+				body: JSON.stringify({ model: selectedOkugakiModel.trim(), language: isJapanese ? 'ja' : 'en', save: true })
 			});
-			if (!response.ok) throw new Error((await response.text()) || `HTTP ${response.status}`);
+			if (!response.ok) {
+				const payload = await response.json().catch(() => null) as { detail?: string } | null;
+				throw new Error(payload?.detail || `HTTP ${response.status}`);
+			}
 			okugakiItems = [...okugakiItems, await response.json()];
 			okugakiLoadedTarget = nodeId;
 		} catch (cause) {
@@ -235,6 +247,61 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		const response = await fetch(`/api/okugaki/${encodeURIComponent(item.id)}`, { method: 'DELETE', credentials: 'include' });
 		if (response.ok) okugakiItems = okugakiItems.filter((entry) => entry.id !== item.id);
 		else okugakiError = (await response.text()) || `HTTP ${response.status}`;
+	}
+
+	function openEditDialog(node: LineageNode, mode: 'description' | 'ddl'): void {
+		if (!node.history) return;
+		activeEditNode = node;
+		editMode = mode;
+		editDraft = mode === 'description'
+			? (node.history.source_text ?? node.history.input ?? '')
+			: (node.history.ddl ?? '');
+		editError = null;
+		activeMenuNodeId = null;
+	}
+
+	function closeEditDialog(): void {
+		if (editDrawing) return;
+		activeEditNode = null;
+		editMode = null;
+		editDraft = '';
+		editError = null;
+	}
+
+	async function drawEditedArtwork(): Promise<void> {
+		if (!activeEditNode || !editMode || !editDraft.trim() || editDrawing) return;
+		editDrawing = true;
+		editError = null;
+		try {
+			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft);
+			else await onDrawDdl(activeEditNode, editDraft);
+			activeEditNode = null;
+			editMode = null;
+			editDraft = '';
+		} catch (cause) {
+			editError = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			editDrawing = false;
+		}
+	}
+
+	async function selectOkugakiModel(provider: Provider, model: string): Promise<void> {
+		const nextModel = qualifiedModelId(provider, model);
+		const previous = selectedOkugakiModel;
+		selectedOkugakiModel = nextModel;
+		okugakiError = null;
+		try {
+			await onSaveOkugakiModel(nextModel);
+		} catch (cause) {
+			selectedOkugakiModel = previous;
+			okugakiError = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
+
+	function handleDialogKeydown(event: KeyboardEvent): void {
+		if (event.key !== 'Escape') return;
+		if (activeEditNode && !editDrawing) closeEditDialog();
+		else if (okugakiOpen && !okugakiGenerating) okugakiOpen = false;
 	}
 
 	async function toggleBranch(node: LineageNode): Promise<void> {
@@ -375,6 +442,8 @@ $effect(() => {
 
 </script>
 
+<svelte:window onkeydown={handleDialogKeydown} />
+
 <section class="lineage-panel" class:overview={overviewOpen}>
 	<header>
 		<div>
@@ -383,7 +452,7 @@ $effect(() => {
 			{#if graph}<p class="lineage-context">{isJapanese ? '表示中の作品が、次の推敲の親になります。' : 'The displayed artwork will be the parent of your next refinement.'}</p>{/if}
 		</div>
 <div class="lineage-actions">
-	<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { okugakiModel = visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
+	<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
 	{#if overviewOpen}
 		<div class="overview-zoom"><button type="button" onclick={() => (overviewScale = Math.max(.4, overviewScale - .1))}>−</button><span>{Math.round(overviewScale * 100)}%</span><button type="button" onclick={() => (overviewScale = Math.min(1.4, overviewScale + .1))}>＋</button></div>
 		<button type="button" onclick={closeOverview}>{isJapanese ? '通常表示へ戻る' : 'Close overview'}</button>
@@ -417,12 +486,12 @@ $effect(() => {
 					{/each}
 				</svg>
 				{#each columns as [depth, nodes] (depth)}
-					<div class="lineage-column">
+					<div class="lineage-column" class:menu-layer={nodes.some((node) => node.id === activeMenuNodeId)}>
 						<div class="generation">{isJapanese ? `第${depth + 1}世代` : `Generation ${depth + 1}`}</div>
 						{#each nodes as node (node.id)}
 							{@const edge = edgeByChild.get(node.id)}
 							{@const childCount = node.child_count ?? childrenByParent.get(node.id)?.length ?? 0}
-							<article use:registerCard={node.id} class="lineage-card" class:focus={node.id === graph.focus_node_id} class:tombstone={node.state === 'tombstone'} class:trashed={!!node.history?.trashed}>
+							<article use:registerCard={node.id} class="lineage-card" class:focus={node.id === graph.focus_node_id} class:tombstone={node.state === 'tombstone'} class:trashed={!!node.history?.trashed} class:menu-open={node.id === activeMenuNodeId}>
 <div class="card-toolbar">
 {#if node.history?.id && !node.history.trashed}
 	<label class="card-check" aria-label={isJapanese ? '一括操作の対象にする' : 'Check for bulk actions'}>
@@ -441,6 +510,12 @@ $effect(() => {
 	</button>
 	{#if activeMenuNodeId === node.id}
 		<div class="card-dropdown-menu" role="menu">
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
+				{isJapanese ? '記述を編集' : 'Edit description'}
+			</button>
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'ddl'); }}>
+				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
+			</button>
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
 				{isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
 			</button>
@@ -510,14 +585,36 @@ $effect(() => {
 	{/if}
 </section>
 
+{#if activeEditNode && editMode}
+	<button type="button" class="lineage-edit-backdrop" aria-label={isJapanese ? '編集ダイアログを閉じる' : 'Close edit dialog'} disabled={editDrawing} onclick={closeEditDialog}></button>
+	<div class="lineage-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="lineage-edit-title" tabindex="-1">
+			<header>
+				<div>
+					<h2 id="lineage-edit-title">{editMode === 'description' ? (isJapanese ? '記述を編集' : 'Edit description') : (isJapanese ? 'DDLを編集' : 'Edit DDL')}</h2>
+					<p>{isJapanese ? '描画すると、選択した作品の子として系譜へ保存します。' : 'Drawing saves a new child of the selected artwork.'}</p>
+				</div>
+				<button type="button" disabled={editDrawing} aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeEditDialog}>×</button>
+			</header>
+			<div class="lineage-edit-body">
+				<label for="lineage-edit-text">{editMode === 'description' ? (isJapanese ? '記述' : 'Description') : 'DDL'}</label>
+				<textarea id="lineage-edit-text" class:ddl-editor={editMode === 'ddl'} rows={editMode === 'ddl' ? 18 : 9} bind:value={editDraft} spellcheck={editMode === 'description'} disabled={editDrawing}></textarea>
+				{#if editError}<div class="lineage-message error">{editError}</div>{/if}
+			</div>
+			<footer>
+				<button type="button" disabled={editDrawing} onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
+				<button type="button" class="edit-draw" disabled={editDrawing || !editDraft.trim()} onclick={drawEditedArtwork}>{editDrawing ? (isJapanese ? '描画中…' : 'Drawing…') : (isJapanese ? '描画' : 'Draw')}</button>
+			</footer>
+	</div>
+{/if}
+
 {#if okugakiOpen}
 	<div class="okugaki-backdrop" role="presentation">
 		<div class="okugaki-dialog" role="dialog" aria-modal="true" aria-labelledby="okugaki-title" tabindex="-1">
 			<header><div><h2 id="okugaki-title">{t().okugakiTitle}</h2><p>{t().okugakiDescription}</p></div><button type="button" disabled={okugakiGenerating} onclick={() => (okugakiOpen = false)}>×</button></header>
 			<div class="okugaki-controls">
 				<p>{t().okugakiBranchConfirm.replace('{count}', String(ancestorIds.size))}</p>
-				<ModelCardPicker label={t().okugakiModel} selectedModel={okugakiModel} providerGroups={visionProviderGroups} disabled={okugakiGenerating} onSelect={(provider: Provider, model: string) => { okugakiModel = qualifiedModelId(provider, model); }} />
-				<button class="okugaki-generate" type="button" disabled={okugakiGenerating || !okugakiModel.trim()} onclick={generateOkugaki}>{okugakiGenerating ? t().okugakiReading : t().okugakiAppend}</button>
+				<ModelCardPicker label={t().okugakiModel} selectedModel={selectedOkugakiModel} providerGroups={visionProviderGroups} disabled={okugakiGenerating} onSelect={(provider: Provider, model: string) => void selectOkugakiModel(provider, model)} />
+				<button class="okugaki-generate" type="button" disabled={okugakiGenerating || !selectedOkugakiModel.trim()} onclick={generateOkugaki}>{okugakiGenerating ? t().okugakiReading : t().okugakiAppend}</button>
 				{#if okugakiGenerating}<div class="okugaki-progress" aria-live="polite"><span></span>{t().okugakiProgress}</div>{/if}
 				{#if okugakiError}<div class="lineage-message error">{okugakiError}</div>{/if}
 			</div>
@@ -568,14 +665,28 @@ $effect(() => {
 	.lineage-arrow.tombstone-arrow { stroke-dasharray: 5 4; }
 	.lineage-arrows marker path { fill: var(--fg2); }
 	.lineage-column { position: relative; z-index: 1; width: 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 14px 18px; }
+	.lineage-column.menu-layer { z-index: 20; }
 	.generation { flex: 0 0 100%; color: var(--fg3); font-size: .72rem; text-align: center; }
 	.lineage-card { position: relative; box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); }
+	.lineage-card.menu-open { z-index: 10; overflow: visible; }
 	.lineage-card.focus { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 	.lineage-card.tombstone { border-style: dashed; opacity: .72; }
 	.lineage-card.trashed { opacity: .62; filter: grayscale(.35); }
 	.card-toolbar { position: relative; z-index: 3; min-height: 22px; margin-bottom: 6px; padding-right: 26px; display: flex; align-items: flex-start; gap: 5px; }
 	.card-check { flex: 0 0 auto; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
 	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
+	.lineage-edit-backdrop { position: fixed; inset: 0; z-index: 1460; width: 100%; height: 100%; border: 0; padding: 0; background: #0009; cursor: default; }
+	.lineage-edit-dialog { position: fixed; z-index: 1461; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(780px, 96vw); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
+	.lineage-edit-dialog > header { padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }
+	.lineage-edit-dialog > header button { border: 0; background: transparent; color: var(--fg2); font-size: 1.35rem; cursor: pointer; }
+	.lineage-edit-body { min-height: 0; overflow-y: auto; display: grid; gap: 8px; padding: 18px 20px; }
+	.lineage-edit-body label { color: var(--fg2); font-size: .78rem; font-weight: 700; }
+	.lineage-edit-body textarea { box-sizing: border-box; width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--border2); border-radius: 8px; padding: 12px 14px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.65; }
+	.lineage-edit-body textarea.ddl-editor { min-height: 390px; tab-size: 2; white-space: pre; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.55; }
+	.lineage-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
+	.lineage-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
+	.lineage-edit-dialog > footer .edit-draw { border-color: var(--accent); background: var(--accent); color: var(--accent-fg, #111); font-weight: 700; }
+	.lineage-edit-dialog button:disabled, .lineage-edit-dialog textarea:disabled { opacity: .55; cursor: default; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
 	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
 	.okugaki-dialog > header { padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }

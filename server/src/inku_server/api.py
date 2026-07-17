@@ -3174,6 +3174,13 @@ def api_okugaki_generate(
             item = _db.add_okugaki(actor["id"], item, idempotency_key=idempotency_key)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        detail = (
+            "Visionモデルがタイムアウトしました。完了済みの世代所見は一時保存されています。再度追記してください。"
+            if body.language == "ja"
+            else "The Vision model timed out. Completed generation readings are cached temporarily; retry the append."
+        )
+        raise HTTPException(status_code=504, detail=detail) from exc
     except Exception as exc:  # noqa: BLE001
         raise _unexpected_http_error("okugaki generation", 502) from exc
     return OkugakiItem(**item)

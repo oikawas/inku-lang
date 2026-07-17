@@ -195,6 +195,7 @@
 		stage2_model: string;
 		vision_provider: Provider;
 		vision_model: string;
+		okugaki_model?: string;
 		model_inspection_selected_models?: string[];
 		instruction_caption_visible?: boolean;
 	};
@@ -676,6 +677,7 @@
 		stage2Model = settings.stage2_model;
 		visionProvider = settings.vision_provider;
 		visionModel = settings.vision_model;
+		okugakiModel = settings.okugaki_model || qualifiedModelId(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
 		modelInspectionSelectedModels = Array.isArray(settings.model_inspection_selected_models)
 			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
@@ -690,6 +692,27 @@
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			currentUser = await r.json() as UserItem;
 		} catch (e) { console.warn('failed to save instruction caption setting', e); }
+	}
+
+	async function persistOkugakiModel(model: string): Promise<void> {
+		const nextModel = model.trim();
+		if (!nextModel || nextModel === okugakiModel) return;
+		const previous = okugakiModel;
+		okugakiModel = nextModel;
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ model_settings: { okugaki_model: nextModel } })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			okugakiModel = previous;
+			console.warn('failed to save okugaki model', e);
+			throw e;
+		}
 	}
 
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
@@ -1028,6 +1051,7 @@
 			stage2_model: stage2Model,
 			vision_provider: visionProvider,
 			vision_model: visionModel,
+			okugaki_model: okugakiModel,
 			model_inspection_selected_models: modelInspectionSelectedModels,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
@@ -1991,6 +2015,7 @@
 	let stage2Model     = $state<string>(DEFAULT_MODEL);
 	let visionProvider  = $state<Provider>(DEFAULT_PROVIDER);
 	let visionModel     = $state<string>(DEFAULT_VISION_MODEL);
+	let okugakiModel    = $state<string>(qualifiedModelId(DEFAULT_PROVIDER, DEFAULT_VISION_MODEL));
 	let includeThinking = $state(false);
 
 	// ── Timer ───────────────────────────────────────────────
@@ -2261,7 +2286,7 @@ if (unreadWords.length > 0) {
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId } = {}): Promise<{
 		score: Score;
 		svg: string;
 		stage2_model?: string | null;
@@ -2299,8 +2324,8 @@ if (unreadWords.length > 0) {
 				original_text: originalText,
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
-				catalog_id: selectedCatalog,
-				canvas_aspect: effectiveCanvasAspectId(),
+				catalog_id: renderOptions.catalogId ?? selectedCatalog,
+				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 			})
 		});
@@ -3751,6 +3776,95 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 	outputTab = 'lineage';
 	lineageDetached = false;
 	await fetchLineage(node.id, true);
+}
+
+function lineageCatalogId(node: LineageNode): string {
+	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? selectedCatalog;
+}
+
+function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
+	return normalizeCanvasAspectId(node.history?.render_canvas_aspect_id ?? node.history?.render_canvas_aspect ?? node.history?.score?.canvas ?? effectiveCanvasAspectId());
+}
+
+async function showNewLineageChild(historyId: string | null | undefined, nodeId: string | null | undefined): Promise<void> {
+	if (!historyId || !nodeId) throw new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The rendered result could not be saved to the lineage.');
+	let found = await fetchHistoryOffset(0, { anchorId: historyId });
+	if (!found && historyStarredOnly) {
+		historyStarredOnly = false;
+		found = await fetchHistoryOffset(0, { anchorId: historyId });
+	}
+	const saved = historyItems.find((item) => item.id === historyId);
+	if (!saved) throw new Error(getLang() === 'ja' ? '保存した作品を読み込めませんでした。' : 'The saved artwork could not be loaded.');
+	outputTab = 'lineage';
+	loadIterationItem(saved);
+	await fetchLineage(nodeId, true);
+}
+
+async function drawLineageDescriptionEdit(node: LineageNode, text: string): Promise<void> {
+	const sourceText = text.trim();
+	if (!sourceText || !node.history) return;
+	const rendered = await paintOne(sourceText, {
+		sourceText,
+		historyInput: sourceText,
+		catalogId: lineageCatalogId(node),
+		canvasAspectId: lineageCanvasAspectId(node),
+		lineageParentNodeId: node.id,
+		derivationKind: 'description_edit',
+		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+	});
+	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
+}
+
+async function drawLineageDdlEdit(node: LineageNode, editedDdl: string): Promise<void> {
+	const nextDdl = editedDdl.trim();
+	if (!nextDdl || !node.history) return;
+	const sourceText = node.history.source_text ?? node.history.input ?? '';
+	const composed = await composeOne(nextDdl, sourceText, undefined, undefined, undefined, {
+		catalogId: lineageCatalogId(node),
+		canvasAspectId: lineageCanvasAspectId(node),
+	});
+	const resolvedEditStage1Model = node.history.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
+	const resolvedEditStage2Model = composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model);
+	const saved = await pushHistory({
+		input: sourceText,
+		source_text: sourceText,
+		ddl: nextDdl,
+		score: composed.score,
+		svg: composed.svg,
+		at: Date.now(),
+		elapsed_ms: composed.elapsed_ms,
+		stage1_model: resolvedEditStage1Model,
+		stage2_model: resolvedEditStage2Model,
+		tokens_in: composed.tokens_in,
+		tokens_out: composed.tokens_out,
+		catalog_id: lineageCatalogId(node),
+		render_build_number: composed.render_build_number,
+		render_color_profile: composed.render_color_profile,
+		render_engine_id: composed.render_engine_id,
+		render_engine_version: composed.render_engine_version,
+		render_color_catalog_id: composed.render_color_catalog_id,
+		render_color_catalog_name: composed.render_color_catalog_name,
+		render_color_catalog_sub: composed.render_color_catalog_sub,
+		render_color_map: composed.render_color_map,
+		render_canvas_aspect: composed.render_canvas_aspect,
+		render_canvas_aspect_id: composed.render_canvas_aspect_id,
+		render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
+		render_seed: composed.render_seed,
+		vary_seed: composed.vary_seed,
+		instruction_lang_requested: composed.instruction_lang_requested,
+		instruction_lang_resolved: composed.instruction_lang_resolved,
+		ui_lang: composed.ui_lang,
+		render_hash: composed.render_hash,
+		render_hash_short: composed.render_hash_short,
+	}, {
+		selectSaved: true,
+		countGeneration: true,
+		sourceText,
+		lineageParentNodeId: node.id,
+		derivationKind: 'ddl_edit',
+		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+	});
+	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
 }
 
 async function promoteLineageNode(node: LineageNode): Promise<void> {
@@ -5352,6 +5466,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusStage1Model}
 				{statusStage2Model}
 				visionModel={qualifiedModelId(visionProvider, visionModel)}
+				{okugakiModel}
 				visionProviderGroups={availableVisionModelCatalog}
 				{statusCatalogName}
 				{statusCanvasName}
@@ -5433,6 +5548,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{lineageError}
 				isJapanese={getLang() === 'ja'}
 				onOpenLineageNode={openLineageNode}
+				onDrawLineageDescription={drawLineageDescriptionEdit}
+				onDrawLineageDdl={drawLineageDdlEdit}
+				onSaveOkugakiModel={persistOkugakiModel}
 				onPromoteLineageNode={promoteLineageNode}
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}

@@ -8,10 +8,14 @@ earlier observation cannot contain information from a later generation.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
+from collections import OrderedDict
 from datetime import datetime
+from threading import Lock
+from time import monotonic
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
@@ -21,6 +25,8 @@ from .feature_analysis import composition_family
 from .model_settings import connection_for, provider_for_model
 
 DEFAULT_MODEL = os.getenv("INKU_OKUGAKI_MODEL", "meta/llama-3.2-90b-vision-instruct")
+_VISION_RESPONSE_CACHE: OrderedDict[str, tuple[float, str]] = OrderedDict()
+_VISION_RESPONSE_CACHE_LOCK = Lock()
 _EVALUATION_WORDS = {
     "ja": ("良い", "美しい", "成功", "失敗", "洗練", "優れ", "劣る", "最高", "最悪", "完成"),
     "en": ("good", "beautiful", "successful", "failure", "refined", "superior", "inferior", "best", "worst", "perfect"),
@@ -164,30 +170,36 @@ def build_generation_request(fact_sheet: dict[str, Any], index: int, prior_obser
     }
 
 
-def _png_data_url(svg: str) -> str:
-    png = cairosvg.svg2png(bytestring=svg.encode("utf-8"), output_width=768, output_height=768)
+def _png_data_url(svg: str, *, width: int = 512, height: int = 512) -> str:
+    png = cairosvg.svg2png(bytestring=svg.encode("utf-8"), output_width=width, output_height=height)
     return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
 
 
 def _vision_thumbnail_data_url(svgs: list[str]) -> str | None:
-    """Rasterize one work or one before/after pair into a single PNG."""
+    """Rasterize one work or one before/after pair once, preserving artwork aspect."""
     clean = [svg for svg in svgs if svg]
     if not clean:
         return None
-    if len(clean) == 1:
-        return _png_data_url(clean[0])
-    encoded = []
-    for svg in clean[:2]:
-        png = cairosvg.svg2png(bytestring=svg.encode("utf-8"), output_width=512, output_height=512)
-        encoded.append(base64.b64encode(png).decode("ascii"))
+    encoded = [base64.b64encode(svg.encode("utf-8")).decode("ascii") for svg in clean[:2]]
+    if len(encoded) == 1:
+        sheet = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">'
+            '<rect width="512" height="512" fill="white"/>'
+            f'<image href="data:image/svg+xml;base64,{encoded[0]}" x="0" y="0" width="512" height="512" '
+            'preserveAspectRatio="xMidYMid meet"/>'
+            '</svg>'
+        )
+        return _png_data_url(sheet)
     sheet = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="512" viewBox="0 0 1024 512">'
         '<rect width="1024" height="512" fill="white"/>'
-        f'<image href="data:image/png;base64,{encoded[0]}" x="0" y="0" width="512" height="512"/>'
-        f'<image href="data:image/png;base64,{encoded[1]}" x="512" y="0" width="512" height="512"/>'
+        f'<image href="data:image/svg+xml;base64,{encoded[0]}" x="0" y="0" width="512" height="512" '
+        'preserveAspectRatio="xMidYMid meet"/>'
+        f'<image href="data:image/svg+xml;base64,{encoded[1]}" x="512" y="0" width="512" height="512" '
+        'preserveAspectRatio="xMidYMid meet"/>'
         '</svg>'
     )
-    return _png_data_url(sheet)
+    return _png_data_url(sheet, width=768, height=384)
 
 
 def _system_prompt(language: str) -> str:
@@ -207,6 +219,48 @@ def _system_prompt(language: str) -> str:
     )
 
 
+def _cached_vision_response(cache_key: str, generate: Callable[[], str]) -> str:
+    """Reuse successful prefix reads so retrying a failed branch resumes cheaply."""
+    ttl_seconds = max(0.0, float(os.getenv("INKU_OKUGAKI_CACHE_TTL_SECONDS", "1800")))
+    if ttl_seconds == 0:
+        return generate()
+    now = monotonic()
+    with _VISION_RESPONSE_CACHE_LOCK:
+        cached = _VISION_RESPONSE_CACHE.get(cache_key)
+        if cached is not None and now - cached[0] <= ttl_seconds:
+            _VISION_RESPONSE_CACHE.move_to_end(cache_key)
+            return cached[1]
+        if cached is not None:
+            del _VISION_RESPONSE_CACHE[cache_key]
+    response = generate()
+    if not response:
+        return response
+    max_entries = max(1, int(os.getenv("INKU_OKUGAKI_CACHE_MAX_ENTRIES", "256")))
+    with _VISION_RESPONSE_CACHE_LOCK:
+        _VISION_RESPONSE_CACHE[cache_key] = (monotonic(), response)
+        _VISION_RESPONSE_CACHE.move_to_end(cache_key)
+        while len(_VISION_RESPONSE_CACHE) > max_entries:
+            _VISION_RESPONSE_CACHE.popitem(last=False)
+    return response
+
+
+def _vision_cache_key(
+    *, provider: str, model_id: str, base_url: str, language: str, request: dict[str, Any], images: list[str]
+) -> str:
+    payload = {
+        "version": 1,
+        "provider": provider,
+        "model": model_id,
+        "base_url": base_url,
+        "language": language,
+        "system_prompt": _system_prompt(language),
+        "request": request,
+        "images": [hashlib.sha256(image.encode("utf-8")).hexdigest() for image in images],
+    }
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _vision_chat(
     *,
     model: str,
@@ -221,8 +275,6 @@ def _vision_chat(
         raise ValueError("okugaki currently requires an OpenAI-compatible vision provider")
     if connection.get("requires_api_key") and not connection.get("api_key"):
         raise ValueError(f"{provider} API key is not configured")
-    from openai import OpenAI
-
     if "invariant_prompt" in request:
         instruction = str(request["invariant_prompt"])
     elif language == "ja":
@@ -233,19 +285,38 @@ def _vision_chat(
         instruction = image_note + "\nFacts available up to this generation:\n" + json.dumps(request, ensure_ascii=False, sort_keys=True)
     content: list[dict[str, Any]] = [{"type": "text", "text": instruction}]
     content.extend({"type": "image_url", "image_url": {"url": image}} for image in images)
-    client = OpenAI(
-        base_url=connection["base_url"],
-        api_key=connection.get("api_key") or "none",
-        timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "180")),
-        max_retries=0,
+    cache_key = _vision_cache_key(
+        provider=provider,
+        model_id=model_id,
+        base_url=str(connection["base_url"]),
+        language=language,
+        request=request,
+        images=images,
     )
-    response = client.chat.completions.create(
-        model=model_id,
-        messages=[{"role": "system", "content": _system_prompt(language)}, {"role": "user", "content": content}],
-        temperature=0.35,
-        max_tokens=260,
-    )
-    return (response.choices[0].message.content or "").strip()
+
+    def request_completion() -> str:
+        from openai import OpenAI
+
+        client = OpenAI(
+            base_url=connection["base_url"],
+            api_key=connection.get("api_key") or "none",
+            timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "180")),
+            max_retries=0,
+        )
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=[{"role": "system", "content": _system_prompt(language)}, {"role": "user", "content": content}],
+            temperature=0.35,
+            max_tokens=260,
+        )
+        return (response.choices[0].message.content or "").strip()
+
+    try:
+        return _cached_vision_response(cache_key, request_completion)
+    except Exception as exc:
+        if type(exc).__name__ in {"APITimeoutError", "ReadTimeout"}:
+            raise TimeoutError("Vision provider timed out") from exc
+        raise
 
 
 def _invariant_prompt(language: str, invariants: dict[str, Any]) -> str:

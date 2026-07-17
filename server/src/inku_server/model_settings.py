@@ -193,6 +193,7 @@ def default_user_model_settings() -> dict[str, Any]:
         "stage2_model": "google/gemma-4-31b-it",
         "vision_provider": "nvidia",
         "vision_model": "meta/llama-3.2-90b-vision-instruct",
+        "okugaki_model": "nvidia:meta/llama-3.2-90b-vision-instruct",
         "model_inspection_selected_models": [],
         "instruction_caption_visible": True,
     }
@@ -314,7 +315,7 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     for key in ("stage1_provider", "stage2_provider", "vision_provider"):
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = str(settings[key])
-    for key in ("stage1_model", "stage2_model", "vision_model"):
+    for key in ("stage1_model", "stage2_model", "vision_model", "okugaki_model"):
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = settings[key].strip()
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
@@ -327,7 +328,7 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
     for key in ("stage1_provider", "stage2_provider", "vision_provider"):
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = str(patch[key])
-    for key in ("stage1_model", "stage2_model", "vision_model"):
+    for key in ("stage1_model", "stage2_model", "vision_model", "okugaki_model"):
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = patch[key].strip()
     if "instruction_caption_visible" in patch:

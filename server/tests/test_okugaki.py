@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import base64
+import struct
 import uuid
 
 from inku_server import db
 from inku_server.okugaki import (
+    _cached_vision_response,
+    _vision_thumbnail_data_url,
     build_fact_sheet,
     build_generation_request,
     deterministic_invariants,
@@ -11,6 +15,34 @@ from inku_server.okugaki import (
 )
 
 db.init_db()
+
+
+def _png_size(data_url: str) -> tuple[int, int]:
+    png = base64.b64decode(data_url.split(",", 1)[1])
+    return struct.unpack(">II", png[16:24])
+
+
+def test_okugaki_vision_thumbnails_use_bounded_aspect_correct_payloads():
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><rect width="20" height="10" fill="black"/></svg>'
+    single = _vision_thumbnail_data_url([svg])
+    pair = _vision_thumbnail_data_url([svg, svg])
+    assert single is not None and _png_size(single) == (512, 512)
+    assert pair is not None and _png_size(pair) == (768, 384)
+
+
+def test_okugaki_successful_prefix_read_is_cached(monkeypatch):
+    monkeypatch.setenv("INKU_OKUGAKI_CACHE_TTL_SECONDS", "1800")
+    key = f"test-{uuid.uuid4()}"
+    calls = 0
+
+    def generate() -> str:
+        nonlocal calls
+        calls += 1
+        return "cached observation"
+
+    assert _cached_vision_response(key, generate) == "cached observation"
+    assert _cached_vision_response(key, generate) == "cached observation"
+    assert calls == 1
 
 
 def _user(prefix: str = "okugaki") -> dict:

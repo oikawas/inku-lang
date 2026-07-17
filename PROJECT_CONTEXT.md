@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.89 / Build 580**
+**Target version: v1.89 / Build 584**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -71,7 +71,7 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-The latest v1.89 / Build 580 change removes Manual Refine from the artwork menu and adds direct entry points for drawing-element, model, and language comparison using the selected work. Selecting bottom history while Lineage is open keeps the tab visible and centers the selected work. The strip replaces elapsed time with lineage generation and state, and the trash action now uses a high-contrast explicit label.
+The latest v1.89 / Build 584 change persists the selected Okugaki Vision model per user. Artwork-menu modals can edit a description or DDL, save the drawing as a child of the selected work, and return to Lineage focused on that newest child. Build 583's prefix-only reading, successful-response cache, reduced Vision payloads, and retryable timeout detail remain in place.
 
 ## Where to Look for a Change
 

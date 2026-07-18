@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas as AndroidCanvas
 import android.net.Uri
 import android.util.LruCache
+import android.view.OrientationEventListener
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -69,6 +71,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -82,6 +85,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -160,6 +164,28 @@ private val ServerCanvasBoxColor = Color(0xFF242321)
 private val ServerCanvasPaperColor = Color(0xFFF5F1E9)
 private val PresentationDarkBackground = Color(0xFF11100F)
 private val PresentationLightBackground = Color(0xFFF8F8F6)
+private const val HISTORY_SWIPE_MIN_DISTANCE_PX = 96f
+private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
+private const val PRESENTATION_PREFS_NAME = "presentation_preferences"
+private const val PRESENTATION_CAPTION_VISIBLE_KEY = "caption_visible"
+private val SvgViewBoxRegex = Regex("""\bviewBox\s*=\s*["']\s*[-+]?[0-9.]+\s+[-+]?[0-9.]+\s+([-+]?[0-9.]+)\s+([-+]?[0-9.]+)\s*["']""")
+private val SvgWidthRegex = Regex("""\bwidth\s*=\s*["']\s*([-+]?[0-9.]+)""")
+private val SvgHeightRegex = Regex("""\bheight\s*=\s*["']\s*([-+]?[0-9.]+)""")
+
+private enum class DeviceRotation {
+    Portrait,
+    LandscapeLeft,
+    ReversePortrait,
+    LandscapeRight,
+}
+
+private val DeviceRotation.clockwiseDegrees: Int
+    get() = when (this) {
+        DeviceRotation.Portrait -> 0
+        DeviceRotation.LandscapeLeft -> 90
+        DeviceRotation.ReversePortrait -> 180
+        DeviceRotation.LandscapeRight -> 270
+    }
 
 private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
 private data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
@@ -212,17 +238,17 @@ private object ArtworkBitmapCache {
         }
     }
 
-    suspend fun get(item: HistoryItemEntity, size: IntSize, rotateLandscape: Boolean): ImageBitmap? {
+    suspend fun get(item: HistoryItemEntity, size: IntSize, rotationDegrees: Int): ImageBitmap? {
         if (size.width <= 0 || size.height <= 0) return null
         val scale = minOf(1f, MAX_RENDER_PX.toFloat() / maxOf(size.width, size.height).toFloat())
         val width = maxOf(1, (size.width * scale).toInt())
         val height = maxOf(1, (size.height * scale).toInt())
-        val key = "${item.renderHash}:$width:$height:$rotateLandscape"
+        val key = "${item.renderHash}:$width:$height:${rotationDegrees.floorMod360()}"
         synchronized(cache) {
             cache.get(key)?.let { return it }
         }
         return withContext(Dispatchers.Default) {
-            val rendered = renderArtworkBitmap(item.displaySvg, width, height, rotateLandscape)
+            val rendered = renderArtworkBitmap(item.displaySvg, width, height, rotationDegrees)
             if (rendered != null) {
                 synchronized(cache) {
                     cache.put(key, rendered)
@@ -232,12 +258,12 @@ private object ArtworkBitmapCache {
         }
     }
 
-    private fun renderArtworkBitmap(svgText: String, width: Int, height: Int, rotateLandscape: Boolean): ImageBitmap? {
+    private fun renderArtworkBitmap(svgText: String, width: Int, height: Int, rotationDegrees: Int): ImageBitmap? {
         return runCatching {
             val parsed = SVG.getFromString(svgText)
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val native = AndroidCanvas(bitmap)
-            renderSvgIntoNativeCanvas(parsed, native, width.toFloat(), height.toFloat(), rotateLandscape)
+            renderSvgIntoNativeCanvas(parsed, native, width.toFloat(), height.toFloat(), rotationDegrees)
             bitmap.asImageBitmap()
         }.getOrNull()
     }
@@ -271,6 +297,7 @@ private val saijikiGroupColors = listOf(
 fun InkuApp() {
     val viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by viewModel.state.collectAsState()
+    val deviceRotation = rememberDeviceRotation(enabled = state.canvasPresentationMode)
 
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
@@ -290,7 +317,7 @@ fun InkuApp() {
                     .background(MaterialTheme.colorScheme.background),
             ) {
                 if (state.canvasPresentationMode) {
-                    CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize())
+                    CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize(), deviceRotation = deviceRotation)
                 } else {
                     when (state.tab) {
                         AppTab.Compose -> ComposeScreen(state, viewModel)
@@ -920,6 +947,34 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
 }
 
 @Composable
+private fun rememberDeviceRotation(enabled: Boolean): DeviceRotation {
+    val context = LocalContext.current
+    var rotation by remember { mutableStateOf(DeviceRotation.Portrait) }
+    DisposableEffect(context, enabled) {
+        if (!enabled) {
+            rotation = DeviceRotation.Portrait
+            return@DisposableEffect onDispose { }
+        }
+        val listener = object : OrientationEventListener(context.applicationContext) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                rotation = when {
+                    orientation >= 315 || orientation < 45 -> DeviceRotation.Portrait
+                    orientation < 135 -> DeviceRotation.LandscapeLeft
+                    orientation < 225 -> DeviceRotation.ReversePortrait
+                    else -> DeviceRotation.LandscapeRight
+                }
+            }
+        }
+        if (listener.canDetectOrientation()) {
+            listener.enable()
+        }
+        onDispose { listener.disable() }
+    }
+    return rotation
+}
+
+@Composable
 private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
     Surface(
         modifier = Modifier
@@ -1058,6 +1113,7 @@ private fun CanvasHeroCard(
     showControls: Boolean = true,
     maxPreviewHeight: Dp = 330.dp,
     canvasAspectOverride: String? = null,
+    deviceRotation: DeviceRotation = DeviceRotation.Portrait,
 ) {
     val item = state.selectedHistory
     val canvasAspectId = canvasAspectOverride
@@ -1065,18 +1121,49 @@ private fun CanvasHeroCard(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val presentationPreferences = remember(context) {
+        context.applicationContext.getSharedPreferences(PRESENTATION_PREFS_NAME, Context.MODE_PRIVATE)
+    }
     var canvasMessage by remember { mutableStateOf<String?>(null) }
     var svgMenuOpen by remember { mutableStateOf(false) }
     var svgHelpOpen by remember { mutableStateOf(false) }
     var pngMenuOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
+    var instructionCaptionVisible by remember {
+        mutableStateOf(presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
+    }
     val presentation = state.canvasPresentationMode
+    val historyItems by viewModel.historyItems.collectAsState()
     BoxWithConstraints(modifier = modifier) {
-        val ratio = canvasAspectRatio(canvasAspectId)
+        val screenWidth = maxWidth
+        val screenHeight = maxHeight
+        val ratio = remember(item?.id, item?.displaySvg, canvasAspectId) {
+            item?.displaySvg?.let(::svgAspectRatio) ?: canvasAspectRatio(canvasAspectId)
+        }
         val previewHeight = if (presentation) maxHeight else (maxWidth / ratio).coerceAtMost(maxPreviewHeight)
+        val presentationArtworkRotation = presentationArtworkRotationDegrees(ratio, deviceRotation, presentation)
+        val presentationRatio = if (presentationArtworkRotation.swapsAxes()) 1f / ratio else ratio
+        val presentationBoundsRatio = if (maxHeight > 0.dp) maxWidth / maxHeight else 1f
+        val presentationCanvasWidth: Dp
+        val presentationCanvasHeight: Dp
+        if (presentationRatio >= presentationBoundsRatio) {
+            presentationCanvasWidth = maxWidth
+            presentationCanvasHeight = maxWidth / presentationRatio
+        } else {
+            presentationCanvasHeight = maxHeight
+            presentationCanvasWidth = maxHeight * presentationRatio
+        }
         val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
             if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
         }
+        val instructionCaptionText = item?.originalInput?.trim().orEmpty()
+        val canShowInstructionCaption = instructionCaptionText.isNotBlank()
+        val historyIndex = item?.let { selected -> historyItems.indexOfFirst { it.id == selected.id } } ?: -1
+        val historyTotal = historyItems.size
+        val canGoLatest = historyIndex > 0
+        val canGoNewer = historyIndex > 0
+        val canGoOlder = historyIndex >= 0 && historyIndex < historyItems.lastIndex
+        val historyCounter = if (historyIndex >= 0 && historyTotal > 0) "${historyIndex + 1} / $historyTotal" else ""
         Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!presentation && showControls) {
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -1122,6 +1209,13 @@ private fun CanvasHeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .historySwipeNavigation(
+                            enabled = presentation,
+                            gestureKey = item?.id,
+                            deviceRotation = deviceRotation,
+                            onSwipeRight = viewModel::selectNextHistory,
+                            onSwipeLeft = viewModel::selectPreviousHistory,
+                        )
                         .pointerInput(item?.id, state.canvasPresentationMode) {
                             detectTapGestures(
                                 onDoubleTap = {
@@ -1134,69 +1228,58 @@ private fun CanvasHeroCard(
                             )
                         },
                 ) {
-                    if (item == null) {
-                        CanvasPlaceholderPreview(modifier = Modifier.fillMaxSize())
+                    val canvasModifier = if (presentation) {
+                        Modifier
+                            .align(Alignment.Center)
+                            .width(presentationCanvasWidth)
+                            .height(presentationCanvasHeight)
                     } else {
-                        ArtworkPreview(
-                            item,
-                            presentationMode = presentation,
-                            presentationBackground = presentationBackground,
-                            rotateLandscape = presentation && ratio > 1f,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(item.id, state.canvasZoom) {
-                                    awaitPointerEventScope {
-                                        var total = Offset.Zero
-                                        var switched = false
-                                        while (true) {
-                                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                                            val pressed = event.changes.filter { it.pressed }
-                                            if (pressed.isEmpty()) {
-                                                total = Offset.Zero
-                                                switched = false
-                                                continue
-                                            }
-                                            if (pressed.size != 1 || state.canvasZoom > 1.05f) {
-                                                total = Offset.Zero
-                                                continue
-                                            }
-                                            if (!switched) {
-                                                val change = pressed.first()
-                                                total += change.position - change.previousPosition
-                                                val horizontal = abs(total.x) > 96f && abs(total.x) > abs(total.y) * 1.6f
-                                                if (horizontal) {
-                                                    if (total.x > 0f) {
-                                                        viewModel.selectPreviousHistory()
-                                                    } else {
-                                                        viewModel.selectNextHistory()
-                                                    }
-                                                    switched = true
+                        Modifier.fillMaxSize()
+                    }
+                    Box(modifier = canvasModifier) {
+                        if (item == null) {
+                            CanvasPlaceholderPreview(modifier = Modifier.fillMaxSize())
+                        } else {
+                            ArtworkPreview(
+                                item,
+                                presentationMode = presentation,
+                                presentationBackground = presentationBackground,
+                                rotationDegrees = presentationArtworkRotation,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .historySwipeNavigation(
+                                        enabled = !presentation && state.canvasZoom <= 1.05f,
+                                        gestureKey = item.id,
+                                        deviceRotation = DeviceRotation.Portrait,
+                                        onSwipeRight = viewModel::selectPreviousHistory,
+                                        onSwipeLeft = viewModel::selectNextHistory,
+                                    )
+                                    .then(
+                                        if (presentation) {
+                                            Modifier
+                                        } else {
+                                            Modifier.pointerInput(Unit) {
+                                                detectTransformGestures { _, pan, zoom, _ ->
+                                                    if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
+                                                    if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
                                                 }
                                             }
-                                        }
-                                    }
-                                }
-                                .pointerInput(Unit) {
-                                    detectTransformGestures { _, pan, zoom, _ ->
-                                        if (!presentation) {
-                                            if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
-                                            if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
-                                        }
-                                    }
-                                }
-                                .graphicsLayer(
-                                    scaleX = if (presentation) 1f else state.canvasZoom,
-                                    scaleY = if (presentation) 1f else state.canvasZoom,
-                                    translationX = if (presentation) 0f else state.canvasPanX,
-                                    translationY = if (presentation) 0f else state.canvasPanY,
-                                )
-                        )
+                                        },
+                                    )
+                                    .graphicsLayer(
+                                        scaleX = if (presentation) 1f else state.canvasZoom,
+                                        scaleY = if (presentation) 1f else state.canvasZoom,
+                                        translationX = if (presentation) 0f else state.canvasPanX,
+                                        translationY = if (presentation) 0f else state.canvasPanY,
+                                    )
+                            )
+                        }
                     }
                     if (presentation && state.demoWaitingSeconds != null) {
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(16.dp),
+                                .padding(end = 16.dp, bottom = 78.dp),
                             shape = RoundedCornerShape(100),
                             color = Color(0xCC11100F),
                             border = BorderStroke(1.dp, Color(0x55EDE7DE)),
@@ -1208,6 +1291,42 @@ private fun CanvasHeroCard(
                                 color = Color(0xFFEDE7DE),
                             )
                         }
+                    }
+                    if (presentation && instructionCaptionVisible && canShowInstructionCaption) {
+                        PresentationCaption(
+                            text = instructionCaptionText,
+                            rotation = deviceRotation,
+                            modifier = presentationCaptionPlacement(screenWidth),
+                        )
+                    }
+                    if (presentation) {
+                        PresentationControls(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(start = 12.dp, end = 12.dp, bottom = 14.dp),
+                            counter = historyCounter,
+                            starred = item?.starred == true,
+                            canGoOlder = canGoOlder,
+                            canGoLatest = canGoLatest,
+                            canGoNewer = canGoNewer,
+                            canToggleStar = item != null,
+                            captionEnabled = canShowInstructionCaption,
+                            captionVisible = instructionCaptionVisible,
+                            onGoOlder = viewModel::selectNextHistory,
+                            onGoLatest = viewModel::selectLatestHistory,
+                            onGoNewer = viewModel::selectPreviousHistory,
+                            onToggleStar = { item?.let(viewModel::toggleStar) },
+                            onToggleCaption = {
+                                if (canShowInstructionCaption) {
+                                    val nextVisible = !instructionCaptionVisible
+                                    instructionCaptionVisible = nextVisible
+                                    presentationPreferences.edit()
+                                        .putBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, nextVisible)
+                                        .apply()
+                                }
+                            },
+                            onClose = viewModel::resetCanvasZoom,
+                        )
                     }
                 }
             }
@@ -4006,6 +4125,121 @@ private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Un
     )
 }
 
+private fun BoxScope.presentationCaptionPlacement(screenWidth: Dp): Modifier =
+    Modifier.align(Alignment.BottomCenter)
+        .width(screenWidth * 0.92f)
+        .padding(bottom = 92.dp)
+
+@Composable
+private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xB8000000),
+        tonalElevation = 0.dp,
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+            color = Color(0xFFFFFDF8),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PresentationControls(
+    counter: String,
+    starred: Boolean,
+    canGoOlder: Boolean,
+    canGoLatest: Boolean,
+    canGoNewer: Boolean,
+    canToggleStar: Boolean,
+    captionEnabled: Boolean,
+    captionVisible: Boolean,
+    onGoOlder: () -> Unit,
+    onGoLatest: () -> Unit,
+    onGoNewer: () -> Unit,
+    onToggleStar: () -> Unit,
+    onToggleCaption: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(100),
+        color = Color(0xE01C1C1C),
+        border = BorderStroke(1.dp, Color(0x2EFFFFFF)),
+        tonalElevation = 0.dp,
+        shadowElevation = 8.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PresentationControlButton("‹", enabled = canGoOlder, onClick = onGoOlder)
+            PresentationControlButton("最新", enabled = canGoLatest, wide = true, onClick = onGoLatest)
+            PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
+            Text(
+                counter,
+                modifier = Modifier.widthIn(min = 44.dp).padding(horizontal = 4.dp),
+                color = Color(0xB8FFFDF8),
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+            PresentationControlButton("★", selected = starred, enabled = canToggleStar, onClick = onToggleStar)
+            PresentationControlButton("▭", selected = captionVisible, enabled = captionEnabled, onClick = onToggleCaption)
+            PresentationControlButton("×", onClick = onClose)
+        }
+    }
+}
+
+@Composable
+private fun PresentationControlButton(
+    text: String,
+    enabled: Boolean = true,
+    selected: Boolean = false,
+    wide: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val shape = if (wide) RoundedCornerShape(100) else RoundedCornerShape(50)
+    val background = when {
+        selected -> Color(0x29FFFFFF)
+        else -> Color(0x10FFFFFF)
+    }
+    val border = when {
+        selected && text == "★" -> Color(0x9EFFD45C)
+        else -> Color(0x2EFFFFFF)
+    }
+    Box(
+        modifier = Modifier
+            .then(if (wide) Modifier.widthIn(min = 54.dp) else Modifier.size(34.dp))
+            .height(34.dp)
+            .background(background, shape)
+            .border(1.dp, border, shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = if (wide) 12.dp else 0.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = when {
+                !enabled -> Color(0x59FFFDF8)
+                selected && text == "★" -> Color(0xFFFFD45C)
+                else -> Color(0xFFFFFDF8)
+            },
+            style = if (wide) MaterialTheme.typography.labelSmall else MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+    }
+}
+
 @Composable
 private fun ChipButton(text: String, selected: Boolean = false, onClick: () -> Unit) {
     if (selected) {
@@ -4159,17 +4393,122 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
     ) { Text(text, maxLines = 1) }
 }
 
+private fun Modifier.historySwipeNavigation(
+    enabled: Boolean,
+    gestureKey: Any?,
+    deviceRotation: DeviceRotation,
+    onSwipeRight: () -> Unit,
+    onSwipeLeft: () -> Unit,
+): Modifier {
+    if (!enabled) return this
+    return pointerInput(gestureKey, enabled) {
+        awaitPointerEventScope {
+            while (true) {
+                var pressed = emptyList<PointerInputChange>()
+                while (pressed.size != 1) {
+                    val downEvent = awaitPointerEvent(PointerEventPass.Initial)
+                    pressed = downEvent.changes.filter { it.pressed }
+                    if (pressed.size > 1) {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.changes.none { it.pressed }) break
+                        }
+                        pressed = emptyList()
+                    }
+                }
+
+                val pointerId = pressed.first().id
+                var total = Offset.Zero
+                var triggered = false
+                var released = false
+
+                while (!triggered && !released) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val active = event.changes.filter { it.pressed }
+                    if (active.isEmpty()) {
+                        released = true
+                        break
+                    }
+                    if (active.size != 1) {
+                        break
+                    }
+
+                    val change = active.firstOrNull { it.id == pointerId } ?: break
+                    total += (change.position - change.previousPosition).asDeviceRelativeOffset(deviceRotation)
+
+                    val horizontal = abs(total.x) >= HISTORY_SWIPE_MIN_DISTANCE_PX &&
+                        abs(total.x) >= abs(total.y) * HISTORY_SWIPE_AXIS_LOCK
+                    val vertical = abs(total.y) >= HISTORY_SWIPE_MIN_DISTANCE_PX &&
+                        abs(total.y) > abs(total.x)
+
+                    if (vertical) {
+                        break
+                    }
+                    if (horizontal) {
+                        if (total.x > 0f) onSwipeRight() else onSwipeLeft()
+                        change.consume()
+                        triggered = true
+                    }
+                }
+
+                if (!released) {
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (triggered) {
+                            event.changes.forEach { change ->
+                                if (change.pressed) change.consume()
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            }
+        }
+    }
+}
+
+private fun Offset.asDeviceRelativeOffset(rotation: DeviceRotation): Offset {
+    return when (rotation) {
+        DeviceRotation.Portrait -> this
+        DeviceRotation.LandscapeLeft -> Offset(y, -x)
+        DeviceRotation.ReversePortrait -> Offset(-x, -y)
+        DeviceRotation.LandscapeRight -> Offset(-y, x)
+    }
+}
+
+private fun presentationArtworkRotationDegrees(aspectRatio: Float, deviceRotation: DeviceRotation, presentation: Boolean): Int {
+    if (!presentation) return 0
+    val screenIsPortrait = true
+    val artworkIsLandscape = aspectRatio > 1f
+    val mustSwapAxes = artworkIsLandscape == screenIsPortrait
+    return if (mustSwapAxes) {
+        when (deviceRotation) {
+            DeviceRotation.ReversePortrait,
+            DeviceRotation.LandscapeRight -> 270
+            else -> 90
+        }
+    } else {
+        when (deviceRotation) {
+            DeviceRotation.ReversePortrait -> 180
+            else -> 0
+        }
+    }
+}
+
+private fun Int.floorMod360(): Int = ((this % 360) + 360) % 360
+
+private fun Int.swapsAxes(): Boolean = floorMod360() == 90 || floorMod360() == 270
+
 @Composable
 private fun ArtworkPreview(
     item: HistoryItemEntity,
     modifier: Modifier = Modifier,
     presentationMode: Boolean = false,
     presentationBackground: Color = Color.White,
-    rotateLandscape: Boolean = false,
+    rotationDegrees: Int = 0,
 ) {
     var pixelSize by remember { mutableStateOf(IntSize.Zero) }
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, pixelSize, rotateLandscape) {
-        value = ArtworkBitmapCache.get(item, pixelSize, rotateLandscape)
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, pixelSize, rotationDegrees) {
+        value = ArtworkBitmapCache.get(item, pixelSize, rotationDegrees)
     }
     Surface(color = ServerCanvasBoxColor, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         Box(
@@ -4192,10 +4531,12 @@ private fun ArtworkPreview(
     }
 }
 
-private fun renderSvgIntoNativeCanvas(parsed: SVG, native: AndroidCanvas, width: Float, height: Float, rotateLandscape: Boolean) {
+private fun renderSvgIntoNativeCanvas(parsed: SVG, native: AndroidCanvas, width: Float, height: Float, rotationDegrees: Int) {
     val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
     val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
-    val documentAspect = if (rotateLandscape) documentHeight / documentWidth else documentWidth / documentHeight
+    val rotation = rotationDegrees.floorMod360()
+    val swapsAxes = rotation.swapsAxes()
+    val documentAspect = if (swapsAxes) documentHeight / documentWidth else documentWidth / documentHeight
     val boxAspect = width / height
     val drawWidth: Float
     val drawHeight: Float
@@ -4208,20 +4549,18 @@ private fun renderSvgIntoNativeCanvas(parsed: SVG, native: AndroidCanvas, width:
     }
     val left = (width - drawWidth) / 2f
     val top = (height - drawHeight) / 2f
+    val contentWidth = if (swapsAxes) drawHeight else drawWidth
+    val contentHeight = if (swapsAxes) drawWidth else drawHeight
     native.save()
-    if (rotateLandscape) {
-        val contentWidth = drawHeight
-        val contentHeight = drawWidth
-        native.translate(width / 2f, height / 2f)
-        native.rotate(90f)
-        native.translate(-contentWidth / 2f, -contentHeight / 2f)
-        parsed.setDocumentWidth(contentWidth)
-        parsed.setDocumentHeight(contentHeight)
-    } else {
+    if (rotation == 0) {
         native.translate(left, top)
-        parsed.setDocumentWidth(drawWidth)
-        parsed.setDocumentHeight(drawHeight)
+    } else {
+        native.translate(width / 2f, height / 2f)
+        native.rotate(rotation.toFloat())
+        native.translate(-contentWidth / 2f, -contentHeight / 2f)
     }
+    parsed.setDocumentWidth(contentWidth)
+    parsed.setDocumentHeight(contentHeight)
     parsed.renderToCanvas(native)
     native.restore()
 }
@@ -4435,17 +4774,20 @@ private fun strokeWidthPx(weight: String): Float = when (weight) {
 private fun ratio(value: Double): Float = value.coerceIn(0.0, 1.0).toFloat()
 
 private fun canvasAspectRatio(id: String): Float {
-    return when (CanvasAspects.normalize(id)) {
-        "golden" -> 1.618f
-        "a4" -> 0.707f
-        "b4" -> 0.707f
-        "pillar" -> 0.5f
-        "oban" -> 0.68f
-        "wide" -> 1.777f
-        "byobu" -> 2.4f
-        "vertical" -> 0.75f
-        else -> 1f
+    return CanvasAspects.ratioFor(id).toFloat().takeIf { it > 0f } ?: 1f
+}
+
+private fun svgAspectRatio(svgText: String): Float? {
+    SvgViewBoxRegex.find(svgText)?.let { match ->
+        val width = match.groupValues.getOrNull(1)?.toFloatOrNull()
+        val height = match.groupValues.getOrNull(2)?.toFloatOrNull()
+        if (width != null && height != null && width > 0f && height > 0f) {
+            return width / height
+        }
     }
+    val width = SvgWidthRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()
+    val height = SvgHeightRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()
+    return if (width != null && height != null && width > 0f && height > 0f) width / height else null
 }
 
 private fun hash01(index: Int, seed: String): Double {

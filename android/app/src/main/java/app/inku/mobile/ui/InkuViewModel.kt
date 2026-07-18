@@ -181,7 +181,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     val historyItems: StateFlow<List<HistoryListItem>> = history.stateIn(
         viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
+        SharingStarted.Eagerly,
         emptyList(),
     )
 
@@ -579,20 +579,29 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         selectAdjacentHistory(1)
     }
 
+    fun selectLatestHistory() {
+        viewModelScope.launch {
+            val latest = historyItems.value.firstOrNull() ?: history.first().firstOrNull() ?: return@launch
+            selectHistory(latest)
+        }
+    }
+
     private fun selectAdjacentHistory(offset: Int) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastHistorySwipeAt < 450L) return
-        val items = historyItems.value
-        if (items.isEmpty()) return
-        val current = localState.value.selectedHistory
-        val currentIndex = current
-            ?.let { selected -> items.indexOfFirst { it.id == selected.id } }
-            ?.takeIf { it >= 0 }
-            ?: 0
-        val nextIndex = (currentIndex + offset).coerceIn(0, items.lastIndex)
-        if (nextIndex == currentIndex) return
-        lastHistorySwipeAt = now
-        selectHistory(items[nextIndex])
+        viewModelScope.launch {
+            val items = historyItems.value.ifEmpty { history.first() }
+            if (items.isEmpty()) return@launch
+            val current = localState.value.selectedHistory
+            val currentIndex = current
+                ?.let { selected -> items.indexOfFirst { it.id == selected.id } }
+                ?.takeIf { it >= 0 }
+                ?: 0
+            val nextIndex = (currentIndex + offset).coerceIn(0, items.lastIndex)
+            if (nextIndex == currentIndex) return@launch
+            lastHistorySwipeAt = now
+            selectHistory(items[nextIndex])
+        }
     }
 
     fun draw() {
@@ -1107,7 +1116,11 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleStar(item: HistoryItemEntity) {
         viewModelScope.launch {
-            repository.setStarred(item.id, !item.starred)
+            val nextStarred = !item.starred
+            repository.setStarred(item.id, nextStarred)
+            if (localState.value.selectedHistory?.id == item.id) {
+                localState.value = localState.value.copy(selectedHistory = item.copy(starred = nextStarred))
+            }
         }
     }
 

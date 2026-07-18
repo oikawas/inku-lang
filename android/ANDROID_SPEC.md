@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-05-06.
+Last updated: 2026-05-13.
 
 ## Specification Update Workflow
 
@@ -659,8 +659,12 @@ swiping directly on the rendered image.
 - Tapping the image remains a no-op.
 - Pinch-in / pinch-out zoom and panning while zoomed remain supported.
 - While zoomed, image manipulation takes priority over history swiping.
+- In normal view, history swipes are active only inside the displayed drawing
+  image area.
 - Short-term repeated history switching is throttled so one horizontal swipe
   does not jump across multiple history items.
+- The ViewModel keeps the history summary list active from startup so swiping
+  works immediately after the latest history item is restored at launch.
 
 This gesture is an Android-specific mobile usability addition and is not a
 server/web parity requirement.
@@ -707,8 +711,16 @@ On Android, double-tapping the drawing image opens a presentation view.
   area to the full screen.
 - The drawing is centered, and its scale is automatically chosen as the largest
   size that still keeps the entire image visible.
-- Landscape canvases are rotated 90 degrees on Pixel 9 portrait screens so the
-  drawing's long edge aligns with the screen's long edge.
+- Android determines the displayed drawing's real aspect ratio from the SVG
+  `viewBox`, or from SVG `width` / `height` when no viewBox is available.
+  Only when SVG dimensions cannot be read does Android fall back to the saved
+  history `canvas_aspect` resolved through `CanvasAspects`.
+- Landscape canvases are rotated 90 or 270 degrees on Pixel 9 portrait screens
+  so the artwork's long edge always aligns with the screen's long edge.
+- While presentation view is active, Android detects the device's physical
+  up/down orientation and dynamically adjusts the artwork's visual up direction
+  to match. For landscape artwork, long-edge alignment takes precedence, so the
+  rendered rotation remains either 90 or 270 degrees.
 - The presentation-view margin background follows the displayed SVG's
   background `rect fill`, treating that fill as the drawing's dominant
   background color.
@@ -722,6 +734,26 @@ On Android, double-tapping the drawing image opens a presentation view.
   the margin color, and dark backgrounds use the Android light-mode background.
 - While presentation view is active, pinch and pan transforms are disabled.
   Double-tapping returns to the normal view.
+- In presentation view, double-tap and left/right swipes are active across the
+  whole presentation surface, including margins outside the displayed artwork.
+- Presentation-view left/right swipes are interpreted relative to the current
+  physical device orientation. Even though `MainActivity` remains portrait
+  locked, holding the device sideways or upside down changes which screen-axis
+  movement counts as device-relative left or right.
+- In presentation view, a right swipe advances one history item and a left
+  swipe moves back one item. This intentionally reverses the normal image-area
+  swipe mapping to favor fullscreen viewing/page-turn behavior on Android.
+- Matching the server/web `CanvasPanel.svelte` presentation controls, Android
+  shows a control strip at the bottom of presentation view. The strip provides
+  the same user-facing roles: move one history item backward, jump to the latest
+  history item, move one history item forward, show current position / total
+  count, star / unstar, toggle instruction captions, and close presentation
+  view.
+- Instruction captions use the displayed history item's original user input,
+  not the internally expanded Stage 1 prompt. Captions are overlaid near the
+  lower part of the presentation surface with horizontal margins.
+- The caption toggle is disabled when there is no original instruction text to
+  display.
 - Normal pinch zoom, pan, and left/right history swipes remain available outside
   presentation view.
 

@@ -42,6 +42,7 @@ web/build/
 # Claude Code
 CLAUDE.md
 
+
 # Android generated files
 android/.gradle/
 android/build/
@@ -63,3 +64,7 @@ server/out/
 
 # Local-only operational files
 no-git-sync/
+docs/
+
+#Codex
+AGENTS.md

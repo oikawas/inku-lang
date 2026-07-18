@@ -1231,14 +1231,13 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 細かく揺れるペンシルの破線が3本、画面を横切る
 ```
 
-**第一段階（Opus 4.7）の出力（正規化DDL）:**
+**第一段階（解釈）の出力（正規化DDL、実コーパス形式）:**
 
 ```
-ペンシルで 破線を 横に 3本 置く
-揺れ: 細かい
+鉛筆の破線の横線を縦に三本並べる。線は細かく揺れる。
 ```
 
-**第二段階（軽量モデル）の出力（JSON Score、抜粋）:**
+**第二段階（構造化）の出力（JSON Score、抜粋）:**
 
 ```json
 {
@@ -1499,7 +1498,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 ### C. Stage 1 interpreter
 
-- EXAMPLE_POOL 現在 45 件 (v1.8 時点)。k=5 動的選択
+- EXAMPLE_POOL 現在 ja 65 件 / en 50 件 (v1.92 時点)。k=5 動的選択
 - EXAMPLE_POOL に arc 例 (弧を使う詩句 → `弧を引く` 等) 追加、弧出力を誘導
 - Stage 1 → Stage 2 の E2E 汎化試験 (interpret 結果が composer を通るか)
 - SPEC §2 原則5 違反動詞の混入率測定 (v0.7 強化 + v1.0 属性保持強化後の再評価)
@@ -1527,7 +1526,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 - **Nature plugin** — 風 / さざ波 / 葉などの現象起因揺らぎ (SPEC §13.7)
 - **エクステンション機構** — プラグイン読込、名前空間 (SPEC §4)
-- **Saijiki 辞書の配信形式** — `web/src/lib/saijiki.ts` 内ハードコード中、将来的に `inku-saijiki` パッケージ
+- **Saijiki 辞書の配信形式** — v1.92 で server の saijiki テーブルを単一情報源とし `GET /api/saijiki` + スナップショット同期ストアへ一本化済み。`inku-saijiki` パッケージとしての切り出しは将来課題のまま
 - **Base Language** — 英語版 Saijiki + 英語 prompt (SPEC §5)
 - **短歌的制約の強化** — 文字数カウント、句跨ぎの扱い
 - **リーダーボード / 作品共有** — v1.10 でユーザーごとの履歴分離は実装済み。グループ内共有・公開作品コレクションは将来機能
@@ -1588,85 +1587,29 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 ---
 
-## 付録: 既存ファイル構成
+## 付録: リポジトリ構成（概観）
 
 ```
-inku-lang/                         # github.com/oikawas/inku-lang
-├── README.md                      # プロジェクト紹介（英語）
-├── README.ja.md                   # プロジェクト紹介（日本語）
-├── LICENSE                        # MIT License
-├── SPEC.ja.md                     # 本書（設計哲学・言語設計、日本語正本）
-├── SPEC.md                        # 英語公開仕様（SPEC.ja.md から再構成）
-├── PROJECT_CONTEXT.ja.md          # 開発者・AI向けの短い日本語入口
-├── PROJECT_CONTEXT.md             # 開発者・AI向けの短い英語入口
-├── CHANGELOG.ja.md                # 日本語の詳細な変更履歴
-├── CHANGELOG.md                   # 英語公開変更履歴
-├── CLAUDE.md                      # Claude Code 用コンテキスト (gitignore)
-├── cli/                           # Python CLI クライアント (uv管理)
-│   ├── pyproject.toml             # inku-cli 0.1.0
-│   ├── uv.lock
-│   ├── README.md
-│   ├── src/inku_cli/
-│   │   ├── __init__.py
-│   │   └── cli.py                 # FastAPI API を操作する CLI 本体
-│   └── tests/
-│       └── test_cli.py            # CLI 設定 / payload / 出力テスト
-├── server/                        # Python バックエンド (uv管理)
-│   ├── pyproject.toml             # inku-server 0.1.0
-│   ├── uv.lock
-│   ├── .env.example               # ANTHROPIC_API_KEY 雛形
-│   ├── src/inku_server/
-│   │   ├── __init__.py
-│   │   ├── schema.py              # JSON Score Pydantic モデル
-│   │   ├── renderer.py            # Score → SVG (svgwrite)
-│   │   ├── render_engines/         # RenderEngine 契約と default engine
-│   │   ├── composer.py            # 正規化DDL → Score (Haiku 4.5)
-│   │   ├── db.py                  # 履歴 / ユーザー / セッション DB 層
-│   │   ├── migrate_history.py     # history.json → DB 移行
-│   │   └── coerce.py              # Score 構造補修 (PRIMITIVE_SPECS テーブル駆動)
-│   └── tests/
-│       ├── conftest.py            # dotenv 読込
-│       ├── test_renderer.py       # 10 cases
-│       ├── test_composer.py       # 15 fixture + 厳密比較
-│       ├── test_interpreter.py    # 5 smoke cases (Saijiki 語彙検査)
-│       ├── test_api.py            # FastAPI TestClient 11 cases
-│       └── fixtures/stage2/       # 正規化DDL ↔ Score ペア
-│           └── {01..15}/{input.txt,expected.json}
-└── web/                           # SvelteKit 2 + Svelte 5 + TS (inku-web 0.1.0)
-    ├── package.json
-    ├── svelte.config.js
-    ├── vite.config.ts             # /api → 127.0.0.1:8100 proxy
-    ├── src/
-    │   ├── app.html
-    │   ├── lib/
-    │   │   ├── saijiki.ts         # 歳時記辞書 (7 カテゴリ)
-    │   │   ├── highlight.ts       # 墨濃淡トークナイザ (Saijiki/感情/地)
-    │   │   └── models.ts          # 選択可能な LLM 一覧と既定
-    │   └── routes/
-    │       ├── +layout.svelte
-    │       └── +page.svelte       # モード / モデル選択 / Saijiki / 履歴 / 思考 UI
-    └── static/
+inku-lang/                 # github.com/oikawas/inku-lang
+├── SPEC.ja.md / SPEC.md               # 仕様（日本語正本 / 英語公開版）
+├── PROJECT_CONTEXT.ja.md / .md        # 開発者・AI 向けの短い入口
+├── CHANGELOG.ja.md / .md              # 時系列の実装・設計記録
+├── README.ja.md / README.md           # プロジェクト紹介
+├── server/                            # FastAPI バックエンド (inku_server, uv 管理)
+├── web/                               # SvelteKit 2 + Svelte 5 フロントエンド
+├── cli/                               # inku-cli (HTTP API クライアント、uv 管理)
+├── manual/ja|en/cli-reference-for-ai.md  # CLI リファレンス
+└── android/                           # ネイティブ Android 実装（正本: android/ANDROID_SPEC.ja.md）
 ```
 
-`server/src/inku_server/`:
-- `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
-- `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
-- `render_engines/` — 将来の描画コア差し替えに備えた RenderEngine 契約と静的レジストリ。現行レンダラーは `default` engine としてラップする
-- `plugins/` — プラグインレジストリと hook 補助。system/user ディレクトリを分け、v1.34 時点では system plugin として `canvas-aspect` の canvas-size hook を提供
-- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
-- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
-- `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
-- `db.py` — SQLAlchemy DB 層。履歴、描画内容ハッシュ、スター状態、ユーザーグループ、ユーザーアカウント、セッション、ユーザー別 UI 設定、バッチ指示履歴、プラグイン拡張記憶域を管理。パスワードは PBKDF2-SHA256 + salt で保存
-- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/history/{id}/star`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
-- `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
+モジュール構成・API 経路・CLI サブコマンド・語彙定数の**現行値は本書に列挙しない**。次を正とする:
 
-`cli/src/inku_cli/`:
-- `cli.py` — `inku-api` を操作する API クライアント CLI。`login` / `logout` / `me` / `paint` / `batch` / `demo-instruction` / `history` / `history-export` を提供する。サーバー内部モジュールを import せず、HTTP API のみを利用する
+- 語彙・定型句・マーカー・領域・weight 特性・検証閾値: **reference dump**（`GET /api/reference` / `inku-cli reference --md`。実装テーブルの機械生成鏡）
+- API 経路: `server/src/inku_server/api.py`（FastAPI ルート定義）
+- CLI サブコマンド: `inku-cli --help` および `manual/ja/cli-reference-for-ai.md`
+- 各パッケージの内部構成: `server/README.md` / `web/README.md` / `cli/README.md`
 
-
-**別リポジトリ / 別 PoC / ネイティブ実装**:
-- `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
-- `android/` — ネイティブ Android 実装。Kotlin + Jetpack Compose + Room を使う単体アプリとして、server/web を開発上の master としながら、Pixel 9 以上を主対象に実装する。Android 詳細仕様は `android/ANDROID_SPEC.ja.md` を正本とする
+`ddl/` は初期 Python PoC（Android 補完軸のベース）であり、Web 版は `server/` に移行済み。
 
 ---
 

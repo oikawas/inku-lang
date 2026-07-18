@@ -92,6 +92,12 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * 収録は8節（歳時記、正規化DDL定型句、展開層、Score schema、色解決、weight 特性、演奏、検証規約）で、すべて実装モジュールから取得します。値をどこにも手書きしない「鏡」であり、生成・受理・coerce のいかなる判定にも接続しません。
 * 設計・執筆セッションの冒頭資料として、生成した Markdown 一枚を添付する運用に使います。ログイン済みセッションで実行できます。
 
+### 0.7 `paint --trace`（RAW trace）
+
+* **`paint <TEXT> --trace [-o DIR --prefix P]`** — 1 回の生成で各層の RAW 中間生成物を持ち帰ります。リクエストに `include_trace` を付与し、応答の `trace` を `<prefix>-trace.json` として出力ディレクトリへ保存します（`--full-json` と独立）。
+* trace 収録: `stage1_raw`／`stage1_thinking`／`stage1_ddl`（プラグイン展開前）、`plugin_expanded_ddl`、`stage15_ddl`（= Stage 2 入力）、`stage2_raw_attempts`（retry・fallback を含む全試行の生テキストと parse 可否）、`score_pre_coerce`、coerce／plugin 集約値。利き目監査（境界逐次検証）とベンチの精度向上に使う「鏡」であり、生成挙動は一切変えません。
+* 旧サーバ（trace 非対応）では警告のみでエラーにしません。`include_trace` 未指定時の応答は現行と完全同一です。
+
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * 指定したIDを基点とする系譜ツリーを表示します。

@@ -92,6 +92,12 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * It covers eight sections (saijiki, normalized-DDL phrases, expansion layer, Score schema, color resolution, weight properties, performance, verification), all pulled from the implementation modules. It is a mirror that hardcodes no values and connects to no generation, acceptance, or coercion decision.
 * Use it to attach one Markdown page at the start of a design or writing session. It runs on any logged-in session.
 
+### 0.7 `paint --trace` (RAW trace)
+
+* **`paint <TEXT> --trace [-o DIR --prefix P]`** — Returns every pipeline layer's RAW intermediate in a single generation. It sends `include_trace` and saves the response `trace` as a separate `<prefix>-trace.json` in the output directory (independent of `--full-json`).
+* The trace contains `stage1_raw` / `stage1_thinking` / `stage1_ddl` (before plugin expansion), `plugin_expanded_ddl`, `stage15_ddl` (the Stage 2 input), `stage2_raw_attempts` (every attempt including retry/fallback, with raw text and parse status), `score_pre_coerce`, and the coerce/plugin aggregates. It is a mirror for the intent-audit harness and benchmark precision; it changes no generation behavior.
+* An older server without trace support is a warning, not an error. Without `include_trace`, the response is identical to the current one.
+
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * Displays the parent-child derivation tree of the work.

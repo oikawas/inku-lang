@@ -2342,3 +2342,10 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
   - `fires_on` 照合を同一位置の最長一致のみ採用に変更し、「枯草」入力での「草」による下草の誤発火を構造的に排除した。異なる位置の複数語（季語の重ね）は従来どおり複数発火する。
 - 閉包検査のマーカー表へ、歳時記の修飾カテゴリ（素材・色・ゆらぎ・かたむき・わりあい・ばしょ）と欠落動詞「描く」「埋める」を暫定追加した。語は reference §1（Stage 1プロンプトのSaijikiブロック）を正とし、v1.92の歳時記構造化モジュールで saijikiテーブル導出へ置換する暫定である。
 - **洗練の会計:** 新primitive・新Scoreフィールド・新coerce・作品governorを追加していない。増えたのは展開層の受け入れ構文と実行前検査であり、Score・rh2・既存fixtureは不変である。日英の配置等価（枯葉のja/en不等価の再発防止）とen反復展開の実行使を回帰テストで固定した。Nature.leaves v0.3.0が `plugin validate` を通過する。
+
+### v1.93 — RAW trace オプション（Build 593）
+
+- 生成パイプライン各層の RAW 中間生成物を 1 回の生成で持ち帰る観測オプションを追加した。`/api/paint` と `/api/compose` のリクエストに `include_trace`（既定 false・後方互換）を加え、指定時のみ応答トップレベルへ `trace` を返す。収録: `stage1_raw`／`stage1_thinking`／`stage1_ddl`（プラグイン展開前）、`plugin_expanded_ddl`、`stage15_ddl`（= Stage 2 入力）、`stage2_raw_attempts`（retry・fallback を含む全試行の生テキストと parse 可否）、`score_pre_coerce`、既存の coerce／plugin 集約値。
+- **鏡であって governor ではない。** 収集は interpreter／composer へ任意の `trace_sink` を通す観測のみで、interpret／expand／compose／coerce／render の判定・分岐・回数を一切変えない。`include_trace` 未指定時の応答は現行とフィールド単位で完全同一（新規キー `trace` も現れない）。trace は応答のみで DB（履歴・lineage）へ保存しない。同一入力・同一 seed では `include_trace` の有無によらず Score と render_hash が不変。収集失敗は生成を落とさず該当キー null ＋ warning とする。
+- `inku-cli paint --trace` を追加し、応答の `trace` を `<prefix>-trace.json` として出力ディレクトリへ保存する（`--full-json` と独立、旧サーバで trace 不在なら警告のみ）。
+- テスト: 上記不変条件（応答同一・非永続・Score/render_hash 不変・生成分岐なし・認証境界・試行構造）を LLM モックで回帰。SPEC 本文は変更しない（利き目監査ハーネスの入口。plan-intent-audit ステップ 4.5）。

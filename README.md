@@ -2,23 +2,25 @@
 
 **One sentence becomes a picture.**
 
-`inku` is the reference implementation of DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic. No drawing skill is required. All you need is one scene that stayed with you, written briefly.
+`inku` is the reference implementation of DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic. No drawing skill or tools are required to give your image a form. Writing down one scene that stayed with you, briefly, is the start — and from there you build the image up.
 
 ```
 A blue line slowly loosens across the night water.
 ```
 
-That sentence is interpreted, written into a score, and performed into a picture. Generate again from the same sentence and a slightly different picture comes back. You choose from what appears — **the back-and-forth of writing and choosing** is how creation works in inku.
+That sentence is interpreted, written into a score (drawing data in JSON), and performed (by inku's own rendering engine) into a picture. Generate again from the same sentence — not by AI, but by seeded variation — and a slightly different picture comes back. Every work you generate is kept under generational management as lineage: build variations on a work (by hand or through AI-assisted refinement), choose from the candidates lined up before you, and a new generation is born. **The back-and-forth of writing and choosing** is how creation works in inku.
 
-inku stands at the crossing of three traditions:
+inku stands at the crossing of ideas learned from three cultural traditions — and it is the result, or perhaps the ongoing process, of thinking about how generative-AI technology should be applied at that crossing.
 
 | Tradition | What it gives inku |
 |---|---|
-| **Sol LeWitt's instruction art** | The idea that the description itself is the artwork |
+| **Sol LeWitt's instruction art** | The idea that the description itself is the artwork; the concept from which this application began |
 | **Bonsai** | The practice that constraint is not limitation but concentration |
 | **Tanka** | The form in which the type silences the self, and presentation replaces assertion |
 
-Constraints on vocabulary, primitives, and coordinates are not limits. They are the instruments by which intention becomes visible.
+As of 2026, generative image and artwork making hides its own process from the creator; it might fairly be called incantatory — write a prompt, then pray, and repeat. The DDL concept takes the opposite path: it splits the generation process into layers, and the human interprets, selects, and edits the AI's interventions at each layer while finishing the work.
+
+inku is built on LLMs, but each layer is placed under strict constraints. Constraints on vocabulary, primitives, and coordinates are not limits on what can be made. They are the instruments by which you make a work and render your intention visible.
 
 ---
 
@@ -26,8 +28,8 @@ Constraints on vocabulary, primitives, and coordinates are not limits. They are 
 
 Developers and AI agents should start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md). It summarizes the current architecture, contracts, and the smallest useful reading path without requiring a full specification reload.
 
-- [SPEC.md](SPEC.md) — maintained public English specification
-- [SPEC.ja.md](SPEC.ja.md) — canonical Japanese specification
+- [SPEC.md](SPEC.md) — maintained public English specification (with excess detail trimmed)
+- [SPEC.ja.md](SPEC.ja.md) — canonical Japanese specification (the author works Japanese-first, so the specification is authored in Japanese)
 - [CHANGELOG.md](CHANGELOG.md) — public English release notes
 - [CHANGELOG.ja.md](CHANGELOG.ja.md) — detailed canonical change history
 
@@ -229,11 +231,11 @@ uv run inku-cli paint "A blue line slowly loosens across the night water." --bas
 
 ## Capabilities
 
-- **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with model, token, and elapsed-time metadata per stage
+- **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with per-stage model selection; non-deterministic AI layers and deterministic algorithmic layers alternate
 - **Refinement through regeneration** — another performance (no LLM call), another composition (vary seed), another interpretation (Stage 1 re-reading), LLM reselection, and generation management through lineage
 - **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle; horizontal, vertical, radial, scatter, and literal tiling grid layouts with paths such as waves and diagonal bands
 - **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
-- **Material rendering** — pencil, rotring, crayon, chalk, brushes, burin, and drypoint rendered through shared hand dynamics, coupled energy, sparse events, and tool-specific edges
+- **Material rendering** — pencil, rotring, crayon, chalk, brushes, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges
 - **Plugins** — namespaced vocabulary macros such as `Nature.wind`; they expand into core vocabulary only and cannot modify the core
 - **Interpretation feedback** — ink-density shading shows how each written word was read
 - **History and editions** — per-user DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs

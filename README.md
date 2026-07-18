@@ -228,7 +228,7 @@ uv run inku-cli paint "A blue line slowly loosens across the night water." --bas
 ## Capabilities
 
 - **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with model, token, and elapsed-time metadata per stage
-- **Three-tier regeneration** — another performance (no LLM call), another composition (vary seed), another interpretation (Stage 1 re-reading), plus grid generation with multiple selection and notes on why a work was chosen
+- **Refinement through regeneration** — another performance (no LLM call), another composition (vary seed), another interpretation (Stage 1 re-reading), LLM reselection, and generation management through lineage
 - **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle; horizontal, vertical, radial, scatter, and literal tiling grid layouts with paths such as waves and diagonal bands
 - **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
 - **Material rendering** — pencil, rotring, crayon, chalk, brushes, burin, and drypoint rendered through shared hand dynamics, coupled energy, sparse events, and tool-specific edges

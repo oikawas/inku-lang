@@ -16,6 +16,7 @@ from xml.sax.saxutils import escape
 
 import svgwrite
 
+from .cloudform import generate_cloudform_contour
 from .plugins import CanvasSize, canvas_size_for_aspect
 from .schema import (
     CanvasGroundSpec,
@@ -565,7 +566,10 @@ def _anchor(ins: Instruction) -> tuple[float, float]:
     """図形の論理的な中心座標を返す。"""
     if ins.primitive == "line" and ins.from_ and ins.to:
         return ((ins.from_[0] + ins.to[0]) / 2, (ins.from_[1] + ins.to[1]) / 2)
-    if ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center:
+    if (
+        ins.primitive in ("circle", "ellipse", "arc", "polygon", "cloudform")
+        and ins.center
+    ):
         return ins.center
     if ins.primitive in ("square", "triangle") and ins.position and ins.size:
         return (ins.position[0] + ins.size[0] / 2, ins.position[1] + ins.size[1] / 2)
@@ -592,7 +596,10 @@ def _shift(ins: Instruction, dx: float, dy: float) -> Instruction:
     if ins.primitive == "line" and ins.from_ and ins.to:
         data["from"] = [ins.from_[0] + dx, ins.from_[1] + dy]
         data["to"] = [ins.to[0] + dx, ins.to[1] + dy]
-    elif ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center:
+    elif (
+        ins.primitive in ("circle", "ellipse", "arc", "polygon", "cloudform")
+        and ins.center
+    ):
         data["center"] = [ins.center[0] + dx, ins.center[1] + dy]
     elif ins.primitive in ("square", "triangle") and ins.position:
         data["position"] = [ins.position[0] + dx, ins.position[1] + dy]
@@ -628,7 +635,7 @@ def _move_anchor_to(ins: Instruction, target: tuple[float, float]) -> Instructio
     if ins.primitive == "line" and ins.from_ and ins.to:
         data["from"] = [_clamp01(ins.from_[0] + dx), _clamp01(ins.from_[1] + dy)]
         data["to"] = [_clamp01(ins.to[0] + dx), _clamp01(ins.to[1] + dy)]
-    elif ins.primitive in ("circle", "ellipse", "arc", "polygon"):
+    elif ins.primitive in ("circle", "ellipse", "arc", "polygon", "cloudform"):
         if ins.center:
             data["center"] = [
                 _clamp01(ins.center[0] + dx),
@@ -661,7 +668,9 @@ def _resolve_at_region(ins: Instruction, seed: int, index: int) -> Instruction:
     return _move_anchor_to(ins, (x, y))
 
 
-def _bbox_for_instruction(ins: Instruction) -> tuple[float, float, float, float] | None:
+def _bbox_for_instruction(
+    ins: Instruction, performance_seed: int | None = None, instruction_index: int = 0
+) -> tuple[float, float, float, float] | None:
     if ins.primitive == "line" and ins.from_ and ins.to:
         return (
             min(ins.from_[0], ins.to[0]),
@@ -687,6 +696,19 @@ def _bbox_for_instruction(ins: Instruction) -> tuple[float, float, float, float]
             ins.center[0] + ins.size[0] / 2,
             ins.center[1] + ins.size[1] / 2,
         )
+    if ins.primitive == "cloudform" and ins.center and ins.size:
+        contour = generate_cloudform_contour(
+            ins.center,
+            ins.size,
+            performance_seed=_seed_for_instruction(ins, performance_seed),
+            instruction_index=instruction_index,
+            mark_index=0,
+            variation=ins.variation,
+            weight=ins.weight,
+        )
+        xs = [point[0] for point in contour.points]
+        ys = [point[1] for point in contour.points]
+        return min(xs), min(ys), max(xs), max(ys)
     if ins.primitive in ("square", "triangle") and ins.position and ins.size:
         return (
             ins.position[0],
@@ -725,7 +747,9 @@ def _resolve_relation(
         return _strip_performance_fields(ins)
     if rel.type != "between" and not previous:
         return _strip_performance_fields(ins)
-    prev_bbox = _bbox_for_instruction(previous[-1]) if previous else None
+    prev_bbox = (
+        _bbox_for_instruction(previous[-1], seed, index - 1) if previous else None
+    )
     if prev_bbox is None:
         return _strip_performance_fields(ins)
     prev_center = _bbox_center(prev_bbox)
@@ -733,7 +757,7 @@ def _resolve_relation(
     gap = _relation_gap(seed, index, rel.gap)
 
     if rel.type == "between":
-        other_bbox = _bbox_for_instruction(previous[-2])
+        other_bbox = _bbox_for_instruction(previous[-2], seed, index - 2)
         if other_bbox is None:
             return _strip_performance_fields(ins)
         other_center = _bbox_center(other_bbox)
@@ -749,6 +773,30 @@ def _resolve_relation(
             ox, oy = _line_perp_offsets(previous[-1].from_, previous[-1].to, gap)
             side = -1.0 if _hash01(index, seed, "along-side") < 0.5 else 1.0
             target = (_clamp01(x + ox * side), _clamp01(y + oy * side))
+        elif (
+            previous[-1].primitive == "cloudform"
+            and previous[-1].center
+            and previous[-1].size
+        ):
+            contour = generate_cloudform_contour(
+                previous[-1].center,
+                previous[-1].size,
+                performance_seed=_seed_for_instruction(previous[-1], seed),
+                instruction_index=index - 1,
+                mark_index=0,
+                variation=previous[-1].variation,
+                weight=previous[-1].weight,
+            )
+            point_index = int(
+                _hash01(index, seed, "along-cloudform") * len(contour.points)
+            )
+            px, py = contour.points[point_index % len(contour.points)]
+            dx, dy = px - prev_center[0], py - prev_center[1]
+            distance = max(math.hypot(dx, dy), 1e-9)
+            target = (
+                _clamp01(px + dx / distance * gap),
+                _clamp01(py + dy / distance * gap),
+            )
         else:
             angle = math.tau * _hash01(index, seed, "along-angle")
             target = (
@@ -773,7 +821,7 @@ def _resolve_relation(
             ]
             return Instruction.model_validate(data)
     else:
-        own_bbox = _bbox_for_instruction(ins)
+        own_bbox = _bbox_for_instruction(ins, seed, index)
         own_radius = _bbox_radius(own_bbox) if own_bbox is not None else 0.0
         distance = prev_radius + own_radius + gap
         angle = math.tau * _hash01(index, seed, "not-touching-angle")
@@ -1213,6 +1261,11 @@ def _shape_bbox(
         w = ins.size[0] * canvas.width
         h = ins.size[1] * canvas.height
         return cx - w / 2, cy - h / 2, w, h
+    if ins.primitive == "cloudform" and ins.center is not None and ins.size is not None:
+        cx, cy = _px(ins.center, canvas)
+        w = ins.size[0] * canvas.width
+        h = ins.size[1] * canvas.height
+        return cx - w * 0.56, cy - h * 0.56, w * 1.12, h * 1.12
     if (
         ins.primitive in ("square", "triangle")
         and ins.position is not None
@@ -1228,7 +1281,14 @@ def _shape_bbox(
 
 
 def _add_shape_to_clip(
-    dwg: svgwrite.Drawing, clip, ins: Instruction, canvas: CanvasSize
+    dwg: svgwrite.Drawing,
+    clip,
+    ins: Instruction,
+    canvas: CanvasSize,
+    *,
+    render_seed: int | None,
+    ins_idx: int,
+    mark_idx: int,
 ) -> None:
     if ins.primitive == "circle" and ins.center is not None and ins.radius is not None:
         cx, cy = _px(ins.center, canvas)
@@ -1275,6 +1335,20 @@ def _add_shape_to_clip(
                 )
             )
         )
+    elif (
+        ins.primitive == "cloudform" and ins.center is not None and ins.size is not None
+    ):
+        cx, cy = _px(ins.center, canvas)
+        contour = generate_cloudform_contour(
+            (cx, cy),
+            (ins.size[0] * canvas.width, ins.size[1] * canvas.height),
+            performance_seed=_seed_for_instruction(ins, render_seed),
+            instruction_index=ins_idx,
+            mark_index=mark_idx,
+            variation=ins.variation,
+            weight=ins.weight,
+        )
+        clip.add(dwg.path(d=contour.path_d))
 
 
 def _surface_color(ins: Instruction, cmap: dict[str, str]) -> str:
@@ -1434,7 +1508,15 @@ def _render_surface_texture(
     if profile == "display":
         clip_id = _safe_svg_id(f"clip_{gid}_{seed % 100000}")
         clip = dwg.defs.add(dwg.clipPath(id=clip_id))
-        _add_shape_to_clip(dwg, clip, ins, canvas)
+        _add_shape_to_clip(
+            dwg,
+            clip,
+            ins,
+            canvas,
+            render_seed=render_seed,
+            ins_idx=ins_idx,
+            mark_idx=mark_idx,
+        )
         group["clip-path"] = f"url(#{clip_id})"
         if surface.texture in {"wash", "bleed"}:
             fid = _safe_svg_id(f"surface_filter_{gid}_{seed % 100000}")
@@ -1616,6 +1698,8 @@ def render(
                 canvas,
                 use_filters=use_filters,
                 render_seed=render_seed,
+                ins_idx=ins_idx,
+                mark_idx=mark_idx,
             )
             if element is not None:
                 if structured:
@@ -1691,7 +1775,9 @@ def render(
     return svg
 
 
-_CLOSED_SHAPES = frozenset({"circle", "ellipse", "square", "triangle", "polygon"})
+_CLOSED_SHAPES = frozenset(
+    {"circle", "ellipse", "square", "triangle", "polygon", "cloudform"}
+)
 
 
 def _texture_filter_weights(score: Score) -> set[str]:
@@ -2664,6 +2750,8 @@ def _render_instruction(
     *,
     use_filters: bool = True,
     render_seed: int | None = None,
+    ins_idx: int = 0,
+    mark_idx: int = 0,
 ):
     canvas = canvas or canvas_size_for_aspect(None)
     attrs = _stroke_attrs(ins, cmap, use_filters=use_filters)
@@ -2717,6 +2805,23 @@ def _render_instruction(
         return _apply_rotation(
             dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs), ins, canvas
         )
+
+    if ins.primitive == "cloudform":
+        if ins.center is None or ins.size is None:
+            raise ValueError("cloudform requires center and size")
+        cx, cy = _px(ins.center, canvas)
+        contour = generate_cloudform_contour(
+            (cx, cy),
+            (ins.size[0] * canvas.width, ins.size[1] * canvas.height),
+            performance_seed=_seed_for_instruction(ins, render_seed),
+            instruction_index=ins_idx,
+            mark_index=mark_idx,
+            variation=ins.variation,
+            weight=ins.weight,
+        )
+        path = dwg.path(d=contour.path_d, **attrs)
+        path["class"] = "cloudform contour-v1 stroke-engine-touch"
+        return _apply_rotation(path, ins, canvas)
 
     if ins.primitive == "square":
         if ins.position is None or ins.size is None:

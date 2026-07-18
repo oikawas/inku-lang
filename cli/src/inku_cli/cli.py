@@ -1522,6 +1522,9 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
     relation_counts: Counter[str] = Counter()
     relation_instruction_count = 0
     repair_part_counts: Counter[str] = Counter()
+    cloudform_count = 0
+    cloudform_expanded_count = 0
+    cloudform_context_counts: Counter[str] = Counter()
 
     presence = score.get("presence")
     if isinstance(presence, dict):
@@ -1557,6 +1560,25 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
             relation_instruction_count += 1
 
         arrangement = instruction.get("arrangement")
+        if primitive == "cloudform":
+            cloudform_count += 1
+            cloudform_context_counts[
+                "single"
+                if not isinstance(arrangement, dict)
+                else "arranged:{}".format(arrangement.get("layout", "unknown"))
+            ] += 1
+            if isinstance(relation, dict) and isinstance(relation.get("type"), str):
+                cloudform_context_counts["relation:{}".format(relation["type"])] += 1
+            surface = instruction.get("surface")
+            if isinstance(surface, dict) and isinstance(surface.get("texture"), str):
+                cloudform_context_counts["surface:{}".format(surface["texture"])] += 1
+            if instruction.get("mode") == "carve":
+                cloudform_context_counts["mode:carve"] += 1
+            variation = instruction.get("variation")
+            if isinstance(variation, dict) and isinstance(variation.get("quality"), str):
+                cloudform_context_counts["variation:{}".format(variation["quality"])] += 1
+            cloud_count = arrangement.get("count") if isinstance(arrangement, dict) else 1
+            cloudform_expanded_count += cloud_count if isinstance(cloud_count, int) and cloud_count > 0 else 1
         if not isinstance(arrangement, dict):
             expanded_count += 1
             continue
@@ -1601,6 +1623,10 @@ def _score_metrics(score: dict[str, Any] | None) -> dict[str, Any]:
         "score_relation_counts": dict(sorted(relation_counts.items())),
         "score_relation_instruction_count": relation_instruction_count,
         "score_has_relation": relation_instruction_count > 0,
+        "score_cloudform_count": cloudform_count,
+        "score_cloudform_expanded_count": cloudform_expanded_count,
+        "score_cloudform_context_counts": dict(sorted(cloudform_context_counts.items())),
+        "score_has_cloudform": cloudform_count > 0,
         "score_quality_metrics": quality_metrics,
         "math_balance_markers": _math_balance_markers([
             instruction for instruction in instructions if isinstance(instruction, dict)
@@ -2384,6 +2410,10 @@ def command_batch(args: argparse.Namespace) -> int:
     aggregate_relation: Counter[str] = Counter()
     aggregate_relation_samples = 0
     aggregate_relation_instructions = 0
+    aggregate_cloudform_samples = 0
+    aggregate_cloudform_instructions = 0
+    aggregate_cloudform_expanded = 0
+    aggregate_cloudform_contexts: Counter[str] = Counter()
     aggregate_coerce_relation_input = 0
     aggregate_coerce_relation_output = 0
     aggregate_coerce_relation_dropped = 0
@@ -2410,6 +2440,11 @@ def command_batch(args: argparse.Namespace) -> int:
         aggregate_relation_instructions += int(result.get("score_relation_instruction_count") or 0)
         if result.get("score_has_relation"):
             aggregate_relation_samples += 1
+        aggregate_cloudform_instructions += int(result.get("score_cloudform_count") or 0)
+        aggregate_cloudform_expanded += int(result.get("score_cloudform_expanded_count") or 0)
+        aggregate_cloudform_contexts.update(result.get("score_cloudform_context_counts") or {})
+        if result.get("score_has_cloudform"):
+            aggregate_cloudform_samples += 1
         aggregate_coerce_relation_input += int(result.get("coerce_relation_input_count") or 0)
         aggregate_coerce_relation_output += int(result.get("coerce_relation_output_count") or 0)
         aggregate_coerce_relation_dropped += int(result.get("coerce_relation_dropped_count") or 0)
@@ -2478,6 +2513,11 @@ def command_batch(args: argparse.Namespace) -> int:
         "score_presence_gaze_counts": dict(sorted(aggregate_presence_gaze.items())),
         "score_presence_lines": _aggregate_marker_lines(results, "score_presence_counts"),
         "score_relation_counts": dict(sorted(aggregate_relation.items())),
+        "score_cloudform_instruction_count": aggregate_cloudform_instructions,
+        "score_cloudform_expanded_count": aggregate_cloudform_expanded,
+        "score_cloudform_sample_count": aggregate_cloudform_samples,
+        "score_cloudform_sample_rate": round(aggregate_cloudform_samples / len(results), 6) if results else 0.0,
+        "score_cloudform_context_counts": dict(sorted(aggregate_cloudform_contexts.items())),
         "score_relation_instruction_count": aggregate_relation_instructions,
         "score_relation_sample_count": aggregate_relation_samples,
         "score_relation_sample_rate": round(aggregate_relation_samples / len(results), 6) if results else None,

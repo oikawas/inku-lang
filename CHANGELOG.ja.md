@@ -2334,3 +2334,11 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - 発火provenanceはAPI応答と履歴の派生メタデータへ記録する一方、Score・DB正本・rh2へプラグイン本文や依存を持ち込まない。追加・削除・再読込、拒否理由表示、歳時記note、`inku-cli plugin list / validate / reload`、削除後Replay不変の回帰を追加した。
 - **洗練の会計:** 新primitive、新Scoreフィールド、新coerce、作品governor、コード実行を追加していない。増えたのはコア語彙へのwriting-down境界と監査provenanceであり、起きにくくしたのはプラグイン再帰、スタンプ化、比喩への過剰発火、保存作品のプラグイン依存である。葉プラグイン本体はこの版に含めない。
 - **構造展開済みDDLの保護（Build 590）:** プラグイン展開がmember別の数値regionを確定した後、Stage 1.5が楕円等の別レシピを追加し、Stage 2もDDLにない補助弧を生成し得た経路を修正した。数値regionを含むコアDDLは構図判断済みとして正規化だけを通し、Scoreのinstruction数も明示region数を超えない。これはplugin namespaceを後段へ注入する特例ではなく、一般の明示regionにも適用する境界である。最小双弧fixtureはMistralでは二本に抑制される。Qwenでは二つのinstruction内のarrangementにより二本を超える可視弧が残る場合があり、instruction数境界と可視要素数のモデル差として受け入れた。
+- **プラグイン形式v2の受け入れ（Build 591）:** 葉プラグイン（Nature.leaves v0.3.0）のStage 3検証と reference（Build 590）の突合で判明した、実装側に帰属する不適合を修正した。展開層に次の受け入れ構文・検査を追加した。承認済み `spec-draft-plugin-format-v2` を正本へ反映した便でもある。
+  - `member 名前: 定義` のプラグイン内ローカル複合形（参照行の各memberへインライン展開、未定義参照はロード拒否）。`注:／note:` コメント行（展開・閉包検査の対象外、傍注として保存）。
+  - `下端の帯` 領域の追加と、「左上から右下への斜めの帯」の展開層計算（下降対角線に沿うmember小region列）。未知領域キーはロード拒否とし、v0.2.0で「下端の帯」が無言で中央帯化した silent fallback を廃止した（runtime遭遇時は既定帯＋warning記録）。
+  - en反復単位を複数語（leaf forms／forms／blades／cloudforms／spots／arcs）へ拡張し、単数形を単位保存（一枚／一本／一個、one leaf form 等）とした。従来 en は範囲行が単位不一致で member展開されず受け入れ側でも未行使だった経路を回帰テストで固定した。
+  - `anchor … を N〜M箇所 置く` の入れ子反復（箇所反復×各anchorからのmember反復、深さ2まで。各箇所は個別の帯region）。
+  - `fires_on` 照合を同一位置の最長一致のみ採用に変更し、「枯草」入力での「草」による下草の誤発火を構造的に排除した。異なる位置の複数語（季語の重ね）は従来どおり複数発火する。
+- 閉包検査のマーカー表へ、歳時記の修飾カテゴリ（素材・色・ゆらぎ・かたむき・わりあい・ばしょ）と欠落動詞「描く」「埋める」を暫定追加した。語は reference §1（Stage 1プロンプトのSaijikiブロック）を正とし、v1.92の歳時記構造化モジュールで saijikiテーブル導出へ置換する暫定である。
+- **洗練の会計:** 新primitive・新Scoreフィールド・新coerce・作品governorを追加していない。増えたのは展開層の受け入れ構文と実行前検査であり、Score・rh2・既存fixtureは不変である。日英の配置等価（枯葉のja/en不等価の再発防止）とen反復展開の実行使を回帰テストで固定した。Nature.leaves v0.3.0が `plugin validate` を通過する。

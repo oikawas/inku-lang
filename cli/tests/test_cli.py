@@ -100,6 +100,27 @@ def test_paint_payload_drops_none_values():
     assert "history_input" not in payload
 
 
+def test_paint_payload_includes_trace_only_when_flag_set():
+    parser = cli.build_parser()
+    with_trace = cli._paint_payload(parser.parse_args(["paint", "x", "--trace"]), "x")
+    without = cli._paint_payload(parser.parse_args(["paint", "x"]), "x")
+    assert with_trace["include_trace"] is True
+    assert "include_trace" not in without
+
+
+def test_write_paint_outputs_saves_trace_file(tmp_path):
+    result = {"svg": "<svg></svg>", "trace": {"stage1_ddl": "x", "stage2_raw_attempts": []}}
+    paths = cli._write_paint_outputs(result, out_dir=tmp_path, prefix="smoke", png=False)
+    trace_file = tmp_path / "smoke-trace.json"
+    assert trace_file.exists()
+    assert json.loads(trace_file.read_text())["stage1_ddl"] == "x"
+    assert paths["trace"] == str(trace_file)
+    # no trace in the response -> no trace file
+    plain = cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="plain", png=False)
+    assert not (tmp_path / "plain-trace.json").exists()
+    assert "trace" not in plain
+
+
 def test_paint_payload_uses_resolved_models():
     parser = cli.build_parser()
     args = parser.parse_args(["paint", "一滴の墨"])

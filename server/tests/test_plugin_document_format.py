@@ -174,6 +174,8 @@ def test_pipeline_expands_before_stage15_and_stage2(monkeypatch, tmp_path: Path)
     assert explicit.plugin_provenance and natural.plugin_provenance
     assert not ordinary.plugin_provenance
     assert all("Sketch." not in ddl for ddl in captured)
+    assert all("楕円" not in ddl for ddl in captured[:2])
+    assert all(ddl.count("細い弧を 一枚") == 2 for ddl in captured[:2])
     assert explicit.score.instructions[0].primitive == "arc"
 
 

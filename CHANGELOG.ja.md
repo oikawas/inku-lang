@@ -2333,3 +2333,4 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - 展開順をStage 1→プラグイン展開→コアDDL→Stage 1.5→Stage 2とし、名前空間明示と指示対象として明示された`fires_on`だけを発火させる。Stage 1には語彙リストだけを注入し、比喩・未知対象、Stage 1.5、coerceからの注入を禁止した。
 - 発火provenanceはAPI応答と履歴の派生メタデータへ記録する一方、Score・DB正本・rh2へプラグイン本文や依存を持ち込まない。追加・削除・再読込、拒否理由表示、歳時記note、`inku-cli plugin list / validate / reload`、削除後Replay不変の回帰を追加した。
 - **洗練の会計:** 新primitive、新Scoreフィールド、新coerce、作品governor、コード実行を追加していない。増えたのはコア語彙へのwriting-down境界と監査provenanceであり、起きにくくしたのはプラグイン再帰、スタンプ化、比喩への過剰発火、保存作品のプラグイン依存である。葉プラグイン本体はこの版に含めない。
+- **構造展開済みDDLの保護（Build 590）:** プラグイン展開がmember別の数値regionを確定した後、Stage 1.5が楕円等の別レシピを追加し、Stage 2もDDLにない補助弧を生成し得た経路を修正した。数値regionを含むコアDDLは構図判断済みとして正規化だけを通し、Stage 2出力も明示region数を超えない。これはplugin namespaceを後段へ注入する特例ではなく、一般の明示regionにも適用する境界である。最小双弧fixtureは二本の弧だけをScoreへ残す。

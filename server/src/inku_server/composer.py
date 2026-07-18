@@ -1167,7 +1167,47 @@ def _finalize_score(score: Score, ddl: str) -> Score:
     score = _enforce_relation_literal_gate(score, ddl)
     score = _enforce_print_literal_transcription(score, ddl)
     score = _enforce_ground_literal_gate(score, ddl)
-    return _enforce_print_literal_gate(score, ddl)
+    score = _enforce_print_literal_gate(score, ddl)
+    return _enforce_explicit_region_instruction_count(score, ddl)
+
+
+def _enforce_explicit_region_instruction_count(score: Score, ddl: str) -> Score:
+    """Do not let Stage 2 add motifs to fully region-resolved core DDL.
+
+    Each numeric region marks one already composed drawing clause. Prefer the
+    instructions that retained those regions, then fall back to source order
+    when a model converted the regions into direct coordinates.
+    """
+
+    region_count = len(
+        re.findall(
+            r"(?:領域|region)\s*\[\s*(?:0(?:\.\d+)?|1(?:\.0+)?)\s*,",
+            unicodedata.normalize("NFKC", ddl),
+            flags=re.IGNORECASE,
+        )
+    )
+    if region_count == 0 or len(score.instructions) <= region_count:
+        return score
+
+    data = score.model_dump(by_alias=True)
+    instructions = data["instructions"]
+    region_anchored = [
+        item
+        for item in instructions
+        if isinstance(item.get("at"), dict)
+        and isinstance(item["at"].get("region"), (list, tuple))
+        and len(item["at"]["region"]) == 4
+    ]
+    data["instructions"] = (
+        region_anchored[:region_count]
+        if len(region_anchored) >= region_count
+        else instructions[:region_count]
+    )
+    _logger.warning(
+        "Stage 2 support instructions dropped for %d explicit numeric regions",
+        region_count,
+    )
+    return Score.model_validate(data)
 
 
 def _enforce_modifier_targeting(score: Score, ddl: str) -> Score:

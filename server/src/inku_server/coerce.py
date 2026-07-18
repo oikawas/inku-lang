@@ -788,6 +788,34 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
     return adjusted
 
 
+def _without_explicit_region_support(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+) -> list[Instruction]:
+    """Keep composition-resolved DDL at one instruction per numeric region."""
+
+    if not ddl:
+        return instructions
+    region_count = len(
+        re.findall(
+            r"(?:領域|region)\s*\[\s*(?:0(?:\.\d+)?|1(?:\.0+)?)\s*,",
+            ddl,
+            flags=re.IGNORECASE,
+        )
+    )
+    if region_count == 0 or len(instructions) <= region_count:
+        return instructions
+    region_anchored = [
+        ins for ins in instructions if ins.at is not None and ins.at.region is not None
+    ]
+    return (
+        region_anchored[:region_count]
+        if len(region_anchored) >= region_count
+        else instructions[:region_count]
+    )
+
+
 def _has_motion_path(instructions: list[Instruction]) -> bool:
     return any(
         ins.arrangement is not None
@@ -4000,6 +4028,9 @@ def coerce_score(score: Score, *, ddl: str | None = None, branch_report: dict[st
         _branch_before = instructions
         instructions = _drop_invalid_relations(instructions)
         _record_branch_fire(branch_report, "drop_invalid_relations", _branch_before, instructions)
+        _branch_before = instructions
+        instructions = _without_explicit_region_support(instructions, ddl=ddl)
+        _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
         data = score.model_dump(by_alias=True)
         data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
         return Score.model_validate(data)
@@ -4114,6 +4145,9 @@ def coerce_score(score: Score, *, ddl: str | None = None, branch_report: dict[st
     _branch_before = instructions
     instructions = _drop_invalid_relations(instructions)
     _record_branch_fire(branch_report, "drop_invalid_relations", _branch_before, instructions)
+    _branch_before = instructions
+    instructions = _without_explicit_region_support(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
     data = score.model_dump(by_alias=True)
     data["background"] = background
     if score.presence is None and effective_presence is not None:

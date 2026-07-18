@@ -225,6 +225,64 @@ def test_modifier_targeting_leaves_multi_motif_scores_alone():
     assert len(repaired.instructions) == 2
 
 
+def test_explicit_regions_drop_stage2_support_instruction():
+    from inku_server.composer import _enforce_explicit_region_instruction_count
+
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.337, 0.498],
+                    "radius": 0.09,
+                    "at": {"region": [0.227, 0.411, 0.447, 0.584]},
+                },
+                {
+                    "primitive": "arc",
+                    "center": [0.651, 0.493],
+                    "radius": 0.09,
+                    "at": {"region": [0.541, 0.406, 0.761, 0.579]},
+                },
+                {
+                    "primitive": "arc",
+                    "center": [0.58, 0.52],
+                    "radius": 0.11,
+                    "color": "red",
+                    "arrangement": {"count": 3, "layout": "scatter"},
+                },
+            ]
+        }
+    )
+    ddl = (
+        "細い弧を 一枚、中心の帯に置く 領域 [0.227, 0.411, 0.447, 0.584]に置き、回転は32度。"
+        "細い弧を 一枚、中心の帯に置く 領域 [0.541, 0.406, 0.761, 0.579]に置き、回転は-11度。"
+    )
+
+    repaired = _enforce_explicit_region_instruction_count(score, ddl)
+
+    assert len(repaired.instructions) == 2
+    assert all(instruction.at is not None for instruction in repaired.instructions)
+
+
+def test_explicit_regions_keep_model_output_when_count_does_not_exceed_regions():
+    from inku_server.composer import _enforce_explicit_region_instruction_count
+
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5]},
+            ]
+        }
+    )
+
+    repaired = _enforce_explicit_region_instruction_count(
+        score,
+        "Place a line in region [0.2, 0.4, 0.8, 0.6].",
+    )
+
+    assert repaired is score
+
+
 def test_relation_literal_gate_drops_narrative_inferred_relations():
     from inku_server.composer import _enforce_relation_literal_gate
 

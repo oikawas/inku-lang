@@ -3288,6 +3288,27 @@ def command_plugin(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_reference(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.json:
+        data, _ = client.request("GET", "/api/reference", query={"format": "json"})
+        text = json.dumps(data, ensure_ascii=False, indent=2)
+    else:
+        text = client.request_text("GET", "/api/reference", query={"format": "md"})
+    if args.output:
+        payload = text if text.endswith("\n") else text + "\n"
+        Path(args.output).write_text(payload, encoding="utf-8")
+        print(f"wrote {args.output}")
+    else:
+        print(text)
+    return 0
+
+
 def command_version(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -3505,6 +3526,16 @@ def build_parser() -> argparse.ArgumentParser:
     plugin_validate.add_argument("file", help="UTF-8 .inku-plugin.md file")
     plugin_sub.add_parser("reload", help="reload the server plugin directory without restart")
     plugin_cmd.set_defaults(func=command_plugin)
+
+    reference_cmd = subparsers.add_parser(
+        "reference", help="dump implementation vocabulary and constant tables (read-only mirror)"
+    )
+    _add_common_server_args(reference_cmd)
+    reference_format = reference_cmd.add_mutually_exclusive_group()
+    reference_format.add_argument("--md", action="store_true", help="Markdown output (default)")
+    reference_format.add_argument("--json", action="store_true", help="JSON output")
+    reference_cmd.add_argument("--output", "-o", help="write to FILE instead of stdout")
+    reference_cmd.set_defaults(func=command_reference)
 
     version_cmd = subparsers.add_parser("version", help="show CLI and server version/build information")
     _add_common_server_args(version_cmd)

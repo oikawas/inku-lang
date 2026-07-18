@@ -112,6 +112,14 @@ _REGIONS = {
     "middle region": (0.18, 0.24, 0.82, 0.76),
     "lower corner": (0.58, 0.62, 0.92, 0.92),
 }
+# Single source for the expansion-layer literals also surfaced by the reference
+# dump. Keep these named so the mirror imports them instead of duplicating values.
+ANCHOR_PREFIX = "anchor "
+SINGULAR_MEMBER = {"ja": "一枚", "en": "one mark"}
+METAPHOR_MARKERS = {
+    "ja": ("のよう", "みたい", "比喩"),
+    "en": ("like ", "as if", "metaphor"),
+}
 
 
 class PluginFormatError(ValueError):
@@ -259,7 +267,7 @@ def _build_manifest(values: dict[str, object]) -> PluginManifest:
 def _instruction_budget(lines: tuple[str, ...]) -> int:
     total = 0
     for line in lines:
-        if line.lower().startswith("anchor "):
+        if line.lower().startswith(ANCHOR_PREFIX):
             continue
         match = _RANGE_RE.search(line)
         total += int(match.group("high")) if match else 1
@@ -428,7 +436,7 @@ def _expand_entry(entry: PluginEntry, *, lang: str, seed_text: str) -> str:
     anchor_region = (0.18, 0.24, 0.82, 0.76)
     expanded: list[str] = []
     for line in lines:
-        if line.lower().startswith("anchor "):
+        if line.lower().startswith(ANCHOR_PREFIX):
             anchor_region = _region_for_line(line, anchor_region)
             continue
         line_region = _region_for_line(line, anchor_region)
@@ -446,7 +454,7 @@ def _expand_entry(entry: PluginEntry, *, lang: str, seed_text: str) -> str:
         if low < 1 or high < low:
             raise PluginFormatError([f"{entry.heading}: invalid repetition range"])
         count = low + _stable_int(seed_text, f"count-{entry.heading}") % (high - low + 1)
-        singular = "一枚" if lang == "ja" else "one mark"
+        singular = SINGULAR_MEMBER[lang]
         base = clean[: match.start()] + singular + clean[match.end() :]
         for index, (member_region, rotation) in enumerate(
             _member_regions(line_region, count, seed_text), start=1
@@ -471,7 +479,7 @@ def _is_metaphorical(source: str, phrase: str, *, lang: str) -> bool:
     if index < 0:
         return False
     window = folded[max(0, index - 16) : index + len(phrase_folded) + 16]
-    markers = ("のよう", "みたい", "比喩") if lang == "ja" else ("like ", "as if", "metaphor")
+    markers = METAPHOR_MARKERS.get(lang, METAPHOR_MARKERS["en"])
     return any(marker in window for marker in markers)
 
 

@@ -85,6 +85,13 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * **`plugin reload`** — サーバーを再起動せず `server/plugins/` を明示再読込します。
 * これらは管理者セッションを必要とします。プラグイン試験で生成するファイルは `cli/out2/<build>-<version>-<benchmark>/` の一つのrunディレクトリにまとめ、Git追跡しません。
 
+### 0.6 `reference`
+
+* **`reference [--md | --json] [-o FILE]`** — 実装内の語彙・定数テーブルの機械生成ダンプを取得します。既定は Markdown、`--json` で構造化 JSON。`-o` でファイルへ保存します。
+* 冒頭に APP_VERSION / BUILD_NUMBER / git short hash / 生成日時 / ロード中プラグインの namespace+version を付けます。
+* 収録は8節（歳時記、正規化DDL定型句、展開層、Score schema、色解決、weight 特性、演奏、検証規約）で、すべて実装モジュールから取得します。値をどこにも手書きしない「鏡」であり、生成・受理・coerce のいかなる判定にも接続しません。
+* 設計・執筆セッションの冒頭資料として、生成した Markdown 一枚を添付する運用に使います。ログイン済みセッションで実行できます。
+
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * 指定したIDを基点とする系譜ツリーを表示します。

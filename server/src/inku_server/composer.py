@@ -23,6 +23,7 @@ from typing import Any
 
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
+from .saijiki import relation_literal_markers
 from .schema import Score, Variation
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
@@ -845,18 +846,8 @@ _COLOR_TERMS = {
 }
 
 
-_RELATION_LITERAL_MARKERS = {
-    "along": ("前の線に沿って", "along the previous line"),
-    "not_touching": ("前の形に触れない", "not touching the previous shape"),
-    "touching": (
-        "前の線に触れる",
-        "前の弧に両端で触れる",
-        "touching the previous line",
-        "touching the previous arc at both ends",
-    ),
-    "cutting": ("前の線を切る", "cutting the previous line"),
-    "between": ("前の二つの間に", "between the previous two"),
-}
+# v1.92: relation 固定句の正は saijiki テーブル (saijiki.RELATIONS)。
+_RELATION_LITERAL_MARKERS = relation_literal_markers()
 
 
 def _literal_relation_types(ddl: str) -> set[str]:

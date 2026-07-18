@@ -1,6 +1,6 @@
 # inku — DDL (Drawing Description Language) — SPEC
 
-**Version: v1.90.0**
+**Version: v1.92.0**
 
 この文書は inku / DDL 仕様の日本語正本である。英語公開版は
 [`SPEC.md`](SPEC.md) として、この文書の意図に基づき再構成・翻訳する。
@@ -75,19 +75,22 @@ DDLは絵を記述する言語ではなく、**視覚的な短歌を書く言語
 
 ### 3.1 コアに入れるもの
 
-| カテゴリ | 語彙 |
+コア語彙は歳時記の 9 カテゴリと、あいだ（関係）で構成される。**語の正は実装の saijiki テーブル（v1.92 で単一情報源化）であり、機械生成の reference §1（`GET /api/reference` / `inku-cli reference`）が常に現行値を公開する。** 以下は v1.92 時点の概観で、語の追加・削除は reference を正とする。
+
+| カテゴリ | 語彙（v1.92 時点） |
 |---|---|
-| **Color** | 白、黒、青、赤、緑、灰 |
-| **Canvas** | 正方形（Option: A4, B4, Letter） |
-| **Action** | 置く、描く、並べる、埋める、敷き詰める、塗りつぶす |
-| **Pen** | ペン、筆太、筆細、ロトリング、クレヨン |
-| **Line** | 直線、波線、ひっかき、ドット |
-| **Object** | 線、円、だ円、三角、四角 |
-| **Location** | 上下左右、斜、回転 |
-| **つらなり (Continuity)** | 実線、破線、点線、一点鎖線 |
-| **ゆらぎ (Movement)** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む、ばらつく |
-| **あいだ (Relations)** | 沿う、触れない、切る、間に、触れる |
-| **わりあい (Proportions)** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
+| **かたち** | 円、楕円、三角、四角、線、弧、雲形 |
+| **かたむき** | 水平、垂直、斜め、右上がり、右下がり、回転 |
+| **てざわり** | 鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、ビュラン、ドライポイント |
+| **つらなり** | 実線(既定)、破線、点線、一点鎖線 |
+| **いろ** | 白、黒(既定)、青、赤、緑、灰 |
+| **ゆらぎ** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む |
+| **ばしょ** | 上、下、中央、左端、右端、上端、下端、中心、隅 |
+| **うごき** | 置く、並べる、引く、散らす、埋める、敷き詰める |
+| **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
+| **あいだ** | 沿う、触れない、切る、間に、触れる |
+
+キャンバス比率は語彙ではなく canvas-aspect プラグイン（§4.4）が扱い、square / golden / a4 / b4 / pillar / oban / wide / byobu / vertical の 9 種とする。
 
 **コアの性質**：
 - 物理素材の語彙のみ（感情語ゼロ）
@@ -162,7 +165,7 @@ v1.29 時点では、参照実装として `canvas-aspect` プラグインを追
 
 - 現在のフックは **canvas-size hook** のみ
 - ユーザーごとのプラグイン設定は DB の plugin extension storage に JSON として保存する
-- Web UI のプラグイン呼び出しボタンは、モデル選択ボタンの左側に配置する
+- Web UI のプラグイン呼び出しボタン（キャンバス）は記述タブの操作列に置く。現行の並び順は「色カタログ」「モデル選択」「キャンバス」「新規作成」（Build 563、§8.4）
 - プラグイン実装は system plugins と user plugins のディレクトリを分け、各プラグインを専用ディレクトリに配置する
 - 参照実装の `canvas-aspect` は、サーバー側では `server/src/inku_server/plugins/system/canvas_aspect/`、Web 側では `web/src/lib/plugins/system/canvas-aspect/` に配置する
 - キャンバス比率を変更した場合、既存の描画表示はクリアし、選択比率に合わせたプレースホルダー画像へ切り替える。ただし表示中作品の系譜文脈は保持し、次に保存する作品を表示中作品の子として `canvas_aspect_change`（UI表示: キャンバス変更）で記録する
@@ -205,7 +208,7 @@ Nature.雨  →  短い線を上から下に多数散らす
 - `anchor 名前`: 領域を確定し、後続memberをanchorの帯へ決定的に配置する。コアrelationの直前参照へは翻訳しない。`anchor … を N〜M箇所 置く`（Build 591）は、箇所反復×各anchorからのmember反復の入れ子（深さ2まで）とし、各箇所は個別の帯regionを持つ。
 - `{領域: 中域}` 等: コアの正規化regionへ翻訳する。登録キーの正規リストはreference §3が公開し（実装が正）、`下端の帯`（Build 591で追加）を含む。「左上から右下への斜めの帯」（Build 591）は矩形ではなく展開層計算（下降対角線に沿うmember小region列）とする。
 
-ロード時のvalidatorは、manifest必須項目、予約namespaceと語の衝突、展開結果のコア語彙閉包（別プラグイン語を含む再帰禁止）、1語48 instruction上限、反復memberの固定座標スタンプ、URL／ファイル参照を検査する。違反はwarning-onlyではなく文書全体を理由付きで拒否する。これは作品を均すgovernorではなく、実行前の構文検査である。実行時にも閉包と量を確認し、失敗した展開は修復せずdropし、通常のコア近似へ戻したことをwarningへ記録する。Build 591では、未知領域キーと未定義member参照をロード拒否理由へ加え、コメント行（注:／note:）を閉包検査の対象外とした。無言の中央fallbackは廃止し、runtimeで万一未知キーへ遭遇した場合は既定帯へ寄せてwarningを記録する。閉包マーカー表には歳時記の修飾カテゴリ（素材・色・ゆらぎ・かたむき・わりあい・ばしょ）と動詞「描く」「埋める」を暫定追加した。語は reference §1 を正とし、v1.92の歳時記構造化でsaijikiテーブル導出へ置換する暫定である。
+ロード時のvalidatorは、manifest必須項目、予約namespaceと語の衝突、展開結果のコア語彙閉包（別プラグイン語を含む再帰禁止）、1語48 instruction上限、反復memberの固定座標スタンプ、URL／ファイル参照を検査する。違反はwarning-onlyではなく文書全体を理由付きで拒否する。これは作品を均すgovernorではなく、実行前の構文検査である。実行時にも閉包と量を確認し、失敗した展開は修復せずdropし、通常のコア近似へ戻したことをwarningへ記録する。Build 591では、未知領域キーと未定義member参照をロード拒否理由へ加え、コメント行（注:／note:）を閉包検査の対象外とした。無言の中央fallbackは廃止し、runtimeで万一未知キーへ遭遇した場合は既定帯へ寄せてwarningを記録する。閉包マーカー表（図形・動詞・関係・歳時記修飾カテゴリ）は v1.92 の歳時記構造化により saijiki テーブルから導出される。語の現行値は reference §1・§3 を正とする。
 
 名前空間付き語は明示時に発火する。`fires_on` は自然文の指示対象として明示された場合だけStage 1が名前空間付き語へ解決でき、比喩・不明瞭な対象・未知対象へ広げない。同一位置で複数の `fires_on` 句がマッチした場合は最長一致のみを採用し（Build 591、部分文字列の誤発火の排除。例: 「枯草」入力で「草」による下草の誤発火を排除）、異なる位置の複数語は従来どおり複数発火する。Stage 1 promptへ注入するのはロード済みの表層語と発火語だけで、テンプレート本文は注入しない。Stage 1.5とcoerceはプラグイン語を生成できない。入力語→名前空間付き語の対応はprovenanceとしてAPI応答と履歴の派生メタデータへ記録するが、プラグイン本文はScore、DB正本、rh2へ保存しない。
 
@@ -446,27 +449,11 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 - 翻訳不可能な言葉を残すこと自体が、DDLの「言語への敬意」と一致する
 - 英語話者にとっては "Saijiki" というボタンを開く行為自体が、異文化の視点で語彙を見る体験になる
 
-**カテゴリ構造（日本語版）**
+**カテゴリ構造**
 
-ひらがなを採用する。漢字は硬い。ひらがなは記述の敷居を下げる。
+歳時記は 10 カテゴリ（かたち・かたむき・てざわり・つらなり・いろ・ゆらぎ・ばしょ・うごき・わりあい・あいだ）に、ロード済みプラグインの名前空間付き語を加えて表示する。語彙の現行値は §3.1 の表と reference §1 を正とし、web の歳時記表示も同じ saijiki テーブルから配信される（v1.92: `GET /api/saijiki` + バンドル内蔵スナップショットの同期ストア）。
 
-| カテゴリ | 語彙例 |
-|---|---|
-| かたち | 円、楕円、三角、四角、線、弧、雲形 |
-| かたむき | 水平、垂直、斜め、右上がり、右下がり、回転 |
-| てざわり | ペン、筆、クレヨン、チョーク、ビュラン、ドライポイント |
-| うごき | 置く、並べる、埋める、散らす、敷き詰める |
-| ばしょ | 上、下、中心、端、隅 |
-
-**カテゴリ構造（英語版）**
-
-| Category | Vocabulary |
-|---|---|
-| forms | circle, ellipse, triangle, square, line, arc |
-| angles | horizontal, vertical, diagonal, rising, falling, rotated |
-| touches | pen, brush, crayon, chalk, burin, drypoint |
-| motions | place, align, fill, scatter, tile |
-| places | top, bottom, center, edge, corner |
+カテゴリ名はひらがなを採用する。漢字は硬い。ひらがなは記述の敷居を下げる。英語版カテゴリ名は forms / angles / touches / continuity / colors / movements / places / motions / proportions / relations とする。
 
 **配置方針**
 
@@ -747,10 +734,9 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
 **方針: 自然文のリズムを保ちつつ、コア語彙に限定する**
 
 ```
-正規化DDL（例）:
+正規化DDL（例、実コーパス形式）:
 
-  中心に 鉛筆の細い線を ひとつ 置く
-  揺らぎ: 小
+  中心に鉛筆の細い線をひとつ置く。線は細かく揺れる。
 ```
 
 **却下した選択肢:**
@@ -760,11 +746,12 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
 | 完全自然文（「中心付近に、細い線を、わずかな揺らぎで置く」） | 第二段階で再度「解釈」の余地が残る |
 | 構造化リスト（YAMLライク） | コードっぽく見える。記述の楽しさを削ぐ |
 | 関数呼び出し風（`置く(対象=線, 位置=中心)`） | コードに近すぎる |
+| 分離修飾行（「揺らぎ: 小」を独立行で書く初期案） | 実装では採用されなかった。運動語彙は「線は細かく揺れる。」のようにインラインの文として書く（fixture コーパスが正）。例外は面・地の質感で、「面: ...」「地: ...」の固定句だけが行として分離される |
 
 **採用形式の特徴:**
 - 自然文のリズム（短歌的な読み心地）
 - 語彙はコアに限定（「置く」「細い」「中心」など）
-- 修飾情報（揺らぎなど）を明示的に分離
+- 運動語彙はインラインの文、面・地の質感のみ「面:／地:」の固定句で分離
 - 日本語版と英語版でフォーマットの構造を共通化
 - **記述者の目に触れる前提で設計する**（解釈フィードバックUIで表示される）
 - 見える線・弧・輪郭線には、歳時記のてざわりを一つ明記する。入力が素材を明示した場合は保持し、未指定の場合は質感・文脈から選ぶ。塗りつぶされた面だけの図形には機械的に付けない
@@ -772,17 +759,12 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
 
 ### 12.5 モデル分割
 
-段階ごとに異なるモデルを使う：
+段階ごとに異なるモデルを使える。**現行実装は Stage 別のモデル選択制**であり、ユーザー・管理者が Stage 1 / Stage 2 / Vision の各用途にモデルを設定できる（§8.4 のモデル設定・モデル比較、`/api/models` の llm/vision カタログ）。
 
-| 段階 | モデル | 理由 |
-|---|---|---|
-| 第一段階（解釈） | **Claude Opus 4.7** | 豊かな解釈・盆栽や短歌のニュアンス理解が必要 |
-| 第二段階（構造化） | **Claude Haiku 4.5 or ローカルLLM** | 機械的変換なので軽量モデルで十分 |
+初期設計時の想定（Stage 1 = 高能力モデル、Stage 2 = 軽量モデル）は方針として維持される:
 
-**利点:**
-- コストの高い Opus は一回だけ使う
-- 第二段階は入力が制限されているので、軽量モデルでも安定する
-- 「モデル選択そのものが創造的変数」という原則を維持しつつ、実用的なコスト構造
+- 解釈（Stage 1）は連想的・創造的でニュアンス理解が必要、構造化（Stage 2）は入力が制限されるため軽量モデルでも安定する
+- 「モデル選択そのものが創造的変数」という原則と、実用的なコスト構造を両立する
 
 ### 12.6 第一段階（解釈）の設計
 
@@ -807,27 +789,18 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
 - スキーマ遵守を最優先する
 - 創造的判断は不要（第一段階で済んでいる）
 
-**プロンプト設計の方針:**
+**プロンプト設計の方針（初期スケッチ）:**
 
 ```
 あなたは、正規化DDLをJSON Scoreに変換する関数です。
 入力は以下のコア語彙のみを含みます:
-
-かたち: 円、楕円、三角、四角、線、弧、雲形
-かたむき: 水平、垂直、斜め、右上がり、右下がり、回転
-てざわり: ペン、筆、クレヨン、チョーク、ビュラン、ドライポイント
-うごき: 置く、並べる、埋める、散らす
-ばしょ: 上、下、中心、端、隅
-太さ: 細、中、太
-揺らぎ: 小、中、大
-
+（語彙ブロック）
 各語彙はJSON Scoreの以下のフィールドに対応します:
 ...（マッピング表）
-
 入力をパースし、スキーマに従ってJSONを出力してください。
 ```
 
-入力が制限されているので、このプロンプトはほぼ決定的な変換関数として機能する。
+入力が制限されているので、このプロンプトはほぼ決定的な変換関数として機能する。※上記は設計当時のスケッチであり、現行の実プロンプトの語彙・relation 固定句テーブルは saijiki テーブル（v1.92）から導出される。現行値は reference §1-§2 を参照。
 
 ### 12.8 エラー回復戦略
 
@@ -1062,7 +1035,7 @@ DDLの揺らぎは、この意味での揺らぎである。
 
 | weight | 揺らぎの質 | 特性 |
 |---|---|---|
-| hair | almost_none | ほぼ揺らぎなし（正確） |
+| hair | almost_none | ほぼ揺らぎなし（正確）。※v1.92 で歳時記語彙からは削除。Score enum には Replay 互換のため残る |
 | pencil | perlin_fine | パーリン寄り（手の連続性）、薄い副線、微細な粒 |
 | pen | perlin_minimal | わずかなパーリン。基準となる標準線 |
 | rotring | almost_none | 均一幅、角端、硬い製図線 |
@@ -1070,6 +1043,10 @@ DDLの揺らぎは、この意味での揺らぎである。
 | chalk | perlin_plus_noise | パーリン + 粉っぽいかすれ、blur |
 | brush_thin | perlin_strong | 細い筆跡、副線、濃淡 |
 | brush_thick | pressure_blur | 太い筆圧、擦れ副線、軽い blur |
+| burin | almost_none | 硬く確実な彫線。丸端、texture filter なし |
+| drypoint | burr_noise | まくれ（バー）による滲み・かすれ。専用の burr 処理 |
+
+数値特性（stroke 幅・不透明度・dasharray・filter 有無）の正は reference §6 とする。
 
 **揺らぎのノイズ種別:**
 - **ホワイトノイズ**: 各点独立・相関なし・ギザギザ
@@ -1090,16 +1067,16 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 | 振幅 | 細かく、大きく |
 | 周波数 | 速く、ゆっくり |
 | 質 | 揺れる、波打つ、震える、滲む |
-| 配置 | ばらつく、散らばる |
 
 **英語版「movements」:**
 
 | Dimension | Vocabulary |
 |---|---|
-| amplitude | fine, broad |
-| frequency | quick, slow |
-| quality | wobble, undulate, tremble, blur |
-| placement | scatter, disperse |
+| amplitude | fine, large |
+| frequency | quickly, slowly |
+| quality | swaying, undulating, trembling, blurring |
+
+配置のばらつきは ゆらぎ ではなく、うごき（散らす）と arrangement（layout / path / jitter）が担う。
 
 ### 13.7 Nature plugin による現象の揺らぎ
 
@@ -1140,9 +1117,9 @@ Nature.風 の展開（概念）:
   形状: パーリンノイズ
 ```
 
-展開は第二段階の構造化層で処理される。プラグイン原則に従い、コアのメカニズムは変更しない。
+展開はコア語彙への writing-down のみであり、プラグイン原則に従い、コアのメカニズムは変更しない。
 
-**v1.70 参照実装:** `Nature.風` / `Nature.うねり` / `Nature.無風` の3語に限定する。`Nature.` 名前空間が明示された場合だけ Stage 1.5 が既存 DDL へ機械的に展開し、新 primitive や新 Score フィールドは追加しない。実装時点では variation / arrangement への既存表現だけで足りたため、§4.8 のプラグイン原則は緩めない。
+**実装の現状（v1.92 時点の注記）:** プラグイン展開の正規の場所は Stage 1 直後の宣言的プラグイン層である（§4.6）。ただし `Nature.風` / `Nature.うねり` / `Nature.無風` の 3 語だけは v1.70 参照実装として **Stage 1.5 内のハードコード展開**のまま残っている（`Nature.` 名前空間の明示時だけ機械的に展開、新 primitive・新 Score フィールドは追加しない）。この 3 語の宣言的プラグイン文書への移行は残件であり（移行までは web 歳時記への静的表示も凍結）、移行時に本節の記述を §4.6 へ統合する。§4.3 のプラグイン原則は緩めない。
 
 ### 13.8 Renderer での揺らぎ生成
 
@@ -1242,7 +1219,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 - 「左から右へ」「横に」→ `layout="horizontal"`, `path="left_to_right"`
 - 「右半分」→ `path="right_half"`
 - 「放射状」「同心円状」→ `layout="radial"`
-- 「敷き詰める」「格子状に敷く」→ `layout="grid"`（この明示語がある場合だけ。countは2000まで、通常配置は1000まで）
+- 「敷き詰める」「格子状に敷く」→ `layout="grid"`（この明示語がある場合だけ。count の上限は layout に関わらず一律 2000）
 
 `path` が `none` の場合は従来どおり `layout` だけで配置する。`path` が指定された場合、Renderer は決定的な hash と連番を使い、同じ JSON Score から同じ軌跡配置を再現する。
 
@@ -1254,14 +1231,13 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 細かく揺れるペンシルの破線が3本、画面を横切る
 ```
 
-**第一段階（Opus 4.7）の出力（正規化DDL）:**
+**第一段階（解釈）の出力（正規化DDL、実コーパス形式）:**
 
 ```
-ペンシルで 破線を 横に 3本 置く
-揺れ: 細かい
+鉛筆の破線の横線を縦に三本並べる。線は細かく揺れる。
 ```
 
-**第二段階（軽量モデル）の出力（JSON Score、抜粋）:**
+**第二段階（構造化）の出力（JSON Score、抜粋）:**
 
 ```json
 {
@@ -1322,7 +1298,7 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 
 v1.52 クローズ時点では、JSON Score の `relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。日本語では `前の線に沿って` / `前の形に触れない` / `前の線を切る` / `前の二つの間に`、英語では `along the previous line` / `not touching the previous shape` / `cutting the previous line` / `between the previous two` を固定句とする。`touching` は日本語の `前の線に触れる` / `前の弧に両端で触れる`、英語の `touching the previous line` / `touching the previous arc at both ends` が接触を明示する場合に限り使い、自発付与しない。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacing で表す。
 
-**第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く、続きから。現行語で表現の不足が実測で示されてから追加する。`続きから (continuing)` は素描で機構動作を確認したが決定的な表現価値を示さず、枯葉の説得力は雲形の surface / ground 表現に律速されていた。雲形の面表現を改善した後に再試験し、それまでは第二段候補に留める。§4.8 の手続きに従う。
+**第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く、続きから。現行語で表現の不足が実測で示されてから追加する。`続きから (continuing)` は素描で機構動作を確認したが決定的な表現価値を示さず、枯葉の説得力は雲形の surface / ground 表現に律速されていた。雲形の面表現を改善した後に再試験し、それまでは第二段候補に留める。§4.11 の手続き（会計を伴う最終判断の留保）に従う。
 
 ### 14.3 JSON Score スキーマ
 
@@ -1400,9 +1376,9 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 
 ---
 
-## 雲形の設計（v1.89.1）
+### 14.9 雲形の設計（v1.89.1）
 
-### 1. なぜ雲形か
+#### 14.9.1 なぜ雲形か
 
 > 窓の外の雲は、二度と同じ形をしていない。それでも人は飽きずに見る。作品を、窓の外を見るように見てもらうこと——雲形はそのための形である。
 
@@ -1412,7 +1388,7 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 
 雲形は雲の模写ではない。名は雲形定規に倣う——不規則曲線の**族**を指す造形語であり、気象の雲ではない。大和絵の霞、料紙の州浜、墨流し——日本の造形は、不定形を恣意ではなく「不規則さの文法を持つ型」として様式化してきた。雲形はその系譜に立つ。LeWitt の "lines not straight, not touching" が否定形と過程で線を定義したように、雲形は過程で面を定義する。
 
-### 2. 生成過程(輪郭は演奏が決める)
+#### 14.9.2 生成過程(輪郭は演奏が決める)
 
 輪郭は二段の決定的合成で生成する。すべて performance seed 従属であり、同一 seed は同一輪郭を再現する。
 
@@ -1421,7 +1397,7 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 
 輪郭のエッジ品質は筆致エンジン(道具文法)が担う——鉛筆の雲形とロットリングの雲形は別物である。内部は surface(wash / stipple / hatch 等)が満たす。`mode: carve` と組み合わせれば、黒地から不定形の光を彫り出せる。出力はベジェ当てはめを経て点数予算に従う。
 
-### 3. 既存語彙との合成(修飾語を新設しない)
+#### 14.9.3 既存語彙との合成(修飾語を新設しない)
 
 雲形が受け取る修飾はすべて既存語彙で表す:
 
@@ -1432,7 +1408,7 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 - **あいだ** → 関係(雲形は「前の形」として参照可能。逐次解決は確定輪郭の bbox / 輪郭線に対して働く)
 - **ばしょ / うごき** → 配置(散らされた複数の雲形は、それぞれ別の輪郭を持つ)
 
-### 4. 選択規則(逃げ場にしない)
+#### 14.9.4 選択規則(逃げ場にしない)
 
 雲形は「分からないときの近似」ではない。制約による凝縮を守るため:
 
@@ -1441,15 +1417,15 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 3. Stage 1.5・coerce は雲形を注入・追加できない(§10.4 の適用)
 4. 雲形の使用率・文脈はモチーフ台帳(洗練の会計)で鏡として監視する。governor・floor は設けない
 
-### 5. 決定性と識別
+#### 14.9.5 決定性と識別
 
 輪郭生成は performance seed からの決定的導出であり、新しい乱数源・新しい hash 入力を追加しない。rh2 の算出仕様は不変。楽譜(JSON Score)は雲形の過程パラメータのみを保持し、輪郭座標を保存しない——輪郭は演奏の実現値である。
 
 
-### 6. 形式の会計
+#### 14.9.6 形式の会計
 
 - **得るもの**: 定義によらない形。揺らぎが装飾ではなく形の本体そのものである最初のかたち。見る人の投影を誘う輪郭(設計原則5「動くのは見る人」が最も強く働く)
-- **失うもの**: 「かたち=定義可能な図形」という語彙の均質性。解釈に迷った際の逃げ場になる危険(→ 雲形の設計 §4 で封じる)
+- **失うもの**: 「かたち=定義可能な図形」という語彙の均質性。解釈に迷った際の逃げ場になる危険(→ §14.9.4 で封じる)
 
 ## 15. 開発方針
 
@@ -1464,20 +1440,20 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 - 「ローカルLLMでも動く」差別化ポイントとして保持
 - 追加開発は最小限
 
-### 15.2 Phase 1（PoC 完成）
+### 15.2 Phase 1（PoC 完成）— v0.8 までに達成済み（当時の計画記録）
 
-- [ ] FastAPI サーバー構築（`/compose` エンドポイント）
-- [ ] Opus 4.7 API 接続（既存 `composer.py` を流用・更新）
-- [ ] SVG レンダラー確認（既存 `renderer.py` 流用）
-- [ ] Web UI 実装（記述エリア + SVG表示 + 反復UI）
-- [ ] DDLテキスト・JSON Score・SVG のトリプル表示
+- [x] FastAPI サーバー構築（`/compose` エンドポイント）
+- [x] Opus 4.7 API 接続（既存 `composer.py` を流用・更新）
+- [x] SVG レンダラー確認（既存 `renderer.py` 流用）
+- [x] Web UI 実装（記述エリア + SVG表示 + 反復UI）
+- [x] DDLテキスト・JSON Score・SVG のトリプル表示
 
-### 15.3 Phase 2（品質向上）
+### 15.3 Phase 2（品質向上）— v1.6 までに達成済み（当時の計画記録）
 
-- [ ] 複数バリエーション同時生成
-- [ ] SVG ダウンロード機能
-- [ ] サンプル DDL テキスト集
-- [ ] LLM比較ビュー（Gemma vs Opus）
+- [x] 複数バリエーション同時生成
+- [x] SVG ダウンロード機能
+- [x] サンプル DDL テキスト集
+- [x] LLM比較ビュー（Gemma vs Opus）
 
 ---
 
@@ -1522,7 +1498,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 ### C. Stage 1 interpreter
 
-- EXAMPLE_POOL 現在 45 件 (v1.8 時点)。k=5 動的選択
+- EXAMPLE_POOL 現在 ja 65 件 / en 50 件 (v1.92 時点)。k=5 動的選択
 - EXAMPLE_POOL に arc 例 (弧を使う詩句 → `弧を引く` 等) 追加、弧出力を誘導
 - Stage 1 → Stage 2 の E2E 汎化試験 (interpret 結果が composer を通るか)
 - SPEC §2 原則5 違反動詞の混入率測定 (v0.7 強化 + v1.0 属性保持強化後の再評価)
@@ -1550,7 +1526,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 - **Nature plugin** — 風 / さざ波 / 葉などの現象起因揺らぎ (SPEC §13.7)
 - **エクステンション機構** — プラグイン読込、名前空間 (SPEC §4)
-- **Saijiki 辞書の配信形式** — `web/src/lib/saijiki.ts` 内ハードコード中、将来的に `inku-saijiki` パッケージ
+- **Saijiki 辞書の配信形式** — v1.92 で server の saijiki テーブルを単一情報源とし `GET /api/saijiki` + スナップショット同期ストアへ一本化済み。`inku-saijiki` パッケージとしての切り出しは将来課題のまま
 - **Base Language** — 英語版 Saijiki + 英語 prompt (SPEC §5)
 - **短歌的制約の強化** — 文字数カウント、句跨ぎの扱い
 - **リーダーボード / 作品共有** — v1.10 でユーザーごとの履歴分離は実装済み。グループ内共有・公開作品コレクションは将来機能
@@ -1611,85 +1587,29 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 ---
 
-## 付録: 既存ファイル構成
+## 付録: リポジトリ構成（概観）
 
 ```
-inku-lang/                         # github.com/oikawas/inku-lang
-├── README.md                      # プロジェクト紹介（英語）
-├── README.ja.md                   # プロジェクト紹介（日本語）
-├── LICENSE                        # MIT License
-├── SPEC.ja.md                     # 本書（設計哲学・言語設計、日本語正本）
-├── SPEC.md                        # 英語公開仕様（SPEC.ja.md から再構成）
-├── PROJECT_CONTEXT.ja.md          # 開発者・AI向けの短い日本語入口
-├── PROJECT_CONTEXT.md             # 開発者・AI向けの短い英語入口
-├── CHANGELOG.ja.md                # 日本語の詳細な変更履歴
-├── CHANGELOG.md                   # 英語公開変更履歴
-├── CLAUDE.md                      # Claude Code 用コンテキスト (gitignore)
-├── cli/                           # Python CLI クライアント (uv管理)
-│   ├── pyproject.toml             # inku-cli 0.1.0
-│   ├── uv.lock
-│   ├── README.md
-│   ├── src/inku_cli/
-│   │   ├── __init__.py
-│   │   └── cli.py                 # FastAPI API を操作する CLI 本体
-│   └── tests/
-│       └── test_cli.py            # CLI 設定 / payload / 出力テスト
-├── server/                        # Python バックエンド (uv管理)
-│   ├── pyproject.toml             # inku-server 0.1.0
-│   ├── uv.lock
-│   ├── .env.example               # ANTHROPIC_API_KEY 雛形
-│   ├── src/inku_server/
-│   │   ├── __init__.py
-│   │   ├── schema.py              # JSON Score Pydantic モデル
-│   │   ├── renderer.py            # Score → SVG (svgwrite)
-│   │   ├── render_engines/         # RenderEngine 契約と default engine
-│   │   ├── composer.py            # 正規化DDL → Score (Haiku 4.5)
-│   │   ├── db.py                  # 履歴 / ユーザー / セッション DB 層
-│   │   ├── migrate_history.py     # history.json → DB 移行
-│   │   └── coerce.py              # Score 構造補修 (PRIMITIVE_SPECS テーブル駆動)
-│   └── tests/
-│       ├── conftest.py            # dotenv 読込
-│       ├── test_renderer.py       # 10 cases
-│       ├── test_composer.py       # 15 fixture + 厳密比較
-│       ├── test_interpreter.py    # 5 smoke cases (Saijiki 語彙検査)
-│       ├── test_api.py            # FastAPI TestClient 11 cases
-│       └── fixtures/stage2/       # 正規化DDL ↔ Score ペア
-│           └── {01..15}/{input.txt,expected.json}
-└── web/                           # SvelteKit 2 + Svelte 5 + TS (inku-web 0.1.0)
-    ├── package.json
-    ├── svelte.config.js
-    ├── vite.config.ts             # /api → 127.0.0.1:8100 proxy
-    ├── src/
-    │   ├── app.html
-    │   ├── lib/
-    │   │   ├── saijiki.ts         # 歳時記辞書 (7 カテゴリ)
-    │   │   ├── highlight.ts       # 墨濃淡トークナイザ (Saijiki/感情/地)
-    │   │   └── models.ts          # 選択可能な LLM 一覧と既定
-    │   └── routes/
-    │       ├── +layout.svelte
-    │       └── +page.svelte       # モード / モデル選択 / Saijiki / 履歴 / 思考 UI
-    └── static/
+inku-lang/                 # github.com/oikawas/inku-lang
+├── SPEC.ja.md / SPEC.md               # 仕様（日本語正本 / 英語公開版）
+├── PROJECT_CONTEXT.ja.md / .md        # 開発者・AI 向けの短い入口
+├── CHANGELOG.ja.md / .md              # 時系列の実装・設計記録
+├── README.ja.md / README.md           # プロジェクト紹介
+├── server/                            # FastAPI バックエンド (inku_server, uv 管理)
+├── web/                               # SvelteKit 2 + Svelte 5 フロントエンド
+├── cli/                               # inku-cli (HTTP API クライアント、uv 管理)
+├── manual/ja|en/cli-reference-for-ai.md  # CLI リファレンス
+└── android/                           # ネイティブ Android 実装（正本: android/ANDROID_SPEC.ja.md）
 ```
 
-`server/src/inku_server/`:
-- `schema.py` — Pydantic Score モデル (Arrangement.count 上限 1000、background/color_cycle/filled フィールド追加)
-- `renderer.py` — Score → SVG (svgwrite)、揺らぎ生成、arrangement 展開、scatter hash 散布、閉形状自動塗りつぶし
-- `render_engines/` — 将来の描画コア差し替えに備えた RenderEngine 契約と静的レジストリ。現行レンダラーは `default` engine としてラップする
-- `plugins/` — プラグインレジストリと hook 補助。system/user ディレクトリを分け、v1.34 時点では system plugin として `canvas-aspect` の canvas-size hook を提供
-- `interpreter.py` — Stage 1: 自由記述 → 正規化DDL (EXAMPLE_POOL 45件 [v1.8]、k=5 動的選択、非 Saijiki 語展開・わりあいルール・てざわり保持強化)
-- `composer.py` — Stage 2: 正規化DDL → Score (backend dispatch、original_text パス・スルー、わりあいマッピング例、てざわり→weight 変換表 [v1.8])
-- `coerce.py` — Score 構造補修レイヤー (PRIMITIVE_SPECS テーブル駆動、generic coerce loop)
-- `db.py` — SQLAlchemy DB 層。履歴、描画内容ハッシュ、スター状態、ユーザーグループ、ユーザーアカウント、セッション、ユーザー別 UI 設定、バッチ指示履歴、プラグイン拡張記憶域を管理。パスワードは PBKDF2-SHA256 + salt で保存
-- `api.py` — FastAPI: `/api/compose`/`/api/interpret`/`/api/history`/`/api/history/{id}/star`/`/api/paint`/`/api/auth/*`/`/api/settings/status`/`/api/users`/`/api/user-groups`/`/health`
-- `trainer.py` — コーパス生成ユーティリティ (学習モード API は v1.2 で廃止)
+モジュール構成・API 経路・CLI サブコマンド・語彙定数の**現行値は本書に列挙しない**。次を正とする:
 
-`cli/src/inku_cli/`:
-- `cli.py` — `inku-api` を操作する API クライアント CLI。`login` / `logout` / `me` / `paint` / `batch` / `demo-instruction` / `history` / `history-export` を提供する。サーバー内部モジュールを import せず、HTTP API のみを利用する
+- 語彙・定型句・マーカー・領域・weight 特性・検証閾値: **reference dump**（`GET /api/reference` / `inku-cli reference --md`。実装テーブルの機械生成鏡）
+- API 経路: `server/src/inku_server/api.py`（FastAPI ルート定義）
+- CLI サブコマンド: `inku-cli --help` および `manual/ja/cli-reference-for-ai.md`
+- 各パッケージの内部構成: `server/README.md` / `web/README.md` / `cli/README.md`
 
-
-**別リポジトリ / 別 PoC / ネイティブ実装**:
-- `ddl/` — 初期 Python PoC (Android 補完軸のベース、Web版は server/ に移行)
-- `android/` — ネイティブ Android 実装。Kotlin + Jetpack Compose + Room を使う単体アプリとして、server/web を開発上の master としながら、Pixel 9 以上を主対象に実装する。Android 詳細仕様は `android/ANDROID_SPEC.ja.md` を正本とする
+`ddl/` は初期 Python PoC（Android 補完軸のベース）であり、Web 版は `server/` に移行済み。
 
 ---
 

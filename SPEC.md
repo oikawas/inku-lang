@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.90.0**
+**Version: v1.92.0**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -297,19 +297,22 @@ The vocabulary dictionary is called Saijiki, following the haiku term for a
 seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
 at all times.
 
-Current core categories include:
+Since v1.92 the vocabulary has a single source of truth: the saijiki table on the server (`saijiki.py`). The Stage 1 prompt vocabulary block, the plugin closure markers, the Stage 2 relation phrases, the web Saijiki display (`GET /api/saijiki`), and reference §1 are all derived from that table. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) always shows the current values; the table below is the v1.92 snapshot.
 
-| English | Japanese | Examples |
+| English | Japanese | Vocabulary |
 | --- | --- | --- |
-| shape | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
-| touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, burin, drypoint |
-| line continuity | つらなり | solid, dashed, dotted, dot-dashed |
-| motion | うごき | place, align, scatter, fill, tile, tremble, undulate |
-| relations | あいだ | along, not touching, cutting, between, touching, with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
-| place | ばしょ | top, bottom, edge, corner, near, across |
-| angle | かたむき | horizontal, vertical, diagonal, rotated |
-| proportion | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
-| color | いろ | white, black, blue, red, green, gray |
+| forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
+| touches | てざわり | pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint |
+| continuity | つらなり | solid (default), dashed, dotted, dash-dot |
+| motions | うごき | place, line-up, fill, scatter, draw, tile |
+| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
+| relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
+| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
+| angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
+| proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
+| colors | いろ | white, black (default), blue, red, green, gray |
+
+In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision; the Score `Weight` enum keeps `hair` so that saved works replay unchanged.
 
 `Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
 
@@ -489,7 +492,7 @@ The pipeline order is **Stage 1 output -> plugin expansion -> core-only DDL -> S
 
 Core DDL with explicit numeric regions after expansion is already composition-resolved. Stage 1.5 still performs normalization but must not append a separate finished-work recipe or auxiliary shapes, and Stage 2 must not retain support instructions beyond the explicit region count. This cap applies to Score instruction count; it does not freeze `arrangement.count` inside each instruction. Visible multiplicity can therefore remain model-dependent: for the minimal twin-arcs fixture, Mistral stays at two arcs while Qwen may repeat the two instructions into more than two visible arcs. Build 590 accepts this as a known limitation.
 
-The load-time validator rejects the whole document with explicit reasons for missing manifest fields, reserved namespace or qualified-word collisions, recursion or non-core plugin references, more than 48 instructions per word, repeated members stamped at fixed coordinates, and URL/file references. This is syntax validation before execution, not an artwork governor. Runtime closure or budget failure drops the expansion without repair, records a warning, and leaves a normal core approximation. Build 591 adds unknown region keys and undefined member references to the load-time rejections, exempts comment lines from the closure check, and removes the silent center fallback (an unknown key at runtime falls back to the default band with a recorded warning). The closure marker table provisionally gains the Saijiki modifier categories (material, color, variation, angle, ratio, place) and the verbs draw and fill, sourced from reference §1 and slated to become table-derived in the v1.92 Saijiki restructuring.
+The load-time validator rejects the whole document with explicit reasons for missing manifest fields, reserved namespace or qualified-word collisions, recursion or non-core plugin references, more than 48 instructions per word, repeated members stamped at fixed coordinates, and URL/file references. This is syntax validation before execution, not an artwork governor. Runtime closure or budget failure drops the expansion without repair, records a warning, and leaves a normal core approximation. Build 591 adds unknown region keys and undefined member references to the load-time rejections, exempts comment lines from the closure check, and removes the silent center fallback (an unknown key at runtime falls back to the default band with a recorded warning). Since v1.92 the closure marker table (shapes, verbs, relations, and the Saijiki modifier categories) is derived from the saijiki table; reference §1 and §3 always show the current values.
 
 An explicit qualified term always fires. Stage 1 may resolve a `fires_on` noun only when it is the stated subject; it must not extend firing to metaphors, unclear subjects, or unknown objects. When several `fires_on` phrases match at the same position, only the longest wins (Build 591, removing substring mis-fires — e.g. the input "枯草" no longer also fires the "草" undergrowth word); phrases at different positions still fire independently. Only the loaded surface/trigger vocabulary is injected into Stage 1, never template bodies. Stage 1.5 and coerce cannot introduce plugin words. Input-term-to-qualified-term provenance is returned by the API and stored in ordinary derivation metadata, while plugin documents and dependencies remain absent from Score, canonical DB artwork data, and rh2.
 

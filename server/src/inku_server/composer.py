@@ -1261,8 +1261,13 @@ def compose(
     original_text: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
+    trace_sink: list[dict] | None = None,
 ) -> tuple[Score, int | None, int | None]:
-    """(score, tokens_in, tokens_out) を返す。system_prompt 指定時はスナップショット使用。"""
+    """(score, tokens_in, tokens_out) を返す。system_prompt 指定時はスナップショット使用。
+
+    trace_sink 指定時は、この呼び出しの Stage 2 生応答 {raw_text, parse_ok} を
+    append する (観測のみ; retry/fallback の判定・挙動は変えない)。
+    """
     user_msg = _build_user_message(ddl, original_text, lang=lang)
     if system_prompt is not None:
         effective_prompt = system_prompt
@@ -1281,6 +1286,7 @@ def compose(
                 model=model_id,
                 system_prompt=effective_prompt,
                 settings=settings,
+                trace_sink=trace_sink,
             )
             return _finalize_score(score, ddl), tokens_in, tokens_out
         if provider == "gemini":
@@ -1289,6 +1295,7 @@ def compose(
                 model=model_id,
                 system_prompt=effective_prompt,
                 settings=settings,
+                trace_sink=trace_sink,
             )
             return _finalize_score(score, ddl), tokens_in, tokens_out
         score, tokens_in, tokens_out = _compose_openai(
@@ -1296,18 +1303,26 @@ def compose(
             model=model_id,
             provider=provider,
             system_prompt=effective_prompt,
+            trace_sink=trace_sink,
         )
         return _finalize_score(score, ddl), tokens_in, tokens_out
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
         score, tokens_in, tokens_out = _compose_openai(
-            user_msg, model=None, system_prompt=effective_prompt
+            user_msg, model=None, system_prompt=effective_prompt, trace_sink=trace_sink
         )
         return _finalize_score(score, ddl), tokens_in, tokens_out
     score, tokens_in, tokens_out = _compose_anthropic(
-        user_msg, system_prompt=effective_prompt
+        user_msg, system_prompt=effective_prompt, trace_sink=trace_sink
     )
     return _finalize_score(score, ddl), tokens_in, tokens_out
+
+
+def _record_stage2_raw(trace_sink: list[dict] | None, raw_text: str, parse_ok: bool) -> None:
+    # Observation only (trace): record the Stage 2 model's raw response text and
+    # whether it parsed. Never affects retry/fallback control flow.
+    if trace_sink is not None:
+        trace_sink.append({"raw_text": raw_text, "parse_ok": bool(parse_ok)})
 
 
 def _compose_anthropic(
@@ -1316,6 +1331,7 @@ def _compose_anthropic(
     model: str | None = None,
     system_prompt: str = SYSTEM_PROMPT,
     settings: dict | None = None,
+    trace_sink: list[dict] | None = None,
 ) -> tuple[Score, int | None, int | None]:
     from anthropic import Anthropic
 
@@ -1336,7 +1352,15 @@ def _compose_anthropic(
     tout = getattr(resp.usage, "output_tokens", None)
     for block in resp.content:
         if block.type == "tool_use" and block.name == "submit_score":
-            return Score.model_validate(block.input), tin, tout
+            raw_text = json.dumps(block.input, ensure_ascii=False, default=str)
+            try:
+                score = Score.model_validate(block.input)
+            except Exception:
+                _record_stage2_raw(trace_sink, raw_text, False)
+                raise
+            _record_stage2_raw(trace_sink, raw_text, True)
+            return score, tin, tout
+    _record_stage2_raw(trace_sink, "", False)
     raise RuntimeError("Anthropic did not return submit_score tool call")
 
 
@@ -1346,6 +1370,7 @@ def _compose_gemini(
     model: str,
     system_prompt: str = SYSTEM_PROMPT,
     settings: dict | None = None,
+    trace_sink: list[dict] | None = None,
 ) -> tuple[Score, int | None, int | None]:
     connection = connection_for("gemini", settings or _current_model_settings())
     api_key = connection.get("api_key") or ""
@@ -1377,11 +1402,13 @@ def _compose_gemini(
     parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     text_out = "\n".join(str(part.get("text", "")) for part in parts).strip()
     usage = payload.get("usageMetadata", {})
-    return (
-        Score.model_validate(_extract_json(text_out)),
-        usage.get("promptTokenCount"),
-        usage.get("candidatesTokenCount"),
-    )
+    try:
+        score = Score.model_validate(_extract_json(text_out))
+    except Exception:
+        _record_stage2_raw(trace_sink, text_out, False)
+        raise
+    _record_stage2_raw(trace_sink, text_out, True)
+    return score, usage.get("promptTokenCount"), usage.get("candidatesTokenCount")
 
 
 def _compose_openai(
@@ -1390,6 +1417,7 @@ def _compose_openai(
     model: str | None = None,
     provider: str | None = None,
     system_prompt: str = SYSTEM_PROMPT,
+    trace_sink: list[dict] | None = None,
 ) -> tuple[Score, int | None, int | None]:
     from openai import OpenAI
 
@@ -1436,15 +1464,32 @@ def _compose_openai(
     msg = resp.choices[0].message
     if msg.tool_calls:
         args = msg.tool_calls[0].function.arguments
-        return Score.model_validate(json.loads(args)), tin, tout
+        try:
+            score = Score.model_validate(json.loads(args))
+        except Exception:
+            _record_stage2_raw(trace_sink, args, False)
+            raise
+        _record_stage2_raw(trace_sink, args, True)
+        return score, tin, tout
 
     text = (msg.content or "").strip()
     args = _extract_tool_call_args(text)
     if args is not None:
-        return Score.model_validate(args), tin, tout
+        try:
+            score = Score.model_validate(args)
+        except Exception:
+            _record_stage2_raw(trace_sink, text, False)
+            raise
+        _record_stage2_raw(trace_sink, text, True)
+        return score, tin, tout
 
-    data = _extract_json(text)
-    return Score.model_validate(data), tin, tout
+    try:
+        score = Score.model_validate(_extract_json(text))
+    except Exception:
+        _record_stage2_raw(trace_sink, text, False)
+        raise
+    _record_stage2_raw(trace_sink, text, True)
+    return score, tin, tout
 
 
 def _extract_tool_call_args(text: str) -> dict | None:

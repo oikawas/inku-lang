@@ -197,7 +197,7 @@ Nature.雨  →  短い線を上から下に多数散らす
 
 展開層は **Stage 1出力 → プラグイン展開 → コアDDL → Stage 1.5 → Stage 2** の位置に置く。テンプレートは通常のコアDDLに加え、次の限定構文だけを使える。
 
-展開後に数値regionが明示されたコアDDLは、すでに構図判断済みの命令としてStage 1.5の正規化だけを通す。Stage 1.5は別の完成品レシピや補助図形を追加してはならず、Stage 2も明示region数を超える補助instructionを残してはならない。
+展開後に数値regionが明示されたコアDDLは、すでに構図判断済みの命令としてStage 1.5の正規化だけを通す。Stage 1.5は別の完成品レシピや補助図形を追加してはならず、Stage 2も明示region数を超える補助instructionを残してはならない。この上限はScoreのinstruction数に対するものであり、各instruction内の`arrangement.count`までは固定しない。そのためモデルによって可視要素数に差が残り、最小双弧fixtureではMistralが二本に収まる一方、Qwenが二つのinstructionを反復して二本を超える弧を描く場合がある。Build 590ではこのモデル差を既知制約として受け入れる。
 
 - `N〜M枚（個／本）`: 入力hashから個数を決定し、memberごとに別regionと回転を割り当てる。
 - `anchor 名前`: 領域を確定し、後続memberをanchorの帯へ決定的に配置する。コアrelationの直前参照へは翻訳しない。

@@ -72,7 +72,7 @@ v1.89では、認証付きWebアプリとして以下が利用できる。
 - HTTP APIを操作するCLI、管理コマンド、ベンチマーク補助
 - `default` Render Engineと、将来のEngine Packに備えた内部境界
 
-直近のv1.90.0では、Build 586で「あいだ」の第5語「触れる」を正式化し、Build 587でrelation全種の参照座標をSVG transform合成後のキャンバス座標へ統一した。Build 588は`touching`の二重関係付与を除去した。Build 589では、検証済み `.inku-plugin.md` をStage 1直後にコアDDLへ展開する宣言的プラグイン層を追加した。名前空間明示または指示対象として明示された`fires_on`だけが発火し、比喩・未知対象へは広げない。展開は決定的かつ48 instruction以内で、再帰、固定座標スタンプ、URL／ファイル参照、namespace衝突はロード拒否する。provenanceは履歴メタデータへ記録するが、Score・DB正本・rh2・Replayはプラグイン本文に依存しない。Build 590では、プラグイン展開等で数値regionが確定済みのコアDDLへStage 1.5が別の補助図形を追加せず、Stage 2も明示region数を超えるinstructionを残さない一般境界を加えた。
+直近のv1.90.0では、Build 586で「あいだ」の第5語「触れる」を正式化し、Build 587でrelation全種の参照座標をSVG transform合成後のキャンバス座標へ統一した。Build 588は`touching`の二重関係付与を除去した。Build 589では、検証済み `.inku-plugin.md` をStage 1直後にコアDDLへ展開する宣言的プラグイン層を追加した。名前空間明示または指示対象として明示された`fires_on`だけが発火し、比喩・未知対象へは広げない。展開は決定的かつ48 instruction以内で、再帰、固定座標スタンプ、URL／ファイル参照、namespace衝突はロード拒否する。provenanceは履歴メタデータへ記録するが、Score・DB正本・rh2・Replayはプラグイン本文に依存しない。Build 590では、プラグイン展開等で数値regionが確定済みのコアDDLへStage 1.5が別の補助図形を追加せず、Scoreも明示region数を超えるinstructionを残さない一般境界を加えた。この境界はinstruction数を対象とし、arrangementによる可視要素数にはMistral／Qwen間のモデル差が残る。
 
 ## 変更時の確認先
 

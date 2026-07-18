@@ -75,19 +75,22 @@ DDLは絵を記述する言語ではなく、**視覚的な短歌を書く言語
 
 ### 3.1 コアに入れるもの
 
-| カテゴリ | 語彙 |
+コア語彙は歳時記の 9 カテゴリと、あいだ（関係）で構成される。**語の正は実装の saijiki テーブル（v1.92 で単一情報源化）であり、機械生成の reference §1（`GET /api/reference` / `inku-cli reference`）が常に現行値を公開する。** 以下は v1.92 時点の概観で、語の追加・削除は reference を正とする。
+
+| カテゴリ | 語彙（v1.92 時点） |
 |---|---|
-| **Color** | 白、黒、青、赤、緑、灰 |
-| **Canvas** | 正方形（Option: A4, B4, Letter） |
-| **Action** | 置く、描く、並べる、埋める、敷き詰める、塗りつぶす |
-| **Pen** | ペン、筆太、筆細、ロトリング、クレヨン |
-| **Line** | 直線、波線、ひっかき、ドット |
-| **Object** | 線、円、だ円、三角、四角 |
-| **Location** | 上下左右、斜、回転 |
-| **つらなり (Continuity)** | 実線、破線、点線、一点鎖線 |
-| **ゆらぎ (Movement)** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む、ばらつく |
-| **あいだ (Relations)** | 沿う、触れない、切る、間に、触れる |
-| **わりあい (Proportions)** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
+| **かたち** | 円、楕円、三角、四角、線、弧、雲形 |
+| **かたむき** | 水平、垂直、斜め、右上がり、右下がり、回転 |
+| **てざわり** | 鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、ビュラン、ドライポイント |
+| **つらなり** | 実線(既定)、破線、点線、一点鎖線 |
+| **いろ** | 白、黒(既定)、青、赤、緑、灰 |
+| **ゆらぎ** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む |
+| **ばしょ** | 上、下、中央、左端、右端、上端、下端、中心、隅 |
+| **うごき** | 置く、並べる、引く、散らす、埋める、敷き詰める |
+| **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
+| **あいだ** | 沿う、触れない、切る、間に、触れる |
+
+キャンバス比率は語彙ではなく canvas-aspect プラグイン（§4.4）が扱い、square / golden / a4 / b4 / pillar / oban / wide / byobu / vertical の 9 種とする。
 
 **コアの性質**：
 - 物理素材の語彙のみ（感情語ゼロ）
@@ -446,27 +449,11 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 - 翻訳不可能な言葉を残すこと自体が、DDLの「言語への敬意」と一致する
 - 英語話者にとっては "Saijiki" というボタンを開く行為自体が、異文化の視点で語彙を見る体験になる
 
-**カテゴリ構造（日本語版）**
+**カテゴリ構造**
 
-ひらがなを採用する。漢字は硬い。ひらがなは記述の敷居を下げる。
+歳時記は 10 カテゴリ（かたち・かたむき・てざわり・つらなり・いろ・ゆらぎ・ばしょ・うごき・わりあい・あいだ）に、ロード済みプラグインの名前空間付き語を加えて表示する。語彙の現行値は §3.1 の表と reference §1 を正とし、web の歳時記表示も同じ saijiki テーブルから配信される（v1.92: `GET /api/saijiki` + バンドル内蔵スナップショットの同期ストア）。
 
-| カテゴリ | 語彙例 |
-|---|---|
-| かたち | 円、楕円、三角、四角、線、弧、雲形 |
-| かたむき | 水平、垂直、斜め、右上がり、右下がり、回転 |
-| てざわり | ペン、筆、クレヨン、チョーク、ビュラン、ドライポイント |
-| うごき | 置く、並べる、埋める、散らす、敷き詰める |
-| ばしょ | 上、下、中心、端、隅 |
-
-**カテゴリ構造（英語版）**
-
-| Category | Vocabulary |
-|---|---|
-| forms | circle, ellipse, triangle, square, line, arc |
-| angles | horizontal, vertical, diagonal, rising, falling, rotated |
-| touches | pen, brush, crayon, chalk, burin, drypoint |
-| motions | place, align, fill, scatter, tile |
-| places | top, bottom, center, edge, corner |
+カテゴリ名はひらがなを採用する。漢字は硬い。ひらがなは記述の敷居を下げる。英語版カテゴリ名は forms / angles / touches / continuity / colors / movements / places / motions / proportions / relations とする。
 
 **配置方針**
 
@@ -1062,7 +1049,7 @@ DDLの揺らぎは、この意味での揺らぎである。
 
 | weight | 揺らぎの質 | 特性 |
 |---|---|---|
-| hair | almost_none | ほぼ揺らぎなし（正確） |
+| hair | almost_none | ほぼ揺らぎなし（正確）。※v1.92 で歳時記語彙からは削除。Score enum には Replay 互換のため残る |
 | pencil | perlin_fine | パーリン寄り（手の連続性）、薄い副線、微細な粒 |
 | pen | perlin_minimal | わずかなパーリン。基準となる標準線 |
 | rotring | almost_none | 均一幅、角端、硬い製図線 |
@@ -1070,6 +1057,10 @@ DDLの揺らぎは、この意味での揺らぎである。
 | chalk | perlin_plus_noise | パーリン + 粉っぽいかすれ、blur |
 | brush_thin | perlin_strong | 細い筆跡、副線、濃淡 |
 | brush_thick | pressure_blur | 太い筆圧、擦れ副線、軽い blur |
+| burin | almost_none | 硬く確実な彫線。丸端、texture filter なし |
+| drypoint | burr_noise | まくれ（バー）による滲み・かすれ。専用の burr 処理 |
+
+数値特性（stroke 幅・不透明度・dasharray・filter 有無）の正は reference §6 とする。
 
 **揺らぎのノイズ種別:**
 - **ホワイトノイズ**: 各点独立・相関なし・ギザギザ
@@ -1090,16 +1081,16 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 | 振幅 | 細かく、大きく |
 | 周波数 | 速く、ゆっくり |
 | 質 | 揺れる、波打つ、震える、滲む |
-| 配置 | ばらつく、散らばる |
 
 **英語版「movements」:**
 
 | Dimension | Vocabulary |
 |---|---|
-| amplitude | fine, broad |
-| frequency | quick, slow |
-| quality | wobble, undulate, tremble, blur |
-| placement | scatter, disperse |
+| amplitude | fine, large |
+| frequency | quickly, slowly |
+| quality | swaying, undulating, trembling, blurring |
+
+配置のばらつきは ゆらぎ ではなく、うごき（散らす）と arrangement（layout / path / jitter）が担う。
 
 ### 13.7 Nature plugin による現象の揺らぎ
 
@@ -1242,7 +1233,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 - 「左から右へ」「横に」→ `layout="horizontal"`, `path="left_to_right"`
 - 「右半分」→ `path="right_half"`
 - 「放射状」「同心円状」→ `layout="radial"`
-- 「敷き詰める」「格子状に敷く」→ `layout="grid"`（この明示語がある場合だけ。countは2000まで、通常配置は1000まで）
+- 「敷き詰める」「格子状に敷く」→ `layout="grid"`（この明示語がある場合だけ。count の上限は layout に関わらず一律 2000）
 
 `path` が `none` の場合は従来どおり `layout` だけで配置する。`path` が指定された場合、Renderer は決定的な hash と連番を使い、同じ JSON Score から同じ軌跡配置を再現する。
 

@@ -26,6 +26,11 @@ from inku_server.stroke_engine import synthesize_stroke
 _ARC_D = re.compile(
     r"M ([\d.-]+) ([\d.-]+) A ([\d.-]+) [\d.-]+ 0 ([01]) ([01]) ([\d.-]+) ([\d.-]+)"
 )
+_LOCAL_LEAF_BENCH_DIR = Path(__file__).parents[2] / "cli" / "bench" / "leaf"
+_requires_local_leaf_bench = pytest.mark.skipif(
+    not _LOCAL_LEAF_BENCH_DIR.is_dir(),
+    reason="local-only CLI leaf benchmark is not available",
+)
 
 
 def _arc_instruction(
@@ -469,8 +474,9 @@ def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
         "04-fallen-b-touching.json",
     ],
 )
+@_requires_local_leaf_bench
 def test_leaf_bench_touching_pairs_close_after_all_svg_transforms(name: str) -> None:
-    path = Path(__file__).parents[2] / "cli" / "bench" / "leaf" / name
+    path = _LOCAL_LEAF_BENCH_DIR / name
     original = Score.model_validate_json(path.read_text())
     score = coerce_score(original)
     assert len(score.instructions) == len(original.instructions)
@@ -524,8 +530,9 @@ def test_stroke_engine_pins_touching_intention_endpoints(weight: str) -> None:
         "04-fallen-b-touching.json",
     ],
 )
+@_requires_local_leaf_bench
 def test_formal_leaf_bench_scores_use_only_strict_schema(name: str) -> None:
-    path = Path(__file__).parents[2] / "cli" / "bench" / "leaf" / name
+    path = _LOCAL_LEAF_BENCH_DIR / name
     score = Score.model_validate_json(path.read_text())
     assert any(
         instruction.relation is not None
@@ -535,8 +542,9 @@ def test_formal_leaf_bench_scores_use_only_strict_schema(name: str) -> None:
     )
 
 
+@_requires_local_leaf_bench
 def test_judge_scores_change_only_color_and_weight() -> None:
-    score_dir = Path(__file__).parents[2] / "cli" / "bench" / "leaf"
+    score_dir = _LOCAL_LEAF_BENCH_DIR
     for name in (
         "00-single-b-touching",
         "01-young-b-touching",

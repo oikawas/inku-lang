@@ -54,15 +54,11 @@ android/local.properties
 **/inku-history.json
 data/history.json
 
-# CLI generated outputs
+# Local CLI benchmark assets and generated outputs
 cli/tune_bench.md
+cli/bench/
 cli/out/
 server/out/
 
-# Local CLI benchmark scripts
-cli/bench/leaf-sketch/*.sh
-cli/bench/leaf-sketch/assert-geometry.py
-
 # Local-only operational files
 no-git-sync/
-

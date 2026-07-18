@@ -2325,6 +2325,6 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - **正式な接触関係（Build 586）:** あいだの第5語へ `touching` を追加し、`contact: both_ends` をline / arcの両端一致として正規Scoreスキーマ、Stage 1、Stage 2、歳時記へ日英同時に実装した。接触の固定句が明示された時だけ選び、自発付与しない。
 - Rendererは直前要素の演奏後端点を使い、二端点と符号付き矢高から `r=c²/(8|b|)+|b|/2` の劣弧を再構成する。直前弧の反対側へ膨らませ、劣弧の符号・windingはSVG描画と共有実装に統一した。variationと筆致は端点を固定する。
 - 閉形と端点を持たない直前要素は警告記録付きdrop-only、退化幾何は演奏時のdrop-onlyとし、座標補修・relation governor・API境界ハックは導入しない。`続きから (continuing)` は第二段候補に留めた。
-- 出力SVGから閉性、尖り30°以上、劣弧180°未満、矢高、同seed再現、Replay差を200 seedで検査する回帰を追加した。素描B系00/01/02/04を正規スキーマの `cli/bench/leaf/` へ固定し、一般30入力ではtouching定型句の発火を0件とした。
+- 出力SVGから閉性、尖り30°以上、劣弧180°未満、矢高、同seed再現、Replay差を200 seedで検査する回帰を追加した。素描B系00/01/02/04はlocal-onlyの `cli/bench/leaf/` に置き、一般30入力ではtouching定型句の発火を0件とした。
 - **形式の会計:** 閉じた有機的輪郭を演奏揺らぎと両立させる代わりに、緩い距離関係だけだった「あいだ」へ初めて正確な端点拘束を加えた。Score version、migration、Render Engine metadata、rh2正規payloadは変更しない。
 - **変換後座標の統一（Build 587）:** touching、along、not_touching、cutting、betweenが参照する端点・輪郭を、SVGのrotation等を合成したキャンバス座標へ統一した。SVG検査は祖先groupのtransformを再帰合成し、通常版00/01/02/04と黒rotringのjudge版を分離した。Score schemaとrh2算出仕様は変更していない。

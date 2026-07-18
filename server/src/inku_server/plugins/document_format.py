@@ -15,6 +15,12 @@ from pathlib import Path
 from threading import RLock
 from typing import Iterable
 
+from ..saijiki import (
+    core_grammar_markers as saijiki_core_grammar_markers,
+    saijiki_marker_table,
+    shape_markers as saijiki_shape_markers,
+)
+
 
 PLUGIN_SUFFIX = ".inku-plugin.md"
 MAX_ENTRY_INSTRUCTIONS = 48
@@ -67,86 +73,18 @@ _RESERVED_NAMESPACES = {
     "score",
     "renderer",
 }
-# Core grammar markers: structural anchors, shapes, verbs, relations.
+# Core grammar markers: structural anchors + saijiki-derived shapes/verbs/relations.
+# v1.92: 語彙の所属は saijiki テーブル (saijiki.py) が単一情報源。構造マーカー
+# (anchor / 領域) はプラグイン文書の文法であり、ここが所有する。
+_STRUCTURAL_MARKERS = {
+    "ja": ("anchor", "{領域:", "領域"),
+    "en": ("anchor", "{region:", "region"),
+}
 _BASE_CORE_MARKERS = {
-    "ja": (
-        "anchor",
-        "{領域:",
-        "領域",
-        "線",
-        "円",
-        "楕円",
-        "三角",
-        "四角",
-        "多角形",
-        "弧",
-        "雲形",
-        "置く",
-        "引く",
-        "並べる",
-        "散らす",
-        "敷き詰める",
-        "描く",
-        "埋める",
-        "触れる",
-        "沿う",
-        "切る",
-        "触れない",
-        "間に",
-    ),
-    "en": (
-        "anchor",
-        "{region:",
-        "region",
-        "line",
-        "circle",
-        "ellipse",
-        "triangle",
-        "square",
-        "polygon",
-        "arc",
-        "cloudform",
-        "place",
-        "draw",
-        "arrange",
-        "scatter",
-        "tile",
-        "fill",
-        "touching",
-        "along",
-        "cutting",
-        "not touching",
-        "between",
-    ),
+    lang: _STRUCTURAL_MARKERS[lang] + saijiki_core_grammar_markers(lang) for lang in ("ja", "en")
 }
-# v1.92 で saijiki 導出へ置換: 歳時記の修飾カテゴリを marker として暫定追加 (A-1)。
-# 語は reference §1 (Stage 1 プロンプトの Saijiki ブロック) を正とする。
-_SAIJIKI_MARKERS = {
-    "material": {
-        "ja": ("髪", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント"),
-        "en": ("hair", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint"),
-    },
-    "color": {
-        "ja": ("白", "黒", "青", "赤", "緑", "灰"),
-        "en": ("white", "black", "blue", "red", "green", "gray"),
-    },
-    "variation": {
-        "ja": ("細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む"),
-        "en": ("fine", "large", "slowly", "quickly", "swaying", "undulating", "trembling", "blurring"),
-    },
-    "angle": {
-        "ja": ("水平", "垂直", "斜め", "右上がり", "右下がり", "回転"),
-        "en": ("horizontal", "vertical", "diagonal", "rising", "falling", "rotated"),
-    },
-    "ratio": {
-        "ja": ("縦長", "横長", "全幅", "半幅", "半円", "上弦", "下弦", "三日月"),
-        "en": ("tall", "wide", "full-width", "half-width", "semicircle", "waxing", "waning", "crescent"),
-    },
-    "place": {
-        "ja": ("上", "下", "中央", "左端", "右端", "上端", "下端", "中心", "隅"),
-        "en": ("top", "bottom", "center", "left-edge", "right-edge", "top-edge", "bottom-edge", "middle", "corner"),
-    },
-}
+# 歳時記の修飾カテゴリ (material/color/variation/angle/ratio/place) — saijiki 導出。
+_SAIJIKI_MARKERS = saijiki_marker_table()
 
 
 def _merged_core_markers(lang: str) -> tuple[str, ...]:
@@ -157,10 +95,7 @@ def _merged_core_markers(lang: str) -> tuple[str, ...]:
 _CORE_MARKERS = {"ja": _merged_core_markers("ja"), "en": _merged_core_markers("en")}
 # Drawable primitive markers — a repetition line must name one of these or a
 # defined member (A-2), otherwise it references an undefined shape.
-_SHAPE_MARKERS = {
-    "ja": ("線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形"),
-    "en": ("line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform"),
-}
+_SHAPE_MARKERS = {"ja": saijiki_shape_markers("ja"), "en": saijiki_shape_markers("en")}
 _REGIONS = {
     "上半分": (0.10, 0.08, 0.90, 0.48),
     "中域": (0.18, 0.24, 0.82, 0.76),

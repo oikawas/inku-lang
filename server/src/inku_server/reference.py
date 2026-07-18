@@ -37,7 +37,7 @@ from .geometry_thresholds import (
     CUSP_LIMIT_DEGREES,
     SAGITTA_RELATIVE_LIMIT,
 )
-from .interpreter import SYSTEM_PROMPT_PREFIX, SYSTEM_PROMPT_PREFIX_EN
+from .saijiki import reference_categories as saijiki_reference_categories
 from .plugins import (
     CANVAS_ASPECTS,
     DEFAULT_CANVAS_ASPECT_ID,
@@ -180,13 +180,16 @@ def _plugin_words() -> list[dict[str, Any]]:
 
 
 def _saijiki() -> dict[str, Any]:
+    # v1.92: saijiki テーブル (saijiki.py) を直接参照する。プロンプトのブロックは
+    # 同じテーブルから生成されるため、_parse_saijiki_block による抽出結果と常に
+    # 一致する (test_reference が両経路の同値を検査する)。
     return {
-        "core_categories_ja": _parse_saijiki_block(
-            SYSTEM_PROMPT_PREFIX, "# Saijiki (歳時記)", "、"
-        ),
-        "core_categories_en": _parse_saijiki_block(
-            SYSTEM_PROMPT_PREFIX_EN, "# Saijiki (Vocabulary)", ","
-        ),
+        "core_categories_ja": {
+            name: list(words) for name, words in saijiki_reference_categories("ja")
+        },
+        "core_categories_en": {
+            name: list(words) for name, words in saijiki_reference_categories("en")
+        },
         "backing_enums": {
             "primitive": list(get_args(schema.Primitive)),
             "weight": list(get_args(schema.Weight)),

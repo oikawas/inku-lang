@@ -20,13 +20,14 @@ import json
 
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
+from .saijiki import prompt_block, texture_material_enumeration
 
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"
 MAX_TOKENS = 1024
 
 # ルールのみ。例は EXAMPLE_POOL に分離。
 # 新機能追加 → EXAMPLE_POOL に例を追加するだけ。ここは変えない。
-SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリタ。
+SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリタ。
 
 入力: 作者の自由な記述 (詩的・比喩的・感情語を含むことがある)
 出力: **正規化DDL** (Saijiki 歳時記の語彙のみを使った簡潔な日本語指示)
@@ -36,7 +37,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 1. **感情語彙を排除せよ** (美しく→削除、激しく→速く、静かに→ゆっくり)
 2. **出力は静止画**。時間経過を表す動詞は禁止:
    - 禁止: 動く、動かす、広がる、広げる、流れる、伸びる、昇る、落ちる、散る、沈む、塗る、塗りつぶす
-   - 使える動作動詞: 置く、並べる、引く、描く、散らす、埋める
+   - 使える動作動詞: 置く、並べる、引く、散らす、埋める
    - 「ゆらぎ」は静止画に含める質感であり、動きの描写ではない
 3. 座標は 0.0〜1.0 の比率で考える (左上=(0,0), 右下=(1,1))
 4. 出力は普通の日本語。箇条書き禁止、説明禁止、前置き禁止
@@ -86,7 +87,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 # てざわり選択 — 線と弧には物理感を必ず選ぶ
 
-線・弧・輪郭線を描く文には、髪・鉛筆・ペン・ロットリング・クレヨン・チョーク・細筆・太筆・ビュラン・ドライポイントのいずれか一つを必ず明記する。
+線・弧・輪郭線を描く文には、""" + texture_material_enumeration("ja") + """のいずれか一つを必ず明記する。
 入力に明示的な素材がなくても、質感・文脈から最も近いてざわりを選ぶ。毎回ペンに寄せない。
 塗りつぶされた円・楕円・三角・四角など、線として見えない面だけの文へは機械的に付けない。
 ビュランとドライポイントは入力がその技法を明示した場合だけ選ぶ。
@@ -192,15 +193,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 # Saijiki (歳時記)
 
-かたち: 円、楕円、三角、四角、線、弧、雲形
-かたむき: 水平、垂直、斜め、右上がり、右下がり、回転
-てざわり: 髪、鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、ビュラン、ドライポイント
-つらなり: 実線(既定)、破線、点線、一点鎖線
-いろ: 白、黒(既定)、青、赤、緑、灰
-ゆらぎ: 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む
-ばしょ: 上、下、中央、左端、右端、上端、下端、中心、隅
-うごき: 置く、並べる、引く、描く、散らす、埋める、敷き詰める
-わりあい: 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月
+""" + prompt_block("ja") + """
 
 # わりあい (比率・描画範囲)
 
@@ -250,7 +243,7 @@ Saijiki にない語が入力にあるとき、その語のイメージ・形・
 
 # 出力形式
 
-正規化DDL のテキストのみ。前置き・説明・タグ・コードブロック装飾はすべて禁止。"""
+正規化DDL のテキストのみ。前置き・説明・タグ・コードブロック装飾はすべて禁止。""")
 
 # 変換例プール。推論時に入力と関連性の高い k 件を選択して使う。
 # 例を増やしても推論プロンプトは増えない (k 件固定)。
@@ -890,7 +883,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     },
 ]
 
-SYSTEM_PROMPT_PREFIX_EN = """You are the Stage 1 interpreter of inku DDL.
+SYSTEM_PROMPT_PREFIX_EN = ("""You are the Stage 1 interpreter of inku DDL.
 
 Input: Author's free-form description (may be poetic, metaphorical, or emotional)
 Output: **Normalized DDL** — concise English instructions using only Saijiki vocabulary
@@ -950,7 +943,7 @@ Multiple attributes in one shape go in one sentence: "Line up thirty thick verti
 
 # Touch Choice — every line and arc chooses physical material
 
-Every sentence that draws a visible line, arc, or outline must explicitly name exactly one of these touches: hair, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, burin, or drypoint.
+Every sentence that draws a visible line, arc, or outline must explicitly name exactly one of these touches: """ + texture_material_enumeration("en") + """.
 If the input does not name a material, infer the nearest touch from texture and context. Do not default everything to pen.
 Do not mechanically attach a touch to a filled circle, ellipse, triangle, or square that has no visible outline.
 Choose burin or drypoint only when the input explicitly names that technique.
@@ -1064,15 +1057,7 @@ Do not normalize to the same foreground and background color. Invisible output i
 
 # Saijiki (Vocabulary)
 
-forms: circle, ellipse, triangle, square, line, arc, cloudform
-angles: horizontal, vertical, diagonal, rising, falling, rotated
-touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint
-continuity: solid (default), dashed, dotted, dash-dot
-colors: white, black (default), blue, red, green, gray
-movements: fine, large, slowly, quickly, swaying, undulating, trembling, blurring
-places: top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner
-motions: place, line-up, fill, scatter, draw, tile
-proportions: tall, wide, full-width, half-width, semicircle, waxing, waning, crescent
+""" + prompt_block("en") + """
 
 # Proportions
 
@@ -1119,7 +1104,7 @@ Expand unknown words to the nearest Saijiki vocabulary using shape, texture, str
 
 # Output Format
 
-Normalized DDL text only. No preamble, explanation, tags, or code block markers."""
+Normalized DDL text only. No preamble, explanation, tags, or code block markers.""")
 
 # api.py が import する SYSTEM_PROMPT — プレフィックスを公開する
 SYSTEM_PROMPT = (

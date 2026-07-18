@@ -6,9 +6,22 @@ export type Part = {
 	category?: string;
 };
 
-const SAIJIKI_ENTRIES = SAIJIKI.flatMap((cat) =>
-	cat.words.map((word) => ({ word, category: cat.label }))
-).sort((a, b) => b.word.length - a.word.length);
+// SAIJIKI is a hydratable store (reassigned on GET /api/saijiki). Rebuild the
+// greedy-match entry list whenever the store reference changes, so annotate
+// stays synchronous while picking up hydrated vocabulary.
+type SaijikiEntry = { word: string; category: string };
+let entriesRef: typeof SAIJIKI | null = null;
+let entriesCache: SaijikiEntry[] = [];
+
+function saijikiEntries(): SaijikiEntry[] {
+	if (entriesRef !== SAIJIKI) {
+		entriesRef = SAIJIKI;
+		entriesCache = SAIJIKI.flatMap((cat) =>
+			cat.words.map((word) => ({ word, category: cat.label }))
+		).sort((a, b) => b.word.length - a.word.length);
+	}
+	return entriesCache;
+}
 
 const EMOTION_WORDS = [
 	'美しい',
@@ -49,7 +62,7 @@ export function annotate(text: string): Part[] {
 	while (i < text.length) {
 		let matched = false;
 
-		for (const entry of SAIJIKI_ENTRIES) {
+		for (const entry of saijikiEntries()) {
 			if (text.startsWith(entry.word, i)) {
 				parts.push({
 					text: entry.word,

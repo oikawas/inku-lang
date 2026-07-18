@@ -1,3 +1,5 @@
+import { GENERATED_SAIJIKI } from './saijiki.generated';
+
 export type SaijikiCategory = {
 	key: string;
 	label: string;
@@ -5,91 +7,17 @@ export type SaijikiCategory = {
 	words: string[];
 };
 
-export const SAIJIKI: SaijikiCategory[] = [
-	{
-		key: 'katachi',
-		label: 'かたち',
-		en: 'forms',
-		words: ['円', '楕円', '三角', '四角', '線', '弧', '雲形']
-	},
-	{
-		key: 'tezawari',
-		label: 'てざわり',
-		en: 'touches',
-		words: [
-			'髪',
-			'鉛筆',
-			'ペン',
-			'ロットリング',
-			'クレヨン',
-			'チョーク',
-			'細筆',
-			'太筆',
-			'ビュラン',
-			'ドライポイント'
-		]
-	},
-	{
-		key: 'tsuranari',
-		label: 'つらなり',
-		en: 'continuity',
-		words: ['実線', '破線', '点線', '一点鎖線']
-	},
-	{
-		key: 'iro',
-		label: 'いろ',
-		en: 'colors',
-		words: ['白', '黒', '青', '赤', '緑', '灰']
-	},
-	{
-		key: 'yuragi',
-		label: 'ゆらぎ',
-		en: 'movements',
-		words: [
-			'細かく',
-			'大きく',
-			'ゆっくり',
-			'速く',
-			'揺れる',
-			'波打つ',
-			'震える',
-			'滲む'
-		]
-	},
-	{
-		key: 'basho',
-		label: 'ばしょ',
-		en: 'places',
-		words: ['上', '下', '中央', '左端', '右端', '上端', '下端', '中心', '隅']
-	},
-	{
-		key: 'ugoki',
-		label: 'うごき',
-		en: 'motions',
-		words: ['置く', '並べる', '埋める', '散らす', '引く', '敷き詰める', '彫る']
-	},
-	{
-		key: 'katamuki',
-		label: 'かたむき',
-		en: 'angles',
-		words: ['水平', '垂直', '斜め', '右上がり', '右下がり', '回転']
-	},
-	{
-		key: 'aida',
-		label: 'あいだ',
-		en: 'relations',
-		words: ['沿う', '触れない', '切る', '間に', '触れる']
-	},
-	{
-		key: 'wariai',
-		label: 'わりあい',
-		en: 'proportions',
-		words: ['縦長', '横長', '全幅', '半幅', '半円', '上弦', '下弦', '三日月']
-	},
-	{
-		key: 'plugin-nature',
-		label: 'Nature',
-		en: 'plugin',
-		words: ['Nature.風', 'Nature.うねり', 'Nature.無風']
-	}
-];
+// Module-level mutable vocabulary store (v1.92 Phase 3). The single source is
+// the server saijiki table. This module ships with a codegen snapshot
+// (saijiki.generated.ts) as the initial value and is hydrated at runtime from
+// GET /api/saijiki after login. Consumers (highlight/SaijikiDrawer/
+// SaijikiInline) read SAIJIKI synchronously; a fetch failure leaves the
+// snapshot in place rather than degrading the UI.
+export let SAIJIKI: SaijikiCategory[] = GENERATED_SAIJIKI.map((cat) => ({
+	...cat,
+	words: [...cat.words]
+}));
+
+export function hydrateSaijiki(categories: SaijikiCategory[]): void {
+	SAIJIKI = categories;
+}

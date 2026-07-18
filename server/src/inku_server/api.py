@@ -55,6 +55,7 @@ from .plugins import (
     validate_plugin_document,
 )
 from .reference import build_reference, render_markdown
+from .saijiki import display_categories
 from .renderer import SVG_PROFILES, new_render_seed
 from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware, SlidingWindowRateLimiter
@@ -1618,6 +1619,28 @@ def api_plugins_validate(
 def api_plugins_reload(actor: dict = Depends(_admin_user)) -> dict[str, object]:
     items = DOCUMENT_PLUGIN_MANAGER.reload(force=True)
     return {"items": [item.as_dict() for item in items]}
+
+
+def _enabled_plugin_entries() -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for item in DOCUMENT_PLUGIN_MANAGER.items():
+        if item.status != "enabled":
+            continue
+        entries.extend(dict(entry) for entry in item.entries)
+    return entries
+
+
+@app.get("/api/saijiki")
+def api_saijiki(
+    lang: str = Query(default="ja", pattern="^(ja|en)$"),
+    actor: dict = Depends(_current_user),
+) -> dict[str, object]:
+    """Saijiki vocabulary for display: core categories (from the saijiki table)
+    plus loaded declarative plugin words. Single delivery for web hydration."""
+    return {
+        "categories": display_categories(lang),
+        "plugins": _enabled_plugin_entries(),
+    }
 
 
 @app.get("/api/reference")

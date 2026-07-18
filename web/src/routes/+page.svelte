@@ -5,6 +5,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { annotate, interpretationFeedback } from '$lib/highlight';
+	import { hydrateSaijiki } from '$lib/saijiki';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -1538,15 +1539,20 @@
 
 	async function loadPluginVocabulary() {
 		try {
-			const response = await apiFetch("/api/plugins", { cache: "no-store" });
+			const response = await apiFetch("/api/saijiki", { cache: "no-store" });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			const data = await response.json() as { items: PluginItem[] };
-			pluginEntries = data.items
-				.filter((item) => item.status === "enabled")
-				.flatMap((item) => item.entries ?? []);
+			const data = await response.json() as {
+				categories: { key: string; name_ja: string; name_en: string; words: string[] }[];
+				plugins: PluginEntry[];
+			};
+			hydrateSaijiki(
+				data.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, words: c.words }))
+			);
+			pluginEntries = data.plugins ?? [];
 		} catch (error) {
+			// keep the bundled saijiki snapshot; only plugin words are cleared
 			pluginEntries = [];
-			console.warn("failed to load plugin vocabulary", error);
+			console.warn("failed to load saijiki vocabulary", error);
 		}
 	}
 

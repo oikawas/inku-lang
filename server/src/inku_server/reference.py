@@ -52,6 +52,7 @@ from .plugins.document_format import (
     _CORE_MARKERS,
     _RANGE_RE,
     _REGIONS,
+    _SAIJIKI_MARKERS,
 )
 from .plugins.system.canvas_aspect import CANVAS_BASE_PX
 from .renderer import (
@@ -245,6 +246,9 @@ def _classify_marker(marker: str) -> str:
     }
     if lowered in primitive_surfaces or marker in ("雲形", "cloudform"):
         return "shape"
+    for category, langs in _SAIJIKI_MARKERS.items():
+        if any(marker in words for words in langs.values()):
+            return category  # material / color / variation / angle / ratio / place
     return "operation"
 
 

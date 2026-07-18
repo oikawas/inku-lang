@@ -54,11 +54,12 @@ android/local.properties
 **/inku-history.json
 data/history.json
 
-# CLI generated outputs
+# Local CLI benchmark assets and generated outputs
 cli/tune_bench.md
+cli/bench/
 cli/out/
+cli/out2/
 server/out/
 
 # Local-only operational files
 no-git-sync/
-

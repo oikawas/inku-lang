@@ -354,6 +354,12 @@ def _dedupe_instructions(instructions: list[Instruction]) -> list[Instruction]:
     deduped: list[Instruction] = []
     seen: set[str] = set()
     for ins in instructions:
+        # Relations are sequential operations whose result depends on the
+        # preceding performed instruction. Identical payloads at different
+        # positions are therefore not duplicates.
+        if ins.relation is not None:
+            deduped.append(ins)
+            continue
         key = json.dumps(ins.model_dump(by_alias=True, exclude_none=True), sort_keys=True, ensure_ascii=False)
         if key in seen:
             continue
@@ -373,6 +379,9 @@ def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[I
     repaired: list[Instruction] = []
     seen: set[str] = set()
     for ins in instructions:
+        if ins.relation is not None:
+            repaired.append(ins)
+            continue
         key = _dedupe_instruction_key(ins)
         if key in seen:
             continue
@@ -777,6 +786,34 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
             data["color_hint"] = f"{hint}; {note}" if hint else note
         adjusted.append(Instruction.model_validate(data))
     return adjusted
+
+
+def _without_explicit_region_support(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+) -> list[Instruction]:
+    """Keep composition-resolved DDL at one instruction per numeric region."""
+
+    if not ddl:
+        return instructions
+    region_count = len(
+        re.findall(
+            r"(?:領域|region)\s*\[\s*(?:0(?:\.\d+)?|1(?:\.0+)?)\s*,",
+            ddl,
+            flags=re.IGNORECASE,
+        )
+    )
+    if region_count == 0 or len(instructions) <= region_count:
+        return instructions
+    region_anchored = [
+        ins for ins in instructions if ins.at is not None and ins.at.region is not None
+    ]
+    return (
+        region_anchored[:region_count]
+        if len(region_anchored) >= region_count
+        else instructions[:region_count]
+    )
 
 
 def _has_motion_path(instructions: list[Instruction]) -> bool:
@@ -3890,6 +3927,9 @@ def _drop_invalid_relations(instructions: list[Instruction]) -> list[Instruction
         invalid = index == 0 or not result or not _has_relation_contour(result[-1])
         if relation.type == "between":
             invalid = invalid or len(result) < 2 or not _has_relation_contour(result[-2])
+        elif relation.type == "touching":
+            invalid = invalid or ins.primitive not in {"line", "arc"}
+            invalid = invalid or result[-1].primitive not in {"line", "arc"}
         if invalid:
             data = ins.model_dump(by_alias=True)
             data.pop("relation", None)
@@ -3988,6 +4028,9 @@ def coerce_score(score: Score, *, ddl: str | None = None, branch_report: dict[st
         _branch_before = instructions
         instructions = _drop_invalid_relations(instructions)
         _record_branch_fire(branch_report, "drop_invalid_relations", _branch_before, instructions)
+        _branch_before = instructions
+        instructions = _without_explicit_region_support(instructions, ddl=ddl)
+        _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
         data = score.model_dump(by_alias=True)
         data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
         return Score.model_validate(data)
@@ -4102,6 +4145,9 @@ def coerce_score(score: Score, *, ddl: str | None = None, branch_report: dict[st
     _branch_before = instructions
     instructions = _drop_invalid_relations(instructions)
     _record_branch_fire(branch_report, "drop_invalid_relations", _branch_before, instructions)
+    _branch_before = instructions
+    instructions = _without_explicit_region_support(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
     data = score.model_dump(by_alias=True)
     data["background"] = background
     if score.presence is None and effective_presence is not None:

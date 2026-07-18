@@ -45,10 +45,13 @@ from .languages import (
     stage_prompts_for_lang,
 )
 from .plugins import (
+    DOCUMENT_PLUGIN_MANAGER,
+    PluginFormatError,
     canvas_aspect_ids,
     canvas_aspect_ratio_for_aspect,
     normalize_canvas_aspect_id,
     plugin_status_items,
+    validate_plugin_document,
 )
 from .renderer import SVG_PROFILES, new_render_seed
 from .render_engines import current_render_engine
@@ -706,6 +709,8 @@ class ComposeRequest(BaseModel):
 
 class ComposeResponse(BaseModel):
     ddl: str
+    plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
+    plugin_warnings: list[str] = Field(default_factory=list)
     score: Score
     svg: str
     stage2_model: str | None = None
@@ -759,6 +764,8 @@ class InterpretRequest(BaseModel):
 
 class InterpretResponse(BaseModel):
     ddl: str
+    plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
+    plugin_warnings: list[str] = Field(default_factory=list)
     thinking: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
@@ -799,6 +806,8 @@ class PaintRequest(BaseModel):
 class PaintResponse(BaseModel):
     text: str
     ddl: str
+    plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
+    plugin_warnings: list[str] = Field(default_factory=list)
     thinking: str | None = None
     score: Score
     svg: str
@@ -915,6 +924,8 @@ class InterpretDetail:
 class ComposeDetail:
     score: Score
     ddl: str
+    plugin_provenance: list[dict[str, str]] = field(default_factory=list)
+    plugin_warnings: list[str] = field(default_factory=list)
     tokens_in: int | None = None
     tokens_out: int | None = None
     retry_count: int = 0
@@ -1225,9 +1236,13 @@ class DbBackupResult(BaseModel):
 
 class PluginSettingsStatus(BaseModel):
     enabled: bool = False
-    loaded: list[dict[str, str]] = Field(default_factory=list)
+    loaded: list[dict[str, object]] = Field(default_factory=list)
     runtime_editable: bool = False
     note: str
+
+
+class PluginValidateBody(BaseModel):
+    document: str = Field(..., min_length=1, max_length=500_000)
 
 
 class OutputSaveStatus(BaseModel):
@@ -1574,6 +1589,35 @@ def api_auth_me_update_demo_settings(
     return DemoSettingsBody(**settings)
 
 
+@app.get("/api/plugins")
+def api_plugins(actor: dict = Depends(_current_user)) -> dict[str, object]:
+    return {"items": [item.as_dict() for item in DOCUMENT_PLUGIN_MANAGER.items()]}
+
+
+@app.post("/api/plugins/validate")
+def api_plugins_validate(
+    body: PluginValidateBody,
+    actor: dict = Depends(_admin_user),
+) -> dict[str, object]:
+    try:
+        document = validate_plugin_document(body.document)
+    except PluginFormatError as exc:
+        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
+    return {
+        "valid": True,
+        "namespace": document.manifest.namespace,
+        "name": document.manifest.name,
+        "version": document.manifest.version,
+        "entries": len(document.entries),
+    }
+
+
+@app.post("/api/plugins/reload")
+def api_plugins_reload(actor: dict = Depends(_admin_user)) -> dict[str, object]:
+    items = DOCUMENT_PLUGIN_MANAGER.reload(force=True)
+    return {"items": [item.as_dict() for item in items]}
+
+
 @app.get("/api/settings/status", response_model=SettingsStatusResponse)
 def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusResponse:
     _db.ensure_scheduled_db_backup()
@@ -1589,7 +1633,8 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
         plugins=PluginSettingsStatus(
             enabled=True,
             loaded=plugin_status_items(),
-            note="Reference plugin hook is enabled for canvas aspect selection. Third-party plugin loading is not implemented yet.",
+            runtime_editable=True,
+            note="Declarative DDL plugin documents are reloaded without restarting; rejected documents include reasons.",
         ),
         output_save=OutputSaveStatus(
             enabled=bool(output_settings["enabled"]),
@@ -2158,7 +2203,20 @@ def _call_compose_detail(
     lang: str = "ja",
     vary_seed: int | None = None,
 ) -> ComposeDetail:
-    ddl = expand_intermediate_for_lang(ddl, lang=lang, context_text=original_text, vary_seed=vary_seed)
+    plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
+        ddl,
+        source_text=original_text,
+        lang=lang,
+        seed_text=original_text or ddl,
+    )
+    ddl = expand_intermediate_for_lang(
+        plugin_expansion.ddl,
+        lang=lang,
+        context_text=original_text,
+        vary_seed=vary_seed,
+    )
+    plugin_provenance = list(plugin_expansion.provenance)
+    plugin_warnings = list(plugin_expansion.warnings)
     retry_count = 0
     retry_reasons: list[str] = []
     fallback_used = False
@@ -2198,9 +2256,18 @@ def _call_compose_detail(
             ddl=ddl,
             retry_reasons=["stage2_hard_timeout"],
             fallback_used=True,
+            plugin_provenance=plugin_provenance,
+            plugin_warnings=plugin_warnings,
         )
     if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
-        return ComposeDetail(score=score, ddl=ddl, tokens_in=tokens_in, tokens_out=tokens_out)
+        return ComposeDetail(
+            score=score,
+            ddl=ddl,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            plugin_provenance=plugin_provenance,
+            plugin_warnings=plugin_warnings,
+        )
 
     reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
     retry_count += 1
@@ -2231,6 +2298,8 @@ def _call_compose_detail(
         retry_count=retry_count,
         retry_reasons=retry_reasons,
         fallback_used=fallback_used,
+        plugin_provenance=plugin_provenance,
+        plugin_warnings=plugin_warnings,
     )
 
 
@@ -2354,6 +2423,8 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
     return ComposeResponse(
         ddl=compose_detail.ddl,
+        plugin_provenance=compose_detail.plugin_provenance,
+        plugin_warnings=compose_detail.plugin_warnings,
         score=score,
         svg=svg,
         stage2_model=resolved_stage2_model,
@@ -2386,8 +2457,22 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("interpret", 502) from e
+    plugin_provenance: list[dict[str, str]] = []
+    plugin_warnings: list[str] = []
     if req.expand_intermediate:
-        detail.ddl = expand_intermediate_for_lang(detail.ddl, lang=instruction_lang_resolved, context_text=source_text)
+        plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
+            detail.ddl,
+            source_text=source_text,
+            lang=instruction_lang_resolved,
+            seed_text=source_text,
+        )
+        detail.ddl = expand_intermediate_for_lang(
+            plugin_expansion.ddl,
+            lang=instruction_lang_resolved,
+            context_text=source_text,
+        )
+        plugin_provenance = list(plugin_expansion.provenance)
+        plugin_warnings = list(plugin_expansion.warnings)
     data: dict = {
         "ddl": detail.ddl,
         "thinking": detail.thinking,
@@ -2395,6 +2480,10 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
     }
+    if plugin_provenance:
+        data["plugin_provenance"] = plugin_provenance
+    if plugin_warnings:
+        data["plugin_warnings"] = plugin_warnings
     if detail.tokens_in is not None:
         data["tokens_in"] = detail.tokens_in
     if detail.tokens_out is not None:
@@ -2726,7 +2815,6 @@ def api_paint(
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("interpret", 502) from e
     ddl = interpret_detail_result.ddl
-    ddl = expand_intermediate_for_lang(ddl, lang=instruction_lang_resolved, context_text=source_text, vary_seed=req.vary_seed)
     t1 = time.perf_counter()
     try:
         compose_detail = _call_compose_detail(
@@ -2738,6 +2826,7 @@ def api_paint(
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
 
+    ddl = compose_detail.ddl
     coerce_report: dict[str, object] = _coerce_relation_report(None, None)
     try:
         score = compose_detail.score
@@ -2767,6 +2856,10 @@ def api_paint(
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
+    if compose_detail.plugin_provenance:
+        render_metadata["plugin_provenance"] = compose_detail.plugin_provenance
+    if compose_detail.plugin_warnings:
+        render_metadata["plugin_warnings"] = compose_detail.plugin_warnings
     t2 = time.perf_counter()
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
@@ -2819,7 +2912,11 @@ def api_paint(
             history_visibility=req.history_visibility,
             lineage_parent_node_id=req.lineage_parent_node_id,
             derivation_kind=req.derivation_kind,
-            derivation_metadata=req.derivation_metadata,
+            derivation_metadata={
+                **req.derivation_metadata,
+                "plugin_provenance": compose_detail.plugin_provenance,
+                "plugin_warnings": compose_detail.plugin_warnings,
+            },
             idempotency_key=idempotency_key,
         )
         history_id = item["id"]

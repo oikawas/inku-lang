@@ -26,6 +26,12 @@ from .schema import (
     SurfaceSpec,
     Variation,
 )
+from .arc_geometry import (
+    arc_from_endpoints_and_sagitta,
+    arc_point,
+    arc_svg_flags,
+    minor_arc_delta,
+)
 from .stroke_engine import outline_for_centerline, polygon_path, synthesize_stroke
 
 CANVAS_PX = 1000
@@ -671,13 +677,26 @@ def _resolve_at_region(ins: Instruction, seed: int, index: int) -> Instruction:
 def _bbox_for_instruction(
     ins: Instruction, performance_seed: int | None = None, instruction_index: int = 0
 ) -> tuple[float, float, float, float] | None:
+    """Return the performed outline bbox in canvas coordinates.
+
+    Relation resolution observes the same rotation that SVG rendering later
+    applies around the instruction anchor.
+    """
+    rotation = ins.rotation or 0.0
+
+    def rotated_bbox(
+        points: list[tuple[float, float]],
+    ) -> tuple[float, float, float, float]:
+        anchor = _anchor(ins)
+        performed = [
+            _rotate_screen_point(point, anchor, rotation) for point in points
+        ]
+        xs = [point[0] for point in performed]
+        ys = [point[1] for point in performed]
+        return min(xs), min(ys), max(xs), max(ys)
+
     if ins.primitive == "line" and ins.from_ and ins.to:
-        return (
-            min(ins.from_[0], ins.to[0]),
-            min(ins.from_[1], ins.to[1]),
-            max(ins.from_[0], ins.to[0]),
-            max(ins.from_[1], ins.to[1]),
-        )
+        return rotated_bbox([ins.from_, ins.to])
     if (
         ins.primitive in ("circle", "arc", "polygon")
         and ins.center
@@ -690,11 +709,15 @@ def _bbox_for_instruction(
             ins.center[1] + ins.radius,
         )
     if ins.primitive == "ellipse" and ins.center and ins.size:
+        rx, ry = ins.size[0] / 2, ins.size[1] / 2
+        angle = math.radians(rotation)
+        half_width = math.hypot(rx * math.cos(angle), ry * math.sin(angle))
+        half_height = math.hypot(rx * math.sin(angle), ry * math.cos(angle))
         return (
-            ins.center[0] - ins.size[0] / 2,
-            ins.center[1] - ins.size[1] / 2,
-            ins.center[0] + ins.size[0] / 2,
-            ins.center[1] + ins.size[1] / 2,
+            ins.center[0] - half_width,
+            ins.center[1] - half_height,
+            ins.center[0] + half_width,
+            ins.center[1] + half_height,
         )
     if ins.primitive == "cloudform" and ins.center and ins.size:
         contour = generate_cloudform_contour(
@@ -706,15 +729,16 @@ def _bbox_for_instruction(
             variation=ins.variation,
             weight=ins.weight,
         )
-        xs = [point[0] for point in contour.points]
-        ys = [point[1] for point in contour.points]
-        return min(xs), min(ys), max(xs), max(ys)
+        return rotated_bbox(list(contour.points))
     if ins.primitive in ("square", "triangle") and ins.position and ins.size:
-        return (
-            ins.position[0],
-            ins.position[1],
-            ins.position[0] + ins.size[0],
-            ins.position[1] + ins.size[1],
+        x, y = ins.position
+        width, height = ins.size
+        if ins.primitive == "triangle":
+            return rotated_bbox(
+                [(x + width / 2, y), (x, y + height), (x + width, y + height)]
+            )
+        return rotated_bbox(
+            [(x, y), (x + width, y), (x + width, y + height), (x, y + height)]
         )
     return None
 
@@ -737,12 +761,184 @@ def _relation_gap(seed: int, index: int, gap: str) -> float:
     return lo + (hi - lo) * _hash01(index, seed, "relation-gap")
 
 
+def _rotate_screen_point(
+    point: tuple[float, float],
+    center: tuple[float, float],
+    degrees: float,
+) -> tuple[float, float]:
+    angle = math.radians(degrees)
+    cosine, sine = math.cos(angle), math.sin(angle)
+    dx, dy = point[0] - center[0], point[1] - center[1]
+    return (
+        center[0] + dx * cosine - dy * sine,
+        center[1] + dx * sine + dy * cosine,
+    )
+
+
+def _rotate_screen_vector(
+    vector: tuple[float, float], degrees: float
+) -> tuple[float, float]:
+    angle = math.radians(degrees)
+    cosine, sine = math.cos(angle), math.sin(angle)
+    return (
+        vector[0] * cosine - vector[1] * sine,
+        vector[0] * sine + vector[1] * cosine,
+    )
+
+
+def _canvas_endpoint_geometry(
+    ins: Instruction,
+    seed: int,
+    index: int,
+) -> tuple[
+    tuple[float, float],
+    tuple[float, float],
+    tuple[float, float],
+    tuple[float, float],
+] | None:
+    """Return start/end points and their forward tangents in normalized space."""
+    rotation = ins.rotation or 0.0
+    if ins.primitive == "line" and ins.from_ and ins.to:
+        center = _anchor(ins)
+        start = _rotate_screen_point(ins.from_, center, rotation)
+        end = _rotate_screen_point(ins.to, center, rotation)
+        tangent = (end[0] - start[0], end[1] - start[1])
+        if math.hypot(*tangent) < 1e-9:
+            return None
+        return start, end, tangent, tangent
+    if (
+        ins.primitive == "arc"
+        and ins.center
+        and ins.radius is not None
+        and ins.angle_start is not None
+        and ins.angle_end is not None
+    ):
+        start_angle = math.radians(ins.angle_start)
+        end_angle = math.radians(ins.angle_end)
+        start = arc_point(ins.center, ins.radius, ins.angle_start)
+        end = arc_point(ins.center, ins.radius, ins.angle_end)
+        direction = 1.0 if ins.angle_end > ins.angle_start else -1.0
+        start_tangent = (
+            -math.sin(start_angle) * direction,
+            -math.cos(start_angle) * direction,
+        )
+        end_tangent = (
+            -math.sin(end_angle) * direction,
+            -math.cos(end_angle) * direction,
+        )
+        return (
+            _rotate_screen_point(start, ins.center, rotation),
+            _rotate_screen_point(end, ins.center, rotation),
+            _rotate_screen_vector(start_tangent, rotation),
+            _rotate_screen_vector(end_tangent, rotation),
+        )
+    if ins.primitive == "cloudform" and ins.center and ins.size:
+        contour = generate_cloudform_contour(
+            ins.center,
+            ins.size,
+            performance_seed=_seed_for_instruction(ins, seed),
+            instruction_index=index,
+            mark_index=0,
+            variation=ins.variation,
+            weight=ins.weight,
+        )
+        if len(contour.points) < 3:
+            return None
+        seam = _rotate_screen_point(contour.points[0], ins.center, rotation)
+        after = _rotate_screen_point(contour.points[1], ins.center, rotation)
+        before = _rotate_screen_point(contour.points[-1], ins.center, rotation)
+        return (
+            seam,
+            seam,
+            (after[0] - seam[0], after[1] - seam[1]),
+            (seam[0] - before[0], seam[1] - before[1]),
+        )
+    return None
+
+
+def _performed_arc_sagitta(ins: Instruction, seed: int, index: int) -> float | None:
+    if (
+        ins.primitive != "arc"
+        or ins.center is None
+        or ins.radius is None
+        or ins.angle_start is None
+        or ins.angle_end is None
+    ):
+        return None
+    endpoints = _canvas_endpoint_geometry(ins, seed, index)
+    if endpoints is None:
+        return None
+    start, end = endpoints[0], endpoints[1]
+    delta = minor_arc_delta(ins.angle_start, ins.angle_end)
+    local_apex = arc_point(
+        ins.center,
+        ins.radius,
+        ins.angle_start + delta / 2.0,
+    )
+    apex = _rotate_screen_point(local_apex, ins.center, ins.rotation or 0.0)
+    chord = (end[0] - start[0], end[1] - start[1])
+    length = math.hypot(*chord)
+    if length <= 1e-12:
+        return None
+    midpoint = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
+    normal = (-chord[1] / length, chord[0] / length)
+    return (apex[0] - midpoint[0]) * normal[0] + (
+        apex[1] - midpoint[1]
+    ) * normal[1]
+
+
+def _resolve_touching_relation(
+    ins: Instruction,
+    previous: list[Instruction],
+    seed: int,
+    index: int,
+) -> Instruction:
+    clean = _strip_performance_fields(ins)
+    if ins.primitive not in {"line", "arc"} or not previous:
+        return clean
+    prior = previous[-1]
+    if prior.primitive not in {"line", "arc"}:
+        return clean
+    prior_geometry = _canvas_endpoint_geometry(prior, seed, index - 1)
+    if prior_geometry is None:
+        return clean
+    start, end = prior_geometry[0], prior_geometry[1]
+    data = clean.model_dump(by_alias=True)
+    data["rotation"] = None
+
+    if ins.primitive == "line":
+        data["from"] = list(start)
+        data["to"] = list(end)
+        return Instruction.model_validate(data)
+
+    own_sagitta = _performed_arc_sagitta(ins, seed, index)
+    if own_sagitta is None or abs(own_sagitta) <= 1e-12:
+        return clean
+    sagitta = own_sagitta
+    if prior.primitive == "arc":
+        prior_sagitta = _performed_arc_sagitta(prior, seed, index - 1)
+        if prior_sagitta is None or abs(prior_sagitta) <= 1e-12:
+            return clean
+        sagitta = -math.copysign(abs(own_sagitta), prior_sagitta)
+    try:
+        geometry = arc_from_endpoints_and_sagitta(start, end, sagitta)
+    except ValueError:
+        return clean
+    data["center"] = list(geometry.center)
+    data["radius"] = geometry.radius
+    data["angle_start"] = geometry.angle_start
+    data["angle_end"] = geometry.angle_end
+    return Instruction.model_validate(data)
+
+
 def _resolve_relation(
     ins: Instruction, previous: list[Instruction], seed: int, index: int
 ) -> Instruction:
     rel = ins.relation
     if rel is None:
         return _strip_performance_fields(ins)
+    if rel.type == "touching":
+        return _resolve_touching_relation(ins, previous, seed, index)
     if rel.type == "between" and len(previous) < 2:
         return _strip_performance_fields(ins)
     if rel.type != "between" and not previous:
@@ -768,9 +964,13 @@ def _resolve_relation(
         )
     elif rel.type == "along":
         if previous[-1].primitive == "line" and previous[-1].from_ and previous[-1].to:
+            line_geometry = _canvas_endpoint_geometry(previous[-1], seed, index - 1)
+            if line_geometry is None:
+                return _strip_performance_fields(ins)
+            line_start, line_end = line_geometry[0], line_geometry[1]
             t = 0.18 + 0.64 * _hash01(index, seed, "along-t")
-            x, y = _point_on_line(previous[-1].from_, previous[-1].to, t)
-            ox, oy = _line_perp_offsets(previous[-1].from_, previous[-1].to, gap)
+            x, y = _point_on_line(line_start, line_end, t)
+            ox, oy = _line_perp_offsets(line_start, line_end, gap)
             side = -1.0 if _hash01(index, seed, "along-side") < 0.5 else 1.0
             target = (_clamp01(x + ox * side), _clamp01(y + oy * side))
         elif (
@@ -790,7 +990,11 @@ def _resolve_relation(
             point_index = int(
                 _hash01(index, seed, "along-cloudform") * len(contour.points)
             )
-            px, py = contour.points[point_index % len(contour.points)]
+            px, py = _rotate_screen_point(
+                contour.points[point_index % len(contour.points)],
+                previous[-1].center,
+                previous[-1].rotation or 0.0,
+            )
             dx, dy = px - prev_center[0], py - prev_center[1]
             distance = max(math.hypot(dx, dy), 1e-9)
             target = (
@@ -2640,9 +2844,7 @@ def _arc_path_d(
     x2 = cx + r * math.cos(ea)
     y2 = cy - r * math.sin(ea)
 
-    delta = (end_deg - start_deg) % 360
-    large_arc = 1 if delta > 180 else 0
-    sweep = 0 if end_deg > start_deg else 1  # math CCW → SVG 反時計回り (y 反転後)
+    large_arc, sweep = arc_svg_flags(start_deg, end_deg)
 
     return (
         f"M {x1:.3f} {y1:.3f} A {r:.3f} {r:.3f} 0 {large_arc} {sweep} {x2:.3f} {y2:.3f}"

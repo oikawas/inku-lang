@@ -353,3 +353,27 @@ def test_nature_plugin_expands_in_english():
     assert "Nature." not in expanded
     assert "Set repeated placement along an undulating trace" in expanded
     assert "Broad slow swaying" in expanded
+
+
+def test_numeric_regions_are_already_structurally_expanded_in_japanese():
+    ddl = (
+        "黒い鉛筆の細い弧を一枚、領域 [0.20, 0.30, 0.40, 0.50] に置く。"
+        "黒い鉛筆の細い弧を一枚、領域 [0.55, 0.30, 0.75, 0.50] に置く。"
+    )
+
+    expanded = expand_intermediate_ddl(ddl, lang="ja", context_text="双弧を描く")
+
+    assert expanded == ddl
+    assert "楕円" not in expanded
+
+
+def test_numeric_regions_are_already_structurally_expanded_in_english():
+    ddl = (
+        "Place one thin black pencil arc in region [0.20, 0.30, 0.40, 0.50]. "
+        "Place one thin black pencil arc in region [0.55, 0.30, 0.75, 0.50]."
+    )
+
+    expanded = expand_intermediate_ddl(ddl, lang="en", context_text="draw twin arcs")
+
+    assert expanded == ddl
+    assert "ellipse" not in expanded.lower()

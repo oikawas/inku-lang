@@ -132,7 +132,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 
 Only physical, observable words belong to the core. Emotional evaluation — "beautifully," "delicately," "boldly" — is excluded, because evaluation belongs to the viewer, not the writer.
 
-Outside the core live namespaced **plugin words** such as `Nature.wind` — shorthand that summons the variation of a phenomenon in a single word. Plugins can only expand into core vocabulary; they cannot bring in new shapes or syntax. The core stays small on purpose.
+Outside the core live namespaced **plugin words** such as `Nature.wind`. A plugin is a validated `.inku-plugin.md` document, not code: it names a phenomenon and expands deterministically to core DDL. It cannot add shapes, Score fields, or executable code, and removing it does not change saved replay or rh2. Settings exposes load/rejection status, Saijiki shows qualified words with notes, and `inku-cli plugin list / validate / reload` provides administration.
 
 ---
 
@@ -144,6 +144,8 @@ Outside the core live namespaced **plugin words** such as `Nature.wind` — shor
       ▼
 ┌──────────────────────────────────────┐
 │ Stage 1   Interpretation (LLM)       │ free words → normalized DDL, core vocabulary only
+├──────────────────────────────────────┤
+│ Plugin   Declarative expansion (det.) │ namespaced words → core-only normalized DDL
 ├──────────────────────────────────────┤
 │ Stage 1.5 Intermediate filter (det.) │ selects composition family and focus, attaches relations
 ├──────────────────────────────────────┤
@@ -228,7 +230,7 @@ uv run inku-cli paint "A blue line slowly loosens across the night water." --bas
 ## Capabilities
 
 - **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with model, token, and elapsed-time metadata per stage
-- **Three-tier regeneration** — another performance (no LLM call), another composition (vary seed), another interpretation (Stage 1 re-reading), plus grid generation with multiple selection and notes on why a work was chosen
+- **Refinement through regeneration** — another performance (no LLM call), another composition (vary seed), another interpretation (Stage 1 re-reading), LLM reselection, and generation management through lineage
 - **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle; horizontal, vertical, radial, scatter, and literal tiling grid layouts with paths such as waves and diagonal bands
 - **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
 - **Material rendering** — pencil, rotring, crayon, chalk, brushes, burin, and drypoint rendered through shared hand dynamics, coupled energy, sparse events, and tool-specific edges

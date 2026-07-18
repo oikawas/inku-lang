@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { SAIJIKI } from '$lib/saijiki';
-	import { t } from '$lib/i18n/index.svelte';
+	import { getLang, t } from '$lib/i18n/index.svelte';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -11,8 +11,15 @@
 		svg: string;
 	};
 
+	type PluginEntry = {
+		qualified_name: string;
+		note_ja: string;
+		note_en: string;
+	};
+
 	type Props = {
 		open: boolean;
+		pluginEntries: PluginEntry[];
 		activePreview: SaijikiPreview | null;
 		onClose: () => void;
 		onInsertWord: (word: string) => void;
@@ -21,6 +28,7 @@
 
 	let {
 		open,
+		pluginEntries,
 		activePreview = $bindable(),
 		onClose,
 		onInsertWord,
@@ -72,6 +80,29 @@
 					</div>
 				</div>
 			{/each}
+			{#if pluginEntries.length > 0}
+				<div class="saijiki-cat plugin-cat">
+					<div class="saijiki-cat-head">
+						<span class="saijiki-cat-ja">Plugin</span>
+						<span class="saijiki-cat-en">namespaced vocabulary</span>
+					</div>
+					<div class="saijiki-chips">
+						{#each pluginEntries as entry (entry.qualified_name)}
+							<div class="plugin-word-with-note">
+								<button
+									class="saijiki-chip plugin-chip"
+									title={getLang() === "ja" ? entry.note_ja : entry.note_en}
+									onpointerdown={(e) => e.preventDefault()}
+									onclick={() => onInsertWord(entry.qualified_name)}
+								>{entry.qualified_name}</button>
+								{#if getLang() === "ja" ? entry.note_ja : entry.note_en}
+									<span class="plugin-note">{getLang() === "ja" ? entry.note_ja : entry.note_en}</span>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>
@@ -174,5 +205,7 @@
 	}
 	.saijiki-cat.plugin-cat { border-left: 2px solid rgba(185, 88, 69, 0.45); }
 	.saijiki-chip.plugin-chip { color: #9f4b3b; border-color: rgba(185, 88, 69, 0.35); background: rgba(185, 88, 69, 0.08); }
+	.plugin-word-with-note { display: flex; flex-direction: column; gap: 3px; max-width: 18rem; }
+	.plugin-note { color: var(--muted); font-size: 0.68rem; line-height: 1.25; }
 	.saijiki-chip:hover { background: var(--bg2); border-color: var(--fg3); }
 </style>

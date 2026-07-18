@@ -1866,8 +1866,15 @@ def test_settings_status_is_admin_only(tmp_path, monkeypatch):
     assert data["db_backup"]["interval_days"] == 7
     assert data["db_backup"]["max_generations"] == 4
     assert data["plugins"]["enabled"] is True
-    assert data["plugins"]["runtime_editable"] is False
-    assert data["plugins"]["loaded"] == [{"name": "canvas-aspect", "version": "0.1.0", "status": "enabled"}]
+    assert data["plugins"]["runtime_editable"] is True
+    assert data["plugins"]["loaded"][0] == {
+        "name": "canvas-aspect",
+        "namespace": "system",
+        "version": "0.1.0",
+        "status": "enabled",
+        "entries": [],
+        "reasons": [],
+    }
     assert data["output_save"]["workers"] >= 1
     assert data["output_save"]["queue_limit"] >= data["output_save"]["workers"]
     assert data["output_save"]["enabled"] is True

@@ -2318,3 +2318,19 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - CLIの洗練台帳へ雲形のinstruction数、展開数、サンプル率、文脈を鏡として追加した。生成のgovernor、floor、品質ゲートには接続しない。
 - **洗練の会計:** この版で減らしたものはない。新しい専用修飾語や輪郭テンプレートは追加せず、既存語彙の合成だけに限定した。この版が起きにくくしたことは、未知・曖昧な対象が雲形へ吸収されること、輪郭が楽譜へ固定され一回性を失うこと、自己交差防止が美的な自動調整へ膨張することである。
 - **作者受入:** 日英各8件と同一楽譜の複数演奏を目視し、「雲形というイメージからは破綻の無い描画」として受け入れた。より飛躍した形は、この版の幾何安全性や選択境界を変えず、別途チューニングする。
+
+
+### v1.90.0 — あいだ「触れる」（2026-07-18）
+
+- **正式な接触関係（Build 586）:** あいだの第5語へ `touching` を追加し、`contact: both_ends` をline / arcの両端一致として正規Scoreスキーマ、Stage 1、Stage 2、歳時記へ日英同時に実装した。接触の固定句が明示された時だけ選び、自発付与しない。
+- Rendererは直前要素の演奏後端点を使い、二端点と符号付き矢高から `r=c²/(8|b|)+|b|/2` の劣弧を再構成する。直前弧の反対側へ膨らませ、劣弧の符号・windingはSVG描画と共有実装に統一した。variationと筆致は端点を固定する。
+- 閉形と端点を持たない直前要素は警告記録付きdrop-only、退化幾何は演奏時のdrop-onlyとし、座標補修・relation governor・API境界ハックは導入しない。`続きから (continuing)` は第二段候補に留めた。
+- 出力SVGから閉性、尖り30°以上、劣弧180°未満、矢高、同seed再現、Replay差を200 seedで検査する回帰を追加した。素描B系00/01/02/04はlocal-onlyの `cli/bench/leaf/` に置き、一般30入力ではtouching定型句の発火を0件とした。
+- **形式の会計:** 閉じた有機的輪郭を演奏揺らぎと両立させる代わりに、緩い距離関係だけだった「あいだ」へ初めて正確な端点拘束を加えた。Score version、migration、Render Engine metadata、rh2正規payloadは変更しない。
+- **変換後座標の統一（Build 587）:** touching、along、not_touching、cutting、betweenが参照する端点・輪郭を、SVGのrotation等を合成したキャンバス座標へ統一した。SVG検査は祖先groupのtransformを再帰合成し、通常版00/01/02/04と黒rotringのjudge版を分離した。Score schemaとrh2算出仕様は変更していない。
+- **関係付与の重複除去（Build 588）:** Stage 1.5で同一のtouching関係が重複して付与される経路を整理し、既存の接触指定を一度だけ保持するようにした。
+- **宣言的プラグイン文書（Build 589）:** front matter manifest、日英語エントリ、日英展開テンプレートからなる `.inku-plugin.md` のparser／validator／決定的展開層を追加した。再帰、48 instruction超過、反復の固定座標スタンプ、namespace衝突、URL・ファイル参照は文書全体を理由付きで拒否する。
+- 展開順をStage 1→プラグイン展開→コアDDL→Stage 1.5→Stage 2とし、名前空間明示と指示対象として明示された`fires_on`だけを発火させる。Stage 1には語彙リストだけを注入し、比喩・未知対象、Stage 1.5、coerceからの注入を禁止した。
+- 発火provenanceはAPI応答と履歴の派生メタデータへ記録する一方、Score・DB正本・rh2へプラグイン本文や依存を持ち込まない。追加・削除・再読込、拒否理由表示、歳時記note、`inku-cli plugin list / validate / reload`、削除後Replay不変の回帰を追加した。
+- **洗練の会計:** 新primitive、新Scoreフィールド、新coerce、作品governor、コード実行を追加していない。増えたのはコア語彙へのwriting-down境界と監査provenanceであり、起きにくくしたのはプラグイン再帰、スタンプ化、比喩への過剰発火、保存作品のプラグイン依存である。葉プラグイン本体はこの版に含めない。
+- **構造展開済みDDLの保護（Build 590）:** プラグイン展開がmember別の数値regionを確定した後、Stage 1.5が楕円等の別レシピを追加し、Stage 2もDDLにない補助弧を生成し得た経路を修正した。数値regionを含むコアDDLは構図判断済みとして正規化だけを通し、Scoreのinstruction数も明示region数を超えない。これはplugin namespaceを後段へ注入する特例ではなく、一般の明示regionにも適用する境界である。最小双弧fixtureはMistralでは二本に抑制される。Qwenでは二つのinstruction内のarrangementにより二本を超える可視弧が残る場合があり、instruction数境界と可視要素数のモデル差として受け入れた。

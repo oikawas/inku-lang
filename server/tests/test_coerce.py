@@ -1201,6 +1201,47 @@ def test_coerce_score_adds_motion_floor_when_motion_context_has_no_path():
     assert floor[0].arrangement.preserve_space is True
 
 
+def test_coerce_score_drops_support_shape_for_explicit_numeric_regions():
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "arc",
+                    "center": [0.337, 0.498],
+                    "radius": 0.09,
+                    "at": {"region": [0.227, 0.411, 0.447, 0.584]},
+                },
+                {
+                    "primitive": "arc",
+                    "center": [0.651, 0.493],
+                    "radius": 0.09,
+                    "at": {"region": [0.541, 0.406, 0.761, 0.579]},
+                },
+                {
+                    "primitive": "arc",
+                    "center": [0.58, 0.52],
+                    "radius": 0.11,
+                    "color": "red",
+                    "arrangement": {"count": 3, "layout": "scatter"},
+                },
+            ]
+        }
+    )
+    ddl = (
+        "細い弧を一枚 領域 [0.227, 0.411, 0.447, 0.584]に置く。"
+        "細い弧を一枚 領域 [0.541, 0.406, 0.761, 0.579]に置く。"
+    )
+
+    fixed = coerce_score(score, ddl=ddl)
+
+    assert len(fixed.instructions) == 2
+    assert all(ins.at is not None for ins in fixed.instructions)
+    assert not any(
+        "motion floor restored" in (ins.color_hint or "")
+        for ins in fixed.instructions
+    )
+
+
 def test_coerce_score_adds_motion_floor_when_existing_path_is_too_small():
     score = Score.model_validate(
         {

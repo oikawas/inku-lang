@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.89.1 / Build 585**
+**Target version: v1.90.0 / Build 590**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -30,7 +30,8 @@ A full specification read is appropriate for first-time onboarding, design-philo
 ```text
 instruction
   -> Stage 1: interpretation
-  -> normalized DDL
+  -> normalized DDL (which may contain namespaced plugin words)
+  -> declarative plugin expansion: deterministic writing-down to core DDL
   -> Stage 1.5: deterministic expansion and relation assignment
   -> Stage 2: JSON Score
   -> coerce / validation: boundary handling with a drop-only preference
@@ -56,7 +57,7 @@ instruction
 - Keep `dh1` description identity, `rh2` work-edition identity, history IDs, and lineage node IDs distinct.
 - Lineage records explicit derivation operations only. Never infer parentage from similarity, time, or matching hashes.
 - Metrics, similarity, and vision reviews are diagnostic mirrors, not generation gates or automatic best-branch selectors.
-- Plugins are normally namespaced macros over core vocabulary. They do not redefine core syntax or existing words.
+- Plugins are validated declarative documents, expanded to core DDL immediately after Stage 1. Stage 1.5, coerce, Score, replay, and rh2 do not depend on plugin content.
 - Japanese and English behavior must stay aligned. Do not introduce English-only requirements.
 
 ## Current Product State
@@ -71,7 +72,7 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-The latest v1.89.1 / Build 585 change adds cloudform to the core forms. A Score keeps only center, size, and existing modifiers; Renderer v4 deterministically derives each performed closed contour from the Score, instruction index, and performance seed. Stage 1 may choose it only when cloudform is explicit or the subject itself is amorphous, while Stage 1.5 and coerce never inject it. Contour coordinates are not stored in the Score, database, or rh2 inputs. Author review accepted the rendering as structurally sound for the cloudform image; more radical contours remain a separate tuning task.
+In v1.90.0, Build 586 formalized `touching`, Build 587 unified relation geometry in transform-composed canvas coordinates, and Build 588 removed duplicate touching assignment. Build 589 adds validated `.inku-plugin.md` documents and a deterministic expansion layer immediately after Stage 1. Explicit qualified terms and `fires_on` nouns that are stated subjects may fire; metaphors and unknown objects may not. Validation rejects recursion, expansion beyond 48 instructions, fixed-coordinate repetition, external references, and namespace collisions. Provenance is ordinary history metadata, while Score, canonical artwork data, rh2, and replay remain independent of plugin documents. Build 590 adds a general boundary preventing Stage 1.5 from appending auxiliary shapes and Score from retaining instructions beyond the explicit numeric-region count after structural expansion. The boundary caps instruction count, while arrangement-driven visible multiplicity remains model-dependent between Mistral and Qwen.
 
 ## Where to Look for a Change
 

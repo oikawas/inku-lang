@@ -109,6 +109,18 @@ _EN_EXPANSION_MARKERS = (
 )
 
 
+def _has_explicit_numeric_regions(ddl: str, *, lang: str) -> bool:
+    """Treat already region-resolved core DDL as structurally expanded.
+
+    A numeric region is a composition decision, not a sparse semantic hint.
+    Stage 1.5 may sanitize it, but must not append another finished-work recipe.
+    This boundary is generic and has no knowledge of plugin namespaces.
+    """
+
+    marker = r"\bregion\s*\[" if lang == "en" else r"領域\s*\["
+    return re.search(marker, ddl, flags=re.IGNORECASE) is not None
+
+
 def _split_sentences(text: str, *, lang: str) -> list[str]:
     if lang == "en":
         return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
@@ -584,7 +596,9 @@ def expand_intermediate_ddl(
 
 
 def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | None = None) -> str:
-    if any(marker in ddl for marker in _JA_EXPANSION_MARKERS):
+    if _has_explicit_numeric_regions(ddl, lang="ja") or any(
+        marker in ddl for marker in _JA_EXPANSION_MARKERS
+    ):
         return ddl
     ddl = _reframe_static_center_ja(ddl)
 
@@ -681,7 +695,9 @@ def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | No
 
 def _expand_en(ddl: str, *, context_text: str | None = None, vary_seed: int | None = None) -> str:
     lower = ddl.lower()
-    if any(marker in lower for marker in _EN_EXPANSION_MARKERS):
+    if _has_explicit_numeric_regions(ddl, lang="en") or any(
+        marker in lower for marker in _EN_EXPANSION_MARKERS
+    ):
         return ddl
     ddl = _reframe_static_center_en(ddl)
     lower = ddl.lower()

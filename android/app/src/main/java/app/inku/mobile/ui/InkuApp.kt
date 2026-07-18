@@ -1296,7 +1296,7 @@ private fun CanvasHeroCard(
                         PresentationCaption(
                             text = instructionCaptionText,
                             rotation = deviceRotation,
-                            modifier = presentationCaptionPlacement(deviceRotation, screenWidth, screenHeight),
+                            modifier = presentationCaptionPlacement(screenWidth),
                         )
                     }
                     if (presentation) {
@@ -4125,34 +4125,10 @@ private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Un
     )
 }
 
-private fun BoxScope.presentationCaptionPlacement(rotation: DeviceRotation, screenWidth: Dp, screenHeight: Dp): Modifier {
-    val captionWidth = when (rotation) {
-        DeviceRotation.Portrait,
-        DeviceRotation.ReversePortrait -> screenWidth * 0.84f
-        DeviceRotation.LandscapeLeft,
-        DeviceRotation.LandscapeRight -> screenHeight * 0.84f
-    }
-    return when (rotation) {
-        DeviceRotation.Portrait -> Modifier.align(Alignment.BottomCenter)
-            .width(captionWidth)
-            .padding(bottom = 10.dp)
-        DeviceRotation.ReversePortrait -> Modifier.align(Alignment.TopCenter)
-            .width(captionWidth)
-            .padding(top = 10.dp)
-        DeviceRotation.LandscapeLeft -> Modifier.align(Alignment.Center)
-            .width(captionWidth)
-            .graphicsLayer {
-                rotationZ = 270f
-            }
-            .padding(bottom = screenWidth * 0.46f)
-        DeviceRotation.LandscapeRight -> Modifier.align(Alignment.Center)
-            .width(captionWidth)
-            .graphicsLayer {
-                rotationZ = 90f
-            }
-            .padding(bottom = screenWidth * 0.46f)
-    }
-}
+private fun BoxScope.presentationCaptionPlacement(screenWidth: Dp): Modifier =
+    Modifier.align(Alignment.BottomCenter)
+        .width(screenWidth * 0.92f)
+        .padding(bottom = 92.dp)
 
 @Composable
 private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier: Modifier = Modifier) {

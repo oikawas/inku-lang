@@ -26,6 +26,10 @@ from .schema import (
     SurfaceSpec,
     Variation,
 )
+from .sketch_relations import (
+    sketch_relation_marker,
+    strip_sketch_relation_marker,
+)
 from .stroke_engine import outline_for_centerline, polygon_path, synthesize_stroke
 
 CANVAS_PX = 1000
@@ -737,9 +741,191 @@ def _relation_gap(seed: int, index: int, gap: str) -> float:
     return lo + (hi - lo) * _hash01(index, seed, "relation-gap")
 
 
+def _rotate_screen_point(
+    point: tuple[float, float],
+    center: tuple[float, float],
+    degrees: float,
+) -> tuple[float, float]:
+    angle = math.radians(degrees)
+    cosine, sine = math.cos(angle), math.sin(angle)
+    dx, dy = point[0] - center[0], point[1] - center[1]
+    return (
+        center[0] + dx * cosine - dy * sine,
+        center[1] + dx * sine + dy * cosine,
+    )
+
+
+def _rotate_screen_vector(
+    vector: tuple[float, float], degrees: float
+) -> tuple[float, float]:
+    angle = math.radians(degrees)
+    cosine, sine = math.cos(angle), math.sin(angle)
+    return (
+        vector[0] * cosine - vector[1] * sine,
+        vector[0] * sine + vector[1] * cosine,
+    )
+
+
+def _endpoint_geometry(
+    ins: Instruction,
+    seed: int,
+    index: int,
+) -> tuple[
+    tuple[float, float],
+    tuple[float, float],
+    tuple[float, float],
+    tuple[float, float],
+] | None:
+    """Return start/end points and their forward tangents in normalized space."""
+    rotation = ins.rotation or 0.0
+    if ins.primitive == "line" and ins.from_ and ins.to:
+        center = _anchor(ins)
+        start = _rotate_screen_point(ins.from_, center, rotation)
+        end = _rotate_screen_point(ins.to, center, rotation)
+        tangent = (end[0] - start[0], end[1] - start[1])
+        if math.hypot(*tangent) < 1e-9:
+            return None
+        return start, end, tangent, tangent
+    if (
+        ins.primitive == "arc"
+        and ins.center
+        and ins.radius is not None
+        and ins.angle_start is not None
+        and ins.angle_end is not None
+    ):
+        start_angle = math.radians(ins.angle_start)
+        end_angle = math.radians(ins.angle_end)
+        start = (
+            ins.center[0] + ins.radius * math.cos(start_angle),
+            ins.center[1] - ins.radius * math.sin(start_angle),
+        )
+        end = (
+            ins.center[0] + ins.radius * math.cos(end_angle),
+            ins.center[1] - ins.radius * math.sin(end_angle),
+        )
+        direction = 1.0 if ins.angle_end > ins.angle_start else -1.0
+        start_tangent = (
+            -math.sin(start_angle) * direction,
+            -math.cos(start_angle) * direction,
+        )
+        end_tangent = (
+            -math.sin(end_angle) * direction,
+            -math.cos(end_angle) * direction,
+        )
+        return (
+            _rotate_screen_point(start, ins.center, rotation),
+            _rotate_screen_point(end, ins.center, rotation),
+            _rotate_screen_vector(start_tangent, rotation),
+            _rotate_screen_vector(end_tangent, rotation),
+        )
+    if ins.primitive == "cloudform" and ins.center and ins.size:
+        contour = generate_cloudform_contour(
+            ins.center,
+            ins.size,
+            performance_seed=_seed_for_instruction(ins, seed),
+            instruction_index=index,
+            mark_index=0,
+            variation=ins.variation,
+            weight=ins.weight,
+        )
+        if len(contour.points) < 3:
+            return None
+        seam = _rotate_screen_point(contour.points[0], ins.center, rotation)
+        after = _rotate_screen_point(contour.points[1], ins.center, rotation)
+        before = _rotate_screen_point(contour.points[-1], ins.center, rotation)
+        return (
+            seam,
+            seam,
+            (after[0] - seam[0], after[1] - seam[1]),
+            (seam[0] - before[0], seam[1] - before[1]),
+        )
+    return None
+
+
+def _clean_sketch_instruction(ins: Instruction) -> Instruction:
+    data = ins.model_dump(by_alias=True)
+    data.pop("at", None)
+    data.pop("relation", None)
+    data["color_hint"] = strip_sketch_relation_marker(ins.color_hint)
+    return Instruction.model_validate(data)
+
+
+def _resolve_sketch_relation(
+    ins: Instruction,
+    previous: list[Instruction],
+    seed: int,
+    index: int,
+    marker: str,
+) -> Instruction:
+    """Resolve the disposable leaf-sketch relations, or drop them unchanged."""
+    clean = _clean_sketch_instruction(ins)
+    if ins.primitive != "arc" or not previous:
+        return clean
+    own = _endpoint_geometry(ins, seed, index)
+    prior = _endpoint_geometry(previous[-1], seed, index - 1)
+    if own is None or prior is None or ins.center is None or ins.radius is None:
+        return clean
+
+    own_start, own_end, own_start_tangent, _ = own
+    prior_start, prior_end, _, prior_end_tangent = prior
+    data = clean.model_dump(by_alias=True)
+
+    if marker == "touching":
+        own_chord = (own_end[0] - own_start[0], own_end[1] - own_start[1])
+        prior_chord = (
+            prior_end[0] - prior_start[0],
+            prior_end[1] - prior_start[1],
+        )
+        own_length = math.hypot(*own_chord)
+        prior_length = math.hypot(*prior_chord)
+        if own_length < 1e-9 or prior_length < 1e-9:
+            return clean
+        scale = prior_length / own_length
+        delta = math.degrees(
+            math.atan2(prior_chord[1], prior_chord[0])
+            - math.atan2(own_chord[1], own_chord[0])
+        )
+        center_offset = (
+            ins.center[0] - own_start[0],
+            ins.center[1] - own_start[1],
+        )
+        rotated = _rotate_screen_vector(center_offset, delta)
+        data["center"] = [
+            prior_start[0] + rotated[0] * scale,
+            prior_start[1] + rotated[1] * scale,
+        ]
+        data["radius"] = ins.radius * scale
+        data["rotation"] = (ins.rotation or 0.0) + delta
+        return Instruction.model_validate(data)
+
+    if marker == "continuing":
+        if math.hypot(*own_start_tangent) < 1e-9 or math.hypot(*prior_end_tangent) < 1e-9:
+            return clean
+        delta = math.degrees(
+            math.atan2(prior_end_tangent[1], prior_end_tangent[0])
+            - math.atan2(own_start_tangent[1], own_start_tangent[0])
+        )
+        center_offset = (
+            ins.center[0] - own_start[0],
+            ins.center[1] - own_start[1],
+        )
+        rotated = _rotate_screen_vector(center_offset, delta)
+        data["center"] = [
+            prior_end[0] + rotated[0],
+            prior_end[1] + rotated[1],
+        ]
+        data["rotation"] = (ins.rotation or 0.0) + delta
+        return Instruction.model_validate(data)
+
+    return clean
+
+
 def _resolve_relation(
     ins: Instruction, previous: list[Instruction], seed: int, index: int
 ) -> Instruction:
+    marker = sketch_relation_marker(ins.color_hint)
+    if marker is not None:
+        return _resolve_sketch_relation(ins, previous, seed, index, marker)
     rel = ins.relation
     if rel is None:
         return _strip_performance_fields(ins)
@@ -2640,8 +2826,8 @@ def _arc_path_d(
     x2 = cx + r * math.cos(ea)
     y2 = cy - r * math.sin(ea)
 
-    delta = (end_deg - start_deg) % 360
-    large_arc = 1 if delta > 180 else 0
+    delta = end_deg - start_deg
+    large_arc = 1 if abs(delta) > 180 else 0
     sweep = 0 if end_deg > start_deg else 1  # math CCW → SVG 反時計回り (y 反転後)
 
     return (

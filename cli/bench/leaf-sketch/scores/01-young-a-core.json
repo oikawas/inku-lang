@@ -1,0 +1,74 @@
+{
+  "instructions": [
+    {
+      "primitive": "arc", "center": [0.50, 0.53], "radius": 0.05,
+      "angle_start": 143.130102, "angle_end": 36.869898, "rotation": -55,
+      "at": {"region": [0.15, 0.12, 0.30, 0.23]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.47], "radius": 0.05,
+      "angle_start": 216.869898, "angle_end": 323.130102, "rotation": -55,
+      "at": {"region": [0.15, 0.12, 0.30, 0.23]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.53], "radius": 0.05,
+      "angle_start": 143.130102, "angle_end": 36.869898, "rotation": -25,
+      "at": {"region": [0.32, 0.16, 0.45, 0.28]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.47], "radius": 0.05,
+      "angle_start": 216.869898, "angle_end": 323.130102, "rotation": -25,
+      "at": {"region": [0.32, 0.16, 0.45, 0.28]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.53], "radius": 0.05,
+      "angle_start": 143.130102, "angle_end": 36.869898, "rotation": 0,
+      "at": {"region": [0.50, 0.10, 0.63, 0.21]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.47], "radius": 0.05,
+      "angle_start": 216.869898, "angle_end": 323.130102, "rotation": 0,
+      "at": {"region": [0.50, 0.10, 0.63, 0.21]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.53], "radius": 0.05,
+      "angle_start": 143.130102, "angle_end": 36.869898, "rotation": 28,
+      "at": {"region": [0.65, 0.22, 0.78, 0.34]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.47], "radius": 0.05,
+      "angle_start": 216.869898, "angle_end": 323.130102, "rotation": 28,
+      "at": {"region": [0.65, 0.22, 0.78, 0.34]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.53], "radius": 0.05,
+      "angle_start": 143.130102, "angle_end": 36.869898, "rotation": 52,
+      "at": {"region": [0.78, 0.08, 0.90, 0.20]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    },
+    {
+      "primitive": "arc", "center": [0.50, 0.47], "radius": 0.05,
+      "angle_start": 216.869898, "angle_end": 323.130102, "rotation": 52,
+      "at": {"region": [0.78, 0.08, 0.90, 0.20]},
+      "weight": "pencil", "color": "green",
+      "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["position_x", "position_y"]}
+    }
+  ]
+}

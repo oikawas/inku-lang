@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import re
 import xml.etree.ElementTree as ET
@@ -8,13 +9,16 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from inku_server.arc_geometry import arc_from_endpoints_and_sagitta
+from inku_server.arc_geometry import (
+    arc_from_endpoints_and_sagitta,
+    minor_arc_delta,
+)
 from inku_server.coerce import coerce_score
 from inku_server.composer import (
     _enforce_relation_literal_gate,
     _literal_relation_types,
 )
-from inku_server.renderer import render
+from inku_server.renderer import _resolve_performance_score, render
 from inku_server.schema import Score, migrate_score_payload
 from inku_server.stroke_engine import synthesize_stroke
 
@@ -22,7 +26,6 @@ from inku_server.stroke_engine import synthesize_stroke
 _ARC_D = re.compile(
     r"M ([\d.-]+) ([\d.-]+) A ([\d.-]+) [\d.-]+ 0 ([01]) ([01]) ([\d.-]+) ([\d.-]+)"
 )
-_ROTATE = re.compile(r"rotate\(([-\d.]+),([-\d.]+),([-\d.]+)\)")
 
 
 def _arc_instruction(
@@ -72,42 +75,92 @@ def _score() -> Score:
     )
 
 
-def _rotate(
-    point: tuple[float, float], degrees: float, center: tuple[float, float]
-) -> tuple[float, float]:
-    angle = math.radians(degrees)
-    dx, dy = point[0] - center[0], point[1] - center[1]
+_TRANSFORM = re.compile(r"([A-Za-z]+)\s*\(([^)]*)\)")
+Affine = tuple[float, float, float, float, float, float]
+_IDENTITY: Affine = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+
+
+def _multiply(left: Affine, right: Affine) -> Affine:
+    a1, b1, c1, d1, e1, f1 = left
+    a2, b2, c2, d2, e2, f2 = right
     return (
-        center[0] + dx * math.cos(angle) - dy * math.sin(angle),
-        center[1] + dx * math.sin(angle) + dy * math.cos(angle),
+        a1 * a2 + c1 * b2,
+        b1 * a2 + d1 * b2,
+        a1 * c2 + c1 * d2,
+        b1 * c2 + d1 * d2,
+        a1 * e2 + c1 * f2 + e1,
+        b1 * e2 + d1 * f2 + f1,
+    )
+
+
+def _translation(x: float, y: float) -> Affine:
+    return (1.0, 0.0, 0.0, 1.0, x, y)
+
+
+def _parse_transform(value: str) -> Affine:
+    result = _IDENTITY
+    for name, arguments in _TRANSFORM.findall(value):
+        values = [float(item) for item in re.split(r"[\s,]+", arguments.strip()) if item]
+        if name == "matrix" and len(values) == 6:
+            current = tuple(values)
+        elif name == "translate" and values:
+            current = _translation(values[0], values[1] if len(values) > 1 else 0.0)
+        elif name == "scale" and values:
+            sx = values[0]
+            sy = values[1] if len(values) > 1 else sx
+            current = (sx, 0.0, 0.0, sy, 0.0, 0.0)
+        elif name == "rotate" and values:
+            angle = math.radians(values[0])
+            cosine, sine = math.cos(angle), math.sin(angle)
+            current = (cosine, sine, -sine, cosine, 0.0, 0.0)
+            if len(values) == 3:
+                current = _multiply(
+                    _translation(values[1], values[2]),
+                    _multiply(current, _translation(-values[1], -values[2])),
+                )
+        else:
+            raise AssertionError(f"unsupported SVG transform: {name}({arguments})")
+        result = _multiply(result, current)
+    return result
+
+
+def _transform_point(point: tuple[float, float], matrix: Affine) -> tuple[float, float]:
+    a, b, c, d, e, f = matrix
+    return (
+        a * point[0] + c * point[1] + e,
+        b * point[0] + d * point[1] + f,
     )
 
 
 def _svg_arcs(svg: str) -> list[dict[str, object]]:
     root = ET.fromstring(svg)
-    result = []
-    for element in root.iter():
+    result: list[dict[str, object]] = []
+
+    def visit(element: ET.Element, inherited: Affine) -> None:
+        matrix = _multiply(
+            inherited,
+            _parse_transform(element.attrib.get("transform", "")),
+        )
         path_d = element.attrib.get("d", "")
         match = _ARC_D.fullmatch(path_d)
-        if match is None:
-            continue
-        start = (float(match[1]), float(match[2]))
-        end = (float(match[6]), float(match[7]))
-        transform = element.attrib.get("transform", "")
-        rotation = _ROTATE.fullmatch(transform)
-        if rotation is not None:
-            center = (float(rotation[2]), float(rotation[3]))
-            start = _rotate(start, float(rotation[1]), center)
-            end = _rotate(end, float(rotation[1]), center)
-        result.append(
-            {
-                "start": start,
-                "end": end,
-                "radius": float(match[3]),
-                "large": int(match[4]),
-                "sweep": int(match[5]),
-            }
-        )
+        stroke_opacity = float(element.attrib.get("stroke-opacity", "1"))
+        if match is not None and stroke_opacity >= 0.45:
+            start = _transform_point((float(match[1]), float(match[2])), matrix)
+            end = _transform_point((float(match[6]), float(match[7])), matrix)
+            radius_scale = math.hypot(matrix[0], matrix[1])
+            result.append(
+                {
+                    "start": start,
+                    "end": end,
+                    "radius": float(match[3]) * radius_scale,
+                    "large": int(match[4]),
+                    "sweep": int(match[5]),
+                }
+            )
+        for child in element:
+            visit(child, matrix)
+
+    visit(root, _IDENTITY)
     return result
 
 
@@ -289,6 +342,94 @@ def test_touching_svg_geometry_and_replay_contract_across_200_seeds() -> None:
     assert len(seen_poses) > 1
 
 
+def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
+    arcs = _svg_arcs(svg)
+    arc_by_instruction: dict[int, dict[str, object]] = {}
+    arc_index = 0
+    for instruction_index, instruction in enumerate(score.instructions):
+        if instruction.primitive != "arc":
+            continue
+        arc_by_instruction[instruction_index] = arcs[arc_index]
+        arc_index += 1
+    assert arc_index == len(arcs)
+
+    for instruction_index, instruction in enumerate(score.instructions):
+        if instruction.relation is None or instruction.relation.type != "touching":
+            continue
+        previous = arc_by_instruction[instruction_index - 1]
+        current = arc_by_instruction[instruction_index]
+        assert _distance(previous["start"], current["start"]) <= 2.0
+        assert _distance(previous["end"], current["end"]) <= 2.0
+        assert previous["large"] == current["large"] == 0
+
+        _, previous_start_tangent, previous_end_tangent = _center_and_tangents(
+            previous
+        )
+        _, current_start_tangent, current_end_tangent = _center_and_tangents(current)
+        assert _angle(previous_start_tangent, current_start_tangent) >= 30.0
+        assert _angle(previous_end_tangent, current_end_tangent) >= 30.0
+
+        assert instruction.radius is not None
+        assert instruction.angle_start is not None
+        assert instruction.angle_end is not None
+        expected_sagitta = instruction.radius * (
+            1.0
+            - math.cos(
+                math.radians(
+                    abs(minor_arc_delta(instruction.angle_start, instruction.angle_end))
+                )
+                / 2.0
+            )
+        )
+        chord = _distance(current["start"], current["end"])
+        radius = current["radius"]
+        assert isinstance(radius, float)
+        actual_sagitta = radius - math.sqrt(radius * radius - chord * chord / 4.0)
+        assert actual_sagitta == pytest.approx(expected_sagitta * 1000.0, rel=0.20)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "00-single-b-touching.json",
+        "01-young-b-touching.json",
+        "02-green-b-touching.json",
+        "04-fallen-b-touching.json",
+    ],
+)
+def test_leaf_bench_touching_pairs_close_after_all_svg_transforms(name: str) -> None:
+    path = Path(__file__).parents[2] / "cli" / "bench" / "leaf" / name
+    score = Score.model_validate_json(path.read_text())
+    # 00 has no rotation and cannot expose the ancestor-transform regression by itself.
+    for seed in range(1, 6):
+        _assert_touching_pairs_from_svg(score, render(score, render_seed=seed))
+
+
+def test_along_reads_a_rotated_line_in_canvas_coordinates() -> None:
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.2, 0.5],
+                    "to": [0.8, 0.5],
+                    "rotation": 90,
+                },
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.02,
+                    "relation": {"type": "along", "gap": "narrow"},
+                },
+            ]
+        }
+    )
+    resolved = _resolve_performance_score(score, 1)
+    center = resolved.instructions[1].center
+    assert center is not None
+    assert 0.019 <= abs(center[0] - 0.5) <= 0.051
+    assert 0.2 <= center[1] <= 0.8
+
 @pytest.mark.parametrize(
     "weight", ["pencil", "crayon", "chalk", "brush_thin", "brush_thick"]
 )
@@ -318,6 +459,27 @@ def test_formal_leaf_bench_scores_use_only_strict_schema(name: str) -> None:
         and instruction.relation.contact == "both_ends"
         for instruction in score.instructions
     )
+
+
+def test_judge_scores_change_only_color_and_weight() -> None:
+    score_dir = Path(__file__).parents[2] / "cli" / "bench" / "leaf"
+    for name in (
+        "00-single-b-touching",
+        "01-young-b-touching",
+        "02-green-b-touching",
+        "04-fallen-b-touching",
+    ):
+        regular = json.loads((score_dir / f"{name}.json").read_text())
+        judge = json.loads((score_dir / f"{name}-judge.json").read_text())
+        assert len(regular["instructions"]) == len(judge["instructions"])
+        for regular_instruction, judge_instruction in zip(
+            regular["instructions"], judge["instructions"], strict=True
+        ):
+            expected = dict(regular_instruction)
+            expected["color"] = "black"
+            expected["weight"] = "rotring"
+            assert judge_instruction == expected
+        Score.model_validate(judge)
 
 
 def test_stage2_literal_gate_maps_explicit_touching_and_drops_spontaneous() -> None:

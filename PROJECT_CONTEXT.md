@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.90.0 / Build 586**
+**Target version: v1.90.0 / Build 587**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -71,7 +71,7 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-The latest v1.90.0 / Build 586 change formalizes `touching` as the fifth relation word. With `contact: both_ends`, it applies only between lines and arcs and pins the current instruction to the previous instruction’s performed endpoints. Arcs are reconstructed as minor arcs from those endpoints and their sagitta, bulging opposite a previous arc by default. Minor-arc winding shares the SVG renderer convention, while variation and stroke performance keep endpoints fixed. Stage 1 and Stage 2 may select touching only from explicit contact phrases. Closed forms and endpointless targets are drop-only with a recorded warning; degenerate performed geometry is also drop-only. No repair or governor is added. `continuing` remains deferred.
+The latest v1.90.0 / Build 586 change formalizes `touching` as the fifth relation word. With `contact: both_ends`, it applies only between lines and arcs and pins the current instruction to the previous instruction’s performed endpoints. Arcs are reconstructed as minor arcs from those endpoints and their sagitta, bulging opposite a previous arc by default. Minor-arc winding shares the SVG renderer convention, while variation and stroke performance keep endpoints fixed. Stage 1 and Stage 2 may select touching only from explicit contact phrases. Closed forms and endpointless targets are drop-only with a recorded warning; degenerate performed geometry is also drop-only. No repair or governor is added. `continuing` remains deferred. Build 587 unifies every relation on endpoints and outlines in canvas coordinates after composing rotation and other drawing transforms; SVG regression checks use only those transform-composed coordinates.
 
 ## Where to Look for a Change
 

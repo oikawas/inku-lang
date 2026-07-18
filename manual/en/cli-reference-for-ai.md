@@ -78,6 +78,13 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 
 ## CLI Command Quick Reference for AI Agents
 
+### 0.5 `plugin`
+
+* **`plugin list`** — Returns loaded and rejected declarative plugin documents with namespace, version, and rejection reasons.
+* **`plugin validate <FILE.inku-plugin.md>`** — Sends a local UTF-8 document body to the management API for validation without executing code or external files.
+* **`plugin reload`** — Forces `server/plugins/` to reload without restarting the server.
+* These commands require an administrator session. Keep any plugin test artifacts together under one untracked `cli/out2/<build>-<version>-<benchmark>/` run directory.
+
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * Displays the parent-child derivation tree of the work.

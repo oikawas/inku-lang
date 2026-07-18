@@ -78,6 +78,13 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 
 ## コマンド API リファレンス（AI高速参照用）
 
+### 0.5 `plugin`
+
+* **`plugin list`** — サーバーの宣言的プラグイン文書について、ロード済み／拒否、namespace、version、拒否理由をJSONで取得します。
+* **`plugin validate <FILE.inku-plugin.md>`** — ローカルのUTF-8文書本文を管理APIへ送り、コードや外部ファイルを実行せず構文検証します。
+* **`plugin reload`** — サーバーを再起動せず `server/plugins/` を明示再読込します。
+* これらは管理者セッションを必要とします。プラグイン試験で生成するファイルは `cli/out2/<build>-<version>-<benchmark>/` の一つのrunディレクトリにまとめ、Git追跡しません。
+
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * 指定したIDを基点とする系譜ツリーを表示します。

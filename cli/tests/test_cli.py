@@ -1111,3 +1111,37 @@ def test_score_metrics_reports_cloudform_usage_and_context_as_mirror_only():
         "surface:wash": 1,
         "variation:wave": 1,
     }
+
+
+def test_plugin_parser_supports_list_validate_and_reload():
+    parser = cli.build_parser()
+    listed = parser.parse_args(["plugin", "list"])
+    validated = parser.parse_args(["plugin", "validate", "sample.inku-plugin.md"])
+    reloaded = parser.parse_args(["plugin", "reload"])
+    assert listed.func is cli.command_plugin
+    assert listed.plugin_action == "list"
+    assert validated.file == "sample.inku-plugin.md"
+    assert reloaded.plugin_action == "reload"
+
+
+def test_plugin_validate_sends_document_body(monkeypatch, tmp_path, capsys):
+    plugin_file = tmp_path / "sample.inku-plugin.md"
+    plugin_file.write_text("---\nnamespace: Test\n---\n", encoding="utf-8")
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            return {"valid": True}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    parser = cli.build_parser()
+    args = parser.parse_args(["plugin", "validate", str(plugin_file)])
+    assert cli.command_plugin(args) == 0
+    assert calls == [
+        ("POST", "/api/plugins/validate", {"document": "---\nnamespace: Test\n---\n"})
+    ]
+    assert json.loads(capsys.readouterr().out) == {"valid": True}

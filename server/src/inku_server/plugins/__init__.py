@@ -17,16 +17,26 @@ from .system.canvas_aspect import (
     canvas_size_for_aspect,
     normalize_canvas_aspect_id,
 )
+from .document_format import (
+    DOCUMENT_PLUGIN_MANAGER,
+    PluginFormatError,
+    parse_plugin_document,
+    validate_plugin_document,
+)
 
 
-def plugin_status_items() -> list[dict[str, str]]:
-    return [
+def plugin_status_items() -> list[dict[str, object]]:
+    system: list[dict[str, object]] = [
         {
             "name": CANVAS_ASPECT_PLUGIN_ID,
+            "namespace": "system",
             "version": "0.1.0",
             "status": "enabled",
+            "entries": [],
+            "reasons": [],
         }
     ]
+    return system + [item.as_dict() for item in DOCUMENT_PLUGIN_MANAGER.items()]
 
 
 __all__ = [
@@ -39,5 +49,9 @@ __all__ = [
     "canvas_aspect_ratio_for_aspect",
     "canvas_size_for_aspect",
     "normalize_canvas_aspect_id",
+    "DOCUMENT_PLUGIN_MANAGER",
+    "PluginFormatError",
+    "parse_plugin_document",
     "plugin_status_items",
+    "validate_plugin_document",
 ]

@@ -1243,7 +1243,28 @@ def _build_system_prompt(
     else:
         prefix = SYSTEM_PROMPT_PREFIX
     section_header = "# Examples\n\n" if lang == "en" else "# 変換例\n\n"
-    return prefix + "\n\n" + section_header + examples
+    from .plugins import DOCUMENT_PLUGIN_MANAGER
+
+    vocabulary = DOCUMENT_PLUGIN_MANAGER.prompt_vocabulary(lang)
+    plugin_section = ""
+    if vocabulary:
+        terms = ", ".join(vocabulary)
+        if lang == "en":
+            plugin_section = (
+                "\n\n# Loaded plugin vocabulary\n"
+                f"{terms}\n"
+                "Use a qualified plugin term only for an explicit qualified name or when a listed "
+                "trigger is the stated subject. Do not infer it from metaphors or unknown objects. "
+                "Do not invent plugin terms."
+            )
+        else:
+            plugin_section = (
+                "\n\n# ロード済みプラグイン語彙\n"
+                f"{terms}\n"
+                "名前空間付き語が明示された場合、または列挙された発火語が指示対象として明示された"
+                "場合だけ名前空間付き語へ解決する。比喩や未知対象から推測せず、プラグイン語を創作しない。"
+            )
+    return prefix + plugin_section + "\n\n" + section_header + examples
 
 
 def _get_provider(model: str) -> str:

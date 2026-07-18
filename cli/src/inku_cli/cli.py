@@ -2770,7 +2770,6 @@ def command_history_export(args: argparse.Namespace) -> int:
 
 
 def command_lineage(args: argparse.Namespace) -> int:
-    import uuid
     config = load_config()
     client = ApiClient(
         args.base_url or config.base_url,
@@ -3267,6 +3266,28 @@ def command_api(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_plugin(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.plugin_action == "list":
+        data, _ = client.request("GET", "/api/plugins")
+    elif args.plugin_action == "validate":
+        path = Path(args.file)
+        try:
+            document = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise CliError(f"cannot read plugin document: {exc}") from exc
+        data, _ = client.request("POST", "/api/plugins/validate", data={"document": document})
+    else:
+        data, _ = client.request("POST", "/api/plugins/reload")
+    _print_json(data)
+    return 0
+
+
 def command_version(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -3475,6 +3496,15 @@ def build_parser() -> argparse.ArgumentParser:
     api_command.add_argument("--no-auth", action="store_true", help="omit the stored session for public endpoints")
     api_command.add_argument("--output", "-o", help="write the raw response body to a file")
     api_command.set_defaults(func=command_api)
+
+    plugin_cmd = subparsers.add_parser("plugin", help="inspect and reload declarative DDL plugins")
+    _add_common_server_args(plugin_cmd)
+    plugin_sub = plugin_cmd.add_subparsers(dest="plugin_action", required=True)
+    plugin_sub.add_parser("list", help="list loaded and rejected plugin documents")
+    plugin_validate = plugin_sub.add_parser("validate", help="validate one local plugin document on the server")
+    plugin_validate.add_argument("file", help="UTF-8 .inku-plugin.md file")
+    plugin_sub.add_parser("reload", help="reload the server plugin directory without restart")
+    plugin_cmd.set_defaults(func=command_plugin)
 
     version_cmd = subparsers.add_parser("version", help="show CLI and server version/build information")
     _add_common_server_args(version_cmd)

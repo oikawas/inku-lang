@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.90.0 / Build 587**
+**Target version: v1.90.0 / Build 589**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -30,7 +30,8 @@ A full specification read is appropriate for first-time onboarding, design-philo
 ```text
 instruction
   -> Stage 1: interpretation
-  -> normalized DDL
+  -> normalized DDL (which may contain namespaced plugin words)
+  -> declarative plugin expansion: deterministic writing-down to core DDL
   -> Stage 1.5: deterministic expansion and relation assignment
   -> Stage 2: JSON Score
   -> coerce / validation: boundary handling with a drop-only preference
@@ -56,7 +57,7 @@ instruction
 - Keep `dh1` description identity, `rh2` work-edition identity, history IDs, and lineage node IDs distinct.
 - Lineage records explicit derivation operations only. Never infer parentage from similarity, time, or matching hashes.
 - Metrics, similarity, and vision reviews are diagnostic mirrors, not generation gates or automatic best-branch selectors.
-- Plugins are normally namespaced macros over core vocabulary. They do not redefine core syntax or existing words.
+- Plugins are validated declarative documents, expanded to core DDL immediately after Stage 1. Stage 1.5, coerce, Score, replay, and rh2 do not depend on plugin content.
 - Japanese and English behavior must stay aligned. Do not introduce English-only requirements.
 
 ## Current Product State
@@ -71,7 +72,7 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-The latest v1.90.0 / Build 586 change formalizes `touching` as the fifth relation word. With `contact: both_ends`, it applies only between lines and arcs and pins the current instruction to the previous instruction’s performed endpoints. Arcs are reconstructed as minor arcs from those endpoints and their sagitta, bulging opposite a previous arc by default. Minor-arc winding shares the SVG renderer convention, while variation and stroke performance keep endpoints fixed. Stage 1 and Stage 2 may select touching only from explicit contact phrases. Closed forms and endpointless targets are drop-only with a recorded warning; degenerate performed geometry is also drop-only. No repair or governor is added. `continuing` remains deferred. Build 587 unifies every relation on endpoints and outlines in canvas coordinates after composing rotation and other drawing transforms; SVG regression checks use only those transform-composed coordinates.
+In v1.90.0, Build 586 formalized `touching`, Build 587 unified relation geometry in transform-composed canvas coordinates, and Build 588 removed duplicate touching assignment. Build 589 adds validated `.inku-plugin.md` documents and a deterministic expansion layer immediately after Stage 1. Explicit qualified terms and `fires_on` nouns that are stated subjects may fire; metaphors and unknown objects may not. Validation rejects recursion, expansion beyond 48 instructions, fixed-coordinate repetition, external references, and namespace collisions. Provenance is ordinary history metadata, while Score, canonical artwork data, rh2, and replay remain independent of plugin documents.
 
 ## Where to Look for a Change
 

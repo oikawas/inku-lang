@@ -132,7 +132,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 
 Only physical, observable words belong to the core. Emotional evaluation — "beautifully," "delicately," "boldly" — is excluded, because evaluation belongs to the viewer, not the writer.
 
-Outside the core live namespaced **plugin words** such as `Nature.wind` — shorthand that summons the variation of a phenomenon in a single word. Plugins can only expand into core vocabulary; they cannot bring in new shapes or syntax. The core stays small on purpose.
+Outside the core live namespaced **plugin words** such as `Nature.wind`. A plugin is a validated `.inku-plugin.md` document, not code: it names a phenomenon and expands deterministically to core DDL. It cannot add shapes, Score fields, or executable code, and removing it does not change saved replay or rh2. Settings exposes load/rejection status, Saijiki shows qualified words with notes, and `inku-cli plugin list / validate / reload` provides administration.
 
 ---
 
@@ -144,6 +144,8 @@ Outside the core live namespaced **plugin words** such as `Nature.wind` — shor
       ▼
 ┌──────────────────────────────────────┐
 │ Stage 1   Interpretation (LLM)       │ free words → normalized DDL, core vocabulary only
+├──────────────────────────────────────┤
+│ Plugin   Declarative expansion (det.) │ namespaced words → core-only normalized DDL
 ├──────────────────────────────────────┤
 │ Stage 1.5 Intermediate filter (det.) │ selects composition family and focus, attaches relations
 ├──────────────────────────────────────┤

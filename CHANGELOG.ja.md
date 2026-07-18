@@ -2328,3 +2328,8 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - 出力SVGから閉性、尖り30°以上、劣弧180°未満、矢高、同seed再現、Replay差を200 seedで検査する回帰を追加した。素描B系00/01/02/04はlocal-onlyの `cli/bench/leaf/` に置き、一般30入力ではtouching定型句の発火を0件とした。
 - **形式の会計:** 閉じた有機的輪郭を演奏揺らぎと両立させる代わりに、緩い距離関係だけだった「あいだ」へ初めて正確な端点拘束を加えた。Score version、migration、Render Engine metadata、rh2正規payloadは変更しない。
 - **変換後座標の統一（Build 587）:** touching、along、not_touching、cutting、betweenが参照する端点・輪郭を、SVGのrotation等を合成したキャンバス座標へ統一した。SVG検査は祖先groupのtransformを再帰合成し、通常版00/01/02/04と黒rotringのjudge版を分離した。Score schemaとrh2算出仕様は変更していない。
+- **関係付与の重複除去（Build 588）:** Stage 1.5で同一のtouching関係が重複して付与される経路を整理し、既存の接触指定を一度だけ保持するようにした。
+- **宣言的プラグイン文書（Build 589）:** front matter manifest、日英語エントリ、日英展開テンプレートからなる `.inku-plugin.md` のparser／validator／決定的展開層を追加した。再帰、48 instruction超過、反復の固定座標スタンプ、namespace衝突、URL・ファイル参照は文書全体を理由付きで拒否する。
+- 展開順をStage 1→プラグイン展開→コアDDL→Stage 1.5→Stage 2とし、名前空間明示と指示対象として明示された`fires_on`だけを発火させる。Stage 1には語彙リストだけを注入し、比喩・未知対象、Stage 1.5、coerceからの注入を禁止した。
+- 発火provenanceはAPI応答と履歴の派生メタデータへ記録する一方、Score・DB正本・rh2へプラグイン本文や依存を持ち込まない。追加・削除・再読込、拒否理由表示、歳時記note、`inku-cli plugin list / validate / reload`、削除後Replay不変の回帰を追加した。
+- **洗練の会計:** 新primitive、新Scoreフィールド、新coerce、作品governor、コード実行を追加していない。増えたのはコア語彙へのwriting-down境界と監査provenanceであり、起きにくくしたのはプラグイン再帰、スタンプ化、比喩への過剰発火、保存作品のプラグイン依存である。葉プラグイン本体はこの版に含めない。

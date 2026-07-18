@@ -483,32 +483,17 @@ accidental stretching.
 
 ## 8. Plugin Model
 
-Plugins separate the core language from optional extensions.  The first
-reference plugin is `canvas-aspect`, which uses the canvas-size hook. v1.70
-also adds the `Nature` reference vocabulary plugin as a Stage 1.5 macro layer.
+Vocabulary plugins are UTF-8 declarative documents, not executable code. One `.inku-plugin.md` file contains a front-matter manifest and word entries. The manifest requires `namespace`, `name`, semantic `version`, `authors`, `languages`, `license`, and Japanese/English descriptions. Each entry provides namespaced identity, Japanese/English surfaces and `fires_on` nouns, optional bilingual Saijiki notes, and equivalent bilingual expansion templates. Arbitrary code, URLs, and file references are forbidden.
 
-Plugin principles:
+The pipeline order is **Stage 1 output -> plugin expansion -> core-only DDL -> Stage 1.5 -> Stage 2**. Templates may use core normalized DDL plus only three bounded expansion forms: deterministic `N to M` repetition, an `anchor` whose region determines separate member bands, and symbolic `{region: ...}` translation. The same input chooses the same count, member regions, and rotations.
 
-1. Plugins should not rewrite core vocabulary.
-2. Plugins should expose a narrow, explicit option surface.
-3. Plugin state is stored per user in DB-backed plugin storage.
-4. Plugin code should be isolated from the main UI where possible.
-5. Plugin behavior should be documented in [PLUGIN.md](PLUGIN.md).
+The load-time validator rejects the whole document with explicit reasons for missing manifest fields, reserved namespace or qualified-word collisions, recursion or non-core plugin references, more than 48 instructions per word, repeated members stamped at fixed coordinates, and URL/file references. This is syntax validation before execution, not an artwork governor. Runtime closure or budget failure drops the expansion without repair, records a warning, and leaves a normal core approximation.
 
-Plugin implementation is split into system and user directories.  Each plugin
-owns its own directory.  The built-in `canvas-aspect` plugin lives under
-`server/src/inku_server/plugins/system/canvas_aspect/` on the backend and
-`web/src/lib/plugins/system/canvas-aspect/` in the frontend.  User plugin
-directories are reserved for future local or third-party plugin loading.
+An explicit qualified term always fires. Stage 1 may resolve a `fires_on` noun only when it is the stated subject; it must not extend firing to metaphors, unclear subjects, or unknown objects. Only the loaded surface/trigger vocabulary is injected into Stage 1, never template bodies. Stage 1.5 and coerce cannot introduce plugin words. Input-term-to-qualified-term provenance is returned by the API and stored in ordinary derivation metadata, while plugin documents and dependencies remain absent from Score, canonical DB artwork data, and rh2.
 
-The `Nature` reference plugin is intentionally narrow: `Nature.wind`,
-`Nature.undulation`, and `Nature.stillness` expand only when the `Nature.`
-namespace is written explicitly. The expansion is deterministic Stage 1.5 DDL
-text that steers existing Score `variation` and `arrangement`; it does not add
-new primitives, new Score fields, or new repair/coerce rules. v1.70 found that
-this macro-only model is sufficient for the reference implementation, so the
-plugin principles remain unchanged. Saijiki displays these plugin words in a
-separate Nature category.
+`server/plugins/` is signature-checked so add/delete changes appear without a restart; management APIs and `inku-cli plugin list / validate / reload` expose status, rejection reasons, validation, and forced reload. Settings shows loaded/rejected documents, while Saijiki distinguishes qualified plugin words and bilingual notes. Removing a plugin must not change replay SVG or rh2 for a saved work because replay uses the already saved core Score and seeds.
+
+The built-in `canvas-aspect` system plugin remains separate and uses its existing hook and per-user plugin storage. Vocabulary plugin documents do not gain that code-level hook.
 
 ---
 

@@ -6,8 +6,12 @@
 
 	type PluginItem = {
 		name: string;
+		namespace?: string;
 		version: string;
 		status: string;
+		path?: string;
+		reasons?: string[];
+		entries?: Array<{ qualified_name: string; note_ja: string; note_en: string }>;
 	};
 	type SettingsStatus = {
 		database: {
@@ -970,16 +974,23 @@
 			</div>
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsUserPlugins}</div>
-				<div class="user-plugin-skeleton">
-					<div>
-						<div class="system-plugin-title">{t().settingsUserPluginsAddTitle}</div>
-						<div class="system-plugin-desc">{t().settingsUserPluginsAddDescription}</div>
-					</div>
-					<div class="plugin-add">
-						<input placeholder={t().settingsUserPluginPathPlaceholder} disabled />
-						<button class="ghost-btn" disabled>{t().addButton}</button>
-					</div>
-				</div>
+				{#if settingsStatus?.plugins.loaded.filter((plugin) => plugin.namespace !== "system").length}
+					{#each settingsStatus.plugins.loaded.filter((plugin) => plugin.namespace !== "system") as plugin (plugin.path ?? `${plugin.namespace}.${plugin.name}`)}
+						<div class="user-plugin-skeleton">
+							<div>
+								<div class="system-plugin-title-row">
+									<div class="system-plugin-title">{plugin.namespace ? `${plugin.namespace}.${plugin.name}` : plugin.name}</div>
+									<span class="plugin-version-pill">{plugin.version ? `v${plugin.version}` : plugin.status}</span>
+								</div>
+								<div class="system-plugin-desc">{plugin.path ?? ""}</div>
+								{#if plugin.reasons?.length}<div class="db-test-result">{plugin.reasons.join(" / ")}</div>{/if}
+							</div>
+							<span class:plugin-rejected={plugin.status === "rejected"}>{plugin.status}</span>
+						</div>
+					{/each}
+				{:else}
+					<div class="inline-message">{t().settingsPluginsEmpty}</div>
+				{/if}
 			</div>
 			<div class="settings-inline-actions">
 				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReload}</button>

@@ -129,10 +129,20 @@
 		failures: BatchFailure[];
 	};
 
+	type PluginEntry = {
+		qualified_name: string;
+		surface_ja: string[];
+		surface_en: string[];
+		note_ja: string;
+		note_en: string;
+	};
 	type PluginItem = {
 		name: string;
+		namespace?: string;
 		version: string;
 		status: string;
+		entries?: PluginEntry[];
+		reasons?: string[];
 	};
 	type SettingsStatus = {
 		database: {
@@ -582,6 +592,7 @@
 	let settingsStatus = $state<SettingsStatus | null>(null);
 	let settingsStatusError = $state<string | null>(null);
 	let settingsStatusLoading = $state(false);
+	let pluginEntries = $state<PluginEntry[]>([]);
 	let modelSettings = $state<ModelSettings | null>(null);
 	let modelSettingsStatus = $state<string | null>(null);
 	let modelFetchResults = $state<Record<string, { type: 'success' | 'error'; message: string }>>({});
@@ -1525,6 +1536,20 @@
 		}
 	}
 
+	async function loadPluginVocabulary() {
+		try {
+			const response = await apiFetch("/api/plugins", { cache: "no-store" });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			const data = await response.json() as { items: PluginItem[] };
+			pluginEntries = data.items
+				.filter((item) => item.status === "enabled")
+				.flatMap((item) => item.entries ?? []);
+		} catch (error) {
+			pluginEntries = [];
+			console.warn("failed to load plugin vocabulary", error);
+		}
+	}
+
 	async function loadSettingsStatus() {
 		if (!currentUser || currentUser.role !== 'admin') {
 			settingsStatus = null;
@@ -1639,7 +1664,7 @@
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
+			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -1689,7 +1714,7 @@
 			trashTotal = 0;
 			historyManager.clear();
 			loginPassword = '';
-			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadExportTemplates()]);
+			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -5596,6 +5621,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 <SaijikiDrawer
 	open={saijikiOpen}
+	{pluginEntries}
 	bind:activePreview={activeSaijikiPreview}
 	onClose={() => (saijikiOpen = false)}
 	onInsertWord={insertWord}

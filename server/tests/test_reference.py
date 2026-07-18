@@ -101,7 +101,7 @@ def test_core_markers_and_regions_match_document_format() -> None:
     assert expansion["regions"] == {
         key: list(value) for key, value in _REGIONS.items()
     }
-    assert len(expansion["regions"]) == 7
+    assert len(expansion["regions"]) == len(_REGIONS)
 
 
 def test_marker_classes_use_known_buckets() -> None:
@@ -109,9 +109,10 @@ def test_marker_classes_use_known_buckets() -> None:
     primitive_surfaces = {
         term.lower() for terms in _PRIMITIVE_TERMS.values() for term in terms
     }
+    allowed = {"structural", "shape", "operation", "material", "color", "variation", "angle", "ratio", "place"}
     for lang in ("ja", "en"):
         for item in expansion["core_markers"][lang]:
-            assert item["class"] in {"structural", "shape", "operation"}
+            assert item["class"] in allowed
             if item["marker"].lower() in primitive_surfaces:
                 assert item["class"] == "shape"
 

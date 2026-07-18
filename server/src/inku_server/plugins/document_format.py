@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from threading import RLock
 from typing import Iterable
@@ -25,10 +25,22 @@ _TEMPLATE_RE = re.compile(
     r"^###\s+(展開|Expansion)(?:\s*[:(]?\s*(ja|en)\s*\)?)?\s*$",
     re.IGNORECASE,
 )
+# v1.92 で saijiki 導出へ置換: en 反復単位を複数語対応で拡張 (A-5)。多語単位は
+# 単語単位より先に並べる (leaf forms を forms より前に置く)。箇所/spots は anchor
+# 反復 (A-6) 用。単数形は単位保存 (_singular_for_unit)。単位語は reference §3 の
+# repetition_range_regex がそのまま公開する。
 _RANGE_RE = re.compile(
-    r"(?P<low>\d+)\s*(?:[〜～-]|to)\s*(?P<high>\d+)\s*(?P<unit>枚|個|本|marks?|items?|lines?)",
+    r"(?P<low>\d+)\s*(?:[〜～-]|to)\s*(?P<high>\d+)\s*"
+    r"(?P<unit>leaf\ forms?|cloudforms?|forms?|blades?|spots?|arcs?"
+    r"|marks?|items?|lines?|枚|個|本|箇所)",
     re.IGNORECASE,
 )
+# member 定義行 (A-2): `member 名前: 定義` / `member name: definition`
+_MEMBER_RE = re.compile(r"^member\s+(?P<name>.+?)\s*[:：]\s*(?P<definition>.+)$", re.IGNORECASE)
+# コメント行 (v2 delta §3): `注: …` / `note: …`。展開・閉包検査の対象外。
+_COMMENT_RE = re.compile(r"^(?:注|note)\s*[:：]\s*(?P<body>.*)$", re.IGNORECASE)
+# anchor 反復 (A-6) の箇所単位。
+_ANCHOR_SPOT_UNITS = ("箇所", "spot", "spots")
 _FIXED_COORD_RE = re.compile(
     r"(?:\[|\()\s*0?\.\d+\s*,\s*0?\.\d+(?:\s*,\s*0?\.\d+\s*,\s*0?\.\d+)?\s*(?:\]|\))"
 )
@@ -55,7 +67,8 @@ _RESERVED_NAMESPACES = {
     "score",
     "renderer",
 }
-_CORE_MARKERS = {
+# Core grammar markers: structural anchors, shapes, verbs, relations.
+_BASE_CORE_MARKERS = {
     "ja": (
         "anchor",
         "{領域:",
@@ -73,6 +86,8 @@ _CORE_MARKERS = {
         "並べる",
         "散らす",
         "敷き詰める",
+        "描く",
+        "埋める",
         "触れる",
         "沿う",
         "切る",
@@ -96,6 +111,7 @@ _CORE_MARKERS = {
         "arrange",
         "scatter",
         "tile",
+        "fill",
         "touching",
         "along",
         "cutting",
@@ -103,15 +119,95 @@ _CORE_MARKERS = {
         "between",
     ),
 }
+# v1.92 で saijiki 導出へ置換: 歳時記の修飾カテゴリを marker として暫定追加 (A-1)。
+# 語は reference §1 (Stage 1 プロンプトの Saijiki ブロック) を正とする。
+_SAIJIKI_MARKERS = {
+    "material": {
+        "ja": ("髪", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント"),
+        "en": ("hair", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint"),
+    },
+    "color": {
+        "ja": ("白", "黒", "青", "赤", "緑", "灰"),
+        "en": ("white", "black", "blue", "red", "green", "gray"),
+    },
+    "variation": {
+        "ja": ("細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む"),
+        "en": ("fine", "large", "slowly", "quickly", "swaying", "undulating", "trembling", "blurring"),
+    },
+    "angle": {
+        "ja": ("水平", "垂直", "斜め", "右上がり", "右下がり", "回転"),
+        "en": ("horizontal", "vertical", "diagonal", "rising", "falling", "rotated"),
+    },
+    "ratio": {
+        "ja": ("縦長", "横長", "全幅", "半幅", "半円", "上弦", "下弦", "三日月"),
+        "en": ("tall", "wide", "full-width", "half-width", "semicircle", "waxing", "waning", "crescent"),
+    },
+    "place": {
+        "ja": ("上", "下", "中央", "左端", "右端", "上端", "下端", "中心", "隅"),
+        "en": ("top", "bottom", "center", "left-edge", "right-edge", "top-edge", "bottom-edge", "middle", "corner"),
+    },
+}
+
+
+def _merged_core_markers(lang: str) -> tuple[str, ...]:
+    extra = tuple(word for category in _SAIJIKI_MARKERS.values() for word in category[lang])
+    return _BASE_CORE_MARKERS[lang] + extra
+
+
+_CORE_MARKERS = {"ja": _merged_core_markers("ja"), "en": _merged_core_markers("en")}
+# Drawable primitive markers — a repetition line must name one of these or a
+# defined member (A-2), otherwise it references an undefined shape.
+_SHAPE_MARKERS = {
+    "ja": ("線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形"),
+    "en": ("line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform"),
+}
 _REGIONS = {
     "上半分": (0.10, 0.08, 0.90, 0.48),
     "中域": (0.18, 0.24, 0.82, 0.76),
     "下の隅": (0.58, 0.62, 0.92, 0.92),
+    "下端の帯": (0.06, 0.78, 0.94, 0.95),
     "upper half": (0.10, 0.08, 0.90, 0.48),
     "middle": (0.18, 0.24, 0.82, 0.76),
     "middle region": (0.18, 0.24, 0.82, 0.76),
     "lower corner": (0.58, 0.62, 0.92, 0.92),
+    "bottom band": (0.06, 0.78, 0.94, 0.95),
 }
+# Diagonal-band keys (A-3): not a rectangle. Member sub-regions are laid along a
+# descending diagonal at expansion time, so these resolve to a computation, not a
+# fixed region. The bbox bounds the diagonal run.
+_DIAGONAL_REGION_KEYS = frozenset(
+    {
+        "左上から右下への斜めの帯",
+        "diagonal band, upper-left to lower-right",
+    }
+)
+_DIAGONAL_BBOX = (0.10, 0.10, 0.90, 0.92)
+_DEFAULT_REGION = (0.18, 0.24, 0.82, 0.76)
+# Single source for the expansion-layer literals also surfaced by the reference
+# dump. Keep these named so the mirror imports them instead of duplicating values.
+ANCHOR_PREFIX = "anchor "
+# Default fallback singular; unit-preserving singulars come from _singular_for_unit (A-5).
+SINGULAR_MEMBER = {"ja": "一枚", "en": "one mark"}
+METAPHOR_MARKERS = {
+    "ja": ("のよう", "みたい", "比喩"),
+    "en": ("like ", "as if", "metaphor"),
+}
+
+
+def _known_region_keys() -> frozenset[str]:
+    return frozenset(key.lower() for key in _REGIONS) | frozenset(
+        key.lower() for key in _DIAGONAL_REGION_KEYS
+    )
+
+
+def _singular_for_unit(unit: str | None, lang: str) -> str:
+    """Unit-preserving singular for a repetition unit (A-5)."""
+    if not unit:
+        return SINGULAR_MEMBER[lang]
+    if lang == "ja":
+        return "一" + unit
+    base = unit[:-1] if unit.lower().endswith("s") else unit
+    return "one " + base
 
 
 class PluginFormatError(ValueError):
@@ -139,6 +235,8 @@ class PluginEntry:
     fires_on: dict[str, tuple[str, ...]]
     notes: dict[str, str]
     templates: dict[str, tuple[str, ...]]
+    members: dict[str, dict[str, str]] = field(default_factory=dict)
+    comments: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def qualified_name(self, namespace: str) -> str:
         return f"{namespace}.{self.heading}"
@@ -259,11 +357,21 @@ def _build_manifest(values: dict[str, object]) -> PluginManifest:
 def _instruction_budget(lines: tuple[str, ...]) -> int:
     total = 0
     for line in lines:
-        if line.lower().startswith("anchor "):
+        if line.lower().startswith(ANCHOR_PREFIX):
             continue
         match = _RANGE_RE.search(line)
         total += int(match.group("high")) if match else 1
     return total
+
+
+def _check_line_syntax(line: str, heading: str, reasons: list[str]) -> None:
+    if _PLUGIN_REFERENCE_RE.search(line):
+        reasons.append(f"{heading}: plugin references are forbidden in expansion: {line}")
+    if _EXTERNAL_REFERENCE_RE.search(line):
+        reasons.append(f"{heading}: URL and file references are forbidden in expansion: {line}")
+    match = _RANGE_RE.search(line)
+    if match and int(match.group("high")) > 1 and _FIXED_COORD_RE.search(line):
+        reasons.append(f"{heading}: repeated members cannot use fixed coordinates")
 
 
 def _validate_entry(entry: PluginEntry, manifest: PluginManifest) -> list[str]:
@@ -274,6 +382,7 @@ def _validate_entry(entry: PluginEntry, manifest: PluginManifest) -> list[str]:
         if not entry.fires_on.get(lang):
             reasons.append(f"{entry.heading}: fires_on_{lang} is required")
         lines = entry.templates.get(lang)
+        members = entry.members.get(lang, {})
         if not lines:
             reasons.append(f"{entry.heading}: expansion template for {lang} is required")
             continue
@@ -282,19 +391,31 @@ def _validate_entry(entry: PluginEntry, manifest: PluginManifest) -> list[str]:
             reasons.append(
                 f"{entry.heading}: expansion budget {budget} exceeds {MAX_ENTRY_INSTRUCTIONS}"
             )
+        # A-2: member definitions must themselves be core vocabulary.
+        member_markers = tuple(members.keys())
+        for name, definition in members.items():
+            _check_line_syntax(definition, entry.heading, reasons)
+            if not any(marker.lower() in definition.lower() for marker in _CORE_MARKERS[lang]):
+                reasons.append(f"{entry.heading}: member '{name}' definition is outside core vocabulary: {definition}")
         for line in lines:
-            if _PLUGIN_REFERENCE_RE.search(line):
-                reasons.append(f"{entry.heading}: plugin references are forbidden in expansion: {line}")
-            if _EXTERNAL_REFERENCE_RE.search(line):
-                reasons.append(
-                    f"{entry.heading}: URL and file references are forbidden in expansion: {line}"
-                )
-            match = _RANGE_RE.search(line)
-            if match and int(match.group("high")) > 1 and _FIXED_COORD_RE.search(line):
-                reasons.append(f"{entry.heading}: repeated members cannot use fixed coordinates")
+            _check_line_syntax(line, entry.heading, reasons)
             lower = line.lower()
-            if not any(marker.lower() in lower for marker in _CORE_MARKERS[lang]):
+            # A-4: unknown region keys are rejected at load time.
+            key = _region_key_of(line)
+            if key is not None and key.lower() not in _known_region_keys():
+                reasons.append(f"{entry.heading}: unknown region key: {key}")
+            allowed = _CORE_MARKERS[lang] + member_markers
+            if not any(marker.lower() in lower for marker in allowed):
                 reasons.append(f"{entry.heading}: expansion line is outside core vocabulary: {line}")
+            # A-2: a repetition line must name a primitive or a defined member.
+            if _RANGE_RE.search(line) and not line.lower().startswith(ANCHOR_PREFIX):
+                shape_ok = any(m.lower() in lower for m in _SHAPE_MARKERS[lang]) or any(
+                    name.lower() in lower for name in member_markers
+                )
+                if not shape_ok:
+                    reasons.append(
+                        f"{entry.heading}: repetition references an undefined member or non-core shape: {line}"
+                    )
     return reasons
 
 
@@ -305,10 +426,12 @@ def parse_plugin_document(text: str, *, source_path: str | None = None) -> Plugi
     current_heading: str | None = None
     fields: dict[str, str] = {}
     templates: dict[str, list[str]] = {}
+    members: dict[str, dict[str, str]] = {}
+    comments: dict[str, list[str]] = {}
     template_lang: str | None = None
 
     def finish_entry() -> None:
-        nonlocal current_heading, fields, templates, template_lang
+        nonlocal current_heading, fields, templates, members, comments, template_lang
         if current_heading is None:
             return
         entry = PluginEntry(
@@ -323,11 +446,15 @@ def parse_plugin_document(text: str, *, source_path: str | None = None) -> Plugi
             },
             notes={lang: fields.get(f"note_{lang}", "") for lang in ("ja", "en")},
             templates={lang: tuple(lines) for lang, lines in templates.items()},
+            members={lang: dict(defs) for lang, defs in members.items()},
+            comments={lang: tuple(items) for lang, items in comments.items()},
         )
         entries.append(entry)
         current_heading = None
         fields = {}
         templates = {}
+        members = {}
+        comments = {}
         template_lang = None
 
     reasons: list[str] = []
@@ -352,6 +479,16 @@ def parse_plugin_document(text: str, *, source_path: str | None = None) -> Plugi
             reasons.append(f"body line {number}: expected '## 語:' or '## Word:'")
             continue
         if template_lang is not None:
+            member_match = _MEMBER_RE.match(line)
+            if member_match:  # A-2: member definition
+                members.setdefault(template_lang, {})[
+                    member_match.group("name").strip()
+                ] = member_match.group("definition").strip()
+                continue
+            comment_match = _COMMENT_RE.match(line)
+            if comment_match:  # v2 delta §3: comment line, exempt from expansion/closure
+                comments.setdefault(template_lang, []).append(comment_match.group("body").strip())
+                continue
             templates[template_lang].append(line)
             continue
         if ":" not in line:
@@ -383,11 +520,42 @@ def _stable_int(text: str, salt: str) -> int:
     return int.from_bytes(digest[:8], "big")
 
 
-def _region_for_line(line: str, fallback: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
-    match = re.search(r"\{(?:領域|region)\s*:\s*([^}]+)\}", line, re.IGNORECASE)
-    if not match:
-        return fallback
-    return _REGIONS.get(match.group(1).strip().lower(), fallback)
+_REGION_TOKEN_RE = re.compile(r"\{(?:領域|region)\s*:\s*([^}]+)\}", re.IGNORECASE)
+
+
+def _line_has_region(line: str) -> bool:
+    return _REGION_TOKEN_RE.search(line) is not None
+
+
+def _region_key_of(line: str) -> str | None:
+    match = _REGION_TOKEN_RE.search(line)
+    return match.group(1).strip() if match else None
+
+
+def _resolve_region_spec(
+    line: str,
+    fallback: tuple[float, float, float, float] | None,
+    *,
+    warnings: list[str],
+    heading: str,
+) -> tuple[str, tuple[float, float, float, float]]:
+    """Resolve a line's region to ('rect', bbox) or ('diagonal', bbox).
+
+    A-3: diagonal-band keys resolve to a computation, not a rectangle.
+    A-4: an unknown key at runtime records a warning and falls back to the
+    default band (no silent fallback). Load-time rejection is in _validate_entry.
+    """
+    key = _region_key_of(line)
+    if key is None:
+        return ("rect", fallback if fallback is not None else _DEFAULT_REGION)
+    lowered = key.lower()
+    if lowered in {k.lower() for k in _DIAGONAL_REGION_KEYS}:
+        return ("diagonal", _DIAGONAL_BBOX)
+    region = _REGIONS.get(lowered)
+    if region is not None:
+        return ("rect", region)
+    warnings.append(f"{heading}: unknown region key at runtime, using default band: {key}")
+    return ("rect", _DEFAULT_REGION)
 
 
 def _format_region(region: tuple[float, float, float, float], *, lang: str) -> str:
@@ -423,55 +591,191 @@ def _member_regions(
     return result
 
 
-def _expand_entry(entry: PluginEntry, *, lang: str, seed_text: str) -> str:
-    lines = entry.templates[lang]
-    anchor_region = (0.18, 0.24, 0.82, 0.76)
-    expanded: list[str] = []
-    for line in lines:
-        if line.lower().startswith("anchor "):
-            anchor_region = _region_for_line(line, anchor_region)
-            continue
-        line_region = _region_for_line(line, anchor_region)
-        clean = re.sub(
+def _diagonal_member_regions(
+    count: int, seed_text: str
+) -> list[tuple[tuple[float, float, float, float], int]]:
+    """Lay member sub-regions along the descending diagonal (A-3).
+
+    Upper-left to lower-right: x and y both increase along the run, so the band
+    is a diagonal, not a rectangle. Equal spacing plus deterministic jitter.
+    """
+    x0, y0, x1, y1 = _DIAGONAL_BBOX
+    result: list[tuple[tuple[float, float, float, float], int]] = []
+    for index in range(count):
+        fraction = (index + 0.5) / count
+        jitter = ((_stable_int(seed_text, f"diag-{index}") % 2001) / 2000 - 0.5) * 0.08
+        t = min(0.97, max(0.03, fraction + jitter))
+        cx = x0 + (x1 - x0) * t
+        cy = y0 + (y1 - y0) * t
+        half = 0.06
+        member = (
+            max(0.0, cx - half),
+            max(0.0, cy - half),
+            min(1.0, cx + half),
+            min(1.0, cy + half),
+        )
+        rotation = -35 + _stable_int(seed_text, f"diag-rot-{index}") % 71
+        result.append((member, rotation))
+    return result
+
+
+def _anchor_spot_regions(
+    band: tuple[float, float, float, float], count: int, seed_text: str
+) -> list[tuple[float, float, float, float]]:
+    """One vertical strip per anchor spot along the band (A-6).
+
+    Each strip rises from the band upward, so members arranged inside it read as
+    growing from that root. Spots are spread along the band's long axis.
+    """
+    x0, y0, x1, y1 = band
+    top = min(y0, 0.30)
+    result: list[tuple[float, float, float, float]] = []
+    for index in range(count):
+        fraction = (index + 0.5) / max(1, count)
+        jitter = ((_stable_int(seed_text, f"spot-{index}") % 2001) / 2000 - 0.5) * 0.06
+        cx = x0 + (x1 - x0) * min(0.94, max(0.06, fraction + jitter))
+        result.append((max(0.0, cx - 0.13), top, min(1.0, cx + 0.13), y1))
+    return result
+
+
+def _referenced_member(line: str, members: dict[str, str]) -> str | None:
+    """Longest defined member name that appears in the line, if any (A-2)."""
+    hits = [name for name in members if name and name.lower() in line.lower()]
+    return max(hits, key=len) if hits else None
+
+
+def _resolve_count(match: "re.Match[str]", seed_text: str, salt: str) -> int:
+    low, high = int(match.group("low")), int(match.group("high"))
+    if low < 1 or high < low:
+        raise PluginFormatError([f"invalid repetition range: {match.group(0)}"])
+    return low + _stable_int(seed_text, salt) % (high - low + 1)
+
+
+def _member_suffix(region: tuple[float, float, float, float], rotation: int, index: int, *, lang: str) -> str:
+    formatted = _format_region(region, lang=lang)
+    if lang == "ja":
+        return f" {formatted}に置き、回転は{rotation}度。"
+    return f" Place member {index} in {formatted} with rotation {rotation} degrees."
+
+
+def _expand_range_line(
+    line: str,
+    match: "re.Match[str]",
+    kind: str,
+    region: tuple[float, float, float, float],
+    members: dict[str, str],
+    *,
+    lang: str,
+    seed_text: str,
+    salt: str,
+) -> list[str]:
+    count = _resolve_count(match, seed_text, f"count-{salt}")
+    member_name = _referenced_member(line, members)
+    if kind == "diagonal":
+        member_regions = _diagonal_member_regions(count, f"{seed_text}:{salt}")
+    else:
+        member_regions = _member_regions(region, count, f"{seed_text}:{salt}")
+
+    if member_name is not None:
+        # A-2: inline the member definition at each member's region.
+        base = members[member_name].rstrip("。.")
+    else:
+        singular = _singular_for_unit(match.group("unit"), lang)  # A-5 unit-preserving
+        cleaned = re.sub(
             r"\{(?:領域|region)\s*:\s*[^}]+\}",
-            _format_region(line_region, lang=lang),
-            line,
+            _format_region(region, lang=lang),
+            line[: match.start()] + singular + line[match.end() :],
             flags=re.IGNORECASE,
         )
-        match = _RANGE_RE.search(clean)
-        if match is None:
-            expanded.append(clean)
-            continue
-        low, high = int(match.group("low")), int(match.group("high"))
-        if low < 1 or high < low:
-            raise PluginFormatError([f"{entry.heading}: invalid repetition range"])
-        count = low + _stable_int(seed_text, f"count-{entry.heading}") % (high - low + 1)
-        singular = "一枚" if lang == "ja" else "one mark"
-        base = clean[: match.start()] + singular + clean[match.end() :]
-        for index, (member_region, rotation) in enumerate(
-            _member_regions(line_region, count, seed_text), start=1
-        ):
-            suffix = (
-                f" {_format_region(member_region, lang=lang)}に置き、回転は{rotation}度。"
-                if lang == "ja"
-                else f" Place member {index} in {_format_region(member_region, lang=lang)} with rotation {rotation} degrees."
+        base = cleaned.rstrip("。.")
+
+    return [
+        base + _member_suffix(member_region, rotation, index, lang=lang)
+        for index, (member_region, rotation) in enumerate(member_regions, start=1)
+    ]
+
+
+def _expand_entry(
+    entry: PluginEntry, *, lang: str, seed_text: str, warnings: list[str]
+) -> str:
+    lines = entry.templates.get(lang, ())
+    members = entry.members.get(lang, {})
+    anchor_regions: list[tuple[float, float, float, float]] = [_DEFAULT_REGION]
+    expanded: list[str] = []
+    for line_idx, line in enumerate(lines):
+        if line.lower().startswith(ANCHOR_PREFIX):
+            kind, region = _resolve_region_spec(
+                line, _DEFAULT_REGION, warnings=warnings, heading=entry.heading
             )
-            expanded.append(base.rstrip("。.") + suffix)
+            band = region  # diagonal anchors collapse to their bbox as a band
+            match = _RANGE_RE.search(line)
+            if match is not None and match.group("unit").lower() in _ANCHOR_SPOT_UNITS:
+                count = _resolve_count(match, seed_text, f"spots-{entry.heading}-{line_idx}")
+                anchor_regions = _anchor_spot_regions(
+                    band, count, f"{seed_text}:spots:{entry.heading}:{line_idx}"
+                )
+            else:
+                anchor_regions = [band]
+            continue
+
+        match = _RANGE_RE.search(line)
+        if match is None:
+            kind, region = _resolve_region_spec(
+                line, _DEFAULT_REGION, warnings=warnings, heading=entry.heading
+            )
+            cleaned = re.sub(
+                r"\{(?:領域|region)\s*:\s*[^}]+\}",
+                _format_region(region, lang=lang),
+                line,
+                flags=re.IGNORECASE,
+            )
+            expanded.append(cleaned)
+            continue
+
+        if _line_has_region(line):
+            kind, region = _resolve_region_spec(
+                line, _DEFAULT_REGION, warnings=warnings, heading=entry.heading
+            )
+            targets = [(kind, region)]
+        else:
+            # A-6: inherit each anchor spot; one member run per spot.
+            targets = [("rect", spot) for spot in anchor_regions]
+
+        for spot_idx, (kind, region) in enumerate(targets):
+            expanded.extend(
+                _expand_range_line(
+                    line,
+                    match,
+                    kind,
+                    region,
+                    members,
+                    lang=lang,
+                    seed_text=seed_text,
+                    salt=f"{entry.heading}:{line_idx}:{spot_idx}",
+                )
+            )
+
     if _instruction_budget(tuple(expanded)) > MAX_ENTRY_INSTRUCTIONS:
         raise PluginFormatError([f"{entry.heading}: runtime expansion exceeds {MAX_ENTRY_INSTRUCTIONS}"])
     separator = "" if lang == "ja" else " "
     ending = "。" if lang == "ja" else "."
-    return separator.join(line if line.endswith(("。", ".", "!", "?")) else line + ending for line in expanded)
+    return separator.join(part if part.endswith(("。", ".", "!", "?")) else part + ending for part in expanded)
 
 
-def _is_metaphorical(source: str, phrase: str, *, lang: str) -> bool:
-    folded = source.casefold()
-    phrase_folded = phrase.casefold()
-    index = folded.find(phrase_folded)
-    if index < 0:
-        return False
-    window = folded[max(0, index - 16) : index + len(phrase_folded) + 16]
-    markers = ("のよう", "みたい", "比喩") if lang == "ja" else ("like ", "as if", "metaphor")
+def _phrase_positions(source_folded: str, phrase_folded: str) -> list[int]:
+    positions: list[int] = []
+    start = 0
+    while True:
+        index = source_folded.find(phrase_folded, start)
+        if index < 0:
+            return positions
+        positions.append(index)
+        start = index + 1
+
+
+def _is_metaphorical_at(source_folded: str, index: int, length: int, *, lang: str) -> bool:
+    window = source_folded[max(0, index - 16) : index + length + 16]
+    markers = METAPHOR_MARKERS.get(lang, METAPHOR_MARKERS["en"])
     return any(marker in window for marker in markers)
 
 
@@ -495,17 +799,47 @@ def expand_plugin_ddl(
     provenance: list[dict[str, str]] = []
     warnings: list[str] = []
     source = source_text or ""
+    source_folded = source.casefold()
+    result_folded = result.casefold()
+
+    # A-7: gather firing candidates, then keep the longest match at each position.
+    explicit_fires: dict[tuple[int, int], str] = {}
+    phrase_candidates: list[tuple[int, int, int, int, str]] = []
+    entry_index: dict[tuple[int, int], tuple[PluginDocument, PluginEntry, str]] = {}
     for document in documents:
         for entry in document.entries:
             qualified = entry.qualified_name(document.manifest.namespace)
-            explicit = qualified.casefold() in result.casefold() or qualified.casefold() in source.casefold()
-            trigger = qualified if explicit else None
-            if not explicit:
-                for phrase in entry.fires_on.get(lang, ()):
-                    if phrase.casefold() in source.casefold() and not _is_metaphorical(source, phrase, lang=lang):
-                        trigger = phrase
-                        break
-            if trigger is None:
+            key = (id(document), id(entry))
+            entry_index[key] = (document, entry, qualified)
+            if qualified.casefold() in result_folded or qualified.casefold() in source_folded:
+                explicit_fires[key] = qualified
+                continue
+            for phrase in entry.fires_on.get(lang, ()):
+                folded = phrase.casefold()
+                for index in _phrase_positions(source_folded, folded):
+                    if _is_metaphorical_at(source_folded, index, len(folded), lang=lang):
+                        continue
+                    phrase_candidates.append((index, index + len(folded), key[0], key[1], phrase))
+
+    phrase_candidates.sort(key=lambda candidate: (-(candidate[1] - candidate[0]), candidate[0]))
+    accepted_spans: list[tuple[int, int]] = []
+    accepted_trigger: dict[tuple[int, int], str] = {}
+    for start, end, doc_id, entry_id, phrase in phrase_candidates:
+        if any(not (end <= s or start >= e) for s, e in accepted_spans):
+            continue  # overlaps a longer accepted match at the same position
+        accepted_spans.append((start, end))
+        accepted_trigger.setdefault((doc_id, entry_id), phrase)
+
+    for document in documents:
+        for entry in document.entries:
+            key = (id(document), id(entry))
+            qualified = entry.qualified_name(document.manifest.namespace)
+            explicit = key in explicit_fires
+            if explicit:
+                trigger = explicit_fires[key]
+            elif key in accepted_trigger:
+                trigger = accepted_trigger[key]
+            else:
                 continue
             base = _strip_qualified_sentence(result, qualified, lang=lang) if explicit else result
             try:
@@ -513,6 +847,7 @@ def expand_plugin_ddl(
                     entry,
                     lang=lang,
                     seed_text=seed_text or source or result or qualified,
+                    warnings=warnings,
                 )
             except (KeyError, PluginFormatError) as exc:
                 warnings.append(f"{qualified}: expansion dropped: {exc}")

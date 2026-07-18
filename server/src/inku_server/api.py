@@ -28,6 +28,7 @@ from typing import Literal
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
@@ -53,6 +54,7 @@ from .plugins import (
     plugin_status_items,
     validate_plugin_document,
 )
+from .reference import build_reference, render_markdown
 from .renderer import SVG_PROFILES, new_render_seed
 from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware, SlidingWindowRateLimiter
@@ -1616,6 +1618,18 @@ def api_plugins_validate(
 def api_plugins_reload(actor: dict = Depends(_admin_user)) -> dict[str, object]:
     items = DOCUMENT_PLUGIN_MANAGER.reload(force=True)
     return {"items": [item.as_dict() for item in items]}
+
+
+@app.get("/api/reference")
+def api_reference(
+    format: str = Query(default="json", pattern="^(json|md)$"),
+    actor: dict = Depends(_current_user),
+) -> Response:
+    """Machine-generated mirror of implementation tables (read-only)."""
+    reference = build_reference()
+    if format == "md":
+        return Response(content=render_markdown(reference), media_type="text/markdown")
+    return JSONResponse(content=reference)
 
 
 @app.get("/api/settings/status", response_model=SettingsStatusResponse)

@@ -85,6 +85,13 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * **`plugin reload`** — Forces `server/plugins/` to reload without restarting the server.
 * These commands require an administrator session. Keep any plugin test artifacts together under one untracked `cli/out2/<build>-<version>-<benchmark>/` run directory.
 
+### 0.6 `reference`
+
+* **`reference [--md | --json] [-o FILE]`** — Fetches a machine-generated dump of the in-implementation vocabulary and constant tables. Markdown is the default; `--json` returns structured JSON; `-o` writes to a file.
+* The output begins with APP_VERSION / BUILD_NUMBER / git short hash / generation time / the namespace+version of each loaded plugin.
+* It covers eight sections (saijiki, normalized-DDL phrases, expansion layer, Score schema, color resolution, weight properties, performance, verification), all pulled from the implementation modules. It is a mirror that hardcodes no values and connects to no generation, acceptance, or coercion decision.
+* Use it to attach one Markdown page at the start of a design or writing session. It runs on any logged-in session.
+
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * Displays the parent-child derivation tree of the work.

@@ -354,6 +354,12 @@ def _dedupe_instructions(instructions: list[Instruction]) -> list[Instruction]:
     deduped: list[Instruction] = []
     seen: set[str] = set()
     for ins in instructions:
+        # Relations are sequential operations whose result depends on the
+        # preceding performed instruction. Identical payloads at different
+        # positions are therefore not duplicates.
+        if ins.relation is not None:
+            deduped.append(ins)
+            continue
         key = json.dumps(ins.model_dump(by_alias=True, exclude_none=True), sort_keys=True, ensure_ascii=False)
         if key in seen:
             continue
@@ -373,6 +379,9 @@ def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[I
     repaired: list[Instruction] = []
     seen: set[str] = set()
     for ins in instructions:
+        if ins.relation is not None:
+            repaired.append(ins)
+            continue
         key = _dedupe_instruction_key(ins)
         if key in seen:
             continue

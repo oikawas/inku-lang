@@ -206,7 +206,31 @@ def _center_and_tangents(arc: dict[str, object]):
             else (radial[1], -radial[0])
         )
 
-    return center, tangent(start), tangent(end)
+    center_side = (
+        (center[0] - midpoint[0]) * normal[0]
+        + (center[1] - midpoint[1]) * normal[1]
+    )
+    sagitta = radius - offset
+    apex_side = -1.0 if center_side > 0.0 else 1.0
+    apex = (
+        midpoint[0] + normal[0] * sagitta * apex_side,
+        midpoint[1] + normal[1] * sagitta * apex_side,
+    )
+    return center, tangent(start), tangent(end), apex
+
+
+def _signed_distance_to_chord(
+    point: tuple[float, float],
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> float:
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    midpoint = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
+    normal = (-dy / length, dx / length)
+    return (point[0] - midpoint[0]) * normal[0] + (
+        point[1] - midpoint[1]
+    ) * normal[1]
 
 
 def _angle(left: tuple[float, float], right: tuple[float, float]) -> float:
@@ -217,6 +241,32 @@ def _angle(left: tuple[float, float], right: tuple[float, float]) -> float:
     )
     return math.degrees(math.acos(cosine))
 
+
+
+def test_svg_arc_extractor_self_calibrates_overlap_and_opposition() -> None:
+    svg = """<svg xmlns="http://www.w3.org/2000/svg">
+      <g transform="rotate(27,50,50)">
+        <path d="M 20 50 A 40 40 0 0 0 80 50" />
+        <path d="M 20 50 A 40 40 0 0 1 80 50" />
+      </g>
+    </svg>"""
+    first, opposite = _svg_arcs(svg)
+    assert _distance(first["start"], opposite["start"]) == pytest.approx(0.0)
+    assert _distance(first["end"], opposite["end"]) == pytest.approx(0.0)
+
+    _, first_start_tangent, _, first_apex = _center_and_tangents(first)
+    _, opposite_start_tangent, _, opposite_apex = _center_and_tangents(opposite)
+    first_side = _signed_distance_to_chord(
+        first_apex, first["start"], first["end"]
+    )
+    opposite_side = _signed_distance_to_chord(
+        opposite_apex, opposite["start"], opposite["end"]
+    )
+
+    assert first_side * first_side > 0.0
+    assert first_side * opposite_side < 0.0
+    assert _angle(first_start_tangent, first_start_tangent) < 1e-5
+    assert _angle(first_start_tangent, opposite_start_tangent) >= 30.0
 
 def test_touching_schema_is_strict_versioned_and_migration_is_idempotent() -> None:
     legacy = {"instructions": []}
@@ -296,15 +346,23 @@ def test_touching_svg_geometry_and_replay_contract_across_200_seeds() -> None:
         assert _distance(first["start"], second["start"]) <= 2.0
         assert _distance(first["end"], second["end"]) <= 2.0
 
-        first_center, first_start_tangent, first_end_tangent = (
+        first_center, first_start_tangent, first_end_tangent, first_apex = (
             _center_and_tangents(first)
         )
-        second_center, second_start_tangent, second_end_tangent = (
+        second_center, second_start_tangent, second_end_tangent, second_apex = (
             _center_and_tangents(second)
         )
         assert _angle(first_start_tangent, second_start_tangent) >= 30.0
         assert _angle(first_end_tangent, second_end_tangent) >= 30.0
         assert first_center != second_center
+        first_side = _signed_distance_to_chord(
+            first_apex, first["start"], first["end"]
+        )
+        second_side = _signed_distance_to_chord(
+            second_apex, second["start"], second["end"]
+        )
+        # Stage 0.6-0.7: opposing sides reject overlap; cusp rejects a smooth circle.
+        assert first_side * second_side < 0.0
 
         for arc in arcs:
             start = arc["start"]
@@ -344,6 +402,10 @@ def test_touching_svg_geometry_and_replay_contract_across_200_seeds() -> None:
 
 def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
     arcs = _svg_arcs(svg)
+    expected_arc_count = sum(
+        instruction.primitive == "arc" for instruction in score.instructions
+    )
+    assert len(arcs) == expected_arc_count
     arc_by_instruction: dict[int, dict[str, object]] = {}
     arc_index = 0
     for instruction_index, instruction in enumerate(score.instructions):
@@ -362,12 +424,22 @@ def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
         assert _distance(previous["end"], current["end"]) <= 2.0
         assert previous["large"] == current["large"] == 0
 
-        _, previous_start_tangent, previous_end_tangent = _center_and_tangents(
-            previous
+        _, previous_start_tangent, previous_end_tangent, previous_apex = (
+            _center_and_tangents(previous)
         )
-        _, current_start_tangent, current_end_tangent = _center_and_tangents(current)
+        _, current_start_tangent, current_end_tangent, current_apex = (
+            _center_and_tangents(current)
+        )
         assert _angle(previous_start_tangent, current_start_tangent) >= 30.0
         assert _angle(previous_end_tangent, current_end_tangent) >= 30.0
+        previous_side = _signed_distance_to_chord(
+            previous_apex, previous["start"], previous["end"]
+        )
+        current_side = _signed_distance_to_chord(
+            current_apex, current["start"], current["end"]
+        )
+        # Opposing apex sides reject overlap; cusp alone only rejects a smooth circle.
+        assert previous_side * current_side < 0.0
 
         assert instruction.radius is not None
         assert instruction.angle_start is not None
@@ -399,7 +471,9 @@ def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
 )
 def test_leaf_bench_touching_pairs_close_after_all_svg_transforms(name: str) -> None:
     path = Path(__file__).parents[2] / "cli" / "bench" / "leaf" / name
-    score = Score.model_validate_json(path.read_text())
+    original = Score.model_validate_json(path.read_text())
+    score = coerce_score(original)
+    assert len(score.instructions) == len(original.instructions)
     # 00 has no rotation and cannot expose the ancestor-transform regression by itself.
     for seed in range(1, 6):
         _assert_touching_pairs_from_svg(score, render(score, render_seed=seed))

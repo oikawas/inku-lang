@@ -48,6 +48,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 記述者が要素間の関係を明示的に書いた場合に限り、次の固定 previous-object 句へ正規化してよい。
 - 沿う → 「前の線に沿って」
 - 触れない → 「前の形に触れない」
+- 触れる → 「前の線に触れる」または「前の弧に両端で触れる」。入力が接触を明示した時だけ選び、自発的に追加しない
 - 切る → 「前の線を切る」
 - 間に → 「前の二つの間に」
 
@@ -353,6 +354,21 @@ EXAMPLE_POOL: list[dict] = [
         "keywords": ["100", "200", "500", "1000", "百", "千", "本"],
         "input": "100本の細い線を画面全体に並べる",
         "output": "黒い鉛筆の細い縦線を画面全体に百本散らす。",
+    },
+    {
+        "keywords": ["触れる", "両端", "弧", "葉", "閉じる"],
+        "input": "緑の弧を置き、もう一本を前の弧に両端で触れさせる",
+        "output": "緑の弧を一本置く。緑の弧を前の弧に両端で触れるように置く。",
+    },
+    {
+        "keywords": ["触れる", "線", "接触"],
+        "input": "黒い線に赤い線を触れさせる",
+        "output": "黒い線を一本引く。赤い線を前の線に触れるように置く。",
+    },
+    {
+        "keywords": ["弧", "二本", "離す", "上下"],
+        "input": "緑の弧を二本、上下に離して置く",
+        "output": "緑の弧を二本、上下に離して置く。",
     },
     {
         "keywords": ["沿う", "触れない", "切る", "間", "交差", "そば", "近く"],
@@ -733,6 +749,21 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Scatter one hundred thin vertical black pencil lines across the whole canvas.",
     },
     {
+        "keywords": ["touching", "both ends", "arc", "leaf", "closed"],
+        "input": "Place a green arc and make another touch it at both ends",
+        "output": "Place one green arc. Place another green arc touching the previous arc at both ends.",
+    },
+    {
+        "keywords": ["touching", "line", "contact"],
+        "input": "Make a red line touch a black line",
+        "output": "Draw one black line. Place one red line touching the previous line.",
+    },
+    {
+        "keywords": ["arcs", "two", "separate", "vertical"],
+        "input": "Place two green arcs separated vertically",
+        "output": "Place two green arcs separated vertically.",
+    },
+    {
         "keywords": ["along", "not touching", "cutting", "between", "cross", "near"],
         "input": "Red dots along a black line but not touching it",
         "output": "Draw one thin black pen horizontal line left to right. Place three small red ellipses along the previous line. Not touching the previous shape.",
@@ -881,6 +912,7 @@ Output: **Normalized DDL** — concise English instructions using only Saijiki v
 Only when the author explicitly writes a relationship between elements, normalize it to one of these fixed previous-object phrases:
 - along -> "along the previous line"
 - not touching -> "not touching the previous shape"
+- touching -> "touching the previous line" or "touching the previous arc at both ends". Use only when the source explicitly states contact; never add it spontaneously
 - cutting -> "cutting the previous line"
 - between -> "between the previous two"
 
@@ -1154,11 +1186,20 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
         (
             "along the previous line",
             "not touching the previous shape",
+            "touching the previous line",
+            "touching the previous arc at both ends",
             "cutting the previous line",
             "between the previous two",
         )
         if lang == "en"
-        else ("前の線に沿って", "前の形に触れない", "前の線を切る", "前の二つの間に")
+        else (
+            "前の線に沿って",
+            "前の形に触れない",
+            "前の線に触れる",
+            "前の弧に両端で触れる",
+            "前の線を切る",
+            "前の二つの間に",
+        )
     )
     if not any(
         any(marker in ex["output"] for marker in relation_markers) for _, ex in top

@@ -73,7 +73,8 @@ PresenceIntensity = Literal["low", "medium", "high"]
 PresenceSymmetry = Literal["none", "bilateral", "radial"]
 GazePressure = Literal["none", "low", "medium", "high"]
 ContourDensity = Literal["low", "medium", "high"]
-RelationType = Literal["along", "not_touching", "cutting", "between"]
+RelationType = Literal["along", "not_touching", "cutting", "between", "touching"]
+RelationContact = Literal["both_ends"]
 RelationGap = Literal["narrow", "medium", "wide"]
 InstructionMode = Literal["additive", "carve"]
 CarveDepth = Literal["light", "half", "bright"]
@@ -207,12 +208,24 @@ class Relation(BaseModel):
     """直前 instruction との観察可能な関係。参照先は暗黙 prev のみ。"""
 
     type: RelationType = Field(
-        description="along=沿う / not_touching=触れない / cutting=切る / between=直前2要素の間に",
+        description="along=沿う / not_touching=触れない / cutting=切る / between=直前2要素の間に / touching=触れる",
     )
     gap: RelationGap = Field(
         default="medium",
         description="関係解決時の距離目安: narrow / medium / wide。具体距離は Renderer が解決する",
     )
+    contact: Optional[RelationContact] = Field(
+        default=None,
+        description="touching の接触方法。現段階では both_ends のみ",
+    )
+
+    @model_validator(mode="after")
+    def _validate_contact(self) -> "Relation":
+        if self.type == "touching" and self.contact != "both_ends":
+            raise ValueError("touching relation requires contact=both_ends")
+        if self.type != "touching" and self.contact is not None:
+            raise ValueError("contact is only valid for touching relation")
+        return self
 
 
 class Variation(BaseModel):

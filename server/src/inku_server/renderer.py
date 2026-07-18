@@ -26,9 +26,11 @@ from .schema import (
     SurfaceSpec,
     Variation,
 )
-from .sketch_relations import (
-    sketch_relation_marker,
-    strip_sketch_relation_marker,
+from .arc_geometry import (
+    arc_from_endpoints_and_sagitta,
+    arc_point,
+    arc_svg_flags,
+    minor_arc_delta,
 )
 from .stroke_engine import outline_for_centerline, polygon_path, synthesize_stroke
 
@@ -795,14 +797,8 @@ def _endpoint_geometry(
     ):
         start_angle = math.radians(ins.angle_start)
         end_angle = math.radians(ins.angle_end)
-        start = (
-            ins.center[0] + ins.radius * math.cos(start_angle),
-            ins.center[1] - ins.radius * math.sin(start_angle),
-        )
-        end = (
-            ins.center[0] + ins.radius * math.cos(end_angle),
-            ins.center[1] - ins.radius * math.sin(end_angle),
-        )
+        start = arc_point(ins.center, ins.radius, ins.angle_start)
+        end = arc_point(ins.center, ins.radius, ins.angle_end)
         direction = 1.0 if ins.angle_end > ins.angle_start else -1.0
         start_tangent = (
             -math.sin(start_angle) * direction,
@@ -842,93 +838,89 @@ def _endpoint_geometry(
     return None
 
 
-def _clean_sketch_instruction(ins: Instruction) -> Instruction:
-    data = ins.model_dump(by_alias=True)
-    data.pop("at", None)
-    data.pop("relation", None)
-    data["color_hint"] = strip_sketch_relation_marker(ins.color_hint)
-    return Instruction.model_validate(data)
+def _performed_arc_sagitta(ins: Instruction, seed: int, index: int) -> float | None:
+    if (
+        ins.primitive != "arc"
+        or ins.center is None
+        or ins.radius is None
+        or ins.angle_start is None
+        or ins.angle_end is None
+    ):
+        return None
+    endpoints = _endpoint_geometry(ins, seed, index)
+    if endpoints is None:
+        return None
+    start, end = endpoints[0], endpoints[1]
+    delta = minor_arc_delta(ins.angle_start, ins.angle_end)
+    local_apex = arc_point(
+        ins.center,
+        ins.radius,
+        ins.angle_start + delta / 2.0,
+    )
+    apex = _rotate_screen_point(local_apex, ins.center, ins.rotation or 0.0)
+    chord = (end[0] - start[0], end[1] - start[1])
+    length = math.hypot(*chord)
+    if length <= 1e-12:
+        return None
+    midpoint = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
+    normal = (-chord[1] / length, chord[0] / length)
+    return (apex[0] - midpoint[0]) * normal[0] + (
+        apex[1] - midpoint[1]
+    ) * normal[1]
 
 
-def _resolve_sketch_relation(
+def _resolve_touching_relation(
     ins: Instruction,
     previous: list[Instruction],
     seed: int,
     index: int,
-    marker: str,
 ) -> Instruction:
-    """Resolve the disposable leaf-sketch relations, or drop them unchanged."""
-    clean = _clean_sketch_instruction(ins)
-    if ins.primitive != "arc" or not previous:
+    clean = _strip_performance_fields(ins)
+    if ins.primitive not in {"line", "arc"} or not previous:
         return clean
-    own = _endpoint_geometry(ins, seed, index)
-    prior = _endpoint_geometry(previous[-1], seed, index - 1)
-    if own is None or prior is None or ins.center is None or ins.radius is None:
+    prior = previous[-1]
+    if prior.primitive not in {"line", "arc"}:
         return clean
-
-    own_start, own_end, own_start_tangent, _ = own
-    prior_start, prior_end, _, prior_end_tangent = prior
+    prior_geometry = _endpoint_geometry(prior, seed, index - 1)
+    if prior_geometry is None:
+        return clean
+    start, end = prior_geometry[0], prior_geometry[1]
     data = clean.model_dump(by_alias=True)
+    data["rotation"] = None
 
-    if marker == "touching":
-        own_chord = (own_end[0] - own_start[0], own_end[1] - own_start[1])
-        prior_chord = (
-            prior_end[0] - prior_start[0],
-            prior_end[1] - prior_start[1],
-        )
-        own_length = math.hypot(*own_chord)
-        prior_length = math.hypot(*prior_chord)
-        if own_length < 1e-9 or prior_length < 1e-9:
-            return clean
-        scale = prior_length / own_length
-        delta = math.degrees(
-            math.atan2(prior_chord[1], prior_chord[0])
-            - math.atan2(own_chord[1], own_chord[0])
-        )
-        center_offset = (
-            ins.center[0] - own_start[0],
-            ins.center[1] - own_start[1],
-        )
-        rotated = _rotate_screen_vector(center_offset, delta)
-        data["center"] = [
-            prior_start[0] + rotated[0] * scale,
-            prior_start[1] + rotated[1] * scale,
-        ]
-        data["radius"] = ins.radius * scale
-        data["rotation"] = (ins.rotation or 0.0) + delta
+    if ins.primitive == "line":
+        data["from"] = list(start)
+        data["to"] = list(end)
         return Instruction.model_validate(data)
 
-    if marker == "continuing":
-        if math.hypot(*own_start_tangent) < 1e-9 or math.hypot(*prior_end_tangent) < 1e-9:
+    own_sagitta = _performed_arc_sagitta(ins, seed, index)
+    if own_sagitta is None or abs(own_sagitta) <= 1e-12:
+        return clean
+    sagitta = own_sagitta
+    if prior.primitive == "arc":
+        prior_sagitta = _performed_arc_sagitta(prior, seed, index - 1)
+        if prior_sagitta is None or abs(prior_sagitta) <= 1e-12:
             return clean
-        delta = math.degrees(
-            math.atan2(prior_end_tangent[1], prior_end_tangent[0])
-            - math.atan2(own_start_tangent[1], own_start_tangent[0])
-        )
-        center_offset = (
-            ins.center[0] - own_start[0],
-            ins.center[1] - own_start[1],
-        )
-        rotated = _rotate_screen_vector(center_offset, delta)
-        data["center"] = [
-            prior_end[0] + rotated[0],
-            prior_end[1] + rotated[1],
-        ]
-        data["rotation"] = (ins.rotation or 0.0) + delta
-        return Instruction.model_validate(data)
-
-    return clean
+        sagitta = -math.copysign(abs(own_sagitta), prior_sagitta)
+    try:
+        geometry = arc_from_endpoints_and_sagitta(start, end, sagitta)
+    except ValueError:
+        return clean
+    data["center"] = list(geometry.center)
+    data["radius"] = geometry.radius
+    data["angle_start"] = geometry.angle_start
+    data["angle_end"] = geometry.angle_end
+    return Instruction.model_validate(data)
 
 
 def _resolve_relation(
     ins: Instruction, previous: list[Instruction], seed: int, index: int
 ) -> Instruction:
-    marker = sketch_relation_marker(ins.color_hint)
-    if marker is not None:
-        return _resolve_sketch_relation(ins, previous, seed, index, marker)
     rel = ins.relation
     if rel is None:
         return _strip_performance_fields(ins)
+    if rel.type == "touching":
+        return _resolve_touching_relation(ins, previous, seed, index)
     if rel.type == "between" and len(previous) < 2:
         return _strip_performance_fields(ins)
     if rel.type != "between" and not previous:
@@ -2826,9 +2818,7 @@ def _arc_path_d(
     x2 = cx + r * math.cos(ea)
     y2 = cy - r * math.sin(ea)
 
-    delta = end_deg - start_deg
-    large_arc = 1 if abs(delta) > 180 else 0
-    sweep = 0 if end_deg > start_deg else 1  # math CCW → SVG 反時計回り (y 反転後)
+    large_arc, sweep = arc_svg_flags(start_deg, end_deg)
 
     return (
         f"M {x1:.3f} {y1:.3f} A {r:.3f} {r:.3f} 0 {large_arc} {sweep} {x2:.3f} {y2:.3f}"

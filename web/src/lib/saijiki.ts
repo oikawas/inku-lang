@@ -78,7 +78,7 @@ export const SAIJIKI: SaijikiCategory[] = [
 		key: 'aida',
 		label: 'あいだ',
 		en: 'relations',
-		words: ['沿う', '触れない', '切る', '間に']
+		words: ['沿う', '触れない', '切る', '間に', '触れる']
 	},
 	{
 		key: 'wariai',

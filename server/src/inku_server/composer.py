@@ -151,14 +151,16 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 - **「前の線に沿って」/ "along the previous line" → relation={"type":"along","gap":"narrow"}**
 - **「前の形に触れない」/ "not touching the previous shape" → relation={"type":"not_touching","gap":"narrow"}。広く触れないなら gap="wide"**
+- **「前の線に触れる」「前の弧に両端で触れる」/ "touching the previous line", "touching the previous arc at both ends" → relation={"type":"touching","contact":"both_ends"}。接触を明示した時だけ使い、自発付与しない**
 - **「前の線を切る」/ "cutting the previous line" → relation={"type":"cutting","gap":"medium"}**
 - **「前の二つの間に」/ "between the previous two" → relation={"type":"between","gap":"medium"}**
 - relation は正規化DDL に上記の定型句が**完全な関係指定として**文字どおりある時だけ転記する。relation を推測で追加しない。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「触れていない」「近く/遠く」は relation ではない。先頭 instruction には relation を付けない。
 - **普通の配置語を relation にしない。** 「斜めの帯に沿って」「揺れる軌跡に沿って」「川沿い」「道沿い」「along a diagonal band」「along an undulating trace」「along a path/edge/road/river」は arrangement/path/position で表し、relation は付けない。
 - relation を付ける直前に、直前の JSON instruction が輪郭を持つ参照先であることを確認する。line は `from`+`to`、circle/arc/polygon は `center`+`radius`、ellipse は `center`+`size`、square/triangle は `position`+`size` がそろう時だけ有効。
+- `touching` は現在と直前がともに line / arc の時だけ使う。閉形や端点のない要素には付けない。
 - relation は必ず「既に出力済みの輪郭 instruction」だけを参照する。background、filled 面、presence、fade だけの補助層、色補修用の小要素、arrangement だけの密度層は relation の参照先にしない。
 - **between は直前2つの JSON instruction がどちらも輪郭を持つ時だけ使う。直前が1つしかない、または直前/前々が補助層なら relation を省略する。**
-- 「前の線に沿って」「前の形に触れない」「前の線を切る」を1つの instruction にまとめない。定型句が複数あっても、出力順に成立するものだけを最大1つ付ける。
+- 「前の線に沿って」「前の形に触れない」「前の線に触れる」「前の弧に両端で触れる」「前の線を切る」を1つの instruction にまとめない。定型句が複数あっても、出力順に成立するものだけを最大1つ付ける。
 - 定型句 1 つにつき relation は最大 1 つ。同じ定型句を複数 instruction に複製しない。
 - 少しでも順序・参照先・定型句一致に迷う場合は、relation フィールドを省略する。fable/自然文を抽象化した DDL では、原則 relation を使わない。省略しても、位置・path・rotation・余白で関係を表せばよい。補助 instruction を追加して救わない。
 
@@ -281,6 +283,15 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 柔らかな光と沈丁花の香りの中で、桜の蕾が開花を待つ。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.48,0.20],"size":[0.42,0.12],"color":"white","filled":true,"color_hint":"柔らかな光","arrangement":{"count":3,"layout":"horizontal","density":"low","fade":"outward","preserve_space":true,"margin":0.24},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}},{"primitive":"ellipse","center":[0.56,0.55],"size":[0.045,0.022],"color":"green","rotation":-18,"color_hint":"沈丁花の香り","arrangement":{"count":7,"layout":"scatter","path":"wave","density":"low","fade":"directional","preserve_space":true,"margin":0.24}},{"primitive":"ellipse","center":[0.70,0.62],"size":[0.055,0.026],"color":"red","rotation":-30,"color_hint":"開花を待つ蕾","arrangement":{"count":5,"layout":"scatter","path":"diagonal","margin":0.18}}]}
 
+
+入力: 緑の弧を一本置く。もう一本の弧を前の弧に両端で触れるように置く。
+出力: {"instructions":[{"primitive":"arc","center":[0.50,0.47],"radius":0.0833,"angle_start":-143.13,"angle_end":-36.87,"color":"green"},{"primitive":"arc","center":[0.50,0.53],"radius":0.0833,"angle_start":143.13,"angle_end":36.87,"color":"green","relation":{"type":"touching","contact":"both_ends"}}]}
+
+入力: 黒い線を一本引く。赤い線を前の線に触れるように置く。
+出力: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching","contact":"both_ends"}}]}
+
+入力: 緑の弧を二本、上下に離して置く。
+出力: {"instructions":[{"primitive":"arc","center":[0.50,0.38],"radius":0.10,"angle_start":200,"angle_end":340,"color":"green"},{"primitive":"arc","center":[0.50,0.62],"radius":0.10,"angle_start":20,"angle_end":160,"color":"green"}]}
 
 入力: 黒い横線を一本引く。赤い小さな楕円を前の線に沿って三つ置く。
 出力: {"instructions":[{"primitive":"line","from":[0.12,0.5],"to":[0.88,0.5],"color":"black"},{"primitive":"ellipse","center":[0.5,0.5],"size":[0.04,0.02],"color":"red","arrangement":{"count":3,"layout":"horizontal"},"relation":{"type":"along","gap":"narrow"}}]}
@@ -499,14 +510,16 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 - **"along the previous line" -> relation={"type":"along","gap":"narrow"}**
 - **"not touching the previous shape" -> relation={"type":"not_touching","gap":"narrow"}. Use gap="wide" for wide separation**
+- **"touching the previous line" / "touching the previous arc at both ends" -> relation={"type":"touching","contact":"both_ends"}. Use only for explicit contact language; never add it spontaneously**
 - **"cutting the previous line" -> relation={"type":"cutting","gap":"medium"}**
 - **"between the previous two" -> relation={"type":"between","gap":"medium"}**
 - Copy relation only when the normalized DDL literally contains one of these fixed phrases as an explicit previous-object relation. Do not infer relations. Natural-language-derived phrases such as "around", "same beat", "ahead/behind", "not touched", "near", or "far" are not relations. Do not attach relation to the first instruction.
 - **Do not turn ordinary placement language into relation.** Phrases such as "along a diagonal band", "along an undulating trace", "along a path/edge/road/river", "riverbank", or "roadside" are arrangement/path/position, not relation.
 - Before writing relation, verify that the immediately previous JSON instruction has an outline target: line has `from`+`to`, circle/arc/polygon has `center`+`radius`, ellipse has `center`+`size`, and square/triangle has `position`+`size`.
+- Use `touching` only when both the current and immediately previous instruction are a line or arc. Never attach it to a closed or endpointless form.
 - Relations may refer only to already emitted drawable outline instructions. Do not use background, filled planes, presence, fade-only support layers, small color-repair marks, or arrangement-only density layers as relation targets.
 - **Use between only when the previous two JSON instructions both have outlines. If only one previous drawable exists, or if either previous item is a support layer, omit the relation.**
-- Do not combine "along", "not touching", and "cutting" on one instruction. If several fixed phrases appear, keep only the one that is valid in output order.
+- Do not combine "along", "not touching", "touching", and "cutting" on one instruction. If several fixed phrases appear, keep only the one that is valid in output order.
 - Generate at most one relation per fixed relation phrase. Do not replicate the same relation phrase into multiple instructions.
 - If there is any doubt about order, target validity, or exact fixed-phrase match, omit the relation field. For fable/natural-language-derived DDL, use no relation by default. Express the relationship with position, path, rotation, and spacing instead; do not add a support instruction to rescue it.
 
@@ -596,6 +609,15 @@ Output: {"instructions":[{"primitive":"line","from":[0.5,0.2],"to":[0.5,0.8],"co
 Input: Line up seven short blue fine-brush lines left to right as syncopated city rhythm. Swaying slowly.
 Output: {"instructions":[{"primitive":"line","from":[0.47,0.5],"to":[0.53,0.5],"color":"blue","weight":"brush_thin","arrangement":{"count":7,"layout":"horizontal","rhythm_spacing":"syncopated"},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
+
+Input: Place one green arc. Place another arc touching the previous arc at both ends.
+Output: {"instructions":[{"primitive":"arc","center":[0.50,0.47],"radius":0.0833,"angle_start":-143.13,"angle_end":-36.87,"color":"green"},{"primitive":"arc","center":[0.50,0.53],"radius":0.0833,"angle_start":143.13,"angle_end":36.87,"color":"green","relation":{"type":"touching","contact":"both_ends"}}]}
+
+Input: Draw one black line. Place a red line touching the previous line.
+Output: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching","contact":"both_ends"}}]}
+
+Input: Place two green arcs separated vertically.
+Output: {"instructions":[{"primitive":"arc","center":[0.50,0.38],"radius":0.10,"angle_start":200,"angle_end":340,"color":"green"},{"primitive":"arc","center":[0.50,0.62],"radius":0.10,"angle_start":20,"angle_end":160,"color":"green"}]}
 
 Input: Draw one black horizontal line. Place three small red ellipses along the previous line.
 Output: {"instructions":[{"primitive":"line","from":[0.12,0.5],"to":[0.88,0.5],"color":"black"},{"primitive":"ellipse","center":[0.5,0.5],"size":[0.04,0.02],"color":"red","arrangement":{"count":3,"layout":"horizontal"},"relation":{"type":"along","gap":"narrow"}}]}
@@ -826,6 +848,12 @@ _COLOR_TERMS = {
 _RELATION_LITERAL_MARKERS = {
     "along": ("前の線に沿って", "along the previous line"),
     "not_touching": ("前の形に触れない", "not touching the previous shape"),
+    "touching": (
+        "前の線に触れる",
+        "前の弧に両端で触れる",
+        "touching the previous line",
+        "touching the previous arc at both ends",
+    ),
     "cutting": ("前の線を切る", "cutting the previous line"),
     "between": ("前の二つの間に", "between the previous two"),
 }
@@ -997,9 +1025,22 @@ def _enforce_relation_literal_gate(score: Score, ddl: str) -> Score:
                     score.instructions[index - 2]
                 ):
                     continue
+                if relation_type == "touching" and (
+                    score.instructions[index].primitive not in {"line", "arc"}
+                    or score.instructions[index - 1].primitive not in {"line", "arc"}
+                ):
+                    continue
                 instructions[index]["relation"] = {
                     "type": relation_type,
-                    "gap": "medium" if relation_type in {"cutting", "between"} else "narrow",
+                    **(
+                        {"contact": "both_ends"}
+                        if relation_type == "touching"
+                        else {
+                            "gap": "medium"
+                            if relation_type in {"cutting", "between"}
+                            else "narrow"
+                        }
+                    ),
                 }
                 changed = True
                 break

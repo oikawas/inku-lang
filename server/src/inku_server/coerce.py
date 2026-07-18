@@ -3890,6 +3890,9 @@ def _drop_invalid_relations(instructions: list[Instruction]) -> list[Instruction
         invalid = index == 0 or not result or not _has_relation_contour(result[-1])
         if relation.type == "between":
             invalid = invalid or len(result) < 2 or not _has_relation_contour(result[-2])
+        elif relation.type == "touching":
+            invalid = invalid or ins.primitive not in {"line", "arc"}
+            invalid = invalid or result[-1].primitive not in {"line", "arc"}
         if invalid:
             data = ins.model_dump(by_alias=True)
             data.pop("relation", None)

@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.89.1**
+**Version: v1.90.0**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -305,7 +305,7 @@ Current core categories include:
 | touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, burin, drypoint |
 | line continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | motion | うごき | place, align, scatter, fill, tile, tremble, undulate |
-| relations | あいだ | along, not touching, cutting, between, with examples such as `along the previous line` |
+| relations | あいだ | along, not touching, cutting, between, touching, with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
 | place | ばしょ | top, bottom, edge, corner, near, across |
 | angle | かたむき | horizontal, vertical, diagonal, rotated |
 | proportion | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
@@ -384,7 +384,7 @@ Important score concepts:
 - `rotation`: shape-level or group-level orientation
 - `color_hint`: optional hint used when resolving catalog colors
 - `at.region`: optional normalized placement region `[x0,y0,x1,y1]` resolved by the renderer seed
-- `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, or `between`
+- `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, `between`, or `touching`; touching currently requires `contact: both_ends`
 
 Large repetitions should prefer group behavior over literal overload.  Dense
 clusters use `arrangement.density`, `cluster_count`, `fade`, and
@@ -399,10 +399,11 @@ Current scene-tone palette behavior uses abstract colors only:
 Nuance that cannot be represented by the six abstract colors is retained in
 `color_hint` for catalog-based rendering.
 
-Relations are sequential.  `along`, `not_touching`, and `cutting` refer to the
-immediately previous instruction; `between` refers to the previous two.  There
-are no arbitrary ids, forward references, or repair governors for relations.
-Invalid relations are dropped silently by validation or coercion, and the instruction is rendered as an ordinary instruction.  The coerce layer may remove invalid relations but must not add new ones.  As of the v1.52 closure, JSON Score `relation` is reserved for explicit previous-object phrases in normalized DDL: `前の線に沿って` / `along the previous line`, `前の形に触れない` / `not touching the previous shape`, `前の線を切る` / `cutting the previous line`, and `前の二つの間に` / `between the previous two`. Natural-language proximity, rhythm, ahead/behind, near, and far are represented with position, path, rotation, and spacing instead of relation.
+Relations are sequential. `along`, `not_touching`, `cutting`, and `touching` refer to the immediately previous instruction; `between` refers to the previous two. There are no arbitrary ids, forward references, or repair governors for relations. Invalid relations are dropped by validation or coercion with a recorded warning, and the instruction is rendered normally without the relation. The coerce layer may remove invalid relations but must not add new ones. JSON Score `relation` is reserved for explicit previous-object phrases in normalized DDL: `前の線に沿って` / `along the previous line`, `前の形に触れない` / `not touching the previous shape`, `前の線を切る` / `cutting the previous line`, `前の二つの間に` / `between the previous two`, and the explicit contact phrases `前の線に触れる` / `touching the previous line` or `前の弧に両端で触れる` / `touching the previous arc at both ends`. Touching is never added spontaneously. Natural-language proximity, rhythm, ahead/behind, near, and far are represented with position, path, rotation, and spacing instead of relation.
+
+For `touching` with `contact: both_ends`, both the current and previous instruction must be a line or arc. The renderer takes the previous instruction’s performed endpoints and pins the current endpoints to them. For an arc with chord length `c` and signed performed sagitta `b`, it reconstructs the minor arc with `r=c²/(8|b|)+|b|/2`; its center lies opposite the bulge, and a previous arc makes the new arc bulge to the opposite side by default. Minor-arc winding uses the same shared convention as SVG arc rendering. Variation and stroke performance keep both endpoints fixed and act only on the interior. Closed forms and endpointless targets are rejected drop-only with a recorded warning. Degenerate performed geometry also drops the relation at render time; no coordinate repair or governor is introduced.
+
+This fifth relation trades the former uniform family of loose distance constraints for one exact endpoint constraint. In return, it can write closed organic contours such as a two-arc leaf without freezing performed coordinates into the Score. The deferred `continuing` candidate remains outside this version; it is reconsidered only after cloudform surface/ground expression improves.
 
 The system treats the DB history record as the source of truth.  SVG, JSON
 files, PNG files, and other artifacts are derived outputs.

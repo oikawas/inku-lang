@@ -54,7 +54,6 @@ from .renderer import SVG_PROFILES, new_render_seed
 from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware, SlidingWindowRateLimiter
 from .schema import CanvasSpec, Score
-from .sketch_relations import prepare_sketch_score_payload
 from .model_settings import (
     connection_for,
     model_provider_catalog,
@@ -417,9 +416,7 @@ def _render_score_svg(
     svg_profile: str | None = None,
     render_seed: int | None = None,
 ) -> str:
-    score = coerce_score(
-        Score.model_validate(prepare_sketch_score_payload(score_payload))
-    )
+    score = coerce_score(Score.model_validate(score_payload))
     canvas = _validated_canvas_aspect_override(canvas_aspect)
     if canvas is not None:
         score = _score_with_canvas(score, canvas)

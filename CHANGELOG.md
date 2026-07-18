@@ -116,3 +116,12 @@ This file records changes chronologically. If a historical note conflicts with t
 - The CLI refinement ledger records cloudform instruction count, expanded count, sample rate, and contexts as a diagnostic mirror only. It does not create a governor, floor, or quality gate.
 - **Refinement accounting:** This version removes no existing feature. It adds no dedicated modifier vocabulary or contour templates and relies only on existing vocabulary composition. The strict boundary makes unknown objects collapsing into cloudform, contours becoming fixed score data, and geometry safety expanding into aesthetic automation less likely.
 - **Author acceptance:** Visual review of eight Japanese and eight English cases plus repeated performances of the same score found no broken drawing within the cloudform image. More radical contour variation is reserved for separate tuning without changing this version’s geometry safety or selection boundary.
+
+
+### v1.90.0 — Touching Relation (2026-07-18)
+
+- **Formal contact relation (Build 586):** Added `touching` as the fifth relation word with `contact: both_ends` for line/arc endpoint coincidence. Japanese and English Stage 1, Stage 2, and Saijiki select it only from explicit fixed contact phrases; it is never spontaneous.
+- The renderer uses the previous instruction’s performed endpoints and reconstructs a minor arc from signed sagitta with `r=c²/(8|b|)+|b|/2`. A new arc bulges opposite a previous arc by default, minor-arc winding shares the SVG rendering implementation, and variation and stroke performance pin endpoints.
+- Closed forms and endpointless targets are drop-only with a recorded warning; degenerate performed geometry is also drop-only. No coordinate repair, relation governor, or API-boundary workaround was added, and `continuing` remains deferred.
+- SVG-output regression tests cover closure, cusps of at least 30 degrees, minor arcs below 180 degrees, sagitta, deterministic same-seed replay, and changed performances across 200 seeds. Formal leaf benchmark Scores 00/01/02/04 live under `cli/bench/leaf/`; a 30-input general set enables no touching phrase.
+- **Refinement accounting:** Closed organic contours can now retain performed placement and rotation, at the cost of adding the first exact endpoint constraint to the otherwise loose relation family. Score versioning, migration, Render Engine metadata, and the canonical rh2 payload remain unchanged.

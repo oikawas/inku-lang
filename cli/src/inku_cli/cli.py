@@ -548,6 +548,12 @@ def _write_paint_outputs(
     svg_path.write_text(str(result["svg"]), encoding="utf-8")
     paths["json"] = str(json_path)
     paths["svg"] = str(svg_path)
+    # RAW trace bundle, saved independently of --full-json when the server returns it.
+    trace = result.get("trace")
+    if trace is not None:
+        trace_path = out_dir / f"{prefix}-trace.json"
+        trace_path.write_text(json.dumps(trace, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        paths["trace"] = str(trace_path)
     if png:
         try:
             import cairosvg
@@ -1839,6 +1845,7 @@ def _paint_payload(
         "render_seed": getattr(args, "render_seed", None),
         "vary_seed": getattr(args, "vary_seed", None),
         "seed_text": getattr(args, "seed_text", None),
+        "include_trace": getattr(args, "trace", False) or None,
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -2171,6 +2178,11 @@ def command_paint(args: argparse.Namespace) -> int:
         )
     prefix = args.prefix or f"inku-{started}"
     output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
+    if getattr(args, "trace", False) and result.get("trace") is None:
+        print(
+            "inku-cli: warning: --trace requested but the server returned no trace (older server?)",
+            file=sys.stderr,
+        )
     paths = _write_paint_outputs(output_result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
     summary = {
         "text": result.get("text"),
@@ -3375,6 +3387,11 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--save-history", action="store_true")
     parser.add_argument("--save-artifacts", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--no-progress", action="store_true", help="disable elapsed-time progress animation")
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="request RAW per-layer intermediates and save them as <prefix>-trace.json",
+    )
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")
         parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")

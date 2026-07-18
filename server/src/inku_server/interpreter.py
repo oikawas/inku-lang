@@ -1301,6 +1301,19 @@ def interpret(text: str, *, model: str | None = None) -> str:
     return ddl
 
 
+def _finish_stage1(
+    ddl: str,
+    thinking: str | None,
+    tin: int | None,
+    tout: int | None,
+    trace_sink: list[str] | None,
+) -> tuple[str, str | None, int | None, int | None]:
+    # Observation only (trace): record the model's raw DDL before sanitization.
+    if trace_sink is not None:
+        trace_sink.append(ddl)
+    return _sanitize_placement_words(ddl), thinking, tin, tout
+
+
 def interpret_detail(
     text: str,
     *,
@@ -1308,8 +1321,12 @@ def interpret_detail(
     include_thinking: bool = False,
     system_prompt_prefix: str | None = None,
     lang: str = "ja",
+    trace_sink: list[str] | None = None,
 ) -> tuple[str, str | None, int | None, int | None]:
-    """(ddl, thinking, tokens_in, tokens_out) を返す。"""
+    """(ddl, thinking, tokens_in, tokens_out) を返す。
+
+    trace_sink 指定時は、サニタイズ前の Stage 1 生 DDL を append する (観測のみ)。
+    """
     system_prompt = _build_system_prompt(
         text, prefix_override=system_prompt_prefix, lang=lang
     )
@@ -1323,12 +1340,12 @@ def interpret_detail(
             ddl, tin, tout = _interpret_anthropic(
                 text, model=model_id, system_prompt=system_prompt, settings=settings
             )
-            return _sanitize_placement_words(ddl), None, tin, tout
+            return _finish_stage1(ddl, None, tin, tout, trace_sink)
         if provider == "gemini":
             ddl, tin, tout = _interpret_gemini(
                 text, model=model_id, system_prompt=system_prompt, settings=settings
             )
-            return _sanitize_placement_words(ddl), None, tin, tout
+            return _finish_stage1(ddl, None, tin, tout, trace_sink)
         ddl, thinking, tin, tout = _interpret_openai_detail(
             text,
             model=model_id,
@@ -1336,7 +1353,7 @@ def interpret_detail(
             include_thinking=include_thinking,
             system_prompt=system_prompt,
         )
-        return _sanitize_placement_words(ddl), thinking, tin, tout
+        return _finish_stage1(ddl, thinking, tin, tout, trace_sink)
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
         ddl, thinking, tin, tout = _interpret_openai_detail(
@@ -1345,9 +1362,9 @@ def interpret_detail(
             include_thinking=include_thinking,
             system_prompt=system_prompt,
         )
-        return _sanitize_placement_words(ddl), thinking, tin, tout
+        return _finish_stage1(ddl, thinking, tin, tout, trace_sink)
     ddl, tin, tout = _interpret_anthropic(text, system_prompt=system_prompt)
-    return _sanitize_placement_words(ddl), None, tin, tout
+    return _finish_stage1(ddl, None, tin, tout, trace_sink)
 
 
 def _interpret_anthropic(

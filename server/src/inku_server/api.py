@@ -708,6 +708,7 @@ class ComposeRequest(BaseModel):
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
+    include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
 
 
 class ComposeResponse(BaseModel):
@@ -749,6 +750,7 @@ class ComposeResponse(BaseModel):
     coerce_relation_drop_rate: float | None = None
     coerce_warnings: list[str] = Field(default_factory=list)
     coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
+    trace: dict | None = None
 
 
 class InterpretRequest(BaseModel):
@@ -804,6 +806,7 @@ class PaintRequest(BaseModel):
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
+    include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
 
 
 class PaintResponse(BaseModel):
@@ -862,6 +865,7 @@ class PaintResponse(BaseModel):
     coerce_relation_drop_rate: float | None = None
     coerce_warnings: list[str] = Field(default_factory=list)
     coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
+    trace: dict | None = None
 
 
 class UnreadWordsBody(BaseModel):
@@ -921,6 +925,7 @@ class InterpretDetail:
     tokens_out: int | None = None
     fallback_used: bool = False
     fallback_reasons: list[str] = field(default_factory=list)
+    raw: str | None = None  # trace: サニタイズ前の Stage 1 生 DDL (include_trace 時のみ)
 
 
 @dataclass
@@ -934,6 +939,11 @@ class ComposeDetail:
     retry_count: int = 0
     retry_reasons: list[str] = field(default_factory=list)
     fallback_used: bool = False
+    # trace (include_trace 時のみ; ddl は stage15 と同一)
+    stage1_ddl_in: str | None = None
+    plugin_expanded_ddl: str | None = None
+    stage15_ddl: str | None = None
+    stage2_raw_attempts: list[dict] | None = None
 
 
 class PromptsResponse(BaseModel):
@@ -2239,37 +2249,61 @@ def _call_compose_detail(
     system_prompt: str | None = None,
     lang: str = "ja",
     vary_seed: int | None = None,
+    include_trace: bool = False,
 ) -> ComposeDetail:
+    stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
     plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
         ddl,
         source_text=original_text,
         lang=lang,
         seed_text=original_text or ddl,
     )
+    plugin_expanded_ddl = plugin_expansion.ddl  # trace: after plugin expansion
     ddl = expand_intermediate_for_lang(
         plugin_expansion.ddl,
         lang=lang,
         context_text=original_text,
         vary_seed=vary_seed,
     )
+    stage15_ddl = ddl  # trace: Stage 1.5 output = Stage 2 input (== ComposeDetail.ddl)
     plugin_provenance = list(plugin_expansion.provenance)
     plugin_warnings = list(plugin_expansion.warnings)
     retry_count = 0
     retry_reasons: list[str] = []
     fallback_used = False
+    attempts: list[dict] = [] if include_trace else []
+
+    def _trace_fields() -> dict:
+        if not include_trace:
+            return {}
+        return {
+            "stage1_ddl_in": stage1_ddl_in,
+            "plugin_expanded_ddl": plugin_expanded_ddl,
+            "stage15_ddl": stage15_ddl,
+            "stage2_raw_attempts": attempts,
+        }
+
+    def _record_fallback_attempt() -> None:
+        if include_trace:
+            attempts.append(
+                {"attempt": len(attempts) + 1, "raw_text": None, "parse_ok": None, "fallback": True}
+            )
 
     def invoke(prompt: str | None) -> tuple[Score, int | None, int | None, int]:
         started = time.perf_counter()
+        sink: list[dict] | None = [] if include_trace else None
 
         def run_compose():
+            kwargs: dict = {
+                "model": model,
+                "original_text": original_text,
+                "system_prompt": prompt,
+                "lang": lang,
+            }
+            if sink is not None:  # only when tracing: keep the no-trace call byte-identical
+                kwargs["trace_sink"] = sink
             try:
-                return compose(
-                    ddl,
-                    model=model,
-                    original_text=original_text,
-                    system_prompt=prompt,
-                    lang=lang,
-                )
+                return compose(ddl, **kwargs)
             except TypeError as e:
                 if "unexpected keyword argument" not in str(e):
                     raise
@@ -2281,6 +2315,16 @@ def _call_compose_detail(
             run_compose,
         )
         elapsed_ms = int((time.perf_counter() - started) * 1000)
+        if include_trace:
+            raw = sink[-1] if sink else {"raw_text": None, "parse_ok": None}
+            attempts.append(
+                {
+                    "attempt": len(attempts) + 1,
+                    "raw_text": raw.get("raw_text"),
+                    "parse_ok": raw.get("parse_ok"),
+                    "fallback": False,
+                }
+            )
         if isinstance(value, tuple):
             return value[0], value[1], value[2], elapsed_ms
         return value, None, None, elapsed_ms
@@ -2288,6 +2332,7 @@ def _call_compose_detail(
     try:
         score, tokens_in, tokens_out, elapsed_ms = invoke(system_prompt)
     except StageHardTimeoutError:
+        _record_fallback_attempt()
         return ComposeDetail(
             score=_fallback_score_from_ddl(ddl, lang=lang),
             ddl=ddl,
@@ -2295,6 +2340,7 @@ def _call_compose_detail(
             fallback_used=True,
             plugin_provenance=plugin_provenance,
             plugin_warnings=plugin_warnings,
+            **_trace_fields(),
         )
     if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
         return ComposeDetail(
@@ -2304,6 +2350,7 @@ def _call_compose_detail(
             tokens_out=tokens_out,
             plugin_provenance=plugin_provenance,
             plugin_warnings=plugin_warnings,
+            **_trace_fields(),
         )
 
     reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
@@ -2319,6 +2366,7 @@ def _call_compose_detail(
         retry_score = _fallback_score_from_ddl(ddl, lang=lang)
         retry_tokens_in = None
         retry_tokens_out = None
+        _record_fallback_attempt()
     if retry_tokens_in is not None:
         tokens_in = (tokens_in or 0) + retry_tokens_in
     if retry_tokens_out is not None:
@@ -2327,6 +2375,8 @@ def _call_compose_detail(
         fallback_used = True
         retry_reasons.append("fallback_after_empty_retry")
         retry_score = _fallback_score_from_ddl(ddl, lang=lang)
+        if include_trace and attempts:
+            attempts[-1]["fallback"] = True
     return ComposeDetail(
         score=retry_score,
         ddl=ddl,
@@ -2337,6 +2387,7 @@ def _call_compose_detail(
         fallback_used=fallback_used,
         plugin_provenance=plugin_provenance,
         plugin_warnings=plugin_warnings,
+        **_trace_fields(),
     )
 
 
@@ -2347,16 +2398,21 @@ def _call_interpret_detail(
     include_thinking: bool = False,
     system_prompt_prefix: str | None = None,
     lang: str = "ja",
+    include_trace: bool = False,
 ) -> InterpretDetail:
+    trace_sink: list[str] | None = [] if include_trace else None
+
     def run_interpret():
+        kwargs: dict = {
+            "model": model,
+            "include_thinking": include_thinking,
+            "system_prompt_prefix": system_prompt_prefix,
+            "lang": lang,
+        }
+        if trace_sink is not None:  # only when tracing: keep the no-trace call byte-identical
+            kwargs["trace_sink"] = trace_sink
         try:
-            return interpret_detail(
-                text,
-                model=model,
-                include_thinking=include_thinking,
-                system_prompt_prefix=system_prompt_prefix,
-                lang=lang,
-            )
+            return interpret_detail(text, **kwargs)
         except TypeError as e:
             if "unexpected keyword argument" not in str(e):
                 raise
@@ -2374,6 +2430,7 @@ def _call_interpret_detail(
             fallback_used=True,
             fallback_reasons=["stage1_hard_timeout"],
         )
+    raw = trace_sink[-1] if trace_sink else None
     if len(value) == 4:
         ddl, thinking, tokens_in, tokens_out = value
         return InterpretDetail(
@@ -2381,9 +2438,47 @@ def _call_interpret_detail(
             thinking=thinking,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
+            raw=raw,
         )
     ddl, thinking = value
-    return InterpretDetail(ddl=_sanitize_placement_words(ddl), thinking=thinking)
+    return InterpretDetail(ddl=_sanitize_placement_words(ddl), thinking=thinking, raw=raw)
+
+
+def _assemble_trace(
+    include_trace: bool,
+    *,
+    interpret_result: InterpretDetail | None = None,
+    compose_detail: ComposeDetail,
+    score_pre_coerce_dump: dict | None,
+    coerce_report: dict,
+) -> dict | None:
+    """Assemble the RAW trace bundle (observation only). Never fails generation:
+    a collection error is reported as a warning inside the trace instead."""
+    if not include_trace:
+        return None
+    try:
+        trace: dict = {}
+        if interpret_result is not None:
+            trace["stage1_raw"] = interpret_result.raw
+            trace["stage1_thinking"] = interpret_result.thinking
+            trace["stage1_ddl"] = interpret_result.ddl
+        trace.update(
+            {
+                "plugin_expanded_ddl": compose_detail.plugin_expanded_ddl,
+                "stage15_ddl": compose_detail.stage15_ddl,
+                "stage2_raw_attempts": compose_detail.stage2_raw_attempts,
+                "score_pre_coerce": score_pre_coerce_dump,
+                "coerce_branch_counts": coerce_report.get("coerce_branch_counts", {}),
+                "coerce_relation_input_count": coerce_report.get("coerce_relation_input_count", 0),
+                "coerce_relation_output_count": coerce_report.get("coerce_relation_output_count", 0),
+                "coerce_relation_dropped_count": coerce_report.get("coerce_relation_dropped_count", 0),
+                "plugin_provenance": compose_detail.plugin_provenance,
+                "plugin_warnings": compose_detail.plugin_warnings,
+            }
+        )
+        return trace
+    except Exception as exc:  # noqa: BLE001 — trace must never break generation
+        return {"warning": f"trace collection failed: {exc}"}
 
 
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
@@ -2406,10 +2501,16 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             system_prompt=None,
             lang=instruction_lang_resolved,
             vary_seed=req.vary_seed,
+            include_trace=req.include_trace,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
 
+    score_pre_coerce_dump = (
+        compose_detail.score.model_dump(mode="json", by_alias=True)
+        if req.include_trace
+        else None
+    )
     coerce_report: dict[str, object] = _coerce_relation_report(None, None)
     try:
         score = compose_detail.score
@@ -2473,6 +2574,12 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         retry_reasons=compose_detail.retry_reasons,
         fallback_used=compose_detail.fallback_used,
         **coerce_report,
+        trace=_assemble_trace(
+            req.include_trace,
+            compose_detail=compose_detail,
+            score_pre_coerce_dump=score_pre_coerce_dump,
+            coerce_report=coerce_report,
+        ),
     )
 
 
@@ -2848,6 +2955,7 @@ def api_paint(
             model=resolved_stage1_model,
             include_thinking=req.include_thinking,
             lang=instruction_lang_resolved,
+            include_trace=req.include_trace,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("interpret", 502) from e
@@ -2859,11 +2967,18 @@ def api_paint(
             model=resolved_stage2_model,
             original_text=source_text,
             lang=instruction_lang_resolved,
+            include_trace=req.include_trace,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
 
     ddl = compose_detail.ddl
+    # trace: capture the pre-coerce Score before any coerce/ensure mutation.
+    score_pre_coerce_dump = (
+        compose_detail.score.model_dump(mode="json", by_alias=True)
+        if req.include_trace
+        else None
+    )
     coerce_report: dict[str, object] = _coerce_relation_report(None, None)
     try:
         score = compose_detail.score
@@ -2986,6 +3101,13 @@ def api_paint(
         user_generation_count = _db.increment_user_generation_count(actor["id"])
         if user_generation_count is None:
             raise HTTPException(status_code=404, detail="user not found")
+    paint_trace = _assemble_trace(
+        req.include_trace,
+        interpret_result=interpret_detail_result,
+        compose_detail=compose_detail,
+        score_pre_coerce_dump=score_pre_coerce_dump,
+        coerce_report=coerce_report,
+    )
     return PaintResponse(
         text=source_text,
         ddl=ddl,
@@ -3013,6 +3135,7 @@ def api_paint(
         user_generation_count=user_generation_count,
         catalog_id=catalog_id,
         **coerce_report,
+        trace=paint_trace,
     )
 
 

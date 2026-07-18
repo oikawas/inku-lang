@@ -2352,3 +2352,10 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - 検証: 全 pytest / ruff / web check・build、pentala 実地確認、reference dump 前後差分 = 削剪語のみ、nature-leaves v0.3.0 validate 通過、実弾ベンチ（葉ミニ10日英 Replay×5 + gallery JP20/EN20）で葉発火 19/20 が v1.91 と一致（相違 1 件は Stage 1 LLM 変動と帰属し受け入れ）。
 - **SPEC 再基準化:** SPEC.ja.md の語彙・定数記載を「saijiki テーブル / reference を正とする参照方式」へ書き換え、内部矛盾（Canvas: Letter、旧語彙表、分離修飾行の例、モデル固定表、プラグイン展開層の所在、参照切れ、雲形節の番号なし等）を解消した。雲形の設計は §14.9 として番号付与。思想散文は改稿していない。
 - **洗練の会計:** この版で減らしたもの — 語彙の定義箇所を 4（Stage 1 プロンプト散文・閉包マーカー表・web saijiki.ts・composer 固定句）から 1（saijiki テーブル）へ、語彙から 描く・髪 の 2 語を削った。起きにくくしたのは、語彙表同士の乖離（web↔server の分裂、SPEC の四重表）、プロンプト組み立ての無言の脱落、削剪の非可逆化（prompt フラグで旧プロンプトを再生成でき、新旧 A/B の帰属判定が一手で可能）である。
+
+### v1.93 — RAW trace オプション（Build 593）
+
+- 生成パイプライン各層の RAW 中間生成物を 1 回の生成で持ち帰る観測オプションを追加した。`/api/paint` と `/api/compose` のリクエストに `include_trace`（既定 false・後方互換）を加え、指定時のみ応答トップレベルへ `trace` を返す。収録: `stage1_raw`／`stage1_thinking`／`stage1_ddl`（プラグイン展開前）、`plugin_expanded_ddl`、`stage15_ddl`（= Stage 2 入力）、`stage2_raw_attempts`（retry・fallback を含む全試行の生テキストと parse 可否）、`score_pre_coerce`、既存の coerce／plugin 集約値。
+- **鏡であって governor ではない。** 収集は interpreter／composer へ任意の `trace_sink` を通す観測のみで、interpret／expand／compose／coerce／render の判定・分岐・回数を一切変えない。`include_trace` 未指定時の応答は現行とフィールド単位で完全同一（新規キー `trace` も現れない）。trace は応答のみで DB（履歴・lineage）へ保存しない。同一入力・同一 seed では `include_trace` の有無によらず Score と render_hash が不変。収集失敗は生成を落とさず該当キー null ＋ warning とする。
+- `inku-cli paint --trace` を追加し、応答の `trace` を `<prefix>-trace.json` として出力ディレクトリへ保存する（`--full-json` と独立、旧サーバで trace 不在なら警告のみ）。
+- テスト: 上記不変条件（応答同一・非永続・Score/render_hash 不変・生成分岐なし・認証境界・試行構造）を LLM モックで回帰。SPEC 本文は変更しない（利き目監査ハーネスの入口。plan-intent-audit ステップ 4.5）。

@@ -67,8 +67,7 @@ A dashed pencil line, trembling finely, crossing the canvas — three of them.
 **Normalized DDL (after interpretation):**
 
 ```
-pencil dashed line, horizontal, 3 lines, placed
-movement: fine tremble
+Line up three dashed pencil horizontal lines vertically. The lines tremble finely.
 ```
 
 **JSON Score (after structuring, excerpt):**
@@ -121,16 +120,18 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 
 | Category (EN) | Category (JA) | Vocabulary |
 |---|---|---|
-| forms | かたち | circle, ellipse, triangle, square, line, arc |
-| touches | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, burin, drypoint |
-| motions | うごき | place, align, fill, scatter, tile, carve |
-| places | ばしょ | top, bottom, center, edge, corner |
-| continuity | つらなり | solid, dashed, dotted, dot-dashed |
-| movements | ゆらぎ | fine, broad, quick, slow, wobble, undulate, tremble, blur |
+| forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
+| touches | てざわり | pen, pencil, rotring, fine-brush, thick-brush, crayon, chalk, burin, drypoint |
+| motions | うごき | place, line-up, draw, scatter, fill, tile |
+| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
+| continuity | つらなり | solid, dashed, dotted, dash-dot |
+| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
 | colors | いろ | white, black, blue, red, green, gray |
-| rotation | かたむき | horizontal, vertical, diagonal, rotated |
-| proportions | わりあい | tall, wide, full-width, half-width, semicircle, first-quarter, last-quarter, crescent |
-| relations | あいだ | along, not touching, cutting, between (used as "along the previous line") |
+| angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
+| proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
+| relations | あいだ | along, not touching, cutting, between, touching (used as "along the previous line") |
+
+The saijiki table in the implementation is the source of truth for the current vocabulary; `inku-cli reference --md` produces a machine-generated listing at any time.
 
 Only physical, observable words belong to the core. Emotional evaluation — "beautifully," "delicately," "boldly" — is excluded, because evaluation belongs to the viewer, not the writer.
 
@@ -233,7 +234,7 @@ uv run inku-cli paint "A blue line slowly loosens across the night water." --bas
 
 - **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with per-stage model selection; non-deterministic AI layers and deterministic algorithmic layers alternate
 - **Refinement through regeneration** — another performance (no LLM call), another composition (vary seed), another interpretation (Stage 1 re-reading), LLM reselection, and generation management through lineage
-- **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle; horizontal, vertical, radial, scatter, and literal tiling grid layouts with paths such as waves and diagonal bands
+- **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle, cloudform; horizontal, vertical, radial, scatter, and literal tiling grid layouts with paths such as waves and diagonal bands
 - **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
 - **Material rendering** — pencil, rotring, crayon, chalk, brushes, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges
 - **Plugins** — namespaced vocabulary macros such as `Nature.wind`; they expand into core vocabulary only and cannot modify the core

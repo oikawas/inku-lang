@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.90.0 / Build 591**
+**Target version: v1.92.0 / Build 592**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -58,6 +58,7 @@ instruction
 - Lineage records explicit derivation operations only. Never infer parentage from similarity, time, or matching hashes.
 - Metrics, similarity, and vision reviews are diagnostic mirrors, not generation gates or automatic best-branch selectors.
 - Plugins are validated declarative documents, expanded to core DDL immediately after Stage 1. Stage 1.5, coerce, Score, replay, and rh2 do not depend on plugin content.
+- The saijiki table (`server/src/inku_server/saijiki.py`, v1.92) is the source of truth for vocabulary. The Stage 1 prompt vocabulary block, plugin closure markers, relation phrases, web Saijiki display, and reference §1 are derived from it; vocabulary changes go through the table and its golden tests.
 - Japanese and English behavior must stay aligned. Do not introduce English-only requirements.
 
 ## Current Product State
@@ -72,7 +73,9 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-In v1.90.0, Build 586 formalized `touching`, Build 587 unified relation geometry in transform-composed canvas coordinates, and Build 588 removed duplicate touching assignment. Build 589 adds validated `.inku-plugin.md` documents and a deterministic expansion layer immediately after Stage 1. Explicit qualified terms and `fires_on` nouns that are stated subjects may fire; metaphors and unknown objects may not. Validation rejects recursion, expansion beyond 48 instructions, fixed-coordinate repetition, external references, and namespace collisions. Provenance is ordinary history metadata, while Score, canonical artwork data, rh2, and replay remain independent of plugin documents. Build 590 adds a general boundary preventing Stage 1.5 from appending auxiliary shapes and Score from retaining instructions beyond the explicit numeric-region count after structural expansion. The boundary caps instruction count, while arrangement-driven visible multiplicity remains model-dependent between Mistral and Qwen. Build 591 extends the declarative plugin format to v2, accepting `member` composites, `note:` comment lines, a `bottom band` and a computed diagonal band, load-time rejection of unknown region keys (removing the silent fallback), English repetition units with unit-preserving singulars, `anchor ... at N to M spots` nested repetition, and longest-match `fires_on` resolution at a position. The Saijiki modifier markers added to the closure table are provisional until the v1.92 restructuring. Score, coerce, and rh2 are unchanged, and Nature.leaves v0.3.0 passes `plugin validate`.
+In v1.90.0, Build 586 formalized `touching`, Build 587 unified relation geometry in transform-composed canvas coordinates, and Build 588 removed duplicate touching assignment. Build 589 adds validated `.inku-plugin.md` documents and a deterministic expansion layer immediately after Stage 1. Explicit qualified terms and `fires_on` nouns that are stated subjects may fire; metaphors and unknown objects may not. Validation rejects recursion, expansion beyond 48 instructions, fixed-coordinate repetition, external references, and namespace collisions. Provenance is ordinary history metadata, while Score, canonical artwork data, rh2, and replay remain independent of plugin documents. Build 590 adds a general boundary preventing Stage 1.5 from appending auxiliary shapes and Score from retaining instructions beyond the explicit numeric-region count after structural expansion. The boundary caps instruction count, while arrangement-driven visible multiplicity remains model-dependent between Mistral and Qwen. Build 591 extends the declarative plugin format to v2, accepting `member` composites, `note:` comment lines, a `bottom band` and a computed diagonal band, load-time rejection of unknown region keys (removing the silent fallback), English repetition units with unit-preserving singulars, `anchor ... at N to M spots` nested repetition, and longest-match `fires_on` resolution at a position. Score, coerce, and rh2 are unchanged, and Nature.leaves v0.3.0 passes `plugin validate`.
+
+v1.92.0 (Build 592) restructures the Saijiki. A single table (`saijiki.py`) now derives the Stage 1 prompt vocabulary block, the plugin closure markers, the relation phrases, reference §1, and the web Saijiki display (`GET /api/saijiki` plus a snapshot-seeded synchronous store). Pre-restructuring prompts are frozen as golden fixtures so any assembly drift beyond the approved pruning fails tests. The words 描く (draw) and 髪 / hair were pruned from the vocabulary by the author's decision (the Score `Weight` enum keeps `hair` for replay compatibility), 彫る (carve) was removed from the web display, and the static Nature entries are frozen until their declarative migration.
 
 ## Where to Look for a Change
 

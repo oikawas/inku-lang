@@ -10,7 +10,7 @@ export const SAIJIKI: SaijikiCategory[] = [
 		key: 'katachi',
 		label: 'かたち',
 		en: 'forms',
-		words: ['円', '楕円', '三角', '四角', '線', '弧']
+		words: ['円', '楕円', '三角', '四角', '線', '弧', '雲形']
 	},
 	{
 		key: 'tezawari',

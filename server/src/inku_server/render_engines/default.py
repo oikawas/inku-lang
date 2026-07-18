@@ -10,7 +10,7 @@ from .base import RenderEngineResult
 @dataclass(frozen=True)
 class DefaultRenderEngine:
     id: str = "default"
-    version: str = "3"
+    version: str = "4"
 
     def render(
         self,
@@ -20,7 +20,9 @@ class DefaultRenderEngine:
         svg_profile: str | None = None,
         render_seed: int | None = None,
     ) -> RenderEngineResult:
-        svg = render_svg(score, color_map=color_map, svg_profile=svg_profile, render_seed=render_seed)
+        svg = render_svg(
+            score, color_map=color_map, svg_profile=svg_profile, render_seed=render_seed
+        )
         return RenderEngineResult(
             svg=svg,
             metadata={

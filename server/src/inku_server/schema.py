@@ -7,11 +7,14 @@
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Coord = tuple[float, float]
+ScoreVersion = Literal["0.1.0"]
 
-Primitive = Literal["line", "circle", "ellipse", "triangle", "square", "polygon", "arc"]
+Primitive = Literal[
+    "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform"
+]
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 Weight = Literal[
     "hair",
@@ -362,7 +365,10 @@ class Instruction(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     primitive: Primitive = Field(
-        description="line=線 / circle=円 / ellipse=楕円 / triangle=三角 / square=四角 / arc=弧",
+        description=(
+            "line=線 / circle=円 / ellipse=楕円 / triangle=三角 / square=四角"
+            " / polygon=多角形 / arc=弧 / cloudform=雲形"
+        ),
     )
 
     from_: Optional[Coord] = Field(
@@ -376,7 +382,7 @@ class Instruction(BaseModel):
     )
     center: Optional[Coord] = Field(
         default=None,
-        description="circle/ellipse/arc の中心 [x,y]。square/triangle には使わない (→position)",
+        description="circle/ellipse/arc/polygon/cloudform の中心 [x,y]。square/triangle には使わない (→position)",
     )
     radius: Optional[float] = Field(
         default=None,
@@ -511,10 +517,19 @@ class Presence(BaseModel):
     )
 
 
+def migrate_score_payload(value: object) -> object:
+    """Idempotently normalize pre-version Score mappings without adding geometry."""
+    if not isinstance(value, dict):
+        return value
+    migrated = dict(value)
+    migrated.setdefault("version", "0.1.0")
+    return migrated
+
+
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: str = "0.1.0"
+    version: ScoreVersion = "0.1.0"
     canvas: Canvas = Field(
         default="square",
         description=(
@@ -534,6 +549,11 @@ class Score(BaseModel):
         ),
     )
     instructions: list[Instruction]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_score(cls, value: object) -> object:
+        return migrate_score_payload(value)
 
     @field_validator("canvas", mode="before")
     @classmethod

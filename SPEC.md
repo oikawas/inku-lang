@@ -1,6 +1,6 @@
 # inku — Drawing Description Language Specification
 
-**Version: v1.89**
+**Version: v1.89.1**
 **Canonical source:** [SPEC.ja.md](SPEC.ja.md)
 
 This document is the official English specification for public review, contest
@@ -301,7 +301,7 @@ Current core categories include:
 
 | English | Japanese | Examples |
 | --- | --- | --- |
-| shape | かたち | circle, ellipse, triangle, square, line, arc |
+| shape | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
 | touch / material | てざわり | pen, pencil, rotring, fine brush, thick brush, crayon, chalk, burin, drypoint |
 | line continuity | つらなり | solid, dashed, dotted, dot-dashed |
 | motion | うごき | place, align, scatter, fill, tile, tremble, undulate |
@@ -377,7 +377,7 @@ Important score concepts:
 
 - `canvas`: selected canvas aspect identifier, such as `square` or `golden`
 - `instructions`: ordered drawing instructions
-- primitive fields: line, circle, ellipse, triangle, square, arc, and related data
+- primitive fields: line, circle, ellipse, triangle, square, polygon, arc, cloudform, and related process data
 - `weight`: material / tool quality
 - `variation`: visible wobble, blur, tremble, or motion behavior
 - `arrangement`: count, distribution, paths, grouping, density, fade, and color cycles
@@ -408,6 +408,44 @@ The system treats the DB history record as the source of truth.  SVG, JSON
 files, PNG files, and other artifacts are derived outputs.
 
 ---
+
+## Cloudform Design (v1.89.1)
+
+Cloudform is the first closed form whose visible identity is decided by the performance rather than by a geometric definition. The Score stores only process parameters such as center, size, variation, touch, surface, relation, and placement. It never stores contour coordinates. The renderer derives the contour from the Score, instruction index, and performance seed, so the same seed reproduces the same contour while another performance produces another contour.
+
+Cloudform does not imitate a meteorological cloud. The name refers to a family of irregular curves: a form with a grammar of irregularity, related to cloud rulers, yamato-e haze, suhama paper forms, and suminagashi. It extends the principle that the description persists and the rendering is a one-time performance from placement and touch into form itself.
+
+### Contour performance
+
+The renderer combines two deterministic periodic processes:
+
+1. A seamless multi-octave 1/f signal modulates a closed polar radius. Existing variation words distribute energy across low lobes or fine high-frequency detail.
+2. A second periodic signal runs along the base curve arc length and creates bays and waists. Its displacement is clamped by local radius and curvature. A strictly positive single-valued polar radius provides the structural self-intersection guarantee; this is geometry safety, not an aesthetic governor.
+
+The contour uses the shared tool grammar, so pencil and rotring produce different edge qualities. Existing surface values such as wash, stipple, hatch, and aquatint fill its interior. Carve mode can cut an irregular light from a dark ground. Output follows the renderer point budget and closed Bezier fitting rules.
+
+### Composition with existing vocabulary
+
+Cloudform introduces no modifier category:
+
+- variation controls octave distribution and contour behavior;
+- proportion controls aspect, including tall, wide, and full-width haze-like bands;
+- touch controls edge quality;
+- surface and color control the interior;
+- relations resolve against the performed contour and its bounding box;
+- place, motion, and arrangement position it, and arranged instances receive distinct contours.
+
+### Selection boundary
+
+Stage 1 may select cloudform only when the author explicitly writes cloudform, or when the instructed subject itself is amorphous, such as cloud, smoke, haze, stain, island silhouette, or puddle. It is never a fallback for an unknown or unclear object. Unknown objects continue to be approximated with existing defined primitives. Stage 1.5 and coerce cannot inject cloudform. Stage 2 only transcribes the normalized form into primitive cloudform with center and size; it never asks an LLM for contour coordinates or control points.
+
+Cloudform frequency and context are recorded by the motif ledger as a diagnostic mirror only. They do not create a governor, floor, generation gate, or automatic preference.
+
+### Determinism and accounting
+
+Contour synthesis uses the existing performance identity and does not change rh2 inputs. The Score remains the score and the contour remains a performed value.
+
+What this version gains is a form without a fixed definition: variation becomes the form itself, and the contour can invite projection by the viewer. What it loses is the previous uniformity in which every core form was geometrically definable. The strict selection boundary makes it harder for cloudform to become an escape hatch for uncertain interpretation.
 
 ## 7. Canvas Model
 

@@ -1082,3 +1082,32 @@ def test_v180_http_502_cost_ledger_counts_existing_failures():
     ]
 
     assert cli._http_502_count(failures) == 2
+
+def test_score_metrics_reports_cloudform_usage_and_context_as_mirror_only():
+    score = {
+        "instructions": [
+            {
+                "primitive": "cloudform",
+                "center": [0.5, 0.5],
+                "size": [0.6, 0.2],
+                "mode": "carve",
+                "surface": {"texture": "wash"},
+                "variation": {"quality": "wave"},
+                "arrangement": {"count": 4, "layout": "scatter"},
+                "relation": {"type": "not_touching"},
+            }
+        ]
+    }
+
+    metrics = cli._score_metrics(score)
+
+    assert metrics["score_cloudform_count"] == 1
+    assert metrics["score_cloudform_expanded_count"] == 4
+    assert metrics["score_has_cloudform"] is True
+    assert metrics["score_cloudform_context_counts"] == {
+        "arranged:scatter": 1,
+        "mode:carve": 1,
+        "relation:not_touching": 1,
+        "surface:wash": 1,
+        "variation:wave": 1,
+    }

@@ -107,6 +107,10 @@ PRIMITIVE_SPECS: dict[str, list[FieldSpec]] = {
         FieldSpec("center", [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
         FieldSpec("size",   [0.3, 0.3],                          coerce=_as_positive_size),
     ],
+    "cloudform": [
+        FieldSpec("center", [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
+        FieldSpec("size",   [0.3, 0.3],                          coerce=_as_positive_size),
+    ],
     "arc": [
         FieldSpec("center",      [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
         FieldSpec("radius",      0.15,                               coerce=_as_positive_float),
@@ -1776,7 +1780,7 @@ def _has_focal_event_hint(ins: Instruction) -> bool:
 def _instruction_anchor(ins: Instruction) -> tuple[float, float]:
     if ins.primitive == "line" and ins.from_ is not None and ins.to is not None:
         return ((ins.from_[0] + ins.to[0]) / 2, (ins.from_[1] + ins.to[1]) / 2)
-    if ins.primitive in ("circle", "ellipse", "arc", "polygon") and ins.center is not None:
+    if ins.primitive in ("circle", "ellipse", "arc", "polygon", "cloudform") and ins.center is not None:
         return ins.center
     if ins.primitive in ("square", "triangle") and ins.position is not None and ins.size is not None:
         return (ins.position[0] + ins.size[0] / 2, ins.position[1] + ins.size[1] / 2)
@@ -3576,7 +3580,7 @@ def _english_count_hint(ddl: str) -> int | None:
     words = re.findall(r"[a-z]+", " ".join(candidates).lower().replace("-", " "))
     count_nouns = {
         "line", "lines", "stroke", "strokes", "square", "squares",
-        "tile", "tiles", "brick", "bricks",
+        "cloudform", "cloudforms", "tile", "tiles", "brick", "bricks",
     }
     number_words = set(ENGLISH_COUNT_UNITS) | {"hundred", "thousand", "and"}
     for start, word in enumerate(words):
@@ -3869,7 +3873,7 @@ def _has_relation_contour(ins: Instruction) -> bool:
         return ins.from_ is not None and ins.to is not None
     if ins.primitive in {"circle", "arc", "polygon"}:
         return ins.center is not None and ins.radius is not None
-    if ins.primitive == "ellipse":
+    if ins.primitive in {"ellipse", "cloudform"}:
         return ins.center is not None and ins.size is not None
     if ins.primitive in {"square", "triangle"}:
         return ins.position is not None and ins.size is not None

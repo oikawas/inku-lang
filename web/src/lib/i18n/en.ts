@@ -586,7 +586,7 @@ export const en: LangPack = {
 	confirmPermanentDeleteMessage: (n) => `Permanently delete ${n} item${n === 1 ? '' : 's'}?`,
 
 	saijikiWords: {
-		katachi: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc'],
+		katachi: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc', 'cloudform'],
 		katamuki: ['horizontal', 'vertical', 'diagonal', 'rising', 'falling', 'rotated'],
 		tezawari: ['hair', 'pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'burin', 'drypoint'],
 		tsuranari: ['solid', 'dashed', 'dotted', 'dash-dot'],

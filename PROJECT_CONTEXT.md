@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.89 / Build 584**
+**Target version: v1.89.1 / Build 585**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -71,7 +71,7 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-The latest v1.89 / Build 584 change persists the selected Okugaki Vision model per user. Artwork-menu modals can edit a description or DDL, save the drawing as a child of the selected work, and return to Lineage focused on that newest child. Build 583's prefix-only reading, successful-response cache, reduced Vision payloads, and retryable timeout detail remain in place.
+The latest v1.89.1 / Build 585 change adds cloudform to the core forms. A Score keeps only center, size, and existing modifiers; Renderer v4 deterministically derives each performed closed contour from the Score, instruction index, and performance seed. Stage 1 may choose it only when cloudform is explicit or the subject itself is amorphous, while Stage 1.5 and coerce never inject it. Contour coordinates are not stored in the Score, database, or rh2 inputs. Author review accepted the rendering as structurally sound for the cloudform image; more radical contours remain a separate tuning task.
 
 ## Where to Look for a Change
 

@@ -41,7 +41,9 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 ## 図形と圧縮
 
 - 座標: 0.0-1.0 比率 (左上=(0,0) 右下=(1,1))
-- circle/ellipse/arc/polygon → center フィールド。square/triangle → position フィールド (bbox 左上)
+- circle/ellipse/arc/polygon/cloudform → center フィールド。square/triangle → position フィールド (bbox 左上)
+- **正規化DDLの「雲形」だけを primitive="cloudform", center+size へ転記する。輪郭座標・制御点は生成しない。雲形を補完・推測で追加しない**
+- **正規化DDLに雲形が1句以上ある場合、出力にも同じ雲形 instruction を必ず残す。横長、arrangement、surface、carve と合成されても ellipse/line へ置換・省略しない。複数同一雲形は1 instruction + arrangementにする**
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
 - **正規化DDL に図形・線・弧の指示がある場合、instructions を空配列にしてはいけない。変換不能なら最も近い線・楕円・四角へ落とし込む**
@@ -75,13 +77,13 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 ## 対象物化の禁止と抽象化
 
-- **膜・霞・霧・透明・気配・余韻 → 薄い ellipse/square/line に fade を付け、preserve_space=true。説明だけで終わらせず、透明な面・薄い反射・消える線として JSON 化する**
+- **膜・透明・気配・余韻 → 薄い ellipse/square/line に fade を付け、preserve_space=true。正規化DDLの霞・霧が雲形になっている場合は、その雲形へfadeと既存surfaceを転記する**
 - **人・顔・動物を対象物として描かない。目鼻口・頭身・四肢・耳・尻尾を instruction にしない。存在感、重心、左右対称性、視線の圧力、群れ、輪郭密度として Score.presence に変換する**
 - **Score.presence は固定の人型記号ではない。symmetry="bilateral" は「正面・対称・顔」など明示がある時だけ使い、通常は symmetry="none" を選ぶ。gaze_pressure も視線・顔・見つめる等が明示された時だけ none 以外にする**
 - **人・動物の補助 instruction を作る場合も、縦線+小楕円、棒人間、頭、胴体、翼、尾のような共通シルエットにしない。余白線、端寄りの焦点、薄い弧、群れの間隔として抽象化する**
-- **涙・視線・屋根・雲のような名詞は、それ自体を別の対象物や記号として足さない。涙=下向きの滲み/透明度差、視線=余白の圧力、屋根=低い重心や斜めの圧、雲=上部の重さや密度差として、既に指定された primitive の配置・方向・密度・fade に変換する**
-- **対象物化を避けた語は削除してはいけない。必ず path、fade、density、rotation、preserve_space、または color_cycle の薄い差として残す。涙/滲みは下向きまたは垂直方向、雲/押し沈めは上部の重さと下方向の圧、視線は片側の余白圧として扱う**
-- **低い雲、押し沈める、影だけ、先に帰る、涙、滲み、ほどける、消えかけは対象物ではなく motion intent として扱う。既存 instruction に path、fade、rotation、rhythm_spacing、片側余白、または小さな焦点差を必ず付ける**
+- **涙・視線・屋根のような名詞は、それ自体を別の対象物や記号として足さない。涙=下向きの滲み/透明度差、視線=余白の圧力、屋根=低い重心や斜めの圧として扱う。正規化DDLに雲形がある場合だけ、その雲形を転記する**
+- **対象物化を避けた語は削除してはいけない。必ず path、fade、density、rotation、preserve_space、または color_cycle の薄い差として残す。涙/滲みは下向きまたは垂直方向、押し沈めは上部の重さと下方向の圧、視線は片側の余白圧として扱う。雲形の配置・動きは正規化DDLどおり転記する**
+- **押し沈める、影だけ、先に帰る、涙、滲み、ほどける、消えかけは motion intent として扱う。既存 instruction に path、fade、rotation、rhythm_spacing、片側余白、または小さな焦点差を付ける。低い雲は正規化済みの雲形へこの intent を適用する**
 - **自転車・車・電車などの乗り物は、車輪・フレーム・車体を instruction にしない。影、斜線、重心、先行/遅れ、余白のずれとして抽象化する**
 - **反射・映り込み → line または arc の少数反復。fade="directional" と path="wave" または "top_to_bottom" を使う**
 - **柔らかな光・日差し → 白または黄色寄りの薄い ellipse を重ね、filled=true, color_hint に原文の光を保持する。香り・匂い → 緑/白/灰の小さな ellipse または arc を wave path で少数散らす。蕾・開花待ち → 赤/白の小さな ellipse を斜めの帯で残す。五感・気配 → 薄い arc/ellipse と fade で残す**
@@ -353,6 +355,15 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 | ビュラン | burin |
 | ドライポイント | drypoint |
 
+入力: 灰色の横長の雲形を上半分に置く。ゆっくり波打つ。
+出力: {"instructions":[{"primitive":"cloudform","center":[0.5,0.3],"size":[0.72,0.22],"color":"gray","variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["radius"]}}]}
+
+入力: 緑の小さな雲形を右半分に七つ散らす。
+出力: {"instructions":[{"primitive":"cloudform","center":[0.75,0.5],"size":[0.1,0.08],"color":"green","arrangement":{"count":7,"layout":"scatter","path":"right_half"}}]}
+
+入力: 地: 黒いメゾチント地。黒地から光を彫り出す（明るく）。白い大きな雲形を中央に置く。
+出力: {"canvas":{"aspect":"square","ground":{"material":"mezzotint","tone":"black"}},"instructions":[{"primitive":"cloudform","center":[0.5,0.5],"size":[0.52,0.36],"color":"white","mode":"carve","carve_depth":"bright"}]}
+
 入力: 青いクレヨンの縦線を横に三十本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"blue","weight":"crayon","arrangement":{"count":30,"layout":"horizontal"}}]}
 
@@ -377,7 +388,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 ## Shapes and compression
 
 - Coordinates: 0.0-1.0 ratio (top-left=(0,0) bottom-right=(1,1))
-- circle/ellipse/arc/polygon → center field. square/triangle → position field (bbox top-left)
+- circle/ellipse/arc/polygon/cloudform → center field. square/triangle → position field (bbox top-left)
+- **Transcribe only normalized DDL cloudform as primitive="cloudform" with center+size. Never generate contour coordinates or control points, and never infer or repair cloudform into the score**
+- **When normalized DDL contains one or more cloudform clauses, the output must retain the same cloudform instruction. Never replace or omit it as ellipse/line when combined with a wide proportion, arrangement, surface, or carve. Repeated identical cloudforms use one instruction plus arrangement**
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
 - **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
 - **If normalized DDL contains shapes, lines, or arcs, instructions must not be empty. If exact conversion is difficult, map it to the nearest line, ellipse, or square**
@@ -411,13 +424,13 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 ## De-objectification and abstraction
 
-- **Membrane, haze, fog, transparency, atmosphere, or lingering presence → thin ellipse/square/line with fade and preserve_space=true. Do not omit them as mere explanation; convert them into transparent planes, faint reflections, or fading lines**
+- **Membrane, transparency, atmosphere, or lingering presence → thin ellipse/square/line with fade and preserve_space=true. When normalized haze or fog is a cloudform, retain that cloudform and transcribe fade and existing surface fields**
 - **Do not draw humans, faces, or animals as objects. Do not make eyes, mouth, body proportions, limbs, ears, or tails into instructions. Convert them into Score.presence as presence, weight, bilateral symmetry, gaze pressure, group behavior, and contour density**
 - **Score.presence is not a fixed human-symbol overlay. Use symmetry="bilateral" only when frontality, symmetry, or a face is explicit; otherwise prefer symmetry="none". Use gaze_pressure other than none only when gaze, face, looking, or staring is explicit**
 - **If supporting instructions are needed for human/animal context, do not make a vertical-line + small-ellipse silhouette, stick figure, head/body, wing, or tail. Abstract it as negative-space lines, edge-biased focus, pale arcs, or group spacing**
-- **Nouns such as tears, gaze, roof, and cloud are not separate objects or signs to add. Convert tears into downward blur or opacity contrast, gaze into negative-space pressure, roof into low weight or diagonal pressure, and cloud into upper weight or density contrast on the primitives already specified**
-- **Do not simply delete words that were not objectified. Preserve them as path, fade, density, rotation, preserve_space, or a faint color_cycle contrast. Tears/blurring should bias downward or vertical; cloud/pressing-down should become upper weight and downward pressure; gaze should become one-sided negative-space pressure**
-- **Low cloud, pressing down, shadow only, going ahead, tears, blur, unraveling, and fading are motion intents, not objects. Always apply them to existing instructions as path, fade, rotation, rhythm_spacing, one-sided negative space, or a small focal contrast**
+- **Nouns such as tears, gaze, and roof are not separate objects or signs to add. Convert tears into downward blur or opacity contrast, gaze into negative-space pressure, and roof into low weight or diagonal pressure. Transcribe cloudform only when normalized DDL contains it**
+- **Do not simply delete words that were not objectified. Preserve them as path, fade, density, rotation, preserve_space, or a faint color_cycle contrast. Tears/blurring should bias downward or vertical; pressing-down should become upper weight and downward pressure; gaze should become one-sided negative-space pressure. Transcribe placement and motion attached to a normalized cloudform**
+- **Pressing down, shadow only, going ahead, tears, blur, unraveling, and fading are motion intents. Apply them as path, fade, rotation, rhythm_spacing, one-sided negative space, or a small focal contrast. Apply low-cloud intent to the normalized cloudform**
 - **Vehicles such as bicycles, cars, and trains must not become wheels, frames, or bodies. Abstract them as shadows, diagonals, center of gravity, leading/lagging motion, or shifted negative space**
 - **Reflection → sparse repeated line or arc with fade="directional" and path="wave" or "top_to_bottom"**
 - **Soft light / sunlight → layered pale white or yellow-leaning ellipse, filled=true, preserving the original phrase in color_hint. Scent / fragrance → small green/white/gray ellipse or arc along path="wave". Buds / waiting to bloom → small red/white ellipses along a diagonal band. Five-sense presence / atmosphere → faint arc/ellipse with fade**
@@ -678,6 +691,15 @@ When the normalized DDL contains a material word, always set the weight field. O
 | burin | burin |
 | drypoint | drypoint |
 
+Input: Place a wide gray cloudform in the upper half. Make it undulate slowly.
+Output: {"instructions":[{"primitive":"cloudform","center":[0.5,0.3],"size":[0.72,0.22],"color":"gray","variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["radius"]}}]}
+
+Input: Scatter seven small green cloudforms across the right half.
+Output: {"instructions":[{"primitive":"cloudform","center":[0.75,0.5],"size":[0.1,0.08],"color":"green","arrangement":{"count":7,"layout":"scatter","path":"right_half"}}]}
+
+Input: Ground: black mezzotint. Carve light from the dark ground (bright). Place one large white cloudform at center.
+Output: {"canvas":{"aspect":"square","ground":{"material":"mezzotint","tone":"black"}},"instructions":[{"primitive":"cloudform","center":[0.5,0.5],"size":[0.52,0.36],"color":"white","mode":"carve","carve_depth":"bright"}]}
+
 Input: Line up thirty vertical blue crayon lines horizontally.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"blue","weight":"crayon","arrangement":{"count":30,"layout":"horizontal"}}]}
 
@@ -829,13 +851,93 @@ def _mentioned_values(
     }
 
 
-def _enforce_relation_literal_gate(score: Score, ddl: str) -> Score:
-    """Drop model-inferred relations unless the DDL contains the exact relation phrase."""
+def _relation_contour_is_available(instruction: object) -> bool:
+    primitive = getattr(instruction, "primitive", None)
+    if primitive == "line":
+        return instruction.from_ is not None and instruction.to is not None
+    if primitive in {"circle", "arc", "polygon"}:
+        return instruction.center is not None and instruction.radius is not None
+    if primitive in {"ellipse", "cloudform"}:
+        return instruction.center is not None and instruction.size is not None
+    if primitive in {"square", "triangle"}:
+        return instruction.position is not None and instruction.size is not None
+    return False
 
-    allowed_types = _literal_relation_types(ddl)
-    if not any(ins.relation is not None for ins in score.instructions):
+
+def _enforce_cloudform_literal_delivery(score: Score, ddl: str) -> Score:
+    """Transcribe explicit cloudform when Stage 2 replaced its closed shape."""
+
+    normalized = unicodedata.normalize("NFKC", ddl)
+    lower = normalized.lower()
+    if "雲形" not in normalized and "cloudform" not in lower:
+        return score
+    if any(ins.primitive == "cloudform" for ins in score.instructions):
         return score
 
+    data = score.model_dump(by_alias=True)
+    candidates = list(enumerate(data["instructions"]))
+    for _, item in candidates:
+        if (
+            item.get("primitive") == "ellipse"
+            and item.get("center") is not None
+            and item.get("size") is not None
+        ):
+            item["primitive"] = "cloudform"
+            _logger.warning("explicit cloudform restored from Stage 2 ellipse omission")
+            return Score.model_validate(data)
+    for _, item in reversed(candidates):
+        if (
+            item.get("primitive") in {"square", "triangle"}
+            and item.get("position") is not None
+            and item.get("size") is not None
+        ):
+            position = item.pop("position")
+            size = item["size"]
+            item["primitive"] = "cloudform"
+            item["center"] = [position[0] + size[0] / 2, position[1] + size[1] / 2]
+            _logger.warning("explicit cloudform restored from Stage 2 closed-shape omission")
+            return Score.model_validate(data)
+
+    from .coerce import count_hint_from_ddl
+
+    color = next(iter(_mentioned_values(normalized, _COLOR_TERMS)), "black")
+    weight = "pen"
+    for marker, value in (
+        (("鉛筆", "pencil"), "pencil"),
+        (("ロットリング", "rotring"), "rotring"),
+        (("細筆", "fine-brush"), "brush_thin"),
+        (("太筆", "thick-brush"), "brush_thick"),
+    ):
+        if any(term in normalized or term in lower for term in marker):
+            weight = value
+            break
+    count = count_hint_from_ddl(normalized) or 1
+    is_wide = any(term in normalized or term in lower for term in ("横長", "wide"))
+    is_small = any(term in normalized or term in lower for term in ("小さ", "small"))
+    center = [0.75, 0.5] if "右半分" in normalized or "right half" in lower else [0.5, 0.5]
+    size = [0.72, 0.22] if is_wide else ([0.1, 0.08] if is_small else [0.34, 0.22])
+    instruction = {
+        "primitive": "cloudform",
+        "center": center,
+        "size": size,
+        "color": color,
+        "weight": weight,
+    }
+    if count > 1:
+        instruction["arrangement"] = {
+            "count": count,
+            "layout": "scatter",
+            "path": "right_half" if center[0] > 0.5 else "none",
+        }
+    data["instructions"].append(instruction)
+    _logger.warning("explicit cloudform transcribed after complete Stage 2 omission")
+    return Score.model_validate(data)
+
+
+def _enforce_relation_literal_gate(score: Score, ddl: str) -> Score:
+    """Keep only literal relations and transcribe one unambiguous omission."""
+
+    allowed_types = _literal_relation_types(ddl)
     instructions = []
     changed = False
     for ins in score.instructions:
@@ -847,10 +949,95 @@ def _enforce_relation_literal_gate(score: Score, ddl: str) -> Score:
         instructions.append(data)
         changed = True
 
+    normalized = unicodedata.normalize("NFKC", ddl)
+    lower = normalized.lower()
+    explicit_cloudform = "雲形" in normalized or "cloudform" in lower
+    if explicit_cloudform and len(allowed_types) == 1:
+        cloud_index = next(
+            (
+                index
+                for index, item in enumerate(instructions)
+                if item.get("primitive") == "cloudform"
+            ),
+            None,
+        )
+        if cloud_index == 0:
+            target_index = next(
+                (
+                    index
+                    for index in range(1, len(score.instructions))
+                    if _relation_contour_is_available(score.instructions[index])
+                ),
+                None,
+            )
+            if target_index is not None:
+                cloud_item = instructions.pop(0)
+                instructions.insert(target_index, cloud_item)
+                score_data = score.model_dump(by_alias=True)
+                score_data["instructions"] = instructions
+                score = Score.model_validate(score_data)
+                changed = True
+
+    present_types = {
+        relation["type"]
+        for item in instructions
+        if isinstance((relation := item.get("relation")), dict)
+        and isinstance(relation.get("type"), str)
+    }
+    if len(allowed_types) == 1:
+        relation_type = next(iter(allowed_types))
+        if relation_type not in present_types:
+            minimum_index = 2 if relation_type == "between" else 1
+            for index in range(minimum_index, len(score.instructions)):
+                if instructions[index].get("relation") is not None:
+                    continue
+                if not _relation_contour_is_available(score.instructions[index - 1]):
+                    continue
+                if relation_type == "between" and not _relation_contour_is_available(
+                    score.instructions[index - 2]
+                ):
+                    continue
+                instructions[index]["relation"] = {
+                    "type": relation_type,
+                    "gap": "medium" if relation_type in {"cutting", "between"} else "narrow",
+                }
+                changed = True
+                break
+
     if not changed:
         return score
     data = score.model_dump(by_alias=True)
     data["instructions"] = instructions
+    return Score.model_validate(data)
+
+
+def _enforce_print_literal_transcription(score: Score, ddl: str) -> Score:
+    """Transcribe exact mezzotint/carve phrases omitted by Stage 2."""
+
+    normalized = unicodedata.normalize("NFKC", ddl)
+    lower = normalized.lower()
+    has_ground = "地: 黒いメゾチント地" in normalized or "ground: black mezzotint" in lower
+    has_carve = "黒地から光を彫り出す" in normalized or "carve light from the dark ground" in lower
+    if not has_ground and not has_carve:
+        return score
+
+    data = score.model_dump(by_alias=True)
+    if has_ground:
+        canvas = data.get("canvas", "square")
+        aspect = canvas if isinstance(canvas, str) else canvas.get("aspect", "square")
+        data["canvas"] = {
+            "aspect": aspect,
+            "ground": {"material": "mezzotint", "tone": "black"},
+        }
+    if has_ground and has_carve:
+        depth = "bright" if "明るく" in normalized or "bright" in lower else "half"
+        target = next(
+            (item for item in data["instructions"] if item.get("primitive") == "cloudform"),
+            None,
+        )
+        if target is not None:
+            target["mode"] = "carve"
+            target["carve_depth"] = depth
     return Score.model_validate(data)
 
 
@@ -935,7 +1122,9 @@ def _enforce_print_literal_gate(score: Score, ddl: str) -> Score:
 
 def _finalize_score(score: Score, ddl: str) -> Score:
     score = _enforce_modifier_targeting(score, ddl)
+    score = _enforce_cloudform_literal_delivery(score, ddl)
     score = _enforce_relation_literal_gate(score, ddl)
+    score = _enforce_print_literal_transcription(score, ddl)
     score = _enforce_ground_literal_gate(score, ddl)
     return _enforce_print_literal_gate(score, ddl)
 

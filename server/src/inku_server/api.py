@@ -35,7 +35,7 @@ from .feature_analysis import composition_distance
 from .okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL, generate_okugaki
 from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
-from .composer import compose
+from .composer import _finalize_score, compose
 from .interpreter import _sanitize_placement_words, interpret_detail
 from .languages import (
     SUPPORTED_INSTRUCTION_LANGS,
@@ -1896,7 +1896,16 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
     else:
         color_cycle = []
 
-    if ("三角" in ddl) or ("triangle" in lower) or ("山" in ddl) or ("mountain" in lower):
+    if ("雲形" in ddl) or ("cloudform" in lower):
+        instruction = {
+            "primitive": "cloudform",
+            "center": [0.62, 0.36],
+            "size": [0.34, 0.22],
+            "color": color,
+            "weight": weight,
+            "color_hint": "fallback from explicit DDL cloudform",
+        }
+    elif ("三角" in ddl) or ("triangle" in lower) or ("山" in ddl) or ("mountain" in lower):
         instruction = {
             "primitive": "triangle",
             "position": [0.54, 0.22],
@@ -2048,7 +2057,10 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             }
         )
 
-    return Score.model_validate({"background": background, "instructions": instructions})
+    return _finalize_score(
+        Score.model_validate({"background": background, "instructions": instructions}),
+        ddl,
+    )
 
 
 def _fallback_needs_negative_space_support(ddl: str) -> bool:
@@ -2116,7 +2128,7 @@ def _compose_retry_prompt(*, reason: str, lang: str) -> str:
             f"The previous Stage 2 result was invalid or inefficient: {reason}.\n"
             "Submit a valid Score through the submit_score tool.\n"
             "Required: instructions must contain 1-5 drawable items.\n"
-            "Allowed primitives: line, circle, ellipse, triangle, square, polygon, arc.\n"
+            "Allowed primitives: line, circle, ellipse, triangle, square, polygon, arc, cloudform.\n"
             "Allowed colors: white, black, blue, red, green, gray.\n"
             "For repeated marks, use one instruction with arrangement instead of many instructions.\n"
             "Do not draw humans, faces, or animals as objects; convert them to abstract presence, weight, spacing, symmetry, or gaze pressure.\n"
@@ -2128,7 +2140,7 @@ def _compose_retry_prompt(*, reason: str, lang: str) -> str:
         f"直前の Stage 2 出力は無効または非効率: {reason}。\n"
         "submit_score tool で有効な Score を提出する。\n"
         "必須: instructions には描画可能な命令を1〜5個入れる。空配列は禁止。\n"
-        "使用できる primitive: line, circle, ellipse, triangle, square, polygon, arc。\n"
+        "使用できる primitive: line, circle, ellipse, triangle, square, polygon, arc, cloudform。\n"
         "使用できる color: white, black, blue, red, green, gray。\n"
         "繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。\n"
         "人・顔・動物を対象物として描かず、存在感、重心、余白、対称性、視線圧として抽象化する。\n"
@@ -2303,6 +2315,11 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
+
+    normalized_compose_ddl = compose_detail.ddl.lower()
+    if "雲形" in compose_detail.ddl or "cloudform" in normalized_compose_ddl:
+        score = _finalize_score(score, compose_detail.ddl)
+        coerce_report["coerce_relation_output_count"] = _score_relation_count(score)
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)
@@ -2732,6 +2749,11 @@ def api_paint(
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
+
+    normalized_compose_ddl = compose_detail.ddl.lower()
+    if "雲形" in compose_detail.ddl or "cloudform" in normalized_compose_ddl:
+        score = _finalize_score(score, compose_detail.ddl)
+        coerce_report["coerce_relation_output_count"] = _score_relation_count(score)
 
     canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     score = _score_with_canvas(score, canvas_aspect)

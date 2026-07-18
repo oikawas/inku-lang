@@ -345,7 +345,8 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "目鼻口・頭身・四肢・耳・尻尾" in SYSTEM_PROMPT
     assert 'symmetry="bilateral" は' in SYSTEM_PROMPT
     assert "縦線+小楕円" in SYSTEM_PROMPT
-    assert "涙・視線・屋根・雲" in SYSTEM_PROMPT
+    assert "涙・視線・屋根のような名詞" in SYSTEM_PROMPT
+    assert "正規化DDLに雲形がある場合だけ" in SYSTEM_PROMPT
     assert "対象物化を避けた語は削除してはいけない" in SYSTEM_PROMPT
     assert "motion intent として扱う" in SYSTEM_PROMPT
     assert "車輪・フレーム・車体" in SYSTEM_PROMPT
@@ -393,9 +394,10 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert '"rotation":-30' in SYSTEM_PROMPT
     assert "油絵の厚塗り" in SYSTEM_PROMPT
     assert "水彩" in SYSTEM_PROMPT
-    assert "tears, gaze, roof, and cloud" in SYSTEM_PROMPT_EN
+    assert "Nouns such as tears, gaze, and roof" in SYSTEM_PROMPT_EN
+    assert "Transcribe cloudform only when normalized DDL contains it" in SYSTEM_PROMPT_EN
     assert "Do not simply delete words that were not objectified" in SYSTEM_PROMPT_EN
-    assert "are motion intents, not objects" in SYSTEM_PROMPT_EN
+    assert "are motion intents. Apply them" in SYSTEM_PROMPT_EN
     assert "must not become wheels, frames, or bodies" in SYSTEM_PROMPT_EN
     assert "パッチワーク" in SYSTEM_PROMPT
     assert "フレスコの下地" in SYSTEM_PROMPT

@@ -191,7 +191,7 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 # Saijiki (歳時記)
 
-かたち: 円、楕円、三角、四角、線、弧
+かたち: 円、楕円、三角、四角、線、弧、雲形
 かたむき: 水平、垂直、斜め、右上がり、右下がり、回転
 てざわり: 髪、鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、ビュラン、ドライポイント
 つらなり: 実線(既定)、破線、点線、一点鎖線
@@ -229,6 +229,8 @@ SYSTEM_PROMPT_PREFIX = """あなたは inku DDL の第一段階インタプリ�
 
 # 非 Saijiki 語の展開
 
+雲形は、(a)「雲形」の明示、または (b) 雲・煙・霞・染み・島影・水たまり等、対象自体が無定形な場合に限って選ぶ。未知・不明瞭な対象の fallback に雲形を使ってはいけない。未知対象は文脈に最も近い既存の円・楕円・三角・四角・線・弧・多角形で近似する。
+
 Saijiki にない語が入力にあるとき、その語のイメージ・形・質感・構造から
 最も近い歳時記語彙に意味展開せよ。展開は文脈と構図全体を考慮すること。
 
@@ -236,12 +238,12 @@ Saijiki にない語が入力にあるとき、その語のイメージ・形・
 - **形状**: 月→円、山→三角、建物→四角、木→縦線
 - **形の偏りを避ける**: 「円・丸・月・太陽」が明示された場合だけ真円を主役にする。点・粒・星・雪・雨・砂・花びらは真円に固定せず、文脈に応じて小さな楕円、短い線、小さな四角へ分散する
 - **人・顔・動物を具象化しない**: 人、村人、老人、顔、視線、鳥、魚、熊などは対象物として描かず、重心、余白の圧、端寄りの焦点、輪郭の密度、群れの間隔へ変換する。縦線+小楕円、棒人間、目、頭、四肢、尾、翼のような共通記号を出力してはいけない
-- **感情語・場所語を物体化しない**: 涙、視線、屋根、雲などは新しい対象物や記号として増やさず、涙=下向きの滲み、視線=余白の圧、屋根=低い重心や斜めの圧、雲=上部の重さや密度差として既存の線・楕円・四角・弧へ変換する
+- **感情語・場所語を物体化しない**: 涙、視線、屋根は新しい対象物や記号として増やさず、涙=下向きの滲み、視線=余白の圧、屋根=低い重心や斜めの圧として既存図形へ変換する。雲・煙・霞・染み・島影・水たまりのように対象自体が無定形な場合だけ雲形を使う
 - **街・建物語も文脈を見る**: 街や建物は通常四角へ展開できるが、低い雲・屋根・押し沈めの文脈では建物ブロックにせず、上からの重さ、斜めの圧、下方向の配置として扱う
-- **物体化しない語も削除しない**: 涙/滲みは下向きまたは上から下、雲/押し沈めは上部の重さと下方向の圧、視線は片側の余白圧として配置語に残す
-- **motion intent として扱う**: 低い雲、押し沈める、影だけ、先に帰る、涙、滲み、ほどける、消えかけは対象物ではなく、既存の線・楕円・四角・弧の path、fade、rotation、rhythm_spacing、片側余白に変換する
+- **物体化しない語も削除しない**: 涙/滲みは下向きまたは上から下、押し沈めは上部の重さと下方向の圧、視線は片側の余白圧として配置語に残す。低い雲は雲形を上部に置き、下方向の圧を組み合わせる
+- **motion intent として扱う**: 押し沈める、影だけ、先に帰る、涙、滲み、ほどける、消えかけは対象物ではなく、既存図形の path、fade、rotation、rhythm_spacing、片側余白に変換する。低い雲は雲形の配置にこの motion intent を加える
 - **乗り物を記号化しない**: 自転車・車・電車などは車輪、フレーム、車体として出力せず、影、斜線、重心、先行/遅れ、余白のずれとして抽象化する
-- **質感**: 霧→楕円(滲む)、砂→小さな四角または短い線を散らす、炎→縦線(波打つ)
+- **質感**: 霧→滲む雲形、砂→小さな四角または短い線を散らす、炎→縦線(波打つ)
 - **構造**: 海→横線を複数、森→縦線を複数、星空→画面全体に小さな四角や短い線
 - **動作→配置**: 昇る→上方に置く、散る→上から下または波打つ軌跡に散らす、広がる→同心円状に並べる
 
@@ -262,7 +264,6 @@ EXAMPLE_POOL: list[dict] = [
         "input": "ドライポイントで滲む一本の線を引く",
         "output": "ドライポイントの横線を中央に引く。",
     },
-
     {
         "keywords": ["月", "昇", "空", "夜", "星", "天"],
         "input": "山の向こうに月が昇る",
@@ -419,7 +420,15 @@ EXAMPLE_POOL: list[dict] = [
     },
     # 背景塗りつぶし
     {
-        "keywords": ["背景", "塗りつぶす", "黒板", "暗い", "暗く", "ダーク", "黒い背景"],
+        "keywords": [
+            "背景",
+            "塗りつぶす",
+            "黒板",
+            "暗い",
+            "暗く",
+            "ダーク",
+            "黒い背景",
+        ],
         "input": "黒い背景に白い線を引く",
         "output": "背景を黒で塗りつぶす。白いチョークの横線を中央に引く。",
     },
@@ -445,7 +454,14 @@ EXAMPLE_POOL: list[dict] = [
     },
     # 色とりどり・多色配色
     {
-        "keywords": ["色とりどり", "カラフル", "虹", "様々な色", "多色", "いろいろな色"],
+        "keywords": [
+            "色とりどり",
+            "カラフル",
+            "虹",
+            "様々な色",
+            "多色",
+            "いろいろな色",
+        ],
         "input": "色とりどりの小さな円を散らす",
         "output": "赤・青・緑・黒・灰の色とりどりの右上がりの小さな楕円を画面全体に点々と四十七個散らす。",
     },
@@ -510,6 +526,16 @@ EXAMPLE_POOL: list[dict] = [
         "keywords": ["篠突く雨", "雨脚", "雨簾", "視界を覆う"],
         "input": "篠突く雨が雨簾となって視界を覆う",
         "output": "灰色の鉛筆の短い縦線を画面全体に二千本敷き詰める。間隔をゆるく揺らす。",
+    },
+    {
+        "keywords": ["雲形", "雲", "煙", "霞", "染み", "島影", "水たまり"],
+        "input": "横長の霞が低く漂う",
+        "output": "灰色の横長の雲形を上半分に置く。ゆっくり波打つ。",
+    },
+    {
+        "keywords": ["未知", "謎", "不明", "装置"],
+        "input": "謎の装置を中央に置く",
+        "output": "黒い四角を中央に置く。細い線を一本、四角を切るように引く。",
     },
     # 非 Saijiki 語の展開: 動作→配置
     {
@@ -584,7 +610,6 @@ EXAMPLE_POOL_EN: list[dict] = [
         "input": "Draw one velvety line in drypoint",
         "output": "Draw one drypoint horizontal line at center.",
     },
-
     {
         "keywords": ["wallpaper", "faded stripes", "vertical stripes"],
         "input": "Faded blue striped wallpaper",
@@ -599,6 +624,16 @@ EXAMPLE_POOL_EN: list[dict] = [
         "keywords": ["rain curtain", "driving rain", "sheets of rain"],
         "input": "Driving rain becomes a curtain across the view",
         "output": "Tile two thousand short gray pencil vertical lines across the whole canvas. Loosely varied spacing.",
+    },
+    {
+        "keywords": ["cloudform", "cloud", "smoke", "haze", "stain", "puddle"],
+        "input": "A wide bank of haze drifts low",
+        "output": "Place a wide gray cloudform in the upper half. Make it undulate slowly.",
+    },
+    {
+        "keywords": ["unknown", "mysterious", "unclear", "device"],
+        "input": "Place a mysterious device at center",
+        "output": "Place a black square at center. Draw one thin line cutting across the square.",
     },
     {
         "keywords": ["moon", "mountain", "sky", "night", "star", "rises"],
@@ -671,7 +706,14 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Scatter seventeen short red crayon lines along a diagonal band in the right half.",
     },
     {
-        "keywords": ["precise", "mechanical", "uniform", "blueprint", "technical", "diagram"],
+        "keywords": [
+            "precise",
+            "mechanical",
+            "uniform",
+            "blueprint",
+            "technical",
+            "diagram",
+        ],
         "input": "Mechanical uniform diagram lines",
         "output": "Line up seven thin rotring vertical lines horizontally.",
     },
@@ -751,7 +793,14 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Fill background with black. Draw a white chalk horizontal line at center.",
     },
     {
-        "keywords": ["white", "background", "line", "invisible", "same color", "contrast"],
+        "keywords": [
+            "white",
+            "background",
+            "line",
+            "invisible",
+            "same color",
+            "contrast",
+        ],
         "input": "White lines on a white background",
         "output": "Fill background with white. Draw a black pen horizontal line at center.",
     },
@@ -797,7 +846,14 @@ EXAMPLE_POOL_EN: list[dict] = [
     },
     # Ground texture: keep as a separate "Ground: ..." sentence (canvas.ground route)
     {
-        "keywords": ["washi", "paper grain", "off-white paper", "ink-wash ground", "on paper", "support"],
+        "keywords": [
+            "washi",
+            "paper grain",
+            "off-white paper",
+            "ink-wash ground",
+            "on paper",
+            "support",
+        ],
         "input": "A thin ink line on off-white paper",
         "output": "Draw a thin fine-brush horizontal line at center. Ground: off-white paper, fine paper grain.",
     },
@@ -976,7 +1032,7 @@ Do not normalize to the same foreground and background color. Invisible output i
 
 # Saijiki (Vocabulary)
 
-forms: circle, ellipse, triangle, square, line, arc
+forms: circle, ellipse, triangle, square, line, arc, cloudform
 angles: horizontal, vertical, diagonal, rising, falling, rotated
 touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint
 continuity: solid (default), dashed, dotted, dash-dot
@@ -1014,16 +1070,18 @@ Arc / Moon:
 
 # Non-Saijiki Word Expansion
 
+Choose cloudform only when (a) the input explicitly says cloudform, or (b) the subject itself is amorphous, such as cloud, smoke, haze, stain, island silhouette, or puddle. Never use cloudform as a fallback for an unknown or unclear object; approximate unknown objects with the nearest existing circle, ellipse, triangle, square, line, arc, or polygon.
+
 Expand unknown words to the nearest Saijiki vocabulary using shape, texture, structure, or motion.
 
 - **avoid shape bias**: Use true circles mainly when the input explicitly says circle, round, moon, or sun. For dots, particles, stars, snow, rain, sand, and petals, vary the form across small ellipses, short lines, and small squares instead of defaulting to true circles.
 - **shape**: moon→circle, mountain→triangle, building→square, tree→line
-- **do not objectify emotion or place words**: Tears, gaze, roof, and cloud are not new objects or signs to add. Convert tears into downward blur, gaze into negative-space pressure, roof into low weight or diagonal pressure, and cloud into upper weight or density contrast on existing lines, ellipses, squares, or arcs.
+- **do not objectify emotion or place words**: Tears, gaze, and roof are not new objects or signs to add. Convert tears into downward blur, gaze into negative-space pressure, and roof into low weight or diagonal pressure. Use cloudform only when the subject itself is amorphous, such as cloud, smoke, haze, stain, island silhouette, or puddle.
 - **respect context for city/building words**: City and building words may normally become squares, but in low-cloud, roof, or pressing-down contexts, do not make building blocks; convert them into overhead weight, diagonal pressure, or downward placement.
-- **do not delete non-objectified words**: Keep tears/blurring as downward or top-to-bottom placement, cloud/pressing-down as upper weight and downward pressure, and gaze as one-sided negative-space pressure.
-- **treat as motion intent**: Low cloud, pressing down, shadow only, going ahead, tears, blur, unraveling, and fading are not objects; convert them into path, fade, rotation, rhythm_spacing, or one-sided negative space on existing lines, ellipses, squares, or arcs.
+- **do not delete non-objectified words**: Keep tears/blurring as downward or top-to-bottom placement, pressing-down as upper weight and downward pressure, and gaze as one-sided negative-space pressure. Place low cloud as a cloudform above and combine it with downward pressure.
+- **treat as motion intent**: Pressing down, shadow only, going ahead, tears, blur, unraveling, and fading are not objects; convert them into path, fade, rotation, rhythm_spacing, or one-sided negative space. For low cloud, apply this motion intent to a cloudform.
 - **do not turn vehicles into signs**: Bicycles, cars, and trains must not become wheels, frames, or bodies; abstract them as shadows, diagonals, center of gravity, leading/lagging motion, or shifted negative space.
-- **texture**: mist→ellipse(blurring), sand→small squares or short lines, flame→line(undulating)
+- **texture**: mist→cloudform(blurring), sand→small squares or short lines, flame→line(undulating)
 - **structure**: sea→horizontal lines, forest→vertical lines, stars→small squares or short lines across the whole canvas
 - **motion→arrangement**: rising→place high, falling→scatter top to bottom, drifting→undulating trace, spreading→concentric circles
 
@@ -1032,8 +1090,13 @@ Expand unknown words to the nearest Saijiki vocabulary using shape, texture, str
 Normalized DDL text only. No preamble, explanation, tags, or code block markers."""
 
 # api.py が import する SYSTEM_PROMPT — プレフィックスを公開する
-SYSTEM_PROMPT = SYSTEM_PROMPT_PREFIX + "\n\n# 変換例\n\n(推論時に入力関連の例を動的に選択して注入)"
-SYSTEM_PROMPT_EN = SYSTEM_PROMPT_PREFIX_EN + "\n\n# Examples\n\n(dynamically selected at inference time)"
+SYSTEM_PROMPT = (
+    SYSTEM_PROMPT_PREFIX + "\n\n# 変換例\n\n(推論時に入力関連の例を動的に選択して注入)"
+)
+SYSTEM_PROMPT_EN = (
+    SYSTEM_PROMPT_PREFIX_EN
+    + "\n\n# Examples\n\n(dynamically selected at inference time)"
+)
 
 
 def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
@@ -1043,17 +1106,40 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
     全スコアが 0 の場合は先頭 k 件 (汎用例) を使う。
     """
     pool = EXAMPLE_POOL_EN if lang == "en" else EXAMPLE_POOL
-    scored = [(sum(1 for kw in ex["keywords"] if kw.lower() in text.lower()), ex) for ex in pool]
+    scored = [
+        (sum(1 for kw in ex["keywords"] if kw.lower() in text.lower()), ex)
+        for ex in pool
+    ]
     scored.sort(key=lambda x: -x[0])
     top = scored[:k]
     if all(s == 0 for s, _ in top):
         top = [(0, ex) for ex in pool[:k]]
     touch_markers = (
-        ("pencil", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint")
+        (
+            "pencil",
+            "rotring",
+            "crayon",
+            "chalk",
+            "fine-brush",
+            "thick-brush",
+            "burin",
+            "drypoint",
+        )
         if lang == "en"
-        else ("鉛筆", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント")
+        else (
+            "鉛筆",
+            "ロットリング",
+            "クレヨン",
+            "チョーク",
+            "細筆",
+            "太筆",
+            "ビュラン",
+            "ドライポイント",
+        )
     )
-    if not any(any(marker in ex["output"] for marker in touch_markers) for _, ex in top):
+    if not any(
+        any(marker in ex["output"] for marker in touch_markers) for _, ex in top
+    ):
         touch_example = next(
             (
                 item
@@ -1065,13 +1151,24 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
         if touch_example is not None and top:
             top[-1] = touch_example
     relation_markers = (
-        ("along the previous line", "not touching the previous shape", "cutting the previous line", "between the previous two")
+        (
+            "along the previous line",
+            "not touching the previous shape",
+            "cutting the previous line",
+            "between the previous two",
+        )
         if lang == "en"
         else ("前の線に沿って", "前の形に触れない", "前の線を切る", "前の二つの間に")
     )
-    if not any(any(marker in ex["output"] for marker in relation_markers) for _, ex in top):
+    if not any(
+        any(marker in ex["output"] for marker in relation_markers) for _, ex in top
+    ):
         relation_example = next(
-            (ex for ex in pool if any(marker in ex["output"] for marker in relation_markers)),
+            (
+                ex
+                for ex in pool
+                if any(marker in ex["output"] for marker in relation_markers)
+            ),
             None,
         )
         if relation_example is not None and top:
@@ -1079,19 +1176,23 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
                 (
                     index
                     for index in range(len(top) - 1, -1, -1)
-                    if not any(marker in top[index][1]["output"] for marker in touch_markers)
+                    if not any(
+                        marker in top[index][1]["output"] for marker in touch_markers
+                    )
                 ),
                 len(top) - 1,
             )
             top[replace_index] = (0, relation_example)
     if lang == "en":
-        return "\n\n".join(f"Input: {ex['input']}\nOutput: {ex['output']}" for _, ex in top)
-    return "\n\n".join(
-        f"入力: {ex['input']}\n出力: {ex['output']}" for _, ex in top
-    )
+        return "\n\n".join(
+            f"Input: {ex['input']}\nOutput: {ex['output']}" for _, ex in top
+        )
+    return "\n\n".join(f"入力: {ex['input']}\n出力: {ex['output']}" for _, ex in top)
 
 
-def _build_system_prompt(text: str, k: int = 5, prefix_override: str | None = None, lang: str = "ja") -> str:
+def _build_system_prompt(
+    text: str, k: int = 5, prefix_override: str | None = None, lang: str = "ja"
+) -> str:
     """推論ごとのシステムプロンプトを構築する (PREFIX + 動的例 k 件)。"""
     examples = _select_examples(text, k=k, lang=lang)
     if prefix_override is not None:
@@ -1162,16 +1263,24 @@ def interpret_detail(
     lang: str = "ja",
 ) -> tuple[str, str | None, int | None, int | None]:
     """(ddl, thinking, tokens_in, tokens_out) を返す。"""
-    system_prompt = _build_system_prompt(text, prefix_override=system_prompt_prefix, lang=lang)
+    system_prompt = _build_system_prompt(
+        text, prefix_override=system_prompt_prefix, lang=lang
+    )
 
     settings = _current_model_settings()
     if model:
-        provider, model_id = provider_for_model(model, stage="stage1", settings=settings)
+        provider, model_id = provider_for_model(
+            model, stage="stage1", settings=settings
+        )
         if provider == "anthropic":
-            ddl, tin, tout = _interpret_anthropic(text, model=model_id, system_prompt=system_prompt, settings=settings)
+            ddl, tin, tout = _interpret_anthropic(
+                text, model=model_id, system_prompt=system_prompt, settings=settings
+            )
             return _sanitize_placement_words(ddl), None, tin, tout
         if provider == "gemini":
-            ddl, tin, tout = _interpret_gemini(text, model=model_id, system_prompt=system_prompt, settings=settings)
+            ddl, tin, tout = _interpret_gemini(
+                text, model=model_id, system_prompt=system_prompt, settings=settings
+            )
             return _sanitize_placement_words(ddl), None, tin, tout
         ddl, thinking, tin, tout = _interpret_openai_detail(
             text,
@@ -1194,7 +1303,13 @@ def interpret_detail(
     return _sanitize_placement_words(ddl), None, tin, tout
 
 
-def _interpret_anthropic(text: str, *, model: str | None = None, system_prompt: str, settings: dict | None = None) -> tuple[str, int | None, int | None]:
+def _interpret_anthropic(
+    text: str,
+    *,
+    model: str | None = None,
+    system_prompt: str,
+    settings: dict | None = None,
+) -> tuple[str, int | None, int | None]:
     from anthropic import Anthropic
 
     connection = connection_for("anthropic", settings or _current_model_settings())
@@ -1216,12 +1331,16 @@ def _interpret_anthropic(text: str, *, model: str | None = None, system_prompt: 
     raise RuntimeError("Anthropic did not return text content")
 
 
-def _interpret_gemini(text: str, *, model: str, system_prompt: str, settings: dict | None = None) -> tuple[str, int | None, int | None]:
+def _interpret_gemini(
+    text: str, *, model: str, system_prompt: str, settings: dict | None = None
+) -> tuple[str, int | None, int | None]:
     connection = connection_for("gemini", settings or _current_model_settings())
     api_key = connection.get("api_key") or ""
     if not api_key:
         raise RuntimeError("Gemini API key is not configured")
-    base_url = str(connection.get("base_url") or "https://generativelanguage.googleapis.com").rstrip("/")
+    base_url = str(
+        connection.get("base_url") or "https://generativelanguage.googleapis.com"
+    ).rstrip("/")
     url = f"{base_url}/v1beta/models/{model}:generateContent?key={api_key}"
     body = {
         "systemInstruction": {"parts": [{"text": system_prompt}]},
@@ -1234,7 +1353,9 @@ def _interpret_gemini(text: str, *, model: str, system_prompt: str, settings: di
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))) as response:
+    with urllib.request.urlopen(
+        request, timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
+    ) as response:
         payload = json.loads(response.read().decode("utf-8"))
     parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     text_out = "\n".join(str(part.get("text", "")) for part in parts).strip()
@@ -1255,7 +1376,9 @@ def _interpret_openai_detail(
     settings = _current_model_settings()
     if model is None:
         provider, model = provider_for_model(None, stage="stage1", settings=settings)
-    provider = provider or provider_for_model(model, stage="stage1", settings=settings)[0]
+    provider = (
+        provider or provider_for_model(model, stage="stage1", settings=settings)[0]
+    )
     connection = connection_for(provider, settings)
     base_url = connection["base_url"]
     api_key = connection.get("api_key") or "none"

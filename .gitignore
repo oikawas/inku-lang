@@ -58,6 +58,7 @@ data/history.json
 cli/tune_bench.md
 cli/bench/
 cli/out/
+cli/out2/
 server/out/
 
 # Local-only operational files

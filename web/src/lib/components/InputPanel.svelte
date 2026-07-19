@@ -267,7 +267,7 @@
 		></textarea>
 		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide}</div>
 
-		{#if singleRunning && !singleDdlReady}
+		{#if singleRunning}
 			<div class="gen-status" aria-live="polite">
 				{#if showKiwi}<div class="gen-mascot"><InkuMascot /></div>{/if}
 				<div class="gen-info">
@@ -276,7 +276,7 @@
 				</div>
 				<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 			</div>
-		{:else if !singleRunning}
+		{:else}
 			<Tooltip placement="top" text={t().tooltipSubmit}>
 				<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
 			</Tooltip>

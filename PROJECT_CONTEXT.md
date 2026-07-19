@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.96.0 / Build 606**
+**Target version: v1.97.0 / Build 608**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -86,6 +86,8 @@ Build 600 fixes an instruction carrying both a region (`at`) and a relation losi
 v1.95 (Builds 601–604) is a second web-UI phase; server, Score, and rh2 are unchanged. Comparison dialogs became single-view, the standalone refine tab was removed, the instruction tab was restructured (read-only normalized DDL, a shared DDL editor dialog, DDL-origin works identified by `display_label='DDL'` with instruction-based actions hidden), the Drawing tab became Artwork with a generation badge, and autonomous-refinement UX was polished. Build 600 also added deterministic transcription of expansion-layer pair members into Score instructions (style-sentence consumption, merging past coerce) plus the inspection-only `carriage_warnings` mirror, making vocabulary carriage model-independent so model choice purely widens expression.
 
 v1.96 (Builds 605–606) introduced the user-selectable scenery level `tenkei` (none / sparse / auto, default auto), mapped deterministically onto all three layers (Stage 1 norm sections plus a pure-invocation bypass, Stage 1.5 pool reduction, a coerce insertion budget) with no post-hoc thinning governor and no effect on rh2. It also restored the §4.6 Stage 1.5 addition guard that Build 600 pair transcription had bypassed, implemented the user plugin management API (content read, create, overwrite, delete, enable/disable persisted in `.plugin-state.json`) with its settings UI, and attached `lineage_generation` to lineage responses. UI phase 3 replaced the mascot with the inku cube, unified the abortable generation-status element across dialogs, redesigned language comparison as direct Stage 1 × Stage 2 combinations, and single-sourced model metadata.
+
+v1.97 (Builds 607–608) made the scenery level per-artwork: a history `tenkei` column with server-side resolution (explicit value > inherited from the lineage parent > auto) keeps a lineage's level intact through refinement, autonomous loops, and the CLI (save-time resolution covers renderer-only derivations such as touch variation). The UI wires the instruction-tab selector (localStorage-persisted) and inheritance-defaulted 3-way selectors in six refinement dialogs (changing one creates a branching point), with the level shown in generation info and history tooltips.
 
 ## Where to Look for a Change
 

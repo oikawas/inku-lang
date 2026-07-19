@@ -5347,9 +5347,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return () => clearTimeout(handle);
 	});
 
-	const tokenSummary = $derived.by(() =>
-		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
-	);
 	function tokenPair(input: number | null, output: number | null): string {
 		return `${input ?? '-'}→${output ?? '-'}tok`;
 	}

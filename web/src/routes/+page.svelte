@@ -386,14 +386,15 @@
 	let targetContextVersion = 0;
 	let modelInspectionAbortController: AbortController | null = null;
 	let modelInspectionCurrentModel = $state('');
-	let languageCompareMode = $state<ModelCompareMode>('common');
-	let languageCompareFixedLang = $state<'ja' | 'en'>('ja');
-	let languageInspectionSelectedLangs = $state<Array<'ja' | 'en'>>([]);
+	// Language comparison selects (Stage 1 × Stage 2) language combinations directly,
+	// each id is `${stage1}:${stage2}` (e.g. 'ja:en').
+	let languageInspectionSelectedCombos = $state<string[]>([]);
 	let languageInspectionBusy = $state(false);
 	let languageInspectionStatus = $state<string | null>(null);
 	let languageInspectionResults = $state<ModelInspectionResult[]>([]);
 	let languageInspectionRunId = 0;
 	let languageInspectionAbortController: AbortController | null = null;
+	let languageInspectionCurrentLabel = $state('');
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -3657,52 +3658,43 @@ if (unreadWords.length > 0) {
 		(result?.instruction_lang_resolved === 'en' ? 'en' : result?.instruction_lang_resolved === 'ja' ? 'ja' : getLang()) as 'ja' | 'en'
 	);
 
-	function setLanguageCompareMode(mode: ModelCompareMode) {
+	// The target artwork's combination (Stage 1 lang == Stage 2 lang == target).
+	function isLanguageComboBlocked(stage1: 'ja' | 'en', stage2: 'ja' | 'en') {
+		return stage1 === languageInspectionTargetLang && stage2 === languageInspectionTargetLang;
+	}
+
+	function toggleLanguageCombo(id: string) {
 		if (languageInspectionBusy) return;
-		languageCompareMode = mode;
-		languageCompareFixedLang = languageInspectionTargetLang;
-		languageInspectionSelectedLangs = [];
-		languageInspectionResults = [];
+		const [s1, s2] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
+		if (isLanguageComboBlocked(s1, s2)) return;
+		languageInspectionSelectedCombos = languageInspectionSelectedCombos.includes(id)
+			? languageInspectionSelectedCombos.filter((value) => value !== id)
+			: [...languageInspectionSelectedCombos, id];
 		languageInspectionStatus = null;
 	}
 
-	function setLanguageCompareFixedLang(lang: 'ja' | 'en') {
-		if (languageInspectionBusy) return;
-		languageCompareFixedLang = lang;
-		languageInspectionResults = [];
-		languageInspectionStatus = null;
-	}
-
-	function isLanguageInspectionChoiceBlocked(lang: 'ja' | 'en') {
-		if (languageCompareMode === 'common') return lang === languageInspectionTargetLang;
-		if (languageCompareMode === 'stage1_fixed') return languageCompareFixedLang === languageInspectionTargetLang && lang === languageInspectionTargetLang;
-		return lang === languageInspectionTargetLang && languageCompareFixedLang === languageInspectionTargetLang;
-	}
-
-	function toggleLanguageInspectionLang(lang: 'ja' | 'en') {
-		if (languageInspectionBusy || isLanguageInspectionChoiceBlocked(lang)) return;
-		languageInspectionSelectedLangs = languageInspectionSelectedLangs.includes(lang)
-			? languageInspectionSelectedLangs.filter((value) => value !== lang)
-			: [...languageInspectionSelectedLangs, lang];
-		languageInspectionStatus = null;
+	function abortLanguageInspection() {
+		languageInspectionAbortController?.abort();
 	}
 
 	async function runLanguageInspection() {
 		if (languageInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const selected = languageInspectionSelectedLangs.filter((lang) => !isLanguageInspectionChoiceBlocked(lang));
+		const selected = languageInspectionSelectedCombos.filter((id) => {
+			const [s1, s2] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
+			return !isLanguageComboBlocked(s1, s2);
+		});
 		if (selected.length === 0) {
-			languageInspectionStatus = getLang() === 'ja' ? '比較する言語を1つ以上選択してください。' : 'Select at least one language to compare.';
+			languageInspectionStatus = getLang() === 'ja' ? '比較する組み合わせを1つ以上選択してください。' : 'Select at least one combination to compare.';
 			return;
 		}
 		const contextVersion = targetContextVersion;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		if (contextVersion !== targetContextVersion) return;
-		const jobs = selected.map((lang) => {
-			const stage1Lang = languageCompareMode === 'stage1_fixed' ? languageCompareFixedLang : lang;
-			const stage2Lang = languageCompareMode === 'stage2_fixed' ? languageCompareFixedLang : lang;
-			return { lang, stage1Lang, stage2Lang, id: `${languageCompareMode}:${stage1Lang}:${stage2Lang}` };
+		const jobs = selected.map((id) => {
+			const [stage1Lang, stage2Lang] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
+			return { lang: stage2Lang, stage1Lang, stage2Lang, id };
 		});
 		const rendered = new Set(languageInspectionResults.map((item) => item.id));
 		const pending = jobs.filter((job) => !rendered.has(job.id));
@@ -3716,15 +3708,16 @@ if (unreadWords.length > 0) {
 		languageInspectionBusy = true;
 		languageInspectionStatus = null;
 		const successful = [...languageInspectionResults];
+		const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
 		try {
 			for (const job of pending) {
 				if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
+				languageInspectionCurrentLabel = `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`;
 				try {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang);
 					const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang);
 					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
-					const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
 					successful.push({
 						id: job.id,
 						model: qualifiedModelId(stage1Provider, stage1Model),
@@ -3754,7 +3747,7 @@ if (unreadWords.length > 0) {
 						tokensOutStage2: composed.tokens_out,
 						elapsedMs: Date.now() - started,
 						lineageParentNodeId: parentNodeId,
-						compareMode: languageCompareMode,
+						compareMode: 'common',
 						comparisonKind: 'language',
 						stage1Lang: job.stage1Lang,
 						stage2Lang: job.stage2Lang,
@@ -3772,6 +3765,7 @@ if (unreadWords.length > 0) {
 			if (languageInspectionRunId === runId) {
 				languageInspectionAbortController = null;
 				languageInspectionBusy = false;
+				languageInspectionCurrentLabel = '';
 			}
 		}
 	}
@@ -5822,17 +5816,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				{languageInspectionTargetLang}
-				{languageCompareMode}
-				{languageCompareFixedLang}
-				{languageInspectionSelectedLangs}
+				{languageInspectionSelectedCombos}
 				{languageInspectionBusy}
 				{languageInspectionStatus}
 				{languageInspectionResults}
-				onSetLanguageCompareMode={setLanguageCompareMode}
-				onSetLanguageCompareFixedLang={setLanguageCompareFixedLang}
-				onToggleLanguageInspectionLang={toggleLanguageInspectionLang}
-				{isLanguageInspectionChoiceBlocked}
+				{languageInspectionCurrentLabel}
+				onToggleLanguageCombo={toggleLanguageCombo}
 				onRunLanguageInspection={runLanguageInspection}
+				onAbortLanguageInspection={abortLanguageInspection}
 				onAdoptLanguageInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleLanguageInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				{lineageGraph}

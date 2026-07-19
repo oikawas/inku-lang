@@ -332,7 +332,7 @@
 	let refineModalOpen = $state(false);
 	let refineKind = $state<RefineKind>('touch');
 	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
-	const statusGenerationLabel = $derived(statusGeneration ? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`) : (isJapanese ? '独立作品' : 'Standalone'));
+	const statusGenerationLabel = $derived(statusGeneration ? (isJapanese ? `系譜 第${statusGeneration}世代` : `Lineage Gen. ${statusGeneration}`) : (isJapanese ? '独立作品' : 'Standalone'));
 	const LANGUAGE_COMBOS: Array<['ja' | 'en', 'ja' | 'en']> = [['ja', 'ja'], ['ja', 'en'], ['en', 'ja'], ['en', 'en']];
 	function langName(lang: 'ja' | 'en'): string {
 		return lang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : 'English';

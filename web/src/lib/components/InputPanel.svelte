@@ -228,15 +228,19 @@
 				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			</Tooltip>
 			{#if inputMode === 'single'}
-				<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
+				<Tooltip text={t().tooltipInputTenkei}>
+					<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
+				</Tooltip>
 			{/if}
 			{#if canvasAspectEnabled}
-				<CanvasAspectPlugin
-					selected={canvasAspectId}
-					open={canvasAspectMenuOpen}
-					onToggle={onToggleCanvasAspectMenu}
-					onSelect={onSelectCanvasAspect}
-				/>
+				<Tooltip text={t().tooltipInputCanvas}>
+					<CanvasAspectPlugin
+						selected={canvasAspectId}
+						open={canvasAspectMenuOpen}
+						onToggle={onToggleCanvasAspectMenu}
+						onSelect={onSelectCanvasAspect}
+					/>
+				</Tooltip>
 			{/if}
 			{#if inputMode !== 'demo'}
 				<Tooltip placement="left" text={t().tooltipInputClear}>

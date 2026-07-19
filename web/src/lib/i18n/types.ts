@@ -174,6 +174,12 @@ export interface LangPack {
 	tooltipInputLang: string;
 	tooltipInputModel: string;
 	tooltipInputClear: string;
+	tooltipInputTenkei: string;
+	tooltipInputCanvas: string;
+	tooltipDdlNew: string;
+	tooltipSaijikiToggle: string;
+	tooltipDdlExpandedToggle: string;
+	tooltipStatsToggle: string;
 	tooltipSubmit: string;
 	tooltipDdlPaint: string;
 	tooltipInputTabSingle: string;

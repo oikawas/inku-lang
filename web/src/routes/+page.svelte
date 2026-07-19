@@ -5859,7 +5859,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- DDL ツール -->
 					{#if inputMode === 'single'}
 						<section class="panel-section ddl-tools-section">
-							<button class="ddl-new-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
+							<Tooltip placement="left" text={t().tooltipDdlNew}>
+								<button class="ddl-new-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
+							</Tooltip>
 						</section>
 					{/if}
 
@@ -5881,10 +5883,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- 統計 -->
 					{#if result && elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
-							<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
-								<span class="stats-arrow" class:open={statsOpen}>▶</span>
-								<span>{t().resultLogLabel}</span>
-							</button>
+							<Tooltip placement="right" text={t().tooltipStatsToggle}>
+								<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
+									<span class="stats-arrow" class:open={statsOpen}>▶</span>
+									<span>{t().resultLogLabel}</span>
+								</button>
+							</Tooltip>
 							{#if statsOpen}
 								<div class="stats-detail">
 									<div class="stats-grid">

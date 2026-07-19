@@ -55,7 +55,6 @@
 			{disabled}
 			aria-haspopup="menu"
 			aria-expanded={open}
-			title={title}
 			onclick={(event) => { event.stopPropagation(); open = !open; }}
 		>
 			<span>{title}: {tenkeiLabel(value, isJapanese)}</span>

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { highlightDDL } from '$lib/highlight';
+	import Tooltip from './Tooltip.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	type Props = {
 		/** Input-side DDL: the Stage 1 output, or the DDL the user wrote. */
@@ -31,15 +33,19 @@
 <div class="ddl-viewer">
 	<div class="ddl-viewer-head">
 		<span class="ddl-viewer-label">{primaryLabel}</span>
-		<button class="ddl-viewer-btn" type="button" onclick={onToggleSaijiki}>{saijikiLabel}</button>
+		<Tooltip placement="left" text={t().tooltipSaijikiToggle}>
+			<button class="ddl-viewer-btn" type="button" onclick={onToggleSaijiki}>{saijikiLabel}</button>
+		</Tooltip>
 	</div>
 	<div class="ddl-viewer-body ddl-highlight">{@html highlighted}</div>
 	{#if showExpanded}
 		<div class="ddl-expanded">
-			<button class="ddl-expanded-toggle" type="button" onclick={() => (expandedOpen = !expandedOpen)}>
-				<span class="ddl-expanded-arrow" class:open={expandedOpen}>▶</span>
-				<span>{expandedLabel}</span>
-			</button>
+			<Tooltip placement="right" text={t().tooltipDdlExpandedToggle}>
+				<button class="ddl-expanded-toggle" type="button" onclick={() => (expandedOpen = !expandedOpen)}>
+					<span class="ddl-expanded-arrow" class:open={expandedOpen}>▶</span>
+					<span>{expandedLabel}</span>
+				</button>
+			</Tooltip>
 			{#if expandedOpen}
 				<div class="ddl-viewer-body ddl-highlight">{@html expandedHighlighted}</div>
 			{/if}

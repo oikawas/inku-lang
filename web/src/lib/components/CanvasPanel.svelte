@@ -20,7 +20,7 @@
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
-	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; notes?: string };
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; tip: string };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
@@ -751,7 +751,7 @@
 							{@const blocked = isModelInspectionChoiceBlocked(choice.id)}
 							{@const checked = modelInspectionSelectedModels.includes(choice.id)}
 							{@const failed = !!modelInspectionFailedModels[choice.id]}
-							{@const modelTip = [choice.label, choice.providerLabel, choice.notes, blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join(' · ')}
+							{@const modelTip = [choice.tip, blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join('\n')}
 							<Tooltip wide placement="bottom" text={modelTip}>
 								<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || (!checked && modelInspectionSelectedModels.length >= 4)}>
 									<input type="checkbox" checked={checked} disabled={modelInspectionBusy || blocked || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />

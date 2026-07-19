@@ -2359,3 +2359,9 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - **鏡であって governor ではない。** 収集は interpreter／composer へ任意の `trace_sink` を通す観測のみで、interpret／expand／compose／coerce／render の判定・分岐・回数を一切変えない。`include_trace` 未指定時の応答は現行とフィールド単位で完全同一（新規キー `trace` も現れない）。trace は応答のみで DB（履歴・lineage）へ保存しない。同一入力・同一 seed では `include_trace` の有無によらず Score と render_hash が不変。収集失敗は生成を落とさず該当キー null ＋ warning とする。
 - `inku-cli paint --trace` を追加し、応答の `trace` を `<prefix>-trace.json` として出力ディレクトリへ保存する（`--full-json` と独立、旧サーバで trace 不在なら警告のみ）。
 - テスト: 上記不変条件（応答同一・非永続・Score/render_hash 不変・生成分岐なし・認証境界・試行構造）を LLM モックで回帰。SPEC 本文は変更しない（利き目監査ハーネスの入口。plan-intent-audit ステップ 4.5）。
+
+### v1.93 — 双弧の演奏修正（Build 594、2026-07-19）
+
+- **region が relation を無言で無効化していた不具合を修正:** region（`at`）と relation を両方持つ instruction は、region 配置時に relation が無記録で破棄され、touching 解決に到達していなかった。region 配置を先に・relation 解決を後に実行するよう改め、プラグイン member 由来の双弧（葉形）が設計どおり——直前要素の演奏後端点で固定された対向劣弧——として演奏されるようにした（利き目監査 F-1）。region は連鎖の起点・情報として扱う。
+- **演奏時 drop の警告記録:** 演奏時にのみ解決不能になる relation（touching 不適な primitive、退化幾何、grid 配置、端点のない直前要素）は §14.4 に従い Renderer が警告記録付きで drop する。座標補修・relation governor は導入していない。
+- 検証: 新規回帰 6 件（region+touching 下の vesica 形成、決定性、region 内配置、警告付き drop）、全 pytest 511 passed。保存済み葉ベンチ Score を同一 seed で再演奏すると、端点共有・劣弧掃引・端点固定の touching 弧が三本連なる。rh2 契約と Score schema は不変（新ビルドでの Replay は設計どおり新エディション）。

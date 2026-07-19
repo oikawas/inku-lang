@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v1.92.0 / Build 592**
+**対象バージョン: v1.92.0 / Build 594**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -76,6 +76,8 @@ v1.89では、認証付きWebアプリとして以下が利用できる。
 直近のv1.90.0では、Build 586で「あいだ」の第5語「触れる」を正式化し、Build 587でrelation全種の参照座標をSVG transform合成後のキャンバス座標へ統一した。Build 588は`touching`の二重関係付与を除去した。Build 589では、検証済み `.inku-plugin.md` をStage 1直後にコアDDLへ展開する宣言的プラグイン層を追加した。名前空間明示または指示対象として明示された`fires_on`だけが発火し、比喩・未知対象へは広げない。展開は決定的かつ48 instruction以内で、再帰、固定座標スタンプ、URL／ファイル参照、namespace衝突はロード拒否する。provenanceは履歴メタデータへ記録するが、Score・DB正本・rh2・Replayはプラグイン本文に依存しない。Build 590では、プラグイン展開等で数値regionが確定済みのコアDDLへStage 1.5が別の補助図形を追加せず、Scoreも明示region数を超えるinstructionを残さない一般境界を加えた。この境界はinstruction数を対象とし、arrangementによる可視要素数にはMistral／Qwen間のモデル差が残る。Build 591では宣言的プラグイン形式をv2へ拡張し、`member`複合形、`注:／note:`コメント行、`下端の帯`と展開層計算による斜めの帯、未知領域キーのロード拒否（silent fallback廃止）、en反復単位と単位保存の単数形、`anchor … N〜M箇所`の入れ子反復、`fires_on`の同一位置最長一致を受け入れる。Score・coerce・rh2は不変で、Nature.leaves v0.3.0が `plugin validate` を通過する。
 
 v1.92.0（Build 592）では歳時記を構造化した。`saijiki.py` の単一テーブルから、Stage 1プロンプトの語彙ブロック・プラグイン閉包マーカー・relation固定句・reference §1・web歳時記表示（`GET /api/saijiki` + スナップショット同期ストア）を導出する。構造化前プロンプトを golden fixture として凍結し、許可差分以外の組み立て差異をテストで検出する。作者裁定により語彙から「描く」「髪」を削剪した（Weight enum の hair は Replay 互換のため残置）。web 表示から「彫る」を削除し、Nature.風/うねり/無風 の静的表示は宣言的移行まで凍結した。
+
+v1.93では観測と演奏を整えた。Build 593で、生成パイプライン各層のRAW中間生成物を1回の生成で持ち帰る観測オプション（`include_trace`）を追加した。指定時のみ応答に`trace`（stage1_raw/ddl・plugin_expanded・stage15・stage2_raw_attempts・score_pre_coerce 等）を返す。収集はinterpreter／composerを通す観測のみで、生成判定・Score・render_hashは不変、DBへ保存しない。`inku-cli paint --trace`が`<prefix>-trace.json`を保存する。Build 594で、region（`at`）とrelationを両方持つinstructionがregion配置時にrelationを無言破棄しtouchingに到達しなかった不具合を修正した。region配置を先に・relation解決を後に実行し、プラグインmember由来の双弧（葉形）が設計どおり端点固定の対向劣弧として演奏される（利き目監査F-1）。演奏時のみ解決不能なrelationは§14.4に従い警告記録付きでdropする。rh2契約とScore schemaは不変。なお本番配布用のベンチ専用コンテナ環境（api 8101／web 5174・専用DB・版固定）をpentala上でbare metalと併走させて確立した（運用詳細はローカルの `AGENTS.md`）。
 
 ## 変更時の確認先
 

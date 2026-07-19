@@ -411,9 +411,6 @@
 		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show artwork derivations'}>
 			<button class="rtab" class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
 		</Tooltip>
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabRefine}>
-			<button class="rtab" class:active={outputTab === 'refine'} onclick={() => { refineModalOpen = false; outputTab = 'refine'; }} disabled={!result}>{t().tabRefine}</button>
-		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if result}
 			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Displayed artwork information'}>
@@ -562,13 +559,6 @@
 						<div class="refine-modal-header">
 							<h2 id="lineage-refine-dialog-title">{refineDialogTitle}</h2>
 							<button type="button" aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeRefineModal}>×</button>
-						</div>
-					{/if}
-					{#if !refineModalOpen}
-						<div class="refine-mode-tabs" role="tablist" aria-label={isJapanese ? '推敲方法' : 'Refinement method'}>
-							<button type="button" role="tab" aria-selected={refineView === 'adjust'} class:active={refineView === 'adjust'} onclick={() => (refineView = 'adjust')}>{isJapanese ? '調整' : 'Adjust'}</button>
-							<button type="button" role="tab" aria-selected={refineView === 'compare'} class:active={refineView === 'compare'} onclick={() => (refineView = 'compare')}>{isJapanese ? 'モデル比較' : 'Model comparison'}</button>
-							<button type="button" role="tab" aria-selected={refineView === 'language'} class:active={refineView === 'language'} onclick={() => (refineView = 'language')}>{isJapanese ? '言語比較' : 'Language comparison'}</button>
 						</div>
 					{/if}
 					{#if refineView === 'adjust'}
@@ -1169,27 +1159,6 @@
 	.refine-modal-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
 	.refine-modal-header h2 { margin: 0; color: var(--fg); font-size: 1rem; }
 	.refine-modal-header button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 1.25rem; line-height: 1; cursor: pointer; }
-	.refine-mode-tabs {
-		flex: 0 0 auto;
-		display: flex;
-		gap: 0;
-		border-bottom: 1px solid var(--border);
-		padding: 0 16px;
-	}
-	.refine-mode-tabs button {
-		padding: 9px 14px;
-		border: 0;
-		border-bottom: 2px solid transparent;
-		background: transparent;
-		color: var(--fg3);
-		font: inherit;
-		cursor: pointer;
-	}
-	.refine-mode-tabs button.active {
-		border-bottom-color: var(--accent);
-		color: var(--fg);
-		font-weight: 600;
-	}
 	.refine-shell .refine-panel,
 	.refine-shell .compare-panel {
 		align-self: auto;

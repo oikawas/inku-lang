@@ -1216,8 +1216,42 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
     return "\n\n".join(f"入力: {ex['input']}\n出力: {ex['output']}" for _, ex in top)
 
 
+_TENKEI_NORMS_JA = {
+    "none": (
+        "\n\n# 添景の抑制（この生成の指定: なし）\n"
+        "入力に書かれた要素だけを正規化する。入力にない補助図形・散布・背景・装飾の文を追加してはいけない。"
+        "名前空間付き語（例: Nature.紅葉）が入力にある場合は、その語と入力に明示された属性だけをそのまま転記し、"
+        "周囲に文を足さない。"
+    ),
+    "sparse": (
+        "\n\n# 添景の抑制（この生成の指定: 控えめ）\n"
+        "入力に書かれた要素を主題とし、追加する補助の文は最大 1 文までにする。"
+        "追加する場合は主題より小さく・薄くする。名前空間付き語が入力にある場合は、その語をそのまま転記する。"
+    ),
+}
+
+_TENKEI_NORMS_EN = {
+    "none": (
+        "\n\n# Scenery suppression (this generation: none)\n"
+        "Normalize only the elements written in the input. Do not add auxiliary shapes, scatters, "
+        "backgrounds, or decorative sentences that are not in the input. When the input contains a "
+        "qualified plugin term (e.g. Nature.autumn leaves), transcribe the term and its explicit "
+        "attributes as-is and add no surrounding sentences."
+    ),
+    "sparse": (
+        "\n\n# Scenery suppression (this generation: sparse)\n"
+        "Treat the written elements as the subject and add at most one auxiliary sentence. "
+        "Any addition must be smaller and paler than the subject. Transcribe qualified plugin terms as-is."
+    ),
+}
+
+
 def _build_system_prompt(
-    text: str, k: int = 5, prefix_override: str | None = None, lang: str = "ja"
+    text: str,
+    k: int = 5,
+    prefix_override: str | None = None,
+    lang: str = "ja",
+    tenkei: str = "auto",
 ) -> str:
     """推論ごとのシステムプロンプトを構築する (PREFIX + 動的例 k 件)。"""
     examples = _select_examples(text, k=k, lang=lang)
@@ -1228,6 +1262,8 @@ def _build_system_prompt(
     else:
         prefix = SYSTEM_PROMPT_PREFIX
     section_header = "# Examples\n\n" if lang == "en" else "# 変換例\n\n"
+    tenkei_norms = _TENKEI_NORMS_EN if lang == "en" else _TENKEI_NORMS_JA
+    tenkei_section = tenkei_norms.get(tenkei, "")
     from .plugins import DOCUMENT_PLUGIN_MANAGER
 
     vocabulary = DOCUMENT_PLUGIN_MANAGER.prompt_vocabulary(lang)
@@ -1249,7 +1285,7 @@ def _build_system_prompt(
                 "名前空間付き語が明示された場合、または列挙された発火語が指示対象として明示された"
                 "場合だけ名前空間付き語へ解決する。比喩や未知対象から推測せず、プラグイン語を創作しない。"
             )
-    return prefix + plugin_section + "\n\n" + section_header + examples
+    return prefix + plugin_section + tenkei_section + "\n\n" + section_header + examples
 
 
 def _get_provider(model: str) -> str:
@@ -1322,13 +1358,14 @@ def interpret_detail(
     system_prompt_prefix: str | None = None,
     lang: str = "ja",
     trace_sink: list[str] | None = None,
+    tenkei: str = "auto",
 ) -> tuple[str, str | None, int | None, int | None]:
     """(ddl, thinking, tokens_in, tokens_out) を返す。
 
     trace_sink 指定時は、サニタイズ前の Stage 1 生 DDL を append する (観測のみ)。
     """
     system_prompt = _build_system_prompt(
-        text, prefix_override=system_prompt_prefix, lang=lang
+        text, prefix_override=system_prompt_prefix, lang=lang, tenkei=tenkei
     )
 
     settings = _current_model_settings()

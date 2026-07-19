@@ -718,6 +718,7 @@ class ComposeRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用するサーバー側色カタログID")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
+    tenkei: str = Field(default="auto", pattern="^(none|sparse|auto)$", description="添景水準 (v1.96): none / sparse / auto")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
@@ -748,6 +749,7 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     vary_seed: int | None = None
+    tenkei: str | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     instruction_lang_requested: str | None = None
@@ -780,6 +782,7 @@ class InterpretRequest(BaseModel):
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
     ui_lang: str | None = Field(default=None, description="UI表示言語")
     expand_intermediate: bool = Field(default=False, description="Stage 1.5 の中間DDL拡張を適用するか")
+    tenkei: str = Field(default="auto", pattern="^(none|sparse|auto)$", description="添景水準 (v1.96): none / sparse / auto")
 
 
 class InterpretResponse(BaseModel):
@@ -817,6 +820,7 @@ class PaintRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用する色カタログID。ランダム選択時は直前IDとして除外する")
     random_color_catalog: bool = Field(default=False, description="現在のcatalog_idを除外してサーバー側で色カタログを選ぶか")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
+    tenkei: str = Field(default="auto", pattern="^(none|sparse|auto)$", description="添景水準 (v1.96): none / sparse / auto")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
@@ -848,6 +852,7 @@ class PaintResponse(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     vary_seed: int | None = None
+    tenkei: str | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     instruction_lang_requested: str | None = None
@@ -1276,6 +1281,19 @@ class PluginValidateBody(BaseModel):
     document: str = Field(..., min_length=1, max_length=500_000)
 
 
+class PluginCreateBody(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500_000)
+    filename: str | None = Field(default=None, max_length=200)
+
+
+class PluginUpdateBody(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500_000)
+
+
+class PluginEnabledBody(BaseModel):
+    enabled: bool
+
+
 class OutputSaveStatus(BaseModel):
     enabled: bool
     output_dir: str
@@ -1647,6 +1665,72 @@ def api_plugins_validate(
 def api_plugins_reload(actor: dict = Depends(_admin_user)) -> dict[str, object]:
     items = DOCUMENT_PLUGIN_MANAGER.reload(force=True)
     return {"items": [item.as_dict() for item in items]}
+
+
+@app.get("/api/plugins/{plugin_id}/content")
+def api_plugin_content(plugin_id: str, actor: dict = Depends(_admin_user)) -> dict[str, object]:
+    try:
+        content = DOCUMENT_PLUGIN_MANAGER.content(plugin_id)
+    except PluginFormatError as exc:
+        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="plugin not found") from None
+    return {"id": plugin_id, "path": plugin_id, "content": content, "editable": True}
+
+
+@app.post("/api/plugins", status_code=201)
+def api_plugin_create(
+    body: PluginCreateBody,
+    actor: dict = Depends(_admin_user),
+) -> dict[str, object]:
+    try:
+        item = DOCUMENT_PLUGIN_MANAGER.create(body.content, filename=body.filename)
+    except PluginFormatError as exc:
+        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=f"plugin file already exists: {exc}") from None
+    return item.as_dict()
+
+
+@app.put("/api/plugins/{plugin_id}")
+def api_plugin_update(
+    plugin_id: str,
+    body: PluginUpdateBody,
+    actor: dict = Depends(_admin_user),
+) -> dict[str, object]:
+    try:
+        item = DOCUMENT_PLUGIN_MANAGER.update(plugin_id, body.content)
+    except PluginFormatError as exc:
+        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="plugin not found") from None
+    return item.as_dict()
+
+
+@app.delete("/api/plugins/{plugin_id}")
+def api_plugin_delete(plugin_id: str, actor: dict = Depends(_admin_user)) -> dict[str, object]:
+    try:
+        DOCUMENT_PLUGIN_MANAGER.delete(plugin_id)
+    except PluginFormatError as exc:
+        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="plugin not found") from None
+    return {"ok": True}
+
+
+@app.put("/api/plugins/{plugin_id}/enabled")
+def api_plugin_set_enabled(
+    plugin_id: str,
+    body: PluginEnabledBody,
+    actor: dict = Depends(_admin_user),
+) -> dict[str, object]:
+    try:
+        item = DOCUMENT_PLUGIN_MANAGER.set_enabled(plugin_id, body.enabled)
+    except PluginFormatError as exc:
+        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="plugin not found") from None
+    return item.as_dict()
 
 
 def _enabled_plugin_entries() -> list[dict[str, object]]:
@@ -2268,6 +2352,7 @@ def _call_compose_detail(
     lang: str = "ja",
     vary_seed: int | None = None,
     include_trace: bool = False,
+    tenkei: str = "auto",
 ) -> ComposeDetail:
     stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
     plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
@@ -2282,6 +2367,8 @@ def _call_compose_detail(
         lang=lang,
         context_text=original_text,
         vary_seed=vary_seed,
+        plugin_instructions_present=bool(plugin_expansion.instructions),
+        tenkei=tenkei,
     )
     stage15_ddl = ddl  # trace: Stage 1.5 output = Stage 2 input (== ComposeDetail.ddl)
     plugin_provenance = list(plugin_expansion.provenance)
@@ -2421,6 +2508,7 @@ def _call_interpret_detail(
     system_prompt_prefix: str | None = None,
     lang: str = "ja",
     include_trace: bool = False,
+    tenkei: str = "auto",
 ) -> InterpretDetail:
     trace_sink: list[str] | None = [] if include_trace else None
 
@@ -2430,6 +2518,7 @@ def _call_interpret_detail(
             "include_thinking": include_thinking,
             "system_prompt_prefix": system_prompt_prefix,
             "lang": lang,
+            "tenkei": tenkei,
         }
         if trace_sink is not None:  # only when tracing: keep the no-trace call byte-identical
             kwargs["trace_sink"] = trace_sink
@@ -2524,6 +2613,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             lang=instruction_lang_resolved,
             vary_seed=req.vary_seed,
             include_trace=req.include_trace,
+            tenkei=req.tenkei,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -2540,7 +2630,13 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         if req.auto_repair:
             before_coerce = score
             branch_counts: dict[str, int] = {}
-            score = coerce_score(score, branch_report=branch_counts, ddl=_coerce_context(compose_detail.ddl, req.original_text))
+            score = coerce_score(
+                score,
+                branch_report=branch_counts,
+                ddl=_coerce_context(compose_detail.ddl, req.original_text),
+                tenkei=req.tenkei,
+                plugin_instructions_present=bool(compose_detail.plugin_instructions),
+            )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -2561,6 +2657,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "ui_lang": ui_lang,
         "render_seed": render_seed,
         "vary_seed": req.vary_seed,
+        "tenkei": req.tenkei,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
@@ -2618,13 +2715,18 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
         source_text, instruction_lang_requested, ui_lang=ui_lang
     )
     try:
-        detail = _call_interpret_detail(
-            req.text,
-            model=_resolved_stage1_model(req.model, actor),
-            include_thinking=req.include_thinking,
-            system_prompt_prefix=None,
-            lang=instruction_lang_resolved,
-        )
+        if req.tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
+            # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
+            detail = InterpretDetail(ddl=req.text.strip(), thinking=None, raw=None)
+        else:
+            detail = _call_interpret_detail(
+                req.text,
+                model=_resolved_stage1_model(req.model, actor),
+                include_thinking=req.include_thinking,
+                system_prompt_prefix=None,
+                lang=instruction_lang_resolved,
+                tenkei=req.tenkei,
+            )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("interpret", 502) from e
     plugin_provenance: list[dict[str, str]] = []
@@ -2640,6 +2742,8 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
             plugin_expansion.ddl,
             lang=instruction_lang_resolved,
             context_text=source_text,
+            plugin_instructions_present=bool(plugin_expansion.instructions),
+            tenkei=req.tenkei,
         )
         plugin_provenance = list(plugin_expansion.provenance)
         plugin_warnings = list(plugin_expansion.warnings)
@@ -2976,13 +3080,20 @@ def api_paint(
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     try:
-        interpret_detail_result = _call_interpret_detail(
-            req.text,
-            model=resolved_stage1_model,
-            include_thinking=req.include_thinking,
-            lang=instruction_lang_resolved,
-            include_trace=req.include_trace,
-        )
+        if req.tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
+            # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
+            interpret_detail_result = InterpretDetail(
+                ddl=req.text.strip(), raw=req.text.strip() if req.include_trace else None
+            )
+        else:
+            interpret_detail_result = _call_interpret_detail(
+                req.text,
+                model=resolved_stage1_model,
+                include_thinking=req.include_thinking,
+                lang=instruction_lang_resolved,
+                include_trace=req.include_trace,
+                tenkei=req.tenkei,
+            )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("interpret", 502) from e
     ddl = interpret_detail_result.ddl
@@ -2994,6 +3105,7 @@ def api_paint(
             original_text=source_text,
             lang=instruction_lang_resolved,
             include_trace=req.include_trace,
+            tenkei=req.tenkei,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -3012,7 +3124,13 @@ def api_paint(
         if req.auto_repair:
             before_coerce = score
             branch_counts: dict[str, int] = {}
-            score = coerce_score(score, branch_report=branch_counts, ddl=_coerce_context(ddl, source_text))
+            score = coerce_score(
+                score,
+                branch_report=branch_counts,
+                ddl=_coerce_context(ddl, source_text),
+                tenkei=req.tenkei,
+                plugin_instructions_present=bool(compose_detail.plugin_instructions),
+            )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -3033,6 +3151,7 @@ def api_paint(
         "ui_lang": ui_lang,
         "render_seed": render_seed,
         "vary_seed": req.vary_seed,
+        "tenkei": req.tenkei,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }

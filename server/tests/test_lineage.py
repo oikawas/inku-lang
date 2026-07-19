@@ -127,6 +127,51 @@ def test_history_lineage_metadata_reports_full_generation_depth():
         assert db.delete_user(user["id"])
 
 
+def test_lineage_nodes_carry_lineage_generation():
+    """v1.96: get_lineage / get_lineage_branch の node.history に lineage_generation を付与する
+    （系譜から開いた作品の世代表示が「独立作品」になる UI 不具合の server 側正規対応）。"""
+    user = _user()
+    try:
+        root = db.add_item(_item(user["id"], "根", 2000))
+        child = db.add_item(_item(
+            user["id"],
+            "枝",
+            2001,
+            lineage_parent_node_id=root["lineage_node_id"],
+            derivation_kind="description_edit",
+        ))
+        grandchild = db.add_item(_item(
+            user["id"],
+            "葉",
+            2002,
+            lineage_parent_node_id=child["lineage_node_id"],
+            derivation_kind="description_edit",
+        ))
+
+        lineage = db.get_lineage(user["id"], grandchild["lineage_node_id"])
+        assert lineage is not None
+        gen_by_node = {
+            node["id"]: node["history"]["lineage_generation"]
+            for node in lineage["nodes"]
+            if "history" in node
+        }
+        assert gen_by_node[root["lineage_node_id"]] == 1
+        assert gen_by_node[child["lineage_node_id"]] == 2
+        assert gen_by_node[grandchild["lineage_node_id"]] == 3
+
+        branch = db.get_lineage_branch(user["id"], grandchild["lineage_node_id"])
+        assert branch is not None
+        branch_gens = [
+            node["history"]["lineage_generation"]
+            for node in branch["nodes"]
+            if "history" in node
+        ]
+        assert branch_gens == [1, 2, 3]
+    finally:
+        db.delete_all(user["id"])
+        assert db.delete_user(user["id"])
+
+
 def test_lineage_only_history_is_hidden_and_can_be_promoted():
     user = _user()
     try:

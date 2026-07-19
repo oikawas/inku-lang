@@ -58,5 +58,13 @@ def expand_intermediate_for_lang(
     lang: str,
     context_text: str | None = None,
     vary_seed: int | None = None,
+    plugin_instructions_present: bool = False,
+    tenkei: str = "auto",
 ) -> str:
-    return instruction_language(lang).expand_intermediate(ddl, context_text, vary_seed)
+    return instruction_language(lang).expand_intermediate(
+        ddl,
+        context_text,
+        vary_seed,
+        plugin_instructions_present=plugin_instructions_present,
+        tenkei=tenkei,
+    )

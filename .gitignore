@@ -68,3 +68,6 @@ docs/
 
 #Codex
 AGENTS.md
+
+# plugin runtime state (enabled/disabled set, server-local)
+server/plugins/.plugin-state.json

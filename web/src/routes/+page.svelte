@@ -4012,6 +4012,13 @@ function closeDdlDialog(): void {
 	ddlDialogOpen = false;
 }
 
+// Refresh the lineage tree when the comparison dialog closes so adopted
+// results (saved as children) appear without reopening the tab.
+function refreshLineageAfterRefine(): void {
+	const focusId = lineageGraph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
+	if (focusId) void fetchLineage(focusId, true);
+}
+
 async function handleDdlDialogDraw(nextDdl: string): Promise<void> {
 	if (ddlDialogDrawing) return;
 	ddlDialogDrawing = true;
@@ -5041,6 +5048,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (inputMode === 'demo' || activeRunMode === 'demo') return null;
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
 	});
+	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
 	function formatHistoryDate(at: number): string {
 		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
@@ -5640,6 +5648,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				visionProviderGroups={availableVisionModelCatalog}
 				{statusCatalogName}
 				{statusCanvasName}
+				{statusGeneration}
 				{statusHistoryItem}
 				{statusHashLabel}
 				{statusHashCopied}
@@ -5716,6 +5725,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onOpenLineageDdlEditor={openLineageDdlEditor}
+				onCloseRefinement={refreshLineageAfterRefine}
 				statusDdlOrigin={statusDdlOrigin}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}

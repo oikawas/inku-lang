@@ -61,6 +61,7 @@
 		return node.history?.display_label === 'DDL';
 	}
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
+	let lineageScrollEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
 	let arrowPaths = $state<ArrowPath[]>([]);
@@ -318,8 +319,16 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			return;
 		}
 		const loadedCount = childrenByParent.get(node.id)?.length ?? 0;
-		if ((node.child_count ?? loadedCount) > loadedCount) await onLoadBranch(node.id);
+		const needsLoad = (node.child_count ?? loadedCount) > loadedCount;
+		// Loading children flips `loading`, which unmounts the scroll area and would
+		// reset scrollTop to 0. Preserve and restore the scroll position across it.
+		const savedScrollTop = lineageScrollEl?.scrollTop ?? 0;
+		if (needsLoad) await onLoadBranch(node.id);
 		expandedNodeIds = [...expandedNodeIds, node.id];
+		if (needsLoad) {
+			await tick();
+			if (lineageScrollEl) lineageScrollEl.scrollTop = savedScrollTop;
+		}
 	}
 	async function openOverview(): Promise<void> {
 		overviewOpen = true;
@@ -463,7 +472,7 @@ $effect(() => {
 	<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
 	{#if overviewOpen}
 		<div class="overview-zoom"><button type="button" onclick={() => (overviewScale = Math.max(.4, overviewScale - .1))}>−</button><span>{Math.round(overviewScale * 100)}%</span><button type="button" onclick={() => (overviewScale = Math.min(1.4, overviewScale + .1))}>＋</button></div>
-		<button type="button" onclick={closeOverview}>{isJapanese ? '通常表示へ戻る' : 'Close overview'}</button>
+		<button type="button" onclick={closeOverview}>{isJapanese ? '閉じる' : 'Close'}</button>
 	{:else}
 		<button type="button" onclick={openOverview}>{isJapanese ? '全体図' : 'Overview'}</button>
 	{/if}
@@ -481,7 +490,7 @@ $effect(() => {
 	{:else if !graph || graph.nodes.length === 0}
 		<div class="lineage-message">{isJapanese ? '保存すると、ここに系譜が表示されます。' : 'Save an artwork to begin its lineage.'}</div>
 	{:else}
-		<div class="lineage-scroll" class:overview-scroll={overviewOpen}>
+		<div class="lineage-scroll" class:overview-scroll={overviewOpen} bind:this={lineageScrollEl}>
 			<div class="lineage-columns" bind:this={lineageColumnsEl} style={overviewOpen ? `transform: scale(${overviewScale}); transform-origin: top left; width: ${100 / overviewScale}%; height: ${100 / overviewScale}%;` : undefined}>
 				<svg class="lineage-arrows" aria-hidden="true">
 					<defs>

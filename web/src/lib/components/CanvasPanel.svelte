@@ -61,6 +61,7 @@
 		visionProviderGroups: ProviderGroup[];
 		statusCatalogName: string;
 		statusCanvasName: string;
+		statusGeneration: number | null;
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopied: boolean;
@@ -140,6 +141,7 @@
 		onDrawLineageDescription: (node: LineageNode, text: string) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
+		onCloseRefinement: () => void;
 		statusDdlOrigin: boolean;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
@@ -192,6 +194,7 @@
 		visionProviderGroups,
 		statusCatalogName,
 		statusCanvasName,
+		statusGeneration,
 		statusHistoryItem,
 		statusHashLabel,
 		statusHashCopied,
@@ -271,6 +274,7 @@
 		onDrawLineageDescription,
 		onDrawLineageDdl,
 		onOpenLineageDdlEditor,
+		onCloseRefinement,
 		statusDdlOrigin,
 		onSaveOkugakiModel,
 		onSaveVisionModel,
@@ -294,6 +298,7 @@
 	let refineModalOpen = $state(false);
 	let refineKind = $state<RefineKind>('touch');
 	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
+	const statusGenerationLabel = $derived(statusGeneration ? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`) : (isJapanese ? '独立作品' : 'Standalone'));
 	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare' | 'language'): Promise<void> {
 		await onOpenLineageNode(node);
 		refineView = view;
@@ -304,6 +309,8 @@
 	function closeRefineModal(): void {
 		refineModalOpen = false;
 		outputTab = 'lineage';
+		// Reflect any adopted comparison/variation results into the lineage tree.
+		onCloseRefinement();
 	}
 
 	const refineCostLabel = $derived(
@@ -419,6 +426,7 @@
 		{#if result}
 			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Displayed artwork information'}>
 				<span class="render-meta-scope">{isJapanese ? '\u8868\u793a\u4e2d' : 'Displayed'}</span>
+				<span class="render-meta-generation">{statusGenerationLabel}</span>
 				<span class="render-meta-item render-meta-model">
 					<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
 					<strong title={statusStage1Model + ' / ' + statusStage2Model}>
@@ -1103,6 +1111,7 @@
 		color: var(--fg3);
 	}
 	.render-meta-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
+	.render-meta-generation { flex: 0 0 auto; color: var(--fg2); font-size: 11px; font-weight: 600; white-space: nowrap; }
 	.render-meta-item {
 		display: inline-flex;
 		align-items: baseline;

@@ -4,6 +4,7 @@
   import type { LineageNode } from './LineagePanel.svelte';
   import HistoryThumbnail from './HistoryThumbnail.svelte';
   import ModelCardPicker from './ModelCardPicker.svelte';
+  import Tooltip from './Tooltip.svelte';
   import { t } from '$lib/i18n/index.svelte';
 
   type RefineMode = 'random' | 'vision';
@@ -130,8 +131,8 @@
         <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" bind:group={refineMode} value="random" /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label><input type="radio" bind:group={refineMode} value="vision" /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
         {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
         <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea></div>
-        <div class="form-row"><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><input id="ai-gens" type="number" min="1" max="10" bind:value={generations} /></div></div>
-        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><label><input type="checkbox" bind:checked={enableReading} /><span>{t().refineCostReading} (Reading)</span></label><label><input type="checkbox" bind:checked={enableColor} /><span>{t().refineCostColor} (Color)</span></label><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().refineCostLayout} (Layout)</span></label><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().refineCostTouch} (Touch)</span></label></div></details>
+        <div class="form-row"><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
+        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label><input type="checkbox" bind:checked={enableReading} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip></div></details>
       {/if}
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}
       {#if errorText}<div class="error-banner">{errorText}</div>{/if}
@@ -150,7 +151,12 @@
   .mode-choice label { display:flex; align-items:flex-start; gap:8px; padding:10px; border:1px solid var(--border2); border-radius:8px; background:var(--bg2); cursor:pointer; } .mode-choice input { margin-top:2px; accent-color:var(--accent); } .mode-choice span { display:grid; gap:3px; } .mode-choice b { font-size:.78rem; } .mode-choice small { color:var(--fg3); font-size:.68rem; line-height:1.35; }
   .form-group { display:flex; flex-direction:column; gap:6px; } .form-group label { font-size:.76rem; color:var(--fg3); font-weight:500; }
   textarea { box-sizing:border-box; width:100%; border:1px solid var(--border2); border-radius:6px; padding:8px 10px; background:var(--bg); color:var(--fg); font:inherit; font-size:.82rem; resize:none; line-height:1.4; }
-  .form-row { display:flex; gap:12px; } .select-generations { width:120px; } input[type="number"] { box-sizing:border-box; width:100%; border:1px solid var(--border2); border-radius:6px; padding:6px 10px; background:var(--bg); color:var(--fg); font:inherit; font-size:.85rem; }
+  .form-row { display:flex; gap:12px; } .select-generations { width:120px; }
+  .gen-stepper { display:flex; align-items:center; width:fit-content; border:1px solid var(--border2); border-radius:6px; overflow:hidden; }
+  .gen-stepper button { width:34px; height:32px; border:0; background:var(--bg); color:var(--fg); font-size:1rem; line-height:1; cursor:pointer; }
+  .gen-stepper button:disabled { opacity:.4; cursor:default; }
+  .gen-stepper button:hover:not(:disabled) { background:var(--bg2); }
+  .gen-value { min-width:38px; text-align:center; font-size:.9rem; font-variant-numeric:tabular-nums; }
   .advanced-settings { border:1px solid var(--border); border-radius:8px; padding:8px 12px; background:var(--bg2); } .advanced-settings summary { font-size:.75rem; font-weight:600; color:var(--fg2); cursor:pointer; user-select:none; }
   .checkbox-group { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; } .checkbox-group label { display:flex; align-items:center; gap:8px; font-size:.74rem; cursor:pointer; } .checkbox-group input { width:14px; height:14px; accent-color:var(--accent); margin:0; }
   .running-state { margin:auto; display:flex; flex-direction:column; align-items:center; text-align:center; gap:14px; padding:10px 0; } .spinner { width:28px; height:28px; border:3px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }

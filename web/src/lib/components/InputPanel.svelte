@@ -210,14 +210,14 @@
 	<div class="section-head">
 		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
-			<Tooltip text={t().tooltipInputCatalog}>
-				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
-			</Tooltip>
 			{#if inputMode === 'single'}
 			<Tooltip text={t().tooltipInputModel}>
 				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			</Tooltip>
 			{/if}
+			<Tooltip text={t().tooltipInputCatalog}>
+				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
+			</Tooltip>
 			{#if canvasAspectEnabled}
 				<CanvasAspectPlugin
 					selected={canvasAspectId}
@@ -461,10 +461,7 @@
 	.cs-sub { color: var(--fg3); flex-shrink: 0; font-size: 10px; }
 	.cs-value {
 		min-width: 0;
-		max-width: 200px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		overflow-wrap: anywhere;
 		color: #4d5f86;
 		font-weight: 500;
 	}

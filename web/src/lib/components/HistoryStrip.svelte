@@ -41,8 +41,9 @@
 		historyStarredOnly: boolean;
 		onSetStarredOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
-		historyModelSummary: (item: HistoryItem) => string;
-		historyModelSummaryFull: (item: HistoryItem) => string;
+		historyModelStage1Short: (item: HistoryItem) => string;
+		historyModelStage1Full: (item: HistoryItem) => string;
+		historyModelStage2Full: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
 		catalogName: (id: string | null | undefined) => string;
 		isJapanese: boolean;
@@ -65,8 +66,9 @@
 		historyStarredOnly,
 		onSetStarredOnly,
 		historyIndexLabel,
-		historyModelSummary,
-		historyModelSummaryFull,
+		historyModelStage1Short,
+		historyModelStage1Full,
+		historyModelStage2Full,
 		formatHistoryDate,
 		catalogName,
 		isJapanese
@@ -142,7 +144,8 @@
 					>
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
-							<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummaryFull(it)}</strong></div>
+							<div class="tooltip-row"><span>Stage 1</span><strong>{historyModelStage1Full(it)}</strong></div>
+							<div class="tooltip-row"><span>Stage 2</span><strong>{historyModelStage2Full(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
 							<div class="tooltip-row"><span>{isJapanese ? '世代' : 'Gen.'}</span><strong>{lineageGenerationLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
@@ -159,7 +162,7 @@
 						>★</button>
 						<div class="thumb-meta">
 							<span class="thumb-generation">{lineageGenerationLabel(it)}</span>
-							<span class="thumb-model" title={historyModelSummaryFull(it)}>{historyModelSummary(it)}</span>
+							<span class="thumb-model" title={historyModelStage1Full(it)}>{historyModelStage1Short(it)}</span>
 						</div>
 						{#if i === historyCursor}
 							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>

@@ -1892,21 +1892,21 @@
 	}
 	.status-spacer { margin-right: auto; }
 	.status-hash-btn {
+		flex: 0 0 auto;
 		display: inline-flex;
 		align-items: center;
-		padding: 4px 9px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
+		padding: 5px 9px;
 		background: var(--panel);
 		color: var(--fg2);
-		font-family: inherit;
+		font: inherit;
+		font-size: 11px;
+		white-space: nowrap;
 		cursor: pointer;
-		line-height: 1;
 	}
-	.status-hash-btn:hover { background: var(--bg2); border-color: var(--accent); }
 	.status-hash-code {
 		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: 12px;
 		font-weight: 600;
 		letter-spacing: 0.06em;
 		color: #4d5f86;

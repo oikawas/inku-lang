@@ -464,7 +464,7 @@ $effect(() => {
 		<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
 		{#if checkedHistoryIds.length > 0}<span>{checkedHistoryIds.length}</span>{/if}
 	</button>
-	<button type="button" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
+	<button type="button" class="detach-btn" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
 </div>
 	</header>
 	{#if loading || overviewLoading}
@@ -528,9 +528,6 @@ $effect(() => {
 			</button>
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
 				{isJapanese ? '言語で比較' : 'Compare languages'}
-			</button>
-			<button type="button" class="menu-danger" role="menuitem" onclick={(event) => { event.stopPropagation(); onAskTrash([node.history?.id as string]); activeMenuNodeId = null; }}>
-				{isJapanese ? '作品をゴミ箱へ移動' : 'Move artwork to trash'}
 			</button>
 		</div>
 	{/if}
@@ -655,6 +652,8 @@ $effect(() => {
 	.overview-zoom { padding-right: 8px; border-right: 1px solid var(--border); }
 	.overview-zoom span { min-width: 42px; color: var(--fg3); font-size: .72rem; text-align: center; }
 	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: 7px; padding: 7px 10px; cursor: pointer; }
+	.detach-btn { background: #fff7e8; border-color: #d8b36a; color: #6c4a10; font-weight: 600; box-shadow: 0 1px 3px rgba(108,74,16,0.12); }
+	.detach-btn:hover { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
@@ -708,8 +707,6 @@ $effect(() => {
 	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 230px; border: 1px solid var(--border2); border-radius: 6px; padding: 5px 0; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
 	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 10px 13px; font-size: 0.84rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
 	.card-dropdown-menu button:hover { background: var(--bg2); }
-	.card-dropdown-menu button.menu-danger { width: calc(100% - 12px); margin: 5px 6px 2px; border-radius: 5px; background: #8f302a; color: #fff; font-weight: 650; }
-	.card-dropdown-menu button.menu-danger:hover { background: #74241f; color: #fff; }
 	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }

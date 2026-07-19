@@ -4957,10 +4957,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return `${s1} → ${s2}`;
 	}
 
-	function historyModelSummaryFull(it: Iteration): string {
-		const s1 = it.stage1_model ? statusModelName(it.stage1_model) : '-';
-		const s2 = it.stage2_model ? statusModelName(it.stage2_model) : '-';
-		return `${s1} → ${s2}`;
+	function historyModelStage1Short(it: Iteration): string {
+		return it.stage1_model ? shortModel(it.stage1_model) : '-';
+	}
+
+	function historyModelStage1Full(it: Iteration): string {
+		return it.stage1_model ? statusModelName(it.stage1_model) : '-';
+	}
+
+	function historyModelStage2Full(it: Iteration): string {
+		return it.stage2_model ? statusModelName(it.stage2_model) : '-';
 	}
 
 	function historyPreviewText(text: string): string {
@@ -5654,8 +5660,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{historyStarredOnly}
 			onSetStarredOnly={setHistoryStarredOnly}
 			{historyIndexLabel}
-			{historyModelSummary}
-			{historyModelSummaryFull}
+			{historyModelStage1Short}
+			{historyModelStage1Full}
+			{historyModelStage2Full}
 			{formatHistoryDate}
 			{catalogName}
 			isJapanese={getLang() === 'ja'}

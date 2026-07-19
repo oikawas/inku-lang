@@ -308,6 +308,12 @@ export const ja: LangPack = {
 	elapsedDetailed: (s1, s2, total) =>
 		`解釈 ${s1.toFixed(1)}s + 構造化 ${s2.toFixed(1)}s = ${total.toFixed(1)}s`,
 	resultLogLabel: '結果ログ',
+	interpretFallbackBadge: '解釈フォールバック',
+	interpretFallbackHint: (reason) => reason === 'stage1_hard_timeout'
+		? 'Stage 1 が時間内に応答しなかったため、定型の代替DDLで描画しました。'
+		: reason === 'stage1_empty_output'
+			? 'Stage 1 が空の応答を返したため、定型の代替DDLで描画しました。'
+			: 'Stage 1 が失敗したため、定型の代替DDLで描画しました。',
 	statsInterp: 'DDL生成',
 	statsStruct: 'JSON生成・SVGレンダリング',
 	statsTotal: '合計',

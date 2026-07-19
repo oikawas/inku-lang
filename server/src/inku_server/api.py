@@ -1030,6 +1030,7 @@ class HistoryPostBody(BaseModel):
     ddl: str | None = None
     expanded_ddl: str | None = None
     focus: str | None = None
+    interpret_fallback: str | None = None
     score: dict
     svg: str = ""
     at: int
@@ -3060,6 +3061,7 @@ def _add_history_item(
     svg: str,
     at: int,
     expanded_ddl: str | None = None,
+    interpret_fallback: str | None = None,
     elapsed_ms: int = 0,
     stage1_model: str | None = None,
     stage2_model: str | None = None,
@@ -3101,6 +3103,7 @@ def _add_history_item(
         "input": input_text,
         "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
         "expanded_ddl": _sanitize_placement_words(expanded_ddl) if expanded_ddl else expanded_ddl,
+        "interpret_fallback": interpret_fallback,
         "score": score_dict,
         "svg": svg,
         "at": at,
@@ -3287,6 +3290,11 @@ def _paint_events(
             input_text=req.history_input or source_text,
             ddl=compose_detail.source_ddl or ddl,
             expanded_ddl=ddl,
+            interpret_fallback=(
+                (interpret_detail_result.fallback_reasons or ["stage1_fallback"])[0]
+                if interpret_detail_result.fallback_used
+                else None
+            ),
             score=score,
             svg=svg,
             at=history_at,
@@ -3840,6 +3848,7 @@ def api_history_post(
         input_text=body.input,
         ddl=body.ddl,
         expanded_ddl=body.expanded_ddl,
+        interpret_fallback=body.interpret_fallback,
         score=score,
         svg=svg,
         at=body.at,

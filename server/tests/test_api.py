@@ -1443,7 +1443,7 @@ def test_compose_returns_source_ddl(monkeypatch, auth_context):
 
 
 def test_empty_stage1_output_falls_back_instead_of_drawing_nothing(monkeypatch, auth_context):
-    headers, _, _ = auth_context
+    headers, user, _ = auth_context
     monkeypatch.setattr(
         api_module,
         "interpret_detail",
@@ -1459,11 +1459,21 @@ def test_empty_stage1_output_falls_back_instead_of_drawing_nothing(monkeypatch, 
 
     monkeypatch.setattr(api_module, "compose", fake_compose)
 
-    r = client.post("/api/paint", json={"text": "空を返すモデル"}, headers=headers)
+    r = client.post(
+        "/api/paint", json={"text": "空を返すモデル", "save_history": True}, headers=headers
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["interpret_fallback_used"] is True
     assert data["interpret_fallback_reasons"] == ["stage1_empty_output"]
+
+    # フォールバックで描かれたことを作品に残し、UI がバッジを出せるようにする。
+    listing = client.get(
+        "/api/history", params={"anchor_id": data["history_id"], "limit": 100}, headers=headers
+    ).json()
+    saved = next(item for item in listing["items"] if item["id"] == data["history_id"])
+    assert saved["interpret_fallback"] == "stage1_empty_output"
+    db.delete_items(user["id"], [data["history_id"]])
     # 記述を持たない作品が保存されないよう、決定的フォールバック DDL で描画する。
     assert data["source_ddl"].strip()
     assert data["ddl"].strip()

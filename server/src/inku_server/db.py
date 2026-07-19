@@ -106,6 +106,8 @@ class HistoryRow(Base):
     vary_seed = Column(String, nullable=True)
     tenkei = Column(String, nullable=True)  # v1.97 添景水準 (none/sparse/auto)。NULL = 保存開始前の作品
     focus = Column(String, nullable=True)  # v1.98 焦点。NULL = DDL テキストから決定的に選択
+    # v1.98: Stage 1 がフォールバック DDL で描かれた作品の理由。NULL = 通常の解釈。
+    interpret_fallback = Column(String, nullable=True)
     interpretation_seed = Column(String, nullable=True)
     seed_text = Column(Text, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
@@ -273,6 +275,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "vary_seed": "ALTER TABLE history ADD COLUMN vary_seed VARCHAR",
     "tenkei": "ALTER TABLE history ADD COLUMN tenkei VARCHAR",
     "focus": "ALTER TABLE history ADD COLUMN focus VARCHAR",
+    "interpret_fallback": "ALTER TABLE history ADD COLUMN interpret_fallback VARCHAR",
     "expanded_ddl": "ALTER TABLE history ADD COLUMN expanded_ddl TEXT",
     "interpretation_seed": "ALTER TABLE history ADD COLUMN interpretation_seed VARCHAR",
     "seed_text": "ALTER TABLE history ADD COLUMN seed_text TEXT",
@@ -1635,6 +1638,8 @@ def _row_to_dict(row: HistoryRow) -> dict:
         item["tenkei"] = row.tenkei
     if row.focus is not None:
         item["focus"] = row.focus
+    if row.interpret_fallback is not None:
+        item["interpret_fallback"] = row.interpret_fallback
     if row.interpretation_seed is not None:
         item["interpretation_seed"] = row.interpretation_seed
     if row.seed_text is not None:
@@ -1767,6 +1772,7 @@ def add_item(item: dict) -> dict:
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
         vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
         tenkei=item.get("tenkei"), focus=item.get("focus"),
+        interpret_fallback=item.get("interpret_fallback"),
         interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
         seed_text=item.get("seed_text"),
         render_hash=render_hash, trashed=0, starred=0, note=item.get("note"),

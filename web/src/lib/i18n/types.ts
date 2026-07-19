@@ -320,6 +320,8 @@ export interface LangPack {
 	// Elapsed / tokens
 	elapsedDetailed: (s1: number, s2: number, total: number) => string;
 	resultLogLabel: string;
+	interpretFallbackBadge: string;
+	interpretFallbackHint: (reason: string) => string;
 	statsInterp: string;
 	statsStruct: string;
 	statsTotal: string;

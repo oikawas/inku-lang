@@ -115,6 +115,8 @@
 		elapsed_total_ms: number;
 		source_ddl?: string | null;
 		focus?: string | null;
+		interpret_fallback_used?: boolean;
+		interpret_fallback_reasons?: string[];
 		tokens_in_stage1: number | null;
 		tokens_out_stage1: number | null;
 		tokens_in_stage2: number | null;
@@ -2275,6 +2277,13 @@
 		if (inputMode === 'batch' || activeRunMode === 'batch') return batchLatestPrompt;
 		return input;
 	});
+
+	// v1.98: Stage 1 が失敗してフォールバック DDL で描かれたかどうか。
+	const interpretFallbackReason = $derived(
+		displayedHistoryItem
+			? (displayedHistoryItem.interpret_fallback ?? null)
+			: (result?.interpret_fallback_used ? (result?.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
+	);
 
 	// Standalone DDL-authored artworks have no instruction; gate instruction-only refine paths.
 	const statusDdlOrigin = $derived((displayedHistoryItem?.display_label ?? null) === DDL_ORIGIN_LABEL);
@@ -5886,6 +5895,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 													<span><span class="stats-metric-label">{t().statsElapsed}</span>{(elapsedStage1Ms / 1000).toFixed(1)}s</span>
 													<span><span class="stats-metric-label">{t().statsTokens}</span>{tokenPair(tokensInStage1, tokensOutStage1)}</span>
 												</span>
+											</div>
+										{/if}
+										{#if interpretFallbackReason}
+											<div class="stats-row">
+												<span class="stats-key">{t().interpretFallbackBadge}</span>
+												<span class="stats-value"><span>{t().interpretFallbackHint(interpretFallbackReason)}</span></span>
 											</div>
 										{/if}
 										<div class="stats-row">

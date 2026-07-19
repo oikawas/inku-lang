@@ -308,6 +308,12 @@ export const en: LangPack = {
 	elapsedDetailed: (s1, s2, total) =>
 		`interp ${s1.toFixed(1)}s + struct ${s2.toFixed(1)}s = ${total.toFixed(1)}s`,
 	resultLogLabel: 'Result Log',
+	interpretFallbackBadge: 'Interpretation fallback',
+	interpretFallbackHint: (reason) => reason === 'stage1_hard_timeout'
+		? 'Stage 1 did not answer in time, so a canned substitute DDL was drawn.'
+		: reason === 'stage1_empty_output'
+			? 'Stage 1 returned an empty answer, so a canned substitute DDL was drawn.'
+			: 'Stage 1 failed, so a canned substitute DDL was drawn.',
 	statsInterp: 'DDL generation',
 	statsStruct: 'JSON generation / SVG rendering',
 	statsTotal: 'Total',

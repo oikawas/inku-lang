@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v1.92.0 / Build 594**
+**対象バージョン: v1.94.0 / Build 600**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -77,7 +77,11 @@ v1.89では、認証付きWebアプリとして以下が利用できる。
 
 v1.92.0（Build 592）では歳時記を構造化した。`saijiki.py` の単一テーブルから、Stage 1プロンプトの語彙ブロック・プラグイン閉包マーカー・relation固定句・reference §1・web歳時記表示（`GET /api/saijiki` + スナップショット同期ストア）を導出する。構造化前プロンプトを golden fixture として凍結し、許可差分以外の組み立て差異をテストで検出する。作者裁定により語彙から「描く」「髪」を削剪した（Weight enum の hair は Replay 互換のため残置）。web 表示から「彫る」を削除し、Nature.風/うねり/無風 の静的表示は宣言的移行まで凍結した。
 
-v1.93では観測と演奏を整えた。Build 593で、生成パイプライン各層のRAW中間生成物を1回の生成で持ち帰る観測オプション（`include_trace`）を追加した。指定時のみ応答に`trace`（stage1_raw/ddl・plugin_expanded・stage15・stage2_raw_attempts・score_pre_coerce 等）を返す。収集はinterpreter／composerを通す観測のみで、生成判定・Score・render_hashは不変、DBへ保存しない。`inku-cli paint --trace`が`<prefix>-trace.json`を保存する。Build 594で、region（`at`）とrelationを両方持つinstructionがregion配置時にrelationを無言破棄しtouchingに到達しなかった不具合を修正した。region配置を先に・relation解決を後に実行し、プラグインmember由来の双弧（葉形）が設計どおり端点固定の対向劣弧として演奏される（利き目監査F-1）。演奏時のみ解決不能なrelationは§14.4に従い警告記録付きでdropする。rh2契約とScore schemaは不変。なお本番配布用のベンチ専用コンテナ環境（api 8101／web 5174・専用DB・版固定）をpentala上でbare metalと併走させて確立した（運用詳細はローカルの `AGENTS.md`）。
+v1.93（Build 593）では RAW trace オプションを追加した。`/api/paint`・`/api/compose` の `include_trace`（既定 false）で各層の中間生成物を 1 応答に持ち帰る観測のみの機能で、Score・render・分岐・回数を変えず DB へも保存しない（利き目監査ハーネスの入口）。 なお本番配布用のベンチ専用コンテナ環境（api 8101／web 5174・専用DB・版固定）をpentala上でbare metalと併走させて確立した（運用詳細はローカルの `AGENTS.md`）。
+
+v1.94.0（Build 594–599）は web UI のみの整理で、描画機構と server には触れていない。記述タブの指示・ボタンの下へ「現在選択中」（モデル・色カタログ・キャンバス、Stage 1／2 差異はラベル付き・モデルはフル名称）を移設し、キャンバス下ステータスバーはモデル等を除いて render hash（下四桁）＋クリックで full hash コピーへ置換した。記述・バッチ・デモの左パネルを左へ折りたためるようにし、キャンバス作品のマウスホイールズームを追加した。Vision モデルは用途別に整理し、AI 自律推敲で選ぶモデルを `vision_model` へ、奥書のモデルを `okugaki_model` へそれぞれ永続化して、記述から開くモデルダイアログからは Vision タブを外した（Vision は生成では使わず所見・推敲観察のみ）。下部履歴サムネイルは Stage 1 短縮名を表示し tooltip は Stage 1／2 をフル名称で分離、状態バッジは除去（tooltip には残置）、英語表記は「Gen.」へ短縮した。ボタン意匠と配置（起点＝新規作成と同意匠、ハッシュ＝他ステータスバーボタンと同意匠、最新ボタンを左、指示タブはモデル→色カタログ順）を整え、推敲・奥書のモデル選択 tooltip を `position: fixed` 化してスクロール容器の見切れを解消した。系譜の作品カードメニューからは「ゴミ箱へ移動」を除いた（ヘッダの一括ゴミ箱は残置）。
+
+Build 600 では、region（`at`）とrelationを両方持つinstructionがregion配置時にrelationを無言破棄しtouchingに到達しなかった不具合を修正した。region配置を先に・relation解決を後に実行し、プラグインmember由来の双弧（葉形）が設計どおり端点固定の対向劣弧として演奏される（利き目監査F-1）。演奏時のみ解決不能なrelationは§14.4に従い警告記録付きでdropする。rh2契約とScore schemaは不変。
 
 ## 変更時の確認先
 

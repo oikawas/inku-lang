@@ -16,9 +16,10 @@
     onPaintOne: (text: string, options: any) => Promise<any>;
     onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<VisionAdvice>;
     onLoadBranch: (nodeId: string) => void | Promise<void>;
+    onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
   };
 
-  let { node, visionModel, visionProviderGroups, onClose, onPaintOne, onVisionAdvice, onLoadBranch }: Props = $props();
+  let { node, visionModel, visionProviderGroups, onClose, onPaintOne, onVisionAdvice, onLoadBranch, onSaveVisionModel }: Props = $props();
   let prompt = $state('');
   let generations = $state(5);
   let refineMode = $state<RefineMode>('random');
@@ -127,7 +128,7 @@
         <div class="running-state"><div class="spinner"></div><p class="status-message">{statusText}</p>{#if lastGeneratedItem}<div class="progress-preview"><HistoryThumbnail item={lastGeneratedItem} scope="ai-refine-progress" size="manager" /></div>{/if}</div>
       {:else}
         <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" bind:group={refineMode} value="random" /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label><input type="radio" bind:group={refineMode} value="vision" /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
-        {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); }} />{/if}
+        {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
         <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea></div>
         <div class="form-row"><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><input id="ai-gens" type="number" min="1" max="10" bind:value={generations} /></div></div>
         <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><label><input type="checkbox" bind:checked={enableReading} /><span>{t().refineCostReading} (Reading)</span></label><label><input type="checkbox" bind:checked={enableColor} /><span>{t().refineCostColor} (Color)</span></label><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().refineCostLayout} (Layout)</span></label><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().refineCostTouch} (Touch)</span></label></div></details>

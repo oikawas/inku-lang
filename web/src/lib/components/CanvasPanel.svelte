@@ -1893,8 +1893,6 @@
 	.status-spacer { margin-right: auto; }
 	.status-hash-btn {
 		flex: 0 0 auto;
-		display: inline-flex;
-		align-items: center;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
 		padding: 5px 9px;

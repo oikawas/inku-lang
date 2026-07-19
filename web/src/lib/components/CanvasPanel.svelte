@@ -120,6 +120,7 @@
 		isModelInspectionChoiceBlocked: (model: string) => boolean;
 		onRunModelInspection: () => void | Promise<void>;
 		onAbortModelInspection: () => void;
+		modelInspectionCurrentModel: string;
 		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
 		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
 		languageInspectionTargetLang: 'ja' | 'en';
@@ -255,6 +256,7 @@
 		isModelInspectionChoiceBlocked,
 		onRunModelInspection,
 		onAbortModelInspection,
+		modelInspectionCurrentModel,
 		onAdoptModelInspectionResult,
 		onToggleModelInspectionStar,
 		languageInspectionTargetLang,
@@ -725,7 +727,10 @@
 							{#if modelInspectionBusy}
 								<div class="compare-status" aria-live="polite">
 									<div class="compare-mascot"><InkuMascot /></div>
-									<span class="compare-status-label">{t().modelCompareBusy}</span>
+									<div class="compare-status-info">
+										<span class="compare-status-label">{t().modelCompareBusy}</span>
+										{#if modelInspectionCurrentModel}<span class="compare-status-model">{modelInspectionCurrentModel}</span>{/if}
+									</div>
 									<StopButton onclick={onAbortModelInspection}>{t().stopBtn}</StopButton>
 								</div>
 							{:else}
@@ -1435,9 +1440,14 @@
 	}
 	.compare-action-wrap :global(.tooltip-wrap) { width: 100%; }
 	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
+	/* While comparing, let the status widen past the button width so the full
+	   model name shows without truncation. */
+	.compare-action-wrap:has(.compare-status) { width: auto; min-width: 0; max-width: 62%; }
 	.compare-status { display: flex; align-items: center; gap: 10px; }
 	.compare-mascot { flex: 0 0 auto; display: flex; align-items: center; }
-	.compare-status-label { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 500; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.compare-status-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+	.compare-status-label { font-size: 11px; color: var(--fg3); }
+	.compare-status-model { font-size: 12px; font-weight: 500; color: var(--fg); white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
 	.compare-status :global(.stop-btn) { flex: 0 0 auto; width: auto; min-width: 0; padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em; }
 
 	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }

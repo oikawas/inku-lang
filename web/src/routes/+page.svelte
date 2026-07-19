@@ -385,6 +385,7 @@
 	let modelInspectionRunId = 0;
 	let targetContextVersion = 0;
 	let modelInspectionAbortController: AbortController | null = null;
+	let modelInspectionCurrentModel = $state('');
 	let languageCompareMode = $state<ModelCompareMode>('common');
 	let languageCompareFixedLang = $state<'ja' | 'en'>('ja');
 	let languageInspectionSelectedLangs = $state<Array<'ja' | 'en'>>([]);
@@ -3586,6 +3587,9 @@ if (unreadWords.length > 0) {
 		try {
 			for (const job of pending) {
 				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+				const jobStage1Name = statusModelName(job.stage1);
+				const jobStage2Name = statusModelName(job.stage2);
+				modelInspectionCurrentModel = jobStage1Name === jobStage2Name ? jobStage1Name : `${jobStage1Name} / ${jobStage2Name}`;
 				try {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, abortController.signal, job.stage1);
@@ -3640,6 +3644,7 @@ if (unreadWords.length > 0) {
 			if (modelInspectionRunId === runId) {
 				modelInspectionAbortController = null;
 				modelInspectionBusy = false;
+				modelInspectionCurrentModel = '';
 			}
 		}
 	}
@@ -5813,6 +5818,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				isModelInspectionChoiceBlocked={isModelInspectionChoiceBlocked}
 				onRunModelInspection={runModelInspection}
 				onAbortModelInspection={abortModelInspection}
+				{modelInspectionCurrentModel}
 				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				{languageInspectionTargetLang}

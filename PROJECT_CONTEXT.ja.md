@@ -83,6 +83,8 @@ v1.94.0（Build 594–599）は web UI のみの整理で、描画機構と serv
 
 Build 600 では、region（`at`）とrelationを両方持つinstructionがregion配置時にrelationを無言破棄しtouchingに到達しなかった不具合を修正した。region配置を先に・relation解決を後に実行し、プラグインmember由来の双弧（葉形）が設計どおり端点固定の対向劣弧として演奏される（利き目監査F-1）。演奏時のみ解決不能なrelationは§14.4に従い警告記録付きでdropする。rh2契約とScore schemaは不変。
 
+v1.95（Build 601–604）は web UI 第 2 期の整理で、server・Score・rh2 は不変。比較ダイアログの単一タブ化と推敲タブの削除、記述タブの指示主体化（正規化DDLは閲覧専用、DDL 作成・編集は共有エディタへ集約、DDL 由来作品は `display_label='DDL'` で識別し指示文前提の操作を非表示）、作品タブ改称・世代表示・AI 自律推敲の UX 整理を行った。また Build 600 で、展開層の対 member 文を LLM を通さず Score instruction へ決定的に転写する層（様式文消費・coerce 迂回合流）と、明示語彙の搬送を検査する鏡 `carriage_warnings`（検査のみ）を追加した。語彙の搬送契約はモデル非依存となり、モデル選択は表現の幅へ純化される。
+
 ## 変更時の確認先
 
 | 変更領域 | 主に読むもの |
@@ -101,5 +103,3 @@ Build 600 では、region（`at`）とrelationを両方持つinstructionがregio
 - リリース／Buildの履歴は `CHANGELOG.ja.md` を先に更新し、公開上必要な内容を `CHANGELOG.md` に反映する。
 - 実装だけの細部を仕様本文へ無制限に積み増さない。現行契約は仕様、時系列の記録は変更履歴へ置く。
 - Webの挙動またはUI変更では `web/BUILD_NUMBER` を更新する。アプリ世代変更時はWebの `APP_VERSION` も揃える。
-
-v1.95（Build 601–604）は web UI 第 2 期の整理で、server・Score・rh2 は不変。比較ダイアログの単一タブ化と推敲タブの削除、記述タブの指示主体化（正規化DDLは閲覧専用、DDL 作成・編集は共有エディタへ集約、DDL 由来作品は `display_label='DDL'` で識別し指示文前提の操作を非表示）、作品タブ改称・世代表示・AI 自律推敲の UX 整理を行った。また Build 600 で、展開層の対 member 文を LLM を通さず Score instruction へ決定的に転写する層（様式文消費・coerce 迂回合流）と、明示語彙の搬送を検査する鏡 `carriage_warnings`（検査のみ）を追加した。語彙の搬送契約はモデル非依存となり、モデル選択は表現の幅へ純化される。

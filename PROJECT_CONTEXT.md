@@ -83,6 +83,8 @@ v1.94.0 (Build 594–599) is web-UI-only cleanup that touches neither the drawin
 
 Build 600 fixes an instruction carrying both a region (`at`) and a relation losing its relation silently during region placement, so touching resolution was never reached. Region placement now runs first and relation resolution follows; plugin-member double arcs (leaf forms) perform as designed as endpoint-pinned opposing minor arcs (intent-audit finding F-1). Relations unresolvable only at performance time drop with a recorded warning per §14.4. The rh2 contract and Score schema are unchanged.
 
+v1.95 (Builds 601–604) is a second web-UI phase; server, Score, and rh2 are unchanged. Comparison dialogs became single-view, the standalone refine tab was removed, the instruction tab was restructured (read-only normalized DDL, a shared DDL editor dialog, DDL-origin works identified by `display_label='DDL'` with instruction-based actions hidden), the Drawing tab became Artwork with a generation badge, and autonomous-refinement UX was polished. Build 600 also added deterministic transcription of expansion-layer pair members into Score instructions (style-sentence consumption, merging past coerce) plus the inspection-only `carriage_warnings` mirror, making vocabulary carriage model-independent so model choice purely widens expression.
+
 ## Where to Look for a Change
 
 | Change area | Primary references |
@@ -101,5 +103,3 @@ Build 600 fixes an instruction carrying both a region (`at`) and a relation losi
 - Update `CHANGELOG.ja.md` first for release/Build history, then reflect publicly relevant content in `CHANGELOG.md`.
 - Keep current contracts in the specification and chronological implementation detail in the changelog.
 - For Web behavior or UI changes, increment `web/BUILD_NUMBER`. When the application generation changes, also update the Web `APP_VERSION`.
-
-v1.95 (Builds 601–604) is a second web-UI phase; server, Score, and rh2 are unchanged. Comparison dialogs became single-view, the standalone refine tab was removed, the instruction tab was restructured (read-only normalized DDL, a shared DDL editor dialog, DDL-origin works identified by `display_label='DDL'` with instruction-based actions hidden), the Drawing tab became Artwork with a generation badge, and autonomous-refinement UX was polished. Build 600 also added deterministic transcription of expansion-layer pair members into Score instructions (style-sentence consumption, merging past coerce) plus the inspection-only `carriage_warnings` mirror, making vocabulary carriage model-independent so model choice purely widens expression.

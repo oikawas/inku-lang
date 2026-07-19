@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.94.0 / Build 600**
+**Target version: v1.95.0 / Build 604**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -101,3 +101,5 @@ Build 600 fixes an instruction carrying both a region (`at`) and a relation losi
 - Update `CHANGELOG.ja.md` first for release/Build history, then reflect publicly relevant content in `CHANGELOG.md`.
 - Keep current contracts in the specification and chronological implementation detail in the changelog.
 - For Web behavior or UI changes, increment `web/BUILD_NUMBER`. When the application generation changes, also update the Web `APP_VERSION`.
+
+v1.95 (Builds 601–604) is a second web-UI phase; server, Score, and rh2 are unchanged. Comparison dialogs became single-view, the standalone refine tab was removed, the instruction tab was restructured (read-only normalized DDL, a shared DDL editor dialog, DDL-origin works identified by `display_label='DDL'` with instruction-based actions hidden), the Drawing tab became Artwork with a generation badge, and autonomous-refinement UX was polished. Build 600 also added deterministic transcription of expansion-layer pair members into Score instructions (style-sentence consumption, merging past coerce) plus the inspection-only `carriage_warnings` mirror, making vocabulary carriage model-independent so model choice purely widens expression.

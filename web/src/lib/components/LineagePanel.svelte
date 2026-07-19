@@ -5,6 +5,8 @@
 	import AIRefineModal from './AIRefineModal.svelte';
 	import InkuMascot from './InkuMascot.svelte';
 	import StopButton from './StopButton.svelte';
+	import TenkeiSelect from './TenkeiSelect.svelte';
+	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
 	import { t } from '$lib/i18n/index.svelte';
 	import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -36,7 +38,7 @@
 		isJapanese: boolean;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
-		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
@@ -85,6 +87,7 @@
 	let editError = $state<string | null>(null);
 	let editElapsedMs = $state(0);
 	let editDrawController: AbortController | null = null;
+	let editTenkeiOverride = $state<TenkeiLevel | null>(null);
 
 	// While the edit dialog is drawing, tick an elapsed timer for the status element.
 	$effect(() => {
@@ -274,6 +277,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	function openEditDialog(node: LineageNode, mode: 'description' | 'ddl'): void {
 		if (!node.history) return;
+		editTenkeiOverride = null;
 		activeEditNode = node;
 		editMode = mode;
 		editDraft = mode === 'description'
@@ -297,7 +301,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		editError = null;
 		editDrawController = new AbortController();
 		try {
-			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal);
+			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal, editTenkeiOverride);
 			else await onDrawDdl(activeEditNode, editDraft);
 			activeEditNode = null;
 			editMode = null;
@@ -653,6 +657,7 @@ $effect(() => {
 						<StopButton onclick={stopEditDraw}>{t().stopBtn}</StopButton>
 					</div>
 				{:else}
+					<TenkeiSelect compact value={editTenkeiOverride ?? normalizeTenkei(activeEditNode?.history?.tenkei) ?? DEFAULT_TENKEI} {isJapanese} inherited={editTenkeiOverride === null} onSelect={(level) => (editTenkeiOverride = level)} />
 					<button type="button" onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
 					<button type="button" class="edit-draw" disabled={!editDraft.trim()} onclick={drawEditedArtwork}>{isJapanese ? '描画' : 'Draw'}</button>
 				{/if}
@@ -739,6 +744,7 @@ $effect(() => {
 	.lineage-edit-body label { color: var(--fg2); font-size: .78rem; font-weight: 700; }
 	.lineage-edit-body textarea { box-sizing: border-box; width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--border2); border-radius: 8px; padding: 12px 14px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.65; }
 	.lineage-edit-body textarea.ddl-editor { min-height: 390px; tab-size: 2; white-space: pre; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.55; }
+	.lineage-edit-dialog > footer :global(.tenkei-inline) { margin-right: auto; }
 	.lineage-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.lineage-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
 	.lineage-edit-dialog > footer .edit-draw { border-color: var(--accent); background: var(--accent); color: var(--accent-fg, #111); font-weight: 700; }

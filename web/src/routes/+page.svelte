@@ -12,6 +12,8 @@
 	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
+	import TenkeiSelect from '$lib/components/TenkeiSelect.svelte';
+	import { DEFAULT_TENKEI, normalizeTenkei, type TenkeiLevel } from '$lib/tenkei';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import DdlEditorDialog from '$lib/components/DdlEditorDialog.svelte';
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
@@ -55,6 +57,7 @@
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
 	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	const CATALOG_KEY         = 'inku-color-catalog';
+	const TENKEI_KEY          = 'inku-tenkei';
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
 	const SHOW_KIWI_KEY       = 'inku-show-kiwi';
 	const SHOW_CRAB_KEY       = 'inku-show-crab';
@@ -409,6 +412,7 @@
 	let ddlDialogInitial = $state('');
 	let ddlDialogDrawing = $state(false);
 	let ddlDialogError = $state<string | null>(null);
+	let ddlDialogTenkeiOverride = $state<TenkeiLevel | null>(null);
 	// DDL-authored (standalone) artworks carry the display_label marker 'DDL'.
 	const DDL_ORIGIN_LABEL = 'DDL';
 	let appInfoOpen = $state(false);
@@ -596,6 +600,15 @@
 
 	// ── Color catalog ────────────────────────────────────────
 	let selectedCatalog = $state('default');
+	// 添景水準 (v1.97). Explicit for describe-tab/root generation; refine flows omit it to inherit.
+	let tenkeiLevel = $state<TenkeiLevel>(DEFAULT_TENKEI);
+	function setTenkeiLevel(level: TenkeiLevel) {
+		tenkeiLevel = level;
+		try { localStorage.setItem(TENKEI_KEY, level); } catch {}
+	}
+	// Refine dialogs: null = inherit from the parent artwork (field omitted).
+	let refineTenkeiOverride = $state<TenkeiLevel | null>(null);
+	function setRefineTenkei(level: TenkeiLevel | null) { refineTenkeiOverride = level; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
 	let defaultCatalogId = $state('default');
 	const currentCatalog = $derived(catalogById(colorCatalogs, selectedCatalog) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
@@ -2338,6 +2351,8 @@
 		lineageParentNodeId?: string | null;
 		derivationKind?: DerivationKind | null;
 		derivationMetadata?: Record<string, unknown>;
+		// null/undefined = omit the field so the server inherits from the parent.
+		tenkei?: TenkeiLevel | null;
 	};
 
 async function requestVisionRefineAdvice(historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) {
@@ -2391,6 +2406,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				batch_run_id: options.batchRunId ?? null,
 				history_visibility: options.historyVisibility ?? 'normal',
 				lineage_parent_node_id: options.lineageParentNodeId ?? null,
+				...(options.tenkei ? { tenkei: options.tenkei } : {}),
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},
 				catalog_id: options.catalogId ?? selectedCatalog,
@@ -2427,7 +2443,7 @@ if (unreadWords.length > 0) {
 		tokens_out: number | null;
 	};
 
-	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<InterpretResult> {
+	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, tenkei?: TenkeiLevel | null): Promise<InterpretResult> {
 		const uiLang = getLang();
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
@@ -2444,6 +2460,7 @@ if (unreadWords.length > 0) {
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				expand_intermediate: true,
+				...(tenkei ? { tenkei } : {}),
 			})
 		});
 		if (!r.ok) {
@@ -2464,7 +2481,7 @@ if (unreadWords.length > 0) {
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId } = {}): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId; tenkei?: TenkeiLevel | null; lineageParentNodeId?: string | null } = {}): Promise<{
 		score: Score;
 		svg: string;
 		stage2_model?: string | null;
@@ -2505,6 +2522,8 @@ if (unreadWords.length > 0) {
 				catalog_id: renderOptions.catalogId ?? selectedCatalog,
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
+				...(renderOptions.tenkei ? { tenkei: renderOptions.tenkei } : {}),
+				...(renderOptions.lineageParentNodeId ? { lineage_parent_node_id: renderOptions.lineageParentNodeId } : {}),
 			})
 		});
 		if (!r.ok) {
@@ -2736,7 +2755,7 @@ if (unreadWords.length > 0) {
 			if (submittedMode === 'single') {
 				stageLabel = t().stageDdlGenerating;
 				const stage1StartedAt = Date.now();
-				const interpreted = await interpretOne(input, abortController.signal);
+				const interpreted = await interpretOne(input, abortController.signal, undefined, undefined, tenkeiLevel);
 				if (submitStopRequested) return;
 				elapsedStage1Ms = Date.now() - stage1StartedAt;
 				tokensInStage1 = interpreted.tokens_in;
@@ -2747,7 +2766,7 @@ if (unreadWords.length > 0) {
 				thinking = interpreted.thinking;
 				stageLabel = t().stageImageGenerating;
 				reloading = true;
-				const composed = await composeOne(interpreted.ddl, input, abortController.signal);
+				const composed = await composeOne(interpreted.ddl, input, abortController.signal, undefined, undefined, { tenkei: tenkeiLevel });
 				if (submitStopRequested) return;
 				reloading = false;
 				elapsedStage2Ms = composed.elapsed_ms;
@@ -2801,7 +2820,7 @@ if (unreadWords.length > 0) {
 					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
 					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
 					catalog_id: selectedCatalog,
-				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind, derivationMetadata: submitDerivationMetadata });
+				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind, derivationMetadata: submitDerivationMetadata, tenkei: tenkeiLevel });
 				if (savedHistory && submitAbortController === abortController && !submitStopRequested) {
 					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 					lineageDetached = false;
@@ -3279,14 +3298,14 @@ if (unreadWords.length > 0) {
 		}
 	}
 
-	async function pushHistory(it: Iteration, options: { selectSaved?: boolean; countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown> } = {}): Promise<Iteration | null> {
+	async function pushHistory(it: Iteration, options: { selectSaved?: boolean; countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown>; tenkei?: TenkeiLevel | null } = {}): Promise<Iteration | null> {
 		if (!authToken) return null;
 		let saved: Iteration | null = null;
 		try {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {} })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3593,9 +3612,9 @@ if (unreadWords.length > 0) {
 				modelInspectionCurrentModel = jobStage1Name === jobStage2Name ? jobStage1Name : `${jobStage1Name} / ${jobStage2Name}`;
 				try {
 					const started = Date.now();
-					const interpreted = await interpretOne(source, abortController.signal, job.stage1);
+					const interpreted = await interpretOne(source, abortController.signal, job.stage1, undefined, refineTenkeiOverride);
 					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-					const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2);
+					const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2, undefined, { tenkei: refineTenkeiOverride, lineageParentNodeId: modelParentNodeId });
 					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
 					successful.push({
 						id: job.id,
@@ -3715,8 +3734,8 @@ if (unreadWords.length > 0) {
 				languageInspectionCurrentLabel = `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`;
 				try {
 					const started = Date.now();
-					const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang);
-					const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang);
+					const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang, refineTenkeiOverride);
+					const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang, { tenkei: refineTenkeiOverride, lineageParentNodeId: parentNodeId });
 					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
 					successful.push({
 						id: job.id,
@@ -3979,7 +3998,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	await fetchLineage(nodeId, true);
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history) return;
 	const rendered = await paintOne(sourceText, {
@@ -3991,6 +4010,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 		derivationKind: 'description_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		signal,
+		tenkei,
 	});
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
@@ -4002,6 +4022,8 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 	const composed = await composeOne(nextDdl, sourceText, signal, undefined, undefined, {
 		catalogId: lineageCatalogId(node),
 		canvasAspectId: lineageCanvasAspectId(node),
+		tenkei: ddlDialogTenkeiOverride,
+		lineageParentNodeId: node.id,
 	});
 	const resolvedEditStage1Model = node.history.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
 	const resolvedEditStage2Model = composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model);
@@ -4043,6 +4065,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		lineageParentNodeId: node.id,
 		derivationKind: 'ddl_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+		tenkei: ddlDialogTenkeiOverride,
 	});
 	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
 }
@@ -4055,6 +4078,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 	const composed = await composeOne(nextDdl, '', signal, undefined, undefined, {
 		catalogId: selectedCatalog,
 		canvasAspectId: effectiveCanvasAspectId(),
+		tenkei: tenkeiLevel,
 	});
 	const saved = await pushHistory({
 		input: '',
@@ -4092,12 +4116,14 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		countGeneration: true,
 		sourceText: firstLine,
 		displayLabel: 'DDL',
+		tenkei: tenkeiLevel,
 	});
 	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
 	outputTab = 'canvas';
 }
 
 function openNewDdlDialog(): void {
+	ddlDialogTenkeiOverride = null;
 	ddlDialogMode = 'new';
 	ddlDialogNode = null;
 	ddlDialogInitial = '';
@@ -4106,6 +4132,7 @@ function openNewDdlDialog(): void {
 }
 
 function openLineageDdlEditor(node: LineageNode): void {
+	ddlDialogTenkeiOverride = null;
 	ddlDialogMode = 'edit';
 	ddlDialogNode = node;
 	ddlDialogInitial = node.history?.ddl ?? '';
@@ -4744,6 +4771,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				canvas_aspect: refinementCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				vary_seed: varySeed,
+				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
+				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
 		if (!r.ok) throw new Error(await r.text());
@@ -4764,6 +4793,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			canvasAspectId: refinementCanvasAspectId(),
 			interpretationSeed,
 			signal,
+			tenkei: refineTenkeiOverride,
+			lineageParentNodeId: currentLineageParentId(),
 		});
 		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
 	}
@@ -4929,7 +4960,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					tokens_in: (candidate.result.tokens_in_stage1 ?? 0) + (candidate.result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
 					catalog_id: candidate.result.render_color_catalog_id ?? selectedCatalog,
-				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {} });
+				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {}, tenkei: refineTenkeiOverride });
 				if (contextVersion !== targetContextVersion) return;
 				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
 				if (saved?.id && result === candidate.result) {
@@ -5157,6 +5188,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (inputMode === 'demo' || activeRunMode === 'demo') return null;
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
 	});
+	const targetTenkei = $derived(normalizeTenkei(displayedHistoryItem?.tenkei) ?? DEFAULT_TENKEI);
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
 	function formatHistoryDate(at: number): string {
@@ -5478,6 +5510,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
+			const tenkei = normalizeTenkei(localStorage.getItem(TENKEI_KEY)); if (tenkei) tenkeiLevel = tenkei;
 			const kiwi = localStorage.getItem(SHOW_KIWI_KEY);
 			const birds = localStorage.getItem(SHOW_BIRDS_KEY);
 			if (kiwi !== null) showKiwi = kiwi !== '0';
@@ -5607,6 +5640,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						generationDisabled={variationGridBusy}
 						{error}
 						{stageLabel}
+						{tenkeiLevel}
+						onSelectTenkei={setTenkeiLevel}
 						{showKiwi}
 						{showCrab}
 						{canvasAspectEnabled}
@@ -5836,6 +5871,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onOpenLineageDdlEditor={openLineageDdlEditor}
 				onCloseRefinement={refreshLineageAfterRefine}
 				statusDdlOrigin={statusDdlOrigin}
+				statusTenkei={normalizeTenkei(displayedHistoryItem?.tenkei)}
+				refineTenkeiValue={refineTenkeiOverride ?? targetTenkei}
+				refineTenkeiInherited={refineTenkeiOverride === null}
+				onSetRefineTenkei={setRefineTenkei}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}
 				onPromoteLineageNode={promoteLineageNode}
@@ -5896,6 +5935,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	drawing={ddlDialogDrawing}
 	error={ddlDialogError}
 	previewForWord={saijikiPreview}
+	showTenkei={ddlDialogMode === 'edit'}
+	tenkeiValue={ddlDialogTenkeiOverride ?? normalizeTenkei(ddlDialogNode?.history?.tenkei) ?? DEFAULT_TENKEI}
+	tenkeiInherited={ddlDialogTenkeiOverride === null}
+	onSelectTenkei={(level) => (ddlDialogTenkeiOverride = level)}
 	onDraw={handleDdlDialogDraw}
 	onClose={closeDdlDialog}
 />

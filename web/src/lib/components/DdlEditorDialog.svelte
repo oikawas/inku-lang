@@ -5,6 +5,8 @@
 	import SaijikiInline from './SaijikiInline.svelte';
 	import InkuMascot from './InkuMascot.svelte';
 	import StopButton from './StopButton.svelte';
+	import TenkeiSelect from './TenkeiSelect.svelte';
+	import type { TenkeiLevel } from '$lib/tenkei';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -24,11 +26,15 @@
 		drawing: boolean;
 		error: string | null;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
+		showTenkei?: boolean;
+		tenkeiValue?: TenkeiLevel;
+		tenkeiInherited?: boolean;
+		onSelectTenkei?: (level: TenkeiLevel) => void;
 		onDraw: (ddl: string, signal?: AbortSignal) => void | Promise<void>;
 		onClose: () => void;
 	};
 
-	let { open, isJapanese, title, subtitle, initialDdl, drawing, error, previewForWord, onDraw, onClose }: Props = $props();
+	let { open, isJapanese, title, subtitle, initialDdl, drawing, error, previewForWord, showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
 
 	let value = $state('');
 	let focused = $state(false);
@@ -195,6 +201,9 @@
 					<StopButton onclick={stopDraw}>{t().stopBtn}</StopButton>
 				</div>
 			{:else}
+				{#if showTenkei && onSelectTenkei}
+					<TenkeiSelect compact value={tenkeiValue} {isJapanese} inherited={tenkeiInherited} onSelect={onSelectTenkei} />
+				{/if}
 				<button type="button" class="ddled-cancel" onclick={requestClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
 				<button type="button" class="ddled-draw" disabled={!value.trim()} onclick={requestDraw}>{isJapanese ? '描画' : 'Draw'}</button>
 			{/if}
@@ -461,6 +470,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
+		flex-wrap: wrap;
 		gap: 8px;
 		padding: 12px 16px;
 		border-top: 1px solid var(--border);
@@ -485,6 +495,7 @@
 		color: #fff;
 		border-color: var(--accent);
 	}
+	.ddled-foot > :global(.tenkei-inline) { margin-right: auto; }
 	.ddled-cancel:hover:not(:disabled) {
 		background: var(--bg2);
 	}

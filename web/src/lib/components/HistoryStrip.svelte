@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { normalizeTenkei, tenkeiLabel } from '$lib/tenkei';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 
@@ -18,6 +19,7 @@
 		catalog_id?: string | null;
 		history_visibility?: 'normal' | 'lineage_only';
 		lineage_generation?: number | null;
+		tenkei?: string | null;
 		lineage_state?: 'active' | 'lineage_only' | 'tombstone' | null;
 		trashed?: boolean;
 		starred?: boolean;
@@ -148,6 +150,7 @@
 							<div class="tooltip-row"><span>Stage 2</span><strong>{historyModelStage2Full(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
 							<div class="tooltip-row"><span>{isJapanese ? '世代' : 'Gen.'}</span><strong>{lineageGenerationLabel(it)}</strong></div>
+							{#if normalizeTenkei(it.tenkei)}<div class="tooltip-row"><span>{isJapanese ? '添景' : 'Staffage'}</span><strong>{tenkeiLabel(normalizeTenkei(it.tenkei)!, isJapanese)}</strong></div>{/if}
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}

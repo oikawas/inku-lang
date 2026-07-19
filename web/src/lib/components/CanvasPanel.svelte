@@ -10,6 +10,8 @@
 	import StopButton from './StopButton.svelte';
 	import InkuMascot from './InkuMascot.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
+	import TenkeiSelect from './TenkeiSelect.svelte';
+	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
 	import type { ModelOption } from '$lib/models';
 	import Tooltip from './Tooltip.svelte';
 
@@ -141,11 +143,15 @@
 		lineageError: string | null;
 		isJapanese: boolean;
 		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
-		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal) => void | Promise<void>;
+		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
 		onCloseRefinement: () => void;
 		statusDdlOrigin: boolean;
+		statusTenkei: TenkeiLevel | null;
+		refineTenkeiValue: TenkeiLevel;
+		refineTenkeiInherited: boolean;
+		onSetRefineTenkei: (level: TenkeiLevel | null) => void;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
@@ -279,6 +285,10 @@
 		onOpenLineageDdlEditor,
 		onCloseRefinement,
 		statusDdlOrigin,
+		statusTenkei,
+		refineTenkeiValue,
+		refineTenkeiInherited,
+		onSetRefineTenkei,
 		onSaveOkugakiModel,
 		onSaveVisionModel,
 		onPromoteLineageNode,
@@ -308,6 +318,7 @@
 	}
 	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare' | 'language'): Promise<void> {
 		await onOpenLineageNode(node);
+		onSetRefineTenkei(null);
 		refineView = view;
 		refineModalOpen = true;
 		outputTab = 'refine';
@@ -668,6 +679,7 @@
 											</div>
 										</Tooltip>
 										{#if variationGridBusy && variationGridCanAbort}<div class="refine-stop-wrap"><StopButton onclick={onAbortVariationCandidates}>{t().refineAbortButton}</StopButton></div>{/if}
+										<div class="refine-tenkei-row"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /></div>
 										{#if refineCostLabel}
 											<div class="refine-cost-indicator" aria-live="polite">
 												<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -723,6 +735,7 @@
 					<div class="compare-panel">
 					<div class="compare-head">
 						<div class="refine-title">{t().modelCompareTitle}</div>
+						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 						<div class="compare-action-wrap">
 							{#if modelInspectionBusy}
 								<div class="compare-status" aria-live="polite">
@@ -800,6 +813,7 @@
 					<div class="compare-panel">
 						<div class="compare-head">
 							<div class="refine-title">{isJapanese ? '指示文言語を比較する' : 'Compare instruction languages'}</div>
+							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 							<div class="compare-action-wrap">
 								{#if languageInspectionBusy}
 									<div class="compare-status" aria-live="polite">
@@ -892,6 +906,7 @@
 							<dt>Stage 2 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage2Lang)}</dd>
 							<dt>{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</dt><dd>{statusCatalogName}</dd>
 							<dt>{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</dt><dd>{statusCanvasName}</dd>
+							{#if statusTenkei}<dt>{isJapanese ? '添景' : 'Staffage'}</dt><dd>{tenkeiLabel(statusTenkei, isJapanese)}</dd>{/if}
 							<dt>render seed</dt><dd>{detailRenderSeed ?? '-'}</dd>
 							<dt>{isJapanese ? '\u914d\u7f6e seed' : 'Layout Seed'}</dt><dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
 							<dt>{isJapanese ? '\u89e3\u91c8 seed' : 'Interpretation Seed'}</dt><dd>{detailInterpretationSeed ?? '-'}</dd>
@@ -1454,6 +1469,7 @@
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover :global(.model-hover-card),
 	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
+	.refine-tenkei-row { display: flex; align-items: center; margin-top: 6px; }
 	.compare-status { display: flex; align-items: center; gap: 10px; }
 	.compare-mascot { flex: 0 0 auto; display: flex; align-items: center; }
 	.compare-status-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }

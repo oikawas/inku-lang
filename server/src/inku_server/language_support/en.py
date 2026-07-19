@@ -209,8 +209,26 @@ def _english_taste_additions(expanded: str, context_text: str | None) -> list[st
     return additions[:2]
 
 
-def expand_intermediate(ddl: str, context_text: str | None = None, vary_seed: int | None = None) -> str:
-    expanded = expand_intermediate_ddl(ddl, lang="en", context_text=context_text, vary_seed=vary_seed)
+def expand_intermediate(
+    ddl: str,
+    context_text: str | None = None,
+    vary_seed: int | None = None,
+    *,
+    plugin_instructions_present: bool = False,
+    tenkei: str = "auto",
+) -> str:
+    expanded = expand_intermediate_ddl(
+        ddl,
+        lang="en",
+        context_text=context_text,
+        vary_seed=vary_seed,
+        plugin_instructions_present=plugin_instructions_present,
+        tenkei=tenkei,
+    )
+    # v1.96: taste additions are recipes too — suppressed by the pair-transcription
+    # guard (2a) and emitted only at the "auto" scenery level.
+    if plugin_instructions_present or tenkei != "auto":
+        return expanded
     return _append_sentences(expanded, _english_taste_additions(expanded, context_text))
 
 

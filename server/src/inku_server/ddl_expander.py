@@ -567,6 +567,26 @@ def _vary_context(text: str, vary_seed: int | None) -> str:
     return f"{text}#vary{int(vary_seed)}"
 
 
+def _cap_category_plan(plan: tuple[int, int, int], tenkei: str) -> tuple[int, int, int]:
+    """添景水準による候補数の決定的な縮約 (v1.96)。
+
+    none はプール追加なし。sparse は合計 1 文まで（構造 > 音楽 > 絵画の優先で
+    最初の非ゼロカテゴリを 1 に縮約）。auto は現行のまま。
+    """
+    if tenkei == "none":
+        return (0, 0, 0)
+    if tenkei != "sparse":
+        return plan
+    structural, music, painting = plan
+    if structural:
+        return (1, 0, 0)
+    if music:
+        return (0, 1, 0)
+    if painting:
+        return (0, 0, 1)
+    return plan
+
+
 def expand_intermediate_ddl(
     ddl: str,
     *,
@@ -574,6 +594,8 @@ def expand_intermediate_ddl(
     context_text: str | None = None,
     vary_seed: int | None = None,
     enable_plugins: bool = True,
+    plugin_instructions_present: bool = False,
+    tenkei: str = "auto",
 ) -> str:
     """Add controlled complexity to normalized DDL before Stage 2.
 
@@ -591,16 +613,41 @@ def expand_intermediate_ddl(
     if not sanitized:
         return sanitized
     if lang == "en":
-        return _expand_en(sanitized, context_text=context_text, vary_seed=vary_seed)
-    return _expand_ja(sanitized, context_text=context_text, vary_seed=vary_seed)
+        return _expand_en(
+            sanitized,
+            context_text=context_text,
+            vary_seed=vary_seed,
+            plugin_instructions_present=plugin_instructions_present,
+            tenkei=tenkei,
+        )
+    return _expand_ja(
+        sanitized,
+        context_text=context_text,
+        vary_seed=vary_seed,
+        plugin_instructions_present=plugin_instructions_present,
+        tenkei=tenkei,
+    )
 
 
-def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | None = None) -> str:
-    if _has_explicit_numeric_regions(ddl, lang="ja") or any(
-        marker in ddl for marker in _JA_EXPANSION_MARKERS
+def _expand_ja(
+    ddl: str,
+    *,
+    context_text: str | None = None,
+    vary_seed: int | None = None,
+    plugin_instructions_present: bool = False,
+    tenkei: str = "auto",
+) -> str:
+    # v1.96 2a: 対 member 決定的転写 (§4.6) で領域文がテキストに残らない場合も
+    # 数値 region ガードと同等に完成品レシピの追加を抑止する。
+    if (
+        plugin_instructions_present
+        or _has_explicit_numeric_regions(ddl, lang="ja")
+        or any(marker in ddl for marker in _JA_EXPANSION_MARKERS)
     ):
         return ddl
     ddl = _reframe_static_center_ja(ddl)
+    if tenkei == "none":
+        return ddl
 
     sentences = _split_sentences(ddl, lang="ja")
     structural: list[str] = []
@@ -680,7 +727,9 @@ def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | No
         _FilterCandidate("白い薄い水彩の楕円を五感の気配として右上に二つ重ねる。境界が滲む。", frozenset(("sensory", "soft", "quiet"))),
     ]
     structural_candidates = [_FilterCandidate(text, _structural_tags(text)) for text in structural]
-    structural_count, music_count, painting_count = _category_plan(profile, has_structural=bool(structural_candidates))
+    structural_count, music_count, painting_count = _cap_category_plan(
+        _category_plan(profile, has_structural=bool(structural_candidates)), tenkei
+    )
 
     selected = (
         _select_category(structural_candidates, structural_count, profile=profile, text=seed_context, salt=_mode_salt(profile, "ja-structure"))
@@ -693,13 +742,25 @@ def _expand_ja(ddl: str, *, context_text: str | None = None, vary_seed: int | No
     return _join_sentences(sentences + selected, lang="ja")
 
 
-def _expand_en(ddl: str, *, context_text: str | None = None, vary_seed: int | None = None) -> str:
+def _expand_en(
+    ddl: str,
+    *,
+    context_text: str | None = None,
+    vary_seed: int | None = None,
+    plugin_instructions_present: bool = False,
+    tenkei: str = "auto",
+) -> str:
     lower = ddl.lower()
-    if _has_explicit_numeric_regions(ddl, lang="en") or any(
-        marker in lower for marker in _EN_EXPANSION_MARKERS
+    # v1.96 2a: mirror of the ja guard (§4.6 pair-transcription boundary).
+    if (
+        plugin_instructions_present
+        or _has_explicit_numeric_regions(ddl, lang="en")
+        or any(marker in lower for marker in _EN_EXPANSION_MARKERS)
     ):
         return ddl
     ddl = _reframe_static_center_en(ddl)
+    if tenkei == "none":
+        return ddl
     lower = ddl.lower()
 
     sentences = _split_sentences(ddl, lang="en")
@@ -782,7 +843,9 @@ def _expand_en(ddl: str, *, context_text: str | None = None, vary_seed: int | No
         _FilterCandidate("Layer two pale white watercolor ellipses in the upper right as five-sense presence. Edges blurring.", frozenset(("sensory", "soft", "quiet"))),
     ]
     structural_candidates = [_FilterCandidate(text, _structural_tags(text)) for text in structural]
-    structural_count, music_count, painting_count = _category_plan(profile, has_structural=bool(structural_candidates))
+    structural_count, music_count, painting_count = _cap_category_plan(
+        _category_plan(profile, has_structural=bool(structural_candidates)), tenkei
+    )
 
     selected = (
         _select_category(structural_candidates, structural_count, profile=profile, text=seed_context, salt=_mode_salt(profile, "en-structure"))

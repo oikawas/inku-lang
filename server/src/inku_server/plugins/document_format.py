@@ -1275,6 +1275,31 @@ class PluginDocumentManager:
                 raise FileNotFoundError(plugin_id)
             return item
 
+    def qualified_names(self) -> tuple[str, ...]:
+        names: list[str] = []
+        for document in self.documents():
+            for entry in document.entries:
+                names.append(entry.qualified_name(document.manifest.namespace))
+        return tuple(dict.fromkeys(names))
+
+    def is_pure_invocation(self, text: str) -> bool:
+        """入力がロード済み名前空間付き語と区切り記号だけで構成されるか (v1.96 純明示バイパス判定)。"""
+        stripped = (text or "").strip()
+        if not stripped:
+            return False
+        names = sorted(self.qualified_names(), key=len, reverse=True)
+        if not names:
+            return False
+        remaining = stripped
+        found = False
+        for name in names:
+            if name in remaining:
+                found = True
+                remaining = remaining.replace(name, " ")
+        if not found:
+            return False
+        return re.fullmatch(r"[\s、。，,.．・]*", remaining) is not None
+
     def prompt_vocabulary(self, lang: str) -> tuple[str, ...]:
         terms: list[str] = []
         for document in self.documents():

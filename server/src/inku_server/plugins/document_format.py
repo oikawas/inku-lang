@@ -16,6 +16,7 @@ from threading import RLock
 from typing import Iterable
 
 from ..saijiki import (
+    RELATIONS,
     core_grammar_markers as saijiki_core_grammar_markers,
     saijiki_marker_table,
     shape_markers as saijiki_shape_markers,
@@ -35,8 +36,11 @@ _TEMPLATE_RE = re.compile(
 # 単語単位より先に並べる (leaf forms を forms より前に置く)。箇所/spots は anchor
 # 反復 (A-6) 用。単数形は単位保存 (_singular_for_unit)。単位語は reference §3 の
 # repetition_range_regex がそのまま公開する。
+# v1.94: en は数と単位の間に形容詞 1 語を許す（例: "5-7 tall blades"）。
+# "to" の誤吸収を防ぐため介在語から to を除外する。ja 単位は文法上隣接のため不変。
 _RANGE_RE = re.compile(
     r"(?P<low>\d+)\s*(?:[〜～-]|to)\s*(?P<high>\d+)\s*"
+    r"(?:(?P<adj>(?!to\b)[A-Za-z][A-Za-z-]*)\s+)?"
     r"(?P<unit>leaf\ forms?|cloudforms?|forms?|blades?|spots?|arcs?"
     r"|marks?|items?|lines?|枚|個|本|箇所)",
     re.IGNORECASE,
@@ -289,13 +293,27 @@ def _build_manifest(values: dict[str, object]) -> PluginManifest:
     )
 
 
-def _instruction_budget(lines: tuple[str, ...]) -> int:
+def _instruction_budget(
+    lines: tuple[str, ...],
+    members: dict[str, str] | None = None,
+    *,
+    lang: str = "ja",
+) -> int:
     total = 0
     for line in lines:
         if line.lower().startswith(ANCHOR_PREFIX):
             continue
         match = _RANGE_RE.search(line)
-        total += int(match.group("high")) if match else 1
+        if match is None:
+            total += 1
+            continue
+        cost = int(match.group("high"))
+        if members:
+            # v1.94 対分離: member 参照行は member 定義のセグメント数ぶん膨らむ
+            name = _referenced_member(line, members)
+            if name is not None:
+                cost *= len(_split_pair_segments(members[name].rstrip("。."), lang))
+        total += cost
     return total
 
 
@@ -321,7 +339,7 @@ def _validate_entry(entry: PluginEntry, manifest: PluginManifest) -> list[str]:
         if not lines:
             reasons.append(f"{entry.heading}: expansion template for {lang} is required")
             continue
-        budget = _instruction_budget(lines)
+        budget = _instruction_budget(lines, members, lang=lang)
         if budget > MAX_ENTRY_INSTRUCTIONS:
             reasons.append(
                 f"{entry.heading}: expansion budget {budget} exceeds {MAX_ENTRY_INSTRUCTIONS}"
@@ -586,6 +604,41 @@ def _resolve_count(match: "re.Match[str]", seed_text: str, salt: str) -> int:
     return low + _stable_int(seed_text, salt) % (high - low + 1)
 
 
+# v1.94 対分離: member 定義内の relation literal（前の弧に両端で触れる 等）
+_RELATION_LITERALS = {
+    "ja": tuple(lit for word in RELATIONS for lit in word.literals_ja),
+    "en": tuple(lit for word in RELATIONS for lit in word.literals_en),
+}
+
+
+def _split_pair_segments(definition: str, lang: str) -> list[str]:
+    """member 定義を relation literal 境界で対の要素へ分割する (v1.94 対分離).
+
+    「弧を置き、前の弧に両端で触れる」のような対の定義を、各要素が独立した
+    region 付き文になるよう分割する。これにより Stage 2 は member ごとに
+    「配置弧 + touching 弧」の 2 instruction を書け、Build 590 の明示 region 数
+    上限とも整合する（両文が region を持つため上限は自然に 2N になる）。
+    relation literal を含まない定義は分割されない（従来どおり 1 文）。
+    """
+    literals = _RELATION_LITERALS[lang]
+    separator = "、" if lang == "ja" else ", "
+    segments: list[str] = []
+    for part in definition.split(separator):
+        if segments and any(lit in part for lit in literals):
+            cleaned = part
+            if lang == "en":
+                for lead in ("and then ", "then ", "and "):
+                    if cleaned.lower().startswith(lead):
+                        cleaned = cleaned[len(lead):]
+                        break
+            segments.append(cleaned)
+        elif segments:
+            segments[-1] = segments[-1] + separator + part
+        else:
+            segments.append(part)
+    return segments
+
+
 def _member_suffix(region: tuple[float, float, float, float], rotation: int, index: int, *, lang: str) -> str:
     formatted = _format_region(region, lang=lang)
     if lang == "ja":
@@ -613,16 +666,26 @@ def _expand_range_line(
 
     if member_name is not None:
         # A-2: inline the member definition at each member's region.
-        base = members[member_name].rstrip("。.")
-    else:
-        singular = _singular_for_unit(match.group("unit"), lang)  # A-5 unit-preserving
-        cleaned = re.sub(
-            r"\{(?:領域|region)\s*:\s*[^}]+\}",
-            _format_region(region, lang=lang),
-            line[: match.start()] + singular + line[match.end() :],
-            flags=re.IGNORECASE,
-        )
-        base = cleaned.rstrip("。.")
+        # v1.94 対分離: relation literal を含む定義は対の各要素を独立文にする。
+        segments = _split_pair_segments(members[member_name].rstrip("。."), lang)
+        out: list[str] = []
+        for index, (member_region, rotation) in enumerate(member_regions, start=1):
+            suffix = _member_suffix(member_region, rotation, index, lang=lang)
+            for segment in segments:
+                out.append(segment + suffix)
+        return out
+
+    singular = _singular_for_unit(match.group("unit"), lang)  # A-5 unit-preserving
+    adj = match.groupdict().get("adj")
+    if adj and lang == "en" and singular.startswith("one "):
+        singular = f"one {adj} " + singular[len("one "):]  # 例: one tall blade
+    cleaned = re.sub(
+        r"\{(?:領域|region)\s*:\s*[^}]+\}",
+        _format_region(region, lang=lang),
+        line[: match.start()] + singular + line[match.end() :],
+        flags=re.IGNORECASE,
+    )
+    base = cleaned.rstrip("。.")
 
     return [
         base + _member_suffix(member_region, rotation, index, lang=lang)
@@ -803,13 +866,30 @@ def expand_plugin_ddl(
                 }
             )
     if _PLUGIN_REFERENCE_RE.search(result):
-        warnings.append("plugin expansion left a non-core reference; expansion was dropped")
-        fallback = (
-            "黒い鉛筆の小さな弧を中域に置く。"
-            if lang == "ja"
-            else "Place a small black pencil arc in the middle region."
-        )
-        return PluginExpansionResult(ddl=fallback, provenance=(), warnings=tuple(warnings))
+        # v1.94: fires_on 発火経路の drop 過敏の緩和。Stage 1 が混入させた
+        # stray な名前空間参照は、展開全体ではなく当該文だけを警告付きで
+        # 除去する（展開テンプレート自体はロード時に閉包検査済み）。
+        if lang == "ja":
+            sentences = [part for part in re.split(r"(?<=。)", result) if part.strip()]
+            joiner = ""
+        else:
+            sentences = [part for part in re.split(r"(?<=[.!?])\s+", result) if part.strip()]
+            joiner = " "
+        kept = [part for part in sentences if not _PLUGIN_REFERENCE_RE.search(part)]
+        removed = len(sentences) - len(kept)
+        if kept:
+            warnings.append(
+                f"stray non-core reference removed from {removed} sentence(s); expansion kept"
+            )
+            result = joiner.join(part.strip() for part in kept)
+        else:
+            warnings.append("plugin expansion left a non-core reference; expansion was dropped")
+            fallback = (
+                "黒い鉛筆の小さな弧を中域に置く。"
+                if lang == "ja"
+                else "Place a small black pencil arc in the middle region."
+            )
+            return PluginExpansionResult(ddl=fallback, provenance=(), warnings=tuple(warnings))
     return PluginExpansionResult(
         ddl=result,
         provenance=tuple(provenance),

@@ -1844,6 +1844,7 @@ def _paint_payload(
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
         "vary_seed": getattr(args, "vary_seed", None),
+        "tenkei": getattr(args, "tenkei", None),
         "seed_text": getattr(args, "seed_text", None),
         "include_trace": getattr(args, "trace", False) or None,
     }
@@ -1873,6 +1874,7 @@ def _compose_payload(
         "auto_repair": True,
         "render_seed": getattr(args, "render_seed", None),
         "vary_seed": getattr(args, "vary_seed", None),
+        "tenkei": getattr(args, "tenkei", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -3380,6 +3382,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     parser.add_argument("--vary-seed", type=int, help="Stage 1.5 composition variation seed")
+    parser.add_argument("--tenkei", choices=["none", "sparse", "auto"], help="scenery level (v1.96): none / sparse / auto")
     parser.add_argument("--seed-text", help="explicit text used only to derive the renderer performance seed")
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
     parser.add_argument("--ui-lang")

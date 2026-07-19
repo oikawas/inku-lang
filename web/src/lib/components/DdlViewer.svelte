@@ -2,22 +2,49 @@
 	import { highlightDDL } from '$lib/highlight';
 
 	type Props = {
+		/** Input-side DDL: the Stage 1 output, or the DDL the user wrote. */
 		ddl: string;
+		/** Stage 1.5 output = what Stage 2 actually received. */
+		expandedDdl?: string | null;
 		label: string;
+		expandedLabel: string;
 		saijikiLabel: string;
 		onToggleSaijiki: () => void;
 	};
 
-	let { ddl, label, saijikiLabel, onToggleSaijiki }: Props = $props();
-	const highlighted = $derived(highlightDDL(ddl));
+	let { ddl, expandedDdl = null, label, expandedLabel, saijikiLabel, onToggleSaijiki }: Props = $props();
+
+	// Artworks saved before v1.98 have no input-side DDL: their single stored text
+	// is the expanded one. Show it in the main slot and rename the label so the
+	// panel never claims to show something it does not have.
+	// LEGACY-ONLY: this branch exists for pre-v1.98 rows in the development
+	// database and can be deleted once those artworks are gone.
+	const legacyExpandedOnly = $derived(!ddl && !!expandedDdl);
+	const primary = $derived(legacyExpandedOnly ? (expandedDdl as string) : ddl);
+	const primaryLabel = $derived(legacyExpandedOnly ? expandedLabel : label);
+	const showExpanded = $derived(!legacyExpandedOnly && !!expandedDdl && expandedDdl !== ddl);
+	const highlighted = $derived(highlightDDL(primary));
+	const expandedHighlighted = $derived(highlightDDL(expandedDdl ?? ''));
+	let expandedOpen = $state(false);
 </script>
 
 <div class="ddl-viewer">
 	<div class="ddl-viewer-head">
-		<span class="ddl-viewer-label">{label}</span>
+		<span class="ddl-viewer-label">{primaryLabel}</span>
 		<button class="ddl-viewer-btn" type="button" onclick={onToggleSaijiki}>{saijikiLabel}</button>
 	</div>
 	<div class="ddl-viewer-body ddl-highlight">{@html highlighted}</div>
+	{#if showExpanded}
+		<div class="ddl-expanded">
+			<button class="ddl-expanded-toggle" type="button" onclick={() => (expandedOpen = !expandedOpen)}>
+				<span class="ddl-expanded-arrow" class:open={expandedOpen}>▶</span>
+				<span>{expandedLabel}</span>
+			</button>
+			{#if expandedOpen}
+				<div class="ddl-viewer-body ddl-highlight">{@html expandedHighlighted}</div>
+			{/if}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -64,6 +91,32 @@
 		word-break: break-word;
 		tab-size: 4;
 		overflow-x: auto;
+	}
+	.ddl-expanded {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.ddl-expanded-toggle {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		padding: 2px 0;
+		border: 0;
+		background: none;
+		color: var(--fg3);
+		font-family: inherit;
+		font-size: 11px;
+		cursor: pointer;
+		text-align: left;
+	}
+	.ddl-expanded-arrow {
+		display: inline-block;
+		font-size: 8px;
+		transition: transform 0.15s ease;
+	}
+	.ddl-expanded-arrow.open {
+		transform: rotate(90deg);
 	}
 	.ddl-highlight :global(.ddl-token) {
 		border-radius: 2px;

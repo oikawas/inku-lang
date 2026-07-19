@@ -216,6 +216,7 @@ def expand_intermediate(
     *,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
+    focus: str | None = None,
 ) -> str:
     expanded = expand_intermediate_ddl(
         ddl,
@@ -224,6 +225,7 @@ def expand_intermediate(
         vary_seed=vary_seed,
         plugin_instructions_present=plugin_instructions_present,
         tenkei=tenkei,
+        focus=focus,
     )
     # v1.96: taste additions are recipes too — suppressed by the pair-transcription
     # guard (2a) and emitted only at the "auto" scenery level.

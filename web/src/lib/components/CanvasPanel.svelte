@@ -22,7 +22,7 @@
 	type HistoryItem = { id?: string; starred?: boolean; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'focus';
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
@@ -355,7 +355,7 @@
 	const refineCostLabel = $derived(
 		refineKind === 'reading'
 			? t().refineCostReading
-			: refineKind === 'layout'
+			: refineKind === 'layout' || refineKind === 'focus'
 				? t().refineCostLayout
 				: refineKind === 'color'
 					? t().refineCostColor
@@ -657,6 +657,15 @@
 												</span>
 											</Tooltip>
 										</label>
+										<label class="model-choice" class:checked={refineKind === 'focus'}>
+											<input type="radio" name="refine-kind" value="focus" checked={refineKind === 'focus'} onchange={() => (refineKind = 'focus')} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryFocus}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryFocus}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
 										<label class="model-choice" class:checked={refineKind === 'touch'}>
 											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
@@ -667,6 +676,9 @@
 											</Tooltip>
 										</label>
 									</div>
+									{#if refineKind === 'focus'}
+										<p class="refine-focus-hint">{t().refineFocusHint}</p>
+									{/if}
 									{#if refineKind === 'touch'}
 										<label class="touch-seed-field">
 											<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={variationBusy || variationGridBusy} />
@@ -1370,6 +1382,7 @@
 		stroke-linejoin: round;
 	}
 	.refine-paint-actions { align-items: stretch; }
+	.refine-focus-hint { margin: 0; font-size: 11px; color: var(--fg3); line-height: 1.5; }
 	.refine-action-wrap { width: min(210px, 100%); }
 	.refine-action-wrap :global(.tooltip-wrap),
 	.refine-action-wrap :global(.paint-btn) { width: 100%; }

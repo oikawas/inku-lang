@@ -38,6 +38,7 @@ from .okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL, generate_okugaki
 from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import _finalize_score, compose
+from .ddl_expander import FOCUS_IDS
 from .interpreter import _sanitize_placement_words, interpret_detail
 from .languages import (
     SUPPORTED_INSTRUCTION_LANGS,
@@ -416,6 +417,17 @@ def _resolved_tenkei(requested: str | None, actor: dict, lineage_parent_node_id:
     return "auto"
 
 
+def _validated_focus(value: str | None) -> str | None:
+    """焦点 (v1.98): 未指定・未知の値は None にして決定的な既定選択へ戻す。
+
+    焦点は系譜継承しない（作者裁定 2026-07-20）。明示された作品だけがその焦点を持ち、
+    未指定の派生は従来どおり DDL テキストのハッシュから選ばれる。
+    """
+    if value in FOCUS_IDS:
+        return value
+    return None
+
+
 def _coerce_context(ddl: str, original_text: str | None = None) -> str:
     original = (original_text or "").strip()
     normalized = ddl.strip()
@@ -735,6 +747,7 @@ class ComposeRequest(BaseModel):
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
+    focus: str | None = Field(default=None, description="焦点 (v1.98): 中央固定を再構成する際の寄せ先。省略時は DDL テキストから決定的に選ばれる")
     lineage_parent_node_id: str | None = Field(default=None, description="添景水準の継承元 lineage ノード (v1.97)。保存には関与しない")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
@@ -745,6 +758,8 @@ class ComposeRequest(BaseModel):
 
 class ComposeResponse(BaseModel):
     ddl: str
+    # 入力側 DDL (展開前)。ddl は Stage 2 に渡った展開後。
+    source_ddl: str | None = None
     plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
     plugin_warnings: list[str] = Field(default_factory=list)
     carriage_warnings: list[str] | None = None  # v1.94 B: 搬送契約の鏡（検査のみ）
@@ -767,6 +782,7 @@ class ComposeResponse(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     tenkei: str | None = None
+    focus: str | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     instruction_lang_requested: str | None = None
@@ -838,6 +854,7 @@ class PaintRequest(BaseModel):
     random_color_catalog: bool = Field(default=False, description="現在のcatalog_idを除外してサーバー側で色カタログを選ぶか")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
+    focus: str | None = Field(default=None, description="焦点 (v1.98): 中央固定を再構成する際の寄せ先。省略時は DDL テキストから決定的に選ばれる")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
@@ -848,6 +865,8 @@ class PaintRequest(BaseModel):
 class PaintResponse(BaseModel):
     text: str
     ddl: str
+    # 入力側 DDL (展開前)。ddl は Stage 2 に渡った展開後。
+    source_ddl: str | None = None
     plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
     plugin_warnings: list[str] = Field(default_factory=list)
     carriage_warnings: list[str] | None = None  # v1.94 B: 搬送契約の鏡（検査のみ）
@@ -870,6 +889,7 @@ class PaintResponse(BaseModel):
     render_seed: int | None = None
     vary_seed: int | None = None
     tenkei: str | None = None
+    focus: str | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     instruction_lang_requested: str | None = None
@@ -969,7 +989,10 @@ class InterpretDetail:
 @dataclass
 class ComposeDetail:
     score: Score
+    # ddl は Stage 2 に渡った展開後 DDL。source_ddl は展開前の入力側 (Stage 1 出力
+    # またはユーザーが書いた DDL)。v1.98 で trace 限定から常時保持へ昇格。
     ddl: str
+    source_ddl: str = ""
     plugin_provenance: list[dict[str, str]] = field(default_factory=list)
     plugin_warnings: list[str] = field(default_factory=list)
     # v1.94 輪1: 展開層が決定的に転写した instruction（coerce を迂回して後段合流）
@@ -1005,6 +1028,8 @@ class ColorCatalogsResponse(BaseModel):
 class HistoryPostBody(BaseModel):
     input: str
     ddl: str | None = None
+    expanded_ddl: str | None = None
+    focus: str | None = None
     score: dict
     svg: str = ""
     at: int
@@ -2371,6 +2396,7 @@ def _call_compose_detail(
     vary_seed: int | None = None,
     include_trace: bool = False,
     tenkei: str = "auto",
+    focus: str | None = None,
 ) -> ComposeDetail:
     stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
     plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
@@ -2387,6 +2413,7 @@ def _call_compose_detail(
         vary_seed=vary_seed,
         plugin_instructions_present=bool(plugin_expansion.instructions),
         tenkei=tenkei,
+        focus=focus,
     )
     stage15_ddl = ddl  # trace: Stage 1.5 output = Stage 2 input (== ComposeDetail.ddl)
     plugin_provenance = list(plugin_expansion.provenance)
@@ -2397,15 +2424,18 @@ def _call_compose_detail(
     fallback_used = False
     attempts: list[dict] = [] if include_trace else []
 
-    def _trace_fields() -> dict:
-        if not include_trace:
-            return {}
-        return {
-            "stage1_ddl_in": stage1_ddl_in,
-            "plugin_expanded_ddl": plugin_expanded_ddl,
-            "stage15_ddl": stage15_ddl,
-            "stage2_raw_attempts": attempts,
-        }
+    def _detail_fields() -> dict:
+        fields: dict = {"source_ddl": stage1_ddl_in}
+        if include_trace:
+            fields.update(
+                {
+                    "plugin_expanded_ddl": plugin_expanded_ddl,
+                    "stage15_ddl": stage15_ddl,
+                    "stage2_raw_attempts": attempts,
+                    "stage1_ddl_in": stage1_ddl_in,
+                }
+            )
+        return fields
 
     def _record_fallback_attempt() -> None:
         if include_trace:
@@ -2465,7 +2495,7 @@ def _call_compose_detail(
             plugin_provenance=plugin_provenance,
             plugin_instructions=plugin_instructions,
             plugin_warnings=plugin_warnings,
-            **_trace_fields(),
+            **_detail_fields(),
         )
     if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
         return ComposeDetail(
@@ -2476,7 +2506,7 @@ def _call_compose_detail(
             plugin_provenance=plugin_provenance,
             plugin_instructions=plugin_instructions,
             plugin_warnings=plugin_warnings,
-            **_trace_fields(),
+            **_detail_fields(),
         )
 
     reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
@@ -2514,7 +2544,7 @@ def _call_compose_detail(
         plugin_provenance=plugin_provenance,
             plugin_instructions=plugin_instructions,
         plugin_warnings=plugin_warnings,
-        **_trace_fields(),
+        **_detail_fields(),
     )
 
 
@@ -2623,6 +2653,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     )
     resolved_stage2_model = _resolved_stage2_model(req.model, actor)
     resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
+    resolved_focus = _validated_focus(req.focus)
     try:
         compose_detail = _call_compose_detail(
             req.ddl,
@@ -2633,6 +2664,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             vary_seed=req.vary_seed,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
+            focus=resolved_focus,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -2677,6 +2709,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "render_seed": render_seed,
         "vary_seed": req.vary_seed,
         "tenkei": resolved_tenkei,
+        "focus": resolved_focus,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
@@ -2702,6 +2735,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     _carriage = _carriage_warnings(compose_detail.ddl, score) or None
     return ComposeResponse(
         ddl=compose_detail.ddl,
+        source_ddl=compose_detail.source_ddl or None,
         plugin_provenance=compose_detail.plugin_provenance,
         plugin_warnings=compose_detail.plugin_warnings,
         carriage_warnings=_carriage,
@@ -3010,6 +3044,7 @@ def _add_history_item(
     score: Score,
     svg: str,
     at: int,
+    expanded_ddl: str | None = None,
     elapsed_ms: int = 0,
     stage1_model: str | None = None,
     stage2_model: str | None = None,
@@ -3050,6 +3085,7 @@ def _add_history_item(
         "output_path": str(prefix),
         "input": input_text,
         "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
+        "expanded_ddl": _sanitize_placement_words(expanded_ddl) if expanded_ddl else expanded_ddl,
         "score": score_dict,
         "svg": svg,
         "at": at,
@@ -3106,6 +3142,7 @@ def _paint_events(
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
+    resolved_focus = _validated_focus(req.focus)
     try:
         if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
@@ -3127,6 +3164,7 @@ def _paint_events(
     t1 = time.perf_counter()
     yield {
         "event": "stage1",
+        # 入力側 DDL (展開前)。done イベントの ddl は展開後なので別物。
         "ddl": ddl,
         "thinking": interpret_detail_result.thinking,
         "stage1_model": resolved_stage1_model,
@@ -3144,6 +3182,7 @@ def _paint_events(
             lang=instruction_lang_resolved,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
+            focus=resolved_focus,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -3190,6 +3229,7 @@ def _paint_events(
         "render_seed": render_seed,
         "vary_seed": req.vary_seed,
         "tenkei": resolved_tenkei,
+        "focus": resolved_focus,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
@@ -3230,7 +3270,8 @@ def _paint_events(
         item = _add_history_item(
             actor=actor,
             input_text=req.history_input or source_text,
-            ddl=ddl,
+            ddl=compose_detail.source_ddl or ddl,
+            expanded_ddl=ddl,
             score=score,
             svg=svg,
             at=history_at,
@@ -3297,6 +3338,7 @@ def _paint_events(
     response = PaintResponse(
         text=source_text,
         ddl=ddl,
+        source_ddl=compose_detail.source_ddl or None,
         thinking=interpret_detail_result.thinking,
         carriage_warnings=_carriage,
         score=score,
@@ -3769,6 +3811,7 @@ def api_history_post(
             "vary_seed": body.vary_seed,
             # v1.97: 保存時に水準を確定する（renderer 専用派生でも系統の水準が途切れない）
             "tenkei": _resolved_tenkei(body.tenkei, actor, body.lineage_parent_node_id),
+            "focus": _validated_focus(body.focus),
             "seed_text": seed_text,
             "interpretation_seed": body.interpretation_seed,
         }
@@ -3781,6 +3824,7 @@ def api_history_post(
         actor=actor,
         input_text=body.input,
         ddl=body.ddl,
+        expanded_ddl=body.expanded_ddl,
         score=score,
         svg=svg,
         at=body.at,

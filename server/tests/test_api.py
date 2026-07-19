@@ -1372,6 +1372,76 @@ def test_paint_stream_reports_compose_failure_as_error_event(monkeypatch, auth_c
     assert events[1]["status"] == 502
 
 
+def test_paint_records_input_and_expanded_ddl_separately(monkeypatch, auth_context):
+    headers, user, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post(
+        "/api/paint", json={"text": "一滴の墨", "save_history": True}, headers=headers
+    )
+    assert r.status_code == 200
+    data = r.json()
+    # ddl は Stage 2 に渡った展開後、source_ddl は展開前の入力側。
+    assert data["source_ddl"] == "中心に黒い円を置く。"
+    assert data["ddl"] != data["source_ddl"]
+
+    listing = client.get(
+        "/api/history", params={"anchor_id": data["history_id"], "limit": 100}, headers=headers
+    ).json()
+    saved = next(item for item in listing["items"] if item["id"] == data["history_id"])
+    assert saved["ddl"] == data["source_ddl"]
+    assert saved["expanded_ddl"] == data["ddl"]
+    db.delete_items(user["id"], [data["history_id"]])
+
+
+def test_explicit_focus_overrides_the_hashed_choice(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    default = client.post("/api/paint", json={"text": "一滴の墨"}, headers=headers).json()
+    moved = client.post(
+        "/api/paint", json={"text": "一滴の墨", "focus": "lower_right"}, headers=headers
+    ).json()
+    assert "右下の焦点" in moved["ddl"]
+    assert moved["ddl"] != default["ddl"]
+
+    # 未知の値は無視され、既定の決定的選択に戻る（既存作品の再現性を保つ）。
+    unknown = client.post(
+        "/api/paint", json={"text": "一滴の墨", "focus": "nowhere"}, headers=headers
+    ).json()
+    assert unknown["ddl"] == default["ddl"]
+
+
+def test_compose_returns_source_ddl(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post("/api/compose", json={"ddl": "中心に黒い円を置く。"}, headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["source_ddl"] == "中心に黒い円を置く。"
+    assert data["ddl"] != data["source_ddl"]
+
+
 def test_paint_stream_requires_auth():
     assert client.post("/api/paint/stream", json={"text": "一滴の墨"}).status_code == 401
 

@@ -102,6 +102,7 @@ export interface LangPack {
 	vocabInInputLabel: string;
 	thinkingLabel: string;
 	ddlLabel: string;
+	ddlExpandedLabel: string;
 	ddlEditSectionLabel: string;
 	ddlNewButton: string;
 	ddlNewDialogTitle: string;
@@ -144,6 +145,8 @@ export interface LangPack {
 	canvasVaryComposition: string;
 	canvasVaryInterpretation: string;
 	canvasVaryColor: string;
+	canvasVaryFocus: string;
+	refineFocusHint: string;
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;
 	variationGridSaveSelected: string;
@@ -185,6 +188,7 @@ export interface LangPack {
 	tooltipCanvasVaryComposition: string;
 	tooltipCanvasVaryInterpretation: string;
 	tooltipCanvasVaryColor: string;
+	tooltipCanvasVaryFocus: string;
 	tooltipCanvasNavPrev: string;
 	tooltipCanvasNavNext: string;
 	tooltipCanvasNavLatest: string;

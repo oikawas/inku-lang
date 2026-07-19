@@ -454,32 +454,60 @@ def _apply_composition_family_en(items: list[str], *, profile: _FilterProfile, t
     return _rewrite_by_map(items, maps.get(family, ()))
 
 
-def _dynamic_focus_ja(text: str) -> str:
-    focuses = (
-        "右上の焦点",
-        "左上の焦点",
-        "右下の焦点",
-        "左下の焦点",
-        "上端寄りの焦点",
-        "右半分の焦点",
-    )
+# Canonical focus ids. The expander picks one from the DDL hash unless the
+# caller names one explicitly (v1.98), which keeps every existing artwork
+# reproducible while letting the refine tab move the focus on purpose.
+FOCUS_IDS = (
+    "upper_right",
+    "upper_left",
+    "lower_right",
+    "lower_left",
+    "upper_edge",
+    "right_half",
+)
+
+_FOCUS_WORDS_JA = {
+    "upper_right": "右上の焦点",
+    "upper_left": "左上の焦点",
+    "lower_right": "右下の焦点",
+    "lower_left": "左下の焦点",
+    "upper_edge": "上端寄りの焦点",
+    "right_half": "右半分の焦点",
+}
+
+_FOCUS_WORDS_EN = {
+    "upper_right": "upper-right focus",
+    "upper_left": "upper-left focus",
+    "lower_right": "lower-right focus",
+    "lower_left": "lower-left focus",
+    "upper_edge": "upper-edge focus",
+    "right_half": "right-half focus",
+}
+
+
+def focus_word(focus: str | None, *, lang: str) -> str | None:
+    words = _FOCUS_WORDS_EN if lang == "en" else _FOCUS_WORDS_JA
+    return words.get(focus or "")
+
+
+def _dynamic_focus_ja(text: str, focus: str | None = None) -> str:
+    named = focus_word(focus, lang="ja")
+    if named:
+        return named
+    focuses = tuple(_FOCUS_WORDS_JA[key] for key in FOCUS_IDS)
     return focuses[_seed(text, "ja-focus") % len(focuses)]
 
 
-def _dynamic_focus_en(text: str) -> str:
-    focuses = (
-        "upper-right focus",
-        "upper-left focus",
-        "lower-right focus",
-        "lower-left focus",
-        "upper-edge focus",
-        "right-half focus",
-    )
+def _dynamic_focus_en(text: str, focus: str | None = None) -> str:
+    named = focus_word(focus, lang="en")
+    if named:
+        return named
+    focuses = tuple(_FOCUS_WORDS_EN[key] for key in FOCUS_IDS)
     return focuses[_seed(text, "en-focus") % len(focuses)]
 
 
-def _reframe_static_center_ja(ddl: str) -> str:
-    focus = _dynamic_focus_ja(ddl)
+def _reframe_static_center_ja(ddl: str, focus: str | None = None) -> str:
+    focus = _dynamic_focus_ja(ddl, focus)
     result = ddl
     replacements = (
         "画面中央",
@@ -493,8 +521,8 @@ def _reframe_static_center_ja(ddl: str) -> str:
     return result
 
 
-def _reframe_static_center_en(ddl: str) -> str:
-    focus = _dynamic_focus_en(ddl)
+def _reframe_static_center_en(ddl: str, focus: str | None = None) -> str:
+    focus = _dynamic_focus_en(ddl, focus)
     result = ddl
     replacements = (
         (r"\bnear the center\b", f"near the {focus}"),
@@ -596,6 +624,7 @@ def expand_intermediate_ddl(
     enable_plugins: bool = True,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
+    focus: str | None = None,
 ) -> str:
     """Add controlled complexity to normalized DDL before Stage 2.
 
@@ -619,6 +648,7 @@ def expand_intermediate_ddl(
             vary_seed=vary_seed,
             plugin_instructions_present=plugin_instructions_present,
             tenkei=tenkei,
+            focus=focus,
         )
     return _expand_ja(
         sanitized,
@@ -626,6 +656,7 @@ def expand_intermediate_ddl(
         vary_seed=vary_seed,
         plugin_instructions_present=plugin_instructions_present,
         tenkei=tenkei,
+        focus=focus,
     )
 
 
@@ -636,6 +667,7 @@ def _expand_ja(
     vary_seed: int | None = None,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
+    focus: str | None = None,
 ) -> str:
     # v1.96 2a: 対 member 決定的転写 (§4.6) で領域文がテキストに残らない場合も
     # 数値 region ガードと同等に完成品レシピの追加を抑止する。
@@ -645,7 +677,7 @@ def _expand_ja(
         or any(marker in ddl for marker in _JA_EXPANSION_MARKERS)
     ):
         return ddl
-    ddl = _reframe_static_center_ja(ddl)
+    ddl = _reframe_static_center_ja(ddl, focus)
     if tenkei == "none":
         return ddl
 
@@ -749,6 +781,7 @@ def _expand_en(
     vary_seed: int | None = None,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
+    focus: str | None = None,
 ) -> str:
     lower = ddl.lower()
     # v1.96 2a: mirror of the ja guard (§4.6 pair-transcription boundary).
@@ -758,7 +791,7 @@ def _expand_en(
         or any(marker in lower for marker in _EN_EXPANSION_MARKERS)
     ):
         return ddl
-    ddl = _reframe_static_center_en(ddl)
+    ddl = _reframe_static_center_en(ddl, focus)
     if tenkei == "none":
         return ddl
     lower = ddl.lower()

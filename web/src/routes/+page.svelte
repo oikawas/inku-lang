@@ -113,6 +113,8 @@
 		elapsed_stage1_ms: number;
 		elapsed_stage2_ms: number;
 		elapsed_total_ms: number;
+		source_ddl?: string | null;
+		focus?: string | null;
 		tokens_in_stage1: number | null;
 		tokens_out_stage1: number | null;
 		tokens_in_stage2: number | null;
@@ -120,7 +122,10 @@
 		user_generation_count?: number | null;
 	};
 	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'language_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'focus';
+	// v1.98: 焦点。中央固定を再構成するときの寄せ先。未指定なら DDL テキストから決定的に選ばれる。
+	const FOCUS_IDS = ['upper_right', 'upper_left', 'lower_right', 'lower_left', 'upper_edge', 'right_half'] as const;
+	type FocusId = (typeof FOCUS_IDS)[number];
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
@@ -321,6 +326,9 @@
 
 	// ── Result ──────────────────────────────────────────────
 	let ddl      = $state<string | null>(null);
+	// v1.98: ddl は入力側 (Stage 1 出力 / ユーザーが書いた DDL)、expandedDdl は展開後
+	// (Stage 1.5 出力 = Stage 2 入力)。旧データは入力側を持たないため null になる。
+	let expandedDdl = $state<string | null>(null);
 	let ddlGeneratedBaseline = $state<string | null>(null);
 	let ddlAutoRepairEnabled = $state(true);
 	let thinking = $state<string | null>(null);
@@ -2589,6 +2597,9 @@ if (unreadWords.length > 0) {
 	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId; tenkei?: TenkeiLevel | null; lineageParentNodeId?: string | null } = {}): Promise<{
 		score: Score;
 		svg: string;
+		// Stage 2 に渡った展開後 DDL (v1.98)
+		ddl?: string | null;
+		source_ddl?: string | null;
 		stage2_model?: string | null;
 		render_build_number?: string | null;
 		render_color_profile?: Record<string, string> | null;
@@ -2727,7 +2738,8 @@ if (unreadWords.length > 0) {
 				if (settings.random_color_catalog && r.render_color_catalog_id) selectedCatalog = r.render_color_catalog_id;
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
-				ddl = r.ddl; ddlGeneratedBaseline = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
+				const demoSourceDdl = r.source_ddl ?? r.ddl;
+				ddl = demoSourceDdl; expandedDdl = r.ddl; ddlGeneratedBaseline = demoSourceDdl; ddlSelection = { start: demoSourceDdl.length, end: demoSourceDdl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
 				fitCanvasZoom();
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
@@ -2840,7 +2852,7 @@ if (unreadWords.length > 0) {
 			: {};
 		loading = true; error = null;
 		activeRunMode = submittedMode;
-		ddl = null; ddlGeneratedBaseline = null; thinking = null; ddlSelection = { start: 0, end: 0 };
+		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null; ddlSelection = { start: 0, end: 0 };
 		displayedHistoryItem = null;
 		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
@@ -2873,6 +2885,7 @@ if (unreadWords.length > 0) {
 						tokensInStage1 = stage1.tokens_in;
 						tokensOutStage1 = stage1.tokens_out;
 						ddl = stage1.ddl;
+						expandedDdl = null;
 						ddlGeneratedBaseline = stage1.ddl;
 						ddlSelection = { start: stage1.ddl.length, end: stage1.ddl.length };
 						thinking = stage1.thinking;
@@ -2889,8 +2902,9 @@ if (unreadWords.length > 0) {
 				tokensOutStage1 = r.tokens_out_stage1;
 				tokensInStage2 = r.tokens_in_stage2;
 				tokensOutStage2 = r.tokens_out_stage2;
-				ddl = r.ddl;
-				ddlGeneratedBaseline = r.ddl;
+				ddl = r.source_ddl ?? r.ddl;
+				expandedDdl = r.ddl;
+				ddlGeneratedBaseline = ddl;
 				thinking = r.thinking;
 				result = r; outputTab = 'canvas';
 				fitCanvasZoom();
@@ -3369,7 +3383,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3447,6 +3461,7 @@ if (unreadWords.length > 0) {
 			demoCurrentSaved = false;
 		}
 		ddl = inputMode === 'single' ? '' : null;
+		expandedDdl = null;
 		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
 		thinking = null;
 		result = null;
@@ -4111,6 +4126,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		input: sourceText,
 		source_text: sourceText,
 		ddl: nextDdl,
+		expanded_ddl: composed.ddl,
 		score: composed.score,
 		svg: composed.svg,
 		at: Date.now(),
@@ -4164,6 +4180,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		input: '',
 		source_text: firstLine,
 		ddl: nextDdl,
+		expanded_ddl: composed.ddl,
 		score: composed.score,
 		svg: composed.svg,
 		at: Date.now(),
@@ -4366,6 +4383,7 @@ $effect(() => {
 		}
 		const itemDDL = it.ddl ?? '';
 		const sourceText = it.source_text ?? it.input;
+		expandedDdl = it.expanded_ddl ?? null;
 		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
 		stage1UserPrompt = sourceText ? sourceText + buildEmotionHint(sourceText) : '';
 		result = {
@@ -4704,8 +4722,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			if (Number.isFinite(result.vary_seed ?? NaN)) usedSeeds.add(Number(result.vary_seed));
 			const nextVarySeed = createSafeIntegerSeed(usedSeeds);
 			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_variation' : null, derivationMetadata: { vary_seed: nextVarySeed } });
-			ddl = r.ddl;
-			ddlGeneratedBaseline = r.ddl;
+			ddl = r.source_ddl ?? r.ddl;
+			expandedDdl = r.ddl;
+			ddlGeneratedBaseline = ddl;
 			thinking = r.thinking;
 			result = r;
 			displayedHistoryItem = null;
@@ -4750,8 +4769,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const interpretationSeed = createInterpretationSeed();
 			const r = await paintOne(source, { historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), interpretationSeed, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'reinterpretation' : null, derivationMetadata: { interpretation_seed: interpretationSeed } });
 			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
-			ddl = r.ddl;
-			ddlGeneratedBaseline = r.ddl;
+			ddl = r.source_ddl ?? r.ddl;
+			expandedDdl = r.ddl;
+			ddlGeneratedBaseline = ddl;
 			thinking = r.thinking;
 			result = r;
 			displayedHistoryItem = null;
@@ -4872,6 +4892,50 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return { id: `comp-${varySeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { vary_seed: varySeed } } };
 	}
 
+	function focusLabel(focus: FocusId): string {
+		const ja: Record<FocusId, string> = {
+			upper_right: '右上の焦点', upper_left: '左上の焦点', lower_right: '右下の焦点',
+			lower_left: '左下の焦点', upper_edge: '上端寄りの焦点', right_half: '右半分の焦点'
+		};
+		const en: Record<FocusId, string> = {
+			upper_right: 'upper-right focus', upper_left: 'upper-left focus', lower_right: 'lower-right focus',
+			lower_left: 'lower-left focus', upper_edge: 'upper-edge focus', right_half: 'right-half focus'
+		};
+		return getLang() === 'ja' ? ja[focus] : en[focus];
+	}
+
+	function focusCandidateList(count: number): FocusId[] {
+		const current = (result?.focus ?? null) as FocusId | null;
+		const rest = FOCUS_IDS.filter((id) => id !== current);
+		return rest.slice(0, count);
+	}
+
+	async function focusVariationCandidate(focus: FocusId, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+		const source = input.trim();
+		const baseDdl = ddl ?? "";
+		const r = await apiFetch("/api/compose", {
+			method: "POST",
+			signal,
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				ddl: baseDdl,
+				original_text: source,
+				model: qualifiedModelId(stage2Provider, stage2Model),
+				instruction_lang: instructionLang,
+				ui_lang: getLang(),
+				catalog_id: refinementCatalogId(),
+				canvas_aspect: refinementCanvasAspectId(),
+				auto_repair: ddlAutoRepairEnabled,
+				focus,
+				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
+				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
+			})
+		});
+		if (!r.ok) throw new Error(await r.text());
+		const data = await r.json();
+		return { id: `focus-${focus}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), focus, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { focus } } };
+	}
+
 	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
 		const interpretationSeed = createInterpretationSeed();
@@ -4984,6 +5048,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
 			}
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
+			const focusCandidateIds = kind === "focus" ? focusCandidateList(count) : [];
 			const jobs = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
@@ -4996,6 +5061,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				}
 				if (kind === "reading") {
 					return interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
+				}
+				if (kind === "focus") {
+					const focus = focusCandidateIds[index] ?? focusCandidateIds[0];
+					return focusVariationCandidate(focus, focusLabel(focus), abortController.signal);
 				}
 				const catalogId = catalogIds[index];
 				return renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
@@ -5027,8 +5096,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	function showVariationCandidate(candidate: VariationCandidate) {
 		resetTargetScopedState({ preserveVariationCandidates: true });
 		historyCursor = -1;
-		ddl = candidate.result.ddl;
-		ddlGeneratedBaseline = candidate.result.ddl;
+		ddl = candidate.result.source_ddl ?? candidate.result.ddl;
+		expandedDdl = candidate.result.ddl;
+		ddlGeneratedBaseline = ddl;
 		thinking = candidate.result.thinking;
 		result = candidate.result;
 		displayedHistoryItem = null;
@@ -5787,7 +5857,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- 解釈 (正規化DDL・閲覧専用) -->
 					{#if ddl !== null && inputMode === 'single'}
 						<section class="panel-section">
-							<DdlViewer {ddl} label={t().ddlLabel} saijikiLabel={t().saijikiToggleBtn} onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)} />
+							<DdlViewer {ddl} {expandedDdl} label={t().ddlLabel} expandedLabel={t().ddlExpandedLabel} saijikiLabel={t().saijikiToggleBtn} onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)} />
 						</section>
 					{/if}
 

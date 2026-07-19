@@ -18,6 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -28,7 +29,7 @@ from typing import Literal
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
@@ -3081,12 +3082,18 @@ def _add_history_item(
     return item_dict
 
 
-@app.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
-def api_paint(
+def _paint_events(
     req: PaintRequest,
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
-    actor: dict = Depends(_current_user),
-) -> PaintResponse:
+    idempotency_key: str | None,
+    actor: dict,
+) -> Iterator[dict[str, object]]:
+    """Run a paint and yield its stage boundaries.
+
+    Both /api/paint and /api/paint/stream consume this generator, so the two
+    endpoints cannot drift apart. Events are ``stage1`` (interpretation is
+    finished, its DDL and token counts are known) followed by ``done`` (the
+    complete PaintResponse).
+    """
     t0 = time.perf_counter()
     source_text = req.original_text or req.text
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
@@ -3118,6 +3125,17 @@ def api_paint(
         raise _unexpected_http_error("interpret", 502) from e
     ddl = interpret_detail_result.ddl
     t1 = time.perf_counter()
+    yield {
+        "event": "stage1",
+        "ddl": ddl,
+        "thinking": interpret_detail_result.thinking,
+        "stage1_model": resolved_stage1_model,
+        "stage2_model": resolved_stage2_model,
+        "tokens_in": interpret_detail_result.tokens_in,
+        "tokens_out": interpret_detail_result.tokens_out,
+        "elapsed_ms": int((t1 - t0) * 1000),
+        "interpret_fallback_used": interpret_detail_result.fallback_used,
+    }
     try:
         compose_detail = _call_compose_detail(
             ddl,
@@ -3276,7 +3294,7 @@ def api_paint(
         coerce_report=coerce_report,
     )
     _carriage = _carriage_warnings(compose_detail.ddl, score) or None
-    return PaintResponse(
+    response = PaintResponse(
         text=source_text,
         ddl=ddl,
         thinking=interpret_detail_result.thinking,
@@ -3305,6 +3323,63 @@ def api_paint(
         catalog_id=catalog_id,
         **coerce_report,
         trace=paint_trace,
+    )
+    yield {"event": "done", "response": response}
+
+
+@app.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
+def api_paint(
+    req: PaintRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> PaintResponse:
+    for event in _paint_events(req, idempotency_key, actor):
+        if event["event"] == "done":
+            return event["response"]  # type: ignore[return-value]
+    raise _unexpected_http_error("paint", 500)
+
+
+@app.post("/api/paint/stream")
+def api_paint_stream(
+    req: PaintRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> StreamingResponse:
+    """Newline-delimited JSON variant of /api/paint.
+
+    The response is already committed once the first event is written, so a
+    failure after that point is reported as an in-band ``error`` event instead
+    of an HTTP status.
+    """
+
+    def lines() -> Iterator[str]:
+        try:
+            for event in _paint_events(req, idempotency_key, actor):
+                if event["event"] == "done":
+                    response = event["response"]
+                    payload = {
+                        "event": "done",
+                        **response.model_dump(mode="json", by_alias=True, exclude_none=True),
+                    }
+                else:
+                    payload = event
+                yield json.dumps(payload, ensure_ascii=False) + "\n"
+        except HTTPException as e:
+            yield json.dumps(
+                {"event": "error", "status": e.status_code, "detail": e.detail},
+                ensure_ascii=False,
+            ) + "\n"
+        except Exception as e:  # noqa: BLE001
+            _logger.exception("paint stream failed: %s", e)
+            yield json.dumps(
+                {"event": "error", "status": 500, "detail": "unexpected error"},
+                ensure_ascii=False,
+            ) + "\n"
+
+    return StreamingResponse(
+        lines(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )
 
 

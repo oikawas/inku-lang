@@ -37,6 +37,7 @@
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
+	import { createElapsed } from '$lib/elapsed.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
@@ -2270,6 +2271,46 @@
 	// Standalone DDL-authored artworks have no instruction; gate instruction-only refine paths.
 	const statusDdlOrigin = $derived((displayedHistoryItem?.display_label ?? null) === DDL_ORIGIN_LABEL);
 
+	// ── Running-indicator state ─────────────────────────────
+	// Tokens confirmed by the stage1 event of the paint currently in flight.
+	// Cleared when that paint finishes; completed runs are folded into the
+	// per-flow totals below.
+	let activeRunTokensIn = $state<number | null>(null);
+	let activeRunTokensOut = $state<number | null>(null);
+
+	// Model names shown by every running indicator.
+	const stage1ModelLabel = $derived(
+		availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model
+	);
+	const stage2ModelLabel = $derived(
+		availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model
+	);
+
+	// Flows that issue several paints per run keep their own running totals.
+	let variationTokensIn = $state<number | null>(null);
+	let variationTokensOut = $state<number | null>(null);
+	let modelInspectionTokensIn = $state<number | null>(null);
+	let modelInspectionTokensOut = $state<number | null>(null);
+	let languageInspectionTokensIn = $state<number | null>(null);
+	let languageInspectionTokensOut = $state<number | null>(null);
+
+	const variationElapsed = createElapsed();
+	const modelInspectionElapsed = createElapsed();
+	const languageInspectionElapsed = createElapsed();
+
+	function addTokens(total: number | null, delta: number | null | undefined): number | null {
+		if (delta === null || delta === undefined) return total;
+		return (total ?? 0) + delta;
+	}
+
+	function paintTokensIn(r: PaintResult): number | null {
+		return addTokens(r.tokens_in_stage1 ?? null, r.tokens_in_stage2);
+	}
+
+	function paintTokensOut(r: PaintResult): number | null {
+		return addTokens(r.tokens_out_stage1 ?? null, r.tokens_out_stage2);
+	}
+
 	// ── Timer ───────────────────────────────────────────────
 	function startTimer() {
 		_timerStart = Date.now();
@@ -2353,6 +2394,8 @@
 		derivationMetadata?: Record<string, unknown>;
 		// null/undefined = omit the field so the server inherits from the parent.
 		tenkei?: TenkeiLevel | null;
+		// Called when interpretation finishes, before rendering starts.
+		onStage1?: (event: PaintStage1Event) => void;
 	};
 
 async function requestVisionRefineAdvice(historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) {
@@ -2369,16 +2412,72 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string };
 }
 
+	type PaintStage1Event = {
+		event: 'stage1';
+		ddl: string;
+		thinking: string | null;
+		stage1_model: string;
+		stage2_model: string;
+		tokens_in: number | null;
+		tokens_out: number | null;
+		elapsed_ms: number;
+		interpret_fallback_used: boolean;
+	};
+
+	/**
+	 * Consume the NDJSON stream of /api/paint/stream.
+	 *
+	 * The stage1 event arrives as soon as interpretation finishes, so the
+	 * running indicator can show the real stage and the Stage 1 token counts
+	 * instead of guessing. The done event carries the same payload the
+	 * non-streaming /api/paint returns.
+	 */
+	async function readPaintStream(
+		response: Response,
+		onStage1: (event: PaintStage1Event) => void
+	): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
+		const reader = response.body?.getReader();
+		if (!reader) throw new Error('paint stream is not readable');
+		const decoder = new TextDecoder();
+		let buffer = '';
+		let done: ({ ddl: string; thinking: string | null } & PaintResult) | null = null;
+
+		for (;;) {
+			const chunk = await reader.read();
+			if (chunk.value) buffer += decoder.decode(chunk.value, { stream: true });
+			let newline = buffer.indexOf('\n');
+			while (newline >= 0) {
+				const line = buffer.slice(0, newline).trim();
+				buffer = buffer.slice(newline + 1);
+				newline = buffer.indexOf('\n');
+				if (!line) continue;
+				const event = JSON.parse(line) as { event: string } & Record<string, unknown>;
+				if (event.event === 'stage1') {
+					onStage1(event as unknown as PaintStage1Event);
+				} else if (event.event === 'error') {
+					throw new Error((event.detail as string) ?? `HTTP ${event.status ?? 500}`);
+				} else if (event.event === 'done') {
+					done = event as unknown as { ddl: string; thinking: string | null } & PaintResult;
+				}
+			}
+			if (chunk.done) break;
+		}
+		if (!done) throw new Error('paint stream ended before completion');
+		return done;
+	}
+
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const uiLang = getLang();
 		stageLabel = t().stageInterpreting;
+		activeRunTokensIn = null;
+		activeRunTokensOut = null;
 		const historyInput = options.historyInput ?? text;
 		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
 		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
 
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
-		const r = await apiFetch('/api/paint', {
+		const r = await apiFetch('/api/paint/stream', {
 			method: 'POST',
 			signal: options.signal,
 			headers: { 'Content-Type': 'application/json' },
@@ -2417,8 +2516,14 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			const d = await r.json().catch(() => ({})) as { detail?: string };
 			throw new Error(d.detail ?? `HTTP ${r.status}`);
 		}
-		stageLabel = t().stageStructuring('');
-		const data = await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+		const data = await readPaintStream(r, (stage1) => {
+			stageLabel = t().stageStructuring('');
+			activeRunTokensIn = stage1.tokens_in;
+			activeRunTokensOut = stage1.tokens_out;
+			options.onStage1?.(stage1);
+		});
+		activeRunTokensIn = null;
+		activeRunTokensOut = null;
 		await loadNearbyHistory(data.history_id);
 const unreadWords = interpretationFeedback(text, data.ddl)
 	.filter((part) => part.tone === 'weak')
@@ -2754,87 +2859,46 @@ if (unreadWords.length > 0) {
 		try {
 			if (submittedMode === 'single') {
 				stageLabel = t().stageDdlGenerating;
-				const stage1StartedAt = Date.now();
-				const interpreted = await interpretOne(input, abortController.signal, undefined, undefined, tenkeiLevel);
-				if (submitStopRequested) return;
-				elapsedStage1Ms = Date.now() - stage1StartedAt;
-				tokensInStage1 = interpreted.tokens_in;
-				tokensOutStage1 = interpreted.tokens_out;
-				ddl = interpreted.ddl;
-				ddlGeneratedBaseline = interpreted.ddl;
-				ddlSelection = { start: interpreted.ddl.length, end: interpreted.ddl.length };
-				thinking = interpreted.thinking;
-				stageLabel = t().stageImageGenerating;
-				reloading = true;
-				const composed = await composeOne(interpreted.ddl, input, abortController.signal, undefined, undefined, { tenkei: tenkeiLevel });
+				const r = await paintOne(input, {
+					sourceText: input,
+					catalogId: selectedCatalog,
+					canvasAspectId: effectiveCanvasAspectId(),
+					lineageParentNodeId: submitParentNodeId,
+					derivationKind: submitDerivationKind,
+					derivationMetadata: submitDerivationMetadata,
+					tenkei: tenkeiLevel,
+					signal: abortController.signal,
+					onStage1: (stage1) => {
+						elapsedStage1Ms = stage1.elapsed_ms;
+						tokensInStage1 = stage1.tokens_in;
+						tokensOutStage1 = stage1.tokens_out;
+						ddl = stage1.ddl;
+						ddlGeneratedBaseline = stage1.ddl;
+						ddlSelection = { start: stage1.ddl.length, end: stage1.ddl.length };
+						thinking = stage1.thinking;
+						stageLabel = t().stageImageGenerating;
+						reloading = true;
+					}
+				});
 				if (submitStopRequested) return;
 				reloading = false;
-				elapsedStage2Ms = composed.elapsed_ms;
-				elapsedTotalMs = Date.now() - _timerStart;
-				tokensInStage2 = composed.tokens_in;
-				tokensOutStage2 = composed.tokens_out;
-				const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
-				const resolvedStage2Model = composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model);
-				const r: PaintResult = {
-					score: composed.score,
-					svg: composed.svg,
-					stage1_model: resolvedStage1Model,
-					stage2_model: resolvedStage2Model,
-					render_build_number: composed.render_build_number,
-					render_color_profile: composed.render_color_profile,
-					render_engine_id: composed.render_engine_id,
-					render_engine_version: composed.render_engine_version,
-					render_color_catalog_id: composed.render_color_catalog_id,
-					render_color_catalog_name: composed.render_color_catalog_name,
-					render_color_catalog_sub: composed.render_color_catalog_sub,
-					render_color_map: composed.render_color_map,
-					render_canvas_aspect: composed.render_canvas_aspect,
-					render_canvas_aspect_id: composed.render_canvas_aspect_id,
-					render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
-					render_seed: composed.render_seed,
-					vary_seed: composed.vary_seed,
-					instruction_lang_requested: composed.instruction_lang_requested,
-					instruction_lang_resolved: composed.instruction_lang_resolved,
-					ui_lang: composed.ui_lang,
-					render_hash: composed.render_hash,
-					render_hash_short: composed.render_hash_short,
-					elapsed_stage1_ms: elapsedStage1Ms,
-					elapsed_stage2_ms: elapsedStage2Ms,
-					elapsed_total_ms: elapsedTotalMs,
-					tokens_in_stage1: tokensInStage1,
-					tokens_out_stage1: tokensOutStage1,
-					tokens_in_stage2: tokensInStage2,
-					tokens_out_stage2: tokensOutStage2,
-				};
+				elapsedStage1Ms = r.elapsed_stage1_ms;
+				elapsedStage2Ms = r.elapsed_stage2_ms;
+				elapsedTotalMs = r.elapsed_total_ms;
+				tokensInStage1 = r.tokens_in_stage1;
+				tokensOutStage1 = r.tokens_out_stage1;
+				tokensInStage2 = r.tokens_in_stage2;
+				tokensOutStage2 = r.tokens_out_stage2;
+				ddl = r.ddl;
+				ddlGeneratedBaseline = r.ddl;
+				thinking = r.thinking;
 				result = r; outputTab = 'canvas';
 				fitCanvasZoom();
-				const savedHistory = await pushHistory({
-					input,
-					ddl: interpreted.ddl,
-					score: composed.score,
-					svg: composed.svg,
-					at: Date.now(),
-					elapsed_ms: elapsedTotalMs,
-					stage1_model: resolvedStage1Model,
-					stage2_model: resolvedStage2Model,
-					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
-					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
-					catalog_id: selectedCatalog,
-				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind, derivationMetadata: submitDerivationMetadata, tenkei: tenkeiLevel });
-				if (savedHistory && submitAbortController === abortController && !submitStopRequested) {
+				if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
 					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 					lineageDetached = false;
-					displayedHistoryItem = savedHistory;
-					result = {
-						...r,
-						history_id: savedHistory.id,
-						history_at: savedHistory.at,
-						render_hash: savedHistory.render_hash,
-						render_hash_short: savedHistory.render_hash_short,
-						description_hash: savedHistory.description_hash,
-						lineage_node_id: savedHistory.lineage_node_id,
-					};
-					await loadNearbyHistory(savedHistory.id);
+					await fetchHistoryOffset(0, { anchorId: r.history_id });
+					displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
 				}
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
@@ -3602,6 +3666,9 @@ if (unreadWords.length > 0) {
 		modelInspectionAbortController = abortController;
 		modelInspectionBusy = true;
 		modelInspectionStatus = null;
+		modelInspectionTokensIn = null;
+		modelInspectionTokensOut = null;
+		modelInspectionElapsed.start();
 		const successful = [...modelInspectionResults];
 		const failed: Record<string, string> = {};
 		try {
@@ -3614,8 +3681,12 @@ if (unreadWords.length > 0) {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, abortController.signal, job.stage1, undefined, refineTenkeiOverride);
 					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					modelInspectionTokensIn = addTokens(modelInspectionTokensIn, interpreted.tokens_in);
+					modelInspectionTokensOut = addTokens(modelInspectionTokensOut, interpreted.tokens_out);
 					const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2, undefined, { tenkei: refineTenkeiOverride, lineageParentNodeId: modelParentNodeId });
 					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					modelInspectionTokensIn = addTokens(modelInspectionTokensIn, composed.tokens_in);
+					modelInspectionTokensOut = addTokens(modelInspectionTokensOut, composed.tokens_out);
 					successful.push({
 						id: job.id,
 						model: job.model,
@@ -3665,6 +3736,7 @@ if (unreadWords.length > 0) {
 				modelInspectionAbortController = null;
 				modelInspectionBusy = false;
 				modelInspectionCurrentModel = '';
+				modelInspectionElapsed.stop();
 			}
 		}
 	}
@@ -3726,6 +3798,9 @@ if (unreadWords.length > 0) {
 		languageInspectionAbortController = abortController;
 		languageInspectionBusy = true;
 		languageInspectionStatus = null;
+		languageInspectionTokensIn = null;
+		languageInspectionTokensOut = null;
+		languageInspectionElapsed.start();
 		const successful = [...languageInspectionResults];
 		const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
 		try {
@@ -3735,8 +3810,12 @@ if (unreadWords.length > 0) {
 				try {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang, refineTenkeiOverride);
+					languageInspectionTokensIn = addTokens(languageInspectionTokensIn, interpreted.tokens_in);
+					languageInspectionTokensOut = addTokens(languageInspectionTokensOut, interpreted.tokens_out);
 					const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang, { tenkei: refineTenkeiOverride, lineageParentNodeId: parentNodeId });
 					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
+					languageInspectionTokensIn = addTokens(languageInspectionTokensIn, composed.tokens_in);
+					languageInspectionTokensOut = addTokens(languageInspectionTokensOut, composed.tokens_out);
 					successful.push({
 						id: job.id,
 						model: qualifiedModelId(stage1Provider, stage1Model),
@@ -3785,6 +3864,7 @@ if (unreadWords.length > 0) {
 				languageInspectionAbortController = null;
 				languageInspectionBusy = false;
 				languageInspectionCurrentLabel = '';
+				languageInspectionElapsed.stop();
 			}
 		}
 	}
@@ -4573,6 +4653,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!result || variationBusy) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
 		reloading = true;
 		reloadError = null;
 		try {
@@ -4601,6 +4684,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		} finally {
 			reloading = false;
 			variationBusy = false;
+			variationElapsed.stop();
 		}
 	}
 
@@ -4610,6 +4694,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!source) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
 		loading = true;
 		error = null;
 		try {
@@ -4642,6 +4729,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		} finally {
 			loading = false;
 			variationBusy = false;
+			variationElapsed.stop();
 			stopTimer();
 		}
 	}
@@ -4652,6 +4740,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!source) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
 		loading = true;
 		error = null;
 		const previousDdl = ddl;
@@ -4684,6 +4775,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		} finally {
 			loading = false;
 			variationBusy = false;
+			variationElapsed.stop();
 			stopTimer();
 		}
 	}
@@ -4870,6 +4962,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		variationGridAbortController = abortController;
 		variationGridBusy = true;
 		variationGridCanAbort = false;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
 		variationGridIncludesReading = kind === "reading";
 		variationGridTaskLabel = kind === "touch"
 			? t().canvasVaryPerformance
@@ -4906,6 +5001,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				return renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
 			});
 			variationCandidates = await Promise.all(jobs);
+			for (const candidate of variationCandidates) {
+				variationTokensIn = addTokens(variationTokensIn, paintTokensIn(candidate.result));
+				variationTokensOut = addTokens(variationTokensOut, paintTokensOut(candidate.result));
+			}
 		} catch (e) {
 			if (!(e instanceof DOMException && e.name === "AbortError")) variationGridStatus = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -4914,6 +5013,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				variationGridAbortController = null;
 				variationGridBusy = false;
 				variationGridCanAbort = false;
+				variationElapsed.stop();
 			}
 		}
 	}
@@ -5647,8 +5747,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
-						stage1ModelLabel={availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}
-						stage2ModelLabel={availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}
+						{stage1ModelLabel}
+						{stage2ModelLabel}
+						runTokensIn={activeRunTokensIn}
+						runTokensOut={activeRunTokensOut}
 						{nextStage1Model}
 						{nextStage2Model}
 						{nextCatalogName}
@@ -5823,6 +5925,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{variationGridIncludesReading}
 				{variationGridTaskLabel}
 				{variationGridStatus}
+				runTokensIn={activeRunTokensIn}
+				runTokensOut={activeRunTokensOut}
+				variationElapsedMs={variationElapsed.ms}
+				{variationTokensIn}
+				{variationTokensOut}
+				modelInspectionElapsedMs={modelInspectionElapsed.ms}
+				{modelInspectionTokensIn}
+				{modelInspectionTokensOut}
+				languageInspectionElapsedMs={languageInspectionElapsed.ms}
+				{languageInspectionTokensIn}
+				{languageInspectionTokensOut}
 				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
 				onAbortVariationCandidates={abortVariationCandidates}
@@ -5933,6 +6046,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	subtitle={ddlDialogMode === 'new' ? t().ddlNewDialogSubtitle : t().ddlEditDialogSubtitle}
 	initialDdl={ddlDialogInitial}
 	drawing={ddlDialogDrawing}
+	{stage1ModelLabel}
+	{stage2ModelLabel}
+	runTokensIn={activeRunTokensIn}
+	runTokensOut={activeRunTokensOut}
 	error={ddlDialogError}
 	previewForWord={saijikiPreview}
 	showTenkei={ddlDialogMode === 'edit'}

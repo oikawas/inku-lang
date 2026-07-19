@@ -4,12 +4,12 @@
   import type { LineageNode } from './LineagePanel.svelte';
   import HistoryThumbnail from './HistoryThumbnail.svelte';
   import ModelCardPicker from './ModelCardPicker.svelte';
-  import InkuMascot from './InkuMascot.svelte';
-  import StopButton from './StopButton.svelte';
+  import RunStatus from './RunStatus.svelte';
   import Tooltip from './Tooltip.svelte';
   import TenkeiSelect from './TenkeiSelect.svelte';
   import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
   import { t } from '$lib/i18n/index.svelte';
+  import { createElapsed } from '$lib/elapsed.svelte';
 
   type RefineMode = 'random' | 'vision';
   type VisionAdvice = { observation: string; next_direction: string; suggested_kind: string; model: string };
@@ -17,6 +17,8 @@
     node: LineageNode;
     visionModel: string;
     visionProviderGroups: ProviderGroup[];
+    stage1ModelLabel: string;
+    stage2ModelLabel: string;
     onClose: () => void;
     onPaintOne: (text: string, options: any) => Promise<any>;
     onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<VisionAdvice>;
@@ -24,7 +26,11 @@
     onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
   };
 
-  let { node, visionModel, visionProviderGroups, onClose, onPaintOne, onVisionAdvice, onLoadBranch, onSaveVisionModel }: Props = $props();
+  let { node, visionModel, visionProviderGroups, stage1ModelLabel, stage2ModelLabel, onClose, onPaintOne, onVisionAdvice, onLoadBranch, onSaveVisionModel }: Props = $props();
+
+  function addTokens(total: number | null, delta: number): number | null {
+    return (total ?? 0) + delta;
+  }
   let prompt = $state('');
   let generations = $state(5);
   let refineMode = $state<RefineMode>('random');
@@ -34,6 +40,9 @@
   let enableLayout = $state(true);
   let enableTouch = $state(true);
   let running = $state(false);
+  const refineElapsed = createElapsed();
+  let refineTokensIn = $state<number | null>(null);
+  let refineTokensOut = $state<number | null>(null);
   let currentStep = $state(0);
   let statusText = $state('');
   let errorText = $state('');
@@ -79,6 +88,9 @@
     if (activeKinds.length === 0) { errorText = t().aiRefineMinElementsError; return; }
     if (refineMode === 'vision' && (!selectedVisionModel || !node.history?.id)) { errorText = t().aiRefineVisionSourceError; return; }
     running = true;
+    refineTokensIn = null;
+    refineTokensOut = null;
+    refineElapsed.start();
     errorText = '';
     currentStep = 0;
     lastGeneratedItem = null;
@@ -114,6 +126,8 @@
         };
         if (kind === 'catalog_change') options.randomColorCatalog = true;
         const result = await onPaintOne(paintText, options);
+        refineTokensIn = addTokens(refineTokensIn, (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0));
+        refineTokensOut = addTokens(refineTokensOut, (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0));
         parentNodeId = result.lineage_node_id;
         lastGeneratedItem = result.history_id ? result : null;
         if (result.source_text) currentText = result.source_text;
@@ -125,6 +139,7 @@
       if (err.name !== 'AbortError') errorText = err.message || String(err);
     } finally {
       running = false;
+      refineElapsed.stop();
       abortController = null;
     }
   }
@@ -139,7 +154,17 @@
     <header><h3 id="modal-title">{t().aiRefineTitle}</h3>{#if !running}<button class="close-btn" type="button" onclick={onClose} aria-label={t().closeLabel}>&times;</button>{/if}</header>
     <div class="modal-body">
       {#if running}
-        <div class="running-state"><div class="running-mascot"><InkuMascot /></div><p class="status-message">{statusText}</p>{#if lastGeneratedItem}<div class="progress-preview"><HistoryThumbnail item={lastGeneratedItem} scope="ai-refine-progress" size="manager" /></div>{/if}</div>
+        <RunStatus
+          label={statusText}
+          stage1Model={stage1ModelLabel}
+          stage2Model={stage2ModelLabel}
+          elapsedMs={refineElapsed.ms}
+          tokensIn={refineTokensIn}
+          tokensOut={refineTokensOut}
+          onStop={stopRefinement}
+        >
+          {#if lastGeneratedItem}<div class="progress-preview"><HistoryThumbnail item={lastGeneratedItem} scope="ai-refine-progress" size="manager" /></div>{/if}
+        </RunStatus>
       {:else}
         <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" bind:group={refineMode} value="random" /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label><input type="radio" bind:group={refineMode} value="vision" /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
         {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
@@ -150,7 +175,7 @@
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}
       {#if errorText}<div class="error-banner">{errorText}</div>{/if}
     </div>
-    <footer>{#if !running}<button class="cancel-action" type="button" onclick={onClose}>{t().confirmCancel}</button><button class="confirm-action" type="button" disabled={activeKinds.length === 0 || (refineMode === 'vision' && (!selectedVisionModel || !node.history?.id))} onclick={startRefinement}>{t().aiRefineStartButton}</button>{:else}<span class="running-label">{t().aiRefineRunningButton}</span><StopButton onclick={stopRefinement}>{t().aiRefineAbortButton}</StopButton>{/if}</footer>
+    <footer>{#if !running}<button class="cancel-action" type="button" onclick={onClose}>{t().confirmCancel}</button><button class="confirm-action" type="button" disabled={activeKinds.length === 0 || (refineMode === 'vision' && (!selectedVisionModel || !node.history?.id))} onclick={startRefinement}>{t().aiRefineStartButton}</button>{/if}</footer>
   </div>
 </div>
 
@@ -173,10 +198,9 @@
   .gen-value { min-width:38px; text-align:center; font-size:.9rem; font-variant-numeric:tabular-nums; }
   .advanced-settings { border:1px solid var(--border); border-radius:8px; padding:8px 12px; background:var(--bg2); } .advanced-settings summary { font-size:.75rem; font-weight:600; color:var(--fg2); cursor:pointer; user-select:none; }
   .checkbox-group { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; } .checkbox-group label { display:flex; align-items:center; gap:8px; font-size:.74rem; cursor:pointer; } .checkbox-group input { width:14px; height:14px; accent-color:var(--accent); margin:0; }
-  .running-state { margin:auto; display:flex; flex-direction:column; align-items:center; text-align:center; gap:14px; padding:10px 0; } .running-mascot { display:flex; align-items:center; justify-content:center; }
-  .status-message { font-size:.82rem; color:var(--fg2); margin:0; } .progress-preview { width:110px; height:110px; border-radius:6px; overflow:hidden; background:var(--bg2); border:1px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,.15); } .progress-preview :global(.history-thumbnail) { width:100%; height:100%; aspect-ratio:auto; } .progress-preview :global(svg) { width:100%; height:100%; display:block; }
+  .progress-preview { width:72px; height:72px; border-radius:6px; overflow:hidden; background:var(--bg2); border:1px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,.15); } .progress-preview :global(.history-thumbnail) { width:100%; height:100%; aspect-ratio:auto; } .progress-preview :global(svg) { width:100%; height:100%; display:block; }
   .vision-advice { padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg2); } .vision-advice h4 { margin:0 0 3px; color:var(--fg3); font-size:.68rem; } .vision-advice p { margin:0 0 8px; color:var(--fg2); font-size:.76rem; line-height:1.45; } .vision-advice p:last-child { margin-bottom:0; }
   .error-banner { padding:8px 12px; background:color-mix(in srgb,var(--danger,#9b3d32) 10%,var(--panel)); border:1px solid var(--danger,#9b3d32); border-radius:6px; color:var(--danger,#9b3d32); font-size:.74rem; line-height:1.35; }
-  footer { display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid var(--border); background:var(--bg2); } footer button { border:1px solid var(--border2); border-radius:6px; padding:7px 14px; font-size:.8rem; font-weight:500; cursor:pointer; background:var(--panel); color:var(--fg); } .confirm-action { background:var(--accent); color:white; border-color:var(--accent); } .confirm-action:disabled { opacity:.5; cursor:default; } .cancel-action:hover { background:var(--bg); } .running-label { margin-right:auto; font-size:.78rem; color:var(--fg3); } footer :global(.stop-btn) { width:auto; min-width:0; flex:0 0 auto; padding:7px 14px; font-size:.8rem; letter-spacing:.06em; }
+  footer { display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid var(--border); background:var(--bg2); } footer button { border:1px solid var(--border2); border-radius:6px; padding:7px 14px; font-size:.8rem; font-weight:500; cursor:pointer; background:var(--panel); color:var(--fg); } .confirm-action { background:var(--accent); color:white; border-color:var(--accent); } .confirm-action:disabled { opacity:.5; cursor:default; } .cancel-action:hover { background:var(--bg); }
   @media (max-width:560px) { .mode-choice { grid-template-columns:1fr; } }
 </style>

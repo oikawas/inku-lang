@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import KiwiMascot from './KiwiMascot.svelte';
 	import SaijikiInline from './SaijikiInline.svelte';
-	import StopButton from './StopButton.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import Tooltip from './Tooltip.svelte';
 
 	type SaijikiPreview = {
@@ -25,8 +24,11 @@
 		reloadError: string | null;
 		loading: boolean;
 		liveMs: number;
-		tokenSummary: string;
 		showKiwi: boolean;
+		stage1ModelLabel: string;
+		stage2ModelLabel: string;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		autoRepairEnabled: boolean;
 		activeSaijikiPreview: SaijikiPreview | null;
 		onToggleSaijiki: () => void;
@@ -48,8 +50,11 @@
 		reloadError,
 		loading,
 		liveMs,
-		tokenSummary,
 		showKiwi,
+		stage1ModelLabel,
+		stage2ModelLabel,
+		runTokensIn,
+		runTokensOut,
 		autoRepairEnabled = $bindable(true),
 		activeSaijikiPreview = $bindable(),
 		onToggleSaijiki,
@@ -127,21 +132,17 @@
 		</div>
 
 		{#if reloading}
-			<div class="progress-wrap">
-				<div class="progress-phases">
-					<span class="phase-item phase-active"><span class="phase-dot"></span>{t().stageImageGenerating}</span>
-				</div>
-				<div class="progress-right">
-					<span class="progress-token">{tokenSummary || '-→-tok'}</span>
-					<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
-					<StopButton onclick={onStopReplay}>{t().stopBtn}</StopButton>
-				</div>
-			</div>
+			<RunStatus
+				label={t().stageImageGenerating}
+				stage1Model={stage1ModelLabel}
+				stage2Model={stage2ModelLabel}
+				elapsedMs={liveMs}
+				tokensIn={runTokensIn}
+				tokensOut={runTokensOut}
+				onStop={onStopReplay}
+			/>
 			<div class="progress-bar-track" style="--progress-target: 100%">
 				<div class="progress-bar-fill"></div>
-				{#if showKiwi}
-					<KiwiMascot />
-				{/if}
 			</div>
 		{/if}
 		{#if reloadError}<p class="error-text">{reloadError}</p>{/if}
@@ -493,70 +494,6 @@
 		background: #1a1918;
 		color: #8c857a;
 		border-color: #3b3834;
-	}
-	.progress-wrap {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-		min-height: 44px;
-		padding: 9px 11px 8px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r) var(--r) 0 0;
-		background: var(--panel);
-		margin-top: 2px;
-	}
-	.progress-phases {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		min-width: 0;
-	}
-	.phase-item {
-		font-size: 11px;
-		color: var(--border2);
-		display: flex;
-		align-items: center;
-		gap: 3px;
-	}
-	.phase-item.phase-active {
-		color: var(--fg);
-		font-weight: 500;
-	}
-	.phase-dot {
-		display: inline-block;
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--accent);
-		flex-shrink: 0;
-		animation: inkupulse 1s ease-in-out infinite;
-	}
-	.progress-right {
-		display: flex;
-		align-items: center;
-		justify-content: flex-end;
-		gap: 7px;
-		min-width: 0;
-		flex: 1;
-	}
-	.progress-token {
-		font-size: 11px;
-		color: var(--fg3);
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
-	.progress-time {
-		font-size: 11px;
-		color: var(--fg3);
-		font-variant-numeric: tabular-nums;
-	}
-	.progress-right :global(.stop-btn) {
-		width: auto;
-		min-width: 86px;
-		flex: 0 0 auto;
-		padding: 8px 10px;
-		font-size: 13px;
 	}
 	.progress-bar-track {
 		position: relative;

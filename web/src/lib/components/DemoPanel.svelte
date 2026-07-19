@@ -3,7 +3,7 @@
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { DemoSettings } from '$lib/demo';
 	import PaintButton from './PaintButton.svelte';
-	import StopButton from './StopButton.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 
 	type Props = {
@@ -11,6 +11,8 @@
 		providerGroups: ProviderGroup[];
 		running: boolean;
 		liveMs: number;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		waitingSeconds: number | null;
 		currentLiveMs: number | null;
 		currentElapsedMs: number | null;
@@ -41,6 +43,8 @@
 		providerGroups,
 		running,
 		liveMs,
+		runTokensIn,
+		runTokensOut,
 		waitingSeconds,
 		currentLiveMs,
 		currentElapsedMs,
@@ -155,12 +159,15 @@
 
 	<div class="demo-actions">
 		{#if running}
-			<div class="demo-status">
-				<span>{t().demoRunning}</span>
-				<span>{(liveMs / 1000).toFixed(1)}s</span>
-				{#if waitingSeconds !== null}<span>{t().demoWaiting(waitingSeconds)}</span>{/if}
-			</div>
-			<StopButton onclick={onStop}>{t().demoStop}</StopButton>
+			<RunStatus
+				label={waitingSeconds !== null ? `${t().demoRunning} · ${t().demoWaiting(waitingSeconds)}` : t().demoRunning}
+				stage1Model={drawingStage1ModelLabel}
+				stage2Model={drawingStage2ModelLabel}
+				elapsedMs={liveMs}
+				tokensIn={totalTokensIn || runTokensIn}
+				tokensOut={totalTokensOut || runTokensOut}
+				onStop={onStop}
+			/>
 		{:else}
 			<PaintButton onclick={onStart} disabled={!settings.seed_phrase.trim() || promptModels.length === 0 || actionDisabled}>{t().demoStart}</PaintButton>
 		{/if}
@@ -270,14 +277,6 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
-	}
-	.demo-status {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		color: var(--fg3);
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
 	}
 	.demo-stats {
 		display: grid;

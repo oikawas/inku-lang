@@ -24,7 +24,10 @@
 		loading: boolean;
 		generationDisabled: boolean;
 		liveMs: number;
-		tokenSummary: string;
+		stage1ModelLabel: string;
+		stage2ModelLabel: string;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		showKiwi: boolean;
 		autoRepairEnabled: boolean;
 		activeSaijikiPreview: SaijikiPreview | null;
@@ -48,7 +51,10 @@
 		loading,
 		generationDisabled,
 		liveMs,
-		tokenSummary,
+		stage1ModelLabel,
+		stage2ModelLabel,
+		runTokensIn,
+		runTokensOut,
 		showKiwi,
 		autoRepairEnabled = $bindable(true),
 		activeSaijikiPreview = $bindable(),
@@ -73,7 +79,10 @@
 		{reloadError}
 		{loading}
 		{liveMs}
-		{tokenSummary}
+		{stage1ModelLabel}
+		{stage2ModelLabel}
+		{runTokensIn}
+		{runTokensOut}
 		{showKiwi}
 		bind:autoRepairEnabled
 		bind:activeSaijikiPreview

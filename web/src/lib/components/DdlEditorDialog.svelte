@@ -3,8 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { highlightDDL } from '$lib/highlight';
 	import SaijikiInline from './SaijikiInline.svelte';
-	import InkuMascot from './InkuMascot.svelte';
-	import StopButton from './StopButton.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import type { TenkeiLevel } from '$lib/tenkei';
 
@@ -24,6 +23,10 @@
 		subtitle: string;
 		initialDdl: string;
 		drawing: boolean;
+		stage1ModelLabel: string;
+		stage2ModelLabel: string;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		error: string | null;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
 		showTenkei?: boolean;
@@ -34,7 +37,7 @@
 		onClose: () => void;
 	};
 
-	let { open, isJapanese, title, subtitle, initialDdl, drawing, error, previewForWord, showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
+	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, error, previewForWord, showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
 
 	let value = $state('');
 	let focused = $state(false);
@@ -192,14 +195,16 @@
 		{#if error}<div class="ddled-error">{error}</div>{/if}
 		<div class="ddled-foot">
 			{#if drawing}
-				<div class="ddled-status" aria-live="polite">
-					<div class="ddled-mascot"><InkuMascot /></div>
-					<div class="ddled-status-info">
-						<span class="ddled-stage">{t().stageImageGenerating}</span>
-						<span class="ddled-elapsed">{isJapanese ? '経過' : 'Elapsed'} {(elapsedMs / 1000).toFixed(1)}s</span>
-					</div>
-					<StopButton onclick={stopDraw}>{t().stopBtn}</StopButton>
-				</div>
+				<RunStatus
+					variant="inline"
+					label={t().stageImageGenerating}
+					stage1Model={stage1ModelLabel}
+					stage2Model={stage2ModelLabel}
+					elapsedMs={elapsedMs}
+					tokensIn={runTokensIn}
+					tokensOut={runTokensOut}
+					onStop={stopDraw}
+				/>
 			{:else}
 				{#if showTenkei && onSelectTenkei}
 					<TenkeiSelect compact value={tenkeiValue} {isJapanese} inherited={tenkeiInherited} onSelect={onSelectTenkei} />
@@ -498,31 +503,6 @@
 	.ddled-foot > :global(.tenkei-inline) { margin-right: auto; }
 	.ddled-cancel:hover:not(:disabled) {
 		background: var(--bg2);
-	}
-	.ddled-status {
-		flex: 0 0 auto;
-		margin-left: auto;
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-	.ddled-mascot { flex: 0 0 auto; display: flex; align-items: center; }
-	.ddled-status-info {
-		flex: 0 0 auto; min-width: 0;
-		display: flex; flex-direction: column; gap: 2px;
-		text-align: right;
-	}
-	.ddled-stage {
-		font-size: 12px; font-weight: 500; color: var(--fg);
-		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-	}
-	.ddled-elapsed {
-		font-size: 11px; color: var(--fg3);
-		font-variant-numeric: tabular-nums; white-space: nowrap;
-	}
-	.ddled-status :global(.stop-btn) {
-		flex: 0 0 auto; width: auto; min-width: 0;
-		padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em;
 	}
 	@keyframes ddl-caret-blink {
 		50% { opacity: 0; }

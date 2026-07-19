@@ -4,11 +4,10 @@
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
-	import InkuMascot from './InkuMascot.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import type { TenkeiLevel } from '$lib/tenkei';
 	import PaintButton from './PaintButton.svelte';
-	import StopButton from './StopButton.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import type { DemoSettings } from '$lib/demo';
 	import type { ProviderGroup } from '$lib/models';
 	import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
@@ -31,6 +30,8 @@
 		batchNonEmpty: number;
 		batchRunning: boolean;
 		singleRunning: boolean;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		singleDdlReady: boolean;
 		batchActiveLine: number | null;
 		batchActiveDdlHighlighted: string;
@@ -103,6 +104,8 @@
 		batchNonEmpty,
 		batchRunning,
 		singleRunning,
+		runTokensIn,
+		runTokensOut,
 		singleDdlReady,
 		batchActiveLine,
 		batchActiveDdlHighlighted,
@@ -277,13 +280,16 @@
 		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide}</div>
 
 		{#if singleRunning}
-			<div class="gen-status" aria-live="polite">
-				{#if showKiwi}<div class="gen-mascot"><InkuMascot /></div>{/if}
-				<div class="gen-info">
-					<span class="gen-stage">{stageLabel || t().stageDdlGenerating}</span>
-					<span class="gen-sub">{isJapanese ? '経過' : 'Elapsed'} {(liveMs / 1000).toFixed(1)}s</span>
-				</div>
-				<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
+			<div class="gen-status-wrap">
+			<RunStatus
+				label={stageLabel || t().stageDdlGenerating}
+				stage1Model={stage1ModelLabel}
+				stage2Model={stage2ModelLabel}
+				elapsedMs={liveMs}
+				tokensIn={runTokensIn}
+				tokensOut={runTokensOut}
+				onStop={onStop}
+			/>
 			</div>
 		{:else}
 			<Tooltip placement="top" text={t().tooltipSubmit}>
@@ -294,6 +300,8 @@
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'batch'}
 		<BatchPanel
+			{runTokensIn}
+			{runTokensOut}
 			bind:batchInput
 			{lineNumbersText}
 			{batchNonEmpty}
@@ -323,6 +331,8 @@
 		/>
 	{:else}
 		<DemoPanel
+			{runTokensIn}
+			{runTokensOut}
 			bind:settings={demoSettings}
 			providerGroups={demoModelProviderGroups}
 			running={demoRunning}
@@ -488,35 +498,7 @@
 		color: color-mix(in srgb, var(--fg3) 68%, transparent);
 	}
 	.input-meter.soft-over { color: color-mix(in srgb, var(--fg) 78%, transparent); }
-	.gen-status {
-		display: flex; align-items: center; gap: 10px;
-		min-height: 46px;
-		padding: 6px 8px;
-		border: 1px solid var(--border2); border-radius: var(--r);
-		background: var(--panel);
-		margin-top: 8px;
-	}
-	.gen-mascot { flex: 0 0 auto; display: flex; align-items: center; }
-	.gen-info {
-		flex: 1 1 auto; min-width: 0;
-		display: flex; flex-direction: column; gap: 2px;
-	}
-	.gen-stage {
-		font-size: 12px; font-weight: 500; color: var(--fg);
-		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-	}
-	.gen-sub {
-		font-size: 11px; color: var(--fg3);
-		font-variant-numeric: tabular-nums; white-space: nowrap;
-	}
-	.gen-status :global(.stop-btn) {
-		flex: 0 0 auto;
-		width: auto;
-		min-width: 0;
-		padding: 7px 14px;
-		font-size: 13px;
-		letter-spacing: 0.06em;
-	}
+	.gen-status-wrap { margin-top: 8px; }
 	.error-text { color: #a2342a; font-size: 12px; }
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }

@@ -89,7 +89,11 @@ class RequestBodyLimitMiddleware:
                 message = messages[message_index]
                 message_index += 1
                 return message
-            return {"type": "http.request", "body": b"", "more_body": False}
+            # The buffered body is exhausted; fall through to the real channel so
+            # http.disconnect still reaches the app. Returning a synthetic empty
+            # http.request here would hang any streaming response, which waits
+            # for a disconnect message.
+            return await receive()
 
         await self.app(scope, replay_receive, send)
 

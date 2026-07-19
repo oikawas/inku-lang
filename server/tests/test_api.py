@@ -1290,6 +1290,92 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert me.json()["image_generation_count"] == 1
 
 
+def _stream_events(response) -> list[dict]:
+    return [json.loads(line) for line in response.text.splitlines() if line.strip()]
+
+
+def test_paint_stream_emits_stage1_before_done(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post("/api/paint/stream", json={"text": "一滴の墨"}, headers=headers)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/x-ndjson")
+
+    events = _stream_events(r)
+    assert [e["event"] for e in events] == ["stage1", "done"]
+
+    stage1 = events[0]
+    assert "黒い円を置く。" in stage1["ddl"]
+    assert stage1["stage1_model"] == "nvidia:google/gemma-4-31b-it"
+    assert stage1["stage2_model"] == "nvidia:google/gemma-4-31b-it"
+    assert stage1["elapsed_ms"] >= 0
+    assert stage1["interpret_fallback_used"] is False
+
+    # The done event carries the Stage 2 DDL, which may rewrite the Stage 1 text.
+    done = events[1]
+    assert "黒い円を置く。" in done["ddl"]
+    assert done["score"]["instructions"][0]["primitive"] == "circle"
+    assert "<svg" in done["svg"]
+    assert done["render_canvas_aspect_id"] == "square"
+
+
+def test_paint_stream_matches_paint_response_shape(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    payload = {"text": "一滴の墨", "save_history": False, "count_generation": False}
+    plain = client.post("/api/paint", json=payload, headers=headers)
+    streamed = _stream_events(
+        client.post("/api/paint/stream", json=payload, headers=headers)
+    )[-1]
+    assert plain.status_code == 200
+
+    volatile = {"elapsed_stage1_ms", "elapsed_stage2_ms", "elapsed_total_ms", "event"}
+    assert set(streamed) - volatile == set(plain.json()) - volatile
+
+
+def test_paint_stream_reports_compose_failure_as_error_event(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
+    )
+
+    def fail_compose(*args, **kwargs):
+        raise RuntimeError("compose failed for test")
+
+    monkeypatch.setattr(api_module, "compose", fail_compose)
+
+    r = client.post("/api/paint/stream", json={"text": "壊れる描画"}, headers=headers)
+    assert r.status_code == 200
+
+    events = _stream_events(r)
+    assert [e["event"] for e in events] == ["stage1", "error"]
+    assert events[1]["status"] == 502
+
+
+def test_paint_stream_requires_auth():
+    assert client.post("/api/paint/stream", json={"text": "一滴の墨"}).status_code == 401
+
+
 def test_generation_count_increment_is_atomic_under_concurrency():
     suffix = uuid.uuid4().hex[:8]
     user = db.add_user(

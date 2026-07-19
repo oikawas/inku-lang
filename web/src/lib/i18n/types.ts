@@ -74,7 +74,6 @@ export interface LangPack {
 	demoSeedPhrase: string;
 	demoInterval: string;
 	demoStart: string;
-	demoStop: string;
 	demoRunning: string;
 	demoGeneratedPrompt: string;
 	demoGeneratedDdl: string;
@@ -89,6 +88,10 @@ export interface LangPack {
 	// Submit / loading
 	submitBtn: string;
 	stopBtn: string;
+	runStatusElapsed: (seconds: string) => string;
+	runStatusTokens: (input: string, output: string) => string;
+	runStatusStage1: string;
+	runStatusStage2: string;
 	stageDdlGenerating: string;
 	stageImageGenerating: string;
 	stageInterpreting: string;
@@ -233,7 +236,6 @@ export interface LangPack {
 	refineGenerating: string;
 	refineGeneratingBody: string;
 	refineGeneratingTask: (task: string) => string;
-	refineAbortButton: string;
 	aiRefineTitle: string;
 	aiRefineModeLabel: string;
 	aiRefineRandomMode: string;
@@ -251,8 +253,6 @@ export interface LangPack {
 	aiRefineGensLabel: string;
 	aiRefineElementsLabel: string;
 	aiRefineStartButton: string;
-	aiRefineRunningButton: string;
-	aiRefineAbortButton: string;
 	aiRefineCompleted: string;
 	aiRefineStepStatus: (gens: number, step: number, label: string) => string;
 	aiRefineMinElementsError: string;

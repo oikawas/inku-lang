@@ -7,8 +7,7 @@
 	import OutputTabsContent from './OutputTabsContent.svelte';
 	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
-	import StopButton from './StopButton.svelte';
-	import InkuMascot from './InkuMascot.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
@@ -96,6 +95,17 @@
 		variationBusy: boolean;
 		variationCandidates: VariationCandidate[];
 		variationGridBusy: boolean;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
+		variationElapsedMs: number;
+		variationTokensIn: number | null;
+		variationTokensOut: number | null;
+		modelInspectionElapsedMs: number;
+		modelInspectionTokensIn: number | null;
+		modelInspectionTokensOut: number | null;
+		languageInspectionElapsedMs: number;
+		languageInspectionTokensIn: number | null;
+		languageInspectionTokensOut: number | null;
 		variationGridCanAbort: boolean;
 		variationGridIncludesReading: boolean;
 		variationGridTaskLabel: string;
@@ -233,6 +243,17 @@
 		variationBusy = false,
 		variationCandidates = [],
 		variationGridBusy = false,
+		runTokensIn = null,
+		runTokensOut = null,
+		variationElapsedMs = 0,
+		variationTokensIn = null,
+		variationTokensOut = null,
+		modelInspectionElapsedMs = 0,
+		modelInspectionTokensIn = null,
+		modelInspectionTokensOut = null,
+		languageInspectionElapsedMs = 0,
+		languageInspectionTokensIn = null,
+		languageInspectionTokensOut = null,
 		variationGridCanAbort = false,
 		variationGridIncludesReading = false,
 		variationGridTaskLabel = '',
@@ -678,7 +699,6 @@
 												</PaintButton>
 											</div>
 										</Tooltip>
-										{#if variationGridBusy && variationGridCanAbort}<div class="refine-stop-wrap"><StopButton onclick={onAbortVariationCandidates}>{t().refineAbortButton}</StopButton></div>{/if}
 										<div class="refine-tenkei-row"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /></div>
 										{#if refineCostLabel}
 											<div class="refine-cost-indicator" aria-live="polite">
@@ -691,10 +711,15 @@
 										{/if}
 
 									{#if variationBusy || variationGridBusy}
-										<div class="model-drawing-animation refine-drawing-animation" aria-live="polite">
-											<div class="model-drawing-spinner" aria-hidden="true"></div>
-											<div><strong>{t().refineGenerating}</strong><span>{t().refineGeneratingTask(variationGridTaskLabel)}</span></div>
-										</div>
+										<RunStatus
+											label={t().refineGeneratingTask(variationGridTaskLabel)}
+											stage1Model={statusStage1Model}
+											stage2Model={statusStage2Model}
+											elapsedMs={variationElapsedMs}
+											tokensIn={variationTokensIn}
+											tokensOut={variationTokensOut}
+											onStop={variationGridBusy && variationGridCanAbort ? onAbortVariationCandidates : null}
+										/>
 									{/if}
 									</div>
 								</section>
@@ -738,14 +763,15 @@
 						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 						<div class="compare-action-wrap">
 							{#if modelInspectionBusy}
-								<div class="compare-status" aria-live="polite">
-									<div class="compare-mascot"><InkuMascot /></div>
-									<div class="compare-status-info">
-										<span class="compare-status-label">{t().modelCompareBusy}</span>
-										{#if modelInspectionCurrentModel}<span class="compare-status-model">{modelInspectionCurrentModel}</span>{/if}
-									</div>
-									<StopButton onclick={onAbortModelInspection}>{t().stopBtn}</StopButton>
-								</div>
+								<RunStatus
+									variant="inline"
+									label={t().modelCompareBusy}
+									model={modelInspectionCurrentModel}
+									elapsedMs={modelInspectionElapsedMs}
+									tokensIn={modelInspectionTokensIn}
+									tokensOut={modelInspectionTokensOut}
+									onStop={onAbortModelInspection}
+								/>
 							{:else}
 								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionSelectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
 							{/if}
@@ -816,14 +842,15 @@
 							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 							<div class="compare-action-wrap">
 								{#if languageInspectionBusy}
-									<div class="compare-status" aria-live="polite">
-										<div class="compare-mascot"><InkuMascot /></div>
-										<div class="compare-status-info">
-											<span class="compare-status-label">{isJapanese ? '比較中' : 'Comparing'}</span>
-											{#if languageInspectionCurrentLabel}<span class="compare-status-model">{languageInspectionCurrentLabel}</span>{/if}
-										</div>
-										<StopButton onclick={onAbortLanguageInspection}>{t().stopBtn}</StopButton>
-									</div>
+									<RunStatus
+										variant="inline"
+										label={isJapanese ? '比較中' : 'Comparing'}
+										model={languageInspectionCurrentLabel}
+										elapsedMs={languageInspectionElapsedMs}
+										tokensIn={languageInspectionTokensIn}
+										tokensOut={languageInspectionTokensOut}
+										onStop={onAbortLanguageInspection}
+									/>
 								{:else}
 									<PaintButton onclick={onRunLanguageInspection} disabled={!result || variationGridBusy || languageInspectionSelectedCombos.length === 0}>{isJapanese ? '選んだ組み合わせで比較' : 'Compare selected combinations'}</PaintButton>
 								{/if}
@@ -854,7 +881,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
 			{/if}
 		</div>
 
@@ -1343,9 +1370,6 @@
 		stroke-linejoin: round;
 	}
 	.refine-paint-actions { align-items: stretch; }
-	.refine-stop-wrap { width: min(210px, 100%); display: flex; }
-	.refine-stop-wrap :global(.stop-btn) { width: 100%; min-width: 0; flex: 1; padding: 9px 12px; font-size: 12px; }
-	.refine-drawing-animation { margin-top: 2px; }
 	.refine-action-wrap { width: min(210px, 100%); }
 	.refine-action-wrap :global(.tooltip-wrap),
 	.refine-action-wrap :global(.paint-btn) { width: 100%; }
@@ -1464,18 +1488,11 @@
 	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
 	/* While comparing, let the status widen past the button width so the full
 	   model name shows without truncation. */
-	.compare-action-wrap:has(.compare-status) { width: auto; min-width: 0; max-width: 62%; }
 	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover :global(.model-hover-card),
 	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
 	.refine-tenkei-row { display: flex; align-items: center; margin-top: 6px; }
-	.compare-status { display: flex; align-items: center; gap: 10px; }
-	.compare-mascot { flex: 0 0 auto; display: flex; align-items: center; }
-	.compare-status-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-	.compare-status-label { font-size: 11px; color: var(--fg3); }
-	.compare-status-model { font-size: 12px; font-weight: 500; color: var(--fg); white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
-	.compare-status :global(.stop-btn) { flex: 0 0 auto; width: auto; min-width: 0; padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em; }
 
 	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
 	.compare-mode-tabs button { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg3); font: inherit; cursor: pointer; }
@@ -1609,34 +1626,6 @@
 		line-height: 1.45;
 		color: var(--fg3);
 	}
-	.model-drawing-animation {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 12px;
-		border: 1px solid var(--border);
-		background: var(--panel);
-		color: var(--fg2);
-	}
-	.model-drawing-animation strong,
-	.model-drawing-animation span { display: block; }
-	.model-drawing-animation span {
-		font-size: 11px;
-		color: var(--fg3);
-		margin-top: 2px;
-	}
-	.model-drawing-spinner {
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-		border: 2px solid var(--border2);
-		border-top-color: var(--accent);
-		animation: spin 0.85s linear infinite;
-		flex: 0 0 auto;
-	}
-
-
-
 	.nav-left,
 	.nav-right {
 		position: absolute;

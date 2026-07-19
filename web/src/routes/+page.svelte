@@ -361,7 +361,7 @@
 		starred?: boolean;
 		saving?: boolean;
 	};
-	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; tip: string };
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
@@ -3474,26 +3474,12 @@ if (unreadWords.length > 0) {
 	function modelInspectionModelChoices(): ModelInspectionChoice[] {
 		const seen = new Set<string>();
 		const choices: ModelInspectionChoice[] = [];
-		const ja = getLang() === 'ja';
 		for (const group of availableModelCatalog) {
 			for (const model of group.models) {
 				const id = qualifiedModelId(group.id as Provider, model.id);
 				if (seen.has(id)) continue;
 				seen.add(id);
-				const lvl = Math.max(0, Math.min(5, Number(model.recommendation_level ?? 0)));
-				const rec = lvl ? `${'★'.repeat(lvl)}${'☆'.repeat(5 - lvl)} (${lvl}/5)` : '—';
-				const comment = ja ? (model.comment_ja || model.comment_en || '—') : (model.comment_en || model.comment_ja || '—');
-				const speed = model.speed_label || model.speed_class || '—';
-				const use = (model.purposes ?? ['llm']).map((p) => (p === 'vision' ? 'Vision' : 'LLM')).join(' / ');
-				const tip = [
-					`${model.label || model.id} · ${group.label || String(group.id)}`,
-					`${ja ? '用途' : 'Use'}: ${use}`,
-					`${ja ? 'オススメ度' : 'Recommendation'}: ${rec}`,
-					`${ja ? '速度' : 'Speed'}: ${speed}`,
-					`${ja ? '評価' : 'Comment'}: ${comment}`,
-					...(model.notes ? [`${ja ? '備考' : 'Notes'}: ${model.notes}`] : []),
-				].join('\n');
-				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id), tip });
+				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id), model });
 			}
 		}
 		return choices;

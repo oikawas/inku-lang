@@ -9,6 +9,8 @@
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 	import InkuMascot from './InkuMascot.svelte';
+	import ModelMetaCard from './ModelMetaCard.svelte';
+	import type { ModelOption } from '$lib/models';
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
@@ -20,7 +22,7 @@
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
-	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; tip: string };
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
@@ -751,13 +753,14 @@
 							{@const blocked = isModelInspectionChoiceBlocked(choice.id)}
 							{@const checked = modelInspectionSelectedModels.includes(choice.id)}
 							{@const failed = !!modelInspectionFailedModels[choice.id]}
-							{@const modelTip = [choice.tip, blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join('\n')}
-							<Tooltip wide placement="bottom" text={modelTip}>
+							{@const choiceExtra = [blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join(' · ')}
+							<div class="model-metadata-hover">
 								<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || (!checked && modelInspectionSelectedModels.length >= 4)}>
 									<input type="checkbox" checked={checked} disabled={modelInspectionBusy || blocked || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
 									<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
 								</label>
-							</Tooltip>
+								<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} />
+							</div>
 						{/each}
 					</div>
 					<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspectionSelectedModels.length, 4)}</div>
@@ -1444,6 +1447,10 @@
 	/* While comparing, let the status widen past the button width so the full
 	   model name shows without truncation. */
 	.compare-action-wrap:has(.compare-status) { width: auto; min-width: 0; max-width: 62%; }
+	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
+	.model-metadata-hover > .model-choice { width: 100%; }
+	.model-metadata-hover:hover :global(.model-hover-card),
+	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
 	.compare-status { display: flex; align-items: center; gap: 10px; }
 	.compare-mascot { flex: 0 0 auto; display: flex; align-items: center; }
 	.compare-status-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }

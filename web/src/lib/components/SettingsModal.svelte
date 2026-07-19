@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import ModelMetaCard from './ModelMetaCard.svelte';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -575,21 +576,7 @@
 		};
 	}
 
-	function modelPurposesLabel(model: ModelOption): string {
-		const purposes = model.purposes ?? ['llm'];
-		return purposes.map((purpose) => purpose === 'vision' ? 'Vision' : 'LLM').join(' / ') || '—';
-	}
-
-	function modelRecommendationLabel(model: ModelOption): string {
-		const level = Math.max(0, Math.min(5, Number(model.recommendation_level ?? 0)));
-		return level > 0 ? `${'★'.repeat(level)}${'☆'.repeat(5 - level)} (${level}/5)` : '—';
-	}
-
-	function modelComment(model: ModelOption): string {
-		return t().closeLabel === 'Close'
-			? (model.comment_en || model.comment_ja || '—')
-			: (model.comment_ja || model.comment_en || '—');
-	}
+	const isJapanese = $derived(t().closeLabel !== 'Close');
 
 
 	function serviceIdLabel(provider: Provider): string {
@@ -662,15 +649,6 @@
 	}
 </script>
 
-{#snippet modelMetadataCard(model: ModelOption)}
-	<span class="model-hover-card" role="tooltip">
-		<span><strong>用途 / Use</strong>{modelPurposesLabel(model)}</span>
-		<span><strong>オススメ度 / Recommendation</strong>{modelRecommendationLabel(model)}</span>
-		<span><strong>速度 / Speed</strong>{model.speed_label || '—'}</span>
-		<span><strong>評価 / Comment</strong>{modelComment(model)}</span>
-	</span>
-{/snippet}
-
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
 <div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 	<div class="modal-head">
@@ -727,7 +705,7 @@
 								>
 									<strong>{model.label}</strong>
 									{#if model.notes}<span>{model.notes}</span>{/if}
-									{@render modelMetadataCard(model)}
+									<ModelMetaCard {model} {isJapanese} />
 								</button>
 							{/each}
 							</div>
@@ -1552,7 +1530,7 @@
 								<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'llm'); }}>LLM</button>
 								<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'vision'); }}>Vision</button>
 							</span>
-							{@render modelMetadataCard(modelDraft(model))}
+							<ModelMetaCard model={modelDraft(model)} {isJapanese} />
 						</label>
 						<details class="model-metadata-editor">
 							<summary>評価設定 / Model metadata</summary>
@@ -1631,17 +1609,9 @@
 	.generation-model-grid span { color: var(--fg3); font-size: 10px; }
 	.model-thinking-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
 	.model-metadata-hover { position: relative; }
-	.model-hover-card {
-		display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 520;
-		width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px;
-		border: 1px solid #64748b; border-radius: var(--r); background: #111820;
-		box-shadow: 0 8px 24px rgba(0,0,0,.32); color: #f8fafc; text-align: left;
-		pointer-events: none; white-space: normal;
-	}
-	.model-hover-card > span { display: grid; gap: 2px; color: #f8fafc; font-size: 11px; line-height: 1.45; }
-	.model-hover-card > span + span { margin-top: 6px; }
-	.model-hover-card strong { color: #cbd5e1; font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
-	.model-metadata-hover:hover .model-hover-card, .model-metadata-hover:focus-visible .model-hover-card, .model-metadata-hover:focus-within .model-hover-card { display: block; }
+	.model-metadata-hover:hover :global(.model-hover-card),
+	.model-metadata-hover:focus-visible :global(.model-hover-card),
+	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
 	.settings-tabs {
 		display: flex; flex: 0 0 auto; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg);
 	}

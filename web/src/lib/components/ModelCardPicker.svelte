@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { qualifiedModelId, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
+	import { modelPurposes, modelRecommendation, modelSpeed, modelComment } from '$lib/modelMeta';
 
 	type Props = {
 		label: string;
@@ -22,18 +23,7 @@
 		return null;
 	});
 
-	function purposes(model: ModelOption): string {
-		return (model.purposes ?? ['llm']).map((purpose) => purpose === 'vision' ? 'Vision' : 'LLM').join(' / ');
-	}
-
-	function recommendation(model: ModelOption): string {
-		const level = Math.max(0, Math.min(5, Number(model.recommendation_level ?? 0)));
-		return level ? `${'★'.repeat(level)}${'☆'.repeat(5 - level)} (${level}/5)` : '—';
-	}
-
-	function comment(model: ModelOption): string {
-		return t().closeLabel === 'Close' ? (model.comment_en || model.comment_ja || '—') : (model.comment_ja || model.comment_en || '—');
-	}
+	const isJapanese = $derived(t().closeLabel !== 'Close');
 
 	async function choose(provider: Provider, model: string) {
 		await onSelect(provider, model);
@@ -78,10 +68,10 @@
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
 							<strong>{model.label}</strong>{#if model.notes}<small>{model.notes}</small>{/if}
 							<span class="metadata" role="tooltip">
-								<span><b>用途 / Use</b>{purposes(model)}</span>
-								<span><b>オススメ度 / Recommendation</b>{recommendation(model)}</span>
-								<span><b>速度 / Speed</b>{model.speed_label || '—'}</span>
-								<span><b>評価 / Comment</b>{comment(model)}</span>
+								<span><b>用途 / Use</b>{modelPurposes(model)}</span>
+								<span><b>オススメ度 / Recommendation</b>{modelRecommendation(model)}</span>
+								<span><b>速度 / Speed</b>{modelSpeed(model)}</span>
+								<span><b>評価 / Comment</b>{modelComment(model, isJapanese)}</span>
 							</span>
 						</button>
 					{/each}

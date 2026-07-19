@@ -2592,15 +2592,30 @@ def _call_interpret_detail(
     raw = trace_sink[-1] if trace_sink else None
     if len(value) == 4:
         ddl, thinking, tokens_in, tokens_out = value
+    else:
+        ddl, thinking = value
+        tokens_in = None
+        tokens_out = None
+    if not (ddl or "").strip():
+        # v1.98: 空の Stage 1 出力はハードタイムアウトと同じ失敗として扱う。
+        # 素通しすると展開層が空を返し、記述を持たない作品が描かれて保存される
+        # （2026-05-05 以降 11 件確認）。
         return InterpretDetail(
-            ddl=_sanitize_placement_words(ddl),
+            ddl=_fallback_ddl_from_text(text, lang=lang),
             thinking=thinking,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
+            fallback_used=True,
+            fallback_reasons=["stage1_empty_output"],
             raw=raw,
         )
-    ddl, thinking = value
-    return InterpretDetail(ddl=_sanitize_placement_words(ddl), thinking=thinking, raw=raw)
+    return InterpretDetail(
+        ddl=_sanitize_placement_words(ddl),
+        thinking=thinking,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        raw=raw,
+    )
 
 
 def _assemble_trace(

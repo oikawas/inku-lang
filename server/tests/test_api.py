@@ -1442,6 +1442,34 @@ def test_compose_returns_source_ddl(monkeypatch, auth_context):
     assert data["ddl"] != data["source_ddl"]
 
 
+def test_empty_stage1_output_falls_back_instead_of_drawing_nothing(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("   ", None),
+    )
+    captured = {}
+
+    def fake_compose(ddl, model=None):
+        captured["ddl"] = ddl
+        return Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    r = client.post("/api/paint", json={"text": "空を返すモデル"}, headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["interpret_fallback_used"] is True
+    assert data["interpret_fallback_reasons"] == ["stage1_empty_output"]
+    # 記述を持たない作品が保存されないよう、決定的フォールバック DDL で描画する。
+    assert data["source_ddl"].strip()
+    assert data["ddl"].strip()
+    assert captured["ddl"].strip()
+
+
 def test_paint_stream_requires_auth():
     assert client.post("/api/paint/stream", json={"text": "一滴の墨"}).status_code == 401
 

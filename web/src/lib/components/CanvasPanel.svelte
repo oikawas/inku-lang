@@ -564,11 +564,13 @@
 							<button type="button" aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeRefineModal}>×</button>
 						</div>
 					{/if}
-					<div class="refine-mode-tabs" role="tablist" aria-label={isJapanese ? '推敲方法' : 'Refinement method'}>
-						<button type="button" role="tab" aria-selected={refineView === 'adjust'} class:active={refineView === 'adjust'} onclick={() => (refineView = 'adjust')}>{isJapanese ? '調整' : 'Adjust'}</button>
-						<button type="button" role="tab" aria-selected={refineView === 'compare'} class:active={refineView === 'compare'} onclick={() => (refineView = 'compare')}>{isJapanese ? 'モデル比較' : 'Model comparison'}</button>
-						<button type="button" role="tab" aria-selected={refineView === 'language'} class:active={refineView === 'language'} onclick={() => (refineView = 'language')}>{isJapanese ? '言語比較' : 'Language comparison'}</button>
-					</div>
+					{#if !refineModalOpen}
+						<div class="refine-mode-tabs" role="tablist" aria-label={isJapanese ? '推敲方法' : 'Refinement method'}>
+							<button type="button" role="tab" aria-selected={refineView === 'adjust'} class:active={refineView === 'adjust'} onclick={() => (refineView = 'adjust')}>{isJapanese ? '調整' : 'Adjust'}</button>
+							<button type="button" role="tab" aria-selected={refineView === 'compare'} class:active={refineView === 'compare'} onclick={() => (refineView = 'compare')}>{isJapanese ? 'モデル比較' : 'Model comparison'}</button>
+							<button type="button" role="tab" aria-selected={refineView === 'language'} class:active={refineView === 'language'} onclick={() => (refineView = 'language')}>{isJapanese ? '言語比較' : 'Language comparison'}</button>
+						</div>
+					{/if}
 					{#if refineView === 'adjust'}
 						<div class="refine-panel">
 					<div class="refine-stage">

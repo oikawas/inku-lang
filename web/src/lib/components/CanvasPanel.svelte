@@ -61,6 +61,7 @@
 		visionProviderGroups: ProviderGroup[];
 		statusCatalogName: string;
 		statusCanvasName: string;
+		statusGeneration: number | null;
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopied: boolean;
@@ -139,6 +140,9 @@
 		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
 		onDrawLineageDescription: (node: LineageNode, text: string) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
+		onOpenLineageDdlEditor: (node: LineageNode) => void;
+		onCloseRefinement: () => void;
+		statusDdlOrigin: boolean;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
@@ -190,6 +194,7 @@
 		visionProviderGroups,
 		statusCatalogName,
 		statusCanvasName,
+		statusGeneration,
 		statusHistoryItem,
 		statusHashLabel,
 		statusHashCopied,
@@ -268,6 +273,9 @@
 		onOpenLineageNode,
 		onDrawLineageDescription,
 		onDrawLineageDdl,
+		onOpenLineageDdlEditor,
+		onCloseRefinement,
+		statusDdlOrigin,
 		onSaveOkugakiModel,
 		onSaveVisionModel,
 		onPromoteLineageNode,
@@ -290,6 +298,7 @@
 	let refineModalOpen = $state(false);
 	let refineKind = $state<RefineKind>('touch');
 	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
+	const statusGenerationLabel = $derived(statusGeneration ? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`) : (isJapanese ? '独立作品' : 'Standalone'));
 	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare' | 'language'): Promise<void> {
 		await onOpenLineageNode(node);
 		refineView = view;
@@ -300,6 +309,8 @@
 	function closeRefineModal(): void {
 		refineModalOpen = false;
 		outputTab = 'lineage';
+		// Reflect any adopted comparison/variation results into the lineage tree.
+		onCloseRefinement();
 	}
 
 	const refineCostLabel = $derived(
@@ -411,13 +422,11 @@
 		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show artwork derivations'}>
 			<button class="rtab" class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
 		</Tooltip>
-		<Tooltip placement="bottom" text={t().tooltipCanvasTabRefine}>
-			<button class="rtab" class:active={outputTab === 'refine'} onclick={() => { refineModalOpen = false; outputTab = 'refine'; }} disabled={!result}>{t().tabRefine}</button>
-		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if result}
 			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Displayed artwork information'}>
 				<span class="render-meta-scope">{isJapanese ? '\u8868\u793a\u4e2d' : 'Displayed'}</span>
+				<span class="render-meta-generation">{statusGenerationLabel}</span>
 				<span class="render-meta-item render-meta-model">
 					<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
 					<strong title={statusStage1Model + ' / ' + statusStage2Model}>
@@ -564,11 +573,6 @@
 							<button type="button" aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeRefineModal}>×</button>
 						</div>
 					{/if}
-					<div class="refine-mode-tabs" role="tablist" aria-label={isJapanese ? '推敲方法' : 'Refinement method'}>
-						<button type="button" role="tab" aria-selected={refineView === 'adjust'} class:active={refineView === 'adjust'} onclick={() => (refineView = 'adjust')}>{isJapanese ? '調整' : 'Adjust'}</button>
-						<button type="button" role="tab" aria-selected={refineView === 'compare'} class:active={refineView === 'compare'} onclick={() => (refineView = 'compare')}>{isJapanese ? 'モデル比較' : 'Model comparison'}</button>
-						<button type="button" role="tab" aria-selected={refineView === 'language'} class:active={refineView === 'language'} onclick={() => (refineView = 'language')}>{isJapanese ? '言語比較' : 'Language comparison'}</button>
-					</div>
 					{#if refineView === 'adjust'}
 						<div class="refine-panel">
 					<div class="refine-stage">
@@ -594,15 +598,17 @@
 												</span>
 											</Tooltip>
 										</label>
-										<label class="model-choice" class:checked={refineKind === 'reading'}>
-											<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => (refineKind = 'reading')} disabled={variationBusy || variationGridBusy} />
-											<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
-												<span class="refine-choice-label">
-													<strong>{t().canvasVaryInterpretation}</strong>
-													<span class="refine-info-mark" aria-hidden="true">i</span>
-												</span>
-											</Tooltip>
-										</label>
+										{#if !statusDdlOrigin}
+											<label class="model-choice" class:checked={refineKind === 'reading'}>
+												<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => (refineKind = 'reading')} disabled={variationBusy || variationGridBusy} />
+												<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
+													<span class="refine-choice-label">
+														<strong>{t().canvasVaryInterpretation}</strong>
+														<span class="refine-info-mark" aria-hidden="true">i</span>
+													</span>
+												</Tooltip>
+											</label>
+										{/if}
 										<label class="model-choice" class:checked={refineKind === 'color'}>
 											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => (refineKind = 'color')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryColor}>
@@ -808,7 +814,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
 			{/if}
 		</div>
 
@@ -1105,6 +1111,7 @@
 		color: var(--fg3);
 	}
 	.render-meta-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
+	.render-meta-generation { flex: 0 0 auto; color: var(--fg2); font-size: 11px; font-weight: 600; white-space: nowrap; }
 	.render-meta-item {
 		display: inline-flex;
 		align-items: baseline;
@@ -1167,27 +1174,6 @@
 	.refine-modal-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
 	.refine-modal-header h2 { margin: 0; color: var(--fg); font-size: 1rem; }
 	.refine-modal-header button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 1.25rem; line-height: 1; cursor: pointer; }
-	.refine-mode-tabs {
-		flex: 0 0 auto;
-		display: flex;
-		gap: 0;
-		border-bottom: 1px solid var(--border);
-		padding: 0 16px;
-	}
-	.refine-mode-tabs button {
-		padding: 9px 14px;
-		border: 0;
-		border-bottom: 2px solid transparent;
-		background: transparent;
-		color: var(--fg3);
-		font: inherit;
-		cursor: pointer;
-	}
-	.refine-mode-tabs button.active {
-		border-bottom-color: var(--accent);
-		color: var(--fg);
-		font-weight: 600;
-	}
 	.refine-shell .refine-panel,
 	.refine-shell .compare-panel {
 		align-self: auto;

@@ -36,6 +36,7 @@
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
 		onDrawDescription: (node: LineageNode, text: string) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
+		onOpenDdlEditor: (node: LineageNode) => void;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
@@ -52,8 +53,15 @@
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+
+	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
+	// no natural-language instruction, so instruction-only refine paths are hidden.
+	function isDdlOrigin(node: LineageNode): boolean {
+		return node.history?.display_label === 'DDL';
+	}
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
+	let lineageScrollEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
 	let arrowPaths = $state<ArrowPath[]>([]);
@@ -311,8 +319,16 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			return;
 		}
 		const loadedCount = childrenByParent.get(node.id)?.length ?? 0;
-		if ((node.child_count ?? loadedCount) > loadedCount) await onLoadBranch(node.id);
+		const needsLoad = (node.child_count ?? loadedCount) > loadedCount;
+		// Loading children flips `loading`, which unmounts the scroll area and would
+		// reset scrollTop to 0. Preserve and restore the scroll position across it.
+		const savedScrollTop = lineageScrollEl?.scrollTop ?? 0;
+		if (needsLoad) await onLoadBranch(node.id);
 		expandedNodeIds = [...expandedNodeIds, node.id];
+		if (needsLoad) {
+			await tick();
+			if (lineageScrollEl) lineageScrollEl.scrollTop = savedScrollTop;
+		}
 	}
 	async function openOverview(): Promise<void> {
 		overviewOpen = true;
@@ -456,7 +472,7 @@ $effect(() => {
 	<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
 	{#if overviewOpen}
 		<div class="overview-zoom"><button type="button" onclick={() => (overviewScale = Math.max(.4, overviewScale - .1))}>−</button><span>{Math.round(overviewScale * 100)}%</span><button type="button" onclick={() => (overviewScale = Math.min(1.4, overviewScale + .1))}>＋</button></div>
-		<button type="button" onclick={closeOverview}>{isJapanese ? '通常表示へ戻る' : 'Close overview'}</button>
+		<button type="button" onclick={closeOverview}>{isJapanese ? '閉じる' : 'Close'}</button>
 	{:else}
 		<button type="button" onclick={openOverview}>{isJapanese ? '全体図' : 'Overview'}</button>
 	{/if}
@@ -474,7 +490,7 @@ $effect(() => {
 	{:else if !graph || graph.nodes.length === 0}
 		<div class="lineage-message">{isJapanese ? '保存すると、ここに系譜が表示されます。' : 'Save an artwork to begin its lineage.'}</div>
 	{:else}
-		<div class="lineage-scroll" class:overview-scroll={overviewOpen}>
+		<div class="lineage-scroll" class:overview-scroll={overviewOpen} bind:this={lineageScrollEl}>
 			<div class="lineage-columns" bind:this={lineageColumnsEl} style={overviewOpen ? `transform: scale(${overviewScale}); transform-origin: top left; width: ${100 / overviewScale}%; height: ${100 / overviewScale}%;` : undefined}>
 				<svg class="lineage-arrows" aria-hidden="true">
 					<defs>
@@ -510,11 +526,14 @@ $effect(() => {
 		<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
 	</button>
 	{#if activeMenuNodeId === node.id}
+		{@const ddlOrigin = isDdlOrigin(node)}
 		<div class="card-dropdown-menu" role="menu">
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-				{isJapanese ? '記述を編集' : 'Edit description'}
-			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'ddl'); }}>
+			{#if !ddlOrigin}
+				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
+					{isJapanese ? '記述を編集' : 'Edit description'}
+				</button>
+			{/if}
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
 				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
 			</button>
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
@@ -523,12 +542,14 @@ $effect(() => {
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
 				{isJapanese ? '描画要素で比較' : 'Compare drawing elements'}
 			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
-				{isJapanese ? 'モデルで比較' : 'Compare models'}
-			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
-				{isJapanese ? '言語で比較' : 'Compare languages'}
-			</button>
+			{#if !ddlOrigin}
+				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
+					{isJapanese ? 'モデルで比較' : 'Compare models'}
+				</button>
+				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
+					{isJapanese ? '言語で比較' : 'Compare languages'}
+				</button>
+			{/if}
 		</div>
 	{/if}
 {/if}

@@ -153,6 +153,7 @@
 		editGroupName: string;
 		showKiwi: boolean;
 		showCrab: boolean;
+		autoRepairEnabled: boolean;
 		pngAlphaWhite: boolean;
 		exportTemplates: ExportTemplate[];
 		exportTemplateStatus: string | null;
@@ -251,6 +252,7 @@
 		editGroupName = $bindable(),
 		showKiwi = $bindable(),
 		showCrab = $bindable(),
+		autoRepairEnabled = $bindable(true),
 		pngAlphaWhite = $bindable(),
 		exportTemplates,
 		exportTemplateStatus,
@@ -1218,6 +1220,13 @@
 				<label class="setting-toggle">
 					<input type="checkbox" bind:checked={showCrab} />
 					<span>{t().settingsShowCrab}</span>
+				</label>
+			</div>
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsGenerationLabel}</div>
+				<label class="setting-toggle" title={t().tooltipDdlAutoRepair}>
+					<input type="checkbox" bind:checked={autoRepairEnabled} />
+					<span>{t().ddlAutoRepairLabel}</span>
 				</label>
 			</div>
 			<div class="popover-group">

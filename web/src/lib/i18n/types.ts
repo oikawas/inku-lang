@@ -100,6 +100,10 @@ export interface LangPack {
 	thinkingLabel: string;
 	ddlLabel: string;
 	ddlEditSectionLabel: string;
+	ddlNewButton: string;
+	ddlNewDialogTitle: string;
+	ddlNewDialogSubtitle: string;
+	ddlEditDialogSubtitle: string;
 	ddlSyntaxGuide: string;
 
 	// Output tabs
@@ -465,6 +469,7 @@ export interface LangPack {
 	settingsUsersLabel: string;
 	settingsDisplayLabel: string;
 	settingsMascotLabel: string;
+	settingsGenerationLabel: string;
 	settingsExportLabel: string;
 	settingsExportTemplatesTitle: string;
 	settingsExportTemplatesDescription: string;

@@ -8,6 +8,7 @@ this is a document-format boundary, not a governor for generated works.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -208,9 +209,11 @@ class PluginLoadItem:
     path: str
     entries: tuple[dict[str, object], ...] = ()
     reasons: tuple[str, ...] = ()
+    enabled: bool = True
 
     def as_dict(self) -> dict[str, object]:
         return {
+            "id": self.path,
             "name": self.name,
             "namespace": self.namespace,
             "version": self.version,
@@ -218,6 +221,7 @@ class PluginLoadItem:
             "path": self.path,
             "entries": list(self.entries),
             "reasons": list(self.reasons),
+            "enabled": self.enabled,
         }
 
 
@@ -1038,9 +1042,33 @@ class PluginDocumentManager:
         return sorted(self.directory.glob(f"*{PLUGIN_SUFFIX}"))
 
     def _current_signature(self) -> tuple[tuple[str, int, int], ...]:
+        paths = list(self._files())
+        state = self._state_path()
+        if state.exists():
+            paths.append(state)
         return tuple(
             (str(path), path.stat().st_mtime_ns, path.stat().st_size)
-            for path in self._files()
+            for path in paths
+        )
+
+    def _state_path(self) -> Path:
+        return self.directory / ".plugin-state.json"
+
+    def _load_disabled(self) -> set[str]:
+        try:
+            raw = json.loads(self._state_path().read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return set()
+        disabled = raw.get("disabled") if isinstance(raw, dict) else None
+        if not isinstance(disabled, list):
+            return set()
+        return {entry for entry in disabled if isinstance(entry, str)}
+
+    def _save_disabled(self, disabled: set[str]) -> None:
+        self.directory.mkdir(parents=True, exist_ok=True)
+        self._state_path().write_text(
+            json.dumps({"disabled": sorted(disabled)}, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
         )
 
     def reload(self, *, force: bool = True) -> tuple[PluginLoadItem, ...]:
@@ -1052,11 +1080,26 @@ class PluginDocumentManager:
             items: list[PluginLoadItem] = []
             identities: set[tuple[str, str]] = set()
             qualified_words: set[str] = set()
+            disabled_ids = self._load_disabled()
             for path in self._files():
+                enabled = path.name not in disabled_ids
                 try:
                     document = parse_plugin_document(
                         path.read_text(encoding="utf-8"), source_path=str(path)
                     )
+                    if not enabled:
+                        # 無効化: 文書は残すが展開・語彙・衝突予約の対象にしない。
+                        items.append(
+                            PluginLoadItem(
+                                name=document.manifest.name,
+                                namespace=document.manifest.namespace,
+                                version=document.manifest.version,
+                                status="disabled",
+                                path=path.name,
+                                enabled=False,
+                            )
+                        )
+                        continue
                     identity = (
                         document.manifest.namespace.casefold(),
                         document.manifest.name.casefold(),
@@ -1107,6 +1150,7 @@ class PluginDocumentManager:
                             status="rejected",
                             path=path.name,
                             reasons=tuple(reasons),
+                            enabled=enabled,
                         )
                     )
             self._signature = signature
@@ -1121,6 +1165,115 @@ class PluginDocumentManager:
     def documents(self) -> tuple[PluginDocument, ...]:
         self.reload(force=False)
         return self._documents
+
+    # --- 管理操作 (admin API 用): 例外は PluginFormatError=422 /
+    # FileNotFoundError=404 / FileExistsError=409 に対応する。
+
+    def _safe_plugin_path(self, plugin_id: str) -> Path:
+        name = plugin_id.strip()
+        if (
+            not name
+            or name != Path(name).name
+            or not name.endswith(PLUGIN_SUFFIX)
+            or name.startswith(".")
+        ):
+            raise PluginFormatError([f"invalid plugin id: {plugin_id!r}"])
+        return self.directory / name
+
+    @staticmethod
+    def _derive_filename(document: PluginDocument) -> str:
+        slug = f"{document.manifest.namespace}-{document.manifest.name}".lower()
+        slug = re.sub(r"\s+", "-", slug)
+        slug = re.sub(r"[^a-z0-9._-]", "", slug).strip("-.")
+        if not slug:
+            raise PluginFormatError(["cannot derive a filename from the plugin manifest"])
+        return f"{slug}{PLUGIN_SUFFIX}"
+
+    def item_for(self, plugin_id: str) -> PluginLoadItem | None:
+        return next((item for item in self.items() if item.path == plugin_id), None)
+
+    def content(self, plugin_id: str) -> str:
+        with self._lock:
+            path = self._safe_plugin_path(plugin_id)
+            if not path.is_file():
+                raise FileNotFoundError(plugin_id)
+            return path.read_text(encoding="utf-8")
+
+    def _write_and_reload(self, path: Path, content: str, *, previous: str | None) -> PluginLoadItem:
+        # クロスファイル衝突は reload でしか判らず、ロード順によっては書き込んだ
+        # ファイルではなく既存側が rejected になる。書き込み前の状態と比較し、
+        # 新たな rejected を生む書き込みは丸ごと巻き戻す。
+        self.reload(force=False)
+        before = {item.path: item.status for item in self._items}
+        path.write_text(content, encoding="utf-8")
+        self.reload(force=True)
+        item = next((it for it in self._items if it.path == path.name), None)
+        newly_rejected = [
+            it
+            for it in self._items
+            if it.status == "rejected" and before.get(it.path) not in (None, "rejected")
+        ]
+        if item is None or item.status == "rejected" or newly_rejected:
+            if previous is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_text(previous, encoding="utf-8")
+            self.reload(force=True)
+            reasons: list[str] = []
+            if item is not None:
+                reasons.extend(item.reasons)
+            for other in newly_rejected:
+                reasons.extend(f"{other.path}: {reason}" for reason in other.reasons)
+            raise PluginFormatError(reasons or ["plugin failed to load"])
+        return item
+
+    def create(self, content: str, filename: str | None = None) -> PluginLoadItem:
+        document = validate_plugin_document(content)
+        with self._lock:
+            name = filename if filename is not None else self._derive_filename(document)
+            path = self._safe_plugin_path(name)
+            if path.exists():
+                raise FileExistsError(name)
+            self.directory.mkdir(parents=True, exist_ok=True)
+            return self._write_and_reload(path, content, previous=None)
+
+    def update(self, plugin_id: str, content: str) -> PluginLoadItem:
+        validate_plugin_document(content)
+        with self._lock:
+            path = self._safe_plugin_path(plugin_id)
+            if not path.is_file():
+                raise FileNotFoundError(plugin_id)
+            previous = path.read_text(encoding="utf-8")
+            return self._write_and_reload(path, content, previous=previous)
+
+    def delete(self, plugin_id: str) -> None:
+        with self._lock:
+            path = self._safe_plugin_path(plugin_id)
+            if not path.is_file():
+                raise FileNotFoundError(plugin_id)
+            path.unlink()
+            disabled = self._load_disabled()
+            if plugin_id in disabled:
+                disabled.discard(plugin_id)
+                self._save_disabled(disabled)
+            self.reload(force=True)
+
+    def set_enabled(self, plugin_id: str, enabled: bool) -> PluginLoadItem:
+        with self._lock:
+            path = self._safe_plugin_path(plugin_id)
+            if not path.is_file():
+                raise FileNotFoundError(plugin_id)
+            disabled = self._load_disabled()
+            if enabled:
+                disabled.discard(plugin_id)
+            else:
+                disabled.add(plugin_id)
+            self._save_disabled(disabled)
+            self.reload(force=True)
+            item = next((it for it in self._items if it.path == plugin_id), None)
+            if item is None:
+                raise FileNotFoundError(plugin_id)
+            return item
 
     def prompt_vocabulary(self, lang: str) -> tuple[str, ...]:
         terms: list[str] = []

@@ -304,7 +304,7 @@
 		z-index: 0;
 	}
 	.batch-progress {
-		display: flex; align-items: center; gap: 8px;
+		display: flex; align-items: center; gap: 10px;
 		padding: 8px 10px;
 		border: 1px solid var(--border2); border-radius: var(--r);
 		background: var(--panel); font-size: 12px; color: var(--fg2);
@@ -313,9 +313,15 @@
 	}
 	.batch-progress :global(.stop-btn) {
 		margin-left: auto;
+		align-self: center;
 		flex: 0 0 auto;
+		width: auto;
+		min-width: 0;
+		padding: 7px 14px;
+		font-size: 13px;
+		letter-spacing: 0.06em;
 	}
-	.batch-mascot { display: flex; align-items: center; justify-content: center; width: 46px; height: 28px; flex: 0 0 46px; }
+	.batch-mascot { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 36px; align-self: center; }
 	.batch-progress-table {
 		display: grid;
 		gap: 4px;
@@ -342,6 +348,9 @@
 	}
 	.batch-progress-row:first-child .batch-progress-value {
 		display: block;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.batch-progress-value > span {
 		min-width: 0;

@@ -50,27 +50,49 @@ def _sentences(ddl: str, lang: str) -> list[str]:
     return [s for s in re.split(r"(?<=[.!?])\s+", ddl) if s.strip()]
 
 
-def test_pair_member_splits_into_place_and_touching_ja() -> None:
+def test_pair_member_transcribes_place_and_touching_ja() -> None:
     doc = validate_plugin_document(_doc())
     res = expand_plugin_ddl("Test.対葉を置く。", source_text="Test.対葉を置く。", lang="ja", documents=[doc])
-    region_sents = [s for s in _sentences(res.ddl, "ja") if "領域 [" in s]
-    assert len(region_sents) == 6  # 3 member × (配置 + touching)
-    touching = [s for s in region_sents if "前の弧に両端で触れる" in s]
-    placing = [s for s in region_sents if "前の弧に両端で触れる" not in s]
-    assert len(touching) == 3 and len(placing) == 3
-    # 対の 2 文は同一 region を共有する
-    regions = [re.search(r"領域 \[[^\]]+\]", s).group(0) for s in region_sents]
-    assert regions[0] == regions[1] and regions[2] == regions[3] and regions[4] == regions[5]
+    # v1.94 輪1: 対 member はテキストではなく決定的 instruction として転写される
+    assert "領域 [" not in res.ddl and "触れる" not in res.ddl
+    assert len(res.instructions) == 6  # 3 member × (配置 + touching)
+    for k in range(0, 6, 2):
+        place, touch = res.instructions[k], res.instructions[k + 1]
+        assert place["primitive"] == "arc" and "at" in place and "relation" not in place
+        assert touch["relation"] == {"type": "touching", "contact": "both_ends"}
+        assert place["center"] == touch["center"]  # 対は同一 member region 由来
+        # 掃引は劣弧（180°未満）で、対ごとに揺れる
+        assert (place["angle_end"] - place["angle_start"]) < 180
+    spans = {i["angle_end"] - i["angle_start"] for i in res.instructions}
+    assert len(spans) > 1  # 固定スタンプ化していない
 
 
-def test_pair_member_splits_en_with_adjective_range() -> None:
+def test_pair_member_deterministic() -> None:
+    doc = validate_plugin_document(_doc())
+    a = expand_plugin_ddl("Test.対葉を置く。", source_text="Test.対葉を置く。", lang="ja", documents=[doc])
+    b = expand_plugin_ddl("Test.対葉を置く。", source_text="Test.対葉を置く。", lang="ja", documents=[doc])
+    assert a.instructions == b.instructions
+
+
+def test_pair_member_transcribes_en_with_adjective_range() -> None:
     doc = validate_plugin_document(_doc(range_en="3-3 tall blades"))
     res = expand_plugin_ddl("Place Test.対葉.", source_text="Place Test.対葉.", lang="en", documents=[doc])
-    region_sents = [s for s in _sentences(res.ddl, "en") if "region [" in s]
-    assert len(region_sents) == 6
-    assert sum("touching the previous arc" in s for s in region_sents) == 3
-    # 分割後の touching 文が "then" を引きずらない
-    assert not any(s.lower().startswith("then ") for s in region_sents)
+    assert len(res.instructions) == 6
+    assert sum(1 for i in res.instructions if i.get("relation")) == 3
+
+
+def test_style_line_applies_weight_and_color_to_pair() -> None:
+    doc = validate_plugin_document(_doc(extra="ロットリングで、赤で。"))
+    res = expand_plugin_ddl("Test.対葉を置く。", source_text="Test.対葉を置く。", lang="ja", documents=[doc])
+    assert "ロットリング" not in res.ddl  # 様式行は消費される
+    assert all(i.get("weight") == "rotring" and i.get("color") == "red" for i in res.instructions)
+
+
+def test_non_style_line_after_pair_stays_in_text() -> None:
+    doc = validate_plugin_document(_doc(extra="中心から線を下へ引く。"))
+    res = expand_plugin_ddl("Test.対葉を置く。", source_text="Test.対葉を置く。", lang="ja", documents=[doc])
+    assert "線を下へ引く" in res.ddl
+    assert all("weight" not in i for i in res.instructions)
 
 
 def test_adjective_range_singular_keeps_adjective() -> None:
@@ -98,7 +120,7 @@ def test_stray_reference_removes_sentence_not_expansion() -> None:
     assert "Foo." not in res.ddl
     assert "赤い円を置く。" in res.ddl  # 無関係な文は保持
     assert any("stray non-core reference removed" in w for w in res.warnings)
-    assert "領域 [" in res.ddl  # 展開は生きている
+    assert len(res.instructions) == 6  # 展開（決定的転写）は生きている
 
 
 def test_all_stray_falls_back_to_core_approximation() -> None:

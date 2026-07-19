@@ -188,6 +188,18 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 縦の実線を横に三本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
 
+入力: 破線の横線を中央に引く。
+出力: {"instructions":[{"primitive":"line","from":[0.3,0.5],"to":[0.7,0.5],"style":"dashed","weight":"pen"}]}
+
+入力: ビュランの斜線を一本引く。
+出力: {"instructions":[{"primitive":"line","from":[0.35,0.65],"to":[0.65,0.35],"weight":"burin"}]}
+
+入力: 中央に半円の弧を置く。半径は0.2。
+出力: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.2,"angle_start":180.0,"angle_end":360.0,"weight":"pen"}]}
+
+入力: 横線を引く。線は大きく滲む。
+出力: {"instructions":[{"primitive":"line","from":[0.2,0.5],"to":[0.8,0.5],"weight":"pen","variation":{"amplitude":"broad","frequency":"slow","quality":"pink","dimensions":["position_y"]}}]}
+
 入力: 青い右上がりの小さな楕円を中央付近に五つ散らす。横長にする。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.5,0.5],"size":[0.06,0.03],"color":"blue","rotation":-30,"arrangement":{"count":5,"layout":"scatter","margin":0.25}}]}
 
@@ -731,6 +743,18 @@ Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"we
 
 Input: Place a white chalk circle at center. Edges blurring.
 Output: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1,"color":"white","weight":"chalk","variation":{"amplitude":"medium","frequency":"medium","quality":"pink","dimensions":["position_x","position_y"]}}]}
+
+Input: Draw a dashed horizontal line at center.
+Output: {"instructions":[{"primitive":"line","from":[0.3,0.5],"to":[0.7,0.5],"style":"dashed","weight":"pen"}]}
+
+Input: Draw one diagonal burin line.
+Output: {"instructions":[{"primitive":"line","from":[0.35,0.65],"to":[0.65,0.35],"weight":"burin"}]}
+
+Input: Place a semicircle arc at center. Radius 0.2.
+Output: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.2,"angle_start":180.0,"angle_end":360.0,"weight":"pen"}]}
+
+Input: Draw a horizontal line. The line blurs largely.
+Output: {"instructions":[{"primitive":"line","from":[0.2,0.5],"to":[0.8,0.5],"weight":"pen","variation":{"amplitude":"broad","frequency":"slow","quality":"pink","dimensions":["position_y"]}}]}
 
 No explanation. Call submit_score only."""
 

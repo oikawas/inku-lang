@@ -270,8 +270,10 @@
 		{#if singleRunning && !singleDdlReady}
 			<div class="gen-status" aria-live="polite">
 				{#if showKiwi}<div class="gen-mascot"><InkuMascot /></div>{/if}
-				<span class="gen-stage">{stageLabel || t().stageDdlGenerating}</span>
-				<span class="gen-time">{(liveMs / 1000).toFixed(1)}s</span>
+				<div class="gen-info">
+					<span class="gen-stage">{stageLabel || t().stageDdlGenerating}</span>
+					<span class="gen-sub">{isJapanese ? '経過' : 'Elapsed'} {(liveMs / 1000).toFixed(1)}s</span>
+				</div>
 				<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 			</div>
 		{:else if !singleRunning}
@@ -486,13 +488,15 @@
 		margin-top: 8px;
 	}
 	.gen-mascot { flex: 0 0 auto; display: flex; align-items: center; }
+	.gen-info {
+		flex: 1 1 auto; min-width: 0;
+		display: flex; flex-direction: column; gap: 2px;
+	}
 	.gen-stage {
-		min-width: 0; flex: 1 1 auto;
 		font-size: 12px; font-weight: 500; color: var(--fg);
 		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 	}
-	.gen-time {
-		flex: 0 0 auto;
+	.gen-sub {
 		font-size: 11px; color: var(--fg3);
 		font-variant-numeric: tabular-nums; white-space: nowrap;
 	}

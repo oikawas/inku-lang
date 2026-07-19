@@ -55,16 +55,21 @@
 		--inku-green: #2f6b3a;
 		--inku-gray: #888888;
 		--inku-ink-shade: #555555;
+		position: relative;
 		width: 32px;
 		height: 32px;
-		display: grid;
-		place-items: center;
-		overflow: visible;
 		flex: 0 0 auto;
 	}
-	/* 92px cube scaled to 33% keeps the visual ~30px while the layout box stays 32px. */
+	/*
+		The 92px cube is scaled to 33% (~30px). transform: scale() does NOT shrink
+		the layout box, so the wrapper is taken out of flow (absolute) and centered;
+		the box itself stays a real 32px so it never leaks into the surrounding row.
+	*/
 	.mascot-wrapper {
-		transform: scale(0.33);
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%) scale(0.33);
 		width: 92px;
 		height: 92px;
 		display: flex;

@@ -849,6 +849,42 @@ def _descendant_edge_ids(
     ).scalars())
 
 
+def _lineage_generations(session, user_id: str, node_ids: list[str]) -> dict[str, int]:
+    """世代 (root=1, 主親エッジを辿って +1) をノード集合分まとめて計算する。
+
+    履歴リスト側 (_rows_to_dicts_with_lineage) と同じ意味論。lineage_generation は
+    DB カラムではなく計算値のため、lineage 応答へ載せる際もここを単一の真実源とする。
+    """
+    memo: dict[str, int] = {}
+
+    def resolve(node_id: str) -> int:
+        if node_id in memo:
+            return memo[node_id]
+        chain: list[str] = []
+        seen: set[str] = set()
+        current = node_id
+        while current not in memo:
+            if current in seen:
+                break  # cycle guard: treat the repeated node as a root
+            seen.add(current)
+            chain.append(current)
+            edge = session.query(LineageEdgeRow).filter(
+                LineageEdgeRow.user_id == user_id,
+                LineageEdgeRow.child_node_id == current,
+            ).first()
+            if edge is None:
+                break
+            current = edge.parent_node_id
+        base = memo.get(current, 0)
+        for offset, nid in enumerate(reversed(chain), start=1):
+            memo[nid] = base + offset
+        return memo[node_id]
+
+    for node_id in node_ids:
+        resolve(node_id)
+    return memo
+
+
 def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, node_limit: int = 200) -> dict | None:
     descendant_depth = max(0, min(descendant_depth, 200))
     node_limit = max(1, min(node_limit, 200))
@@ -907,6 +943,7 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
             .group_by(LineageEdgeRow.parent_node_id)
             .all()
         )
+        generations = _lineage_generations(session, user_id, [node.id for node in nodes])
         node_payloads = []
         for node in nodes:
             payload = {
@@ -922,6 +959,7 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
                 history = history_by_id.get(node.history_id or "")
                 if history is not None:
                     payload["history"] = _row_to_dict(history)
+                    payload["history"]["lineage_generation"] = generations.get(node.id)
             node_payloads.append(payload)
         return {
             "focus_node_id": focus.id,
@@ -1001,6 +1039,7 @@ def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
             .group_by(LineageEdgeRow.parent_node_id)
             .all()
         )
+        generations = _lineage_generations(session, user_id, [node.id for node in nodes])
         payload_nodes = []
         for node in nodes:
             payload = {
@@ -1013,6 +1052,7 @@ def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
             history = histories.get(node.history_id or "")
             if node.state != "tombstone" and history is not None:
                 payload["history"] = _row_to_dict(history)
+                payload["history"]["lineage_generation"] = generations.get(node.id)
             payload_nodes.append(payload)
         return {
             "target_node_id": target.id,

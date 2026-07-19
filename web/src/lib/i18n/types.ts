@@ -252,6 +252,7 @@ export interface LangPack {
 	aiRefineElementsLabel: string;
 	aiRefineStartButton: string;
 	aiRefineRunningButton: string;
+	aiRefineAbortButton: string;
 	aiRefineCompleted: string;
 	aiRefineStepStatus: (gens: number, step: number, label: string) => string;
 	aiRefineMinElementsError: string;
@@ -462,6 +463,13 @@ export interface LangPack {
 	settingsUserPlugins: string;
 	settingsUserPluginsAddTitle: string;
 	settingsUserPluginsAddDescription: string;
+	settingsPluginLoadFile: string;
+	settingsPluginViewEdit: string;
+	settingsPluginDelete: string;
+	settingsPluginDeleteConfirm: string;
+	settingsPluginEditorTitle: string;
+	settingsPluginSave: string;
+	settingsPluginInvalid: string;
 	settingsUserPluginPathPlaceholder: string;
 	settingsYes: string;
 	settingsNo: string;

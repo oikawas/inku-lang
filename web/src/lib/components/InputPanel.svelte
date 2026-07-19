@@ -4,7 +4,7 @@
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
-	import KiwiMascot from './KiwiMascot.svelte';
+	import InkuMascot from './InkuMascot.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 	import type { DemoSettings } from '$lib/demo';
@@ -267,28 +267,16 @@
 		></textarea>
 		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide}</div>
 
-		{#if singleRunning && !singleDdlReady}
-			<div class="progress-wrap">
-				<div class="progress-phases">
-					<span class="phase-item phase-active"><span class="phase-dot"></span>{t().stageDdlGenerating}</span>
+		{#if singleRunning}
+			<div class="gen-status" aria-live="polite">
+				{#if showKiwi}<div class="gen-mascot"><InkuMascot /></div>{/if}
+				<div class="gen-info">
+					<span class="gen-stage">{stageLabel || t().stageDdlGenerating}</span>
+					<span class="gen-sub">{isJapanese ? '経過' : 'Elapsed'} {(liveMs / 1000).toFixed(1)}s</span>
 				</div>
-				<div class="progress-right">
-					<span class="progress-token">-→-tok</span>
-					<span class="progress-time">{(liveMs / 1000).toFixed(1)}s</span>
-					<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
-				</div>
+				<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 			</div>
-			<div
-				class="progress-bar-track"
-				style="--progress-target: 100%"
-			>
-				<div class="progress-bar-fill"></div>
-				{#if showKiwi}
-					<KiwiMascot />
-				{/if}
-			</div>
-			<div class="progress-stage-text">{stageLabel}</div>
-		{:else if !singleRunning}
+		{:else}
 			<Tooltip placement="top" text={t().tooltipSubmit}>
 				<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
 			</Tooltip>
@@ -491,66 +479,39 @@
 		color: color-mix(in srgb, var(--fg3) 68%, transparent);
 	}
 	.input-meter.soft-over { color: color-mix(in srgb, var(--fg) 78%, transparent); }
-	.progress-wrap {
-		display: flex; align-items: center; justify-content: space-between;
-		gap: 10px;
-		min-height: 44px;
-		padding: 9px 11px 8px;
-		border: 1px solid var(--border2); border-radius: var(--r) var(--r) 0 0;
+	.gen-status {
+		display: flex; align-items: center; gap: 10px;
+		min-height: 46px;
+		padding: 6px 8px;
+		border: 1px solid var(--border2); border-radius: var(--r);
 		background: var(--panel);
 		margin-top: 8px;
 	}
-	.progress-phases { display: flex; align-items: center; gap: 4px; min-width: 0; }
-	.phase-item { font-size: 11px; color: var(--border2); display: flex; align-items: center; gap: 3px; }
-	.phase-item.phase-active { color: var(--fg); font-weight: 500; }
-	.phase-dot {
-		display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-		background: var(--accent); flex-shrink: 0;
-		animation: inkupulse 1s ease-in-out infinite;
+	.gen-mascot { flex: 0 0 auto; display: flex; align-items: center; }
+	.gen-info {
+		flex: 1 1 auto; min-width: 0;
+		display: flex; flex-direction: column; gap: 2px;
 	}
-	.progress-right { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; flex: 1; }
-	.progress-token { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-	.progress-time { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
-	.progress-right :global(.stop-btn) {
-		width: auto;
-		min-width: 86px;
-		flex: 0 0 auto;
-		padding: 8px 10px;
-		font-size: 13px;
+	.gen-stage {
+		font-size: 12px; font-weight: 500; color: var(--fg);
+		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 	}
-	.progress-bar-track {
-		position: relative;
-		height: 36px; background: transparent;
-		border-left: 1px solid var(--border2); border-right: 1px solid var(--border2);
-		overflow: visible;
-	}
-	.progress-bar-track::before {
-		content: "";
-		position: absolute; top: 20px; left: 0; right: 0; height: 3px;
-		background: var(--bg3);
-	}
-	.progress-bar-fill {
-		position: absolute; top: 20px; left: 0; height: 3px;
-		width: var(--progress-target, 100%);
-		transform-origin: left center;
-		background: var(--accent); transition: width 0.3s ease;
-		animation: progressFillEven 10s linear forwards;
-	}
-	.progress-stage-text {
+	.gen-sub {
 		font-size: 11px; color: var(--fg3);
-		padding: 5px 10px 7px;
-		border: 1px solid var(--border2); border-top: none;
-		border-radius: 0 0 var(--r) var(--r);
-		background: var(--panel);
+		font-variant-numeric: tabular-nums; white-space: nowrap;
+	}
+	.gen-status :global(.stop-btn) {
+		flex: 0 0 auto;
+		width: auto;
+		min-width: 0;
+		padding: 7px 14px;
+		font-size: 13px;
+		letter-spacing: 0.06em;
 	}
 	.error-text { color: #a2342a; font-size: 12px; }
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50% { opacity: 0.4; transform: scale(0.7); }
-	}
-	@keyframes progressFillEven {
-		from { transform: scaleX(0); }
-		to { transform: scaleX(1); }
 	}
 	@keyframes tabrun {
 		from { background-position: 180% 0; }

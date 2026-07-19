@@ -8,6 +8,9 @@
 	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
+	import InkuMascot from './InkuMascot.svelte';
+	import ModelMetaCard from './ModelMetaCard.svelte';
+	import type { ModelOption } from '$lib/models';
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
@@ -19,7 +22,7 @@
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
-	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
 	type Props = {
@@ -62,6 +65,7 @@
 		statusCatalogName: string;
 		statusCanvasName: string;
 		statusGeneration: number | null;
+		stageLabel: string;
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopied: boolean;
@@ -117,20 +121,19 @@
 		onSetModelCompareFixedModel: (model: string) => void;
 		isModelInspectionChoiceBlocked: (model: string) => boolean;
 		onRunModelInspection: () => void | Promise<void>;
+		onAbortModelInspection: () => void;
+		modelInspectionCurrentModel: string;
 		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
 		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
 		languageInspectionTargetLang: 'ja' | 'en';
-		languageCompareMode: ModelCompareMode;
-		languageCompareFixedLang: 'ja' | 'en';
-		languageInspectionSelectedLangs: Array<'ja' | 'en'>;
+		languageInspectionSelectedCombos: string[];
 		languageInspectionBusy: boolean;
 		languageInspectionStatus: string | null;
 		languageInspectionResults: ModelInspectionResult[];
-		onSetLanguageCompareMode: (mode: ModelCompareMode) => void;
-		onSetLanguageCompareFixedLang: (lang: 'ja' | 'en') => void;
-		onToggleLanguageInspectionLang: (lang: 'ja' | 'en') => void;
-		isLanguageInspectionChoiceBlocked: (lang: 'ja' | 'en') => boolean;
+		languageInspectionCurrentLabel: string;
+		onToggleLanguageCombo: (id: string) => void;
 		onRunLanguageInspection: () => void | Promise<void>;
+		onAbortLanguageInspection: () => void;
 		onAdoptLanguageInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
 		onToggleLanguageInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
 		lineageGraph: LineageGraph | null;
@@ -138,7 +141,7 @@
 		lineageError: string | null;
 		isJapanese: boolean;
 		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
-		onDrawLineageDescription: (node: LineageNode, text: string) => void | Promise<void>;
+		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
 		onCloseRefinement: () => void;
@@ -195,6 +198,7 @@
 		statusCatalogName,
 		statusCanvasName,
 		statusGeneration,
+		stageLabel,
 		statusHistoryItem,
 		statusHashLabel,
 		statusHashCopied,
@@ -250,20 +254,19 @@
 		onSetModelCompareFixedModel,
 		isModelInspectionChoiceBlocked,
 		onRunModelInspection,
+		onAbortModelInspection,
+		modelInspectionCurrentModel,
 		onAdoptModelInspectionResult,
 		onToggleModelInspectionStar,
 		languageInspectionTargetLang,
-		languageCompareMode = 'common',
-		languageCompareFixedLang = 'ja',
-		languageInspectionSelectedLangs = [],
+		languageInspectionSelectedCombos = [],
 		languageInspectionBusy = false,
 		languageInspectionStatus = null,
 		languageInspectionResults = [],
-		onSetLanguageCompareMode,
-		onSetLanguageCompareFixedLang,
-		onToggleLanguageInspectionLang,
-		isLanguageInspectionChoiceBlocked,
+		languageInspectionCurrentLabel = '',
+		onToggleLanguageCombo,
 		onRunLanguageInspection,
+		onAbortLanguageInspection,
 		onAdoptLanguageInspectionResult,
 		onToggleLanguageInspectionStar,
 		lineageGraph = null,
@@ -299,6 +302,10 @@
 	let refineKind = $state<RefineKind>('touch');
 	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
 	const statusGenerationLabel = $derived(statusGeneration ? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`) : (isJapanese ? '独立作品' : 'Standalone'));
+	const LANGUAGE_COMBOS: Array<['ja' | 'en', 'ja' | 'en']> = [['ja', 'ja'], ['ja', 'en'], ['en', 'ja'], ['en', 'en']];
+	function langName(lang: 'ja' | 'en'): string {
+		return lang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : 'English';
+	}
 	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare' | 'language'): Promise<void> {
 		await onOpenLineageNode(node);
 		refineView = view;
@@ -716,7 +723,20 @@
 					<div class="compare-panel">
 					<div class="compare-head">
 						<div class="refine-title">{t().modelCompareTitle}</div>
-						<div class="compare-action-wrap"><Tooltip text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</PaintButton></Tooltip></div>
+						<div class="compare-action-wrap">
+							{#if modelInspectionBusy}
+								<div class="compare-status" aria-live="polite">
+									<div class="compare-mascot"><InkuMascot /></div>
+									<div class="compare-status-info">
+										<span class="compare-status-label">{t().modelCompareBusy}</span>
+										{#if modelInspectionCurrentModel}<span class="compare-status-model">{modelInspectionCurrentModel}</span>{/if}
+									</div>
+									<StopButton onclick={onAbortModelInspection}>{t().stopBtn}</StopButton>
+								</div>
+							{:else}
+								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionSelectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
+							{/if}
+						</div>
 					</div>
 					<div class="compare-mode-tabs" role="tablist" aria-label={t().modelCompareModeLabel}>
 						<button class:active={modelCompareMode === 'common'} onclick={() => onSetModelCompareMode('common')}>{t().modelCompareModeCommon}</button>
@@ -731,12 +751,14 @@
 							{@const blocked = isModelInspectionChoiceBlocked(choice.id)}
 							{@const checked = modelInspectionSelectedModels.includes(choice.id)}
 							{@const failed = !!modelInspectionFailedModels[choice.id]}
-							<Tooltip text={blocked ? t().modelCompareTargetDisabledTooltip : ''}>
+							{@const choiceExtra = [blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join(' · ')}
+							<div class="model-metadata-hover">
 								<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || (!checked && modelInspectionSelectedModels.length >= 4)}>
 									<input type="checkbox" checked={checked} disabled={modelInspectionBusy || blocked || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
 									<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
 								</label>
-							</Tooltip>
+								<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} />
+							</div>
 						{/each}
 					</div>
 					<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspectionSelectedModels.length, 4)}</div>
@@ -744,7 +766,6 @@
 					<div class="model-compare-stage" class:busy={modelInspectionBusy}>
 						<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {modelInspectionTargetStage1Model}<br />Stage 2: {modelInspectionTargetStage2Model}</div></div>
 						<div class="model-results-column">
-							{#if modelInspectionBusy}<div class="model-drawing-animation" aria-live="polite"><div class="model-drawing-spinner" aria-hidden="true"></div><div><strong>{t().modelCompareDrawingTitle}</strong><span>{t().modelCompareDrawingBody}</span></div></div>{/if}
 							{#if modelInspectionResults.length > 0}
 								<div class="model-inspection-grid">
 									{#each modelInspectionResults as item (item.id)}
@@ -779,34 +800,39 @@
 					<div class="compare-panel">
 						<div class="compare-head">
 							<div class="refine-title">{isJapanese ? '指示文言語を比較する' : 'Compare instruction languages'}</div>
-							<div class="compare-action-wrap"><PaintButton onclick={onRunLanguageInspection} disabled={!result || variationGridBusy || languageInspectionBusy || languageInspectionSelectedLangs.length === 0}>{languageInspectionBusy ? (isJapanese ? '比較中' : 'Comparing') : (isJapanese ? '選んだ言語で比較' : 'Compare selected languages')}</PaintButton></div>
+							<div class="compare-action-wrap">
+								{#if languageInspectionBusy}
+									<div class="compare-status" aria-live="polite">
+										<div class="compare-mascot"><InkuMascot /></div>
+										<div class="compare-status-info">
+											<span class="compare-status-label">{isJapanese ? '比較中' : 'Comparing'}</span>
+											{#if languageInspectionCurrentLabel}<span class="compare-status-model">{languageInspectionCurrentLabel}</span>{/if}
+										</div>
+										<StopButton onclick={onAbortLanguageInspection}>{t().stopBtn}</StopButton>
+									</div>
+								{:else}
+									<PaintButton onclick={onRunLanguageInspection} disabled={!result || variationGridBusy || languageInspectionSelectedCombos.length === 0}>{isJapanese ? '選んだ組み合わせで比較' : 'Compare selected combinations'}</PaintButton>
+								{/if}
+							</div>
 						</div>
-						<div class="compare-mode-tabs" role="tablist" aria-label={isJapanese ? '言語比較モード' : 'Language comparison mode'}>
-							<button class:active={languageCompareMode === 'common'} onclick={() => onSetLanguageCompareMode('common')}>{t().modelCompareModeCommon}</button>
-							<button class:active={languageCompareMode === 'stage1_fixed'} onclick={() => onSetLanguageCompareMode('stage1_fixed')}>{t().modelCompareModeStage1Fixed}</button>
-							<button class:active={languageCompareMode === 'stage2_fixed'} onclick={() => onSetLanguageCompareMode('stage2_fixed')}>{t().modelCompareModeStage2Fixed}</button>
-						</div>
-						{#if languageCompareMode !== 'common'}
-							<label class="compare-fixed-model"><span>{languageCompareMode === 'stage1_fixed' ? (isJapanese ? '固定するStage 1言語' : 'Fixed Stage 1 language') : (isJapanese ? '固定するStage 2言語' : 'Fixed Stage 2 language')}</span><select value={languageCompareFixedLang} disabled={languageInspectionBusy} onchange={(event) => onSetLanguageCompareFixedLang(event.currentTarget.value as 'ja' | 'en')}><option value="ja">{isJapanese ? '日本語' : 'Japanese'}</option><option value="en">English</option></select></label>
-						{/if}
-						<div class="model-choice-grid" aria-label={isJapanese ? '比較する言語' : 'Languages to compare'}>
-							{#each ['ja', 'en'] as lang}
-								{@const typedLang = lang as 'ja' | 'en'}
-								{@const blocked = isLanguageInspectionChoiceBlocked(typedLang)}
-								{@const checked = languageInspectionSelectedLangs.includes(typedLang)}
-								<Tooltip text={blocked ? (isJapanese ? '対象作品と同じ言語構成です' : 'Same language combination as the target') : ''}>
-									<label class="model-choice" class:checked={checked} class:target={blocked} class:disabled={blocked}>
-										<input type="checkbox" checked={checked} disabled={languageInspectionBusy || blocked} onchange={() => onToggleLanguageInspectionLang(typedLang)} />
-										<span><strong>{typedLang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : 'English'}</strong><small>{blocked ? (isJapanese ? '対象作品で使用中' : 'Used by Target') : ''}</small></span>
-									</label>
-								</Tooltip>
+						<p class="lang-combo-hint">{isJapanese ? 'Stage 1（解釈）と Stage 2（描画）の言語の組み合わせを選びます。' : 'Pick the Stage 1 (interpretation) × Stage 2 (rendering) language combination.'}</p>
+						<div class="model-choice-grid lang-combo-grid" aria-label={isJapanese ? '比較する言語の組み合わせ' : 'Language combinations to compare'}>
+							{#each LANGUAGE_COMBOS as combo (combo.join(':'))}
+								{@const stage1 = combo[0]}
+								{@const stage2 = combo[1]}
+								{@const comboId = `${stage1}:${stage2}`}
+								{@const blocked = stage1 === languageInspectionTargetLang && stage2 === languageInspectionTargetLang}
+								{@const checked = languageInspectionSelectedCombos.includes(comboId)}
+								<label class="model-choice lang-combo" class:checked={checked} class:target={blocked} class:disabled={blocked}>
+									<input type="checkbox" checked={checked} disabled={languageInspectionBusy || blocked} onchange={() => onToggleLanguageCombo(comboId)} />
+									<span><strong>Stage 1: {langName(stage1)} ／ Stage 2: {langName(stage2)}</strong><small>{blocked ? (isJapanese ? '対象作品で使用中' : 'Used by target') : ''}</small></span>
+								</label>
 							{/each}
 						</div>
 						{#if languageInspectionStatus}<div class="variation-grid-status">{languageInspectionStatus}</div>{/if}
 						<div class="model-compare-stage" class:busy={languageInspectionBusy}>
-							<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {languageInspectionTargetLang}<br />Stage 2: {languageInspectionTargetLang}</div></div>
+							<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {langName(languageInspectionTargetLang)}<br />Stage 2: {langName(languageInspectionTargetLang)}</div></div>
 							<div class="model-results-column">
-								{#if languageInspectionBusy}<div class="model-drawing-animation" aria-live="polite"><div class="model-drawing-spinner" aria-hidden="true"></div><div><strong>{isJapanese ? '言語比較用の描画を生成中…' : 'Generating language comparisons…'}</strong></div></div>{/if}
 								{#if languageInspectionResults.length > 0}<div class="model-inspection-grid">{#each languageInspectionResults as item (item.id)}<div class="model-inspection-card" class:saved={!!item.savedHistoryId}><div class="comparison-label">{item.label}</div><div class="model-comparison-art-wrap"><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div><button class="variation-select model-adopt-select" class:selected={!!item.savedHistoryId} type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptLanguageInspectionResult(item)}>{item.saving ? '…' : item.savedHistoryId ? '✓' : '+'}</button></div><div class="model-result-actions"><button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleLanguageInspectionStar(item)}>{item.starred ? '★' : '☆'}</button></div><pre>{item.ddl}</pre></div>{/each}</div>{/if}
 							</div>
 						</div>
@@ -814,7 +840,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
 			{/if}
 		</div>
 
@@ -1421,6 +1447,19 @@
 	}
 	.compare-action-wrap :global(.tooltip-wrap) { width: 100%; }
 	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
+	/* While comparing, let the status widen past the button width so the full
+	   model name shows without truncation. */
+	.compare-action-wrap:has(.compare-status) { width: auto; min-width: 0; max-width: 62%; }
+	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
+	.model-metadata-hover > .model-choice { width: 100%; }
+	.model-metadata-hover:hover :global(.model-hover-card),
+	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
+	.compare-status { display: flex; align-items: center; gap: 10px; }
+	.compare-mascot { flex: 0 0 auto; display: flex; align-items: center; }
+	.compare-status-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+	.compare-status-label { font-size: 11px; color: var(--fg3); }
+	.compare-status-model { font-size: 12px; font-weight: 500; color: var(--fg); white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+	.compare-status :global(.stop-btn) { flex: 0 0 auto; width: auto; min-width: 0; padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em; }
 
 	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
 	.compare-mode-tabs button { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg3); font: inherit; cursor: pointer; }
@@ -1432,6 +1471,9 @@
 		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 		gap: 8px;
 	}
+	.lang-combo-hint { margin: 8px 0 0; font-size: 11px; color: var(--fg3); }
+	.lang-combo-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+	.lang-combo strong { white-space: nowrap; }
 	.model-choice {
 		display: grid;
 		grid-template-columns: auto minmax(0, 1fr);

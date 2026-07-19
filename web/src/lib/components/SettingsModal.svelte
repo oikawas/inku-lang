@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import ModelMetaCard from './ModelMetaCard.svelte';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -12,6 +13,8 @@
 		path?: string;
 		reasons?: string[];
 		entries?: Array<{ qualified_name: string; note_ja: string; note_en: string }>;
+		id?: string;
+		enabled?: boolean;
 	};
 	type SettingsStatus = {
 		database: {
@@ -181,6 +184,12 @@
 		onSaveModelSettings: () => void | Promise<void>;
 		onLoadModelSettings: () => void | Promise<void>;
 		onLoadSettingsStatus: () => void;
+		pluginActionStatus: string | null;
+		onLoadPluginContent: (id: string) => Promise<string | null>;
+		onSavePlugin: (id: string, content: string) => Promise<string[] | null>;
+		onCreatePlugin: (content: string, filename: string) => Promise<string[] | null>;
+		onDeletePlugin: (id: string) => Promise<boolean>;
+		onSetPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
 		onUpdateDbBackupSettings: (intervalDays: number, maxGenerations: number) => void | Promise<void>;
 		onRunDbBackupNow: () => void | Promise<void>;
 		onUpdateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => void | Promise<void>;
@@ -280,6 +289,12 @@
 		onSaveModelSettings,
 		onLoadModelSettings,
 		onLoadSettingsStatus,
+		pluginActionStatus,
+		onLoadPluginContent,
+		onSavePlugin,
+		onCreatePlugin,
+		onDeletePlugin,
+		onSetPluginEnabled,
 		onUpdateDbBackupSettings,
 		onRunDbBackupNow,
 		onUpdateOutputSaveSettings,
@@ -304,6 +319,86 @@
 		onCancelModelSelection,
 		onConfirmModelSelection,
 	}: Props = $props();
+
+	// ── User plugin management (plugins tab) ──
+	let pluginFileInput = $state<HTMLInputElement | null>(null);
+	let pluginBusy = $state(false);
+	let pluginDeleteConfirmId = $state<string | null>(null);
+	let pluginSectionReasons = $state<string[]>([]);
+	let pluginEditorOpen = $state(false);
+	let pluginEditorId = $state<string | null>(null);
+	let pluginEditorTitle = $state('');
+	let pluginEditorContent = $state('');
+	let pluginEditorLoading = $state(false);
+	let pluginEditorSaving = $state(false);
+	let pluginEditorReasons = $state<string[]>([]);
+
+	function pluginId(plugin: PluginItem): string {
+		return plugin.id ?? plugin.path ?? `${plugin.namespace ?? ''}.${plugin.name}`;
+	}
+	function pluginIsEnabled(plugin: PluginItem): boolean {
+		return plugin.enabled ?? plugin.status === 'enabled';
+	}
+
+	async function togglePluginEnabled(plugin: PluginItem): Promise<void> {
+		if (!isAdmin || pluginBusy) return;
+		pluginBusy = true;
+		await onSetPluginEnabled(pluginId(plugin), !pluginIsEnabled(plugin));
+		pluginBusy = false;
+	}
+
+	async function confirmDeletePlugin(plugin: PluginItem): Promise<void> {
+		if (!isAdmin || pluginBusy) return;
+		pluginBusy = true;
+		await onDeletePlugin(pluginId(plugin));
+		pluginDeleteConfirmId = null;
+		pluginBusy = false;
+	}
+
+	function triggerPluginFile(): void {
+		pluginSectionReasons = [];
+		pluginFileInput?.click();
+	}
+
+	async function onPluginFileChange(event: Event): Promise<void> {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		pluginBusy = true;
+		const content = await file.text();
+		const reasons = await onCreatePlugin(content, file.name);
+		pluginBusy = false;
+		pluginSectionReasons = reasons ?? [];
+	}
+
+	async function openPluginEditor(plugin: PluginItem): Promise<void> {
+		pluginEditorId = pluginId(plugin);
+		pluginEditorTitle = plugin.namespace ? `${plugin.namespace}.${plugin.name}` : plugin.name;
+		pluginEditorReasons = [];
+		pluginEditorContent = '';
+		pluginEditorOpen = true;
+		pluginEditorLoading = true;
+		const content = await onLoadPluginContent(pluginEditorId);
+		pluginEditorLoading = false;
+		if (content === null) { pluginEditorOpen = false; pluginEditorId = null; return; }
+		pluginEditorContent = content;
+	}
+
+	function closePluginEditor(): void {
+		if (pluginEditorSaving) return;
+		pluginEditorOpen = false;
+		pluginEditorId = null;
+	}
+
+	async function savePluginEditor(): Promise<void> {
+		if (!pluginEditorId || pluginEditorSaving) return;
+		pluginEditorSaving = true;
+		const reasons = await onSavePlugin(pluginEditorId, pluginEditorContent);
+		pluginEditorSaving = false;
+		if (reasons === null) { pluginEditorOpen = false; pluginEditorId = null; pluginEditorReasons = []; }
+		else pluginEditorReasons = reasons;
+	}
 
 	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
 	const isAdmin = $derived(currentUser?.role === 'admin');
@@ -481,21 +576,7 @@
 		};
 	}
 
-	function modelPurposesLabel(model: ModelOption): string {
-		const purposes = model.purposes ?? ['llm'];
-		return purposes.map((purpose) => purpose === 'vision' ? 'Vision' : 'LLM').join(' / ') || '—';
-	}
-
-	function modelRecommendationLabel(model: ModelOption): string {
-		const level = Math.max(0, Math.min(5, Number(model.recommendation_level ?? 0)));
-		return level > 0 ? `${'★'.repeat(level)}${'☆'.repeat(5 - level)} (${level}/5)` : '—';
-	}
-
-	function modelComment(model: ModelOption): string {
-		return t().closeLabel === 'Close'
-			? (model.comment_en || model.comment_ja || '—')
-			: (model.comment_ja || model.comment_en || '—');
-	}
+	const isJapanese = $derived(t().closeLabel !== 'Close');
 
 
 	function serviceIdLabel(provider: Provider): string {
@@ -568,15 +649,6 @@
 	}
 </script>
 
-{#snippet modelMetadataCard(model: ModelOption)}
-	<span class="model-hover-card" role="tooltip">
-		<span><strong>用途 / Use</strong>{modelPurposesLabel(model)}</span>
-		<span><strong>オススメ度 / Recommendation</strong>{modelRecommendationLabel(model)}</span>
-		<span><strong>速度 / Speed</strong>{model.speed_label || '—'}</span>
-		<span><strong>評価 / Comment</strong>{modelComment(model)}</span>
-	</span>
-{/snippet}
-
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
 <div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 	<div class="modal-head">
@@ -633,7 +705,7 @@
 								>
 									<strong>{model.label}</strong>
 									{#if model.notes}<span>{model.notes}</span>{/if}
-									{@render modelMetadataCard(model)}
+									<ModelMetaCard {model} {isJapanese} />
 								</button>
 							{/each}
 							</div>
@@ -975,19 +1047,48 @@
 				{/if}
 			</div>
 			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsUserPlugins}</div>
+				<div class="popover-group-label user-plugin-head">
+					<span>{t().settingsUserPlugins}</span>
+					<button class="ghost-btn" onclick={triggerPluginFile} disabled={!isAdmin || pluginBusy}>{t().settingsPluginLoadFile}</button>
+					<input type="file" accept=".md" bind:this={pluginFileInput} onchange={onPluginFileChange} style="display:none" />
+				</div>
+				{#if pluginActionStatus}<div class="db-test-result">{pluginActionStatus}</div>{/if}
+				{#if pluginSectionReasons.length}<div class="db-test-result">{t().settingsPluginInvalid}: {pluginSectionReasons.join(" / ")}</div>{/if}
 				{#if settingsStatus?.plugins.loaded.filter((plugin) => plugin.namespace !== "system").length}
-					{#each settingsStatus.plugins.loaded.filter((plugin) => plugin.namespace !== "system") as plugin (plugin.path ?? `${plugin.namespace}.${plugin.name}`)}
-						<div class="user-plugin-skeleton">
-							<div>
+					{#each settingsStatus.plugins.loaded.filter((plugin) => plugin.namespace !== "system") as plugin (plugin.id ?? plugin.path ?? `${plugin.namespace}.${plugin.name}`)}
+						<div class="user-plugin-row">
+							<div class="user-plugin-info">
 								<div class="system-plugin-title-row">
 									<div class="system-plugin-title">{plugin.namespace ? `${plugin.namespace}.${plugin.name}` : plugin.name}</div>
 									<span class="plugin-version-pill">{plugin.version ? `v${plugin.version}` : plugin.status}</span>
+									{#if plugin.status === "rejected"}<span class="plugin-rejected">{plugin.status}</span>{/if}
 								</div>
 								<div class="system-plugin-desc">{plugin.path ?? ""}</div>
 								{#if plugin.reasons?.length}<div class="db-test-result">{plugin.reasons.join(" / ")}</div>{/if}
 							</div>
-							<span class:plugin-rejected={plugin.status === "rejected"}>{plugin.status}</span>
+							<div class="user-plugin-controls">
+								{#if plugin.status !== "rejected"}
+									<button
+										type="button"
+										class="plugin-switch"
+										class:plugin-enabled={pluginIsEnabled(plugin)}
+										role="switch"
+										aria-checked={pluginIsEnabled(plugin)}
+										disabled={!isAdmin || pluginBusy}
+										onclick={() => void togglePluginEnabled(plugin)}
+									>
+										<span class="switch-track"><span class="switch-knob"></span></span>
+										<span class="switch-label">{pluginIsEnabled(plugin) ? t().settingsPluginEnabled : t().settingsPluginDisabled}</span>
+									</button>
+								{/if}
+								<button class="ghost-btn user-plugin-btn" onclick={() => void openPluginEditor(plugin)} disabled={!isAdmin || pluginBusy}>{t().settingsPluginViewEdit}</button>
+								{#if pluginDeleteConfirmId === pluginId(plugin)}
+									<button class="ghost-btn user-plugin-btn danger" onclick={() => void confirmDeletePlugin(plugin)} disabled={pluginBusy}>{t().settingsPluginDeleteConfirm}</button>
+									<button class="ghost-btn user-plugin-btn" onclick={() => (pluginDeleteConfirmId = null)} disabled={pluginBusy}>{t().confirmCancel}</button>
+								{:else}
+									<button class="ghost-btn user-plugin-btn danger" onclick={() => (pluginDeleteConfirmId = pluginId(plugin))} disabled={!isAdmin || pluginBusy}>{t().settingsPluginDelete}</button>
+								{/if}
+							</div>
 						</div>
 					{/each}
 				{:else}
@@ -1267,6 +1368,28 @@
 	{/if}
 </div>
 
+{#if pluginEditorOpen}
+	<div class="modal-backdrop" onclick={closePluginEditor} aria-hidden="true"></div>
+	<div class="plugin-editor-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') closePluginEditor(); }}>
+		<div class="modal-head">
+			<div class="catalog-modal-title">{t().settingsPluginEditorTitle} — {pluginEditorTitle}</div>
+			<button class="catalog-close" onclick={closePluginEditor} disabled={pluginEditorSaving}>×</button>
+		</div>
+		<div class="plugin-editor-body">
+			{#if pluginEditorLoading}
+				<div class="inline-message">{t().settingsLoading}</div>
+			{:else}
+				<textarea class="plugin-editor-ta" bind:value={pluginEditorContent} spellcheck="false" disabled={pluginEditorSaving}></textarea>
+			{/if}
+			{#if pluginEditorReasons.length}<div class="db-test-result">{t().settingsPluginInvalid}: {pluginEditorReasons.join(" / ")}</div>{/if}
+		</div>
+		<div class="plugin-editor-foot">
+			<button class="ghost-btn" onclick={closePluginEditor} disabled={pluginEditorSaving}>{t().confirmCancel}</button>
+			<button class="ghost-btn primary" onclick={savePluginEditor} disabled={pluginEditorSaving || pluginEditorLoading || !isAdmin}>{pluginEditorSaving ? t().settingsLoading : t().settingsPluginSave}</button>
+		</div>
+	</div>
+{/if}
+
 {#if showAddServiceDialog}
 	<div class="modal-backdrop add-service-backdrop" onclick={() => (showAddServiceDialog = false)} aria-hidden="true"></div>
 	<div class="add-service-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
@@ -1407,7 +1530,7 @@
 								<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'llm'); }}>LLM</button>
 								<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} onclick={(event) => { event.preventDefault(); toggleModelPurpose(model.id, 'vision'); }}>Vision</button>
 							</span>
-							{@render modelMetadataCard(modelDraft(model))}
+							<ModelMetaCard model={modelDraft(model)} {isJapanese} />
 						</label>
 						<details class="model-metadata-editor">
 							<summary>評価設定 / Model metadata</summary>
@@ -1486,17 +1609,9 @@
 	.generation-model-grid span { color: var(--fg3); font-size: 10px; }
 	.model-thinking-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
 	.model-metadata-hover { position: relative; }
-	.model-hover-card {
-		display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 520;
-		width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px;
-		border: 1px solid #64748b; border-radius: var(--r); background: #111820;
-		box-shadow: 0 8px 24px rgba(0,0,0,.32); color: #f8fafc; text-align: left;
-		pointer-events: none; white-space: normal;
-	}
-	.model-hover-card > span { display: grid; gap: 2px; color: #f8fafc; font-size: 11px; line-height: 1.45; }
-	.model-hover-card > span + span { margin-top: 6px; }
-	.model-hover-card strong { color: #cbd5e1; font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
-	.model-metadata-hover:hover .model-hover-card, .model-metadata-hover:focus-visible .model-hover-card, .model-metadata-hover:focus-within .model-hover-card { display: block; }
+	.model-metadata-hover:hover :global(.model-hover-card),
+	.model-metadata-hover:focus-visible :global(.model-hover-card),
+	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
 	.settings-tabs {
 		display: flex; flex: 0 0 auto; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg);
 	}
@@ -2202,11 +2317,81 @@
 		opacity: 0.62;
 		cursor: default;
 	}
-	.user-plugin-skeleton {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
+	.user-plugin-head {
+		display: flex;
+		align-items: center;
 		gap: 10px;
 	}
+	.user-plugin-head span { margin-right: auto; }
+	.user-plugin-row {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 10px 0;
+		border-top: 1px solid var(--border);
+	}
+	.user-plugin-info { min-width: 0; }
+	.user-plugin-controls {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+	.user-plugin-btn { padding: 5px 10px; font-size: 12px; }
+	.user-plugin-btn.danger { color: var(--danger, #9b3d32); border-color: var(--danger, #9b3d32); }
+	.plugin-editor-dialog {
+		position: fixed;
+		left: 50%;
+		top: 50%;
+		z-index: 1002;
+		transform: translate(-50%, -50%);
+		width: min(880px, calc(100vw - 40px));
+		height: min(680px, calc(100vh - 40px));
+		display: flex;
+		flex-direction: column;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel2, var(--panel));
+		box-shadow: 0 18px 56px rgba(0, 0, 0, 0.28);
+		overflow: hidden;
+	}
+	.plugin-editor-body {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 14px 16px;
+	}
+	.plugin-editor-ta {
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		box-sizing: border-box;
+		resize: none;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		padding: 10px 11px;
+		background: var(--bg);
+		color: var(--fg);
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 12.5px;
+		line-height: 1.6;
+		white-space: pre;
+		tab-size: 4;
+	}
+	.plugin-editor-foot {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 8px;
+		padding: 12px 16px;
+		border-top: 1px solid var(--border);
+	}
+	.plugin-editor-foot .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 	.login-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;

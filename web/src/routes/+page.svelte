@@ -361,7 +361,7 @@
 		starred?: boolean;
 		saving?: boolean;
 	};
-	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
@@ -385,14 +385,16 @@
 	let modelInspectionRunId = 0;
 	let targetContextVersion = 0;
 	let modelInspectionAbortController: AbortController | null = null;
-	let languageCompareMode = $state<ModelCompareMode>('common');
-	let languageCompareFixedLang = $state<'ja' | 'en'>('ja');
-	let languageInspectionSelectedLangs = $state<Array<'ja' | 'en'>>([]);
+	let modelInspectionCurrentModel = $state('');
+	// Language comparison selects (Stage 1 × Stage 2) language combinations directly,
+	// each id is `${stage1}:${stage2}` (e.g. 'ja:en').
+	let languageInspectionSelectedCombos = $state<string[]>([]);
 	let languageInspectionBusy = $state(false);
 	let languageInspectionStatus = $state<string | null>(null);
 	let languageInspectionResults = $state<ModelInspectionResult[]>([]);
 	let languageInspectionRunId = 0;
 	let languageInspectionAbortController: AbortController | null = null;
+	let languageInspectionCurrentLabel = $state('');
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -1616,6 +1618,108 @@
 			settingsStatusError = e instanceof Error ? e.message : String(e);
 		} finally {
 			settingsStatusLoading = false;
+		}
+	}
+
+	// ── User plugin management (backend contract may not be deployed yet) ──
+	let pluginActionStatus = $state<string | null>(null);
+
+	function pluginErrorMessage(status: number, detail: unknown): string {
+		if (status === 404 || status === 405 || status === 501) {
+			return getLang() === 'ja'
+				? 'このプラグイン管理機能はサーバー側が未実装です（バックエンド待ち）。'
+				: 'This plugin management endpoint is not implemented on the server yet.';
+		}
+		if (Array.isArray(detail)) return (detail as string[]).join(' / ');
+		if (typeof detail === 'string') return detail;
+		return `HTTP ${status}`;
+	}
+
+	async function loadPluginContent(id: string): Promise<string | null> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}/content`);
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
+				return null;
+			}
+			const data = await r.json() as { content?: string };
+			return data.content ?? '';
+		} catch (e) {
+			pluginActionStatus = e instanceof Error ? e.message : String(e);
+			return null;
+		}
+	}
+
+	// Returns null on success, or an array of validation reasons / messages on failure.
+	async function savePlugin(id: string, content: string): Promise<string[] | null> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}`, {
+				method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }),
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				return Array.isArray(d.detail) ? d.detail as string[] : [pluginErrorMessage(r.status, d.detail)];
+			}
+			await loadSettingsStatus();
+			return null;
+		} catch (e) {
+			return [e instanceof Error ? e.message : String(e)];
+		}
+	}
+
+	async function createPlugin(content: string, filename: string): Promise<string[] | null> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch('/api/plugins', {
+				method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, filename }),
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				return Array.isArray(d.detail) ? d.detail as string[] : [pluginErrorMessage(r.status, d.detail)];
+			}
+			await loadSettingsStatus();
+			return null;
+		} catch (e) {
+			return [e instanceof Error ? e.message : String(e)];
+		}
+	}
+
+	async function deletePlugin(id: string): Promise<boolean> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' });
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
+				return false;
+			}
+			await loadSettingsStatus();
+			return true;
+		} catch (e) {
+			pluginActionStatus = e instanceof Error ? e.message : String(e);
+			return false;
+		}
+	}
+
+	async function setPluginEnabled(id: string, enabled: boolean): Promise<boolean> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}/enabled`, {
+				method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
+				return false;
+			}
+			await loadSettingsStatus();
+			return true;
+		} catch (e) {
+			pluginActionStatus = e instanceof Error ? e.message : String(e);
+			return false;
 		}
 	}
 
@@ -3376,7 +3480,7 @@ if (unreadWords.length > 0) {
 				const id = qualifiedModelId(group.id as Provider, model.id);
 				if (seen.has(id)) continue;
 				seen.add(id);
-				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id) });
+				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id), model });
 			}
 		}
 		return choices;
@@ -3484,6 +3588,9 @@ if (unreadWords.length > 0) {
 		try {
 			for (const job of pending) {
 				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+				const jobStage1Name = statusModelName(job.stage1);
+				const jobStage2Name = statusModelName(job.stage2);
+				modelInspectionCurrentModel = jobStage1Name === jobStage2Name ? jobStage1Name : `${jobStage1Name} / ${jobStage2Name}`;
 				try {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, abortController.signal, job.stage1);
@@ -3538,60 +3645,56 @@ if (unreadWords.length > 0) {
 			if (modelInspectionRunId === runId) {
 				modelInspectionAbortController = null;
 				modelInspectionBusy = false;
+				modelInspectionCurrentModel = '';
 			}
 		}
+	}
+
+	function abortModelInspection() {
+		modelInspectionAbortController?.abort();
 	}
 
 	const languageInspectionTargetLang = $derived(
 		(result?.instruction_lang_resolved === 'en' ? 'en' : result?.instruction_lang_resolved === 'ja' ? 'ja' : getLang()) as 'ja' | 'en'
 	);
 
-	function setLanguageCompareMode(mode: ModelCompareMode) {
+	// The target artwork's combination (Stage 1 lang == Stage 2 lang == target).
+	function isLanguageComboBlocked(stage1: 'ja' | 'en', stage2: 'ja' | 'en') {
+		return stage1 === languageInspectionTargetLang && stage2 === languageInspectionTargetLang;
+	}
+
+	function toggleLanguageCombo(id: string) {
 		if (languageInspectionBusy) return;
-		languageCompareMode = mode;
-		languageCompareFixedLang = languageInspectionTargetLang;
-		languageInspectionSelectedLangs = [];
-		languageInspectionResults = [];
+		const [s1, s2] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
+		if (isLanguageComboBlocked(s1, s2)) return;
+		languageInspectionSelectedCombos = languageInspectionSelectedCombos.includes(id)
+			? languageInspectionSelectedCombos.filter((value) => value !== id)
+			: [...languageInspectionSelectedCombos, id];
 		languageInspectionStatus = null;
 	}
 
-	function setLanguageCompareFixedLang(lang: 'ja' | 'en') {
-		if (languageInspectionBusy) return;
-		languageCompareFixedLang = lang;
-		languageInspectionResults = [];
-		languageInspectionStatus = null;
-	}
-
-	function isLanguageInspectionChoiceBlocked(lang: 'ja' | 'en') {
-		if (languageCompareMode === 'common') return lang === languageInspectionTargetLang;
-		if (languageCompareMode === 'stage1_fixed') return languageCompareFixedLang === languageInspectionTargetLang && lang === languageInspectionTargetLang;
-		return lang === languageInspectionTargetLang && languageCompareFixedLang === languageInspectionTargetLang;
-	}
-
-	function toggleLanguageInspectionLang(lang: 'ja' | 'en') {
-		if (languageInspectionBusy || isLanguageInspectionChoiceBlocked(lang)) return;
-		languageInspectionSelectedLangs = languageInspectionSelectedLangs.includes(lang)
-			? languageInspectionSelectedLangs.filter((value) => value !== lang)
-			: [...languageInspectionSelectedLangs, lang];
-		languageInspectionStatus = null;
+	function abortLanguageInspection() {
+		languageInspectionAbortController?.abort();
 	}
 
 	async function runLanguageInspection() {
 		if (languageInspectionBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
-		const selected = languageInspectionSelectedLangs.filter((lang) => !isLanguageInspectionChoiceBlocked(lang));
+		const selected = languageInspectionSelectedCombos.filter((id) => {
+			const [s1, s2] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
+			return !isLanguageComboBlocked(s1, s2);
+		});
 		if (selected.length === 0) {
-			languageInspectionStatus = getLang() === 'ja' ? '比較する言語を1つ以上選択してください。' : 'Select at least one language to compare.';
+			languageInspectionStatus = getLang() === 'ja' ? '比較する組み合わせを1つ以上選択してください。' : 'Select at least one combination to compare.';
 			return;
 		}
 		const contextVersion = targetContextVersion;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		if (contextVersion !== targetContextVersion) return;
-		const jobs = selected.map((lang) => {
-			const stage1Lang = languageCompareMode === 'stage1_fixed' ? languageCompareFixedLang : lang;
-			const stage2Lang = languageCompareMode === 'stage2_fixed' ? languageCompareFixedLang : lang;
-			return { lang, stage1Lang, stage2Lang, id: `${languageCompareMode}:${stage1Lang}:${stage2Lang}` };
+		const jobs = selected.map((id) => {
+			const [stage1Lang, stage2Lang] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
+			return { lang: stage2Lang, stage1Lang, stage2Lang, id };
 		});
 		const rendered = new Set(languageInspectionResults.map((item) => item.id));
 		const pending = jobs.filter((job) => !rendered.has(job.id));
@@ -3605,15 +3708,16 @@ if (unreadWords.length > 0) {
 		languageInspectionBusy = true;
 		languageInspectionStatus = null;
 		const successful = [...languageInspectionResults];
+		const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
 		try {
 			for (const job of pending) {
 				if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
+				languageInspectionCurrentLabel = `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`;
 				try {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang);
 					const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang);
 					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
-					const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
 					successful.push({
 						id: job.id,
 						model: qualifiedModelId(stage1Provider, stage1Model),
@@ -3643,7 +3747,7 @@ if (unreadWords.length > 0) {
 						tokensOutStage2: composed.tokens_out,
 						elapsedMs: Date.now() - started,
 						lineageParentNodeId: parentNodeId,
-						compareMode: languageCompareMode,
+						compareMode: 'common',
 						comparisonKind: 'language',
 						stage1Lang: job.stage1Lang,
 						stage2Lang: job.stage2Lang,
@@ -3661,6 +3765,7 @@ if (unreadWords.length > 0) {
 			if (languageInspectionRunId === runId) {
 				languageInspectionAbortController = null;
 				languageInspectionBusy = false;
+				languageInspectionCurrentLabel = '';
 			}
 		}
 	}
@@ -3874,7 +3979,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	await fetchLineage(nodeId, true);
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history) return;
 	const rendered = await paintOne(sourceText, {
@@ -3885,15 +3990,16 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string): Prom
 		lineageParentNodeId: node.id,
 		derivationKind: 'description_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+		signal,
 	});
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
 
-async function drawLineageDdlEdit(node: LineageNode, editedDdl: string): Promise<void> {
+async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = editedDdl.trim();
 	if (!nextDdl || !node.history) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
-	const composed = await composeOne(nextDdl, sourceText, undefined, undefined, undefined, {
+	const composed = await composeOne(nextDdl, sourceText, signal, undefined, undefined, {
 		catalogId: lineageCatalogId(node),
 		canvasAspectId: lineageCanvasAspectId(node),
 	});
@@ -3942,11 +4048,11 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string): Promise
 }
 
 // Draw a standalone artwork authored directly in DDL (no instruction, no parent).
-async function drawNewDdl(rawDdl: string): Promise<void> {
+async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = rawDdl.trim();
 	if (!nextDdl) return;
 	const firstLine = (nextDdl.split('\n').find((line) => line.trim().length > 0) ?? nextDdl).trim().slice(0, 80);
-	const composed = await composeOne(nextDdl, '', undefined, undefined, undefined, {
+	const composed = await composeOne(nextDdl, '', signal, undefined, undefined, {
 		catalogId: selectedCatalog,
 		canvasAspectId: effectiveCanvasAspectId(),
 	});
@@ -4019,16 +4125,19 @@ function refreshLineageAfterRefine(): void {
 	if (focusId) void fetchLineage(focusId, true);
 }
 
-async function handleDdlDialogDraw(nextDdl: string): Promise<void> {
+async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal): Promise<void> {
 	if (ddlDialogDrawing) return;
 	ddlDialogDrawing = true;
 	ddlDialogError = null;
 	try {
-		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl);
-		else await drawNewDdl(nextDdl);
+		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl, signal);
+		else await drawNewDdl(nextDdl, signal);
 		ddlDialogOpen = false;
 	} catch (cause) {
-		ddlDialogError = cause instanceof Error ? cause.message : String(cause);
+		// Aborted by the dialog stop button: keep the dialog open, no error.
+		if (!(cause instanceof DOMException && cause.name === 'AbortError') && !(cause instanceof Error && cause.name === 'AbortError')) {
+			ddlDialogError = cause instanceof Error ? cause.message : String(cause);
+		}
 	} finally {
 		ddlDialogDrawing = false;
 	}
@@ -5649,6 +5758,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusCatalogName}
 				{statusCanvasName}
 				{statusGeneration}
+				{stageLabel}
 				{statusHistoryItem}
 				{statusHashLabel}
 				{statusHashCopied}
@@ -5701,20 +5811,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onSetModelCompareFixedModel={setModelCompareFixedModel}
 				isModelInspectionChoiceBlocked={isModelInspectionChoiceBlocked}
 				onRunModelInspection={runModelInspection}
+				onAbortModelInspection={abortModelInspection}
+				{modelInspectionCurrentModel}
 				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				{languageInspectionTargetLang}
-				{languageCompareMode}
-				{languageCompareFixedLang}
-				{languageInspectionSelectedLangs}
+				{languageInspectionSelectedCombos}
 				{languageInspectionBusy}
 				{languageInspectionStatus}
 				{languageInspectionResults}
-				onSetLanguageCompareMode={setLanguageCompareMode}
-				onSetLanguageCompareFixedLang={setLanguageCompareFixedLang}
-				onToggleLanguageInspectionLang={toggleLanguageInspectionLang}
-				{isLanguageInspectionChoiceBlocked}
+				{languageInspectionCurrentLabel}
+				onToggleLanguageCombo={toggleLanguageCombo}
 				onRunLanguageInspection={runLanguageInspection}
+				onAbortLanguageInspection={abortLanguageInspection}
 				onAdoptLanguageInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleLanguageInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				{lineageGraph}
@@ -5868,6 +5977,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onSaveModelSettings={saveModelSettings}
 		onLoadModelSettings={loadModelSettings}
 		onLoadSettingsStatus={loadSettingsStatus}
+		{pluginActionStatus}
+		onLoadPluginContent={loadPluginContent}
+		onSavePlugin={savePlugin}
+		onCreatePlugin={createPlugin}
+		onDeletePlugin={deletePlugin}
+		onSetPluginEnabled={setPluginEnabled}
 		onUpdateDbBackupSettings={updateDbBackupSettings}
 		onRunDbBackupNow={runDbBackupNow}
 		onUpdateOutputSaveSettings={updateOutputSaveSettings}

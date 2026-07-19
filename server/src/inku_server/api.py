@@ -57,6 +57,7 @@ from .plugins import (
 from .reference import build_reference, render_markdown
 from .saijiki import display_categories
 from .renderer import SVG_PROFILES, new_render_seed
+from .carriage import carriage_warnings as _carriage_warnings
 from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware, SlidingWindowRateLimiter
 from .schema import CanvasSpec, Score
@@ -414,6 +415,19 @@ def _validated_svg_profile(svg_profile: str | None) -> str:
     return profile
 
 
+def _score_with_plugin_instructions(score: Score, instructions: list[dict]) -> Score:
+    """展開層の決定的転写 instruction を coerce 後の Score へ合流させる (v1.94 輪1)。
+
+    機械生成の instruction は構築時に確定済みのため coerce の対象にしない。
+    自由文由来の instruction 群の後ろへ、展開順のまま連結する。
+    """
+    if not instructions:
+        return score
+    data = score.model_dump(by_alias=True)
+    data["instructions"] = list(data["instructions"]) + [dict(i) for i in instructions]
+    return Score.model_validate(data)
+
+
 def _render_score_svg(
     score_payload: dict,
     *,
@@ -715,6 +729,7 @@ class ComposeResponse(BaseModel):
     ddl: str
     plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
     plugin_warnings: list[str] = Field(default_factory=list)
+    carriage_warnings: list[str] | None = None  # v1.94 B: 搬送契約の鏡（検査のみ）
     score: Score
     svg: str
     stage2_model: str | None = None
@@ -814,6 +829,7 @@ class PaintResponse(BaseModel):
     ddl: str
     plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
     plugin_warnings: list[str] = Field(default_factory=list)
+    carriage_warnings: list[str] | None = None  # v1.94 B: 搬送契約の鏡（検査のみ）
     thinking: str | None = None
     score: Score
     svg: str
@@ -934,6 +950,8 @@ class ComposeDetail:
     ddl: str
     plugin_provenance: list[dict[str, str]] = field(default_factory=list)
     plugin_warnings: list[str] = field(default_factory=list)
+    # v1.94 輪1: 展開層が決定的に転写した instruction（coerce を迂回して後段合流）
+    plugin_instructions: list[dict] = field(default_factory=list)
     tokens_in: int | None = None
     tokens_out: int | None = None
     retry_count: int = 0
@@ -2268,6 +2286,7 @@ def _call_compose_detail(
     stage15_ddl = ddl  # trace: Stage 1.5 output = Stage 2 input (== ComposeDetail.ddl)
     plugin_provenance = list(plugin_expansion.provenance)
     plugin_warnings = list(plugin_expansion.warnings)
+    plugin_instructions = list(plugin_expansion.instructions)
     retry_count = 0
     retry_reasons: list[str] = []
     fallback_used = False
@@ -2339,6 +2358,7 @@ def _call_compose_detail(
             retry_reasons=["stage2_hard_timeout"],
             fallback_used=True,
             plugin_provenance=plugin_provenance,
+            plugin_instructions=plugin_instructions,
             plugin_warnings=plugin_warnings,
             **_trace_fields(),
         )
@@ -2349,6 +2369,7 @@ def _call_compose_detail(
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             plugin_provenance=plugin_provenance,
+            plugin_instructions=plugin_instructions,
             plugin_warnings=plugin_warnings,
             **_trace_fields(),
         )
@@ -2386,6 +2407,7 @@ def _call_compose_detail(
         retry_reasons=retry_reasons,
         fallback_used=fallback_used,
         plugin_provenance=plugin_provenance,
+            plugin_instructions=plugin_instructions,
         plugin_warnings=plugin_warnings,
         **_trace_fields(),
     )
@@ -2523,6 +2545,8 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
 
+    score = _score_with_plugin_instructions(score, compose_detail.plugin_instructions)
+
     normalized_compose_ddl = compose_detail.ddl.lower()
     if "雲形" in compose_detail.ddl or "cloudform" in normalized_compose_ddl:
         score = _finalize_score(score, compose_detail.ddl)
@@ -2559,10 +2583,12 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     }
 
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
+    _carriage = _carriage_warnings(compose_detail.ddl, score) or None
     return ComposeResponse(
         ddl=compose_detail.ddl,
         plugin_provenance=compose_detail.plugin_provenance,
         plugin_warnings=compose_detail.plugin_warnings,
+        carriage_warnings=_carriage,
         score=score,
         svg=svg,
         stage2_model=resolved_stage2_model,
@@ -2991,6 +3017,8 @@ def api_paint(
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
 
+    score = _score_with_plugin_instructions(score, compose_detail.plugin_instructions)
+
     normalized_compose_ddl = compose_detail.ddl.lower()
     if "雲形" in compose_detail.ddl or "cloudform" in normalized_compose_ddl:
         score = _finalize_score(score, compose_detail.ddl)
@@ -3108,10 +3136,12 @@ def api_paint(
         score_pre_coerce_dump=score_pre_coerce_dump,
         coerce_report=coerce_report,
     )
+    _carriage = _carriage_warnings(compose_detail.ddl, score) or None
     return PaintResponse(
         text=source_text,
         ddl=ddl,
         thinking=interpret_detail_result.thinking,
+        carriage_warnings=_carriage,
         score=score,
         svg=svg,
         stage1_model=resolved_stage1_model,

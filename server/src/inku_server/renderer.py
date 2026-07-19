@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import secrets
 import re
@@ -33,6 +34,8 @@ from .arc_geometry import (
     minor_arc_delta,
 )
 from .stroke_engine import outline_for_centerline, polygon_path, synthesize_stroke
+
+logger = logging.getLogger(__name__)
 
 CANVAS_PX = 1000
 
@@ -631,11 +634,16 @@ def _strip_performance_fields(ins: Instruction) -> Instruction:
     return Instruction.model_validate(data)
 
 
-def _move_anchor_to(ins: Instruction, target: tuple[float, float]) -> Instruction:
+def _move_anchor_to(
+    ins: Instruction, target: tuple[float, float], *, keep_relation: bool = False
+) -> Instruction:
     ax, ay = _anchor(ins)
     data = ins.model_dump(by_alias=True)
     data.pop("at", None)
-    data.pop("relation", None)
+    # 関係解決後の移動では relation は消費済み。region 配置 (at) 経路では保存し、
+    # 後段の _resolve_relation に委ねる (v1.93: region が relation を食う競合の修正)。
+    if not keep_relation:
+        data.pop("relation", None)
     dx = target[0] - ax
     dy = target[1] - ay
     if ins.primitive == "line" and ins.from_ and ins.to:
@@ -671,7 +679,7 @@ def _resolve_at_region(ins: Instruction, seed: int, index: int) -> Instruction:
     x0, y0, x1, y1 = ins.at.region
     x = x0 + (x1 - x0) * _hash01(index, seed, "region-x")
     y = y0 + (y1 - y0) * _hash01(index, seed, "region-y")
-    return _move_anchor_to(ins, (x, y))
+    return _move_anchor_to(ins, (x, y), keep_relation=True)
 
 
 def _bbox_for_instruction(
@@ -887,22 +895,33 @@ def _performed_arc_sagitta(ins: Instruction, seed: int, index: int) -> float | N
     ) * normal[1]
 
 
+def _dropped_relation(ins: Instruction, index: int, reason: str) -> Instruction:
+    """§14.4: 解決不能な relation は修復せず drop し、警告を記録する。"""
+    logger.warning(
+        "relation dropped at performance: index=%d type=%s reason=%s",
+        index,
+        ins.relation.type if ins.relation else None,
+        reason,
+    )
+    return _strip_performance_fields(ins)
+
+
 def _resolve_touching_relation(
     ins: Instruction,
     previous: list[Instruction],
     seed: int,
     index: int,
 ) -> Instruction:
-    clean = _strip_performance_fields(ins)
     if ins.primitive not in {"line", "arc"} or not previous:
-        return clean
+        return _dropped_relation(ins, index, "touching requires a line/arc with a prior")
     prior = previous[-1]
     if prior.primitive not in {"line", "arc"}:
-        return clean
+        return _dropped_relation(ins, index, "prior is not a line/arc")
     prior_geometry = _canvas_endpoint_geometry(prior, seed, index - 1)
     if prior_geometry is None:
-        return clean
+        return _dropped_relation(ins, index, "prior has no endpoint geometry")
     start, end = prior_geometry[0], prior_geometry[1]
+    clean = _strip_performance_fields(ins)
     data = clean.model_dump(by_alias=True)
     data["rotation"] = None
 
@@ -913,17 +932,17 @@ def _resolve_touching_relation(
 
     own_sagitta = _performed_arc_sagitta(ins, seed, index)
     if own_sagitta is None or abs(own_sagitta) <= 1e-12:
-        return clean
+        return _dropped_relation(ins, index, "degenerate own sagitta")
     sagitta = own_sagitta
     if prior.primitive == "arc":
         prior_sagitta = _performed_arc_sagitta(prior, seed, index - 1)
         if prior_sagitta is None or abs(prior_sagitta) <= 1e-12:
-            return clean
+            return _dropped_relation(ins, index, "degenerate prior sagitta")
         sagitta = -math.copysign(abs(own_sagitta), prior_sagitta)
     try:
         geometry = arc_from_endpoints_and_sagitta(start, end, sagitta)
-    except ValueError:
-        return clean
+    except ValueError as exc:
+        return _dropped_relation(ins, index, f"minor-arc reconstruction failed: {exc}")
     data["center"] = list(geometry.center)
     data["radius"] = geometry.radius
     data["angle_start"] = geometry.angle_start
@@ -940,14 +959,14 @@ def _resolve_relation(
     if rel.type == "touching":
         return _resolve_touching_relation(ins, previous, seed, index)
     if rel.type == "between" and len(previous) < 2:
-        return _strip_performance_fields(ins)
+        return _dropped_relation(ins, index, "between requires two priors")
     if rel.type != "between" and not previous:
-        return _strip_performance_fields(ins)
+        return _dropped_relation(ins, index, "no prior instruction")
     prev_bbox = (
         _bbox_for_instruction(previous[-1], seed, index - 1) if previous else None
     )
     if prev_bbox is None:
-        return _strip_performance_fields(ins)
+        return _dropped_relation(ins, index, "prior has no performed bbox")
     prev_center = _bbox_center(prev_bbox)
     prev_radius = _bbox_radius(prev_bbox)
     gap = _relation_gap(seed, index, rel.gap)
@@ -1044,6 +1063,12 @@ def _resolve_performance_score(score: Score, performance_seed: int | None) -> Sc
     for index, original in enumerate(score.instructions):
         ins = _ensure_line_coords(original)
         if ins.arrangement and ins.arrangement.layout == "grid":
+            if ins.relation is not None:
+                logger.warning(
+                    "relation dropped at performance: index=%d type=%s reason=grid layout",
+                    index,
+                    ins.relation.type,
+                )
             data = ins.model_dump(by_alias=True)
             data.pop("relation", None)
             ins = Instruction.model_validate(data)

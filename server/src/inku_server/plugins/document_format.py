@@ -16,6 +16,7 @@ from threading import RLock
 from typing import Iterable
 
 from ..saijiki import (
+    RELATIONS,
     core_grammar_markers as saijiki_core_grammar_markers,
     saijiki_marker_table,
     shape_markers as saijiki_shape_markers,
@@ -35,8 +36,11 @@ _TEMPLATE_RE = re.compile(
 # 単語単位より先に並べる (leaf forms を forms より前に置く)。箇所/spots は anchor
 # 反復 (A-6) 用。単数形は単位保存 (_singular_for_unit)。単位語は reference §3 の
 # repetition_range_regex がそのまま公開する。
+# v1.94: en は数と単位の間に形容詞 1 語を許す（例: "5-7 tall blades"）。
+# "to" の誤吸収を防ぐため介在語から to を除外する。ja 単位は文法上隣接のため不変。
 _RANGE_RE = re.compile(
     r"(?P<low>\d+)\s*(?:[〜～-]|to)\s*(?P<high>\d+)\s*"
+    r"(?:(?P<adj>(?!to\b)[A-Za-z][A-Za-z-]*)\s+)?"
     r"(?P<unit>leaf\ forms?|cloudforms?|forms?|blades?|spots?|arcs?"
     r"|marks?|items?|lines?|枚|個|本|箇所)",
     re.IGNORECASE,
@@ -189,6 +193,10 @@ class PluginExpansionResult:
     ddl: str
     provenance: tuple[dict[str, str], ...] = ()
     warnings: tuple[str, ...] = ()
+    # v1.94 輪1: 対 member（relation literal を含む member 定義）の決定的転写。
+    # 機械が書いた member 文は LLM を通さず、ここに Score instruction 断片として
+    # 確定する（DDL テキストからは除外される）。coerce の対象にもしない。
+    instructions: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -289,13 +297,27 @@ def _build_manifest(values: dict[str, object]) -> PluginManifest:
     )
 
 
-def _instruction_budget(lines: tuple[str, ...]) -> int:
+def _instruction_budget(
+    lines: tuple[str, ...],
+    members: dict[str, str] | None = None,
+    *,
+    lang: str = "ja",
+) -> int:
     total = 0
     for line in lines:
         if line.lower().startswith(ANCHOR_PREFIX):
             continue
         match = _RANGE_RE.search(line)
-        total += int(match.group("high")) if match else 1
+        if match is None:
+            total += 1
+            continue
+        cost = int(match.group("high"))
+        if members:
+            # v1.94 対分離: member 参照行は member 定義のセグメント数ぶん膨らむ
+            name = _referenced_member(line, members)
+            if name is not None:
+                cost *= len(_split_pair_segments(members[name].rstrip("。."), lang))
+        total += cost
     return total
 
 
@@ -321,7 +343,7 @@ def _validate_entry(entry: PluginEntry, manifest: PluginManifest) -> list[str]:
         if not lines:
             reasons.append(f"{entry.heading}: expansion template for {lang} is required")
             continue
-        budget = _instruction_budget(lines)
+        budget = _instruction_budget(lines, members, lang=lang)
         if budget > MAX_ENTRY_INSTRUCTIONS:
             reasons.append(
                 f"{entry.heading}: expansion budget {budget} exceeds {MAX_ENTRY_INSTRUCTIONS}"
@@ -586,6 +608,131 @@ def _resolve_count(match: "re.Match[str]", seed_text: str, salt: str) -> int:
     return low + _stable_int(seed_text, salt) % (high - low + 1)
 
 
+# v1.94 対分離: member 定義内の relation literal（前の弧に両端で触れる 等）
+_RELATION_LITERALS = {
+    "ja": tuple(lit for word in RELATIONS for lit in word.literals_ja),
+    "en": tuple(lit for word in RELATIONS for lit in word.literals_en),
+}
+
+
+# v1.94 輪1: 対 member の決定的転写 ------------------------------------------
+
+_SLIM_HINTS = ("膨らみは細く", "bulge kept slim")
+
+
+def _pair_instructions(
+    segments: list[str],
+    member_regions: list[tuple[tuple[float, float, float, float], int]],
+    *,
+    seed_text: str,
+    salt: str,
+) -> list[dict]:
+    """対 member（配置弧 + touching 弧）を Score instruction へ決定的に転写する。
+
+    幾何は member region・回転・seed から導出し、掃引角は member ごとに揺らす
+    （固定値のスタンプ化を避ける）。「膨らみは細く」ヒントは細い掃引へ写像する。
+    place 弧は `at` を保持し、領域内の位置決めは従来どおり演奏（seed）に属する。
+    weight / color は既定のまま返し、直後の様式行（素材で、色で。）が消費時に
+    上書きする。
+    """
+    slim = any(h in seg for seg in segments for h in _SLIM_HINTS)
+    out: list[dict] = []
+    for index, (region, rotation) in enumerate(member_regions, start=1):
+        x0, y0, x1, y1 = region
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        radius = round(0.45 * min(x1 - x0, y1 - y0), 4)
+        h1 = _stable_int(seed_text, f"{salt}:span1:{index}")
+        h2 = _stable_int(seed_text, f"{salt}:span2:{index}")
+        if slim:
+            span1, span2 = 40 + h1 % 20, 35 + h2 % 20
+        else:
+            span1, span2 = 55 + h1 % 30, 45 + h2 % 30
+        start1 = 270 - span1 / 2
+        out.append(
+            {
+                "primitive": "arc",
+                "center": [round(cx, 4), round(cy, 4)],
+                "radius": radius,
+                "angle_start": float(round(start1)),
+                "angle_end": float(round(start1 + span1)),
+                "rotation": float(rotation),
+                "at": {"region": [round(v, 4) for v in region]},
+            }
+        )
+        start2 = 270 - span2 / 2
+        out.append(
+            {
+                "primitive": "arc",
+                "center": [round(cx, 4), round(cy, 4)],
+                "radius": radius,
+                "angle_start": float(round(start2)),
+                "angle_end": float(round(start2 + span2)),
+                "relation": {"type": "touching", "contact": "both_ends"},
+            }
+        )
+    return out
+
+
+def _parse_style_line(line: str, lang: str) -> dict[str, str] | None:
+    """「ロットリングで、赤で。」/ "In rotring, in red." 型の純粋な様式行を解釈する。
+
+    全 token が てざわり/いろ の表層語に解決できる場合だけ weight/color を返す。
+    ひとつでも解決できなければ None（様式行として消費せず、テキストのまま残す）。
+    """
+    from ..saijiki import color_for_surface, weight_for_surface
+
+    weights = weight_for_surface()
+    colors = color_for_surface()
+    text = line.strip().rstrip("。.")
+    parts = text.split("、") if lang == "ja" else text.split(", ")
+    resolved: dict[str, str] = {}
+    for part in parts:
+        part = part.strip()
+        if lang == "ja":
+            m = re.fullmatch(r"(.+?)で", part)
+            token = m.group(1).strip() if m else None
+        else:
+            m = re.fullmatch(r"[Ii]n (.+)", part)
+            token = m.group(1).strip() if m else None
+        if token is None:
+            return None
+        if token in weights:
+            resolved["weight"] = weights[token]
+        elif token in colors:
+            resolved["color"] = colors[token]
+        else:
+            return None
+    return resolved or None
+
+
+def _split_pair_segments(definition: str, lang: str) -> list[str]:
+    """member 定義を relation literal 境界で対の要素へ分割する (v1.94 対分離).
+
+    「弧を置き、前の弧に両端で触れる」のような対の定義を、各要素が独立した
+    region 付き文になるよう分割する。これにより Stage 2 は member ごとに
+    「配置弧 + touching 弧」の 2 instruction を書け、Build 590 の明示 region 数
+    上限とも整合する（両文が region を持つため上限は自然に 2N になる）。
+    relation literal を含まない定義は分割されない（従来どおり 1 文）。
+    """
+    literals = _RELATION_LITERALS[lang]
+    separator = "、" if lang == "ja" else ", "
+    segments: list[str] = []
+    for part in definition.split(separator):
+        if segments and any(lit in part for lit in literals):
+            cleaned = part
+            if lang == "en":
+                for lead in ("and then ", "then ", "and "):
+                    if cleaned.lower().startswith(lead):
+                        cleaned = cleaned[len(lead):]
+                        break
+            segments.append(cleaned)
+        elif segments:
+            segments[-1] = segments[-1] + separator + part
+        else:
+            segments.append(part)
+    return segments
+
+
 def _member_suffix(region: tuple[float, float, float, float], rotation: int, index: int, *, lang: str) -> str:
     formatted = _format_region(region, lang=lang)
     if lang == "ja":
@@ -603,7 +750,7 @@ def _expand_range_line(
     lang: str,
     seed_text: str,
     salt: str,
-) -> list[str]:
+) -> tuple[list[str], list[dict]]:
     count = _resolve_count(match, seed_text, f"count-{salt}")
     member_name = _referenced_member(line, members)
     if kind == "diagonal":
@@ -613,31 +760,65 @@ def _expand_range_line(
 
     if member_name is not None:
         # A-2: inline the member definition at each member's region.
-        base = members[member_name].rstrip("。.")
-    else:
-        singular = _singular_for_unit(match.group("unit"), lang)  # A-5 unit-preserving
-        cleaned = re.sub(
-            r"\{(?:領域|region)\s*:\s*[^}]+\}",
-            _format_region(region, lang=lang),
-            line[: match.start()] + singular + line[match.end() :],
-            flags=re.IGNORECASE,
-        )
-        base = cleaned.rstrip("。.")
+        # v1.94 対分離: relation literal を含む定義は対の各要素を独立文にする。
+        segments = _split_pair_segments(members[member_name].rstrip("。."), lang)
+        if len(segments) >= 2:
+            # v1.94 輪1: 対 member は決定的転写（テキストは出力しない）
+            return [], _pair_instructions(
+                segments, member_regions, seed_text=seed_text, salt=salt
+            )
+        out: list[str] = []
+        for index, (member_region, rotation) in enumerate(member_regions, start=1):
+            suffix = _member_suffix(member_region, rotation, index, lang=lang)
+            for segment in segments:
+                out.append(segment + suffix)
+        return out, []
+
+    singular = _singular_for_unit(match.group("unit"), lang)  # A-5 unit-preserving
+    adj = match.groupdict().get("adj")
+    if adj and lang == "en" and singular.startswith("one "):
+        singular = f"one {adj} " + singular[len("one "):]  # 例: one tall blade
+    cleaned = re.sub(
+        r"\{(?:領域|region)\s*:\s*[^}]+\}",
+        _format_region(region, lang=lang),
+        line[: match.start()] + singular + line[match.end() :],
+        flags=re.IGNORECASE,
+    )
+    base = cleaned.rstrip("。.")
 
     return [
         base + _member_suffix(member_region, rotation, index, lang=lang)
         for index, (member_region, rotation) in enumerate(member_regions, start=1)
-    ]
+    ], []
 
 
 def _expand_entry(
     entry: PluginEntry, *, lang: str, seed_text: str, warnings: list[str]
-) -> str:
+) -> tuple[str, list[dict]]:
     lines = entry.templates.get(lang, ())
     members = entry.members.get(lang, {})
     anchor_regions: list[tuple[float, float, float, float]] = [_DEFAULT_REGION]
     expanded: list[str] = []
+    instructions: list[dict] = []
+    pending_style_targets: list[dict] = []  # 直前の対 member 転写（様式行の適用先）
     for line_idx, line in enumerate(lines):
+        # v1.94 輪1: 対 member 転写の直後の様式は消費して適用する。
+        # 行頭の様式文（「鉛筆で、緑で。」）だけを消費し、続く運動句などの
+        # 残余（「細かく震える。」）はテキストとして残す。
+        if pending_style_targets:
+            targets, pending_style_targets = pending_style_targets, []
+            if lang == "ja":
+                head, sep, rest = line.partition("。")
+            else:
+                head, sep, rest = line.partition(". ")
+            style = _parse_style_line(head, lang)
+            if style is not None:
+                for ins in targets:
+                    ins.update(style)
+                rest = rest.strip()
+                if not rest:
+                    continue
+                line = rest
         if line.lower().startswith(ANCHOR_PREFIX):
             kind, region = _resolve_region_spec(
                 line, _DEFAULT_REGION, warnings=warnings, heading=entry.heading
@@ -676,25 +857,30 @@ def _expand_entry(
             # A-6: inherit each anchor spot; one member run per spot.
             targets = [("rect", spot) for spot in anchor_regions]
 
+        line_instructions: list[dict] = []
         for spot_idx, (kind, region) in enumerate(targets):
-            expanded.extend(
-                _expand_range_line(
-                    line,
-                    match,
-                    kind,
-                    region,
-                    members,
-                    lang=lang,
-                    seed_text=seed_text,
-                    salt=f"{entry.heading}:{line_idx}:{spot_idx}",
-                )
+            text_lines, instr_dicts = _expand_range_line(
+                line,
+                match,
+                kind,
+                region,
+                members,
+                lang=lang,
+                seed_text=seed_text,
+                salt=f"{entry.heading}:{line_idx}:{spot_idx}",
             )
+            expanded.extend(text_lines)
+            line_instructions.extend(instr_dicts)
+        if line_instructions:
+            instructions.extend(line_instructions)
+            pending_style_targets = line_instructions
 
-    if _instruction_budget(tuple(expanded)) > MAX_ENTRY_INSTRUCTIONS:
+    if _instruction_budget(tuple(expanded)) + len(instructions) > MAX_ENTRY_INSTRUCTIONS:
         raise PluginFormatError([f"{entry.heading}: runtime expansion exceeds {MAX_ENTRY_INSTRUCTIONS}"])
     separator = "" if lang == "ja" else " "
     ending = "。" if lang == "ja" else "."
-    return separator.join(part if part.endswith(("。", ".", "!", "?")) else part + ending for part in expanded)
+    text = separator.join(part if part.endswith(("。", ".", "!", "?")) else part + ending for part in expanded)
+    return text, instructions
 
 
 def _phrase_positions(source_folded: str, phrase_folded: str) -> list[int]:
@@ -733,6 +919,7 @@ def expand_plugin_ddl(
     result = ddl
     provenance: list[dict[str, str]] = []
     warnings: list[str] = []
+    instructions: list[dict] = []
     source = source_text or ""
     source_folded = source.casefold()
     result_folded = result.casefold()
@@ -778,7 +965,7 @@ def expand_plugin_ddl(
                 continue
             base = _strip_qualified_sentence(result, qualified, lang=lang) if explicit else result
             try:
-                expansion = _expand_entry(
+                expansion, entry_instructions = _expand_entry(
                     entry,
                     lang=lang,
                     seed_text=seed_text or source or result or qualified,
@@ -794,6 +981,7 @@ def expand_plugin_ddl(
                 continue
             joiner = "" if lang == "ja" else " "
             result = joiner.join(part for part in (base.strip(), expansion.strip()) if part)
+            instructions.extend(entry_instructions)
             provenance.append(
                 {
                     "input_term": trigger,
@@ -803,17 +991,35 @@ def expand_plugin_ddl(
                 }
             )
     if _PLUGIN_REFERENCE_RE.search(result):
-        warnings.append("plugin expansion left a non-core reference; expansion was dropped")
-        fallback = (
-            "黒い鉛筆の小さな弧を中域に置く。"
-            if lang == "ja"
-            else "Place a small black pencil arc in the middle region."
-        )
-        return PluginExpansionResult(ddl=fallback, provenance=(), warnings=tuple(warnings))
+        # v1.94: fires_on 発火経路の drop 過敏の緩和。Stage 1 が混入させた
+        # stray な名前空間参照は、展開全体ではなく当該文だけを警告付きで
+        # 除去する（展開テンプレート自体はロード時に閉包検査済み）。
+        if lang == "ja":
+            sentences = [part for part in re.split(r"(?<=。)", result) if part.strip()]
+            joiner = ""
+        else:
+            sentences = [part for part in re.split(r"(?<=[.!?])\s+", result) if part.strip()]
+            joiner = " "
+        kept = [part for part in sentences if not _PLUGIN_REFERENCE_RE.search(part)]
+        removed = len(sentences) - len(kept)
+        if kept:
+            warnings.append(
+                f"stray non-core reference removed from {removed} sentence(s); expansion kept"
+            )
+            result = joiner.join(part.strip() for part in kept)
+        else:
+            warnings.append("plugin expansion left a non-core reference; expansion was dropped")
+            fallback = (
+                "黒い鉛筆の小さな弧を中域に置く。"
+                if lang == "ja"
+                else "Place a small black pencil arc in the middle region."
+            )
+            return PluginExpansionResult(ddl=fallback, provenance=(), warnings=tuple(warnings))
     return PluginExpansionResult(
         ddl=result,
         provenance=tuple(provenance),
         warnings=tuple(warnings),
+        instructions=tuple(instructions),
     )
 
 

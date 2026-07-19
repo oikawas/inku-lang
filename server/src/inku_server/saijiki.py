@@ -432,6 +432,38 @@ def reference_categories(lang: str) -> list[tuple[str, tuple[str, ...]]]:
     return result
 
 
+# てざわり語 → Score Weight 値（saijiki 語順 = Weight enum 順。削剪語 髪/hair も
+# 保存済み Score 互換のため対応を残す）
+_WEIGHT_VALUES = (
+    "hair", "pencil", "pen", "rotring", "crayon", "chalk",
+    "brush_thin", "brush_thick", "burin", "drypoint",
+)
+# いろ語 → Score Color 値
+_COLOR_VALUES = ("white", "black", "blue", "red", "green", "gray")
+
+
+def _surface_value_map(category_key: str, values: tuple[str, ...]) -> dict[str, str]:
+    category = next(c for c in SAIJIKI if c.key == category_key)
+    mapping: dict[str, str] = {}
+    for lang in _LANGS:
+        words = category.words(lang)
+        if len(words) != len(values):
+            raise ValueError(f"saijiki {category_key}/{lang} と enum の要素数が不一致")
+        for word, value in zip(words, values):
+            mapping[word.surface] = value
+    return mapping
+
+
+def weight_for_surface() -> dict[str, str]:
+    """てざわり表層語（日英・削剪語含む）→ Weight 値の対応表。"""
+    return _surface_value_map("tezawari", _WEIGHT_VALUES)
+
+
+def color_for_surface() -> dict[str, str]:
+    """いろ表層語（日英）→ Color 値の対応表。"""
+    return _surface_value_map("iro", _COLOR_VALUES)
+
+
 def display_categories(lang: str) -> list[dict[str, object]]:
     """歳時記表示 (Phase 3: API / web スナップショット) 用のカテゴリ一覧。"""
     result: list[dict[str, object]] = []

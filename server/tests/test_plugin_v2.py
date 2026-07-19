@@ -114,9 +114,14 @@ def test_a2_member_definition_is_inlined_per_member() -> None:
     )
     assert doc.entries[0].members["ja"] == {"葉形": "弧を置き、前の弧に両端で触れる"}
     result = _expand(doc, "語", "ja")
-    # The member definition is inlined at every member, not left as a bare noun.
-    assert result.ddl.count("両端で触れる") >= 3
+    # v1.94 輪1: 対 member は決定的転写され、member ごとに配置弧 + touching 弧の
+    # instruction 対になる（テキストには残らない）。
     assert "葉形を" not in result.ddl
+    assert "両端で触れる" not in result.ddl
+    assert len(result.instructions) >= 6 and len(result.instructions) % 2 == 0
+    touching = [i for i in result.instructions if i.get("relation")]
+    assert len(touching) == len(result.instructions) // 2
+    assert all(i["relation"]["type"] == "touching" for i in touching)
 
 
 def test_a2_undefined_member_reference_is_rejected() -> None:

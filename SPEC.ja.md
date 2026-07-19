@@ -1345,7 +1345,9 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 
 関係は相対指定であるため、参照先の位置が動けば連なる要素すべてが動く。これにより「関係（=楽譜に記された秩序）は保たれたまま、構図が毎回変わる」というマクロの揺らぎが成立する。§13.1 の定義——秩序の中の変動——が、線の震えから構図スケールへ、原理を変えずに拡張される。
 
-解決不能な関係（例: 直前要素が背景塗りで輪郭を持たない）は、validator / coerce が relation を drop し、警告記録を残す。instruction は relation なしの通常配置で描画される（graceful degradation）。
+region（`at`）と relation を両方持つ instruction（プラグイン member 由来の双弧など）は、region 配置を先に適用した後で relation を解決する（v1.94）。touching では直前要素の演奏後端点が位置を確定するため、region は連鎖の起点・情報として扱われる。
+
+解決不能な関係（例: 直前要素が背景塗りで輪郭を持たない）は、validator / coerce が relation を drop し、警告記録を残す。演奏時にのみ判明する解決不能（退化幾何・grid 配置・端点を持たない直前要素）も同様に、Renderer が警告記録付きで drop する（v1.94）。instruction は relation なしの通常配置で描画される（graceful degradation）。
 
 ### 14.5 Stage 1.5 の役割転換
 

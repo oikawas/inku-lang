@@ -5,6 +5,8 @@
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
 	import InkuMascot from './InkuMascot.svelte';
+	import TenkeiSelect from './TenkeiSelect.svelte';
+	import type { TenkeiLevel } from '$lib/tenkei';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 	import type { DemoSettings } from '$lib/demo';
@@ -65,6 +67,8 @@
 		demoError: string | null;
 		lockNonDemo: boolean;
 		stageLabel: string;
+		tenkeiLevel: TenkeiLevel;
+		onSelectTenkei: (level: TenkeiLevel) => void;
 		showKiwi: boolean;
 		showCrab: boolean;
 		canvasAspectEnabled: boolean;
@@ -135,6 +139,8 @@
 		demoError,
 		lockNonDemo,
 		stageLabel,
+		tenkeiLevel,
+		onSelectTenkei,
 		showKiwi,
 		showCrab,
 		canvasAspectEnabled,
@@ -218,6 +224,9 @@
 			<Tooltip text={t().tooltipInputCatalog}>
 				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			</Tooltip>
+			{#if inputMode === 'single'}
+				<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
+			{/if}
 			{#if canvasAspectEnabled}
 				<CanvasAspectPlugin
 					selected={canvasAspectId}

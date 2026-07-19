@@ -7,6 +7,8 @@
   import InkuMascot from './InkuMascot.svelte';
   import StopButton from './StopButton.svelte';
   import Tooltip from './Tooltip.svelte';
+  import TenkeiSelect from './TenkeiSelect.svelte';
+  import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
   import { t } from '$lib/i18n/index.svelte';
 
   type RefineMode = 'random' | 'vision';
@@ -38,6 +40,10 @@
   let lastGeneratedItem = $state<any>(null);
   let latestAdvice = $state<VisionAdvice | null>(null);
   let abortController: AbortController | null = null;
+  const isJapanese = $derived(t().code === 'ja');
+  // null = inherit the parent artwork's level (field omitted).
+  let tenkeiOverride = $state<TenkeiLevel | null>(null);
+  const parentTenkei = $derived(normalizeTenkei(node.history?.tenkei) ?? DEFAULT_TENKEI);
 
   $effect(() => { if (!selectedVisionModel) selectedVisionModel = visionModel; });
   onDestroy(() => abortController?.abort());
@@ -100,6 +106,7 @@
             autonomous_refine_mode: refineMode,
             ...(advice ? { vision_model: advice.model, vision_observation: advice.observation, vision_next_direction: advice.next_direction } : {})
           },
+          ...(tenkeiOverride ? { tenkei: tenkeiOverride } : {}),
           historyVisibility: i === generations - 1 ? 'normal' : 'lineage_only',
           saveHistory: true,
           countGeneration: true,
@@ -137,7 +144,7 @@
         <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" bind:group={refineMode} value="random" /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label><input type="radio" bind:group={refineMode} value="vision" /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
         {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
         <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea></div>
-        <div class="form-row"><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
+        <div class="form-row"><div class="form-group tenkei-group"><span class="tenkei-group-label">&nbsp;</span><TenkeiSelect compact value={tenkeiOverride ?? parentTenkei} {isJapanese} inherited={tenkeiOverride === null} onSelect={(level) => (tenkeiOverride = level)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
         <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label><input type="checkbox" bind:checked={enableReading} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip></div></details>
       {/if}
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}
@@ -158,6 +165,7 @@
   .form-group { display:flex; flex-direction:column; gap:6px; } .form-group label { font-size:.76rem; color:var(--fg3); font-weight:500; }
   textarea { box-sizing:border-box; width:100%; border:1px solid var(--border2); border-radius:6px; padding:8px 10px; background:var(--bg); color:var(--fg); font:inherit; font-size:.82rem; resize:none; line-height:1.4; }
   .form-row { display:flex; gap:12px; } .select-generations { width:120px; }
+  .form-row { flex-wrap: wrap; align-items: flex-end; } .tenkei-group { order: 2; } .tenkei-group-label { display:none; }
   .gen-stepper { display:flex; align-items:center; width:fit-content; border:1px solid var(--border2); border-radius:6px; overflow:hidden; }
   .gen-stepper button { width:34px; height:32px; border:0; background:var(--bg); color:var(--fg); font-size:1rem; line-height:1; cursor:pointer; }
   .gen-stepper button:disabled { opacity:.4; cursor:default; }

@@ -332,7 +332,11 @@
 	let refineModalOpen = $state(false);
 	let refineKind = $state<RefineKind>('touch');
 	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
-	const statusGenerationLabel = $derived(statusGeneration ? (isJapanese ? `系譜 第${statusGeneration}世代` : `Lineage Gen. ${statusGeneration}`) : (isJapanese ? '独立作品' : 'Standalone'));
+	const statusGenerationValue = $derived(
+		statusGeneration
+			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
+			: (isJapanese ? '独立作品' : 'Standalone')
+	);
 	const LANGUAGE_COMBOS: Array<['ja' | 'en', 'ja' | 'en']> = [['ja', 'ja'], ['ja', 'en'], ['en', 'ja'], ['en', 'en']];
 	function langName(lang: 'ja' | 'en'): string {
 		return lang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : 'English';
@@ -471,7 +475,10 @@
 		{#if result}
 			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Displayed artwork information'}>
 				<span class="render-meta-scope">{isJapanese ? '\u8868\u793a\u4e2d' : 'Displayed'}</span>
-				<span class="render-meta-generation">{statusGenerationLabel}</span>
+				<span class="render-meta-item render-meta-generation">
+					{#if statusGeneration}<span class="render-meta-label">{isJapanese ? '系譜' : 'Lineage'}</span>{/if}
+					<strong>{statusGenerationValue}</strong>
+				</span>
 				<span class="render-meta-item render-meta-model">
 					<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
 					<strong title={statusStage1Model + ' / ' + statusStage2Model}>
@@ -1200,7 +1207,8 @@
 		color: var(--fg3);
 	}
 	.render-meta-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
-	.render-meta-generation { flex: 0 0 auto; color: var(--fg2); font-size: 11px; font-weight: 600; white-space: nowrap; }
+	.render-meta-generation { flex: 0 0 auto; }
+	.render-meta-generation strong { max-width: none; }
 	.render-meta-item {
 		display: inline-flex;
 		align-items: baseline;

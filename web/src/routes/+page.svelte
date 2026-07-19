@@ -3644,6 +3644,10 @@ if (unreadWords.length > 0) {
 		}
 	}
 
+	function abortModelInspection() {
+		modelInspectionAbortController?.abort();
+	}
+
 	const languageInspectionTargetLang = $derived(
 		(result?.instruction_lang_resolved === 'en' ? 'en' : result?.instruction_lang_resolved === 'ja' ? 'ja' : getLang()) as 'ja' | 'en'
 	);
@@ -5808,6 +5812,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onSetModelCompareFixedModel={setModelCompareFixedModel}
 				isModelInspectionChoiceBlocked={isModelInspectionChoiceBlocked}
 				onRunModelInspection={runModelInspection}
+				onAbortModelInspection={abortModelInspection}
 				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
 				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
 				{languageInspectionTargetLang}

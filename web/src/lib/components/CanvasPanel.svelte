@@ -8,6 +8,7 @@
 	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
+	import InkuMascot from './InkuMascot.svelte';
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
@@ -118,6 +119,7 @@
 		onSetModelCompareFixedModel: (model: string) => void;
 		isModelInspectionChoiceBlocked: (model: string) => boolean;
 		onRunModelInspection: () => void | Promise<void>;
+		onAbortModelInspection: () => void;
 		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
 		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
 		languageInspectionTargetLang: 'ja' | 'en';
@@ -252,6 +254,7 @@
 		onSetModelCompareFixedModel,
 		isModelInspectionChoiceBlocked,
 		onRunModelInspection,
+		onAbortModelInspection,
 		onAdoptModelInspectionResult,
 		onToggleModelInspectionStar,
 		languageInspectionTargetLang,
@@ -718,7 +721,17 @@
 					<div class="compare-panel">
 					<div class="compare-head">
 						<div class="refine-title">{t().modelCompareTitle}</div>
-						<div class="compare-action-wrap"><Tooltip text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionBusy || modelInspectionSelectedModels.length === 0}>{modelInspectionBusy ? t().modelCompareBusy : t().modelCompareButton}</PaintButton></Tooltip></div>
+						<div class="compare-action-wrap">
+							{#if modelInspectionBusy}
+								<div class="compare-status" aria-live="polite">
+									<div class="compare-mascot"><InkuMascot /></div>
+									<span class="compare-status-label">{t().modelCompareBusy}</span>
+									<StopButton onclick={onAbortModelInspection}>{t().stopBtn}</StopButton>
+								</div>
+							{:else}
+								<Tooltip text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionSelectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
+							{/if}
+						</div>
 					</div>
 					<div class="compare-mode-tabs" role="tablist" aria-label={t().modelCompareModeLabel}>
 						<button class:active={modelCompareMode === 'common'} onclick={() => onSetModelCompareMode('common')}>{t().modelCompareModeCommon}</button>
@@ -1423,6 +1436,10 @@
 	}
 	.compare-action-wrap :global(.tooltip-wrap) { width: 100%; }
 	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
+	.compare-status { display: flex; align-items: center; gap: 10px; }
+	.compare-mascot { flex: 0 0 auto; display: flex; align-items: center; }
+	.compare-status-label { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 500; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.compare-status :global(.stop-btn) { flex: 0 0 auto; width: auto; min-width: 0; padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em; }
 
 	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
 	.compare-mode-tabs button { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg3); font: inherit; cursor: pointer; }

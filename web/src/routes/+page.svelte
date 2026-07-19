@@ -6306,9 +6306,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
-	.ddl-tools-section { flex-direction: row; }
-	.ddl-new-btn { align-self: flex-start; padding: 7px 14px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; }
-	.ddl-new-btn:hover { background: var(--bg2); }
+	.ddl-tools-section { flex-direction: row; justify-content: flex-end; }
+	.ddl-new-btn {
+		padding: 4px 10px;
+		border: 1px solid #d8b36a;
+		border-radius: var(--r);
+		background: #fff7e8;
+		color: #6c4a10;
+		font-family: inherit;
+		font-size: 11px;
+		font-weight: 600;
+		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.ddl-new-btn:hover { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
 
 	/* thinking */
 	.thinking-details {

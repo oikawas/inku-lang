@@ -113,7 +113,7 @@ export const en: LangPack = {
 	thinkingLabel: 'Thinking (Qwen3 Internal)',
 	ddlLabel: 'Interpretation (Normalized DDL)',
 	ddlEditSectionLabel: 'DDL editing',
-	ddlNewButton: 'New from DDL',
+	ddlNewButton: 'New DDL',
 	ddlNewDialogTitle: 'Create from DDL',
 	ddlNewDialogSubtitle: 'Write DDL directly and draw it as a standalone artwork.',
 	ddlEditDialogSubtitle: 'Drawing saves a new child of the selected artwork.',

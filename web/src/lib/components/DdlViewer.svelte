@@ -53,10 +53,9 @@
 		background: var(--bg2);
 	}
 	.ddl-viewer-body {
-		padding: 10px 11px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--panel);
+		padding: 2px 0 2px 12px;
+		border-left: 2px solid var(--border2);
+		background: transparent;
 		color: var(--fg);
 		font-family: inherit;
 		font-size: 13px;

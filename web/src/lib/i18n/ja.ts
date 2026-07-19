@@ -101,7 +101,7 @@ export const ja: LangPack = {
 	demoStatsPending: '計測中',
 	demoRenderCount: (count) => `${count}件`,
 
-	submitBtn: '生成する',
+	submitBtn: '描画する',
 	stopBtn: '停止',
 	stageDdlGenerating: 'DDL生成',
 	stageImageGenerating: 'JSON生成・SVGレンダリング',
@@ -113,7 +113,7 @@ export const ja: LangPack = {
 	thinkingLabel: '思考 (qwen3 内部)',
 	ddlLabel: '解釈 (正規化DDL)',
 	ddlEditSectionLabel: 'DDL編集',
-	ddlNewButton: 'DDLから新規作成',
+	ddlNewButton: 'DDLを新規作成',
 	ddlNewDialogTitle: 'DDLから新規作成',
 	ddlNewDialogSubtitle: 'DDLを直接書いて、独立した作品として描画します。',
 	ddlEditDialogSubtitle: '描画すると、選択した作品の子として系譜へ保存します。',

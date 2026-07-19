@@ -361,7 +361,7 @@
 		starred?: boolean;
 		saving?: boolean;
 	};
-	type ModelInspectionChoice = { id: string; label: string; providerLabel: string };
+	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; notes?: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
@@ -3479,7 +3479,7 @@ if (unreadWords.length > 0) {
 				const id = qualifiedModelId(group.id as Provider, model.id);
 				if (seen.has(id)) continue;
 				seen.add(id);
-				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id) });
+				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id), notes: model.notes });
 			}
 		}
 		return choices;

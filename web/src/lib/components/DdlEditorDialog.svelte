@@ -3,6 +3,8 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { highlightDDL } from '$lib/highlight';
 	import SaijikiInline from './SaijikiInline.svelte';
+	import InkuMascot from './InkuMascot.svelte';
+	import StopButton from './StopButton.svelte';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -22,7 +24,7 @@
 		drawing: boolean;
 		error: string | null;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
-		onDraw: (ddl: string) => void | Promise<void>;
+		onDraw: (ddl: string, signal?: AbortSignal) => void | Promise<void>;
 		onClose: () => void;
 	};
 
@@ -36,6 +38,17 @@
 	let lineNumberEl = $state<HTMLDivElement | null>(null);
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let lastOpen = false;
+	let elapsedMs = $state(0);
+	let drawController: AbortController | null = null;
+
+	// While drawing, tick an elapsed timer for the on-dialog status element.
+	$effect(() => {
+		if (!drawing) return;
+		elapsedMs = 0;
+		const startedAt = Date.now();
+		const handle = setInterval(() => { elapsedMs = Date.now() - startedAt; }, 100);
+		return () => clearInterval(handle);
+	});
 
 	const lineNumbers = $derived(value.split('\n'));
 	const highlighted = $derived(highlightDDL(value, focused && selection.start === selection.end ? selection.start : null));
@@ -94,7 +107,16 @@
 
 	async function requestDraw(): Promise<void> {
 		if (drawing || !value.trim()) return;
-		await onDraw(value);
+		drawController = new AbortController();
+		try {
+			await onDraw(value, drawController.signal);
+		} finally {
+			drawController = null;
+		}
+	}
+
+	function stopDraw(): void {
+		drawController?.abort();
 	}
 </script>
 
@@ -163,8 +185,19 @@
 		</div>
 		{#if error}<div class="ddled-error">{error}</div>{/if}
 		<div class="ddled-foot">
-			<button type="button" class="ddled-cancel" disabled={drawing} onclick={requestClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
-			<button type="button" class="ddled-draw" disabled={drawing || !value.trim()} onclick={requestDraw}>{drawing ? (isJapanese ? '描画中…' : 'Drawing…') : (isJapanese ? '描画' : 'Draw')}</button>
+			{#if drawing}
+				<div class="ddled-status" aria-live="polite">
+					<div class="ddled-mascot"><InkuMascot /></div>
+					<div class="ddled-status-info">
+						<span class="ddled-stage">{t().stageImageGenerating}</span>
+						<span class="ddled-elapsed">{isJapanese ? '経過' : 'Elapsed'} {(elapsedMs / 1000).toFixed(1)}s</span>
+					</div>
+					<StopButton onclick={stopDraw}>{t().stopBtn}</StopButton>
+				</div>
+			{:else}
+				<button type="button" class="ddled-cancel" onclick={requestClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
+				<button type="button" class="ddled-draw" disabled={!value.trim()} onclick={requestDraw}>{isJapanese ? '描画' : 'Draw'}</button>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -454,6 +487,29 @@
 	}
 	.ddled-cancel:hover:not(:disabled) {
 		background: var(--bg2);
+	}
+	.ddled-status {
+		flex: 1 1 auto;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.ddled-mascot { flex: 0 0 auto; display: flex; align-items: center; }
+	.ddled-status-info {
+		flex: 1 1 auto; min-width: 0;
+		display: flex; flex-direction: column; gap: 2px;
+	}
+	.ddled-stage {
+		font-size: 12px; font-weight: 500; color: var(--fg);
+		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+	}
+	.ddled-elapsed {
+		font-size: 11px; color: var(--fg3);
+		font-variant-numeric: tabular-nums; white-space: nowrap;
+	}
+	.ddled-status :global(.stop-btn) {
+		flex: 0 0 auto; width: auto; min-width: 0;
+		padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em;
 	}
 	@keyframes ddl-caret-blink {
 		50% { opacity: 0; }

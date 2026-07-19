@@ -3991,11 +3991,11 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string): Prom
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
 
-async function drawLineageDdlEdit(node: LineageNode, editedDdl: string): Promise<void> {
+async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = editedDdl.trim();
 	if (!nextDdl || !node.history) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
-	const composed = await composeOne(nextDdl, sourceText, undefined, undefined, undefined, {
+	const composed = await composeOne(nextDdl, sourceText, signal, undefined, undefined, {
 		catalogId: lineageCatalogId(node),
 		canvasAspectId: lineageCanvasAspectId(node),
 	});
@@ -4044,11 +4044,11 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string): Promise
 }
 
 // Draw a standalone artwork authored directly in DDL (no instruction, no parent).
-async function drawNewDdl(rawDdl: string): Promise<void> {
+async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = rawDdl.trim();
 	if (!nextDdl) return;
 	const firstLine = (nextDdl.split('\n').find((line) => line.trim().length > 0) ?? nextDdl).trim().slice(0, 80);
-	const composed = await composeOne(nextDdl, '', undefined, undefined, undefined, {
+	const composed = await composeOne(nextDdl, '', signal, undefined, undefined, {
 		catalogId: selectedCatalog,
 		canvasAspectId: effectiveCanvasAspectId(),
 	});
@@ -4121,16 +4121,19 @@ function refreshLineageAfterRefine(): void {
 	if (focusId) void fetchLineage(focusId, true);
 }
 
-async function handleDdlDialogDraw(nextDdl: string): Promise<void> {
+async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal): Promise<void> {
 	if (ddlDialogDrawing) return;
 	ddlDialogDrawing = true;
 	ddlDialogError = null;
 	try {
-		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl);
-		else await drawNewDdl(nextDdl);
+		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl, signal);
+		else await drawNewDdl(nextDdl, signal);
 		ddlDialogOpen = false;
 	} catch (cause) {
-		ddlDialogError = cause instanceof Error ? cause.message : String(cause);
+		// Aborted by the dialog stop button: keep the dialog open, no error.
+		if (!(cause instanceof DOMException && cause.name === 'AbortError') && !(cause instanceof Error && cause.name === 'AbortError')) {
+			ddlDialogError = cause instanceof Error ? cause.message : String(cause);
+		}
 	} finally {
 		ddlDialogDrawing = false;
 	}

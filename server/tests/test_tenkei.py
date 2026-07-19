@@ -233,3 +233,89 @@ def test_api_interpret_rejects_invalid_tenkei(plugin_dir, user_headers):
         json={"text": "Sketch.双弧", "tenkei": "loud"},
     )
     assert r.status_code == 422
+
+
+# --- v1.97: 作品ごとの保存と親継承 ---
+
+
+def _history_item(user_id: str, at: int, **extra) -> dict:
+    return {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "input": "根",
+        "source_text": "根",
+        "ddl": "中心に黒い円を置く。",
+        "score": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]},
+        "svg": "<svg/>",
+        "at": at,
+        "render_seed": 1,
+        "render_build_number": "605",
+        "render_engine_id": "default",
+        "render_engine_version": "3",
+        "render_color_catalog_id": "default",
+        **extra,
+    }
+
+
+@pytest.fixture
+def db_user():
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"tenkei-db-{suffix}")
+    user = db.add_user(
+        username=f"tenkei-db-{suffix}",
+        email=f"tenkei-db-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    yield user
+    db.delete_all(user["id"])
+    db.delete_user(user["id"])
+
+
+def test_tenkei_persists_on_history_and_resolves_for_node(db_user):
+    root = db.add_item(_history_item(db_user["id"], 3000, tenkei="none"))
+    assert root["tenkei"] == "none"
+    assert db.tenkei_for_node(db_user["id"], root["lineage_node_id"]) == "none"
+
+    # 未記録の作品 (保存開始前相当) は None
+    legacy = db.add_item(_history_item(db_user["id"], 3001))
+    assert "tenkei" not in legacy
+    assert db.tenkei_for_node(db_user["id"], legacy["lineage_node_id"]) is None
+
+
+def test_resolved_tenkei_precedence(db_user):
+    from inku_server.api import _resolved_tenkei
+
+    root = db.add_item(_history_item(db_user["id"], 3100, tenkei="none"))
+    node_id = root["lineage_node_id"]
+    actor = {"id": db_user["id"]}
+
+    # 明示値 > 継承 > auto
+    assert _resolved_tenkei("sparse", actor, node_id) == "sparse"
+    assert _resolved_tenkei(None, actor, node_id) == "none"
+    assert _resolved_tenkei(None, actor, None) == "auto"
+    assert _resolved_tenkei(None, actor, "missing-node") == "auto"
+
+
+def test_history_post_inherits_tenkei_from_parent(db_user, plugin_dir):
+    token = db.create_session(db_user["id"])
+    headers = {"Authorization": f"Bearer {token}"}
+    root = db.add_item(_history_item(db_user["id"], 3200, tenkei="none"))
+
+    r = client.post(
+        "/api/history",
+        headers=headers,
+        json={
+            "input": "枝",
+            "score": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]},
+            "at": 3201,
+            "lineage_parent_node_id": root["lineage_node_id"],
+            "derivation_kind": "touch_variation",
+        },
+    )
+    assert r.status_code == 200
+    saved = r.json()
+    assert saved["tenkei"] == "none"
+    # 保存された派生作品からさらに継承できる（renderer 専用派生でも途切れない）
+    assert db.tenkei_for_node(db_user["id"], saved["lineage_node_id"]) == "none"

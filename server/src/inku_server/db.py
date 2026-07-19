@@ -103,6 +103,7 @@ class HistoryRow(Base):
     ui_lang = Column(String, nullable=True)
     render_seed = Column(String, nullable=True)
     vary_seed = Column(String, nullable=True)
+    tenkei = Column(String, nullable=True)  # v1.97 添景水準 (none/sparse/auto)。NULL = 保存開始前の作品
     interpretation_seed = Column(String, nullable=True)
     seed_text = Column(Text, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
@@ -268,6 +269,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "ui_lang": "ALTER TABLE history ADD COLUMN ui_lang VARCHAR",
     "render_seed": "ALTER TABLE history ADD COLUMN render_seed VARCHAR",
     "vary_seed": "ALTER TABLE history ADD COLUMN vary_seed VARCHAR",
+    "tenkei": "ALTER TABLE history ADD COLUMN tenkei VARCHAR",
     "interpretation_seed": "ALTER TABLE history ADD COLUMN interpretation_seed VARCHAR",
     "seed_text": "ALTER TABLE history ADD COLUMN seed_text TEXT",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
@@ -847,6 +849,28 @@ def _descendant_edge_ids(
             "limit": limit,
         },
     ).scalars())
+
+
+def tenkei_for_node(user_id: str, node_id: str) -> str | None:
+    """派生元 lineage ノードの作品に記録された添景水準を返す (v1.97 継承)。
+
+    未記録 (保存開始前の作品・renderer 専用派生の欠損) は None。呼び出し側が
+    既定 "auto" へ落とす。
+    """
+    with SessionLocal() as session:
+        node = session.query(LineageNodeRow).filter(
+            LineageNodeRow.id == node_id,
+            LineageNodeRow.user_id == user_id,
+        ).first()
+        if node is None or not node.history_id:
+            return None
+        row = session.query(HistoryRow).filter(
+            HistoryRow.id == node.history_id,
+            HistoryRow.user_id == user_id,
+        ).first()
+        if row is None:
+            return None
+        return row.tenkei
 
 
 def _lineage_generations(session, user_id: str, node_ids: list[str]) -> dict[str, int]:
@@ -1590,6 +1614,8 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["vary_seed"] = int(row.vary_seed)
         except ValueError:
             item["vary_seed"] = row.vary_seed
+    if row.tenkei is not None:
+        item["tenkei"] = row.tenkei
     if row.interpretation_seed is not None:
         item["interpretation_seed"] = row.interpretation_seed
     if row.seed_text is not None:
@@ -1720,6 +1746,7 @@ def add_item(item: dict) -> dict:
         instruction_lang_resolved=item.get("instruction_lang_resolved"), ui_lang=item.get("ui_lang"),
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
         vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
+        tenkei=item.get("tenkei"),
         interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
         seed_text=item.get("seed_text"),
         render_hash=render_hash, trashed=0, starred=0, note=item.get("note"),

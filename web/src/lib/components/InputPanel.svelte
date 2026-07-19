@@ -4,7 +4,7 @@
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
-	import KiwiMascot from './KiwiMascot.svelte';
+	import InkuMascot from './InkuMascot.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import StopButton from './StopButton.svelte';
 	import type { DemoSettings } from '$lib/demo';
@@ -278,15 +278,9 @@
 					<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
 				</div>
 			</div>
-			<div
-				class="progress-bar-track"
-				style="--progress-target: 100%"
-			>
-				<div class="progress-bar-fill"></div>
-				{#if showKiwi}
-					<KiwiMascot />
-				{/if}
-			</div>
+			{#if showKiwi}
+				<div class="progress-mascot"><InkuMascot /></div>
+			{/if}
 			<div class="progress-stage-text">{stageLabel}</div>
 		{:else if !singleRunning}
 			<Tooltip placement="top" text={t().tooltipSubmit}>
@@ -518,23 +512,12 @@
 		padding: 8px 10px;
 		font-size: 13px;
 	}
-	.progress-bar-track {
-		position: relative;
-		height: 36px; background: transparent;
+	.progress-mascot {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		padding: 6px 0;
 		border-left: 1px solid var(--border2); border-right: 1px solid var(--border2);
-		overflow: visible;
-	}
-	.progress-bar-track::before {
-		content: "";
-		position: absolute; top: 20px; left: 0; right: 0; height: 3px;
-		background: var(--bg3);
-	}
-	.progress-bar-fill {
-		position: absolute; top: 20px; left: 0; height: 3px;
-		width: var(--progress-target, 100%);
-		transform-origin: left center;
-		background: var(--accent); transition: width 0.3s ease;
-		animation: progressFillEven 10s linear forwards;
 	}
 	.progress-stage-text {
 		font-size: 11px; color: var(--fg3);
@@ -547,10 +530,6 @@
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50% { opacity: 0.4; transform: scale(0.7); }
-	}
-	@keyframes progressFillEven {
-		from { transform: scaleX(0); }
-		to { transform: scaleX(1); }
 	}
 	@keyframes tabrun {
 		from { background-position: 180% 0; }

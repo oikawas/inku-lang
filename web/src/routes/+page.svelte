@@ -12,7 +12,8 @@
 	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
-	import DdlEditor from '$lib/components/DdlEditor.svelte';
+	import DdlViewer from '$lib/components/DdlViewer.svelte';
+	import DdlEditorDialog from '$lib/components/DdlEditorDialog.svelte';
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
@@ -399,6 +400,15 @@
 	let saijikiOpen  = $state(false);
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let settingsOpen = $state(false);
+	// DDL editor dialog (new / edit), shared by 記述タブ new-button and lineage card menu.
+	let ddlDialogOpen = $state(false);
+	let ddlDialogMode = $state<'new' | 'edit'>('new');
+	let ddlDialogNode = $state<LineageNode | null>(null);
+	let ddlDialogInitial = $state('');
+	let ddlDialogDrawing = $state(false);
+	let ddlDialogError = $state<string | null>(null);
+	// DDL-authored (standalone) artworks carry the display_label marker 'DDL'.
+	const DDL_ORIGIN_LABEL = 'DDL';
 	let appInfoOpen = $state(false);
 	let leftPanelCollapsed = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
@@ -2139,6 +2149,9 @@
 		if (inputMode === 'batch' || activeRunMode === 'batch') return batchLatestPrompt;
 		return input;
 	});
+
+	// Standalone DDL-authored artworks have no instruction; gate instruction-only refine paths.
+	const statusDdlOrigin = $derived((displayedHistoryItem?.display_label ?? null) === DDL_ORIGIN_LABEL);
 
 	// ── Timer ───────────────────────────────────────────────
 	function startTimer() {
@@ -3928,6 +3941,92 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string): Promise
 	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
 }
 
+// Draw a standalone artwork authored directly in DDL (no instruction, no parent).
+async function drawNewDdl(rawDdl: string): Promise<void> {
+	const nextDdl = rawDdl.trim();
+	if (!nextDdl) return;
+	const firstLine = (nextDdl.split('\n').find((line) => line.trim().length > 0) ?? nextDdl).trim().slice(0, 80);
+	const composed = await composeOne(nextDdl, '', undefined, undefined, undefined, {
+		catalogId: selectedCatalog,
+		canvasAspectId: effectiveCanvasAspectId(),
+	});
+	const saved = await pushHistory({
+		input: '',
+		source_text: firstLine,
+		ddl: nextDdl,
+		score: composed.score,
+		svg: composed.svg,
+		at: Date.now(),
+		elapsed_ms: composed.elapsed_ms,
+		stage1_model: null,
+		stage2_model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
+		tokens_in: composed.tokens_in,
+		tokens_out: composed.tokens_out,
+		catalog_id: selectedCatalog,
+		render_build_number: composed.render_build_number,
+		render_color_profile: composed.render_color_profile,
+		render_engine_id: composed.render_engine_id,
+		render_engine_version: composed.render_engine_version,
+		render_color_catalog_id: composed.render_color_catalog_id,
+		render_color_catalog_name: composed.render_color_catalog_name,
+		render_color_catalog_sub: composed.render_color_catalog_sub,
+		render_color_map: composed.render_color_map,
+		render_canvas_aspect: composed.render_canvas_aspect,
+		render_canvas_aspect_id: composed.render_canvas_aspect_id,
+		render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
+		render_seed: composed.render_seed,
+		vary_seed: composed.vary_seed,
+		instruction_lang_requested: composed.instruction_lang_requested,
+		instruction_lang_resolved: composed.instruction_lang_resolved,
+		ui_lang: composed.ui_lang,
+		render_hash: composed.render_hash,
+		render_hash_short: composed.render_hash_short,
+	}, {
+		selectSaved: true,
+		countGeneration: true,
+		sourceText: firstLine,
+		displayLabel: 'DDL',
+	});
+	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
+	outputTab = 'canvas';
+}
+
+function openNewDdlDialog(): void {
+	ddlDialogMode = 'new';
+	ddlDialogNode = null;
+	ddlDialogInitial = '';
+	ddlDialogError = null;
+	ddlDialogOpen = true;
+}
+
+function openLineageDdlEditor(node: LineageNode): void {
+	ddlDialogMode = 'edit';
+	ddlDialogNode = node;
+	ddlDialogInitial = node.history?.ddl ?? '';
+	ddlDialogError = null;
+	ddlDialogOpen = true;
+}
+
+function closeDdlDialog(): void {
+	if (ddlDialogDrawing) return;
+	ddlDialogOpen = false;
+}
+
+async function handleDdlDialogDraw(nextDdl: string): Promise<void> {
+	if (ddlDialogDrawing) return;
+	ddlDialogDrawing = true;
+	ddlDialogError = null;
+	try {
+		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl);
+		else await drawNewDdl(nextDdl);
+		ddlDialogOpen = false;
+	} catch (cause) {
+		ddlDialogError = cause instanceof Error ? cause.message : String(cause);
+	} finally {
+		ddlDialogDrawing = false;
+	}
+}
+
 async function promoteLineageNode(node: LineageNode): Promise<void> {
 	const contextVersion = targetContextVersion;
 	const r = await apiFetch(`/api/lineage/${encodeURIComponent(node.id)}/promote`, { method: 'POST' });
@@ -5427,31 +5526,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- 解釈 (正規化DDL) -->
+					<!-- DDL ツール -->
+					{#if inputMode === 'single'}
+						<section class="panel-section ddl-tools-section">
+							<button class="ddl-new-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
+						</section>
+					{/if}
+
+					<!-- 解釈 (正規化DDL・閲覧専用) -->
 					{#if ddl !== null && inputMode === 'single'}
-						<DdlEditor
-							bind:ddl
-							{ddlHighlighted}
-							bind:ddlTextareaEl
-							bind:ddlHighlightEl
-							bind:ddlFocused
-							{reloading}
-							{reloadError}
-							{loading}
-							generationDisabled={variationGridBusy}
-							{liveMs}
-							{tokenSummary}
-							{showKiwi}
-							bind:autoRepairEnabled={ddlAutoRepairEnabled}
-							bind:activeSaijikiPreview
-							onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
-							onInsertWord={insertWord}
-							previewForWord={saijikiPreview}
-							onRememberSelection={rememberDDLSelection}
-							onSyncHighlightScroll={syncDDLHighlightScroll}
-							onReplay={replay}
-							onStopReplay={stopDdlRender}
-						/>
+						<section class="panel-section">
+							<DdlViewer {ddl} label={t().ddlLabel} saijikiLabel={t().saijikiToggleBtn} onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)} />
+						</section>
 					{/if}
 
 					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
@@ -5629,6 +5715,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onOpenLineageNode={openLineageNode}
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
+				onOpenLineageDdlEditor={openLineageDdlEditor}
+				statusDdlOrigin={statusDdlOrigin}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}
 				onPromoteLineageNode={promoteLineageNode}
@@ -5680,6 +5768,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	previewForWord={saijikiPreview}
 />
 
+<DdlEditorDialog
+	open={ddlDialogOpen}
+	isJapanese={getLang() === 'ja'}
+	title={ddlDialogMode === 'new' ? t().ddlNewDialogTitle : (getLang() === 'ja' ? 'DDLを編集' : 'Edit DDL')}
+	subtitle={ddlDialogMode === 'new' ? t().ddlNewDialogSubtitle : t().ddlEditDialogSubtitle}
+	initialDdl={ddlDialogInitial}
+	drawing={ddlDialogDrawing}
+	error={ddlDialogError}
+	previewForWord={saijikiPreview}
+	onDraw={handleDdlDialogDraw}
+	onClose={closeDdlDialog}
+/>
+
 <!-- ══ SETTINGS MODAL ══ -->
 {#if settingsOpen}
 	<SettingsModal
@@ -5728,6 +5829,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{editGroupId}
 		bind:showKiwi
 		bind:showCrab
+		bind:autoRepairEnabled={ddlAutoRepairEnabled}
 		bind:pngAlphaWhite
 		{exportTemplates}
 		{exportTemplateStatus}
@@ -6036,6 +6138,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
+	.ddl-tools-section { flex-direction: row; }
+	.ddl-new-btn { align-self: flex-start; padding: 7px 14px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; }
+	.ddl-new-btn:hover { background: var(--bg2); }
 
 	/* thinking */
 	.thinking-details {

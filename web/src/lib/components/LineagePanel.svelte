@@ -36,6 +36,7 @@
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
 		onDrawDescription: (node: LineageNode, text: string) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
+		onOpenDdlEditor: (node: LineageNode) => void;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
@@ -52,7 +53,13 @@
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+
+	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
+	// no natural-language instruction, so instruction-only refine paths are hidden.
+	function isDdlOrigin(node: LineageNode): boolean {
+		return node.history?.display_label === 'DDL';
+	}
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
@@ -510,11 +517,14 @@ $effect(() => {
 		<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
 	</button>
 	{#if activeMenuNodeId === node.id}
+		{@const ddlOrigin = isDdlOrigin(node)}
 		<div class="card-dropdown-menu" role="menu">
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-				{isJapanese ? '記述を編集' : 'Edit description'}
-			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'ddl'); }}>
+			{#if !ddlOrigin}
+				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
+					{isJapanese ? '記述を編集' : 'Edit description'}
+				</button>
+			{/if}
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
 				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
 			</button>
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
@@ -523,12 +533,14 @@ $effect(() => {
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
 				{isJapanese ? '描画要素で比較' : 'Compare drawing elements'}
 			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
-				{isJapanese ? 'モデルで比較' : 'Compare models'}
-			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
-				{isJapanese ? '言語で比較' : 'Compare languages'}
-			</button>
+			{#if !ddlOrigin}
+				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
+					{isJapanese ? 'モデルで比較' : 'Compare models'}
+				</button>
+				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
+					{isJapanese ? '言語で比較' : 'Compare languages'}
+				</button>
+			{/if}
 		</div>
 	{/if}
 {/if}

@@ -139,6 +139,8 @@
 		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
 		onDrawLineageDescription: (node: LineageNode, text: string) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
+		onOpenLineageDdlEditor: (node: LineageNode) => void;
+		statusDdlOrigin: boolean;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
@@ -268,6 +270,8 @@
 		onOpenLineageNode,
 		onDrawLineageDescription,
 		onDrawLineageDdl,
+		onOpenLineageDdlEditor,
+		statusDdlOrigin,
 		onSaveOkugakiModel,
 		onSaveVisionModel,
 		onPromoteLineageNode,
@@ -586,15 +590,17 @@
 												</span>
 											</Tooltip>
 										</label>
-										<label class="model-choice" class:checked={refineKind === 'reading'}>
-											<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => (refineKind = 'reading')} disabled={variationBusy || variationGridBusy} />
-											<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
-												<span class="refine-choice-label">
-													<strong>{t().canvasVaryInterpretation}</strong>
-													<span class="refine-info-mark" aria-hidden="true">i</span>
-												</span>
-											</Tooltip>
-										</label>
+										{#if !statusDdlOrigin}
+											<label class="model-choice" class:checked={refineKind === 'reading'}>
+												<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => (refineKind = 'reading')} disabled={variationBusy || variationGridBusy} />
+												<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
+													<span class="refine-choice-label">
+														<strong>{t().canvasVaryInterpretation}</strong>
+														<span class="refine-info-mark" aria-hidden="true">i</span>
+													</span>
+												</Tooltip>
+											</label>
+										{/if}
 										<label class="model-choice" class:checked={refineKind === 'color'}>
 											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => (refineKind = 'color')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryColor}>
@@ -800,7 +806,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
 			{/if}
 		</div>
 

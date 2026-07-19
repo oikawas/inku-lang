@@ -93,6 +93,68 @@ export function annotate(text: string): Part[] {
 	return parts;
 }
 
+function escapeHtml(value: string): string {
+	return value
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;');
+}
+
+function saijikiCategoryClass(category: string | undefined): string {
+	switch (category) {
+		case 'かたち': return 'shape';
+		case 'てざわり': return 'touch';
+		case 'つらなり': return 'line';
+		case 'いろ': return 'color';
+		case 'ゆらぎ': return 'motion';
+		case 'ばしょ': return 'place';
+		case 'うごき': return 'action';
+		case 'かたむき': return 'angle';
+		case 'わりあい': return 'ratio';
+		case 'Nature': return 'plugin';
+		default: return 'word';
+	}
+}
+
+function ddlCaretMarkup(): string {
+	return '<span class="ddl-custom-caret"></span>';
+}
+
+function renderDDLPart(text: string, kind: string, category: string | undefined, caretOffset: number | null): string {
+	const before = caretOffset === null ? text : text.slice(0, caretOffset);
+	const after = caretOffset === null ? '' : text.slice(caretOffset);
+	const content = caretOffset === null ? escapeHtml(text) : `${escapeHtml(before)}${ddlCaretMarkup()}${escapeHtml(after)}`;
+	if (kind === 'saijiki') {
+		return `<span class="ddl-token ddl-token-${saijikiCategoryClass(category)}">${content}</span>`;
+	}
+	if (kind === 'emotion') {
+		return `<span class="ddl-token-emotion">${content}</span>`;
+	}
+	return content;
+}
+
+/**
+ * DDL テキストを Saijiki / 感情語 で色分けした HTML を返す。
+ * caretIndex を渡すとその位置にカスタムキャレット span を差し込む。
+ */
+export function highlightDDL(text: string, caretIndex: number | null = null): string {
+	const clampedCaret = caretIndex === null ? null : Math.max(0, Math.min(text.length, caretIndex));
+	let offset = 0;
+	const html = annotate(text).map((part) => {
+		const nextOffset = offset + part.text.length;
+		const localCaret = clampedCaret !== null
+			&& clampedCaret >= offset
+			&& (clampedCaret < nextOffset || (clampedCaret === text.length && clampedCaret === nextOffset))
+			? clampedCaret - offset
+			: null;
+		const rendered = renderDDLPart(part.text, part.kind, part.category, localCaret);
+		offset = nextOffset;
+		return rendered;
+	}).join('');
+	if (clampedCaret === text.length && text.length === 0) return ddlCaretMarkup();
+	return html;
+}
+
 export type InterpretationFeedbackPart = {
 	text: string;
 	tone: 'strong' | 'medium' | 'weak';

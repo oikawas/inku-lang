@@ -113,6 +113,10 @@ export const en: LangPack = {
 	thinkingLabel: 'Thinking (Qwen3 Internal)',
 	ddlLabel: 'Interpretation (Normalized DDL)',
 	ddlEditSectionLabel: 'DDL editing',
+	ddlNewButton: 'New from DDL',
+	ddlNewDialogTitle: 'Create from DDL',
+	ddlNewDialogSubtitle: 'Write DDL directly and draw it as a standalone artwork.',
+	ddlEditDialogSubtitle: 'Drawing saves a new child of the selected artwork.',
 	ddlSyntaxGuide: 'DDL quick guide\nDDL is not the picture itself. It is a compact visual instruction used to generate the picture. It turns natural language into a performable description made of color, shape, place, motion, and material.\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, crayon, or pencil.',
 
 	tabCanvas: 'Drawing',
@@ -451,6 +455,7 @@ export const en: LangPack = {
 	settingsUsersLabel: 'Users',
 	settingsDisplayLabel: 'Display',
 	settingsMascotLabel: 'Drawing Mascots',
+	settingsGenerationLabel: 'Generation',
 	settingsExportLabel: 'Export',
 	settingsExportTemplatesTitle: 'PNG export templates',
 	settingsExportTemplatesDescription: 'Manage the save formats shown in the status bar PNG menu. The y-axis height is specified in pixels.',

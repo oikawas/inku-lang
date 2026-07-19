@@ -1,9 +1,10 @@
-FROM python:3.12-slim AS runtime
+FROM python:3.10-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_PYTHON_PREFERENCE=only-system
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libcairo2 \

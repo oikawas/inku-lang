@@ -729,7 +729,7 @@
 									<StopButton onclick={onAbortModelInspection}>{t().stopBtn}</StopButton>
 								</div>
 							{:else}
-								<Tooltip text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionSelectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
+								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionSelectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
 							{/if}
 						</div>
 					</div>
@@ -759,7 +759,6 @@
 					<div class="model-compare-stage" class:busy={modelInspectionBusy}>
 						<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {modelInspectionTargetStage1Model}<br />Stage 2: {modelInspectionTargetStage2Model}</div></div>
 						<div class="model-results-column">
-							{#if modelInspectionBusy}<div class="model-drawing-animation" aria-live="polite"><div class="model-drawing-spinner" aria-hidden="true"></div><div><strong>{t().modelCompareDrawingTitle}</strong><span>{t().modelCompareDrawingBody}</span></div></div>{/if}
 							{#if modelInspectionResults.length > 0}
 								<div class="model-inspection-grid">
 									{#each modelInspectionResults as item (item.id)}

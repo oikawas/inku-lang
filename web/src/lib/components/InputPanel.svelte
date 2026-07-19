@@ -241,7 +241,10 @@
 				{#if nextStage1Model === nextStage2Model}
 					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
 				{:else}
-					<span class="cs-value" title={nextStage1Model + ' / ' + nextStage2Model}>{nextStage1Model} / {nextStage2Model}</span>
+					<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
+					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
+					<span class="cs-sub">{isJapanese ? '描画' : 'Rendering'}</span>
+					<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
 				{/if}
 			</span>
 			<span class="cs-divider"></span>
@@ -455,6 +458,7 @@
 		min-width: 0;
 	}
 	.cs-label { color: var(--fg3); flex-shrink: 0; }
+	.cs-sub { color: var(--fg3); flex-shrink: 0; font-size: 10px; }
 	.cs-value {
 		min-width: 0;
 		max-width: 200px;

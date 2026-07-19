@@ -3,7 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { Score } from '$lib/historyManagerState.svelte';
-	import type { ProviderGroup } from '$lib/models';
+	import type { Provider, ProviderGroup } from '$lib/models';
 	import OutputTabsContent from './OutputTabsContent.svelte';
 	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
@@ -63,7 +63,6 @@
 		statusCanvasName: string;
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
-		statusHashCopyTitle: string;
 		statusHashCopied: boolean;
 		pngMenuOpen: boolean;
 		pngWrapEl: HTMLDivElement | null;
@@ -141,6 +140,7 @@
 		onDrawLineageDescription: (node: LineageNode, text: string) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
+		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
 		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrashLineage: (historyIds: string[]) => void;
@@ -192,7 +192,6 @@
 		statusCanvasName,
 		statusHistoryItem,
 		statusHashLabel,
-		statusHashCopyTitle,
 		statusHashCopied,
 		pngMenuOpen = $bindable(false),
 		pngWrapEl = $bindable(null),
@@ -270,6 +269,7 @@
 		onDrawLineageDescription,
 		onDrawLineageDdl,
 		onSaveOkugakiModel,
+		onSaveVisionModel,
 		onPromoteLineageNode,
 		onSaveLineageNote,
 		onAskTrashLineage,
@@ -446,6 +446,9 @@
 
 	<div class="canvas-area">
 		<div class="nav-left">
+			<Tooltip placement="right" text={t().tooltipCanvasNavLatest}>
+				<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
+			</Tooltip>
 			<Tooltip placement="right" text={t().tooltipCanvasNavPrev}>
 				<button class="nav-circle" onclick={onGotoNext} disabled={nextDisabled}>‹</button>
 			</Tooltip>
@@ -805,7 +808,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onSaveOkugakiModel={onSaveOkugakiModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
 			{/if}
 		</div>
 
@@ -827,9 +830,6 @@
 
 
 		<div class="nav-right">
-			<Tooltip placement="left" text={t().tooltipCanvasNavLatest}>
-				<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
-			</Tooltip>
 			<Tooltip placement="left" text={t().tooltipCanvasNavNext}>
 				<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
 			</Tooltip>
@@ -892,20 +892,7 @@
 	{/if}
 
 	<div class="status-bar">
-		<div class="status-summary" aria-label={isJapanese ? '\u4f5c\u54c1\u30cf\u30c3\u30b7\u30e5' : 'Artwork hash'}>
-			{#if statusHashLabel}
-				<button
-					type="button"
-					class="status-hash-btn"
-					title={statusHashCopyTitle}
-					onclick={onCopyStatusHash}
-				>
-					<span class="status-label">{isJapanese ? '\u30cf\u30c3\u30b7\u30e5' : 'Hash'}</span>
-					<code class="status-hash-code">{statusHashLabel}</code>
-					<span class="status-hash-feedback" aria-live="polite">{statusHashCopied ? (isJapanese ? '\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f' : 'Copied') : (isJapanese ? '\u30af\u30ea\u30c3\u30af\u3067\u30b3\u30d4\u30fc' : 'Click to copy')}</span>
-				</button>
-			{/if}
-		</div>
+		<div class="status-spacer"></div>
 		<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
 			<button
 				class="star-btn status-star"
@@ -915,6 +902,17 @@
 				aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
 			>★</button>
 		</Tooltip>
+		{#if statusHashLabel}
+			<Tooltip placement="top" text={statusHashCopied ? (isJapanese ? '\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f' : 'Copied') : (isJapanese ? '\u30af\u30ea\u30c3\u30af\u3067full hash\u3092\u30b3\u30d4\u30fc\u3057\u307e\u3059' : 'Click to copy the full hash')}>
+				<button
+					type="button"
+					class="status-hash-btn"
+					onclick={onCopyStatusHash}
+				>
+					<code class="status-hash-code">{statusHashLabel}</code>
+				</button>
+			</Tooltip>
+		{/if}
 		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show generation details, prompts, and JSON for the selected artwork'}>
 			<button
 				type="button"
@@ -1892,30 +1890,10 @@
 		background: var(--bg);
 		flex-shrink: 0;
 	}
-	.status-summary {
-		min-width: 0;
-		margin-right: auto;
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		color: var(--fg2);
-		font-size: 11px;
-		line-height: 1;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.status-label {
-		color: var(--fg3);
-		font-size: 11px;
-		font-weight: 400;
-		letter-spacing: 0;
-		text-transform: none;
-	}
+	.status-spacer { margin-right: auto; }
 	.status-hash-btn {
 		display: inline-flex;
 		align-items: center;
-		gap: 7px;
 		padding: 4px 9px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
@@ -1932,10 +1910,6 @@
 		font-weight: 600;
 		letter-spacing: 0.06em;
 		color: #4d5f86;
-	}
-	.status-hash-feedback {
-		color: var(--fg3);
-		font-size: 10px;
 	}
 	.export-btn {
 		display: inline-flex;

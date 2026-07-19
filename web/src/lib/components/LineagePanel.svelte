@@ -45,13 +45,14 @@
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
+		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		visionModel: string;
 		okugakiModel: string;
 		visionProviderGroups: ProviderGroup[];
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
@@ -635,6 +636,7 @@ $effect(() => {
 		onClose={() => (activeAIRefineNode = null)}
 		{onPaintOne}
 		{onVisionAdvice}
+		{onSaveVisionModel}
 		{visionModel}
 		{visionProviderGroups}
 		onLoadBranch={onLoadBranch}

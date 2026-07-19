@@ -733,6 +733,30 @@
 		}
 	}
 
+	async function persistVisionModel(provider: Provider, model: string): Promise<void> {
+		if (!provider || !model) return;
+		if (provider === visionProvider && model === visionModel) return;
+		const prevProvider = visionProvider;
+		const prevModel = visionModel;
+		visionProvider = provider;
+		visionModel = model;
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ model_settings: { vision_provider: provider, vision_model: model } })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			visionProvider = prevProvider;
+			visionModel = prevModel;
+			console.warn('failed to save vision model', e);
+			throw e;
+		}
+	}
+
 	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
 		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
 	}
@@ -4907,9 +4931,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			?? result?.render_hash?.slice(-4)
 			?? ''
 	).toUpperCase());
-	const statusHashCopyTitle = $derived(statusHashLabel
-		? `${t().historyHashCopyTitle}: ${statusHashLabel}`
-		: t().historyHashCopyTitle);
 	const statusHistoryItem = $derived.by(() => {
 		if (displayedHistoryItem) return displayedHistoryItem;
 		if (result?.history_id) {
@@ -4933,6 +4954,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	function historyModelSummary(it: Iteration): string {
 		const s1 = it.stage1_model ? shortModel(it.stage1_model) : '-';
 		const s2 = it.stage2_model ? shortModel(it.stage2_model) : '-';
+		return `${s1} → ${s2}`;
+	}
+
+	function historyModelSummaryFull(it: Iteration): string {
+		const s1 = it.stage1_model ? statusModelName(it.stage1_model) : '-';
+		const s2 = it.stage2_model ? statusModelName(it.stage2_model) : '-';
 		return `${s1} → ${s2}`;
 	}
 
@@ -5371,7 +5398,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{nextCanvasName}
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
-						onOpenModelSelection={() => openModelSelection(true)}
+						onOpenModelSelection={() => openModelSelection(false)}
 						onOpenLlmModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
@@ -5523,7 +5550,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusCanvasName}
 				{statusHistoryItem}
 				{statusHashLabel}
-				{statusHashCopyTitle}
 				{statusHashCopied}
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}
@@ -5598,6 +5624,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onSaveOkugakiModel={persistOkugakiModel}
+				onSaveVisionModel={persistVisionModel}
 				onPromoteLineageNode={promoteLineageNode}
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
@@ -5628,6 +5655,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetStarredOnly={setHistoryStarredOnly}
 			{historyIndexLabel}
 			{historyModelSummary}
+			{historyModelSummaryFull}
 			{formatHistoryDate}
 			{catalogName}
 			isJapanese={getLang() === 'ja'}

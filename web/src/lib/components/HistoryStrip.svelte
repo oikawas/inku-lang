@@ -42,6 +42,7 @@
 		onSetStarredOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
 		historyModelSummary: (item: HistoryItem) => string;
+		historyModelSummaryFull: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
 		catalogName: (id: string | null | undefined) => string;
 		isJapanese: boolean;
@@ -65,6 +66,7 @@
 		onSetStarredOnly,
 		historyIndexLabel,
 		historyModelSummary,
+		historyModelSummaryFull,
 		formatHistoryDate,
 		catalogName,
 		isJapanese
@@ -140,7 +142,7 @@
 					>
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
-							<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(it)}</strong></div>
+							<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummaryFull(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
 							<div class="tooltip-row"><span>{isJapanese ? '世代' : 'Gen.'}</span><strong>{lineageGenerationLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
@@ -157,6 +159,7 @@
 						>★</button>
 						<div class="thumb-meta">
 							<span class="thumb-generation">{lineageGenerationLabel(it)}</span>
+							<span class="thumb-model" title={historyModelSummaryFull(it)}>{historyModelSummary(it)}</span>
 						</div>
 						{#if i === historyCursor}
 							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
@@ -354,6 +357,7 @@
 		gap: 1px;
 	}
 	.thumb-generation { font-size: 10px; font-weight: 650; color: var(--fg2); white-space: nowrap; }
+	.thumb-model { font-size: 9px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-current-badge {
 		position: absolute;
 		bottom: 22px;

@@ -3,7 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { Score } from '$lib/historyManagerState.svelte';
-	import type { ProviderGroup } from '$lib/models';
+	import type { Provider, ProviderGroup } from '$lib/models';
 	import OutputTabsContent from './OutputTabsContent.svelte';
 	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
@@ -61,13 +61,8 @@
 		visionProviderGroups: ProviderGroup[];
 		statusCatalogName: string;
 		statusCanvasName: string;
-		nextStage1Model: string;
-		nextStage2Model: string;
-		nextCatalogName: string;
-		nextCanvasName: string;
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
-		statusHashCopyTitle: string;
 		statusHashCopied: boolean;
 		pngMenuOpen: boolean;
 		pngWrapEl: HTMLDivElement | null;
@@ -145,6 +140,7 @@
 		onDrawLineageDescription: (node: LineageNode, text: string) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
+		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
 		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrashLineage: (historyIds: string[]) => void;
@@ -194,13 +190,8 @@
 		visionProviderGroups,
 		statusCatalogName,
 		statusCanvasName,
-		nextStage1Model,
-		nextStage2Model,
-		nextCatalogName,
-		nextCanvasName,
 		statusHistoryItem,
 		statusHashLabel,
-		statusHashCopyTitle,
 		statusHashCopied,
 		pngMenuOpen = $bindable(false),
 		pngWrapEl = $bindable(null),
@@ -278,6 +269,7 @@
 		onDrawLineageDescription,
 		onDrawLineageDdl,
 		onSaveOkugakiModel,
+		onSaveVisionModel,
 		onPromoteLineageNode,
 		onSaveLineageNote,
 		onAskTrashLineage,
@@ -346,7 +338,18 @@
 		updateFitZoom();
 		const observer = new ResizeObserver(updateFitZoom);
 		if (canvasContentEl) observer.observe(canvasContentEl);
-		return () => observer.disconnect();
+		const wheelTarget = canvasContentEl;
+		const onWheel = (event: WheelEvent) => {
+			if (outputTab !== 'canvas' || !result) return;
+			event.preventDefault();
+			const step = event.deltaY < 0 ? 0.15 : -0.15;
+			onSetZoom(zoom + step);
+		};
+		wheelTarget?.addEventListener('wheel', onWheel, { passive: false });
+		return () => {
+			observer.disconnect();
+			wheelTarget?.removeEventListener('wheel', onWheel);
+		};
 	});
 
 	$effect(() => {
@@ -443,6 +446,9 @@
 
 	<div class="canvas-area">
 		<div class="nav-left">
+			<Tooltip placement="right" text={t().tooltipCanvasNavLatest}>
+				<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
+			</Tooltip>
 			<Tooltip placement="right" text={t().tooltipCanvasNavPrev}>
 				<button class="nav-circle" onclick={onGotoNext} disabled={nextDisabled}>‹</button>
 			</Tooltip>
@@ -802,7 +808,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onSaveOkugakiModel={onSaveOkugakiModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
 			{/if}
 		</div>
 
@@ -824,9 +830,6 @@
 
 
 		<div class="nav-right">
-			<Tooltip placement="left" text={t().tooltipCanvasNavLatest}>
-				<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
-			</Tooltip>
 			<Tooltip placement="left" text={t().tooltipCanvasNavNext}>
 				<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
 			</Tooltip>
@@ -889,28 +892,7 @@
 	{/if}
 
 	<div class="status-bar">
-		<div class="status-summary" aria-label={isJapanese ? '\u6b21\u306e\u63cf\u753b\u8a2d\u5b9a' : 'Next generation settings'}>
-			<span class="status-scope">{isJapanese ? '\u6b21\u306e\u63cf\u753b' : 'Next generation'}</span>
-			<span class="status-group">
-				<span class="status-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
-				{#if nextStage1Model === nextStage2Model}
-					<span class="status-k">{isJapanese ? '\u89e3\u91c8\uff0f\u63cf\u753b' : 'Interpretation / rendering'}</span><span class="status-v" title={nextStage1Model}>{nextStage1Model}</span>
-				{:else}
-					<span class="status-k">{isJapanese ? '\u89e3\u91c8' : 'Interpretation'}</span><span class="status-v" title={nextStage1Model}>{nextStage1Model}</span>
-					<span class="status-k">{isJapanese ? '\u63cf\u753b' : 'Rendering'}</span><span class="status-v" title={nextStage2Model}>{nextStage2Model}</span>
-				{/if}
-			</span>
-			<span class="status-divider"></span>
-			<span class="status-group">
-				<span class="status-label">{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</span>
-				<span class="status-v" title={nextCatalogName}>{nextCatalogName}</span>
-			</span>
-			<span class="status-divider"></span>
-			<span class="status-group">
-				<span class="status-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
-				<span class="status-v" title={nextCanvasName}>{nextCanvasName}</span>
-			</span>
-		</div>
+		<div class="status-spacer"></div>
 		<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
 			<button
 				class="star-btn status-star"
@@ -920,6 +902,17 @@
 				aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
 			>★</button>
 		</Tooltip>
+		{#if statusHashLabel}
+			<Tooltip placement="top" text={statusHashCopied ? (isJapanese ? '\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f' : 'Copied') : (isJapanese ? '\u30af\u30ea\u30c3\u30af\u3067full hash\u3092\u30b3\u30d4\u30fc\u3057\u307e\u3059' : 'Click to copy the full hash')}>
+				<button
+					type="button"
+					class="status-hash-btn"
+					onclick={onCopyStatusHash}
+				>
+					<code class="status-hash-code">{statusHashLabel}</code>
+				</button>
+			</Tooltip>
+		{/if}
 		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show generation details, prompts, and JSON for the selected artwork'}>
 			<button
 				type="button"
@@ -1111,7 +1104,7 @@
 		font-size: 11px;
 		color: var(--fg3);
 	}
-	.render-meta-scope, .status-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
+	.render-meta-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
 	.render-meta-item {
 		display: inline-flex;
 		align-items: baseline;
@@ -1897,52 +1890,24 @@
 		background: var(--bg);
 		flex-shrink: 0;
 	}
-	.status-summary {
-		min-width: 0;
-		margin-right: auto;
-		display: flex;
-		align-items: center;
-		gap: 10px;
+	.status-spacer { margin-right: auto; }
+	.status-hash-btn {
+		flex: 0 0 auto;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		padding: 5px 9px;
+		background: var(--panel);
 		color: var(--fg2);
+		font: inherit;
 		font-size: 11px;
-		line-height: 1;
 		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		cursor: pointer;
 	}
-	.status-group {
-		min-width: 0;
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		line-height: 1;
-	}
-	.status-label {
-		color: var(--fg3);
-		font-size: 11px;
-		font-weight: 400;
-		letter-spacing: 0;
-		text-transform: none;
-	}
-	.status-k {
-		color: var(--fg3);
-		font-size: 11px;
-	}
-	.status-v {
-		min-width: 0;
-		max-width: 260px;
-		overflow: hidden;
-		text-overflow: ellipsis;
+	.status-hash-code {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-weight: 600;
+		letter-spacing: 0.06em;
 		color: #4d5f86;
-		font-size: 11px;
-		font-weight: 400;
-	}
-	.status-summary .status-v { max-width: 130px; }
-	.status-divider {
-		width: 1px;
-		height: 16px;
-		background: var(--border2);
-		flex-shrink: 0;
 	}
 	.export-btn {
 		display: inline-flex;

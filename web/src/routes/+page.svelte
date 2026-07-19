@@ -62,7 +62,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v1.92.0';
+	const APP_VERSION = 'v1.94.0';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -400,6 +400,7 @@
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let settingsOpen = $state(false);
 	let appInfoOpen = $state(false);
+	let leftPanelCollapsed = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<SettingsTab>('connection');
 	let pngMenuOpen  = $state(false);
@@ -728,6 +729,30 @@
 		} catch (e) {
 			okugakiModel = previous;
 			console.warn('failed to save okugaki model', e);
+			throw e;
+		}
+	}
+
+	async function persistVisionModel(provider: Provider, model: string): Promise<void> {
+		if (!provider || !model) return;
+		if (provider === visionProvider && model === visionModel) return;
+		const prevProvider = visionProvider;
+		const prevModel = visionModel;
+		visionProvider = provider;
+		visionModel = model;
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ model_settings: { vision_provider: provider, vision_model: model } })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			visionProvider = prevProvider;
+			visionModel = prevModel;
+			console.warn('failed to save vision model', e);
 			throw e;
 		}
 	}
@@ -4906,9 +4931,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			?? result?.render_hash?.slice(-4)
 			?? ''
 	).toUpperCase());
-	const statusHashCopyTitle = $derived(statusHashLabel
-		? `${t().historyHashCopyTitle}: ${statusHashLabel}`
-		: t().historyHashCopyTitle);
 	const statusHistoryItem = $derived.by(() => {
 		if (displayedHistoryItem) return displayedHistoryItem;
 		if (result?.history_id) {
@@ -4933,6 +4955,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const s1 = it.stage1_model ? shortModel(it.stage1_model) : '-';
 		const s2 = it.stage2_model ? shortModel(it.stage2_model) : '-';
 		return `${s1} → ${s2}`;
+	}
+
+	function historyModelStage1Short(it: Iteration): string {
+		return it.stage1_model ? shortModel(it.stage1_model) : '-';
+	}
+
+	function historyModelStage1Full(it: Iteration): string {
+		return it.stage1_model ? statusModelName(it.stage1_model) : '-';
+	}
+
+	function historyModelStage2Full(it: Iteration): string {
+		return it.stage2_model ? statusModelName(it.stage2_model) : '-';
 	}
 
 	function historyPreviewText(text: string): string {
@@ -5310,6 +5344,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	<div class="main-shell">
 		<div class="body">
 			<!-- ── LEFT PANEL ── -->
+			{#if !leftPanelCollapsed}
 			<div class="left-panel">
 				<div class="panel-scroll">
 					<InputPanel
@@ -5363,9 +5398,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{canvasAspectMenuOpen}
 						stage1ModelLabel={availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}
 						stage2ModelLabel={availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}
+						{nextStage1Model}
+						{nextStage2Model}
+						{nextCatalogName}
+						{nextCanvasName}
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
-						onOpenModelSelection={() => openModelSelection(true)}
+						onOpenModelSelection={() => openModelSelection(false)}
 						onOpenLlmModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
@@ -5464,6 +5503,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 				</div><!-- /panel-scroll -->
 			</div><!-- /left-panel -->
+			{/if}
+
+			<button
+				class="left-rail-toggle"
+				onclick={() => (leftPanelCollapsed = !leftPanelCollapsed)}
+				title={leftPanelCollapsed ? (getLang() === 'ja' ? '記述エリアを開く' : 'Open input area') : (getLang() === 'ja' ? '記述エリアを畳む' : 'Collapse input area')}
+				aria-label={leftPanelCollapsed ? (getLang() === 'ja' ? '記述エリアを開く' : 'Open input area') : (getLang() === 'ja' ? '記述エリアを畳む' : 'Collapse input area')}
+				aria-expanded={!leftPanelCollapsed}
+			>{leftPanelCollapsed ? '›' : '‹'}</button>
 
 			<CanvasPanel
 				bind:outputTab
@@ -5506,13 +5554,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				visionProviderGroups={availableVisionModelCatalog}
 				{statusCatalogName}
 				{statusCanvasName}
-				{nextStage1Model}
-				{nextStage2Model}
-				{nextCatalogName}
-				{nextCanvasName}
 				{statusHistoryItem}
 				{statusHashLabel}
-				{statusHashCopyTitle}
 				{statusHashCopied}
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}
@@ -5587,6 +5630,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onSaveOkugakiModel={persistOkugakiModel}
+				onSaveVisionModel={persistVisionModel}
 				onPromoteLineageNode={promoteLineageNode}
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
@@ -5616,7 +5660,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{historyStarredOnly}
 			onSetStarredOnly={setHistoryStarredOnly}
 			{historyIndexLabel}
-			{historyModelSummary}
+			{historyModelStage1Short}
+			{historyModelStage1Full}
+			{historyModelStage2Full}
 			{formatHistoryDate}
 			{catalogName}
 			isJapanese={getLang() === 'ja'}
@@ -5953,9 +5999,27 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		flex-shrink: 0;
 		display: flex;
 		flex-direction: column;
-		border-right: 1px solid var(--border);
 		overflow: hidden;
 	}
+
+	.left-rail-toggle {
+		flex: 0 0 auto;
+		align-self: stretch;
+		width: 18px;
+		padding: 0;
+		border: none;
+		border-right: 1px solid var(--border);
+		background: var(--bg2);
+		color: var(--fg3);
+		font-family: inherit;
+		font-size: 13px;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.left-rail-toggle:hover { background: var(--panel); color: var(--fg); }
 
 	@media (max-width: 1180px) {
 		.left-panel { width: min(400px, 42vw); }

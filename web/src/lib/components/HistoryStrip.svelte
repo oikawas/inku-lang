@@ -41,7 +41,9 @@
 		historyStarredOnly: boolean;
 		onSetStarredOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
-		historyModelSummary: (item: HistoryItem) => string;
+		historyModelStage1Short: (item: HistoryItem) => string;
+		historyModelStage1Full: (item: HistoryItem) => string;
+		historyModelStage2Full: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
 		catalogName: (id: string | null | undefined) => string;
 		isJapanese: boolean;
@@ -64,7 +66,9 @@
 		historyStarredOnly,
 		onSetStarredOnly,
 		historyIndexLabel,
-		historyModelSummary,
+		historyModelStage1Short,
+		historyModelStage1Full,
+		historyModelStage2Full,
 		formatHistoryDate,
 		catalogName,
 		isJapanese
@@ -74,7 +78,7 @@
 
 	function lineageGenerationLabel(item: HistoryItem): string {
 		if (!item.lineage_generation) return isJapanese ? '独立作品' : 'Standalone';
-		return isJapanese ? `第${item.lineage_generation}世代` : `Generation ${item.lineage_generation}`;
+		return isJapanese ? `第${item.lineage_generation}世代` : `Gen. ${item.lineage_generation}`;
 	}
 
 	function lineageStateLabel(item: HistoryItem): string {
@@ -140,9 +144,10 @@
 					>
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
-							<div class="tooltip-row"><span>{t().historyTooltipModel}</span><strong>{historyModelSummary(it)}</strong></div>
+							<div class="tooltip-row"><span>Stage 1</span><strong>{historyModelStage1Full(it)}</strong></div>
+							<div class="tooltip-row"><span>Stage 2</span><strong>{historyModelStage2Full(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
-							<div class="tooltip-row"><span>{isJapanese ? '世代' : 'Generation'}</span><strong>{lineageGenerationLabel(it)}</strong></div>
+							<div class="tooltip-row"><span>{isJapanese ? '世代' : 'Gen.'}</span><strong>{lineageGenerationLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
@@ -157,7 +162,7 @@
 						>★</button>
 						<div class="thumb-meta">
 							<span class="thumb-generation">{lineageGenerationLabel(it)}</span>
-							<span class="thumb-state">{lineageStateLabel(it)}</span>
+							<span class="thumb-model" title={historyModelStage1Full(it)}>{historyModelStage1Short(it)}</span>
 						</div>
 						{#if i === historyCursor}
 							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
@@ -355,7 +360,7 @@
 		gap: 1px;
 	}
 	.thumb-generation { font-size: 10px; font-weight: 650; color: var(--fg2); white-space: nowrap; }
-	.thumb-state { width: fit-content; max-width: 100%; border-radius: 999px; padding: 0 4px; background: var(--bg2); color: var(--fg3); font-size: 9px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-model { font-size: 9px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-current-badge {
 		position: absolute;
 		bottom: 22px;

@@ -462,6 +462,13 @@ export interface LangPack {
 	settingsUserPlugins: string;
 	settingsUserPluginsAddTitle: string;
 	settingsUserPluginsAddDescription: string;
+	settingsPluginLoadFile: string;
+	settingsPluginViewEdit: string;
+	settingsPluginDelete: string;
+	settingsPluginDeleteConfirm: string;
+	settingsPluginEditorTitle: string;
+	settingsPluginSave: string;
+	settingsPluginInvalid: string;
 	settingsUserPluginPathPlaceholder: string;
 	settingsYes: string;
 	settingsNo: string;

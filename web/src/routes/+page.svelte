@@ -1619,6 +1619,108 @@
 		}
 	}
 
+	// ── User plugin management (backend contract may not be deployed yet) ──
+	let pluginActionStatus = $state<string | null>(null);
+
+	function pluginErrorMessage(status: number, detail: unknown): string {
+		if (status === 404 || status === 405 || status === 501) {
+			return getLang() === 'ja'
+				? 'このプラグイン管理機能はサーバー側が未実装です（バックエンド待ち）。'
+				: 'This plugin management endpoint is not implemented on the server yet.';
+		}
+		if (Array.isArray(detail)) return (detail as string[]).join(' / ');
+		if (typeof detail === 'string') return detail;
+		return `HTTP ${status}`;
+	}
+
+	async function loadPluginContent(id: string): Promise<string | null> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}/content`);
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
+				return null;
+			}
+			const data = await r.json() as { content?: string };
+			return data.content ?? '';
+		} catch (e) {
+			pluginActionStatus = e instanceof Error ? e.message : String(e);
+			return null;
+		}
+	}
+
+	// Returns null on success, or an array of validation reasons / messages on failure.
+	async function savePlugin(id: string, content: string): Promise<string[] | null> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}`, {
+				method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }),
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				return Array.isArray(d.detail) ? d.detail as string[] : [pluginErrorMessage(r.status, d.detail)];
+			}
+			await loadSettingsStatus();
+			return null;
+		} catch (e) {
+			return [e instanceof Error ? e.message : String(e)];
+		}
+	}
+
+	async function createPlugin(content: string, filename: string): Promise<string[] | null> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch('/api/plugins', {
+				method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, filename }),
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				return Array.isArray(d.detail) ? d.detail as string[] : [pluginErrorMessage(r.status, d.detail)];
+			}
+			await loadSettingsStatus();
+			return null;
+		} catch (e) {
+			return [e instanceof Error ? e.message : String(e)];
+		}
+	}
+
+	async function deletePlugin(id: string): Promise<boolean> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' });
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
+				return false;
+			}
+			await loadSettingsStatus();
+			return true;
+		} catch (e) {
+			pluginActionStatus = e instanceof Error ? e.message : String(e);
+			return false;
+		}
+	}
+
+	async function setPluginEnabled(id: string, enabled: boolean): Promise<boolean> {
+		pluginActionStatus = null;
+		try {
+			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}/enabled`, {
+				method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
+				return false;
+			}
+			await loadSettingsStatus();
+			return true;
+		} catch (e) {
+			pluginActionStatus = e instanceof Error ? e.message : String(e);
+			return false;
+		}
+	}
+
 	async function updateDbBackupSettings(intervalDays: number, maxGenerations: number) {
 		dbBackupStatus = null;
 		try {
@@ -5868,6 +5970,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onSaveModelSettings={saveModelSettings}
 		onLoadModelSettings={loadModelSettings}
 		onLoadSettingsStatus={loadSettingsStatus}
+		{pluginActionStatus}
+		onLoadPluginContent={loadPluginContent}
+		onSavePlugin={savePlugin}
+		onCreatePlugin={createPlugin}
+		onDeletePlugin={deletePlugin}
+		onSetPluginEnabled={setPluginEnabled}
 		onUpdateDbBackupSettings={updateDbBackupSettings}
 		onRunDbBackupNow={runDbBackupNow}
 		onUpdateOutputSaveSettings={updateOutputSaveSettings}

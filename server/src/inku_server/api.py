@@ -400,6 +400,21 @@ def _render_hash_metadata(
     }
 
 
+def _resolved_tenkei(requested: str | None, actor: dict, lineage_parent_node_id: str | None) -> str:
+    """添景水準の解決 (v1.97): 明示値 > 派生元作品からの継承 > auto。
+
+    継承をサーバー側で解決することで、AI 自律推敲・CLI・全クライアントの派生生成が
+    系統の水準を無指定のまま維持する（作者裁定 2026-07-19: 親作品から継承）。
+    """
+    if requested:
+        return requested
+    if lineage_parent_node_id:
+        inherited = _db.tenkei_for_node(actor["id"], lineage_parent_node_id)
+        if inherited in {"none", "sparse", "auto"}:
+            return inherited
+    return "auto"
+
+
 def _coerce_context(ddl: str, original_text: str | None = None) -> str:
     original = (original_text or "").strip()
     normalized = ddl.strip()
@@ -718,7 +733,8 @@ class ComposeRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用するサーバー側色カタログID")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
-    tenkei: str = Field(default="auto", pattern="^(none|sparse|auto)$", description="添景水準 (v1.96): none / sparse / auto")
+    tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
+    lineage_parent_node_id: str | None = Field(default=None, description="添景水準の継承元 lineage ノード (v1.97)。保存には関与しない")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
@@ -782,7 +798,7 @@ class InterpretRequest(BaseModel):
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
     ui_lang: str | None = Field(default=None, description="UI表示言語")
     expand_intermediate: bool = Field(default=False, description="Stage 1.5 の中間DDL拡張を適用するか")
-    tenkei: str = Field(default="auto", pattern="^(none|sparse|auto)$", description="添景水準 (v1.96): none / sparse / auto")
+    tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時 auto")
 
 
 class InterpretResponse(BaseModel):
@@ -820,7 +836,7 @@ class PaintRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用する色カタログID。ランダム選択時は直前IDとして除外する")
     random_color_catalog: bool = Field(default=False, description="現在のcatalog_idを除外してサーバー側で色カタログを選ぶか")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
-    tenkei: str = Field(default="auto", pattern="^(none|sparse|auto)$", description="添景水準 (v1.96): none / sparse / auto")
+    tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
@@ -1010,6 +1026,7 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     vary_seed: int | None = None
+    tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$")
     interpretation_seed: str | None = None
     seed_text: str | None = None
     source_text: str | None = None
@@ -2604,6 +2621,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         ui_lang=ui_lang,
     )
     resolved_stage2_model = _resolved_stage2_model(req.model, actor)
+    resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
     try:
         compose_detail = _call_compose_detail(
             req.ddl,
@@ -2613,7 +2631,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             lang=instruction_lang_resolved,
             vary_seed=req.vary_seed,
             include_trace=req.include_trace,
-            tenkei=req.tenkei,
+            tenkei=resolved_tenkei,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -2634,7 +2652,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
                 score,
                 branch_report=branch_counts,
                 ddl=_coerce_context(compose_detail.ddl, req.original_text),
-                tenkei=req.tenkei,
+                tenkei=resolved_tenkei,
                 plugin_instructions_present=bool(compose_detail.plugin_instructions),
             )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
@@ -2657,7 +2675,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "ui_lang": ui_lang,
         "render_seed": render_seed,
         "vary_seed": req.vary_seed,
-        "tenkei": req.tenkei,
+        "tenkei": resolved_tenkei,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
@@ -2714,8 +2732,9 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
     instruction_lang_resolved = _resolve_instruction_lang(
         source_text, instruction_lang_requested, ui_lang=ui_lang
     )
+    resolved_tenkei = req.tenkei or "auto"
     try:
-        if req.tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
+        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
             detail = InterpretDetail(ddl=req.text.strip(), thinking=None, raw=None)
         else:
@@ -2725,7 +2744,7 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
                 include_thinking=req.include_thinking,
                 system_prompt_prefix=None,
                 lang=instruction_lang_resolved,
-                tenkei=req.tenkei,
+                tenkei=resolved_tenkei,
             )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("interpret", 502) from e
@@ -2743,7 +2762,7 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
             lang=instruction_lang_resolved,
             context_text=source_text,
             plugin_instructions_present=bool(plugin_expansion.instructions),
-            tenkei=req.tenkei,
+            tenkei=resolved_tenkei,
         )
         plugin_provenance = list(plugin_expansion.provenance)
         plugin_warnings = list(plugin_expansion.warnings)
@@ -3079,8 +3098,9 @@ def api_paint(
     resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
+    resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
     try:
-        if req.tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
+        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
             interpret_detail_result = InterpretDetail(
                 ddl=req.text.strip(), raw=req.text.strip() if req.include_trace else None
@@ -3092,7 +3112,7 @@ def api_paint(
                 include_thinking=req.include_thinking,
                 lang=instruction_lang_resolved,
                 include_trace=req.include_trace,
-                tenkei=req.tenkei,
+                tenkei=resolved_tenkei,
             )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("interpret", 502) from e
@@ -3105,7 +3125,7 @@ def api_paint(
             original_text=source_text,
             lang=instruction_lang_resolved,
             include_trace=req.include_trace,
-            tenkei=req.tenkei,
+            tenkei=resolved_tenkei,
         )
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -3128,7 +3148,7 @@ def api_paint(
                 score,
                 branch_report=branch_counts,
                 ddl=_coerce_context(ddl, source_text),
-                tenkei=req.tenkei,
+                tenkei=resolved_tenkei,
                 plugin_instructions_present=bool(compose_detail.plugin_instructions),
             )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
@@ -3151,7 +3171,7 @@ def api_paint(
         "ui_lang": ui_lang,
         "render_seed": render_seed,
         "vary_seed": req.vary_seed,
-        "tenkei": req.tenkei,
+        "tenkei": resolved_tenkei,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
@@ -3672,6 +3692,8 @@ def api_history_post(
             "ui_lang": body.ui_lang,
             "render_seed": render_seed,
             "vary_seed": body.vary_seed,
+            # v1.97: 保存時に水準を確定する（renderer 専用派生でも系統の水準が途切れない）
+            "tenkei": _resolved_tenkei(body.tenkei, actor, body.lineage_parent_node_id),
             "seed_text": seed_text,
             "interpretation_seed": body.interpretation_seed,
         }

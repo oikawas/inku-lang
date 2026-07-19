@@ -61,10 +61,6 @@
 		visionProviderGroups: ProviderGroup[];
 		statusCatalogName: string;
 		statusCanvasName: string;
-		nextStage1Model: string;
-		nextStage2Model: string;
-		nextCatalogName: string;
-		nextCanvasName: string;
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopyTitle: string;
@@ -194,10 +190,6 @@
 		visionProviderGroups,
 		statusCatalogName,
 		statusCanvasName,
-		nextStage1Model,
-		nextStage2Model,
-		nextCatalogName,
-		nextCanvasName,
 		statusHistoryItem,
 		statusHashLabel,
 		statusHashCopyTitle,
@@ -346,7 +338,18 @@
 		updateFitZoom();
 		const observer = new ResizeObserver(updateFitZoom);
 		if (canvasContentEl) observer.observe(canvasContentEl);
-		return () => observer.disconnect();
+		const wheelTarget = canvasContentEl;
+		const onWheel = (event: WheelEvent) => {
+			if (outputTab !== 'canvas' || !result) return;
+			event.preventDefault();
+			const step = event.deltaY < 0 ? 0.15 : -0.15;
+			onSetZoom(zoom + step);
+		};
+		wheelTarget?.addEventListener('wheel', onWheel, { passive: false });
+		return () => {
+			observer.disconnect();
+			wheelTarget?.removeEventListener('wheel', onWheel);
+		};
 	});
 
 	$effect(() => {
@@ -889,27 +892,19 @@
 	{/if}
 
 	<div class="status-bar">
-		<div class="status-summary" aria-label={isJapanese ? '\u6b21\u306e\u63cf\u753b\u8a2d\u5b9a' : 'Next generation settings'}>
-			<span class="status-scope">{isJapanese ? '\u6b21\u306e\u63cf\u753b' : 'Next generation'}</span>
-			<span class="status-group">
-				<span class="status-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
-				{#if nextStage1Model === nextStage2Model}
-					<span class="status-k">{isJapanese ? '\u89e3\u91c8\uff0f\u63cf\u753b' : 'Interpretation / rendering'}</span><span class="status-v" title={nextStage1Model}>{nextStage1Model}</span>
-				{:else}
-					<span class="status-k">{isJapanese ? '\u89e3\u91c8' : 'Interpretation'}</span><span class="status-v" title={nextStage1Model}>{nextStage1Model}</span>
-					<span class="status-k">{isJapanese ? '\u63cf\u753b' : 'Rendering'}</span><span class="status-v" title={nextStage2Model}>{nextStage2Model}</span>
-				{/if}
-			</span>
-			<span class="status-divider"></span>
-			<span class="status-group">
-				<span class="status-label">{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</span>
-				<span class="status-v" title={nextCatalogName}>{nextCatalogName}</span>
-			</span>
-			<span class="status-divider"></span>
-			<span class="status-group">
-				<span class="status-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
-				<span class="status-v" title={nextCanvasName}>{nextCanvasName}</span>
-			</span>
+		<div class="status-summary" aria-label={isJapanese ? '\u4f5c\u54c1\u30cf\u30c3\u30b7\u30e5' : 'Artwork hash'}>
+			{#if statusHashLabel}
+				<button
+					type="button"
+					class="status-hash-btn"
+					title={statusHashCopyTitle}
+					onclick={onCopyStatusHash}
+				>
+					<span class="status-label">{isJapanese ? '\u30cf\u30c3\u30b7\u30e5' : 'Hash'}</span>
+					<code class="status-hash-code">{statusHashLabel}</code>
+					<span class="status-hash-feedback" aria-live="polite">{statusHashCopied ? (isJapanese ? '\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f' : 'Copied') : (isJapanese ? '\u30af\u30ea\u30c3\u30af\u3067\u30b3\u30d4\u30fc' : 'Click to copy')}</span>
+				</button>
+			{/if}
 		</div>
 		<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
 			<button
@@ -1111,7 +1106,7 @@
 		font-size: 11px;
 		color: var(--fg3);
 	}
-	.render-meta-scope, .status-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
+	.render-meta-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
 	.render-meta-item {
 		display: inline-flex;
 		align-items: baseline;
@@ -1910,13 +1905,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.status-group {
-		min-width: 0;
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		line-height: 1;
-	}
 	.status-label {
 		color: var(--fg3);
 		font-size: 11px;
@@ -1924,25 +1912,30 @@
 		letter-spacing: 0;
 		text-transform: none;
 	}
-	.status-k {
-		color: var(--fg3);
-		font-size: 11px;
+	.status-hash-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		padding: 4px 9px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg2);
+		font-family: inherit;
+		cursor: pointer;
+		line-height: 1;
 	}
-	.status-v {
-		min-width: 0;
-		max-width: 260px;
-		overflow: hidden;
-		text-overflow: ellipsis;
+	.status-hash-btn:hover { background: var(--bg2); border-color: var(--accent); }
+	.status-hash-code {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 12px;
+		font-weight: 600;
+		letter-spacing: 0.06em;
 		color: #4d5f86;
-		font-size: 11px;
-		font-weight: 400;
 	}
-	.status-summary .status-v { max-width: 130px; }
-	.status-divider {
-		width: 1px;
-		height: 16px;
-		background: var(--border2);
-		flex-shrink: 0;
+	.status-hash-feedback {
+		color: var(--fg3);
+		font-size: 10px;
 	}
 	.export-btn {
 		display: inline-flex;

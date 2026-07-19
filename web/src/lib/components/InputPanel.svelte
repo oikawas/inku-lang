@@ -72,6 +72,10 @@
 		canvasAspectMenuOpen: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
+		nextStage1Model: string;
+		nextStage2Model: string;
+		nextCatalogName: string;
+		nextCanvasName: string;
 		onToggleCanvasAspectMenu: () => void;
 		onSelectCanvasAspect: (id: CanvasAspectId) => void | Promise<void>;
 		onOpenModelSelection: () => void;
@@ -138,6 +142,10 @@
 		canvasAspectMenuOpen,
 		stage1ModelLabel,
 		stage2ModelLabel,
+		nextStage1Model,
+		nextStage2Model,
+		nextCatalogName,
+		nextCanvasName,
 		onToggleCanvasAspectMenu,
 		onSelectCanvasAspect,
 		onOpenModelSelection,
@@ -152,6 +160,8 @@
 		onSubmit,
 		onStop,
 	}: Props = $props();
+
+	const isJapanese = $derived(t().code === 'ja');
 
 	const tabItems = $derived([
 		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning },
@@ -225,6 +235,26 @@
 	</div>
 
 	{#if inputMode === 'single'}
+		<div class="current-selection" aria-label={isJapanese ? '現在選択中の設定' : 'Current selection'}>
+			<span class="cs-group">
+				<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
+				{#if nextStage1Model === nextStage2Model}
+					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
+				{:else}
+					<span class="cs-value" title={nextStage1Model + ' / ' + nextStage2Model}>{nextStage1Model} / {nextStage2Model}</span>
+				{/if}
+			</span>
+			<span class="cs-divider"></span>
+			<span class="cs-group">
+				<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
+				<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
+			</span>
+			<span class="cs-divider"></span>
+			<span class="cs-group">
+				<span class="cs-label">{isJapanese ? 'キャンバス' : 'Canvas'}</span>
+				<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
+			</span>
+		</div>
 		<textarea
 			bind:value={input}
 			rows="5"
@@ -404,6 +434,41 @@
 		background: #ffefd0;
 		border-color: #bd8f34;
 		color: #4f360b;
+	}
+	.current-selection {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 6px 10px;
+		padding: 6px 9px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--bg2);
+		font-size: 11px;
+		line-height: 1;
+		min-width: 0;
+	}
+	.cs-group {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+	}
+	.cs-label { color: var(--fg3); flex-shrink: 0; }
+	.cs-value {
+		min-width: 0;
+		max-width: 200px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: #4d5f86;
+		font-weight: 500;
+	}
+	.cs-divider {
+		width: 1px;
+		height: 12px;
+		background: var(--border2);
+		flex-shrink: 0;
 	}
 	.input-ta {
 		width: 100%; padding: 9px 10px;

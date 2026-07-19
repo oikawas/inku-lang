@@ -400,6 +400,7 @@
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let settingsOpen = $state(false);
 	let appInfoOpen = $state(false);
+	let leftPanelCollapsed = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<SettingsTab>('connection');
 	let pngMenuOpen  = $state(false);
@@ -5310,6 +5311,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	<div class="main-shell">
 		<div class="body">
 			<!-- ── LEFT PANEL ── -->
+			{#if !leftPanelCollapsed}
 			<div class="left-panel">
 				<div class="panel-scroll">
 					<InputPanel
@@ -5363,6 +5365,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{canvasAspectMenuOpen}
 						stage1ModelLabel={availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}
 						stage2ModelLabel={availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}
+						{nextStage1Model}
+						{nextStage2Model}
+						{nextCatalogName}
+						{nextCanvasName}
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
 						onOpenModelSelection={() => openModelSelection(true)}
@@ -5464,6 +5470,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 				</div><!-- /panel-scroll -->
 			</div><!-- /left-panel -->
+			{/if}
+
+			<button
+				class="left-rail-toggle"
+				onclick={() => (leftPanelCollapsed = !leftPanelCollapsed)}
+				title={leftPanelCollapsed ? (getLang() === 'ja' ? '記述エリアを開く' : 'Open input area') : (getLang() === 'ja' ? '記述エリアを畳む' : 'Collapse input area')}
+				aria-label={leftPanelCollapsed ? (getLang() === 'ja' ? '記述エリアを開く' : 'Open input area') : (getLang() === 'ja' ? '記述エリアを畳む' : 'Collapse input area')}
+				aria-expanded={!leftPanelCollapsed}
+			>{leftPanelCollapsed ? '›' : '‹'}</button>
 
 			<CanvasPanel
 				bind:outputTab
@@ -5506,10 +5521,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				visionProviderGroups={availableVisionModelCatalog}
 				{statusCatalogName}
 				{statusCanvasName}
-				{nextStage1Model}
-				{nextStage2Model}
-				{nextCatalogName}
-				{nextCanvasName}
 				{statusHistoryItem}
 				{statusHashLabel}
 				{statusHashCopyTitle}
@@ -5953,9 +5964,27 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		flex-shrink: 0;
 		display: flex;
 		flex-direction: column;
-		border-right: 1px solid var(--border);
 		overflow: hidden;
 	}
+
+	.left-rail-toggle {
+		flex: 0 0 auto;
+		align-self: stretch;
+		width: 18px;
+		padding: 0;
+		border: none;
+		border-right: 1px solid var(--border);
+		background: var(--bg2);
+		color: var(--fg3);
+		font-family: inherit;
+		font-size: 13px;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.left-rail-toggle:hover { background: var(--panel); color: var(--fg); }
 
 	@media (max-width: 1180px) {
 		.left-panel { width: min(400px, 42vw); }

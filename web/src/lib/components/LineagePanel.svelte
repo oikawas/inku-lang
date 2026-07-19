@@ -3,6 +3,8 @@
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import AIRefineModal from './AIRefineModal.svelte';
+	import InkuMascot from './InkuMascot.svelte';
+	import StopButton from './StopButton.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -34,9 +36,10 @@
 		isJapanese: boolean;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
-		onDrawDescription: (node: LineageNode, text: string) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
+		stageLabel: string;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
@@ -53,7 +56,7 @@
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -80,6 +83,17 @@
 	let editDraft = $state('');
 	let editDrawing = $state(false);
 	let editError = $state<string | null>(null);
+	let editElapsedMs = $state(0);
+	let editDrawController: AbortController | null = null;
+
+	// While the edit dialog is drawing, tick an elapsed timer for the status element.
+	$effect(() => {
+		if (!editDrawing) return;
+		editElapsedMs = 0;
+		const startedAt = Date.now();
+		const handle = setInterval(() => { editElapsedMs = Date.now() - startedAt; }, 100);
+		return () => clearInterval(handle);
+	});
 	let okugakiOpen = $state(false);
 	let selectedOkugakiModel = $state('');
 	let okugakiItems = $state<OkugakiItem[]>([]);
@@ -281,17 +295,26 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		if (!activeEditNode || !editMode || !editDraft.trim() || editDrawing) return;
 		editDrawing = true;
 		editError = null;
+		editDrawController = new AbortController();
 		try {
-			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft);
+			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal);
 			else await onDrawDdl(activeEditNode, editDraft);
 			activeEditNode = null;
 			editMode = null;
 			editDraft = '';
 		} catch (cause) {
-			editError = cause instanceof Error ? cause.message : String(cause);
+			// Aborted by the stop button: keep the dialog open, no error.
+			if (!(cause instanceof Error && cause.name === 'AbortError')) {
+				editError = cause instanceof Error ? cause.message : String(cause);
+			}
 		} finally {
+			editDrawController = null;
 			editDrawing = false;
 		}
+	}
+
+	function stopEditDraw(): void {
+		editDrawController?.abort();
 	}
 
 	async function selectOkugakiModel(provider: Provider, model: string): Promise<void> {
@@ -620,8 +643,19 @@ $effect(() => {
 				{#if editError}<div class="lineage-message error">{editError}</div>{/if}
 			</div>
 			<footer>
-				<button type="button" disabled={editDrawing} onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
-				<button type="button" class="edit-draw" disabled={editDrawing || !editDraft.trim()} onclick={drawEditedArtwork}>{editDrawing ? (isJapanese ? '描画中…' : 'Drawing…') : (isJapanese ? '描画' : 'Draw')}</button>
+				{#if editDrawing}
+					<div class="lineage-edit-status" aria-live="polite">
+						<div class="lineage-edit-mascot"><InkuMascot /></div>
+						<div class="lineage-edit-status-info">
+							<span class="lineage-edit-stage">{stageLabel || (isJapanese ? '生成中…' : 'Generating…')}</span>
+							<span class="lineage-edit-elapsed">{isJapanese ? '経過' : 'Elapsed'} {(editElapsedMs / 1000).toFixed(1)}s</span>
+						</div>
+						<StopButton onclick={stopEditDraw}>{t().stopBtn}</StopButton>
+					</div>
+				{:else}
+					<button type="button" onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
+					<button type="button" class="edit-draw" disabled={!editDraft.trim()} onclick={drawEditedArtwork}>{isJapanese ? '描画' : 'Draw'}</button>
+				{/if}
 			</footer>
 	</div>
 {/if}
@@ -708,6 +742,12 @@ $effect(() => {
 	.lineage-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.lineage-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
 	.lineage-edit-dialog > footer .edit-draw { border-color: var(--accent); background: var(--accent); color: var(--accent-fg, #111); font-weight: 700; }
+	.lineage-edit-status { flex: 0 0 auto; margin-left: auto; display: flex; align-items: center; gap: 10px; }
+	.lineage-edit-mascot { flex: 0 0 auto; display: flex; align-items: center; }
+	.lineage-edit-status-info { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; text-align: right; }
+	.lineage-edit-stage { font-size: 12px; font-weight: 500; color: var(--fg); white-space: nowrap; }
+	.lineage-edit-elapsed { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.lineage-edit-status :global(.stop-btn) { flex: 0 0 auto; width: auto; min-width: 0; padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em; }
 	.lineage-edit-dialog button:disabled, .lineage-edit-dialog textarea:disabled { opacity: .55; cursor: default; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
 	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }

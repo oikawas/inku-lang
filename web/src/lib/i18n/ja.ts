@@ -241,6 +241,7 @@ export const ja: LangPack = {
 	aiRefineElementsLabel: '使用する推敲要素（詳細設定）',
 	aiRefineStartButton: '推敲を開始',
 	aiRefineRunningButton: '推敲中...',
+	aiRefineAbortButton: '中止',
 	aiRefineCompleted: '自律推敲が完了しました！',
 	aiRefineStepStatus: (gens, step, label) => `${gens}世代中 ${step}世代目を生成中 (${label})...`,
 	aiRefineMinElementsError: '少なくとも1つの要素を有効にしてください。',

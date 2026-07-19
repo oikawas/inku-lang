@@ -3976,7 +3976,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	await fetchLineage(nodeId, true);
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history) return;
 	const rendered = await paintOne(sourceText, {
@@ -3987,6 +3987,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string): Prom
 		lineageParentNodeId: node.id,
 		derivationKind: 'description_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+		signal,
 	});
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
@@ -5754,6 +5755,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusCatalogName}
 				{statusCanvasName}
 				{statusGeneration}
+				{stageLabel}
 				{statusHistoryItem}
 				{statusHashLabel}
 				{statusHashCopied}

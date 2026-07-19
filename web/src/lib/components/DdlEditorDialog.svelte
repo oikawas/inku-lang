@@ -489,15 +489,17 @@
 		background: var(--bg2);
 	}
 	.ddled-status {
-		flex: 1 1 auto;
+		flex: 0 0 auto;
+		margin-left: auto;
 		display: flex;
 		align-items: center;
 		gap: 10px;
 	}
 	.ddled-mascot { flex: 0 0 auto; display: flex; align-items: center; }
 	.ddled-status-info {
-		flex: 1 1 auto; min-width: 0;
+		flex: 0 0 auto; min-width: 0;
 		display: flex; flex-direction: column; gap: 2px;
+		text-align: right;
 	}
 	.ddled-stage {
 		font-size: 12px; font-weight: 500; color: var(--fg);

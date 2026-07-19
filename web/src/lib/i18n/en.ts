@@ -241,6 +241,7 @@ export const en: LangPack = {
 	aiRefineElementsLabel: 'Evolutionary Elements (Advanced)',
 	aiRefineStartButton: 'Start Evolving',
 	aiRefineRunningButton: 'Evolving...',
+	aiRefineAbortButton: 'Abort',
 	aiRefineCompleted: 'Autonomous refinement completed successfully!',
 	aiRefineStepStatus: (gens, step, label) => `Generating Gen ${step}/${gens} (${label})...`,
 	aiRefineMinElementsError: 'Please enable at least one element.',

@@ -252,6 +252,7 @@ export interface LangPack {
 	aiRefineElementsLabel: string;
 	aiRefineStartButton: string;
 	aiRefineRunningButton: string;
+	aiRefineAbortButton: string;
 	aiRefineCompleted: string;
 	aiRefineStepStatus: (gens: number, step: number, label: string) => string;
 	aiRefineMinElementsError: string;

@@ -88,6 +88,15 @@ def test_style_line_applies_weight_and_color_to_pair() -> None:
     assert all(i.get("weight") == "rotring" and i.get("color") == "red" for i in res.instructions)
 
 
+def test_mixed_style_line_applies_head_and_keeps_motion_text() -> None:
+    # 「鉛筆で、緑で。細かく震える。」— 行頭の様式文だけ消費し、運動句は残す
+    doc = validate_plugin_document(_doc(extra="鉛筆で、緑で。細かく震える。"))
+    res = expand_plugin_ddl("Test.対葉を置く。", source_text="Test.対葉を置く。", lang="ja", documents=[doc])
+    assert all(i.get("weight") == "pencil" and i.get("color") == "green" for i in res.instructions)
+    assert "鉛筆" not in res.ddl and "緑" not in res.ddl
+    assert "細かく震える" in res.ddl
+
+
 def test_non_style_line_after_pair_stays_in_text() -> None:
     doc = validate_plugin_document(_doc(extra="中心から線を下へ引く。"))
     res = expand_plugin_ddl("Test.対葉を置く。", source_text="Test.対葉を置く。", lang="ja", documents=[doc])

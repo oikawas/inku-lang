@@ -802,14 +802,23 @@ def _expand_entry(
     instructions: list[dict] = []
     pending_style_targets: list[dict] = []  # 直前の対 member 転写（様式行の適用先）
     for line_idx, line in enumerate(lines):
-        # v1.94 輪1: 対 member 転写の直後に純粋な様式行が続く場合は消費して適用
+        # v1.94 輪1: 対 member 転写の直後の様式は消費して適用する。
+        # 行頭の様式文（「鉛筆で、緑で。」）だけを消費し、続く運動句などの
+        # 残余（「細かく震える。」）はテキストとして残す。
         if pending_style_targets:
-            style = _parse_style_line(line, lang)
             targets, pending_style_targets = pending_style_targets, []
+            if lang == "ja":
+                head, sep, rest = line.partition("。")
+            else:
+                head, sep, rest = line.partition(". ")
+            style = _parse_style_line(head, lang)
             if style is not None:
                 for ins in targets:
                     ins.update(style)
-                continue
+                rest = rest.strip()
+                if not rest:
+                    continue
+                line = rest
         if line.lower().startswith(ANCHOR_PREFIX):
             kind, region = _resolve_region_spec(
                 line, _DEFAULT_REGION, warnings=warnings, heading=entry.heading

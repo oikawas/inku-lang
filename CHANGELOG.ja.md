@@ -2442,3 +2442,10 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **時間帯検証の打ち止め:** 昼・夕・深夜とも総所要は 3 時間 16〜20 分に収まり、深夜は応答中央値が下がる（62.8s → 41.9s）ものの、フォールバックが単調増加（35 → 37 → 38）して相殺した。「空いた時間帯なら短縮される」仮説の検証はこれで打ち止め。詳細は `no-git-sync/fable5/mode-api-claude/RUN-LOG.md`。
 - **検証:** pytest 636 passed / 30 skipped（テスト変更はカタログ表明値の実測更新のみ）・`npm run check` 0 errors。pentala 配備済み。
 
+
+### v2.0.2 — 小粒バグ 2 件の修正（近傍履歴の 500・履歴ロード時の変奏値消失、Build 613、2026-07-21）
+
+- **`GET /api/history/{id}/neighbors` の 500 を修正:** `list_neighbor_candidates()` だけが `history.score`（TEXT 列の JSON 文字列）を `json.loads` せず生のまま返しており、`composition_distance()` 内の `score.get(...)` が `AttributeError: 'str' object has no attribute 'get'` で毎回 500 になっていた（他の履歴取得経路は loads 済み。pentala 実測 2026-07-20 以降 79 件、score 保存済み候補が 1 件でもあれば必ず失敗するため近傍表示は事実上全滅していた）。新設の `_neighbor_score()` で loads し、壊れた JSON・NULL・非オブジェクトは `{}` にフォールバックして候補を落とさない。回帰テスト 1 件を追加（修正前に契約記載と同一の AttributeError で失敗することを確認済み。`history.score` は NOT NULL 制約のため NULL 混在は空文字列で代替検証）。
+- **履歴ロード時に変奏フィールドを復元:** `loadIterationItem()` の `result` 再構成に `variation_amplitude` / `variation_seed` の 2 行を追加した（保存側は v2.0 で結線済み。読み直すと undefined になっていた）。`focus` の復元は外部入力撤去済みのため行わない（現状維持）。復元値の消費先（変奏再実行への seed 引き継ぎ等）はスコープ外。
+- **検証:** pytest 637 passed / 30 skipped（ベースライン 636 + 新規 1）・ruff・`npm run check` 0 errors。実装レポートは `no-git-sync/fable5/claude_code/tasks/small-bugs-v202-result.md`。
+

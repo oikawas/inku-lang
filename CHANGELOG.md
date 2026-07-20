@@ -235,3 +235,10 @@ Web-UI-only work. The drawing machinery (Score, render, pipeline) is untouched a
 - **Time-of-day question closed:** all three runs land within 3 h 16–20 m of total wall time; late night lowers the response median (62.8 s → 41.9 s) but fallbacks rise monotonically (35 → 37 → 38) and cancel the gain. The "an idle window will be faster" hypothesis is retired. Details in `no-git-sync/fable5/mode-api-claude/RUN-LOG.md`.
 - **Verification:** pytest 636 passed / 30 skipped (test changes only update asserted catalog values), `npm run check` 0 errors. Deployed to pentala.
 
+
+### v2.0.2 — Two small bug fixes (history-neighbors 500, variation fields lost on history load, Build 613, 2026-07-21)
+
+- **`GET /api/history/{id}/neighbors` no longer 500s:** `list_neighbor_candidates()` was the only history path returning `history.score` (a TEXT column holding JSON) without `json.loads`, so `score.get(...)` inside `composition_distance()` raised `AttributeError: 'str' object has no attribute 'get'` on every call (79 occurrences on pentala since 2026-07-20; with even one stored score among the candidates the endpoint always failed, so the neighbors feature was effectively dead). The new `_neighbor_score()` parses the column and falls back to `{}` on broken JSON, NULL, or non-object values without dropping the candidate. One regression test added — confirmed to fail with the exact AttributeError before the fix (`history.score` is NOT NULL, so the NULL case is exercised via an empty string instead).
+- **Variation fields survive a history load:** `loadIterationItem()`'s `result` reconstruction gains `variation_amplitude` / `variation_seed` (saving was already wired in v2.0; reloading left them undefined). `focus` stays unrestored — the external input was retired. Consuming the restored values (e.g., carrying the seed into a re-run) is out of scope.
+- **Verification:** pytest 637 passed / 30 skipped (baseline 636 + 1 new), ruff clean, `npm run check` 0 errors. Implementation report: `no-git-sync/fable5/claude_code/tasks/small-bugs-v202-result.md`.
+

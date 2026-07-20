@@ -6,6 +6,9 @@ export type ModelOption = {
 	notes?: string;
 	purposes?: ('llm' | 'vision')[];
 	enabled?: boolean;
+	// v1.98: 推奨度は用途ごとに持つ。recommendation_level は旧形式の読み取り用。
+	recommendation_llm?: number;
+	recommendation_vision?: number;
 	recommendation_level?: number;
 	speed_class?: string;
 	speed_label?: string;

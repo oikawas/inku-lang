@@ -1996,7 +1996,8 @@ def api_settings_fetch_provider_models(
         for model in previous_provider.get("models", [])
     }
     carried = (
-        "purposes", "recommendation_level", "speed_class", "speed_label",
+        "purposes", "recommendation_llm", "recommendation_vision",
+        "recommendation_level", "speed_class", "speed_label",
         "comment_ja", "comment_en", "eol", "eol_date",
     )
     for model in models:

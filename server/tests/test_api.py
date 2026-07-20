@@ -1573,7 +1573,7 @@ def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
     # 提供が続くモデルは EOL 印が付かず、整えたラベルと評価が残る。
     assert models["google/gemma-4-31b-it"].get("eol") is not True
     assert models["google/gemma-4-31b-it"]["label"] == "Google Gemma 4 31B Instruct"
-    assert models["google/gemma-4-31b-it"]["recommendation_level"] == 5
+    assert models["google/gemma-4-31b-it"]["recommendation_llm"] == 5
     # 提供が消えたモデルは一覧から消えず、EOL として日付付きで残る。
     retired = models["mistralai/mistral-medium-3.5-128b"]
     assert retired["eol"] is True
@@ -2618,7 +2618,9 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
 
     gemma = next(model for model in nvidia_models if model["id"] == "google/gemma-4-31b-it")
     assert gemma["purposes"] == ["llm", "vision"]
-    assert gemma["recommendation_level"] == 5
+    # v1.98: 推奨度は用途ごと。旧 recommendation_level は用途別の値が無いときだけ読む。
+    assert gemma["recommendation_llm"] == 5
+    assert gemma["recommendation_vision"] == 5
     assert gemma["speed_class"] == "fast"
     assert gemma["speed_label"] == "高速 (約15〜22秒)"
     assert "本命モデル" in gemma["comment_ja"]
@@ -2650,7 +2652,10 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     overridden = next(model for model in normalized_models if model["id"] == "google/gemma-4-31b-it")
     assert overridden["label"] == "Gemma custom label"
     assert overridden["purposes"] == ["vision"]
-    assert overridden["recommendation_level"] == 2
+    # 上書きは vision 側だけに効く。LLM 側は組み込みカタログの値が残るが、purposes が
+    # vision のみなので LLM の一覧には出ない。
+    assert overridden["recommendation_vision"] == 2
+    assert overridden["recommendation_llm"] == 5
     assert overridden["speed_label"] == "再計測 約30秒"
     assert overridden["comment_en"] == "Administrator override"
 
@@ -2668,7 +2673,7 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     legacy_gemma = next(model for model in legacy["providers"]["nvidia"]["models"] if model["id"] == "google/gemma-4-31b-it")
     assert legacy_gemma["label"] == "Legacy stored label"
     assert legacy_gemma["purposes"] == ["llm", "vision"]
-    assert legacy_gemma["recommendation_level"] == 5
+    assert legacy_gemma["recommendation_llm"] == 5
     assert legacy_gemma["speed_label"] == "高速 (約15〜22秒)"
 
 

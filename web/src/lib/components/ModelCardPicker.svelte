@@ -1,17 +1,18 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { qualifiedModelId, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
-	import { modelPurposes, modelRecommendation, modelSpeed, modelComment, modelEolLabel } from '$lib/modelMeta';
+	import { modelPurposes, modelRecommendation, modelSpeed, modelComment, modelEolLabel, sortModels, type ModelPurpose } from '$lib/modelMeta';
 
 	type Props = {
 		label: string;
 		selectedModel: string;
 		providerGroups: ProviderGroup[];
+		purpose?: ModelPurpose;
 		disabled?: boolean;
 		onSelect: (provider: Provider, model: string) => void | Promise<void>;
 	};
 
-	let { label, selectedModel, providerGroups, disabled = false, onSelect }: Props = $props();
+	let { label, selectedModel, providerGroups, purpose = 'llm', disabled = false, onSelect }: Props = $props();
 	let open = $state(false);
 
 	const configuredGroups = $derived(providerGroups.filter((group) => group.models.length > 0));
@@ -64,13 +65,13 @@
 		<div class="picker-groups">
 			{#each configuredGroups as group (group.id)}
 				<section><h3>{group.label}</h3><div class="model-grid">
-					{#each group.models as model (model.id)}
+					{#each sortModels(group.models, purpose) as model (model.id)}
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} disabled={model.eol} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
 							<strong>{model.label}</strong>{#if model.eol}<small class="eol-mark">{modelEolLabel(model, isJapanese)}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
 							<span class="metadata" role="tooltip">
 								{#if model.eol}<span><b>{isJapanese ? '状態 / Status' : 'Status'}</b>{modelEolLabel(model, isJapanese)}</span>{/if}
 								<span><b>用途 / Use</b>{modelPurposes(model)}</span>
-								<span><b>オススメ度 / Recommendation</b>{modelRecommendation(model)}</span>
+								<span><b>オススメ度 / Recommendation</b>{modelRecommendation(model, purpose)}</span>
 								<span><b>速度 / Speed</b>{modelSpeed(model)}</span>
 								<span><b>評価 / Comment</b>{modelComment(model, isJapanese)}</span>
 							</span>

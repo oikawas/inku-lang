@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
-	import { modelEolLabel } from '$lib/modelMeta';
+	import { modelEolLabel, sortModels } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -611,7 +611,10 @@
 	}
 
 	function selectedModels(provider: ProviderGroup, setting: ModelProviderSetting, purpose: 'llm' | 'vision') {
-		return provider.models.filter((model) => modelEnabled(setting, model.id) && (model.purposes ?? ['llm']).includes(purpose));
+		return sortModels(
+			provider.models.filter((model) => modelEnabled(setting, model.id) && (model.purposes ?? ['llm']).includes(purpose)),
+			purpose
+		);
 	}
 
 	const modelPickerProvider = $derived(providerGroups.find((provider) => provider.id === modelPickerProviderId) ?? null);
@@ -624,11 +627,13 @@
 		const provider = modelPickerProvider;
 		if (!provider) return [];
 		const query = modelPickerSearch.trim().toLowerCase();
-		if (!query) return provider.models;
-		return provider.models.filter((model) => {
-			const text = `${model.id} ${model.label ?? ''} ${model.notes ?? ''} ${model.speed_label ?? ''} ${model.comment_ja ?? ''} ${model.comment_en ?? ''}`.toLowerCase();
-			return text.includes(query);
-		});
+		if (!query) return sortModels(provider.models);
+		return sortModels(
+			provider.models.filter((model) => {
+				const text = `${model.id} ${model.label ?? ''} ${model.notes ?? ''} ${model.speed_label ?? ''} ${model.comment_ja ?? ''} ${model.comment_en ?? ''}`.toLowerCase();
+				return text.includes(query);
+			})
+		);
 	});
 
 	function formatBytes(bytes: number | null | undefined): string {
@@ -696,7 +701,7 @@
 						<section class="generation-model-provider">
 							<h3>{provider.label}</h3>
 							<div class="generation-model-grid">
-								{#each provider.models as model (model.id)}
+								{#each sortModels(provider.models, modelSelectionTab === 'vision' ? 'vision' : 'llm') as model (model.id)}
 								<button
 									type="button"
 									class="model-metadata-hover"

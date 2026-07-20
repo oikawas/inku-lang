@@ -115,6 +115,9 @@
 		elapsed_total_ms: number;
 		source_ddl?: string | null;
 		focus?: string | null;
+		variation_amplitude?: string | null;
+		variation_seed?: number | null;
+		variation_moved_axes?: Array<{ axis: string; from: string; to: string }>;
 		interpret_fallback_used?: boolean;
 		interpret_fallback_reasons?: string[];
 		tokens_in_stage1: number | null;
@@ -123,11 +126,9 @@
 		tokens_out_stage2: number | null;
 		user_generation_count?: number | null;
 	};
-	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'language_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'focus';
-	// v1.98: 焦点。中央固定を再構成するときの寄せ先。未指定なら DDL テキストから決定的に選ばれる。
-	const FOCUS_IDS = ['upper_right', 'upper_left', 'lower_right', 'lower_left', 'upper_edge', 'right_half'] as const;
-	type FocusId = (typeof FOCUS_IDS)[number];
+	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'language_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change' | 'hensou';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
+	type HensouAmplitude = 'small' | 'medium' | 'large';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
@@ -3417,7 +3418,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -4884,50 +4885,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return { id: `comp-${varySeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { vary_seed: varySeed } } };
 	}
 
-	function focusLabel(focus: FocusId): string {
-		const ja: Record<FocusId, string> = {
-			upper_right: '右上の焦点', upper_left: '左上の焦点', lower_right: '右下の焦点',
-			lower_left: '左下の焦点', upper_edge: '上端寄りの焦点', right_half: '右半分の焦点'
-		};
-		const en: Record<FocusId, string> = {
-			upper_right: 'upper-right focus', upper_left: 'upper-left focus', lower_right: 'lower-right focus',
-			lower_left: 'lower-left focus', upper_edge: 'upper-edge focus', right_half: 'right-half focus'
-		};
-		return getLang() === 'ja' ? ja[focus] : en[focus];
-	}
-
-	function focusCandidateList(count: number): FocusId[] {
-		const current = (result?.focus ?? null) as FocusId | null;
-		const rest = FOCUS_IDS.filter((id) => id !== current);
-		return rest.slice(0, count);
-	}
-
-	async function focusVariationCandidate(focus: FocusId, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		const source = input.trim();
-		const baseDdl = ddl ?? "";
-		const r = await apiFetch("/api/compose", {
-			method: "POST",
-			signal,
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				ddl: baseDdl,
-				original_text: source,
-				model: qualifiedModelId(stage2Provider, stage2Model),
-				instruction_lang: instructionLang,
-				ui_lang: getLang(),
-				catalog_id: refinementCatalogId(),
-				canvas_aspect: refinementCanvasAspectId(),
-				auto_repair: ddlAutoRepairEnabled,
-				focus,
-				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
-				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
-			})
-		});
-		if (!r.ok) throw new Error(await r.text());
-		const data = await r.json();
-		return { id: `focus-${focus}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), focus, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { focus } } };
-	}
-
 	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
 		const interpretationSeed = createInterpretationSeed();
@@ -4998,6 +4955,94 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		};
 	}
 
+	async function hensouVariationCandidate(amplitude: HensouAmplitude, seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+		const source = input.trim();
+		const baseDdl = ddl ?? "";
+		const r = await apiFetch("/api/compose", {
+			method: "POST",
+			signal,
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				ddl: baseDdl,
+				original_text: source,
+				model: qualifiedModelId(stage2Provider, stage2Model),
+				instruction_lang: instructionLang,
+				ui_lang: getLang(),
+				catalog_id: refinementCatalogId(),
+				canvas_aspect: refinementCanvasAspectId(),
+				auto_repair: ddlAutoRepairEnabled,
+				variation_amplitude: amplitude,
+				variation_seed: seed,
+				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
+				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
+			})
+		});
+		if (!r.ok) throw new Error(await r.text());
+		const data = await r.json();
+		return {
+			id: `hensou-${amplitude}-${seed}`,
+			label,
+			selected: false,
+			result: {
+				...composeCandidateResult(source, baseDdl, data),
+				lineage_parent_node_id: currentLineageParentId(),
+				derivation_kind: currentLineageParentId() ? 'hensou' : null,
+				derivation_metadata: { variation_amplitude: amplitude, variation_seed: seed },
+			},
+		};
+	}
+
+	// 変奏の seed はサーバーが採番する。seed 空間の管理と重複回避を UI に持ち込まない。
+	async function allocateHensouSeeds(amplitude: HensouAmplitude, count: number): Promise<number[]> {
+		const r = await apiFetch("/api/variation/seeds", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ amplitude, count })
+		});
+		if (!r.ok) throw new Error(await r.text());
+		return (await r.json()).seeds as number[];
+	}
+
+	async function generateHensouCandidates(amplitude: HensouAmplitude) {
+		if (!result || variationGridBusy || loading) return;
+		const source = input.trim();
+		if (!source || !ddl) return;
+		const abortController = new AbortController();
+		variationGridAbortController = abortController;
+		variationCandidates = [];
+		variationGridBusy = true;
+		variationGridCanAbort = false;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
+		variationGridIncludesReading = false;
+		variationGridTaskLabel = t().hensouTitle;
+		variationGridStatus = null;
+		const abortTimer = window.setTimeout(() => {
+			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
+		}, 3000);
+		try {
+			const seeds = await allocateHensouSeeds(amplitude, 4);
+			variationCandidates = await Promise.all(seeds.map((seed, index) =>
+				hensouVariationCandidate(amplitude, seed, `${t().hensouTitle} ${index + 1}`, abortController.signal)
+			));
+			for (const candidate of variationCandidates) {
+				variationTokensIn = addTokens(variationTokensIn, paintTokensIn(candidate.result));
+				variationTokensOut = addTokens(variationTokensOut, paintTokensOut(candidate.result));
+			}
+		} catch (e) {
+			if (!(e instanceof DOMException && e.name === "AbortError")) variationGridStatus = e instanceof Error ? e.message : String(e);
+		} finally {
+			window.clearTimeout(abortTimer);
+			if (variationGridAbortController === abortController) {
+				variationGridAbortController = null;
+				variationGridBusy = false;
+				variationGridCanAbort = false;
+				variationElapsed.stop();
+			}
+		}
+	}
+
 	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string) {
 		if (!result || variationGridBusy || loading) return;
 		const source = input.trim();
@@ -5040,7 +5085,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
 			}
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
-			const focusCandidateIds = kind === "focus" ? focusCandidateList(count) : [];
 			const jobs = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
@@ -5053,10 +5097,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				}
 				if (kind === "reading") {
 					return interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
-				}
-				if (kind === "focus") {
-					const focus = focusCandidateIds[index] ?? focusCandidateIds[0];
-					return focusVariationCandidate(focus, focusLabel(focus), abortController.signal);
 				}
 				const catalogId = catalogIds[index];
 				return renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
@@ -6003,6 +6043,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{languageInspectionTokensOut}
 				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
+				onGenerateHensouCandidates={generateHensouCandidates}
 				onAbortVariationCandidates={abortVariationCandidates}
 				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
 				onShowVariationCandidate={showVariationCandidate}

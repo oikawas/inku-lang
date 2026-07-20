@@ -355,11 +355,18 @@ def _select_category(
     if swap_offset is None:
         return default
     # 型の差し替え: 既定と同じ結果に落ちた場合は隣の選択肢へ送る (契約 §3.2)。
+    # 本当に別の型へ移る組み合わせを優先し、順序だけの入れ替えは候補が
+    # 採用本数と同数で他に選びようがないときの最後の手段にする。
+    reordered: list[str] | None = None
     for step in range(len(pool) + 1):
         alternate = _pick(pool, count, text=text, salt=f"{salt}#hensou{swap_offset + step}")
-        if alternate != default:
+        if alternate == default:
+            continue
+        if set(alternate) != set(default):
             return alternate
-    return default
+        if reordered is None:
+            reordered = alternate
+    return reordered if reordered is not None else default
 
 
 def _category_plan(profile: _FilterProfile, *, has_structural: bool) -> tuple[int, int, int]:

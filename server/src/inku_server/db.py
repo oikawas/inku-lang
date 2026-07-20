@@ -2852,6 +2852,14 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
         return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
 
+def _neighbor_score(raw: str | None) -> dict:
+    try:
+        score = json.loads(raw) if raw else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return score if isinstance(score, dict) else {}
+
+
 def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000) -> list[dict]:
     """Load only fields used by similarity ranking, avoiding SVG and lineage hydration."""
     with SessionLocal() as session:
@@ -2867,7 +2875,7 @@ def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000)
             .limit(limit)
             .all()
         )
-        return [{"id": row.id, "at": row.at, "score": row.score or {}} for row in rows]
+        return [{"id": row.id, "at": row.at, "score": _neighbor_score(row.score)} for row in rows]
 
 
 def delete_all(user_id: str) -> None:

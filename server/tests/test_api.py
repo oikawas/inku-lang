@@ -2716,7 +2716,7 @@ def test_log_retention_settings_are_admin_only():
 def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     settings = default_model_settings()
     nvidia_models = settings["providers"]["nvidia"]["models"]
-    assert len(nvidia_models) == 43
+    assert len(nvidia_models) == 44
 
     gemma = next(model for model in nvidia_models if model["id"] == "google/gemma-4-31b-it")
     assert gemma["purposes"] == ["llm", "vision"]
@@ -2724,12 +2724,12 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     assert gemma["recommendation_llm"] == 4
     assert gemma["recommendation_vision"] == 5
     assert gemma["speed_class"] == "medium"
-    assert gemma["speed_label"] == "昼 221s / 夕 114s"
+    assert gemma["speed_label"] == "昼 221s / 夕 114s / 深夜 199s"
     assert "スキーマ違反なし" in gemma["comment_ja"]
 
     llm_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="llm") if provider["id"] == "nvidia")
     vision_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="vision") if provider["id"] == "nvidia")
-    assert len(llm_nvidia["models"]) == 39
+    assert len(llm_nvidia["models"]) == 40
     assert len(vision_nvidia["models"]) == 10
 
     normalized = normalize_model_settings({
@@ -2750,7 +2750,7 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
         },
     })
     normalized_models = normalized["providers"]["nvidia"]["models"]
-    assert len(normalized_models) == 43
+    assert len(normalized_models) == 44
     overridden = next(model for model in normalized_models if model["id"] == "google/gemma-4-31b-it")
     assert overridden["label"] == "Gemma custom label"
     assert overridden["purposes"] == ["vision"]
@@ -2776,7 +2776,7 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     assert legacy_gemma["label"] == "Legacy stored label"
     assert legacy_gemma["purposes"] == ["llm", "vision"]
     assert legacy_gemma["recommendation_llm"] == 4
-    assert legacy_gemma["speed_label"] == "昼 221s / 夕 114s"
+    assert legacy_gemma["speed_label"] == "昼 221s / 夕 114s / 深夜 199s"
 
 
 def test_model_settings_store_keys_server_side(monkeypatch):
@@ -2844,7 +2844,7 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
     nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
     nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
-    assert len(nvidia_llm["models"]) == 39
+    assert len(nvidia_llm["models"]) == 40
     assert len(nvidia_vision["models"]) == 10
     assert all("llm" in model["purposes"] for model in nvidia_llm["models"])
     assert all("vision" in model["purposes"] for model in nvidia_vision["models"])

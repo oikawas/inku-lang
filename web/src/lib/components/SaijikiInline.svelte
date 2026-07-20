@@ -11,17 +11,28 @@
 		svg: string;
 	};
 
+	type PluginEntry = {
+		qualified_name: string;
+		note_ja: string;
+		note_en: string;
+	};
+
 	type Props = {
 		activePreview: SaijikiPreview | null;
+		/** Namespaced plugin vocabulary, same list the saijiki drawer shows. */
+		pluginEntries?: PluginEntry[];
 		onInsertWord: (word: string) => void;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
 	};
 
 	let {
 		activePreview = $bindable(),
+		pluginEntries = [],
 		onInsertWord,
 		previewForWord,
 	}: Props = $props();
+
+	const isJapanese = $derived(t().code === 'ja');
 </script>
 
 <aside class="saijiki-inline">
@@ -64,6 +75,28 @@
 				</div>
 			</div>
 		{/each}
+		{#if pluginEntries.length > 0}
+			<div class="saijiki-cat plugin-cat">
+				<div class="saijiki-cat-head">
+					<span class="saijiki-cat-ja">Plugin</span>
+					<span class="saijiki-cat-en">namespaced vocabulary</span>
+				</div>
+				<div class="saijiki-chips">
+					{#each pluginEntries as entry (entry.qualified_name)}
+						<div class="plugin-word-with-note">
+							<button
+								class="saijiki-chip plugin-chip"
+								onpointerdown={(e) => e.preventDefault()}
+								onclick={() => onInsertWord(entry.qualified_name)}
+							>{entry.qualified_name}</button>
+							{#if isJapanese ? entry.note_ja : entry.note_en}
+								<span class="plugin-note">{isJapanese ? entry.note_ja : entry.note_en}</span>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
 	</div>
 </aside>
 
@@ -196,6 +229,9 @@
 	}
 	.saijiki-cat.plugin-cat { border-left: 2px solid rgba(185, 88, 69, 0.45); }
 	.saijiki-chip.plugin-chip { color: #9f4b3b; border-color: rgba(185, 88, 69, 0.35); background: rgba(185, 88, 69, 0.08); }
+	:global(html[data-theme='dark']) .saijiki-chip.plugin-chip { color: #f0a58f; border-color: rgba(226, 138, 112, 0.45); background: rgba(185, 88, 69, 0.22); }
+	.plugin-word-with-note { display: flex; flex-direction: column; gap: 3px; max-width: 18rem; }
+	.plugin-note { color: var(--fg3); font-size: 0.68rem; line-height: 1.25; }
 	.saijiki-chip:hover,
 	.saijiki-chip:focus-visible {
 		background: var(--bg2);

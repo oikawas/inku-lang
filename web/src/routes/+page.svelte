@@ -6117,6 +6117,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	runTokensOut={activeRunTokensOut}
 	error={ddlDialogError}
 	previewForWord={saijikiPreview}
+	{pluginEntries}
 	showTenkei={ddlDialogMode === 'edit'}
 	tenkeiValue={ddlDialogTenkeiOverride ?? normalizeTenkei(ddlDialogNode?.history?.tenkei) ?? DEFAULT_TENKEI}
 	tenkeiInherited={ddlDialogTenkeiOverride === null}

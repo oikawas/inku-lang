@@ -29,6 +29,7 @@
 		runTokensOut: number | null;
 		error: string | null;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
+		pluginEntries?: { qualified_name: string; note_ja: string; note_en: string }[];
 		showTenkei?: boolean;
 		tenkeiValue?: TenkeiLevel;
 		tenkeiInherited?: boolean;
@@ -37,7 +38,7 @@
 		onClose: () => void;
 	};
 
-	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, error, previewForWord, showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
+	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
 
 	let value = $state('');
 	let focused = $state(false);
@@ -188,6 +189,7 @@
 			</div>
 			<SaijikiInline
 				bind:activePreview={activeSaijikiPreview}
+				{pluginEntries}
 				onInsertWord={insertWord}
 				{previewForWord}
 			/>

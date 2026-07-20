@@ -74,7 +74,6 @@ export interface LangPack {
 	demoSeedPhrase: string;
 	demoInterval: string;
 	demoStart: string;
-	demoStop: string;
 	demoRunning: string;
 	demoGeneratedPrompt: string;
 	demoGeneratedDdl: string;
@@ -89,6 +88,14 @@ export interface LangPack {
 	// Submit / loading
 	submitBtn: string;
 	stopBtn: string;
+	errorModelGone: (stage: string) => string;
+	errorProviderAuth: (stage: string) => string;
+	errorProviderRateLimit: (stage: string) => string;
+	errorProviderOther: (stage: string, status: number) => string;
+	runStatusElapsed: (seconds: string) => string;
+	runStatusTokens: (input: string, output: string) => string;
+	runStatusStage1: string;
+	runStatusStage2: string;
 	stageDdlGenerating: string;
 	stageImageGenerating: string;
 	stageInterpreting: string;
@@ -99,6 +106,7 @@ export interface LangPack {
 	vocabInInputLabel: string;
 	thinkingLabel: string;
 	ddlLabel: string;
+	ddlExpandedLabel: string;
 	ddlEditSectionLabel: string;
 	ddlNewButton: string;
 	ddlNewDialogTitle: string;
@@ -141,6 +149,8 @@ export interface LangPack {
 	canvasVaryComposition: string;
 	canvasVaryInterpretation: string;
 	canvasVaryColor: string;
+	canvasVaryFocus: string;
+	refineFocusHint: string;
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;
 	variationGridSaveSelected: string;
@@ -168,6 +178,12 @@ export interface LangPack {
 	tooltipInputLang: string;
 	tooltipInputModel: string;
 	tooltipInputClear: string;
+	tooltipInputTenkei: string;
+	tooltipInputCanvas: string;
+	tooltipDdlNew: string;
+	tooltipSaijikiToggle: string;
+	tooltipDdlExpandedToggle: string;
+	tooltipStatsToggle: string;
 	tooltipSubmit: string;
 	tooltipDdlPaint: string;
 	tooltipInputTabSingle: string;
@@ -182,6 +198,7 @@ export interface LangPack {
 	tooltipCanvasVaryComposition: string;
 	tooltipCanvasVaryInterpretation: string;
 	tooltipCanvasVaryColor: string;
+	tooltipCanvasVaryFocus: string;
 	tooltipCanvasNavPrev: string;
 	tooltipCanvasNavNext: string;
 	tooltipCanvasNavLatest: string;
@@ -233,7 +250,6 @@ export interface LangPack {
 	refineGenerating: string;
 	refineGeneratingBody: string;
 	refineGeneratingTask: (task: string) => string;
-	refineAbortButton: string;
 	aiRefineTitle: string;
 	aiRefineModeLabel: string;
 	aiRefineRandomMode: string;
@@ -251,8 +267,6 @@ export interface LangPack {
 	aiRefineGensLabel: string;
 	aiRefineElementsLabel: string;
 	aiRefineStartButton: string;
-	aiRefineRunningButton: string;
-	aiRefineAbortButton: string;
 	aiRefineCompleted: string;
 	aiRefineStepStatus: (gens: number, step: number, label: string) => string;
 	aiRefineMinElementsError: string;
@@ -316,6 +330,8 @@ export interface LangPack {
 	// Elapsed / tokens
 	elapsedDetailed: (s1: number, s2: number, total: number) => string;
 	resultLogLabel: string;
+	interpretFallbackBadge: string;
+	interpretFallbackHint: (reason: string) => string;
 	statsInterp: string;
 	statsStruct: string;
 	statsTotal: string;

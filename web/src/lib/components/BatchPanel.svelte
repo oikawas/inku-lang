@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import InkuMascot from './InkuMascot.svelte';
 	import PaintButton from './PaintButton.svelte';
-	import StopButton from './StopButton.svelte';
+	import RunStatus from './RunStatus.svelte';
 
 	type BatchFailure = {
 		line: number;
@@ -24,6 +23,8 @@
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		batchActiveTokensIn: number | null;
 		batchActiveTokensOut: number | null;
 		batchTokensInTotal: number;
@@ -53,6 +54,8 @@
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
+		runTokensIn,
+		runTokensOut,
 		batchActiveTokensIn,
 		batchActiveTokensOut,
 		batchTokensInTotal,
@@ -159,24 +162,16 @@
 {/if}
 
 {#if batchRunning && batchTotal > 0}
-	<div class="batch-progress">
-		{#if showCrab}
-			<div class="batch-mascot"><InkuMascot /></div>
-		{/if}
-		<div class="batch-progress-table">
-			<div class="batch-progress-row">
-				<span class="batch-progress-key">{t().statsProgress}</span>
-				<span class="batch-progress-value">{t().batchProgress(batchCurrent, batchTotal)}</span>
-			</div>
-			<div class="batch-progress-row">
-				<span class="batch-progress-key">{t().statsTotal}</span>
-				<span class="batch-progress-value">
-					<span><span class="batch-metric-label">{t().statsElapsed}</span>{(liveMs / 1000).toFixed(1)}s</span>
-					<span><span class="batch-metric-label">{t().statsTokens}</span>{tokenPair(batchTokensInTotal, batchTokensOutTotal)}</span>
-				</span>
-			</div>
-		</div>
-		<StopButton onclick={onStop}>{t().stopBtn}</StopButton>
+	<div class="batch-progress-wrap">
+		<RunStatus
+			label={t().batchProgress(batchCurrent, batchTotal)}
+			stage1Model={stage1ModelLabel}
+			stage2Model={stage2ModelLabel}
+			elapsedMs={liveMs}
+			tokensIn={batchTokensInTotal || runTokensIn}
+			tokensOut={batchTokensOutTotal || runTokensOut}
+			onStop={onStop}
+		/>
 	</div>
 {:else}
 	<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled}>{t().submitBtn}</PaintButton>
@@ -303,59 +298,7 @@
 		pointer-events: none;
 		z-index: 0;
 	}
-	.batch-progress {
-		display: flex; align-items: center; gap: 10px;
-		padding: 8px 10px;
-		border: 1px solid var(--border2); border-radius: var(--r);
-		background: var(--panel); font-size: 12px; color: var(--fg2);
-		margin-top: 8px;
-		min-width: 0;
-	}
-	.batch-progress :global(.stop-btn) {
-		margin-left: auto;
-		align-self: center;
-		flex: 0 0 auto;
-		width: auto;
-		min-width: 0;
-		padding: 7px 14px;
-		font-size: 13px;
-		letter-spacing: 0.06em;
-	}
-	.batch-mascot { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 36px; align-self: center; }
-	.batch-progress-table {
-		display: grid;
-		gap: 4px;
-		flex: 1 1 auto;
-		min-width: 0;
-	}
-	.batch-progress-row {
-		display: grid;
-		grid-template-columns: minmax(48px, 0.45fr) minmax(0, 1.55fr);
-		gap: 8px;
-		align-items: center;
-		min-width: 0;
-	}
-	.batch-progress-key {
-		color: var(--fg3);
-		min-width: 0;
-	}
-	.batch-progress-value {
-		display: grid;
-		grid-template-columns: minmax(86px, 1fr) minmax(100px, 1.1fr);
-		gap: 6px 10px;
-		min-width: 0;
-		font-variant-numeric: tabular-nums;
-	}
-	.batch-progress-row:first-child .batch-progress-value {
-		display: block;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.batch-progress-value > span {
-		min-width: 0;
-		white-space: nowrap;
-	}
+	.batch-progress-wrap { margin-top: 8px; }
 	.batch-metric-label {
 		display: inline-block;
 		min-width: 3.9em;
@@ -363,7 +306,7 @@
 		color: var(--fg3);
 		font-variant-numeric: normal;
 	}
-	.error-text { color: #a2342a; font-size: 12px; }
+	.error-text { color: var(--danger); font-size: 12px; white-space: pre-line; }
 	.batch-summary {
 		margin-top: 8px;
 		padding: 8px 10px;
@@ -402,7 +345,7 @@
 	}
 	.batch-failure-message {
 		grid-column: 2;
-		color: #a2342a;
+		color: var(--danger);
 		font-size: 11px;
 		word-break: break-word;
 	}
@@ -450,24 +393,5 @@
 		font-size: 12px;
 		line-height: 1.55;
 		white-space: pre-wrap;
-	}
-	.batch-observe-body :global(.ddl-token) {
-		border-radius: 2px;
-		font-weight: inherit;
-	}
-	.batch-observe-body :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
-	.batch-observe-body :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
-	.batch-observe-body :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
-	.batch-observe-body :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
-	.batch-observe-body :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
-	.batch-observe-body :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
-	.batch-observe-body :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
-	.batch-observe-body :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
-	.batch-observe-body :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
-	.batch-observe-body :global(.ddl-token-plugin) { color: #9f4b3b; background: rgba(185, 88, 69, 0.10); }
-	.batch-observe-body :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
-	.batch-observe-body :global(.ddl-token-emotion) {
-		color: #9b7a66;
-		font-style: inherit;
 	}
 </style>

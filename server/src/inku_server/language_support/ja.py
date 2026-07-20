@@ -111,6 +111,7 @@ def expand_intermediate(
     *,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
+    focus: str | None = None,
 ) -> str:
     return expand_intermediate_ddl(
         ddl,
@@ -119,6 +120,7 @@ def expand_intermediate(
         vary_seed=vary_seed,
         plugin_instructions_present=plugin_instructions_present,
         tenkei=tenkei,
+        focus=focus,
     )
 
 

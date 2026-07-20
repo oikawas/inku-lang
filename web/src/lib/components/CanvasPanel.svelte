@@ -7,8 +7,7 @@
 	import OutputTabsContent from './OutputTabsContent.svelte';
 	import LineagePanel, { type LineageGraph, type LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
-	import StopButton from './StopButton.svelte';
-	import InkuMascot from './InkuMascot.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
@@ -18,12 +17,12 @@
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: Score; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
+	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'focus';
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
@@ -96,6 +95,17 @@
 		variationBusy: boolean;
 		variationCandidates: VariationCandidate[];
 		variationGridBusy: boolean;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
+		variationElapsedMs: number;
+		variationTokensIn: number | null;
+		variationTokensOut: number | null;
+		modelInspectionElapsedMs: number;
+		modelInspectionTokensIn: number | null;
+		modelInspectionTokensOut: number | null;
+		languageInspectionElapsedMs: number;
+		languageInspectionTokensIn: number | null;
+		languageInspectionTokensOut: number | null;
 		variationGridCanAbort: boolean;
 		variationGridIncludesReading: boolean;
 		variationGridTaskLabel: string;
@@ -146,6 +156,7 @@
 		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
+		onToggleSaijiki: () => void;
 		onCloseRefinement: () => void;
 		statusDdlOrigin: boolean;
 		statusTenkei: TenkeiLevel | null;
@@ -233,6 +244,17 @@
 		variationBusy = false,
 		variationCandidates = [],
 		variationGridBusy = false,
+		runTokensIn = null,
+		runTokensOut = null,
+		variationElapsedMs = 0,
+		variationTokensIn = null,
+		variationTokensOut = null,
+		modelInspectionElapsedMs = 0,
+		modelInspectionTokensIn = null,
+		modelInspectionTokensOut = null,
+		languageInspectionElapsedMs = 0,
+		languageInspectionTokensIn = null,
+		languageInspectionTokensOut = null,
 		variationGridCanAbort = false,
 		variationGridIncludesReading = false,
 		variationGridTaskLabel = '',
@@ -283,6 +305,7 @@
 		onDrawLineageDescription,
 		onDrawLineageDdl,
 		onOpenLineageDdlEditor,
+		onToggleSaijiki,
 		onCloseRefinement,
 		statusDdlOrigin,
 		statusTenkei,
@@ -311,7 +334,11 @@
 	let refineModalOpen = $state(false);
 	let refineKind = $state<RefineKind>('touch');
 	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
-	const statusGenerationLabel = $derived(statusGeneration ? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`) : (isJapanese ? '独立作品' : 'Standalone'));
+	const statusGenerationValue = $derived(
+		statusGeneration
+			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
+			: (isJapanese ? '独立作品' : 'Standalone')
+	);
 	const LANGUAGE_COMBOS: Array<['ja' | 'en', 'ja' | 'en']> = [['ja', 'ja'], ['ja', 'en'], ['en', 'ja'], ['en', 'en']];
 	function langName(lang: 'ja' | 'en'): string {
 		return lang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : 'English';
@@ -334,7 +361,7 @@
 	const refineCostLabel = $derived(
 		refineKind === 'reading'
 			? t().refineCostReading
-			: refineKind === 'layout'
+			: refineKind === 'layout' || refineKind === 'focus'
 				? t().refineCostLayout
 				: refineKind === 'color'
 					? t().refineCostColor
@@ -407,6 +434,12 @@
 				.replace('{vary}', result.vary_seed == null ? t().seedBaseLabel : String(result.vary_seed))
 			: ''
 	);
+	// v1.98: Stage 1 が失敗してフォールバック DDL で描かれた作品を明示する。
+	const interpretFallbackReason = $derived(
+		statusHistoryItem
+			? (statusHistoryItem.interpret_fallback ?? null)
+			: (result?.interpret_fallback_used ? (result?.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
+	);
 	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
 	const detailVarySeed = $derived(statusHistoryItem?.vary_seed ?? result?.vary_seed ?? null);
 	const detailInterpretationSeed = $derived(statusHistoryItem?.interpretation_seed ?? result?.interpretation_seed ?? null);
@@ -444,7 +477,10 @@
 		{#if result}
 			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Displayed artwork information'}>
 				<span class="render-meta-scope">{isJapanese ? '\u8868\u793a\u4e2d' : 'Displayed'}</span>
-				<span class="render-meta-generation">{statusGenerationLabel}</span>
+				<span class="render-meta-item render-meta-generation">
+					{#if statusGeneration}<span class="render-meta-label">{isJapanese ? '系譜' : 'Lineage'}</span>{/if}
+					<strong>{statusGenerationValue}</strong>
+				</span>
 				<span class="render-meta-item render-meta-model">
 					<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
 					<strong title={statusStage1Model + ' / ' + statusStage2Model}>
@@ -519,6 +555,9 @@
 				</div>
 {#if unsavedRefinementPreview}
 	<div class="unsaved-refinement-badge" role="status">{t().unsavedRefinementPreviewLabel}</div>
+{/if}
+{#if interpretFallbackReason}
+	<div class="interpret-fallback-badge" role="status" title={t().interpretFallbackHint(interpretFallbackReason)}>{t().interpretFallbackBadge}</div>
 {/if}
 {#if lineageIntermediateNotice}
 	<div class="lineage-intermediate-notice" role="status">{lineageIntermediateNotice}</div>
@@ -636,6 +675,15 @@
 												</span>
 											</Tooltip>
 										</label>
+										<label class="model-choice" class:checked={refineKind === 'focus'}>
+											<input type="radio" name="refine-kind" value="focus" checked={refineKind === 'focus'} onchange={() => (refineKind = 'focus')} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryFocus}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryFocus}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
 										<label class="model-choice" class:checked={refineKind === 'touch'}>
 											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
@@ -646,6 +694,9 @@
 											</Tooltip>
 										</label>
 									</div>
+									{#if refineKind === 'focus'}
+										<p class="refine-focus-hint">{t().refineFocusHint}</p>
+									{/if}
 									{#if refineKind === 'touch'}
 										<label class="touch-seed-field">
 											<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={variationBusy || variationGridBusy} />
@@ -678,7 +729,6 @@
 												</PaintButton>
 											</div>
 										</Tooltip>
-										{#if variationGridBusy && variationGridCanAbort}<div class="refine-stop-wrap"><StopButton onclick={onAbortVariationCandidates}>{t().refineAbortButton}</StopButton></div>{/if}
 										<div class="refine-tenkei-row"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /></div>
 										{#if refineCostLabel}
 											<div class="refine-cost-indicator" aria-live="polite">
@@ -691,10 +741,15 @@
 										{/if}
 
 									{#if variationBusy || variationGridBusy}
-										<div class="model-drawing-animation refine-drawing-animation" aria-live="polite">
-											<div class="model-drawing-spinner" aria-hidden="true"></div>
-											<div><strong>{t().refineGenerating}</strong><span>{t().refineGeneratingTask(variationGridTaskLabel)}</span></div>
-										</div>
+										<RunStatus
+											label={t().refineGeneratingTask(variationGridTaskLabel)}
+											stage1Model={statusStage1Model}
+											stage2Model={statusStage2Model}
+											elapsedMs={variationElapsedMs}
+											tokensIn={variationTokensIn}
+											tokensOut={variationTokensOut}
+											onStop={variationGridBusy && variationGridCanAbort ? onAbortVariationCandidates : null}
+										/>
 									{/if}
 									</div>
 								</section>
@@ -738,14 +793,15 @@
 						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 						<div class="compare-action-wrap">
 							{#if modelInspectionBusy}
-								<div class="compare-status" aria-live="polite">
-									<div class="compare-mascot"><InkuMascot /></div>
-									<div class="compare-status-info">
-										<span class="compare-status-label">{t().modelCompareBusy}</span>
-										{#if modelInspectionCurrentModel}<span class="compare-status-model">{modelInspectionCurrentModel}</span>{/if}
-									</div>
-									<StopButton onclick={onAbortModelInspection}>{t().stopBtn}</StopButton>
-								</div>
+								<RunStatus
+									variant="inline"
+									label={t().modelCompareBusy}
+									model={modelInspectionCurrentModel}
+									elapsedMs={modelInspectionElapsedMs}
+									tokensIn={modelInspectionTokensIn}
+									tokensOut={modelInspectionTokensOut}
+									onStop={onAbortModelInspection}
+								/>
 							{:else}
 								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionSelectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
 							{/if}
@@ -816,14 +872,15 @@
 							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 							<div class="compare-action-wrap">
 								{#if languageInspectionBusy}
-									<div class="compare-status" aria-live="polite">
-										<div class="compare-mascot"><InkuMascot /></div>
-										<div class="compare-status-info">
-											<span class="compare-status-label">{isJapanese ? '比較中' : 'Comparing'}</span>
-											{#if languageInspectionCurrentLabel}<span class="compare-status-model">{languageInspectionCurrentLabel}</span>{/if}
-										</div>
-										<StopButton onclick={onAbortLanguageInspection}>{t().stopBtn}</StopButton>
-									</div>
+									<RunStatus
+										variant="inline"
+										label={isJapanese ? '比較中' : 'Comparing'}
+										model={languageInspectionCurrentLabel}
+										elapsedMs={languageInspectionElapsedMs}
+										tokensIn={languageInspectionTokensIn}
+										tokensOut={languageInspectionTokensOut}
+										onStop={onAbortLanguageInspection}
+									/>
 								{:else}
 									<PaintButton onclick={onRunLanguageInspection} disabled={!result || variationGridBusy || languageInspectionSelectedCombos.length === 0}>{isJapanese ? '選んだ組み合わせで比較' : 'Compare selected combinations'}</PaintButton>
 								{/if}
@@ -854,7 +911,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
 			{/if}
 		</div>
 
@@ -969,6 +1026,13 @@
 				aria-expanded={generationInfoOpen}
 				onclick={() => (generationInfoOpen = !generationInfoOpen)}
 			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation Info'}</button>
+		</Tooltip>
+		<Tooltip placement="top" text={t().tooltipSaijikiToggle}>
+			<button
+				type="button"
+				class="ghost-btn saijiki-open-btn"
+				onclick={onToggleSaijiki}
+			>{t().saijikiToggleBtn}</button>
 		</Tooltip>
 		<div class="png-wrap">
 			<Tooltip placement="left" text={t().tooltipCanvasDownloadSvg}>
@@ -1152,7 +1216,8 @@
 		color: var(--fg3);
 	}
 	.render-meta-scope { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; background: var(--bg2); color: var(--fg2); font-size: 10px; font-weight: 600; white-space: nowrap; }
-	.render-meta-generation { flex: 0 0 auto; color: var(--fg2); font-size: 11px; font-weight: 600; white-space: nowrap; }
+	.render-meta-generation { flex: 0 0 auto; }
+	.render-meta-generation strong { max-width: none; }
 	.render-meta-item {
 		display: inline-flex;
 		align-items: baseline;
@@ -1343,9 +1408,7 @@
 		stroke-linejoin: round;
 	}
 	.refine-paint-actions { align-items: stretch; }
-	.refine-stop-wrap { width: min(210px, 100%); display: flex; }
-	.refine-stop-wrap :global(.stop-btn) { width: 100%; min-width: 0; flex: 1; padding: 9px 12px; font-size: 12px; }
-	.refine-drawing-animation { margin-top: 2px; }
+	.refine-focus-hint { margin: 0; font-size: 11px; color: var(--fg3); line-height: 1.5; }
 	.refine-action-wrap { width: min(210px, 100%); }
 	.refine-action-wrap :global(.tooltip-wrap),
 	.refine-action-wrap :global(.paint-btn) { width: 100%; }
@@ -1464,18 +1527,11 @@
 	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
 	/* While comparing, let the status widen past the button width so the full
 	   model name shows without truncation. */
-	.compare-action-wrap:has(.compare-status) { width: auto; min-width: 0; max-width: 62%; }
 	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover :global(.model-hover-card),
 	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
 	.refine-tenkei-row { display: flex; align-items: center; margin-top: 6px; }
-	.compare-status { display: flex; align-items: center; gap: 10px; }
-	.compare-mascot { flex: 0 0 auto; display: flex; align-items: center; }
-	.compare-status-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-	.compare-status-label { font-size: 11px; color: var(--fg3); }
-	.compare-status-model { font-size: 12px; font-weight: 500; color: var(--fg); white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
-	.compare-status :global(.stop-btn) { flex: 0 0 auto; width: auto; min-width: 0; padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em; }
 
 	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
 	.compare-mode-tabs button { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg3); font: inherit; cursor: pointer; }
@@ -1609,34 +1665,6 @@
 		line-height: 1.45;
 		color: var(--fg3);
 	}
-	.model-drawing-animation {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 12px;
-		border: 1px solid var(--border);
-		background: var(--panel);
-		color: var(--fg2);
-	}
-	.model-drawing-animation strong,
-	.model-drawing-animation span { display: block; }
-	.model-drawing-animation span {
-		font-size: 11px;
-		color: var(--fg3);
-		margin-top: 2px;
-	}
-	.model-drawing-spinner {
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-		border: 2px solid var(--border2);
-		border-top-color: var(--accent);
-		animation: spin 0.85s linear infinite;
-		flex: 0 0 auto;
-	}
-
-
-
 	.nav-left,
 	.nav-right {
 		position: absolute;
@@ -1695,6 +1723,8 @@
 	}
 	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
+	.interpret-fallback-badge { position: absolute; top: 12px; right: 12px; z-index: 5; padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
+	:global(html[data-theme='dark']) .interpret-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
 	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: white; box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
 	.nearby-mirror { position: absolute; right: 64px; bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); box-shadow: 0 2px 10px #0002; color: var(--fg3); font-size: 0.68rem; z-index: 4; }
 	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: white; border: 1px solid var(--border); cursor: pointer; }
@@ -1910,6 +1940,7 @@
 	.detail-copy-row { display: flex; align-items: flex-start; gap: 8px; }
 	.detail-copy-row code { min-width: 0; flex: 1; }
 	.detail-copy-row button { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: 5px; padding: 3px 7px; background: var(--panel); color: var(--fg2); font: inherit; font-size: 10px; cursor: pointer; }
+	.saijiki-open-btn { flex: 0 0 auto; white-space: nowrap; }
 	.generation-info-button {
 		flex: 0 0 auto;
 		border: 1px solid var(--border2);
@@ -1953,6 +1984,7 @@
 		letter-spacing: 0.06em;
 		color: #4d5f86;
 	}
+	:global(html[data-theme='dark']) .status-hash-code { color: #a9c0ee; }
 	.export-btn {
 		display: inline-flex;
 		align-items: center;

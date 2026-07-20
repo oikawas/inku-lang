@@ -76,7 +76,8 @@ class HistoryRow(Base):
     user_id      = Column(String,     ForeignKey("user_accounts.id"), nullable=True, index=True)
     at           = Column(BigInteger, nullable=False, index=True)
     input        = Column(Text,       nullable=False, default="")
-    ddl          = Column(Text,       nullable=True)
+    ddl          = Column(Text,       nullable=True)  # v1.98: 入力側 DDL (Stage 1 出力 / ユーザー原文)
+    expanded_ddl = Column(Text,       nullable=True)  # v1.98: 展開後 DDL (Stage 1.5 出力 = Stage 2 入力)
     score        = Column(Text,       nullable=False, default="{}")
     svg          = Column(Text,       nullable=False, default="")
     output_path  = Column(Text,       nullable=True)
@@ -104,6 +105,9 @@ class HistoryRow(Base):
     render_seed = Column(String, nullable=True)
     vary_seed = Column(String, nullable=True)
     tenkei = Column(String, nullable=True)  # v1.97 添景水準 (none/sparse/auto)。NULL = 保存開始前の作品
+    focus = Column(String, nullable=True)  # v1.98 焦点。NULL = DDL テキストから決定的に選択
+    # v1.98: Stage 1 がフォールバック DDL で描かれた作品の理由。NULL = 通常の解釈。
+    interpret_fallback = Column(String, nullable=True)
     interpretation_seed = Column(String, nullable=True)
     seed_text = Column(Text, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
@@ -270,6 +274,9 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "render_seed": "ALTER TABLE history ADD COLUMN render_seed VARCHAR",
     "vary_seed": "ALTER TABLE history ADD COLUMN vary_seed VARCHAR",
     "tenkei": "ALTER TABLE history ADD COLUMN tenkei VARCHAR",
+    "focus": "ALTER TABLE history ADD COLUMN focus VARCHAR",
+    "interpret_fallback": "ALTER TABLE history ADD COLUMN interpret_fallback VARCHAR",
+    "expanded_ddl": "ALTER TABLE history ADD COLUMN expanded_ddl TEXT",
     "interpretation_seed": "ALTER TABLE history ADD COLUMN interpretation_seed VARCHAR",
     "seed_text": "ALTER TABLE history ADD COLUMN seed_text TEXT",
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
@@ -400,6 +407,7 @@ def _migrate_columns() -> None:
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError("failed to inspect history table columns for migration") from exc
 
+        adding_expanded_ddl = "expanded_ddl" not in existing_history_columns
         for column, ddl in _HISTORY_COLUMN_MIGRATIONS.items():
             if column in existing_history_columns:
                 continue
@@ -407,6 +415,17 @@ def _migrate_columns() -> None:
                 conn.execute(text(ddl))
             except Exception as exc:  # noqa: BLE001
                 raise RuntimeError(f"failed to migrate history.{column}") from exc
+
+        if adding_expanded_ddl:
+            # v1.98: history.ddl の意味を「入力側」に定義し直したため、既存行が持つ
+            # テキスト (Stage 2 に渡った展開後 DDL) を expanded_ddl へ移し、入力側は
+            # NULL = 記録なしとする。Stage 1 出力は保存されたことがないので復元できない。
+            # DDL から直接作られた少数の作品では原文が expanded_ddl 側に入るが、
+            # 作者裁定 (2026-07-20) によりその誤差は許容する。
+            try:
+                conn.execute(text("UPDATE history SET expanded_ddl = ddl, ddl = NULL WHERE ddl IS NOT NULL"))
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError("failed to move legacy history.ddl into expanded_ddl") from exc
 
         try:
             existing_user_columns = {col["name"] for col in inspector.get_columns("user_accounts")}
@@ -1531,6 +1550,7 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "at":           row.at,
         "input":        row.input,
         "ddl":          row.ddl,
+        "expanded_ddl": row.expanded_ddl,
         "score":        score,
         "svg":          row.svg,
         "output_path":  row.output_path,
@@ -1616,6 +1636,10 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["vary_seed"] = row.vary_seed
     if row.tenkei is not None:
         item["tenkei"] = row.tenkei
+    if row.focus is not None:
+        item["focus"] = row.focus
+    if row.interpret_fallback is not None:
+        item["interpret_fallback"] = row.interpret_fallback
     if row.interpretation_seed is not None:
         item["interpretation_seed"] = row.interpretation_seed
     if row.seed_text is not None:
@@ -1728,7 +1752,8 @@ def add_item(item: dict) -> dict:
     node_id = str(uuid.uuid4())
     row = HistoryRow(
         id=item["id"], user_id=item["user_id"], at=item["at"], input=item.get("input", ""),
-        ddl=item.get("ddl"), score=json.dumps(item.get("score", {})), svg=item.get("svg", ""),
+        ddl=item.get("ddl"), expanded_ddl=item.get("expanded_ddl"),
+        score=json.dumps(item.get("score", {})), svg=item.get("svg", ""),
         output_path=item.get("output_path"), elapsed_ms=item.get("elapsed_ms", 0),
         stage1_model=item.get("stage1_model"), stage2_model=item.get("stage2_model"),
         tokens_in=item.get("tokens_in"), tokens_out=item.get("tokens_out"), catalog_id=item.get("catalog_id"),
@@ -1746,7 +1771,8 @@ def add_item(item: dict) -> dict:
         instruction_lang_resolved=item.get("instruction_lang_resolved"), ui_lang=item.get("ui_lang"),
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
         vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
-        tenkei=item.get("tenkei"),
+        tenkei=item.get("tenkei"), focus=item.get("focus"),
+        interpret_fallback=item.get("interpret_fallback"),
         interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
         seed_text=item.get("seed_text"),
         render_hash=render_hash, trashed=0, starred=0, note=item.get("note"),

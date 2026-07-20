@@ -3,7 +3,7 @@
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { DemoSettings } from '$lib/demo';
 	import PaintButton from './PaintButton.svelte';
-	import StopButton from './StopButton.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 
 	type Props = {
@@ -11,6 +11,8 @@
 		providerGroups: ProviderGroup[];
 		running: boolean;
 		liveMs: number;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		waitingSeconds: number | null;
 		currentLiveMs: number | null;
 		currentElapsedMs: number | null;
@@ -41,6 +43,8 @@
 		providerGroups,
 		running,
 		liveMs,
+		runTokensIn,
+		runTokensOut,
 		waitingSeconds,
 		currentLiveMs,
 		currentElapsedMs,
@@ -155,12 +159,15 @@
 
 	<div class="demo-actions">
 		{#if running}
-			<div class="demo-status">
-				<span>{t().demoRunning}</span>
-				<span>{(liveMs / 1000).toFixed(1)}s</span>
-				{#if waitingSeconds !== null}<span>{t().demoWaiting(waitingSeconds)}</span>{/if}
-			</div>
-			<StopButton onclick={onStop}>{t().demoStop}</StopButton>
+			<RunStatus
+				label={waitingSeconds !== null ? `${t().demoRunning} · ${t().demoWaiting(waitingSeconds)}` : t().demoRunning}
+				stage1Model={drawingStage1ModelLabel}
+				stage2Model={drawingStage2ModelLabel}
+				elapsedMs={liveMs}
+				tokensIn={totalTokensIn || runTokensIn}
+				tokensOut={totalTokensOut || runTokensOut}
+				onStop={onStop}
+			/>
 		{:else}
 			<PaintButton onclick={onStart} disabled={!settings.seed_phrase.trim() || promptModels.length === 0 || actionDisabled}>{t().demoStart}</PaintButton>
 		{/if}
@@ -271,14 +278,6 @@
 		justify-content: space-between;
 		gap: 8px;
 	}
-	.demo-status {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		color: var(--fg3);
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
-	}
 	.demo-stats {
 		display: grid;
 		gap: 4px;
@@ -353,21 +352,4 @@
 		line-height: 1.55;
 		white-space: pre-wrap;
 	}
-	.observe-body :global(.ddl-token) {
-		border-radius: 3px;
-		padding: 0 2px;
-		font-weight: 500;
-	}
-	.observe-body :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
-	.observe-body :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
-	.observe-body :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
-	.observe-body :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
-	.observe-body :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
-	.observe-body :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
-	.observe-body :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
-	.observe-body :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
-	.observe-body :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
-	.observe-body :global(.ddl-token-plugin) { color: #9f4b3b; background: rgba(185, 88, 69, 0.10); }
-	.observe-body :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
-	.observe-body :global(.ddl-token-emotion) { color: #875a9c; background: rgba(135, 90, 156, 0.10); }
 </style>

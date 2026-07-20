@@ -37,6 +37,7 @@
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
+	import { createElapsed } from '$lib/elapsed.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
@@ -112,6 +113,10 @@
 		elapsed_stage1_ms: number;
 		elapsed_stage2_ms: number;
 		elapsed_total_ms: number;
+		source_ddl?: string | null;
+		focus?: string | null;
+		interpret_fallback_used?: boolean;
+		interpret_fallback_reasons?: string[];
 		tokens_in_stage1: number | null;
 		tokens_out_stage1: number | null;
 		tokens_in_stage2: number | null;
@@ -119,7 +124,10 @@
 		user_generation_count?: number | null;
 	};
 	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'language_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change';
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'focus';
+	// v1.98: 焦点。中央固定を再構成するときの寄せ先。未指定なら DDL テキストから決定的に選ばれる。
+	const FOCUS_IDS = ['upper_right', 'upper_left', 'lower_right', 'lower_left', 'upper_edge', 'right_half'] as const;
+	type FocusId = (typeof FOCUS_IDS)[number];
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
@@ -258,10 +266,6 @@
 	let batchInput  = $state('');
 	const instructionLang: InstructionLang = 'auto';
 	let stage1UserPrompt = $state('');
-	let ddlTextareaEl = $state<HTMLTextAreaElement | null>(null);
-	let ddlHighlightEl = $state<HTMLDivElement | null>(null);
-	let ddlSelection = $state({ start: 0, end: 0 });
-	let ddlFocused = $state(false);
 	type CopyKind = 'stage1' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
 	let statusHashCopied = $state(false);
@@ -320,6 +324,9 @@
 
 	// ── Result ──────────────────────────────────────────────
 	let ddl      = $state<string | null>(null);
+	// v1.98: ddl は入力側 (Stage 1 出力 / ユーザーが書いた DDL)、expandedDdl は展開後
+	// (Stage 1.5 出力 = Stage 2 入力)。旧データは入力側を持たないため null になる。
+	let expandedDdl = $state<string | null>(null);
 	let ddlGeneratedBaseline = $state<string | null>(null);
 	let ddlAutoRepairEnabled = $state(true);
 	let thinking = $state<string | null>(null);
@@ -663,6 +670,36 @@
 	let profileStatus = $state<string | null>(null);
 	let profileSaving = $state(false);
 
+	type ProviderFailure = {
+		code: 'model_gone' | 'provider_auth' | 'provider_rate_limit' | 'provider_error';
+		stage: string;
+		provider_status: number;
+		message: string;
+	};
+
+	/**
+	 * v1.98: サーバーが返す失敗詳細を人が読める 1 行にする。
+	 * プロバイダ由来の失敗（提供終了・認証・レート制限）は種別の説明を頭に置き、
+	 * 原因を追えるようにプロバイダの原文メッセージを必ず併記する。
+	 */
+	function describeApiError(detail: unknown, status: number): string {
+		if (typeof detail === 'string' && detail) return detail;
+		if (detail && typeof detail === 'object' && 'code' in detail) {
+			const failure = detail as ProviderFailure;
+			const stage = failure.stage === 'interpret' ? t().runStatusStage1 : t().runStatusStage2;
+			const headline =
+				failure.code === 'model_gone'
+					? t().errorModelGone(stage)
+					: failure.code === 'provider_auth'
+						? t().errorProviderAuth(stage)
+						: failure.code === 'provider_rate_limit'
+							? t().errorProviderRateLimit(stage)
+							: t().errorProviderOther(stage, failure.provider_status);
+			return `${headline}\n${failure.message}`;
+		}
+		return `HTTP ${status}`;
+	}
+
 	function apiFetch(path: string, init: RequestInit = {}) {
 		const headers = new Headers(init.headers);
 		return fetch(path, { ...init, headers, credentials: 'same-origin' });
@@ -968,8 +1005,8 @@
 				body: JSON.stringify({ templates: next })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const data = await r.json() as { templates?: unknown };
 			exportTemplates = normalizeExportTemplates(data.templates);
@@ -1028,8 +1065,8 @@
 				body: JSON.stringify({ items: next })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const data = await r.json() as { items?: unknown };
 			if (Array.isArray(data.items)) {
@@ -1055,8 +1092,8 @@
 				body: JSON.stringify({ ui_theme: nextDarkMode ? 'dark' : 'light' })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
@@ -1077,8 +1114,8 @@
 				body: JSON.stringify({ settings_tab: tab })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			currentUser = await r.json() as UserItem;
 		} catch (e) {
@@ -1129,8 +1166,8 @@
 				body: JSON.stringify({ model_settings })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserModelSettings(currentUser);
@@ -1355,8 +1392,8 @@
 				method: 'POST',
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
 			modelCatalog = data.catalog;
@@ -1618,8 +1655,8 @@
 		try {
 			const r = await apiFetch('/api/settings/status');
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			settingsStatus = await r.json();
 			settingsStatusError = null;
@@ -1745,8 +1782,8 @@
 				body: JSON.stringify({ interval_days: intervalDays, max_generations: maxGenerations })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const nextBackup = await r.json() as SettingsStatus['db_backup'];
 			if (settingsStatus) settingsStatus = { ...settingsStatus, db_backup: nextBackup };
@@ -1761,8 +1798,8 @@
 		try {
 			const r = await apiFetch('/api/settings/db-backup/run', { method: 'POST' });
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			await loadSettingsStatus();
 			dbBackupStatus = t().settingsDbBackupRunDone;
@@ -1780,8 +1817,8 @@
 				body: JSON.stringify({ enabled, output_dir: outputDir, png_size: pngSize })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const nextOutputSave = await r.json() as SettingsStatus['output_save'];
 			if (settingsStatus) settingsStatus = { ...settingsStatus, output_save: nextOutputSave };
@@ -1801,8 +1838,8 @@
 				body: JSON.stringify({ enabled, retention_days: retentionDays, rotate, compress })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const nextLogRetention = await r.json() as SettingsStatus['log_retention'];
 			if (settingsStatus) settingsStatus = { ...settingsStatus, log_retention: nextLogRetention };
@@ -1857,8 +1894,8 @@
 				body: JSON.stringify({ username: loginUserName, password: loginPassword })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const data = await r.json() as { user: UserItem };
 			authToken = 'cookie';
@@ -1956,8 +1993,8 @@
 				body: JSON.stringify(body),
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
@@ -1991,8 +2028,8 @@
 				body: JSON.stringify({ username: name, email, password: newUserPassword, role: newUserRole, group_id: newUserGroupId || null })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			newUserName = '';
 			newUserEmail = '';
@@ -2012,8 +2049,8 @@
 				body: JSON.stringify(patch)
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			await loadUserSettings();
 		} catch (e) {
@@ -2067,8 +2104,8 @@
 		try {
 			const r = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			if (selectedUserId === id) clearEditUser();
 			await loadUserSettings();
@@ -2087,8 +2124,8 @@
 				body: JSON.stringify({ name })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			newGroupName = '';
 			await loadUserSettings();
@@ -2101,8 +2138,8 @@
 		try {
 			const r = await apiFetch(`/api/user-groups/${group.id}`, { method: 'DELETE' });
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			await loadUserSettings();
 		} catch (e) {
@@ -2131,8 +2168,8 @@
 				body: JSON.stringify({ name })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			clearEditGroup();
 			await loadUserSettings();
@@ -2267,8 +2304,55 @@
 		return input;
 	});
 
+	// v1.98: Stage 1 が失敗してフォールバック DDL で描かれたかどうか。
+	const interpretFallbackReason = $derived(
+		displayedHistoryItem
+			? (displayedHistoryItem.interpret_fallback ?? null)
+			: (result?.interpret_fallback_used ? (result?.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
+	);
+
 	// Standalone DDL-authored artworks have no instruction; gate instruction-only refine paths.
 	const statusDdlOrigin = $derived((displayedHistoryItem?.display_label ?? null) === DDL_ORIGIN_LABEL);
+
+	// ── Running-indicator state ─────────────────────────────
+	// Tokens confirmed by the stage1 event of the paint currently in flight.
+	// Cleared when that paint finishes; completed runs are folded into the
+	// per-flow totals below.
+	let activeRunTokensIn = $state<number | null>(null);
+	let activeRunTokensOut = $state<number | null>(null);
+
+	// Model names shown by every running indicator.
+	const stage1ModelLabel = $derived(
+		availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model
+	);
+	const stage2ModelLabel = $derived(
+		availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model
+	);
+
+	// Flows that issue several paints per run keep their own running totals.
+	let variationTokensIn = $state<number | null>(null);
+	let variationTokensOut = $state<number | null>(null);
+	let modelInspectionTokensIn = $state<number | null>(null);
+	let modelInspectionTokensOut = $state<number | null>(null);
+	let languageInspectionTokensIn = $state<number | null>(null);
+	let languageInspectionTokensOut = $state<number | null>(null);
+
+	const variationElapsed = createElapsed();
+	const modelInspectionElapsed = createElapsed();
+	const languageInspectionElapsed = createElapsed();
+
+	function addTokens(total: number | null, delta: number | null | undefined): number | null {
+		if (delta === null || delta === undefined) return total;
+		return (total ?? 0) + delta;
+	}
+
+	function paintTokensIn(r: PaintResult): number | null {
+		return addTokens(r.tokens_in_stage1 ?? null, r.tokens_in_stage2);
+	}
+
+	function paintTokensOut(r: PaintResult): number | null {
+		return addTokens(r.tokens_out_stage1 ?? null, r.tokens_out_stage2);
+	}
 
 	// ── Timer ───────────────────────────────────────────────
 	function startTimer() {
@@ -2353,6 +2437,8 @@
 		derivationMetadata?: Record<string, unknown>;
 		// null/undefined = omit the field so the server inherits from the parent.
 		tenkei?: TenkeiLevel | null;
+		// Called when interpretation finishes, before rendering starts.
+		onStage1?: (event: PaintStage1Event) => void;
 	};
 
 async function requestVisionRefineAdvice(historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) {
@@ -2363,22 +2449,78 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		body: JSON.stringify({ history_id: historyId, model, instruction, direction, enabled_kinds: enabledKinds, language: getLang() })
 	});
 	if (!r.ok) {
-		const data = await r.json().catch(() => ({})) as { detail?: string };
-		throw new Error(data.detail ?? `HTTP ${r.status}`);
+		const data = await r.json().catch(() => ({})) as { detail?: unknown };
+		throw new Error(describeApiError(data.detail, r.status));
 	}
 	return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string };
 }
 
+	type PaintStage1Event = {
+		event: 'stage1';
+		ddl: string;
+		thinking: string | null;
+		stage1_model: string;
+		stage2_model: string;
+		tokens_in: number | null;
+		tokens_out: number | null;
+		elapsed_ms: number;
+		interpret_fallback_used: boolean;
+	};
+
+	/**
+	 * Consume the NDJSON stream of /api/paint/stream.
+	 *
+	 * The stage1 event arrives as soon as interpretation finishes, so the
+	 * running indicator can show the real stage and the Stage 1 token counts
+	 * instead of guessing. The done event carries the same payload the
+	 * non-streaming /api/paint returns.
+	 */
+	async function readPaintStream(
+		response: Response,
+		onStage1: (event: PaintStage1Event) => void
+	): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
+		const reader = response.body?.getReader();
+		if (!reader) throw new Error('paint stream is not readable');
+		const decoder = new TextDecoder();
+		let buffer = '';
+		let done: ({ ddl: string; thinking: string | null } & PaintResult) | null = null;
+
+		for (;;) {
+			const chunk = await reader.read();
+			if (chunk.value) buffer += decoder.decode(chunk.value, { stream: true });
+			let newline = buffer.indexOf('\n');
+			while (newline >= 0) {
+				const line = buffer.slice(0, newline).trim();
+				buffer = buffer.slice(newline + 1);
+				newline = buffer.indexOf('\n');
+				if (!line) continue;
+				const event = JSON.parse(line) as { event: string } & Record<string, unknown>;
+				if (event.event === 'stage1') {
+					onStage1(event as unknown as PaintStage1Event);
+				} else if (event.event === 'error') {
+					throw new Error(describeApiError(event.detail, Number(event.status ?? 500)));
+				} else if (event.event === 'done') {
+					done = event as unknown as { ddl: string; thinking: string | null } & PaintResult;
+				}
+			}
+			if (chunk.done) break;
+		}
+		if (!done) throw new Error('paint stream ended before completion');
+		return done;
+	}
+
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const uiLang = getLang();
 		stageLabel = t().stageInterpreting;
+		activeRunTokensIn = null;
+		activeRunTokensOut = null;
 		const historyInput = options.historyInput ?? text;
 		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
 		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
 
 		const augmented = text + buildEmotionHint(text);
 		stage1UserPrompt = augmented;
-		const r = await apiFetch('/api/paint', {
+		const r = await apiFetch('/api/paint/stream', {
 			method: 'POST',
 			signal: options.signal,
 			headers: { 'Content-Type': 'application/json' },
@@ -2414,11 +2556,17 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r.status}`);
+			const d = await r.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(d.detail, r.status));
 		}
-		stageLabel = t().stageStructuring('');
-		const data = await r.json() as { ddl: string; thinking: string | null } & PaintResult;
+		const data = await readPaintStream(r, (stage1) => {
+			stageLabel = t().stageStructuring('');
+			activeRunTokensIn = stage1.tokens_in;
+			activeRunTokensOut = stage1.tokens_out;
+			options.onStage1?.(stage1);
+		});
+		activeRunTokensIn = null;
+		activeRunTokensOut = null;
 		await loadNearbyHistory(data.history_id);
 const unreadWords = interpretationFeedback(text, data.ddl)
 	.filter((part) => part.tone === 'weak')
@@ -2464,8 +2612,8 @@ if (unreadWords.length > 0) {
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r.status}`);
+			const d = await r.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(d.detail, r.status));
 		}
 		const data = await r.json() as {
 			ddl: string;
@@ -2484,6 +2632,9 @@ if (unreadWords.length > 0) {
 	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId; tenkei?: TenkeiLevel | null; lineageParentNodeId?: string | null } = {}): Promise<{
 		score: Score;
 		svg: string;
+		// Stage 2 に渡った展開後 DDL (v1.98)
+		ddl?: string | null;
+		source_ddl?: string | null;
 		stage2_model?: string | null;
 		render_build_number?: string | null;
 		render_color_profile?: Record<string, string> | null;
@@ -2527,8 +2678,8 @@ if (unreadWords.length > 0) {
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r.status}`);
+			const d = await r.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(d.detail, r.status));
 		}
 		const data = await r.json() as {
 			score: Score;
@@ -2585,8 +2736,8 @@ if (unreadWords.length > 0) {
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r.status}`);
+			const d = await r.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(d.detail, r.status));
 		}
 		const data = await r.json() as { instruction: string };
 		return data.instruction;
@@ -2622,7 +2773,8 @@ if (unreadWords.length > 0) {
 				if (settings.random_color_catalog && r.render_color_catalog_id) selectedCatalog = r.render_color_catalog_id;
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
-				ddl = r.ddl; ddlGeneratedBaseline = r.ddl; ddlSelection = { start: r.ddl.length, end: r.ddl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
+				const demoSourceDdl = r.source_ddl ?? r.ddl;
+				ddl = demoSourceDdl; expandedDdl = r.ddl; ddlGeneratedBaseline = demoSourceDdl; thinking = r.thinking; result = r; outputTab = 'canvas';
 				fitCanvasZoom();
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
@@ -2735,7 +2887,7 @@ if (unreadWords.length > 0) {
 			: {};
 		loading = true; error = null;
 		activeRunMode = submittedMode;
-		ddl = null; ddlGeneratedBaseline = null; thinking = null; ddlSelection = { start: 0, end: 0 };
+		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
 		displayedHistoryItem = null;
 		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
@@ -2754,87 +2906,47 @@ if (unreadWords.length > 0) {
 		try {
 			if (submittedMode === 'single') {
 				stageLabel = t().stageDdlGenerating;
-				const stage1StartedAt = Date.now();
-				const interpreted = await interpretOne(input, abortController.signal, undefined, undefined, tenkeiLevel);
-				if (submitStopRequested) return;
-				elapsedStage1Ms = Date.now() - stage1StartedAt;
-				tokensInStage1 = interpreted.tokens_in;
-				tokensOutStage1 = interpreted.tokens_out;
-				ddl = interpreted.ddl;
-				ddlGeneratedBaseline = interpreted.ddl;
-				ddlSelection = { start: interpreted.ddl.length, end: interpreted.ddl.length };
-				thinking = interpreted.thinking;
-				stageLabel = t().stageImageGenerating;
-				reloading = true;
-				const composed = await composeOne(interpreted.ddl, input, abortController.signal, undefined, undefined, { tenkei: tenkeiLevel });
+				const r = await paintOne(input, {
+					sourceText: input,
+					catalogId: selectedCatalog,
+					canvasAspectId: effectiveCanvasAspectId(),
+					lineageParentNodeId: submitParentNodeId,
+					derivationKind: submitDerivationKind,
+					derivationMetadata: submitDerivationMetadata,
+					tenkei: tenkeiLevel,
+					signal: abortController.signal,
+					onStage1: (stage1) => {
+						elapsedStage1Ms = stage1.elapsed_ms;
+						tokensInStage1 = stage1.tokens_in;
+						tokensOutStage1 = stage1.tokens_out;
+						ddl = stage1.ddl;
+						expandedDdl = null;
+						ddlGeneratedBaseline = stage1.ddl;
+						thinking = stage1.thinking;
+						stageLabel = t().stageImageGenerating;
+						reloading = true;
+					}
+				});
 				if (submitStopRequested) return;
 				reloading = false;
-				elapsedStage2Ms = composed.elapsed_ms;
-				elapsedTotalMs = Date.now() - _timerStart;
-				tokensInStage2 = composed.tokens_in;
-				tokensOutStage2 = composed.tokens_out;
-				const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
-				const resolvedStage2Model = composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model);
-				const r: PaintResult = {
-					score: composed.score,
-					svg: composed.svg,
-					stage1_model: resolvedStage1Model,
-					stage2_model: resolvedStage2Model,
-					render_build_number: composed.render_build_number,
-					render_color_profile: composed.render_color_profile,
-					render_engine_id: composed.render_engine_id,
-					render_engine_version: composed.render_engine_version,
-					render_color_catalog_id: composed.render_color_catalog_id,
-					render_color_catalog_name: composed.render_color_catalog_name,
-					render_color_catalog_sub: composed.render_color_catalog_sub,
-					render_color_map: composed.render_color_map,
-					render_canvas_aspect: composed.render_canvas_aspect,
-					render_canvas_aspect_id: composed.render_canvas_aspect_id,
-					render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
-					render_seed: composed.render_seed,
-					vary_seed: composed.vary_seed,
-					instruction_lang_requested: composed.instruction_lang_requested,
-					instruction_lang_resolved: composed.instruction_lang_resolved,
-					ui_lang: composed.ui_lang,
-					render_hash: composed.render_hash,
-					render_hash_short: composed.render_hash_short,
-					elapsed_stage1_ms: elapsedStage1Ms,
-					elapsed_stage2_ms: elapsedStage2Ms,
-					elapsed_total_ms: elapsedTotalMs,
-					tokens_in_stage1: tokensInStage1,
-					tokens_out_stage1: tokensOutStage1,
-					tokens_in_stage2: tokensInStage2,
-					tokens_out_stage2: tokensOutStage2,
-				};
+				elapsedStage1Ms = r.elapsed_stage1_ms;
+				elapsedStage2Ms = r.elapsed_stage2_ms;
+				elapsedTotalMs = r.elapsed_total_ms;
+				tokensInStage1 = r.tokens_in_stage1;
+				tokensOutStage1 = r.tokens_out_stage1;
+				tokensInStage2 = r.tokens_in_stage2;
+				tokensOutStage2 = r.tokens_out_stage2;
+				ddl = r.source_ddl ?? r.ddl;
+				expandedDdl = r.ddl;
+				ddlGeneratedBaseline = ddl;
+				thinking = r.thinking;
 				result = r; outputTab = 'canvas';
 				fitCanvasZoom();
-				const savedHistory = await pushHistory({
-					input,
-					ddl: interpreted.ddl,
-					score: composed.score,
-					svg: composed.svg,
-					at: Date.now(),
-					elapsed_ms: elapsedTotalMs,
-					stage1_model: resolvedStage1Model,
-					stage2_model: resolvedStage2Model,
-					tokens_in: (tokensInStage1 ?? 0) + (tokensInStage2 ?? 0) || null,
-					tokens_out: (tokensOutStage1 ?? 0) + (tokensOutStage2 ?? 0) || null,
-					catalog_id: selectedCatalog,
-				}, { selectSaved: true, countGeneration: true, sourceText: input, lineageParentNodeId: submitParentNodeId, derivationKind: submitDerivationKind, derivationMetadata: submitDerivationMetadata, tenkei: tenkeiLevel });
-				if (savedHistory && submitAbortController === abortController && !submitStopRequested) {
+				if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
 					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 					lineageDetached = false;
-					displayedHistoryItem = savedHistory;
-					result = {
-						...r,
-						history_id: savedHistory.id,
-						history_at: savedHistory.at,
-						render_hash: savedHistory.render_hash,
-						render_hash_short: savedHistory.render_hash_short,
-						description_hash: savedHistory.description_hash,
-						lineage_node_id: savedHistory.lineage_node_id,
-					};
-					await loadNearbyHistory(savedHistory.id);
+					await fetchHistoryOffset(0, { anchorId: r.history_id });
+					displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
 				}
 			} else {
 				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
@@ -2984,8 +3096,8 @@ if (unreadWords.length > 0) {
 				})
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const d = await r.json() as {
 				score: Score;
@@ -3305,7 +3417,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3352,8 +3464,8 @@ if (unreadWords.length > 0) {
 				})
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const saved = await r.json() as Iteration;
 			if (result) {
@@ -3383,6 +3495,7 @@ if (unreadWords.length > 0) {
 			demoCurrentSaved = false;
 		}
 		ddl = inputMode === 'single' ? '' : null;
+		expandedDdl = null;
 		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
 		thinking = null;
 		result = null;
@@ -3402,8 +3515,6 @@ if (unreadWords.length > 0) {
 		tokensOutStage1 = null;
 		tokensInStage2 = null;
 		tokensOutStage2 = null;
-		ddlFocused = false;
-		ddlSelection = { start: 0, end: 0 };
 		displayedHistoryItem = null;
 		historyCursor = -1;
 		resetZoom();
@@ -3602,6 +3713,9 @@ if (unreadWords.length > 0) {
 		modelInspectionAbortController = abortController;
 		modelInspectionBusy = true;
 		modelInspectionStatus = null;
+		modelInspectionTokensIn = null;
+		modelInspectionTokensOut = null;
+		modelInspectionElapsed.start();
 		const successful = [...modelInspectionResults];
 		const failed: Record<string, string> = {};
 		try {
@@ -3614,8 +3728,12 @@ if (unreadWords.length > 0) {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, abortController.signal, job.stage1, undefined, refineTenkeiOverride);
 					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					modelInspectionTokensIn = addTokens(modelInspectionTokensIn, interpreted.tokens_in);
+					modelInspectionTokensOut = addTokens(modelInspectionTokensOut, interpreted.tokens_out);
 					const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2, undefined, { tenkei: refineTenkeiOverride, lineageParentNodeId: modelParentNodeId });
 					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
+					modelInspectionTokensIn = addTokens(modelInspectionTokensIn, composed.tokens_in);
+					modelInspectionTokensOut = addTokens(modelInspectionTokensOut, composed.tokens_out);
 					successful.push({
 						id: job.id,
 						model: job.model,
@@ -3665,6 +3783,7 @@ if (unreadWords.length > 0) {
 				modelInspectionAbortController = null;
 				modelInspectionBusy = false;
 				modelInspectionCurrentModel = '';
+				modelInspectionElapsed.stop();
 			}
 		}
 	}
@@ -3726,6 +3845,9 @@ if (unreadWords.length > 0) {
 		languageInspectionAbortController = abortController;
 		languageInspectionBusy = true;
 		languageInspectionStatus = null;
+		languageInspectionTokensIn = null;
+		languageInspectionTokensOut = null;
+		languageInspectionElapsed.start();
 		const successful = [...languageInspectionResults];
 		const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
 		try {
@@ -3735,8 +3857,12 @@ if (unreadWords.length > 0) {
 				try {
 					const started = Date.now();
 					const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang, refineTenkeiOverride);
+					languageInspectionTokensIn = addTokens(languageInspectionTokensIn, interpreted.tokens_in);
+					languageInspectionTokensOut = addTokens(languageInspectionTokensOut, interpreted.tokens_out);
 					const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang, { tenkei: refineTenkeiOverride, lineageParentNodeId: parentNodeId });
 					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
+					languageInspectionTokensIn = addTokens(languageInspectionTokensIn, composed.tokens_in);
+					languageInspectionTokensOut = addTokens(languageInspectionTokensOut, composed.tokens_out);
 					successful.push({
 						id: job.id,
 						model: qualifiedModelId(stage1Provider, stage1Model),
@@ -3785,6 +3911,7 @@ if (unreadWords.length > 0) {
 				languageInspectionAbortController = null;
 				languageInspectionBusy = false;
 				languageInspectionCurrentLabel = '';
+				languageInspectionElapsed.stop();
 			}
 		}
 	}
@@ -4031,6 +4158,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		input: sourceText,
 		source_text: sourceText,
 		ddl: nextDdl,
+		expanded_ddl: composed.ddl,
 		score: composed.score,
 		svg: composed.svg,
 		at: Date.now(),
@@ -4084,6 +4212,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		input: '',
 		source_text: firstLine,
 		ddl: nextDdl,
+		expanded_ddl: composed.ddl,
 		score: composed.score,
 		svg: composed.svg,
 		at: Date.now(),
@@ -4286,7 +4415,8 @@ $effect(() => {
 		}
 		const itemDDL = it.ddl ?? '';
 		const sourceText = it.source_text ?? it.input;
-		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
+		expandedDdl = it.expanded_ddl ?? null;
+		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; thinking = it.thinking ?? null;
 		stage1UserPrompt = sourceText ? sourceText + buildEmotionHint(sourceText) : '';
 		result = {
 			score: it.score,
@@ -4368,46 +4498,6 @@ $effect(() => {
 	const navPos       = $derived(historyOffset + historyCursor + 1);
 
 	// ── Saijiki ─────────────────────────────────────────────
-	function insertWord(word: string) {
-		if (ddl === null) return;
-		const ta = ddlTextareaEl;
-		if (!ta) {
-			ddl = ddl + word;
-			ddlSelection = { start: ddl.length, end: ddl.length };
-			return;
-		}
-		const hasTextareaFocus = document.activeElement === ta;
-		const currentDDL = ddl;
-		const liveStart = ta.selectionStart ?? ddlSelection.start;
-		const liveEnd = ta.selectionEnd ?? ddlSelection.end;
-		const savedStart = ddlSelection.start;
-		const savedEnd = ddlSelection.end;
-		const start = Math.max(0, Math.min(currentDDL.length, hasTextareaFocus ? liveStart : savedStart));
-		const end = Math.max(start, Math.min(currentDDL.length, hasTextareaFocus ? liveEnd : savedEnd));
-		ddl = currentDDL.slice(0, start) + word + currentDDL.slice(end);
-		ddlSelection = { start: start + word.length, end: start + word.length };
-		requestAnimationFrame(() => {
-			if (!ddlTextareaEl) return;
-			ddlTextareaEl.focus();
-			ddlTextareaEl.setSelectionRange(ddlSelection.start, ddlSelection.end);
-		});
-	}
-
-	function rememberDDLSelection() {
-		const ta = ddlTextareaEl;
-		if (!ta || ddl === null) return;
-		ddlSelection = {
-			start: ta.selectionStart ?? ddl.length,
-			end: ta.selectionEnd ?? ddl.length,
-		};
-	}
-
-	function syncDDLHighlightScroll() {
-		if (!ddlTextareaEl || !ddlHighlightEl) return;
-		ddlHighlightEl.scrollTop = ddlTextareaEl.scrollTop;
-		ddlHighlightEl.scrollLeft = ddlTextareaEl.scrollLeft;
-	}
-
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
@@ -4573,6 +4663,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!result || variationBusy) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
 		reloading = true;
 		reloadError = null;
 		try {
@@ -4601,6 +4694,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		} finally {
 			reloading = false;
 			variationBusy = false;
+			variationElapsed.stop();
 		}
 	}
 
@@ -4610,6 +4704,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!source) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
 		loading = true;
 		error = null;
 		try {
@@ -4617,8 +4714,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			if (Number.isFinite(result.vary_seed ?? NaN)) usedSeeds.add(Number(result.vary_seed));
 			const nextVarySeed = createSafeIntegerSeed(usedSeeds);
 			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_variation' : null, derivationMetadata: { vary_seed: nextVarySeed } });
-			ddl = r.ddl;
-			ddlGeneratedBaseline = r.ddl;
+			ddl = r.source_ddl ?? r.ddl;
+			expandedDdl = r.ddl;
+			ddlGeneratedBaseline = ddl;
 			thinking = r.thinking;
 			result = r;
 			displayedHistoryItem = null;
@@ -4642,6 +4740,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		} finally {
 			loading = false;
 			variationBusy = false;
+			variationElapsed.stop();
 			stopTimer();
 		}
 	}
@@ -4652,6 +4751,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!source) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
 		loading = true;
 		error = null;
 		const previousDdl = ddl;
@@ -4659,8 +4761,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const interpretationSeed = createInterpretationSeed();
 			const r = await paintOne(source, { historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), interpretationSeed, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'reinterpretation' : null, derivationMetadata: { interpretation_seed: interpretationSeed } });
 			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
-			ddl = r.ddl;
-			ddlGeneratedBaseline = r.ddl;
+			ddl = r.source_ddl ?? r.ddl;
+			expandedDdl = r.ddl;
+			ddlGeneratedBaseline = ddl;
 			thinking = r.thinking;
 			result = r;
 			displayedHistoryItem = null;
@@ -4684,6 +4787,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		} finally {
 			loading = false;
 			variationBusy = false;
+			variationElapsed.stop();
 			stopTimer();
 		}
 	}
@@ -4780,6 +4884,50 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return { id: `comp-${varySeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { vary_seed: varySeed } } };
 	}
 
+	function focusLabel(focus: FocusId): string {
+		const ja: Record<FocusId, string> = {
+			upper_right: '右上の焦点', upper_left: '左上の焦点', lower_right: '右下の焦点',
+			lower_left: '左下の焦点', upper_edge: '上端寄りの焦点', right_half: '右半分の焦点'
+		};
+		const en: Record<FocusId, string> = {
+			upper_right: 'upper-right focus', upper_left: 'upper-left focus', lower_right: 'lower-right focus',
+			lower_left: 'lower-left focus', upper_edge: 'upper-edge focus', right_half: 'right-half focus'
+		};
+		return getLang() === 'ja' ? ja[focus] : en[focus];
+	}
+
+	function focusCandidateList(count: number): FocusId[] {
+		const current = (result?.focus ?? null) as FocusId | null;
+		const rest = FOCUS_IDS.filter((id) => id !== current);
+		return rest.slice(0, count);
+	}
+
+	async function focusVariationCandidate(focus: FocusId, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+		const source = input.trim();
+		const baseDdl = ddl ?? "";
+		const r = await apiFetch("/api/compose", {
+			method: "POST",
+			signal,
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				ddl: baseDdl,
+				original_text: source,
+				model: qualifiedModelId(stage2Provider, stage2Model),
+				instruction_lang: instructionLang,
+				ui_lang: getLang(),
+				catalog_id: refinementCatalogId(),
+				canvas_aspect: refinementCanvasAspectId(),
+				auto_repair: ddlAutoRepairEnabled,
+				focus,
+				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
+				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
+			})
+		});
+		if (!r.ok) throw new Error(await r.text());
+		const data = await r.json();
+		return { id: `focus-${focus}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), focus, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { focus } } };
+	}
+
 	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
 		const interpretationSeed = createInterpretationSeed();
@@ -4870,6 +5018,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		variationGridAbortController = abortController;
 		variationGridBusy = true;
 		variationGridCanAbort = false;
+		variationTokensIn = null;
+		variationTokensOut = null;
+		variationElapsed.start();
 		variationGridIncludesReading = kind === "reading";
 		variationGridTaskLabel = kind === "touch"
 			? t().canvasVaryPerformance
@@ -4889,6 +5040,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
 			}
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
+			const focusCandidateIds = kind === "focus" ? focusCandidateList(count) : [];
 			const jobs = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
@@ -4902,10 +5054,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				if (kind === "reading") {
 					return interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
 				}
+				if (kind === "focus") {
+					const focus = focusCandidateIds[index] ?? focusCandidateIds[0];
+					return focusVariationCandidate(focus, focusLabel(focus), abortController.signal);
+				}
 				const catalogId = catalogIds[index];
 				return renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
 			});
 			variationCandidates = await Promise.all(jobs);
+			for (const candidate of variationCandidates) {
+				variationTokensIn = addTokens(variationTokensIn, paintTokensIn(candidate.result));
+				variationTokensOut = addTokens(variationTokensOut, paintTokensOut(candidate.result));
+			}
 		} catch (e) {
 			if (!(e instanceof DOMException && e.name === "AbortError")) variationGridStatus = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -4914,6 +5074,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				variationGridAbortController = null;
 				variationGridBusy = false;
 				variationGridCanAbort = false;
+				variationElapsed.stop();
 			}
 		}
 	}
@@ -4927,8 +5088,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	function showVariationCandidate(candidate: VariationCandidate) {
 		resetTargetScopedState({ preserveVariationCandidates: true });
 		historyCursor = -1;
-		ddl = candidate.result.ddl;
-		ddlGeneratedBaseline = candidate.result.ddl;
+		ddl = candidate.result.source_ddl ?? candidate.result.ddl;
+		expandedDdl = candidate.result.ddl;
+		ddlGeneratedBaseline = ddl;
 		thinking = candidate.result.thinking;
 		result = candidate.result;
 		displayedHistoryItem = null;
@@ -5095,7 +5257,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		result = batchLatestResult;
 		ddl = batchLatestDdl;
 		ddlGeneratedBaseline = batchLatestDdl;
-		ddlSelection = { start: batchLatestDdl?.length ?? 0, end: batchLatestDdl?.length ?? 0 };
 		thinking = batchLatestThinking;
 		outputTab = 'canvas';
 		fitCanvasZoom();
@@ -5247,9 +5408,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return () => clearTimeout(handle);
 	});
 
-	const tokenSummary = $derived.by(() =>
-		t().tokenSummary(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)
-	);
 	function tokenPair(input: number | null, output: number | null): string {
 		return `${input ?? '-'}→${output ?? '-'}tok`;
 	}
@@ -5311,9 +5469,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const index = scoreJsonLines.findIndex((line) => line.startsWith('  "score"'));
 		return index >= 0 ? index : null;
 	});
-	const ddlHighlighted = $derived(ddl !== null
-		? highlightDDL(ddl, ddlFocused && ddlSelection.start === ddlSelection.end ? ddlSelection.start : null)
-		: '');
 	const batchActiveDdlHighlighted = $derived(batchActiveDdl !== null
 		? highlightDDL(batchActiveDdl)
 		: escapeHtml(t().batchActiveDdlPending));
@@ -5647,8 +5802,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
-						stage1ModelLabel={availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}
-						stage2ModelLabel={availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model}
+						{stage1ModelLabel}
+						{stage2ModelLabel}
+						runTokensIn={activeRunTokensIn}
+						runTokensOut={activeRunTokensOut}
 						{nextStage1Model}
 						{nextStage2Model}
 						{nextCatalogName}
@@ -5681,14 +5838,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- DDL ツール -->
 					{#if inputMode === 'single'}
 						<section class="panel-section ddl-tools-section">
-							<button class="ddl-new-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
+							<Tooltip placement="left" text={t().tooltipDdlNew}>
+								<button class="ddl-new-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
+							</Tooltip>
 						</section>
 					{/if}
 
 					<!-- 解釈 (正規化DDL・閲覧専用) -->
 					{#if ddl !== null && inputMode === 'single'}
 						<section class="panel-section">
-							<DdlViewer {ddl} label={t().ddlLabel} saijikiLabel={t().saijikiToggleBtn} onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)} />
+							<DdlViewer {ddl} {expandedDdl} label={t().ddlLabel} expandedLabel={t().ddlExpandedLabel} />
 						</section>
 					{/if}
 
@@ -5703,10 +5862,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- 統計 -->
 					{#if result && elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
-							<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
-								<span class="stats-arrow" class:open={statsOpen}>▶</span>
-								<span>{t().resultLogLabel}</span>
-							</button>
+							<Tooltip placement="right" text={t().tooltipStatsToggle}>
+								<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
+									<span class="stats-arrow" class:open={statsOpen}>▶</span>
+									<span>{t().resultLogLabel}</span>
+								</button>
+							</Tooltip>
 							{#if statsOpen}
 								<div class="stats-detail">
 									<div class="stats-grid">
@@ -5717,6 +5878,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 													<span><span class="stats-metric-label">{t().statsElapsed}</span>{(elapsedStage1Ms / 1000).toFixed(1)}s</span>
 													<span><span class="stats-metric-label">{t().statsTokens}</span>{tokenPair(tokensInStage1, tokensOutStage1)}</span>
 												</span>
+											</div>
+										{/if}
+										{#if interpretFallbackReason}
+											<div class="stats-row">
+												<span class="stats-key">{t().interpretFallbackBadge}</span>
+												<span class="stats-value"><span>{t().interpretFallbackHint(interpretFallbackReason)}</span></span>
 											</div>
 										{/if}
 										<div class="stats-row">
@@ -5823,6 +5990,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{variationGridIncludesReading}
 				{variationGridTaskLabel}
 				{variationGridStatus}
+				runTokensIn={activeRunTokensIn}
+				runTokensOut={activeRunTokensOut}
+				variationElapsedMs={variationElapsed.ms}
+				{variationTokensIn}
+				{variationTokensOut}
+				modelInspectionElapsedMs={modelInspectionElapsed.ms}
+				{modelInspectionTokensIn}
+				{modelInspectionTokensOut}
+				languageInspectionElapsedMs={languageInspectionElapsed.ms}
+				{languageInspectionTokensIn}
+				{languageInspectionTokensOut}
 				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
 				onAbortVariationCandidates={abortVariationCandidates}
@@ -5869,6 +6047,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onOpenLineageDdlEditor={openLineageDdlEditor}
+				onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 				onCloseRefinement={refreshLineageAfterRefine}
 				statusDdlOrigin={statusDdlOrigin}
 				statusTenkei={normalizeTenkei(displayedHistoryItem?.tenkei)}
@@ -5922,7 +6101,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	{pluginEntries}
 	bind:activePreview={activeSaijikiPreview}
 	onClose={() => (saijikiOpen = false)}
-	onInsertWord={insertWord}
 	previewForWord={saijikiPreview}
 />
 
@@ -5933,8 +6111,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	subtitle={ddlDialogMode === 'new' ? t().ddlNewDialogSubtitle : t().ddlEditDialogSubtitle}
 	initialDdl={ddlDialogInitial}
 	drawing={ddlDialogDrawing}
+	{stage1ModelLabel}
+	{stage2ModelLabel}
+	runTokensIn={activeRunTokensIn}
+	runTokensOut={activeRunTokensOut}
 	error={ddlDialogError}
 	previewForWord={saijikiPreview}
+	{pluginEntries}
 	showTenkei={ddlDialogMode === 'edit'}
 	tenkeiValue={ddlDialogTenkeiOverride ?? normalizeTenkei(ddlDialogNode?.history?.tenkei) ?? DEFAULT_TENKEI}
 	tenkeiInherited={ddlDialogTenkeiOverride === null}
@@ -6193,6 +6376,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--accent-light: #e8eef5;
 		--border:       #d4d0c8;
 		--border2:      #c4c0b8;
+		--danger:       #a2342a;
 		--r:            4px;
 		--r-lg:         8px;
 	}
@@ -6223,7 +6407,38 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--accent-light: #253246;
 		--border:       #38342f;
 		--border2:      #514b43;
+		--danger:       #ff9a86;
 	}
+
+	/* DDL token palette (v1.98): one definition for every surface that renders
+	   highlighted DDL — interpretation view, batch observer, demo observer,
+	   DDL editor dialog. Previously each component carried its own copy and
+	   only some had dark-theme values. */
+	:global(.ddl-token) { border-radius: 2px; font-weight: inherit; }
+	:global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
+	:global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
+	:global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
+	:global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
+	:global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
+	:global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
+	:global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
+	:global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
+	:global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
+	:global(.ddl-token-plugin) { color: #9f4b3b; background: rgba(185, 88, 69, 0.10); }
+	:global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
+	:global(.ddl-token-emotion) { color: #9b7a66; font-style: inherit; }
+	:global(html[data-theme='dark'] .ddl-token-shape) { color: #9cc4ff; background: rgba(92, 143, 220, 0.26); }
+	:global(html[data-theme='dark'] .ddl-token-touch) { color: #e2bf82; background: rgba(188, 139, 62, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-line) { color: #c4ccd5; background: rgba(147, 160, 176, 0.22); }
+	:global(html[data-theme='dark'] .ddl-token-color) { color: #ff91c7; background: rgba(215, 80, 149, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-motion) { color: #7ce1d4; background: rgba(50, 157, 147, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-place) { color: #c2a9ff; background: rgba(133, 99, 214, 0.26); }
+	:global(html[data-theme='dark'] .ddl-token-action) { color: #f0aa73; background: rgba(197, 105, 45, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-angle) { color: #a7d88e; background: rgba(89, 142, 65, 0.25); }
+	:global(html[data-theme='dark'] .ddl-token-ratio) { color: #f0a0a0; background: rgba(196, 78, 78, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-plugin) { color: #f0a58f; background: rgba(185, 88, 69, 0.26); }
+	:global(html[data-theme='dark'] .ddl-token-word) { color: #b8c7ff; background: rgba(92, 111, 205, 0.26); }
+	:global(html[data-theme='dark'] .ddl-token-emotion) { color: #d8b8a6; }
 
 	:global(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -6306,9 +6521,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
-	.ddl-tools-section { flex-direction: row; }
-	.ddl-new-btn { align-self: flex-start; padding: 7px 14px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; }
-	.ddl-new-btn:hover { background: var(--bg2); }
+	.ddl-tools-section { flex-direction: row; justify-content: flex-end; }
+	.ddl-new-btn {
+		padding: 4px 10px;
+		border: 1px solid #d8b36a;
+		border-radius: var(--r);
+		background: #fff7e8;
+		color: #6c4a10;
+		font-family: inherit;
+		font-size: 11px;
+		font-weight: 600;
+		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.ddl-new-btn:hover { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
 
 	/* thinking */
 	.thinking-details {

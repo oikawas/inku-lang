@@ -3,8 +3,7 @@
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import AIRefineModal from './AIRefineModal.svelte';
-	import InkuMascot from './InkuMascot.svelte';
-	import StopButton from './StopButton.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
 	import { t } from '$lib/i18n/index.svelte';
@@ -42,6 +41,10 @@
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
+		stage1ModelLabel: string;
+		stage2ModelLabel: string;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		onSaveOkugakiModel: (model: string) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
@@ -58,7 +61,7 @@
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -648,14 +651,16 @@ $effect(() => {
 			</div>
 			<footer>
 				{#if editDrawing}
-					<div class="lineage-edit-status" aria-live="polite">
-						<div class="lineage-edit-mascot"><InkuMascot /></div>
-						<div class="lineage-edit-status-info">
-							<span class="lineage-edit-stage">{stageLabel || (isJapanese ? '生成中…' : 'Generating…')}</span>
-							<span class="lineage-edit-elapsed">{isJapanese ? '経過' : 'Elapsed'} {(editElapsedMs / 1000).toFixed(1)}s</span>
-						</div>
-						<StopButton onclick={stopEditDraw}>{t().stopBtn}</StopButton>
-					</div>
+					<RunStatus
+						variant="inline"
+						label={stageLabel || (isJapanese ? '生成中…' : 'Generating…')}
+						stage1Model={stage1ModelLabel}
+						stage2Model={stage2ModelLabel}
+						elapsedMs={editElapsedMs}
+						tokensIn={runTokensIn}
+						tokensOut={runTokensOut}
+						onStop={stopEditDraw}
+					/>
 				{:else}
 					<TenkeiSelect compact value={editTenkeiOverride ?? normalizeTenkei(activeEditNode?.history?.tenkei) ?? DEFAULT_TENKEI} {isJapanese} inherited={editTenkeiOverride === null} onSelect={(level) => (editTenkeiOverride = level)} />
 					<button type="button" onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
@@ -671,7 +676,7 @@ $effect(() => {
 			<header><div><h2 id="okugaki-title">{t().okugakiTitle}</h2><p>{t().okugakiDescription}</p></div><button type="button" disabled={okugakiGenerating} onclick={() => (okugakiOpen = false)}>×</button></header>
 			<div class="okugaki-controls">
 				<p>{t().okugakiBranchConfirm.replace('{count}', String(ancestorIds.size))}</p>
-				<ModelCardPicker label={t().okugakiModel} selectedModel={selectedOkugakiModel} providerGroups={visionProviderGroups} disabled={okugakiGenerating} onSelect={(provider: Provider, model: string) => void selectOkugakiModel(provider, model)} />
+				<ModelCardPicker label={t().okugakiModel} selectedModel={selectedOkugakiModel} providerGroups={visionProviderGroups} purpose="vision" disabled={okugakiGenerating} onSelect={(provider: Provider, model: string) => void selectOkugakiModel(provider, model)} />
 				<button class="okugaki-generate" type="button" disabled={okugakiGenerating || !selectedOkugakiModel.trim()} onclick={generateOkugaki}>{okugakiGenerating ? t().okugakiReading : t().okugakiAppend}</button>
 				{#if okugakiGenerating}<div class="okugaki-progress" aria-live="polite"><span></span>{t().okugakiProgress}</div>{/if}
 				{#if okugakiError}<div class="lineage-message error">{okugakiError}</div>{/if}
@@ -696,6 +701,8 @@ $effect(() => {
 		{onSaveVisionModel}
 		{visionModel}
 		{visionProviderGroups}
+		{stage1ModelLabel}
+		{stage2ModelLabel}
 		onLoadBranch={onLoadBranch}
 	/>
 {/if}
@@ -718,7 +725,7 @@ $effect(() => {
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
 	.lineage-message { margin: auto; color: var(--fg3); }
-	.lineage-message.error { color: var(--danger, #9b3d32); }
+	.lineage-message.error { color: var(--danger, #9b3d32); white-space: pre-line; }
 	.lineage-scroll { min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 8px 18px 24px 8px; }
 	.lineage-columns { position: relative; width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 58px; transform-origin: top center; }
 	.lineage-arrows { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
@@ -748,12 +755,6 @@ $effect(() => {
 	.lineage-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.lineage-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
 	.lineage-edit-dialog > footer .edit-draw { border-color: var(--accent); background: var(--accent); color: var(--accent-fg, #111); font-weight: 700; }
-	.lineage-edit-status { flex: 0 0 auto; margin-left: auto; display: flex; align-items: center; gap: 10px; }
-	.lineage-edit-mascot { flex: 0 0 auto; display: flex; align-items: center; }
-	.lineage-edit-status-info { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; text-align: right; }
-	.lineage-edit-stage { font-size: 12px; font-weight: 500; color: var(--fg); white-space: nowrap; }
-	.lineage-edit-elapsed { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-	.lineage-edit-status :global(.stop-btn) { flex: 0 0 auto; width: auto; min-width: 0; padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em; }
 	.lineage-edit-dialog button:disabled, .lineage-edit-dialog textarea:disabled { opacity: .55; cursor: default; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
 	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }

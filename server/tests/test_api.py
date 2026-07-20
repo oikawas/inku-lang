@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import builtins
 import json
+from datetime import datetime, timezone
 import logging
 import sys
 import time
@@ -1290,6 +1291,306 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert me.json()["image_generation_count"] == 1
 
 
+def _stream_events(response) -> list[dict]:
+    return [json.loads(line) for line in response.text.splitlines() if line.strip()]
+
+
+def test_paint_stream_emits_stage1_before_done(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post("/api/paint/stream", json={"text": "一滴の墨"}, headers=headers)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/x-ndjson")
+
+    events = _stream_events(r)
+    assert [e["event"] for e in events] == ["stage1", "done"]
+
+    stage1 = events[0]
+    assert "黒い円を置く。" in stage1["ddl"]
+    assert stage1["stage1_model"] == "nvidia:google/gemma-4-31b-it"
+    assert stage1["stage2_model"] == "nvidia:google/gemma-4-31b-it"
+    assert stage1["elapsed_ms"] >= 0
+    assert stage1["interpret_fallback_used"] is False
+
+    # The done event carries the Stage 2 DDL, which may rewrite the Stage 1 text.
+    done = events[1]
+    assert "黒い円を置く。" in done["ddl"]
+    assert done["score"]["instructions"][0]["primitive"] == "circle"
+    assert "<svg" in done["svg"]
+    assert done["render_canvas_aspect_id"] == "square"
+
+
+def test_paint_stream_matches_paint_response_shape(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    payload = {"text": "一滴の墨", "save_history": False, "count_generation": False}
+    plain = client.post("/api/paint", json=payload, headers=headers)
+    streamed = _stream_events(
+        client.post("/api/paint/stream", json=payload, headers=headers)
+    )[-1]
+    assert plain.status_code == 200
+
+    volatile = {"elapsed_stage1_ms", "elapsed_stage2_ms", "elapsed_total_ms", "event"}
+    assert set(streamed) - volatile == set(plain.json()) - volatile
+
+
+def test_paint_stream_reports_compose_failure_as_error_event(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
+    )
+
+    def fail_compose(*args, **kwargs):
+        raise RuntimeError("compose failed for test")
+
+    monkeypatch.setattr(api_module, "compose", fail_compose)
+
+    r = client.post("/api/paint/stream", json={"text": "壊れる描画"}, headers=headers)
+    assert r.status_code == 200
+
+    events = _stream_events(r)
+    assert [e["event"] for e in events] == ["stage1", "error"]
+    assert events[1]["status"] == 502
+
+
+def test_paint_records_input_and_expanded_ddl_separately(monkeypatch, auth_context):
+    headers, user, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post(
+        "/api/paint", json={"text": "一滴の墨", "save_history": True}, headers=headers
+    )
+    assert r.status_code == 200
+    data = r.json()
+    # ddl は Stage 2 に渡った展開後、source_ddl は展開前の入力側。
+    assert data["source_ddl"] == "中心に黒い円を置く。"
+    assert data["ddl"] != data["source_ddl"]
+
+    listing = client.get(
+        "/api/history", params={"anchor_id": data["history_id"], "limit": 100}, headers=headers
+    ).json()
+    saved = next(item for item in listing["items"] if item["id"] == data["history_id"])
+    assert saved["ddl"] == data["source_ddl"]
+    assert saved["expanded_ddl"] == data["ddl"]
+    db.delete_items(user["id"], [data["history_id"]])
+
+
+def test_explicit_focus_overrides_the_hashed_choice(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
+    )
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    default = client.post("/api/paint", json={"text": "一滴の墨"}, headers=headers).json()
+    moved = client.post(
+        "/api/paint", json={"text": "一滴の墨", "focus": "lower_right"}, headers=headers
+    ).json()
+    assert "右下の焦点" in moved["ddl"]
+    assert moved["ddl"] != default["ddl"]
+
+    # 未知の値は無視され、既定の決定的選択に戻る（既存作品の再現性を保つ）。
+    unknown = client.post(
+        "/api/paint", json={"text": "一滴の墨", "focus": "nowhere"}, headers=headers
+    ).json()
+    assert unknown["ddl"] == default["ddl"]
+
+
+def test_compose_returns_source_ddl(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+    r = client.post("/api/compose", json={"ddl": "中心に黒い円を置く。"}, headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["source_ddl"] == "中心に黒い円を置く。"
+    assert data["ddl"] != data["source_ddl"]
+
+
+def test_empty_stage1_output_falls_back_instead_of_drawing_nothing(monkeypatch, auth_context):
+    headers, user, _ = auth_context
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("   ", None),
+    )
+    captured = {}
+
+    def fake_compose(ddl, model=None):
+        captured["ddl"] = ddl
+        return Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+        )
+
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    r = client.post(
+        "/api/paint", json={"text": "空を返すモデル", "save_history": True}, headers=headers
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["interpret_fallback_used"] is True
+    assert data["interpret_fallback_reasons"] == ["stage1_empty_output"]
+
+    # フォールバックで描かれたことを作品に残し、UI がバッジを出せるようにする。
+    listing = client.get(
+        "/api/history", params={"anchor_id": data["history_id"], "limit": 100}, headers=headers
+    ).json()
+    saved = next(item for item in listing["items"] if item["id"] == data["history_id"])
+    assert saved["interpret_fallback"] == "stage1_empty_output"
+    db.delete_items(user["id"], [data["history_id"]])
+    # 記述を持たない作品が保存されないよう、決定的フォールバック DDL で描画する。
+    assert data["source_ddl"].strip()
+    assert data["ddl"].strip()
+    assert captured["ddl"].strip()
+
+
+class _FakeProviderError(Exception):
+    def __init__(self, message: str, status_code: int) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def test_provider_end_of_life_is_reported_as_a_typed_error(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+
+    def gone(*args, **kwargs):
+        raise _FakeProviderError(
+            "Error code: 410 - The model 'x' has reached its end of life.", 410
+        )
+
+    monkeypatch.setattr(api_module, "interpret_detail", gone)
+
+    r = client.post("/api/paint", json={"text": "提供終了モデル"}, headers=headers)
+    assert r.status_code == 502
+    detail = r.json()["detail"]
+    assert detail["code"] == "model_gone"
+    assert detail["stage"] == "interpret"
+    assert detail["provider_status"] == 410
+    # 原文をそのまま渡し、UI が併記できるようにする。
+    assert "end of life" in detail["message"]
+
+
+def test_provider_auth_and_rate_limit_are_distinguished(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
+    )
+
+    for status, expected in ((401, "provider_auth"), (429, "provider_rate_limit"), (500, "provider_error")):
+        def failing(*args, _status=status, **kwargs):
+            raise _FakeProviderError(f"boom {_status}", _status)
+
+        monkeypatch.setattr(api_module, "compose", failing)
+        r = client.post("/api/paint", json={"text": "失敗する描画"}, headers=headers)
+        assert r.status_code == 502
+        detail = r.json()["detail"]
+        assert detail["code"] == expected
+        assert detail["stage"] == "compose"
+        assert detail["provider_status"] == status
+
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+
+def test_retired_models_are_marked_eol_in_the_catalog():
+    from inku_server.model_settings import default_model_settings
+
+    nvidia = default_model_settings()["providers"]["nvidia"]["models"]
+    retired = [model for model in nvidia if model.get("eol")]
+    assert any(model["id"] == "qwen/qwen3.5-122b-a10b" for model in retired)
+    assert all(model.get("eol_date") for model in retired)
+
+
+def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
+    """取得ボタンを押しても、過去の作品が参照するモデルの情報を落とさない。"""
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"fetch-models-{suffix}")
+    admin = db.add_user(
+        username=f"fetch-models-admin-{suffix}",
+        email=f"fetch-models-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    admin_headers, admin_token = _auth_headers(admin)
+
+    # 提供元は gemma しか返さない状況を作る。
+    monkeypatch.setattr(
+        api_module,
+        "_fetch_provider_model_list",
+        lambda provider_id, settings: [{"id": "google/gemma-4-31b-it", "label": "google/gemma-4-31b-it"}],
+    )
+    r = client.post("/api/settings/models/nvidia/fetch-models", headers=admin_headers)
+    assert r.status_code == 200
+
+    models = {
+        model["id"]: model
+        for provider in r.json()["catalog"]
+        if provider["id"] == "nvidia"
+        for model in provider["models"]
+    }
+    # 提供が続くモデルは EOL 印が付かず、整えたラベルと評価が残る。
+    assert models["google/gemma-4-31b-it"].get("eol") is not True
+    assert models["google/gemma-4-31b-it"]["label"] == "Google Gemma 4 31B Instruct"
+    assert models["google/gemma-4-31b-it"]["recommendation_llm"] == 4
+    # 提供が消えたモデルは一覧から消えず、EOL として日付付きで残る。
+    retired = models["mistralai/mistral-medium-3.5-128b"]
+    assert retired["eol"] is True
+    assert retired["eol_date"]
+    assert retired["comment_ja"]
+
+    # 共有 DB を元の一覧へ戻す（他テストがカタログ件数を前提にしているため）。
+    db.update_model_settings(default_model_settings())
+    db.delete_session(admin_token)
+    db.delete_user(admin["id"])
+    db.delete_user_group(group["id"])
+
+
+def test_paint_stream_requires_auth():
+    assert client.post("/api/paint/stream", json={"text": "一滴の墨"}).status_code == 401
+
+
 def test_generation_count_increment_is_atomic_under_concurrency():
     suffix = uuid.uuid4().hex[:8]
     user = db.add_user(
@@ -2313,19 +2614,21 @@ def test_log_retention_settings_are_admin_only():
 def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     settings = default_model_settings()
     nvidia_models = settings["providers"]["nvidia"]["models"]
-    assert len(nvidia_models) == 29
+    assert len(nvidia_models) == 43
 
     gemma = next(model for model in nvidia_models if model["id"] == "google/gemma-4-31b-it")
     assert gemma["purposes"] == ["llm", "vision"]
-    assert gemma["recommendation_level"] == 5
-    assert gemma["speed_class"] == "fast"
-    assert gemma["speed_label"] == "高速 (約15〜22秒)"
-    assert "本命モデル" in gemma["comment_ja"]
+    # v1.98: 推奨度は用途ごと。旧 recommendation_level は用途別の値が無いときだけ読む。
+    assert gemma["recommendation_llm"] == 4
+    assert gemma["recommendation_vision"] == 5
+    assert gemma["speed_class"] == "medium"
+    assert gemma["speed_label"] == "昼 221s / 夕 114s"
+    assert "スキーマ違反なし" in gemma["comment_ja"]
 
     llm_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="llm") if provider["id"] == "nvidia")
     vision_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="vision") if provider["id"] == "nvidia")
-    assert len(llm_nvidia["models"]) == 22
-    assert len(vision_nvidia["models"]) == 12
+    assert len(llm_nvidia["models"]) == 39
+    assert len(vision_nvidia["models"]) == 10
 
     normalized = normalize_model_settings({
         "model_catalog_version": settings["model_catalog_version"],
@@ -2345,11 +2648,14 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
         },
     })
     normalized_models = normalized["providers"]["nvidia"]["models"]
-    assert len(normalized_models) == 29
+    assert len(normalized_models) == 43
     overridden = next(model for model in normalized_models if model["id"] == "google/gemma-4-31b-it")
     assert overridden["label"] == "Gemma custom label"
     assert overridden["purposes"] == ["vision"]
-    assert overridden["recommendation_level"] == 2
+    # 上書きは vision 側だけに効く。LLM 側は組み込みカタログの値が残るが、purposes が
+    # vision のみなので LLM の一覧には出ない。
+    assert overridden["recommendation_vision"] == 2
+    assert overridden["recommendation_llm"] == 4
     assert overridden["speed_label"] == "再計測 約30秒"
     assert overridden["comment_en"] == "Administrator override"
 
@@ -2367,8 +2673,8 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     legacy_gemma = next(model for model in legacy["providers"]["nvidia"]["models"] if model["id"] == "google/gemma-4-31b-it")
     assert legacy_gemma["label"] == "Legacy stored label"
     assert legacy_gemma["purposes"] == ["llm", "vision"]
-    assert legacy_gemma["recommendation_level"] == 5
-    assert legacy_gemma["speed_label"] == "高速 (約15〜22秒)"
+    assert legacy_gemma["recommendation_llm"] == 4
+    assert legacy_gemma["speed_label"] == "昼 221s / 夕 114s"
 
 
 def test_model_settings_store_keys_server_side(monkeypatch):
@@ -2436,8 +2742,8 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
     nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
     nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
-    assert len(nvidia_llm["models"]) == 22
-    assert len(nvidia_vision["models"]) == 12
+    assert len(nvidia_llm["models"]) == 39
+    assert len(nvidia_vision["models"]) == 10
     assert all("llm" in model["purposes"] for model in nvidia_llm["models"])
     assert all("vision" in model["purposes"] for model in nvidia_vision["models"])
 
@@ -2533,9 +2839,19 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     assert r.status_code == 200
     assert seen["url"] == "https://api.openai.com/v1/models"
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
+    # v1.98: 提供元から消えたモデルは削除せず EOL として末尾に残す。
+    today = datetime.now(timezone.utc).date().isoformat()
     assert openai_catalog["models"] == [
         {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": True},
         {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False},
+        {
+            "id": "removed-model",
+            "label": "Removed Model",
+            "purposes": ["llm"],
+            "enabled": False,
+            "eol": True,
+            "eol_date": today,
+        },
     ]
 
     class NewFakeResponse(FakeResponse):
@@ -2549,7 +2865,12 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     r = client.post("/api/settings/models/openai/fetch-models", headers=headers)
     assert r.status_code == 200
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
-    assert openai_catalog["models"] == [{"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False}]
+    assert openai_catalog["models"] == [
+        {"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False},
+        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
+        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
+        {"id": "removed-model", "label": "Removed Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
+    ]
 
     db.update_model_settings(default_model_settings())
     db.delete_session(token)

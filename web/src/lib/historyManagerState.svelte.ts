@@ -23,6 +23,11 @@ export type HistoryItem = {
 	derivation_kind?: string | null;
 	derivation_metadata?: Record<string, unknown>;
 	ddl: string | null;
+	// v1.98: 展開後 DDL (Stage 2 入力)。v1.98 以前の作品は持たない。
+	expanded_ddl?: string | null;
+	focus?: string | null;
+	// v1.98: Stage 1 フォールバックで描かれた作品の理由。null = 通常の解釈。
+	interpret_fallback?: string | null;
 	thinking?: string | null;
 	score: Score;
 	svg: string;

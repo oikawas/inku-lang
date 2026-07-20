@@ -146,13 +146,24 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             if not clean_purposes:
                 clean_purposes = ["llm"]
             item["purposes"] = clean_purposes
-            recommendation = model.get("recommendation_level")
-            if isinstance(recommendation, int) and not isinstance(recommendation, bool):
-                item["recommendation_level"] = max(1, min(5, recommendation))
-            for key in ("speed_class", "speed_label", "comment_ja", "comment_en"):
+            # v1.98: 推奨度は用途ごとに持つ。LLM は「3 回成功したか・スキーマを壊さないか・
+            # 補正発火が少ないか」、Vision は画像特徴の再現率で決まり、尺度が異なるため。
+            # 旧 recommendation_level は用途別の値が無いときだけ読む (書き出しはしない)。
+            legacy = model.get("recommendation_level")
+            for key in ("recommendation_llm", "recommendation_vision"):
+                purpose = "llm" if key == "recommendation_llm" else "vision"
+                value = model.get(key)
+                if not isinstance(value, int) or isinstance(value, bool):
+                    value = legacy if purpose in clean_purposes else None
+                if isinstance(value, int) and not isinstance(value, bool):
+                    item[key] = max(1, min(5, value))
+            for key in ("speed_class", "speed_label", "comment_ja", "comment_en", "eol_date"):
                 value = model.get(key)
                 if isinstance(value, str) and value.strip():
                     item[key] = value.strip()
+            # v1.98: 提供終了 (EOL) の印。新規描画では選べないが一覧には残す。
+            if model.get("eol") is True:
+                item["eol"] = True
             normalized.append(item)
     return normalized
 
@@ -259,7 +270,11 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
             if models:
                 if provider_id == "nvidia" and builtin:
                     merged = {str(model["id"]): model for model in provider["models"]}
-                    metadata_keys = ("purposes", "recommendation_level", "speed_class", "speed_label", "comment_ja", "comment_en")
+                    metadata_keys = (
+                        "purposes", "recommendation_llm", "recommendation_vision",
+                        "recommendation_level", "speed_class", "speed_label",
+                        "comment_ja", "comment_en",
+                    )
                     for model in models:
                         model_id = str(model["id"])
                         combined = {**merged.get(model_id, {}), **model}

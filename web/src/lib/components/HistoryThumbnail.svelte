@@ -1,8 +1,11 @@
 <script lang="ts">
+	import { t } from '$lib/i18n/index.svelte';
 	type HistoryItem = {
 		id?: string;
 		svg: string;
 		at: number;
+		// v1.98: Stage 1 フォールバックで描かれた作品の理由。null = 通常の解釈。
+		interpret_fallback?: string | null;
 	};
 
 	type Size = 'strip' | 'manager' | 'mini';
@@ -38,11 +41,26 @@
 </script>
 
 <div class="history-thumbnail" class:strip={size === 'strip'} class:manager={size === 'manager'} class:mini={size === 'mini'}>
+	{#if item.interpret_fallback}
+		<span class="thumb-fallback-mark" title={t().interpretFallbackBadge} aria-label={t().interpretFallbackBadge}></span>
+	{/if}
 	{@html clippedSvg}
 </div>
 
 <style>
+	.thumb-fallback-mark {
+		position: absolute;
+		top: 3px;
+		right: 3px;
+		z-index: 2;
+		width: 7px;
+		height: 7px;
+		border: 1px solid #6b4410;
+		border-radius: 50%;
+		background: #e0a850;
+	}
 	.history-thumbnail {
+		position: relative;
 		overflow: hidden;
 		overflow: clip;
 		clip-path: inset(0);

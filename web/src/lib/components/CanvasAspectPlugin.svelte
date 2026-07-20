@@ -25,7 +25,6 @@
 			event.stopPropagation();
 			onToggle();
 		}}
-		title={t().canvasAspectButton}
 		aria-haspopup="menu"
 		aria-expanded={open}
 	>

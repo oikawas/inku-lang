@@ -6,11 +6,17 @@ export type ModelOption = {
 	notes?: string;
 	purposes?: ('llm' | 'vision')[];
 	enabled?: boolean;
+	// v1.98: 推奨度は用途ごとに持つ。recommendation_level は旧形式の読み取り用。
+	recommendation_llm?: number;
+	recommendation_vision?: number;
 	recommendation_level?: number;
 	speed_class?: string;
 	speed_label?: string;
 	comment_ja?: string;
 	comment_en?: string;
+	// v1.98: 提供元が提供終了したモデル。一覧には残すが新規描画では選べない。
+	eol?: boolean;
+	eol_date?: string;
 };
 
 export type ProviderGroup = {

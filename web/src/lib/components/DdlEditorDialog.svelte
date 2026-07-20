@@ -3,8 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { highlightDDL } from '$lib/highlight';
 	import SaijikiInline from './SaijikiInline.svelte';
-	import InkuMascot from './InkuMascot.svelte';
-	import StopButton from './StopButton.svelte';
+	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import type { TenkeiLevel } from '$lib/tenkei';
 
@@ -24,8 +23,13 @@
 		subtitle: string;
 		initialDdl: string;
 		drawing: boolean;
+		stage1ModelLabel: string;
+		stage2ModelLabel: string;
+		runTokensIn: number | null;
+		runTokensOut: number | null;
 		error: string | null;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
+		pluginEntries?: { qualified_name: string; note_ja: string; note_en: string }[];
 		showTenkei?: boolean;
 		tenkeiValue?: TenkeiLevel;
 		tenkeiInherited?: boolean;
@@ -34,7 +38,7 @@
 		onClose: () => void;
 	};
 
-	let { open, isJapanese, title, subtitle, initialDdl, drawing, error, previewForWord, showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
+	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
 
 	let value = $state('');
 	let focused = $state(false);
@@ -185,6 +189,7 @@
 			</div>
 			<SaijikiInline
 				bind:activePreview={activeSaijikiPreview}
+				{pluginEntries}
 				onInsertWord={insertWord}
 				{previewForWord}
 			/>
@@ -192,14 +197,16 @@
 		{#if error}<div class="ddled-error">{error}</div>{/if}
 		<div class="ddled-foot">
 			{#if drawing}
-				<div class="ddled-status" aria-live="polite">
-					<div class="ddled-mascot"><InkuMascot /></div>
-					<div class="ddled-status-info">
-						<span class="ddled-stage">{t().stageImageGenerating}</span>
-						<span class="ddled-elapsed">{isJapanese ? '経過' : 'Elapsed'} {(elapsedMs / 1000).toFixed(1)}s</span>
-					</div>
-					<StopButton onclick={stopDraw}>{t().stopBtn}</StopButton>
-				</div>
+				<RunStatus
+					variant="inline"
+					label={t().stageImageGenerating}
+					stage1Model={stage1ModelLabel}
+					stage2Model={stage2ModelLabel}
+					elapsedMs={elapsedMs}
+					tokensIn={runTokensIn}
+					tokensOut={runTokensOut}
+					onStop={stopDraw}
+				/>
 			{:else}
 				{#if showTenkei && onSelectTenkei}
 					<TenkeiSelect compact value={tenkeiValue} {isJapanese} inherited={tenkeiInherited} onSelect={onSelectTenkei} />
@@ -407,10 +414,6 @@
 		cursor: not-allowed;
 		opacity: 0.72;
 	}
-	.ddl-highlight :global(.ddl-token) {
-		border-radius: 2px;
-		font-weight: inherit;
-	}
 	.ddl-highlight :global(.ddl-custom-caret) {
 		position: relative;
 		display: inline-block;
@@ -429,32 +432,6 @@
 		background: var(--fg);
 		animation: ddl-caret-blink 1s steps(2, start) infinite;
 	}
-	.ddl-highlight :global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
-	.ddl-highlight :global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
-	.ddl-highlight :global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
-	.ddl-highlight :global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
-	.ddl-highlight :global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
-	.ddl-highlight :global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
-	.ddl-highlight :global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
-	.ddl-highlight :global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
-	.ddl-highlight :global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
-	.ddl-highlight :global(.ddl-token-plugin) { color: #9f4b3b; background: rgba(185, 88, 69, 0.10); }
-	.ddl-highlight :global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
-	.ddl-highlight :global(.ddl-token-emotion) {
-		color: #9b7a66;
-		font-style: inherit;
-	}
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-shape) { color: #9cc4ff; background: rgba(92, 143, 220, 0.26); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-touch) { color: #e2bf82; background: rgba(188, 139, 62, 0.24); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-line) { color: #c4ccd5; background: rgba(147, 160, 176, 0.22); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-color) { color: #ff91c7; background: rgba(215, 80, 149, 0.24); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-motion) { color: #7ce1d4; background: rgba(50, 157, 147, 0.24); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-place) { color: #c2a9ff; background: rgba(133, 99, 214, 0.26); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-action) { color: #f0aa73; background: rgba(197, 105, 45, 0.24); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-angle) { color: #a7d88e; background: rgba(89, 142, 65, 0.25); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-ratio) { color: #f0a0a0; background: rgba(196, 78, 78, 0.24); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-word) { color: #b8c7ff; background: rgba(92, 111, 205, 0.26); }
-	:global(html[data-theme='dark']) .ddl-highlight :global(.ddl-token-emotion) { color: #d8b8a6; }
 	:global(html[data-theme='dark']) .ddl-line-numbers { background: #1a1918; color: #8c857a; border-color: #3b3834; }
 	.ddled-error {
 		margin: 0 16px;
@@ -463,6 +440,7 @@
 		border: 1px solid var(--danger, #9b3d32);
 		border-radius: var(--r);
 		color: var(--danger, #9b3d32);
+		white-space: pre-line;
 		font-size: 12px;
 		line-height: 1.4;
 	}
@@ -498,31 +476,6 @@
 	.ddled-foot > :global(.tenkei-inline) { margin-right: auto; }
 	.ddled-cancel:hover:not(:disabled) {
 		background: var(--bg2);
-	}
-	.ddled-status {
-		flex: 0 0 auto;
-		margin-left: auto;
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-	.ddled-mascot { flex: 0 0 auto; display: flex; align-items: center; }
-	.ddled-status-info {
-		flex: 0 0 auto; min-width: 0;
-		display: flex; flex-direction: column; gap: 2px;
-		text-align: right;
-	}
-	.ddled-stage {
-		font-size: 12px; font-weight: 500; color: var(--fg);
-		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-	}
-	.ddled-elapsed {
-		font-size: 11px; color: var(--fg3);
-		font-variant-numeric: tabular-nums; white-space: nowrap;
-	}
-	.ddled-status :global(.stop-btn) {
-		flex: 0 0 auto; width: auto; min-width: 0;
-		padding: 7px 14px; font-size: 13px; letter-spacing: 0.06em;
 	}
 	@keyframes ddl-caret-blink {
 		50% { opacity: 0; }

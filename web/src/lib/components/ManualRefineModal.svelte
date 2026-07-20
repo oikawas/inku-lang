@@ -156,7 +156,7 @@
 	.parent-info { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--bg2); }
 	.parent-info h4 { margin: 0 0 6px; font-size: 0.72rem; color: var(--fg3); font-weight: 600; }
 	.parent-info pre { margin: 0; font-family: monospace; font-size: 0.72rem; white-space: pre-wrap; word-break: break-all; color: var(--fg2); max-height: 5.5em; overflow-y: auto; line-height: 1.4; }
-	.error-banner { padding: 8px 12px; background: color-mix(in srgb, var(--danger, #9b3d32) 10%, var(--panel)); border: 1px solid var(--danger, #9b3d32); border-radius: 6px; color: var(--danger, #9b3d32); font-size: 0.74rem; line-height: 1.35; }
+	.error-banner { padding: 8px 12px; background: color-mix(in srgb, var(--danger, #9b3d32) 10%, var(--panel)); border: 1px solid var(--danger, #9b3d32); border-radius: 6px; color: var(--danger, #9b3d32); font-size: 0.74rem; line-height: 1.35; white-space: pre-line; }
 	footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg2); }
 	footer button { border: 1px solid var(--border2); border-radius: 6px; padding: 7px 14px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: var(--panel); color: var(--fg); }
 	.confirm-action { background: var(--accent); color: white; border-color: var(--accent); }

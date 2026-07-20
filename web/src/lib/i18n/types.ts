@@ -149,8 +149,14 @@ export interface LangPack {
 	canvasVaryComposition: string;
 	canvasVaryInterpretation: string;
 	canvasVaryColor: string;
-	canvasVaryFocus: string;
-	refineFocusHint: string;
+	hensouTitle: string;
+	hensouHint: string;
+	hensouSmall: string;
+	hensouMedium: string;
+	hensouLarge: string;
+	hensouButton: string;
+	hensouMovedTitle: string;
+	hensouAxis: (axis: string) => string;
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;
 	variationGridSaveSelected: string;
@@ -198,7 +204,7 @@ export interface LangPack {
 	tooltipCanvasVaryComposition: string;
 	tooltipCanvasVaryInterpretation: string;
 	tooltipCanvasVaryColor: string;
-	tooltipCanvasVaryFocus: string;
+	tooltipHensou: string;
 	tooltipCanvasNavPrev: string;
 	tooltipCanvasNavNext: string;
 	tooltipCanvasNavLatest: string;

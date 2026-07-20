@@ -195,9 +195,38 @@ DDL is not expanded twice.
 Since v1.98 history stores the input-side DDL (the user's text or the Stage 1
 output, `ddl`) separately from the expanded DDL that Stage 2 consumes
 (`expanded_ddl`); works saved before the split keep only the expanded form.
-The focus can also be selected explicitly via `focus` on `/api/paint` and
-`/api/compose`; when omitted the focus is chosen deterministically from the
-DDL text as before, and unknown values are treated as omitted.
+The explicit `focus` input added in v1.98 was retired in v2.0: the focus
+defaults to a deterministic hash choice from the DDL text and moves only as a
+variation axis (see below). The focus the expansion layer resolves is recorded
+in the response and in `history.focus`.
+
+Stage 1.5 is the application's own layer: it is deterministic, uses no LLM,
+and the author does not intervene in its individual parameters — by design
+principle, not by implementation convenience. The author's handles are the
+input text, `vary_seed`, `tenkei`, and **variation** (強度/amplitude + seed).
+The author writes, the application shakes, the author chooses.
+
+Variation (v2.0, "hensou") shakes the expansion layer as a whole in one
+explicit operation. Amplitude is discrete — small, medium, large. Which axes
+move is decided by the seed; the same (amplitude, seed) always reproduces the
+same expansion, and variation is never inherited along a lineage. The seven
+official axis names are: focus, composition family, touch material, adopted
+count, main/contrast colors, type swap, and type family. Axes are released by
+weight: small moves one light axis (type swap, count); medium up to two
+mid-weight axes (touch, focus, colors); large two to four including the heavy
+axes (composition family, type family). Small never changes the picture's
+skeleton (composition family, focus). An axis reported as moved is guaranteed
+to produce a real difference in the expansion (visibility over axis count when
+the description offers too few movable axes). Candidates come in fours (same
+amplitude, distinct server-issued seeds), each card showing what moved
+(from → to in the official vocabulary). Variation is orthogonal to tenkei and
+never exceeds its cap (under `none` only the focus axis moves). The four
+existing refinement kinds keep their one-axis-chisel meaning; variation is a
+parallel concept. Terminology: variation (hensou) belongs to Stage 1.5 — a
+deterministic variation of the score; yuragi (wobble) belongs to the renderer's
+nondeterministic performance. The replay contract (same Score + same seed =
+same work) is untouched, since variation happens before the Score exists and
+is not an rh2 ingredient.
 
 ### Stage 2: Structuring
 

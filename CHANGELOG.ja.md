@@ -2423,3 +2423,15 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **検証:** pytest 578 passed / 39 skipped（新規 42 テスト: 6 図形 × 3 quality の演奏確認、dims 別演奏、ゲート閉時のバイト一致、決定性、pink の blur 維持、弧の端点固定、多角形の角固定、周期サンプラーの継ぎ目連続性）。既存回帰ゼロ、ruff 通過。Score schema・coerce・rh2 の変更なし。マージ時、ローカル専用 leaf-bench の touching 検査 3 件が「演奏された弧は polyline 要素になる」表現変化で失敗することが判明（render worktree では fixture 不在で skip されていた）。追補修正で SVG 抽出系を polyline 対応へ拡張（端点拘束付き円当てはめ・掃引角からの劣弧再導出・ゲート発火/非発火の形状一致 assert）。検査の緩和ゼロ、最終値 602 passed / 30 skipped。
 - **残作業:** 作者の実演奏目視確認（「震える円」「ゆっくり揺れる四角」「震える弧」、葉の「定規の円弧」問題の改善度）、材質輪郭（Phase 2）の要否判断、必要なら amplitude/周波数の調整（現行は line と共用）。
 
+
+### v2.0 — Stage 1.5「変奏」・focus 外部入力の撤去（Build 611、2026-07-20）
+
+- **変奏（決定的な展開層の揺すり）:** `expand_intermediate_ddl()` に `variation_amplitude`（小/中/大）と `variation_seed` を追加した。`(強度, seed)` から変奏プランを 1 回だけ決定的に組み（`_seed()` ハッシュのみ・乱数源なし）、7 軸——型の差し替え・採用本数（Tier 1）／タッチ材質・焦点・主色対比色（Tier 2）／構図族・型の系統（Tier 3）——を重み付き段階解放で振る。小 = Tier 1 から 1 軸、中 = Tier 1∪2 から 1〜2 軸、大 = 全 Tier から 2〜4 軸。小では構図族・焦点は動かない。両引数が揃わなければ現行挙動とバイト一致（既存作品の再現性維持）。
+- **可視性保証（契約 §3.2 を超える追加 2 段）:** 値をずらしても出力が変わらない場合（採用文が `{touch}` を含まない等）があるため、①軸単独適用の実走で差分を確認しオフセットを隣へ送る（最大 8 回、不動なら同強度の別軸へ置換）、②組み合わせの打ち消し検出（相殺時は軸を減らす）を実装した。large 1 回あたり約 2ms。副作用として、動かせる軸が足りない記述では軸数が範囲を下回ることがある（可視性優先）。moved_axes は「実際に出力が変わった軸」だけを公式語彙の from → to で報告し、候補カードにチップ表示する。型の名前は候補 34 件（ja/en 各）へ手で表示名を付与した。
+- **tenkei 直交:** `none` では対象軸は焦点のみ、`sparse` では合計 1 本を超えないよう再クランプ。採用本数の ±1 は cap 適用後の値に振り、cap と実プール長を越えない。
+- **API・候補生成:** `PaintRequest` / `ComposeRequest` に `variation_amplitude` / `variation_seed`、応答に `variation_moved_axes` を追加。seed 採番は新設の `POST /api/variation/seeds` に置き、4 案の生成は既存候補グリッド機構（並列 fetch・進捗・中断）を使う。history に `variation_amplitude` / `variation_seed` の 2 列を追加（moved_axes は決定的に再計算可能なため列を設けない）。`LINEAGE_DERIVATION_KINDS` に `hensou` を追加。
+- **focus 外部入力の撤去:** `PaintRequest.focus` / `ComposeRequest.focus` / `_validated_focus` と UI の推敲要素「焦点を変える」一式を撤去し、推敲要素は 4 種（タッチ・配置・読み取り・色）に戻った。展開層の focus 機構・未指定時のハッシュ選択・`history.focus` 列・`HistoryPostBody.focus` は残置。展開層が決めた焦点を `resolved_focus` として render_metadata へ結線したため、撤去後も `history.focus` は NULL にならない（変奏なしの通常描画では既定ハッシュ選択が記録される）。
+- **UI:** 調整ダイアログ内に推敲 4 種と分離した「変奏」セクション（強度 3 択 + 変奏を描く）。カードには動いた軸を「型の差し替え 蕾」形式のチップで表示。表示語は「変奏」で統一し「揺らぎ」を使わない。
+- **検証:** pytest 636 passed / 30 skipped（+34: `test_variation.py` 30 件 + `test_api.py` 5 件 − focus テスト 1 件）。契約 §4 の 7 項目（再現性・無効時バイト一致・段階解放 seed 0〜199 掃引・可視性・tenkei 直交・レポート整合・focus 撤去回帰）全対応。ruff・`npm run check` 0 errors・build 通過。
+- **既知の残件:** 変奏セクションの UI 配置は作者イメージと相違があり手直し予定（機能は現状のまま採用）。`loadIterationItem` は変奏フィールドを復元しない（保存は行われるため再計算可能。既存 focus と同扱い）。`api_history_neighbors` が history の score を文字列のまま比較関数へ渡す既存バグを pentala ログで確認（変奏とは無関係、未修正）。
+

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.99.0 / Build 610**
+**Target version: v2.0.0 / Build 611**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -92,6 +92,8 @@ v1.97 (Builds 607–608) made the scenery level per-artwork: a history `tenkei` 
 v1.98 (Build 609) moved single drawing to `POST /api/paint/stream` (NDJSON), showing the normalized DDL as soon as interpretation completes (`/api/paint` stays a wrapper over the same logic with an unchanged response shape). History now stores the input-side DDL (`ddl`) separately from the expanded DDL (`expanded_ddl`; a one-time backfill leaves pre-split works with only the expanded form), adds explicit `focus` selection, and records `interpret_fallback` (an empty Stage 1 output is a failure; fallback-drawn works are marked). The verified model catalog was rebuilt as v2 from two measured benchmark runs (29 → 43 entries, per-purpose recommendations `recommendation_llm` / `recommendation_vision`, retired models kept as marked EOL entries, one shared sort path), and provider failures are classified and explained by kind. The Saijiki drawer became browse-only; word insertion is concentrated in the DDL editor dialog's inline Saijiki, which also lists plugin vocabulary.
 
 v1.99 (Build 610) extended variation performance from lines only to arcs and closed shapes (circle, ellipse, triangle, square, polygon) — F-4. The gate mirrors the line gate (quality in {perlin, wave, white} with position_x/position_y/radius dims). Closed contours use seam-continuous periodic noise, polygonal shapes keep corners fixed, and arcs keep both endpoints fixed to preserve the touching contact contract. Because performances change, the render engine version was bumped to 5 (saved SVGs, Scores, and rh2 untouched). The author's visual confirmation and the Phase 2 material-outline decision remain.
+
+v2.0 (Build 611) implemented Stage 1.5 variation, "hensou" (SPEC §12.13): one explicit operation that shakes the whole expansion layer. Three discrete amplitudes move seven axes (type swap, adopted count, touch material, focus, main/contrast colors, composition family, type family) under weighted staged release, fully reproducible from (amplitude, seed), never inherited along a lineage, and always within the tenkei cap. Four candidates per run (server-issued seeds via `/api/variation/seeds`), each card showing what moved in the official vocabulary, with a real-difference guarantee for every reported axis. The external focus input (`PaintRequest.focus` etc.) and the "vary focus" refinement were retired, returning refinement to four kinds; the layer's resolved focus is wired into render_metadata so `history.focus` keeps recording. History gains `variation_amplitude` / `variation_seed`. Follow-ups: rework of the variation section's UI placement (differs from the author's image), `loadIterationItem` not restoring variation fields, and the pre-existing `api_history_neighbors` bug.
 
 ## Where to Look for a Change
 

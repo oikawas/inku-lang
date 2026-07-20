@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v1.99.0 / Build 610**
+**対象バージョン: v2.0.0 / Build 611**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -92,6 +92,8 @@ v1.97（Build 607–608）では添景水準を作品ごとに保存する形へ
 v1.98（Build 609）では単発描画を `POST /api/paint/stream`（NDJSON）へ移行し、解釈完了時点で正規化DDLを先に表示する（`/api/paint` は同一ロジックのラッパで応答形状不変）。history は入力側 DDL（`ddl`）と展開後 DDL（`expanded_ddl`）を分離保存し（一度きりバックフィルで旧作品は展開後のみ）、`focus` の明示指定と `interpret_fallback`（空の Stage 1 出力の失敗化・フォールバック印）を導入した。検証済みモデルカタログは実測 2 回に基づき v2 へ再構築（29→43 エントリ、用途別推奨度 `recommendation_llm`/`recommendation_vision`、EOL 印つき残置、表示順の単一経路化）、プロバイダ失敗は種別分類で説明表示する。歳時記ドロワーは閲覧専用となり、語の挿入は DDL エディタダイアログのインライン歳時記（プラグイン語彙含む）に集約した。
 
 v1.99（Build 610）では揺らぎ（variation）の演奏対象を line のみから弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した（F-4）。ゲートは line と対称（quality ∈ {perlin, wave, white} かつ dims に position_x/position_y/radius）。閉図形は継ぎ目連続の周期ノイズ、多角形系は角固定、弧は両端点固定で touching 接点契約を維持する。演奏結果が変わるため render engine version を 5 へ更新（保存済み SVG・Score・rh2 は不変）。作者の実演奏目視確認と材質輪郭（Phase 2）の要否判断が残る。
+
+v2.0（Build 611）では Stage 1.5 に「変奏」を実装した（SPEC §12.13）。展開層をまとめて振る明示操作で、強度は小中大の 3 段、7 軸（型の差し替え・採用本数・タッチ材質・焦点・主色対比色・構図族・型の系統）を重み付き段階解放で動かし、`(強度, seed)` で完全再現・系譜非継承・tenkei の cap 内。候補は 4 案（seed はサーバー採番 `/api/variation/seeds`）で、各カードに「何が動いたか」を公式語彙で表示する。動かすと決めた軸は実差分を保証（可視性保証）。あわせて focus の外部入力（`PaintRequest.focus` 等）と推敲要素「焦点を変える」を撤去し、推敲は 4 種へ回帰。展開層の解決焦点を render_metadata へ結線したため `history.focus` は記録され続ける。history に `variation_amplitude` / `variation_seed` の 2 列を追加。残件: 変奏セクションの UI 配置手直し（作者イメージと相違）、`loadIterationItem` の変奏フィールド未復元、`api_history_neighbors` の既存バグ。
 
 ## 変更時の確認先
 

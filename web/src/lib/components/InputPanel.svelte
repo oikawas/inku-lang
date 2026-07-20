@@ -503,7 +503,7 @@
 	}
 	.input-meter.soft-over { color: color-mix(in srgb, var(--fg) 78%, transparent); }
 	.gen-status-wrap { margin-top: 8px; }
-	.error-text { color: #a2342a; font-size: 12px; }
+	.error-text { color: var(--danger); font-size: 12px; white-space: pre-line; }
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50% { opacity: 0.4; transform: scale(0.7); }

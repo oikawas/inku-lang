@@ -6375,6 +6375,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--accent-light: #e8eef5;
 		--border:       #d4d0c8;
 		--border2:      #c4c0b8;
+		--danger:       #a2342a;
 		--r:            4px;
 		--r-lg:         8px;
 	}
@@ -6405,6 +6406,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--accent-light: #253246;
 		--border:       #38342f;
 		--border2:      #514b43;
+		--danger:       #ff9a86;
 	}
 
 	:global(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }

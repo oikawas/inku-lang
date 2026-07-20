@@ -468,6 +468,7 @@
 		border: 1px solid var(--danger, #9b3d32);
 		border-radius: var(--r);
 		color: var(--danger, #9b3d32);
+		white-space: pre-line;
 		font-size: 12px;
 		line-height: 1.4;
 	}

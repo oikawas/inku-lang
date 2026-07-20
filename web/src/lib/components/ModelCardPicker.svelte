@@ -85,7 +85,7 @@
 <style>
 	.model-grid button.eol { opacity: 0.55; cursor: not-allowed; }
 	.model-grid button.eol strong { text-decoration: line-through; }
-	.eol-mark { color: #a2342a; font-weight: 600; }
+	.eol-mark { color: var(--danger); font-weight: 600; }
 	.context-model-picker { display: grid; gap: 4px; min-width: 0; }
 	.field-label { color: var(--fg2); font-size: 11px; }
 	.picker-launch { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); text-align: left; cursor: pointer; font: inherit; }

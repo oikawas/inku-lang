@@ -306,7 +306,7 @@
 		color: var(--fg3);
 		font-variant-numeric: normal;
 	}
-	.error-text { color: #a2342a; font-size: 12px; }
+	.error-text { color: var(--danger); font-size: 12px; white-space: pre-line; }
 	.batch-summary {
 		margin-top: 8px;
 		padding: 8px 10px;
@@ -345,7 +345,7 @@
 	}
 	.batch-failure-message {
 		grid-column: 2;
-		color: #a2342a;
+		color: var(--danger);
 		font-size: 11px;
 		word-break: break-word;
 	}

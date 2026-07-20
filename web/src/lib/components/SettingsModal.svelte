@@ -1610,7 +1610,7 @@
 	.generation-model-grid button:hover { border-color: var(--accent); background: var(--bg2); }
 	.generation-model-grid button.eol { opacity: 0.55; cursor: not-allowed; }
 	.generation-model-grid button.eol strong { text-decoration: line-through; }
-	.eol-mark { color: #a2342a; font-weight: 600; }
+	.eol-mark { color: var(--danger); font-weight: 600; }
 	.generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
 	.generation-model-grid strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
 	.generation-model-grid span { color: var(--fg3); font-size: 10px; }

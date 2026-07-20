@@ -725,7 +725,7 @@ $effect(() => {
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
 	.lineage-message { margin: auto; color: var(--fg3); }
-	.lineage-message.error { color: var(--danger, #9b3d32); }
+	.lineage-message.error { color: var(--danger, #9b3d32); white-space: pre-line; }
 	.lineage-scroll { min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 8px 18px 24px 8px; }
 	.lineage-columns { position: relative; width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 58px; transform-origin: top center; }
 	.lineage-arrows { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }

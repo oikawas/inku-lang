@@ -329,6 +329,18 @@ def _needs_path_variation(v: Variation | None) -> bool:
     return any(d in ("position_x", "position_y") for d in v.dimensions)
 
 
+_CONTOUR_VARIATION_DIMS = ("position_x", "position_y", "radius")
+
+
+def _needs_contour_variation(v: Variation | None) -> bool:
+    """弧・閉図形の輪郭揺らぎ。line のゲートと対称で、図形の自然軸として radius を加える。"""
+    if v is None:
+        return False
+    if v.quality in ("none", "pink"):
+        return False
+    return any(d in _CONTOUR_VARIATION_DIMS for d in v.dimensions)
+
+
 def _sample_offset(t: float, variation: Variation, seed: int, segment: int) -> float:
     amp = AMPLITUDE_PX[variation.amplitude]
     freq = FREQUENCY_CYCLES[variation.frequency]
@@ -394,6 +406,119 @@ def _line_with_variation(
         pts.append((x, y))
     pts.append(end_px)
     return pts
+
+
+def _periodic_value_noise_1d(x: float, seed: int, period: int) -> float:
+    """周期境界つき value noise。閉じた輪郭の継ぎ目を連続にする。"""
+    xi = math.floor(x)
+    xf = x - xi
+    v1 = _hash_to_unit(int(xi) % period, seed)
+    v2 = _hash_to_unit((int(xi) + 1) % period, seed)
+    t = xf * xf * (3 - 2 * xf)
+    return v1 * (1 - t) + v2 * t
+
+
+def _sample_offset_periodic(
+    t: float, variation: Variation, seed: int, segment: int
+) -> float:
+    """閉輪郭用の offset サンプル。t∈[0,1) を一周として周期連続にする。
+
+    wave は FREQUENCY_CYCLES が整数値のため自動的に閉じる。perlin は格子を
+    周期化する。white は頂点毎の独立雑音なので継ぎ目の概念を持たない。
+    """
+    amp = AMPLITUDE_PX[variation.amplitude]
+    freq = FREQUENCY_CYCLES[variation.frequency]
+    q = variation.quality
+    if q == "wave":
+        return math.sin(t * 2 * math.pi * freq) * amp
+    if q == "perlin":
+        return _periodic_value_noise_1d(t * freq, seed, max(1, int(round(freq)))) * amp
+    if q == "white":
+        return _hash_to_unit(segment, seed) * amp
+    return 0.0
+
+
+def _offset_contour_point(
+    x: float,
+    y: float,
+    off: float,
+    center: tuple[float, float],
+    axis_x: bool,
+    axis_y: bool,
+) -> tuple[float, float]:
+    """dimensions の指定に応じて輪郭上の 1 点をずらす (line と対称の意味論)。
+
+    position_x のみ: x 軸方向 / position_y のみ: y 軸方向 /
+    両方または radius: 輪郭法線 (中心から外向き) 方向。
+    """
+    if axis_x and not axis_y:
+        return (x + off, y)
+    if axis_y and not axis_x:
+        return (x, y + off)
+    dx = x - center[0]
+    dy = y - center[1]
+    norm = math.hypot(dx, dy)
+    if norm <= 1e-6:
+        return (x, y)
+    return (x + off * dx / norm, y + off * dy / norm)
+
+
+def _closed_contour_with_variation(
+    points: list[tuple[float, float]],
+    center: tuple[float, float],
+    variation: Variation,
+    seed: int,
+) -> list[tuple[float, float]]:
+    """閉じた輪郭の頂点列に周期揺らぎを適用する (circle / ellipse 用)。"""
+    dims = set(variation.dimensions)
+    axis_x = "position_x" in dims
+    axis_y = "position_y" in dims
+    n = len(points)
+    result: list[tuple[float, float]] = []
+    for i, (x, y) in enumerate(points):
+        off = _sample_offset_periodic(i / n, variation, seed, i)
+        result.append(_offset_contour_point(x, y, off, center, axis_x, axis_y))
+    return result
+
+
+def _edge_contour_with_variation(
+    corners: list[tuple[float, float]],
+    variation: Variation,
+    seed: int,
+) -> list[tuple[float, float]]:
+    """多角形の各辺に line と同じ揺らぎを適用し、角を固定した閉輪郭を返す。"""
+    result: list[tuple[float, float]] = []
+    n = len(corners)
+    for i in range(n):
+        start = corners[i]
+        end = corners[(i + 1) % n]
+        edge = _line_with_variation(start, end, variation, seed + (i + 1) * 7919)
+        result.extend(edge[:-1])
+    return result
+
+
+def _arc_points_with_variation(
+    cx: float,
+    cy: float,
+    r: float,
+    start_deg: float,
+    end_deg: float,
+    variation: Variation,
+    seed: int,
+) -> list[tuple[float, float]]:
+    """弧を分割し揺らぎを注入する。両端点は固定 (touching 接点契約の維持)。"""
+    base = _arc_points(cx, cy, r, start_deg, end_deg, SEGMENT_COUNT + 1)
+    dims = set(variation.dimensions)
+    axis_x = "position_x" in dims
+    axis_y = "position_y" in dims
+    last = len(base) - 1
+    result: list[tuple[float, float]] = [base[0]]
+    for i in range(1, last):
+        x, y = base[i]
+        off = _sample_offset(i / last, variation, seed, i)
+        result.append(_offset_contour_point(x, y, off, (cx, cy), axis_x, axis_y))
+    result.append(base[last])
+    return result
 
 
 def _scatter_pos(i: int, seed: int, margin: float) -> tuple[float, float]:
@@ -3011,12 +3136,23 @@ def _render_instruction(
             raise ValueError("circle requires 'center' and 'radius'")
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
+        if _needs_contour_variation(ins.variation):
+            assert ins.variation is not None
+            contour = _closed_contour_with_variation(
+                _circle_points(cx, cy, r, r, SEGMENT_COUNT),
+                (cx, cy),
+                ins.variation,
+                _seed_for_instruction(ins, render_seed),
+            )
+            element = dwg.polygon(points=contour, **attrs)
+        else:
+            element = dwg.circle(center=(cx, cy), r=r, **attrs)
         if _uses_material_outline(ins.weight):
             group = dwg.g()
-            group.add(dwg.circle(center=(cx, cy), r=r, **attrs))
+            group.add(element)
             _add_material_circle_outline(dwg, group, ins, attrs, cx, cy, r)
             return _apply_rotation(group, ins, canvas)
-        return _apply_rotation(dwg.circle(center=(cx, cy), r=r, **attrs), ins, canvas)
+        return _apply_rotation(element, ins, canvas)
 
     if ins.primitive == "ellipse":
         if ins.center is None or ins.size is None:
@@ -3024,14 +3160,23 @@ def _render_instruction(
         cx, cy = _px(ins.center, canvas)
         rx = ins.size[0] * canvas.width / 2
         ry = ins.size[1] * canvas.height / 2
+        if _needs_contour_variation(ins.variation):
+            assert ins.variation is not None
+            contour = _closed_contour_with_variation(
+                _circle_points(cx, cy, rx, ry, SEGMENT_COUNT),
+                (cx, cy),
+                ins.variation,
+                _seed_for_instruction(ins, render_seed),
+            )
+            element = dwg.polygon(points=contour, **attrs)
+        else:
+            element = dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs)
         if _uses_material_outline(ins.weight):
             group = dwg.g()
-            group.add(dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs))
+            group.add(element)
             _add_material_ellipse_outline(dwg, group, ins, attrs, cx, cy, rx, ry)
             return _apply_rotation(group, ins, canvas)
-        return _apply_rotation(
-            dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs), ins, canvas
-        )
+        return _apply_rotation(element, ins, canvas)
 
     if ins.primitive == "cloudform":
         if ins.center is None or ins.size is None:
@@ -3056,14 +3201,21 @@ def _render_instruction(
         x, y = _px(ins.position, canvas)
         w = ins.size[0] * canvas.width
         h = ins.size[1] * canvas.height
+        if _needs_contour_variation(ins.variation):
+            assert ins.variation is not None
+            corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+            contour = _edge_contour_with_variation(
+                corners, ins.variation, _seed_for_instruction(ins, render_seed)
+            )
+            element = dwg.polygon(points=contour, **attrs)
+        else:
+            element = dwg.rect(insert=(x, y), size=(w, h), **attrs)
         if _uses_material_outline(ins.weight):
             group = dwg.g()
-            group.add(dwg.rect(insert=(x, y), size=(w, h), **attrs))
+            group.add(element)
             _add_material_rect_outline(dwg, group, ins, attrs, x, y, w, h)
             return _apply_rotation(group, ins, canvas)
-        return _apply_rotation(
-            dwg.rect(insert=(x, y), size=(w, h), **attrs), ins, canvas
-        )
+        return _apply_rotation(element, ins, canvas)
 
     if ins.primitive == "triangle":
         if ins.position is None or ins.size is None:
@@ -3076,6 +3228,11 @@ def _render_instruction(
             (x, y + h),
             (x + w, y + h),
         ]
+        if _needs_contour_variation(ins.variation):
+            assert ins.variation is not None
+            points = _edge_contour_with_variation(
+                points, ins.variation, _seed_for_instruction(ins, render_seed)
+            )
         return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
 
     if ins.primitive == "polygon":
@@ -3084,6 +3241,11 @@ def _render_instruction(
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
         points = _polygon_points(cx, cy, r, ins.sides or 5)
+        if _needs_contour_variation(ins.variation):
+            assert ins.variation is not None
+            points = _edge_contour_with_variation(
+                points, ins.variation, _seed_for_instruction(ins, render_seed)
+            )
         return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
 
     if ins.primitive == "arc":
@@ -3093,14 +3255,28 @@ def _render_instruction(
             raise ValueError("arc requires 'angle_start' and 'angle_end'")
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
-        path_d = _arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)
+        if _needs_contour_variation(ins.variation):
+            assert ins.variation is not None
+            contour = _arc_points_with_variation(
+                cx,
+                cy,
+                r,
+                ins.angle_start,
+                ins.angle_end,
+                ins.variation,
+                _seed_for_instruction(ins, render_seed),
+            )
+            element = dwg.polyline(points=contour, **attrs)
+        else:
+            path_d = _arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)
+            element = dwg.path(d=path_d, **attrs)
         if _uses_material_outline(ins.weight):
             group = dwg.g()
-            group.add(dwg.path(d=path_d, **attrs))
+            group.add(element)
             _add_material_arc_outline(
                 dwg, group, ins, attrs, cx, cy, r, ins.angle_start, ins.angle_end
             )
             return _apply_rotation(group, ins, canvas)
-        return _apply_rotation(dwg.path(d=path_d, **attrs), ins, canvas)
+        return _apply_rotation(element, ins, canvas)
 
     raise NotImplementedError(f"primitive '{ins.primitive}' not yet supported")

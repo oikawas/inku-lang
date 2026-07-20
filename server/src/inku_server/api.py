@@ -39,7 +39,7 @@ from .okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL, generate_okugaki
 from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import _finalize_score, compose
-from .ddl_expander import FOCUS_IDS
+from .ddl_expander import FOCUS_IDS, VARIATION_AMPLITUDES
 from .interpreter import _sanitize_placement_words, interpret_detail
 from .languages import (
     SUPPORTED_INSTRUCTION_LANGS,
@@ -460,13 +460,13 @@ def _resolved_tenkei(requested: str | None, actor: dict, lineage_parent_node_id:
     return "auto"
 
 
-def _validated_focus(value: str | None) -> str | None:
-    """焦点 (v1.98): 未指定・未知の値は None にして決定的な既定選択へ戻す。
+def _validated_variation_amplitude(value: str | None) -> str | None:
+    """変奏 (v2.0): 未指定・未知の強度は None にして変奏なしへ戻す。
 
-    焦点は系譜継承しない（作者裁定 2026-07-20）。明示された作品だけがその焦点を持ち、
-    未指定の派生は従来どおり DDL テキストのハッシュから選ばれる。
+    変奏は系譜継承しない（作者裁定 2026-07-20）。明示された作品だけが
+    (強度, seed) を持ち、未指定の派生は変奏前と同じ展開になる。
     """
-    if value in FOCUS_IDS:
+    if value in VARIATION_AMPLITUDES:
         return value
     return None
 
@@ -790,7 +790,8 @@ class ComposeRequest(BaseModel):
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
-    focus: str | None = Field(default=None, description="焦点 (v1.98): 中央固定を再構成する際の寄せ先。省略時は DDL テキストから決定的に選ばれる")
+    variation_amplitude: str | None = Field(default=None, description="変奏 (v2.0): 展開層をずらす強度 small / medium / large。variation_seed と揃って初めて有効")
+    variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     lineage_parent_node_id: str | None = Field(default=None, description="添景水準の継承元 lineage ノード (v1.97)。保存には関与しない")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
@@ -826,6 +827,9 @@ class ComposeResponse(BaseModel):
     vary_seed: int | None = None
     tenkei: str | None = None
     focus: str | None = None
+    variation_amplitude: str | None = None
+    variation_seed: int | None = None
+    variation_moved_axes: list[dict[str, str]] = Field(default_factory=list)
     interpretation_seed: str | None = None
     seed_text: str | None = None
     instruction_lang_requested: str | None = None
@@ -897,7 +901,8 @@ class PaintRequest(BaseModel):
     random_color_catalog: bool = Field(default=False, description="現在のcatalog_idを除外してサーバー側で色カタログを選ぶか")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
-    focus: str | None = Field(default=None, description="焦点 (v1.98): 中央固定を再構成する際の寄せ先。省略時は DDL テキストから決定的に選ばれる")
+    variation_amplitude: str | None = Field(default=None, description="変奏 (v2.0): 展開層をずらす強度 small / medium / large。variation_seed と揃って初めて有効")
+    variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
@@ -933,6 +938,9 @@ class PaintResponse(BaseModel):
     vary_seed: int | None = None
     tenkei: str | None = None
     focus: str | None = None
+    variation_amplitude: str | None = None
+    variation_seed: int | None = None
+    variation_moved_axes: list[dict[str, str]] = Field(default_factory=list)
     interpretation_seed: str | None = None
     seed_text: str | None = None
     instruction_lang_requested: str | None = None
@@ -1050,6 +1058,9 @@ class ComposeDetail:
     plugin_expanded_ddl: str | None = None
     stage15_ddl: str | None = None
     stage2_raw_attempts: list[dict] | None = None
+    # 変奏 (v2.0): 展開層が実際に振った結果。resolved_focus は history.focus の供給源。
+    variation_moved_axes: list[dict[str, str]] = field(default_factory=list)
+    resolved_focus: str | None = None
 
 
 class PromptsResponse(BaseModel):
@@ -1073,6 +1084,8 @@ class HistoryPostBody(BaseModel):
     ddl: str | None = None
     expanded_ddl: str | None = None
     focus: str | None = None
+    variation_amplitude: str | None = None
+    variation_seed: int | None = None
     interpret_fallback: str | None = None
     score: dict
     svg: str = ""
@@ -2478,6 +2491,8 @@ def _call_compose_detail(
     include_trace: bool = False,
     tenkei: str = "auto",
     focus: str | None = None,
+    variation_amplitude: str | None = None,
+    variation_seed: int | None = None,
 ) -> ComposeDetail:
     stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
     plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
@@ -2487,6 +2502,7 @@ def _call_compose_detail(
         seed_text=original_text or ddl,
     )
     plugin_expanded_ddl = plugin_expansion.ddl  # trace: after plugin expansion
+    variation_report: dict = {}
     ddl = expand_intermediate_for_lang(
         plugin_expansion.ddl,
         lang=lang,
@@ -2495,6 +2511,9 @@ def _call_compose_detail(
         plugin_instructions_present=bool(plugin_expansion.instructions),
         tenkei=tenkei,
         focus=focus,
+        variation_amplitude=variation_amplitude,
+        variation_seed=variation_seed,
+        variation_report=variation_report,
     )
     stage15_ddl = ddl  # trace: Stage 1.5 output = Stage 2 input (== ComposeDetail.ddl)
     plugin_provenance = list(plugin_expansion.provenance)
@@ -2506,7 +2525,11 @@ def _call_compose_detail(
     attempts: list[dict] = [] if include_trace else []
 
     def _detail_fields() -> dict:
-        fields: dict = {"source_ddl": stage1_ddl_in}
+        fields: dict = {
+            "source_ddl": stage1_ddl_in,
+            "variation_moved_axes": list(variation_report.get("moved_axes") or []),
+            "resolved_focus": variation_report.get("resolved_focus"),
+        }
         if include_trace:
             fields.update(
                 {
@@ -2736,6 +2759,37 @@ def _assemble_trace(
         return {"warning": f"trace collection failed: {exc}"}
 
 
+class VariationSeedsRequest(BaseModel):
+    amplitude: str = Field(..., description="変奏の強度 small / medium / large")
+    count: int = Field(default=4, ge=1, le=8, description="採番する候補数")
+
+
+class VariationSeedsResponse(BaseModel):
+    amplitude: str
+    seeds: list[int]
+
+
+@app.post("/api/variation/seeds", response_model=VariationSeedsResponse)
+def api_variation_seeds(
+    req: VariationSeedsRequest, actor: dict = Depends(_current_user)
+) -> VariationSeedsResponse:
+    """変奏候補の seed を採番する。
+
+    採番をサーバー側に置くのは、seed 空間の管理と重複回避を UI に持ち込まない
+    ため（契約 §3.4）。展開は決定的なので、返した seed をそのまま /api/compose
+    へ渡せば候補が再現できる。
+    """
+    amplitude = _validated_variation_amplitude(req.amplitude)
+    if amplitude is None:
+        raise HTTPException(status_code=422, detail="unknown variation amplitude")
+    seeds: list[int] = []
+    while len(seeds) < req.count:
+        candidate = secrets.randbelow(2**31 - 1) + 1
+        if candidate not in seeds:
+            seeds.append(candidate)
+    return VariationSeedsResponse(amplitude=amplitude, seeds=seeds)
+
+
 @app.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
 def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> ComposeResponse:
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
@@ -2749,7 +2803,10 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     )
     resolved_stage2_model = _resolved_stage2_model(req.model, actor)
     resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
-    resolved_focus = _validated_focus(req.focus)
+    resolved_variation_amplitude = _validated_variation_amplitude(req.variation_amplitude)
+    resolved_variation_seed = (
+        req.variation_seed if resolved_variation_amplitude is not None else None
+    )
     try:
         compose_detail = _call_compose_detail(
             req.ddl,
@@ -2760,7 +2817,8 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             vary_seed=req.vary_seed,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
-            focus=resolved_focus,
+            variation_amplitude=resolved_variation_amplitude,
+            variation_seed=resolved_variation_seed,
         )
     except Exception as e:  # noqa: BLE001
         raise _stage_http_error("compose", 502) from e
@@ -2805,7 +2863,9 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "render_seed": render_seed,
         "vary_seed": req.vary_seed,
         "tenkei": resolved_tenkei,
-        "focus": resolved_focus,
+        "focus": compose_detail.resolved_focus,
+        "variation_amplitude": resolved_variation_amplitude,
+        "variation_seed": resolved_variation_seed,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
@@ -2838,6 +2898,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         score=score,
         svg=svg,
         stage2_model=resolved_stage2_model,
+        variation_moved_axes=compose_detail.variation_moved_axes,
         **render_metadata,
         elapsed_ms=elapsed_ms,
         tokens_in=compose_detail.tokens_in,
@@ -3240,7 +3301,10 @@ def _paint_events(
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
-    resolved_focus = _validated_focus(req.focus)
+    resolved_variation_amplitude = _validated_variation_amplitude(req.variation_amplitude)
+    resolved_variation_seed = (
+        req.variation_seed if resolved_variation_amplitude is not None else None
+    )
     try:
         if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
@@ -3280,7 +3344,8 @@ def _paint_events(
             lang=instruction_lang_resolved,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
-            focus=resolved_focus,
+            variation_amplitude=resolved_variation_amplitude,
+            variation_seed=resolved_variation_seed,
         )
     except Exception as e:  # noqa: BLE001
         raise _stage_http_error("compose", 502) from e
@@ -3327,7 +3392,9 @@ def _paint_events(
         "render_seed": render_seed,
         "vary_seed": req.vary_seed,
         "tenkei": resolved_tenkei,
-        "focus": resolved_focus,
+        "focus": compose_detail.resolved_focus,
+        "variation_amplitude": resolved_variation_amplitude,
+        "variation_seed": resolved_variation_seed,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
     }
@@ -3448,6 +3515,7 @@ def _paint_events(
         svg=svg,
         stage1_model=resolved_stage1_model,
         stage2_model=resolved_stage2_model,
+        variation_moved_axes=compose_detail.variation_moved_axes,
         **render_metadata,
         history_id=history_id,
         history_at=history_at,
@@ -3914,7 +3982,9 @@ def api_history_post(
             "vary_seed": body.vary_seed,
             # v1.97: 保存時に水準を確定する（renderer 専用派生でも系統の水準が途切れない）
             "tenkei": _resolved_tenkei(body.tenkei, actor, body.lineage_parent_node_id),
-            "focus": _validated_focus(body.focus),
+            "focus": body.focus if body.focus in FOCUS_IDS else None,
+            "variation_amplitude": _validated_variation_amplitude(body.variation_amplitude),
+            "variation_seed": body.variation_seed,
             "seed_text": seed_text,
             "interpretation_seed": body.interpretation_seed,
         }

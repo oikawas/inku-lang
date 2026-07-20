@@ -112,6 +112,9 @@ def expand_intermediate(
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
     focus: str | None = None,
+    variation_amplitude: str | None = None,
+    variation_seed: int | None = None,
+    variation_report: dict | None = None,
 ) -> str:
     return expand_intermediate_ddl(
         ddl,
@@ -121,6 +124,9 @@ def expand_intermediate(
         plugin_instructions_present=plugin_instructions_present,
         tenkei=tenkei,
         focus=focus,
+        variation_amplitude=variation_amplitude,
+        variation_seed=variation_seed,
+        variation_report=variation_report,
     )
 
 

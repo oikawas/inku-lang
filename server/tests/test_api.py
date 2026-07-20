@@ -25,6 +25,7 @@ from sqlalchemy import create_engine, inspect, text
 from inku_server import db
 from inku_server import api as api_module
 from inku_server.api import app
+from inku_server.ddl_expander import FOCUS_IDS, focus_word
 from inku_server.model_settings import (
     connection_for,
     default_model_settings,
@@ -1403,8 +1404,7 @@ def test_paint_records_input_and_expanded_ddl_separately(monkeypatch, auth_conte
     db.delete_items(user["id"], [data["history_id"]])
 
 
-def test_explicit_focus_overrides_the_hashed_choice(monkeypatch, auth_context):
-    headers, _, _ = auth_context
+def _stub_stages(monkeypatch):
     monkeypatch.setattr(
         api_module,
         "interpret_detail",
@@ -1415,18 +1415,120 @@ def test_explicit_focus_overrides_the_hashed_choice(monkeypatch, auth_context):
     )
     monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
 
+
+def test_focus_is_no_longer_an_api_input_but_is_still_recorded(monkeypatch, auth_context):
+    """v2.0: 焦点は外部入力から外れ、展開層が決めた結果だけが記録される。"""
+    headers, _, _ = auth_context
+    _stub_stages(monkeypatch)
+
     default = client.post("/api/paint", json={"text": "一滴の墨"}, headers=headers).json()
-    moved = client.post(
+    # 送っても無視される（機構は残るが口は閉じた）。
+    sent = client.post(
         "/api/paint", json={"text": "一滴の墨", "focus": "lower_right"}, headers=headers
     ).json()
-    assert "右下の焦点" in moved["ddl"]
-    assert moved["ddl"] != default["ddl"]
+    assert sent["ddl"] == default["ddl"]
 
-    # 未知の値は無視され、既定の決定的選択に戻る（既存作品の再現性を保つ）。
+    # history.focus の供給源は展開層。変奏なしでも既定のハッシュ選択が載る。
+    assert default["focus"] in FOCUS_IDS
+    assert focus_word(default["focus"], lang="ja") in default["ddl"]
+
+
+def test_variation_needs_both_amplitude_and_seed(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    _stub_stages(monkeypatch)
+    body = {"text": "一滴の墨"}
+    default = client.post("/api/paint", json=body, headers=headers).json()
+
+    for partial in ({"variation_amplitude": "large"}, {"variation_seed": 7}):
+        response = client.post("/api/paint", json={**body, **partial}, headers=headers).json()
+        assert response["ddl"] == default["ddl"]
+        assert response["variation_moved_axes"] == []
+
     unknown = client.post(
-        "/api/paint", json={"text": "一滴の墨", "focus": "nowhere"}, headers=headers
+        "/api/paint",
+        json={**body, "variation_amplitude": "huge", "variation_seed": 7},
+        headers=headers,
     ).json()
     assert unknown["ddl"] == default["ddl"]
+
+
+def test_variation_moves_the_expansion_and_reports_the_axes(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    _stub_stages(monkeypatch)
+    body = {"text": "一滴の墨"}
+    default = client.post("/api/paint", json=body, headers=headers).json()
+
+    varied = client.post(
+        "/api/paint",
+        json={**body, "variation_amplitude": "large", "variation_seed": 7},
+        headers=headers,
+    ).json()
+    assert varied["ddl"] != default["ddl"]
+    assert varied["variation_amplitude"] == "large"
+    assert varied["variation_seed"] == 7
+    assert varied["variation_moved_axes"]
+    for entry in varied["variation_moved_axes"]:
+        assert set(entry) == {"axis", "from", "to"}
+        assert entry["from"] != entry["to"]
+
+    # 同じ (強度, seed) は同じ展開を再現する。
+    replay = client.post(
+        "/api/paint",
+        json={**body, "variation_amplitude": "large", "variation_seed": 7},
+        headers=headers,
+    ).json()
+    assert replay["ddl"] == varied["ddl"]
+    assert replay["variation_moved_axes"] == varied["variation_moved_axes"]
+
+
+def test_history_records_the_focus_the_expander_landed_on(monkeypatch, auth_context):
+    """v2.0: focus 推敲を外しても history.focus は NULL にならない。
+
+    moved_axes は列を持たず決定的に再計算するので、その入力である焦点と
+    (強度, seed) が保存されていることが再現の前提になる。
+    """
+    headers, user, _ = auth_context
+    _stub_stages(monkeypatch)
+
+    response = client.post(
+        "/api/paint",
+        json={
+            "text": "一滴の墨",
+            "save_history": True,
+            "variation_amplitude": "large",
+            "variation_seed": 11,
+        },
+        headers=headers,
+    ).json()
+    listing = client.get(
+        "/api/history",
+        params={"anchor_id": response["history_id"], "limit": 100},
+        headers=headers,
+    ).json()
+    saved = next(item for item in listing["items"] if item["id"] == response["history_id"])
+    assert saved["focus"] == response["focus"]
+    assert saved["focus"] in FOCUS_IDS
+    assert saved["variation_amplitude"] == "large"
+    assert str(saved["variation_seed"]) == "11"
+    db.delete_items(user["id"], [response["history_id"]])
+
+
+def test_variation_seeds_are_allocated_server_side(auth_context):
+    headers, _, _ = auth_context
+    response = client.post(
+        "/api/variation/seeds", json={"amplitude": "medium", "count": 4}, headers=headers
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["amplitude"] == "medium"
+    assert len(body["seeds"]) == 4
+    assert len(set(body["seeds"])) == 4
+    assert all(seed > 0 for seed in body["seeds"])
+
+    rejected = client.post(
+        "/api/variation/seeds", json={"amplitude": "huge"}, headers=headers
+    )
+    assert rejected.status_code == 422
 
 
 def test_compose_returns_source_ddl(monkeypatch, auth_context):

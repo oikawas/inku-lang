@@ -1282,6 +1282,8 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 
 JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（パーリンノイズ、細かい振幅、高い周波数、y軸方向）を選んで SVG を生成する。Replay のたびに異なる乱数値で演奏される。
 
+v1.99 で揺らぎの演奏対象を線に加えて弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した。発火条件は quality ∈ {perlin, wave, white} かつ dimensions が position_x / position_y / radius のいずれかを含む場合（line と対称、radius は図形の自然軸）。閉図形は継ぎ目が連続する周期ノイズで輪郭を演奏し、多角形系は辺ごとに演奏して角を固定、弧は両端点を完全固定して touching の接点契約を維持する。pink（滲み）と quality=none の経路は不変。この変更で同一 Score + 同一 seed の演奏結果が変わるため、render engine version を 5 へ更新した（過去作品の再演奏は見た目が変わりうるが、保存済み SVG は不変）。
+
 ---
 
 ## 14. 関係（あいだ）の設計
@@ -1498,11 +1500,11 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 |---|---|---|
 | line 揺らぎ | 実装済 (v0.8) | 80 segments polyline、perlin/wave/pink/white |
 | 滲む (pink quality) | 実装済 (v1.8) | SVG `feGaussianBlur` フィルター、`BLUR_STD` dict で amplitude 別 stdDeviation |
-| circle 揺らぎ | 未実装 | 円周 polygon 化 → radius or 位置の揺らぎ注入 |
-| ellipse 揺らぎ | 未実装 | circle と同様 (rx/ry 方向別揺らぎ可能) |
-| triangle 揺らぎ | 未実装 | 3 辺それぞれ polyline に展開 |
-| square 揺らぎ | 未実装 | 4 辺それぞれ polyline に展開 |
-| arc 揺らぎ | 未実装 | path を N 分割して radius 揺らぎ |
+| circle 揺らぎ | 実装済 (v1.99) | 80 分割輪郭 + 周期ノイズ（perlin は格子 wrap、wave は整数周波数で閉合）。継ぎ目連続 |
+| ellipse 揺らぎ | 実装済 (v1.99) | circle と同一機構。dims により x / y / 法線方向オフセット |
+| triangle 揺らぎ | 実装済 (v1.99) | 辺ごとに line 揺らぎを適用し角を固定 |
+| square 揺らぎ | 実装済 (v1.99) | 辺ごとに line 揺らぎを適用し角を固定（polygon も同様） |
+| arc 揺らぎ | 実装済 (v1.99) | 分割 + オフセット、両端点は完全固定（touching 接点契約の維持） |
 | `thickness` dimension | 未対応 | stroke-width を segment 毎に変化 (1 line = 複数 path 必要) |
 | `angle` / `rotation` / `length` dimension | 未対応 | 線の端点位置に作用する軸 |
 | てざわり視覚品質 | 実装済 (v1.25) | `weight` ごとに stroke 属性、texture filter、副線、粒、撚り線を生成。line / circle / ellipse / square / arc の輪郭に適用 |

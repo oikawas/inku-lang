@@ -240,6 +240,16 @@ resolution of regions and relations).  Each render may carry a `render_seed`;
 providing the same seed makes replay reproducible while leaving the canonical
 Score stable.
 
+Since v1.99 variation is performed not only on lines but also on arcs and
+closed shapes (circle, ellipse, triangle, square, polygon). The gate mirrors
+the line gate: quality in {perlin, wave, white} and dimensions intersecting
+{position_x, position_y, radius} (radius being a shape's natural axis). Closed
+contours use seam-continuous periodic noise, polygonal shapes perform each edge
+with fixed corners, and arcs keep both endpoints exactly fixed so the touching
+contact contract holds. The pink (blur) and quality=none paths are unchanged.
+Because the same Score and seed now render differently for affected works, the
+render engine version was bumped to 5; saved SVGs are untouched.
+
 For literal `layout="grid"` tiling, performance composes three controlled layers: a deterministic seed-derived within-cell position jitter, the existing per-element `variation` with a distinct phase for every mark, and the existing material behavior of weights such as pencil, brush, and chalk. The same Score and render seed remain bit-identical. Because full-field repetition is explicit author intent, grid bypasses scatter-oriented bias, fade, clustering, preserved-space injection, and representative count reduction.
 
 inku exposes this as the first half of two-step regeneration: **another

@@ -2414,3 +2414,12 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **歳時記の閲覧専用化と UI 整理:** 歳時記トグルをキャンバス下部ツールバーへ移し、ドロワーを閲覧専用（チップクリック = プレビュー）へ変更した。語の挿入は DDL エディタダイアログ内のインライン歳時記に集約し、ロード済みプラグインの名前空間付き語も同所に表示する。未使用の旧 DDL 編集パネル 2 コンポーネント（734 行）を削除。世代ラベルへ系譜名を前置し体裁をモデル欄へ統一、記述タブ残りのコントロールへツールチップを追加、テーマ対応の `--danger` 変数を定義し、DDL トークン配色 12 クラスをグローバル定義へ統合してダークテーマの可読性を修正した。
 - **検証:** Mac / pentala とも pytest 548 passed・ruff・`npm run check` 0 errors・build 成功。pentala の DB 移行は事前バックアップのうえ実施し件数照合済（1565 件）。
 
+
+### v1.99 — 描画コア: 弧・閉図形への揺らぎ演奏（F-4、Build 610、2026-07-20）
+
+- **揺らぎの演奏対象を拡張:** これまで line のみだった `variation` の演奏を、弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した。ゲートは line と対称の `quality ∈ {perlin, wave, white}` かつ `dimensions ∩ {position_x, position_y, radius} ≠ ∅`（radius は図形の自然軸として追加）。円・楕円は 80 分割輪郭 + 周期ノイズ（perlin は格子を mod freq で wrap、wave は整数周波数で自動閉合）で継ぎ目が連続し、四角・三角・多角形は辺ごとに line 揺らぎを適用して角を固定、弧は分割 + オフセットで両端点を完全固定し touching の接点契約を維持する。pink（滲み）と quality=none の経路は不変。touching 再構成後の弧も同一分岐を通る。
+- **利き目監査の死にフィールド解消:** 監査 A/B 同一条件の再実行で、旧 SAME 16 ケース中 position/radius 軸の 11 ケースが DIFF へ転化（rotation/thickness/angle/length 軸の 5 ケースはゲート対象外として SAME のまま、SPEC §17.A の別項目）。composer は既に square・ellipse へ position dims 付き variation を出力しており、本ゲートは実弾で発火する。
+- **render engine version 5:** 同一 Score + 同一 seed の演奏結果が変わるため版数を 4 → 5 へ更新（調停側判断）。弧・閉図形に variation を載せた過去作品は再演奏で見た目が変わるが、保存済み SVG・Score・rh2 は不変。
+- **検証:** pytest 578 passed / 39 skipped（新規 42 テスト: 6 図形 × 3 quality の演奏確認、dims 別演奏、ゲート閉時のバイト一致、決定性、pink の blur 維持、弧の端点固定、多角形の角固定、周期サンプラーの継ぎ目連続性）。既存回帰ゼロ、ruff 通過。Score schema・coerce・rh2 の変更なし。
+- **残作業:** 作者の実演奏目視確認（「震える円」「ゆっくり揺れる四角」「震える弧」、葉の「定規の円弧」問題の改善度）、材質輪郭（Phase 2）の要否判断、必要なら amplitude/周波数の調整（現行は line と共用）。
+

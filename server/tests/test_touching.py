@@ -18,7 +18,11 @@ from inku_server.composer import (
     _enforce_relation_literal_gate,
     _literal_relation_types,
 )
-from inku_server.renderer import _resolve_performance_score, render
+from inku_server.renderer import (
+    _needs_contour_variation,
+    _resolve_performance_score,
+    render,
+)
 from inku_server.schema import Score, migrate_score_payload
 from inku_server.stroke_engine import synthesize_stroke
 
@@ -26,6 +30,12 @@ from inku_server.stroke_engine import synthesize_stroke
 _ARC_D = re.compile(
     r"M ([\d.-]+) ([\d.-]+) A ([\d.-]+) [\d.-]+ 0 ([01]) ([01]) ([\d.-]+) ([\d.-]+)"
 )
+_POINT_PAIR = re.compile(r"(-?[\d.]+(?:[eE][+-]?\d+)?)[,\s]+(-?[\d.]+(?:[eE][+-]?\d+)?)")
+# A polyline is read as a performed arc only if it turns far enough to be one.
+# Measured on the leaf benchmark, performed arcs sweep 122deg-169deg, while a
+# performed line reads as 17deg. A shallower arc would be dropped, but the arc
+# count assertion turns that into a failure rather than a silent pass.
+_MIN_POLYLINE_ARC_SWEEP_DEGREES = 45.0
 _LOCAL_LEAF_BENCH_DIR = Path(__file__).parents[2] / "cli" / "bench" / "leaf"
 _requires_local_leaf_bench = pytest.mark.skipif(
     not _LOCAL_LEAF_BENCH_DIR.is_dir(),
@@ -137,6 +147,84 @@ def _transform_point(point: tuple[float, float], matrix: Affine) -> tuple[float,
     )
 
 
+def _fit_arc_through_endpoints(
+    points: list[tuple[float, float]],
+) -> tuple[tuple[float, float], float] | None:
+    """Least-squares circle through the polyline's two endpoints.
+
+    An arc performed with variation is a sampled polyline whose interior
+    vertices sit off the nominal circle, so its radius has to be recovered by
+    fitting. Fitting all five circle degrees of freedom is ill-conditioned on a
+    single noisy arc, but the performance pins both endpoints exactly, which
+    puts the centre on the chord's perpendicular bisector and leaves one free
+    parameter: the signed offset `t` along that bisector. Requiring
+    |p - centre|^2 == t^2 + (chord/2)^2 is then linear in `t`, so the fit is a
+    closed form and the variation noise averages out across the vertices.
+    """
+    if len(points) < 3:
+        return None
+    start, end = points[0], points[-1]
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    chord = math.hypot(dx, dy)
+    if chord < 1e-9:
+        return None
+    midpoint = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
+    normal = (-dy / chord, dx / chord)
+    half_chord_squared = chord * chord / 4.0
+    numerator = denominator = 0.0
+    for x, y in points:
+        offset_x, offset_y = x - midpoint[0], y - midpoint[1]
+        along = offset_x * normal[0] + offset_y * normal[1]
+        numerator += along * (
+            offset_x * offset_x + offset_y * offset_y - half_chord_squared
+        )
+        denominator += 2.0 * along * along
+    if denominator < 1e-9:
+        return None
+    t = numerator / denominator
+    center = (midpoint[0] + normal[0] * t, midpoint[1] + normal[1] * t)
+    return center, math.sqrt(t * t + half_chord_squared)
+
+
+def _swept_degrees(
+    points: list[tuple[float, float]], center: tuple[float, float]
+) -> float:
+    """Signed angle traversed around `center`, accumulated vertex by vertex.
+
+    Positive means the SVG positive-angle direction, i.e. the sweep flag of the
+    equivalent arc command. The magnitude replaces the large-arc flag, which a
+    polyline does not carry.
+    """
+    total = 0.0
+    previous = math.atan2(points[0][1] - center[1], points[0][0] - center[0])
+    for x, y in points[1:]:
+        current = math.atan2(y - center[1], x - center[0])
+        total += (current - previous + math.pi) % (2 * math.pi) - math.pi
+        previous = current
+    return math.degrees(total)
+
+
+def _polyline_arc(
+    points: list[tuple[float, float]],
+) -> dict[str, object] | None:
+    fit = _fit_arc_through_endpoints(points)
+    if fit is None:
+        return None
+    center, radius = fit
+    swept = _swept_degrees(points, center)
+    if abs(swept) < _MIN_POLYLINE_ARC_SWEEP_DEGREES:
+        return None
+    return {
+        "start": points[0],
+        "end": points[-1],
+        "radius": radius,
+        "large": 0 if abs(swept) < 180.0 else 1,
+        "sweep": 1 if swept > 0.0 else 0,
+        "swept": swept,
+        "kind": "polyline",
+    }
+
+
 def _svg_arcs(svg: str) -> list[dict[str, object]]:
     root = ET.fromstring(svg)
     result: list[dict[str, object]] = []
@@ -149,10 +237,13 @@ def _svg_arcs(svg: str) -> list[dict[str, object]]:
         path_d = element.attrib.get("d", "")
         match = _ARC_D.fullmatch(path_d)
         stroke_opacity = float(element.attrib.get("stroke-opacity", "1"))
+        radius_scale = math.hypot(matrix[0], matrix[1])
         if match is not None and stroke_opacity >= 0.45:
             start = _transform_point((float(match[1]), float(match[2])), matrix)
             end = _transform_point((float(match[6]), float(match[7])), matrix)
-            radius_scale = math.hypot(matrix[0], matrix[1])
+            sweep_degrees = _arc_command_sweep_degrees(
+                start, end, float(match[3]) * radius_scale, int(match[4]), int(match[5])
+            )
             result.append(
                 {
                     "start": start,
@@ -160,13 +251,43 @@ def _svg_arcs(svg: str) -> list[dict[str, object]]:
                     "radius": float(match[3]) * radius_scale,
                     "large": int(match[4]),
                     "sweep": int(match[5]),
+                    "swept": sweep_degrees,
+                    "kind": "path",
                 }
             )
+        points_attribute = element.attrib.get("points", "")
+        if (
+            element.tag.endswith("polyline")
+            and points_attribute
+            and stroke_opacity >= 0.45
+        ):
+            points = [
+                _transform_point((float(x), float(y)), matrix)
+                for x, y in _POINT_PAIR.findall(points_attribute)
+            ]
+            arc = _polyline_arc(points)
+            if arc is not None:
+                result.append(arc)
         for child in element:
             visit(child, matrix)
 
     visit(root, _IDENTITY)
     return result
+
+
+def _arc_command_sweep_degrees(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    radius: float,
+    large: int,
+    sweep: int,
+) -> float:
+    """Signed swept angle of an arc command, in the same convention as
+    `_swept_degrees`, so both arc shapes are comparable."""
+    chord = _distance(start, end)
+    half = math.degrees(math.asin(min(1.0, chord / (2.0 * radius))))
+    magnitude = 2.0 * (180.0 - half if large == 1 else half)
+    return magnitude if sweep == 1 else -magnitude
 
 
 def _distance(
@@ -273,6 +394,76 @@ def test_svg_arc_extractor_self_calibrates_overlap_and_opposition() -> None:
     assert _angle(first_start_tangent, first_start_tangent) < 1e-5
     assert _angle(first_start_tangent, opposite_start_tangent) >= 30.0
 
+def test_svg_arc_extractor_reads_a_performed_polyline_like_its_arc_command() -> None:
+    center, radius = (50.0, 50.0), 40.0
+    start_degrees, end_degrees = 200.0, 340.0
+    samples = 81
+
+    def on_circle(degrees: float, offset: float) -> tuple[float, float]:
+        angle = math.radians(degrees)
+        return (
+            center[0] + (radius + offset) * math.cos(angle),
+            center[1] + (radius + offset) * math.sin(angle),
+        )
+
+    points = []
+    for index in range(samples):
+        degrees = start_degrees + (end_degrees - start_degrees) * index / (samples - 1)
+        # Interior vertices wander off the circle exactly as variation moves them.
+        wander = 0.0 if index in (0, samples - 1) else 7.0 * math.sin(index * 1.7)
+        points.append(on_circle(degrees, wander))
+    rendered = " ".join(f"{x},{y}" for x, y in points)
+    start, end = on_circle(start_degrees, 0.0), on_circle(end_degrees, 0.0)
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg">
+      <g transform="rotate(27,50,50)">
+        <path d="M {start[0]} {start[1]} A {radius} {radius} 0 0 1 {end[0]} {end[1]}" />
+        <polyline points="{rendered}" fill="none" />
+      </g>
+    </svg>"""
+    command, performed = _svg_arcs(svg)
+
+    assert command["kind"] == "path"
+    assert performed["kind"] == "polyline"
+    assert _distance(command["start"], performed["start"]) == pytest.approx(0.0)
+    assert _distance(command["end"], performed["end"]) == pytest.approx(0.0)
+    assert performed["radius"] == pytest.approx(command["radius"], rel=0.10)
+    assert performed["sweep"] == command["sweep"] == 1
+    assert performed["large"] == command["large"] == 0
+    assert command["swept"] == pytest.approx(end_degrees - start_degrees, abs=1e-6)
+    # Accumulating the turn vertex by vertex charges the wander to the sweep.
+    assert performed["swept"] == pytest.approx(command["swept"], abs=12.0)
+
+
+def test_svg_arc_extractor_flags_a_major_polyline_arc() -> None:
+    """A polyline carries no large-arc flag, so the minor-arc contract is
+    re-derived from the angle the vertices actually sweep."""
+    points = [
+        (
+            50.0 + 40.0 * math.cos(math.radians(20.0 + 320.0 * index / 80.0)),
+            50.0 + 40.0 * math.sin(math.radians(20.0 + 320.0 * index / 80.0)),
+        )
+        for index in range(81)
+    ]
+    rendered = " ".join(f"{x},{y}" for x, y in points)
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg">'
+        f'<polyline points="{rendered}" fill="none" /></svg>'
+    )
+    (major,) = _svg_arcs(svg)
+    assert major["swept"] == pytest.approx(320.0)
+    assert major["large"] == 1
+
+
+def test_svg_arc_extractor_ignores_a_performed_line() -> None:
+    points = [(100.0 + index * 5.0, 200.0 + math.sin(index) * 6.0) for index in range(81)]
+    rendered = " ".join(f"{x},{y}" for x, y in points)
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg">'
+        f'<polyline points="{rendered}" fill="none" /></svg>'
+    )
+    assert _svg_arcs(svg) == []
+
+
 def test_touching_schema_is_strict_versioned_and_migration_is_idempotent() -> None:
     legacy = {"instructions": []}
     assert migrate_score_payload(migrate_score_payload(legacy)) == {
@@ -347,6 +538,8 @@ def test_touching_svg_geometry_and_replay_contract_across_200_seeds() -> None:
         arcs = _svg_arcs(svg)
         assert len(arcs) == 2
         first, second = arcs
+        # No variation on this score: both arcs stay single arc commands.
+        assert first["kind"] == second["kind"] == "path"
         assert first["large"] == second["large"] == 0
         assert _distance(first["start"], second["start"]) <= 2.0
         assert _distance(first["end"], second["end"]) <= 2.0
@@ -416,7 +609,14 @@ def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
     for instruction_index, instruction in enumerate(score.instructions):
         if instruction.primitive != "arc":
             continue
-        arc_by_instruction[instruction_index] = arcs[arc_index]
+        arc = arcs[arc_index]
+        # A performed arc is a sampled polyline; an unperformed one stays a
+        # single arc command.
+        expected_kind = (
+            "polyline" if _needs_contour_variation(instruction.variation) else "path"
+        )
+        assert arc["kind"] == expected_kind
+        arc_by_instruction[instruction_index] = arc
         arc_index += 1
     assert arc_index == len(arcs)
 
@@ -428,6 +628,8 @@ def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
         assert _distance(previous["start"], current["start"]) <= 2.0
         assert _distance(previous["end"], current["end"]) <= 2.0
         assert previous["large"] == current["large"] == 0
+        assert abs(previous["swept"]) < 180.0
+        assert abs(current["swept"]) < 180.0
 
         _, previous_start_tangent, previous_end_tangent, previous_apex = (
             _center_and_tangents(previous)

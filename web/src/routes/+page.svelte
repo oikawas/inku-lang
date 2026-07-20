@@ -4449,6 +4449,8 @@ $effect(() => {
 			render_seed: it.render_seed == null ? null : Number(it.render_seed),
 			vary_seed: it.vary_seed == null ? null : Number(it.vary_seed),
 			interpretation_seed: it.interpretation_seed ?? null,
+			variation_amplitude: it.variation_amplitude ?? null,
+			variation_seed: it.variation_seed == null ? null : Number(it.variation_seed),
 			elapsed_stage1_ms: 0,
 			elapsed_stage2_ms: 0,
 			elapsed_total_ms: it.elapsed_ms ?? 0,

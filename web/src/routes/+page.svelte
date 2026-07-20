@@ -127,7 +127,7 @@
 		user_generation_count?: number | null;
 	};
 	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'language_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change' | 'hensou';
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'hensou';
 	type HensouAmplitude = 'small' | 'medium' | 'large';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
@@ -5005,47 +5005,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return (await r.json()).seeds as number[];
 	}
 
-	async function generateHensouCandidates(amplitude: HensouAmplitude) {
-		if (!result || variationGridBusy || loading) return;
-		const source = input.trim();
-		if (!source || !ddl) return;
-		const abortController = new AbortController();
-		variationGridAbortController = abortController;
-		variationCandidates = [];
-		variationGridBusy = true;
-		variationGridCanAbort = false;
-		variationTokensIn = null;
-		variationTokensOut = null;
-		variationElapsed.start();
-		variationGridIncludesReading = false;
-		variationGridTaskLabel = t().hensouTitle;
-		variationGridStatus = null;
-		const abortTimer = window.setTimeout(() => {
-			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
-		}, 3000);
-		try {
-			const seeds = await allocateHensouSeeds(amplitude, 4);
-			variationCandidates = await Promise.all(seeds.map((seed, index) =>
-				hensouVariationCandidate(amplitude, seed, `${t().hensouTitle} ${index + 1}`, abortController.signal)
-			));
-			for (const candidate of variationCandidates) {
-				variationTokensIn = addTokens(variationTokensIn, paintTokensIn(candidate.result));
-				variationTokensOut = addTokens(variationTokensOut, paintTokensOut(candidate.result));
-			}
-		} catch (e) {
-			if (!(e instanceof DOMException && e.name === "AbortError")) variationGridStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			window.clearTimeout(abortTimer);
-			if (variationGridAbortController === abortController) {
-				variationGridAbortController = null;
-				variationGridBusy = false;
-				variationGridCanAbort = false;
-				variationElapsed.stop();
-			}
-		}
-	}
-
-	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string) {
+	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: HensouAmplitude) {
 		if (!result || variationGridBusy || loading) return;
 		const source = input.trim();
 		if (!source || !ddl) return;
@@ -5075,7 +5035,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				? t().canvasVaryComposition
 				: kind === "reading"
 					? t().canvasVaryInterpretation
-					: t().canvasVaryColor;
+					: kind === "hensou"
+						? t().hensouTitle
+						: t().canvasVaryColor;
 		variationGridStatus = null;
 		const abortTimer = window.setTimeout(() => {
 			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
@@ -5087,6 +5049,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
 			}
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
+			// 変奏の seed 採番はサーバー側なので、候補生成前に count 個まとめて確保する。
+			const hensouSeeds = kind === "hensou" ? await allocateHensouSeeds(amplitude ?? "medium", count) : [];
 			const jobs = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
@@ -5099,6 +5063,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				}
 				if (kind === "reading") {
 					return interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
+				}
+				if (kind === "hensou") {
+					return hensouVariationCandidate(amplitude ?? "medium", hensouSeeds[index], t().hensouTitle + " " + sequence, abortController.signal);
 				}
 				const catalogId = catalogIds[index];
 				return renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
@@ -6045,7 +6012,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{languageInspectionTokensOut}
 				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
-				onGenerateHensouCandidates={generateHensouCandidates}
 				onAbortVariationCandidates={abortVariationCandidates}
 				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
 				onShowVariationCandidate={showVariationCandidate}

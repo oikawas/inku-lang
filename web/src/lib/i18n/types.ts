@@ -154,7 +154,6 @@ export interface LangPack {
 	hensouSmall: string;
 	hensouMedium: string;
 	hensouLarge: string;
-	hensouButton: string;
 	hensouMovedTitle: string;
 	hensouAxis: (axis: string) => string;
 	variationGridDefault: string;

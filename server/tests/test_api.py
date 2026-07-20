@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import builtins
 import json
+from datetime import datetime, timezone
 import logging
 import sys
 import time
@@ -1541,6 +1542,51 @@ def test_retired_models_are_marked_eol_in_the_catalog():
     assert all(model.get("eol_date") for model in retired)
 
 
+def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
+    """取得ボタンを押しても、過去の作品が参照するモデルの情報を落とさない。"""
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"fetch-models-{suffix}")
+    admin = db.add_user(
+        username=f"fetch-models-admin-{suffix}",
+        email=f"fetch-models-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    admin_headers, admin_token = _auth_headers(admin)
+
+    # 提供元は gemma しか返さない状況を作る。
+    monkeypatch.setattr(
+        api_module,
+        "_fetch_provider_model_list",
+        lambda provider_id, settings: [{"id": "google/gemma-4-31b-it", "label": "google/gemma-4-31b-it"}],
+    )
+    r = client.post("/api/settings/models/nvidia/fetch-models", headers=admin_headers)
+    assert r.status_code == 200
+
+    models = {
+        model["id"]: model
+        for provider in r.json()["catalog"]
+        if provider["id"] == "nvidia"
+        for model in provider["models"]
+    }
+    # 提供が続くモデルは EOL 印が付かず、整えたラベルと評価が残る。
+    assert models["google/gemma-4-31b-it"].get("eol") is not True
+    assert models["google/gemma-4-31b-it"]["label"] == "Google Gemma 4 31B Instruct"
+    assert models["google/gemma-4-31b-it"]["recommendation_level"] == 5
+    # 提供が消えたモデルは一覧から消えず、EOL として日付付きで残る。
+    retired = models["mistralai/mistral-medium-3.5-128b"]
+    assert retired["eol"] is True
+    assert retired["eol_date"]
+    assert retired["comment_ja"]
+
+    # 共有 DB を元の一覧へ戻す（他テストがカタログ件数を前提にしているため）。
+    db.update_model_settings(default_model_settings())
+    db.delete_session(admin_token)
+    db.delete_user(admin["id"])
+    db.delete_user_group(group["id"])
+
+
 def test_paint_stream_requires_auth():
     assert client.post("/api/paint/stream", json={"text": "一滴の墨"}).status_code == 401
 
@@ -2788,9 +2834,19 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     assert r.status_code == 200
     assert seen["url"] == "https://api.openai.com/v1/models"
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
+    # v1.98: 提供元から消えたモデルは削除せず EOL として末尾に残す。
+    today = datetime.now(timezone.utc).date().isoformat()
     assert openai_catalog["models"] == [
         {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": True},
         {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False},
+        {
+            "id": "removed-model",
+            "label": "Removed Model",
+            "purposes": ["llm"],
+            "enabled": False,
+            "eol": True,
+            "eol_date": today,
+        },
     ]
 
     class NewFakeResponse(FakeResponse):
@@ -2804,7 +2860,12 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     r = client.post("/api/settings/models/openai/fetch-models", headers=headers)
     assert r.status_code == 200
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
-    assert openai_catalog["models"] == [{"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False}]
+    assert openai_catalog["models"] == [
+        {"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False},
+        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
+        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
+        {"id": "removed-model", "label": "Removed Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
+    ]
 
     db.update_model_settings(default_model_settings())
     db.delete_session(token)

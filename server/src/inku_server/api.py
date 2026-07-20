@@ -1995,16 +1995,52 @@ def api_settings_fetch_provider_models(
         str(model.get("id")): model
         for model in previous_provider.get("models", [])
     }
+    carried = (
+        "purposes", "recommendation_level", "speed_class", "speed_label",
+        "comment_ja", "comment_en", "eol", "eol_date",
+    )
     for model in models:
         previous = previous_models.get(str(model["id"]))
-        if previous:
-            for key in ("purposes", "recommendation_level", "speed_class", "speed_label", "comment_ja", "comment_en"):
-                if key in previous:
-                    model[key] = previous[key]
-    previous_model_ids = {str(model.get("id")) for model in previous_provider.get("models", [])}
+        if not previous:
+            continue
+        for key in carried:
+            if key in previous:
+                model[key] = previous[key]
+        # NVIDIA NIM のようにプロバイダが display_name を返さない場合、取得のたびに
+        # ラベルが ID へ戻ってしまう。提供元が実質ラベルを持たないときだけ、
+        # 既存の整えたラベルを残す (提供元が名前を返すならそちらを優先)。
+        previous_label = str(previous.get("label") or "").strip()
+        if (
+            previous_label
+            and previous_label != str(previous.get("id"))
+            and str(model.get("label") or "") == str(model["id"])
+        ):
+            model["label"] = previous_label
+        # 一度 EOL にしたモデルが再び提供された場合は印を外す。
+        model.pop("eol", None)
+        model.pop("eol_date", None)
+
+    # 提供元から消えたモデルは削除せず EOL として末尾に残す。過去の作品が記録して
+    # いるモデル名の表示・評価情報を失わないため (v1.98)。
+    live_ids = {str(model["id"]) for model in models}
+    retired_on = datetime.now(timezone.utc).date().isoformat()
+    retired = []
+    for model_id, previous in previous_models.items():
+        if model_id in live_ids:
+            continue
+        kept = dict(previous)
+        kept["eol"] = True
+        kept.setdefault("eol_date", retired_on)
+        retired.append(kept)
+    models = models + sorted(retired, key=lambda item: str(item.get("id")))
+
     previous_enabled_models = previous_provider.get("enabled_models") or {}
     enabled_models = {
-        model["id"]: model["id"] in previous_model_ids and bool(previous_enabled_models.get(model["id"], False))
+        model["id"]: (
+            not model.get("eol")
+            and str(model["id"]) in previous_models
+            and bool(previous_enabled_models.get(model["id"], False))
+        )
         for model in models
     }
     saved = _db.update_model_settings(update_model_settings(current, {

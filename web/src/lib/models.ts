@@ -11,6 +11,9 @@ export type ModelOption = {
 	speed_label?: string;
 	comment_ja?: string;
 	comment_en?: string;
+	// v1.98: 提供元が提供終了したモデル。一覧には残すが新規描画では選べない。
+	eol?: boolean;
+	eol_date?: string;
 };
 
 export type ProviderGroup = {

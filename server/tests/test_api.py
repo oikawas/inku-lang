@@ -1480,6 +1480,67 @@ def test_empty_stage1_output_falls_back_instead_of_drawing_nothing(monkeypatch, 
     assert captured["ddl"].strip()
 
 
+class _FakeProviderError(Exception):
+    def __init__(self, message: str, status_code: int) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def test_provider_end_of_life_is_reported_as_a_typed_error(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+
+    def gone(*args, **kwargs):
+        raise _FakeProviderError(
+            "Error code: 410 - The model 'x' has reached its end of life.", 410
+        )
+
+    monkeypatch.setattr(api_module, "interpret_detail", gone)
+
+    r = client.post("/api/paint", json={"text": "提供終了モデル"}, headers=headers)
+    assert r.status_code == 502
+    detail = r.json()["detail"]
+    assert detail["code"] == "model_gone"
+    assert detail["stage"] == "interpret"
+    assert detail["provider_status"] == 410
+    # 原文をそのまま渡し、UI が併記できるようにする。
+    assert "end of life" in detail["message"]
+
+
+def test_provider_auth_and_rate_limit_are_distinguished(monkeypatch, auth_context):
+    headers, _, _ = auth_context
+    fake_score = Score.model_validate(
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+    )
+    monkeypatch.setattr(
+        api_module,
+        "interpret_detail",
+        lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
+    )
+
+    for status, expected in ((401, "provider_auth"), (429, "provider_rate_limit"), (500, "provider_error")):
+        def failing(*args, _status=status, **kwargs):
+            raise _FakeProviderError(f"boom {_status}", _status)
+
+        monkeypatch.setattr(api_module, "compose", failing)
+        r = client.post("/api/paint", json={"text": "失敗する描画"}, headers=headers)
+        assert r.status_code == 502
+        detail = r.json()["detail"]
+        assert detail["code"] == expected
+        assert detail["stage"] == "compose"
+        assert detail["provider_status"] == status
+
+    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+
+
+def test_retired_models_are_marked_eol_in_the_catalog():
+    from inku_server.model_settings import default_model_settings
+
+    nvidia = default_model_settings()["providers"]["nvidia"]["models"]
+    retired = [model for model in nvidia if model.get("eol")]
+    assert any(model["id"] == "qwen/qwen3.5-122b-a10b" for model in retired)
+    assert all(model.get("eol_date") for model in retired)
+
+
 def test_paint_stream_requires_auth():
     assert client.post("/api/paint/stream", json={"text": "一滴の墨"}).status_code == 401
 

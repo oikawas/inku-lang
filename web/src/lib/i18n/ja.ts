@@ -101,6 +101,10 @@ export const ja: LangPack = {
 	demoRenderCount: (count) => `${count}件`,
 
 	submitBtn: '描画する',
+	errorModelGone: (stage) => `${stage}に選ばれているモデルは提供が終了しています。モデル選択から別のモデルへ切り替えてください。`,
+	errorProviderAuth: (stage) => `${stage}のモデル提供元で認証に失敗しました。APIキーの設定を確認してください。`,
+	errorProviderRateLimit: (stage) => `${stage}のモデル提供元がレート制限を返しました。時間をおいて再試行してください。`,
+	errorProviderOther: (stage, status) => `${stage}のモデル提供元がエラーを返しました（HTTP ${status}）。`,
 	stopBtn: '停止',
 	runStatusElapsed: (seconds) => `経過 ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,

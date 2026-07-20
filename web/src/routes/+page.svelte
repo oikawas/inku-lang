@@ -670,6 +670,36 @@
 	let profileStatus = $state<string | null>(null);
 	let profileSaving = $state(false);
 
+	type ProviderFailure = {
+		code: 'model_gone' | 'provider_auth' | 'provider_rate_limit' | 'provider_error';
+		stage: string;
+		provider_status: number;
+		message: string;
+	};
+
+	/**
+	 * v1.98: サーバーが返す失敗詳細を人が読める 1 行にする。
+	 * プロバイダ由来の失敗（提供終了・認証・レート制限）は種別の説明を頭に置き、
+	 * 原因を追えるようにプロバイダの原文メッセージを必ず併記する。
+	 */
+	function describeApiError(detail: unknown, status: number): string {
+		if (typeof detail === 'string' && detail) return detail;
+		if (detail && typeof detail === 'object' && 'code' in detail) {
+			const failure = detail as ProviderFailure;
+			const stage = failure.stage === 'interpret' ? t().runStatusStage1 : t().runStatusStage2;
+			const headline =
+				failure.code === 'model_gone'
+					? t().errorModelGone(stage)
+					: failure.code === 'provider_auth'
+						? t().errorProviderAuth(stage)
+						: failure.code === 'provider_rate_limit'
+							? t().errorProviderRateLimit(stage)
+							: t().errorProviderOther(stage, failure.provider_status);
+			return `${headline}\n${failure.message}`;
+		}
+		return `HTTP ${status}`;
+	}
+
 	function apiFetch(path: string, init: RequestInit = {}) {
 		const headers = new Headers(init.headers);
 		return fetch(path, { ...init, headers, credentials: 'same-origin' });
@@ -975,8 +1005,8 @@
 				body: JSON.stringify({ templates: next })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const data = await r.json() as { templates?: unknown };
 			exportTemplates = normalizeExportTemplates(data.templates);
@@ -1035,8 +1065,8 @@
 				body: JSON.stringify({ items: next })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const data = await r.json() as { items?: unknown };
 			if (Array.isArray(data.items)) {
@@ -1062,8 +1092,8 @@
 				body: JSON.stringify({ ui_theme: nextDarkMode ? 'dark' : 'light' })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
@@ -1084,8 +1114,8 @@
 				body: JSON.stringify({ settings_tab: tab })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			currentUser = await r.json() as UserItem;
 		} catch (e) {
@@ -1136,8 +1166,8 @@
 				body: JSON.stringify({ model_settings })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserModelSettings(currentUser);
@@ -1362,8 +1392,8 @@
 				method: 'POST',
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
 			modelCatalog = data.catalog;
@@ -1625,8 +1655,8 @@
 		try {
 			const r = await apiFetch('/api/settings/status');
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			settingsStatus = await r.json();
 			settingsStatusError = null;
@@ -1752,8 +1782,8 @@
 				body: JSON.stringify({ interval_days: intervalDays, max_generations: maxGenerations })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const nextBackup = await r.json() as SettingsStatus['db_backup'];
 			if (settingsStatus) settingsStatus = { ...settingsStatus, db_backup: nextBackup };
@@ -1768,8 +1798,8 @@
 		try {
 			const r = await apiFetch('/api/settings/db-backup/run', { method: 'POST' });
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			await loadSettingsStatus();
 			dbBackupStatus = t().settingsDbBackupRunDone;
@@ -1787,8 +1817,8 @@
 				body: JSON.stringify({ enabled, output_dir: outputDir, png_size: pngSize })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const nextOutputSave = await r.json() as SettingsStatus['output_save'];
 			if (settingsStatus) settingsStatus = { ...settingsStatus, output_save: nextOutputSave };
@@ -1808,8 +1838,8 @@
 				body: JSON.stringify({ enabled, retention_days: retentionDays, rotate, compress })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const nextLogRetention = await r.json() as SettingsStatus['log_retention'];
 			if (settingsStatus) settingsStatus = { ...settingsStatus, log_retention: nextLogRetention };
@@ -1864,8 +1894,8 @@
 				body: JSON.stringify({ username: loginUserName, password: loginPassword })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const data = await r.json() as { user: UserItem };
 			authToken = 'cookie';
@@ -1963,8 +1993,8 @@
 				body: JSON.stringify(body),
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
@@ -1998,8 +2028,8 @@
 				body: JSON.stringify({ username: name, email, password: newUserPassword, role: newUserRole, group_id: newUserGroupId || null })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			newUserName = '';
 			newUserEmail = '';
@@ -2019,8 +2049,8 @@
 				body: JSON.stringify(patch)
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			await loadUserSettings();
 		} catch (e) {
@@ -2074,8 +2104,8 @@
 		try {
 			const r = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			if (selectedUserId === id) clearEditUser();
 			await loadUserSettings();
@@ -2094,8 +2124,8 @@
 				body: JSON.stringify({ name })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			newGroupName = '';
 			await loadUserSettings();
@@ -2108,8 +2138,8 @@
 		try {
 			const r = await apiFetch(`/api/user-groups/${group.id}`, { method: 'DELETE' });
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			await loadUserSettings();
 		} catch (e) {
@@ -2138,8 +2168,8 @@
 				body: JSON.stringify({ name })
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			clearEditGroup();
 			await loadUserSettings();
@@ -2419,8 +2449,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		body: JSON.stringify({ history_id: historyId, model, instruction, direction, enabled_kinds: enabledKinds, language: getLang() })
 	});
 	if (!r.ok) {
-		const data = await r.json().catch(() => ({})) as { detail?: string };
-		throw new Error(data.detail ?? `HTTP ${r.status}`);
+		const data = await r.json().catch(() => ({})) as { detail?: unknown };
+		throw new Error(describeApiError(data.detail, r.status));
 	}
 	return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string };
 }
@@ -2468,7 +2498,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				if (event.event === 'stage1') {
 					onStage1(event as unknown as PaintStage1Event);
 				} else if (event.event === 'error') {
-					throw new Error((event.detail as string) ?? `HTTP ${event.status ?? 500}`);
+					throw new Error(describeApiError(event.detail, Number(event.status ?? 500)));
 				} else if (event.event === 'done') {
 					done = event as unknown as { ddl: string; thinking: string | null } & PaintResult;
 				}
@@ -2526,8 +2556,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r.status}`);
+			const d = await r.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(d.detail, r.status));
 		}
 		const data = await readPaintStream(r, (stage1) => {
 			stageLabel = t().stageStructuring('');
@@ -2582,8 +2612,8 @@ if (unreadWords.length > 0) {
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r.status}`);
+			const d = await r.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(d.detail, r.status));
 		}
 		const data = await r.json() as {
 			ddl: string;
@@ -2648,8 +2678,8 @@ if (unreadWords.length > 0) {
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r.status}`);
+			const d = await r.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(d.detail, r.status));
 		}
 		const data = await r.json() as {
 			score: Score;
@@ -2706,8 +2736,8 @@ if (unreadWords.length > 0) {
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: string };
-			throw new Error(d.detail ?? `HTTP ${r.status}`);
+			const d = await r.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(d.detail, r.status));
 		}
 		const data = await r.json() as { instruction: string };
 		return data.instruction;
@@ -3066,8 +3096,8 @@ if (unreadWords.length > 0) {
 				})
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const d = await r.json() as {
 				score: Score;
@@ -3434,8 +3464,8 @@ if (unreadWords.length > 0) {
 				})
 			});
 			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: string };
-				throw new Error(d.detail ?? `HTTP ${r.status}`);
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const saved = await r.json() as Iteration;
 			if (result) {

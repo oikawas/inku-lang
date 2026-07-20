@@ -13,6 +13,7 @@ import os
 import platform
 import re
 import secrets
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -126,6 +127,48 @@ _SRGB_COLOR_PROFILE = {
     "name": "sRGB IEC61966-2.1",
     "standard": "IEC 61966-2-1:1999",
 }
+
+
+def _provider_failure_detail(operation: str, exc: BaseException | None) -> dict | None:
+    """LLM プロバイダ由来の失敗を種別に分けて返す (v1.98)。
+
+    種別が分かるものだけを構造化する。判別できない失敗は None を返し、
+    従来どおり `<operation> failed` として扱う。原文メッセージは常に添える。
+    """
+    seen: set[int] = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        status = getattr(exc, "status_code", None)
+        if status is None:
+            response = getattr(exc, "response", None)
+            status = getattr(response, "status_code", None)
+        if isinstance(status, int):
+            if status == 410:
+                code = "model_gone"
+            elif status in (401, 403):
+                code = "provider_auth"
+            elif status == 429:
+                code = "provider_rate_limit"
+            else:
+                code = "provider_error"
+            return {
+                "code": code,
+                "stage": operation,
+                "provider_status": status,
+                "message": str(exc),
+            }
+        exc = exc.__cause__ or exc.__context__
+    return None
+
+
+def _stage_http_error(operation: str, status_code: int) -> HTTPException:
+    """種別が分かるプロバイダ失敗は構造化し、それ以外は従来の扱いに落とす。"""
+    _, exc_value, _ = sys.exc_info()
+    detail = _provider_failure_detail(operation, exc_value)
+    if detail is not None:
+        _logger.warning("%s failed: %s %s", operation, detail["provider_status"], detail["message"])
+        return HTTPException(status_code=status_code, detail=detail)
+    return _unexpected_http_error(operation, status_code)
 
 
 def _unexpected_http_error(operation: str, status_code: int) -> HTTPException:
@@ -2683,7 +2726,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             focus=resolved_focus,
         )
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("compose", 502) from e
+        raise _stage_http_error("compose", 502) from e
 
     score_pre_coerce_dump = (
         compose_detail.score.model_dump(mode="json", by_alias=True)
@@ -2798,7 +2841,7 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
                 tenkei=resolved_tenkei,
             )
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("interpret", 502) from e
+        raise _stage_http_error("interpret", 502) from e
     plugin_provenance: list[dict[str, str]] = []
     plugin_warnings: list[str] = []
     if req.expand_intermediate:
@@ -3177,7 +3220,7 @@ def _paint_events(
                 tenkei=resolved_tenkei,
             )
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("interpret", 502) from e
+        raise _stage_http_error("interpret", 502) from e
     ddl = interpret_detail_result.ddl
     t1 = time.perf_counter()
     yield {
@@ -3203,7 +3246,7 @@ def _paint_events(
             focus=resolved_focus,
         )
     except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("compose", 502) from e
+        raise _stage_http_error("compose", 502) from e
 
     ddl = compose_detail.ddl
     # trace: capture the pre-coerce Score before any coerce/ensure mutation.

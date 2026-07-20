@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
+	import { modelEolLabel } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -700,10 +701,13 @@
 									type="button"
 									class="model-metadata-hover"
 									class:selected={modelSelected(provider.id, model.id)}
+									class:eol={model.eol}
+									disabled={model.eol}
 									aria-pressed={modelSelected(provider.id, model.id)}
 									onclick={() => selectGenerationModel(provider.id, model.id)}
 								>
 									<strong>{model.label}</strong>
+									{#if model.eol}<span class="eol-mark">{modelEolLabel(model, isJapanese)}</span>{/if}
 									{#if model.notes}<span>{model.notes}</span>{/if}
 									<ModelMetaCard {model} {isJapanese} />
 								</button>
@@ -1604,6 +1608,9 @@
 		background: var(--panel); color: var(--fg2); cursor: pointer; text-align: left; font-family: inherit;
 	}
 	.generation-model-grid button:hover { border-color: var(--accent); background: var(--bg2); }
+	.generation-model-grid button.eol { opacity: 0.55; cursor: not-allowed; }
+	.generation-model-grid button.eol strong { text-decoration: line-through; }
+	.eol-mark { color: #a2342a; font-weight: 600; }
 	.generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
 	.generation-model-grid strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
 	.generation-model-grid span { color: var(--fg3); font-size: 10px; }

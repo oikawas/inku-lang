@@ -101,6 +101,10 @@ export const en: LangPack = {
 	demoRenderCount: (count) => `${count} renders`,
 
 	submitBtn: 'Generate',
+	errorModelGone: (stage) => `The model selected for ${stage} has reached end of life. Pick another model from the model selector.`,
+	errorProviderAuth: (stage) => `Authentication failed at the model provider for ${stage}. Check the API key settings.`,
+	errorProviderRateLimit: (stage) => `The model provider rate-limited the ${stage} request. Retry after a while.`,
+	errorProviderOther: (stage, status) => `The model provider returned an error for ${stage} (HTTP ${status}).`,
 	stopBtn: 'Stop',
 	runStatusElapsed: (seconds) => `Elapsed ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,

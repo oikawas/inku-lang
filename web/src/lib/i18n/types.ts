@@ -88,6 +88,10 @@ export interface LangPack {
 	// Submit / loading
 	submitBtn: string;
 	stopBtn: string;
+	errorModelGone: (stage: string) => string;
+	errorProviderAuth: (stage: string) => string;
+	errorProviderRateLimit: (stage: string) => string;
+	errorProviderOther: (stage: string, status: number) => string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
 	runStatusStage1: string;

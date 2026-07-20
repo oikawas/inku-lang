@@ -1,13 +1,18 @@
-"""Verified model metadata seeded from no-git-sync/api-test/model-config.md."""
+"""Verified model metadata seeded from no-git-sync/api-test/model-config.md.
 
-MODEL_CONFIG_VERSION = "1.1.0"
-MODEL_CONFIG_LAST_UPDATED = "2026-07-17T07:32:00Z"
+`eol` marks a model the provider has retired. Retired models stay listed so an
+artwork that names one still shows a meaningful label, but they cannot be
+selected for a new drawing.
+"""
+
+MODEL_CONFIG_VERSION = "1.2.0"
+MODEL_CONFIG_LAST_UPDATED = "2026-07-20T02:00:00Z"
 
 VERIFIED_NVIDIA_MODELS: list[dict[str, object]] = [
     {"id":"google/gemma-4-31b-it","label":"Google Gemma 4 31B Instruct","purposes":["llm","vision"],"recommendation_level":5,"speed_class":"fast","speed_label":"高速 (約15〜22秒)","comment_ja":"本アプリの表現思想（余白・焦点の構成）に最適化されたDDLを出力。Visionでの芸術的読解・文脈理解も最高峰です。本命モデル。","comment_en":"Best adapted to the app's artistic core (negative space and focus). Outstanding Vision comprehension."},
     {"id":"mistralai/mistral-medium-3.5-128b","label":"mistralai/mistral-medium-3.5-128b","purposes":["llm","vision"],"recommendation_level":5,"speed_class":"fast","speed_label":"高速 (約17〜53秒)","comment_ja":"図形の「揺らぎ」パラメータを仕様通り正確に適用し、視認性の高い美しい配色を安定出力する非常に好適なモデル。","comment_en":"Accurately applies variation parameters and stably outputs high-contrast, beautiful color scores."},
     {"id":"mistralai/mistral-small-4-119b-2603","label":"mistralai/mistral-small-4-119b-2603","purposes":["llm","vision"],"recommendation_level":5,"speed_class":"ultra-fast","speed_label":"超高速 (約4〜5秒)","comment_ja":"LLM/Visionともに脅威の5秒前後で処理。シンプルで過密化のないソリッドな楽譜を極めてスムーズに構築します。","comment_en":"Blazing fast response times around 5 seconds. Generates clean and solid scores without overcrowding."},
-    {"id":"qwen/qwen3.5-122b-a10b","label":"qwen/qwen3.5-122b-a10b","purposes":["llm","vision"],"recommendation_level":4,"speed_class":"slow","speed_label":"低速 (約109〜118秒)","comment_ja":"応答は遅いですが、元の指示のコンテキストをカラーヒントに色濃く反映し、Visionでの哲学的な分析能力も優秀です。","comment_en":"Preserves context accurately in color_hint. Excellent philosophical Vision analysis."},
+    {"id":"qwen/qwen3.5-122b-a10b","label":"qwen/qwen3.5-122b-a10b","purposes":["llm","vision"],"recommendation_level":4,"eol":True,"eol_date":"2026-07-20","speed_class":"slow","speed_label":"低速 (約109〜118秒)","comment_ja":"応答は遅いですが、元の指示のコンテキストをカラーヒントに色濃く反映し、Visionでの哲学的な分析能力も優秀です。","comment_en":"Preserves context accurately in color_hint. Excellent philosophical Vision analysis."},
     {"id":"meta/llama-3.2-11b-vision-instruct","label":"meta/llama-3.2-11b-vision-instruct","purposes":["vision"],"recommendation_level":4,"speed_class":"fast","speed_label":"高速 (約13秒)","comment_ja":"応答が軽く、画像内テキストと幾何学的形状の関係性を正確に捉えます。専用の画像評価モデルとして非常に適しています。","comment_en":"Lightweight and fast. Highly capable of extracting relations between text and geometry in patterns."},
     {"id":"meta/llama-3.1-70b-instruct","label":"meta/llama-3.1-70b-instruct","purposes":["llm"],"recommendation_level":4,"speed_class":"medium","speed_label":"中速 (約119秒)","comment_ja":"指示文の細かなニュアンスを、背景色の選定や線の密度へと高次元に抽象化できる実力派モデル。","comment_en":"Highly capable of abstracting subtle text nuances into color palettes and line densities."},
     {"id":"meta/llama-3.2-90b-vision-instruct","label":"Llama 3.2 90B Vision Instruct","purposes":["vision"],"recommendation_level":4,"speed_class":"medium","speed_label":"中速 (約52秒)","comment_ja":"大容量モデルならではの安定感があり、幾何学的パターンの組み合わせを論理的・詳細に解説します。","comment_en":"Highly stable output, describing geometric pattern variations with logical consistency."},

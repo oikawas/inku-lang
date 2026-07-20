@@ -20,3 +20,9 @@ export function modelSpeed(model: ModelOption): string {
 export function modelComment(model: ModelOption, isJapanese: boolean): string {
 	return isJapanese ? (model.comment_ja || model.comment_en || '—') : (model.comment_en || model.comment_ja || '—');
 }
+
+export function modelEolLabel(model: ModelOption, isJapanese: boolean): string | null {
+	if (!model.eol) return null;
+	const date = model.eol_date ? ` (${model.eol_date})` : '';
+	return isJapanese ? `提供終了${date}` : `End of life${date}`;
+}

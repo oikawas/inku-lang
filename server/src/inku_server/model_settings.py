@@ -149,10 +149,13 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             recommendation = model.get("recommendation_level")
             if isinstance(recommendation, int) and not isinstance(recommendation, bool):
                 item["recommendation_level"] = max(1, min(5, recommendation))
-            for key in ("speed_class", "speed_label", "comment_ja", "comment_en"):
+            for key in ("speed_class", "speed_label", "comment_ja", "comment_en", "eol_date"):
                 value = model.get(key)
                 if isinstance(value, str) and value.strip():
                     item[key] = value.strip()
+            # v1.98: 提供終了 (EOL) の印。新規描画では選べないが一覧には残す。
+            if model.get("eol") is True:
+                item["eol"] = True
             normalized.append(item)
     return normalized
 

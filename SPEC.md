@@ -156,6 +156,13 @@ not leave touchless phrases such as “thin black line” or “white horizontal
 line.” Dynamic few-shot selection always includes at least one non-pen material
 example.
 
+Since v1.98 an empty Stage 1 output is treated as a failure rather than drawn
+from nothing. A work drawn through a Stage 1 fallback path records an
+`interpret_fallback` reason in history and is marked in the UI. Provider-side
+failures are classified by HTTP status into model-gone, authentication,
+rate-limit, and other kinds, reported with the failing stage and the provider's
+original message (the legacy string-form error path is kept for compatibility).
+
 ### Stage 1.5: Deterministic Expansion Filter
 
 Stage 1.5 sits between natural interpretation and strict JSON generation.  It
@@ -184,6 +191,13 @@ intent.
 Any line or arc introduced by Stage 1.5 must also name one context-selected
 touch. Composition-family rewrites must preserve expansion markers so the same
 DDL is not expanded twice.
+
+Since v1.98 history stores the input-side DDL (the user's text or the Stage 1
+output, `ddl`) separately from the expanded DDL that Stage 2 consumes
+(`expanded_ddl`); works saved before the split keep only the expanded form.
+The focus can also be selected explicitly via `focus` on `/api/paint` and
+`/api/compose`; when omitted the focus is chosen deterministically from the
+DDL text as before, and unknown values are treated as omitted.
 
 ### Stage 2: Structuring
 
@@ -591,10 +605,13 @@ The normalized DDL appears as an interpretation box under the single drawing
 input.  The box supports two editing paths:
 
 - direct inline editing in the highlighted interpretation box
-- the `Saijiki` button opens the side drawer for vocabulary reference and word
-  insertion at the current caret position
+- the `Saijiki` toggle, placed on the canvas toolbar since v1.98, opens the
+  side drawer as a browse-only vocabulary reference: clicking a word chip
+  shows its preview instead of inserting it
 - the `DDL editing` button opens a larger dialog with line numbers, a
-  two-column Saijiki vocabulary panel, and a short DDL syntax guide
+  two-column Saijiki vocabulary panel, and a short DDL syntax guide; since
+  v1.98 word insertion happens only through this dialog's inline Saijiki,
+  which also lists loaded plugin vocabulary
 - the `auto repair` checkbox controls whether the server applies deterministic
   JSON Score repair after Stage 2. It is enabled by default. When disabled,
   Stage 2 output is rendered without the broader `coerce_score()` repair pass,
@@ -624,6 +641,14 @@ identity of the work but increments a `vary_seed` for Stage 1.5 selection, so
 composition family, focus, and technique candidates can change without making
 the default path nondeterministic. The same text plus the same `vary_seed` and
 `render_seed` is reproducible from metadata.
+
+Since v1.98 single drawing calls `POST /api/paint/stream` (NDJSON): a `stage1`
+event is emitted as soon as interpretation completes (normalized DDL, models
+used, token counts, elapsed time, fallback flag) so the UI can show the
+interpretation while Stage 2 and rendering continue, and the final `done` event
+carries the same `PaintResponse` as before. `POST /api/paint` remains a wrapper
+over the same logic with an unchanged response shape, so the CLI and Android
+need no changes.
 
 DDL replay shows elapsed time, token information, a stop button, and the kiwi
 progress mascot.  Stopping replay aborts the active `/api/compose` request.
@@ -1322,7 +1347,9 @@ The writing tab no longer asks the author to choose an instruction language. Nor
 
 Normal Stage 1 and Stage 2 generation is LLM processing, while image-reading operations have a separate per-user Vision model setting. The model dialog separates Shared Stage 1/2, Stage 1, Stage 2, and Vision selection, and admin model settings identify whether each model is available for LLM, Vision, or both. `GET /api/models` retains the LLM `catalog` for older CLI clients and also returns `llm_catalog` and `vision_catalog`. Okugaki has its own per-user model choice, initially derived from the general Vision default and restored the next time Okugaki opens. An explicit API or CLI model remains authoritative for compatibility.
 
-Each model may carry LLM/Vision purposes, a five-level recommendation, Japanese and English evaluation comments, and a measured speed class and label. Administrators can edit this metadata, and both admin and user model selection expose it on hover. Speed values are observations from a particular measurement run, not a permanent performance guarantee or an acceptance gate for generation quality. Beyond normal generation, Batch has no image input, so it shows the current Stage 1/2 models and opens a model dialog without Vision. Demo separately selects its instruction-generation LLM and rendering Stage 1/2 models, while Okugaki selects from Vision cards grouped by provider. These cards expose the same evaluation metadata on hover using a theme-independent high-contrast tooltip.
+Each model may carry LLM/Vision purposes, per-purpose five-level recommendations (split into LLM and Vision values in v1.98; the old single value is read for compatibility only), Japanese and English evaluation comments, and a measured speed class and label. Administrators can edit this metadata, and both admin and user model selection expose it on hover. Speed values are observations from a particular measurement run, not a permanent performance guarantee or an acceptance gate for generation quality. Beyond normal generation, Batch has no image input, so it shows the current Stage 1/2 models and opens a model dialog without Vision. Demo separately selects its instruction-generation LLM and rendering Stage 1/2 models, while Okugaki selects from Vision cards grouped by provider. These cards expose the same evaluation metadata on hover using a theme-independent high-contrast tooltip.
+
+Since v1.98 every model list is ordered with end-of-life (EOL) models last, then by the recommendation for the purpose at hand in descending order, with ties broken by label. EOL models stay in the catalog marked as retired and unselectable rather than being removed, so model references in saved works remain resolvable. The server does not reject requests naming an EOL model; the provider's failure is classified and explained by kind (model gone, authentication, rate limit, other).
 
 Refine adds Language comparison beside Adjust and Model comparison. It uses the same three comparison modes: shared Stage 1/2 language, fixed Stage 1 with Stage 2 comparison, and Stage 1 comparison with fixed Stage 2. Japanese and English can be assigned per stage only for an explicit comparison run, without changing automatic detection for normal generation. The target's identical language combination is excluded, results show the Stage 1/2 language pair and normalized DDL, and an adopted result records the pair in lineage metadata. Changing the target clears results and aborts an in-flight language comparison.
 

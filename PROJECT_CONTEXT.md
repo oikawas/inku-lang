@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v1.97.0 / Build 608**
+**Target version: v1.98.0 / Build 609**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -88,6 +88,8 @@ v1.95 (Builds 601–604) is a second web-UI phase; server, Score, and rh2 are un
 v1.96 (Builds 605–606) introduced the user-selectable scenery level `tenkei` (none / sparse / auto, default auto), mapped deterministically onto all three layers (Stage 1 norm sections plus a pure-invocation bypass, Stage 1.5 pool reduction, a coerce insertion budget) with no post-hoc thinning governor and no effect on rh2. It also restored the §4.6 Stage 1.5 addition guard that Build 600 pair transcription had bypassed, implemented the user plugin management API (content read, create, overwrite, delete, enable/disable persisted in `.plugin-state.json`) with its settings UI, and attached `lineage_generation` to lineage responses. UI phase 3 replaced the mascot with the inku cube, unified the abortable generation-status element across dialogs, redesigned language comparison as direct Stage 1 × Stage 2 combinations, and single-sourced model metadata.
 
 v1.97 (Builds 607–608) made the scenery level per-artwork: a history `tenkei` column with server-side resolution (explicit value > inherited from the lineage parent > auto) keeps a lineage's level intact through refinement, autonomous loops, and the CLI (save-time resolution covers renderer-only derivations such as touch variation). The UI wires the instruction-tab selector (localStorage-persisted) and inheritance-defaulted 3-way selectors in six refinement dialogs (changing one creates a branching point), with the level shown in generation info and history tooltips.
+
+v1.98 (Build 609) moved single drawing to `POST /api/paint/stream` (NDJSON), showing the normalized DDL as soon as interpretation completes (`/api/paint` stays a wrapper over the same logic with an unchanged response shape). History now stores the input-side DDL (`ddl`) separately from the expanded DDL (`expanded_ddl`; a one-time backfill leaves pre-split works with only the expanded form), adds explicit `focus` selection, and records `interpret_fallback` (an empty Stage 1 output is a failure; fallback-drawn works are marked). The verified model catalog was rebuilt as v2 from two measured benchmark runs (29 → 43 entries, per-purpose recommendations `recommendation_llm` / `recommendation_vision`, retired models kept as marked EOL entries, one shared sort path), and provider failures are classified and explained by kind. The Saijiki drawer became browse-only; word insertion is concentrated in the DDL editor dialog's inline Saijiki, which also lists plugin vocabulary.
 
 ## Where to Look for a Change
 

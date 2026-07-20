@@ -1573,7 +1573,7 @@ def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
     # 提供が続くモデルは EOL 印が付かず、整えたラベルと評価が残る。
     assert models["google/gemma-4-31b-it"].get("eol") is not True
     assert models["google/gemma-4-31b-it"]["label"] == "Google Gemma 4 31B Instruct"
-    assert models["google/gemma-4-31b-it"]["recommendation_llm"] == 5
+    assert models["google/gemma-4-31b-it"]["recommendation_llm"] == 4
     # 提供が消えたモデルは一覧から消えず、EOL として日付付きで残る。
     retired = models["mistralai/mistral-medium-3.5-128b"]
     assert retired["eol"] is True
@@ -2614,21 +2614,21 @@ def test_log_retention_settings_are_admin_only():
 def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     settings = default_model_settings()
     nvidia_models = settings["providers"]["nvidia"]["models"]
-    assert len(nvidia_models) == 29
+    assert len(nvidia_models) == 43
 
     gemma = next(model for model in nvidia_models if model["id"] == "google/gemma-4-31b-it")
     assert gemma["purposes"] == ["llm", "vision"]
     # v1.98: 推奨度は用途ごと。旧 recommendation_level は用途別の値が無いときだけ読む。
-    assert gemma["recommendation_llm"] == 5
+    assert gemma["recommendation_llm"] == 4
     assert gemma["recommendation_vision"] == 5
-    assert gemma["speed_class"] == "fast"
-    assert gemma["speed_label"] == "高速 (約15〜22秒)"
-    assert "本命モデル" in gemma["comment_ja"]
+    assert gemma["speed_class"] == "medium"
+    assert gemma["speed_label"] == "昼 221s / 夕 114s"
+    assert "スキーマ違反なし" in gemma["comment_ja"]
 
     llm_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="llm") if provider["id"] == "nvidia")
     vision_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="vision") if provider["id"] == "nvidia")
-    assert len(llm_nvidia["models"]) == 22
-    assert len(vision_nvidia["models"]) == 12
+    assert len(llm_nvidia["models"]) == 39
+    assert len(vision_nvidia["models"]) == 10
 
     normalized = normalize_model_settings({
         "model_catalog_version": settings["model_catalog_version"],
@@ -2648,14 +2648,14 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
         },
     })
     normalized_models = normalized["providers"]["nvidia"]["models"]
-    assert len(normalized_models) == 29
+    assert len(normalized_models) == 43
     overridden = next(model for model in normalized_models if model["id"] == "google/gemma-4-31b-it")
     assert overridden["label"] == "Gemma custom label"
     assert overridden["purposes"] == ["vision"]
     # 上書きは vision 側だけに効く。LLM 側は組み込みカタログの値が残るが、purposes が
     # vision のみなので LLM の一覧には出ない。
     assert overridden["recommendation_vision"] == 2
-    assert overridden["recommendation_llm"] == 5
+    assert overridden["recommendation_llm"] == 4
     assert overridden["speed_label"] == "再計測 約30秒"
     assert overridden["comment_en"] == "Administrator override"
 
@@ -2673,8 +2673,8 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     legacy_gemma = next(model for model in legacy["providers"]["nvidia"]["models"] if model["id"] == "google/gemma-4-31b-it")
     assert legacy_gemma["label"] == "Legacy stored label"
     assert legacy_gemma["purposes"] == ["llm", "vision"]
-    assert legacy_gemma["recommendation_llm"] == 5
-    assert legacy_gemma["speed_label"] == "高速 (約15〜22秒)"
+    assert legacy_gemma["recommendation_llm"] == 4
+    assert legacy_gemma["speed_label"] == "昼 221s / 夕 114s"
 
 
 def test_model_settings_store_keys_server_side(monkeypatch):
@@ -2742,8 +2742,8 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
     nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
     nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
-    assert len(nvidia_llm["models"]) == 22
-    assert len(nvidia_vision["models"]) == 12
+    assert len(nvidia_llm["models"]) == 39
+    assert len(nvidia_vision["models"]) == 10
     assert all("llm" in model["purposes"] for model in nvidia_llm["models"])
     assert all("vision" in model["purposes"] for model in nvidia_vision["models"])
 

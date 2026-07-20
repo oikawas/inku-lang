@@ -2435,3 +2435,10 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **検証:** pytest 636 passed / 30 skipped（+34: `test_variation.py` 30 件 + `test_api.py` 5 件 − focus テスト 1 件）。契約 §4 の 7 項目（再現性・無効時バイト一致・段階解放 seed 0〜199 掃引・可視性・tenkei 直交・レポート整合・focus 撤去回帰）全対応。ruff・`npm run check` 0 errors・build 通過。
 - **既知の残件:** 変奏セクションの UI 配置は作者イメージと相違があり手直し予定（機能は現状のまま採用）。`loadIterationItem` は変奏フィールドを復元しない（保存は行われるため再計算可能。既存 focus と同扱い）。`api_history_neighbors` が history の score を文字列のまま比較関数へ渡す既存バグを pentala ログで確認（変奏とは無関係、未修正）。
 
+
+### v2.0.1 — モデルカタログ v2.1（深夜ベンチ統合、Build 612、2026-07-21）
+
+- **実測 3 回目（深夜）の統合:** NVIDIA NIM 86 モデルの深夜ベンチ（2026-07-20 23:38 〜 翌 02:54、86/86 完走、スリープ中断なし）を統合し、採点を昼・夕・深夜の 3 実行合算へ更新した（`MODEL_CONFIG_VERSION` 2.0.0 → 2.1.0、43 → 44 エントリ）。`openai/gpt-oss-20b` を新規収載、削除はゼロ。速度ラベルは 3 実行を併記する。採点基準は不変だが、推奨度 5 の「全実行で全成功」条件が実行追加で厳しくなり、昇格 4 件（`qwen/qwen3.5-397b-a17b`・`z-ai/glm-5.2` が 5 へ、`meta/llama-3.3-70b-instruct`・`poolside/laguna-xs-2.1` が 4 へ）・降格 7 件（`mistralai/mistral-nemotron` 5→4、`minimaxai/minimax-m3` 4→2 ほか）。履歴が参照するモデルの脱落はゼロ（保全チェック通過）。
+- **時間帯検証の打ち止め:** 昼・夕・深夜とも総所要は 3 時間 16〜20 分に収まり、深夜は応答中央値が下がる（62.8s → 41.9s）ものの、フォールバックが単調増加（35 → 37 → 38）して相殺した。「空いた時間帯なら短縮される」仮説の検証はこれで打ち止め。詳細は `no-git-sync/fable5/mode-api-claude/RUN-LOG.md`。
+- **検証:** pytest 636 passed / 30 skipped（テスト変更はカタログ表明値の実測更新のみ）・`npm run check` 0 errors。pentala 配備済み。
+

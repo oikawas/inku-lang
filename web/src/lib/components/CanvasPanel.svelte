@@ -1984,6 +1984,7 @@
 		letter-spacing: 0.06em;
 		color: #4d5f86;
 	}
+	:global(html[data-theme='dark']) .status-hash-code { color: #a9c0ee; }
 	.export-btn {
 		display: inline-flex;
 		align-items: center;

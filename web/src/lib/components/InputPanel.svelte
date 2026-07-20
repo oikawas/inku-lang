@@ -476,6 +476,7 @@
 		color: #4d5f86;
 		font-weight: 500;
 	}
+	:global(html[data-theme='dark']) .cs-value { color: #a9c0ee; }
 	.cs-divider {
 		width: 1px;
 		height: 12px;

@@ -6409,6 +6409,36 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--danger:       #ff9a86;
 	}
 
+	/* DDL token palette (v1.98): one definition for every surface that renders
+	   highlighted DDL — interpretation view, batch observer, demo observer,
+	   DDL editor dialog. Previously each component carried its own copy and
+	   only some had dark-theme values. */
+	:global(.ddl-token) { border-radius: 2px; font-weight: inherit; }
+	:global(.ddl-token-shape) { color: #2c5fb8; background: rgba(44, 95, 184, 0.08); }
+	:global(.ddl-token-touch) { color: #7a5b2f; background: rgba(122, 91, 47, 0.10); }
+	:global(.ddl-token-line) { color: #53606b; background: rgba(83, 96, 107, 0.10); }
+	:global(.ddl-token-color) { color: #b12a6b; background: rgba(177, 42, 107, 0.09); }
+	:global(.ddl-token-motion) { color: #197a74; background: rgba(25, 122, 116, 0.10); }
+	:global(.ddl-token-place) { color: #6b4cb3; background: rgba(107, 76, 179, 0.09); }
+	:global(.ddl-token-action) { color: #9a4a1d; background: rgba(154, 74, 29, 0.10); }
+	:global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
+	:global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
+	:global(.ddl-token-plugin) { color: #9f4b3b; background: rgba(185, 88, 69, 0.10); }
+	:global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
+	:global(.ddl-token-emotion) { color: #9b7a66; font-style: inherit; }
+	:global(html[data-theme='dark'] .ddl-token-shape) { color: #9cc4ff; background: rgba(92, 143, 220, 0.26); }
+	:global(html[data-theme='dark'] .ddl-token-touch) { color: #e2bf82; background: rgba(188, 139, 62, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-line) { color: #c4ccd5; background: rgba(147, 160, 176, 0.22); }
+	:global(html[data-theme='dark'] .ddl-token-color) { color: #ff91c7; background: rgba(215, 80, 149, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-motion) { color: #7ce1d4; background: rgba(50, 157, 147, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-place) { color: #c2a9ff; background: rgba(133, 99, 214, 0.26); }
+	:global(html[data-theme='dark'] .ddl-token-action) { color: #f0aa73; background: rgba(197, 105, 45, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-angle) { color: #a7d88e; background: rgba(89, 142, 65, 0.25); }
+	:global(html[data-theme='dark'] .ddl-token-ratio) { color: #f0a0a0; background: rgba(196, 78, 78, 0.24); }
+	:global(html[data-theme='dark'] .ddl-token-plugin) { color: #f0a58f; background: rgba(185, 88, 69, 0.26); }
+	:global(html[data-theme='dark'] .ddl-token-word) { color: #b8c7ff; background: rgba(92, 111, 205, 0.26); }
+	:global(html[data-theme='dark'] .ddl-token-emotion) { color: #d8b8a6; }
+
 	:global(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }
 
 	:global(html), :global(body) {

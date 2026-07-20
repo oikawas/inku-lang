@@ -170,6 +170,10 @@
 		color: #2f6f45;
 		background: rgba(47, 111, 69, 0.08);
 	}
+	:global(html[data-theme='dark']) .prompt-copy-btn.copied {
+		color: #86d8a4;
+		background: rgba(47, 111, 69, 0.28);
+	}
 	.prompt-copy-btn svg {
 		width: 15px;
 		height: 15px;
@@ -257,6 +261,10 @@
 	.score-copy-btn.copied {
 		color: #2f6f45;
 		background: rgba(47, 111, 69, 0.10);
+	}
+	:global(html[data-theme='dark']) .score-copy-btn.copied {
+		color: #86d8a4;
+		background: rgba(47, 111, 69, 0.28);
 	}
 	.score-view {
 		display: flex;

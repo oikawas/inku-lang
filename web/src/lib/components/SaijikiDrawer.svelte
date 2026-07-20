@@ -202,7 +202,8 @@
 	}
 	.saijiki-cat.plugin-cat { border-left: 2px solid rgba(185, 88, 69, 0.45); }
 	.saijiki-chip.plugin-chip { color: #9f4b3b; border-color: rgba(185, 88, 69, 0.35); background: rgba(185, 88, 69, 0.08); }
+	:global(html[data-theme='dark']) .saijiki-chip.plugin-chip { color: #f0a58f; border-color: rgba(226, 138, 112, 0.45); background: rgba(185, 88, 69, 0.22); }
 	.plugin-word-with-note { display: flex; flex-direction: column; gap: 3px; max-width: 18rem; }
-	.plugin-note { color: var(--muted); font-size: 0.68rem; line-height: 1.25; }
+	.plugin-note { color: var(--fg3); font-size: 0.68rem; line-height: 1.25; }
 	.saijiki-chip:hover { background: var(--bg2); border-color: var(--fg3); }
 </style>

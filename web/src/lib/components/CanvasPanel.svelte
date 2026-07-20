@@ -156,6 +156,7 @@
 		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
+		onToggleSaijiki: () => void;
 		onCloseRefinement: () => void;
 		statusDdlOrigin: boolean;
 		statusTenkei: TenkeiLevel | null;
@@ -304,6 +305,7 @@
 		onDrawLineageDescription,
 		onDrawLineageDdl,
 		onOpenLineageDdlEditor,
+		onToggleSaijiki,
 		onCloseRefinement,
 		statusDdlOrigin,
 		statusTenkei,
@@ -1024,6 +1026,13 @@
 				aria-expanded={generationInfoOpen}
 				onclick={() => (generationInfoOpen = !generationInfoOpen)}
 			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation Info'}</button>
+		</Tooltip>
+		<Tooltip placement="top" text={t().tooltipSaijikiToggle}>
+			<button
+				type="button"
+				class="ghost-btn saijiki-open-btn"
+				onclick={onToggleSaijiki}
+			>{t().saijikiToggleBtn}</button>
 		</Tooltip>
 		<div class="png-wrap">
 			<Tooltip placement="left" text={t().tooltipCanvasDownloadSvg}>
@@ -1931,6 +1940,7 @@
 	.detail-copy-row { display: flex; align-items: flex-start; gap: 8px; }
 	.detail-copy-row code { min-width: 0; flex: 1; }
 	.detail-copy-row button { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: 5px; padding: 3px 7px; background: var(--panel); color: var(--fg2); font: inherit; font-size: 10px; cursor: pointer; }
+	.saijiki-open-btn { flex: 0 0 auto; white-space: nowrap; }
 	.generation-info-button {
 		flex: 0 0 auto;
 		border: 1px solid var(--border2);

@@ -22,7 +22,6 @@
 		pluginEntries: PluginEntry[];
 		activePreview: SaijikiPreview | null;
 		onClose: () => void;
-		onInsertWord: (word: string) => void;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
 	};
 
@@ -31,7 +30,6 @@
 		pluginEntries,
 		activePreview = $bindable(),
 		onClose,
-		onInsertWord,
 		previewForWord,
 	}: Props = $props();
 </script>
@@ -55,7 +53,7 @@
 						<div class="saijiki-preview-example">{activePreview.example}</div>
 					</div>
 				{:else}
-					<div class="saijiki-preview-placeholder">語彙にマウスを重ねると、描画への効き方を表示します。</div>
+					<div class="saijiki-preview-placeholder">{t().saijikiPreviewPlaceholder}</div>
 				{/if}
 			</div>
 			{#each SAIJIKI as cat, ci (cat.key)}
@@ -72,7 +70,7 @@
 								class="saijiki-chip"
 								class:plugin-chip={cat.key.startsWith("plugin-")}
 								onpointerdown={(e) => e.preventDefault()}
-								onclick={() => onInsertWord(word)}
+								onclick={() => (activePreview = previewForWord(cat.key, canonicalWord, word))}
 								onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word))}
 								onfocus={() => (activePreview = previewForWord(cat.key, canonicalWord, word))}
 							>{word}</button>
@@ -93,7 +91,6 @@
 									class="saijiki-chip plugin-chip"
 									title={getLang() === "ja" ? entry.note_ja : entry.note_en}
 									onpointerdown={(e) => e.preventDefault()}
-									onclick={() => onInsertWord(entry.qualified_name)}
 								>{entry.qualified_name}</button>
 								{#if getLang() === "ja" ? entry.note_ja : entry.note_en}
 									<span class="plugin-note">{getLang() === "ja" ? entry.note_ja : entry.note_en}</span>
@@ -114,10 +111,10 @@
 		transition: width 0.25s cubic-bezier(0.4,0,0.2,1);
 		pointer-events: none;
 	}
-	.saijiki-drawer.open { width: 280px; pointer-events: all; }
+	.saijiki-drawer.open { width: 460px; pointer-events: all; }
 
 	.saijiki-inner {
-		width: 280px; height: 100%;
+		width: 460px; height: 100%;
 		background: var(--panel2); border-left: 1px solid var(--border);
 		display: flex; flex-direction: column;
 		box-shadow: -4px 0 24px rgba(0,0,0,0.08);

@@ -10,11 +10,9 @@
 		expandedDdl?: string | null;
 		label: string;
 		expandedLabel: string;
-		saijikiLabel: string;
-		onToggleSaijiki: () => void;
 	};
 
-	let { ddl, expandedDdl = null, label, expandedLabel, saijikiLabel, onToggleSaijiki }: Props = $props();
+	let { ddl, expandedDdl = null, label, expandedLabel }: Props = $props();
 
 	// Artworks saved before v1.98 have no input-side DDL: their single stored text
 	// is the expanded one. Show it in the main slot and rename the label so the
@@ -33,9 +31,6 @@
 <div class="ddl-viewer">
 	<div class="ddl-viewer-head">
 		<span class="ddl-viewer-label">{primaryLabel}</span>
-		<Tooltip placement="left" text={t().tooltipSaijikiToggle}>
-			<button class="ddl-viewer-btn" type="button" onclick={onToggleSaijiki}>{saijikiLabel}</button>
-		</Tooltip>
 	</div>
 	<div class="ddl-viewer-body ddl-highlight">{@html highlighted}</div>
 	{#if showExpanded}
@@ -71,19 +66,6 @@
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		color: var(--fg2);
-	}
-	.ddl-viewer-btn {
-		padding: 4px 10px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: 11px;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.ddl-viewer-btn:hover {
-		background: var(--bg2);
 	}
 	.ddl-viewer-body {
 		padding: 2px 0 2px 12px;

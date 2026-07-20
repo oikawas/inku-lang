@@ -266,10 +266,6 @@
 	let batchInput  = $state('');
 	const instructionLang: InstructionLang = 'auto';
 	let stage1UserPrompt = $state('');
-	let ddlTextareaEl = $state<HTMLTextAreaElement | null>(null);
-	let ddlHighlightEl = $state<HTMLDivElement | null>(null);
-	let ddlSelection = $state({ start: 0, end: 0 });
-	let ddlFocused = $state(false);
 	type CopyKind = 'stage1' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
 	let statusHashCopied = $state(false);
@@ -2748,7 +2744,7 @@ if (unreadWords.length > 0) {
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
 				const demoSourceDdl = r.source_ddl ?? r.ddl;
-				ddl = demoSourceDdl; expandedDdl = r.ddl; ddlGeneratedBaseline = demoSourceDdl; ddlSelection = { start: demoSourceDdl.length, end: demoSourceDdl.length }; thinking = r.thinking; result = r; outputTab = 'canvas';
+				ddl = demoSourceDdl; expandedDdl = r.ddl; ddlGeneratedBaseline = demoSourceDdl; thinking = r.thinking; result = r; outputTab = 'canvas';
 				fitCanvasZoom();
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
@@ -2861,7 +2857,7 @@ if (unreadWords.length > 0) {
 			: {};
 		loading = true; error = null;
 		activeRunMode = submittedMode;
-		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null; ddlSelection = { start: 0, end: 0 };
+		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
 		displayedHistoryItem = null;
 		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
@@ -2896,7 +2892,6 @@ if (unreadWords.length > 0) {
 						ddl = stage1.ddl;
 						expandedDdl = null;
 						ddlGeneratedBaseline = stage1.ddl;
-						ddlSelection = { start: stage1.ddl.length, end: stage1.ddl.length };
 						thinking = stage1.thinking;
 						stageLabel = t().stageImageGenerating;
 						reloading = true;
@@ -3490,8 +3485,6 @@ if (unreadWords.length > 0) {
 		tokensOutStage1 = null;
 		tokensInStage2 = null;
 		tokensOutStage2 = null;
-		ddlFocused = false;
-		ddlSelection = { start: 0, end: 0 };
 		displayedHistoryItem = null;
 		historyCursor = -1;
 		resetZoom();
@@ -4393,7 +4386,7 @@ $effect(() => {
 		const itemDDL = it.ddl ?? '';
 		const sourceText = it.source_text ?? it.input;
 		expandedDdl = it.expanded_ddl ?? null;
-		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; ddlSelection = { start: itemDDL.length, end: itemDDL.length }; thinking = it.thinking ?? null;
+		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; thinking = it.thinking ?? null;
 		stage1UserPrompt = sourceText ? sourceText + buildEmotionHint(sourceText) : '';
 		result = {
 			score: it.score,
@@ -4475,46 +4468,6 @@ $effect(() => {
 	const navPos       = $derived(historyOffset + historyCursor + 1);
 
 	// ── Saijiki ─────────────────────────────────────────────
-	function insertWord(word: string) {
-		if (ddl === null) return;
-		const ta = ddlTextareaEl;
-		if (!ta) {
-			ddl = ddl + word;
-			ddlSelection = { start: ddl.length, end: ddl.length };
-			return;
-		}
-		const hasTextareaFocus = document.activeElement === ta;
-		const currentDDL = ddl;
-		const liveStart = ta.selectionStart ?? ddlSelection.start;
-		const liveEnd = ta.selectionEnd ?? ddlSelection.end;
-		const savedStart = ddlSelection.start;
-		const savedEnd = ddlSelection.end;
-		const start = Math.max(0, Math.min(currentDDL.length, hasTextareaFocus ? liveStart : savedStart));
-		const end = Math.max(start, Math.min(currentDDL.length, hasTextareaFocus ? liveEnd : savedEnd));
-		ddl = currentDDL.slice(0, start) + word + currentDDL.slice(end);
-		ddlSelection = { start: start + word.length, end: start + word.length };
-		requestAnimationFrame(() => {
-			if (!ddlTextareaEl) return;
-			ddlTextareaEl.focus();
-			ddlTextareaEl.setSelectionRange(ddlSelection.start, ddlSelection.end);
-		});
-	}
-
-	function rememberDDLSelection() {
-		const ta = ddlTextareaEl;
-		if (!ta || ddl === null) return;
-		ddlSelection = {
-			start: ta.selectionStart ?? ddl.length,
-			end: ta.selectionEnd ?? ddl.length,
-		};
-	}
-
-	function syncDDLHighlightScroll() {
-		if (!ddlTextareaEl || !ddlHighlightEl) return;
-		ddlHighlightEl.scrollTop = ddlTextareaEl.scrollTop;
-		ddlHighlightEl.scrollLeft = ddlTextareaEl.scrollLeft;
-	}
-
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
@@ -5274,7 +5227,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		result = batchLatestResult;
 		ddl = batchLatestDdl;
 		ddlGeneratedBaseline = batchLatestDdl;
-		ddlSelection = { start: batchLatestDdl?.length ?? 0, end: batchLatestDdl?.length ?? 0 };
 		thinking = batchLatestThinking;
 		outputTab = 'canvas';
 		fitCanvasZoom();
@@ -5487,9 +5439,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const index = scoreJsonLines.findIndex((line) => line.startsWith('  "score"'));
 		return index >= 0 ? index : null;
 	});
-	const ddlHighlighted = $derived(ddl !== null
-		? highlightDDL(ddl, ddlFocused && ddlSelection.start === ddlSelection.end ? ddlSelection.start : null)
-		: '');
 	const batchActiveDdlHighlighted = $derived(batchActiveDdl !== null
 		? highlightDDL(batchActiveDdl)
 		: escapeHtml(t().batchActiveDdlPending));
@@ -5868,7 +5817,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- 解釈 (正規化DDL・閲覧専用) -->
 					{#if ddl !== null && inputMode === 'single'}
 						<section class="panel-section">
-							<DdlViewer {ddl} {expandedDdl} label={t().ddlLabel} expandedLabel={t().ddlExpandedLabel} saijikiLabel={t().saijikiToggleBtn} onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)} />
+							<DdlViewer {ddl} {expandedDdl} label={t().ddlLabel} expandedLabel={t().ddlExpandedLabel} />
 						</section>
 					{/if}
 
@@ -6068,6 +6017,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onOpenLineageDdlEditor={openLineageDdlEditor}
+				onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 				onCloseRefinement={refreshLineageAfterRefine}
 				statusDdlOrigin={statusDdlOrigin}
 				statusTenkei={normalizeTenkei(displayedHistoryItem?.tenkei)}
@@ -6121,7 +6071,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	{pluginEntries}
 	bind:activePreview={activeSaijikiPreview}
 	onClose={() => (saijikiOpen = false)}
-	onInsertWord={insertWord}
 	previewForWord={saijikiPreview}
 />
 

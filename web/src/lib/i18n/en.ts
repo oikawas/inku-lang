@@ -41,7 +41,7 @@ export const en: LangPack = {
 	saijikiLabel: 'saijiki:',
 	saijikiToggleBtn: 'Saijiki',
 	saijikiTitle: 'Saijiki',
-	saijikiHint: 'Click a word to insert it at the caret.',
+	saijikiHint: 'Pick a word to see how it affects the drawing, with an example.',
 	currentSetting: 'Current Settings',
 	saveCurrentBtn: 'Save Current',
 
@@ -61,7 +61,7 @@ export const en: LangPack = {
 	ddlAutoRepairLabel: 'Auto Repair',
 	ddlEditBtn: 'Edit',
 	ddlDoneBtn: 'Done',
-	saijikiPreviewPlaceholder: 'Hover over a word to preview how it affects the drawing.',
+	saijikiPreviewPlaceholder: 'Hover over (or tap) a word to preview how it affects the drawing.',
 
 	modeSingle: 'Describe',
 	modeBatch: 'Batch',
@@ -165,7 +165,7 @@ export const en: LangPack = {
 	tooltipInputTenkei: 'Choose how much staffage (small supporting elements) is added: none, sparse, or auto.',
 	tooltipInputCanvas: 'Choose the canvas aspect ratio (square, wide, tall, and so on).',
 	tooltipDdlNew: 'Write DDL code directly and draw it as a standalone artwork, without an instruction.',
-	tooltipSaijikiToggle: 'Open the saijiki and click a season word to insert it into the description.',
+	tooltipSaijikiToggle: 'Open the saijiki to see how each season word affects the drawing, with examples (browsing only).',
 	tooltipDdlExpandedToggle: 'Show the DDL Stage 2 actually received, including the structure lines the expansion layer added.',
 	tooltipStatsToggle: 'Show the elapsed time and token counts for interpretation and rendering.',
 	tooltipInputClear: 'Clear text input',

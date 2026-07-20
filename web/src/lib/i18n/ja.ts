@@ -41,7 +41,7 @@ export const ja: LangPack = {
 	saijikiLabel: '歳時記:',
 	saijikiToggleBtn: '歳時記',
 	saijikiTitle: '歳時記',
-	saijikiHint: '語彙をクリックするとカーソル位置に挿入されます。',
+	saijikiHint: '語彙を選ぶと、描画への効き方と作例を表示します。',
 	currentSetting: '現在の設定',
 	saveCurrentBtn: '現在を保存',
 
@@ -61,7 +61,7 @@ export const ja: LangPack = {
 	ddlAutoRepairLabel: '自動補正',
 	ddlEditBtn: '編集',
 	ddlDoneBtn: '完了',
-	saijikiPreviewPlaceholder: '語彙にマウスを重ねると、描画への効き方を表示します。',
+	saijikiPreviewPlaceholder: '語彙にマウスを重ねる（またはクリックする）と、描画への効き方を表示します。',
 
 	modeSingle: '記述',
 	modeBatch: 'バッチ',
@@ -165,7 +165,7 @@ export const ja: LangPack = {
 	tooltipInputTenkei: '添景（画面に添える小さな要素）の量を選びます。なし・控えめ・自動の三段階',
 	tooltipInputCanvas: 'キャンバスの縦横比を選びます（正方形・横長・縦長など）',
 	tooltipDdlNew: '記述を介さず、DDLコードを直接書いて独立した作品として描画します',
-	tooltipSaijikiToggle: '歳時記を開き、季語や語彙をクリックして記述へ挿入します',
+	tooltipSaijikiToggle: '歳時記を開き、季語や語彙が描画にどう効くかを作例つきで確認します（閲覧のみ）',
 	tooltipDdlExpandedToggle: '展開層が補った構造文を含む、Stage 2 が実際に受け取ったDDLを表示します',
 	tooltipStatsToggle: '解釈・描画それぞれの所要時間とトークン数を表示します',
 	tooltipInputClear: '入力をクリアする',

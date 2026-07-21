@@ -94,17 +94,16 @@ MATERIAL_SHAPES: dict[str, dict] = {
     },
 }
 
-# v2.1 (比例レンダリング / 比率 P3 / 材質強度 s1) で採取した render_seed=None
-# 出力の sha256 (先頭 32 桁)。
-# seed 未指定の演奏が不変であることの固定。v2.0.4 の値からの差分は speck 個数の
-# 周長比例化と stroke 分割数の長さ比例化のみで、材質の寸法・dasharray・線幅は
-# canvas.unit=1000 で以前とバイト一致する。
+# v2.2 (閉図形の手描きストローク / engine 8) で採取した render_seed=None 出力の
+# sha256 (先頭 32 桁)。seed 未指定の演奏が不変であることの固定。
+# v2.1 の値からの差分は閉図形 (circle / ellipse / square) の輪郭がストロークの帯に
+# なった分だけで、line と arc は v2.1 とバイト一致したまま。
 MATERIAL_NONE_SEED_DIGESTS = {
     "brush_thin_line": "caf585ff657f4430d6c4b38cbc51ceb5",
-    "chalk_square": "c84f938ae6a9da0b4182044479e30989",
+    "chalk_square": "30e72859c3bad016bb1d807c983ab6c3",
     "crayon_arc": "cfb845988d7b2ffde128037f5633942b",
-    "pencil_circle": "705114e3eca84e5d1283f2435e1f5de7",
-    "pencil_ellipse": "c2e3a7f7dfc2d97eff7d3ea4c6a09bb9",
+    "pencil_circle": "7f6369cf1d186d2b3dcc83aca62782fc",
+    "pencil_ellipse": "865965b578d0ef079a56c546423a3fcb",
 }
 
 

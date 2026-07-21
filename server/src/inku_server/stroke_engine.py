@@ -52,6 +52,30 @@ class StrokeResult:
     burr_opacity: float
 
 
+@dataclass(frozen=True)
+class ContourStrokeResult:
+    """A stroke synthesized along an arbitrary centerline.
+
+    `left` and `right` are the two banks of the stroke. For an open centerline
+    they form one polygon; for a closed one they are the outer and inner rings
+    of a band and must be filled with the even-odd rule.
+    """
+
+    samples: tuple[StrokeSample, ...]
+    left: tuple[tuple[float, float], ...]
+    right: tuple[tuple[float, float], ...]
+    event_count: int
+    burr_side: int
+    burr_opacity: float
+    closed: bool
+
+
+# A closed contour is drawn as one loop, so it has no entry/exit taper. The
+# seam still thins, because that is where the tool lands and leaves, but it is
+# floored so the loop never reads as broken.
+CLOSED_ENVELOPE_FLOOR = 0.35
+
+
 def _unit(seed: int, label: str, index: int) -> float:
     raw = hashlib.sha256(f"{seed}:{label}:{index}".encode()).digest()[:8]
     return int.from_bytes(raw, "little") / (2**64 - 1)
@@ -183,22 +207,232 @@ def polygon_path(points: tuple[tuple[float, float], ...]) -> str:
     return "M " + " L ".join(f"{x:.3f} {y:.3f}" for x, y in points) + " Z"
 
 
+def ring_path(
+    outer: tuple[tuple[float, float], ...], inner: tuple[tuple[float, float], ...]
+) -> str:
+    """Two subpaths forming a band. The caller must fill it with even-odd."""
+    return f"{polygon_path(outer)} {polygon_path(inner)}".strip()
+
+
+def contour_stroke_path(result: ContourStrokeResult) -> str:
+    if result.closed:
+        return ring_path(result.left, result.right)
+    return polygon_path(result.left + tuple(reversed(result.right)))
+
+
+def centerline_normals(
+    points: list[tuple[float, float]], closed: bool
+) -> list[tuple[float, float]]:
+    """Unit normal per vertex, taken from the neighbouring vertices."""
+    last = len(points) - 1
+    count = len(points)
+    normals: list[tuple[float, float]] = []
+    for index in range(count):
+        if closed:
+            before = points[index - 1]
+            after = points[(index + 1) % count]
+        else:
+            before = points[max(0, index - 1)]
+            after = points[min(last, index + 1)]
+        dx, dy = after[0] - before[0], after[1] - before[1]
+        length = max(1e-6, math.hypot(dx, dy))
+        normals.append((-dy / length, dx / length))
+    return normals
+
+
+def _arc_length_parameters(
+    points: list[tuple[float, float]], closed: bool
+) -> list[float]:
+    """Normalized arc length per vertex. A closed loop counts the seam segment."""
+    running = [0.0]
+    total = 0.0
+    for index in range(1, len(points)):
+        previous, current = points[index - 1], points[index]
+        total += math.hypot(current[0] - previous[0], current[1] - previous[1])
+        running.append(total)
+    if closed and len(points) > 1:
+        total += math.hypot(points[0][0] - points[-1][0], points[0][1] - points[-1][1])
+    if total <= 1e-9:
+        return [0.0] * len(points)
+    return [value / total for value in running]
+
+
 def outline_for_centerline(
     points: list[tuple[float, float]], widths: list[float]
 ) -> tuple[tuple[float, float], ...]:
     """Build one variable-width polygon around an arbitrary intended centerline."""
     if len(points) < 2:
         return tuple(points)
+    left, right = _banks_for_centerline(points, widths, closed=False)
+    return tuple(list(left) + list(reversed(right)))
+
+
+def _banks_for_centerline(
+    points: list[tuple[float, float]], widths: list[float], closed: bool
+) -> tuple[tuple[tuple[float, float], ...], tuple[tuple[float, float], ...]]:
+    normals = centerline_normals(points, closed)
     left: list[tuple[float, float]] = []
     right: list[tuple[float, float]] = []
-    last = len(points) - 1
     for index, (x, y) in enumerate(points):
-        before = points[max(0, index - 1)]
-        after = points[min(last, index + 1)]
-        dx, dy = after[0] - before[0], after[1] - before[1]
-        length = max(1e-6, math.hypot(dx, dy))
-        nx, ny = -dy / length, dx / length
+        nx, ny = normals[index]
         width = widths[min(index, len(widths) - 1)]
         left.append((x + nx * width / 2, y + ny * width / 2))
         right.append((x - nx * width / 2, y - ny * width / 2))
-    return tuple(left + list(reversed(right)))
+    return tuple(left), tuple(right)
+
+
+def synthesize_along(
+    centerline: list[tuple[float, float]],
+    base_width: float,
+    weight: str,
+    seed: int,
+    *,
+    closed: bool,
+    anchors: frozenset[int] = frozenset(),
+) -> ContourStrokeResult:
+    """Synthesize one stroke that follows an arbitrary intended centerline.
+
+    Same tool grammar as `synthesize_stroke`: the damped tracker lags behind the
+    intention, latent energy modulates width and lateral drift, and sparse
+    events (catch / fade / correction) interrupt the run. Only the target track
+    differs, so a contour is played as a stroke rather than drawn as geometry.
+
+    `anchors` are vertex indices the tool is required to reach exactly; the
+    tracker is reset there, which is how a polygon corner reads as a joint
+    between two strokes. A closed centerline with no anchors is instead closed
+    by ramping the accumulated deviation back to its seam value, so the loop
+    meets itself without a kink.
+    """
+    points = list(centerline)
+    count = len(points)
+    grammar = GRAMMARS[weight]
+    if count < 2:
+        sample = StrokeSample(0.0, points[0][0], points[0][1], base_width, 0.0, 0.0)
+        return ContourStrokeResult(
+            (sample,), tuple(points), tuple(points), 0, 1, 0.0, closed
+        )
+
+    normals = centerline_normals(points, closed)
+    parameters = _arc_length_parameters(points, closed)
+    events = _event_map(seed, grammar.event_rate, count)
+    position = [points[0][0], points[0][1]]
+    velocity = [0.0, 0.0]
+    samples: list[StrokeSample] = []
+    for index, target in enumerate(points):
+        t = parameters[index]
+        if index:
+            # L1 with the intended step fed forward: the same damped tracker as
+            # the straight-line synthesizer, but the spring only carries the
+            # residual. On a straight run the tracker's lag is purely along the
+            # track and invisible; on a curve it would turn into a radial error
+            # that shrinks and dents the shape. Feeding the step forward leaves
+            # deviation where the intention actually changes direction — the
+            # corners — which is where a hand overshoots.
+            previous = points[index - 1]
+            step = (target[0] - previous[0], target[1] - previous[1])
+            velocity[0] = (
+                velocity[0] * grammar.damping
+                + (target[0] - position[0] - step[0]) * grammar.stiffness
+            )
+            velocity[1] = (
+                velocity[1] * grammar.damping
+                + (target[1] - position[1] - step[1]) * grammar.stiffness
+            )
+            position[0] += step[0] + velocity[0] * 0.72
+            position[1] += step[1] + velocity[1] * 0.72
+        energy = latent_energy(t, seed)
+        envelope = max(0.0, math.sin(math.pi * t))
+        if closed:
+            envelope = max(CLOSED_ENVELOPE_FLOOR, envelope)
+        lateral = (
+            energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope)
+        )
+        event = events.get(index)
+        event_width = 1.0
+        if event == "catch":
+            event_width = 1.45
+            lateral += (_unit(seed, "catch-side", index) * 2 - 1) * base_width * 0.35
+        elif event == "fade":
+            event_width = 0.04
+        elif event == "correction":
+            lateral += math.sin((index % 5) * math.pi / 2) * base_width * 0.25
+        profile = 1.0
+        if grammar.taper:
+            profile *= (1 - grammar.taper) + grammar.taper * envelope
+        if grammar.bulge:
+            profile *= 1 + grammar.bulge * envelope
+        width = max(
+            0.015,
+            base_width
+            * profile
+            * (1 + grammar.energy_width * energy * 0.45)
+            * event_width,
+        )
+        nx, ny = normals[index]
+        x, y = position[0] + nx * lateral, position[1] + ny * lateral
+        if index in anchors:
+            x, y, lateral, event = target[0], target[1], 0.0, None
+            position = [target[0], target[1]]
+        samples.append(StrokeSample(t, x, y, width, energy, lateral, event))
+
+    if not closed:
+        # Pin intention endpoints, as the straight-line synthesizer does.
+        samples[0] = StrokeSample(
+            0.0, points[0][0], points[0][1], samples[0].width, samples[0].energy, 0.0
+        )
+        samples[-1] = StrokeSample(
+            1.0,
+            points[-1][0],
+            points[-1][1],
+            samples[-1].width,
+            samples[-1].energy,
+            0.0,
+        )
+    elif not anchors and count > 2:
+        samples = _closed_seam_correction(samples, points, parameters)
+
+    performed = [(sample.x, sample.y) for sample in samples]
+    widths = [sample.width for sample in samples]
+    left, right = _banks_for_centerline(performed, widths, closed)
+    side = -1 if _unit(seed, "burr-side", 0) < 0.5 else 1
+    slow_energy = sum(sample.energy for sample in samples) / len(samples)
+    burr_opacity = 0.15 + 0.12 * (1 - slow_energy) + 0.08 * _unit(seed, "burr-ink", 0)
+    return ContourStrokeResult(
+        tuple(samples),
+        left,
+        right,
+        len(events),
+        side,
+        min(0.35, burr_opacity),
+        closed,
+    )
+
+
+def _closed_seam_correction(
+    samples: list[StrokeSample],
+    points: list[tuple[float, float]],
+    parameters: list[float],
+) -> list[StrokeSample]:
+    """Ramp the accumulated deviation so the loop meets itself at the seam."""
+    span = parameters[-1]
+    if span <= 1e-9:
+        return samples
+    first, last = samples[0], samples[-1]
+    gap_x = (last.x - points[-1][0]) - (first.x - points[0][0])
+    gap_y = (last.y - points[-1][1]) - (first.y - points[0][1])
+    gap_width = last.width - first.width
+    corrected: list[StrokeSample] = []
+    for index, sample in enumerate(samples):
+        factor = parameters[index] / span
+        corrected.append(
+            StrokeSample(
+                sample.t,
+                sample.x - gap_x * factor,
+                sample.y - gap_y * factor,
+                max(0.015, sample.width - gap_width * factor),
+                sample.energy,
+                sample.lateral,
+                sample.event,
+            )
+        )
+    return corrected

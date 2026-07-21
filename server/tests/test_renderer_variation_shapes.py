@@ -6,6 +6,7 @@ circle / ellipse / triangle / square / arc (+polygon) が演奏されること�
 """
 
 import math
+from xml.etree import ElementTree
 
 import pytest
 
@@ -93,9 +94,34 @@ def test_contour_variation_each_dimension(primitive: str, dimensions: list[str])
     assert plain != varied
 
 
+def _intended_geometry(svg: str) -> list[str]:
+    """手描きストローク層を除いた「意図の幾何」要素を取り出す。
+
+    v2.2 (engine 8) で閉図形の輪郭が手描きストローク合成に載った。筆の揺れは
+    演奏 seed に追随し、seed key は Instruction 全体から作られるので、演奏され
+    ない variation フィールドでも筆致は変わる (line が以前からそうであるのと
+    同じ)。ゲートが閉じているとき不変であるべきなのは、揺らぎを適用されない
+    本体要素 = 意図した幾何である。
+    """
+    root = ElementTree.fromstring(svg)
+    result: list[str] = []
+
+    def visit(element: ElementTree.Element, inside_stroke: bool) -> None:
+        stroke_layer = inside_stroke or "contour-stroke-v1" in element.attrib.get(
+            "class", ""
+        )
+        if not stroke_layer and not element.tag.endswith(("svg", "g", "defs")):
+            result.append(ElementTree.tostring(element, encoding="unicode"))
+        for child in element:
+            visit(child, stroke_layer)
+
+    visit(root, False)
+    return result
+
+
 @pytest.mark.parametrize("primitive", sorted(BASES))
-def test_gate_closed_output_unchanged(primitive: str):
-    """quality=none や dims 対象外は演奏せず、既存出力とバイト一致する。"""
+def test_gate_closed_geometry_unchanged(primitive: str):
+    """quality=none や dims 対象外は演奏せず、意図した幾何が変わらない。"""
     base = BASES[primitive]
     plain = _render_with(base, None)
     quality_none = _render_with(
@@ -116,8 +142,8 @@ def test_gate_closed_output_unchanged(primitive: str):
             "dimensions": ["rotation"],
         },
     )
-    assert plain == quality_none
-    assert plain == dims_out_of_scope
+    assert _intended_geometry(plain) == _intended_geometry(quality_none)
+    assert _intended_geometry(plain) == _intended_geometry(dims_out_of_scope)
 
 
 @pytest.mark.parametrize("primitive", sorted(BASES))

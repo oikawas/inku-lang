@@ -1296,6 +1296,8 @@ JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（
 
 v1.99 で揺らぎの演奏対象を線に加えて弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した。発火条件は quality ∈ {perlin, wave, white} かつ dimensions が position_x / position_y / radius のいずれかを含む場合（line と対称、radius は図形の自然軸）。閉図形は継ぎ目が連続する周期ノイズで輪郭を演奏し、多角形系は辺ごとに演奏して角を固定、弧は両端点を完全固定して touching の接点契約を維持する。pink（滲み）と quality=none の経路は不変。この変更で同一 Score + 同一 seed の演奏結果が変わるため、render engine version を 5 へ更新した（過去作品の再演奏は見た目が変わりうるが、保存済み SVG は不変）。
 
+v2.0.5 で wave 品質の揺らぎに演奏 seed 由来の位相を導入した（従来は位相固定の正弦波で、seed を変えても波形が同一だった）。位相は seed から決定的に導出し、整数周波数による閉輪郭の自動閉合・弧の端点固定・多角形の角固定は維持される。あわせて材質輪郭（pencil / crayon / chalk 等の輪郭とspeck）も演奏 seed に追随させた。演奏 seed 未指定時は従来とバイト一致。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 6 へ更新した。
+
 ---
 
 ## 14. 関係（あいだ）の設計

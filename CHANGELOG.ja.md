@@ -2467,3 +2467,12 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **ボタン寸法トークン移行の完了:** `--btn-sm-*` トークンへの変換を全対象に広げた。3 プロパティ完全一致の 12 ブロック / 10 ファイル（`.ghost-btn` 9 件 + `.danger-btn`/`.confirm-btn`/`.ddl-new-btn`）は見た目不変の単純置換。部分一致で保留した 6 ブロックも作者裁定「未変更のものも全て変更して」により統一し、デモパネル・未読語パネル・プロフィール・認証パネル・履歴マネージャ系統メンバー行（9px→11px 拡大）で寸法が変わった（ロックバッジは同値で不変、ピル形状の radius のみ非トークン）。これで `.ghost-btn` 定義全 14 ファイルの移行が完了し、px 直書きの小型ボタンは解消。色・hover・disabled は全ブロックで不変。
 - **検証:** pytest 637 passed / 30 skipped（サーバー無変更の回帰確認）・`npm run check` 0 errors（既存 a11y 警告 2 件）・build 成功（Mac / pentala とも）。マージ後の主 checkout でも同値を再確認。実装中に Build 631〜633 を pentala へ逐次配備し、強度 UI とトークン変換は作者が実画面で確認済み（ツールチップ見切れは Build 632 で修正）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v204-followups-result.md`。
 - **残件:** v1.99 F-4 の作者目視確認と SPEC §17.A の未対応 dimension（作者裁定待ち）は継続。
+
+
+### v2.0.5 — wave 揺らぎの seed 位相・材質輪郭の演奏 seed 追随（F-4 Phase 2、Build 636、2026-07-21）
+
+- **wave 品質の seed 非依存バグを修正:** 作者の F-4 目視確認で「変奏候補・タッチ変更・再演奏で揺れ方が変わらない」ことが発覚。原因は `_sample_offset` / `_sample_offset_periodic` の wave 分岐が位相固定の `sin(t·2πf)·amp` で seed を使っていなかったこと（line 時代からの挙動。perlin/pink/white は seed 依存）。`_wave_phase(seed) = _hash01(...)·2π` を導入し `sin(2π·t·freq + φ(seed))·amp` へ変更した。整数周波数（slow 2 / medium 6 / high 14）による閉輪郭の自動閉合、弧の両端点固定、多角形の角固定（辺ごとに位相独立）は維持。
+- **材質輪郭の演奏 seed 追随（Phase 2）:** `_add_material_{circle,ellipse,rect,arc}_outline` / `_material_line_group` の 5 箇所に `render_seed` をスレッドし `_seed_for_instruction(ins, render_seed)` へ変更。形状パラメータ（offset/width/opacity/dash/speck）の値域・語彙は不変。演奏 seed 未指定時は従来とバイト一致（後方互換）。
+- **render engine version 5 → 6:** 同一 Score + 同一 seed の演奏結果が変わるため。`test_api.py` の期待値 3 箇所を更新（歴史的リテラルと `test_cloudform.py` は不変）。
+- **検証:** pytest 693 passed / 30 skipped（新規 `test_renderer_wave_phase.py` 56 件: 7 primitive の seed 追随・決定性・閉合・端点/角固定・材質輪郭 seed 差・None 後方互換）。新規テストは変更を stash して main の実装で 11 件落ちることを確認済み（退行検知の実証）。SVG 全文比較は display 用 touch filter が常に差を出すため、filter 除去後の比較に修正。Mac/Linux の sin/cos 実装差（末尾桁）による golden 割れは 6 桁丸め正規化で 3 環境一致を確認。PNG 比較成果物は `cli/out2/635-v2.0.5-wave-phase/`（3 Score × seed 111/222/333 + 再演奏 + コンタクトシート）。
+- **作者確認:** UI の変奏 4 案・タッチ変更で揺れ方が変わることを確認済み。ただし「変奏 大でも驚くような量変化ではない」との評価があり、原因は振幅の絶対 px 設計（`AMPLITUDE_PX` fine 7 / medium 12 / broad 30、キャンバス 1000px 比 0.7〜3%）にあるため、**B 案（振幅の図形寸法比例化）を次契約として起票予定**（engine 7 の再 bump を伴う見込み）。

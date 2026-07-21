@@ -280,6 +280,15 @@ contact contract holds. The pink (blur) and quality=none paths are unchanged.
 Because the same Score and seed now render differently for affected works, the
 render engine version was bumped to 5; saved SVGs are untouched.
 
+v2.0.5 gave wave-quality variation a performance-seed-derived phase (it was a
+fixed-phase sine before, so the waveform never changed across seeds). The phase
+is derived deterministically from the seed; closure of closed contours at
+integer frequencies, exact arc endpoints, and fixed polygon corners are all
+preserved. Material outlines (pencil / crayon / chalk contours and specks) now
+also follow the performance seed. With no performance seed the output stays
+byte-identical to the previous behavior. Because the same Score and seed render
+differently, the render engine version was bumped to 6.
+
 For literal `layout="grid"` tiling, performance composes three controlled layers: a deterministic seed-derived within-cell position jitter, the existing per-element `variation` with a distinct phase for every mark, and the existing material behavior of weights such as pencil, brush, and chalk. The same Score and render seed remain bit-identical. Because full-field repetition is explicit author intent, grid bypasses scatter-oriented bias, fade, clustering, preserved-space injection, and representative count reduction.
 
 inku exposes this as the first half of two-step regeneration: **another

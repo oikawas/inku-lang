@@ -2459,3 +2459,11 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **ボタン寸法トークンの導入（作者裁定によるルール化）:** `+page.svelte` の `:root` に `--btn-sm-font-size` / `--btn-sm-padding` / `--btn-sm-radius` を新設し、`InputPanel` の `.ghost-btn` と `LineagePanel` のボタン群を変換した（`.ghost-btn` は約 37 箇所で個別定義されており片方だけ直すとズレる状態だった）。以後、ボタン CSS に触れたコンポーネントは漸進的にトークンへ寄せる規約とし、`docs/inku-dev-conventions.md` §3-2-1 と AGENTS.md に記載。あわせて「コード変更時の pentala rsync + 再起動 + Build 採番は作者承認不要」の常時承認を規約化した（§4-5）。
 - **検証:** pytest 637 passed / 30 skipped（サーバーは 2 行変更のみ、回帰ゼロ）・ruff・`npm run check` 0 errors（既存 a11y 警告 2 件）・build 成功。マージ後の主 checkout でも同値を再確認。pentala へは実装中に Build 614〜629 を逐次配備し、作者が実画面で確認済み。実装レポートは `no-git-sync/fable5/claude_code/tasks/hensou-ui-5th-refine-result.md`。
 - **残件:** AI 自律推敲の変奏は強度中固定で UI から選べない。寸法トークンへの移行は 2 コンポーネントのみ（規約に従い漸進）。
+
+
+### v2.0.4 — 自律推敲の変奏強度選択・ボタン寸法トークン移行の完了（Build 634、2026-07-21）
+
+- **AI 自律推敲の変奏強度選択:** v2.0.3 で中固定だった自律推敲の変奏強度を選択可能にした。推敲要素の変奏チェックが ON のときだけ、直下に段落ちで小・中・大の 3 択を表示（既定 中、調整ダイアログの強度インラインと同型・ツールチップは既存キー再利用）。選んだ強度は実行中の全変奏世代に適用される。既定のまま実行した場合の挙動は v2.0.3 と同一。変更は `AIRefineModal.svelte` のみでサーバー無変更（強度は従来どおり `PaintOptions` 経由で世代ごとに渡る）。強度 3 択のツールチップはモーダル本文のスクロールコンテナに切られるため上向き配置とした。
+- **ボタン寸法トークン移行の完了:** `--btn-sm-*` トークンへの変換を全対象に広げた。3 プロパティ完全一致の 12 ブロック / 10 ファイル（`.ghost-btn` 9 件 + `.danger-btn`/`.confirm-btn`/`.ddl-new-btn`）は見た目不変の単純置換。部分一致で保留した 6 ブロックも作者裁定「未変更のものも全て変更して」により統一し、デモパネル・未読語パネル・プロフィール・認証パネル・履歴マネージャ系統メンバー行（9px→11px 拡大）で寸法が変わった（ロックバッジは同値で不変、ピル形状の radius のみ非トークン）。これで `.ghost-btn` 定義全 14 ファイルの移行が完了し、px 直書きの小型ボタンは解消。色・hover・disabled は全ブロックで不変。
+- **検証:** pytest 637 passed / 30 skipped（サーバー無変更の回帰確認）・`npm run check` 0 errors（既存 a11y 警告 2 件）・build 成功（Mac / pentala とも）。マージ後の主 checkout でも同値を再確認。実装中に Build 631〜633 を pentala へ逐次配備し、強度 UI とトークン変換は作者が実画面で確認済み（ツールチップ見切れは Build 632 で修正）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v204-followups-result.md`。
+- **残件:** v1.99 F-4 の作者目視確認と SPEC §17.A の未対応 dimension（作者裁定待ち）は継続。

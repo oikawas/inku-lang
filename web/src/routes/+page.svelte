@@ -6388,6 +6388,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--danger:       #a2342a;
 		--r:            4px;
 		--r-lg:         8px;
+		/* 小型ボタン (ghost / ツールバー) の寸法。テーマに依らないので light 側にのみ置く。
+		   個々のコンポーネントで px を書かず、必ずこのトークンを参照する。 */
+		--btn-sm-font-size: 11px;
+		--btn-sm-padding:   4px 10px;
+		--btn-sm-radius:    var(--r);
 	}
 
 	:global(html[data-theme='dark']) {

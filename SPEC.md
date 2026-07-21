@@ -289,6 +289,25 @@ also follow the performance seed. With no performance seed the output stays
 byte-identical to the previous behavior. Because the same Score and seed render
 differently, the render engine version was bumped to 6.
 
+v2.1.0 replaced absolute pixel values throughout rendering with proportional
+systems. The amplitude vocabulary (fine / medium / broad) changed meaning from
+absolute pixels on a 1000px canvas (7 / 12 / 30px) to **ratios of a shape's
+representative size** (0.025 / 0.08 / 0.18): radius for circle / polygon / arc,
+geometric mean of the radii for ellipse, half the short side for square /
+triangle / cloudform, and line length for line. Small shapes now wobble finely
+and large shapes broadly. Bleed (pink) stdDeviation was ratioed the same way
+(0.009 / 0.03 / 0.07). Contour segment counts and stroke sample counts changed
+from fixed values (80 / 49) to length-proportional with clamps. The material
+layer (stroke widths, dasharrays, texture filters, material outlines, specks)
+and the display filter became `canvas.unit`-relative, matching previous output
+at `unit=1000` except for perimeter-proportional speck counts and
+length-proportional stroke samples. Author calibration also raised material
+outline and speck strength via floors (intensity level s1: floors on outline
+offset / opacity and speck opacity / count; texture filters unchanged).
+Material outlines now carry `class="material-outline"` so they can be
+mechanically distinguished from primary lines. Because the same Score and seed
+render differently, the render engine version was bumped to 7.
+
 For literal `layout="grid"` tiling, performance composes three controlled layers: a deterministic seed-derived within-cell position jitter, the existing per-element `variation` with a distinct phase for every mark, and the existing material behavior of weights such as pencil, brush, and chalk. The same Score and render seed remain bit-identical. Because full-field repetition is explicit author intent, grid bypasses scatter-oriented bias, fade, clustering, preserved-space injection, and representative count reduction.
 
 inku exposes this as the first half of two-step regeneration: **another

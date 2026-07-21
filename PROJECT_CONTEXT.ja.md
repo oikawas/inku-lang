@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.0.5 / Build 636**
+**対象バージョン: v2.1.0 / Build 638**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -97,7 +97,9 @@ v2.0（Build 611）では Stage 1.5 に「変奏」を実装した（SPEC §12.1
 
 v2.0.1〜v2.0.3（Build 612〜630）では、モデルカタログを実測 3 回合算の v2.1 へ更新し（44 エントリ、時間帯検証は打ち止め）、v2.0 の残件を解消した。`api_history_neighbors` の 500（score 文字列）修正と `loadIterationItem` の変奏フィールド復元（v2.0.2）、変奏 UI の配置（v2.0.3、作者裁定により第 5 の推敲要素へ統合。選択時のみ強度小・中・大を表示し、実行は 1案/4案 に統合、独立セクションは撤去）。あわせて AI 自律推敲の有効要素に変奏を追加（上限 5）、作品カードメニューと各ダイアログの見出し・並びを整理し、候補グリッドのウインドウ内表示と保存の 3 状態化、ボタン寸法トークン（`--btn-sm-*`）の導入と漸進移行規約を定めた。v2.0.4（Build 634）では自律推敲の変奏に強度選択（小・中・大、既定 中、実行中の全変奏世代へ適用）を追加し、小型ボタンの寸法トークン移行を完了した（部分一致 6 ブロックも作者裁定で統一）。
 
-v2.0.5（Build 636）では作者の F-4 目視確認で発覚した wave 揺らぎの seed 非依存バグ（位相固定の正弦波）を修正し、演奏 seed 由来の位相を導入。材質輪郭も演奏 seed に追随させた（F-4 Phase 2）。render engine version は 6。残る課題は振幅の絶対 px 設計（大きい図形ほど揺れが相対的に小さい）で、図形寸法比例化（B 案）を次契約として起票予定。
+v2.0.5（Build 636）では作者の F-4 目視確認で発覚した wave 揺らぎの seed 非依存バグ（位相固定の正弦波）を修正し、演奏 seed 由来の位相を導入。材質輪郭も演奏 seed に追随させた（F-4 Phase 2）。render engine version は 6。
+
+v2.1.0（Build 638）ではレンダリングの px 絶対値を比例系へ全面改修した。揺らぎ振幅と滲みは図形の代表寸法比（fine / medium / broad = 0.025 / 0.08 / 0.18、滲み 0.009 / 0.03 / 0.07）、分割数・標本数は長さ比例、材質層（線幅・dasharray・質感 filter・材質輪郭・speck）と display filter は `canvas.unit` 相対（`unit=1000` でほぼバイト一致、speck 個数は周長比例化）。作者キャリブレーション 2 巡で材質強度 s1（輪郭 offset / opacity・speck opacity / 個数の下限方式、質感 filter は据え置き）を採用。材質輪郭に `class="material-outline"` を付与。render engine version は 7。後続契約として閉図形への手描きストローク適用（`opus-closed-shape-strokes.md`）と PNG ラスタライザの filter 対応（`opus-png-filter-rasterizer.md`、cairosvg は feTurbulence / feDisplacementMap / feGaussianBlur を非描画）が起票済み。
 
 ## 変更時の確認先
 

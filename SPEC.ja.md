@@ -1207,7 +1207,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 
 **記述者はこの構造を直接書かない**。運動語彙・weight・プラグインの組み合わせから、第二段階の構造化層が生成する。
 
-現行実装では、線の揺らぎは Renderer で polyline 化して表現する。1000px キャンバス上の振幅は `fine=7px` / `medium=12px` / `broad=30px` とし、サムネイルでも「細かく揺れる」効果が見えることを優先する。
+現行実装では、線の揺らぎは Renderer で polyline 化して表現する。振幅は図形の代表寸法に対する比率で `fine=0.025` / `medium=0.08` / `broad=0.18` とし（v2.1.0。それ以前は 1000px キャンバス基準の絶対 px 7 / 12 / 30）、図形の大小によらず揺らぎ語彙の知覚が一定になることを優先する。
 
 `quality` の使い分けは以下を基本とする。
 
@@ -1297,6 +1297,8 @@ JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（
 v1.99 で揺らぎの演奏対象を線に加えて弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した。発火条件は quality ∈ {perlin, wave, white} かつ dimensions が position_x / position_y / radius のいずれかを含む場合（line と対称、radius は図形の自然軸）。閉図形は継ぎ目が連続する周期ノイズで輪郭を演奏し、多角形系は辺ごとに演奏して角を固定、弧は両端点を完全固定して touching の接点契約を維持する。pink（滲み）と quality=none の経路は不変。この変更で同一 Score + 同一 seed の演奏結果が変わるため、render engine version を 5 へ更新した（過去作品の再演奏は見た目が変わりうるが、保存済み SVG は不変）。
 
 v2.0.5 で wave 品質の揺らぎに演奏 seed 由来の位相を導入した（従来は位相固定の正弦波で、seed を変えても波形が同一だった）。位相は seed から決定的に導出し、整数周波数による閉輪郭の自動閉合・弧の端点固定・多角形の角固定は維持される。あわせて材質輪郭（pencil / crayon / chalk 等の輪郭とspeck）も演奏 seed に追随させた。演奏 seed 未指定時は従来とバイト一致。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 6 へ更新した。
+
+v2.1.0 でレンダリングの px 絶対値を比例系へ全面改修した。揺らぎ振幅語彙（fine / medium / broad）の意味を 1000px キャンバス基準の絶対 px（7 / 12 / 30px）から**図形の代表寸法に対する比率**（0.025 / 0.08 / 0.18）へ変更した。代表寸法は circle / polygon / arc = 半径、ellipse = 半径の相乗平均、square / triangle / cloudform = 短辺の 1/2、line = 線長。小さな図形は細かく、大きな図形は大きく揺れる。滲み（pink）の stdDeviation も同様に比率化（0.009 / 0.03 / 0.07）。輪郭の分割数とストロークの標本数は固定値（80 / 49）から長さ比例（クランプ付き）へ変更した。材質層（線幅・dasharray・質感 filter・材質輪郭・speck）と display filter は `canvas.unit` 相対化し、`unit=1000` では従来と一致する（speck 個数の周長比例化と stroke 標本数の長さ比例化を除く）。あわせて作者キャリブレーションにより材質輪郭と speck の強度を下限方式で引き上げた（強度段 s1: 輪郭 offset / opacity と speck opacity / 個数に下限を設定、質感 filter は据え置き）。材質輪郭には `class="material-outline"` を付与し、主線と機械的に区別できるようにした。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 7 へ更新した。
 
 ---
 
@@ -1512,9 +1514,9 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 
 | 項目 | 状態 | 備考 |
 |---|---|---|
-| line 揺らぎ | 実装済 (v0.8) | 80 segments polyline、perlin/wave/pink/white |
-| 滲む (pink quality) | 実装済 (v1.8) | SVG `feGaussianBlur` フィルター、`BLUR_STD` dict で amplitude 別 stdDeviation |
-| circle 揺らぎ | 実装済 (v1.99) | 80 分割輪郭 + 周期ノイズ（perlin は格子 wrap、wave は整数周波数で閉合）。継ぎ目連続 |
+| line 揺らぎ | 実装済 (v0.8) | polyline 化。perlin/wave/pink/white。分割数は v2.1.0 で固定 80 → 長さ比例（クランプ 32〜200）|
+| 滲む (pink quality) | 実装済 (v1.8) | SVG `feGaussianBlur` フィルター。stdDeviation は v2.1.0 で `BLUR_RATIO`（代表寸法比 0.009 / 0.03 / 0.07）|
+| circle 揺らぎ | 実装済 (v1.99) | 分割輪郭 + 周期ノイズ（perlin は格子 wrap、wave は整数周波数で閉合）。継ぎ目連続 |
 | ellipse 揺らぎ | 実装済 (v1.99) | circle と同一機構。dims により x / y / 法線方向オフセット |
 | triangle 揺らぎ | 実装済 (v1.99) | 辺ごとに line 揺らぎを適用し角を固定 |
 | square 揺らぎ | 実装済 (v1.99) | 辺ごとに line 揺らぎを適用し角を固定（polygon も同様） |

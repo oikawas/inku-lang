@@ -2449,3 +2449,13 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **履歴ロード時に変奏フィールドを復元:** `loadIterationItem()` の `result` 再構成に `variation_amplitude` / `variation_seed` の 2 行を追加した（保存側は v2.0 で結線済み。読み直すと undefined になっていた）。`focus` の復元は外部入力撤去済みのため行わない（現状維持）。復元値の消費先（変奏再実行への seed 引き継ぎ等）はスコープ外。
 - **検証:** pytest 637 passed / 30 skipped（ベースライン 636 + 新規 1）・ruff・`npm run check` 0 errors。実装レポートは `no-git-sync/fable5/claude_code/tasks/small-bugs-v202-result.md`。
 
+
+
+### v2.0.3 — 変奏を第 5 の推敲要素へ統合・調整ダイアログの手直し（Build 630、2026-07-21）
+
+- **変奏の第 5 推敲要素化（作者裁定）:** v2.0 の既知残件だった変奏セクションの配置を裁定どおり整理した。`RefineKind` に `hensou` を追加し、ラジオは 配置 / 読み取り / 色カタログ / 変奏 / 言葉でタッチ の順（作者指示で「言葉でタッチ」の上へ）。変奏選択時のみ強度（小・中・大、既定 中）をラジオ直下に段落ちで表示し、各強度に `ddl_expander.py` の段階解放に対応するツールチップを付けた。実行は既存の 1案/4案 に統合（1案 = 新規 seed 1 つ、4案 = 4 つ、採番は `POST /api/variation/seeds`）。「変奏を描く」ボタン・独立セクション・関連 i18n/CSS を撤去。統合の副産物として変奏候補でも系譜の親可視化（`ensureVisibleLineageParentId`）が走るようになった。
+- **調整ダイアログ・候補・カードメニューの逐次改良（作者の逐次指示 13 件）:** 速度目安を描画ボタン直下の単独行へ移動。候補の保存ボタンを右寄せし未保存・保存中・保存済みの 3 状態化（保存済みは押下不可）。候補グリッドをウインドウ内に収め（`max-height`、固定 aspect-ratio 廃止）、1案時は全幅 1 列。推敲要素の選択を `localStorage` で記憶（`reading` が非表示になる場合は `touch` へ退避）。未描画時も破線枠プレースホルダで候補エリアを常時表示。作品カードメニューは見出し「作品を編集する」を付けて 描画要素 → 記述 → DDL → モデル → 言語 → AI 自律推敲 の順に再編し、項目名を対象語のみに短縮・行間を詰めた。調整/モデル/言語ダイアログのタイトルを「描画要素を編集」「モデルを編集」「言語を編集」へ統一。ランダム自律推敲では方向性が読み取り世代にだけ反映される条件をヒント表示（挙動は不変）。
+- **AI 自律推敲に変奏を追加:** サーバーの `ALLOWED_KINDS` に `hensou` を追加し有効要素の上限を 4 → 5 に（サーバー変更は 2 ファイル 2 行。契約の「サーバー無変更」は作者指示で解除）。変奏世代は強度を中に固定し、seed はサーバー採番。UI は `PaintOptions` に `variationAmplitude` / `variationSeed` を追加。
+- **ボタン寸法トークンの導入（作者裁定によるルール化）:** `+page.svelte` の `:root` に `--btn-sm-font-size` / `--btn-sm-padding` / `--btn-sm-radius` を新設し、`InputPanel` の `.ghost-btn` と `LineagePanel` のボタン群を変換した（`.ghost-btn` は約 37 箇所で個別定義されており片方だけ直すとズレる状態だった）。以後、ボタン CSS に触れたコンポーネントは漸進的にトークンへ寄せる規約とし、`docs/inku-dev-conventions.md` §3-2-1 と AGENTS.md に記載。あわせて「コード変更時の pentala rsync + 再起動 + Build 採番は作者承認不要」の常時承認を規約化した（§4-5）。
+- **検証:** pytest 637 passed / 30 skipped（サーバーは 2 行変更のみ、回帰ゼロ）・ruff・`npm run check` 0 errors（既存 a11y 警告 2 件）・build 成功。マージ後の主 checkout でも同値を再確認。pentala へは実装中に Build 614〜629 を逐次配備し、作者が実画面で確認済み。実装レポートは `no-git-sync/fable5/claude_code/tasks/hensou-ui-5th-refine-result.md`。
+- **残件:** AI 自律推敲の変奏は強度中固定で UI から選べない。寸法トークンへの移行は 2 コンポーネントのみ（規約に従い漸進）。

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.0.0 / Build 611**
+**Target version: v2.0.3 / Build 630**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -94,6 +94,8 @@ v1.98 (Build 609) moved single drawing to `POST /api/paint/stream` (NDJSON), sho
 v1.99 (Build 610) extended variation performance from lines only to arcs and closed shapes (circle, ellipse, triangle, square, polygon) — F-4. The gate mirrors the line gate (quality in {perlin, wave, white} with position_x/position_y/radius dims). Closed contours use seam-continuous periodic noise, polygonal shapes keep corners fixed, and arcs keep both endpoints fixed to preserve the touching contact contract. Because performances change, the render engine version was bumped to 5 (saved SVGs, Scores, and rh2 untouched). The author's visual confirmation and the Phase 2 material-outline decision remain.
 
 v2.0 (Build 611) implemented Stage 1.5 variation, "hensou" (SPEC §12.13): one explicit operation that shakes the whole expansion layer. Three discrete amplitudes move seven axes (type swap, adopted count, touch material, focus, main/contrast colors, composition family, type family) under weighted staged release, fully reproducible from (amplitude, seed), never inherited along a lineage, and always within the tenkei cap. Four candidates per run (server-issued seeds via `/api/variation/seeds`), each card showing what moved in the official vocabulary, with a real-difference guarantee for every reported axis. The external focus input (`PaintRequest.focus` etc.) and the "vary focus" refinement were retired, returning refinement to four kinds; the layer's resolved focus is wired into render_metadata so `history.focus` keeps recording. History gains `variation_amplitude` / `variation_seed`. Follow-ups: rework of the variation section's UI placement (differs from the author's image), `loadIterationItem` not restoring variation fields, and the pre-existing `api_history_neighbors` bug.
+
+v2.0.1–v2.0.3 (Builds 612–630) updated the model catalog to v2.1 from three combined measured runs (44 entries; the time-of-day question is closed) and resolved the v2.0 follow-ups: the `api_history_neighbors` 500 (raw score string) and variation-field restoration in `loadIterationItem` (v2.0.2), and the variation UI placement (v2.0.3 — ruled into the fifth refinement element, showing small/medium/large only while selected, execution folded into the one/four-candidate buttons, separate section removed). Variation also joined the autonomous-refinement elements (cap 5, medium amplitude fixed), the artwork-card menu and dialog headings were reorganized, the candidate grid now fits the window with three-state save buttons, and button size tokens (`--btn-sm-*`) were introduced with an incremental-migration convention.
 
 ## Where to Look for a Change
 

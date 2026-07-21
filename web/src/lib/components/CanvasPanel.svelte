@@ -679,20 +679,20 @@
 												</span>
 											</Tooltip>
 										</label>
-										<label class="model-choice" class:checked={refineKind === 'touch'}>
-											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
-											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
-												<span class="refine-choice-label">
-													<strong>{t().canvasVaryPerformance}</strong>
-													<span class="refine-info-mark" aria-hidden="true">i</span>
-												</span>
-											</Tooltip>
-										</label>
 										<label class="model-choice" class:checked={refineKind === 'hensou'}>
 											<input type="radio" name="refine-kind" value="hensou" checked={refineKind === 'hensou'} onchange={() => (refineKind = 'hensou')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipHensou}>
 												<span class="refine-choice-label">
 													<strong>{t().hensouTitle}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
+										<label class="model-choice" class:checked={refineKind === 'touch'}>
+											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
+												<span class="refine-choice-label">
+													<strong>{t().canvasVaryPerformance}</strong>
 													<span class="refine-info-mark" aria-hidden="true">i</span>
 												</span>
 											</Tooltip>

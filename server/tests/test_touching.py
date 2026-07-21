@@ -238,7 +238,10 @@ def _svg_arcs(svg: str) -> list[dict[str, object]]:
         match = _ARC_D.fullmatch(path_d)
         stroke_opacity = float(element.attrib.get("stroke-opacity", "1"))
         radius_scale = math.hypot(matrix[0], matrix[1])
-        if match is not None and stroke_opacity >= 0.45:
+        # 材質装飾は主線ではないので数えない。class が正で、opacity は保険
+        # (v2.1 で材質強度が上がり、装飾の opacity だけでは主線と分離できない)。
+        is_material = "material-outline" in element.attrib.get("class", "")
+        if match is not None and not is_material and stroke_opacity >= 0.45:
             start = _transform_point((float(match[1]), float(match[2])), matrix)
             end = _transform_point((float(match[6]), float(match[7])), matrix)
             sweep_degrees = _arc_command_sweep_degrees(

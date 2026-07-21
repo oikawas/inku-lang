@@ -215,45 +215,230 @@ WEIGHT_STYLE: dict[str, dict[str, str | float]] = {
 BACKGROUND = "#ffffff"
 
 # SPEC §13.8: 揺らぎは Renderer 層で生成する (JSON Score は決定的な楽譜)
-AMPLITUDE_PX: dict[str, float] = {"fine": 7.0, "medium": 12.0, "broad": 30.0}
+#
+# 揺らぎ・滲みは「図形の代表寸法に対する比率」で定義する (v2.1)。
+# 絶対 px だと小図形は壊れ大図形は静止して見えるため、運動語彙 (fine/medium/
+# broad) が図形に対する相対量として意味を持つようにする。
+# 比率は v2.1 キャリブレーション (Build 637) で作者が候補 P3 を選択した値。
+AMPLITUDE_RATIO: dict[str, float] = {"fine": 0.025, "medium": 0.08, "broad": 0.18}
 FREQUENCY_CYCLES: dict[str, float] = {"slow": 2.0, "medium": 6.0, "high": 14.0}
-SEGMENT_COUNT = 80  # polyline の分割数
 
-# 滲む (quality=pink): SVG feGaussianBlur の stdDeviation
-BLUR_STD: dict[str, float] = {"fine": 2.0, "medium": 6.0, "broad": 15.0}
-TEXTURE_FILTERS: dict[str, str] = {
-    "pencil": (
-        '<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%">'
-        '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" result="noise"/>'
-        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/>'
-        "</filter>"
-    ),
-    "crayon": (
-        '<filter id="texture-crayon" x="-18%" y="-18%" width="136%" height="136%">'
-        '<feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="17" result="noise"/>'
-        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8"/>'
-        "</filter>"
-    ),
-    "chalk": (
-        '<filter id="texture-chalk" x="-25%" y="-25%" width="150%" height="150%">'
-        '<feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="23" result="noise"/>'
-        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2"/>'
-        '<feGaussianBlur stdDeviation="0.9"/>'
-        "</filter>"
-    ),
-    "brush_thick": (
-        '<filter id="texture-brush_thick" x="-20%" y="-20%" width="140%" height="140%">'
-        '<feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="2" seed="31" result="noise"/>'
-        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4"/>'
-        '<feGaussianBlur stdDeviation="0.6"/>'
-        "</filter>"
-    ),
-    "drypoint": (
-        '<filter id="texture-drypoint" x="-35%" y="-35%" width="170%" height="170%">'
-        '<feGaussianBlur stdDeviation="1.8"/>'
-        "</filter>"
-    ),
+# 滲む (quality=pink): feGaussianBlur の stdDeviation も代表寸法比
+BLUR_RATIO: dict[str, float] = {"fine": 0.009, "medium": 0.03, "broad": 0.07}
+BLUR_MIN_RATIO = 0.0005  # canvas.unit 比の下限 (点に近い図形で滲みが消えない)
+
+# 代表寸法が点に近い図形での暴走を防ぐ下限 (canvas.unit 比) と、
+# 輪郭の自己交差・反転を防ぐ上限 (代表寸法比)。
+REPRESENTATIVE_MIN_RATIO = 0.02
+AMPLITUDE_CLAMP_RATIO = 0.40
+
+# キャリブレーション用の primitive 別ゲイン。既定 1.0。
+# line は代表寸法が線長のため、必要ならここだけで抑えられる。
+PRIMITIVE_AMP_GAIN: dict[str, float] = {}
+
+# 分割数は輪郭・線の長さに比例させ、セグメント長をほぼ一定に保つ。
+SEGMENT_TARGET_RATIO = 0.01  # 目標セグメント長 = canvas.unit の 1%
+SEGMENT_COUNT_MIN = 32
+SEGMENT_COUNT_MAX = 200
+STROKE_SAMPLE_TARGET_RATIO = 1.0 / 49.0  # 長さ = canvas.unit で現行の 49 本
+STROKE_SAMPLE_MIN = 17
+STROKE_SAMPLE_MAX = 129
+
+# 材質層の強度候補。相対化の起点 (m0) は v2.0.5 相当。
+# 採用段は MATERIAL_INTENSITY_LEVEL で選ぶ。
+MATERIAL_INTENSITY: dict[str, dict[str, float]] = {
+    "m0": {
+        "texture_displacement": 1.0,
+        "texture_blur": 1.0,
+        "outline_offset": 1.0,
+        "outline_opacity": 1.0,
+        "speck_count": 1.0,
+        "speck_spread": 1.0,
+        "speck_opacity": 1.0,
+    },
+    "m1": {
+        "texture_displacement": 1.8,
+        "texture_blur": 1.3,
+        "outline_offset": 1.8,
+        "outline_opacity": 1.4,
+        "speck_count": 1.5,
+        "speck_spread": 1.4,
+        "speck_opacity": 1.3,
+    },
+    "m2": {
+        "texture_displacement": 2.8,
+        "texture_blur": 1.6,
+        "outline_offset": 2.8,
+        "outline_opacity": 1.8,
+        "speck_count": 2.2,
+        "speck_spread": 1.8,
+        "speck_opacity": 1.6,
+    },
+    # s1 / s2 は m2 の質感 filter を据え置いたまま、材質輪郭と speck だけを
+    # 強める段。倍率ではなく下限 (floor) で上げるのは、弱い weight (pencil・
+    # crayon) だけを引き上げ、既に読める weight (brush_thin/thick) の輪郭が
+    # 二重線に崩れるのを避けるため。
+    "s1": {
+        "texture_displacement": 2.8,
+        "texture_blur": 1.6,
+        "outline_offset": 2.8,
+        "outline_opacity": 1.8,
+        "speck_count": 2.6,
+        "speck_spread": 1.8,
+        "speck_opacity": 1.6,
+        "outline_offset_floor_ratio": 0.0035,
+        "outline_opacity_floor": 0.50,
+        "speck_opacity_floor": 0.40,
+    },
+    "s2": {
+        "texture_displacement": 2.8,
+        "texture_blur": 1.6,
+        "outline_offset": 2.8,
+        "outline_opacity": 1.8,
+        "speck_count": 3.0,
+        "speck_spread": 2.0,
+        "speck_opacity": 1.6,
+        "outline_offset_floor_ratio": 0.0050,
+        "outline_opacity_floor": 0.62,
+        "speck_opacity_floor": 0.50,
+    },
 }
+# v2.1 キャリブレーション (Build 637) の 2 巡目で作者が s1 を選択。
+# 1 巡目で m2 を選んだうえで「crayon・chalk は判別できるが弱い」との所感があり、
+# 質感 filter を m2 に据え置いたまま材質輪郭と speck を下限で上げた段が s1。
+MATERIAL_INTENSITY_LEVEL = "s1"
+
+# speck 個数の周長比例化。基準は radius 0.2 の円の周長 (canvas.unit 比)。
+SPECK_ANCHOR_PERIMETER_RATIO = 2 * math.pi * 0.2
+SPECK_COUNT_MIN = 10
+SPECK_COUNT_MAX_GAIN = 4  # 基準個数に対する上限倍率
+
+# 質感 filter の定義。px 量は canvas.unit 相対で生成する
+# (baseFrequency は 1/px 単位なので unit に反比例)。
+TEXTURE_SPECS: dict[str, dict[str, float | int]] = {
+    "pencil": {
+        "margin": 12,
+        "base_frequency": 0.9,
+        "octaves": 2,
+        "seed": 11,
+        "displacement": 0.7,
+    },
+    "crayon": {
+        "margin": 18,
+        "base_frequency": 0.55,
+        "octaves": 3,
+        "seed": 17,
+        "displacement": 1.8,
+    },
+    "chalk": {
+        "margin": 25,
+        "base_frequency": 0.75,
+        "octaves": 3,
+        "seed": 23,
+        "displacement": 2.2,
+        "blur": 0.9,
+    },
+    "brush_thick": {
+        "margin": 20,
+        "base_frequency": 0.2,
+        "octaves": 2,
+        "seed": 31,
+        "displacement": 1.4,
+        "blur": 0.6,
+    },
+    "drypoint": {"margin": 35, "blur": 1.8},
+}
+TEXTURE_FILTER_WEIGHTS = frozenset(TEXTURE_SPECS)
+
+
+def _material_gain(key: str) -> float:
+    """材質強度候補の係数を返す。floor 系の既定は 0 (下限なし)。"""
+    return MATERIAL_INTENSITY[MATERIAL_INTENSITY_LEVEL].get(key, 0.0)
+
+
+def _outline_offset_px(offset: float, canvas: CanvasSize) -> float:
+    """材質輪郭の法線オフセット。符号を保ったまま下限を課す。"""
+    floor = _material_gain("outline_offset_floor_ratio") * canvas.unit
+    if floor <= 0 or abs(offset) >= floor:
+        return offset
+    return math.copysign(floor, offset)
+
+
+def _outline_opacity(opacity: float) -> float:
+    """材質輪郭の opacity。下限を課したうえで 1.0 に丸める。"""
+    return min(1.0, max(opacity, _material_gain("outline_opacity_floor")))
+
+
+def _unit_scale(canvas: CanvasSize) -> float:
+    """px 定数を canvas.unit 相対へ写す係数。unit=1000 で厳密に 1.0。"""
+    return canvas.unit / CANVAS_PX
+
+
+def _stroke_width_px(weight: str, canvas: CanvasSize) -> float:
+    """weight の線幅 (px)。canvas.unit 相対 (unit=1000 で表の値そのもの)。"""
+    return WEIGHT_TO_STROKE_WIDTH[weight] * _unit_scale(canvas)
+
+
+def _speck_count(base: int, path_len_px: float, canvas: CanvasSize) -> int:
+    """speck の個数を輪郭長 (線なら線長) に比例させる。
+
+    基準は radius 0.2 の円の周長で、そこで表の個数 (18/28/36) に一致する。
+    """
+    ratio = (path_len_px / canvas.unit) / SPECK_ANCHOR_PERIMETER_RATIO
+    count = int(round(base * ratio * _material_gain("speck_count")))
+    return max(SPECK_COUNT_MIN, min(base * SPECK_COUNT_MAX_GAIN, count))
+
+
+def _speck_opacity(opacity: float) -> float:
+    return min(
+        1.0,
+        max(
+            opacity * _material_gain("speck_opacity"),
+            _material_gain("speck_opacity_floor"),
+        ),
+    )
+
+
+def _fmt_num(value: float) -> str:
+    """SVG 属性用の数値整形。unit=1000 では元の px リテラルを再現する。"""
+    return f"{value:g}"
+
+
+def _scale_dash(spec: str | None, scale: float) -> str | None:
+    """dasharray の各値を canvas.unit 相対へ写す。scale=1.0 で文字列同一。"""
+    if spec is None:
+        return None
+    return ",".join(_fmt_num(float(part) * scale) for part in spec.split(","))
+
+
+def _texture_filter_xml(weight: str, canvas: CanvasSize) -> str:
+    """質感 filter の定義 XML を canvas.unit 相対で生成する。"""
+    spec = TEXTURE_SPECS[weight]
+    scale = _unit_scale(canvas)
+    margin = spec["margin"]
+    parts = [
+        f'<filter id="texture-{weight}" x="-{margin}%" y="-{margin}%" '
+        f'width="{100 + 2 * margin}%" height="{100 + 2 * margin}%">'
+    ]
+    if "base_frequency" in spec:
+        # baseFrequency は 1/px なので unit に反比例させる
+        frequency = float(spec["base_frequency"]) / scale
+        parts.append(
+            f'<feTurbulence type="fractalNoise" baseFrequency="{_fmt_num(frequency)}" '
+            f'numOctaves="{spec["octaves"]}" seed="{spec["seed"]}" result="noise"/>'
+        )
+        displacement = (
+            float(spec["displacement"]) * scale * _material_gain("texture_displacement")
+        )
+        parts.append(
+            f'<feDisplacementMap in="SourceGraphic" in2="noise" '
+            f'scale="{_fmt_num(displacement)}"/>'
+        )
+    if "blur" in spec:
+        blur = float(spec["blur"]) * scale * _material_gain("texture_blur")
+        parts.append(f'<feGaussianBlur stdDeviation="{_fmt_num(blur)}"/>')
+    parts.append("</filter>")
+    return "".join(parts)
 
 
 def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None) -> int:
@@ -281,12 +466,19 @@ def new_render_seed() -> int:
     return secrets.randbits(53)
 
 
-def _performance_touch_filter(render_seed: int) -> tuple[str, str]:
-    """固定図形にも seed ごとの微細な輪郭差を与える display 用 filter。"""
+def _performance_touch_filter(render_seed: int, canvas: CanvasSize) -> tuple[str, str]:
+    """固定図形にも seed ごとの微細な輪郭差を与える display 用 filter。
+
+    baseFrequency は 1/px 単位なので canvas.unit に反比例、変位量は比例させる。
+    unit=1000 では現行の値と一致する。
+    """
     seed = int(render_seed)
+    unit_scale = _unit_scale(canvas)
     filter_id = _safe_svg_id(f"performance_touch_{seed % 100000}")
-    frequency = 0.012 + _hash01(0, seed, "performance-touch-frequency") * 0.008
-    scale = 1.6 + _hash01(1, seed, "performance-touch-scale") * 1.4
+    frequency = (
+        0.012 + _hash01(0, seed, "performance-touch-frequency") * 0.008
+    ) / unit_scale
+    scale = (1.6 + _hash01(1, seed, "performance-touch-scale") * 1.4) * unit_scale
     xml = (
         f'<filter id="{filter_id}" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">'
         f'<feTurbulence type="fractalNoise" baseFrequency="{frequency:.5f}" numOctaves="2" '
@@ -351,8 +543,84 @@ def _wave_phase(seed: int) -> float:
     return _hash01(0, seed, "wave-phase") * 2 * math.pi
 
 
-def _sample_offset(t: float, variation: Variation, seed: int, segment: int) -> float:
-    amp = AMPLITUDE_PX[variation.amplitude]
+def _ellipse_perimeter(rx: float, ry: float) -> float:
+    """楕円の周長 (Ramanujan の第二近似)。"""
+    a, b = abs(rx), abs(ry)
+    if a + b <= 0:
+        return 0.0
+    h = ((a - b) / (a + b)) ** 2
+    return math.pi * (a + b) * (1 + 3 * h / (10 + math.sqrt(4 - 3 * h)))
+
+
+def _representative_size_px(ins: Instruction, canvas: CanvasSize) -> float:
+    """揺らぎ振幅の基準となる図形の代表寸法 (px)。
+
+    circle は半径、ellipse は半径の相乗平均、square/triangle は短辺の 1/2、
+    polygon は外接半径、line は線長、arc は半径 (弦長ではない。touching の
+    接点契約と整合させるため)。
+    """
+    p = ins.primitive
+    if p in ("circle", "polygon", "arc") and ins.radius is not None:
+        return ins.radius * canvas.unit
+    if p == "ellipse" and ins.size is not None:
+        rx = ins.size[0] * canvas.width / 2
+        ry = ins.size[1] * canvas.height / 2
+        return math.sqrt(max(0.0, rx * ry))
+    if p in ("square", "triangle", "cloudform") and ins.size is not None:
+        w = ins.size[0] * canvas.width
+        h = ins.size[1] * canvas.height
+        return min(w, h) / 2
+    if p == "line":
+        start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0), canvas)
+        end = _px(ins.to if ins.to is not None else (0.5, 1.0), canvas)
+        return math.hypot(end[0] - start[0], end[1] - start[1])
+    return canvas.unit * REPRESENTATIVE_MIN_RATIO
+
+
+def _clamped_representative_px(ins: Instruction, canvas: CanvasSize) -> float:
+    return max(
+        _representative_size_px(ins, canvas), canvas.unit * REPRESENTATIVE_MIN_RATIO
+    )
+
+
+def _amplitude_px(variation: Variation, ins: Instruction, canvas: CanvasSize) -> float:
+    """揺らぎ振幅 (px) を図形の代表寸法から決める。"""
+    rep = _clamped_representative_px(ins, canvas)
+    ratio = AMPLITUDE_RATIO[variation.amplitude] * PRIMITIVE_AMP_GAIN.get(
+        ins.primitive, 1.0
+    )
+    return min(ratio * rep, AMPLITUDE_CLAMP_RATIO * rep)
+
+
+def _blur_std_px(variation: Variation, ins: Instruction, canvas: CanvasSize) -> float:
+    """滲み (quality=pink) の stdDeviation (px)。"""
+    rep = _clamped_representative_px(ins, canvas)
+    return max(canvas.unit * BLUR_MIN_RATIO, BLUR_RATIO[variation.amplitude] * rep)
+
+
+def _segment_count(path_len_px: float, canvas: CanvasSize) -> int:
+    """輪郭・線の長さに比例した分割数 (セグメント長をほぼ一定に保つ)。"""
+    target = canvas.unit * SEGMENT_TARGET_RATIO
+    if target <= 0:
+        return SEGMENT_COUNT_MIN
+    return max(
+        SEGMENT_COUNT_MIN, min(SEGMENT_COUNT_MAX, int(round(path_len_px / target)))
+    )
+
+
+def _stroke_sample_count(length_px: float, canvas: CanvasSize) -> int:
+    """手描きストロークの分割数。長さ = canvas.unit で現行の 49 本。"""
+    target = canvas.unit * STROKE_SAMPLE_TARGET_RATIO
+    if target <= 0:
+        return STROKE_SAMPLE_MIN
+    return max(
+        STROKE_SAMPLE_MIN, min(STROKE_SAMPLE_MAX, int(round(length_px / target)))
+    )
+
+
+def _sample_offset(
+    t: float, variation: Variation, seed: int, segment: int, amp: float
+) -> float:
     freq = FREQUENCY_CYCLES[variation.frequency]
     q = variation.quality
 
@@ -376,6 +644,8 @@ def _line_with_variation(
     end_px: tuple[float, float],
     variation: Variation,
     seed: int,
+    amp: float,
+    canvas: CanvasSize,
 ) -> list[tuple[float, float]]:
     """直線の polyline に揺らぎを適用した頂点列を返す。
 
@@ -398,12 +668,13 @@ def _line_with_variation(
     axis_x = "position_x" in dims
     axis_y = "position_y" in dims
 
+    segments = _segment_count(length, canvas)
     pts: list[tuple[float, float]] = [start_px]
-    for i in range(1, SEGMENT_COUNT):
-        t = i / SEGMENT_COUNT
+    for i in range(1, segments):
+        t = i / segments
         x = start_px[0] + t * dx
         y = start_px[1] + t * dy
-        off = _sample_offset(t, variation, seed, i)
+        off = _sample_offset(t, variation, seed, i, amp)
 
         if axis_x and not axis_y:
             x += off
@@ -429,7 +700,7 @@ def _periodic_value_noise_1d(x: float, seed: int, period: int) -> float:
 
 
 def _sample_offset_periodic(
-    t: float, variation: Variation, seed: int, segment: int
+    t: float, variation: Variation, seed: int, segment: int, amp: float
 ) -> float:
     """閉輪郭用の offset サンプル。t∈[0,1) を一周として周期連続にする。
 
@@ -437,7 +708,6 @@ def _sample_offset_periodic(
     足しても周期は変わらないので閉合は保たれる。perlin は格子を周期化する。
     white は頂点毎の独立雑音なので継ぎ目の概念を持たない。
     """
-    amp = AMPLITUDE_PX[variation.amplitude]
     freq = FREQUENCY_CYCLES[variation.frequency]
     q = variation.quality
     if q == "wave":
@@ -479,6 +749,7 @@ def _closed_contour_with_variation(
     center: tuple[float, float],
     variation: Variation,
     seed: int,
+    amp: float,
 ) -> list[tuple[float, float]]:
     """閉じた輪郭の頂点列に周期揺らぎを適用する (circle / ellipse 用)。"""
     dims = set(variation.dimensions)
@@ -487,7 +758,7 @@ def _closed_contour_with_variation(
     n = len(points)
     result: list[tuple[float, float]] = []
     for i, (x, y) in enumerate(points):
-        off = _sample_offset_periodic(i / n, variation, seed, i)
+        off = _sample_offset_periodic(i / n, variation, seed, i, amp)
         result.append(_offset_contour_point(x, y, off, center, axis_x, axis_y))
     return result
 
@@ -496,14 +767,22 @@ def _edge_contour_with_variation(
     corners: list[tuple[float, float]],
     variation: Variation,
     seed: int,
+    amp: float,
+    canvas: CanvasSize,
 ) -> list[tuple[float, float]]:
-    """多角形の各辺に line と同じ揺らぎを適用し、角を固定した閉輪郭を返す。"""
+    """多角形の各辺に line と同じ揺らぎを適用し、角を固定した閉輪郭を返す。
+
+    振幅は辺ごとの長さではなく図形の代表寸法から決めた amp を共有する
+    (横長の矩形で揺らぎが異方性を持たないようにするため)。分割数は辺長比例。
+    """
     result: list[tuple[float, float]] = []
     n = len(corners)
     for i in range(n):
         start = corners[i]
         end = corners[(i + 1) % n]
-        edge = _line_with_variation(start, end, variation, seed + (i + 1) * 7919)
+        edge = _line_with_variation(
+            start, end, variation, seed + (i + 1) * 7919, amp, canvas
+        )
         result.extend(edge[:-1])
     return result
 
@@ -516,9 +795,14 @@ def _arc_points_with_variation(
     end_deg: float,
     variation: Variation,
     seed: int,
+    amp: float,
+    canvas: CanvasSize,
 ) -> list[tuple[float, float]]:
     """弧を分割し揺らぎを注入する。両端点は固定 (touching 接点契約の維持)。"""
-    base = _arc_points(cx, cy, r, start_deg, end_deg, SEGMENT_COUNT + 1)
+    arc_len = r * abs(math.radians(end_deg) - math.radians(start_deg))
+    base = _arc_points(
+        cx, cy, r, start_deg, end_deg, _segment_count(arc_len, canvas) + 1
+    )
     dims = set(variation.dimensions)
     axis_x = "position_x" in dims
     axis_y = "position_y" in dims
@@ -526,7 +810,7 @@ def _arc_points_with_variation(
     result: list[tuple[float, float]] = [base[0]]
     for i in range(1, last):
         x, y = base[i]
-        off = _sample_offset(i / last, variation, seed, i)
+        off = _sample_offset(i / last, variation, seed, i, amp)
         result.append(_offset_contour_point(x, y, off, (cx, cy), axis_x, axis_y))
     result.append(base[last])
     return result
@@ -1427,12 +1711,16 @@ def _inject_blur_filters(
     blur_needed: dict[str, float],
     blur_elems: list[tuple[str, str]],
 ) -> str:
-    """feGaussianBlur フィルター定義を defs に注入し、対象要素に filter 属性を付与する。"""
+    """feGaussianBlur フィルター定義を defs に注入し、対象要素に filter 属性を付与する。
+
+    blur_needed の key は filter id (振幅名 + std 値)。滲みは図形寸法比なので
+    同じ振幅語でも図形ごとに std が変わる。
+    """
     filter_xml = "".join(
-        f'<filter id="blur-{amp}" x="-30%" y="-30%" width="160%" height="160%">'
+        f'<filter id="{filter_id}" x="-30%" y="-30%" width="160%" height="160%">'
         f'<feGaussianBlur in="SourceGraphic" stdDeviation="{std:.1f}"/>'
         f"</filter>"
-        for amp, std in sorted(blur_needed.items())
+        for filter_id, std in sorted(blur_needed.items())
     )
     # svgwrite は "<defs />" を出力する (スペースあり)
     if "<defs />" in svg:
@@ -1442,7 +1730,7 @@ def _inject_blur_filters(
     else:
         svg = svg.replace("<defs>", f"<defs>{filter_xml}", 1)
 
-    for eid, amp in blur_elems:
+    for eid, filter_id in blur_elems:
         id_start = svg.find(f'id="{eid}"')
         if id_start < 0:
             continue
@@ -1452,14 +1740,20 @@ def _inject_blur_filters(
             continue
         if ' filter="' in svg[tag_start:tag_end]:
             continue
-        svg = svg.replace(f'id="{eid}"', f'id="{eid}" filter="url(#blur-{amp})"', 1)
+        svg = svg.replace(
+            f'id="{eid}"', f'id="{eid}" filter="url(#{filter_id})"', 1
+        )
     return svg
 
 
-def _inject_texture_filters(svg: str, filters: set[str]) -> str:
+def _inject_texture_filters(
+    svg: str, filters: set[str], canvas: CanvasSize
+) -> str:
     if not filters:
         return svg
-    filter_xml = "".join(TEXTURE_FILTERS[weight] for weight in sorted(filters))
+    filter_xml = "".join(
+        _texture_filter_xml(weight, canvas) for weight in sorted(filters)
+    )
     if "<defs />" in svg:
         return svg.replace("<defs />", f"<defs>{filter_xml}</defs>", 1)
     if "<defs/>" in svg:
@@ -2036,7 +2330,7 @@ def render(
 
     if use_filters and render_seed is not None:
         performance_filter_id, performance_filter_xml = _performance_touch_filter(
-            render_seed
+            render_seed, canvas
         )
         content["filter"] = f"url(#{performance_filter_id})"
 
@@ -2072,10 +2366,13 @@ def render(
                 elif _needs_blur(single.variation):
                     v = single.variation
                     assert v is not None
-                    blur_needed[v.amplitude] = BLUR_STD[v.amplitude]
+                    # 滲みは図形寸法比なので、filter は振幅名ではなく値で識別する
+                    std = _blur_std_px(v, single, canvas)
+                    filter_id = f"blur-{v.amplitude}-{int(round(std * 10))}"
+                    blur_needed[filter_id] = std
                     eid = f"e{elem_idx}"
                     element["id"] = eid
-                    blur_elems.append((eid, v.amplitude))
+                    blur_elems.append((eid, filter_id))
                 instruction_group.add(element)
             surface_group, surface_filter = _render_surface_texture(
                 dwg,
@@ -2132,7 +2429,7 @@ def render(
             svg = svg.replace("<defs/>", f"<defs>{extra_filter_xml}</defs>", 1)
         else:
             svg = svg.replace("<defs>", f"<defs>{extra_filter_xml}", 1)
-    svg = _inject_texture_filters(svg, texture_filters)
+    svg = _inject_texture_filters(svg, texture_filters, canvas)
     if blur_elems:
         svg = _inject_blur_filters(svg, blur_needed, blur_elems)
     if structured:
@@ -2148,7 +2445,7 @@ _CLOSED_SHAPES = frozenset(
 def _texture_filter_weights(score: Score) -> set[str]:
     weights: set[str] = set()
     for ins in score.instructions:
-        if ins.weight in TEXTURE_FILTERS:
+        if ins.weight in TEXTURE_FILTER_WEIGHTS:
             weights.add(ins.weight)
     return weights
 
@@ -2430,7 +2727,11 @@ def _resolve_color(color: str, color_hint: str | None, cmap: dict[str, str]) -> 
 
 
 def _stroke_attrs(
-    ins: Instruction, cmap: dict[str, str], *, use_filters: bool = True
+    ins: Instruction,
+    cmap: dict[str, str],
+    canvas: CanvasSize,
+    *,
+    use_filters: bool = True,
 ) -> dict:
     do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled
     color = _resolve_color(ins.color, ins.color_hint, cmap)
@@ -2438,13 +2739,13 @@ def _stroke_attrs(
     hint = _norm_label(ins.color_hint or "")
     attrs = {
         "stroke": color,
-        "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight],
+        "stroke_width": _stroke_width_px(ins.weight, canvas),
         "fill": color if do_fill else "none",
         "stroke_linecap": weight_style.get("stroke_linecap", "round"),
     }
     if "stroke_opacity" in weight_style:
         attrs["stroke_opacity"] = weight_style["stroke_opacity"]
-    if use_filters and ins.weight in TEXTURE_FILTERS and ins.weight != "drypoint":
+    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
         attrs["filter"] = f"url(#texture-{ins.weight})"
     if any(
         token in hint
@@ -2491,8 +2792,9 @@ def _stroke_attrs(
             attrs["fill_opacity"] = 0.22
     if any(token in hint for token in ("reflection", "反射", "映り")):
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.52)
-    dash = STYLE_TO_DASH[ins.style]
-    texture_dash = weight_style.get("stroke_dasharray")
+    scale = _unit_scale(canvas)
+    dash = _scale_dash(STYLE_TO_DASH[ins.style], scale)
+    texture_dash = _scale_dash(weight_style.get("stroke_dasharray"), scale)
     if dash:
         attrs["stroke_dasharray"] = dash
     elif texture_dash:
@@ -2539,6 +2841,7 @@ def _add_powder_specks(
     end: tuple[float, float],
     attrs: dict,
     seed: int,
+    canvas: CanvasSize,
     *,
     count: int,
     spread: float,
@@ -2546,6 +2849,7 @@ def _add_powder_specks(
     opacity: float,
 ) -> None:
     color = attrs.get("stroke", "#111111")
+    min_radius = 0.35 * _unit_scale(canvas)
     for idx in range(count):
         t = (idx + 0.5) / count
         px, py = _point_on_line(start, end, t)
@@ -2556,7 +2860,8 @@ def _add_powder_specks(
             dwg.circle(
                 center=(px + ox + ux * along, py + oy + uy * along),
                 r=max(
-                    0.35, radius * (0.75 + abs(_hash_to_unit(idx + 202, seed)) * 0.7)
+                    min_radius,
+                    radius * (0.75 + abs(_hash_to_unit(idx + 202, seed)) * 0.7),
                 ),
                 fill=color,
                 stroke="none",
@@ -2571,12 +2876,14 @@ def _add_specks_at_points(
     points: list[tuple[float, float]],
     attrs: dict,
     seed: int,
+    canvas: CanvasSize,
     *,
     spread: float,
     radius: float,
     opacity: float,
 ) -> None:
     color = attrs.get("stroke", "#111111")
+    min_radius = 0.35 * _unit_scale(canvas)
     for idx, (px, py) in enumerate(points):
         ox = _hash_to_unit(idx, seed) * spread
         oy = _hash_to_unit(idx + 157, seed) * spread
@@ -2584,7 +2891,8 @@ def _add_specks_at_points(
             dwg.circle(
                 center=(px + ox, py + oy),
                 r=max(
-                    0.35, radius * (0.75 + abs(_hash_to_unit(idx + 263, seed)) * 0.7)
+                    min_radius,
+                    radius * (0.75 + abs(_hash_to_unit(idx + 263, seed)) * 0.7),
                 ),
                 fill=color,
                 stroke="none",
@@ -2660,49 +2968,79 @@ def _outline_attrs(
     result["fill"] = "none"
     result["stroke_width"] = stroke_width
     result["stroke_opacity"] = opacity
+    # 材質装飾であることを明示する。読み手 (弧抽出・ラスタライザ等) が主線と
+    # 装飾を区別するのに opacity の大小へ頼らずに済ませるため。
+    result["class"] = "material-outline"
     if dash is not None:
         result["stroke_dasharray"] = dash
     return result
 
 
+_MATERIAL_OUTLINE_SPECS: dict[str, list[tuple[float, float, float, float, str]]] = {
+    # (offset_px, 絶対幅_px, base_width 係数, opacity, dasharray)
+    "pencil": [(-1.0, 0.45, 0.0, 0.24, "1,7"), (1.2, 0.5, 0.0, 0.20, "1,5")],
+    "chalk": [(-3.2, 1.2, 0.0, 0.30, "8,12,1,8"), (3.6, 1.0, 0.0, 0.24, "5,10,1,6")],
+    "brush_thin": [(-1.6, 1.0, 0.0, 0.32, "22,9"), (1.8, 1.4, 0.0, 0.28, "14,8")],
+    "brush_thick": [
+        (-4.0, 0.0, 0.28, 0.36, "18,7,3,11"),
+        (3.2, 0.0, 0.22, 0.28, "11,9"),
+    ],
+    "crayon": [
+        (-3.4, 0.0, 0.24, 0.24, "2,5,9,7"),
+        (-1.5, 0.0, 0.20, 0.20, "4,8"),
+        (2.4, 0.0, 0.22, 0.22, "2,5,9,7"),
+    ],
+}
+
+# (基準個数, spread_px, radius_px, opacity)。個数は周長比例の基準値。
+_SPECK_SPECS: dict[str, tuple[int, float, float, float]] = {
+    "pencil": (18, 1.8, 0.45, 0.20),
+    "crayon": (28, 4.0, 0.75, 0.18),
+    "chalk": (36, 5.5, 0.9, 0.26),
+}
+
+
 def _material_outline_profile(
-    weight: str, base_width: float
+    weight: str, canvas: CanvasSize
 ) -> list[tuple[float, float, float, str | None]]:
-    if weight == "pencil":
-        return [(-1.0, 0.45, 0.24, "1,7"), (1.2, 0.5, 0.20, "1,5")]
-    if weight == "chalk":
-        return [(-3.2, 1.2, 0.30, "8,12,1,8"), (3.6, 1.0, 0.24, "5,10,1,6")]
-    if weight == "brush_thin":
-        return [(-1.6, 1.0, 0.32, "22,9"), (1.8, 1.4, 0.28, "14,8")]
-    if weight == "brush_thick":
-        return [
-            (-4.0, base_width * 0.28, 0.36, "18,7,3,11"),
-            (3.2, base_width * 0.22, 0.28, "11,9"),
-        ]
-    if weight == "crayon":
-        return [
-            (-3.4, base_width * 0.24, 0.24, "2,5,9,7"),
-            (-1.5, base_width * 0.20, 0.20, "4,8"),
-            (2.4, base_width * 0.22, 0.22, "2,5,9,7"),
-        ]
-    return []
+    """材質輪郭の (offset, 線幅, opacity, dasharray)。すべて canvas.unit 相対。"""
+    spec = _MATERIAL_OUTLINE_SPECS.get(weight)
+    if not spec:
+        return []
+    scale = _unit_scale(canvas)
+    base_width = _stroke_width_px(weight, canvas)
+    offset_gain = _material_gain("outline_offset")
+    opacity_gain = _material_gain("outline_opacity")
+    return [
+        (
+            _outline_offset_px(offset * scale * offset_gain, canvas),
+            abs_width * scale + base_width * width_ratio,
+            _outline_opacity(opacity * opacity_gain),
+            _scale_dash(dash, scale),
+        )
+        for offset, abs_width, width_ratio, opacity, dash in spec
+    ]
 
 
-def _speck_profile(weight: str) -> tuple[int, float, float, float] | None:
-    if weight == "pencil":
-        return 18, 1.8, 0.45, 0.20
-    if weight == "crayon":
-        return 28, 4.0, 0.75, 0.18
-    if weight == "chalk":
-        return 36, 5.5, 0.9, 0.26
-    return None
+def _speck_profile(
+    weight: str, path_len_px: float, canvas: CanvasSize
+) -> tuple[int, float, float, float] | None:
+    """speck の (個数, spread, radius, opacity)。個数は輪郭長比例、寸法は unit 相対。"""
+    spec = _SPECK_SPECS.get(weight)
+    if spec is None:
+        return None
+    base_count, spread, radius, opacity = spec
+    scale = _unit_scale(canvas)
+    return (
+        _speck_count(base_count, path_len_px, canvas),
+        spread * scale * _material_gain("speck_spread"),
+        radius * scale,
+        _speck_opacity(opacity),
+    )
 
 
 def _uses_material_outline(weight: str) -> bool:
-    return (
-        bool(_material_outline_profile(weight, WEIGHT_TO_STROKE_WIDTH[weight]))
-        or _speck_profile(weight) is not None
-    )
+    return weight in _MATERIAL_OUTLINE_SPECS or weight in _SPECK_SPECS
 
 
 def _add_material_circle_outline(
@@ -2713,12 +3051,11 @@ def _add_material_circle_outline(
     cx: float,
     cy: float,
     r: float,
+    canvas: CanvasSize,
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(
-        ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
-    ):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
         group.add(
             dwg.circle(
                 center=(cx, cy),
@@ -2726,7 +3063,7 @@ def _add_material_circle_outline(
                 **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash),
             )
         )
-    specks = _speck_profile(ins.weight)
+    specks = _speck_profile(ins.weight, 2 * math.pi * r, canvas)
     if specks is not None:
         count, spread, radius, opacity = specks
         _add_specks_at_points(
@@ -2735,6 +3072,7 @@ def _add_material_circle_outline(
             _circle_points(cx, cy, r, r, count),
             attrs,
             seed,
+            canvas,
             spread=spread,
             radius=radius,
             opacity=opacity,
@@ -2750,12 +3088,11 @@ def _add_material_ellipse_outline(
     cy: float,
     rx: float,
     ry: float,
+    canvas: CanvasSize,
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(
-        ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
-    ):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
         group.add(
             dwg.ellipse(
                 center=(cx, cy),
@@ -2763,7 +3100,7 @@ def _add_material_ellipse_outline(
                 **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash),
             )
         )
-    specks = _speck_profile(ins.weight)
+    specks = _speck_profile(ins.weight, _ellipse_perimeter(rx, ry), canvas)
     if specks is not None:
         count, spread, radius, opacity = specks
         _add_specks_at_points(
@@ -2772,6 +3109,7 @@ def _add_material_ellipse_outline(
             _circle_points(cx, cy, rx, ry, count),
             attrs,
             seed,
+            canvas,
             spread=spread,
             radius=radius,
             opacity=opacity,
@@ -2787,12 +3125,11 @@ def _add_material_rect_outline(
     y: float,
     w: float,
     h: float,
+    canvas: CanvasSize,
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(
-        ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
-    ):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
         group.add(
             dwg.rect(
                 insert=(x - offset, y - offset),
@@ -2800,7 +3137,7 @@ def _add_material_rect_outline(
                 **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash),
             )
         )
-    specks = _speck_profile(ins.weight)
+    specks = _speck_profile(ins.weight, 2 * (w + h), canvas)
     if specks is not None:
         count, spread, radius, opacity = specks
         _add_specks_at_points(
@@ -2809,6 +3146,7 @@ def _add_material_rect_outline(
             _rect_points(x, y, w, h, count),
             attrs,
             seed,
+            canvas,
             spread=spread,
             radius=radius,
             opacity=opacity,
@@ -2825,19 +3163,19 @@ def _add_material_arc_outline(
     r: float,
     start_deg: float,
     end_deg: float,
+    canvas: CanvasSize,
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(
-        ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
-    ):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
         group.add(
             dwg.path(
                 d=_arc_path_d(cx, cy, max(0.0, r + offset), start_deg, end_deg),
                 **_outline_attrs(attrs, stroke_width=width, opacity=opacity, dash=dash),
             )
         )
-    specks = _speck_profile(ins.weight)
+    arc_len = r * abs(math.radians(end_deg) - math.radians(start_deg))
+    specks = _speck_profile(ins.weight, arc_len, canvas)
     if specks is not None:
         count, spread, radius, opacity = specks
         _add_specks_at_points(
@@ -2846,6 +3184,7 @@ def _add_material_arc_outline(
             _arc_points(cx, cy, r, start_deg, end_deg, count),
             attrs,
             seed,
+            canvas,
             spread=spread,
             radius=radius,
             opacity=opacity,
@@ -2872,17 +3211,28 @@ def _material_line_group(
         base = _copy_attrs(attrs)
         group.add(dwg.line(start=start, end=end, **base))
     seed = _seed_for_instruction(ins, render_seed)
+    scale = _unit_scale(canvas)
+    offset_gain = _material_gain("outline_offset")
+    opacity_gain = _material_gain("outline_opacity")
+    spread_gain = _material_gain("speck_spread")
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+
+    def _layer_opacity(value: float) -> float:
+        return _outline_opacity(value * opacity_gain)
+
+    def _layer_offset(amount: float) -> float:
+        return _outline_offset_px(amount * scale * offset_gain, canvas)
 
     if ins.weight == "pencil":
         for idx, amount in enumerate((-0.9, 1.1)):
-            ox, oy = _line_perp_offsets(start, end, amount)
+            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
             layer_attrs = _copy_attrs(attrs)
-            layer_attrs["stroke_width"] = 0.45
-            layer_attrs["stroke_opacity"] = 0.26
-            layer_attrs["stroke_dasharray"] = "1,7"
+            layer_attrs["stroke_width"] = 0.45 * scale
+            layer_attrs["stroke_opacity"] = _layer_opacity(0.26)
+            layer_attrs["stroke_dasharray"] = _scale_dash("1,7", scale)
             if use_filters:
                 layer_attrs["filter"] = "url(#texture-pencil)"
-            jitter = _hash_to_unit(idx, seed) * 0.6
+            jitter = _hash_to_unit(idx, seed) * 0.6 * scale
             group.add(
                 dwg.line(
                     start=(start[0] + ox + jitter, start[1] + oy),
@@ -2897,19 +3247,20 @@ def _material_line_group(
             end,
             attrs,
             seed,
-            count=18,
-            spread=1.8,
-            radius=0.45,
-            opacity=0.20,
+            canvas,
+            count=_speck_count(18, length, canvas),
+            spread=1.8 * scale * spread_gain,
+            radius=0.45 * scale,
+            opacity=_speck_opacity(0.20),
         )
     elif ins.weight == "chalk":
         for idx, amount in enumerate((-3.0, 3.4)):
-            ox, oy = _line_perp_offsets(start, end, amount)
+            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
             layer_attrs = _copy_attrs(attrs)
-            layer_attrs["stroke_width"] = 1.1
-            layer_attrs["stroke_opacity"] = 0.28
-            layer_attrs["stroke_dasharray"] = "8,12,1,8"
-            jitter = _hash_to_unit(idx, seed) * 1.4
+            layer_attrs["stroke_width"] = 1.1 * scale
+            layer_attrs["stroke_opacity"] = _layer_opacity(0.28)
+            layer_attrs["stroke_dasharray"] = _scale_dash("8,12,1,8", scale)
+            jitter = _hash_to_unit(idx, seed) * 1.4 * scale
             group.add(
                 dwg.line(
                     start=(start[0] + ox + jitter, start[1] + oy),
@@ -2924,19 +3275,20 @@ def _material_line_group(
             end,
             attrs,
             seed,
-            count=34,
-            spread=5.5,
-            radius=0.9,
-            opacity=0.26,
+            canvas,
+            count=_speck_count(34, length, canvas),
+            spread=5.5 * scale * spread_gain,
+            radius=0.9 * scale,
+            opacity=_speck_opacity(0.26),
         )
     elif ins.weight == "brush_thin":
         for idx, amount in enumerate((-1.4, 1.8)):
-            ox, oy = _line_perp_offsets(start, end, amount)
+            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
             layer_attrs = _copy_attrs(attrs)
-            layer_attrs["stroke_width"] = 0.9 + idx * 0.5
-            layer_attrs["stroke_opacity"] = 0.32
-            layer_attrs["stroke_dasharray"] = "22,9"
-            jitter = _hash_to_unit(idx, seed) * 1.1
+            layer_attrs["stroke_width"] = (0.9 + idx * 0.5) * scale
+            layer_attrs["stroke_opacity"] = _layer_opacity(0.32)
+            layer_attrs["stroke_dasharray"] = _scale_dash("22,9", scale)
+            jitter = _hash_to_unit(idx, seed) * 1.1 * scale
             group.add(
                 dwg.line(
                     start=(start[0] + ox + jitter, start[1] + oy),
@@ -2947,17 +3299,23 @@ def _material_line_group(
     else:
         amounts = (-3.2, -1.4, 2.0, 3.6) if ins.weight == "crayon" else (-3.5, 2.8, 5.0)
         for idx, amount in enumerate(amounts):
-            ox, oy = _line_perp_offsets(start, end, amount)
-            jitter = _hash_to_unit(idx, seed) * (2.2 if ins.weight == "crayon" else 2.8)
+            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
+            jitter = (
+                _hash_to_unit(idx, seed)
+                * (2.2 if ins.weight == "crayon" else 2.8)
+                * scale
+            )
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = max(
-                0.8,
-                WEIGHT_TO_STROKE_WIDTH[ins.weight]
+                0.8 * scale,
+                _stroke_width_px(ins.weight, canvas)
                 * (0.25 if ins.weight == "crayon" else 0.30),
             )
-            layer_attrs["stroke_opacity"] = 0.24 if ins.weight == "crayon" else 0.38
-            layer_attrs["stroke_dasharray"] = (
-                "2,5,9,7" if ins.weight == "crayon" else "18,7,3,11"
+            layer_attrs["stroke_opacity"] = _layer_opacity(
+                0.24 if ins.weight == "crayon" else 0.38
+            )
+            layer_attrs["stroke_dasharray"] = _scale_dash(
+                "2,5,9,7" if ins.weight == "crayon" else "18,7,3,11", scale
             )
             group.add(
                 dwg.line(
@@ -2974,10 +3332,11 @@ def _material_line_group(
                 end,
                 attrs,
                 seed,
-                count=26,
-                spread=4.0,
-                radius=0.75,
-                opacity=0.18,
+                canvas,
+                count=_speck_count(26, length, canvas),
+                spread=4.0 * scale * spread_gain,
+                radius=0.75 * scale,
+                opacity=_speck_opacity(0.18),
             )
     return _apply_rotation(group, ins, canvas)
 
@@ -3028,12 +3387,15 @@ def _render_hand_stroke(
     *,
     use_filters: bool,
 ):
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    base_width = _stroke_width_px(ins.weight, canvas)
     stroke = synthesize_stroke(
         start,
         end,
-        WEIGHT_TO_STROKE_WIDTH[ins.weight],
+        base_width,
         ins.weight,
         _seed_for_instruction(ins, render_seed),
+        samples=_stroke_sample_count(length, canvas),
     )
     group = dwg.g(
         class_=f"stroke-engine-v1 controls-{len(stroke.samples)} events-{stroke.event_count}"
@@ -3044,12 +3406,17 @@ def _render_hand_stroke(
     if _needs_path_variation(ins.variation):
         assert ins.variation is not None
         centerline = _line_with_variation(
-            start, end, ins.variation, _seed_for_instruction(ins, render_seed)
+            start,
+            end,
+            ins.variation,
+            _seed_for_instruction(ins, render_seed),
+            _amplitude_px(ins.variation, ins, canvas),
+            canvas,
         )
         varied = synthesize_stroke(
             start,
             end,
-            WEIGHT_TO_STROKE_WIDTH[ins.weight],
+            base_width,
             ins.weight,
             _seed_for_instruction(ins, render_seed),
             samples=len(centerline),
@@ -3063,7 +3430,11 @@ def _render_hand_stroke(
         "fill_opacity": opacity,
         "stroke": "none",
     }
-    if use_filters and ins.weight in TEXTURE_FILTERS and ins.weight != "drypoint":
+    if (
+        use_filters
+        and ins.weight in TEXTURE_FILTER_WEIGHTS
+        and ins.weight != "drypoint"
+    ):
         path_attrs["filter"] = f"url(#texture-{ins.weight})"
     group.add(dwg.path(**path_attrs))
 
@@ -3082,17 +3453,15 @@ def _render_hand_stroke(
         group.add(material)
     if ins.style != "solid":
         styled_attrs = _copy_attrs(attrs)
-        styled_attrs["stroke_width"] = max(
-            0.45, WEIGHT_TO_STROKE_WIDTH[ins.weight] * 0.42
-        )
+        styled_attrs["stroke_width"] = max(0.45 * _unit_scale(canvas), base_width * 0.42)
         styled_attrs.pop("filter", None)
         group.add(dwg.line(start=start, end=end, **styled_attrs))
 
     if ins.weight == "drypoint":
         dx, dy = end[0] - start[0], end[1] - start[1]
-        length = max(1e-6, math.hypot(dx, dy))
-        nx, ny = -dy / length, dx / length
-        offset = stroke.burr_side * WEIGHT_TO_STROKE_WIDTH[ins.weight]
+        norm = max(1e-6, math.hypot(dx, dy))
+        nx, ny = -dy / norm, dx / norm
+        offset = stroke.burr_side * base_width
         points = [
             (sample.x + nx * offset, sample.y + ny * offset)
             for sample in stroke.samples
@@ -3101,7 +3470,7 @@ def _render_hand_stroke(
             "points": points,
             "fill": "none",
             "stroke": color,
-            "stroke_width": WEIGHT_TO_STROKE_WIDTH[ins.weight] * 1.25,
+            "stroke_width": base_width * 1.25,
             "stroke_opacity": stroke.burr_opacity,
             "stroke_linecap": "round",
         }
@@ -3123,7 +3492,7 @@ def _render_instruction(
     mark_idx: int = 0,
 ):
     canvas = canvas or canvas_size_for_aspect(None)
-    attrs = _stroke_attrs(ins, cmap, use_filters=use_filters)
+    attrs = _stroke_attrs(ins, cmap, canvas, use_filters=use_filters)
     if ins.mode == "carve":
         depth = ins.carve_depth or "half"
         attrs["stroke"] = {"light": "#8a8a8a", "half": "#c7c7c7", "bright": "#ffffff"}[
@@ -3156,10 +3525,13 @@ def _render_instruction(
         if _needs_contour_variation(ins.variation):
             assert ins.variation is not None
             contour = _closed_contour_with_variation(
-                _circle_points(cx, cy, r, r, SEGMENT_COUNT),
+                _circle_points(
+                    cx, cy, r, r, _segment_count(2 * math.pi * r, canvas)
+                ),
                 (cx, cy),
                 ins.variation,
                 _seed_for_instruction(ins, render_seed),
+                _amplitude_px(ins.variation, ins, canvas),
             )
             element = dwg.polygon(points=contour, **attrs)
         else:
@@ -3167,7 +3539,9 @@ def _render_instruction(
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
-            _add_material_circle_outline(dwg, group, ins, attrs, cx, cy, r, render_seed)
+            _add_material_circle_outline(
+                dwg, group, ins, attrs, cx, cy, r, canvas, render_seed
+            )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -3180,10 +3554,17 @@ def _render_instruction(
         if _needs_contour_variation(ins.variation):
             assert ins.variation is not None
             contour = _closed_contour_with_variation(
-                _circle_points(cx, cy, rx, ry, SEGMENT_COUNT),
+                _circle_points(
+                    cx,
+                    cy,
+                    rx,
+                    ry,
+                    _segment_count(_ellipse_perimeter(rx, ry), canvas),
+                ),
                 (cx, cy),
                 ins.variation,
                 _seed_for_instruction(ins, render_seed),
+                _amplitude_px(ins.variation, ins, canvas),
             )
             element = dwg.polygon(points=contour, **attrs)
         else:
@@ -3192,7 +3573,7 @@ def _render_instruction(
             group = dwg.g()
             group.add(element)
             _add_material_ellipse_outline(
-                dwg, group, ins, attrs, cx, cy, rx, ry, render_seed
+                dwg, group, ins, attrs, cx, cy, rx, ry, canvas, render_seed
             )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
@@ -3224,7 +3605,11 @@ def _render_instruction(
             assert ins.variation is not None
             corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
             contour = _edge_contour_with_variation(
-                corners, ins.variation, _seed_for_instruction(ins, render_seed)
+                corners,
+                ins.variation,
+                _seed_for_instruction(ins, render_seed),
+                _amplitude_px(ins.variation, ins, canvas),
+                canvas,
             )
             element = dwg.polygon(points=contour, **attrs)
         else:
@@ -3232,7 +3617,9 @@ def _render_instruction(
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
-            _add_material_rect_outline(dwg, group, ins, attrs, x, y, w, h, render_seed)
+            _add_material_rect_outline(
+                dwg, group, ins, attrs, x, y, w, h, canvas, render_seed
+            )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -3250,7 +3637,11 @@ def _render_instruction(
         if _needs_contour_variation(ins.variation):
             assert ins.variation is not None
             points = _edge_contour_with_variation(
-                points, ins.variation, _seed_for_instruction(ins, render_seed)
+                points,
+                ins.variation,
+                _seed_for_instruction(ins, render_seed),
+                _amplitude_px(ins.variation, ins, canvas),
+                canvas,
             )
         return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
 
@@ -3263,7 +3654,11 @@ def _render_instruction(
         if _needs_contour_variation(ins.variation):
             assert ins.variation is not None
             points = _edge_contour_with_variation(
-                points, ins.variation, _seed_for_instruction(ins, render_seed)
+                points,
+                ins.variation,
+                _seed_for_instruction(ins, render_seed),
+                _amplitude_px(ins.variation, ins, canvas),
+                canvas,
             )
         return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
 
@@ -3284,6 +3679,8 @@ def _render_instruction(
                 ins.angle_end,
                 ins.variation,
                 _seed_for_instruction(ins, render_seed),
+                _amplitude_px(ins.variation, ins, canvas),
+                canvas,
             )
             element = dwg.polyline(points=contour, **attrs)
         else:
@@ -3302,6 +3699,7 @@ def _render_instruction(
                 r,
                 ins.angle_start,
                 ins.angle_end,
+                canvas,
                 render_seed,
             )
             return _apply_rotation(group, ins, canvas)

@@ -2,8 +2,11 @@ import hashlib
 import math
 from xml.etree import ElementTree
 
+from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import (
+    _ellipse_perimeter,
+    _speck_count,
     _clustered_pos,
     _expand_arrangement,
     _resolve_performance_score,
@@ -199,6 +202,11 @@ def test_render_polygon_outputs_svg_polygon():
     assert "<polygon" in svg
 
 
+def _expected_specks(base: int, path_len_px: float) -> int:
+    """周長比例化後の speck 個数 (検査の意図を保つため規則から算出する)。"""
+    return _speck_count(base, path_len_px, canvas_size_for_aspect(None))
+
+
 def test_render_dashed_line_has_dasharray():
     score = Score.model_validate(
         {
@@ -235,7 +243,7 @@ def test_render_pencil_line_uses_material_texture():
     assert 'stroke-dasharray="1,7"' in svg
     assert 'id="texture-pencil"' in svg
     assert 'filter="url(#texture-pencil)"' in svg
-    assert svg.count("<circle") >= 18
+    assert svg.count("<circle") >= _expected_specks(18, 1000.0)
 
 
 def test_render_chalk_line_uses_blurred_powder_texture():
@@ -257,7 +265,7 @@ def test_render_chalk_line_uses_blurred_powder_texture():
     assert 'stroke-dasharray="8,12,1,8"' in svg
     assert "<feTurbulence" in svg
     assert "<feDisplacementMap" in svg
-    assert svg.count("<circle") >= 34
+    assert svg.count("<circle") >= _expected_specks(34, 1000.0)
 
 
 def test_render_crayon_line_adds_rubbed_layers():
@@ -278,7 +286,7 @@ def test_render_crayon_line_adds_rubbed_layers():
     assert "stroke-engine-v1" in svg
     assert 'stroke-dasharray="2,5,9,7"' in svg
     assert 'id="texture-crayon"' in svg
-    assert svg.count("<circle") >= 26
+    assert svg.count("<circle") >= _expected_specks(26, 1000.0)
 
 
 def test_render_scatter_path_wave_places_items_on_trace():
@@ -484,7 +492,7 @@ def test_render_circle_material_applies_outline_texture():
         }
     )
     svg = render(score)
-    assert svg.count("<circle") >= 38
+    assert svg.count("<circle") >= 2 + _expected_specks(36, 2 * math.pi * 180.0)
     assert 'id="texture-chalk"' in svg
     assert 'stroke-dasharray="8,12,1,8"' in svg
 
@@ -504,7 +512,7 @@ def test_render_ellipse_material_applies_outline_texture():
     )
     svg = render(score)
     assert svg.count("<ellipse") >= 4
-    assert svg.count("<circle") >= 28
+    assert svg.count("<circle") >= _expected_specks(28, _ellipse_perimeter(200.0, 100.0))
     assert 'id="texture-crayon"' in svg
     assert 'stroke-dasharray="2,5,9,7"' in svg
 
@@ -524,7 +532,7 @@ def test_render_square_material_applies_outline_texture():
     )
     svg = render(score)
     assert svg.count("<rect") >= 4
-    assert svg.count("<circle") >= 18
+    assert svg.count("<circle") >= _expected_specks(18, 4 * 300.0)
     assert 'id="texture-pencil"' in svg
     assert 'stroke-dasharray="1,7"' in svg
 
@@ -878,7 +886,9 @@ def test_render_circle_with_pink_variation_emits_blur_filter():
     )
     svg = render(score)
     assert "feGaussianBlur" in svg
-    assert 'filter="url(#blur-medium)"' in svg
+    # 滲みは図形寸法比なので filter id に std 値が入る (r=200 * 0.03 = 6.0px)
+    assert 'filter="url(#blur-medium-60)"' in svg
+    assert 'stdDeviation="6.0"' in svg
     assert "<circle" in svg
     assert "<polyline" not in svg
 

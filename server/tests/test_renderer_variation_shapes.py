@@ -10,13 +10,22 @@ import math
 import pytest
 
 from inku_server.renderer import (
-    SEGMENT_COUNT,
+    AMPLITUDE_RATIO,
     _arc_points_with_variation,
     _edge_contour_with_variation,
     _sample_offset_periodic,
+    _segment_count,
     render,
 )
 from inku_server.schema import Score, Variation
+
+from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+
+CANVAS = canvas_size_for_aspect(None)
+# 弧: 半径 200px が代表寸法 / 多角形: 800px 角の短辺 1/2 = 400px が代表寸法
+ARC_AMP = AMPLITUDE_RATIO["broad"] * 200.0
+POLY_AMP = AMPLITUDE_RATIO["broad"] * 400.0
+EDGE_SEGMENTS = _segment_count(800.0, CANVAS)
 
 BASES: dict[str, dict] = {
     "circle": {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2},
@@ -148,7 +157,9 @@ def test_arc_endpoints_are_pinned():
         quality="perlin",
         dimensions=["radius"],
     )
-    pts = _arc_points_with_variation(500.0, 500.0, 200.0, 0.0, 270.0, variation, 123)
+    pts = _arc_points_with_variation(
+        500.0, 500.0, 200.0, 0.0, 270.0, variation, 123, ARC_AMP, CANVAS
+    )
     assert pts[0] == pytest.approx((700.0, 500.0))
     assert pts[-1] == pytest.approx((500.0, 700.0))
     # 内部点は理想弧から動いている
@@ -167,10 +178,10 @@ def test_polygon_corners_are_pinned():
         quality="perlin",
         dimensions=["position_x", "position_y"],
     )
-    contour = _edge_contour_with_variation(corners, variation, 123)
-    assert len(contour) == 4 * SEGMENT_COUNT
+    contour = _edge_contour_with_variation(corners, variation, 123, POLY_AMP, CANVAS)
+    assert len(contour) == 4 * EDGE_SEGMENTS
     for i, corner in enumerate(corners):
-        assert contour[i * SEGMENT_COUNT] == pytest.approx(corner)
+        assert contour[i * EDGE_SEGMENTS] == pytest.approx(corner)
 
 
 @pytest.mark.parametrize("frequency", ["slow", "medium", "high"])
@@ -183,6 +194,6 @@ def test_periodic_sampler_is_continuous_at_seam(frequency: str):
             quality=quality,
             dimensions=["radius"],
         )
-        at_end = _sample_offset_periodic(1.0 - 1e-9, variation, 99, 0)
-        at_start = _sample_offset_periodic(0.0, variation, 99, 0)
+        at_end = _sample_offset_periodic(1.0 - 1e-9, variation, 99, 0, ARC_AMP)
+        at_start = _sample_offset_periodic(0.0, variation, 99, 0, ARC_AMP)
         assert abs(at_end - at_start) < 1e-3

@@ -1,8 +1,10 @@
+import math
 import re
 import time
 import pytest
 from pydantic import ValidationError
-from inku_server.renderer import render
+from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+from inku_server.renderer import _stroke_sample_count, render
 from inku_server.schema import Score
 from inku_server.stroke_engine import GRAMMARS, synthesize_stroke
 
@@ -19,6 +21,15 @@ def _line(weight: str) -> Score:
                 }
             ]
         }
+    )
+
+
+def _line_length_px(score: Score) -> float:
+    ins = score.instructions[0]
+    canvas = canvas_size_for_aspect(None)
+    return math.hypot(
+        (ins.to[0] - ins.from_[0]) * canvas.width,
+        (ins.to[1] - ins.from_[1]) * canvas.height,
     )
 
 
@@ -74,7 +85,11 @@ def test_stroke_render_is_seed_deterministic_and_budgeted():
     score = _line("pencil")
     a = render(score, render_seed=123)
     assert a == render(score, render_seed=123) and a != render(score, render_seed=124)
-    assert "controls-49" in a
+    # 分割数は線長比例。この fixture の線長で決まる本数を規則から算出する
+    expected = _stroke_sample_count(
+        _line_length_px(score), canvas_size_for_aspect(None)
+    )
+    assert f"controls-{expected}" in a
 
 
 def test_burin_cut_is_not_masked_by_a_fixed_width_line():

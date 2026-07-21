@@ -719,7 +719,8 @@ $effect(() => {
 	.overview-zoom { padding-right: 8px; border-right: 1px solid var(--border); }
 	.overview-zoom span { min-width: 42px; color: var(--fg3); font-size: .72rem; text-align: center; }
 	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: 7px; padding: 7px 10px; cursor: pointer; }
-	.detach-btn { background: #fff7e8; border-color: #d8b36a; color: #6c4a10; font-weight: 600; box-shadow: 0 1px 3px rgba(108,74,16,0.12); }
+	/* 「新規作成」(InputPanel の .ghost-btn.create-btn) と字送り・高さを揃える */
+	.detach-btn { background: #fff7e8; border-color: #d8b36a; color: #6c4a10; font-weight: 600; box-shadow: 0 1px 3px rgba(108,74,16,0.12); padding: 4px 10px; border-radius: var(--r); font-family: inherit; font-size: 11px; white-space: nowrap; }
 	.detach-btn:hover { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }

@@ -303,8 +303,10 @@ MATERIAL_INTENSITY: dict[str, dict[str, float]] = {
         "speck_opacity_floor": 0.50,
     },
 }
-# v2.1 キャリブレーション (Build 637) で作者が m2 を選択。
-MATERIAL_INTENSITY_LEVEL = "m2"
+# v2.1 キャリブレーション (Build 637) の 2 巡目で作者が s1 を選択。
+# 1 巡目で m2 を選んだうえで「crayon・chalk は判別できるが弱い」との所感があり、
+# 質感 filter を m2 に据え置いたまま材質輪郭と speck を下限で上げた段が s1。
+MATERIAL_INTENSITY_LEVEL = "s1"
 
 # speck 個数の周長比例化。基準は radius 0.2 の円の周長 (canvas.unit 比)。
 SPECK_ANCHOR_PERIMETER_RATIO = 2 * math.pi * 0.2

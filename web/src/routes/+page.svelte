@@ -2425,6 +2425,9 @@
 		canvasAspectId?: CanvasAspectId;
 		renderSeed?: number;
 		varySeed?: number;
+		// 変奏 (v2.0): 両方そろって初めてサーバーが展開層をずらす。
+		variationAmplitude?: string;
+		variationSeed?: number;
 		interpretationSeed?: string;
 		seedText?: string;
 		signal?: AbortSignal;
@@ -2536,6 +2539,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
 				render_seed: options.renderSeed,
 				vary_seed: options.varySeed,
+				variation_amplitude: options.variationAmplitude ?? null,
+				variation_seed: options.variationSeed ?? null,
 				interpretation_seed: options.interpretationSeed,
 				seed_text: options.seedText,
 				auto_repair: ddlAutoRepairEnabled,

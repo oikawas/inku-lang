@@ -229,7 +229,6 @@ export interface LangPack {
 	modelCompareFixedStage2: string;
 	modelCompareTargetDisabledTooltip: string;
 	modelCompareBusy: string;
-	modelCompareTitle: string;
 	modelCompareSubtitle: string;
 	modelCompareModelSelectLabel: string;
 	modelCompareSelectPrompt: string;
@@ -254,7 +253,6 @@ export interface LangPack {
 	refineTargetTitle: string;
 	refineSingleTitle: string;
 	refineSingleSubtitle: string;
-	refineGridTitle: string;
 	refineGridSubtitle: string;
 	refineGenerating: string;
 	refineGeneratingBody: string;

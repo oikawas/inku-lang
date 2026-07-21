@@ -12,7 +12,7 @@ import cairosvg
 
 from .model_settings import connection_for, provider_for_model
 
-ALLOWED_KINDS = ("reinterpretation", "catalog_change", "layout_variation", "touch_variation")
+ALLOWED_KINDS = ("reinterpretation", "catalog_change", "layout_variation", "touch_variation", "hensou")
 
 
 def _png_data_url(svg: str) -> str:

@@ -39,6 +39,8 @@
   let enableColor = $state(true);
   let enableLayout = $state(true);
   let enableTouch = $state(true);
+  let enableHensou = $state(true);
+  const hensouAmplitude = 'medium';
   let running = $state(false);
   const refineElapsed = createElapsed();
   let refineTokensIn = $state<number | null>(null);
@@ -63,6 +65,7 @@
     if (enableColor) kinds.push('catalog_change');
     if (enableLayout) kinds.push('layout_variation');
     if (enableTouch) kinds.push('touch_variation');
+    if (enableHensou) kinds.push('hensou');
     return kinds;
   });
 
@@ -71,9 +74,22 @@
       touch_variation: t().refineCostTouch,
       layout_variation: t().refineCostLayout,
       catalog_change: t().refineCostColor,
-      reinterpretation: t().refineCostReading
+      reinterpretation: t().refineCostReading,
+      hensou: t().hensouTitle
     };
     return labels[kind] ?? kind;
+  }
+
+  // 変奏 seed はサーバーが採番する (UI が seed 空間を持たない)。
+  async function allocateHensouSeed(amplitude: string): Promise<number> {
+    const response = await fetch('/api/variation/seeds', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amplitude, count: 1 })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return (await response.json()).seeds[0] as number;
   }
 
   async function readVisionAdvice(historyId: string, instruction: string): Promise<VisionAdvice> {
@@ -125,6 +141,10 @@
           signal: abortController.signal
         };
         if (kind === 'catalog_change') options.randomColorCatalog = true;
+        if (kind === 'hensou') {
+          options.variationAmplitude = hensouAmplitude;
+          options.variationSeed = await allocateHensouSeed(hensouAmplitude);
+        }
         const result = await onPaintOne(paintText, options);
         refineTokensIn = addTokens(refineTokensIn, (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0));
         refineTokensOut = addTokens(refineTokensOut, (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0));
@@ -170,7 +190,7 @@
         {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
         <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea></div>
         <div class="form-row"><div class="form-group tenkei-group"><span class="tenkei-group-label">&nbsp;</span><TenkeiSelect compact value={tenkeiOverride ?? parentTenkei} {isJapanese} inherited={tenkeiOverride === null} onSelect={(level) => (tenkeiOverride = level)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
-        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label><input type="checkbox" bind:checked={enableReading} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip></div></details>
+        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label><input type="checkbox" bind:checked={enableReading} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip><Tooltip placement="bottom" text={t().tooltipHensou}><label><input type="checkbox" bind:checked={enableHensou} /><span>{t().hensouTitle}</span></label></Tooltip></div></details>
       {/if}
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}
       {#if errorText}<div class="error-banner">{errorText}</div>{/if}

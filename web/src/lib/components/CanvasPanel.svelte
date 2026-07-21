@@ -352,7 +352,7 @@
 	$effect(() => {
 		if (statusDdlOrigin && refineKind === 'reading') refineKind = 'touch';
 	});
-	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
+	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '描画要素を編集' : 'Edit drawing elements') : refineView === 'compare' ? (isJapanese ? 'モデルを編集' : 'Edit models') : (isJapanese ? '言語を編集' : 'Edit languages'));
 	const statusGenerationValue = $derived(
 		statusGeneration
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
@@ -740,9 +740,6 @@
 									{/if}
 								</section>
 								<section class="refine-action-section">
-									<div class="refine-section-head">
-										<div class="refine-section-title">{t().refineGridTitle}</div>
-									</div>
 									<div class="refine-actions refine-paint-actions">
 										<Tooltip text={t().tooltipRefineSingle}>
 											<div class="refine-action-wrap">
@@ -844,7 +841,6 @@
 					{:else if refineView === 'compare'}
 					<div class="compare-panel">
 					<div class="compare-head">
-						<div class="refine-title">{t().modelCompareTitle}</div>
 						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 						<div class="compare-action-wrap">
 							{#if modelInspectionBusy}
@@ -923,7 +919,6 @@
 					{:else}
 					<div class="compare-panel">
 						<div class="compare-head">
-							<div class="refine-title">{isJapanese ? '指示文言語を比較する' : 'Compare instruction languages'}</div>
 							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 							<div class="compare-action-wrap">
 								{#if languageInspectionBusy}
@@ -1353,11 +1348,6 @@
 		gap: 12px;
 		padding: 16px;
 		box-sizing: border-box;
-	}
-	.refine-title {
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--fg);
 	}
 	.variation-grid-status {
 		font-size: 12px;

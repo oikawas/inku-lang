@@ -2605,12 +2605,12 @@
 		flex-shrink: 0;
 	}
 	.ghost-btn {
-		padding: 4px 10px;
+		padding: var(--btn-sm-padding);
 		border: 1px solid var(--border2);
-		border-radius: var(--r);
+		border-radius: var(--btn-sm-radius);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		cursor: pointer;
 		font-family: inherit;
 	}

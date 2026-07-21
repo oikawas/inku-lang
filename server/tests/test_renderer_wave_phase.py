@@ -12,14 +12,23 @@ import re
 import pytest
 
 from inku_server.renderer import (
-    SEGMENT_COUNT,
+    AMPLITUDE_RATIO,
     _arc_points_with_variation,
     _edge_contour_with_variation,
     _sample_offset_periodic,
+    _segment_count,
     _seed_for_instruction,
     render,
 )
 from inku_server.schema import Instruction, Score, Variation
+
+from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+
+CANVAS = canvas_size_for_aspect(None)
+# 弧: 半径 200px が代表寸法 / 多角形: 800px 角の短辺 1/2 = 400px が代表寸法
+ARC_AMP = AMPLITUDE_RATIO["broad"] * 200.0
+POLY_AMP = AMPLITUDE_RATIO["broad"] * 400.0
+EDGE_SEGMENTS = _segment_count(800.0, CANVAS)
 
 WAVE = {
     "amplitude": "medium",
@@ -85,14 +94,16 @@ MATERIAL_SHAPES: dict[str, dict] = {
     },
 }
 
-# main (v2.0.4 / Build 634) の実装で採取した render_seed=None 出力の sha256 (先頭 32 桁)。
-# 材質輪郭に演奏 seed をスレッドしても、seed 未指定の演奏は不変であることの固定。
+# v2.1 (比例レンダリング) で採取し直した render_seed=None 出力の sha256 (先頭 32 桁)。
+# seed 未指定の演奏が不変であることの固定。v2.0.4 の値からの差分は speck 個数の
+# 周長比例化と stroke 分割数の長さ比例化のみで、材質の寸法・dasharray・線幅は
+# canvas.unit=1000 で以前とバイト一致する。
 MATERIAL_NONE_SEED_DIGESTS = {
+    "brush_thin_line": "c3e3c095b91b63b172c7b9f62ca14496",
+    "chalk_square": "16acc45062fe0d6cdb6f4cd03fcf62c8",
+    "crayon_arc": "adb61fda83813c20accd8ce80d2d7623",
     "pencil_circle": "fa729f4ea8d4d2868ea1338ab04eeb77",
-    "chalk_square": "e4e0e91e77752267e221108fe59b7f5b",
-    "crayon_arc": "ed36a1041571cad8a7d149c933da8869",
-    "brush_thin_line": "056c8b93383051df71b02c1a7e686c1c",
-    "pencil_ellipse": "c4b65545b20518b96f6a877c8235767b",
+    "pencil_ellipse": "7258a0d890266424bd6283b0175e6f32",
 }
 
 
@@ -156,8 +167,8 @@ def test_wave_closed_contour_stays_closed(frequency: str, seed: int):
         quality="wave",
         dimensions=["radius"],
     )
-    at_end = _sample_offset_periodic(1.0 - 1e-9, variation, seed, 0)
-    at_start = _sample_offset_periodic(0.0, variation, seed, 0)
+    at_end = _sample_offset_periodic(1.0 - 1e-9, variation, seed, 0, ARC_AMP)
+    at_start = _sample_offset_periodic(0.0, variation, seed, 0, ARC_AMP)
     assert abs(at_end - at_start) < 1e-3
 
 
@@ -170,7 +181,9 @@ def test_wave_arc_endpoints_are_pinned(seed: int):
         quality="wave",
         dimensions=["radius"],
     )
-    pts = _arc_points_with_variation(500.0, 500.0, 200.0, 0.0, 270.0, variation, seed)
+    pts = _arc_points_with_variation(
+        500.0, 500.0, 200.0, 0.0, 270.0, variation, seed, ARC_AMP, CANVAS
+    )
     assert pts[0] == pytest.approx((700.0, 500.0))
     assert pts[-1] == pytest.approx((500.0, 700.0))
     interior_moved = any(
@@ -189,10 +202,10 @@ def test_wave_polygon_corners_are_pinned(seed: int):
         quality="wave",
         dimensions=["position_x", "position_y"],
     )
-    contour = _edge_contour_with_variation(corners, variation, seed)
-    assert len(contour) == 4 * SEGMENT_COUNT
+    contour = _edge_contour_with_variation(corners, variation, seed, POLY_AMP, CANVAS)
+    assert len(contour) == 4 * EDGE_SEGMENTS
     for i, corner in enumerate(corners):
-        assert contour[i * SEGMENT_COUNT] == pytest.approx(corner)
+        assert contour[i * EDGE_SEGMENTS] == pytest.approx(corner)
 
 
 def test_wave_phase_differs_between_seeds_at_same_t():
@@ -204,7 +217,7 @@ def test_wave_phase_differs_between_seeds_at_same_t():
         dimensions=["radius"],
     )
     samples = {
-        seed: _sample_offset_periodic(0.13, variation, seed, 3)
+        seed: _sample_offset_periodic(0.13, variation, seed, 3, ARC_AMP)
         for seed in (111, 222, 333)
     }
     assert len(set(round(v, 9) for v in samples.values())) == 3

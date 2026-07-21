@@ -1,0 +1,385 @@
+"""v2.1: 揺らぎ・滲みの図形寸法比例化と、材質・display 層の canvas 相対化。
+
+契約は no-git-sync/fable5/claude_code/tasks/opus-v2.1-proportional-render.md。
+語彙 (fine/medium/broad) は不変で、語彙が指す物理量の定義だけが変わる。
+"""
+
+import math
+from xml.etree import ElementTree
+
+import pytest
+
+from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+from inku_server.renderer import (
+    AMPLITUDE_CLAMP_RATIO,
+    AMPLITUDE_RATIO,
+    BLUR_RATIO,
+    SEGMENT_COUNT_MAX,
+    SEGMENT_COUNT_MIN,
+    SPECK_COUNT_MIN,
+    STYLE_TO_DASH,
+    WEIGHT_TO_STROKE_WIDTH,
+    _amplitude_px,
+    _material_outline_profile,
+    _performance_touch_filter,
+    _segment_count,
+    _speck_count,
+    _speck_profile,
+    _stroke_width_px,
+    _texture_filter_xml,
+    render,
+)
+from inku_server.schema import Score, Variation
+
+SQUARE = canvas_size_for_aspect(None)
+VERTICAL = canvas_size_for_aspect("vertical")  # 9:16 → unit = width < 1000
+
+
+def _circle_score(radius: float, **variation) -> Score:
+    return Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": radius,
+                    "variation": variation or None,
+                }
+            ]
+        }
+    )
+
+
+def _contour(svg: str) -> list[tuple[float, float]]:
+    """揺らぎ適用後の polygon / polyline 頂点列を取り出す。"""
+    root = ElementTree.fromstring(svg)
+    for node in root.iter():
+        if node.tag.endswith(("polygon", "polyline")):
+            return [
+                (float(p.split(",")[0]), float(p.split(",")[1]))
+                for p in node.attrib["points"].split()
+            ]
+    raise AssertionError("contour not found")
+
+
+def _max_radial_deviation(svg: str, r: float) -> float:
+    return max(
+        abs(math.hypot(x - 500.0, y - 500.0) - r) for x, y in _contour(svg)
+    )
+
+
+# --------------------------------------------------------------------------- #
+# 1. 振幅が図形寸法に比例する                                                   #
+# --------------------------------------------------------------------------- #
+def test_amplitude_px_is_exactly_proportional_to_representative_size():
+    """振幅そのものは代表寸法に厳密比例する (語彙 → 物理量の定義)。"""
+    variation = Variation(
+        amplitude="medium", frequency="medium", quality="wave", dimensions=["radius"]
+    )
+    small = _circle_score(0.1).instructions[0]
+    large = _circle_score(0.2).instructions[0]
+    assert _amplitude_px(variation, small, SQUARE) == pytest.approx(
+        AMPLITUDE_RATIO["medium"] * 100.0
+    )
+    assert _amplitude_px(variation, large, SQUARE) == 2 * _amplitude_px(
+        variation, small, SQUARE
+    )
+
+
+# perlin / white は seed が命令ごとに変わるため雑音の実現値が図形間で異なる。
+# 振幅は厳密比例でも観測される最大変位はばらつくので、決定的な wave だけ
+# 厳密に、雑音系は幅を持たせて検査する。
+@pytest.mark.parametrize(
+    ("quality", "tolerance"), [("wave", 0.02), ("perlin", 0.25), ("white", 0.25)]
+)
+def test_closed_contour_amplitude_scales_with_shape_size(
+    quality: str, tolerance: float
+):
+    """図形サイズ 2 倍 → 揺らぎオフセットの絶対量も約 2 倍 (閉輪郭)。"""
+    variation = {
+        "quality": quality,
+        "amplitude": "medium",
+        "frequency": "medium",
+        "dimensions": ["radius"],
+    }
+    small = _max_radial_deviation(render(_circle_score(0.1, **variation)), 100.0)
+    large = _max_radial_deviation(render(_circle_score(0.2, **variation)), 200.0)
+    assert large / small == pytest.approx(2.0, rel=tolerance)
+
+
+def test_open_curve_amplitude_scales_with_shape_size():
+    """開曲線 (arc) でも図形サイズ 2 倍で振幅が約 2 倍になる。"""
+
+    def deviation(radius: float) -> float:
+        score = Score.model_validate(
+            {
+                "instructions": [
+                    {
+                        "primitive": "arc",
+                        "center": [0.5, 0.5],
+                        "radius": radius,
+                        "angle_start": 0,
+                        "angle_end": 180,
+                        "variation": {
+                            "quality": "wave",
+                            "amplitude": "broad",
+                            "frequency": "medium",
+                            "dimensions": ["radius"],
+                        },
+                    }
+                ]
+            }
+        )
+        return _max_radial_deviation(render(score), radius * 1000.0)
+
+    assert deviation(0.3) / deviation(0.15) == pytest.approx(2.0, rel=0.1)
+
+
+def test_amplitude_vocabulary_keeps_its_order():
+    """fine < medium < broad の順序は比例化後も保たれる。"""
+    devs = [
+        _max_radial_deviation(
+            render(
+                _circle_score(
+                    0.2,
+                    quality="wave",
+                    amplitude=amp,
+                    frequency="medium",
+                    dimensions=["radius"],
+                )
+            ),
+            200.0,
+        )
+        for amp in ("fine", "medium", "broad")
+    ]
+    assert devs[0] < devs[1] < devs[2]
+
+
+# --------------------------------------------------------------------------- #
+# 2. 滲み (pink) も図形寸法比例                                                 #
+# --------------------------------------------------------------------------- #
+def test_blur_std_scales_with_shape_size():
+    """stdDeviation が代表寸法に比例する (図形 2 倍 → 滲み 2 倍)。"""
+
+    def std(radius: float) -> float:
+        svg = render(_circle_score(radius, quality="pink", amplitude="medium"))
+        root = ElementTree.fromstring(svg)
+        for node in root.iter():
+            if node.tag.endswith("feGaussianBlur"):
+                return float(node.attrib["stdDeviation"])
+        raise AssertionError("blur filter not found")
+
+    assert std(0.1) == pytest.approx(BLUR_RATIO["medium"] * 100.0, rel=0.05)
+    assert std(0.2) / std(0.1) == pytest.approx(2.0, rel=0.05)
+
+
+def test_blur_filter_ids_separate_by_std_value():
+    """同じ振幅語でも図形が違えば別 filter になる (id が値込みのため)。"""
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.3, 0.5],
+                    "radius": 0.1,
+                    "variation": {"quality": "pink", "amplitude": "medium"},
+                },
+                {
+                    "primitive": "circle",
+                    "center": [0.7, 0.5],
+                    "radius": 0.3,
+                    "variation": {"quality": "pink", "amplitude": "medium"},
+                },
+            ]
+        }
+    )
+    svg = render(score)
+    assert svg.count("<filter id=\"blur-medium-") == 2
+
+
+# --------------------------------------------------------------------------- #
+# 3. クランプ                                                                   #
+# --------------------------------------------------------------------------- #
+def test_tiny_shape_is_not_destroyed_by_wobble():
+    """極小図形でも振幅が図形を壊さない (負半径・原点貫通なし)。"""
+    r = 0.004 * 1000.0
+    svg = render(
+        _circle_score(
+            0.004,
+            quality="perlin",
+            amplitude="broad",
+            frequency="high",
+            dimensions=["radius"],
+        )
+    )
+    for x, y in _contour(svg):
+        dist = math.hypot(x - 500.0, y - 500.0)
+        assert dist > 0.0
+        # 下限クランプで振幅は canvas.unit 基準になるが、暴走はしない
+        assert dist < r + SQUARE.unit * 0.02 * AMPLITUDE_CLAMP_RATIO + 1e-6
+
+
+def test_large_shape_amplitude_stays_within_clamp():
+    """極大図形でも振幅は代表寸法比の上限を超えない。"""
+    r = 450.0
+    svg = render(
+        _circle_score(
+            0.45,
+            quality="perlin",
+            amplitude="broad",
+            frequency="medium",
+            dimensions=["radius"],
+        )
+    )
+    assert _max_radial_deviation(svg, r) <= r * AMPLITUDE_CLAMP_RATIO + 1e-6
+
+
+def test_amplitude_ratio_defaults_stay_below_the_clamp():
+    """既定の比率はクランプに触れない (クランプは異常値の保険)。"""
+    assert max(AMPLITUDE_RATIO.values()) < AMPLITUDE_CLAMP_RATIO
+
+
+# --------------------------------------------------------------------------- #
+# 4. 分割数の長さ比例化                                                         #
+# --------------------------------------------------------------------------- #
+def test_segment_count_grows_with_length_and_saturates():
+    target = SQUARE.unit * 0.01
+    assert _segment_count(target * 50, SQUARE) == 50
+    assert _segment_count(target * 100, SQUARE) == 100
+    # 下限・上限で飽和する
+    assert _segment_count(0.0, SQUARE) == SEGMENT_COUNT_MIN
+    assert _segment_count(target * 10_000, SQUARE) == SEGMENT_COUNT_MAX
+
+
+def test_longer_contour_gets_more_vertices():
+    def vertices(radius: float) -> int:
+        return len(
+            _contour(
+                render(
+                    _circle_score(
+                        radius,
+                        quality="wave",
+                        amplitude="fine",
+                        frequency="medium",
+                        dimensions=["radius"],
+                    )
+                )
+            )
+        )
+
+    assert vertices(0.05) < vertices(0.15) < vertices(0.30)
+
+
+def test_segment_count_is_deterministic():
+    score = _circle_score(
+        0.2, quality="perlin", amplitude="medium", frequency="high", dimensions=["radius"]
+    )
+    assert render(score, render_seed=7) == render(score, render_seed=7)
+
+
+# --------------------------------------------------------------------------- #
+# 5. speck の周長比例化                                                         #
+# --------------------------------------------------------------------------- #
+def test_speck_count_is_proportional_to_perimeter():
+    """基準 (radius 0.2 の円) で表の個数、周長 2 倍で約 2 倍。"""
+    anchor = 2 * math.pi * 0.2 * SQUARE.unit
+    assert _speck_count(18, anchor, SQUARE) == 18
+    assert _speck_count(18, anchor * 2, SQUARE) == 36
+    # 下限と上限
+    assert _speck_count(18, 0.0, SQUARE) == SPECK_COUNT_MIN
+    assert _speck_count(18, anchor * 100, SQUARE) == 18 * 4
+
+
+def test_speck_profile_is_deterministic():
+    a = _speck_profile("chalk", 1600.0, SQUARE)
+    b = _speck_profile("chalk", 1600.0, SQUARE)
+    assert a == b
+    assert _speck_profile("pen", 1600.0, SQUARE) is None
+
+
+# --------------------------------------------------------------------------- #
+# 6. unit=1000 でのバイト一致 (C 層・線幅・dasharray)                            #
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("weight", sorted(WEIGHT_TO_STROKE_WIDTH))
+def test_stroke_width_matches_the_table_at_unit_1000(weight: str):
+    assert _stroke_width_px(weight, SQUARE) == WEIGHT_TO_STROKE_WIDTH[weight]
+
+
+def test_dasharray_strings_are_unchanged_at_unit_1000():
+    svg = render(
+        Score.model_validate(
+            {
+                "instructions": [
+                    {
+                        "primitive": "line",
+                        "from": [0.0, 0.5],
+                        "to": [1.0, 0.5],
+                        "style": "dashed",
+                        "weight": "rotring",
+                    }
+                ]
+            }
+        )
+    )
+    assert f'stroke-dasharray="{STYLE_TO_DASH["dashed"]}"' in svg
+
+
+def test_performance_touch_filter_is_unchanged_at_unit_1000():
+    """C 層は機械的相対化のみ。unit=1000 で現行とバイト一致する。"""
+    _, xml = _performance_touch_filter(4242, SQUARE)
+    assert 'baseFrequency="0.01' in xml or 'baseFrequency="0.02' in xml
+    scale = float(xml.split('scale="')[1].split('"')[0])
+    assert 1.6 <= scale <= 3.0
+
+
+def test_texture_filter_xml_is_unchanged_at_unit_1000():
+    assert _texture_filter_xml("pencil", SQUARE) == (
+        '<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%">'
+        '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" '
+        'seed="11" result="noise"/>'
+        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/>'
+        "</filter>"
+    )
+    assert _texture_filter_xml("drypoint", SQUARE) == (
+        '<filter id="texture-drypoint" x="-35%" y="-35%" width="170%" height="170%">'
+        '<feGaussianBlur stdDeviation="1.8"/>'
+        "</filter>"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# 7. 縦長 aspect (unit < 1000) で B 層が unit 比に縮む                          #
+# --------------------------------------------------------------------------- #
+def test_material_layer_shrinks_with_canvas_unit():
+    assert VERTICAL.unit < SQUARE.unit
+    ratio = VERTICAL.unit / SQUARE.unit
+
+    assert _stroke_width_px("brush_thick", VERTICAL) == pytest.approx(
+        WEIGHT_TO_STROKE_WIDTH["brush_thick"] * ratio
+    )
+
+    square_profile = _material_outline_profile("chalk", SQUARE)
+    vertical_profile = _material_outline_profile("chalk", VERTICAL)
+    for (s_off, s_w, s_op, _), (v_off, v_w, v_op, _) in zip(
+        square_profile, vertical_profile
+    ):
+        assert v_off == pytest.approx(s_off * ratio)
+        assert v_w == pytest.approx(s_w * ratio)
+        assert v_op == s_op  # opacity は寸法ではないので不変
+
+    _, s_spread, s_radius, _ = _speck_profile("chalk", 1600.0, SQUARE)
+    _, v_spread, v_radius, _ = _speck_profile("chalk", 1600.0, VERTICAL)
+    assert v_spread == pytest.approx(s_spread * ratio)
+    assert v_radius == pytest.approx(s_radius * ratio)
+
+
+def test_texture_base_frequency_is_inverse_to_unit():
+    """feTurbulence の baseFrequency は 1/px なので unit に反比例する。"""
+
+    def frequency(canvas) -> float:
+        xml = _texture_filter_xml("crayon", canvas)
+        return float(xml.split('baseFrequency="')[1].split('"')[0])
+
+    assert frequency(VERTICAL) == pytest.approx(
+        frequency(SQUARE) * SQUARE.unit / VERTICAL.unit, rel=1e-4
+    )

@@ -56,14 +56,18 @@ from .plugins.document_format import (
 )
 from .plugins.system.canvas_aspect import CANVAS_BASE_PX
 from .renderer import (
-    AMPLITUDE_PX,
-    BLUR_STD,
+    AMPLITUDE_CLAMP_RATIO,
+    AMPLITUDE_RATIO,
+    BLUR_RATIO,
     CANVAS_PX,
     FREQUENCY_CYCLES,
-    SEGMENT_COUNT,
+    REPRESENTATIVE_MIN_RATIO,
+    SEGMENT_COUNT_MAX,
+    SEGMENT_COUNT_MIN,
+    SEGMENT_TARGET_RATIO,
     STYLE_TO_DASH,
     SVG_PROFILES,
-    TEXTURE_FILTERS,
+    TEXTURE_FILTER_WEIGHTS,
     WEIGHT_STYLE,
     WEIGHT_TO_STROKE_WIDTH,
 )
@@ -369,13 +373,13 @@ def _weight_properties() -> dict[str, Any]:
                 "stroke_opacity": style.get("stroke_opacity"),
                 "stroke_dasharray": style.get("stroke_dasharray"),
                 "stroke_linecap": style.get("stroke_linecap"),
-                "texture_filter": weight in TEXTURE_FILTERS,
+                "texture_filter": weight in TEXTURE_FILTER_WEIGHTS,
             }
         )
     return {
         "weights": weights,
         "line_style_dash": {style: STYLE_TO_DASH[style] for style in get_args(schema.LineStyle)},
-        "texture_filter_weights": sorted(TEXTURE_FILTERS),
+        "texture_filter_weights": sorted(TEXTURE_FILTER_WEIGHTS),
         "canvas_px": CANVAS_PX,
     }
 
@@ -399,10 +403,13 @@ def _performance() -> dict[str, Any]:
         "default_canvas_aspect_id": DEFAULT_CANVAS_ASPECT_ID,
         "canvas_base_px": CANVAS_BASE_PX,
         "svg_profiles": sorted(SVG_PROFILES),
-        "amplitude_px": dict(AMPLITUDE_PX),
+        "amplitude_ratio": dict(AMPLITUDE_RATIO),
+        "amplitude_clamp_ratio": AMPLITUDE_CLAMP_RATIO,
+        "representative_min_ratio": REPRESENTATIVE_MIN_RATIO,
         "frequency_cycles": dict(FREQUENCY_CYCLES),
-        "blur_std": dict(BLUR_STD),
-        "segment_count": SEGMENT_COUNT,
+        "blur_ratio": dict(BLUR_RATIO),
+        "segment_target_ratio": SEGMENT_TARGET_RATIO,
+        "segment_count_range": [SEGMENT_COUNT_MIN, SEGMENT_COUNT_MAX],
         "default_anchor_region": list(_REGIONS["中域"]),
         "seed_summary": (
             "The JSON Score is deterministic; wobble and scatter are performed by "
@@ -681,10 +688,13 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
             ["default_canvas_aspect_id", performance["default_canvas_aspect_id"]],
             ["canvas_base_px", performance["canvas_base_px"]],
             ["svg_profiles", performance["svg_profiles"]],
-            ["amplitude_px", performance["amplitude_px"]],
+            ["amplitude_ratio", performance["amplitude_ratio"]],
+            ["amplitude_clamp_ratio", performance["amplitude_clamp_ratio"]],
+            ["representative_min_ratio", performance["representative_min_ratio"]],
             ["frequency_cycles", performance["frequency_cycles"]],
-            ["blur_std", performance["blur_std"]],
-            ["segment_count", performance["segment_count"]],
+            ["blur_ratio", performance["blur_ratio"]],
+            ["segment_target_ratio", performance["segment_target_ratio"]],
+            ["segment_count_range", performance["segment_count_range"]],
             ["default_anchor_region", performance["default_anchor_region"]],
         ],
     )

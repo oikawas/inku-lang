@@ -39,7 +39,6 @@
 		showCrab: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
-		onOpenModelSelection: () => void;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
@@ -70,7 +69,6 @@
 		showCrab,
 		stage1ModelLabel,
 		stage2ModelLabel,
-		onOpenModelSelection,
 		onRememberBatchPrompt,
 		onSubmit,
 		onStop,
@@ -111,11 +109,6 @@
 		return `${input ?? '-'}→${output ?? '-'}tok`;
 	}
 </script>
-
-<div class="batch-model-summary">
-	<span><b>Stage 1</b>{stage1ModelLabel}</span><span><b>Stage 2</b>{stage2ModelLabel}</span>
-	<button type="button" disabled={batchRunning} onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
-</div>
 
 <div class="batch-wrap">
 	<div class="line-nums" aria-hidden="true">{displayLineNumbersText}</div>
@@ -207,11 +200,6 @@
 {/if}
 
 <style>
-	.batch-model-summary { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: stretch; gap: 6px; margin-bottom: 8px; }
-	.batch-model-summary span { display: grid; gap: 2px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: 10px; overflow-wrap: anywhere; }
-	.batch-model-summary b { color: var(--fg3); font-size: 8px; letter-spacing: .06em; }
-	.batch-model-summary button { padding: 6px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--accent); font: inherit; font-size: 10px; cursor: pointer; }
-	.batch-model-summary button:disabled { opacity: .45; cursor: not-allowed; }
 	.batch-wrap {
 		display: flex;
 		border: 1px solid var(--border2);
@@ -382,6 +370,31 @@
 		font-variant-numeric: tabular-nums;
 		min-width: 0;
 		white-space: nowrap;
+	}
+	/* The batch panel's status blocks were authored in light-theme paper colours
+	   only, so on the dark theme they read as white sheets over the panel. */
+	:global(html[data-theme='dark']) .batch-active-line {
+		background: rgba(189, 143, 52, 0.26);
+		border-top-color: rgba(226, 191, 130, 0.35);
+		border-bottom-color: rgba(226, 191, 130, 0.35);
+	}
+	:global(html[data-theme='dark']) .batch-observe {
+		border-color: var(--border2);
+		background: var(--panel);
+	}
+	:global(html[data-theme='dark']) .batch-observe-head {
+		border-bottom-color: var(--border);
+		color: var(--fg2);
+	}
+	:global(html[data-theme='dark']) .batch-summary {
+		border-color: rgba(154, 183, 220, 0.35);
+		background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+		color: var(--fg);
+	}
+	:global(html[data-theme='dark']) .batch-summary.has-failures {
+		border-color: rgba(255, 154, 134, 0.45);
+		background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+		color: var(--fg);
 	}
 	.batch-observe-body {
 		margin: 0;

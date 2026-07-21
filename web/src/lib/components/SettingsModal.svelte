@@ -56,6 +56,13 @@
 			skipped: number;
 			note: string;
 		};
+		render_concurrency: {
+			server_limit: number;
+			client_limit: number;
+			min_limit: number;
+			max_limit: number;
+			note: string;
+		};
 		log_retention: {
 			enabled: boolean;
 			retention_days: number;
@@ -194,6 +201,8 @@
 		onUpdateDbBackupSettings: (intervalDays: number, maxGenerations: number) => void | Promise<void>;
 		onRunDbBackupNow: () => void | Promise<void>;
 		onUpdateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => void | Promise<void>;
+		renderConcurrencyStatus: string | null;
+		onUpdateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => void | Promise<void>;
 		onUpdateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => void | Promise<void>;
 		onLoadUserSettings: () => void;
 		onLogin: () => void | Promise<void>;
@@ -299,6 +308,8 @@
 		onUpdateDbBackupSettings,
 		onRunDbBackupNow,
 		onUpdateOutputSaveSettings,
+		renderConcurrencyStatus,
+		onUpdateRenderConcurrencySettings,
 		onUpdateLogRetentionSettings,
 		onLoadUserSettings,
 		onLogin,
@@ -942,6 +953,51 @@
 					<div class="db-test-result">{t().settingsOutputSaveNoteLabel}: {t().settingsOutputSaveNote}</div>
 					{#if outputSaveStatus}
 						<div class="inline-message">{outputSaveStatus}</div>
+					{/if}
+				{:else}
+					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
+				{/if}
+			</div>
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsRenderConcurrencyTitle}</div>
+				{#if settingsStatusLoading}
+					<div class="inline-message">{t().settingsLoading}</div>
+				{:else if settingsStatus}
+					<label class="server-path-row compact-control">
+						<span>
+							{t().settingsRenderConcurrencyServer}
+							<span class="info-dot" aria-label={t().settingsRenderConcurrencyServerHelp}>
+								i
+								<span class="info-tooltip">{t().settingsRenderConcurrencyServerHelp}</span>
+							</span>
+						</span>
+						<input
+							type="number"
+							min={settingsStatus.render_concurrency.min_limit}
+							max={settingsStatus.render_concurrency.max_limit}
+							value={settingsStatus.render_concurrency.server_limit}
+							onchange={(e) => onUpdateRenderConcurrencySettings(Number((e.currentTarget as HTMLInputElement).value), settingsStatus?.render_concurrency.client_limit ?? 4)}
+						/>
+					</label>
+					<label class="server-path-row compact-control">
+						<span>
+							{t().settingsRenderConcurrencyClient}
+							<span class="info-dot" aria-label={t().settingsRenderConcurrencyClientHelp}>
+								i
+								<span class="info-tooltip">{t().settingsRenderConcurrencyClientHelp}</span>
+							</span>
+						</span>
+						<input
+							type="number"
+							min={settingsStatus.render_concurrency.min_limit}
+							max={settingsStatus.render_concurrency.max_limit}
+							value={settingsStatus.render_concurrency.client_limit}
+							onchange={(e) => onUpdateRenderConcurrencySettings(settingsStatus?.render_concurrency.server_limit ?? 2, Number((e.currentTarget as HTMLInputElement).value))}
+						/>
+					</label>
+					<div class="db-test-result">{t().settingsRenderConcurrencyRange(settingsStatus.render_concurrency.min_limit, settingsStatus.render_concurrency.max_limit)}</div>
+					{#if renderConcurrencyStatus}
+						<div class="inline-message">{renderConcurrencyStatus}</div>
 					{/if}
 				{:else}
 					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>

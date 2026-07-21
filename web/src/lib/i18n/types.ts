@@ -92,8 +92,10 @@ export interface LangPack {
 	errorProviderAuth: (stage: string) => string;
 	errorProviderRateLimit: (stage: string) => string;
 	errorProviderOther: (stage: string, status: number) => string;
+	errorRenderBusy: string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
+	runStatusProgress: (done: number, total: number) => string;
 	runStatusStage1: string;
 	runStatusStage2: string;
 	stageDdlGenerating: string;
@@ -109,10 +111,12 @@ export interface LangPack {
 	ddlExpandedLabel: string;
 	ddlEditSectionLabel: string;
 	ddlNewButton: string;
+	ddlEditButton: string;
 	ddlNewDialogTitle: string;
 	ddlNewDialogSubtitle: string;
 	ddlEditDialogSubtitle: string;
 	ddlSyntaxGuide: string;
+	ddlDialogDrawingModel: string;
 
 	// Output tabs
 	tabCanvas: string;
@@ -190,6 +194,7 @@ export interface LangPack {
 	tooltipInputTenkei: string;
 	tooltipInputCanvas: string;
 	tooltipDdlNew: string;
+	tooltipDdlEdit: string;
 	tooltipSaijikiToggle: string;
 	tooltipDdlExpandedToggle: string;
 	tooltipStatsToggle: string;
@@ -420,6 +425,13 @@ export interface LangPack {
 	settingsOutputSaveNoteLabel: string;
 	settingsOutputSaveNote: string;
 	settingsOutputSaveSaved: string;
+	settingsRenderConcurrencyTitle: string;
+	settingsRenderConcurrencyServer: string;
+	settingsRenderConcurrencyServerHelp: string;
+	settingsRenderConcurrencyClient: string;
+	settingsRenderConcurrencyClientHelp: string;
+	settingsRenderConcurrencyRange: (min: number, max: number) => string;
+	settingsRenderConcurrencySaved: string;
 	settingsLogRetentionTitle: string;
 	settingsLogRetentionEnabled: string;
 	settingsLogRetentionDays: string;

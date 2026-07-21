@@ -110,6 +110,8 @@
 		variationGridCanAbort: boolean;
 		variationGridIncludesReading: boolean;
 		variationGridTaskLabel: string;
+		variationGridDone: number;
+		variationGridTotal: number;
 		variationGridStatus: string | null;
 		touchSeedText: string;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: HensouAmplitude) => void | Promise<void>;
@@ -259,6 +261,8 @@
 		variationGridCanAbort = false,
 		variationGridIncludesReading = false,
 		variationGridTaskLabel = '',
+		variationGridDone = 0,
+		variationGridTotal = 0,
 		variationGridStatus = null,
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
@@ -775,6 +779,8 @@
 									{#if variationBusy || variationGridBusy}
 										<RunStatus
 											label={t().refineGeneratingTask(variationGridTaskLabel)}
+											progressDone={variationGridDone}
+											progressTotal={variationGridTotal}
 											stage1Model={statusStage1Model}
 											stage2Model={statusStage2Model}
 											elapsedMs={variationElapsedMs}

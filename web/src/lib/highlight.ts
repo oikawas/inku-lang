@@ -1,26 +1,57 @@
-import { SAIJIKI } from './saijiki';
+import { SAIJIKI, SAIJIKI_EN, type SaijikiCategory } from './saijiki';
 
 export type Part = {
 	text: string;
 	kind: 'saijiki' | 'emotion' | 'plain';
 	category?: string;
+	categoryKey?: string;
 };
 
-// SAIJIKI is a hydratable store (reassigned on GET /api/saijiki). Rebuild the
-// greedy-match entry list whenever the store reference changes, so annotate
-// stays synchronous while picking up hydrated vocabulary.
-type SaijikiEntry = { word: string; category: string };
-let entriesRef: typeof SAIJIKI | null = null;
+// SAIJIKI / SAIJIKI_EN are hydratable stores (reassigned on GET /api/saijiki).
+// Rebuild the greedy-match entry list whenever either store reference changes,
+// so annotate stays synchronous while picking up hydrated vocabulary. Both
+// languages are matched at once: the DDL language follows instruction_lang and
+// need not agree with the UI language.
+type SaijikiEntry = { word: string; lower: string; category: string; categoryKey: string; ascii: boolean };
+let entriesJaRef: SaijikiCategory[] | null = null;
+let entriesEnRef: SaijikiCategory[] | null = null;
 let entriesCache: SaijikiEntry[] = [];
 
+// ASCII surfaces ("line", "pen", "dash-dot") must not match inside a longer
+// word ("outline", "open"). Japanese surfaces have no such boundary.
+const WORD_CHAR = /[A-Za-z0-9-]/;
+
+function categoryEntries(categories: SaijikiCategory[], label: (cat: SaijikiCategory) => string): SaijikiEntry[] {
+	return categories.flatMap((cat) =>
+		cat.words.map((word) => ({
+			word,
+			lower: word.toLowerCase(),
+			category: label(cat),
+			categoryKey: cat.key,
+			ascii: /^[\x20-\x7e]+$/.test(word)
+		}))
+	);
+}
+
 function saijikiEntries(): SaijikiEntry[] {
-	if (entriesRef !== SAIJIKI) {
-		entriesRef = SAIJIKI;
-		entriesCache = SAIJIKI.flatMap((cat) =>
-			cat.words.map((word) => ({ word, category: cat.label }))
-		).sort((a, b) => b.word.length - a.word.length);
+	if (entriesJaRef !== SAIJIKI || entriesEnRef !== SAIJIKI_EN) {
+		entriesJaRef = SAIJIKI;
+		entriesEnRef = SAIJIKI_EN;
+		entriesCache = [
+			...categoryEntries(SAIJIKI, (cat) => cat.label),
+			...categoryEntries(SAIJIKI_EN, (cat) => cat.en)
+		].sort((a, b) => b.word.length - a.word.length);
 	}
 	return entriesCache;
+}
+
+function matchesAt(text: string, index: number, entry: SaijikiEntry): boolean {
+	if (!entry.ascii) return text.startsWith(entry.word, index);
+	const end = index + entry.word.length;
+	if (text.slice(index, end).toLowerCase() !== entry.lower) return false;
+	if (index > 0 && WORD_CHAR.test(text[index - 1])) return false;
+	if (end < text.length && WORD_CHAR.test(text[end])) return false;
+	return true;
 }
 
 const EMOTION_WORDS = [
@@ -63,11 +94,12 @@ export function annotate(text: string): Part[] {
 		let matched = false;
 
 		for (const entry of saijikiEntries()) {
-			if (text.startsWith(entry.word, i)) {
+			if (matchesAt(text, i, entry)) {
 				parts.push({
-					text: entry.word,
+					text: text.slice(i, i + entry.word.length),
 					kind: 'saijiki',
-					category: entry.category
+					category: entry.category,
+					categoryKey: entry.categoryKey
 				});
 				i += entry.word.length;
 				matched = true;
@@ -100,6 +132,25 @@ function escapeHtml(value: string): string {
 		.replaceAll('>', '&gt;');
 }
 
+// Color class per category. The key is language-neutral, so English surfaces
+// get the same color as their Japanese counterparts; the label switch stays as
+// the fallback for callers that only carry a label.
+function saijikiCategoryClassByKey(key: string): string {
+	if (key.startsWith('plugin-')) return 'plugin';
+	switch (key) {
+		case 'katachi': return 'shape';
+		case 'tezawari': return 'touch';
+		case 'tsuranari': return 'line';
+		case 'iro': return 'color';
+		case 'yuragi': return 'motion';
+		case 'basho': return 'place';
+		case 'ugoki': return 'action';
+		case 'katamuki': return 'angle';
+		case 'wariai': return 'ratio';
+		default: return 'word';
+	}
+}
+
 function saijikiCategoryClass(category: string | undefined): string {
 	switch (category) {
 		case 'かたち': return 'shape';
@@ -120,12 +171,13 @@ function ddlCaretMarkup(): string {
 	return '<span class="ddl-custom-caret"></span>';
 }
 
-function renderDDLPart(text: string, kind: string, category: string | undefined, caretOffset: number | null): string {
+function renderDDLPart(text: string, kind: string, category: string | undefined, categoryKey: string | undefined, caretOffset: number | null): string {
 	const before = caretOffset === null ? text : text.slice(0, caretOffset);
 	const after = caretOffset === null ? '' : text.slice(caretOffset);
 	const content = caretOffset === null ? escapeHtml(text) : `${escapeHtml(before)}${ddlCaretMarkup()}${escapeHtml(after)}`;
 	if (kind === 'saijiki') {
-		return `<span class="ddl-token ddl-token-${saijikiCategoryClass(category)}">${content}</span>`;
+		const cls = categoryKey ? saijikiCategoryClassByKey(categoryKey) : saijikiCategoryClass(category);
+		return `<span class="ddl-token ddl-token-${cls}">${content}</span>`;
 	}
 	if (kind === 'emotion') {
 		return `<span class="ddl-token-emotion">${content}</span>`;
@@ -147,7 +199,7 @@ export function highlightDDL(text: string, caretIndex: number | null = null): st
 			&& (clampedCaret < nextOffset || (clampedCaret === text.length && clampedCaret === nextOffset))
 			? clampedCaret - offset
 			: null;
-		const rendered = renderDDLPart(part.text, part.kind, part.category, localCaret);
+		const rendered = renderDDLPart(part.text, part.kind, part.category, part.categoryKey, localCaret);
 		offset = nextOffset;
 		return rendered;
 	}).join('');

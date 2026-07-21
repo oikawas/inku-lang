@@ -219,7 +219,7 @@
 	<div class="section-head">
 		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
-			{#if inputMode === 'single'}
+			{#if inputMode !== 'demo'}
 			<Tooltip text={t().tooltipInputModel}>
 				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			</Tooltip>
@@ -250,7 +250,7 @@
 		</div>
 	</div>
 
-	{#if inputMode === 'single'}
+	{#if inputMode !== 'demo'}
 		<div class="current-selection" aria-label={isJapanese ? '現在選択中の設定' : 'Current selection'}>
 			<span class="cs-group">
 				<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
@@ -266,7 +266,11 @@
 			<span class="cs-divider"></span>
 			<span class="cs-group">
 				<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
-				<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
+				{#if inputMode === 'batch' && batchRandomColorCatalog}
+					<span class="cs-value">{t().batchRandomColorCatalog}</span>
+				{:else}
+					<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
+				{/if}
 			</span>
 			<span class="cs-divider"></span>
 			<span class="cs-group">
@@ -274,6 +278,9 @@
 				<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
 			</span>
 		</div>
+	{/if}
+
+	{#if inputMode === 'single'}
 		<textarea
 			bind:value={input}
 			rows="5"
@@ -328,7 +335,6 @@
 			{showCrab}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
-			onOpenModelSelection={onOpenLlmModelSelection}
 			{onRememberBatchPrompt}
 			onSubmit={onSubmit}
 			onStop={onStop}

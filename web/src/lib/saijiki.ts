@@ -21,3 +21,13 @@ export let SAIJIKI: SaijikiCategory[] = GENERATED_SAIJIKI.map((cat) => ({
 export function hydrateSaijiki(categories: SaijikiCategory[]): void {
 	SAIJIKI = categories;
 }
+
+// English surfaces of the same table (GET /api/saijiki?lang=en). Display
+// components keep reading SAIJIKI; this store exists so highlighting can match
+// English DDL regardless of the UI language (instruction_lang can differ from
+// it). There is no codegen snapshot for it, so it stays empty until hydration.
+export let SAIJIKI_EN: SaijikiCategory[] = [];
+
+export function hydrateSaijikiEn(categories: SaijikiCategory[]): void {
+	SAIJIKI_EN = categories;
+}

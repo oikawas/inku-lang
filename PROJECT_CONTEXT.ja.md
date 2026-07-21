@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.3.0 / Build 645**
+**対象バージョン: v2.3.1 / Build 647**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -105,7 +105,9 @@ v2.2.0（Build 640）では閉図形（円・楕円・四角・三角・多角�
 
 v2.2.1（Build 643）では PNG ラスタライザを resvg-py へ置換し、質感 filter・滲みが全 PNG 経路（ダウンロード・AI Vision 入力・奥書サムネイル・CLI 5 箇所）で描画されるようになった。共通ヘルパー `shared/src/inku_analysis/rasterizer.py`（resvg 優先・cairosvg フォールバック・不在時警告 + skip 維持）。API に PNG エンドポイントは無く CLI は応答 `svg` を自プロセスでラスタライズする構造のため、CLI 側も同ヘルパーへ寄せた。cairosvg フォールバック時は CLI 警告 + サーバー WARNING + 成果物へ `png_rasterizer`（backend/version）を記録。Python は server / cli / shared とも 3.12 へ統一（resvg-py の wheel 都合）。`inku-analysis` を editable 依存化し「shared を rsync しても uv sync まで反映されない」罠を解消。SVG・rh2・engine（8）は不変。生成 PNG は旧 PNG と画素非互換（過去ランとの直接画素比較は不成立）。lock 一本化（uv workspace 化）は別契約。
 
-v2.3.0（Build 645）では閉図形の塗りを領域 fill から素材の筆致で内側を埋めるストローク塗り（`class="fill-stroke-v1"`）へ変更し、`filled` の意味論を復権した（`True` = 素材の筆致で内部を埋める / `False` = 輪郭のみ。従来は死にフィールドで常に塗りつぶし）。走査線と閉輪郭の交点で 1 区間 = 1 筆を `synthesize_along` に通す（clipPath 不要・凹形可・端点は輪郭に揃う）。走査角は演奏 seed 由来 0〜180°、間隔 `max(線幅 × 1.5, canvas.unit × 0.012)` + ±12% ジッタで紙目を残す。rotring は領域 fill 維持、走査線 3 本未満は領域 fill に縮退。`surface` 指定時は素材塗りを抑制し、surface の hatch / crosshatch は筆致の帯（`class="surface-stroke-v1"`）へ差し替え。演奏されない variation は seed key から除外（primitive 別不活性判定）。render engine version は 9。サイズは 1 図形 11〜123KB・10 instruction で 422KB（上限規則は分布を見て後付け、最大要因は surface crosshatch の帯化）。残: 実 UI 目視（塗り間隔の粗密）・粒系 / 滲み系の筆致化。次契約 = arc のストローク化（engine 10 / v2.4、裁定済み仕様はレポート付録）。
+v2.3.0（Build 645）では閉図形の塗りを領域 fill から素材の筆致で内側を埋めるストローク塗り（`class="fill-stroke-v1"`）へ変更し、`filled` の意味論を復権した（`True` = 素材の筆致で内部を埋める / `False` = 輪郭のみ。従来は死にフィールドで常に塗りつぶし）。走査線と閉輪郭の交点で 1 区間 = 1 筆を `synthesize_along` に通す（clipPath 不要・凹形可・端点は輪郭に揃う）。走査角は演奏 seed 由来 0〜180°、間隔 `max(線幅 × 1.5, canvas.unit × 0.012)` + ±12% ジッタで紙目を残す。rotring は領域 fill 維持、走査線 3 本未満は領域 fill に縮退。`surface` 指定時は素材塗りを抑制し、surface の hatch / crosshatch は筆致の帯（`class="surface-stroke-v1"`）へ差し替え。演奏されない variation は seed key から除外（primitive 別不活性判定）。render engine version は 9。サイズは 1 図形 11〜123KB・10 instruction で 422KB（上限規則は分布を見て後付け、最大要因は surface crosshatch の帯化）。残: 実 UI 目視（塗り間隔の粗密）・粒系 / 滲み系の筆致化。次契約 = arc のストローク化（engine 10、裁定済み仕様はレポート付録）。
+
+v2.3.1（Build 647）では弧（arc）も手描きストロークの帯（`class="arc-stroke-v1"`）で演奏するようにし、v2.2.0 で残されていた最後のストローク化対象外を解消した。幾何の弧は不可視の意図要素（`stroke="none"`）として残り、touching（接点契約）は意図弧を読み戻して座標で担保（弧抽出器は無改変、`test_touching.py` 全通過）。接点端も taper のまま（幅の下限なし、葉の先端は柔らかく消える）。破線・点線は意図弧を細く可視化、drypoint は中心線沿い burr、材質輪郭・speck は帯と併存、rotring は幾何のまま。render engine version は 10。塗り間隔の粗密は実 UI 目視 OK で確定済み。残: 弧の実 UI 目視（Stage 3 葉の再目視も候補）・サイズ上限・粒系 / 滲み系の筆致化。**バージョン採番の作者裁定（2026-07-21）: 小改修は patch（+0.0.1）とする。**
 
 ## 変更時の確認先
 

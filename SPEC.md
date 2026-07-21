@@ -352,6 +352,24 @@ since its contour generator always consumes quality / amplitude / frequency).
 Because the same Score and seed render differently, the render engine version
 was bumped to 9.
 
+v2.3.1 performs arcs as hand-drawn stroke bands too (`class="arc-stroke-v1"`),
+closing the last exclusion left by v2.2.0. All hand-drawn weights participate;
+rotring and non-hand-drawn weights keep the geometric arc. The band's
+centerline is the arc after variation is performed, with both endpoints pinned
+to their intended values. **The geometric arc remains as an invisible intent
+element (`stroke="none"`)**: the touching (contact) contract is verified by
+reading this intent arc back from the rendered SVG, so the arc extractor needs
+no change (the band is a filled `M..L..Z` polygon with no arc command, so
+nothing is double-counted). **Contact ends stay tapered**: the stroke
+synthesis envelope converges to zero at both ends, and since the intent arc
+guarantees the contact contract by coordinates, the band may fade out at
+contact points just like free ends (leaf tips and bases fade softly). Dashed
+and dotted styles make the intent arc itself visible as a thin dashed / dotted
+line (the line style is the description, symmetric with lines and closed
+shapes). Drypoint emits burr along the performed centerline, and material
+outlines and specks coexist with the band. Because the same Score and seed
+render differently, the render engine version was bumped to 10.
+
 For literal `layout="grid"` tiling, performance composes three controlled layers: a deterministic seed-derived within-cell position jitter, the existing per-element `variation` with a distinct phase for every mark, and the existing material behavior of weights such as pencil, brush, and chalk. The same Score and render seed remain bit-identical. Because full-field repetition is explicit author intent, grid bypasses scatter-oriented bias, fade, clustering, preserved-space injection, and representative count reduction.
 
 inku exposes this as the first half of two-step regeneration: **another

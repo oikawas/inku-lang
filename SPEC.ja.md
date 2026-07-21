@@ -1304,6 +1304,8 @@ v2.2.0 で閉図形（circle / ellipse / square / triangle / polygon）の輪郭
 
 v2.3.0 で閉図形の塗りを領域 fill から**素材の筆致で内側を埋めるストローク塗り**へ変更し、`filled` の意味論を復権した（`True` = 素材の筆致で内部を埋める / `False` = 輪郭のみ。従来は閉図形が `filled` に関わらず常に塗りつぶされる死にフィールドだった）。塗りは走査線と閉輪郭の交点を対で取り、内部区間 1 つ = 1 筆として `synthesize_along` に通す（clipPath 不要。凹形 cloudform も交点対のまま扱え、端点は交点から線幅の半分だけ内側へ寄るので縁が輪郭に揃う）。群は `class="fill-stroke-v1"`。走査角は演奏 seed 由来（0〜180° 一様）で図形ごとに変わり、間隔は `max(線幅 × 1.5, canvas.unit × 0.012)` に ±12% のジッタ。完全被覆は狙わず紙目（隙間）を残す。rotring は領域 fill を維持し（`True` = ベタ塗り / `False` = 輪郭のみ）、走査線 3 本未満の微小図形は領域 fill に縮退する。`surface` 指定時は素材塗りを出さない（塗り = 素材の既定の埋め方、`surface` = 明示的な版表現）。あわせて surface の hatch / crosshatch を幾何直線から筆致の帯（`class="surface-stroke-v1"`）へ差し替え（中心線・角度・間隔・本数は不変、rotring は幾何直線のまま）、演奏されない variation を seed key から除外して不活性な variation の有無で演奏バイトが変わらないようにした（primitive 別の不活性判定。cloudform は輪郭生成器が quality / amplitude / frequency を常に消費するため不活性なのは dimensions のみ）。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 9 へ更新した。
 
+v2.3.1 で弧（arc）も手描きストロークの帯（`class="arc-stroke-v1"`）で演奏するようにし、v2.2.0 で残されていた最後の対象外を解消した。対象 weight は rotring を除く手描き系全種（rotring と非手描き weight は幾何の弧のまま）。帯の中心線は変奏を演奏した後の弧で、両端は意図値に固定される。**幾何の弧は不可視の意図要素（`stroke="none"`）として残し**、touching（接点契約）の検査は描画 SVG からこの意図弧を読み戻して座標で担保する（弧抽出器は無改変。帯は `M..L..Z` の塗りポリゴンで弧コマンドを持たないため二重計上されない）。**接点端も taper のまま**とする（ストローク合成の envelope は両端でゼロへ収束する。接点契約は意図弧が座標で担保するため、帯は自由端と同じく端で柔らかく消えてよい。葉の先端・付け根は柔らかく消える見た目になる）。破線・点線は意図弧そのものを細い破線 / 点線で可視化する（線種は記述なので読めるまま残す。line・閉図形と対称）。drypoint は演奏後の中心線に沿って burr を出し、材質輪郭・speck は帯と併存する。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 10 へ更新した。
+
 ---
 
 ## 14. 関係（あいだ）の設計

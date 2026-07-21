@@ -2521,3 +2521,15 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **サイズ実測（上限なしで観測、作者裁定）:** 1 図形 11〜123KB（中央 45KB）、10 instruction の作品で 422KB。最大は塗りではなく surface crosshatch の 192KB（幾何直線 80 本 × 2 層が帯化）。上限規則は実運用の分布を見て後付け。採取物 = `cli/out2/644-v2.2.1-stroke-fill/size-observation.json`。
 - **作者所感（PNG 報告後）:**「一気に情報量とニュアンスが増えました。ブレイクスルーだと思います」。あわせて人間のエミュレーションの危険への自覚が示され、以後の筆致改修は「より人間らしく」を理由にせず**記述で書き分けられる差が増えるか**で提示する方針を恒久記録。
 - **残件:** 実 UI 目視（特に塗り間隔の粗密）・サイズ上限規則・surface 粒系 / 滲み系の筆致化。arc のストローク化は裁定済み（不可視の意図弧を残し抽出器無改変・接点端も taper のまま）で engine 10 / v2.4 として次契約へ。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v23-stroke-fill-result.md`。
+
+
+### v2.3.1 — 弧のストローク化（Build 647、2026-07-21）
+
+- **arc を手描きストロークの帯（`arc-stroke-v1`）で演奏:** `_render_instruction` の arc 分岐を `_uses_hand_stroke` で分け（line と対称）、rotring / 非 GRAMMARS は幾何の弧のまま、手描き系は新規 `_render_arc_hand_stroke` で帯として描く。中心線は変奏なし = 幾何弧の密標本化、変奏あり = 演奏後の弧（両端は意図値に固定）。帯は `synthesize_along(closed=False)` 1 呼び出し。v2.2.0 で残されていた最後のストローク化対象外を解消。
+- **不可視の意図弧（裁定 A、2026-07-21）:** 幾何の弧を `stroke="none"` の意図要素として残す（変奏なし = `<path d="M..A..">`、変奏あり = `<polyline>`）。touching（接点契約）の検査は描画 SVG からこの意図弧を読み戻して座標で担保するため、**弧抽出器 `_svg_arcs` は無改変**（`test_touching.py` 全通過が要の検査。帯は弧コマンドを持たない塗りポリゴンなので二重計上されない。drypoint burr は低 opacity で polyline 分岐に拾われない）。
+- **接点端は taper のまま（裁定、2026-07-21）:** envelope が両端でゼロへ収束し、幅の下限は置かない。接点契約は意図弧が座標で担保するため、帯は自由端と同じく端で柔らかく消える（葉の先端・付け根は柔らかく消える見た目になることを作者了承）。
+- **style / drypoint / 材質:** 破線・点線は意図弧そのものを細い破線 / 点線で可視化（別要素を足さないので弧は 1 個のまま）。drypoint は演奏後の中心線に法線オフセットで burr を出し、帯にはテクスチャ filter を載せない。材質輪郭・speck（`_add_material_arc_outline`）は帯と併存。z 順 = 意図要素 → 帯 → burr → 材質輪郭。プロファイル差は display のみ帯に texture filter。**初版試作の罠（帯だけでは材質が抜け評価が反転する）は契約に明記され、材質併載で実装された**。
+- **render engine version 9 → 10:** 同一 Score + 同一 seed の演奏結果が変わるため。arc 以外は不変（`MATERIAL_NONE_SEED_DIGESTS` の `brush_thin_line` と閉図形 3 件は無更新のまま通過、`crayon_arc` のみ理由つき再採取）。
+- **検証:** pytest **1022 passed / 30 skipped**（新規 `test_arc_strokes.py` 37 件: 手描き 9 weight の帯存在・rotring 不変・solid の意図弧不可視と抽出器規準で弧 1 個・変奏ありの polyline 化・破線可視化・drypoint burr・材質併存・決定性・seed 追随・変奏後合成）、cli 68 passed、ruff clean（Mac / pentala 両環境）。`test_touching.py` 全通過（200 seed の幾何 / replay 契約含む）。
+- **目視採取:** `cli/out2/646-v2.3.1-arc-strokes/`（SVG / PNG 8 組、resvg で材質 filter 込み: pencil の taper・brush_thick の濃淡・crayon / chalk の粒・drypoint の burr・rotring の幾何・破線・wave 変奏）。
+- **残件:** 実 UI 目視（弧の帯の筆致・両端 taper・weight 差）。葉の見え方が変わるため Stage 3 葉の再目視も候補（「双弧が円に見える」所感との対照）。サイズ上限規則は引き続き後付け（今回サイズ網羅採取は未実施）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v24-arc-strokes-result.md`。

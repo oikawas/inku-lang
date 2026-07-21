@@ -7,6 +7,7 @@ from inku_analysis.rasterizer import (
     BACKEND_RESVG,
     RasterizerUnavailable,
     rasterizer_backend,
+    rasterizer_info,
     svg_to_png,
 )
 
@@ -77,6 +78,22 @@ def test_output_size_matches_between_backends(monkeypatch, kwargs, expected_pref
         _block_imports(ctx, "resvg_py")
         cairo_png = svg_to_png(PLAIN_SVG, **kwargs)
     assert cairo_png[16:24] == expected_prefix
+
+
+def test_rasterizer_info_identifies_backend_and_version():
+    info = rasterizer_info()
+    assert info["backend"] == BACKEND_RESVG
+    assert info["version"]
+
+
+def test_rasterizer_info_follows_the_fallback(monkeypatch):
+    _block_imports(monkeypatch, "resvg_py")
+    assert rasterizer_info()["backend"] == BACKEND_CAIROSVG
+
+
+def test_rasterizer_info_is_empty_without_a_backend(monkeypatch):
+    _block_imports(monkeypatch, "resvg_py", "cairosvg")
+    assert rasterizer_info() == {}
 
 
 def test_resvg_renders_material_filters_that_cairosvg_drops(monkeypatch):

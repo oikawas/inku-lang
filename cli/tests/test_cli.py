@@ -1160,3 +1160,41 @@ def test_plugin_validate_sends_document_body(monkeypatch, tmp_path, capsys):
         ("POST", "/api/plugins/validate", {"document": "---\nnamespace: Test\n---\n"})
     ]
     assert json.loads(capsys.readouterr().out) == {"valid": True}
+
+
+def test_png_output_records_the_rasterizer_that_produced_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
+
+    paths = cli._write_paint_outputs(
+        {"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="smoke", png=True
+    )
+
+    assert paths["png_rasterizer"]["backend"] == "resvg"
+    assert paths["png_rasterizer"]["version"]
+    # No PNG requested -> nothing to attribute.
+    without = cli._write_paint_outputs(
+        {"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="plain", png=False
+    )
+    assert "png_rasterizer" not in without
+
+
+def test_cairosvg_fallback_warns_once_that_material_filters_are_missing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "rasterizer_backend", lambda: cli.BACKEND_CAIROSVG)
+    monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
+    monkeypatch.setattr(cli, "_rasterizer_warned", False)
+
+    for prefix in ("one", "two"):
+        cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix=prefix, png=True)
+
+    stderr = capsys.readouterr().err
+    assert stderr.count("falls back to cairosvg") == 1
+    assert "material filters" in stderr
+
+
+def test_no_warning_when_resvg_is_present(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
+    monkeypatch.setattr(cli, "_rasterizer_warned", False)
+
+    cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="quiet", png=True)
+
+    assert capsys.readouterr().err == ""

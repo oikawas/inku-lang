@@ -30,7 +30,13 @@ from inku_analysis import (
     composition_family as _composition_family_from_score,
     motif_signatures as _motif_signatures,
 )
-from inku_analysis.rasterizer import RasterizerUnavailable, rasterizer_backend, svg_to_png
+from inku_analysis.rasterizer import (
+    BACKEND_CAIROSVG,
+    RasterizerUnavailable,
+    rasterizer_backend,
+    rasterizer_info,
+    svg_to_png,
+)
 
 SESSION_COOKIE_NAME = "inku_session"
 DEFAULT_BASE_URL = "http://127.0.0.1:8100"
@@ -532,17 +538,38 @@ def _read_text_argument(text: str | None, file_path: str | None) -> str:
         return text.strip()
     raise CliError("text is required")
 
+_rasterizer_warned = False
+
+
+def _rasterize_png(svg: str, **kwargs: int) -> bytes:
+    """Rasterize, warning once when the fallback backend is in use.
+
+    A cairosvg fallback still writes a clean-looking PNG, it just silently omits the
+    material filters, so without this the degradation is invisible in the artifact.
+    """
+    global _rasterizer_warned
+    if not _rasterizer_warned and rasterizer_backend() == BACKEND_CAIROSVG:
+        _rasterizer_warned = True
+        print(
+            "warning: resvg-py is not installed, so PNG output falls back to cairosvg, "
+            "which does not render the material filters (pencil / crayon / chalk / brush_thick). "
+            "The PNGs will look cleaner than the artwork actually is.",
+            file=sys.stderr,
+        )
+    return svg_to_png(svg, **kwargs)
+
+
 def _write_paint_outputs(
     result: dict[str, Any],
     *,
     out_dir: Path | None,
     prefix: str,
     png: bool,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     if out_dir is None:
         return {}
     out_dir.mkdir(parents=True, exist_ok=True)
-    paths: dict[str, str] = {}
+    paths: dict[str, Any] = {}
     json_path = out_dir / f"{prefix}.json"
     svg_path = out_dir / f"{prefix}.svg"
     json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -558,10 +585,12 @@ def _write_paint_outputs(
     if png:
         png_path = out_dir / f"{prefix}.png"
         try:
-            png_path.write_bytes(svg_to_png(str(result["svg"])))
+            png_path.write_bytes(_rasterize_png(str(result["svg"])))
         except RasterizerUnavailable as exc:
             raise CliError("PNG output requires a rasterizer (resvg-py or cairosvg)") from exc
         paths["png"] = str(png_path)
+        # Different backends and versions produce different pixels from one SVG.
+        paths["png_rasterizer"] = rasterizer_info()
     return paths
 
 def _result_with_svg_profile(
@@ -687,7 +716,7 @@ def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
     except ImportError as exc:
         raise CliError("analyze --replay requires Pillow") from exc
     try:
-        buffer = io.BytesIO(svg_to_png(svg))
+        buffer = io.BytesIO(_rasterize_png(svg))
     except RasterizerUnavailable as exc:
         raise CliError("analyze --replay requires a rasterizer (resvg-py or cairosvg)") from exc
     with Image.open(buffer) as image:
@@ -1268,7 +1297,7 @@ def _write_history_export(
         _write_json_file(json_path, export_item)
         svg = str(item.get("svg") or "")
         svg_path.write_text(svg, encoding="utf-8")
-        png_path.write_bytes(svg_to_png(svg))
+        png_path.write_bytes(_rasterize_png(svg))
         item["_export_paths"] = export_paths
     sheet_path = out_dir / "contact-sheet.png"
     _make_contact_sheet(item_dir, sheet_path, columns=columns, thumb_size=thumb_size)
@@ -1278,6 +1307,8 @@ def _write_history_export(
         "items_dir": str(item_dir),
         "contact_sheet": str(sheet_path),
         "summary_json": str(summary_path),
+        # Different backends and versions produce different pixels from one SVG.
+        "png_rasterizer": rasterizer_info(),
     }
     summary = _history_export_summary(items, paths)
     _write_json_file(summary_path, summary)
@@ -2949,7 +2980,7 @@ def command_refine(args: argparse.Namespace) -> int:
             print(f"Saved: {out_dir}/{stem}.[json|svg]")
             if args.png:
                 try:
-                    (out_dir / f"{stem}.png").write_bytes(svg_to_png(data["svg"]))
+                    (out_dir / f"{stem}.png").write_bytes(_rasterize_png(data["svg"]))
                 except RasterizerUnavailable:
                     pass
         else:
@@ -3022,7 +3053,7 @@ def command_inspect(args: argparse.Namespace) -> int:
             
             if args.png:
                 try:
-                    (out_dir / f"inspect-{safe_model_name}.png").write_bytes(svg_to_png(data["svg"]))
+                    (out_dir / f"inspect-{safe_model_name}.png").write_bytes(_rasterize_png(data["svg"]))
                 except RasterizerUnavailable:
                     pass
         except Exception as exc:

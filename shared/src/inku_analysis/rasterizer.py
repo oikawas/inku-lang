@@ -72,6 +72,25 @@ def rasterizer_backend() -> str | None:
     return None
 
 
+def rasterizer_info() -> dict[str, str]:
+    """Identify the backend that would rasterize, for recording alongside PNG output.
+
+    Two machines with different backends, or different versions of one backend,
+    produce different pixels from the same SVG, so artifacts carry this to stay
+    comparable. Returns an empty dict when no backend is installed.
+    """
+    backend = rasterizer_backend()
+    if backend is None:
+        return {}
+    distribution = "resvg-py" if backend == BACKEND_RESVG else BACKEND_CAIROSVG
+    try:
+        from importlib.metadata import version
+
+        return {"backend": backend, "version": version(distribution)}
+    except Exception:
+        return {"backend": backend}
+
+
 def svg_to_png(svg: str, *, width: int | None = None, height: int | None = None) -> bytes:
     """Rasterize ``svg`` to PNG bytes.
 

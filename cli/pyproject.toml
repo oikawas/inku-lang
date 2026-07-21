@@ -24,4 +24,4 @@ dev = [
 ]
 
 [tool.uv.sources]
-inku-analysis = { path = "../shared" }
+inku-analysis = { path = "../shared", editable = true }

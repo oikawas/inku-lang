@@ -402,7 +402,7 @@ wheels = [
 [[package]]
 name = "inku-analysis"
 version = "0.1.0"
-source = { directory = "../shared" }
+source = { editable = "../shared" }
 dependencies = [
     { name = "cairosvg" },
     { name = "resvg-py" },
@@ -444,7 +444,7 @@ requires-dist = [
     { name = "cairosvg", specifier = ">=2.7.0" },
     { name = "cryptography", specifier = ">=46.0.0" },
     { name = "fastapi", specifier = ">=0.136.0" },
-    { name = "inku-analysis", directory = "../shared" },
+    { name = "inku-analysis", editable = "../shared" },
     { name = "openai", specifier = ">=2.32.0" },
     { name = "pydantic", specifier = ">=2.13.3" },
     { name = "python-dotenv", specifier = ">=1.2.2" },

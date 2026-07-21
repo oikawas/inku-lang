@@ -8,7 +8,7 @@ import os
 import re
 from typing import Any, Callable
 
-import cairosvg
+from inku_analysis.rasterizer import svg_to_png
 
 from .model_settings import connection_for, provider_for_model
 
@@ -16,7 +16,7 @@ ALLOWED_KINDS = ("reinterpretation", "catalog_change", "layout_variation", "touc
 
 
 def _png_data_url(svg: str) -> str:
-    png = cairosvg.svg2png(bytestring=svg.encode("utf-8"), output_width=768, output_height=768)
+    png = svg_to_png(svg, width=768, height=768)
     return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
 
 

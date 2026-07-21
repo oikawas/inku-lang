@@ -110,6 +110,32 @@ _stage_stats = {
 _RENDER_CONCURRENCY = max(1, int(os.getenv("INKU_RENDER_CONCURRENCY", "2")))
 _render_slots = BoundedSemaphore(_RENDER_CONCURRENCY)
 _logger = logging.getLogger(__name__)
+
+
+def _log_rasterizer_backend() -> None:
+    """Announce the PNG backend at boot.
+
+    A cairosvg fallback still writes clean-looking PNGs, it just silently omits the
+    material filters, so both the saved artwork and the Vision input degrade with no
+    other trace. Logged once per process rather than per rasterization.
+    """
+    from inku_analysis.rasterizer import BACKEND_CAIROSVG, rasterizer_info
+
+    info = rasterizer_info()
+    if not info:
+        _logger.warning("no SVG rasterizer is installed; PNG output is disabled")
+    elif info["backend"] == BACKEND_CAIROSVG:
+        _logger.warning(
+            "PNG rasterizer fell back to cairosvg %s; material filters "
+            "(pencil / crayon / chalk / brush_thick) will not be rendered into PNG or Vision input",
+            info.get("version", "?"),
+        )
+    else:
+        _logger.info("PNG rasterizer: %s %s", info["backend"], info.get("version", "?"))
+
+
+_log_rasterizer_backend()
+
 _HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 _SESSION_COOKIE_NAME = "inku_session"
 _SESSION_COOKIE_MAX_AGE = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
@@ -407,15 +433,13 @@ def _save_output_files(
         _logger.exception("failed to save output files: prefix=%s", prefix)
         return
 
-    try:
-        import cairosvg  # lazy import — optional dependency
-    except ImportError:
-        _logger.warning("cairosvg is not installed; skipped PNG output: prefix=%s", prefix)
-        return
+    from inku_analysis.rasterizer import RasterizerUnavailable, svg_to_png
 
     try:
-        png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=int(_output_save_settings()["png_size"]))
+        png_bytes = svg_to_png(svg, width=int(_output_save_settings()["png_size"]))
         Path(f"{prefix}_output.png").write_bytes(png_bytes)
+    except RasterizerUnavailable:
+        _logger.warning("no SVG rasterizer is installed; skipped PNG output: prefix=%s", prefix)
     except Exception:
         _logger.exception("failed to save PNG output: prefix=%s", prefix)
 

@@ -3,7 +3,7 @@ name = "inku-cli"
 version = "0.1.0"
 description = "Command line client for controlling an inku API server"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "inku-analysis",
     "cairosvg>=2.7.0",
@@ -24,4 +24,4 @@ dev = [
 ]
 
 [tool.uv.sources]
-inku-analysis = { path = "../shared" }
+inku-analysis = { path = "../shared", editable = true }

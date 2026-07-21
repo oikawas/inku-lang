@@ -10,7 +10,7 @@ from .base import RenderEngineResult
 @dataclass(frozen=True)
 class DefaultRenderEngine:
     id: str = "default"
-    version: str = "8"
+    version: str = "9"
 
     def render(
         self,

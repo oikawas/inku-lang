@@ -100,10 +100,10 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # なった分だけで、line と arc は v2.1 とバイト一致したまま。
 MATERIAL_NONE_SEED_DIGESTS = {
     "brush_thin_line": "caf585ff657f4430d6c4b38cbc51ceb5",
-    "chalk_square": "30e72859c3bad016bb1d807c983ab6c3",
+    "chalk_square": "1c5f83ded213aab30a7273476dc8c11f",
     "crayon_arc": "cfb845988d7b2ffde128037f5633942b",
-    "pencil_circle": "7f6369cf1d186d2b3dcc83aca62782fc",
-    "pencil_ellipse": "865965b578d0ef079a56c546423a3fcb",
+    "pencil_circle": "3c26c91346dba1512246074cae8527b9",
+    "pencil_ellipse": "ea2c0056db2a1a0308f15bb4791d3aa6",
 }
 
 

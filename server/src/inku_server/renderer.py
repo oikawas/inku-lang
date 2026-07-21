@@ -17,7 +17,7 @@ from xml.sax.saxutils import escape
 
 import svgwrite
 
-from .cloudform import generate_cloudform_contour
+from .cloudform import generate_cloudform_contour, sample_closed_catmull_rom
 from .plugins import CanvasSize, canvas_size_for_aspect
 from .schema import (
     CanvasGroundSpec,
@@ -449,6 +449,33 @@ def _texture_filter_xml(weight: str, canvas: CanvasSize) -> str:
     return "".join(parts)
 
 
+_VARIATION_SEED_FIELDS_ALL = frozenset(
+    {"amplitude", "frequency", "quality", "dimensions"}
+)
+
+
+def _variation_seed_fields(ins: Instruction) -> frozenset[str] | None:
+    """seed key に残す variation フィールド。None = variation ごと落とす。
+
+    演奏されない variation が seed を動かすと、同じ意図が weight 次第で別の
+    演奏になる。実際に消費されるフィールドだけを残す。判定は primitive ごとに
+    異なる (cloudform は dimensions を見ず、残り 3 つを輪郭生成器の引数に使う)。
+    """
+    variation = ins.variation
+    if variation is None:
+        return None
+    if ins.primitive == "cloudform":
+        return frozenset({"amplitude", "frequency", "quality"})
+    if _needs_blur(variation):
+        # 滲みは stdDeviation だけを代表寸法と amplitude から決める。
+        return frozenset({"amplitude", "quality"})
+    if ins.primitive == "line":
+        return _VARIATION_SEED_FIELDS_ALL if _needs_path_variation(variation) else None
+    if _needs_contour_variation(variation):
+        return _VARIATION_SEED_FIELDS_ALL
+    return None
+
+
 def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None) -> int:
     """Instruction と演奏 seed から安定した乱数 seed を作る。"""
     payload = ins.model_dump(mode="json")
@@ -456,6 +483,18 @@ def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None)
         payload.pop("mode", None)
     if payload.get("carve_depth") is None:
         payload.pop("carve_depth", None)
+    variation_payload = payload.get("variation")
+    if isinstance(variation_payload, dict):
+        fields = _variation_seed_fields(ins)
+        if fields is None:
+            # variation なしの Instruction と同じ key にする (pop ではなく None)。
+            payload["variation"] = None
+        elif fields is not _VARIATION_SEED_FIELDS_ALL:
+            payload["variation"] = {
+                name: value
+                for name, value in variation_payload.items()
+                if name in fields
+            }
     surface = payload.get("surface")
     if isinstance(surface, dict):
         if surface.get("spacing_gradient") == "none":
@@ -2126,15 +2165,47 @@ def _render_surface_vectors(
                     + _hash_to_unit(i + layer_index * 401 + 500, seed) * spacing * 0.12
                 )
                 ox, oy = lnx * offset, lny * offset
+                start = (cx + ox - lux * span / 2, cy + oy - luy * span / 2)
+                end = (cx + ox + lux * span / 2, cy + oy + luy * span / 2)
+                line_width = max(0.45, canvas.unit * 0.0016)
+                hatch_class = f"hatch-spacing-{spacing * gradient:.3f}"
+                if not _uses_hand_stroke(ins.weight):
+                    group.add(
+                        dwg.line(
+                            start=start,
+                            end=end,
+                            stroke=color,
+                            stroke_width=line_width,
+                            stroke_opacity=opacity,
+                            stroke_linecap="round",
+                            class_=hatch_class,
+                        )
+                    )
+                    continue
+                # ハッチも版の筆致であって幾何直線ではない。中心線・角度・間隔は
+                # そのままに、描画だけ材質エンジンを通す。
+                count_samples = max(2, _stroke_sample_count(span, canvas))
+                centerline = [
+                    (
+                        start[0] + (end[0] - start[0]) * i / (count_samples - 1),
+                        start[1] + (end[1] - start[1]) * i / (count_samples - 1),
+                    )
+                    for i in range(count_samples)
+                ]
+                hatch_stroke = synthesize_along(
+                    centerline,
+                    line_width,
+                    ins.weight,
+                    _fill_stroke_seed(seed, i + layer_index * 4096),
+                    closed=False,
+                )
                 group.add(
-                    dwg.line(
-                        start=(cx + ox - lux * span / 2, cy + oy - luy * span / 2),
-                        end=(cx + ox + lux * span / 2, cy + oy + luy * span / 2),
-                        stroke=color,
-                        stroke_width=max(0.45, canvas.unit * 0.0016),
-                        stroke_opacity=opacity,
-                        stroke_linecap="round",
-                        class_=f"hatch-spacing-{spacing * gradient:.3f}",
+                    dwg.path(
+                        d=contour_stroke_path(hatch_stroke),
+                        fill=color,
+                        fill_opacity=opacity,
+                        stroke="none",
+                        class_=f"surface-stroke-v1 {hatch_class}",
                     )
                 )
     elif surface.texture == "aquatint":
@@ -2762,6 +2833,27 @@ def _resolve_color(color: str, color_hint: str | None, cmap: dict[str, str]) -> 
     return best_hex
 
 
+def _has_surface_texture(ins: Instruction) -> bool:
+    """surface が内部を担うか (閉図形のみ。線・弧では surface は描かれない)。"""
+    return (
+        ins.surface is not None
+        and ins.surface.texture != "none"
+        and ins.primitive in _CLOSED_SHAPES
+    )
+
+
+def _fills_interior(ins: Instruction) -> bool:
+    """内部を埋めるか。
+
+    塗り = 素材の既定の埋め方、`surface` = 明示的な版表現。両方は出さない。
+    閉図形が `filled` に関わらず常に塗られていた挙動 (死にフィールド) は
+    engine 9 で解消し、`filled` の記述どおりに演奏する。
+    """
+    if _has_surface_texture(ins):
+        return False
+    return bool(ins.filled)
+
+
 def _stroke_attrs(
     ins: Instruction,
     cmap: dict[str, str],
@@ -2769,7 +2861,7 @@ def _stroke_attrs(
     *,
     use_filters: bool = True,
 ) -> dict:
-    do_fill = ins.primitive in _CLOSED_SHAPES or ins.filled
+    do_fill = _fills_interior(ins)
     color = _resolve_color(ins.color, ins.color_hint, cmap)
     weight_style = WEIGHT_STYLE.get(ins.weight, {})
     hint = _norm_label(ins.color_hint or "")
@@ -3521,14 +3613,22 @@ def _uses_hand_stroke(weight: str) -> bool:
     return weight != "rotring" and weight in GRAMMARS
 
 
-def _body_attrs_for_contour_stroke(attrs: dict, ins: Instruction) -> dict:
-    """輪郭をストロークで描くとき、本体要素は塗りだけを担う。
+def _body_attrs_for_contour_stroke(
+    attrs: dict, ins: Instruction, *, region_fill: bool = True
+) -> dict:
+    """輪郭をストロークで描くとき、本体要素に残す属性。
 
     実線は輪郭を帯に置き換えるので stroke を落とす。破線・点線は線種そのものが
     記述なので、細めた幾何輪郭を残して線種を読ませる (line 側で style != solid
     のとき幾何線を重ねているのと対称)。
+
+    `region_fill=False` のとき本体は塗りも持たない。内部は塗りストローク群が
+    担うか (`filled=True`)、そもそも描かれない (`filled=False` / `surface` 指定)。
     """
     result = _copy_attrs(attrs)
+    if not region_fill:
+        result["fill"] = "none"
+        result.pop("fill_opacity", None)
     if ins.style == "solid":
         result["stroke"] = "none"
         result.pop("stroke_width", None)
@@ -3538,6 +3638,184 @@ def _body_attrs_for_contour_stroke(attrs: dict, ins: Instruction) -> dict:
     else:
         result["stroke_width"] = float(result.get("stroke_width", 1.0)) * 0.42
     return result
+
+
+FILL_SPACING_WIDTH_GAIN = 1.5
+FILL_SPACING_UNIT_RATIO = 0.012
+FILL_SPACING_JITTER = 0.24
+FILL_MIN_SCANLINES = 3
+FILL_MIN_STROKE_WIDTHS = 1.2
+
+
+def _fill_scan_angle(seed: int) -> float:
+    """塗りの走査角 (0〜π)。固定角だと作品内で揃って機械的に見える。"""
+    return _hash01(0, seed, "fill-angle") * math.pi
+
+
+def _fill_scan_spacing(ins: Instruction, canvas: CanvasSize) -> float:
+    """走査線の間隔。完全被覆は狙わない (実際の塗りも紙目を残す)。"""
+    return max(
+        _stroke_width_px(ins.weight, canvas) * FILL_SPACING_WIDTH_GAIN,
+        canvas.unit * FILL_SPACING_UNIT_RATIO,
+    )
+
+
+def _fill_stroke_seed(seed: int, index: int) -> int:
+    """筆ごとの seed。輪郭帯と共有すると同じ energy 波形が内部にも出る。"""
+    digest = hashlib.sha256(f"{seed}:fill-stroke:{index}".encode("utf-8")).digest()
+    return struct.unpack("<Q", digest[:8])[0]
+
+
+def _scanline_segments(
+    contour: list[tuple[float, float]],
+    angle: float,
+    spacing: float,
+    seed: int,
+) -> list[tuple[int, tuple[float, float], tuple[float, float]]]:
+    """走査線と閉輪郭の交点を対で取り、輪郭内部の区間を返す。
+
+    交点で切るので clipPath が要らず、凹形 (cloudform) も交点対のまま扱える。
+    辺の判定を半開区間にしてあるので、頂点をかすめる走査線を二重に数えない。
+    """
+    ux, uy = math.cos(angle), math.sin(angle)
+    nx, ny = -uy, ux
+    projections = [x * nx + y * ny for x, y in contour]
+    lo, hi = min(projections), max(projections)
+    segments: list[tuple[int, tuple[float, float], tuple[float, float]]] = []
+    offset = lo + spacing * 0.5
+    index = 0
+    while offset < hi and index < 4096:
+        hits: list[float] = []
+        for edge in range(len(contour)):
+            ax, ay = contour[edge]
+            bx, by = contour[(edge + 1) % len(contour)]
+            da = ax * nx + ay * ny - offset
+            db = bx * nx + by * ny - offset
+            if (da <= 0.0 < db) or (db <= 0.0 < da):
+                t = da / (da - db)
+                px, py = ax + (bx - ax) * t, ay + (by - ay) * t
+                hits.append(px * ux + py * uy)
+        hits.sort()
+        for pair in range(0, len(hits) - 1, 2):
+            s0, s1 = hits[pair], hits[pair + 1]
+            segments.append(
+                (
+                    index,
+                    (nx * offset + ux * s0, ny * offset + uy * s0),
+                    (nx * offset + ux * s1, ny * offset + uy * s1),
+                )
+            )
+        jitter = 1.0 + (_hash01(index, seed, "fill-spacing") - 0.5) * FILL_SPACING_JITTER
+        offset += spacing * jitter
+        index += 1
+    return segments
+
+
+def _render_fill_strokes(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    use_filters: bool,
+):
+    """閉図形の内部を素材の筆致で埋める。1 パス = 1 筆。
+
+    塗りは領域 fill ではなく、細かいストロークで内側を埋めること。走査線と輪郭の
+    交点で筆を切るため各筆の端点は輪郭上に乗り、縁が揃う。走査線が
+    `FILL_MIN_SCANLINES` 本に満たない微小図形では None を返し、呼び出し側が
+    領域 fill に縮退する (点のような粒子が輪郭だけになって消えるのを防ぐ)。
+    """
+    if len(contour) < 3:
+        return None
+    base_width = _stroke_width_px(ins.weight, canvas)
+    seed = _seed_for_instruction(ins, render_seed)
+    segments = _scanline_segments(
+        contour, _fill_scan_angle(seed), _fill_scan_spacing(ins, canvas), seed
+    )
+    if len({index for index, _, _ in segments}) < FILL_MIN_SCANLINES:
+        return None
+
+    color = attrs.get("stroke", "#111111")
+    # 塗りストロークは輪郭ではなく塗りなので、濃度は fill 側の指定に従う。
+    opacity = float(attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0)))
+    inset = base_width * 0.5
+    minimum = inset * 2 + base_width * FILL_MIN_STROKE_WIDTHS
+    paths: list[dict] = []
+    for order, (index, start, end) in enumerate(segments):
+        length = math.hypot(end[0] - start[0], end[1] - start[1])
+        if length <= minimum:
+            continue
+        # 端を線幅の半分だけ内側へ寄せ、帯が輪郭からはみ出さないようにする。
+        ux = (end[0] - start[0]) / length
+        uy = (end[1] - start[1]) / length
+        p0 = (start[0] + ux * inset, start[1] + uy * inset)
+        p1 = (end[0] - ux * inset, end[1] - uy * inset)
+        if index % 2:
+            # 走査線ごとに往復させる。taper の向きが交互になり手の運びとして読める。
+            p0, p1 = p1, p0
+        count = max(2, _stroke_sample_count(length - inset * 2, canvas))
+        centerline = [
+            (
+                p0[0] + (p1[0] - p0[0]) * i / (count - 1),
+                p0[1] + (p1[1] - p0[1]) * i / (count - 1),
+            )
+            for i in range(count)
+        ]
+        stroke = synthesize_along(
+            centerline,
+            base_width,
+            ins.weight,
+            _fill_stroke_seed(seed, order),
+            closed=False,
+        )
+        path_attrs = {
+            "d": contour_stroke_path(stroke),
+            "fill": color,
+            "fill_opacity": opacity,
+            "stroke": "none",
+        }
+        if (
+            use_filters
+            and ins.weight in TEXTURE_FILTER_WEIGHTS
+            and ins.weight != "drypoint"
+        ):
+            path_attrs["filter"] = f"url(#texture-{ins.weight})"
+        paths.append(path_attrs)
+
+    if not paths:
+        return None
+    group = dwg.g(class_=f"fill-stroke-v1 strokes-{len(paths)}")
+    for path_attrs in paths:
+        group.add(dwg.path(**path_attrs))
+    return group
+
+
+def _interior_fill(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    use_filters: bool,
+) -> tuple[object | None, bool]:
+    """内部表現を返す。戻り値は (塗りストローク群, 領域 fill に縮退したか)。
+
+    rotring (製図ペン) は engine 8 で輪郭を筆致から外してあるのと同じ理由で、
+    塗りも機械の塗り = 領域 fill のままにする。
+    """
+    if not _fills_interior(ins):
+        return None, False
+    if not _uses_hand_stroke(ins.weight):
+        return None, True
+    group = _render_fill_strokes(
+        dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters
+    )
+    return (None, True) if group is None else (group, False)
 
 
 def _render_contour_hand_stroke(
@@ -3622,12 +3900,17 @@ def _render_corner_shape(
         _amplitude_px(ins.variation, ins, canvas) if ins.variation else 0.0,
         canvas,
     )
+    points = contour if varied else corners
     if not _uses_hand_stroke(ins.weight):
-        points = contour if varied else corners
         return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
-    body_attrs = _body_attrs_for_contour_stroke(attrs, ins)
+    fill_group, region_fill = _interior_fill(
+        dwg, ins, points, attrs, canvas, render_seed, use_filters=use_filters
+    )
+    body_attrs = _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
     group = dwg.g()
-    group.add(dwg.polygon(points=contour if varied else corners, **body_attrs))
+    group.add(dwg.polygon(points=points, **body_attrs))
+    if fill_group is not None:
+        group.add(fill_group)
     group.add(
         _render_contour_hand_stroke(
             dwg,
@@ -3686,8 +3969,8 @@ def _render_instruction(
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
         hand = _uses_hand_stroke(ins.weight)
-        body_attrs = _body_attrs_for_contour_stroke(attrs, ins) if hand else attrs
-        if _needs_contour_variation(ins.variation):
+        varied = _needs_contour_variation(ins.variation)
+        if varied:
             assert ins.variation is not None
             contour = _closed_contour_with_variation(
                 _circle_points(
@@ -3698,15 +3981,27 @@ def _render_instruction(
                 _seed_for_instruction(ins, render_seed),
                 _amplitude_px(ins.variation, ins, canvas),
             )
-            element = dwg.polygon(points=contour, **body_attrs)
         else:
             contour = _circle_points(
                 cx, cy, r, r, _stroke_sample_count(2 * math.pi * r, canvas)
             )
+        fill_group, region_fill = _interior_fill(
+            dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters
+        )
+        body_attrs = (
+            _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
+            if hand
+            else attrs
+        )
+        if varied:
+            element = dwg.polygon(points=contour, **body_attrs)
+        else:
             element = dwg.circle(center=(cx, cy), r=r, **body_attrs)
-        if hand or _uses_material_outline(ins.weight):
+        if hand or fill_group is not None or _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
+            if fill_group is not None:
+                group.add(fill_group)
             if hand:
                 group.add(
                     _render_contour_hand_stroke(
@@ -3733,8 +4028,8 @@ def _render_instruction(
         rx = ins.size[0] * canvas.width / 2
         ry = ins.size[1] * canvas.height / 2
         hand = _uses_hand_stroke(ins.weight)
-        body_attrs = _body_attrs_for_contour_stroke(attrs, ins) if hand else attrs
-        if _needs_contour_variation(ins.variation):
+        varied = _needs_contour_variation(ins.variation)
+        if varied:
             assert ins.variation is not None
             contour = _closed_contour_with_variation(
                 _circle_points(
@@ -3749,7 +4044,6 @@ def _render_instruction(
                 _seed_for_instruction(ins, render_seed),
                 _amplitude_px(ins.variation, ins, canvas),
             )
-            element = dwg.polygon(points=contour, **body_attrs)
         else:
             contour = _circle_points(
                 cx,
@@ -3758,10 +4052,23 @@ def _render_instruction(
                 ry,
                 _stroke_sample_count(_ellipse_perimeter(rx, ry), canvas),
             )
+        fill_group, region_fill = _interior_fill(
+            dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters
+        )
+        body_attrs = (
+            _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
+            if hand
+            else attrs
+        )
+        if varied:
+            element = dwg.polygon(points=contour, **body_attrs)
+        else:
             element = dwg.ellipse(center=(cx, cy), r=(rx, ry), **body_attrs)
-        if hand or _uses_material_outline(ins.weight):
+        if hand or fill_group is not None or _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
+            if fill_group is not None:
+                group.add(fill_group)
             if hand:
                 group.add(
                     _render_contour_hand_stroke(
@@ -3794,9 +4101,30 @@ def _render_instruction(
             variation=ins.variation,
             weight=ins.weight,
         )
-        path = dwg.path(d=contour.path_d, **attrs)
+        # 塗りは描かれた曲線に沿わせたいので、制御点ではなく Catmull-Rom を
+        # 標本化した密なポリゴンを走査する。凹みも交点対のまま扱える。
+        fill_group, _region_fill = _interior_fill(
+            dwg,
+            ins,
+            list(sample_closed_catmull_rom(contour.points)),
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+        )
+        body_attrs = attrs
+        if fill_group is not None:
+            body_attrs = _copy_attrs(attrs)
+            body_attrs["fill"] = "none"
+            body_attrs.pop("fill_opacity", None)
+        path = dwg.path(d=contour.path_d, **body_attrs)
         path["class"] = "cloudform contour-v1 stroke-engine-touch"
-        return _apply_rotation(path, ins, canvas)
+        if fill_group is None:
+            return _apply_rotation(path, ins, canvas)
+        group = dwg.g()
+        group.add(path)
+        group.add(fill_group)
+        return _apply_rotation(group, ins, canvas)
 
     if ins.primitive == "square":
         if ins.position is None or ins.size is None:
@@ -3806,7 +4134,6 @@ def _render_instruction(
         h = ins.size[1] * canvas.height
         corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
         hand = _uses_hand_stroke(ins.weight)
-        body_attrs = _body_attrs_for_contour_stroke(attrs, ins) if hand else attrs
         varied = _needs_contour_variation(ins.variation)
         contour, anchors = _edge_contour_with_anchors(
             corners,
@@ -3815,13 +4142,29 @@ def _render_instruction(
             _amplitude_px(ins.variation, ins, canvas) if ins.variation else 0.0,
             canvas,
         )
+        fill_group, region_fill = _interior_fill(
+            dwg,
+            ins,
+            contour if varied else corners,
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+        )
+        body_attrs = (
+            _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
+            if hand
+            else attrs
+        )
         if varied:
             element = dwg.polygon(points=contour, **body_attrs)
         else:
             element = dwg.rect(insert=(x, y), size=(w, h), **body_attrs)
-        if hand or _uses_material_outline(ins.weight):
+        if hand or fill_group is not None or _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
+            if fill_group is not None:
+                group.add(fill_group)
             if hand:
                 group.add(
                     _render_contour_hand_stroke(

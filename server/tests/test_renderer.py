@@ -400,7 +400,9 @@ def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
     # v2.2 (engine 8): 手描き weight の閉図形は輪郭を帯で描くので、輪郭側の
     # 濃度は stroke-opacity ではなく帯の fill-opacity に載る。
     assert 'fill-opacity="0.4"' in svg
-    assert 'fill-opacity="0.22"' in svg
+    # v2.3 (engine 9): `filled` の復権により、塗らない図形には fade の塗り濃度
+    # (0.22) は載らない。fade は輪郭帯の濃度として読める。
+    assert 'fill-opacity="0.22"' not in svg
 
 
 def test_clustered_positions_do_not_form_constant_radius_ring():
@@ -1054,7 +1056,8 @@ def test_render_color_cycle_preserves_effect_hint_opacity():
 
     svg = render(score)
 
-    assert svg.count('fill-opacity="0.12"') == 2
+    # v2.3 (engine 9): 塗らない図形 (filled 未指定) では膜の濃度は輪郭帯に載る。
+    assert svg.count('fill-opacity="0.26"') == 2
     assert 'fill="#111111"' in svg
     assert 'fill="#ffffff"' in svg
 
@@ -1358,7 +1361,8 @@ def test_render_editable_surface_has_stable_group_id_without_filters():
     svg = render(score, svg_profile="editable", render_seed=123)
 
     assert 'id="surface_000_000_hatch"' in svg
-    assert "<line" in svg
+    # v2.3 (engine 9): ハッチも材質エンジンを通るので幾何直線ではなく帯になる。
+    assert "surface-stroke-v1" in svg
     assert "<filter" not in svg
     assert "clip-path" not in svg
 
@@ -1600,8 +1604,8 @@ def test_legacy_arrangement_layouts_keep_golden_output():
         rendered.append(render(score, svg_profile="compat", render_seed=123))
 
     digest = hashlib.sha256("".join(rendered).encode()).hexdigest()
-    # v2.2 (engine 8) で採取。円の輪郭が手描きストロークの帯になった分の差分。
-    assert digest == "00ae9fa718fbef7587faa782b93fd831b6da99b4e764fe25139ba6430cb4d0a6"
+    # v2.3 (engine 9) で再採取。`filled` の復権で閉図形の領域 fill が外れた分の差分。
+    assert digest == "01777e4a0deefda161e40082c2fa27865548b7ae0659d8829def72b9b9fb4d90"
 
 
 def test_grid_render_is_bit_deterministic_for_same_score_and_seed():

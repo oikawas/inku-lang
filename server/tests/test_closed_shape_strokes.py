@@ -114,7 +114,11 @@ def test_contour_stroke_follows_render_seed(name: str):
 
 @pytest.mark.parametrize("name", sorted(SHAPES))
 def test_intended_geometry_is_kept_as_the_body(name: str):
-    """本体要素 (塗り) は幾何のまま残り、輪郭だけが帯に置き換わる。"""
+    """本体要素は幾何のまま残る (engine 9 では塗りも持たない)。
+
+    engine 9 で `filled` を復権したため、`filled=False` の閉図形は塗られない。
+    本体要素は意図の幾何として残り、輪郭は帯が、内部は塗りストロークが担う。
+    """
     svg = _render(name, render_seed=11)
     expected = {
         "circle": "<circle",
@@ -123,15 +127,14 @@ def test_intended_geometry_is_kept_as_the_body(name: str):
         "triangle": "<polygon",
         "polygon": "<polygon",
     }[name]
-    # 地の矩形 (塗りなし) と speck (opacity 付き) を除いた墨色の要素が本体。
+    # 地の矩形と speck (opacity 付き) を除いた、塗りも stroke も持たない要素が本体。
     bodies = [
         item
         for item in re.findall(rf"{re.escape(expected)}[^>]*>", svg)
-        if 'fill="#111111"' in item and " opacity=" not in item
+        if 'fill="none"' in item and 'stroke="none"' in item
     ]
+    # 実線では本体の stroke を落とし、輪郭は帯だけが担う。塗りも持たない。
     assert len(bodies) == 1
-    # 実線では本体の stroke を落とし、輪郭は帯だけが担う。
-    assert 'stroke="none"' in bodies[0]
 
 
 @pytest.mark.parametrize("name", ["square", "triangle", "polygon"])

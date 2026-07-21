@@ -341,13 +341,23 @@ def _needs_contour_variation(v: Variation | None) -> bool:
     return any(d in _CONTOUR_VARIATION_DIMS for d in v.dimensions)
 
 
+def _wave_phase(seed: int) -> float:
+    """seed から [0, 2π) の位相を決定的に導出する。
+
+    wave は sin の位相が固定だと演奏 seed に依存せず、同じ Score が常に同じ
+    山谷の位置になる。位相だけを seed 由来にすることで、周期性 (整数周波数
+    なら t∈[0,1) で閉じる) と振幅・周波数の語彙を保ったまま演奏差を作る。
+    """
+    return _hash01(0, seed, "wave-phase") * 2 * math.pi
+
+
 def _sample_offset(t: float, variation: Variation, seed: int, segment: int) -> float:
     amp = AMPLITUDE_PX[variation.amplitude]
     freq = FREQUENCY_CYCLES[variation.frequency]
     q = variation.quality
 
     if q == "wave":
-        return math.sin(t * 2 * math.pi * freq) * amp
+        return math.sin(t * 2 * math.pi * freq + _wave_phase(seed)) * amp
     if q == "perlin":
         return _value_noise_1d(t * freq, seed) * amp
     if q == "pink":
@@ -423,14 +433,15 @@ def _sample_offset_periodic(
 ) -> float:
     """閉輪郭用の offset サンプル。t∈[0,1) を一周として周期連続にする。
 
-    wave は FREQUENCY_CYCLES が整数値のため自動的に閉じる。perlin は格子を
-    周期化する。white は頂点毎の独立雑音なので継ぎ目の概念を持たない。
+    wave は FREQUENCY_CYCLES が整数値のため自動的に閉じる。seed 由来の位相を
+    足しても周期は変わらないので閉合は保たれる。perlin は格子を周期化する。
+    white は頂点毎の独立雑音なので継ぎ目の概念を持たない。
     """
     amp = AMPLITUDE_PX[variation.amplitude]
     freq = FREQUENCY_CYCLES[variation.frequency]
     q = variation.quality
     if q == "wave":
-        return math.sin(t * 2 * math.pi * freq) * amp
+        return math.sin(t * 2 * math.pi * freq + _wave_phase(seed)) * amp
     if q == "perlin":
         return _periodic_value_noise_1d(t * freq, seed, max(1, int(round(freq)))) * amp
     if q == "white":
@@ -2702,8 +2713,9 @@ def _add_material_circle_outline(
     cx: float,
     cy: float,
     r: float,
+    render_seed: int | None = None,
 ) -> None:
-    seed = _seed_for_instruction(ins)
+    seed = _seed_for_instruction(ins, render_seed)
     for offset, width, opacity, dash in _material_outline_profile(
         ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
     ):
@@ -2738,8 +2750,9 @@ def _add_material_ellipse_outline(
     cy: float,
     rx: float,
     ry: float,
+    render_seed: int | None = None,
 ) -> None:
-    seed = _seed_for_instruction(ins)
+    seed = _seed_for_instruction(ins, render_seed)
     for offset, width, opacity, dash in _material_outline_profile(
         ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
     ):
@@ -2774,8 +2787,9 @@ def _add_material_rect_outline(
     y: float,
     w: float,
     h: float,
+    render_seed: int | None = None,
 ) -> None:
-    seed = _seed_for_instruction(ins)
+    seed = _seed_for_instruction(ins, render_seed)
     for offset, width, opacity, dash in _material_outline_profile(
         ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
     ):
@@ -2811,8 +2825,9 @@ def _add_material_arc_outline(
     r: float,
     start_deg: float,
     end_deg: float,
+    render_seed: int | None = None,
 ) -> None:
-    seed = _seed_for_instruction(ins)
+    seed = _seed_for_instruction(ins, render_seed)
     for offset, width, opacity, dash in _material_outline_profile(
         ins.weight, WEIGHT_TO_STROKE_WIDTH[ins.weight]
     ):
@@ -2847,6 +2862,7 @@ def _material_line_group(
     *,
     use_filters: bool = True,
     include_base: bool = True,
+    render_seed: int | None = None,
 ):
     if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick"):
         return None
@@ -2855,7 +2871,7 @@ def _material_line_group(
     if include_base:
         base = _copy_attrs(attrs)
         group.add(dwg.line(start=start, end=end, **base))
-    seed = _seed_for_instruction(ins)
+    seed = _seed_for_instruction(ins, render_seed)
 
     if ins.weight == "pencil":
         for idx, amount in enumerate((-0.9, 1.1)):
@@ -3060,6 +3076,7 @@ def _render_hand_stroke(
         canvas,
         use_filters=False,
         include_base=False,
+        render_seed=render_seed,
     )
     if material is not None:
         group.add(material)
@@ -3150,7 +3167,7 @@ def _render_instruction(
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
-            _add_material_circle_outline(dwg, group, ins, attrs, cx, cy, r)
+            _add_material_circle_outline(dwg, group, ins, attrs, cx, cy, r, render_seed)
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -3174,7 +3191,9 @@ def _render_instruction(
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
-            _add_material_ellipse_outline(dwg, group, ins, attrs, cx, cy, rx, ry)
+            _add_material_ellipse_outline(
+                dwg, group, ins, attrs, cx, cy, rx, ry, render_seed
+            )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -3213,7 +3232,7 @@ def _render_instruction(
         if _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
-            _add_material_rect_outline(dwg, group, ins, attrs, x, y, w, h)
+            _add_material_rect_outline(dwg, group, ins, attrs, x, y, w, h, render_seed)
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -3274,7 +3293,16 @@ def _render_instruction(
             group = dwg.g()
             group.add(element)
             _add_material_arc_outline(
-                dwg, group, ins, attrs, cx, cy, r, ins.angle_start, ins.angle_end
+                dwg,
+                group,
+                ins,
+                attrs,
+                cx,
+                cy,
+                r,
+                ins.angle_start,
+                ins.angle_end,
+                render_seed,
             )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)

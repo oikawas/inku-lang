@@ -703,7 +703,6 @@
 														</label>
 													{/each}
 												</div>
-												<p class="refine-hensou-hint">{t().hensouHint}</p>
 											</div>
 										{/if}
 										<label class="model-choice" class:checked={refineKind === 'touch'}>
@@ -1451,7 +1450,6 @@
 	.hensou-amplitude-field .model-choice-grid.hensou-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 	.hensou-amplitude-field .model-choice { padding: 6px; gap: 5px; }
 	.hensou-amplitude-field .refine-info-mark { width: 13px; height: 13px; font-size: 9px; }
-	.refine-hensou-hint { margin: 0; font-size: 11px; color: var(--fg3); line-height: 1.5; }
 	.variation-card-moved { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 	.variation-moved-axis { padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 10px; color: var(--fg2); white-space: nowrap; }
 	.refine-action-wrap { width: min(210px, 100%); }

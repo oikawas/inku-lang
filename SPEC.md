@@ -326,6 +326,32 @@ byte-identical to v2.1 (arc stroke-ization awaits a redesign of the touching
 test's arc extractor in a follow-up contract). Because the same Score and seed
 render differently, the render engine version was bumped to 8.
 
+v2.3.0 replaces the area fill of closed shapes with **stroke fill — the
+material's brushwork filling the interior** — and restores the semantics of
+`filled` (`True` = fill the interior with material strokes / `False` = contour
+only; previously closed shapes were always filled regardless of `filled`, a
+dead field). Fill strokes are built by intersecting scanlines with the closed
+contour and passing each interior span — one span = one brush stroke — through
+`synthesize_along` (no clipPath needed; concave cloudforms are handled as
+intersection pairs, and endpoints are pulled half a stroke-width inside the
+intersections so edges align with the contour). The group carries
+`class="fill-stroke-v1"`. The scan angle derives from the render seed (uniform
+over 0–180°) so it differs per shape; spacing is `max(stroke width × 1.5,
+canvas.unit × 0.012)` with ±12% jitter per scanline. Full coverage is not the
+goal — paper grain (gaps) remains. Rotring keeps area fill (`True` = solid
+fill / `False` = contour only), and tiny shapes with fewer than three
+scanlines degrade to area fill. When `surface` is specified the material fill
+is suppressed (fill = the material's default way of covering; `surface` = an
+explicit printmaking expression). Surface hatch / crosshatch lines also moved
+from geometric lines to brushwork bands (`class="surface-stroke-v1"`;
+centerline, angle, spacing, and count unchanged; rotring keeps geometric
+lines). Variations that are not performed are now excluded from the seed key,
+so the presence of an inactive variation no longer changes the rendered bytes
+(per-primitive inactivity rules; for cloudform only `dimensions` is inactive
+since its contour generator always consumes quality / amplitude / frequency).
+Because the same Score and seed render differently, the render engine version
+was bumped to 9.
+
 For literal `layout="grid"` tiling, performance composes three controlled layers: a deterministic seed-derived within-cell position jitter, the existing per-element `variation` with a distinct phase for every mark, and the existing material behavior of weights such as pencil, brush, and chalk. The same Score and render seed remain bit-identical. Because full-field repetition is explicit author intent, grid bypasses scatter-oriented bias, fade, clustering, preserved-space injection, and representative count reduction.
 
 inku exposes this as the first half of two-step regeneration: **another

@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.2.1 / Build 643**
+**対象バージョン: v2.3.0 / Build 645**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -104,6 +104,8 @@ v2.1.0（Build 638）ではレンダリングの px 絶対値を比例系へ全�
 v2.2.0（Build 640）では閉図形（円・楕円・四角・三角・多角形）の輪郭を手描きストローク（筆致エンジン）で描くようにした。`stroke_engine` に任意中心線への合成 `synthesize_along` を追加し（歩幅フィードフォワード積分器で曲率歪みを排除）、輪郭を外周・内周 2 サブパスの塗り帯（`class="contour-stroke-v1"`）として描く。角は理想位置固定の筆の継ぎ目、角なし閉輪郭は線形ランプで閉合。rotring は幾何輪郭のまま、帯は変奏演奏後の輪郭に合成、材質輪郭・speck と併存、本体要素は幾何のまま（bbox・touching 不変）。line・弧は v2.1 とバイト一致（弧のストローク化は touching 弧抽出器の再設計込みで次契約）。render engine version は 8。作者判断待ち: `filled` が閉図形で死にフィールド（常に塗りつぶし）である件と、「塗り = 細かいストロークで内側を埋める」案（試作 3 回記録済み、engine 9 相当、pending 消化後）。後続契約として PNG ラスタライザの filter 対応（`opus-png-filter-rasterizer.md`、cairosvg は feTurbulence / feDisplacementMap / feGaussianBlur を非描画）が起票済み。
 
 v2.2.1（Build 643）では PNG ラスタライザを resvg-py へ置換し、質感 filter・滲みが全 PNG 経路（ダウンロード・AI Vision 入力・奥書サムネイル・CLI 5 箇所）で描画されるようになった。共通ヘルパー `shared/src/inku_analysis/rasterizer.py`（resvg 優先・cairosvg フォールバック・不在時警告 + skip 維持）。API に PNG エンドポイントは無く CLI は応答 `svg` を自プロセスでラスタライズする構造のため、CLI 側も同ヘルパーへ寄せた。cairosvg フォールバック時は CLI 警告 + サーバー WARNING + 成果物へ `png_rasterizer`（backend/version）を記録。Python は server / cli / shared とも 3.12 へ統一（resvg-py の wheel 都合）。`inku-analysis` を editable 依存化し「shared を rsync しても uv sync まで反映されない」罠を解消。SVG・rh2・engine（8）は不変。生成 PNG は旧 PNG と画素非互換（過去ランとの直接画素比較は不成立）。lock 一本化（uv workspace 化）は別契約。
+
+v2.3.0（Build 645）では閉図形の塗りを領域 fill から素材の筆致で内側を埋めるストローク塗り（`class="fill-stroke-v1"`）へ変更し、`filled` の意味論を復権した（`True` = 素材の筆致で内部を埋める / `False` = 輪郭のみ。従来は死にフィールドで常に塗りつぶし）。走査線と閉輪郭の交点で 1 区間 = 1 筆を `synthesize_along` に通す（clipPath 不要・凹形可・端点は輪郭に揃う）。走査角は演奏 seed 由来 0〜180°、間隔 `max(線幅 × 1.5, canvas.unit × 0.012)` + ±12% ジッタで紙目を残す。rotring は領域 fill 維持、走査線 3 本未満は領域 fill に縮退。`surface` 指定時は素材塗りを抑制し、surface の hatch / crosshatch は筆致の帯（`class="surface-stroke-v1"`）へ差し替え。演奏されない variation は seed key から除外（primitive 別不活性判定）。render engine version は 9。サイズは 1 図形 11〜123KB・10 instruction で 422KB（上限規則は分布を見て後付け、最大要因は surface crosshatch の帯化）。残: 実 UI 目視（塗り間隔の粗密）・粒系 / 滲み系の筆致化。次契約 = arc のストローク化（engine 10 / v2.4、裁定済み仕様はレポート付録）。
 
 ## 変更時の確認先
 

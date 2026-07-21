@@ -1302,6 +1302,8 @@ v2.1.0 でレンダリングの px 絶対値を比例系へ全面改修した。
 
 v2.2.0 で閉図形（circle / ellipse / square / triangle / polygon）の輪郭を手描きストローク（筆致エンジン）で描くようにした。`stroke_engine` に任意中心線へのストローク合成 `synthesize_along` を追加し（道具文法は line 用と同一、追従目標だけを差し替え。意図の歩幅をフィードフォワードし、ばねには残差だけを担わせる積分器で曲率による半径方向の歪みを排除）、輪郭は外周・内周 2 サブパスの塗り帯（`class="contour-stroke-v1"`、fill-rule evenodd）として描く。角は理想位置に固定して筆の継ぎ目とし、角のない閉輪郭は継ぎ目を線形ランプで閉合させる。対象 weight は rotring を除く手描き系全種（rotring は幾何輪郭のまま）。帯の中心線は変奏を演奏した後の輪郭で、材質輪郭・speck は帯と併存する。破線・点線は線種そのものが記述なので、細めた幾何輪郭を残す。本体要素は幾何のまま維持され（実線では `stroke="none"` で塗りのみ）、bbox・touching 契約は不変。line と弧の出力は v2.1 とバイト一致（弧のストローク化は touching 検査の弧抽出器の再設計を伴うため次契約へ）。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 8 へ更新した。
 
+v2.3.0 で閉図形の塗りを領域 fill から**素材の筆致で内側を埋めるストローク塗り**へ変更し、`filled` の意味論を復権した（`True` = 素材の筆致で内部を埋める / `False` = 輪郭のみ。従来は閉図形が `filled` に関わらず常に塗りつぶされる死にフィールドだった）。塗りは走査線と閉輪郭の交点を対で取り、内部区間 1 つ = 1 筆として `synthesize_along` に通す（clipPath 不要。凹形 cloudform も交点対のまま扱え、端点は交点から線幅の半分だけ内側へ寄るので縁が輪郭に揃う）。群は `class="fill-stroke-v1"`。走査角は演奏 seed 由来（0〜180° 一様）で図形ごとに変わり、間隔は `max(線幅 × 1.5, canvas.unit × 0.012)` に ±12% のジッタ。完全被覆は狙わず紙目（隙間）を残す。rotring は領域 fill を維持し（`True` = ベタ塗り / `False` = 輪郭のみ）、走査線 3 本未満の微小図形は領域 fill に縮退する。`surface` 指定時は素材塗りを出さない（塗り = 素材の既定の埋め方、`surface` = 明示的な版表現）。あわせて surface の hatch / crosshatch を幾何直線から筆致の帯（`class="surface-stroke-v1"`）へ差し替え（中心線・角度・間隔・本数は不変、rotring は幾何直線のまま）、演奏されない variation を seed key から除外して不活性な variation の有無で演奏バイトが変わらないようにした（primitive 別の不活性判定。cloudform は輪郭生成器が quality / amplitude / frequency を常に消費するため不活性なのは dimensions のみ）。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 9 へ更新した。
+
 ---
 
 ## 14. 関係（あいだ）の設計

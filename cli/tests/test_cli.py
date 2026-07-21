@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import pytest
@@ -694,12 +693,7 @@ def test_resolve_history_hash_rejects_ambiguous_short_hash():
 
 
 def test_history_export_writes_contact_sheet_and_evaluation_json(tmp_path, monkeypatch):
-    class FakeCairoSvg:
-        @staticmethod
-        def svg2png(*, bytestring, write_to):
-            Path(write_to).write_bytes(b"png")
-
-    monkeypatch.setitem(sys.modules, "cairosvg", FakeCairoSvg)
+    monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
     monkeypatch.setattr(cli, "_make_contact_sheet", lambda input_dir, output_path, *, columns, thumb_size: Path(output_path).write_bytes(b"sheet"))
 
     item_dir = tmp_path / "items"

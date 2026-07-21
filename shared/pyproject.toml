@@ -1,9 +1,12 @@
 [project]
 name = "inku-analysis"
 version = "0.1.0"
-description = "Read-only composition mirrors shared by inku server and CLI"
-requires-python = ">=3.10"
-dependencies = []
+description = "Read-only composition mirrors and SVG rasterization shared by inku server and CLI"
+requires-python = ">=3.12"
+dependencies = [
+    "resvg-py>=0.3.3",
+    "cairosvg>=2.7.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]

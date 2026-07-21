@@ -407,15 +407,13 @@ def _save_output_files(
         _logger.exception("failed to save output files: prefix=%s", prefix)
         return
 
-    try:
-        import cairosvg  # lazy import — optional dependency
-    except ImportError:
-        _logger.warning("cairosvg is not installed; skipped PNG output: prefix=%s", prefix)
-        return
+    from inku_analysis.rasterizer import RasterizerUnavailable, svg_to_png
 
     try:
-        png_bytes = cairosvg.svg2png(bytestring=svg_bytes, output_width=int(_output_save_settings()["png_size"]))
+        png_bytes = svg_to_png(svg, width=int(_output_save_settings()["png_size"]))
         Path(f"{prefix}_output.png").write_bytes(png_bytes)
+    except RasterizerUnavailable:
+        _logger.warning("no SVG rasterizer is installed; skipped PNG output: prefix=%s", prefix)
     except Exception:
         _logger.exception("failed to save PNG output: prefix=%s", prefix)
 

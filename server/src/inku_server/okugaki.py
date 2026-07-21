@@ -19,7 +19,7 @@ from time import monotonic
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
-import cairosvg
+from inku_analysis.rasterizer import svg_to_png
 
 from .feature_analysis import composition_family
 from .model_settings import connection_for, provider_for_model
@@ -171,7 +171,7 @@ def build_generation_request(fact_sheet: dict[str, Any], index: int, prior_obser
 
 
 def _png_data_url(svg: str, *, width: int = 512, height: int = 512) -> str:
-    png = cairosvg.svg2png(bytestring=svg.encode("utf-8"), output_width=width, output_height=height)
+    png = svg_to_png(svg, width=width, height=height)
     return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
 
 

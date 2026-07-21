@@ -30,6 +30,7 @@ from inku_analysis import (
     composition_family as _composition_family_from_score,
     motif_signatures as _motif_signatures,
 )
+from inku_analysis.rasterizer import RasterizerUnavailable, rasterizer_backend, svg_to_png
 
 SESSION_COOKIE_NAME = "inku_session"
 DEFAULT_BASE_URL = "http://127.0.0.1:8100"
@@ -555,12 +556,11 @@ def _write_paint_outputs(
         trace_path.write_text(json.dumps(trace, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         paths["trace"] = str(trace_path)
     if png:
-        try:
-            import cairosvg
-        except ImportError as exc:
-            raise CliError("PNG output requires cairosvg") from exc
         png_path = out_dir / f"{prefix}.png"
-        cairosvg.svg2png(bytestring=str(result["svg"]).encode("utf-8"), write_to=str(png_path))
+        try:
+            png_path.write_bytes(svg_to_png(str(result["svg"])))
+        except RasterizerUnavailable as exc:
+            raise CliError("PNG output requires a rasterizer (resvg-py or cairosvg)") from exc
         paths["png"] = str(png_path)
     return paths
 
@@ -683,13 +683,13 @@ def _png_occupancy_grid(path: Path, *, cells: int = 16) -> list[float]:
 
 def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
     try:
-        import cairosvg
         from PIL import Image
     except ImportError as exc:
-        raise CliError("analyze --replay requires cairosvg and Pillow") from exc
-    buffer = io.BytesIO()
-    cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=buffer)
-    buffer.seek(0)
+        raise CliError("analyze --replay requires Pillow") from exc
+    try:
+        buffer = io.BytesIO(svg_to_png(svg))
+    except RasterizerUnavailable as exc:
+        raise CliError("analyze --replay requires a rasterizer (resvg-py or cairosvg)") from exc
     with Image.open(buffer) as image:
         image = image.convert("L").resize((cells, cells))
         pixels = list(image.getdata())
@@ -1244,10 +1244,8 @@ def _write_history_export(
     columns: int,
     thumb_size: int,
 ) -> dict[str, Any]:
-    try:
-        import cairosvg
-    except ImportError as exc:
-        raise CliError("history-export requires cairosvg for contact-sheet PNGs") from exc
+    if rasterizer_backend() is None:
+        raise CliError("history-export requires a rasterizer (resvg-py or cairosvg) for contact-sheet PNGs")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     item_dir = out_dir / "items"
@@ -1270,7 +1268,7 @@ def _write_history_export(
         _write_json_file(json_path, export_item)
         svg = str(item.get("svg") or "")
         svg_path.write_text(svg, encoding="utf-8")
-        cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=str(png_path))
+        png_path.write_bytes(svg_to_png(svg))
         item["_export_paths"] = export_paths
     sheet_path = out_dir / "contact-sheet.png"
     _make_contact_sheet(item_dir, sheet_path, columns=columns, thumb_size=thumb_size)
@@ -2951,9 +2949,8 @@ def command_refine(args: argparse.Namespace) -> int:
             print(f"Saved: {out_dir}/{stem}.[json|svg]")
             if args.png:
                 try:
-                    import cairosvg
-                    cairosvg.svg2png(bytestring=data["svg"].encode("utf-8"), write_to=str(out_dir / f"{stem}.png"))
-                except ImportError:
+                    (out_dir / f"{stem}.png").write_bytes(svg_to_png(data["svg"]))
+                except RasterizerUnavailable:
                     pass
         else:
             _print_json(data)
@@ -3025,9 +3022,8 @@ def command_inspect(args: argparse.Namespace) -> int:
             
             if args.png:
                 try:
-                    import cairosvg
-                    cairosvg.svg2png(bytestring=data["svg"].encode("utf-8"), write_to=str(out_dir / f"inspect-{safe_model_name}.png"))
-                except ImportError:
+                    (out_dir / f"inspect-{safe_model_name}.png").write_bytes(svg_to_png(data["svg"]))
+                except RasterizerUnavailable:
                     pass
         except Exception as exc:
             print(f"Model {model} failed: {exc}", file=sys.stderr)

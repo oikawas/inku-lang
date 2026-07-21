@@ -57,7 +57,9 @@
 			aria-expanded={open}
 			onclick={(event) => { event.stopPropagation(); open = !open; }}
 		>
-			<span>{title}: {tenkeiLabel(value, isJapanese)}</span>
+			<!-- The selected level is reported by the current-selection strip below
+			     the button row, so the trigger stays a plain label. -->
+			<span>{title}</span>
 		</button>
 		{#if open}
 			<div class="tenkei-menu" role="menu">

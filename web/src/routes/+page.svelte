@@ -2860,6 +2860,7 @@ if (unreadWords.length > 0) {
 					sourceText: demoGeneratedPrompt,
 					displayLabel: '[demo]',
 					catalogId: demoCatalogId,
+					tenkei: tenkeiLevel,
 					randomColorCatalog: settings.random_color_catalog,
 				});
 				if (demoRunId !== runId || !loading) break;
@@ -3067,6 +3068,7 @@ if (unreadWords.length > 0) {
 							batchRunId,
 							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : batchCatalogId,
 							canvasAspectId: batchCanvasAspectId,
+							tenkei: tenkeiLevel,
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) break;
@@ -5920,7 +5922,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
 						onOpenModelSelection={() => openModelSelection(false)}
-						onOpenLlmModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
 						onRememberBatchPrompt={rememberBatchPrompt}

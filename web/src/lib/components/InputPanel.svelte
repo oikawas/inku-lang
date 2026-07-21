@@ -5,7 +5,7 @@
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
-	import type { TenkeiLevel } from '$lib/tenkei';
+	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import type { DemoSettings } from '$lib/demo';
@@ -84,7 +84,6 @@
 		onToggleCanvasAspectMenu: () => void;
 		onSelectCanvasAspect: (id: CanvasAspectId) => void | Promise<void>;
 		onOpenModelSelection: () => void;
-		onOpenLlmModelSelection: () => void;
 		onOpenCatalogModal: () => void;
 		onClearInput: () => void;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -158,7 +157,6 @@
 		onToggleCanvasAspectMenu,
 		onSelectCanvasAspect,
 		onOpenModelSelection,
-		onOpenLlmModelSelection,
 		onOpenCatalogModal,
 		onClearInput,
 		onRememberBatchPrompt,
@@ -171,6 +169,10 @@
 	}: Props = $props();
 
 	const isJapanese = $derived(t().code === 'ja');
+	const randomCatalogActive = $derived(
+		(inputMode === 'batch' && batchRandomColorCatalog)
+		|| (inputMode === 'demo' && demoSettings.random_color_catalog)
+	);
 
 	const tabItems = $derived([
 		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning },
@@ -219,19 +221,17 @@
 	<div class="section-head">
 		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
-			{#if inputMode !== 'demo'}
+			<!-- Model / catalog / staffage / canvas apply to every input mode, so the
+			     button row is identical across the three tabs. -->
 			<Tooltip text={t().tooltipInputModel}>
 				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
 			</Tooltip>
-			{/if}
 			<Tooltip text={t().tooltipInputCatalog}>
 				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			</Tooltip>
-			{#if inputMode === 'single'}
-				<Tooltip text={t().tooltipInputTenkei}>
-					<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
-				</Tooltip>
-			{/if}
+			<Tooltip text={t().tooltipInputTenkei}>
+				<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
+			</Tooltip>
 			{#if canvasAspectEnabled}
 				<Tooltip text={t().tooltipInputCanvas}>
 					<CanvasAspectPlugin
@@ -250,35 +250,47 @@
 		</div>
 	</div>
 
-	{#if inputMode !== 'demo'}
-		<div class="current-selection" aria-label={isJapanese ? '現在選択中の設定' : 'Current selection'}>
-			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
-				{#if nextStage1Model === nextStage2Model}
-					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-				{:else}
-					<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
-					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-					<span class="cs-sub">{isJapanese ? '描画' : 'Rendering'}</span>
-					<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
-				{/if}
-			</span>
+	<div class="current-selection" aria-label={isJapanese ? '現在選択中の設定' : 'Current selection'}>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
+			{#if nextStage1Model === nextStage2Model}
+				<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
+			{:else}
+				<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
+				<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
+				<span class="cs-sub">{isJapanese ? '描画' : 'Rendering'}</span>
+				<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
+			{/if}
+		</span>
+		{#if inputMode === 'demo'}
 			<span class="cs-divider"></span>
 			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
-				{#if inputMode === 'batch' && batchRandomColorCatalog}
-					<span class="cs-value">{t().batchRandomColorCatalog}</span>
-				{:else}
-					<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
-				{/if}
+				<span class="cs-label">{isJapanese ? '指示生成' : 'Instruction'}</span>
+				<span class="cs-value" title={demoSettings.prompt_model}>{demoSettings.prompt_model}</span>
 			</span>
-			<span class="cs-divider"></span>
-			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? 'キャンバス' : 'Canvas'}</span>
-				<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
-			</span>
-		</div>
-	{/if}
+		{/if}
+		<span class="cs-divider"></span>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
+			<!-- Batch and demo can randomise the catalog per line / per loop, in which
+			     case the picked catalog is not knowable in advance. -->
+			{#if randomCatalogActive}
+				<span class="cs-value">{t().batchRandomColorCatalog}</span>
+			{:else}
+				<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
+			{/if}
+		</span>
+		<span class="cs-divider"></span>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? '添景' : 'Staffage'}</span>
+			<span class="cs-value">{tenkeiLabel(tenkeiLevel, isJapanese)}</span>
+		</span>
+		<span class="cs-divider"></span>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? 'キャンバス' : 'Canvas'}</span>
+			<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
+		</span>
+	</div>
 
 	{#if inputMode === 'single'}
 		<textarea
@@ -369,7 +381,6 @@
 			onSaveCurrent={onSaveCurrentDemo}
 			onStart={onStartDemo}
 			onStop={onStopDemo}
-			onOpenDrawingModelSelection={onOpenLlmModelSelection}
 		/>
 	{/if}
 </section>

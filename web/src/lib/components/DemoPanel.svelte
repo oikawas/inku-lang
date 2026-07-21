@@ -35,7 +35,6 @@
 		onSaveCurrent: () => void | Promise<void>;
 		onStart: () => void | Promise<void>;
 		onStop: () => void;
-		onOpenDrawingModelSelection: () => void;
 	};
 
 	let {
@@ -67,7 +66,6 @@
 		onSaveCurrent,
 		onStart,
 		onStop,
-		onOpenDrawingModelSelection,
 	}: Props = $props();
 
 	const promptModels = $derived(providerGroups.flatMap((group) => group.models));
@@ -125,10 +123,6 @@
 			<span>{t().demoRandomColorCatalog}</span>
 		</label>
 		<div class="wide"><ModelCardPicker label={t().demoPromptModel} selectedModel={settings.prompt_model} {providerGroups} disabled={running} onSelect={(_provider: Provider, model: string) => updateSettings({ prompt_model: model })} /></div>
-		<div class="drawing-model-summary wide">
-			<span class="drawing-title">描画用モデル / Drawing models</span>
-			<div><span><b>Stage 1</b>{drawingStage1ModelLabel}</span><span><b>Stage 2</b>{drawingStage2ModelLabel}</span><button type="button" disabled={running} onclick={onOpenDrawingModelSelection}>{t().modelSelectButton}</button></div>
-		</div>
 		<label class="wide">
 			<span>{t().demoSeedPhrase}</span>
 			<textarea
@@ -212,13 +206,6 @@
 
 <style>
 	.demo-panel { display: flex; flex-direction: column; gap: 10px; }
-	.drawing-model-summary { display: grid; gap: 4px; }
-	.drawing-title { color: var(--fg2); font-size: 11px; }
-	.drawing-model-summary > div { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; gap: 6px; }
-	.drawing-model-summary > div > span { display: grid; gap: 2px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: 10px; overflow-wrap: anywhere; }
-	.drawing-model-summary b { color: var(--fg3); font-size: 8px; letter-spacing: .06em; }
-	.drawing-model-summary button { padding: 6px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--accent); font: inherit; font-size: 10px; cursor: pointer; }
-	.drawing-model-summary button:disabled { opacity: .45; cursor: not-allowed; }
 	.demo-grid {
 
 		display: grid;

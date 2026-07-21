@@ -22,7 +22,7 @@
 	type HistoryItem = { id?: string; starred?: boolean; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'hensou';
 	type HensouAmplitude = 'small' | 'medium' | 'large';
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
@@ -112,8 +112,7 @@
 		variationGridTaskLabel: string;
 		variationGridStatus: string | null;
 		touchSeedText: string;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
-		onGenerateHensouCandidates: (amplitude: HensouAmplitude) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: HensouAmplitude) => void | Promise<void>;
 		onAbortVariationCandidates: () => void;
 		onSaveSelectedVariationCandidates: () => void | Promise<void>;
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
@@ -263,7 +262,6 @@
 		variationGridStatus = null,
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
-		onGenerateHensouCandidates,
 		onAbortVariationCandidates,
 		onSaveSelectedVariationCandidates,
 		onShowVariationCandidate,
@@ -335,9 +333,26 @@
 	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
 	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
 	let refineModalOpen = $state(false);
+	// 推敲要素の選択は前回の指定を引き継ぐ。
+	const REFINE_KIND_KEY = 'inku-refine-kind';
+	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'color', 'hensou'];
 	let refineKind = $state<RefineKind>('touch');
 	let hensouAmplitude = $state<HensouAmplitude>('medium');
-	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
+	onMount(() => {
+		try {
+			const stored = localStorage.getItem(REFINE_KIND_KEY) as RefineKind | null;
+			if (stored && REFINE_KINDS.includes(stored)) refineKind = stored;
+		} catch {}
+	});
+	function setRefineKind(kind: RefineKind) {
+		refineKind = kind;
+		try { localStorage.setItem(REFINE_KIND_KEY, kind); } catch {}
+	}
+	// 「読み取りを変える」は DDL 由来の作品では出せないので、復元値がそれなら外す。
+	$effect(() => {
+		if (statusDdlOrigin && refineKind === 'reading') refineKind = 'touch';
+	});
+	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '描画要素を編集' : 'Edit drawing elements') : refineView === 'compare' ? (isJapanese ? 'モデルを編集' : 'Edit models') : (isJapanese ? '言語を編集' : 'Edit languages'));
 	const statusGenerationValue = $derived(
 		statusGeneration
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
@@ -369,7 +384,9 @@
 				? t().refineCostLayout
 				: refineKind === 'color'
 					? t().refineCostColor
-					: t().refineCostTouch
+					: refineKind === 'hensou'
+						? t().refineCostLayout
+						: t().refineCostTouch
 	);
 	const canvasMaxRatio = $derived(Math.max(canvasAspectWidth, canvasAspectHeight, 1));
 	const canvasBaseWidth = $derived(400 * canvasAspectWidth / canvasMaxRatio);
@@ -651,7 +668,7 @@
 									</div>
 									<div class="model-choice-grid" role="radiogroup" aria-label={t().refineSingleSelectionHint}>
 										<label class="model-choice" class:checked={refineKind === 'layout'}>
-											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => (refineKind = 'layout')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => setRefineKind('layout')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryComposition}</strong>
@@ -661,7 +678,7 @@
 										</label>
 										{#if !statusDdlOrigin}
 											<label class="model-choice" class:checked={refineKind === 'reading'}>
-												<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => (refineKind = 'reading')} disabled={variationBusy || variationGridBusy} />
+												<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => setRefineKind('reading')} disabled={variationBusy || variationGridBusy} />
 												<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
 													<span class="refine-choice-label">
 														<strong>{t().canvasVaryInterpretation}</strong>
@@ -671,7 +688,7 @@
 											</label>
 										{/if}
 										<label class="model-choice" class:checked={refineKind === 'color'}>
-											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => (refineKind = 'color')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => setRefineKind('color')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryColor}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryColor}</strong>
@@ -679,8 +696,34 @@
 												</span>
 											</Tooltip>
 										</label>
+										<label class="model-choice" class:checked={refineKind === 'hensou'}>
+											<input type="radio" name="refine-kind" value="hensou" checked={refineKind === 'hensou'} onchange={() => setRefineKind('hensou')} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipHensou}>
+												<span class="refine-choice-label">
+													<strong>{t().hensouRadioLabel}</strong>
+													<span class="refine-info-mark" aria-hidden="true">i</span>
+												</span>
+											</Tooltip>
+										</label>
+										{#if refineKind === 'hensou'}
+											<div class="hensou-amplitude-field">
+												<div class="model-choice-grid hensou-amplitude-grid" role="radiogroup" aria-label={t().hensouTitle}>
+													{#each [['small', t().hensouSmall, t().hensouTooltipSmall, 'bottom-right'], ['medium', t().hensouMedium, t().hensouTooltipMedium, 'bottom'], ['large', t().hensouLarge, t().hensouTooltipLarge, 'bottom-left']] as [level, label, hint, place] (level)}
+														<label class="model-choice" class:checked={hensouAmplitude === level}>
+															<input type="radio" name="hensou-amplitude" value={level} checked={hensouAmplitude === level} onchange={() => (hensouAmplitude = level as HensouAmplitude)} disabled={variationBusy || variationGridBusy} />
+															<Tooltip placement={place as 'bottom' | 'bottom-left' | 'bottom-right'} text={hint}>
+																<span class="refine-choice-label">
+																	<strong>{label}</strong>
+																	<span class="refine-info-mark" aria-hidden="true">i</span>
+																</span>
+															</Tooltip>
+														</label>
+													{/each}
+												</div>
+											</div>
+										{/if}
 										<label class="model-choice" class:checked={refineKind === 'touch'}>
-											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => setRefineKind('touch')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryPerformance}</strong>
@@ -696,41 +739,12 @@
 										</label>
 									{/if}
 								</section>
-								<section class="refine-action-section refine-hensou-section">
-									<div class="refine-section-head">
-										<div class="refine-section-title">{t().hensouTitle}</div>
-									</div>
-									<p class="refine-hensou-hint">{t().hensouHint}</p>
-									<div class="model-choice-grid" role="radiogroup" aria-label={t().hensouTitle}>
-										{#each [['small', t().hensouSmall], ['medium', t().hensouMedium], ['large', t().hensouLarge]] as [level, label] (level)}
-											<label class="model-choice" class:checked={hensouAmplitude === level}>
-												<input type="radio" name="hensou-amplitude" value={level} checked={hensouAmplitude === level} onchange={() => (hensouAmplitude = level as HensouAmplitude)} disabled={variationBusy || variationGridBusy} />
-												<span class="refine-choice-label"><strong>{label}</strong></span>
-											</label>
-										{/each}
-									</div>
-									<div class="refine-actions refine-paint-actions">
-										<Tooltip text={t().tooltipHensou}>
-											<div class="refine-action-wrap">
-												<PaintButton
-													onclick={() => onGenerateHensouCandidates(hensouAmplitude)}
-													disabled={!result || variationBusy || variationGridBusy}
-												>
-													{t().hensouButton}
-												</PaintButton>
-											</div>
-										</Tooltip>
-									</div>
-								</section>
 								<section class="refine-action-section">
-									<div class="refine-section-head">
-										<div class="refine-section-title">{t().refineGridTitle}</div>
-									</div>
 									<div class="refine-actions refine-paint-actions">
 										<Tooltip text={t().tooltipRefineSingle}>
 											<div class="refine-action-wrap">
 												<PaintButton
-												onclick={() => onGenerateVariationCandidates(refineKind, 1, refineKind === 'touch' ? touchSeedText : undefined)}
+												onclick={() => onGenerateVariationCandidates(refineKind, 1, refineKind === 'touch' ? touchSeedText : undefined, refineKind === 'hensou' ? hensouAmplitude : undefined)}
 												disabled={!result || variationBusy || variationGridBusy || (refineKind === 'touch' && !touchSeedText.trim())}
 												>
 													{t().refineSingleButton}
@@ -740,14 +754,13 @@
 										<Tooltip text={t().tooltipVariationGridDefault}>
 											<div class="refine-action-wrap">
 												<PaintButton
-												onclick={() => onGenerateVariationCandidates(refineKind, 4)}
+												onclick={() => onGenerateVariationCandidates(refineKind, 4, undefined, refineKind === 'hensou' ? hensouAmplitude : undefined)}
 												disabled={!result || variationBusy || variationGridBusy || refineKind === 'touch'}
 												>
 													{t().variationGridDefault}
 												</PaintButton>
 											</div>
 										</Tooltip>
-										<div class="refine-tenkei-row"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /></div>
 										{#if refineCostLabel}
 											<div class="refine-cost-indicator" aria-live="polite">
 												<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -757,6 +770,7 @@
 												<span>{refineCostLabel}</span>
 											</div>
 										{/if}
+										<div class="refine-tenkei-row"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /></div>
 
 									{#if variationBusy || variationGridBusy}
 										<RunStatus
@@ -774,8 +788,8 @@
 							</div>
 						</div>
 						<div class="refine-workspace">
-							{#if variationCandidates.length > 0}
-								<section class="refine-action-section refine-candidates-section">
+							<section class="refine-action-section refine-candidates-section">
+								{#if variationCandidates.length > 0}
 									<div class="refine-actions refine-save-actions">
 										<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
 											<button class="refine-save-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>
@@ -783,7 +797,7 @@
 											</button>
 										</Tooltip>
 									</div>
-									<div class="variation-grid">
+									<div class="variation-grid" style="--variation-cols: {variationCandidates.length > 1 ? 2 : 1};">
 										{#each variationCandidates as candidate (candidate.id)}
 											<div class="variation-card-wrap">
 												<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
@@ -801,12 +815,25 @@
 													</span>
 												</button>
 											{#if variationGridIncludesReading}<pre class="variation-ddl-popup">{candidate.result.ddl}</pre>{/if}
-												<button class="variation-select" class:selected={candidate.selected} onclick={() => onToggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
+												<button
+													class="variation-select"
+													class:selected={candidate.selected}
+													class:saved={candidate.saved}
+													disabled={candidate.saved}
+													title={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
+													aria-label={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
+													onclick={() => onToggleVariationCandidate(candidate.id)}
+													type="button"
+												>{candidate.saved ? "✔" : candidate.selected ? "✓" : "+"}</button>
 											</div>
 										{/each}
 									</div>
-								</section>
-							{/if}
+								{:else}
+									<div class="variation-grid-placeholder">
+										<span>{t().refineCandidatePlaceholder}</span>
+									</div>
+								{/if}
+							</section>
 							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
 						</div>
 					</div>
@@ -814,7 +841,6 @@
 					{:else if refineView === 'compare'}
 					<div class="compare-panel">
 					<div class="compare-head">
-						<div class="refine-title">{t().modelCompareTitle}</div>
 						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 						<div class="compare-action-wrap">
 							{#if modelInspectionBusy}
@@ -893,7 +919,6 @@
 					{:else}
 					<div class="compare-panel">
 						<div class="compare-head">
-							<div class="refine-title">{isJapanese ? '指示文言語を比較する' : 'Compare instruction languages'}</div>
 							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
 							<div class="compare-action-wrap">
 								{#if languageInspectionBusy}
@@ -1324,11 +1349,6 @@
 		padding: 16px;
 		box-sizing: border-box;
 	}
-	.refine-title {
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--fg);
-	}
 	.variation-grid-status {
 		font-size: 12px;
 		color: var(--fg3);
@@ -1433,7 +1453,14 @@
 		stroke-linejoin: round;
 	}
 	.refine-paint-actions { align-items: stretch; }
-	.refine-hensou-hint { margin: 0; font-size: 11px; color: var(--fg3); line-height: 1.5; }
+	/* 速度目安は描画ボタンの直下に単独行で置く */
+	.refine-paint-actions .refine-cost-indicator { flex: 0 0 100%; min-height: 0; }
+	/* 変奏の子であることが見えるよう、変奏ラジオの直下に段落ちさせる */
+	.hensou-amplitude-field { display: grid; gap: 5px; grid-column: 1 / -1; margin: -2px 0 2px 18px; padding-left: 10px; border-left: 2px solid var(--border2); }
+	/* 小・中・大は常に横 3 列（後段の .model-choice-grid に負けないよう詳細度を上げる） */
+	.hensou-amplitude-field .model-choice-grid.hensou-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+	.hensou-amplitude-field .model-choice { padding: 6px; gap: 5px; }
+	.hensou-amplitude-field .refine-info-mark { width: 13px; height: 13px; font-size: 9px; }
 	.variation-card-moved { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 	.variation-moved-axis { padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 10px; color: var(--fg2); white-space: nowrap; }
 	.refine-action-wrap { width: min(210px, 100%); }
@@ -1443,6 +1470,7 @@
 	.refine-save-actions {
 		margin-bottom: 12px;
 		display: flex;
+		justify-content: flex-end;
 	}
 	.refine-save-actions :global(.tooltip-wrap) { width: fit-content; max-width: 100%; }
 	.refine-save-actions button {
@@ -1453,6 +1481,8 @@
 	}
 	.refine-candidates-section {
 		border-top: 1px dashed var(--border);
+		flex: 1 1 auto;
+		min-height: 0;
 	}
 
 	.refine-save-btn { border: 1px solid var(--action-bg); border-radius: var(--r); background: var(--action-bg); color: var(--action-fg); cursor: pointer; }
@@ -1460,20 +1490,46 @@
 	.refine-save-btn:disabled { border-color: var(--border); background: var(--bg2); color: var(--fg3); cursor: not-allowed; }
 	.variation-ddl-popup { position: absolute; z-index: 8; left: 10px; right: 10px; bottom: calc(100% - 10px); display: none; max-height: 220px; overflow: auto; padding: 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--tooltip-bg); color: #fff; font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; box-shadow: 0 8px 24px rgba(0,0,0,.24); pointer-events: none; }
 	.variation-card-wrap:hover .variation-ddl-popup { display: block; }
+	/* 候補はウインドウの残り高さに収める。行は等分し、カードは行の高さを埋める。 */
+	/* 候補が 1 枚なら 1 列にしてダイアログ幅いっぱいに見せる */
 	.variation-grid {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: repeat(var(--variation-cols, 2), minmax(0, 1fr));
+		grid-auto-rows: minmax(0, 1fr);
 		gap: 10px;
+		min-height: 0;
+		max-height: calc(100vh - 200px);
 	}
 	.variation-card-wrap {
 		position: relative;
 		min-width: 0;
+		min-height: 0;
+	}
+	/* 未描画でも候補が並ぶ場所だと分かるよう、同じ枠を破線で示す */
+	.variation-grid-placeholder {
+		display: grid;
+		place-items: center;
+		flex: 1 1 auto;
+		min-height: 180px;
+		max-height: calc(100vh - 200px);
+		padding: 24px;
+		border: 1px dashed var(--border2);
+		border-radius: var(--r);
+		background: var(--bg2);
+		text-align: center;
+	}
+	.variation-grid-placeholder span {
+		max-width: 30em;
+		color: var(--fg3);
+		font-size: 12px;
+		line-height: 1.6;
 	}
 	.variation-card {
 		display: grid;
 		grid-template-rows: minmax(0, 1fr) auto;
 		width: 100%;
-		aspect-ratio: 1 / 1.1;
+		height: 100%;
+		min-height: 150px;
 		padding: 0;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
@@ -1527,6 +1583,14 @@
 		border-color: var(--accent);
 		background: var(--accent);
 		color: white;
+	}
+	/* 保存済みは選択と区別できる塗りにし、押せない状態にする */
+	.variation-select.saved {
+		border-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 20%, var(--panel));
+		color: var(--accent);
+		cursor: default;
+		opacity: 1;
 	}
 
 	.compare-panel {

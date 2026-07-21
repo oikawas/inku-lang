@@ -1172,7 +1172,7 @@ class VisionRefineAdviceBody(BaseModel):
     model: str | None = Field(default=None, min_length=1, max_length=200)
     instruction: str = Field(..., min_length=1, max_length=100_000)
     direction: str = Field(default="", max_length=2000)
-    enabled_kinds: list[str] = Field(..., min_length=1, max_length=4)
+    enabled_kinds: list[str] = Field(..., min_length=1, max_length=5)
     language: str = Field(default="ja", pattern="^(ja|en)$")
 
 

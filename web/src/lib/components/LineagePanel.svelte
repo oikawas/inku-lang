@@ -558,28 +558,29 @@ $effect(() => {
 	{#if activeMenuNodeId === node.id}
 		{@const ddlOrigin = isDdlOrigin(node)}
 		<div class="card-dropdown-menu" role="menu">
+			<div class="card-dropdown-title">{isJapanese ? '作品を編集する' : 'Edit this artwork'}</div>
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
+				{isJapanese ? '描画要素' : 'Drawing elements'}
+			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-					{isJapanese ? '記述を編集' : 'Edit description'}
+					{isJapanese ? '記述' : 'Description'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
-				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
-			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
-				{isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
-			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
-				{isJapanese ? '描画要素で比較' : 'Compare drawing elements'}
+				{isJapanese ? 'DDL' : 'DDL'}
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
-					{isJapanese ? 'モデルで比較' : 'Compare models'}
+					{isJapanese ? 'モデル' : 'Models'}
 				</button>
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
-					{isJapanese ? '言語で比較' : 'Compare languages'}
+					{isJapanese ? '言語' : 'Languages'}
 				</button>
 			{/if}
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
+				{isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
+			</button>
 		</div>
 	{/if}
 {/if}
@@ -718,8 +719,9 @@ $effect(() => {
 	.lineage-actions, .overview-zoom { display: flex; align-items: center; gap: 8px; }
 	.overview-zoom { padding-right: 8px; border-right: 1px solid var(--border); }
 	.overview-zoom span { min-width: 42px; color: var(--fg3); font-size: .72rem; text-align: center; }
-	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: 7px; padding: 7px 10px; cursor: pointer; }
-	.detach-btn { background: #fff7e8; border-color: #d8b36a; color: #6c4a10; font-weight: 600; box-shadow: 0 1px 3px rgba(108,74,16,0.12); }
+	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-family: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
+	/* 寸法は header button 側 (--btn-sm-*) に従う。ここでは色だけを上書きする。 */
+	.detach-btn { background: #fff7e8; border-color: #d8b36a; color: #6c4a10; font-weight: 600; box-shadow: 0 1px 3px rgba(108,74,16,0.12); white-space: nowrap; }
 	.detach-btn:hover { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -772,9 +774,11 @@ $effect(() => {
 	@keyframes okugaki-spin { to { transform: rotate(360deg); } }
 	.card-menu-trigger { position: absolute; z-index: 3; top: 0; right: 0; display: grid; place-items: center; width: 22px; height: 22px; border: 0; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--fg3); cursor: pointer; }
 	.card-menu-trigger:hover { background: var(--bg2); color: var(--fg); }
-	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 230px; border: 1px solid var(--border2); border-radius: 6px; padding: 5px 0; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
-	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 10px 13px; font-size: 0.84rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
+	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 210px; border: 1px solid var(--border2); border-radius: 6px; padding: 0 0 4px; overflow: hidden; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
+	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font-size: 0.82rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
 	.card-dropdown-menu button:hover { background: var(--bg2); }
+	/* メニュー見出し: 帯を敷いて項目と明確に分ける */
+	.card-dropdown-title { margin-bottom: 4px; padding: 6px 13px; border-bottom: 1px solid var(--border2); background: var(--bg2); color: var(--fg2); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; }
 	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }

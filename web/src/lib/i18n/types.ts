@@ -150,11 +150,13 @@ export interface LangPack {
 	canvasVaryInterpretation: string;
 	canvasVaryColor: string;
 	hensouTitle: string;
-	hensouHint: string;
+	hensouRadioLabel: string;
 	hensouSmall: string;
 	hensouMedium: string;
 	hensouLarge: string;
-	hensouButton: string;
+	hensouTooltipSmall: string;
+	hensouTooltipMedium: string;
+	hensouTooltipLarge: string;
 	hensouMovedTitle: string;
 	hensouAxis: (axis: string) => string;
 	variationGridDefault: string;
@@ -168,6 +170,7 @@ export interface LangPack {
 	refineCostReading: string;
 	refineCostColor: string;
 	variationGridEmpty: string;
+	refineCandidatePlaceholder: string;
 	refineNoAlternateCatalog: string;
 	tooltipVariationGridDefault: string;
 	tooltipVariationGridWithInterpretation: string;
@@ -226,7 +229,6 @@ export interface LangPack {
 	modelCompareFixedStage2: string;
 	modelCompareTargetDisabledTooltip: string;
 	modelCompareBusy: string;
-	modelCompareTitle: string;
 	modelCompareSubtitle: string;
 	modelCompareModelSelectLabel: string;
 	modelCompareSelectPrompt: string;
@@ -251,7 +253,6 @@ export interface LangPack {
 	refineTargetTitle: string;
 	refineSingleTitle: string;
 	refineSingleSubtitle: string;
-	refineGridTitle: string;
 	refineGridSubtitle: string;
 	refineGenerating: string;
 	refineGeneratingBody: string;
@@ -270,6 +271,7 @@ export interface LangPack {
 	aiRefineAppliedDirection: string;
 	aiRefineDirectionLabel: string;
 	aiRefineDirectionPlaceholder: string;
+	aiRefineDirectionRandomHint: string;
 	aiRefineGensLabel: string;
 	aiRefineElementsLabel: string;
 	aiRefineStartButton: string;

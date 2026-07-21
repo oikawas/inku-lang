@@ -3881,6 +3881,117 @@ def _render_contour_hand_stroke(
     return group
 
 
+def _render_arc_hand_stroke(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    cx: float,
+    cy: float,
+    r: float,
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    use_filters: bool,
+):
+    """弧を一筆のストロークとして演奏し、帯として描く (line / 閉図形と対称)。
+
+    幾何の弧は不可視の意図要素 (`stroke="none"`) として残す。touching の接点契約は
+    この意図弧の座標が担保するので、帯は自由端と同じく両端で 0 へ細ってよい
+    (幅の下限を置かない)。抽出器 (`_svg_arcs`) は stroke-opacity 既定 "1"・
+    `material-outline` クラス無しでこの意図要素を 1 個だけ数える。
+    """
+    assert ins.angle_start is not None and ins.angle_end is not None
+    seed = _seed_for_instruction(ins, render_seed)
+    varied = _needs_contour_variation(ins.variation)
+    if varied:
+        assert ins.variation is not None
+        centerline = _arc_points_with_variation(
+            cx,
+            cy,
+            r,
+            ins.angle_start,
+            ins.angle_end,
+            ins.variation,
+            seed,
+            _amplitude_px(ins.variation, ins, canvas),
+            canvas,
+        )
+    else:
+        arc_len = r * abs(math.radians(ins.angle_end) - math.radians(ins.angle_start))
+        centerline = _arc_points(
+            cx, cy, r, ins.angle_start, ins.angle_end, _stroke_sample_count(arc_len, canvas)
+        )
+    base_width = _stroke_width_px(ins.weight, canvas)
+    stroke = synthesize_along(centerline, base_width, ins.weight, seed, closed=False)
+    group = dwg.g(
+        class_=(
+            f"arc-stroke-v1 controls-{len(stroke.samples)} events-{stroke.event_count}"
+        )
+    )
+
+    # 意図要素: 実線は不可視、破線・点線は細い線種として可視化 (line 側で
+    # style != solid のとき幾何線を重ねているのと対称)。どちらも 1 要素なので
+    # 抽出器に二重計上されない。
+    body_attrs = _body_attrs_for_contour_stroke(attrs, ins, region_fill=False)
+    body_attrs.pop("filter", None)
+    if varied:
+        group.add(dwg.polyline(points=centerline, **body_attrs))
+    else:
+        group.add(
+            dwg.path(
+                d=_arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end), **body_attrs
+            )
+        )
+
+    color = attrs.get("stroke", "#111111")
+    opacity = float(attrs.get("stroke_opacity", 1.0))
+    path_attrs = {
+        "d": contour_stroke_path(stroke),
+        "fill": color,
+        "fill_opacity": opacity,
+        "stroke": "none",
+    }
+    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+        path_attrs["filter"] = f"url(#texture-{ins.weight})"
+    group.add(dwg.path(**path_attrs))
+
+    if ins.weight == "drypoint":
+        offset = stroke.burr_side * base_width
+        normals = centerline_normals(
+            [(sample.x, sample.y) for sample in stroke.samples], False
+        )
+        burr_attrs = {
+            "points": [
+                (sample.x + nx * offset, sample.y + ny * offset)
+                for sample, (nx, ny) in zip(stroke.samples, normals)
+            ],
+            "fill": "none",
+            "stroke": color,
+            "stroke_width": base_width * 1.25,
+            "stroke_opacity": stroke.burr_opacity,
+            "stroke_linecap": "round",
+        }
+        if use_filters:
+            burr_attrs["filter"] = "url(#texture-drypoint)"
+        group.add(dwg.polyline(**burr_attrs))
+
+    if _uses_material_outline(ins.weight):
+        _add_material_arc_outline(
+            dwg,
+            group,
+            ins,
+            attrs,
+            cx,
+            cy,
+            r,
+            ins.angle_start,
+            ins.angle_end,
+            canvas,
+            render_seed,
+        )
+    return _apply_rotation(group, ins, canvas)
+
+
 def _render_corner_shape(
     dwg: svgwrite.Drawing,
     ins: Instruction,
@@ -4228,6 +4339,18 @@ def _render_instruction(
             raise ValueError("arc requires 'angle_start' and 'angle_end'")
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
+        if _uses_hand_stroke(ins.weight):
+            return _render_arc_hand_stroke(
+                dwg,
+                ins,
+                cx,
+                cy,
+                r,
+                attrs,
+                canvas,
+                render_seed,
+                use_filters=use_filters,
+            )
         if _needs_contour_variation(ins.variation):
             assert ins.variation is not None
             contour = _arc_points_with_variation(

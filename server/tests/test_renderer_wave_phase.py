@@ -97,11 +97,14 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # v2.2 (閉図形の手描きストローク / engine 8) で採取した render_seed=None 出力の
 # sha256 (先頭 32 桁)。seed 未指定の演奏が不変であることの固定。
 # v2.1 の値からの差分は閉図形 (circle / ellipse / square) の輪郭がストロークの帯に
-# なった分だけで、line と arc は v2.1 とバイト一致したまま。
+# なった分だけで、line と arc は v2.1 とバイト一致したままだった。
+# v2.4 (engine 10) で arc をストローク化したため crayon_arc のみ再採取した
+# (幾何弧を不可視の意図要素として残し、上に材質込みの帯を重ねた分の増加)。
+# line (brush_thin_line) と閉図形 3 件は v2.4 でも不変。
 MATERIAL_NONE_SEED_DIGESTS = {
     "brush_thin_line": "caf585ff657f4430d6c4b38cbc51ceb5",
     "chalk_square": "1c5f83ded213aab30a7273476dc8c11f",
-    "crayon_arc": "cfb845988d7b2ffde128037f5633942b",
+    "crayon_arc": "d7fb82a3bf483ca15ed8751896281c50",
     "pencil_circle": "3c26c91346dba1512246074cae8527b9",
     "pencil_ellipse": "ea2c0056db2a1a0308f15bb4791d3aa6",
 }

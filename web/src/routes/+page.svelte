@@ -6542,13 +6542,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
 	.ddl-tools-section { flex-direction: row; justify-content: flex-end; }
 	.ddl-new-btn {
-		padding: 4px 10px;
+		padding: var(--btn-sm-padding);
 		border: 1px solid #d8b36a;
-		border-radius: var(--r);
+		border-radius: var(--btn-sm-radius);
 		background: #fff7e8;
 		color: #6c4a10;
 		font-family: inherit;
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		font-weight: 600;
 		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
 		white-space: nowrap;

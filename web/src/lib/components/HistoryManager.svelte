@@ -604,7 +604,7 @@
 	.lineage-member-main :global(svg) { width: 100%; max-height: 110px; }
 	.lineage-member-main span { display: block; overflow: hidden; margin-top: 4px; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 	.lineage-member-actions { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
-	.lineage-member-actions .ghost-btn, .lineage-member-actions .danger-btn { margin-left: 0; padding: 3px 6px; font-size: 9px; }
+	.lineage-member-actions .ghost-btn, .lineage-member-actions .danger-btn { margin-left: 0; padding: var(--btn-sm-padding); font-size: var(--btn-sm-font-size); }
 	.lineage-history-list.list-mode .lineage-member-grid { display: flex; flex-direction: column; }
 	.lineage-history-list.list-mode .lineage-member { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 	.lineage-history-list.list-mode .lineage-member > .selection-checkbox { position: static; }
@@ -951,12 +951,12 @@
 	}
 	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
 	.ghost-btn {
-		padding: 4px 10px;
+		padding: var(--btn-sm-padding);
 		border: 1px solid var(--border2);
-		border-radius: var(--r);
+		border-radius: var(--btn-sm-radius);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		cursor: pointer;
 		font-family: inherit;
 	}
@@ -986,12 +986,12 @@
 	}
 	.icon-trash-btn:hover { color: var(--fg); }
 	.danger-btn {
-		padding: 4px 10px;
+		padding: var(--btn-sm-padding);
 		border: none;
-		border-radius: var(--r);
+		border-radius: var(--btn-sm-radius);
 		background: #c0392b;
 		color: #fff;
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		cursor: pointer;
 		font-family: inherit;
 	}

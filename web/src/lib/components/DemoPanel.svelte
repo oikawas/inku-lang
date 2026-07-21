@@ -304,13 +304,13 @@
 		margin-left: auto;
 	}
 	.ghost-btn {
-		padding: 5px 10px;
+		padding: var(--btn-sm-padding);
 		border: 1px solid var(--border2);
-		border-radius: var(--r);
+		border-radius: var(--btn-sm-radius);
 		background: var(--panel);
 		color: var(--fg2);
 		font: inherit;
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		cursor: pointer;
 	}
 	.ghost-btn:disabled { opacity: 0.45; cursor: not-allowed; }

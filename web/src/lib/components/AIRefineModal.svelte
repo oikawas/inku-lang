@@ -12,6 +12,7 @@
   import { createElapsed } from '$lib/elapsed.svelte';
 
   type RefineMode = 'random' | 'vision';
+  type HensouAmplitude = 'small' | 'medium' | 'large';
   type VisionAdvice = { observation: string; next_direction: string; suggested_kind: string; model: string };
   type Props = {
     node: LineageNode;
@@ -40,7 +41,7 @@
   let enableLayout = $state(true);
   let enableTouch = $state(true);
   let enableHensou = $state(true);
-  const hensouAmplitude = 'medium';
+  let hensouAmplitude = $state<HensouAmplitude>('medium');
   let running = $state(false);
   const refineElapsed = createElapsed();
   let refineTokensIn = $state<number | null>(null);
@@ -190,7 +191,7 @@
         {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
         <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea>{#if refineMode === 'random'}<small class="field-hint">{t().aiRefineDirectionRandomHint}</small>{/if}</div>
         <div class="form-row"><div class="form-group tenkei-group"><span class="tenkei-group-label">&nbsp;</span><TenkeiSelect compact value={tenkeiOverride ?? parentTenkei} {isJapanese} inherited={tenkeiOverride === null} onSelect={(level) => (tenkeiOverride = level)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
-        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label><input type="checkbox" bind:checked={enableReading} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip><Tooltip placement="bottom" text={t().tooltipHensou}><label><input type="checkbox" bind:checked={enableHensou} /><span>{t().hensouTitle}</span></label></Tooltip></div></details>
+        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label><input type="checkbox" bind:checked={enableReading} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip><Tooltip placement="bottom" text={t().tooltipHensou}><label><input type="checkbox" bind:checked={enableHensou} /><span>{t().hensouTitle}</span></label></Tooltip>{#if enableHensou}<div class="hensou-amplitude-field"><div class="hensou-amplitude-grid" role="radiogroup" aria-label={t().hensouTitle}>{#each [['small', t().hensouSmall, t().hensouTooltipSmall, 'top-right'], ['medium', t().hensouMedium, t().hensouTooltipMedium, 'top'], ['large', t().hensouLarge, t().hensouTooltipLarge, 'top-left']] as [level, label, hint, place] (level)}<label class="amplitude-choice" class:checked={hensouAmplitude === level}><input type="radio" name="ai-hensou-amplitude" value={level} checked={hensouAmplitude === level} onchange={() => (hensouAmplitude = level as HensouAmplitude)} /><Tooltip placement={place as 'top' | 'top-left' | 'top-right'} text={hint}><span class="amplitude-choice-label"><strong>{label}</strong><span class="amplitude-info-mark" aria-hidden="true">i</span></span></Tooltip></label>{/each}</div></div>{/if}</div></details>
       {/if}
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}
       {#if errorText}<div class="error-banner">{errorText}</div>{/if}
@@ -219,6 +220,15 @@
   .gen-value { min-width:38px; text-align:center; font-size:.9rem; font-variant-numeric:tabular-nums; }
   .advanced-settings { border:1px solid var(--border); border-radius:8px; padding:8px 12px; background:var(--bg2); } .advanced-settings summary { font-size:.75rem; font-weight:600; color:var(--fg2); cursor:pointer; user-select:none; }
   .checkbox-group { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; } .checkbox-group label { display:flex; align-items:center; gap:8px; font-size:.74rem; cursor:pointer; } .checkbox-group input { width:14px; height:14px; accent-color:var(--accent); margin:0; }
+  /* 変奏の強度は変奏チェックボックスに従属するので、段落ち + border-left で示す (調整ダイアログと同型)。 */
+  .hensou-amplitude-field { grid-column: 1 / -1; margin: 2px 0 0 20px; padding-left: 10px; border-left: 2px solid var(--border2); }
+  .hensou-amplitude-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  /* .checkbox-group label / input より詳細度を上げる (同グリッド内のため)。 */
+  .hensou-amplitude-field .amplitude-choice { display:flex; align-items:center; gap:6px; padding:6px; border:1px solid var(--border); border-radius:var(--r); background:var(--panel); color:var(--fg2); font-size:.68rem; cursor:pointer; }
+  .hensou-amplitude-field .amplitude-choice.checked { border-color: var(--accent); color: var(--fg); }
+  .hensou-amplitude-field .amplitude-choice input { width:12px; height:12px; accent-color:var(--accent); margin:0; }
+  .amplitude-choice-label { display:inline-flex; align-items:center; gap:5px; min-width:0; }
+  .amplitude-info-mark { display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; border:1px solid var(--border2); border-radius:50%; color:var(--fg3); font-size:9px; }
   .progress-preview { width:72px; height:72px; border-radius:6px; overflow:hidden; background:var(--bg2); border:1px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,.15); } .progress-preview :global(.history-thumbnail) { width:100%; height:100%; aspect-ratio:auto; } .progress-preview :global(svg) { width:100%; height:100%; display:block; }
   .vision-advice { padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg2); } .vision-advice h4 { margin:0 0 3px; color:var(--fg3); font-size:.68rem; } .vision-advice p { margin:0 0 8px; color:var(--fg2); font-size:.76rem; line-height:1.45; } .vision-advice p:last-child { margin-bottom:0; }
   .error-banner { padding:8px 12px; background:color-mix(in srgb,var(--danger,#9b3d32) 10%,var(--panel)); border:1px solid var(--danger,#9b3d32); border-radius:6px; color:var(--danger,#9b3d32); font-size:.74rem; line-height:1.35; white-space:pre-line; }

@@ -774,10 +774,11 @@ $effect(() => {
 	@keyframes okugaki-spin { to { transform: rotate(360deg); } }
 	.card-menu-trigger { position: absolute; z-index: 3; top: 0; right: 0; display: grid; place-items: center; width: 22px; height: 22px; border: 0; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--fg3); cursor: pointer; }
 	.card-menu-trigger:hover { background: var(--bg2); color: var(--fg); }
-	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 230px; border: 1px solid var(--border2); border-radius: 6px; padding: 5px 0; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
-	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 10px 13px; font-size: 0.84rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
+	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 210px; border: 1px solid var(--border2); border-radius: 6px; padding: 0 0 4px; overflow: hidden; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
+	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font-size: 0.82rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
 	.card-dropdown-menu button:hover { background: var(--bg2); }
-	.card-dropdown-title { padding: 8px 13px 6px; border-bottom: 1px solid var(--border); color: var(--fg3); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; }
+	/* メニュー見出し: 帯を敷いて項目と明確に分ける */
+	.card-dropdown-title { margin-bottom: 4px; padding: 6px 13px; border-bottom: 1px solid var(--border2); background: var(--bg2); color: var(--fg2); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; }
 	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }

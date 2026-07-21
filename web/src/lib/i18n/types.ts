@@ -155,6 +155,9 @@ export interface LangPack {
 	hensouSmall: string;
 	hensouMedium: string;
 	hensouLarge: string;
+	hensouTooltipSmall: string;
+	hensouTooltipMedium: string;
+	hensouTooltipLarge: string;
 	hensouMovedTitle: string;
 	hensouAxis: (axis: string) => string;
 	variationGridDefault: string;

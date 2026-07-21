@@ -691,10 +691,15 @@
 										{#if refineKind === 'hensou'}
 											<div class="hensou-amplitude-field">
 												<div class="model-choice-grid hensou-amplitude-grid" role="radiogroup" aria-label={t().hensouTitle}>
-													{#each [['small', t().hensouSmall], ['medium', t().hensouMedium], ['large', t().hensouLarge]] as [level, label] (level)}
+													{#each [['small', t().hensouSmall, t().hensouTooltipSmall], ['medium', t().hensouMedium, t().hensouTooltipMedium], ['large', t().hensouLarge, t().hensouTooltipLarge]] as [level, label, hint] (level)}
 														<label class="model-choice" class:checked={hensouAmplitude === level}>
 															<input type="radio" name="hensou-amplitude" value={level} checked={hensouAmplitude === level} onchange={() => (hensouAmplitude = level as HensouAmplitude)} disabled={variationBusy || variationGridBusy} />
-															<span class="refine-choice-label"><strong>{label}</strong></span>
+															<Tooltip placement="bottom" text={hint}>
+																<span class="refine-choice-label">
+																	<strong>{label}</strong>
+																	<span class="refine-info-mark" aria-hidden="true">i</span>
+																</span>
+															</Tooltip>
 														</label>
 													{/each}
 												</div>
@@ -1442,7 +1447,10 @@
 	.refine-paint-actions .refine-cost-indicator { flex: 0 0 100%; min-height: 0; }
 	/* 変奏の子であることが見えるよう、変奏ラジオの直下に段落ちさせる */
 	.hensou-amplitude-field { display: grid; gap: 5px; grid-column: 1 / -1; margin: -2px 0 2px 18px; padding-left: 10px; border-left: 2px solid var(--border2); }
-	.hensou-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+	/* 小・中・大は常に横 3 列（後段の .model-choice-grid に負けないよう詳細度を上げる） */
+	.hensou-amplitude-field .model-choice-grid.hensou-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+	.hensou-amplitude-field .model-choice { padding: 6px; gap: 5px; }
+	.hensou-amplitude-field .refine-info-mark { width: 13px; height: 13px; font-size: 9px; }
 	.refine-hensou-hint { margin: 0; font-size: 11px; color: var(--fg3); line-height: 1.5; }
 	.variation-card-moved { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 	.variation-moved-axis { padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 10px; color: var(--fg2); white-space: nowrap; }

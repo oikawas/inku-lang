@@ -33,7 +33,15 @@ from .arc_geometry import (
     arc_svg_flags,
     minor_arc_delta,
 )
-from .stroke_engine import outline_for_centerline, polygon_path, synthesize_stroke
+from .stroke_engine import (
+    GRAMMARS,
+    centerline_normals,
+    contour_stroke_path,
+    outline_for_centerline,
+    polygon_path,
+    synthesize_along,
+    synthesize_stroke,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -763,6 +771,47 @@ def _closed_contour_with_variation(
     return result
 
 
+def _edge_contour_with_anchors(
+    corners: list[tuple[float, float]],
+    variation: Variation | None,
+    seed: int,
+    amp: float,
+    canvas: CanvasSize,
+) -> tuple[list[tuple[float, float]], frozenset[int]]:
+    """辺ごとに分割した閉輪郭と、角に当たる頂点 index を返す。
+
+    variation を渡すと各辺に line と同じ揺らぎを適用し、分割数は _segment_count
+    (揺らぎ輪郭の解像度)。振幅は辺ごとの長さではなく図形の代表寸法から決めた
+    amp を共有する (横長の矩形で揺らぎが異方性を持たないようにするため)。
+    variation なしは手描きストロークの中心線用で、分割数は line と同じ
+    _stroke_sample_count に合わせる (筆の追従遅れの尺度を線と揃えるため)。
+    """
+    result: list[tuple[float, float]] = []
+    anchors: list[int] = []
+    n = len(corners)
+    for i in range(n):
+        start = corners[i]
+        end = corners[(i + 1) % n]
+        anchors.append(len(result))
+        if variation is None:
+            segments = _stroke_sample_count(
+                math.hypot(end[0] - start[0], end[1] - start[1]), canvas
+            )
+            edge = [
+                (
+                    start[0] + (end[0] - start[0]) * k / segments,
+                    start[1] + (end[1] - start[1]) * k / segments,
+                )
+                for k in range(segments + 1)
+            ]
+        else:
+            edge = _line_with_variation(
+                start, end, variation, seed + (i + 1) * 7919, amp, canvas
+            )
+        result.extend(edge[:-1])
+    return result, frozenset(anchors)
+
+
 def _edge_contour_with_variation(
     corners: list[tuple[float, float]],
     variation: Variation,
@@ -770,21 +819,8 @@ def _edge_contour_with_variation(
     amp: float,
     canvas: CanvasSize,
 ) -> list[tuple[float, float]]:
-    """多角形の各辺に line と同じ揺らぎを適用し、角を固定した閉輪郭を返す。
-
-    振幅は辺ごとの長さではなく図形の代表寸法から決めた amp を共有する
-    (横長の矩形で揺らぎが異方性を持たないようにするため)。分割数は辺長比例。
-    """
-    result: list[tuple[float, float]] = []
-    n = len(corners)
-    for i in range(n):
-        start = corners[i]
-        end = corners[(i + 1) % n]
-        edge = _line_with_variation(
-            start, end, variation, seed + (i + 1) * 7919, amp, canvas
-        )
-        result.extend(edge[:-1])
-    return result
+    """多角形の各辺に line と同じ揺らぎを適用し、角を固定した閉輪郭を返す。"""
+    return _edge_contour_with_anchors(corners, variation, seed, amp, canvas)[0]
 
 
 def _arc_points_with_variation(
@@ -3480,6 +3516,133 @@ def _render_hand_stroke(
     return _apply_rotation(group, ins, canvas)
 
 
+def _uses_hand_stroke(weight: str) -> bool:
+    """手描きストローク合成の対象か。rotring (製図ペン) だけが幾何のまま。"""
+    return weight != "rotring" and weight in GRAMMARS
+
+
+def _body_attrs_for_contour_stroke(attrs: dict, ins: Instruction) -> dict:
+    """輪郭をストロークで描くとき、本体要素は塗りだけを担う。
+
+    実線は輪郭を帯に置き換えるので stroke を落とす。破線・点線は線種そのものが
+    記述なので、細めた幾何輪郭を残して線種を読ませる (line 側で style != solid
+    のとき幾何線を重ねているのと対称)。
+    """
+    result = _copy_attrs(attrs)
+    if ins.style == "solid":
+        result["stroke"] = "none"
+        result.pop("stroke_width", None)
+        result.pop("stroke_opacity", None)
+        result.pop("stroke_dasharray", None)
+        result.pop("stroke_linecap", None)
+    else:
+        result["stroke_width"] = float(result.get("stroke_width", 1.0)) * 0.42
+    return result
+
+
+def _render_contour_hand_stroke(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    use_filters: bool,
+    closed: bool = True,
+    anchors: frozenset[int] = frozenset(),
+):
+    """閉輪郭を一筆のストロークとして合成し、帯 (ring) として描く。"""
+    base_width = _stroke_width_px(ins.weight, canvas)
+    stroke = synthesize_along(
+        contour,
+        base_width,
+        ins.weight,
+        _seed_for_instruction(ins, render_seed),
+        closed=closed,
+        anchors=anchors,
+    )
+    group = dwg.g(
+        class_=(
+            f"contour-stroke-v1 controls-{len(stroke.samples)} "
+            f"events-{stroke.event_count}"
+        )
+    )
+    color = attrs.get("stroke", "#111111")
+    opacity = float(attrs.get("stroke_opacity", 1.0))
+    path_attrs = {
+        "d": contour_stroke_path(stroke),
+        "fill": color,
+        "fill_opacity": opacity,
+        "fill_rule": "evenodd",
+        "stroke": "none",
+    }
+    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+        path_attrs["filter"] = f"url(#texture-{ins.weight})"
+    group.add(dwg.path(**path_attrs))
+
+    if ins.weight == "drypoint":
+        offset = stroke.burr_side * base_width
+        normals = centerline_normals(
+            [(sample.x, sample.y) for sample in stroke.samples], closed
+        )
+        burr_attrs = {
+            "points": [
+                (sample.x + nx * offset, sample.y + ny * offset)
+                for sample, (nx, ny) in zip(stroke.samples, normals)
+            ],
+            "fill": "none",
+            "stroke": color,
+            "stroke_width": base_width * 1.25,
+            "stroke_opacity": stroke.burr_opacity,
+            "stroke_linecap": "round",
+        }
+        if use_filters:
+            burr_attrs["filter"] = "url(#texture-drypoint)"
+        group.add(dwg.polygon(**burr_attrs))
+    return group
+
+
+def _render_corner_shape(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    corners: list[tuple[float, float]],
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    use_filters: bool,
+):
+    """角を持つ閉図形 (triangle / polygon) を描く。角は筆の継ぎ目として固定。"""
+    varied = _needs_contour_variation(ins.variation)
+    contour, anchors = _edge_contour_with_anchors(
+        corners,
+        ins.variation if varied else None,
+        _seed_for_instruction(ins, render_seed),
+        _amplitude_px(ins.variation, ins, canvas) if ins.variation else 0.0,
+        canvas,
+    )
+    if not _uses_hand_stroke(ins.weight):
+        points = contour if varied else corners
+        return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
+    body_attrs = _body_attrs_for_contour_stroke(attrs, ins)
+    group = dwg.g()
+    group.add(dwg.polygon(points=contour if varied else corners, **body_attrs))
+    group.add(
+        _render_contour_hand_stroke(
+            dwg,
+            ins,
+            contour,
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+            anchors=anchors,
+        )
+    )
+    return _apply_rotation(group, ins, canvas)
+
+
 def _render_instruction(
     dwg: svgwrite.Drawing,
     ins: Instruction,
@@ -3522,6 +3685,8 @@ def _render_instruction(
             raise ValueError("circle requires 'center' and 'radius'")
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
+        hand = _uses_hand_stroke(ins.weight)
+        body_attrs = _body_attrs_for_contour_stroke(attrs, ins) if hand else attrs
         if _needs_contour_variation(ins.variation):
             assert ins.variation is not None
             contour = _closed_contour_with_variation(
@@ -3533,15 +3698,31 @@ def _render_instruction(
                 _seed_for_instruction(ins, render_seed),
                 _amplitude_px(ins.variation, ins, canvas),
             )
-            element = dwg.polygon(points=contour, **attrs)
+            element = dwg.polygon(points=contour, **body_attrs)
         else:
-            element = dwg.circle(center=(cx, cy), r=r, **attrs)
-        if _uses_material_outline(ins.weight):
+            contour = _circle_points(
+                cx, cy, r, r, _stroke_sample_count(2 * math.pi * r, canvas)
+            )
+            element = dwg.circle(center=(cx, cy), r=r, **body_attrs)
+        if hand or _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
-            _add_material_circle_outline(
-                dwg, group, ins, attrs, cx, cy, r, canvas, render_seed
-            )
+            if hand:
+                group.add(
+                    _render_contour_hand_stroke(
+                        dwg,
+                        ins,
+                        contour,
+                        attrs,
+                        canvas,
+                        render_seed,
+                        use_filters=use_filters,
+                    )
+                )
+            if _uses_material_outline(ins.weight):
+                _add_material_circle_outline(
+                    dwg, group, ins, attrs, cx, cy, r, canvas, render_seed
+                )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -3551,6 +3732,8 @@ def _render_instruction(
         cx, cy = _px(ins.center, canvas)
         rx = ins.size[0] * canvas.width / 2
         ry = ins.size[1] * canvas.height / 2
+        hand = _uses_hand_stroke(ins.weight)
+        body_attrs = _body_attrs_for_contour_stroke(attrs, ins) if hand else attrs
         if _needs_contour_variation(ins.variation):
             assert ins.variation is not None
             contour = _closed_contour_with_variation(
@@ -3566,15 +3749,35 @@ def _render_instruction(
                 _seed_for_instruction(ins, render_seed),
                 _amplitude_px(ins.variation, ins, canvas),
             )
-            element = dwg.polygon(points=contour, **attrs)
+            element = dwg.polygon(points=contour, **body_attrs)
         else:
-            element = dwg.ellipse(center=(cx, cy), r=(rx, ry), **attrs)
-        if _uses_material_outline(ins.weight):
+            contour = _circle_points(
+                cx,
+                cy,
+                rx,
+                ry,
+                _stroke_sample_count(_ellipse_perimeter(rx, ry), canvas),
+            )
+            element = dwg.ellipse(center=(cx, cy), r=(rx, ry), **body_attrs)
+        if hand or _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
-            _add_material_ellipse_outline(
-                dwg, group, ins, attrs, cx, cy, rx, ry, canvas, render_seed
-            )
+            if hand:
+                group.add(
+                    _render_contour_hand_stroke(
+                        dwg,
+                        ins,
+                        contour,
+                        attrs,
+                        canvas,
+                        render_seed,
+                        use_filters=use_filters,
+                    )
+                )
+            if _uses_material_outline(ins.weight):
+                _add_material_ellipse_outline(
+                    dwg, group, ins, attrs, cx, cy, rx, ry, canvas, render_seed
+                )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -3601,25 +3804,41 @@ def _render_instruction(
         x, y = _px(ins.position, canvas)
         w = ins.size[0] * canvas.width
         h = ins.size[1] * canvas.height
-        if _needs_contour_variation(ins.variation):
-            assert ins.variation is not None
-            corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
-            contour = _edge_contour_with_variation(
-                corners,
-                ins.variation,
-                _seed_for_instruction(ins, render_seed),
-                _amplitude_px(ins.variation, ins, canvas),
-                canvas,
-            )
-            element = dwg.polygon(points=contour, **attrs)
+        corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+        hand = _uses_hand_stroke(ins.weight)
+        body_attrs = _body_attrs_for_contour_stroke(attrs, ins) if hand else attrs
+        varied = _needs_contour_variation(ins.variation)
+        contour, anchors = _edge_contour_with_anchors(
+            corners,
+            ins.variation if varied else None,
+            _seed_for_instruction(ins, render_seed),
+            _amplitude_px(ins.variation, ins, canvas) if ins.variation else 0.0,
+            canvas,
+        )
+        if varied:
+            element = dwg.polygon(points=contour, **body_attrs)
         else:
-            element = dwg.rect(insert=(x, y), size=(w, h), **attrs)
-        if _uses_material_outline(ins.weight):
+            element = dwg.rect(insert=(x, y), size=(w, h), **body_attrs)
+        if hand or _uses_material_outline(ins.weight):
             group = dwg.g()
             group.add(element)
-            _add_material_rect_outline(
-                dwg, group, ins, attrs, x, y, w, h, canvas, render_seed
-            )
+            if hand:
+                group.add(
+                    _render_contour_hand_stroke(
+                        dwg,
+                        ins,
+                        contour,
+                        attrs,
+                        canvas,
+                        render_seed,
+                        use_filters=use_filters,
+                        anchors=anchors,
+                    )
+                )
+            if _uses_material_outline(ins.weight):
+                _add_material_rect_outline(
+                    dwg, group, ins, attrs, x, y, w, h, canvas, render_seed
+                )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -3629,38 +3848,35 @@ def _render_instruction(
         x, y = _px(ins.position, canvas)
         w = ins.size[0] * canvas.width
         h = ins.size[1] * canvas.height
-        points = [
+        corners = [
             (x + w / 2, y),
             (x, y + h),
             (x + w, y + h),
         ]
-        if _needs_contour_variation(ins.variation):
-            assert ins.variation is not None
-            points = _edge_contour_with_variation(
-                points,
-                ins.variation,
-                _seed_for_instruction(ins, render_seed),
-                _amplitude_px(ins.variation, ins, canvas),
-                canvas,
-            )
-        return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
+        return _render_corner_shape(
+            dwg,
+            ins,
+            corners,
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+        )
 
     if ins.primitive == "polygon":
         if ins.center is None or ins.radius is None:
             raise ValueError("polygon requires 'center' and 'radius'")
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
-        points = _polygon_points(cx, cy, r, ins.sides or 5)
-        if _needs_contour_variation(ins.variation):
-            assert ins.variation is not None
-            points = _edge_contour_with_variation(
-                points,
-                ins.variation,
-                _seed_for_instruction(ins, render_seed),
-                _amplitude_px(ins.variation, ins, canvas),
-                canvas,
-            )
-        return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
+        return _render_corner_shape(
+            dwg,
+            ins,
+            _polygon_points(cx, cy, r, ins.sides or 5),
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+        )
 
     if ins.primitive == "arc":
         if ins.center is None or ins.radius is None:

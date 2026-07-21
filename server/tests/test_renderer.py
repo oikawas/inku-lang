@@ -397,7 +397,9 @@ def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
     svg = render(score)
 
     assert svg.count("<rect") >= 25
-    assert 'stroke-opacity="0.4"' in svg
+    # v2.2 (engine 8): 手描き weight の閉図形は輪郭を帯で描くので、輪郭側の
+    # 濃度は stroke-opacity ではなく帯の fill-opacity に載る。
+    assert 'fill-opacity="0.4"' in svg
     assert 'fill-opacity="0.22"' in svg
 
 
@@ -909,7 +911,8 @@ def test_render_textured_pink_variation_keeps_valid_svg_filter_attribute():
     )
     svg = render(score)
     ElementTree.fromstring(svg)
-    assert svg.count('filter="url(#texture-chalk)"') == 1
+    # v2.2 (engine 8): 塗り本体と輪郭の帯がそれぞれ質感 filter を持つ。
+    assert svg.count('filter="url(#texture-chalk)"') == 2
     assert svg.count('filter="url(#blur-medium)"') == 0
 
 
@@ -1597,7 +1600,8 @@ def test_legacy_arrangement_layouts_keep_golden_output():
         rendered.append(render(score, svg_profile="compat", render_seed=123))
 
     digest = hashlib.sha256("".join(rendered).encode()).hexdigest()
-    assert digest == "79e08066fd91cab3e6e608f7349236d9957456728f9adf7bd7f26186db0d25b3"
+    # v2.2 (engine 8) で採取。円の輪郭が手描きストロークの帯になった分の差分。
+    assert digest == "00ae9fa718fbef7587faa782b93fd831b6da99b4e764fe25139ba6430cb4d0a6"
 
 
 def test_grid_render_is_bit_deterministic_for_same_score_and_seed():

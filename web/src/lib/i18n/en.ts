@@ -149,6 +149,7 @@ export const en: LangPack = {
 	refineCostReading: 'Slower (LLM and API)',
 	refineCostColor: 'Very fast (no LLM)',
 	variationGridEmpty: 'select candidates first',
+	refineCandidatePlaceholder: 'Candidates appear here. Pick an element on the left, then press Create 1 Option or Make 4 Variations.',
 	refineNoAlternateCatalog: 'No alternate color catalog is available',
 	hensouTitle: 'Variation',
 	hensouRadioLabel: 'Variation (let the app change Stage 1.5)',

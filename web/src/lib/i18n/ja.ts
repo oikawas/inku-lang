@@ -149,6 +149,7 @@ export const ja: LangPack = {
 	refineCostReading: '低速（LLM・API使用）',
 	refineCostColor: '超高速（LLM不要）',
 	variationGridEmpty: '候補を選択してください',
+	refineCandidatePlaceholder: '候補はここに並びます。左の要素を選んで「1案を作る」または「4案を作る」を押してください。',
 	refineNoAlternateCatalog: '変更先として使える別の色カタログがありません',
 	hensouTitle: '変奏',
 	hensouRadioLabel: '変奏（Stage1.5をお任せで変える）',

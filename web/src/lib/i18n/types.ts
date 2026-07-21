@@ -170,6 +170,7 @@ export interface LangPack {
 	refineCostReading: string;
 	refineCostColor: string;
 	variationGridEmpty: string;
+	refineCandidatePlaceholder: string;
 	refineNoAlternateCatalog: string;
 	tooltipVariationGridDefault: string;
 	tooltipVariationGridWithInterpretation: string;

@@ -333,8 +333,25 @@
 	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
 	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
 	let refineModalOpen = $state(false);
+	// 推敲要素の選択は前回の指定を引き継ぐ。
+	const REFINE_KIND_KEY = 'inku-refine-kind';
+	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'color', 'hensou'];
 	let refineKind = $state<RefineKind>('touch');
 	let hensouAmplitude = $state<HensouAmplitude>('medium');
+	onMount(() => {
+		try {
+			const stored = localStorage.getItem(REFINE_KIND_KEY) as RefineKind | null;
+			if (stored && REFINE_KINDS.includes(stored)) refineKind = stored;
+		} catch {}
+	});
+	function setRefineKind(kind: RefineKind) {
+		refineKind = kind;
+		try { localStorage.setItem(REFINE_KIND_KEY, kind); } catch {}
+	}
+	// 「読み取りを変える」は DDL 由来の作品では出せないので、復元値がそれなら外す。
+	$effect(() => {
+		if (statusDdlOrigin && refineKind === 'reading') refineKind = 'touch';
+	});
 	const refineDialogTitle = $derived(refineView === 'adjust' ? (isJapanese ? '調整' : 'Adjust') : refineView === 'compare' ? (isJapanese ? 'モデル比較' : 'Model comparison') : (isJapanese ? '言語比較' : 'Language comparison'));
 	const statusGenerationValue = $derived(
 		statusGeneration
@@ -651,7 +668,7 @@
 									</div>
 									<div class="model-choice-grid" role="radiogroup" aria-label={t().refineSingleSelectionHint}>
 										<label class="model-choice" class:checked={refineKind === 'layout'}>
-											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => (refineKind = 'layout')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => setRefineKind('layout')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryComposition}</strong>
@@ -661,7 +678,7 @@
 										</label>
 										{#if !statusDdlOrigin}
 											<label class="model-choice" class:checked={refineKind === 'reading'}>
-												<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => (refineKind = 'reading')} disabled={variationBusy || variationGridBusy} />
+												<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => setRefineKind('reading')} disabled={variationBusy || variationGridBusy} />
 												<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
 													<span class="refine-choice-label">
 														<strong>{t().canvasVaryInterpretation}</strong>
@@ -671,7 +688,7 @@
 											</label>
 										{/if}
 										<label class="model-choice" class:checked={refineKind === 'color'}>
-											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => (refineKind = 'color')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => setRefineKind('color')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryColor}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryColor}</strong>
@@ -680,7 +697,7 @@
 											</Tooltip>
 										</label>
 										<label class="model-choice" class:checked={refineKind === 'hensou'}>
-											<input type="radio" name="refine-kind" value="hensou" checked={refineKind === 'hensou'} onchange={() => (refineKind = 'hensou')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="hensou" checked={refineKind === 'hensou'} onchange={() => setRefineKind('hensou')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipHensou}>
 												<span class="refine-choice-label">
 													<strong>{t().hensouRadioLabel}</strong>
@@ -706,7 +723,7 @@
 											</div>
 										{/if}
 										<label class="model-choice" class:checked={refineKind === 'touch'}>
-											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => (refineKind = 'touch')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => setRefineKind('touch')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryPerformance}</strong>
@@ -774,8 +791,8 @@
 							</div>
 						</div>
 						<div class="refine-workspace">
-							{#if variationCandidates.length > 0}
-								<section class="refine-action-section refine-candidates-section">
+							<section class="refine-action-section refine-candidates-section">
+								{#if variationCandidates.length > 0}
 									<div class="refine-actions refine-save-actions">
 										<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
 											<button class="refine-save-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>
@@ -783,7 +800,7 @@
 											</button>
 										</Tooltip>
 									</div>
-									<div class="variation-grid">
+									<div class="variation-grid" style="--variation-cols: {variationCandidates.length > 1 ? 2 : 1};">
 										{#each variationCandidates as candidate (candidate.id)}
 											<div class="variation-card-wrap">
 												<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
@@ -814,8 +831,12 @@
 											</div>
 										{/each}
 									</div>
-								</section>
-							{/if}
+								{:else}
+									<div class="variation-grid-placeholder">
+										<span>{t().refineCandidatePlaceholder}</span>
+									</div>
+								{/if}
+							</section>
 							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
 						</div>
 					</div>
@@ -1480,9 +1501,10 @@
 	.variation-ddl-popup { position: absolute; z-index: 8; left: 10px; right: 10px; bottom: calc(100% - 10px); display: none; max-height: 220px; overflow: auto; padding: 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--tooltip-bg); color: #fff; font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; box-shadow: 0 8px 24px rgba(0,0,0,.24); pointer-events: none; }
 	.variation-card-wrap:hover .variation-ddl-popup { display: block; }
 	/* 候補はウインドウの残り高さに収める。行は等分し、カードは行の高さを埋める。 */
+	/* 候補が 1 枚なら 1 列にしてダイアログ幅いっぱいに見せる */
 	.variation-grid {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: repeat(var(--variation-cols, 2), minmax(0, 1fr));
 		grid-auto-rows: minmax(0, 1fr);
 		gap: 10px;
 		min-height: 0;
@@ -1492,6 +1514,25 @@
 		position: relative;
 		min-width: 0;
 		min-height: 0;
+	}
+	/* 未描画でも候補が並ぶ場所だと分かるよう、同じ枠を破線で示す */
+	.variation-grid-placeholder {
+		display: grid;
+		place-items: center;
+		flex: 1 1 auto;
+		min-height: 180px;
+		max-height: calc(100vh - 200px);
+		padding: 24px;
+		border: 1px dashed var(--border2);
+		border-radius: var(--r);
+		background: var(--bg2);
+		text-align: center;
+	}
+	.variation-grid-placeholder span {
+		max-width: 30em;
+		color: var(--fg3);
+		font-size: 12px;
+		line-height: 1.6;
 	}
 	.variation-card {
 		display: grid;

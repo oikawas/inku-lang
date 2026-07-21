@@ -1464,6 +1464,8 @@
 	}
 	.refine-candidates-section {
 		border-top: 1px dashed var(--border);
+		flex: 1 1 auto;
+		min-height: 0;
 	}
 
 	.refine-save-btn { border: 1px solid var(--action-bg); border-radius: var(--r); background: var(--action-bg); color: var(--action-fg); cursor: pointer; }
@@ -1471,20 +1473,26 @@
 	.refine-save-btn:disabled { border-color: var(--border); background: var(--bg2); color: var(--fg3); cursor: not-allowed; }
 	.variation-ddl-popup { position: absolute; z-index: 8; left: 10px; right: 10px; bottom: calc(100% - 10px); display: none; max-height: 220px; overflow: auto; padding: 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--tooltip-bg); color: #fff; font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; box-shadow: 0 8px 24px rgba(0,0,0,.24); pointer-events: none; }
 	.variation-card-wrap:hover .variation-ddl-popup { display: block; }
+	/* 候補はウインドウの残り高さに収める。行は等分し、カードは行の高さを埋める。 */
 	.variation-grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-auto-rows: minmax(0, 1fr);
 		gap: 10px;
+		min-height: 0;
+		max-height: calc(100vh - 200px);
 	}
 	.variation-card-wrap {
 		position: relative;
 		min-width: 0;
+		min-height: 0;
 	}
 	.variation-card {
 		display: grid;
 		grid-template-rows: minmax(0, 1fr) auto;
 		width: 100%;
-		aspect-ratio: 1 / 1.1;
+		height: 100%;
+		min-height: 150px;
 		padding: 0;
 		border: 1px solid var(--border);
 		border-radius: var(--r);

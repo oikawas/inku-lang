@@ -797,7 +797,16 @@
 													</span>
 												</button>
 											{#if variationGridIncludesReading}<pre class="variation-ddl-popup">{candidate.result.ddl}</pre>{/if}
-												<button class="variation-select" class:selected={candidate.selected} onclick={() => onToggleVariationCandidate(candidate.id)} type="button">{candidate.selected ? "✓" : "+"}</button>
+												<button
+													class="variation-select"
+													class:selected={candidate.selected}
+													class:saved={candidate.saved}
+													disabled={candidate.saved}
+													title={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
+													aria-label={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
+													onclick={() => onToggleVariationCandidate(candidate.id)}
+													type="button"
+												>{candidate.saved ? "✔" : candidate.selected ? "✓" : "+"}</button>
 											</div>
 										{/each}
 									</div>
@@ -1444,6 +1453,7 @@
 	.refine-save-actions {
 		margin-bottom: 12px;
 		display: flex;
+		justify-content: flex-end;
 	}
 	.refine-save-actions :global(.tooltip-wrap) { width: fit-content; max-width: 100%; }
 	.refine-save-actions button {
@@ -1528,6 +1538,14 @@
 		border-color: var(--accent);
 		background: var(--accent);
 		color: white;
+	}
+	/* 保存済みは選択と区別できる塗りにし、押せない状態にする */
+	.variation-select.saved {
+		border-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 20%, var(--panel));
+		color: var(--accent);
+		cursor: default;
+		opacity: 1;
 	}
 
 	.compare-panel {

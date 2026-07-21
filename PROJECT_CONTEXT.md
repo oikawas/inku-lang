@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.1.0 / Build 638**
+**Target version: v2.2.0 / Build 640**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -99,7 +99,9 @@ v2.0.1–v2.0.3 (Builds 612–630) updated the model catalog to v2.1 from three 
 
 v2.0.5 (Build 636) fixed the wave seed-independence bug the author's F-4 visual check uncovered (a fixed-phase sine) by introducing a performance-seed-derived phase, and made material outlines follow the performance seed (F-4 Phase 2). The render engine version is 6.
 
-v2.1.0 (Build 638) moved rendering from absolute pixels to proportional systems. Wobble amplitude and bleed are now ratios of a shape's representative size (fine / medium / broad = 0.025 / 0.08 / 0.18; bleed 0.009 / 0.03 / 0.07), segment and sample counts are length-proportional, and the material layer (stroke widths, dasharrays, texture filters, material outlines, specks) plus the display filter are `canvas.unit`-relative (near byte-identical at `unit=1000`; speck counts became perimeter-proportional). Two author calibration rounds adopted material intensity s1 (floors on outline offset / opacity and speck opacity / count; texture filters unchanged). Material outlines carry `class="material-outline"`. The render engine version is 7. Follow-up contracts are filed for hand strokes on closed shapes (`opus-closed-shape-strokes.md`) and a filter-capable PNG rasterizer (`opus-png-filter-rasterizer.md`; cairosvg silently skips feTurbulence / feDisplacementMap / feGaussianBlur).
+v2.1.0 (Build 638) moved rendering from absolute pixels to proportional systems. Wobble amplitude and bleed are now ratios of a shape's representative size (fine / medium / broad = 0.025 / 0.08 / 0.18; bleed 0.009 / 0.03 / 0.07), segment and sample counts are length-proportional, and the material layer (stroke widths, dasharrays, texture filters, material outlines, specks) plus the display filter are `canvas.unit`-relative (near byte-identical at `unit=1000`; speck counts became perimeter-proportional). Two author calibration rounds adopted material intensity s1 (floors on outline offset / opacity and speck opacity / count; texture filters unchanged). Material outlines carry `class="material-outline"`. The render engine version is 7.
+
+v2.2.0 (Build 640) draws closed-shape contours (circle / ellipse / square / triangle / polygon) with hand strokes from the stroke engine. `synthesize_along` synthesizes along arbitrary centerlines (a step-feed-forward integrator eliminates curvature distortion), rendering the contour as a filled band of outer and inner banks (`class="contour-stroke-v1"`). Corners are pinned as brush seams; cornerless contours close with a linear ramp. Rotring keeps its geometric contour, the band follows the post-variation contour, material outlines and specks coexist, and body elements stay geometric (bbox and touching unchanged). Line and arc output is byte-identical to v2.1 (arc stroke-ization is a follow-up including a touching arc-extractor redesign). The render engine version is 8. Awaiting author rulings: `filled` being a dead field for closed shapes (always filled), and "fill = covering the interior with fine strokes" (three prototypes recorded, engine 9 class, after pending items). A follow-up contract is filed for a filter-capable PNG rasterizer (`opus-png-filter-rasterizer.md`; cairosvg silently skips feTurbulence / feDisplacementMap / feGaussianBlur).
 
 ## Where to Look for a Change
 

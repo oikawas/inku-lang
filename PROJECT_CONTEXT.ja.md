@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.1.0 / Build 638**
+**対象バージョン: v2.2.0 / Build 640**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -99,7 +99,9 @@ v2.0.1〜v2.0.3（Build 612〜630）では、モデルカタログを実測 3 �
 
 v2.0.5（Build 636）では作者の F-4 目視確認で発覚した wave 揺らぎの seed 非依存バグ（位相固定の正弦波）を修正し、演奏 seed 由来の位相を導入。材質輪郭も演奏 seed に追随させた（F-4 Phase 2）。render engine version は 6。
 
-v2.1.0（Build 638）ではレンダリングの px 絶対値を比例系へ全面改修した。揺らぎ振幅と滲みは図形の代表寸法比（fine / medium / broad = 0.025 / 0.08 / 0.18、滲み 0.009 / 0.03 / 0.07）、分割数・標本数は長さ比例、材質層（線幅・dasharray・質感 filter・材質輪郭・speck）と display filter は `canvas.unit` 相対（`unit=1000` でほぼバイト一致、speck 個数は周長比例化）。作者キャリブレーション 2 巡で材質強度 s1（輪郭 offset / opacity・speck opacity / 個数の下限方式、質感 filter は据え置き）を採用。材質輪郭に `class="material-outline"` を付与。render engine version は 7。後続契約として閉図形への手描きストローク適用（`opus-closed-shape-strokes.md`）と PNG ラスタライザの filter 対応（`opus-png-filter-rasterizer.md`、cairosvg は feTurbulence / feDisplacementMap / feGaussianBlur を非描画）が起票済み。
+v2.1.0（Build 638）ではレンダリングの px 絶対値を比例系へ全面改修した。揺らぎ振幅と滲みは図形の代表寸法比（fine / medium / broad = 0.025 / 0.08 / 0.18、滲み 0.009 / 0.03 / 0.07）、分割数・標本数は長さ比例、材質層（線幅・dasharray・質感 filter・材質輪郭・speck）と display filter は `canvas.unit` 相対（`unit=1000` でほぼバイト一致、speck 個数は周長比例化）。作者キャリブレーション 2 巡で材質強度 s1（輪郭 offset / opacity・speck opacity / 個数の下限方式、質感 filter は据え置き）を採用。材質輪郭に `class="material-outline"` を付与。render engine version は 7。
+
+v2.2.0（Build 640）では閉図形（円・楕円・四角・三角・多角形）の輪郭を手描きストローク（筆致エンジン）で描くようにした。`stroke_engine` に任意中心線への合成 `synthesize_along` を追加し（歩幅フィードフォワード積分器で曲率歪みを排除）、輪郭を外周・内周 2 サブパスの塗り帯（`class="contour-stroke-v1"`）として描く。角は理想位置固定の筆の継ぎ目、角なし閉輪郭は線形ランプで閉合。rotring は幾何輪郭のまま、帯は変奏演奏後の輪郭に合成、材質輪郭・speck と併存、本体要素は幾何のまま（bbox・touching 不変）。line・弧は v2.1 とバイト一致（弧のストローク化は touching 弧抽出器の再設計込みで次契約）。render engine version は 8。作者判断待ち: `filled` が閉図形で死にフィールド（常に塗りつぶし）である件と、「塗り = 細かいストロークで内側を埋める」案（試作 3 回記録済み、engine 9 相当、pending 消化後）。後続契約として PNG ラスタライザの filter 対応（`opus-png-filter-rasterizer.md`、cairosvg は feTurbulence / feDisplacementMap / feGaussianBlur を非描画）が起票済み。
 
 ## 変更時の確認先
 

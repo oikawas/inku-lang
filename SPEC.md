@@ -308,6 +308,24 @@ Material outlines now carry `class="material-outline"` so they can be
 mechanically distinguished from primary lines. Because the same Score and seed
 render differently, the render engine version was bumped to 7.
 
+v2.2.0 draws closed-shape contours (circle / ellipse / square / triangle /
+polygon) with hand strokes from the stroke engine. `synthesize_along` extends
+stroke synthesis to arbitrary centerlines (same tool grammar as lines, only the
+target path changes; the integrator feed-forwards the intended step and leaves
+only the residual to the spring, eliminating radial distortion on curved
+paths). The contour is drawn as a filled band of outer and inner banks
+(`class="contour-stroke-v1"`, fill-rule evenodd). Corners are pinned to their
+ideal positions as brush seams; cornerless closed contours close their seam
+with a linear ramp. All hand-drawn weights participate; rotring keeps its
+geometric contour. The band's centerline is the contour after variation is
+performed, and material outlines and specks coexist with the band. Dashed and
+dotted styles keep a thinned geometric contour since the line style itself is
+the description. Body elements stay geometric (with `stroke="none"` for solid
+style), so bbox and touching contracts are unchanged. Line and arc output is
+byte-identical to v2.1 (arc stroke-ization awaits a redesign of the touching
+test's arc extractor in a follow-up contract). Because the same Score and seed
+render differently, the render engine version was bumped to 8.
+
 For literal `layout="grid"` tiling, performance composes three controlled layers: a deterministic seed-derived within-cell position jitter, the existing per-element `variation` with a distinct phase for every mark, and the existing material behavior of weights such as pencil, brush, and chalk. The same Score and render seed remain bit-identical. Because full-field repetition is explicit author intent, grid bypasses scatter-oriented bias, fade, clustering, preserved-space injection, and representative count reduction.
 
 inku exposes this as the first half of two-step regeneration: **another

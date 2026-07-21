@@ -1300,6 +1300,8 @@ v2.0.5 で wave 品質の揺らぎに演奏 seed 由来の位相を導入した�
 
 v2.1.0 でレンダリングの px 絶対値を比例系へ全面改修した。揺らぎ振幅語彙（fine / medium / broad）の意味を 1000px キャンバス基準の絶対 px（7 / 12 / 30px）から**図形の代表寸法に対する比率**（0.025 / 0.08 / 0.18）へ変更した。代表寸法は circle / polygon / arc = 半径、ellipse = 半径の相乗平均、square / triangle / cloudform = 短辺の 1/2、line = 線長。小さな図形は細かく、大きな図形は大きく揺れる。滲み（pink）の stdDeviation も同様に比率化（0.009 / 0.03 / 0.07）。輪郭の分割数とストロークの標本数は固定値（80 / 49）から長さ比例（クランプ付き）へ変更した。材質層（線幅・dasharray・質感 filter・材質輪郭・speck）と display filter は `canvas.unit` 相対化し、`unit=1000` では従来と一致する（speck 個数の周長比例化と stroke 標本数の長さ比例化を除く）。あわせて作者キャリブレーションにより材質輪郭と speck の強度を下限方式で引き上げた（強度段 s1: 輪郭 offset / opacity と speck opacity / 個数に下限を設定、質感 filter は据え置き）。材質輪郭には `class="material-outline"` を付与し、主線と機械的に区別できるようにした。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 7 へ更新した。
 
+v2.2.0 で閉図形（circle / ellipse / square / triangle / polygon）の輪郭を手描きストローク（筆致エンジン）で描くようにした。`stroke_engine` に任意中心線へのストローク合成 `synthesize_along` を追加し（道具文法は line 用と同一、追従目標だけを差し替え。意図の歩幅をフィードフォワードし、ばねには残差だけを担わせる積分器で曲率による半径方向の歪みを排除）、輪郭は外周・内周 2 サブパスの塗り帯（`class="contour-stroke-v1"`、fill-rule evenodd）として描く。角は理想位置に固定して筆の継ぎ目とし、角のない閉輪郭は継ぎ目を線形ランプで閉合させる。対象 weight は rotring を除く手描き系全種（rotring は幾何輪郭のまま）。帯の中心線は変奏を演奏した後の輪郭で、材質輪郭・speck は帯と併存する。破線・点線は線種そのものが記述なので、細めた幾何輪郭を残す。本体要素は幾何のまま維持され（実線では `stroke="none"` で塗りのみ）、bbox・touching 契約は不変。line と弧の出力は v2.1 とバイト一致（弧のストローク化は touching 検査の弧抽出器の再設計を伴うため次契約へ）。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 8 へ更新した。
+
 ---
 
 ## 14. 関係（あいだ）の設計

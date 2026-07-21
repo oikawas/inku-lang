@@ -219,11 +219,12 @@ BACKGROUND = "#ffffff"
 # 揺らぎ・滲みは「図形の代表寸法に対する比率」で定義する (v2.1)。
 # 絶対 px だと小図形は壊れ大図形は静止して見えるため、運動語彙 (fine/medium/
 # broad) が図形に対する相対量として意味を持つようにする。
-AMPLITUDE_RATIO: dict[str, float] = {"fine": 0.020, "medium": 0.065, "broad": 0.15}
+# 比率は v2.1 キャリブレーション (Build 637) で作者が候補 P3 を選択した値。
+AMPLITUDE_RATIO: dict[str, float] = {"fine": 0.025, "medium": 0.08, "broad": 0.18}
 FREQUENCY_CYCLES: dict[str, float] = {"slow": 2.0, "medium": 6.0, "high": 14.0}
 
 # 滲む (quality=pink): feGaussianBlur の stdDeviation も代表寸法比
-BLUR_RATIO: dict[str, float] = {"fine": 0.007, "medium": 0.025, "broad": 0.06}
+BLUR_RATIO: dict[str, float] = {"fine": 0.009, "medium": 0.03, "broad": 0.07}
 BLUR_MIN_RATIO = 0.0005  # canvas.unit 比の下限 (点に近い図形で滲みが消えない)
 
 # 代表寸法が点に近い図形での暴走を防ぐ下限 (canvas.unit 比) と、
@@ -243,8 +244,8 @@ STROKE_SAMPLE_TARGET_RATIO = 1.0 / 49.0  # 長さ = canvas.unit で現行の 49 
 STROKE_SAMPLE_MIN = 17
 STROKE_SAMPLE_MAX = 129
 
-# 材質層の強度候補。相対化の起点 (m0) は現行相当。
-# 作者承認後に MATERIAL_INTENSITY_LEVEL を差し替えるだけで確定できる。
+# 材質層の強度候補。相対化の起点 (m0) は v2.0.5 相当。
+# 採用段は MATERIAL_INTENSITY_LEVEL で選ぶ。
 MATERIAL_INTENSITY: dict[str, dict[str, float]] = {
     "m0": {
         "texture_displacement": 1.0,
@@ -274,7 +275,8 @@ MATERIAL_INTENSITY: dict[str, dict[str, float]] = {
         "speck_opacity": 1.6,
     },
 }
-MATERIAL_INTENSITY_LEVEL = "m0"
+# v2.1 キャリブレーション (Build 637) で作者が m2 を選択。
+MATERIAL_INTENSITY_LEVEL = "m2"
 
 # speck 個数の周長比例化。基準は radius 0.2 の円の周長 (canvas.unit 比)。
 SPECK_ANCHOR_PERIMETER_RATIO = 2 * math.pi * 0.2
@@ -2917,6 +2919,9 @@ def _outline_attrs(
     result["fill"] = "none"
     result["stroke_width"] = stroke_width
     result["stroke_opacity"] = opacity
+    # 材質装飾であることを明示する。読み手 (弧抽出・ラスタライザ等) が主線と
+    # 装飾を区別するのに opacity の大小へ頼らずに済ませるため。
+    result["class"] = "material-outline"
     if dash is not None:
         result["stroke_dasharray"] = dash
     return result

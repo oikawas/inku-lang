@@ -886,9 +886,9 @@ def test_render_circle_with_pink_variation_emits_blur_filter():
     )
     svg = render(score)
     assert "feGaussianBlur" in svg
-    # 滲みは図形寸法比なので filter id に std 値が入る (r=200 * 0.025 = 5.0px)
-    assert 'filter="url(#blur-medium-50)"' in svg
-    assert 'stdDeviation="5.0"' in svg
+    # 滲みは図形寸法比なので filter id に std 値が入る (r=200 * 0.03 = 6.0px)
+    assert 'filter="url(#blur-medium-60)"' in svg
+    assert 'stdDeviation="6.0"' in svg
     assert "<circle" in svg
     assert "<polyline" not in svg
 

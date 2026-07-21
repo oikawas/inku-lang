@@ -94,16 +94,17 @@ MATERIAL_SHAPES: dict[str, dict] = {
     },
 }
 
-# v2.1 (比例レンダリング) で採取し直した render_seed=None 出力の sha256 (先頭 32 桁)。
+# v2.1 (比例レンダリング / 比率 P3 / 材質強度 m2) で採取した render_seed=None
+# 出力の sha256 (先頭 32 桁)。
 # seed 未指定の演奏が不変であることの固定。v2.0.4 の値からの差分は speck 個数の
 # 周長比例化と stroke 分割数の長さ比例化のみで、材質の寸法・dasharray・線幅は
 # canvas.unit=1000 で以前とバイト一致する。
 MATERIAL_NONE_SEED_DIGESTS = {
-    "brush_thin_line": "c3e3c095b91b63b172c7b9f62ca14496",
-    "chalk_square": "16acc45062fe0d6cdb6f4cd03fcf62c8",
-    "crayon_arc": "adb61fda83813c20accd8ce80d2d7623",
-    "pencil_circle": "fa729f4ea8d4d2868ea1338ab04eeb77",
-    "pencil_ellipse": "7258a0d890266424bd6283b0175e6f32",
+    "brush_thin_line": "caf585ff657f4430d6c4b38cbc51ceb5",
+    "chalk_square": "4767a224db6313256602df0cfb840ba3",
+    "crayon_arc": "d3e07b79b2fd1de48357128976f78801",
+    "pencil_circle": "96f4efcf86ea5a468635f10909ce751d",
+    "pencil_ellipse": "6ffa2c0885af1bdfa01fe395507e90c6",
 }
 
 

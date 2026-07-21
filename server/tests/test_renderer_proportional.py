@@ -9,9 +9,12 @@ from xml.etree import ElementTree
 
 import pytest
 
+from inku_server import renderer
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.renderer import (
     AMPLITUDE_CLAMP_RATIO,
+    MATERIAL_INTENSITY,
+    MATERIAL_INTENSITY_LEVEL,
     AMPLITUDE_RATIO,
     BLUR_RATIO,
     SEGMENT_COUNT_MAX,
@@ -281,10 +284,12 @@ def test_segment_count_is_deterministic():
 # 5. speck の周長比例化                                                         #
 # --------------------------------------------------------------------------- #
 def test_speck_count_is_proportional_to_perimeter():
-    """基準 (radius 0.2 の円) で表の個数、周長 2 倍で約 2 倍。"""
+    """基準 (radius 0.2 の円) で表の個数 × 強度ゲイン、周長 2 倍で約 2 倍。"""
     anchor = 2 * math.pi * 0.2 * SQUARE.unit
-    assert _speck_count(18, anchor, SQUARE) == 18
-    assert _speck_count(18, anchor * 2, SQUARE) == 36
+    gain = MATERIAL_INTENSITY[MATERIAL_INTENSITY_LEVEL]["speck_count"]
+    assert _speck_count(18, anchor, SQUARE) == round(18 * gain)
+    # 上限 (基準の 4 倍) に触れない範囲で周長比例を見る
+    assert _speck_count(18, anchor * 1.5, SQUARE) == round(27 * gain)
     # 下限と上限
     assert _speck_count(18, 0.0, SQUARE) == SPECK_COUNT_MIN
     assert _speck_count(18, anchor * 100, SQUARE) == 18 * 4
@@ -332,7 +337,9 @@ def test_performance_touch_filter_is_unchanged_at_unit_1000():
     assert 1.6 <= scale <= 3.0
 
 
-def test_texture_filter_xml_is_unchanged_at_unit_1000():
+def test_texture_filter_xml_is_unchanged_at_unit_1000(monkeypatch):
+    """単位換算だけを見るため強度は起点 (m0) に固定する。"""
+    monkeypatch.setattr(renderer, "MATERIAL_INTENSITY_LEVEL", "m0")
     assert _texture_filter_xml("pencil", SQUARE) == (
         '<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%">'
         '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" '

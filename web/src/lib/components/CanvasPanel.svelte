@@ -691,10 +691,10 @@
 										{#if refineKind === 'hensou'}
 											<div class="hensou-amplitude-field">
 												<div class="model-choice-grid hensou-amplitude-grid" role="radiogroup" aria-label={t().hensouTitle}>
-													{#each [['small', t().hensouSmall, t().hensouTooltipSmall], ['medium', t().hensouMedium, t().hensouTooltipMedium], ['large', t().hensouLarge, t().hensouTooltipLarge]] as [level, label, hint] (level)}
+													{#each [['small', t().hensouSmall, t().hensouTooltipSmall, 'bottom-right'], ['medium', t().hensouMedium, t().hensouTooltipMedium, 'bottom'], ['large', t().hensouLarge, t().hensouTooltipLarge, 'bottom-left']] as [level, label, hint, place] (level)}
 														<label class="model-choice" class:checked={hensouAmplitude === level}>
 															<input type="radio" name="hensou-amplitude" value={level} checked={hensouAmplitude === level} onchange={() => (hensouAmplitude = level as HensouAmplitude)} disabled={variationBusy || variationGridBusy} />
-															<Tooltip placement="bottom" text={hint}>
+															<Tooltip placement={place as 'bottom' | 'bottom-left' | 'bottom-right'} text={hint}>
 																<span class="refine-choice-label">
 																	<strong>{label}</strong>
 																	<span class="refine-info-mark" aria-hidden="true">i</span>

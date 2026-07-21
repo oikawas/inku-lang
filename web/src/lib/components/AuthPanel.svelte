@@ -232,7 +232,9 @@
 	}
 	.ghost-btn {
 		border: 1px solid var(--border2);
-		border-radius: var(--r);
+		padding: var(--btn-sm-padding);
+		font-size: var(--btn-sm-font-size);
+		border-radius: var(--btn-sm-radius);
 		background: var(--panel);
 		color: var(--fg);
 		font-family: inherit;

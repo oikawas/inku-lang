@@ -232,8 +232,8 @@
 		border-radius: 999px;
 		background: rgba(122, 91, 47, 0.09);
 		color: var(--fg2);
-		font-size: 11px;
-		padding: 4px 10px;
+		font-size: var(--btn-sm-font-size);
+		padding: var(--btn-sm-padding);
 		margin-left: 10px;
 	}
 	.lock-icon {

@@ -110,7 +110,7 @@
 	.scope-toggle button { border: 0; border-right: 1px solid var(--border2); padding: 5px 9px; background: var(--panel); color: var(--fg2); cursor: pointer; font: inherit; font-size: 12px; }
 	.scope-toggle button:last-child { border-right: 0; }
 	.scope-toggle button.active { background: var(--accent); color: var(--bg); }
-	.ghost-btn { border: 1px solid var(--border2); border-radius: var(--r); padding: 5px 9px; background: var(--panel); color: var(--fg2); cursor: pointer; font: inherit; font-size: 12px; }
+	.ghost-btn { border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); background: var(--panel); color: var(--fg2); cursor: pointer; font: inherit; font-size: var(--btn-sm-font-size); }
 	.ghost-btn:disabled { opacity: 0.55; cursor: default; }
 	.inline-message { color: var(--fg2); font-size: 12px; padding: 12px 0; }
 	.inline-message.error { color: var(--danger, #b33); }

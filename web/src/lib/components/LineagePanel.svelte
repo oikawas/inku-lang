@@ -558,23 +558,24 @@ $effect(() => {
 	{#if activeMenuNodeId === node.id}
 		{@const ddlOrigin = isDdlOrigin(node)}
 		<div class="card-dropdown-menu" role="menu">
+			<div class="card-dropdown-title">{isJapanese ? '作品を編集する' : 'Edit this artwork'}</div>
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
-				{isJapanese ? '描画要素で比較' : 'Compare drawing elements'}
+				{isJapanese ? '描画要素' : 'Drawing elements'}
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-					{isJapanese ? '記述を編集' : 'Edit description'}
+					{isJapanese ? '記述' : 'Description'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
-				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
+				{isJapanese ? 'DDL' : 'DDL'}
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
-					{isJapanese ? 'モデルで比較' : 'Compare models'}
+					{isJapanese ? 'モデル' : 'Models'}
 				</button>
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
-					{isJapanese ? '言語で比較' : 'Compare languages'}
+					{isJapanese ? '言語' : 'Languages'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
@@ -776,6 +777,7 @@ $effect(() => {
 	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 230px; border: 1px solid var(--border2); border-radius: 6px; padding: 5px 0; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
 	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 10px 13px; font-size: 0.84rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
 	.card-dropdown-menu button:hover { background: var(--bg2); }
+	.card-dropdown-title { padding: 8px 13px 6px; border-bottom: 1px solid var(--border); color: var(--fg3); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; }
 	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }

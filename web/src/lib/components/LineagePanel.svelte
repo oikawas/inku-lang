@@ -558,6 +558,9 @@ $effect(() => {
 	{#if activeMenuNodeId === node.id}
 		{@const ddlOrigin = isDdlOrigin(node)}
 		<div class="card-dropdown-menu" role="menu">
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
+				{isJapanese ? '描画要素で比較' : 'Compare drawing elements'}
+			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
 					{isJapanese ? '記述を編集' : 'Edit description'}
@@ -565,12 +568,6 @@ $effect(() => {
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
 				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
-			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
-				{isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
-			</button>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
-				{isJapanese ? '描画要素で比較' : 'Compare drawing elements'}
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
@@ -580,6 +577,9 @@ $effect(() => {
 					{isJapanese ? '言語で比較' : 'Compare languages'}
 				</button>
 			{/if}
+			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
+				{isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
+			</button>
 		</div>
 	{/if}
 {/if}

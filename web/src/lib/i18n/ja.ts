@@ -151,6 +151,7 @@ export const ja: LangPack = {
 	variationGridEmpty: '候補を選択してください',
 	refineNoAlternateCatalog: '変更先として使える別の色カタログがありません',
 	hensouTitle: '変奏',
+	hensouRadioLabel: '変奏（Stage1.5をお任せで変える）',
 	hensouHint: '展開層をまとめて振ります。どの軸が動くかはアプリが決めます。強度を上げるほど重い軸まで解放されます。',
 	hensouSmall: '小',
 	hensouMedium: '中',

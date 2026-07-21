@@ -150,6 +150,7 @@ export interface LangPack {
 	canvasVaryInterpretation: string;
 	canvasVaryColor: string;
 	hensouTitle: string;
+	hensouRadioLabel: string;
 	hensouHint: string;
 	hensouSmall: string;
 	hensouMedium: string;

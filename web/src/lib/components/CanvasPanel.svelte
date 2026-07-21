@@ -683,7 +683,7 @@
 											<input type="radio" name="refine-kind" value="hensou" checked={refineKind === 'hensou'} onchange={() => (refineKind = 'hensou')} disabled={variationBusy || variationGridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipHensou}>
 												<span class="refine-choice-label">
-													<strong>{t().hensouTitle}</strong>
+													<strong>{t().hensouRadioLabel}</strong>
 													<span class="refine-info-mark" aria-hidden="true">i</span>
 												</span>
 											</Tooltip>

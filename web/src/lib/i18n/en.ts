@@ -151,6 +151,7 @@ export const en: LangPack = {
 	variationGridEmpty: 'select candidates first',
 	refineNoAlternateCatalog: 'No alternate color catalog is available',
 	hensouTitle: 'Variation',
+	hensouRadioLabel: 'Variation (let the app change Stage 1.5)',
 	hensouHint: 'Shakes the expansion layer as a whole. The app decides which axes move; a higher amplitude releases heavier ones.',
 	hensouSmall: 'Small',
 	hensouMedium: 'Medium',

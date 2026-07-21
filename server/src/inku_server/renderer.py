@@ -274,6 +274,34 @@ MATERIAL_INTENSITY: dict[str, dict[str, float]] = {
         "speck_spread": 1.8,
         "speck_opacity": 1.6,
     },
+    # s1 / s2 は m2 の質感 filter を据え置いたまま、材質輪郭と speck だけを
+    # 強める段。倍率ではなく下限 (floor) で上げるのは、弱い weight (pencil・
+    # crayon) だけを引き上げ、既に読める weight (brush_thin/thick) の輪郭が
+    # 二重線に崩れるのを避けるため。
+    "s1": {
+        "texture_displacement": 2.8,
+        "texture_blur": 1.6,
+        "outline_offset": 2.8,
+        "outline_opacity": 1.8,
+        "speck_count": 2.6,
+        "speck_spread": 1.8,
+        "speck_opacity": 1.6,
+        "outline_offset_floor_ratio": 0.0035,
+        "outline_opacity_floor": 0.50,
+        "speck_opacity_floor": 0.40,
+    },
+    "s2": {
+        "texture_displacement": 2.8,
+        "texture_blur": 1.6,
+        "outline_offset": 2.8,
+        "outline_opacity": 1.8,
+        "speck_count": 3.0,
+        "speck_spread": 2.0,
+        "speck_opacity": 1.6,
+        "outline_offset_floor_ratio": 0.0050,
+        "outline_opacity_floor": 0.62,
+        "speck_opacity_floor": 0.50,
+    },
 }
 # v2.1 キャリブレーション (Build 637) で作者が m2 を選択。
 MATERIAL_INTENSITY_LEVEL = "m2"
@@ -322,8 +350,21 @@ TEXTURE_FILTER_WEIGHTS = frozenset(TEXTURE_SPECS)
 
 
 def _material_gain(key: str) -> float:
-    """材質強度候補の係数を返す。"""
-    return MATERIAL_INTENSITY[MATERIAL_INTENSITY_LEVEL][key]
+    """材質強度候補の係数を返す。floor 系の既定は 0 (下限なし)。"""
+    return MATERIAL_INTENSITY[MATERIAL_INTENSITY_LEVEL].get(key, 0.0)
+
+
+def _outline_offset_px(offset: float, canvas: CanvasSize) -> float:
+    """材質輪郭の法線オフセット。符号を保ったまま下限を課す。"""
+    floor = _material_gain("outline_offset_floor_ratio") * canvas.unit
+    if floor <= 0 or abs(offset) >= floor:
+        return offset
+    return math.copysign(floor, offset)
+
+
+def _outline_opacity(opacity: float) -> float:
+    """材質輪郭の opacity。下限を課したうえで 1.0 に丸める。"""
+    return min(1.0, max(opacity, _material_gain("outline_opacity_floor")))
 
 
 def _unit_scale(canvas: CanvasSize) -> float:
@@ -347,7 +388,13 @@ def _speck_count(base: int, path_len_px: float, canvas: CanvasSize) -> int:
 
 
 def _speck_opacity(opacity: float) -> float:
-    return min(1.0, opacity * _material_gain("speck_opacity"))
+    return min(
+        1.0,
+        max(
+            opacity * _material_gain("speck_opacity"),
+            _material_gain("speck_opacity_floor"),
+        ),
+    )
 
 
 def _fmt_num(value: float) -> str:
@@ -2964,9 +3011,9 @@ def _material_outline_profile(
     opacity_gain = _material_gain("outline_opacity")
     return [
         (
-            offset * scale * offset_gain,
+            _outline_offset_px(offset * scale * offset_gain, canvas),
             abs_width * scale + base_width * width_ratio,
-            min(1.0, opacity * opacity_gain),
+            _outline_opacity(opacity * opacity_gain),
             _scale_dash(dash, scale),
         )
         for offset, abs_width, width_ratio, opacity, dash in spec
@@ -3169,11 +3216,14 @@ def _material_line_group(
     length = math.hypot(end[0] - start[0], end[1] - start[1])
 
     def _layer_opacity(value: float) -> float:
-        return min(1.0, value * opacity_gain)
+        return _outline_opacity(value * opacity_gain)
+
+    def _layer_offset(amount: float) -> float:
+        return _outline_offset_px(amount * scale * offset_gain, canvas)
 
     if ins.weight == "pencil":
         for idx, amount in enumerate((-0.9, 1.1)):
-            ox, oy = _line_perp_offsets(start, end, amount * scale * offset_gain)
+            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = 0.45 * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.26)
@@ -3203,7 +3253,7 @@ def _material_line_group(
         )
     elif ins.weight == "chalk":
         for idx, amount in enumerate((-3.0, 3.4)):
-            ox, oy = _line_perp_offsets(start, end, amount * scale * offset_gain)
+            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = 1.1 * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.28)
@@ -3231,7 +3281,7 @@ def _material_line_group(
         )
     elif ins.weight == "brush_thin":
         for idx, amount in enumerate((-1.4, 1.8)):
-            ox, oy = _line_perp_offsets(start, end, amount * scale * offset_gain)
+            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = (0.9 + idx * 0.5) * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.32)
@@ -3247,7 +3297,7 @@ def _material_line_group(
     else:
         amounts = (-3.2, -1.4, 2.0, 3.6) if ins.weight == "crayon" else (-3.5, 2.8, 5.0)
         for idx, amount in enumerate(amounts):
-            ox, oy = _line_perp_offsets(start, end, amount * scale * offset_gain)
+            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
             jitter = (
                 _hash_to_unit(idx, seed)
                 * (2.2 if ins.weight == "crayon" else 2.8)

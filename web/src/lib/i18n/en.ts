@@ -260,6 +260,7 @@ export const en: LangPack = {
 	aiRefineAppliedDirection: 'Refinement direction',
 	aiRefineDirectionLabel: 'AI Direction (Prompt)',
 	aiRefineDirectionPlaceholder: 'e.g., vibrant and cool',
+	aiRefineDirectionRandomHint: 'In random refinement the direction reaches only the generations that vary the reading (the first one, plus any generation where reading is drawn). Unchecking Vary Reading drops it entirely.',
 	aiRefineGensLabel: 'Generations to evolve',
 	aiRefineElementsLabel: 'Evolutionary Elements (Advanced)',
 	aiRefineStartButton: 'Start Evolving',

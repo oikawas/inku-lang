@@ -271,6 +271,7 @@ export interface LangPack {
 	aiRefineAppliedDirection: string;
 	aiRefineDirectionLabel: string;
 	aiRefineDirectionPlaceholder: string;
+	aiRefineDirectionRandomHint: string;
 	aiRefineGensLabel: string;
 	aiRefineElementsLabel: string;
 	aiRefineStartButton: string;

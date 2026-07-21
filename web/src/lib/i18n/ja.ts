@@ -260,6 +260,7 @@ export const ja: LangPack = {
 	aiRefineAppliedDirection: '推敲方針',
 	aiRefineDirectionLabel: 'AIに指示する方向性（プロンプト）',
 	aiRefineDirectionPlaceholder: '例：華やかで、かつ、涼しげに',
+	aiRefineDirectionRandomHint: 'ランダムな自動推敲では、方向性は「読み取りを変える」世代にだけ反映されます（1世代目と、抽選で読み取りが選ばれた世代）。「読み取りを変える」を外すと反映されません。',
 	aiRefineGensLabel: '試行の世代数',
 	aiRefineElementsLabel: '使用する推敲要素（詳細設定）',
 	aiRefineStartButton: '推敲を開始',

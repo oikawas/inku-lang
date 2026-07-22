@@ -613,7 +613,7 @@ export const ja: LangPack = {
 	historyContactSheet: '人用コンタクトシート',
 	historyContactSheetHint: '選択した作品を PNG に並べて保存（1 枚あたり 7×4 点、超過分は別ファイル）',
 	historyContactSheetAi: 'AI用コンタクトシート',
-	historyContactSheetAiHint: 'AI に読ませる用。1 枚あたり 3×4 点、長辺 1568px、キャプションは連番のみ',
+	historyContactSheetAiHint: 'AI に読ませる用。1 枚あたり 3×4 点、長辺 1568px、キャプションは連番のみ。番号・記述・DDL・来歴を収めた md も同時に保存',
 	historyContactSheetBusy: '作成中…',
 	historyContactSheetTitle: 'inku コンタクトシート',
 	historyContactSheetSubtitle: (count, at, page, pages) => pages > 1 ? `${count} 点 / ${page} 枚目（全 ${pages} 枚） / ${at}` : `${count} 点 / ${at}`,

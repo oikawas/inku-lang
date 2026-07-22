@@ -1962,7 +1962,7 @@
 			exportTemplateStatus = null;
 			canvasAspectEnabled = true;
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-			loginStatus = t().loginRequiredMessage;
+			loginStatus = null;
 			settingsStatus = null;
 			settingsStatusError = t().loginRequiredMessage;
 			historyItems = [];

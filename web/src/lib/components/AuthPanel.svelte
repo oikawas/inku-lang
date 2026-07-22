@@ -84,7 +84,7 @@
 				<button class="ghost-btn login-submit" onclick={onLogin}>{t().loginSubmit}</button>
 			</div>
 		</div>
-		<div class="login-meta">{appVersion} · {t().appInfoBuildLabel} {buildNumber}</div>
+		<div class="login-meta">{appVersion} {t().appInfoBuildLabel} {buildNumber}</div>
 	</section>
 </main>
 

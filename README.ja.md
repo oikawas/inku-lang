@@ -5,7 +5,7 @@
 <table align="center">
 <tr>
 <td width="33%"><img src="docs/assets/gallery/ballroom-current-waltz.png" width="100%" alt="濃い青の地一面に、白と灰の細い線が斜めに交差して束をなし、短い破線の群れがその間に散る"></td>
-<td width="33%"><img src="docs/assets/gallery/ebb-tide-foam-arcs.png" width="100%" alt="ほぼ白い画面に、輪郭のぼやけた灰色の弧が三つ、少しずつ位置をずらして重なる"></td>
+<td width="33%"><img src="docs/assets/gallery/armistice-morning-silver-shoal.png" width="100%" alt="白い地に、灰色の波線が幾層も横に走り、その上に黒い小さな楕円が群れをなして散る。右端を一本の赤い線が縦に下る"></td>
 <td width="33%"><img src="docs/assets/gallery/blackout-candle-lattice.png" width="100%" alt="黒い地の中央に、白いクレヨンで擦った四角が数十、隙間を残して重なり合い不揃いな塊をつくる。中心近くに小さな赤い印"></td>
 </tr>
 </table>
@@ -53,18 +53,21 @@ LLMをベースにしていますが、各層には厳しい制約を設けて�
 
 </details>
 
-<table><tr><td><img src="docs/assets/gallery/ebb-tide-foam-arcs.png" width="480" alt="ほぼ白い画面に、輪郭のぼやけた灰色の弧が三つ、少しずつ位置をずらして重なる"></td></tr></table>
+<table><tr><td><img src="docs/assets/gallery/armistice-morning-silver-shoal.png" width="480" alt="白い地に、灰色の波線が幾層も横に走り、その上に黒い小さな楕円が群れをなして散る。右端を一本の赤い線が縦に下る"></td></tr></table>
 
-> 干潮の砂浜に、引き波が残した泡の弧が、幾重にも重なって乾いていった。
+> 戦争が終わった朝、対岸の狙撃手と漁師は、同じ魚群の銀色を見ていた。
 
 <details>
 <summary>指示書（正規化DDL）と元 SVG</summary>
 
 ```
-白い細筆の弧を、太さを変えて五本を並べる。波打つ軌跡に沿って、弧を重ねて置く。面: 滲む。
+背景を白で塗りつぶす。
+画面下半分に灰色の細筆の横線を二十本並べる。
+中央付近に白い小さな楕円を百二十個、波打つ軌跡に沿って散らす。
+右端に黒い鉛筆の縦線を一本引く。
 ```
 
-[ebb-tide-foam-arcs.svg](docs/assets/gallery/ebb-tide-foam-arcs.svg) — seed `1997407931189975` / 色カタログ inku Default
+[armistice-morning-silver-shoal.svg](docs/assets/gallery/armistice-morning-silver-shoal.svg) — seed `1759981552357047` / 色カタログ inku Default
 
 </details>
 
@@ -172,19 +175,22 @@ SVG（演奏 — 一回性）
 
 ### 一枚の作品を層で追う
 
-ギャラリー 2 点目「引き波の泡の弧」を例に、各層が何を持つかを見ます。記述は次の一文でした。
+ギャラリー 2 点目「魚群の銀色」を例に、各層が何を持つかを見ます。記述は次の一文でした。
 
 ```
-干潮の砂浜に、引き波が残した泡の弧が、幾重にも重なって乾いていった。
+戦争が終わった朝、対岸の狙撃手と漁師は、同じ魚群の銀色を見ていた。
 ```
 
-解釈がこれを指示書（正規化DDL）に読み解きます。感情語は残らず、図形・素材・運動の語だけが残ります。
+解釈がこれを指示書（正規化DDL）に読み解きます。狙撃手も漁師も戦争も残りません。残るのは図形・素材・運動の語だけです。
 
 ```
-白い細筆の弧を、太さを変えて五本を並べる。波打つ軌跡に沿って、弧を重ねて置く。面: 滲む。
+背景を白で塗りつぶす。
+画面下半分に灰色の細筆の横線を二十本並べる。
+中央付近に白い小さな楕円を百二十個、波打つ軌跡に沿って散らす。
+右端に黒い鉛筆の縦線を一本引く。
 ```
 
-構造化がこの指示書を楽譜（JSON Score）に書き起こします。実際に保存された楽譜の抜粋です（3 命令のうち 1 つめ、`null` の項は省いています）。
+構造化がこの指示書を楽譜（JSON Score）に書き起こします。実際に保存された楽譜の抜粋です（3 命令のうち魚群にあたる 2 つめ、`null` の項は省いています）。
 
 ```json
 {
@@ -193,31 +199,32 @@ SVG（演奏 — 一回性）
   "background": "white",
   "instructions": [
     {
-      "primitive": "arc",
+      "primitive": "ellipse",
       "center": [0.5, 0.5],
-      "radius": 0.3,
-      "angle_start": 0.0,
-      "angle_end": 270.0,
-      "weight": "brush_thin",
+      "size": [0.02, 0.01],
+      "rotation": 18.0,
+      "filled": false,
+      "weight": "pencil",
       "color": "black",
       "variation": {
         "amplitude": "medium",
-        "frequency": "medium",
-        "quality": "pink",
+        "frequency": "slow",
+        "quality": "wave",
         "dimensions": ["position_x", "position_y"]
       },
       "arrangement": {
-        "count": 5,
+        "count": 110,
         "layout": "scatter",
         "path": "wave",
         "color_cycle": ["black", "white"],
+        "density": "high",
+        "cluster_count": 7,
         "fade": "outward",
         "rhythm_spacing": "loose"
       },
       "surface": {
-        "texture": "bleed",
+        "texture": "wash",
         "opacity": 0.6,
-        "bleed": 0.3,
         "tone_steps": 3
       }
     }
@@ -225,7 +232,7 @@ SVG（演奏 — 一回性）
 }
 ```
 
-「幾重にも」は `arrangement.count` と `layout` に、「乾いていった」は `surface.texture: bleed` と `fade: outward` に落ちています。レンダラーがこの楽譜を演奏します——毎回わずかに違う形で。出力はベクターなので、額に入れても、壁一面に引き伸ばしても、手のひらの画面で見ても成立します。物理的なサイズの制約はありません。
+「魚群」は `count` と `cluster_count: 7` に、「波打つ軌跡に沿って」は `path: wave` に、「銀色」は `color_cycle` と `surface.texture: wash` に落ちています。「対岸」は右端の一本の縦線になりました。レンダラーがこの楽譜を演奏します——毎回わずかに違う形で。出力はベクターなので、額に入れても、壁一面に引き伸ばしても、手のひらの画面で見ても成立します。物理的なサイズの制約はありません。
 
 楽譜には、面と地の質感も保持できます。円の内部を薄墨や点で満たす指定は `instruction.surface`、生成りの紙・和紙・薄墨地のような支持体は `canvas.ground` に入ります。これらは抽象属性のまま保存され、Renderer が SVG filter、clip された vector mark、compat 向けの単純化出力として演奏します。
 

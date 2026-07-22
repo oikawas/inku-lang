@@ -7,6 +7,8 @@
 		loginPasswordVisible: boolean;
 		loginStatus: string | null;
 		onLogin: () => void | Promise<void>;
+		appVersion: string;
+		buildNumber: string;
 	};
 
 	let {
@@ -14,7 +16,9 @@
 		loginPassword = $bindable(''),
 		loginPasswordVisible = $bindable(false),
 		loginStatus,
-		onLogin
+		onLogin,
+		appVersion,
+		buildNumber
 	}: Props = $props();
 </script>
 
@@ -80,6 +84,7 @@
 				<button class="ghost-btn login-submit" onclick={onLogin}>{t().loginSubmit}</button>
 			</div>
 		</div>
+		<div class="login-meta">{appVersion} · {t().appInfoBuildLabel} {buildNumber}</div>
 	</section>
 </main>
 
@@ -138,6 +143,12 @@
 		margin-top: 2px;
 		color: var(--fg3);
 		font-size: 11px;
+	}
+	.login-meta {
+		padding: 0 24px 18px;
+		color: var(--fg3);
+		font-size: 11px;
+		letter-spacing: 0.02em;
 	}
 	.login-lang-switcher {
 		display: flex;

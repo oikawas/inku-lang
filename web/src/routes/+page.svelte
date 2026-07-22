@@ -5835,6 +5835,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:loginPasswordVisible
 		{loginStatus}
 		onLogin={login}
+		appVersion={APP_VERSION}
+		buildNumber={__BUILD_NUMBER__}
 	/>
 {:else}
 <div class="root">

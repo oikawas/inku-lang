@@ -369,7 +369,7 @@
 		bottom: 22px;
 		right: 3px;
 		background: var(--accent);
-		color: #fff;
+		color: var(--accent-fg);
 		font-size: 9px;
 		padding: 1px 4px;
 		border-radius: 2px;

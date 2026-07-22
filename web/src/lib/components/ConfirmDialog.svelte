@@ -69,7 +69,7 @@ type ConfirmAction = {
 	.danger-btn { background: #c0392b; }
 	.confirm-btn {
 		background: var(--accent);
-		color: var(--button-active-fg);
+		color: var(--accent-fg);
 		border: 1px solid color-mix(in srgb, var(--accent) 82%, #000);
 	}
 	.confirm-btn:hover {

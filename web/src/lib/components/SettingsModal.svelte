@@ -2459,7 +2459,7 @@
 		padding: 12px 16px;
 		border-top: 1px solid var(--border);
 	}
-	.plugin-editor-foot .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+	.plugin-editor-foot .primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 	.login-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;

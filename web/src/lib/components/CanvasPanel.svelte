@@ -1597,7 +1597,7 @@
 	.variation-select.selected {
 		border-color: var(--accent);
 		background: var(--accent);
-		color: white;
+		color: var(--accent-fg);
 	}
 	/* 保存済みは選択と区別できる塗りにし、押せない状態にする */
 	.variation-select.saved {

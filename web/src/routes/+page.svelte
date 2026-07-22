@@ -6513,6 +6513,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--action-disabled-bg: #807a70;
 		--action-disabled-fg: #f7f3eb;
 		--accent:       #2a4a72;
+		/* Label colour for anything filled with --accent. The accent flips from a
+		   dark navy to a light blue between themes, so the label has to flip too. */
+		--accent-fg:    #ffffff;
 		--accent-light: #e8eef5;
 		--border:       #d4d0c8;
 		--border2:      #c4c0b8;
@@ -6549,6 +6552,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--action-disabled-bg: #4c5258;
 		--action-disabled-fg: #d2d7dc;
 		--accent:       #9ab7dc;
+		--accent-fg:    #11151a;
 		--accent-light: #253246;
 		--border:       #38342f;
 		--border2:      #514b43;

@@ -881,7 +881,7 @@
 	border: 1px solid color-mix(in srgb, var(--fg) 32%, var(--border));
 	border-radius: 3px;
 	background: color-mix(in srgb, var(--panel) 92%, transparent);
-	color: #fff;
+	color: var(--accent-fg);
 	cursor: pointer;
 	font: 700 11px/1 system-ui, sans-serif;
 	box-shadow: 0 1px 3px rgba(0,0,0,.16);

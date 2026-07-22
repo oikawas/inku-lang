@@ -153,6 +153,6 @@
 	}
 	.tenkei-seg button:last-child { border-right: 0; }
 	.tenkei-seg button:hover:not(:disabled) { background: var(--bg2); }
-	.tenkei-seg button.active { background: var(--accent); color: #fff; }
+	.tenkei-seg button.active { background: var(--accent); color: var(--accent-fg); }
 	.tenkei-seg button:disabled { opacity: .5; cursor: not-allowed; }
 </style>

@@ -490,7 +490,7 @@
 	}
 	.ddled-draw {
 		background: var(--accent);
-		color: #fff;
+		color: var(--accent-fg);
 		border-color: var(--accent);
 	}
 	.ddled-foot > :global(.tenkei-inline) { margin-right: auto; }

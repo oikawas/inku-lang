@@ -159,6 +159,90 @@ def variation_fixtures() -> None:
     }, ensure_ascii=False, indent=2))
 
 
+def proportional_fixtures() -> None:
+    """The engine 7 proportional system, sampled per canvas aspect.
+
+    Everything here derives from `canvas.unit` (the shorter side) or from the
+    shape's representative size, so a port that keeps an absolute px constant
+    anywhere shows up as a mismatch on a non-square canvas.
+    """
+    from inku_server.plugins import canvas_size_for_aspect
+    from inku_server.schema import Instruction, Variation
+
+    aspects = ["square", "wide", "pillar", "vertical"]
+    canvases = {a: canvas_size_for_aspect(a) for a in aspects}
+
+    shapes = {
+        "circle_r020": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.2),
+        "circle_r005": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.05),
+        "ellipse_06x03": Instruction(primitive="ellipse", center=(0.5, 0.5), size=(0.6, 0.3)),
+        "square_04": Instruction(primitive="square", position=(0.3, 0.3), size=(0.4, 0.4)),
+        "line_diagonal": Instruction(primitive="line", **{"from": (0.1, 0.1)}, to=(0.9, 0.9)),
+        "arc_r030": Instruction(primitive="arc", center=(0.5, 0.5), radius=0.3, angle_start=0, angle_end=180),
+        "tiny_dot": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.001),
+    }
+
+    out: dict = {
+        "constants": {
+            "AMPLITUDE_RATIO": renderer.AMPLITUDE_RATIO,
+            "BLUR_RATIO": renderer.BLUR_RATIO,
+            "BLUR_MIN_RATIO": renderer.BLUR_MIN_RATIO,
+            "REPRESENTATIVE_MIN_RATIO": renderer.REPRESENTATIVE_MIN_RATIO,
+            "AMPLITUDE_CLAMP_RATIO": renderer.AMPLITUDE_CLAMP_RATIO,
+            "SEGMENT_TARGET_RATIO": renderer.SEGMENT_TARGET_RATIO,
+            "SEGMENT_COUNT_MIN": renderer.SEGMENT_COUNT_MIN,
+            "SEGMENT_COUNT_MAX": renderer.SEGMENT_COUNT_MAX,
+            "STROKE_SAMPLE_TARGET_RATIO": renderer.STROKE_SAMPLE_TARGET_RATIO,
+            "STROKE_SAMPLE_MIN": renderer.STROKE_SAMPLE_MIN,
+            "STROKE_SAMPLE_MAX": renderer.STROKE_SAMPLE_MAX,
+            "SPECK_ANCHOR_PERIMETER_RATIO": renderer.SPECK_ANCHOR_PERIMETER_RATIO,
+            "SPECK_COUNT_MIN": renderer.SPECK_COUNT_MIN,
+            "SPECK_COUNT_MAX_GAIN": renderer.SPECK_COUNT_MAX_GAIN,
+            "CANVAS_PX": renderer.CANVAS_PX,
+            "MATERIAL_INTENSITY_LEVEL": renderer.MATERIAL_INTENSITY_LEVEL,
+            "MATERIAL_INTENSITY_SELECTED": renderer.MATERIAL_INTENSITY[renderer.MATERIAL_INTENSITY_LEVEL],
+            "WEIGHT_TO_STROKE_WIDTH": renderer.WEIGHT_TO_STROKE_WIDTH,
+        },
+        "canvases": {a: {"width": c.width, "height": c.height, "unit": c.unit, "unit_scale": renderer._unit_scale(c)} for a, c in canvases.items()},
+        "representative_size_px": [],
+        "amplitude_px": [],
+        "blur_std_px": [],
+        "segment_count": [],
+        "stroke_sample_count": [],
+        "stroke_width_px": [],
+        "speck_count": [],
+    }
+
+    for aspect, canvas in canvases.items():
+        for shape_name, ins in shapes.items():
+            out["representative_size_px"].append({
+                "aspect": aspect, "shape": shape_name,
+                "raw": renderer._representative_size_px(ins, canvas),
+                "clamped": renderer._clamped_representative_px(ins, canvas),
+            })
+            for amplitude in ("fine", "medium", "broad"):
+                variation = Variation(amplitude=amplitude, frequency="medium", quality="perlin", dimensions=["position_y"])
+                out["amplitude_px"].append({"aspect": aspect, "shape": shape_name, "amplitude": amplitude,
+                                            "value": renderer._amplitude_px(variation, ins, canvas)})
+                out["blur_std_px"].append({"aspect": aspect, "shape": shape_name, "amplitude": amplitude,
+                                           "value": renderer._blur_std_px(variation, ins, canvas)})
+
+        for path_len in (10.0, 120.0, 1256.6, 5000.0, 40000.0):
+            out["segment_count"].append({"aspect": aspect, "path_len_px": path_len,
+                                         "value": renderer._segment_count(path_len, canvas)})
+            out["stroke_sample_count"].append({"aspect": aspect, "length_px": path_len,
+                                               "value": renderer._stroke_sample_count(path_len, canvas)})
+            for base in (18, 28, 36):
+                out["speck_count"].append({"aspect": aspect, "base": base, "path_len_px": path_len,
+                                           "value": renderer._speck_count(base, path_len, canvas)})
+
+        for weight in sorted(renderer.WEIGHT_TO_STROKE_WIDTH):
+            out["stroke_width_px"].append({"aspect": aspect, "weight": weight,
+                                           "value": renderer._stroke_width_px(weight, canvas)})
+
+    (OUT / "renderer_proportional.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+
+
 VARIATION_SCORES: dict[str, dict] = {
     "07_circle_wave": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.25, "weight": "pen", "variation": {"amplitude": "broad", "frequency": "medium", "quality": "wave", "dimensions": ["position_x", "position_y"]}}]},
     "08_circle_perlin": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.25, "weight": "pen", "variation": {"amplitude": "fine", "frequency": "high", "quality": "perlin", "dimensions": ["radius"]}}]},
@@ -172,6 +256,7 @@ def main() -> None:
     SCORES.update(VARIATION_SCORES)
     stroke_engine_fixtures()
     variation_fixtures()
+    proportional_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

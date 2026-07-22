@@ -44,11 +44,13 @@ cd server
 uv sync
 ```
 
-初回起動時に管理者ユーザーを作成する場合は、8文字以上のパスワードを環境変数で指定する。
+初回起動時に管理者ユーザーを作成するため、8文字以上のパスワードを環境変数で指定する。
 
 ```sh
 export INKU_BOOTSTRAP_ADMIN_PASSWORD='change-this-password'
 ```
+
+inku にはセルフサインアップがなく、アカウントを作れるのは認証済みの管理者だけである。**この初期管理者なしで空の DB を起動すると、ログインする手段がない**。設定を忘れた場合は、パスワードを設定して再起動すれば作成される。既にユーザーがいる DB では何も起きないため、既存のパスワードが上書きされることはない。空文字は未指定と同じ扱いになる。
 
 必要に応じてDB保存先を指定する。未指定の場合は、ユーザーのローカルデータディレクトリ配下にSQLite DBが作成される。
 
@@ -136,7 +138,7 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "青い円を右上に置
 | 変数 | 用途 |
 | --- | --- |
 | `INKU_DB_URL` | DB接続先。未指定時はSQLite |
-| `INKU_BOOTSTRAP_ADMIN_PASSWORD` | 新規DB作成時の初期管理者パスワード |
+| `INKU_BOOTSTRAP_ADMIN_PASSWORD` | 新規DB作成時の初期管理者パスワード。ログイン手段を得るために必須。空文字は未指定と同じ |
 | `INKU_BOOTSTRAP_ADMIN_USERNAME` | 初期管理者名。未指定時は `admin` |
 | `INKU_SECRET_KEY` | APIキー暗号化用秘密鍵 |
 | `INKU_SECRET_KEY_FILE` | 秘密鍵ファイルの保存先 |

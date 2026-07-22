@@ -44,11 +44,13 @@ cd server
 uv sync
 ```
 
-To create an initial admin user on a new DB, set an 8-character-or-longer password before the first startup.
+Set an 8-character-or-longer password before the first startup, so that an initial admin user is created on the new DB.
 
 ```sh
 export INKU_BOOTSTRAP_ADMIN_PASSWORD='change-this-password'
 ```
+
+inku has no self-service registration, and only an authenticated admin can create accounts. **An empty DB started without this initial admin offers no way to sign in.** If it was missed, set the password and restart: the account is created then. Nothing happens on a DB that already has users, so an existing password is never overwritten. A blank value counts as unset.
 
 Optionally set the DB location. If unset, the server creates a SQLite DB under the user's local data directory.
 
@@ -136,7 +138,7 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue circle in the upp
 | Variable | Purpose |
 | --- | --- |
 | `INKU_DB_URL` | DB connection URL. SQLite is used by default |
-| `INKU_BOOTSTRAP_ADMIN_PASSWORD` | Initial admin password for a new DB |
+| `INKU_BOOTSTRAP_ADMIN_PASSWORD` | Initial admin password for a new DB. Required to be able to sign in at all; blank counts as unset |
 | `INKU_BOOTSTRAP_ADMIN_USERNAME` | Initial admin username. Defaults to `admin` |
 | `INKU_SECRET_KEY` | Secret key used to encrypt saved API keys |
 | `INKU_SECRET_KEY_FILE` | File path for the generated secret key |

@@ -25,6 +25,9 @@
 		/** Single model name, used instead of the stage pair (comparison runs). */
 		model?: string | null;
 		elapsedMs?: number | null;
+		/** Concurrent-job progress. Shown in the meta line when total > 1. */
+		progressDone?: number | null;
+		progressTotal?: number | null;
 		tokensIn?: number | null;
 		tokensOut?: number | null;
 		stopLabel?: string;
@@ -39,6 +42,8 @@
 		stage2Model = null,
 		model = null,
 		elapsedMs = null,
+		progressDone = null,
+		progressTotal = null,
 		tokensIn = null,
 		tokensOut = null,
 		stopLabel,
@@ -54,6 +59,13 @@
 		}
 		return stage1Model || stage2Model || '';
 	});
+	// The label is a single ellipsized line, so progress goes in the meta line
+	// where it stays visible in narrow panels.
+	const progressText = $derived(
+		progressDone !== null && progressTotal !== null && progressTotal > 1
+			? t().runStatusProgress(progressDone, progressTotal)
+			: ''
+	);
 	const elapsedText = $derived(
 		elapsedMs === null ? '' : t().runStatusElapsed((elapsedMs / 1000).toFixed(1))
 	);
@@ -71,6 +83,7 @@
 		<span class="run-label">{label}</span>
 		{#if modelLine}<span class="run-model">{modelLine}</span>{/if}
 		<span class="run-meta">
+			{#if progressText}<span class="run-progress">{progressText}</span>{/if}
 			{#if elapsedText}<span>{elapsedText}</span>{/if}
 			<span>{tokenText}</span>
 		</span>
@@ -141,6 +154,10 @@
 	}
 	.run-status.inline .run-meta {
 		justify-content: flex-end;
+	}
+	.run-progress {
+		color: var(--fg2);
+		font-weight: 600;
 	}
 	.run-extra {
 		flex: 0 0 auto;

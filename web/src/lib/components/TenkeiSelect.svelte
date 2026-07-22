@@ -57,7 +57,9 @@
 			aria-expanded={open}
 			onclick={(event) => { event.stopPropagation(); open = !open; }}
 		>
-			<span>{title}: {tenkeiLabel(value, isJapanese)}</span>
+			<!-- The selected level is reported by the current-selection strip below
+			     the button row, so the trigger stays a plain label. -->
+			<span>{title}</span>
 		</button>
 		{#if open}
 			<div class="tenkei-menu" role="menu">
@@ -151,6 +153,6 @@
 	}
 	.tenkei-seg button:last-child { border-right: 0; }
 	.tenkei-seg button:hover:not(:disabled) { background: var(--bg2); }
-	.tenkei-seg button.active { background: var(--accent); color: #fff; }
+	.tenkei-seg button.active { background: var(--accent); color: var(--accent-fg); }
 	.tenkei-seg button:disabled { opacity: .5; cursor: not-allowed; }
 </style>

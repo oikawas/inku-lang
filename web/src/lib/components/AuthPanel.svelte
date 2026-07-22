@@ -7,6 +7,8 @@
 		loginPasswordVisible: boolean;
 		loginStatus: string | null;
 		onLogin: () => void | Promise<void>;
+		appVersion: string;
+		buildNumber: string;
 	};
 
 	let {
@@ -14,7 +16,9 @@
 		loginPassword = $bindable(''),
 		loginPasswordVisible = $bindable(false),
 		loginStatus,
-		onLogin
+		onLogin,
+		appVersion,
+		buildNumber
 	}: Props = $props();
 </script>
 
@@ -80,6 +84,7 @@
 				<button class="ghost-btn login-submit" onclick={onLogin}>{t().loginSubmit}</button>
 			</div>
 		</div>
+		<div class="login-meta">{appVersion} {t().appInfoBuildLabel} {buildNumber}</div>
 	</section>
 </main>
 
@@ -139,6 +144,12 @@
 		color: var(--fg3);
 		font-size: 11px;
 	}
+	.login-meta {
+		padding: 0 24px 18px;
+		color: var(--fg3);
+		font-size: 11px;
+		letter-spacing: 0.02em;
+	}
 	.login-lang-switcher {
 		display: flex;
 		border: 1px solid var(--border2);
@@ -161,7 +172,9 @@
 	}
 	.login-lang-btn:last-child { border-right: none; }
 	.login-lang-btn:hover { color: var(--fg); background: var(--panel); }
-	.login-lang-btn.active { background: var(--fg); color: #fff; }
+	/* --action-* is the theme-aware primary pair; var(--fg) with a hardcoded
+	   white label collapses to white-on-white in the dark theme. */
+	.login-lang-btn.active { background: var(--action-bg); color: var(--action-fg); }
 	.login-title {
 		padding: 18px 24px 0;
 		font-size: 16px;

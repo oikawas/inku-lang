@@ -2717,6 +2717,78 @@ def test_output_save_settings_are_admin_only(tmp_path):
         db.delete_user_group(group["id"])
 
 
+def test_render_concurrency_settings_are_admin_only():
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"render-concurrency-{suffix}")
+    user = db.add_user(
+        username=f"render-concurrency-user-{suffix}",
+        email=f"render-concurrency-user-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    admin = db.add_user(
+        username=f"render-concurrency-admin-{suffix}",
+        email=f"render-concurrency-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    user_headers, user_token = _auth_headers(user)
+    admin_headers, admin_token = _auth_headers(admin)
+    baseline = db.get_render_concurrency_settings()
+    try:
+        assert client.put(
+            "/api/settings/render-concurrency",
+            headers=user_headers,
+            json={"server_limit": 3, "client_limit": 3},
+        ).status_code == 403
+
+        r = client.put(
+            "/api/settings/render-concurrency",
+            headers=admin_headers,
+            json={"server_limit": 5, "client_limit": 3},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["server_limit"] == 5
+        assert data["client_limit"] == 3
+        assert data["min_limit"] == db.RENDER_CONCURRENCY_MIN
+        assert data["max_limit"] == db.RENDER_CONCURRENCY_MAX
+
+        # The running server honours the new limit, not the import-time default.
+        from inku_server.api import _render_slots
+
+        assert _render_slots.limit == 5
+
+        status_r = client.get("/api/settings/status", headers=admin_headers)
+        assert status_r.status_code == 200
+        assert status_r.json()["render_concurrency"]["server_limit"] == 5
+
+        # Every authenticated client reads the advisory fan-out limit.
+        config_r = client.get("/api/client-config", headers=user_headers)
+        assert config_r.status_code == 200
+        assert config_r.json()["render_fanout_limit"] == 3
+        assert client.get("/api/client-config").status_code == 401
+
+        for payload in ({"server_limit": 0, "client_limit": 3}, {"server_limit": 3, "client_limit": 99}):
+            assert client.put(
+                "/api/settings/render-concurrency",
+                headers=admin_headers,
+                json=payload,
+            ).status_code == 400
+    finally:
+        from inku_server.api import _render_slots as _slots
+
+        db.update_render_concurrency_settings(int(baseline["server_limit"]), int(baseline["client_limit"]))
+        _slots.set_limit(int(baseline["server_limit"]))
+        db.delete_session(admin_token)
+        db.delete_session(user_token)
+        db.delete_user(admin["id"])
+        db.delete_user(user["id"])
+        db.delete_user_group(group["id"])
+
+
 def test_log_retention_settings_are_admin_only():
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"log-retention-{suffix}")

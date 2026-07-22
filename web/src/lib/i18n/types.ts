@@ -15,6 +15,12 @@ export interface LangPack {
 	appInfoBuildLabel: string;
 	appInfoRepositoryLabel: string;
 	appInfoClose: string;
+	inputSectionHint: string;
+	appInfoVocabTitle: string;
+	appInfoVocabIntro: string;
+	appInfoVocabColTerm: string;
+	appInfoVocabColMeaning: string;
+	appInfoVocabRows: { term: string; meaning: string }[];
 	settingsButton: string;
 	themeLight: string;
 	themeDark: string;
@@ -92,8 +98,10 @@ export interface LangPack {
 	errorProviderAuth: (stage: string) => string;
 	errorProviderRateLimit: (stage: string) => string;
 	errorProviderOther: (stage: string, status: number) => string;
+	errorRenderBusy: string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
+	runStatusProgress: (done: number, total: number) => string;
 	runStatusStage1: string;
 	runStatusStage2: string;
 	stageDdlGenerating: string;
@@ -109,10 +117,12 @@ export interface LangPack {
 	ddlExpandedLabel: string;
 	ddlEditSectionLabel: string;
 	ddlNewButton: string;
+	ddlEditButton: string;
 	ddlNewDialogTitle: string;
 	ddlNewDialogSubtitle: string;
 	ddlEditDialogSubtitle: string;
 	ddlSyntaxGuide: string;
+	ddlDialogDrawingModel: string;
 
 	// Output tabs
 	tabCanvas: string;
@@ -127,6 +137,7 @@ export interface LangPack {
 	canvasAspectButton: string;
 	canvasAspectTitle: string;
 	modelSelectButton: string;
+	modelButton: string;
 	colorCatalogButton: string;
 	instructionLangLabel: string;
 	instructionLangAuto: string;
@@ -190,6 +201,7 @@ export interface LangPack {
 	tooltipInputTenkei: string;
 	tooltipInputCanvas: string;
 	tooltipDdlNew: string;
+	tooltipDdlEdit: string;
 	tooltipSaijikiToggle: string;
 	tooltipDdlExpandedToggle: string;
 	tooltipStatsToggle: string;
@@ -420,6 +432,13 @@ export interface LangPack {
 	settingsOutputSaveNoteLabel: string;
 	settingsOutputSaveNote: string;
 	settingsOutputSaveSaved: string;
+	settingsRenderConcurrencyTitle: string;
+	settingsRenderConcurrencyServer: string;
+	settingsRenderConcurrencyServerHelp: string;
+	settingsRenderConcurrencyClient: string;
+	settingsRenderConcurrencyClientHelp: string;
+	settingsRenderConcurrencyRange: (min: number, max: number) => string;
+	settingsRenderConcurrencySaved: string;
 	settingsLogRetentionTitle: string;
 	settingsLogRetentionEnabled: string;
 	settingsLogRetentionDays: string;
@@ -593,6 +612,14 @@ export interface LangPack {
 	historySelectLineage: string;
 	historySelectItem: (selected: boolean) => string;
 	historySelectAll: string;
+	historyContactSheet: string;
+	historyContactSheetHint: string;
+	historyContactSheetAi: string;
+	historyContactSheetAiHint: string;
+	historyContactSheetBusy: string;
+	historyContactSheetTitle: string;
+	historyContactSheetSubtitle: (count: number, at: string, page: number, pages: number) => string;
+	historyContactSheetFailed: string;
 	historyMoveToTrash: string;
 	historyRestoreSelected: string;
 	historyPermanentDelete: string;

@@ -107,9 +107,52 @@ _stage_stats = {
     "timed_out": 0,
     "rejected": 0,
 }
-_RENDER_CONCURRENCY = max(1, int(os.getenv("INKU_RENDER_CONCURRENCY", "2")))
-_render_slots = BoundedSemaphore(_RENDER_CONCURRENCY)
+class _RenderCapacity:
+    """描画スロット。上限は管理者設定で実行中に変更できるため、固定長の
+    BoundedSemaphore ではなく上限と使用数を明示的に持つ。acquire は待たない
+    (満杯なら即 False) 従来どおりの挙動。"""
+
+    def __init__(self, limit: int) -> None:
+        self._lock = Lock()
+        self._limit = max(1, limit)
+        self._active = 0
+
+    @property
+    def limit(self) -> int:
+        with self._lock:
+            return self._limit
+
+    def set_limit(self, limit: int) -> None:
+        with self._lock:
+            self._limit = max(1, limit)
+
+    def acquire(self) -> bool:
+        with self._lock:
+            if self._active >= self._limit:
+                return False
+            self._active += 1
+            return True
+
+    def release(self) -> None:
+        with self._lock:
+            self._active = max(0, self._active - 1)
+
+
+_render_slots = _RenderCapacity(max(1, int(os.getenv("INKU_RENDER_CONCURRENCY", "2"))))
 _logger = logging.getLogger(__name__)
+
+
+def _apply_stored_render_concurrency() -> None:
+    """起動時に DB の設定を反映する。env は DB 未設定時の初期値でしかない。"""
+    try:
+        settings = _db.get_render_concurrency_settings()
+    except Exception:
+        _logger.warning("render concurrency settings unavailable; keeping environment default")
+        return
+    _render_slots.set_limit(int(settings["server_limit"]))
+
+
+_apply_stored_render_concurrency()
 
 
 def _log_rasterizer_backend() -> None:
@@ -211,7 +254,7 @@ def _unexpected_http_error(operation: str, status_code: int) -> HTTPException:
 
 @contextmanager
 def _render_capacity():
-    if not _render_slots.acquire(blocking=False):
+    if not _render_slots.acquire():
         raise HTTPException(status_code=503, detail="render capacity is full", headers={"Retry-After": "1"})
     try:
         yield
@@ -1486,6 +1529,14 @@ class ModelSettingsPatch(BaseModel):
     providers: dict[str, ModelProviderPatch] = Field(default_factory=dict)
 
 
+class RenderConcurrencyStatus(BaseModel):
+    server_limit: int
+    client_limit: int
+    min_limit: int
+    max_limit: int
+    note: str
+
+
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus
     db_backup: DbBackupStatus
@@ -1493,6 +1544,7 @@ class SettingsStatusResponse(BaseModel):
     output_save: OutputSaveStatus
     log_retention: LogRetentionStatus
     stage_execution: StageExecutionStatus
+    render_concurrency: RenderConcurrencyStatus
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -1929,6 +1981,7 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             logrotate_config=_logrotate_config(log_settings),
             note="Log retention policy is stored in the application DB. Applying systemd and logrotate files requires server OS privileges.",
         ),
+        render_concurrency=_render_concurrency_status(),
         stage_execution=StageExecutionStatus(
             workers=_STAGE_WORKERS,
             queue_limit=_STAGE_QUEUE_LIMIT,
@@ -2125,6 +2178,46 @@ def api_settings_update_output_save(
         **_artifact_save_stats(),
         note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
     )
+
+
+def _render_concurrency_status() -> RenderConcurrencyStatus:
+    settings = _db.get_render_concurrency_settings()
+    return RenderConcurrencyStatus(
+        server_limit=_render_slots.limit,
+        client_limit=int(settings["client_limit"]),
+        min_limit=_db.RENDER_CONCURRENCY_MIN,
+        max_limit=_db.RENDER_CONCURRENCY_MAX,
+        note=(
+            "Server limit caps concurrent renders in this process; requests beyond it are refused with 503. "
+            "Client limit is advisory and bounds the browser's candidate fan-out. "
+            "INKU_RENDER_CONCURRENCY / INKU_CLIENT_FANOUT_LIMIT only seed the first value."
+        ),
+    )
+
+
+class RenderConcurrencyBody(BaseModel):
+    server_limit: int
+    client_limit: int
+
+
+@app.put("/api/settings/render-concurrency", response_model=RenderConcurrencyStatus)
+def api_settings_update_render_concurrency(
+    body: RenderConcurrencyBody,
+    actor: dict = Depends(_admin_user),
+) -> RenderConcurrencyStatus:
+    try:
+        settings = _db.update_render_concurrency_settings(body.server_limit, body.client_limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    # New limit applies to renders acquired from here on; running renders finish.
+    _render_slots.set_limit(int(settings["server_limit"]))
+    return _render_concurrency_status()
+
+
+@app.get("/api/client-config")
+def api_client_config(actor: dict = Depends(_current_user)) -> dict[str, object]:
+    """Server-owned values every client needs. Editable by admins only."""
+    return {"render_fanout_limit": int(_db.get_render_concurrency_settings()["client_limit"])}
 
 
 @app.put("/api/settings/log-retention", response_model=LogRetentionStatus)

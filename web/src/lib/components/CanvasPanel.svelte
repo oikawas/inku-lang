@@ -110,6 +110,8 @@
 		variationGridCanAbort: boolean;
 		variationGridIncludesReading: boolean;
 		variationGridTaskLabel: string;
+		variationGridDone: number;
+		variationGridTotal: number;
 		variationGridStatus: string | null;
 		touchSeedText: string;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: HensouAmplitude) => void | Promise<void>;
@@ -259,6 +261,8 @@
 		variationGridCanAbort = false,
 		variationGridIncludesReading = false,
 		variationGridTaskLabel = '',
+		variationGridDone = 0,
+		variationGridTotal = 0,
 		variationGridStatus = null,
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
@@ -477,6 +481,13 @@
 	const detailElapsedMs = $derived(statusHistoryItem?.elapsed_ms ?? result?.elapsed_total_ms ?? null);
 	const detailTokensIn = $derived(statusHistoryItem?.tokens_in ?? ((result?.tokens_in_stage1 ?? 0) + (result?.tokens_in_stage2 ?? 0) || null));
 	const detailTokensOut = $derived(statusHistoryItem?.tokens_out ?? ((result?.tokens_out_stage1 ?? 0) + (result?.tokens_out_stage2 ?? 0) || null));
+	// SVG のデータ量。演奏そのものの重さを示す指標として詳細タブに並べる。
+	const detailSvgBytes = $derived(result?.svg ? new TextEncoder().encode(result.svg).length : null);
+	const formatBytes = (bytes: number | null) => {
+		if (bytes == null) return '-';
+		if (bytes < 1024) return `${bytes} B`;
+		return `${(bytes / 1024).toFixed(1)} KB`;
+	};
 </script>
 
 <svelte:window onkeydown={(event) => {
@@ -775,6 +786,8 @@
 									{#if variationBusy || variationGridBusy}
 										<RunStatus
 											label={t().refineGeneratingTask(variationGridTaskLabel)}
+											progressDone={variationGridDone}
+											progressTotal={variationGridTotal}
 											stage1Model={statusStage1Model}
 											stage2Model={statusStage2Model}
 											elapsedMs={variationElapsedMs}
@@ -1007,13 +1020,14 @@
 				{#if generationInfoTab === 'details'}
 					<div class="generation-details">
 						<dl>
+							<dt>{isJapanese ? '\u4f5c\u6210\u65e5' : 'Created'}</dt><dd>{currentRenderedAt ?? '-'}</dd>
 							<dt>Stage 1 ({isJapanese ? '\u89e3\u91c8' : 'Interpretation'})</dt><dd>{statusStage1Model}</dd>
 							<dt>Stage 2 ({isJapanese ? '\u63cf\u753b' : 'Rendering'})</dt><dd>{statusStage2Model}</dd>
 							<dt>Stage 1 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage1Lang)}</dd>
 							<dt>Stage 2 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage2Lang)}</dd>
 							<dt>{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</dt><dd>{statusCatalogName}</dd>
 							<dt>{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</dt><dd>{statusCanvasName}</dd>
-							{#if statusTenkei}<dt>{isJapanese ? '添景' : 'Staffage'}</dt><dd>{tenkeiLabel(statusTenkei, isJapanese)}</dd>{/if}
+							<dt>{isJapanese ? '添景' : 'Staffage'}</dt><dd>{statusTenkei ? tenkeiLabel(statusTenkei, isJapanese) : '-'}</dd>
 							<dt>render seed</dt><dd>{detailRenderSeed ?? '-'}</dd>
 							<dt>{isJapanese ? '\u914d\u7f6e seed' : 'Layout Seed'}</dt><dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
 							<dt>{isJapanese ? '\u89e3\u91c8 seed' : 'Interpretation Seed'}</dt><dd>{detailInterpretationSeed ?? '-'}</dd>
@@ -1021,6 +1035,7 @@
 							<dt>description hash</dt><dd><code>{detailDescriptionHash || '-'}</code></dd>
 							<dt>render engine</dt><dd>{detailEngine || '-'}{detailEngineVersion ? ' / ' + detailEngineVersion : ''}</dd>
 							<dt>Build</dt><dd>{detailBuild || '-'}</dd>
+							<dt>{isJapanese ? 'SVG サイズ' : 'SVG size'}</dt><dd>{formatBytes(detailSvgBytes)}</dd>
 							<dt>{isJapanese ? '\u51e6\u7406\u6642\u9593' : 'Elapsed'}</dt><dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
 							<dt>tokens in / out</dt><dd>{detailTokensIn ?? '-'} / {detailTokensOut ?? '-'}</dd>
 						</dl>
@@ -1582,7 +1597,7 @@
 	.variation-select.selected {
 		border-color: var(--accent);
 		background: var(--accent);
-		color: white;
+		color: var(--accent-fg);
 	}
 	/* 保存済みは選択と区別できる塗りにし、押せない状態にする */
 	.variation-select.saved {

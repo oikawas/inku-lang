@@ -159,7 +159,7 @@
 	.error-banner { padding: 8px 12px; background: color-mix(in srgb, var(--danger, #9b3d32) 10%, var(--panel)); border: 1px solid var(--danger, #9b3d32); border-radius: 6px; color: var(--danger, #9b3d32); font-size: 0.74rem; line-height: 1.35; white-space: pre-line; }
 	footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg2); }
 	footer button { border: 1px solid var(--border2); border-radius: 6px; padding: 7px 14px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: var(--panel); color: var(--fg); }
-	.confirm-action { background: var(--accent); color: white; border-color: var(--accent); }
+	.confirm-action { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 	.confirm-action:disabled { opacity: 0.5; cursor: default; }
 	.confirm-action.active-loading { opacity: 0.8; cursor: default; }
 	.cancel-action:hover { background: var(--bg); }

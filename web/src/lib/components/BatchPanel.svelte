@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
@@ -39,10 +40,12 @@
 		showCrab: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
-		onOpenModelSelection: () => void;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
+		// The shared button row and settings readout, rendered by the parent but
+		// placed here so it sits between the input box and the batch options.
+		settings?: Snippet;
 	};
 
 	let {
@@ -70,22 +73,41 @@
 		showCrab,
 		stage1ModelLabel,
 		stage2ModelLabel,
-		onOpenModelSelection,
 		onRememberBatchPrompt,
 		onSubmit,
 		onStop,
+		settings,
 	}: Props = $props();
+
+	// Row pitch of the textarea (13px × 1.65). The gutter, the active-line band
+	// and the follow-the-run scrolling all step by it.
+	const LINE_HEIGHT = 21.45;
+	const TEXT_PAD_TOP = 9;
 
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
 	let batchScrollTop = $state(0);
 	let selectedHistoryPrompt = $state('');
 	const displayLineNumbersText = $derived(batchInput.trim() ? lineNumbersText : t().batchPlaceholder.split('\n').map((_, i) => String(i + 1)).join('\n'));
-	const batchTextareaHeight = $derived(`${Math.max(240, displayLineNumbersText.split('\n').length * 21.45 + 18)}px`);
 	const batchActiveLineStyle = $derived(
 		batchActiveLine === null
 			? ''
-			: `--batch-active-top: ${9 + (batchActiveLine - 1) * 21.45 - batchScrollTop}px`
+			: `--batch-active-top: ${TEXT_PAD_TOP + (batchActiveLine - 1) * LINE_HEIGHT - batchScrollTop}px`
 	);
+
+	// The box no longer grows with the line count, so on a long batch the line
+	// being painted can sit below the fold. Keep it in view while the box is
+	// read-only; once the run ends the caret is the user's again.
+	$effect(() => {
+		const line = batchActiveLine;
+		const el = batchTextareaEl;
+		if (!batchRunning || line === null || !el) return;
+		const top = (line - 1) * LINE_HEIGHT;
+		const viewTop = el.scrollTop;
+		const viewBottom = viewTop + el.clientHeight - LINE_HEIGHT * 2;
+		if (top < viewTop || top > viewBottom) {
+			el.scrollTop = Math.max(0, top - el.clientHeight / 2);
+		}
+	});
 
 	function normalizePrompt(text: string): string {
 		return text.trim().replace(/\r\n/g, '\n');
@@ -112,13 +134,12 @@
 	}
 </script>
 
-<div class="batch-model-summary">
-	<span><b>Stage 1</b>{stage1ModelLabel}</span><span><b>Stage 2</b>{stage2ModelLabel}</span>
-	<button type="button" disabled={batchRunning} onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
-</div>
-
 <div class="batch-wrap">
-	<div class="line-nums" aria-hidden="true">{displayLineNumbersText}</div>
+	<div class="line-nums" aria-hidden="true">
+		<!-- The gutter is a plain block, so it is scrolled by hand to stay level
+		     with the textarea it labels. -->
+		<div class="line-nums-inner" style={`transform: translateY(${-batchScrollTop}px)`}>{displayLineNumbersText}</div>
+	</div>
 	<div class="batch-ta-wrap">
 		{#if batchRunning && batchActiveLine !== null}
 			<div class="batch-active-line" style={batchActiveLineStyle}></div>
@@ -132,32 +153,37 @@
 			wrap="off"
 			placeholder={t().batchPlaceholder}
 			readonly={batchRunning}
-			style={`height: ${batchTextareaHeight}`}
 			onscroll={() => (batchScrollTop = batchTextareaEl?.scrollTop ?? 0)}
 		></textarea>
 	</div>
 </div>
 {#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
+
+<!-- Restoring a past batch refills the input box, so the picker sits directly
+     under it rather than down with the run options. -->
+{#if !batchRunning && batchPromptHistory.length > 0}
+	<div class="batch-history">
+		<select
+			bind:value={selectedHistoryPrompt}
+			aria-label={t().batchHistoryLabel}
+			onchange={restoreSelectedHistoryPrompt}
+		>
+			<option value="">{t().batchHistoryPlaceholder}</option>
+			{#each batchPromptHistory as prompt, i (`${i}-${prompt}`)}
+				<option value={prompt}>{prompt.split('\n')[0]}</option>
+			{/each}
+		</select>
+	</div>
+{/if}
+
+{@render settings?.()}
+
 {#if !batchRunning}
 	<div class="batch-tools">
 		<label class="batch-option">
 			<input type="checkbox" bind:checked={randomColorCatalog} />
 			<span>{t().batchRandomColorCatalog}</span>
 		</label>
-		{#if batchPromptHistory.length > 0}
-			<div class="batch-history">
-				<select
-					bind:value={selectedHistoryPrompt}
-					aria-label={t().batchHistoryLabel}
-					onchange={restoreSelectedHistoryPrompt}
-				>
-					<option value="">{t().batchHistoryPlaceholder}</option>
-					{#each batchPromptHistory as prompt, i (`${i}-${prompt}`)}
-						<option value={prompt}>{prompt.split('\n')[0]}</option>
-					{/each}
-				</select>
-			</div>
-		{/if}
 	</div>
 {/if}
 
@@ -207,11 +233,6 @@
 {/if}
 
 <style>
-	.batch-model-summary { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: stretch; gap: 6px; margin-bottom: 8px; }
-	.batch-model-summary span { display: grid; gap: 2px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: 10px; overflow-wrap: anywhere; }
-	.batch-model-summary b { color: var(--fg3); font-size: 8px; letter-spacing: .06em; }
-	.batch-model-summary button { padding: 6px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--accent); font: inherit; font-size: 10px; cursor: pointer; }
-	.batch-model-summary button:disabled { opacity: .45; cursor: not-allowed; }
 	.batch-wrap {
 		display: flex;
 		border: 1px solid var(--border2);
@@ -224,6 +245,7 @@
 		text-align: right; color: var(--fg3); user-select: none;
 		font-family: inherit;
 		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
+		overflow: hidden;
 	}
 	.batch-ta {
 		width: 100%; padding: 9px 10px;
@@ -235,11 +257,13 @@
 		resize: vertical; outline: none;
 		white-space: pre;
 		overflow-wrap: normal;
-		overflow-x: auto;
+		overflow: auto;
 		position: relative;
 		z-index: 1;
-		min-height: 240px;
-		height: 100%;
+		/* Sized to the window, not to the line count: a long batch scrolls inside
+		   the box instead of pushing the run button off the bottom of the panel.
+		   Still draggable, so a taller box is one gesture away. */
+		height: clamp(200px, 42vh, 640px);
 	}
 	.batch-ta:focus { border-color: var(--accent); }
 	.batch-ta:read-only {
@@ -382,6 +406,31 @@
 		font-variant-numeric: tabular-nums;
 		min-width: 0;
 		white-space: nowrap;
+	}
+	/* The batch panel's status blocks were authored in light-theme paper colours
+	   only, so on the dark theme they read as white sheets over the panel. */
+	:global(html[data-theme='dark']) .batch-active-line {
+		background: rgba(189, 143, 52, 0.26);
+		border-top-color: rgba(226, 191, 130, 0.35);
+		border-bottom-color: rgba(226, 191, 130, 0.35);
+	}
+	:global(html[data-theme='dark']) .batch-observe {
+		border-color: var(--border2);
+		background: var(--panel);
+	}
+	:global(html[data-theme='dark']) .batch-observe-head {
+		border-bottom-color: var(--border);
+		color: var(--fg2);
+	}
+	:global(html[data-theme='dark']) .batch-summary {
+		border-color: rgba(154, 183, 220, 0.35);
+		background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+		color: var(--fg);
+	}
+	:global(html[data-theme='dark']) .batch-summary.has-failures {
+		border-color: rgba(255, 154, 134, 0.45);
+		background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+		color: var(--fg);
 	}
 	.batch-observe-body {
 		margin: 0;

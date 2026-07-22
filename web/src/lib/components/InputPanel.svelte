@@ -5,7 +5,7 @@
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
-	import type { TenkeiLevel } from '$lib/tenkei';
+	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import type { DemoSettings } from '$lib/demo';
@@ -84,7 +84,6 @@
 		onToggleCanvasAspectMenu: () => void;
 		onSelectCanvasAspect: (id: CanvasAspectId) => void | Promise<void>;
 		onOpenModelSelection: () => void;
-		onOpenLlmModelSelection: () => void;
 		onOpenCatalogModal: () => void;
 		onClearInput: () => void;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -158,7 +157,6 @@
 		onToggleCanvasAspectMenu,
 		onSelectCanvasAspect,
 		onOpenModelSelection,
-		onOpenLlmModelSelection,
 		onOpenCatalogModal,
 		onClearInput,
 		onRememberBatchPrompt,
@@ -171,6 +169,10 @@
 	}: Props = $props();
 
 	const isJapanese = $derived(t().code === 'ja');
+	const randomCatalogActive = $derived(
+		(inputMode === 'batch' && batchRandomColorCatalog)
+		|| (inputMode === 'demo' && demoSettings.random_color_catalog)
+	);
 
 	const tabItems = $derived([
 		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning },
@@ -187,7 +189,8 @@
 		const count = useWords
 			? (source.match(/[A-Za-z0-9]+(?:[-][A-Za-z0-9]+)*/g) ?? []).length
 			: Array.from(source.replace(/\s/g, "")).length;
-		return { count, guide, over: count > guide };
+		const unit = useWords ? (isJapanese ? '語' : 'words') : (isJapanese ? '字' : 'chars');
+		return { count, guide, over: count > guide, unit };
 	});
 </script>
 
@@ -216,22 +219,23 @@
 </div>
 
 <section class="panel-section">
+	<!-- The button row and the settings readout are the same for every input
+	     mode, but the 記述 tab puts them below the input box: the description is
+	     written first, the settings are confirmed just before painting. -->
+	{#snippet inputSettings()}
 	<div class="section-head">
-		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
-			{#if inputMode === 'single'}
+			<!-- Model / catalog / staffage / canvas apply to every input mode, so the
+			     button row is identical across the three tabs. -->
 			<Tooltip text={t().tooltipInputModel}>
-				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
+				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelButton}</button>
 			</Tooltip>
-			{/if}
 			<Tooltip text={t().tooltipInputCatalog}>
 				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			</Tooltip>
-			{#if inputMode === 'single'}
-				<Tooltip text={t().tooltipInputTenkei}>
-					<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
-				</Tooltip>
-			{/if}
+			<Tooltip text={t().tooltipInputTenkei}>
+				<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
+			</Tooltip>
 			{#if canvasAspectEnabled}
 				<Tooltip text={t().tooltipInputCanvas}>
 					<CanvasAspectPlugin
@@ -242,7 +246,9 @@
 					/>
 				</Tooltip>
 			{/if}
-			{#if inputMode !== 'demo'}
+			<!-- On the 記述 tab this button lives at the right end of the label row
+			     instead, next to the text it clears. -->
+			{#if inputMode === 'batch'}
 				<Tooltip placement="left" text={t().tooltipInputClear}>
 					<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
 				</Tooltip>
@@ -250,29 +256,55 @@
 		</div>
 	</div>
 
-	{#if inputMode === 'single'}
-		<div class="current-selection" aria-label={isJapanese ? '現在選択中の設定' : 'Current selection'}>
-			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
-				{#if nextStage1Model === nextStage2Model}
-					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-				{:else}
-					<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
-					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-					<span class="cs-sub">{isJapanese ? '描画' : 'Rendering'}</span>
-					<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
-				{/if}
-			</span>
+	<div class="current-selection" aria-label={isJapanese ? '現在選択中の設定' : 'Current selection'}>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
+			{#if nextStage1Model === nextStage2Model}
+				<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
+			{:else}
+				<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
+				<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
+				<span class="cs-sub">{isJapanese ? '描画' : 'Rendering'}</span>
+				<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
+			{/if}
+		</span>
+		{#if inputMode === 'demo'}
 			<span class="cs-divider"></span>
 			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
+				<span class="cs-label">{isJapanese ? '指示生成' : 'Instruction'}</span>
+				<span class="cs-value" title={demoSettings.prompt_model}>{demoSettings.prompt_model}</span>
+			</span>
+		{/if}
+		<span class="cs-divider"></span>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
+			<!-- Batch and demo can randomise the catalog per line / per loop, in which
+			     case the picked catalog is not knowable in advance. -->
+			{#if randomCatalogActive}
+				<span class="cs-value">{t().batchRandomColorCatalog}</span>
+			{:else}
 				<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
-			</span>
-			<span class="cs-divider"></span>
-			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? 'キャンバス' : 'Canvas'}</span>
-				<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
-			</span>
+			{/if}
+		</span>
+		<span class="cs-divider"></span>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? '添景' : 'Staffage'}</span>
+			<span class="cs-value">{tenkeiLabel(tenkeiLevel, isJapanese)}</span>
+		</span>
+		<span class="cs-divider"></span>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? 'キャンバス' : 'Canvas'}</span>
+			<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
+		</span>
+	</div>
+	{/snippet}
+
+	{#if inputMode === 'single'}
+		<div class="input-label">
+			<span class="input-label-text"><strong>{t().inputSectionLabel}</strong>{t().inputSectionHint}</span>
+			<Tooltip placement="left" text={t().tooltipInputClear}>
+				<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+			</Tooltip>
 		</div>
 		<textarea
 			bind:value={input}
@@ -281,7 +313,9 @@
 			placeholder={t().inputPlaceholder}
 			class="input-ta"
 		></textarea>
-		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide}</div>
+		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide} {singleInputStats.unit}</div>
+
+		{@render inputSettings()}
 
 		{#if singleRunning}
 			<div class="gen-status-wrap">
@@ -304,6 +338,7 @@
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'batch'}
 		<BatchPanel
+			settings={inputSettings}
 			{runTokensIn}
 			{runTokensOut}
 			bind:batchInput
@@ -328,12 +363,12 @@
 			{showCrab}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
-			onOpenModelSelection={onOpenLlmModelSelection}
 			{onRememberBatchPrompt}
 			onSubmit={onSubmit}
 			onStop={onStop}
 		/>
 	{:else}
+		{@render inputSettings()}
 		<DemoPanel
 			{runTokensIn}
 			{runTokensOut}
@@ -363,7 +398,6 @@
 			onSaveCurrent={onSaveCurrentDemo}
 			onStart={onStartDemo}
 			onStop={onStopDemo}
-			onOpenDrawingModelSelection={onOpenLlmModelSelection}
 		/>
 	{/if}
 </section>
@@ -413,11 +447,18 @@
 		justify-content: space-between;
 		align-items: center;
 	}
-	.section-label {
-		font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
-		color: var(--fg2);
+	.section-actions { display: flex; gap: 5px; min-width: 0; flex: 1; }
+	.input-label {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		font-size: 12px; line-height: 1.5; color: var(--fg2);
+		font-weight: 400;
 	}
-	.section-actions { display: flex; gap: 5px; min-width: 0; }
+	.input-label-text { min-width: 0; }
+	.input-label :global(.tooltip-wrap) { flex: none; }
+	.input-label strong { font-weight: 600; color: var(--fg); }
 	.ghost-btn {
 		padding: var(--btn-sm-padding);
 		border: 1px solid var(--border2);

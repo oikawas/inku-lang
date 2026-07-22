@@ -5,6 +5,8 @@
 	import SaijikiInline from './SaijikiInline.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
+	import ModelCardPicker from './ModelCardPicker.svelte';
+	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { TenkeiLevel } from '$lib/tenkei';
 
 	type SaijikiPreview = {
@@ -25,6 +27,11 @@
 		drawing: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
+		// Drawing here runs Stage 2 only (DDL -> Score), so the picker selects
+		// the Stage 2 model and changes the global selection like the main screen.
+		drawingModelId: string;
+		drawingModelGroups: ProviderGroup[];
+		onSelectDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		error: string | null;
@@ -38,7 +45,7 @@
 		onClose: () => void;
 	};
 
-	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
+	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
 
 	let value = $state('');
 	let focused = $state(false);
@@ -208,6 +215,14 @@
 					onStop={stopDraw}
 				/>
 			{:else}
+				<div class="ddled-model">
+					<ModelCardPicker
+						label={t().ddlDialogDrawingModel}
+						selectedModel={drawingModelId}
+						providerGroups={drawingModelGroups}
+						onSelect={onSelectDrawingModel}
+					/>
+				</div>
 				{#if showTenkei && onSelectTenkei}
 					<TenkeiSelect compact value={tenkeiValue} {isJapanese} inherited={tenkeiInherited} onSelect={onSelectTenkei} />
 				{/if}
@@ -454,6 +469,11 @@
 		border-top: 1px solid var(--border);
 		flex-shrink: 0;
 	}
+	.ddled-model {
+		margin-right: auto;
+		min-width: 0;
+		max-width: 280px;
+	}
 	.ddled-foot button {
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
@@ -470,7 +490,7 @@
 	}
 	.ddled-draw {
 		background: var(--accent);
-		color: #fff;
+		color: var(--accent-fg);
 		border-color: var(--accent);
 	}
 	.ddled-foot > :global(.tenkei-inline) { margin-right: auto; }

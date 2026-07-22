@@ -4,8 +4,9 @@
 
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { annotate, interpretationFeedback } from '$lib/highlight';
-	import { hydrateSaijiki } from '$lib/saijiki';
+	import { annotate, highlightDDL, interpretationFeedback } from '$lib/highlight';
+	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
+	import { withPngCaptureDate } from '$lib/pngMetadata';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -197,6 +198,13 @@
 			skipped: number;
 			note: string;
 		};
+		render_concurrency: {
+			server_limit: number;
+			client_limit: number;
+			min_limit: number;
+			max_limit: number;
+			note: string;
+		};
 		log_retention: {
 			enabled: boolean;
 			retention_days: number;
@@ -383,6 +391,10 @@
 	let variationGridCanAbort = $state(false);
 	let variationGridIncludesReading = $state(false);
 	let variationGridTaskLabel = $state('');
+	// Candidates run concurrently, so progress is "how many have finished",
+	// not "which one is being processed".
+	let variationGridDone = $state(0);
+	let variationGridTotal = $state(0);
 	let variationGridAbortController: AbortController | null = null;
 	let variationGridStatus = $state<string | null>(null);
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
@@ -466,6 +478,8 @@
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
 	let modelSelectionAllowVision = $state(true);
+	let renderConcurrencyStatus = $state<string | null>(null);
+	let renderFanoutLimit = $state(4);
 	let showKiwi = $state(true);
 	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
@@ -684,6 +698,7 @@
 	 * 原因を追えるようにプロバイダの原文メッセージを必ず併記する。
 	 */
 	function describeApiError(detail: unknown, status: number): string {
+		if (detail === 'render capacity is full') return t().errorRenderBusy;
 		if (typeof detail === 'string' && detail) return detail;
 		if (detail && typeof detail === 'object' && 'code' in detail) {
 			const failure = detail as ProviderFailure;
@@ -701,9 +716,40 @@
 		return `HTTP ${status}`;
 	}
 
-	function apiFetch(path: string, init: RequestInit = {}) {
+	// The server holds a fixed number of render slots and refuses immediately
+	// (no queueing) when they are all taken, so a fan-out such as the 4-candidate
+	// grid can lose requests to a 503 that a short wait would have avoided.
+	// Retry that one condition here; every other status is passed through.
+	const RENDER_CAPACITY_RETRIES = 3;
+
+	function delay(ms: number, signal?: AbortSignal | null): Promise<void> {
+		return new Promise((resolve, reject) => {
+			if (signal?.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+			const timer = window.setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+			function onAbort() { window.clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); }
+			signal?.addEventListener('abort', onAbort, { once: true });
+		});
+	}
+
+	/** Failed response -> Error carrying the localized message, never the raw body. */
+	async function apiError(r: Response): Promise<Error> {
+		const d = await r.json().catch(() => ({})) as { detail?: unknown };
+		return new Error(describeApiError(d.detail, r.status));
+	}
+
+	async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
 		const headers = new Headers(init.headers);
-		return fetch(path, { ...init, headers, credentials: 'same-origin' });
+		for (let attempt = 0; ; attempt += 1) {
+			const response = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+			if (response.status !== 503 || attempt >= RENDER_CAPACITY_RETRIES) return response;
+			const body = await response.clone().text().catch(() => '');
+			if (!body.includes('render capacity is full')) return response;
+			// Slots free in well under the Retry-After of 1s the server suggests,
+			// so back off in shorter steps but never longer than it asked for.
+			const retryAfterMs = Number(response.headers.get('Retry-After')) * 1000;
+			const backoffMs = 200 * 2 ** attempt;
+			await delay(Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? Math.min(retryAfterMs, backoffMs) : backoffMs, init.signal);
+		}
 	}
 
 	let nearbyHistoryRequestId = 0;
@@ -1626,17 +1672,26 @@
 	}
 
 	async function loadPluginVocabulary() {
-		try {
-			const response = await apiFetch("/api/saijiki", { cache: "no-store" });
+		type SaijikiPayload = {
+			categories: { key: string; name_ja: string; name_en: string; words: string[] }[];
+			plugins: PluginEntry[];
+		};
+		const fetchSaijiki = async (lang: 'ja' | 'en'): Promise<SaijikiPayload> => {
+			const response = await apiFetch(`/api/saijiki?lang=${lang}`, { cache: "no-store" });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			const data = await response.json() as {
-				categories: { key: string; name_ja: string; name_en: string; words: string[] }[];
-				plugins: PluginEntry[];
-			};
+			return await response.json() as SaijikiPayload;
+		};
+		try {
+			// Both languages: highlighting matches the DDL's own language, which
+			// follows instruction_lang and need not agree with the UI language.
+			const [ja, en] = await Promise.all([fetchSaijiki('ja'), fetchSaijiki('en')]);
 			hydrateSaijiki(
-				data.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, words: c.words }))
+				ja.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, words: c.words }))
 			);
-			pluginEntries = data.plugins ?? [];
+			hydrateSaijikiEn(
+				en.categories.map((c) => ({ key: c.key, label: c.name_ja, en: c.name_en, words: c.words }))
+			);
+			pluginEntries = ja.plugins ?? [];
 		} catch (error) {
 			// keep the bundled saijiki snapshot; only plugin words are cleared
 			pluginEntries = [];
@@ -1830,6 +1885,39 @@
 		}
 	}
 
+	async function updateRenderConcurrencySettings(serverLimit: number, clientLimit: number) {
+		renderConcurrencyStatus = null;
+		try {
+			const r = await apiFetch('/api/settings/render-concurrency', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ server_limit: serverLimit, client_limit: clientLimit })
+			});
+			if (!r.ok) throw await apiError(r);
+			const next = await r.json() as SettingsStatus['render_concurrency'];
+			if (settingsStatus) settingsStatus = { ...settingsStatus, render_concurrency: next };
+			// Apply to this tab at once; other tabs pick it up on their next load.
+			renderFanoutLimit = next.client_limit;
+			renderConcurrencyStatus = t().settingsRenderConcurrencySaved;
+		} catch (e) {
+			renderConcurrencyStatus = e instanceof Error ? e.message : String(e);
+			console.warn('failed to update render concurrency settings', e);
+		}
+	}
+
+	// Server-owned client limit. Any authenticated user may read it; only admins
+	// may change it, so a failure keeps the built-in default rather than blocking.
+	async function loadClientConfig() {
+		try {
+			const r = await apiFetch('/api/client-config', { cache: 'no-store' });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { render_fanout_limit?: number };
+			if (Number.isFinite(data.render_fanout_limit)) renderFanoutLimit = Number(data.render_fanout_limit);
+		} catch (error) {
+			console.warn('failed to load client config', error);
+		}
+	}
+
 	async function updateLogRetentionSettings(enabled: boolean, retentionDays: number, rotate: string, compress: boolean) {
 		logRetentionStatus = null;
 		try {
@@ -1860,7 +1948,7 @@
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates()]);
+			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -1874,7 +1962,7 @@
 			exportTemplateStatus = null;
 			canvasAspectEnabled = true;
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-			loginStatus = t().loginRequiredMessage;
+			loginStatus = null;
 			settingsStatus = null;
 			settingsStatusError = t().loginRequiredMessage;
 			historyItems = [];
@@ -1910,7 +1998,7 @@
 			trashTotal = 0;
 			historyManager.clear();
 			loginPassword = '';
-			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates()]);
+			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
 			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -2713,9 +2801,20 @@ if (unreadWords.length > 0) {
 		return data;
 	}
 
+	// The strip badge marks what the canvas is showing, not what was saved last.
+	// A batch can be stepped off the latest render — clicking a thumbnail or
+	// leaving the バッチ tab stops the follow — and from then on the badge has to
+	// stay on the artwork on screen instead of chasing every new line. It clears
+	// when that artwork is not in the newest window, rather than pointing at a
+	// neighbour.
 	async function refreshHistoryAfterServerSave() {
+		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? null;
 		await fetchHistoryOffset(0);
-		historyCursor = 0;
+		if (!activeHistoryId) {
+			historyCursor = 0;
+			return;
+		}
+		historyCursor = historyItems.findIndex((item) => item.id === activeHistoryId);
 	}
 
 	function sleep(ms: number): Promise<void> {
@@ -2772,6 +2871,7 @@ if (unreadWords.length > 0) {
 					sourceText: demoGeneratedPrompt,
 					displayLabel: '[demo]',
 					catalogId: demoCatalogId,
+					tenkei: tenkeiLevel,
 					randomColorCatalog: settings.random_color_catalog,
 				});
 				if (demoRunId !== runId || !loading) break;
@@ -2979,6 +3079,7 @@ if (unreadWords.length > 0) {
 							batchRunId,
 							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : batchCatalogId,
 							canvasAspectId: batchCanvasAspectId,
+							tenkei: tenkeiLevel,
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) break;
@@ -4018,7 +4119,7 @@ if (unreadWords.length > 0) {
 					seed_text: it.seed_text,
 				})
 			});
-			if (!r.ok) throw new Error(await r.text());
+			if (!r.ok) throw await apiError(r);
 			const svg = await r.text();
 			if (contextVersion !== targetContextVersion) return;
 			loadIterationItem({ ...it, svg });
@@ -4126,7 +4227,9 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	}
 	const saved = historyItems.find((item) => item.id === historyId);
 	if (!saved) throw new Error(getLang() === 'ja' ? '保存した作品を読み込めませんでした。' : 'The saved artwork could not be loaded.');
-	outputTab = 'lineage';
+	// Description / DDL edits produce a single artwork, not a candidate set, so
+	// land on the canvas tab and show it. The lineage is still refreshed below.
+	outputTab = 'canvas';
 	loadIterationItem(saved);
 	await fetchLineage(nodeId, true);
 }
@@ -4254,7 +4357,6 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		tenkei: tenkeiLevel,
 	});
 	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
-	outputTab = 'canvas';
 }
 
 function openNewDdlDialog(): void {
@@ -4264,6 +4366,19 @@ function openNewDdlDialog(): void {
 	ddlDialogInitial = '';
 	ddlDialogError = null;
 	ddlDialogOpen = true;
+}
+
+// Description tab entry to the same dialog. Edit mode needs a lineage node, so
+// resolve the displayed artwork's node from the loaded graph, fetching the
+// lineage first when that tab has not been opened in this session.
+async function openCurrentDdlEditor(): Promise<void> {
+	const nodeId = currentLineageNodeId;
+	if (!nodeId) return;
+	const item = displayedHistoryItem ?? historyItems.find((entry) => entry.id === result?.history_id) ?? null;
+	if (!lineageGraph?.nodes.some((entry) => entry.id === nodeId)) await fetchLineage(nodeId, true);
+	const node = lineageGraph?.nodes.find((entry) => entry.id === nodeId) ?? null;
+	if (!node) return;
+	openLineageDdlEditor(node.history ? node : { ...node, history: item });
 }
 
 function openLineageDdlEditor(node: LineageNode): void {
@@ -4285,6 +4400,17 @@ function closeDdlDialog(): void {
 function refreshLineageAfterRefine(): void {
 	const focusId = lineageGraph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
 	if (focusId) void fetchLineage(focusId, true);
+}
+
+// The DDL dialog draws through Stage 2 only, so its picker moves the global
+// Stage 2 selection (same target as the main-screen model selection) and
+// persists it. Unlike setStage2Model it leaves the history selection alone:
+// the dialog stays open over the current view and its draw selects the saved
+// result anyway.
+async function selectDdlDialogDrawingModel(provider: Provider, model: string): Promise<void> {
+	stage2Provider = provider;
+	stage2Model = model;
+	await persistModelSelection();
 }
 
 async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal): Promise<void> {
@@ -4349,9 +4475,13 @@ function detachLineage(): void {
 	outputTab = 'canvas';
 }
 
+const currentLineageNodeId = $derived(displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null);
+// The description tab's edit button needs both a node to branch from and a DDL
+// to load into the editor.
+const canEditCurrentDdl = $derived(!!currentLineageNodeId && !!(displayedHistoryItem?.ddl ?? ddl));
+
 $effect(() => {
-	const nodeId = displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
-	if (outputTab === 'lineage' && nodeId) void fetchLineage(nodeId);
+	if (outputTab === 'lineage' && currentLineageNodeId) void fetchLineage(currentLineageNodeId);
 });
 
 	function resetTargetScopedState(options: { preserveVariationCandidates?: boolean } = {}): void {
@@ -4364,6 +4494,8 @@ $effect(() => {
 			variationCandidates = [];
 			variationGridIncludesReading = false;
 			variationGridTaskLabel = '';
+			variationGridDone = 0;
+			variationGridTotal = 0;
 			variationGridStatus = null;
 		}
 
@@ -4690,7 +4822,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					render_seed: nextSeed,
 				})
 			});
-			if (!r.ok) throw new Error(await r.text());
+			if (!r.ok) throw await apiError(r);
 			const svg = await r.text();
 			result = { ...result, svg, render_seed: nextSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_variation' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
 			displayedHistoryItem = null;
@@ -4845,7 +4977,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				seed_text: normalizedSeedText,
 			}),
 		});
-		if (!r.ok) throw new Error(await r.text());
+		if (!r.ok) throw await apiError(r);
 		const data = await r.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score' | 'render_seed'>;
 		return {
 			id: `word-touch-${String(data.render_seed)}`,
@@ -4887,7 +5019,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
-		if (!r.ok) throw new Error(await r.text());
+		if (!r.ok) throw await apiError(r);
 		const data = await r.json();
 		return { id: `comp-${varySeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { vary_seed: varySeed } } };
 	}
@@ -4941,7 +5073,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				interpretation_seed: result.interpretation_seed,
 			}),
 		});
-		if (!r.ok) throw new Error(await r.text());
+		if (!r.ok) throw await apiError(r);
 		const data = await r.json() as Partial<PaintResult> & Pick<PaintResult, "svg" | "score">;
 		return {
 			id: "catalog-" + catalogId + "-" + label,
@@ -4984,7 +5116,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
-		if (!r.ok) throw new Error(await r.text());
+		if (!r.ok) throw await apiError(r);
 		const data = await r.json();
 		return {
 			id: `hensou-${amplitude}-${seed}`,
@@ -4999,6 +5131,23 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		};
 	}
 
+	// Fan-out cap for candidate grids, served by GET /api/client-config so it can
+	// track the server's own render slot count. The 503 retry in apiFetch covers
+	// slots taken by other work.
+
+	async function runWithLimit<T>(thunks: Array<() => Promise<T>>, limit: number, onEach?: () => void): Promise<T[]> {
+		const results = new Array<T>(thunks.length);
+		let next = 0;
+		const workers = Array.from({ length: Math.max(1, Math.min(limit, thunks.length)) }, async () => {
+			for (let index = next++; index < thunks.length; index = next++) {
+				results[index] = await thunks[index]();
+				onEach?.();
+			}
+		});
+		await Promise.all(workers);
+		return results;
+	}
+
 	// 変奏の seed はサーバーが採番する。seed 空間の管理と重複回避を UI に持ち込まない。
 	async function allocateHensouSeeds(amplitude: HensouAmplitude, count: number): Promise<number[]> {
 		const r = await apiFetch("/api/variation/seeds", {
@@ -5006,7 +5155,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ amplitude, count })
 		});
-		if (!r.ok) throw new Error(await r.text());
+		if (!r.ok) throw await apiError(r);
 		return (await r.json()).seeds as number[];
 	}
 
@@ -5044,6 +5193,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						? t().hensouTitle
 						: t().canvasVaryColor;
 		variationGridStatus = null;
+		variationGridDone = 0;
+		variationGridTotal = count;
 		const abortTimer = window.setTimeout(() => {
 			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
 		}, 3000);
@@ -5059,23 +5210,25 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const jobs = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
-					return renderWordTouchCandidate(normalizedTouchWords, t().canvasVaryPerformance, abortController.signal);
+					return () => renderWordTouchCandidate(normalizedTouchWords, t().canvasVaryPerformance, abortController.signal);
 				}
 				if (kind === "layout") {
 					const varySeed = createSafeIntegerSeed(usedVarySeeds);
 					usedVarySeeds.add(varySeed);
-					return composeVariationCandidate(varySeed, t().canvasVaryComposition + " " + sequence, abortController.signal);
+					return () => composeVariationCandidate(varySeed, t().canvasVaryComposition + " " + sequence, abortController.signal);
 				}
 				if (kind === "reading") {
-					return interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
+					return () => interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
 				}
 				if (kind === "hensou") {
-					return hensouVariationCandidate(amplitude ?? "medium", hensouSeeds[index], t().hensouTitle + " " + sequence, abortController.signal);
+					return () => hensouVariationCandidate(amplitude ?? "medium", hensouSeeds[index], t().hensouTitle + " " + sequence, abortController.signal);
 				}
 				const catalogId = catalogIds[index];
-				return renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
+				return () => renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
 			});
-			variationCandidates = await Promise.all(jobs);
+			variationCandidates = await runWithLimit(jobs, renderFanoutLimit, () => {
+				if (variationGridAbortController === abortController) variationGridDone += 1;
+			});
 			for (const candidate of variationCandidates) {
 				variationTokensIn = addTokens(variationTokensIn, paintTokensIn(candidate.result));
 				variationTokensOut = addTokens(variationTokensOut, paintTokensOut(candidate.result));
@@ -5167,7 +5320,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			svg = result.svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
 		} else if (displayedHistoryItem?.id) {
 			const r = await apiFetch(`/api/history/${displayedHistoryItem.id}/svg?profile=${profile}`);
-			if (!r.ok) throw new Error(await r.text());
+			if (!r.ok) throw await apiError(r);
 			svg = await r.text();
 		} else {
 			const r = await apiFetch('/api/render-svg', {
@@ -5180,7 +5333,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					svg_profile: profile
 				})
 			});
-			if (!r.ok) throw new Error(await r.text());
+			if (!r.ok) throw await apiError(r);
 			svg = await r.text();
 		}
 		triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), exportFilename(profile === 'display' ? 'svg' : `${profile}.svg`));
@@ -5210,7 +5363,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					ctx.drawImage(img, 0, 0, pngWidth, pngHeight);
 					canvas.toBlob((b) => {
 						if (!b) { reject(new Error('canvas error')); return; }
-						triggerDownload(b, exportFilename('png', size)); resolve();
+						// Stamp the artwork's own generation time, not the download time.
+						const generatedAt = displayedHistoryItem?.at ?? result?.history_at ?? Date.now();
+						withPngCaptureDate(b, new Date(generatedAt))
+							.then((stamped) => { triggerDownload(stamped, exportFilename('png', size)); resolve(); })
+							.catch(reject);
 					}, 'image/png');
 				};
 				img.onerror = () => reject(new Error('svg load error'));
@@ -5510,57 +5667,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		);
 	}
 
-	function saijikiCategoryClass(category: string | undefined): string {
-		switch (category) {
-			case 'かたち': return 'shape';
-			case 'てざわり': return 'touch';
-			case 'つらなり': return 'line';
-			case 'いろ': return 'color';
-			case 'ゆらぎ': return 'motion';
-			case 'ばしょ': return 'place';
-			case 'うごき': return 'action';
-			case 'かたむき': return 'angle';
-			case 'わりあい': return 'ratio';
-			case 'Nature': return 'plugin';
-			default: return 'word';
-		}
-	}
-
-	function ddlCaretMarkup(): string {
-		return '<span class="ddl-custom-caret"></span>';
-	}
-
-	function renderDDLPart(text: string, kind: string, category: string | undefined, caretOffset: number | null): string {
-		const before = caretOffset === null ? text : text.slice(0, caretOffset);
-		const after = caretOffset === null ? '' : text.slice(caretOffset);
-		const content = caretOffset === null ? escapeHtml(text) : `${escapeHtml(before)}${ddlCaretMarkup()}${escapeHtml(after)}`;
-		if (kind === 'saijiki') {
-			return `<span class="ddl-token ddl-token-${saijikiCategoryClass(category)}">${content}</span>`;
-		}
-		if (kind === 'emotion') {
-			return `<span class="ddl-token-emotion">${content}</span>`;
-		}
-		return content;
-	}
-
-	function highlightDDL(text: string, caretIndex: number | null = null): string {
-		const clampedCaret = caretIndex === null ? null : Math.max(0, Math.min(text.length, caretIndex));
-		let offset = 0;
-		const html = annotate(text).map((part) => {
-			const nextOffset = offset + part.text.length;
-			const localCaret = clampedCaret !== null
-				&& clampedCaret >= offset
-				&& (clampedCaret < nextOffset || (clampedCaret === text.length && clampedCaret === nextOffset))
-				? clampedCaret - offset
-				: null;
-			const rendered = renderDDLPart(part.text, part.kind, part.category, localCaret);
-			offset = nextOffset;
-			return rendered;
-		}).join('');
-		if (clampedCaret === text.length && text.length === 0) return ddlCaretMarkup();
-		return html;
-	}
-
 	function setZoom(nextZoom: number) {
 		zoom = Math.max(0.25, Math.min(10, +nextZoom.toFixed(2)));
 		if (zoom <= 1) {
@@ -5740,6 +5846,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:loginPasswordVisible
 		{loginStatus}
 		onLogin={login}
+		appVersion={APP_VERSION}
+		buildNumber={__BUILD_NUMBER__}
 	/>
 {:else}
 <div class="root">
@@ -5827,7 +5935,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
 						onOpenModelSelection={() => openModelSelection(false)}
-						onOpenLlmModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
 						onRememberBatchPrompt={rememberBatchPrompt}
@@ -5852,6 +5959,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- DDL ツール -->
 					{#if inputMode === 'single'}
 						<section class="panel-section ddl-tools-section">
+							<Tooltip placement="left" text={t().tooltipDdlEdit}>
+								<button class="ddl-new-btn" type="button" disabled={!canEditCurrentDdl} onclick={openCurrentDdlEditor}>{t().ddlEditButton}</button>
+							</Tooltip>
 							<Tooltip placement="left" text={t().tooltipDdlNew}>
 								<button class="ddl-new-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
 							</Tooltip>
@@ -6003,6 +6113,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{variationGridCanAbort}
 				{variationGridIncludesReading}
 				{variationGridTaskLabel}
+				{variationGridDone}
+				{variationGridTotal}
 				{variationGridStatus}
 				runTokensIn={activeRunTokensIn}
 				runTokensOut={activeRunTokensOut}
@@ -6121,12 +6233,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 <DdlEditorDialog
 	open={ddlDialogOpen}
 	isJapanese={getLang() === 'ja'}
-	title={ddlDialogMode === 'new' ? t().ddlNewDialogTitle : (getLang() === 'ja' ? 'DDLを編集' : 'Edit DDL')}
+	title={ddlDialogMode === 'new' ? t().ddlNewDialogTitle : t().ddlEditButton}
 	subtitle={ddlDialogMode === 'new' ? t().ddlNewDialogSubtitle : t().ddlEditDialogSubtitle}
 	initialDdl={ddlDialogInitial}
 	drawing={ddlDialogDrawing}
 	{stage1ModelLabel}
 	{stage2ModelLabel}
+	drawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
+	drawingModelGroups={availableModelCatalog}
+	onSelectDrawingModel={selectDdlDialogDrawingModel}
 	runTokensIn={activeRunTokensIn}
 	runTokensOut={activeRunTokensOut}
 	error={ddlDialogError}
@@ -6226,6 +6341,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onUpdateDbBackupSettings={updateDbBackupSettings}
 		onRunDbBackupNow={runDbBackupNow}
 		onUpdateOutputSaveSettings={updateOutputSaveSettings}
+		{renderConcurrencyStatus}
+		onUpdateRenderConcurrencySettings={updateRenderConcurrencySettings}
 		onUpdateLogRetentionSettings={updateLogRetentionSettings}
 		onLoadUserSettings={loadUserSettings}
 		onLogin={login}
@@ -6259,6 +6376,26 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			<section>
 				<h2>{t().appInfoConceptTitle}</h2>
 				<p>{t().appInfoConceptBody}</p>
+			</section>
+			<section>
+				<h2>{t().appInfoVocabTitle}</h2>
+				<p>{t().appInfoVocabIntro}</p>
+				<table class="app-info-vocab">
+					<thead>
+						<tr>
+							<th scope="col">{t().appInfoVocabColTerm}</th>
+							<th scope="col">{t().appInfoVocabColMeaning}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each t().appInfoVocabRows as row (row.term)}
+							<tr>
+								<th scope="row">{row.term}</th>
+								<td>{row.meaning}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			</section>
 			<section>
 				<h2>{t().appInfoCreatorTitle}</h2>
@@ -6387,6 +6524,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--action-disabled-bg: #807a70;
 		--action-disabled-fg: #f7f3eb;
 		--accent:       #2a4a72;
+		/* Label colour for anything filled with --accent. The accent flips from a
+		   dark navy to a light blue between themes, so the label has to flip too. */
+		--accent-fg:    #ffffff;
 		--accent-light: #e8eef5;
 		--border:       #d4d0c8;
 		--border2:      #c4c0b8;
@@ -6423,6 +6563,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--action-disabled-bg: #4c5258;
 		--action-disabled-fg: #d2d7dc;
 		--accent:       #9ab7dc;
+		--accent-fg:    #11151a;
 		--accent-light: #253246;
 		--border:       #38342f;
 		--border2:      #514b43;
@@ -6540,7 +6681,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
-	.ddl-tools-section { flex-direction: row; justify-content: flex-end; }
+	.ddl-tools-section { flex-direction: row; justify-content: flex-end; gap: 6px; }
 	.ddl-new-btn {
 		padding: var(--btn-sm-padding);
 		border: 1px solid #d8b36a;
@@ -6554,7 +6695,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		white-space: nowrap;
 		cursor: pointer;
 	}
-	.ddl-new-btn:hover { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
+	.ddl-new-btn:hover:not(:disabled) { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
+	.ddl-new-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 	/* thinking */
 	.thinking-details {
@@ -6724,6 +6866,38 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.app-info-meta a:hover {
 		text-decoration: underline;
+	}
+	.app-info-vocab {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 12px;
+		line-height: 1.6;
+	}
+	.app-info-vocab th,
+	.app-info-vocab td {
+		padding: 5px 10px 5px 0;
+		text-align: left;
+		vertical-align: top;
+		border-bottom: 1px solid var(--border);
+	}
+	.app-info-vocab thead th {
+		color: var(--fg3);
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.app-info-vocab tbody th {
+		color: var(--fg);
+		font-weight: 500;
+		white-space: nowrap;
+		padding-right: 16px;
+	}
+	.app-info-vocab tbody td {
+		color: var(--fg2);
+		min-width: 0;
+	}
+	.app-info-vocab tbody tr:last-child th,
+	.app-info-vocab tbody tr:last-child td {
+		border-bottom: none;
 	}
 
 	.interpretation-diff {

@@ -558,28 +558,31 @@ $effect(() => {
 	{#if activeMenuNodeId === node.id}
 		{@const ddlOrigin = isDdlOrigin(node)}
 		<div class="card-dropdown-menu" role="menu">
-			<div class="card-dropdown-title">{isJapanese ? '作品を編集する' : 'Edit this artwork'}</div>
+			<div class="card-dropdown-title">
+				{isJapanese ? '作品編集' : 'Edit artwork'}
+				{#if ddlOrigin}<span class="card-dropdown-origin">{isJapanese ? '（DDL直接生成作品）' : '(DDL-authored)'}</span>{/if}
+			</div>
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
-				{isJapanese ? '描画要素' : 'Drawing elements'}
+				{isJapanese ? '描画パラメータの編集' : 'Edit drawing parameters'}
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-					{isJapanese ? '記述' : 'Description'}
+					{isJapanese ? '指示を編集' : 'Edit instruction'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
-				{isJapanese ? 'DDL' : 'DDL'}
+				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
-					{isJapanese ? 'モデル' : 'Models'}
+					{isJapanese ? '使用モデル変更' : 'Change models'}
 				</button>
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
-					{isJapanese ? '言語' : 'Languages'}
+					{isJapanese ? '使用言語変更' : 'Change languages'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
-				{isJapanese ? 'AIに自律推敲させる...' : 'AI Refine...'}
+				{isJapanese ? 'AI自動推敲プロセス' : 'AI refinement process'}
 			</button>
 		</div>
 	{/if}
@@ -756,14 +759,14 @@ $effect(() => {
 	.lineage-edit-dialog > footer :global(.tenkei-inline) { margin-right: auto; }
 	.lineage-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.lineage-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
-	.lineage-edit-dialog > footer .edit-draw { border-color: var(--accent); background: var(--accent); color: var(--accent-fg, #111); font-weight: 700; }
+	.lineage-edit-dialog > footer .edit-draw { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); font-weight: 700; }
 	.lineage-edit-dialog button:disabled, .lineage-edit-dialog textarea:disabled { opacity: .55; cursor: default; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
 	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
 	.okugaki-dialog > header { padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }
 	.okugaki-dialog > header button, .okugaki-record-head button { border: 0; background: transparent; color: var(--fg3); font-size: 1.2rem; cursor: pointer; }
 	.okugaki-controls { display: grid; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
-	.okugaki-generate { justify-self: start; border: 1px solid var(--accent); border-radius: 7px; padding: 9px 14px; background: var(--accent); color: var(--accent-fg, #111); cursor: pointer; }
+	.okugaki-generate { justify-self: start; border: 1px solid var(--accent); border-radius: 7px; padding: 9px 14px; background: var(--accent); color: var(--accent-fg); cursor: pointer; }
 	.okugaki-progress { display: flex; align-items: center; gap: 8px; color: var(--fg2); font-size: .8rem; }
 	.okugaki-progress span { width: 13px; height: 13px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: okugaki-spin .8s linear infinite; }
 	.okugaki-list { min-height: 160px; overflow-y: auto; padding: 18px 20px 24px; display: grid; gap: 16px; }
@@ -778,7 +781,8 @@ $effect(() => {
 	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font-size: 0.82rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
 	.card-dropdown-menu button:hover { background: var(--bg2); }
 	/* メニュー見出し: 帯を敷いて項目と明確に分ける */
-	.card-dropdown-title { margin-bottom: 4px; padding: 6px 13px; border-bottom: 1px solid var(--border2); background: var(--bg2); color: var(--fg2); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; }
+	.card-dropdown-title { margin-bottom: 4px; padding: 7px 13px; border-bottom: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--fg); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; }
+	.card-dropdown-origin { display: block; margin-top: 2px; color: var(--fg2); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.02em; }
 	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }

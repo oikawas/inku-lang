@@ -2,6 +2,9 @@
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
+	import { buildContactSheet, sheetCapacity, sheetPageCount, type ContactSheetEntry, type SheetVariant } from '$lib/contactSheet';
+	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
+	import { normalizeTenkei, tenkeiLabel } from '$lib/tenkei';
 
 	type HistoryItem = {
 		id?: string;
@@ -19,11 +22,20 @@
 		tokens_in?: number | null;
 		tokens_out?: number | null;
 		catalog_id?: string | null;
+		tenkei?: string | null;
 		render_hash?: string | null;
 		render_hash_short?: string | null;
+		render_build_number?: string | null;
+		render_engine_id?: string | null;
+		render_engine_version?: string | null;
 		render_color_catalog_id?: string | null;
+		render_color_catalog_name?: string | null;
+		render_color_catalog_sub?: string | null;
 		render_canvas_aspect_id?: string | null;
 		render_canvas_aspect?: string | null;
+		render_canvas_aspect_ratio?: number | null;
+		variation_amplitude?: string | null;
+		variation_seed?: number | string | null;
 		render_seed?: number | string | null;
 		vary_seed?: number | string | null;
 	interpretation_seed?: string | null;
@@ -225,6 +237,141 @@
 		for (const id of ids) if (!selectedHistoryIds.includes(id)) onToggleSelection(id);
 	}
 
+	let contactSheetBusy = $state<SheetVariant | null>(null);
+	let contactSheetError = $state<string | null>(null);
+
+	// Selection is confined to the page on screen, but in lineage mode the
+	// expanded members come from a separate request, so both pools are searched.
+	function findSelectedItem(id: string): HistoryItem | null {
+		const onPage = managedHistoryItems.find((it) => it.id === id);
+		if (onPage) return onPage;
+		for (const members of Object.values(lineageGroupItems)) {
+			const member = members.find((it) => it.id === id);
+			if (member) return member;
+		}
+		const representative = lineageGroups.find((group) => group.representative.id === id)?.representative;
+		return representative ?? null;
+	}
+
+	async function fetchHistoryItem(id: string): Promise<HistoryItem | null> {
+		try {
+			const response = await apiFetch('/api/history/' + encodeURIComponent(id) + '/neighbors', { cache: 'no-store' });
+			if (!response.ok) return null;
+			const items = await response.json() as HistoryItem[];
+			return items.find((it) => it.id === id) ?? null;
+		} catch {
+			return null;
+		}
+	}
+
+	// The AI sheet carries index badges only, so the notes file has to restate
+	// everything a caption would have said, plus the machinery behind the
+	// performance. Labels stay English; the description keeps its own language.
+	function noteEntryFor(item: HistoryItem): ContactSheetNoteEntry {
+		const catalog = item.render_color_catalog_name
+			? item.render_color_catalog_sub
+				? `${item.render_color_catalog_name} (${item.render_color_catalog_sub})`
+				: item.render_color_catalog_name
+			: catalogName(item.render_color_catalog_id ?? item.catalog_id);
+		const aspect = item.render_canvas_aspect ?? item.render_canvas_aspect_id ?? '';
+		const ratio = item.render_canvas_aspect_ratio;
+		const engineName = [item.render_engine_id, item.render_engine_version].filter(Boolean).join(' ');
+		const level = normalizeTenkei(item.tenkei);
+		const models = [item.stage1_model, item.stage2_model].filter(Boolean).join(' -> ');
+		const variation = item.variation_amplitude
+			? item.variation_seed == null
+				? item.variation_amplitude
+				: `${item.variation_amplitude} (seed ${item.variation_seed})`
+			: '';
+		return {
+			description: item.source_text || item.input || '',
+			staffage: level ? tenkeiLabel(level, false) : '',
+			colorCatalog: catalog,
+			canvas: aspect ? (ratio ? `${aspect} (${ratio.toFixed(3)})` : aspect) : '',
+			engine: engineName ? (item.render_build_number ? `${engineName} / build ${item.render_build_number}` : engineName) : '',
+			models,
+			variation,
+			renderHash: item.render_hash_short ?? item.render_hash ?? '',
+			created: formatHistoryDate(item.at),
+			ddl: item.ddl
+		};
+	}
+
+	function triggerDownload(blob: Blob, filename: string) {
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement('a');
+		anchor.href = url;
+		anchor.download = filename;
+		anchor.click();
+		URL.revokeObjectURL(url);
+	}
+
+	async function downloadContactSheet(variant: SheetVariant): Promise<void> {
+		if (contactSheetBusy || selectedHistoryIds.length === 0) return;
+		contactSheetBusy = variant;
+		contactSheetError = null;
+		try {
+			const entries: ContactSheetEntry[] = [];
+			const notes: ContactSheetNoteEntry[] = [];
+			for (const id of selectedHistoryIds) {
+				const item = findSelectedItem(id) ?? await fetchHistoryItem(id);
+				if (!item?.svg) continue;
+				entries.push({
+					svg: item.svg,
+					caption: historyPreviewText(item.display_label || item.source_text || item.input || ''),
+					sub: formatHistoryDate(item.at)
+				});
+				if (variant === 'ai') notes.push(noteEntryFor(item));
+			}
+			if (entries.length === 0) throw new Error('no artworks to place on the sheet');
+			const generatedAt = new Date();
+			const stamp = [
+				generatedAt.getFullYear(),
+				String(generatedAt.getMonth() + 1).padStart(2, '0'),
+				String(generatedAt.getDate()).padStart(2, '0'),
+				'-',
+				String(generatedAt.getHours()).padStart(2, '0'),
+				String(generatedAt.getMinutes()).padStart(2, '0'),
+				String(generatedAt.getSeconds()).padStart(2, '0')
+			].join('');
+			const capacity = sheetCapacity(variant);
+			const pages = sheetPageCount(entries.length, variant);
+			const kind = variant === 'ai' ? '-ai' : '';
+			const sheetFiles: Array<{ name: string; from: number; to: number }> = [];
+			for (let page = 0; page < pages; page += 1) {
+				const startIndex = page * capacity;
+				const slice = entries.slice(startIndex, startIndex + capacity);
+				const blob = await buildContactSheet(slice, {
+					variant,
+					title: t().historyContactSheetTitle,
+					subtitle: t().historyContactSheetSubtitle(entries.length, formatHistoryDate(generatedAt.getTime()), page + 1, pages),
+					startIndex
+				});
+				const suffix = pages > 1 ? `-${String(page + 1).padStart(2, '0')}` : '';
+				const filename = `inku-contact-sheet${kind}-${stamp}${suffix}.png`;
+				sheetFiles.push({ name: filename, from: startIndex + 1, to: startIndex + slice.length });
+				triggerDownload(blob, filename);
+				// Browsers drop back-to-back programmatic downloads; space them out.
+				if (page < pages - 1) await new Promise((resolve) => setTimeout(resolve, 400));
+			}
+			// One notes file for the whole selection, numbered straight through the
+			// split sheets, so the badges stay unambiguous across files.
+			if (variant === 'ai' && notes.length > 0) {
+				await new Promise((resolve) => setTimeout(resolve, 400));
+				const markdown = buildContactSheetNotes(notes, {
+					title: t().historyContactSheetTitle,
+					generatedAt: formatHistoryDate(generatedAt.getTime()),
+					sheets: sheetFiles
+				});
+				triggerDownload(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }), `inku-contact-sheet-ai-${stamp}.md`);
+			}
+		} catch {
+			contactSheetError = t().historyContactSheetFailed;
+		} finally {
+			contactSheetBusy = null;
+		}
+	}
+
 	function loadItemAndClose(item: HistoryItem) {
 		if (historyManagerView !== 'active') return;
 		onLoadItem(item);
@@ -412,6 +559,26 @@
 				<button class="ghost-btn" onclick={() => onAskRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
 				<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
 			{/if}
+			<button
+				class="ghost-btn"
+				type="button"
+				onclick={() => downloadContactSheet('review')}
+				disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
+				title={t().historyContactSheetHint}
+			>
+				{contactSheetBusy === 'review' ? t().historyContactSheetBusy : t().historyContactSheet}
+				{#if contactSheetBusy === null && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
+			</button>
+			<button
+				class="ghost-btn"
+				type="button"
+				onclick={() => downloadContactSheet('ai')}
+				disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
+				title={t().historyContactSheetAiHint}
+			>
+				{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
+			</button>
+			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
 		</div>
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
 	</div>
@@ -778,7 +945,7 @@
 	border: 1px solid color-mix(in srgb, var(--fg) 32%, var(--border));
 	border-radius: 3px;
 	background: color-mix(in srgb, var(--panel) 92%, transparent);
-	color: #fff;
+	color: var(--accent-fg);
 	cursor: pointer;
 	font: 700 11px/1 system-ui, sans-serif;
 	box-shadow: 0 1px 3px rgba(0,0,0,.16);
@@ -962,10 +1129,14 @@
 	}
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
+	/* --action-* is the theme-aware primary pair; var(--fg) with a hardcoded
+	   white label collapses to white-on-white in the dark theme. */
+	.ghost-btn.ghost-active { background: var(--action-bg); color: var(--action-fg); border-color: var(--action-bg); }
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
+	.tool-count { margin-left: 4px; color: var(--fg3); }
+	.tool-error { align-self: center; color: #b3452c; font-size: 11px; }
 	.icon-trash-btn {
 		width: 24px;
 		height: 22px;

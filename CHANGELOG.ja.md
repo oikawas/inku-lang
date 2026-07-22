@@ -2578,6 +2578,17 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **検証:** 相対参照 55 件すべて解決・孤児アセットなし・`alt` 全数・タグ均衡。push 後の GitHub 実表示で日英とも画像 12 点ロード成功・raw 配信は SHA-256 一致・旧アセットは 404（削除確認）。
 - **不変:** コード（`web/src/`・server）無変更、render engine version 10 のまま。`APP_VERSION` / `web/BUILD_NUMBER` / pyproject の採番なし（docs のみ）。pentala 反映なし（README はサーバー配信物でない）。マージ = `7e1469a` + 差し替え `9f3ada1`（本契約は特例として Opus がマージ・push・worktree 削除まで実施）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-readme-visuals-result.md`。
 
+### v2.4.2 — 歳時記語彙の日英ペアリングを構造で担保する（Build 689、2026-07-23）
+
+- **位置依存の解消:** `SaijikiCategory` が持っていた `words_ja` / `words_en` の 2 本の並行タプルを廃し、`words` 1 本へ統合した。`SaijikiWord` は `surface_ja` / `surface_en` を 1 エントリに持ち（`surface_en` は `None` 可）、`default` / `prompt` / `display` / `marker` のフラグを言語間で共有する。日英の対応は**位置ではなくエントリ**が担保する。あいだ（relations）の `RelationWord` が最初から採っていた形（`surface_ja` / `surface_en`）へ、かたち〜わりあいの語彙も揃えた。
+- **背景:** v2.4.1 で是正した日英対応バグ 2 件（`髪` / `hair` の残置による 1 ずれ、`ugoki` の並び非対応による解説交差）は、**並べ替えとテストによる固定**であって構造の修正ではなかった。「`words_ja` と同順で並べる」という規約がコメントでしか担保されず、語の追加・並べ替えのたびに再発しうる状態が残っていた。
+- **Score 値の位置依存も同時に解消:** てざわり・いろの各語へ `score_value` を持たせ、カテゴリの語列と `_WEIGHT_VALUES` / `_COLOR_VALUES` を `zip` していた `_surface_value_map` を削除した。**てざわり語の並べ替えが Score の weight 値の取り違えに直結する**状態（長さ検査だけが番人だった）は、歳時記表示のずれより影響が重い。
+- **特例の保持:** 削剪済みの墓標 `描く`（`ugoki`、英語に対応語なし）は `surface_en=None` の同一語列内エントリとして保持。`並べる` / `line-up` は 1 エントリにしたうえで、英語の閉包マーカーだけ `marker_surfaces_en=("arrange",)` で従来値を維持。`髪` / `hair` は `_PRUNED` のまま `score_value="hair"` を保持する（保存済み Score の Replay 互換）。
+- **出力不変（受け入れ条件）:** `prompt_block` / `texture_material_enumeration` / `display_categories` / `saijiki_marker_table` / `core_grammar_markers` / `shape_markers` / `relation_literal_markers` / `reference_categories` / `weight_for_surface` / `color_for_surface` の日英 15 項目を変更前後で SHA-256 比較し全一致。`gen_saijiki_ts.py` の再生成結果 `web/src/lib/saijiki.generated.ts` もバイト一致（git 差分なし）。`_EXPECTED_PAIRING` の 68 ペアは**書き換えずに通過**した。Stage 1 プロンプトは日英とも 1 バイトも変わっていない。
+- **不変:** render engine version 10 のまま。Score schema / coerce / rh2・renderer / stroke_engine・語彙そのもの（増減・改称）は無変更。
+- **検証:** pytest **1028 passed / 30 skipped**（+2 = 構造テスト。旧構造では fail-first を確認済み）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）、`npm run build` exit 0。Mac / pentala 両環境。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-saijiki-word-pairing-result.md`。
+- **残存する位置対応:** 最終出力形式（`GET /api/saijiki` の言語別語列、`saijiki.generated.ts` の 2 配列、表示リストの位置突き合わせテスト）には位置対応が残るが、いずれも**同一の二言語語列から導出**される派生物であり、正本側に手書きの並行リストはない。
+
 ### v2.4.1 — UI 調整 2 巡目（歳時記語彙の日英対応是正・語プレビューの英語化・記述タブの文言整理）（Build 687、2026-07-22）
 
 - **対話型調整（Build 685〜686、2 セッション）:** DDL エディタの語プレビュー全 69 エントリを日英化（`effectEn` / `exampleEn`。Nature プラグイン 3 語を日英 1 エントリに統合、解説未登録だった `敷き詰める` / `触れる` を追加、汎用フォールバック文も日英化）。系譜タブの見出し下 2 文を削除（全体図側の説明のみ残置）。英語 UI の Okugaki ボタンラベルを `Okugaki` に簡素化。記述タブはヒント文とカウンタの二重記述を解消し、短歌への言及をカウンタ側へ移動（`文字数 12 / 31字（短歌）` / `Characters 12 / 31 (tanka)`。英語ヒント文は 85 → 49 字で 1 行に収まる）。

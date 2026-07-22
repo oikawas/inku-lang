@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.4.1 / Build 687**
+**対象バージョン: v2.4.2 / Build 689**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -114,6 +114,8 @@ v2.3.2（Build 683）では v2.3.1 機能群に UI を追随させる対話型�
 v2.4.0（Build 684）ではリリース配布パイプラインを確立した。git タグ `vX.Y.Z` の push で GitHub Actions が `ghcr.io/oikawas/inku-api` / `inku-web` を multi-arch（amd64 / arm64）build & push し、利用者は `deploy/` の compose + `.env.example` で起動する（SPEC.ja §15.4）。`server/Dockerfile` に BUILD_NUMBER を焼き込み（コンテナの `/api/info` と `render_build_number` の null を解消）、`/api/info` の `version` を `server/pyproject.toml` 由来の単一情報源にしてリリースごとに採番（本リリースで 2.4.0）、nature-leaves プラグイン v0.3.0 を git 管理化してイメージ同梱、bootstrap admin の空文字を「未設定」扱いに是正して compose 側を `:?` で必須化した（セルフサインアップ不在の前提を manual / SETUP / SPEC に明記）。engine 10・Score schema・web UI は不変。
 
 README 整備（2026-07-22、docs のみ・採番なし）では README 日英に作品ギャラリー 6 点（`docs/assets/gallery/`。作者のスター付き履歴から選定、絵 + 詞書 + `<details>` の指示書・SVG・seed）と UI スクリーンショット 6 点（`docs/assets/ui/`、日英各 3。`*.ja/.en.png` で各 README が自言語のみ参照）を追加し、構成を「作品 — 記述が絵になる → しくみ（実 Score の層解説）→ 画面 → … → ドキュメント（末尾へ）」に改訂した。GitHub のサニタイザ下で唯一残る枠線手段として単一セル `<table>` を採用し、`.gitignore` を `docs/*` + `!docs/assets/` に変更。白背景に溶けていた 2 点目は公開後に silver-shoal（B962）へ差し替え済み。コード・engine・採番は不変。
+
+v2.4.2（Build 689）は歳時記語彙の日英ペアリングを構造で担保する改修。`SaijikiCategory` の `words_ja` / `words_en` という 2 本の並行タプルを廃し、`surface_ja` / `surface_en` を 1 エントリに持つ `SaijikiWord` の単一語列へ統合した（フラグは言語間で共有、`surface_en=None` で墓標語を表現）。あわせて てざわり・いろ の各語へ `score_value` を持たせ、語列と Score enum 値を `zip` していた `_surface_value_map` を削除（**てざわりの並べ替えが Score weight 値の取り違えに直結する**状態の解消）。あいだの `RelationWord` が元から採っていた形へ他カテゴリを揃えたもの。出力は日英 15 項目すべて変更前後で SHA-256 一致、生成 TS もバイト一致、`_EXPECTED_PAIRING` 68 ペアは無改変で通過。engine 10 のまま、語彙の増減・改称なし。pytest 1028/30（+2 構造テスト）。
 
 v2.4.1（Build 687）は UI 調整 2 巡目。DDL エディタの語プレビュー全 69 エントリを日英化し、作業中に発見した歳時記語彙の日英対応バグ 2 件（削剪済み `髪`/`hair` の i18n 残置による 1 ずれ、`words_en` の並び非対応による解説の交差）を是正した。原因だった i18n の手書き複製 `saijikiWords` を廃止し、表示語はハイドレート済み `SAIJIKI` / `SAIJIKI_EN` から直接取得。全 68 語の日英対応を明示テーブルで固定するテストを追加。副作用として英語版 Stage 1 プロンプトの `motions:` 語順が変わる（集合不変、ベンチ未確認）。記述タブは短歌の目安をヒント文からカウンタへ移動。engine 10 のまま。UI 調整は対話で継続中。
 

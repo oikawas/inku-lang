@@ -6365,6 +6365,26 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				<p>{t().appInfoConceptBody}</p>
 			</section>
 			<section>
+				<h2>{t().appInfoVocabTitle}</h2>
+				<p>{t().appInfoVocabIntro}</p>
+				<table class="app-info-vocab">
+					<thead>
+						<tr>
+							<th scope="col">{t().appInfoVocabColTerm}</th>
+							<th scope="col">{t().appInfoVocabColMeaning}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each t().appInfoVocabRows as row (row.term)}
+							<tr>
+								<th scope="row">{row.term}</th>
+								<td>{row.meaning}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</section>
+			<section>
 				<h2>{t().appInfoCreatorTitle}</h2>
 				<div class="app-info-creator">{t().appInfoCreatorName}</div>
 				<p>{t().appInfoCreatorBody}</p>
@@ -6829,6 +6849,38 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.app-info-meta a:hover {
 		text-decoration: underline;
+	}
+	.app-info-vocab {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 12px;
+		line-height: 1.6;
+	}
+	.app-info-vocab th,
+	.app-info-vocab td {
+		padding: 5px 10px 5px 0;
+		text-align: left;
+		vertical-align: top;
+		border-bottom: 1px solid var(--border);
+	}
+	.app-info-vocab thead th {
+		color: var(--fg3);
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.app-info-vocab tbody th {
+		color: var(--fg);
+		font-weight: 500;
+		white-space: nowrap;
+		padding-right: 16px;
+	}
+	.app-info-vocab tbody td {
+		color: var(--fg2);
+		min-width: 0;
+	}
+	.app-info-vocab tbody tr:last-child th,
+	.app-info-vocab tbody tr:last-child td {
+		border-bottom: none;
 	}
 
 	.interpretation-diff {

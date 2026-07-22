@@ -15,6 +15,11 @@ export interface LangPack {
 	appInfoBuildLabel: string;
 	appInfoRepositoryLabel: string;
 	appInfoClose: string;
+	appInfoVocabTitle: string;
+	appInfoVocabIntro: string;
+	appInfoVocabColTerm: string;
+	appInfoVocabColMeaning: string;
+	appInfoVocabRows: { term: string; meaning: string }[];
 	settingsButton: string;
 	themeLight: string;
 	themeDark: string;

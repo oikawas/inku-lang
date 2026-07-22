@@ -137,6 +137,23 @@
 </div>
 {#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 
+<!-- Restoring a past batch refills the input box, so the picker sits directly
+     under it rather than down with the run options. -->
+{#if !batchRunning && batchPromptHistory.length > 0}
+	<div class="batch-history">
+		<select
+			bind:value={selectedHistoryPrompt}
+			aria-label={t().batchHistoryLabel}
+			onchange={restoreSelectedHistoryPrompt}
+		>
+			<option value="">{t().batchHistoryPlaceholder}</option>
+			{#each batchPromptHistory as prompt, i (`${i}-${prompt}`)}
+				<option value={prompt}>{prompt.split('\n')[0]}</option>
+			{/each}
+		</select>
+	</div>
+{/if}
+
 {@render settings?.()}
 
 {#if !batchRunning}
@@ -145,20 +162,6 @@
 			<input type="checkbox" bind:checked={randomColorCatalog} />
 			<span>{t().batchRandomColorCatalog}</span>
 		</label>
-		{#if batchPromptHistory.length > 0}
-			<div class="batch-history">
-				<select
-					bind:value={selectedHistoryPrompt}
-					aria-label={t().batchHistoryLabel}
-					onchange={restoreSelectedHistoryPrompt}
-				>
-					<option value="">{t().batchHistoryPlaceholder}</option>
-					{#each batchPromptHistory as prompt, i (`${i}-${prompt}`)}
-						<option value={prompt}>{prompt.split('\n')[0]}</option>
-					{/each}
-				</select>
-			</div>
-		{/if}
 	</div>
 {/if}
 

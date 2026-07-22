@@ -2,6 +2,8 @@ package app.inku.mobile.render
 
 import java.security.MessageDigest
 import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -14,6 +16,14 @@ internal object ServerRendererGeometry {
 
     fun fmt(value: Double): String = "%.3f".format(java.util.Locale.US, value)
 
+    fun seedToInt(seed: Any?): Int {
+        return when (seed) {
+            is Number -> seed.toInt()
+            is String -> seed.toIntOrNull() ?: seed.hashCode()
+            else -> 0
+        }
+    }
+
     fun signedHash(i: Int, seed: String): Double {
         val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$i".toByteArray())
         var raw = 0L
@@ -23,13 +33,114 @@ internal object ServerRendererGeometry {
         return raw.toDouble() / 9_223_372_036_854_775_808.0
     }
 
+    fun signedHash(i: Int, seed: Int): Double {
+        return signedHash(i, seed.toString())
+    }
+
     fun hash01(i: Int, seed: String): Double {
-        val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$i".toByteArray())
-        val raw = ((digest[0].toLong() and 0xffL)) or
+        return hash01(i, seedToInt(seed), "")
+    }
+
+    fun hash01(i: Int, seed: Int, salt: String = ""): Double {
+        val rawStr = "$seed:$salt:$i"
+        val digest = MessageDigest.getInstance("SHA-256").digest(rawStr.toByteArray(Charsets.UTF_8))
+        val raw = (digest[0].toLong() and 0xffL) or
             ((digest[1].toLong() and 0xffL) shl 8) or
             ((digest[2].toLong() and 0xffL) shl 16) or
             ((digest[3].toLong() and 0xffL) shl 24)
         return (raw and 0xffffffffL).toDouble() / 0xffffffffL.toDouble()
+    }
+
+    fun hashToUnit(i: Int, seed: Int): Double {
+        val rawStr = "$seed:$i"
+        val digest = MessageDigest.getInstance("SHA-256").digest(rawStr.toByteArray(Charsets.UTF_8))
+        var raw = 0L
+        for (offset in 0 until 8) {
+            raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
+        }
+        return raw.toDouble() / 9_223_372_036_854_775_808.0
+    }
+
+    fun wavePhase(seed: Int): Double {
+        return hash01(0, seed, "wave-phase") * 2.0 * Math.PI
+    }
+
+    fun valueNoise1D(x: Double, seed: Int): Double {
+        val xi = floor(x).toInt()
+        val xf = x - xi
+        val v1 = hashToUnit(xi, seed)
+        val v2 = hashToUnit(xi + 1, seed)
+        val t = xf * xf * (3.0 - 2.0 * xf)
+        return v1 * (1.0 - t) + v2 * t
+    }
+
+    fun periodicValueNoise1D(x: Double, seed: Int, period: Int): Double {
+        val xi = floor(x).toInt()
+        val xf = x - xi
+        val p = max(1, period)
+        val v1 = hashToUnit(Math.floorMod(xi, p), seed)
+        val v2 = hashToUnit(Math.floorMod(xi + 1, p), seed)
+        val t = xf * xf * (3.0 - 2.0 * xf)
+        return v1 * (1.0 - t) + v2 * t
+    }
+
+    fun getAmplitudePx(variation: JSONObject): Double {
+        return when (variation.optString("amplitude", "medium")) {
+            "fine" -> 7.0
+            "broad" -> 30.0
+            else -> 12.0
+        }
+    }
+
+    fun getFrequencyCycles(variation: JSONObject): Double {
+        return when (variation.optString("frequency", "medium")) {
+            "slow" -> 2.0
+            "high" -> 14.0
+            else -> 6.0
+        }
+    }
+
+    fun sampleOffset(t: Double, variation: JSONObject, seed: Int, segment: Int, amp: Double): Double {
+        val freq = getFrequencyCycles(variation)
+        return when (variation.optString("quality", "none")) {
+            "wave" -> sin(t * 2.0 * Math.PI * freq + wavePhase(seed)) * amp
+            "perlin" -> valueNoise1D(t * freq, seed) * amp
+            "pink" -> (
+                valueNoise1D(t * freq, seed) * amp +
+                    valueNoise1D(t * freq * 2.0, seed xor 0x9E37) * amp * 0.5
+                ) / 1.5
+            "white" -> hashToUnit(segment, seed) * amp
+            else -> 0.0
+        }
+    }
+
+    fun sampleOffsetPeriodic(t: Double, variation: JSONObject, seed: Int, segment: Int, amp: Double): Double {
+        val freq = getFrequencyCycles(variation)
+        return when (variation.optString("quality", "none")) {
+            "wave" -> sin(t * 2.0 * Math.PI * freq + wavePhase(seed)) * amp
+            "perlin" -> periodicValueNoise1D(t * freq, seed, max(1, kotlin.math.round(freq).toInt())) * amp
+            "white" -> hashToUnit(segment, seed) * amp
+            else -> 0.0
+        }
+    }
+
+    fun offsetContourPoint(
+        x: Double,
+        y: Double,
+        off: Double,
+        center: Pair<Double, Double>,
+        axisX: Boolean,
+        axisY: Boolean,
+    ): Pair<Double, Double> {
+        if (axisX && !axisY) return (x + off) to y
+        if (axisY && !axisX) return x to (y + off)
+        val dx = x - center.first
+        val dy = y - center.second
+        val dist = hypot(dx, dy)
+        if (dist < 1e-6) return (x + off) to y
+        val nx = dx / dist
+        val ny = dy / dist
+        return (x + off * nx) to (y + off * ny)
     }
 
     fun pointsForRegular(ins: JSONObject, sides: Int, width: Double, height: Double): List<Pair<Double, Double>> {
@@ -122,15 +233,19 @@ internal object ServerRendererGeometry {
     fun needsPathVariation(variation: JSONObject?): Boolean {
         if (variation == null) return false
         val quality = variation.optString("quality", "none")
-        if (quality == "none" || quality == "pink") return false
+        if (quality == "none") return false
         val dimensions = variation.optJSONArray("dimensions") ?: return false
         for (i in 0 until dimensions.length()) {
-            if (dimensions.optString(i) in setOf("position_x", "position_y")) return true
+            if (dimensions.optString(i) in setOf("position_x", "position_y", "radius")) return true
         }
         return false
     }
 
     fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String): List<Pair<Double, Double>> {
+        return variedLinePoints(x1, y1, x2, y2, variation, seedToInt(seed))
+    }
+
+    fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: Int): List<Pair<Double, Double>> {
         if (variation == null) return listOf(x1 to y1, x2 to y2)
         val dx = x2 - x1
         val dy = y2 - y1
@@ -141,11 +256,12 @@ internal object ServerRendererGeometry {
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
+        val amp = getAmplitudePx(variation)
         val result = mutableListOf(x1 to y1)
         val segments = 80
         for (i in 1 until segments) {
             val t = i.toDouble() / segments.toDouble()
-            val offset = variationOffset(t, i, variation, seed)
+            val offset = sampleOffset(t, variation, seed, i, amp)
             var x = x1 + dx * t
             var y = y1 + dy * t
             if (axisX && !axisY) {
@@ -162,31 +278,68 @@ internal object ServerRendererGeometry {
         return result
     }
 
-    private fun variationOffset(t: Double, segment: Int, variation: JSONObject, seed: String): Double {
-        val amp = when (variation.optString("amplitude", "medium")) {
-            "fine" -> 7.0
-            "broad" -> 30.0
-            else -> 12.0
-        }
-        val freq = when (variation.optString("frequency", "medium")) {
-            "slow" -> 2.0
-            "high" -> 14.0
-            else -> 6.0
-        }
-        return when (variation.optString("quality", "none")) {
-            "wave" -> sin(t * Math.PI * 2.0 * freq) * amp
-            "perlin" -> smoothNoise(t * freq, seed) * amp
-            "white" -> signedHash(segment, seed) * amp
-            else -> 0.0
+    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: String, count: Int = 100): List<Pair<Double, Double>> {
+        return variedCirclePoints(cx, cy, rx, ry, variation, seedToInt(seed), count)
+    }
+
+    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: Int, count: Int = 100): List<Pair<Double, Double>> {
+        val basePoints = circlePoints(cx, cy, rx, ry, count)
+        if (variation == null || !needsPathVariation(variation)) return basePoints
+        val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
+        val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
+        val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
+        val amp = getAmplitudePx(variation)
+        val center = cx to cy
+        return basePoints.mapIndexed { i, pt ->
+            val t = i.toDouble() / count.toDouble()
+            val off = sampleOffsetPeriodic(t, variation, seed, i, amp)
+            offsetContourPoint(pt.first, pt.second, off, center, axisX, axisY)
         }
     }
 
-    private fun smoothNoise(x: Double, seed: String): Double {
-        val xi = kotlin.math.floor(x).toInt()
-        val xf = x - xi
-        val v1 = signedHash(xi, seed)
-        val v2 = signedHash(xi + 1, seed)
-        val t = xf * xf * (3.0 - 2.0 * xf)
-        return v1 * (1.0 - t) + v2 * t
+    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: String, cx: Double, cy: Double): List<Pair<Double, Double>> {
+        return variedPolygonPoints(points, variation, seedToInt(seed), cx, cy)
+    }
+
+    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Int, cx: Double, cy: Double): List<Pair<Double, Double>> {
+        if (variation == null || !needsPathVariation(variation) || points.isEmpty()) return points
+        val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
+        val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
+        val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
+        val amp = getAmplitudePx(variation)
+        val center = cx to cy
+        val count = points.size
+        return points.mapIndexed { i, pt ->
+            val t = i.toDouble() / count.toDouble()
+            val off = sampleOffsetPeriodic(t, variation, seed, i, amp)
+            offsetContourPoint(pt.first, pt.second, off, center, axisX, axisY)
+        }
+    }
+
+    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: String, count: Int = 60): String {
+        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToInt(seed), count)
+    }
+
+    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Int, count: Int = 60): String {
+        if (variation == null || !needsPathVariation(variation)) {
+            return arcPathD(cx, cy, r, startDeg, endDeg)
+        }
+        val points = arcPoints(cx, cy, r, startDeg, endDeg, count)
+        val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
+        val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
+        val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
+        val amp = getAmplitudePx(variation)
+        val center = cx to cy
+        val variedPts = points.mapIndexed { i, pt ->
+            val t = i.toDouble() / count.toDouble()
+            val off = sampleOffset(t, variation, seed, i, amp)
+            offsetContourPoint(pt.first, pt.second, off, center, axisX, axisY)
+        }
+        if (variedPts.isEmpty()) return ""
+        val sb = StringBuilder("M ${fmt(variedPts[0].first)} ${fmt(variedPts[0].second)}")
+        for (i in 1 until variedPts.size) {
+            sb.append(" L ${fmt(variedPts[i].first)} ${fmt(variedPts[i].second)}")
+        }
+        return sb.toString()
     }
 }

@@ -1465,3 +1465,55 @@ The following belong to Phase 2 and later:
 `gradle :app:testDebugUnitTest` passes all 11 tests and `gradle :app:assembleDebug`
 succeeds. `android/BUILD_NUMBER` is `148069`; `android/VERSION` remains
 `1.48.0-android.1`.
+
+## 2026-07-23 web/server v2 Alignment Phase 2a (Geometry Variation & Wave Phase Seed Tracking)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §4/§5, Phase 2a of the renderer alignment was completed.
+`render_engine_version` remains `"2"` as decreed in ruling 1.
+
+### Scope Ported
+
+- **Geometry Variation (`ServerRendererGeometry.kt`)**:
+  - `wavePhase(seed: Int)`: `_hash01(0, seed, "wave-phase") * 2 * Math.PI` derives the noise phase nonlinearly from `seed` when `wave` quality is requested.
+  - `periodicValueNoise1D`: Added periodic noise helper for closed contours ($t \in [0, 1)$) to ensure seamless boundary loop continuity.
+  - `variedCirclePoints`, `variedEllipsePoints`, `variedPolygonPoints`, `variedArcPathD`:
+    Applies variation noise according to `quality` (`wave`, `perlin`, `pink`, `white`) and `dimensions` (`position_x`, `position_y`, `radius`) for circle, ellipse, polygon, rect, and arc primitives.
+- **Material Seed Dependency (`ServerRendererMaterial.kt`)**:
+  - `seedToInt` normalizes `render_seed` to ensure 100% deterministic output for material lines and powder specks.
+- **Renderer Integration (`DefaultSvgRenderer.kt`)**:
+  - Evaluates `variation` presence for `circle`, `ellipse`, `square`, `triangle`, `polygon`, and `arc`, outputting distorted `<polygon points="...">` or `<path d="...">` elements accordingly.
+
+### Verification
+
+`app/src/test/java/app/inku/mobile/render/ServerRendererGeometryTest.kt` was added.
+
+- **Wave Phase Seed Dependency**: Verified that seeds 111 and 222 yield distinct wave phases and sample offsets, while identical seeds yield 100% deterministic points.
+- **Geometry Distortion & Determinism**: Verified that circle, arc, and polygon variations distort accurately and reproduce identically for identical seeds.
+
+`gradle :app:testDebugUnitTest` (all 15 tests) and `gradle :app:assembleDebug` succeed.
+`android/BUILD_NUMBER` is `148070`; `android/VERSION` remains `1.48.0-android.1`.
+
+## 2026-07-23 web/server v2 Alignment Phase 2a′ (Exact Server Alignment of Variation Primitives)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8, Phase 2a′ exact alignment of variation primitives (`_hash01`, `_hash_to_unit`) was completed.
+
+### Explicit Separation & Specification of Two Hash Functions
+
+1. **`_hash01(i, seed, salt)`**:
+   - String format is **`"{seed}:{salt}:{i}"`** (yielding `"{seed}::{i}"` when `salt` is empty).
+   - Extracts the first 4 bytes of SHA-256 digest as a little-endian unsigned 32-bit integer, divided by `0xFFFFFFFF` (4294967295) to produce a float in $[0.0, 1.0]$. Used for `wavePhase` etc.
+2. **`_hash_to_unit(i, seed)`**:
+   - Has a completely independent arithmetic structure from `_hash01`. String format is **`"{seed}:{i}"`** (no salt).
+   - Extracts the first 8 bytes of SHA-256 digest as a little-endian **signed 64-bit integer** (`Long`), divided by $2^{63}$ (`9223372036854775808.0`) to produce a float in $[-1.0, 1.0]$.
+   - Used as the foundation for `valueNoise1D` (Perlin lattice) and `white` noise.
+
+### Verification
+
+Added `testReferencePrimitivesExactParity` to `ServerRendererGeometryTest.kt` to assert against `renderer_variation_primitives.json`.
+
+- All items for `wave_phase` (3 cases), `hash01` (6 cases), `hash_to_unit` (5 cases, including negative $i$), `value_noise_1d` (5 cases), `periodic_value_noise_1d` (5 cases), `sample_offset` (36 samples), and `sample_offset_periodic` (36 samples) match server measured values 100% within **tolerance 1e-9**.
+
+`gradle :app:testDebugUnitTest` (all 16 tests) and `gradle :app:assembleDebug` succeed.
+`android/BUILD_NUMBER` is `148071`; `android/VERSION` remains `1.48.0-android.1`.
+
+

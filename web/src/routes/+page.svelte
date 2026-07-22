@@ -2801,9 +2801,20 @@ if (unreadWords.length > 0) {
 		return data;
 	}
 
+	// The strip badge marks what the canvas is showing, not what was saved last.
+	// A batch can be stepped off the latest render — clicking a thumbnail or
+	// leaving the バッチ tab stops the follow — and from then on the badge has to
+	// stay on the artwork on screen instead of chasing every new line. It clears
+	// when that artwork is not in the newest window, rather than pointing at a
+	// neighbour.
 	async function refreshHistoryAfterServerSave() {
+		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? null;
 		await fetchHistoryOffset(0);
-		historyCursor = 0;
+		if (!activeHistoryId) {
+			historyCursor = 0;
+			return;
+		}
+		historyCursor = historyItems.findIndex((item) => item.id === activeHistoryId);
 	}
 
 	function sleep(ms: number): Promise<void> {

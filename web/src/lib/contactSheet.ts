@@ -11,6 +11,8 @@ export type ContactSheetEntry = {
 export type ContactSheetOptions = {
 	title: string;
 	subtitle: string;
+	// Caption numbering continues across the split sheets.
+	startIndex?: number;
 };
 
 const CELL_W = 300;
@@ -22,9 +24,14 @@ const HEADER_H = 58;
 const MAX_PIXEL_SIDE = 6000;
 const FONT_STACK = 'system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif';
 
-function columnsFor(count: number): number {
-	if (count <= 1) return 1;
-	return Math.max(2, Math.min(8, Math.ceil(Math.sqrt(count))));
+// One sheet is a fixed 7 x 4 grid. Anything beyond that spills onto further
+// sheets, each written out as its own file.
+export const SHEET_COLS = 7;
+export const SHEET_ROWS = 4;
+export const SHEET_CAPACITY = SHEET_COLS * SHEET_ROWS;
+
+export function sheetPageCount(count: number): number {
+	return Math.max(1, Math.ceil(count / SHEET_CAPACITY));
 }
 
 // Read the artwork's own aspect from its viewBox. Artworks on one sheet may
@@ -70,7 +77,10 @@ function ellipsise(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 
 export async function buildContactSheet(entries: ContactSheetEntry[], options: ContactSheetOptions): Promise<Blob> {
 	if (entries.length === 0) throw new Error('no artworks selected');
-	const cols = columnsFor(entries.length);
+	if (entries.length > SHEET_CAPACITY) throw new Error('too many artworks for one sheet');
+	const startIndex = options.startIndex ?? 0;
+	// A full sheet is 7 x 4; a trailing sheet shrinks to what it actually holds.
+	const cols = Math.min(SHEET_COLS, entries.length);
 	const rows = Math.ceil(entries.length / cols);
 	const sheetW = PAD * 2 + cols * CELL_W + (cols - 1) * GAP;
 	const sheetH = PAD * 2 + HEADER_H + rows * (CELL_H + CAPTION_H) + (rows - 1) * GAP;
@@ -124,7 +134,7 @@ export async function buildContactSheet(entries: ContactSheetEntry[], options: C
 
 		ctx.font = `12px ${FONT_STACK}`;
 		ctx.fillStyle = '#3a3a3a';
-		ctx.fillText(ellipsise(ctx, `${index + 1}. ${entry.caption}`, CELL_W), cellX, cellY + CELL_H + 17);
+		ctx.fillText(ellipsise(ctx, `${startIndex + index + 1}. ${entry.caption}`, CELL_W), cellX, cellY + CELL_H + 17);
 		ctx.font = `11px ${FONT_STACK}`;
 		ctx.fillStyle = '#9a9a9a';
 		ctx.fillText(ellipsise(ctx, entry.sub, CELL_W), cellX, cellY + CELL_H + 33);

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
-	import { buildContactSheet, type ContactSheetEntry } from '$lib/contactSheet';
+	import { buildContactSheet, SHEET_CAPACITY, sheetPageCount, type ContactSheetEntry } from '$lib/contactSheet';
 
 	type HistoryItem = {
 		id?: string;
@@ -270,10 +270,6 @@
 			}
 			if (entries.length === 0) throw new Error('no artworks to place on the sheet');
 			const generatedAt = new Date();
-			const blob = await buildContactSheet(entries, {
-				title: t().historyContactSheetTitle,
-				subtitle: t().historyContactSheetSubtitle(entries.length, formatHistoryDate(generatedAt.getTime()))
-			});
 			const stamp = [
 				generatedAt.getFullYear(),
 				String(generatedAt.getMonth() + 1).padStart(2, '0'),
@@ -283,12 +279,25 @@
 				String(generatedAt.getMinutes()).padStart(2, '0'),
 				String(generatedAt.getSeconds()).padStart(2, '0')
 			].join('');
-			const url = URL.createObjectURL(blob);
-			const anchor = document.createElement('a');
-			anchor.href = url;
-			anchor.download = `inku-contact-sheet-${stamp}.png`;
-			anchor.click();
-			URL.revokeObjectURL(url);
+			const pages = sheetPageCount(entries.length);
+			for (let page = 0; page < pages; page += 1) {
+				const startIndex = page * SHEET_CAPACITY;
+				const slice = entries.slice(startIndex, startIndex + SHEET_CAPACITY);
+				const blob = await buildContactSheet(slice, {
+					title: t().historyContactSheetTitle,
+					subtitle: t().historyContactSheetSubtitle(entries.length, formatHistoryDate(generatedAt.getTime()), page + 1, pages),
+					startIndex
+				});
+				const suffix = pages > 1 ? `-${String(page + 1).padStart(2, '0')}` : '';
+				const url = URL.createObjectURL(blob);
+				const anchor = document.createElement('a');
+				anchor.href = url;
+				anchor.download = `inku-contact-sheet-${stamp}${suffix}.png`;
+				anchor.click();
+				URL.revokeObjectURL(url);
+				// Browsers drop back-to-back programmatic downloads; space them out.
+				if (page < pages - 1) await new Promise((resolve) => setTimeout(resolve, 400));
+			}
 		} catch {
 			contactSheetError = t().historyContactSheetFailed;
 		} finally {

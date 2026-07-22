@@ -616,7 +616,7 @@ export interface LangPack {
 	historyContactSheetHint: string;
 	historyContactSheetBusy: string;
 	historyContactSheetTitle: string;
-	historyContactSheetSubtitle: (count: number, at: string) => string;
+	historyContactSheetSubtitle: (count: number, at: string, page: number, pages: number) => string;
 	historyContactSheetFailed: string;
 	historyMoveToTrash: string;
 	historyRestoreSelected: string;

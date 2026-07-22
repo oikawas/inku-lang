@@ -60,7 +60,9 @@ export const en: LangPack = {
 
 	clearInputBtn: 'New',
 	inputSectionLabel: 'Description',
-	inputSectionHint: ': Write a short line for what you want to express — a tanka\'s brevity is the guide.',
+	inputSectionHint: ': Write what you want to express, in a short line.',
+	inputMeterChars: (count, guide) => `Characters ${count} / ${guide} (tanka)`,
+	inputMeterWords: (count, guide) => `Words ${count} / ${guide} (tanka)`,
 	interpretationFeedbackLabel: 'Interpretation Feedback',
 	canvasAspectButton: 'Canvas',
 	canvasAspectTitle: 'Canvas Aspect',
@@ -639,7 +641,7 @@ export const en: LangPack = {
 	historySecondsHeader: 'Seconds',
 	historyCatalogHeader: 'Color Catalog',
 	historyActionHeader: 'Actions',
-	okugakiRead: 'Read the Okugaki',
+	okugakiRead: 'Okugaki',
 	okugakiTooltip: 'Recite the branch to the displayed artwork as a first-person reader',
 	okugakiTitle: 'Okugaki — Lineage Recitation',
 	okugakiDescription: 'Records observed changes generation by generation and the invariants across them. Readings are appended and never edited.',
@@ -660,18 +662,4 @@ export const en: LangPack = {
 	confirmTrashMessage: (n) => `Move ${n} item${n === 1 ? '' : 's'} to trash?`,
 	confirmRestoreMessage: (n) => `Restore ${n} item${n === 1 ? '' : 's'}?`,
 	confirmPermanentDeleteMessage: (n) => `Permanently delete ${n} item${n === 1 ? '' : 's'}?`,
-
-	saijikiWords: {
-		katachi: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc', 'cloudform'],
-		katamuki: ['horizontal', 'vertical', 'diagonal', 'rising', 'falling', 'rotated'],
-		tezawari: ['hair', 'pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'burin', 'drypoint'],
-		tsuranari: ['solid', 'dashed', 'dotted', 'dash-dot'],
-		iro: ['white', 'black', 'blue', 'red', 'green', 'gray'],
-		yuragi: ['fine', 'large', 'slowly', 'quickly', 'swaying', 'undulating', 'trembling', 'blurring'],
-		basho: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'middle', 'corner'],
-		ugoki: ['place', 'line-up', 'fill', 'scatter', 'draw', 'tile'],
-		aida: ['along', 'not touching', 'cutting', 'between', 'touching'],
-		wariai: ['tall', 'wide', 'full-width', 'half-width', 'semicircle', 'waxing', 'waning', 'crescent'],
-		'plugin-nature': ['Nature.wind', 'Nature.undulation', 'Nature.stillness'],
-	},
 };

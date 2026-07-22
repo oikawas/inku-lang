@@ -60,7 +60,9 @@ export const ja: LangPack = {
 
 	clearInputBtn: '新規作成',
 	inputSectionLabel: '記述',
-	inputSectionHint: '：短い文章で、表現したいものを入力。短歌の31文字が目安。',
+	inputSectionHint: '：短い文章で、表現したいものを入力。',
+	inputMeterChars: (count, guide) => `文字数 ${count} / ${guide}字（短歌）`,
+	inputMeterWords: (count, guide) => `語数 ${count} / ${guide}語（短歌）`,
 	interpretationFeedbackLabel: '解釈フィードバック',
 	canvasAspectButton: 'キャンバス',
 	canvasAspectTitle: 'キャンバス比率',
@@ -660,18 +662,4 @@ export const ja: LangPack = {
 	confirmTrashMessage: (n) => `${n}件をごみ箱に移動しますか？`,
 	confirmRestoreMessage: (n) => `${n}件を復元しますか？`,
 	confirmPermanentDeleteMessage: (n) => `${n}件を完全に削除しますか？`,
-
-	saijikiWords: {
-		katachi: ['円', '楕円', '三角', '四角', '線', '弧', '雲形'],
-		katamuki: ['水平', '垂直', '斜め', '右上がり', '右下がり', '回転'],
-		tezawari: ['髪', '鉛筆', 'ペン', 'ロットリング', 'クレヨン', 'チョーク', '細筆', '太筆', 'ビュラン', 'ドライポイント'],
-		tsuranari: ['実線', '破線', '点線', '一点鎖線'],
-		iro: ['白', '黒', '青', '赤', '緑', '灰'],
-		yuragi: ['細かく', '大きく', 'ゆっくり', '速く', '揺れる', '波打つ', '震える', '滲む'],
-		basho: ['上', '下', '中央', '左端', '右端', '上端', '下端', '中心', '隅'],
-		ugoki: ['置く', '並べる', '埋める', '散らす', '引く', '敷き詰める'],
-		aida: ['沿う', '触れない', '切る', '間に', '触れる'],
-		wariai: ['縦長', '横長', '全幅', '半幅', '半円', '上弦', '下弦', '三日月'],
-		'plugin-nature': ['Nature.風', 'Nature.うねり', 'Nature.無風'],
-	},
 };

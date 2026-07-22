@@ -63,3 +63,66 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['沿う', '触れない', '切る', '間に', '触れる']
 	},
 ];
+
+export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
+	{
+		key: 'katachi',
+		label: 'かたち',
+		en: 'forms',
+		words: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc', 'cloudform']
+	},
+	{
+		key: 'katamuki',
+		label: 'かたむき',
+		en: 'angles',
+		words: ['horizontal', 'vertical', 'diagonal', 'rising', 'falling', 'rotated']
+	},
+	{
+		key: 'tezawari',
+		label: 'てざわり',
+		en: 'touches',
+		words: ['pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'burin', 'drypoint']
+	},
+	{
+		key: 'tsuranari',
+		label: 'つらなり',
+		en: 'continuity',
+		words: ['solid', 'dashed', 'dotted', 'dash-dot']
+	},
+	{
+		key: 'iro',
+		label: 'いろ',
+		en: 'colors',
+		words: ['white', 'black', 'blue', 'red', 'green', 'gray']
+	},
+	{
+		key: 'yuragi',
+		label: 'ゆらぎ',
+		en: 'movements',
+		words: ['fine', 'large', 'slowly', 'quickly', 'swaying', 'undulating', 'trembling', 'blurring']
+	},
+	{
+		key: 'basho',
+		label: 'ばしょ',
+		en: 'places',
+		words: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'middle', 'corner']
+	},
+	{
+		key: 'ugoki',
+		label: 'うごき',
+		en: 'motions',
+		words: ['place', 'line-up', 'draw', 'scatter', 'fill', 'tile']
+	},
+	{
+		key: 'wariai',
+		label: 'わりあい',
+		en: 'proportions',
+		words: ['tall', 'wide', 'full-width', 'half-width', 'semicircle', 'waxing', 'waning', 'crescent']
+	},
+	{
+		key: 'aida',
+		label: 'あいだ',
+		en: 'relations',
+		words: ['along', 'not touching', 'cutting', 'between', 'touching']
+	},
+];

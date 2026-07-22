@@ -255,13 +255,16 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("埋める"),
             _w("敷き詰める"),
         ),
+        # 表示語は words_ja と同順で並べる (削剪語を除いた位置で対応させる)。
+        # web の歳時記パネルは両言語の表示リストを位置で突き合わせるため、
+        # ここが崩れると語と解説の対応がずれる。
         words_en=(
             _w("place"),
             # 従来の閉包マーカー「arrange」を互換のため保持する (語彙は line-up)。
             _w("line-up", marker_surfaces=("arrange",)),
-            _w("fill"),
-            _w("scatter"),
             _w("draw"),  # 引く の対訳。ja「描く」の削剪後も en マーカーとして残る
+            _w("scatter"),
+            _w("fill"),
             _w("tile"),
         ),
         marker_order_ja=("置く", "引く", "並べる", "散らす", "敷き詰める", "描く", "埋める"),

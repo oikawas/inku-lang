@@ -16,6 +16,8 @@ export interface LangPack {
 	appInfoRepositoryLabel: string;
 	appInfoClose: string;
 	inputSectionHint: string;
+	inputMeterChars: (count: number, guide: number) => string;
+	inputMeterWords: (count: number, guide: number) => string;
 	appInfoVocabTitle: string;
 	appInfoVocabIntro: string;
 	appInfoVocabColTerm: string;
@@ -662,7 +664,4 @@ export interface LangPack {
 	confirmTrashMessage: (n: number) => string;
 	confirmRestoreMessage: (n: number) => string;
 	confirmPermanentDeleteMessage: (n: number) => string;
-
-	// Saijiki vocabulary (localized words per category key)
-	saijikiWords: Record<string, string[]>;
 }

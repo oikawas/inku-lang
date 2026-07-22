@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SAIJIKI } from '$lib/saijiki';
+	import { SAIJIKI, saijikiWordsFor } from '$lib/saijiki';
 	import { getLang, t } from '$lib/i18n/index.svelte';
 
 	type SaijikiPreview = {
@@ -57,7 +57,7 @@
 				{/if}
 			</div>
 			{#each SAIJIKI as cat, ci (cat.key)}
-				{@const words = t().saijikiWords[cat.key] ?? cat.words}
+				{@const words = saijikiWordsFor(cat.key, getLang() === 'ja')}
 				<div class="saijiki-cat" class:plugin-cat={cat.key.startsWith("plugin-")} style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
 					<div class="saijiki-cat-head">
 						<span class="saijiki-cat-ja">{cat.label}</span>

@@ -189,8 +189,7 @@
 		const count = useWords
 			? (source.match(/[A-Za-z0-9]+(?:[-][A-Za-z0-9]+)*/g) ?? []).length
 			: Array.from(source.replace(/\s/g, "")).length;
-		const unit = useWords ? (isJapanese ? '語' : 'words') : (isJapanese ? '字' : 'chars');
-		return { count, guide, over: count > guide, unit };
+		return { count, guide, over: count > guide, useWords };
 	});
 </script>
 
@@ -313,7 +312,7 @@
 			placeholder={t().inputPlaceholder}
 			class="input-ta"
 		></textarea>
-		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide} {singleInputStats.unit}</div>
+		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.useWords ? t().inputMeterWords(singleInputStats.count, singleInputStats.guide) : t().inputMeterChars(singleInputStats.count, singleInputStats.guide)}</div>
 
 		{@render inputSettings()}
 

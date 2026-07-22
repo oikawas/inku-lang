@@ -614,6 +614,8 @@ export interface LangPack {
 	historySelectAll: string;
 	historyContactSheet: string;
 	historyContactSheetHint: string;
+	historyContactSheetAi: string;
+	historyContactSheetAiHint: string;
 	historyContactSheetBusy: string;
 	historyContactSheetTitle: string;
 	historyContactSheetSubtitle: (count: number, at: string, page: number, pages: number) => string;

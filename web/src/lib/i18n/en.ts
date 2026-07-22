@@ -612,6 +612,8 @@ export const en: LangPack = {
 	historySelectAll: 'Select All',
 	historyContactSheet: 'Contact Sheet',
 	historyContactSheetHint: 'Save the selected artworks as PNG sheets (7×4 per sheet, the rest as further files)',
+	historyContactSheetAi: 'Contact Sheet (AI)',
+	historyContactSheetAiHint: 'For a vision model: 3×4 per sheet, 1568px long edge, index badges instead of captions',
 	historyContactSheetBusy: 'Building…',
 	historyContactSheetTitle: 'inku Contact Sheet',
 	historyContactSheetSubtitle: (count, at, page, pages) => pages > 1 ? `${count} artworks / sheet ${page} of ${pages} / ${at}` : `${count} artworks / ${at}`,

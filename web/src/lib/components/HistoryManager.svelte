@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
-	import { buildContactSheet, SHEET_CAPACITY, sheetPageCount, type ContactSheetEntry } from '$lib/contactSheet';
+	import { buildContactSheet, sheetCapacity, sheetPageCount, type ContactSheetEntry, type SheetVariant } from '$lib/contactSheet';
 
 	type HistoryItem = {
 		id?: string;
@@ -226,7 +226,7 @@
 		for (const id of ids) if (!selectedHistoryIds.includes(id)) onToggleSelection(id);
 	}
 
-	let contactSheetBusy = $state(false);
+	let contactSheetBusy = $state<SheetVariant | null>(null);
 	let contactSheetError = $state<string | null>(null);
 
 	// Selection is confined to the page on screen, but in lineage mode the
@@ -253,9 +253,9 @@
 		}
 	}
 
-	async function downloadContactSheet(): Promise<void> {
+	async function downloadContactSheet(variant: SheetVariant): Promise<void> {
 		if (contactSheetBusy || selectedHistoryIds.length === 0) return;
-		contactSheetBusy = true;
+		contactSheetBusy = variant;
 		contactSheetError = null;
 		try {
 			const entries: ContactSheetEntry[] = [];
@@ -279,20 +279,23 @@
 				String(generatedAt.getMinutes()).padStart(2, '0'),
 				String(generatedAt.getSeconds()).padStart(2, '0')
 			].join('');
-			const pages = sheetPageCount(entries.length);
+			const capacity = sheetCapacity(variant);
+			const pages = sheetPageCount(entries.length, variant);
 			for (let page = 0; page < pages; page += 1) {
-				const startIndex = page * SHEET_CAPACITY;
-				const slice = entries.slice(startIndex, startIndex + SHEET_CAPACITY);
+				const startIndex = page * capacity;
+				const slice = entries.slice(startIndex, startIndex + capacity);
 				const blob = await buildContactSheet(slice, {
+					variant,
 					title: t().historyContactSheetTitle,
 					subtitle: t().historyContactSheetSubtitle(entries.length, formatHistoryDate(generatedAt.getTime()), page + 1, pages),
 					startIndex
 				});
 				const suffix = pages > 1 ? `-${String(page + 1).padStart(2, '0')}` : '';
+				const kind = variant === 'ai' ? '-ai' : '';
 				const url = URL.createObjectURL(blob);
 				const anchor = document.createElement('a');
 				anchor.href = url;
-				anchor.download = `inku-contact-sheet-${stamp}${suffix}.png`;
+				anchor.download = `inku-contact-sheet${kind}-${stamp}${suffix}.png`;
 				anchor.click();
 				URL.revokeObjectURL(url);
 				// Browsers drop back-to-back programmatic downloads; space them out.
@@ -301,7 +304,7 @@
 		} catch {
 			contactSheetError = t().historyContactSheetFailed;
 		} finally {
-			contactSheetBusy = false;
+			contactSheetBusy = null;
 		}
 	}
 
@@ -495,12 +498,21 @@
 			<button
 				class="ghost-btn"
 				type="button"
-				onclick={downloadContactSheet}
-				disabled={selectedHistoryIds.length === 0 || contactSheetBusy}
+				onclick={() => downloadContactSheet('review')}
+				disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
 				title={t().historyContactSheetHint}
 			>
-				{contactSheetBusy ? t().historyContactSheetBusy : t().historyContactSheet}
-				{#if !contactSheetBusy && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
+				{contactSheetBusy === 'review' ? t().historyContactSheetBusy : t().historyContactSheet}
+				{#if contactSheetBusy === null && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
+			</button>
+			<button
+				class="ghost-btn"
+				type="button"
+				onclick={() => downloadContactSheet('ai')}
+				disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
+				title={t().historyContactSheetAiHint}
+			>
+				{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
 			</button>
 			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
 		</div>

@@ -8,30 +8,49 @@ export type ContactSheetEntry = {
 	sub: string;
 };
 
+// 'review' is the sheet a person reads. 'ai' is sized for a vision model: the
+// grid is squarer and the sheet is emitted at the long edge those models
+// downscale to, so no budget is spent on pixels that get thrown away. Captions
+// would be illegible after that downscale, so cells carry a number badge only
+// and the descriptions belong in the prompt text instead.
+export type SheetVariant = 'review' | 'ai';
+
+type SheetLayout = {
+	cols: number;
+	rows: number;
+	cellW: number;
+	cellH: number;
+	captionH: number;
+	gap: number;
+	pad: number;
+	headerH: number;
+	badge: boolean;
+	targetLongEdge: number | null;
+};
+
+const LAYOUTS: Record<SheetVariant, SheetLayout> = {
+	review: { cols: 7, rows: 4, cellW: 300, cellH: 220, captionH: 44, gap: 18, pad: 32, headerH: 58, badge: false, targetLongEdge: null },
+	ai: { cols: 3, rows: 4, cellW: 300, cellH: 220, captionH: 0, gap: 14, pad: 24, headerH: 40, badge: true, targetLongEdge: 1568 }
+};
+
+const MAX_PIXEL_SIDE = 6000;
+const FONT_STACK = 'system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif';
+
 export type ContactSheetOptions = {
+	variant: SheetVariant;
 	title: string;
 	subtitle: string;
 	// Caption numbering continues across the split sheets.
 	startIndex?: number;
 };
 
-const CELL_W = 300;
-const CELL_H = 220;
-const CAPTION_H = 44;
-const GAP = 18;
-const PAD = 32;
-const HEADER_H = 58;
-const MAX_PIXEL_SIDE = 6000;
-const FONT_STACK = 'system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif';
+export function sheetCapacity(variant: SheetVariant): number {
+	const layout = LAYOUTS[variant];
+	return layout.cols * layout.rows;
+}
 
-// One sheet is a fixed 7 x 4 grid. Anything beyond that spills onto further
-// sheets, each written out as its own file.
-export const SHEET_COLS = 7;
-export const SHEET_ROWS = 4;
-export const SHEET_CAPACITY = SHEET_COLS * SHEET_ROWS;
-
-export function sheetPageCount(count: number): number {
-	return Math.max(1, Math.ceil(count / SHEET_CAPACITY));
+export function sheetPageCount(count: number, variant: SheetVariant): number {
+	return Math.max(1, Math.ceil(count / sheetCapacity(variant)));
 }
 
 // Read the artwork's own aspect from its viewBox. Artworks on one sheet may
@@ -75,17 +94,38 @@ function ellipsise(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 	return text.slice(0, low) + '…';
 }
 
+function drawBadge(ctx: CanvasRenderingContext2D, x: number, y: number, label: string): void {
+	const radius = 17;
+	ctx.beginPath();
+	ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
+	ctx.fillStyle = 'rgba(20, 20, 20, 0.82)';
+	ctx.fill();
+	ctx.fillStyle = '#ffffff';
+	ctx.font = `600 20px ${FONT_STACK}`;
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+	ctx.fillText(label, x + radius, y + radius + 1);
+	ctx.textAlign = 'start';
+	ctx.textBaseline = 'alphabetic';
+}
+
 export async function buildContactSheet(entries: ContactSheetEntry[], options: ContactSheetOptions): Promise<Blob> {
+	const layout = LAYOUTS[options.variant];
+	const capacity = layout.cols * layout.rows;
 	if (entries.length === 0) throw new Error('no artworks selected');
-	if (entries.length > SHEET_CAPACITY) throw new Error('too many artworks for one sheet');
+	if (entries.length > capacity) throw new Error('too many artworks for one sheet');
 	const startIndex = options.startIndex ?? 0;
-	// A full sheet is 7 x 4; a trailing sheet shrinks to what it actually holds.
-	const cols = Math.min(SHEET_COLS, entries.length);
+	// A full sheet uses the whole grid; a trailing sheet shrinks to what it holds.
+	const cols = Math.min(layout.cols, entries.length);
 	const rows = Math.ceil(entries.length / cols);
-	const sheetW = PAD * 2 + cols * CELL_W + (cols - 1) * GAP;
-	const sheetH = PAD * 2 + HEADER_H + rows * (CELL_H + CAPTION_H) + (rows - 1) * GAP;
-	// Keep the sheet within a size the browser can actually allocate.
-	const scale = Math.min(2, MAX_PIXEL_SIDE / Math.max(sheetW, sheetH));
+	const sheetW = layout.pad * 2 + cols * layout.cellW + (cols - 1) * layout.gap;
+	const sheetH = layout.pad * 2 + layout.headerH + rows * (layout.cellH + layout.captionH) + (rows - 1) * layout.gap;
+	// The AI sheet is emitted at the exact long edge those models resize to, so
+	// the file is never resampled twice. The review sheet just stays within a
+	// size the browser can allocate.
+	const scale = layout.targetLongEdge
+		? layout.targetLongEdge / Math.max(sheetW, sheetH)
+		: Math.min(2, MAX_PIXEL_SIDE / Math.max(sheetW, sheetH));
 
 	const canvas = document.createElement('canvas');
 	canvas.width = Math.round(sheetW * scale);
@@ -99,27 +139,27 @@ export async function buildContactSheet(entries: ContactSheetEntry[], options: C
 	ctx.fillRect(0, 0, sheetW, sheetH);
 
 	ctx.fillStyle = '#1a1a1a';
-	ctx.font = `600 20px ${FONT_STACK}`;
-	ctx.fillText(options.title, PAD, PAD + 20);
+	ctx.font = `600 ${layout.badge ? 17 : 20}px ${FONT_STACK}`;
+	ctx.fillText(options.title, layout.pad, layout.pad + 17);
 	ctx.fillStyle = '#8a8a8a';
-	ctx.font = `12px ${FONT_STACK}`;
-	ctx.fillText(options.subtitle, PAD, PAD + 40);
+	ctx.font = `${layout.badge ? 13 : 12}px ${FONT_STACK}`;
+	ctx.fillText(options.subtitle, layout.pad, layout.pad + (layout.badge ? 36 : 40));
 
 	for (let index = 0; index < entries.length; index += 1) {
 		const entry = entries[index];
 		const col = index % cols;
 		const row = Math.floor(index / cols);
-		const cellX = PAD + col * (CELL_W + GAP);
-		const cellY = PAD + HEADER_H + row * (CELL_H + CAPTION_H + GAP);
+		const cellX = layout.pad + col * (layout.cellW + layout.gap);
+		const cellY = layout.pad + layout.headerH + row * (layout.cellH + layout.captionH + layout.gap);
 
 		ctx.fillStyle = '#fbfbfa';
-		ctx.fillRect(cellX, cellY, CELL_W, CELL_H);
+		ctx.fillRect(cellX, cellY, layout.cellW, layout.cellH);
 
 		const aspect = aspectOf(entry.svg);
-		const artW = Math.min(CELL_W, CELL_H * aspect);
+		const artW = Math.min(layout.cellW, layout.cellH * aspect);
 		const artH = artW / aspect;
-		const artX = cellX + (CELL_W - artW) / 2;
-		const artY = cellY + (CELL_H - artH) / 2;
+		const artX = cellX + (layout.cellW - artW) / 2;
+		const artY = cellY + (layout.cellH - artH) / 2;
 		try {
 			const image = await loadSvgImage(entry.svg, Math.round(artW * scale), Math.round(artH * scale));
 			ctx.drawImage(image, artX, artY, artW, artH);
@@ -130,14 +170,19 @@ export async function buildContactSheet(entries: ContactSheetEntry[], options: C
 
 		ctx.strokeStyle = '#e2e0dc';
 		ctx.lineWidth = 1;
-		ctx.strokeRect(cellX + 0.5, cellY + 0.5, CELL_W - 1, CELL_H - 1);
+		ctx.strokeRect(cellX + 0.5, cellY + 0.5, layout.cellW - 1, layout.cellH - 1);
+
+		if (layout.badge) {
+			drawBadge(ctx, cellX + 8, cellY + 8, String(startIndex + index + 1));
+			continue;
+		}
 
 		ctx.font = `12px ${FONT_STACK}`;
 		ctx.fillStyle = '#3a3a3a';
-		ctx.fillText(ellipsise(ctx, `${startIndex + index + 1}. ${entry.caption}`, CELL_W), cellX, cellY + CELL_H + 17);
+		ctx.fillText(ellipsise(ctx, `${startIndex + index + 1}. ${entry.caption}`, layout.cellW), cellX, cellY + layout.cellH + 17);
 		ctx.font = `11px ${FONT_STACK}`;
 		ctx.fillStyle = '#9a9a9a';
-		ctx.fillText(ellipsise(ctx, entry.sub, CELL_W), cellX, cellY + CELL_H + 33);
+		ctx.fillText(ellipsise(ctx, entry.sub, layout.cellW), cellX, cellY + layout.cellH + 33);
 	}
 
 	return await new Promise<Blob>((resolve, reject) => {

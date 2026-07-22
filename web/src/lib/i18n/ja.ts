@@ -612,6 +612,8 @@ export const ja: LangPack = {
 	historySelectAll: 'すべて選択',
 	historyContactSheet: 'コンタクトシート',
 	historyContactSheetHint: '選択した作品を PNG に並べて保存（1 枚あたり 7×4 点、超過分は別ファイル）',
+	historyContactSheetAi: 'コンタクトシート（AI）',
+	historyContactSheetAiHint: 'AI に読ませる用。1 枚あたり 3×4 点、長辺 1568px、キャプションは連番のみ',
 	historyContactSheetBusy: '作成中…',
 	historyContactSheetTitle: 'inku コンタクトシート',
 	historyContactSheetSubtitle: (count, at, page, pages) => pages > 1 ? `${count} 点 / ${page} 枚目（全 ${pages} 枚） / ${at}` : `${count} 点 / ${at}`,

@@ -612,6 +612,12 @@ export interface LangPack {
 	historySelectLineage: string;
 	historySelectItem: (selected: boolean) => string;
 	historySelectAll: string;
+	historyContactSheet: string;
+	historyContactSheetHint: string;
+	historyContactSheetBusy: string;
+	historyContactSheetTitle: string;
+	historyContactSheetSubtitle: (count: number, at: string) => string;
+	historyContactSheetFailed: string;
 	historyMoveToTrash: string;
 	historyRestoreSelected: string;
 	historyPermanentDelete: string;

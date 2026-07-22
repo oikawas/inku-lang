@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
+	import { buildContactSheet, type ContactSheetEntry } from '$lib/contactSheet';
 
 	type HistoryItem = {
 		id?: string;
@@ -225,6 +226,76 @@
 		for (const id of ids) if (!selectedHistoryIds.includes(id)) onToggleSelection(id);
 	}
 
+	let contactSheetBusy = $state(false);
+	let contactSheetError = $state<string | null>(null);
+
+	// Selection is confined to the page on screen, but in lineage mode the
+	// expanded members come from a separate request, so both pools are searched.
+	function findSelectedItem(id: string): HistoryItem | null {
+		const onPage = managedHistoryItems.find((it) => it.id === id);
+		if (onPage) return onPage;
+		for (const members of Object.values(lineageGroupItems)) {
+			const member = members.find((it) => it.id === id);
+			if (member) return member;
+		}
+		const representative = lineageGroups.find((group) => group.representative.id === id)?.representative;
+		return representative ?? null;
+	}
+
+	async function fetchHistoryItem(id: string): Promise<HistoryItem | null> {
+		try {
+			const response = await apiFetch('/api/history/' + encodeURIComponent(id) + '/neighbors', { cache: 'no-store' });
+			if (!response.ok) return null;
+			const items = await response.json() as HistoryItem[];
+			return items.find((it) => it.id === id) ?? null;
+		} catch {
+			return null;
+		}
+	}
+
+	async function downloadContactSheet(): Promise<void> {
+		if (contactSheetBusy || selectedHistoryIds.length === 0) return;
+		contactSheetBusy = true;
+		contactSheetError = null;
+		try {
+			const entries: ContactSheetEntry[] = [];
+			for (const id of selectedHistoryIds) {
+				const item = findSelectedItem(id) ?? await fetchHistoryItem(id);
+				if (!item?.svg) continue;
+				entries.push({
+					svg: item.svg,
+					caption: historyPreviewText(item.display_label || item.source_text || item.input || ''),
+					sub: formatHistoryDate(item.at)
+				});
+			}
+			if (entries.length === 0) throw new Error('no artworks to place on the sheet');
+			const generatedAt = new Date();
+			const blob = await buildContactSheet(entries, {
+				title: t().historyContactSheetTitle,
+				subtitle: t().historyContactSheetSubtitle(entries.length, formatHistoryDate(generatedAt.getTime()))
+			});
+			const stamp = [
+				generatedAt.getFullYear(),
+				String(generatedAt.getMonth() + 1).padStart(2, '0'),
+				String(generatedAt.getDate()).padStart(2, '0'),
+				'-',
+				String(generatedAt.getHours()).padStart(2, '0'),
+				String(generatedAt.getMinutes()).padStart(2, '0'),
+				String(generatedAt.getSeconds()).padStart(2, '0')
+			].join('');
+			const url = URL.createObjectURL(blob);
+			const anchor = document.createElement('a');
+			anchor.href = url;
+			anchor.download = `inku-contact-sheet-${stamp}.png`;
+			anchor.click();
+			URL.revokeObjectURL(url);
+		} catch {
+			contactSheetError = t().historyContactSheetFailed;
+		} finally {
+			contactSheetBusy = false;
+		}
+	}
+
 	function loadItemAndClose(item: HistoryItem) {
 		if (historyManagerView !== 'active') return;
 		onLoadItem(item);
@@ -412,6 +483,17 @@
 				<button class="ghost-btn" onclick={() => onAskRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
 				<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
 			{/if}
+			<button
+				class="ghost-btn"
+				type="button"
+				onclick={downloadContactSheet}
+				disabled={selectedHistoryIds.length === 0 || contactSheetBusy}
+				title={t().historyContactSheetHint}
+			>
+				{contactSheetBusy ? t().historyContactSheetBusy : t().historyContactSheet}
+				{#if !contactSheetBusy && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
+			</button>
+			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
 		</div>
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
 	</div>
@@ -966,6 +1048,8 @@
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
+	.tool-count { margin-left: 4px; color: var(--fg3); }
+	.tool-error { align-self: center; color: #b3452c; font-size: 11px; }
 	.icon-trash-btn {
 		width: 24px;
 		height: 22px;

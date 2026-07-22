@@ -64,7 +64,10 @@ server/out/
 
 # Local-only operational files
 no-git-sync/
-docs/
+# docs/* rather than docs/: git cannot re-include a path under an excluded
+# directory, and docs/assets/ holds the images the READMEs publish
+docs/*
+!docs/assets/
 
 #Codex
 AGENTS.md

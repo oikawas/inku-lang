@@ -1484,33 +1484,52 @@ class LocalFallbackPipeline(
         return ServerScoreSemantics.visibleForeground(color, background)
     }
 
+    fun descriptionHash(input: String): String {
+        val normalized = java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFC)
+            .replace("\r\n", "\n")
+            .replace("\r", "\n")
+            .trim()
+        return "dh1:" + sha256(normalized)
+    }
+
+    private fun canonicalSeed(value: Any?): Any? {
+        if (value == null || value == JSONObject.NULL) return null
+        return when (value) {
+            is Number -> value.toLong().let { if (it in Int.MIN_VALUE..Int.MAX_VALUE) it.toInt() else it }
+            is String -> value.toIntOrNull() ?: value.toLongOrNull() ?: value
+            else -> value
+        }
+    }
+
     private fun renderHash(input: String, ddl: String, scoreJson: String, svg: String, renderMetadataJson: String, catalogId: String): String {
         val metadata = JSONObject(renderMetadataJson)
+        val scoreObj = runCatching { JSONObject(scoreJson) }.getOrNull() ?: JSONObject()
+        val renderSeed = canonicalSeed(metadata.opt("render_seed") ?: metadata.opt("seed"))
+        val varySeed = canonicalSeed(metadata.opt("vary_seed"))
+        val buildNumber = metadata.opt("render_build_number")?.toString()
+        val engineId = metadata.optString("render_engine_id", "default").ifBlank { "default" }
+        val engineVersion = metadata.optString("render_engine_version", "2").ifBlank { "2" }
+        val colorCatalogId = metadata.optString("render_color_catalog_id", catalogId).ifBlank { catalogId }
+
         val payload = JSONObject()
-            .put("input", input)
-            .put("ddl", ddl)
-            .put("score", JSONObject(scoreJson))
-            .put("svg", svg)
-            .put("render_build_number", JSONObject.NULL)
-            .put("render_engine_id", metadata.opt("render_engine_id"))
-            .put("render_engine_version", metadata.opt("render_engine_version"))
-            .put("render_canvas_aspect", metadata.opt("render_canvas_aspect"))
-            .put("render_canvas_aspect_id", metadata.opt("render_canvas_aspect_id"))
-            .put("render_canvas_aspect_ratio", metadata.opt("render_canvas_aspect_ratio"))
-            .put("render_color_catalog_id", metadata.opt("render_color_catalog_id") ?: catalogId)
-            .put("render_color_catalog_name", metadata.opt("render_color_catalog_name"))
-            .put("render_color_catalog_sub", metadata.opt("render_color_catalog_sub"))
-            .put("render_color_map", metadata.optJSONObject("render_color_map"))
-        return sha256(canonicalJson(payload))
+            .put("version", "rh2")
+            .put("score", scoreObj)
+            .put("render_seed", renderSeed ?: JSONObject.NULL)
+            .put("vary_seed", varySeed ?: JSONObject.NULL)
+            .put("render_build_number", buildNumber ?: JSONObject.NULL)
+            .put("render_engine_id", engineId)
+            .put("render_engine_version", engineVersion)
+            .put("render_color_catalog_id", colorCatalogId)
+        return "rh2:" + sha256(canonicalJson(payload))
     }
 
     private fun canonicalJson(value: Any?): String {
         return when (value) {
             null, JSONObject.NULL -> "null"
-            is JSONObject -> value.keys().asSequence().toList().sorted().joinToString(prefix = "{", postfix = "}") { key ->
+            is JSONObject -> value.keys().asSequence().toList().sorted().joinToString(separator = ",", prefix = "{", postfix = "}") { key ->
                 JSONObject.quote(key) + ":" + canonicalJson(value.opt(key))
             }
-            is JSONArray -> (0 until value.length()).joinToString(prefix = "[", postfix = "]") { canonicalJson(value.opt(it)) }
+            is JSONArray -> (0 until value.length()).joinToString(separator = ",", prefix = "[", postfix = "]") { canonicalJson(value.opt(it)) }
             is String -> JSONObject.quote(value)
             is Number, is Boolean -> value.toString()
             else -> JSONObject.quote(value.toString())

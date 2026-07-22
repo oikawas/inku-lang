@@ -93,7 +93,7 @@ internal object ServerScoreSemantics {
                 val radius = item.optDouble("radius", 0.0)
                 PI * radius * radius * 0.35
             }
-            "ellipse" -> {
+            "ellipse", "cloudform" -> {
                 val size = item.optJSONArray("size")
                 val width = size?.optDouble(0, 0.0) ?: 0.0
                 val height = size?.optDouble(1, 0.0) ?: 0.0
@@ -121,7 +121,7 @@ internal object ServerScoreSemantics {
                 val center = roundedArray(item.optJSONArray("center")) ?: return null
                 listOf(item.optString("primitive"), center[0], center[1], round2(item.optDouble("radius", 0.10))).joinToString("|")
             }
-            "ellipse", "square", "triangle" -> {
+            "ellipse", "square", "triangle", "cloudform" -> {
                 val center = roundedArray(item.optJSONArray("center") ?: item.optJSONArray("position")) ?: return null
                 val size = roundedArray(item.optJSONArray("size")) ?: return null
                 listOf(item.optString("primitive"), center[0], center[1], size[0], size[1], round2(item.optDouble("rotation", 0.0))).joinToString("|")
@@ -272,6 +272,8 @@ internal object ServerScoreSemantics {
 
     fun detectWeightKey(text: String): String = when {
         text.contains("髪") || text.contains("ヘア") || text.contains("hair", ignoreCase = true) -> "hair"
+        text.contains("ビュラン") || text.contains("burin", ignoreCase = true) -> "burin"
+        text.contains("ドライポイント") || text.contains("drypoint", ignoreCase = true) -> "drypoint"
         text.contains("ロットリング") || text.contains("rotring", ignoreCase = true) -> "rotring"
         text.contains("鉛筆") || text.contains("pencil", ignoreCase = true) -> "pencil"
         text.contains("ペン") || text.contains("pen", ignoreCase = true) -> "pen"
@@ -279,7 +281,6 @@ internal object ServerScoreSemantics {
         text.contains("チョーク") || text.contains("chalk", ignoreCase = true) -> "chalk"
         text.contains("太筆") || text.contains("厚塗り") || text.contains("油絵") || text.contains("thick-brush", ignoreCase = true) || text.contains("thick brush", ignoreCase = true) || text.contains("oil impasto", ignoreCase = true) -> "brush_thick"
         text.contains("細筆") || text.contains("水墨") || text.contains("墨") || text.contains("fine-brush", ignoreCase = true) || text.contains("fine brush", ignoreCase = true) || text.contains("ink-wash", ignoreCase = true) || text.contains("ink wash", ignoreCase = true) -> "brush_thin"
-        text.contains("縄") || text.contains("ロープ") || text.contains("rope", ignoreCase = true) -> "rope"
         else -> "pen"
     }
 

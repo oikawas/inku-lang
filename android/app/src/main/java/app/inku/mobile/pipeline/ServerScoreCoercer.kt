@@ -43,6 +43,10 @@ internal object ServerScoreCoercer {
             FieldSpec("position", listOf(0.35, 0.35), fallbacks = listOf("center"), coerce = ::asCoord),
             FieldSpec("size", listOf(0.3, 0.3), coerce = ::asPositiveSize),
         ),
+        "cloudform" to listOf(
+            FieldSpec("center", listOf(0.5, 0.5), fallbacks = listOf("position"), coerce = ::asCoord),
+            FieldSpec("size", listOf(0.3, 0.3), coerce = ::asPositiveSize),
+        ),
     )
 
     private val supportedPrimitives = primitiveSpecs.keys
@@ -58,11 +62,21 @@ internal object ServerScoreCoercer {
         val primitive = source.optString("primitive", "line").takeIf { it in supportedPrimitives } ?: "line"
         val data = JSONObject(source.toString()).put("primitive", primitive)
         data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray") } ?: "black")
-        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("hair", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "rope") } ?: "pen")
+        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("hair", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint") } ?: "pen")
         data.put("style", data.optString("style", "solid").ifBlank { "solid" })
         if (!data.has("filled")) data.put("filled", false)
+        if (data.has("mode")) {
+            val mode = data.optString("mode").takeIf { it in setOf("additive", "carve") } ?: "additive"
+            data.put("mode", mode)
+        }
+        if (data.has("carve_depth")) {
+            val cd = data.optString("carve_depth").takeIf { it in setOf("light", "half", "bright") }
+            if (cd != null) data.put("carve_depth", cd) else data.remove("carve_depth")
+        }
         data.optJSONObject("arrangement")?.let { data.put("arrangement", normalizeArrangement(it)) }
         data.optJSONObject("variation")?.let { data.put("variation", normalizeVariation(it)) }
+        data.optJSONObject("surface")?.let { data.put("surface", normalizeSurface(it)) }
+        data.optJSONObject("relation")?.let { data.put("relation", normalizeRelation(it)) }
 
         primitiveSpecs.getValue(primitive).forEach { spec ->
             val value = coercedField(data, spec)
@@ -71,6 +85,17 @@ internal object ServerScoreCoercer {
         postCoerce(primitive, data)
         applyMaterialHint(data, ddl)
         applyVariationHint(primitive, data, ddl)
+
+        // Strip unknown extra fields to comply with ConfigDict(extra="forbid")
+        val allowedKeys = setOf(
+            "primitive", "from", "to", "center", "radius", "sides", "position", "size",
+            "angle_start", "angle_end", "rotation", "filled", "style", "weight",
+            "mode", "carve_depth", "color", "color_hint", "variation", "arrangement",
+            "at", "relation", "surface",
+        )
+        val keysToRemove = data.keys().asSequence().filter { it !in allowedKeys }.toList()
+        keysToRemove.forEach { data.remove(it) }
+
         return data
     }
 
@@ -94,8 +119,15 @@ internal object ServerScoreCoercer {
 
     private fun normalizeArrangement(source: JSONObject): JSONObject {
         val result = JSONObject(source.toString())
-        result.put("count", result.optInt("count", 1).coerceIn(1, 1000))
-        result.put("layout", result.optString("layout", "horizontal").takeIf { it in setOf("horizontal", "vertical", "radial", "scatter") } ?: "horizontal")
+        val layout = result.optString("layout", "horizontal").takeIf { it in setOf("horizontal", "vertical", "radial", "scatter", "grid") } ?: "horizontal"
+        val maxCount = if (layout == "grid") 2000 else 1000
+        result.put("count", result.optInt("count", 1).coerceIn(1, maxCount))
+        result.put("layout", layout)
+        if (layout == "grid") {
+            if (result.has("rows")) result.put("rows", result.optInt("rows", 1).coerceIn(1, 64))
+            if (result.has("cols")) result.put("cols", result.optInt("cols", 1).coerceIn(1, 64))
+            result.put("jitter", result.optDouble("jitter", 0.12).coerceIn(0.0, 1.0))
+        }
         result.put("path", result.optString("path", "none").takeIf { it in setOf("none", "diagonal", "wave", "top_to_bottom", "left_to_right", "right_half") } ?: "none")
         if (!result.has("color_cycle")) result.put("color_cycle", JSONArray())
         result.put("margin", result.optDouble("margin", 0.1).coerceIn(0.0, 0.45))
@@ -113,6 +145,32 @@ internal object ServerScoreCoercer {
         result.put("frequency", result.optString("frequency", "medium").takeIf { it in setOf("slow", "medium", "high") } ?: "medium")
         result.put("quality", result.optString("quality", "none").takeIf { it in setOf("none", "white", "perlin", "pink", "wave") } ?: "none")
         if (!result.has("dimensions")) result.put("dimensions", JSONArray())
+        return result
+    }
+
+    private fun normalizeSurface(source: JSONObject): JSONObject {
+        val result = JSONObject(source.toString())
+        result.put("texture", result.optString("texture", "none").takeIf { it in setOf("none", "stipple", "hatch", "crosshatch", "aquatint", "grain", "wash", "bleed", "paper_grain") } ?: "none")
+        result.put("density", result.optDouble("density", 0.35).coerceIn(0.0, 1.0))
+        result.put("scale", result.optDouble("scale", 0.35).coerceIn(0.0, 1.0))
+        result.put("opacity", result.optDouble("opacity", 0.28).coerceIn(0.0, 1.0))
+        result.put("bleed", result.optDouble("bleed", 0.0).coerceIn(0.0, 1.0))
+        result.put("direction", result.optString("direction", "none").takeIf { it in setOf("none", "horizontal", "vertical", "diagonal_rising", "diagonal_falling") } ?: "none")
+        result.put("spacing_gradient", result.optString("spacing_gradient", "none").takeIf { it in setOf("none", "coarse_to_dense", "dense_to_coarse") } ?: "none")
+        result.put("tone_steps", result.optInt("tone_steps", 3).coerceIn(2, 4))
+        return result
+    }
+
+    private fun normalizeRelation(source: JSONObject): JSONObject {
+        val result = JSONObject(source.toString())
+        val type = result.optString("type", "along").takeIf { it in setOf("along", "not_touching", "cutting", "between", "touching") } ?: "along"
+        result.put("type", type)
+        result.put("gap", result.optString("gap", "medium").takeIf { it in setOf("narrow", "medium", "wide") } ?: "medium")
+        if (type == "touching") {
+            result.put("contact", "both_ends")
+        } else {
+            result.remove("contact")
+        }
         return result
     }
 
@@ -216,6 +274,8 @@ internal object ServerScoreCoercer {
         listOf("細筆", "fine-brush", "fine brush") to "brush_thin",
         listOf("太筆", "thick-brush", "thick brush", "厚塗り", "油絵") to "brush_thick",
         listOf("水墨", "墨", "ink-wash", "ink wash") to "brush_thin",
-        listOf("縄", "ロープ", "rope") to "rope",
+        listOf("ビュラン", "burin") to "burin",
+        listOf("ドライポイント", "drypoint") to "drypoint",
     )
 }
+

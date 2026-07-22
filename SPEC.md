@@ -467,7 +467,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
 | touches | てざわり | pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint |
 | continuity | つらなり | solid (default), dashed, dotted, dash-dot |
-| motions | うごき | place, line-up, fill, scatter, draw, tile |
+| motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
 | relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |

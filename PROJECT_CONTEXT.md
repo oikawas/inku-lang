@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.4.0 / Build 684**
+**Target version: v2.4.1 / Build 687**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -114,6 +114,8 @@ v2.3.2 (Build 683) brings the UI up to date with the v2.3.1 feature set through 
 v2.4.0 (Build 684) establishes the release distribution pipeline. Pushing a git tag `vX.Y.Z` makes GitHub Actions build and publish `ghcr.io/oikawas/inku-api` / `inku-web` as multi-arch (amd64 / arm64) images, and users run them with the compose file and `.env.example` under `deploy/` (SPEC.md §12.1). The build number is baked into the api image (fixing the null container `/api/info` and `render_build_number`), `/api/info`'s `version` now derives from `server/pyproject.toml` as the single source and is stamped per release (2.4.0 this release), the nature-leaves plugin v0.3.0 is tracked in git and bundled in the image, and a blank bootstrap-admin password is treated as unset with both compose files requiring the variable via `:?` (the no-self-signup premise is now stated in manual / SETUP / SPEC). Engine 10, the Score schema, and the web UI are unchanged.
 
 The README visuals pass (2026-07-22, docs only, no version stamp) added a six-work gallery to both READMEs (`docs/assets/gallery/`, selected from the author's starred history; each work pairs the picture with its kotobagaki and a `<details>` block of instructions, SVG, and seed) and six UI screenshots (`docs/assets/ui/`, three per language, `*.ja/.en.png` so each README references only its own language), restructuring the page as "Works — descriptions become pictures → How it works (a layer walkthrough of a real Score) → Screens → … → Documentation (moved to the end)". Single-cell `<table>` wrappers provide the only border style that survives GitHub's sanitizer, and `.gitignore` became `docs/*` + `!docs/assets/`. The low-contrast second work was swapped post-publication for the silver-shoal piece (B962). Code, engine, and version stamps are unchanged.
+
+v2.4.1 (Build 687) is UI adjustments round 2. All 69 DDL-editor word-preview entries were localized, and two cross-language saijiki pairing bugs found mid-work were fixed (a pruned `髪`/`hair` lingering in i18n shifted the join by one; `words_en` ordering did not match `words_ja`, crossing explanations). The root cause — hand-maintained i18n copies (`saijikiWords`) — was removed; display words now come straight from the hydrated `SAIJIKI` / `SAIJIKI_EN`, and a test pins all 68 ja/en pairs explicitly. Side effect: the English Stage 1 prompt's `motions:` order changes (same word set, no bench run yet). The describe tab moved the tanka guide from the hint into the counter. Engine stays 10. UI adjustments continue interactively.
 
 ## Where to Look for a Change
 

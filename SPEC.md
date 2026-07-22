@@ -978,6 +978,30 @@ are verified at milestones such as release candidates rather than rebuilt for
 every ordinary source change. Git is used for source history, not as a file
 exchange mechanism with the local server.
 
+### 12.1 Release Distribution (v2.4.0)
+
+Releases are distributed as container images. Pushing a git tag `vX.Y.Z`
+triggers a GitHub Actions workflow that builds and publishes
+`ghcr.io/oikawas/inku-api` and `ghcr.io/oikawas/inku-web` as multi-arch
+(amd64 / arm64) images. Users run them with the compose file and `.env.example`
+under `deploy/` (`deploy/README.md` is the quickstart). Bundled plugins under
+`server/plugins/` (currently Nature.leaves) ship inside the api image.
+
+**Account premise:** there is no self-signup path. Accounts are created only by
+an authenticated administrator via `POST /api/users`, so the first way in is the
+bootstrap admin created on first start against a fresh database
+(`INKU_BOOTSTRAP_ADMIN_PASSWORD`, 8 characters or more). A server started
+without it is a box nobody can sign in to (set the value and restart to
+recover; databases that already have accounts are left untouched). An empty
+string is treated as unset (v2.4.0), and the distributed compose file refuses
+to start without a value.
+
+`/api/info` reports `version` as the server implementation version
+(`server/pyproject.toml`, made the single source in v2.4.0 and stamped per
+release). It is a separate namespace from the web display version
+(`APP_VERSION`), but the numbers normally coincide because releases are
+repo-wide.
+
 ---
 
 ## 13. CLI

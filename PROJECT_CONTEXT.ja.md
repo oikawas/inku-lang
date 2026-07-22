@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.3.2 / Build 683**
+**対象バージョン: v2.4.0 / Build 684**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -110,6 +110,8 @@ v2.3.0（Build 645）では閉図形の塗りを領域 fill から素材の筆�
 v2.3.1（Build 647）では弧（arc）も手描きストロークの帯（`class="arc-stroke-v1"`）で演奏するようにし、v2.2.0 で残されていた最後のストローク化対象外を解消した。幾何の弧は不可視の意図要素（`stroke="none"`）として残り、touching（接点契約）は意図弧を読み戻して座標で担保（弧抽出器は無改変、`test_touching.py` 全通過）。接点端も taper のまま（幅の下限なし、葉の先端は柔らかく消える）。破線・点線は意図弧を細く可視化、drypoint は中心線沿い burr、材質輪郭・speck は帯と併存、rotring は幾何のまま。render engine version は 10。塗り間隔の粗密は実 UI 目視 OK で確定済み。残: 弧の実 UI 目視（Stage 3 葉の再目視も候補）・サイズ上限・粒系 / 滲み系の筆致化。**バージョン採番の作者裁定（2026-07-21）: 小改修は patch（+0.0.1）とする。**
 
 v2.3.2（Build 683）では v2.3.1 機能群に UI を追随させる対話型調整 35 件（Build 648〜682）を実施した。歳時記ハイライトの英語対応、指示書エディタの拡充、PNG EXIF 撮影日、入力 3 タブの整理（設定状況帯の共通化・字数メーター単位）、コンタクトシート（人用 7×4 / AI 用 3×4 + md ノート）、ダークモードのコントラスト是正（`--accent-fg` トークン新設）、バッチ追従性の改善。サーバー変更は描画並列度の管理者設定のみ（`_RenderCapacity`、`render_concurrency_settings`、`PUT /api/settings/render-concurrency`、`GET /api/client-config`。`INKU_RENDER_CONCURRENCY` は DB 未設定時の初期値へ）。あわせて用語を層別に統一（**Sol LeWitt の指示書 = 正規化DDL。作者の書く記述はその一段上の詩歌的な層**。Stage 1 の生成物は「指示書」、詞書 = 記述の再掲）し、SPEC.ja §5 の改訂（4 段パイプライン図 + §5.3 用語対応表）・SPEC.md §2・README 日英に反映、UI の App Info に語彙ダイアログを常設した。engine は 10 のまま。UI 調整は新セッションで継続予定。
+
+v2.4.0（Build 684）ではリリース配布パイプラインを確立した。git タグ `vX.Y.Z` の push で GitHub Actions が `ghcr.io/oikawas/inku-api` / `inku-web` を multi-arch（amd64 / arm64）build & push し、利用者は `deploy/` の compose + `.env.example` で起動する（SPEC.ja §15.4）。`server/Dockerfile` に BUILD_NUMBER を焼き込み（コンテナの `/api/info` と `render_build_number` の null を解消）、`/api/info` の `version` を `server/pyproject.toml` 由来の単一情報源にしてリリースごとに採番（本リリースで 2.4.0）、nature-leaves プラグイン v0.3.0 を git 管理化してイメージ同梱、bootstrap admin の空文字を「未設定」扱いに是正して compose 側を `:?` で必須化した（セルフサインアップ不在の前提を manual / SETUP / SPEC に明記）。engine 10・Score schema・web UI は不変。
 
 ## 変更時の確認先
 

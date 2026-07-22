@@ -194,6 +194,19 @@ SVG（演奏 — 一回性）
 
 ## Quick Start
 
+### 0. Docker（リリースイメージ・最速）
+
+リリース版は GHCR のコンテナイメージ（`ghcr.io/oikawas/inku-api` / `inku-web`、amd64 / arm64）で配布しています。
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/oikawas/inku-lang/main/deploy/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/oikawas/inku-lang/main/deploy/.env.example
+cp .env.example .env   # LLM の API キーと INKU_BOOTSTRAP_ADMIN_PASSWORD（8 文字以上）を記入
+docker compose up -d   # → http://localhost:5173
+```
+
+初回アカウント・データ永続・版固定・HTTPS の詳細は [`deploy/README.md`](deploy/README.md) を参照してください。以下はソースから動かす手順です。
+
 ### 1. Backend
 
 ```sh
@@ -201,7 +214,7 @@ cd server
 UV_CACHE_DIR=/tmp/inku-uv-cache UV_PYTHON_INSTALL_DIR=$HOME/.local/share/uv/python uv run inku-server
 ```
 
-既定ではローカル SQLite DB を使います。初回管理者を作る場合は、新規 DB に対して `INKU_BOOTSTRAP_ADMIN_PASSWORD` を明示してください。
+既定ではローカル SQLite DB を使います。セルフサインアップは無いため、新規 DB では `INKU_BOOTSTRAP_ADMIN_PASSWORD`（8 文字以上）で bootstrap 管理者を作らないと誰もログインできません。後から設定して再起動すれば作成されます（空文字は未設定として扱われ、既存アカウントがある DB では何も起きません）。
 
 ### 2. LLM provider
 

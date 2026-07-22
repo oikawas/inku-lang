@@ -194,6 +194,19 @@ For the public English specification, see [SPEC.md](SPEC.md). The canonical Japa
 
 ## Quick Start
 
+### 0. Docker (release images, fastest)
+
+Releases are distributed as container images on GHCR (`ghcr.io/oikawas/inku-api` / `inku-web`, amd64 / arm64).
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/oikawas/inku-lang/main/deploy/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/oikawas/inku-lang/main/deploy/.env.example
+cp .env.example .env   # fill in your LLM API key and INKU_BOOTSTRAP_ADMIN_PASSWORD (8+ characters)
+docker compose up -d   # → http://localhost:5173
+```
+
+See [`deploy/README.md`](deploy/README.md) for the first account, data persistence, version pinning, and HTTPS. The steps below run from source.
+
 ### 1. Backend
 
 ```sh
@@ -201,7 +214,7 @@ cd server
 UV_CACHE_DIR=/tmp/inku-uv-cache UV_PYTHON_INSTALL_DIR=$HOME/.local/share/uv/python uv run inku-server
 ```
 
-The default setup uses a local SQLite DB. To create the first admin account on a new DB, set `INKU_BOOTSTRAP_ADMIN_PASSWORD` explicitly.
+The default setup uses a local SQLite DB. There is no self-signup, so on a new DB nobody can sign in until you create the bootstrap admin with `INKU_BOOTSTRAP_ADMIN_PASSWORD` (8+ characters). Setting it later and restarting creates the account (an empty string is treated as unset, and DBs that already have accounts are left untouched).
 
 ### 2. LLM provider
 

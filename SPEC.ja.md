@@ -1525,6 +1525,14 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 - [x] サンプル DDL テキスト集
 - [x] LLM比較ビュー（Gemma vs Opus）
 
+### 15.4 配布（v2.4.0）
+
+リリース版はコンテナイメージで配布する。git タグ `vX.Y.Z` の push を起点に GitHub Actions が `ghcr.io/oikawas/inku-api` / `ghcr.io/oikawas/inku-web` を multi-arch（amd64 / arm64）で build & push し、利用者は `deploy/` の compose と `.env.example` で起動する（Quickstart は `deploy/README.md`）。開発は従来どおり bare metal（rsync + systemd）で行い、コンテナは Release タイミングで更新する。標準プラグイン（`server/plugins/`、現在は Nature.leaves）はイメージに同梱される。
+
+**アカウントの前提**: セルフサインアップの経路は設けない。アカウント作成は認証済み管理者による `POST /api/users` のみで、最初の入口は新規 DB 起動時に作られる bootstrap admin（`INKU_BOOTSTRAP_ADMIN_PASSWORD`、8 文字以上）である。この値が無いまま起動したサーバーは誰もログインできない箱になる（値を設定して再起動すれば復旧する。既存アカウントがある DB では何も起きない）。空文字は「未設定」として扱い（v2.4.0）、配布 compose は値の無い起動を必須チェックで拒否する。
+
+`/api/info` の `version` はサーバー実装の版（`server/pyproject.toml`。v2.4.0 で単一情報源化し、リリースごとに採番する）を返す。web の表示版（`APP_VERSION`）とは名前空間が別だが、一体リリースのため通常は数字が一致する。
+
 ---
 
 ## 16. ライセンス
@@ -1639,7 +1647,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~生成系 API の認証境界が弱い~~ → v1.13 で `/api/interpret`、`/api/compose`、`/api/paint` を認証必須化。未認証リクエストは 401 を返す
 - ~~セッショントークンを localStorage に保存している~~ → v1.14 で Web UI はセッショントークンを保持せず、サーバーが HttpOnly / SameSite=Lax Cookie としてセッションを管理する形へ変更
 - ~~履歴DBと出力ファイル保存の整合性~~ → v1.15 で DB の履歴レコードを正本、出力ファイルを再生成可能な副産物と定義。`POST /api/history/rebuild-output-files` で DB から出力ファイルを再生成できる
-- ~~初期管理者アカウントが既知のデフォルトパスワードで作成される~~ → v1.16 で `INKU_BOOTSTRAP_ADMIN_PASSWORD` が明示された新規DBの場合のみ bootstrap admin を作成する形へ変更
+- ~~初期管理者アカウントが既知のデフォルトパスワードで作成される~~ → v1.16 で `INKU_BOOTSTRAP_ADMIN_PASSWORD` が明示された新規DBの場合のみ bootstrap admin を作成する形へ変更。v2.4.0 で空文字を「未設定」として扱う是正と、配布 compose 側の必須チェックを追加（§15.4）
 - ~~ユーザー管理タブの表示がサーバー最新状態から遅れる~~ → v1.17 でユーザー管理タブ表示時 / 再読み込み時に `/api/auth/me`、`/api/user-groups`、`/api/users` を `cache: no-store` で再取得する形へ変更
 - ~~テストが実DBにテストユーザーを残す可能性がある~~ → v1.17 で pytest は既定で `/tmp` の一時SQLite DBを使う形へ変更
 - ~~履歴管理のスケール対応~~ → v1.11 でサーバーサイド検索 / ページング化し、全件DOM描画を廃止

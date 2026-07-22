@@ -44,6 +44,10 @@ When both encryption variables are set, direct key material has priority. A pers
 
 The account is created only when a password is set and the DB contains no users. Passwords shorter than eight characters are rejected. Remove the secret from the environment after initial creation.
 
+A blank value counts as unset. Neither an empty field in an environment file nor the empty value that Compose's `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` interpolation supplies will fail startup. When clearing the secret after initial creation, deleting the line and blanking it have the same effect.
+
+inku has no self-service registration. Accounts are created only through `POST /api/users` by an authenticated administrator or group lead. **Starting an empty database without a bootstrap administrator therefore leaves a server nobody can sign in to.** Recovery is simply to set the password and restart. The bootstrap administrator is attempted only while the DB has no users, so an existing account's password is never overwritten.
+
 ### 2.3 Artifacts and Concurrency
 
 | Variable | Purpose | Default |

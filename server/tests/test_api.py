@@ -7,6 +7,7 @@ Stage 2 composer を monkeypatch でバイパスし、FastAPI のスキーマ/�
 from __future__ import annotations
 
 import builtins
+import importlib.metadata
 import json
 from datetime import datetime, timezone
 import logging
@@ -126,7 +127,9 @@ def test_info_reports_version_and_build_number():
     assert r.status_code == 200
     data = r.json()
     assert data["name"] == "inku-server"
-    assert data["version"] == "0.1.0"
+    # Track the installed distribution rather than a literal, so release version
+    # bumps in pyproject.toml do not require editing this test.
+    assert data["version"] == importlib.metadata.version("inku-server")
     assert data["build_number"]
 
 
@@ -243,6 +246,19 @@ def test_bootstrap_admin_password_requires_explicit_env(monkeypatch):
     monkeypatch.delenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", raising=False)
     monkeypatch.delenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", raising=False)
     assert db._bootstrap_admin_password() is None
+
+
+def test_bootstrap_admin_password_treats_blank_env_as_unset(monkeypatch):
+    # Compose passes "" for an unfilled variable; that must not fail startup.
+    monkeypatch.setenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", "")
+    monkeypatch.delenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", raising=False)
+    assert db._bootstrap_admin_password() is None
+
+
+def test_bootstrap_admin_password_blank_env_still_honors_insecure_flag(monkeypatch):
+    monkeypatch.setenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", "")
+    monkeypatch.setenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", "1")
+    assert db._bootstrap_admin_password() == "inku-admin"
 
 
 def test_bootstrap_admin_password_rejects_short_env(monkeypatch):

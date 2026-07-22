@@ -1,0 +1,56 @@
+# inku — deployment compose for published GHCR images.
+#
+#   curl -O https://raw.githubusercontent.com/oikawas/inku-lang/main/deploy/compose.yaml
+#   curl -o .env https://raw.githubusercontent.com/oikawas/inku-lang/main/deploy/.env.example
+#   $EDITOR .env      # INKU_BOOTSTRAP_ADMIN_PASSWORD is required
+#   docker compose up -d
+#
+# The repository's top-level compose.yaml builds from source and is for
+# development and benchmarking; this file only pulls released images.
+
+services:
+  api:
+    image: ghcr.io/oikawas/inku-api:${INKU_IMAGE_TAG:-latest}
+    environment:
+      INKU_ENV: production
+      INKU_SESSION_COOKIE_SECURE: ${INKU_SESSION_COOKIE_SECURE:-0}
+      INKU_CORS_ORIGINS: ${INKU_CORS_ORIGINS:-}
+      # The first startup creates this administrator on an empty database.
+      # Compose refuses to start when it is unset, because a server with no
+      # account has no way to sign in: there is no self-service registration.
+      INKU_BOOTSTRAP_ADMIN_USERNAME: ${INKU_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      INKU_BOOTSTRAP_ADMIN_EMAIL: ${INKU_BOOTSTRAP_ADMIN_EMAIL:-admin@localhost}
+      INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:?set INKU_BOOTSTRAP_ADMIN_PASSWORD in .env (8 characters or more)}
+      # LLM backend. Pick one provider and fill in its key; see .env.example.
+      INKU_LLM_BACKEND: ${INKU_LLM_BACKEND:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_MODEL_STAGE1: ${OPENAI_MODEL_STAGE1:-}
+    ports:
+      - "${INKU_API_PORT:-8100}:8100"
+    volumes:
+      - inku-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: ghcr.io/oikawas/inku-web:${INKU_IMAGE_TAG:-latest}
+    environment:
+      INKU_API_BASE_URL: http://api:8100
+      ORIGIN: ${INKU_ORIGIN:-http://localhost:5173}
+    ports:
+      - "${INKU_WEB_PORT:-5173}:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  inku-data:

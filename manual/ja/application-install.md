@@ -111,7 +111,9 @@ GEMINI_API_KEY=
 NVIDIA_API_KEY=
 ```
 
-`INKU_BOOTSTRAP_ADMIN_PASSWORD`は8文字以上です。新規DBにユーザーがいない場合だけbootstrap adminを作成します。初回作成後は環境ファイルから削除するか、秘密管理システムへ移します。
+`INKU_BOOTSTRAP_ADMIN_PASSWORD`は8文字以上です。新規DBにユーザーがいない場合だけbootstrap adminを作成します。初回作成後は環境ファイルから削除するか、秘密管理システムへ移します。空文字は未設定と同じ扱いなので、行を削除しても空欄にしても構いません。
+
+**この初回設定は省略できません。** inkuにはセルフサインアップがなく、アカウントを作れるのは認証済みのadminまたはgroup leadだけです。bootstrap adminなしで空のDBを起動したサーバーには、ログインする手段がありません。設定を忘れた場合は、passwordを設定して再起動すれば作成されます（ユーザーが0件のときだけ作成を試みるため、既存アカウントには影響しません）。
 
 ## 8. 手動起動で確認する
 
@@ -265,6 +267,8 @@ DB、暗号化鍵、出力artifactを削除すると復旧できません。保�
     docker compose build
     docker compose up -d
     docker compose ps
+
+`INKU_BOOTSTRAP_ADMIN_PASSWORD` は必須です。値が無いまま `docker compose up` すると、containerを起動する前にcomposeが停止して不足を知らせます。空のdata volumeから起動したサーバーは、この管理者が唯一のログイン手段だからです。
 
 Webは5173番portで公開し、Node serverが同一originの /api requestを内部FastAPI containerへproxyします。SQLite、backup、artifactは inku-data volumeに永続化されます。API containerは非root userで動作します。
 

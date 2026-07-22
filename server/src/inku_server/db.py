@@ -706,8 +706,12 @@ def _ensure_default_user_group() -> None:
 
 
 def _bootstrap_admin_password() -> str | None:
+    # An empty value means unset, not a zero-length password: compose interpolation
+    # (${VAR:-}) and env-file templates hand one over whenever the operator left the
+    # field blank. Raising there would fail startup on an empty database, where the
+    # bootstrap admin is the only thing that reads this.
     password = os.getenv("INKU_BOOTSTRAP_ADMIN_PASSWORD")
-    if password is not None:
+    if password:
         if len(password) < 8:
             raise ValueError("INKU_BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters")
         return password

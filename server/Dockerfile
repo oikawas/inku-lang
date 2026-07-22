@@ -16,6 +16,10 @@ COPY shared/ /app/shared/
 COPY server/ /app/server/
 RUN cd /app/server && uv sync --frozen --no-dev
 
+# Copied after the dependency sync so re-numbering a build does not invalidate it.
+# api.py resolves the build number relative to the package: parents[3]/web/BUILD_NUMBER.
+COPY web/BUILD_NUMBER /app/web/BUILD_NUMBER
+
 RUN useradd --create-home --uid 10001 inku \
     && mkdir -p /data/outputs /data/db-backups /data/cache \
     && chown -R inku:inku /data

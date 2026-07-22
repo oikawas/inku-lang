@@ -60,7 +60,9 @@ export const en: LangPack = {
 
 	clearInputBtn: 'New',
 	inputSectionLabel: 'Description',
-	inputSectionHint: ': Write a short line for what you want to express — a tanka\'s brevity is the guide.',
+	inputSectionHint: ': Write what you want to express, in a short line.',
+	inputMeterChars: (count, guide) => `Characters ${count} / ${guide} (tanka)`,
+	inputMeterWords: (count, guide) => `Words ${count} / ${guide} (tanka)`,
 	interpretationFeedbackLabel: 'Interpretation Feedback',
 	canvasAspectButton: 'Canvas',
 	canvasAspectTitle: 'Canvas Aspect',

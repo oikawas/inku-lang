@@ -4,7 +4,12 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-05-13.
+Last updated: 2026-07-23.
+
+**Catch-up status**: Android sits at generation `1.48.0-android.1` with render engine
+version `2`. The master web/server implementation is at v2.4.2 with engine 10. The port
+proceeds in phases; see "2026-07-23 Catching Up With web/server v2, Phase 1" at the end
+of this document.
 
 ## Specification Update Workflow
 
@@ -164,7 +169,12 @@ Not implemented yet:
 - Full web feature parity for import/export, plugin management, advanced
   settings, user-management equivalents, and admin/server-only web features.
 - Import from web-compatible JSON exports.
-- Reference compatibility tests against exported web JSON fixtures.
+- Reference compatibility tests at the SVG and render-metadata level.
+  **Score-level parity started on 2026-07-23** (`ServerScoreParityTest.kt` checks the 15
+  cases in `server/tests/fixtures/stage2/` plus exact `dh1` / `rh2` values; see the final
+  section).
+- Catching up with the web/server v2 generation (renderer engine 2 → 10, variation,
+  plugins, lineage, tenkei). Only Phase 1 (Score schema / coerce / hash) is complete.
 
 ## Verified Device State
 
@@ -324,6 +334,8 @@ Current pipeline compatibility layout:
 | `server/src/inku_server/coerce.py` / DDL coverage, shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | Drawable clause extraction, clause primitive/color mapping, coverage instruction, shape/motif repair instruction factories |
 | `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration, dedupe, DDL coverage, color/shape/motif/composition/context/motion/presence/density repair order, fallback Score construction, Stage 1/2 provider fallback control |
 | `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 `submit_score` schema, Stage 2 JSON extraction, tool_calls/arguments unwrap, renderable instructions guard |
+| Output of `server/src/inku_server/composer.py::_score_tool_schema()` | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSchemaJson.kt` | The Stage 2 tool schema JSON itself: primitive / weight / style enums, `additionalProperties: false`, and the arrangement, `at`, `relation`, and `surface` definitions. **Server schema changes land here first.** |
+| `server/src/inku_server/db.py::render_hash_for_item` / `identity.py::description_hash` | `renderHash` / `descriptionHash` / `canonicalSeed` in `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | The eight `rh2` payload fields and the canonical-JSON rules, the `dh1` normalization rules, and integer coercion of seeds |
 
 Function-level parity table from prompt to rendering:
 
@@ -1355,3 +1367,101 @@ The Android app implements the following additional performance improvements.
 - These are Android-internal performance optimizations. They do not change
   saved DDL, Score, SVG, history JSON, render metadata, or render hash
   compatibility.
+
+## 2026-07-23 Catching Up With web/server v2, Phase 1 (Score schema / coerce / hash parity)
+
+Android is at generation `1.48.0-android.1` with render engine version `2`, while the
+master web/server implementation has reached v2.4.2 and engine 10. The gap corresponds to
+`### v1.49` through `### v2.4.2` in `CHANGELOG.ja.md` and includes a change of method in
+the drawing core (absolute px replaced by proportional units; closed-shape outlines,
+fills, and arcs redrawn as hand strokes) as well as the additions of variation, plugins,
+lineage, and tenkei.
+
+The catch-up proceeds in phases. **Phase 1 is limited to letting the Score carry the new
+information; it does not touch how anything is drawn.**
+
+Author's rulings (2026-07-23):
+
+- The drawing core (Score schema / coerce, then the renderer) comes first; lineage and UI
+  follow.
+- **`render_engine_version` keeps reporting `"2"` until engine 10 is reached.** Reporting
+  an intermediate value mid-port would change `render_hash`, breaking history
+  compatibility and the meaning of the work edition ID.
+- Parity between server and Android is required only up to visual equivalence for now;
+  byte-identical SVG is a decision to make once parity tests exist. **The Score (JSON) and
+  the hashes, however, must match structurally and by value.**
+- `android/VERSION` moves to the `2.x` series when engine 10 is reached; until then it
+  stays `1.48.0-android.1`.
+
+### Ported in Phase 1
+
+- **Stage 2 tool schema** (`ServerScoreSchemaJson.kt`): `cloudform` added to the
+  primitives; `burin` and `drypoint` added to the weights and `rope` removed; `mode`
+  (`additive` / `carve`), `carve_depth`, `at` (a placement region resolved at render
+  time), `relation` (`along` / `not_touching` / `cutting` / `between` / `touching`, with
+  `contact: both_ends`), and `surface` added to instructions; `layout="grid"` with `rows`,
+  `cols`, and `jitter` added to arrangements, with the count ceiling raised to 2000 for
+  grids; `canvas` now accepts `{aspect, ground}` as well as an ID string.
+- **Unknown fields are rejected**: following the server change that added
+  `ConfigDict(extra="forbid")` to every Pydantic schema (v1.86.1), every object in the
+  schema carries `additionalProperties: false`, and `ServerScoreCoercer` holds the set of
+  permitted instruction keys and drops anything outside it. That set matches the
+  `Instruction` fields in the server's `schema.py`.
+- **Coercion**: normalization for `surface` and `relation` (defaults, range clamping, and
+  keeping `contact` only for `touching`), clamping of grid `rows` / `cols` (1-64) and
+  `jitter` (0.0-1.0), and required-field repair for `cloudform`.
+- **Vocabulary detection** (`ServerScoreSemantics.kt`): `burin` and `drypoint` added to
+  weight detection, the removed `rope` dropped, and `cloudform` treated as a shape with a
+  `center` and a `size`.
+- **Hashes** (`LocalFallbackPipeline.kt`):
+  - `dh1` (description identity) follows `identity.py`: NFC normalization, `\r\n` and `\r`
+    folded to `\n`, surrounding whitespace stripped, then `"dh1:" + sha256(...)`.
+  - `render_hash` is redefined as `rh2`. The payload holds the same eight fields as the
+    server's `db.render_hash_for_item` — `version`, `score`, `render_seed`, `vary_seed`,
+    `render_build_number`, `render_engine_id`, `render_engine_version`, and
+    `render_color_catalog_id` — and the result is `"rh2:" + sha256(canonical_json)`, where
+    canonical JSON means sorted keys, `(",", ":")` separators, and no ASCII escaping.
+  - **Seed canonicalization**: the server passes `render_seed` and `vary_seed` through
+    `_canonical_seed`, which coerces them to integers before hashing, so the string
+    `"12345"` and the number `12345` produce the same hash. Android now has an equivalent
+    `canonicalSeed`.
+
+### Not ported in Phase 1 (Phase 2 onward)
+
+The Score accepts and preserves the fields above, but **the renderer does not draw them**.
+The following belong to Phase 2 and later:
+
+- `surface` texture rendering and `canvas.ground` ground rendering
+- grid (tiling) cell expansion
+- `cloudform` contour generation (1/f base curve plus a 49-point closed Bezier)
+- the `carve` subtractive compositing order (ground → additive → carve → plate tone)
+- minor-arc reconstruction for `touching`, and the region/relation resolution order
+  (including the double-arc fix from v1.94)
+- the proportional-unit rework (engine 7) and the stroke work that follows (engines 8, 9,
+  and 10)
+
+### Verification
+
+`app/src/test/java/app/inku/mobile/pipeline/ServerScoreParityTest.kt` was added.
+
+- **The repair path**: the 15 cases from `server/tests/fixtures/stage2/` are carried in
+  with their origin noted, and each is fed to `ServerScoreCoercer` as **the kind of
+  unpolished Score an LLM emits** — numbers as strings, `position` used in place of
+  `center`, unknown fields mixed in — and the result is checked against the fixture's
+  `expected.json`. The comparison covers `center`, `position`, `from`, `to`, `radius`,
+  `size`, `style`, `weight`, `color`, and `variation` as well as `primitive`, and
+  multi-instruction fixtures are checked in full.
+- **Hash values**: pinned against values measured on the server.
+  - `中心に円を置く。` → `dh1:4acea64b6cec1944e40896dbf6c167322850bd8a2c15938651ffd3275101da99`
+  - `上から1/3に横線を引く。` → `dh1:31d1445b92e140db68a8528022f299325eb9cd1e4c873361d5c94b9bcff6e618`
+  - `score` = a centered circle of radius 0.1, `render_seed` = `"12345"` (given as a
+    string), `vary_seed` = null, `render_build_number` = `"689"`, `render_engine_id` =
+    `"default"`, `render_engine_version` = `"2"`, `render_color_catalog_id` =
+    `"sumi_traditional"` → `rh2:b96d71a1af99a98373fd47b093b12bd836f9af33a0da0546a1312fdc253adb99`
+    (short `DB99`)
+
+    Passing the seed as a string and still matching is what confirms `canonicalSeed` works.
+
+`gradle :app:testDebugUnitTest` passes all 11 tests and `gradle :app:assembleDebug`
+succeeds. `android/BUILD_NUMBER` is `148069`; `android/VERSION` remains
+`1.48.0-android.1`.

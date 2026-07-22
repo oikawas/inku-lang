@@ -3,7 +3,11 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-05-13。
+最終更新: 2026-07-23。
+
+**追随状況**: Android は `1.48.0-android.1` / render engine version `2` の世代にある。
+master の web/server は v2.4.2 / engine 10。差分の追随は段階的に行う（末尾
+「2026-07-23 web/server v2 追随 Phase 1」を参照）。
 
 ## 更新ルール
 
@@ -130,7 +134,11 @@ Android ワークスペースには、namespace `app.inku.mobile` の build 可�
 - 外部 provider execution。provider record は現時点では compatibility data structures として存在する。
 - import/export、plugin management、advanced settings、user-management equivalents、admin/server-only web features の full web feature parity。
 - Web-compatible JSON export からの import。
-- exported web JSON fixture に対する reference compatibility tests。
+- SVG / render metadata レベルの reference compatibility tests。
+  **Score レベルは 2026-07-23 に着手済み**（`ServerScoreParityTest.kt` が
+  `server/tests/fixtures/stage2/` の 15 ケースと `dh1` / `rh2` の値一致を検証する。末尾の節を参照）。
+- web/server v2 世代への追随（Renderer engine 2 → 10、変奏、プラグイン、系譜、添景）。
+  Phase 1（Score schema / coerce / hash）のみ完了。
 
 ## 実機検証状態
 
@@ -277,6 +285,8 @@ web/server との parity を優先する。
 | `server/src/inku_server/coerce.py` / DDL coverage、shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | drawable clause extraction、clause primitive/color mapping、coverage instruction、shape/motif repair instruction factories |
 | `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration、dedupe、DDL coverage、color/shape/motif/composition/context/motion/presence/density repair order、fallback Score construction、Stage 1/2 provider fallback control |
 | `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 submit_score schema、Stage 2 JSON extraction、tool_calls / arguments unwrap、renderable instructions guard |
+| `server/src/inku_server/composer.py::_score_tool_schema()` の生成結果 | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSchemaJson.kt` | Stage 2 tool schema の JSON 本体。primitive / weight / style の列挙、`additionalProperties: false`、arrangement・`at`・`relation`・`surface` の定義。**server schema の変更はまずここへ反映する** |
+| `server/src/inku_server/db.py::render_hash_for_item` / `identity.py::description_hash` | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` の `renderHash` / `descriptionHash` / `canonicalSeed` | `rh2` payload の 8 項目と canonical JSON 規則、`dh1` の正規化規則、seed の整数化 |
 
 指示から描画までの function-level parity table:
 
@@ -950,3 +960,87 @@ Android 版は追加の性能改善として、以下を実装する。
 - モデル設定 UI の公開モデルID parse は小さなLRU cacheを通し、同じ `publishedModelsJson` の再parseを避ける。
 - PNG export 中は progress indicator と状態メッセージを表示する。大きなPNG出力時にUIが無反応に見えないようにする。
 - Compose の artwork / history thumbnail cache は引き続き推定bitmap byte数で制限し、今回の追加変更でも保存形式・render hash・履歴JSONの互換性は変更しない。
+
+## 2026-07-23 web/server v2 追随 Phase 1（Score schema / coerce / hash parity）
+
+Android 版は `1.48.0-android.1` / render engine version `2` の世代にあり、master である
+web/server は v2.4.2 / engine 10 に達している。差分は `CHANGELOG.ja.md` の
+`### v1.49` 〜 `### v2.4.2` に対応し、描画コアの方式転換（絶対 px から比例系への改修、
+閉図形輪郭・塗り・弧の手描きストローク化）と、変奏・プラグイン・系譜・添景の追加を含む。
+
+追随は段階的に行う。**Phase 1 は「Score が新しい情報を運べるところまで」に限定し、
+描き方（Renderer）には触れない。**
+
+作者裁定（2026-07-23）:
+
+- 描画コア（Score schema / coerce → Renderer）を優先し、系譜・UI は後続とする。
+- **`render_engine_version` は engine 10 に到達するまで `"2"` を申告し続ける。**
+  部分移植の途中で中間の値を名乗ると `render_hash` が変わり、履歴の互換と
+  作品エディション ID の意味が壊れるため。
+- server と Android の一致条件は当面「視覚的に同等」までとし、SVG のバイト一致は
+  parity テスト整備後に判断する。ただし **Score（JSON）とハッシュは構造・値の一致を求める。**
+- `android/VERSION` は engine 10 到達時に `2.x` 系へ上げる。それまで `1.48.0-android.1` を維持する。
+
+### Phase 1 で移植した範囲
+
+- **Stage 2 tool schema**（`ServerScoreSchemaJson.kt`）: primitive に `cloudform` を追加。
+  weight に `burin` / `drypoint` を追加し `rope` を削除。instruction に `mode`（`additive` / `carve`）、
+  `carve_depth`、`at`（演奏時配置領域）、`relation`（`along` / `not_touching` / `cutting` /
+  `between` / `touching` と `contact: both_ends`）、`surface`（面の質感）を追加。
+  arrangement に `layout="grid"` と `rows` / `cols` / `jitter` を追加し、count 上限を
+  grid のとき 2000 とする。canvas は ID 文字列に加えて `{aspect, ground}` を受理する。
+- **未知フィールドの拒否**: server が全 Pydantic スキーマへ `ConfigDict(extra="forbid")` を
+  入れた変更（v1.86.1）に追随し、schema の全オブジェクトへ `additionalProperties: false` を
+  付与した。`ServerScoreCoercer` は instruction の許可キー集合を持ち、範囲外のキーを除去する。
+  許可キー集合は server `schema.py` の `Instruction` フィールドと一致させる。
+- **Coercion**: `surface` と `relation` の正規化（既定値・範囲クランプ・`touching` のときのみ
+  `contact` を残す）、grid の `rows` / `cols`（1-64）と `jitter`（0.0-1.0）のクランプ、
+  `cloudform` の必須フィールド補修を追加した。
+- **語彙判定**（`ServerScoreSemantics.kt`）: 「ビュラン」/ `burin`、「ドライポイント」/ `drypoint` を
+  weight 判定へ追加し、削除済みの「縄」/ `rope` を落とした。`cloudform` は `center` と `size` を
+  持つ図形として扱う。
+- **ハッシュ体系**（`LocalFallbackPipeline.kt`）:
+  - `dh1`（記述同一性）を `identity.py` と同じ規則で算出する。NFC 正規化 → `\r\n` と `\r` を
+    `\n` へ → 前後の空白を除去 → `"dh1:" + sha256(...)`。
+  - `render_hash` を `rh2` へ再定義した。payload は server `db.render_hash_for_item` と同じ
+    `version` / `score` / `render_seed` / `vary_seed` / `render_build_number` /
+    `render_engine_id` / `render_engine_version` / `render_color_catalog_id` の 8 項目とし、
+    `"rh2:" + sha256(canonical_json)` を返す。canonical JSON は
+    `sort_keys=True` / `separators=(",", ":")` / `ensure_ascii=False` 相当とする。
+  - **seed の正規化**: server は `_canonical_seed` で `render_seed` / `vary_seed` を整数化して
+    から payload に入れる。したがって文字列 `"12345"` と数値 `12345` は同じハッシュになる。
+    Android にも `canonicalSeed` を置き、同じ正規化を行う。
+
+### Phase 1 で移植していない範囲（Phase 2 以降）
+
+Score は上記フィールドを受理・保持するが、**Renderer は描かない**。以下は Phase 2 以降で扱う。
+
+- `surface` の質感描画、`canvas.ground` の地の描画
+- grid（敷き詰め）のセル展開
+- `cloudform` の輪郭生成（1/f 基底曲線 + 49 点閉 Bezier）
+- `carve` の減算合成順序（ground → additive → carve → plate tone）
+- `touching` の劣弧再構成と region / relation の解決順序（v1.94 の双弧修正を含む）
+- 比例系改修（engine 7）以降のストローク化一式（engine 8 / 9 / 10）
+
+### 検証
+
+`app/src/test/java/app/inku/mobile/pipeline/ServerScoreParityTest.kt` を追加した。
+
+- **Score の修復経路**: `server/tests/fixtures/stage2/` の 15 ケースを出所付きで取り込み、
+  **LLM が吐きうる未整形の Score**（数値が文字列、`center` の別名 `position`、未知フィールドの
+  混入）を入力として `ServerScoreCoercer` を通し、結果が fixture の `expected.json` と
+  一致することを検証する。`primitive` だけでなく `center` / `position` / `from` / `to` /
+  `radius` / `size` / `style` / `weight` / `color` / `variation` を照合し、
+  複数命令の fixture は全命令を対象とする。
+- **ハッシュの値一致**: server 実測値を固定値として検証する。
+  - `中心に円を置く。` → `dh1:4acea64b6cec1944e40896dbf6c167322850bd8a2c15938651ffd3275101da99`
+  - `上から1/3に横線を引く。` → `dh1:31d1445b92e140db68a8528022f299325eb9cd1e4c873361d5c94b9bcff6e618`
+  - `score` = 中心の円（半径 0.1）、`render_seed` = `"12345"`（文字列で与える）、
+    `vary_seed` = null、`render_build_number` = `"689"`、`render_engine_id` = `"default"`、
+    `render_engine_version` = `"2"`、`render_color_catalog_id` = `"sumi_traditional"`
+    → `rh2:b96d71a1af99a98373fd47b093b12bd836f9af33a0da0546a1312fdc253adb99`（short `DB99`）
+
+    seed を文字列で与えたうえで一致することが、`canonicalSeed` が効いていることの確認になる。
+
+`gradle :app:testDebugUnitTest` は 11 件すべて通過し、`gradle :app:assembleDebug` も成功する。
+`android/BUILD_NUMBER` は `148069`、`android/VERSION` は `1.48.0-android.1` のまま。

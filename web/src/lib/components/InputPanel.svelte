@@ -337,8 +337,8 @@
 
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'batch'}
-		{@render inputSettings()}
 		<BatchPanel
+			settings={inputSettings}
 			{runTokensIn}
 			{runTokensOut}
 			bind:batchInput

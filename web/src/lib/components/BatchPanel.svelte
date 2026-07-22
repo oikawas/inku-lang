@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
@@ -42,6 +43,9 @@
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
+		// The shared button row and settings readout, rendered by the parent but
+		// placed here so it sits between the input box and the batch options.
+		settings?: Snippet;
 	};
 
 	let {
@@ -72,6 +76,7 @@
 		onRememberBatchPrompt,
 		onSubmit,
 		onStop,
+		settings,
 	}: Props = $props();
 
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
@@ -131,6 +136,9 @@
 	</div>
 </div>
 {#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
+
+{@render settings?.()}
+
 {#if !batchRunning}
 	<div class="batch-tools">
 		<label class="batch-option">

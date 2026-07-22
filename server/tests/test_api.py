@@ -248,6 +248,19 @@ def test_bootstrap_admin_password_requires_explicit_env(monkeypatch):
     assert db._bootstrap_admin_password() is None
 
 
+def test_bootstrap_admin_password_treats_blank_env_as_unset(monkeypatch):
+    # Compose passes "" for an unfilled variable; that must not fail startup.
+    monkeypatch.setenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", "")
+    monkeypatch.delenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", raising=False)
+    assert db._bootstrap_admin_password() is None
+
+
+def test_bootstrap_admin_password_blank_env_still_honors_insecure_flag(monkeypatch):
+    monkeypatch.setenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", "")
+    monkeypatch.setenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", "1")
+    assert db._bootstrap_admin_password() == "inku-admin"
+
+
 def test_bootstrap_admin_password_rejects_short_env(monkeypatch):
     monkeypatch.setenv("INKU_BOOTSTRAP_ADMIN_PASSWORD", "short")
     monkeypatch.delenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", raising=False)

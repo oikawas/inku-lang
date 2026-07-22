@@ -9,7 +9,9 @@ services:
       INKU_CORS_ORIGINS: ${INKU_CORS_ORIGINS:-}
       INKU_BOOTSTRAP_ADMIN_USERNAME: ${INKU_BOOTSTRAP_ADMIN_USERNAME:-admin}
       INKU_BOOTSTRAP_ADMIN_EMAIL: ${INKU_BOOTSTRAP_ADMIN_EMAIL:-admin@localhost}
-      INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}
+      # Required, because the first startup on an empty volume creates the only
+      # account there is: inku has no self-service registration.
+      INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:?set INKU_BOOTSTRAP_ADMIN_PASSWORD (8 characters or more) in the --env-file}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # LLM backend wiring for bench parity with bare metal. Values come from the

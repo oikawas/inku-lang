@@ -1516,4 +1516,31 @@ Added `testReferencePrimitivesExactParity` to `ServerRendererGeometryTest.kt` to
 `gradle :app:testDebugUnitTest` (all 16 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` is `148071`; `android/VERSION` remains `1.48.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2b (Full Proportional Scale Rework of px Constants)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §9, absolute px constants were refactored into a proportional scaling system based on `canvas.unit` and shape representative sizes (aligning with engine 7 / v2.1.0).
+
+### Explicit Differentiation of Scaling Systems
+
+1. **`canvas.unit` System (`min(width, height)`)**:
+   - Stroke width $\text{strokeWidthPx}$ ($\text{base} \times \frac{\text{unit}}{1000}$), segment target length ($\text{unit} \times 0.01$), stroke sample target ($\text{unit} \times \frac{1}{49}$), and material outline offset floor ($\text{unit} \times 0.0035$).
+2. **Shape Representative Size $\text{representativeSizePx}$ System**:
+   - `circle` / `polygon` / `arc`: Radius $r \cdot \text{unit}$
+   - `ellipse`: Geometric mean of 2 radii $\sqrt{r_x \cdot r_y}$
+   - `square` / `triangle` / `cloudform`: Half of short side ($\min(w, h) / 2$)
+   - `line`: Line length $\text{hypot}(dx, dy)$
+   - Lower clamp $\text{clampedRepresentativePx}$: $\max(\text{rep}, \text{unit} \times 0.02)$
+   - Variation amplitude `amplitudePx` (ratios 0.025/0.08/0.18, max $0.40 \times \text{rep}$), blur std `blurStdPx` (ratios 0.009/0.03/0.07, min $\text{unit} \times 0.0005$).
+
+### Verification
+
+Added `ServerRendererProportionalTest.kt` to assert against `renderer_proportional.json` across 4 aspect ratios (`square`, `wide`, `pillar`, `vertical`).
+
+- `representative_size_px` (28 cases), `amplitude_px` (84 cases), `blur_std_px` (84 cases), and `stroke_width_px` (40 cases) match 100% within **tolerance 1e-9**.
+- Integer rounding items `segment_count` (20 cases), `stroke_sample_count` (20 cases), and `speck_count` (60 cases) match 100% via Banker's Rounding (`Math.rint(...).toInt()`).
+
+`gradle :app:testDebugUnitTest` (all 17 tests) and `gradle :app:assembleDebug` succeed.
+`android/BUILD_NUMBER` is `148072`; `android/VERSION` remains `1.48.0-android.1`.
+
+
 

@@ -84,6 +84,75 @@ internal object ServerRendererGeometry {
         return v1 * (1.0 - t) + v2 * t
     }
 
+    fun representativeSizePx(ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        val p = ins.optString("primitive", "")
+        if (p in listOf("circle", "polygon", "arc") && ins.has("radius")) {
+            return ins.getDouble("radius") * unit
+        }
+        if (p == "ellipse" && ins.has("size")) {
+            val size = ins.getJSONArray("size")
+            val rx = size.getDouble(0) * width / 2.0
+            val ry = size.getDouble(1) * height / 2.0
+            return kotlin.math.sqrt(kotlin.math.max(0.0, rx * ry))
+        }
+        if (p in listOf("square", "triangle", "cloudform") && ins.has("size")) {
+            val size = ins.getJSONArray("size")
+            val w = size.getDouble(0) * width
+            val h = size.getDouble(1) * height
+            return kotlin.math.min(w, h) / 2.0
+        }
+        if (p == "line") {
+            val fromArr = if (ins.has("from")) ins.getJSONArray("from") else null
+            val toArr = if (ins.has("to")) ins.getJSONArray("to") else null
+            val x1 = (fromArr?.getDouble(0) ?: 0.5) * width
+            val y1 = (fromArr?.getDouble(1) ?: 0.0) * height
+            val x2 = (toArr?.getDouble(0) ?: 0.5) * width
+            val y2 = (toArr?.getDouble(1) ?: 1.0) * height
+            return kotlin.math.hypot(x2 - x1, y2 - y1)
+        }
+        return unit * 0.02
+    }
+
+    fun clampedRepresentativePx(ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        return kotlin.math.max(representativeSizePx(ins, width, height, unit), unit * 0.02)
+    }
+
+    fun amplitudePx(variation: JSONObject, ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        val rep = clampedRepresentativePx(ins, width, height, unit)
+        val ampStr = variation.optString("amplitude", "medium")
+        val ratio = when (ampStr) {
+            "fine" -> 0.025
+            "broad" -> 0.18
+            else -> 0.08
+        }
+        return kotlin.math.min(ratio * rep, 0.40 * rep)
+    }
+
+    fun blurStdPx(variation: JSONObject, ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        val rep = clampedRepresentativePx(ins, width, height, unit)
+        val ampStr = variation.optString("amplitude", "medium")
+        val ratio = when (ampStr) {
+            "fine" -> 0.009
+            "broad" -> 0.07
+            else -> 0.03
+        }
+        return kotlin.math.max(unit * 0.0005, ratio * rep)
+    }
+
+    fun segmentCount(pathLenPx: Double, unit: Double): Int {
+        val target = unit * 0.01
+        if (target <= 0) return 32
+        val cnt = Math.rint(pathLenPx / target).toInt()
+        return kotlin.math.max(32, kotlin.math.min(200, cnt))
+    }
+
+    fun strokeSampleCount(lengthPx: Double, unit: Double): Int {
+        val target = unit * (1.0 / 49.0)
+        if (target <= 0) return 17
+        val cnt = Math.rint(lengthPx / target).toInt()
+        return kotlin.math.max(17, kotlin.math.min(129, cnt))
+    }
+
     fun getAmplitudePx(variation: JSONObject): Double {
         return when (variation.optString("amplitude", "medium")) {
             "fine" -> 7.0

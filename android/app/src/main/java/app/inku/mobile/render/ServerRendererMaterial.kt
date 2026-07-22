@@ -127,6 +127,13 @@ internal object ServerRendererMaterial {
         }
     }
 
+    fun speckCount(baseCount: Int, pathLengthPx: Double, unit: Double): Int {
+        val anchorPerim = unit * 1.2566370614359172
+        val ratio = if (anchorPerim > 0) pathLengthPx / anchorPerim else 1.0
+        val rawCount = Math.rint(baseCount * ratio * 2.6).toInt()
+        return kotlin.math.max(10, kotlin.math.min(baseCount * 4, rawCount))
+    }
+
     private fun speckProfile(weight: String): SpeckProfile? = when (weight) {
         "pencil" -> SpeckProfile(18, 1.8, 0.45, 0.20)
         "crayon" -> SpeckProfile(28, 4.0, 0.75, 0.18)

@@ -37,7 +37,7 @@ internal data class SvgAttrs(
 }
 
 internal object ServerRendererStyle {
-    fun strokeAttrs(primitive: String, weight: String, colorKey: String, colorMap: Map<String, String>, ins: JSONObject): SvgAttrs {
+    fun strokeAttrs(primitive: String, weight: String, colorKey: String, colorMap: Map<String, String>, ins: JSONObject, unit: Double = 1000.0): SvgAttrs {
         val colorHint = if (ins.has("color_hint") && !ins.isNull("color_hint")) ins.optString("color_hint") else null
         val color = resolveColor(colorKey, colorHint, colorMap)
         val closedShape = primitive in setOf("circle", "ellipse", "square", "triangle", "polygon")
@@ -86,7 +86,7 @@ internal object ServerRendererStyle {
         }
         return SvgAttrs(
             stroke = color,
-            strokeWidth = strokeWidth(weight),
+            strokeWidth = strokeWidth(weight, unit),
             strokeLinecap = lineCap(weight),
             strokeOpacity = strokeOpacity,
             fill = fill,
@@ -100,16 +100,20 @@ internal object ServerRendererStyle {
         return attrs.copy(strokeWidth = strokeWidth, strokeOpacity = opacity, fill = "none", fillOpacity = null, dash = dash ?: attrs.dash)
     }
 
-    fun strokeWidth(weight: String): Double = when (weight) {
-        "hair" -> 0.5
-        "pencil" -> 1.5
-        "rotring" -> 1.0
-        "crayon" -> 4.0
-        "chalk" -> 3.0
-        "brush_thin" -> 3.0
-        "brush_thick" -> 8.0
-        "rope" -> 10.0
-        else -> 2.0
+    fun strokeWidth(weight: String, unit: Double = 1000.0): Double {
+        val base = when (weight) {
+            "hair" -> 0.5
+            "pencil" -> 1.5
+            "rotring" -> 1.0
+            "crayon" -> 4.0
+            "chalk" -> 3.0
+            "brush_thin" -> 3.0
+            "brush_thick" -> 8.0
+            "burin" -> 3.2
+            "drypoint" -> 2.6
+            else -> 2.0
+        }
+        return base * (unit / 1000.0)
     }
 
     fun strokeOpacity(weight: String): Double = when (weight) {

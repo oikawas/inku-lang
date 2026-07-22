@@ -272,7 +272,18 @@ Scores may also carry surface and ground texture. A circle can say it is filled 
 
 ## Screens — the back-and-forth of writing and choosing
 
-<!-- UI-SCREENSHOTS -->
+The description sits on the left, the work on the right, and the **instructions (normalized DDL)** in between, ink-shaded to show how each written word was read. History along the bottom and lineage on the right carry the choosing: whichever work is displayed becomes the parent of your next refinement.
+
+<img src="docs/assets/ui/describe-paint-lineage-dark.png" width="900" alt="The description input on the left with word-highlighted instructions (normalized DDL) beneath it, a lineage tree branching generation by generation on the right, and a strip of history thumbnails along the bottom">
+
+The instructions can be edited by hand and drawn again. Selecting a word in the Saijiki on the right returns a sample of that stroke — so you write while looking, rather than after memorizing the vocabulary. The layout is identical in both themes.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/ui/edit-instructions-saijiki-dark.png" width="100%" alt="The instructions editor dialog: the full instructions on the left with each word color-coded, and the Saijiki vocabulary list on the right showing a stroke sample for the selected fine-brush. Dark theme"></td>
+<td width="50%"><img src="docs/assets/ui/edit-instructions-saijiki-light.png" width="100%" alt="The same instructions editor in the light theme, with burin selected in the Saijiki and its one-sided burr stroke sample shown"></td>
+</tr>
+</table>
 
 ---
 

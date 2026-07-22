@@ -1044,3 +1044,31 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 
 `gradle :app:testDebugUnitTest` は 11 件すべて通過し、`gradle :app:assembleDebug` も成功する。
 `android/BUILD_NUMBER` は `148069`、`android/VERSION` は `1.48.0-android.1` のまま。
+
+## 2026-07-23 web/server v2 追随 Phase 2a (幾何揺らぎ演奏 + wave 位相 & 材質 seed 追随)
+
+契約 `antigravity-android-phase2-renderer.md` §4/§5 に基づき、Renderer 側の Phase 2a を実施した。
+`render_engine_version` は契約裁定 1 に従い `"2"` のまま維持している。
+
+### 移植した範囲
+
+- **幾何揺らぎ演奏 (`ServerRendererGeometry.kt`)**:
+  - `wavePhase(seed: Int)`: `_hash01(0, seed, "wave-phase") * 2 * Math.PI` により、`wave` 品質指定時のノイズ位相を `seed` に非線形依存させた。
+  - `periodicValueNoise1D`: 円・楕円・多角形等の閉輪郭 ($t \in [0, 1)$) の継ぎ目を連続化する周期ノイズ関数を追加。
+  - `variedCirclePoints`, `variedEllipsePoints`, `variedPolygonPoints`, `variedArcPathD`:
+    円・楕円・多角形・矩形・弧に対し、`variation` の `quality` (`wave`, `perlin`, `pink`, `white`) および `dimensions` (`position_x`, `position_y`, `radius`) に基づくノイズ変形を適用。
+- **材質乱数シード依存化 (`ServerRendererMaterial.kt`)**:
+  - `seedToInt` による `render_seed` の数値正規化を行い、材質線や粉体散乱（speckles）が同 seed で 100% 同一に出力される決定性を確保。
+- **`DefaultSvgRenderer.kt` での結合**:
+  - `circle`, `ellipse`, `square`, `triangle`, `polygon`, `arc` の要素出力時に `variation` の有無を判定し、歪み変形された `<polygon points="...">` または `<path d="...">` を出力するよう更新。
+
+### 検証
+
+`app/src/test/java/app/inku/mobile/render/ServerRendererGeometryTest.kt` を新規追加した。
+
+- **`wave` 位相の seed 依存性**: seed 111 と 222 で `wavePhase` および `sampleOffset` の波形が異なること、同 seed では完全一致することをアサート。
+- **幾何変形と決定性**: 円・弧・多角形に対し `variation` が正確に変形を適用し、同 seed で再現されることをアサート。
+
+`gradle :app:testDebugUnitTest` （全 15 件）および `gradle :app:assembleDebug` が成功する。
+`android/BUILD_NUMBER` は `148070`、`android/VERSION` は `1.48.0-android.1` を維持。
+

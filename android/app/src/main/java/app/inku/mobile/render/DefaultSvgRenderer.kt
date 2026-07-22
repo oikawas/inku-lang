@@ -88,7 +88,14 @@ class DefaultSvgRenderer : SvgRenderer {
                 val cx = px(center?.optDouble(0, 0.5) ?: 0.5, width)
                 val cy = px(center?.optDouble(1, 0.5) ?: 0.5, height)
                 val r = px(ins.optDouble("radius", 0.12), min(width, height))
-                val base = """<circle cx="$cx" cy="$cy" r="$r" fill="$fill" $common/>"""
+                val variation = ins.optJSONObject("variation")
+                val base = if (needsPathVariation(variation)) {
+                    val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins))
+                        .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                    """<polygon points="$pts" fill="$fill" $common/>"""
+                } else {
+                    """<circle cx="$cx" cy="$cy" r="$r" fill="$fill" $common/>"""
+                }
                 if (usesMaterialOutline(weight)) """<g>$base${materialCircleOutline(ins, attrs, cx, cy, r)}</g>""" else base
             }
             "ellipse" -> {
@@ -98,7 +105,14 @@ class DefaultSvgRenderer : SvgRenderer {
                 val cy = px(center?.optDouble(1, 0.5) ?: 0.5, height)
                 val rx = px((size?.optDouble(0, 0.26) ?: 0.26) / 2.0, width)
                 val ry = px((size?.optDouble(1, 0.16) ?: 0.16) / 2.0, height)
-                val base = """<ellipse cx="$cx" cy="$cy" rx="$rx" ry="$ry" fill="$fill" $common/>"""
+                val variation = ins.optJSONObject("variation")
+                val base = if (needsPathVariation(variation)) {
+                    val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins))
+                        .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                    """<polygon points="$pts" fill="$fill" $common/>"""
+                } else {
+                    """<ellipse cx="$cx" cy="$cy" rx="$rx" ry="$ry" fill="$fill" $common/>"""
+                }
                 if (usesMaterialOutline(weight)) """<g>$base${materialEllipseOutline(ins, attrs, cx, cy, rx, ry)}</g>""" else base
             }
             "square" -> {
@@ -108,14 +122,46 @@ class DefaultSvgRenderer : SvgRenderer {
                 val y = px(pos?.optDouble(1, 0.38) ?: 0.38, height)
                 val w = px(size?.optDouble(0, 0.24) ?: 0.24, width)
                 val h = px(size?.optDouble(1, 0.24) ?: 0.24, height)
-                val base = """<rect x="$x" y="$y" width="$w" height="$h" fill="$fill" $common/>"""
+                val variation = ins.optJSONObject("variation")
+                val base = if (needsPathVariation(variation)) {
+                    val rectPts = ServerRendererGeometry.rectPoints(x, y, w, h, 80)
+                    val pts = ServerRendererGeometry.variedPolygonPoints(rectPts, variation, seedForInstruction(ins), x + w / 2.0, y + h / 2.0)
+                        .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                    """<polygon points="$pts" fill="$fill" $common/>"""
+                } else {
+                    """<rect x="$x" y="$y" width="$w" height="$h" fill="$fill" $common/>"""
+                }
                 if (usesMaterialOutline(weight)) """<g>$base${materialRectOutline(ins, attrs, x, y, w, h)}</g>""" else base
             }
             "triangle" -> {
                 val points = trianglePoints(ins, width, height)
-                polygon(points, fill, common)
+                val variation = ins.optJSONObject("variation")
+                val pts = if (needsPathVariation(variation)) {
+                    val pos = ins.optJSONArray("position")
+                    val size = ins.optJSONArray("size")
+                    val cx = px((pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.30) ?: 0.30) / 2.0, width)
+                    val cy = px((pos?.optDouble(1, 0.35) ?: 0.35) + (size?.optDouble(1, 0.30) ?: 0.30) / 2.0, height)
+                    ServerRendererGeometry.variedPolygonPoints(points, variation, seedForInstruction(ins), cx, cy)
+                } else {
+                    points
+                }
+                polygon(pts, fill, common)
             }
-            "polygon" -> polygon(pointsForRegular(ins, ins.optInt("sides", 5).coerceIn(5, 8), width, height), fill, common)
+            "polygon" -> {
+                val rawPoints = pointsForRegular(ins, ins.optInt("sides", 5).coerceIn(5, 8), width, height)
+                val variation = ins.optJSONObject("variation")
+                val pts = if (needsPathVariation(variation)) {
+                    val center = ins.optJSONArray("center")
+                    val position = ins.optJSONArray("position")
+                    val size = ins.optJSONArray("size")
+                    val cx = px(center?.optDouble(0) ?: ((position?.optDouble(0, 0.4) ?: 0.4) + (size?.optDouble(0, 0.2) ?: 0.2) / 2.0), width)
+                    val cy = px(center?.optDouble(1) ?: ((position?.optDouble(1, 0.4) ?: 0.4) + (size?.optDouble(1, 0.2) ?: 0.2) / 2.0), height)
+                    ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedForInstruction(ins), cx, cy)
+                } else {
+                    rawPoints
+                }
+                polygon(pts, fill, common)
+            }
             "arc" -> {
                 val center = ins.optJSONArray("center")
                 val cx = px(center?.optDouble(0, 0.5) ?: 0.5, width)
@@ -123,7 +169,8 @@ class DefaultSvgRenderer : SvgRenderer {
                 val r = px(ins.optDouble("radius", 0.18), min(width, height))
                 val start = ins.optDouble("angle_start", 20.0)
                 val end = ins.optDouble("angle_end", 300.0)
-                val path = arcPathD(cx, cy, r, start, end)
+                val variation = ins.optJSONObject("variation")
+                val path = ServerRendererGeometry.variedArcPathD(cx, cy, r, start, end, variation, seedForInstruction(ins))
                 val base = """<path d="$path" fill="none" $common/>"""
                 if (usesMaterialOutline(weight)) """<g>$base${materialArcOutline(ins, attrs, cx, cy, r, start, end)}</g>""" else base
             }

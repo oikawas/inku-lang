@@ -13,49 +13,43 @@ internal object ServerRendererMaterial {
 
     fun lineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double): String? {
         val weight = ins.optString("weight", "pen")
-        if (weight !in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "rope")) return null
-        val seed = ins.toString()
+        if (weight !in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint")) return null
+        val seedStr = ins.toString()
+        val seedInt = ServerRendererGeometry.seedToInt(seedStr)
         val out = StringBuilder()
         out.append("""<g><line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" ${attrs.toSvgAttributes(includeFill = false)}/>""")
         when (weight) {
             "pencil" -> {
                 listOf(-0.9, 1.1).forEachIndexed { idx, amount ->
                     val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, amount)
-                    val jitter = ServerRendererGeometry.signedHash(idx, seed) * 0.6
+                    val jitter = ServerRendererGeometry.hashToUnit(idx, seedInt) * 0.6
                     val layer = attrs.copy(strokeWidth = 0.45, strokeOpacity = 0.26, dash = "1,7", filter = "url(#texture-pencil)")
                     out.append(lineElement(x1 + ox + jitter, y1 + oy, x2 + ox - jitter, y2 + oy, layer))
                 }
-                out.append(powderSpecks(x1, y1, x2, y2, attrs, seed, count = 18, spread = 1.8, radius = 0.45, opacity = 0.20))
+                out.append(powderSpecks(x1, y1, x2, y2, attrs, seedStr, count = 18, spread = 1.8, radius = 0.45, opacity = 0.20))
             }
             "chalk" -> {
                 listOf(-3.0, 3.4).forEachIndexed { idx, amount ->
                     val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, amount)
-                    val jitter = ServerRendererGeometry.signedHash(idx, seed) * 1.4
+                    val jitter = ServerRendererGeometry.hashToUnit(idx, seedInt) * 1.4
                     val layer = attrs.copy(strokeWidth = 1.1, strokeOpacity = 0.28, dash = "8,12,1,8")
                     out.append(lineElement(x1 + ox + jitter, y1 + oy, x2 + ox - jitter, y2 + oy, layer))
                 }
-                out.append(powderSpecks(x1, y1, x2, y2, attrs, seed, count = 34, spread = 5.5, radius = 0.9, opacity = 0.26))
+                out.append(powderSpecks(x1, y1, x2, y2, attrs, seedStr, count = 34, spread = 5.5, radius = 0.9, opacity = 0.26))
             }
             "brush_thin" -> {
                 listOf(-1.4, 1.8).forEachIndexed { idx, amount ->
                     val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, amount)
-                    val jitter = ServerRendererGeometry.signedHash(idx, seed) * 1.1
+                    val jitter = ServerRendererGeometry.hashToUnit(idx, seedInt) * 1.1
                     val layer = attrs.copy(strokeWidth = 0.9 + idx * 0.5, strokeOpacity = 0.32, dash = if (idx == 0) "22,9" else "14,8")
                     out.append(lineElement(x1 + ox + jitter, y1 + oy, x2 + ox - jitter, y2 + oy, layer))
                 }
-            }
-            "rope" -> {
-                val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, 4.0)
-                val layer = attrs.copy(strokeWidth = max(1.0, ServerRendererStyle.strokeWidth(weight) * 0.35), strokeOpacity = 0.55, dash = "4,8")
-                out.append(lineElement(x1 + ox, y1 + oy, x2 + ox, y2 + oy, layer))
-                out.append(lineElement(x1 - ox, y1 - oy, x2 - ox, y2 - oy, layer))
-                out.append(ropeTwists(x1, y1, x2, y2, attrs, seed))
             }
             else -> {
                 val amounts = if (weight == "crayon") listOf(-3.2, -1.4, 2.0, 3.6) else listOf(-3.5, 2.8, 5.0)
                 amounts.forEachIndexed { idx, amount ->
                     val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, amount)
-                    val jitter = ServerRendererGeometry.signedHash(idx, seed) * if (weight == "crayon") 2.2 else 2.8
+                    val jitter = ServerRendererGeometry.hashToUnit(idx, seedInt) * if (weight == "crayon") 2.2 else 2.8
                     val layer = attrs.copy(
                         strokeWidth = max(0.8, ServerRendererStyle.strokeWidth(weight) * if (weight == "crayon") 0.25 else 0.30),
                         strokeOpacity = if (weight == "crayon") 0.24 else 0.38,
@@ -64,7 +58,7 @@ internal object ServerRendererMaterial {
                     out.append(lineElement(x1 + ox + jitter, y1 + oy, x2 + ox - jitter, y2 + oy, layer))
                 }
                 if (weight == "crayon") {
-                    out.append(powderSpecks(x1, y1, x2, y2, attrs, seed, count = 26, spread = 4.0, radius = 0.75, opacity = 0.18))
+                    out.append(powderSpecks(x1, y1, x2, y2, attrs, seedStr, count = 26, spread = 4.0, radius = 0.75, opacity = 0.18))
                 }
             }
         }
@@ -79,15 +73,6 @@ internal object ServerRendererMaterial {
         materialOutlineProfile(weight).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
             out.append("""<circle cx="$cx" cy="$cy" r="${max(0.0, r + offset)}" ${outline.toSvgAttributes()}/>""")
-        }
-        if (weight == "rope") {
-            ServerRendererGeometry.circlePoints(cx, cy, r, r, 16).forEachIndexed { idx, point ->
-                val angle = kotlin.math.atan2(point.second - cy, point.first - cx)
-                val tangent = -sin(angle) to cos(angle)
-                val normal = cos(angle) to sin(angle)
-                val span = 6.0 + kotlin.math.abs(ServerRendererGeometry.signedHash(idx, seed)) * 2.0
-                out.append(lineElement(point.first + tangent.first * 3.0 + normal.first * span, point.second + tangent.second * 3.0 + normal.second * span, point.first - tangent.first * 3.0 - normal.first * span, point.second - tangent.second * 3.0 - normal.second * span, attrs.copy(strokeWidth = 1.1, strokeOpacity = 0.40, dash = null, filter = null)))
-            }
         }
         out.append(specksAtPoints(ServerRendererGeometry.circlePoints(cx, cy, r, r, speckProfile(weight)?.count ?: 0), attrs, seed, speckProfile(weight)))
         return out.toString()
@@ -137,7 +122,7 @@ internal object ServerRendererMaterial {
             "brush_thin" -> listOf(OutlineProfile(-1.6, 1.0, 0.32, "22,9"), OutlineProfile(1.8, 1.4, 0.28, "14,8"))
             "brush_thick" -> listOf(OutlineProfile(-4.0, baseWidth * 0.28, 0.36, "18,7,3,11"), OutlineProfile(3.2, baseWidth * 0.22, 0.28, "11,9"))
             "crayon" -> listOf(OutlineProfile(-3.4, baseWidth * 0.24, 0.24, "2,5,9,7"), OutlineProfile(-1.5, baseWidth * 0.20, 0.20, "4,8"), OutlineProfile(2.4, baseWidth * 0.22, 0.22, "2,5,9,7"))
-            "rope" -> listOf(OutlineProfile(-5.0, baseWidth * 0.35, 0.46, "4,8"), OutlineProfile(5.0, baseWidth * 0.35, 0.46, "4,8"))
+            "burin", "drypoint" -> listOf(OutlineProfile(-0.8, 0.4, 0.30, "1,4"))
             else -> emptyList()
         }
     }

@@ -60,6 +60,7 @@ export const ja: LangPack = {
 
 	clearInputBtn: '新規作成',
 	inputSectionLabel: '記述',
+	inputSectionHint: '：短い文章で、表現したいものを入力。短歌の31文字が目安。',
 	interpretationFeedbackLabel: '解釈フィードバック',
 	canvasAspectButton: 'キャンバス',
 	canvasAspectTitle: 'キャンバス比率',

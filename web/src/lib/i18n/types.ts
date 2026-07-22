@@ -15,6 +15,7 @@ export interface LangPack {
 	appInfoBuildLabel: string;
 	appInfoRepositoryLabel: string;
 	appInfoClose: string;
+	inputSectionHint: string;
 	appInfoVocabTitle: string;
 	appInfoVocabIntro: string;
 	appInfoVocabColTerm: string;

@@ -60,6 +60,7 @@ export const en: LangPack = {
 
 	clearInputBtn: 'New',
 	inputSectionLabel: 'Description',
+	inputSectionHint: ': Write a short line for what you want to express — a tanka\'s brevity is the guide.',
 	interpretationFeedbackLabel: 'Interpretation Feedback',
 	canvasAspectButton: 'Canvas',
 	canvasAspectTitle: 'Canvas Aspect',

@@ -189,7 +189,8 @@
 		const count = useWords
 			? (source.match(/[A-Za-z0-9]+(?:[-][A-Za-z0-9]+)*/g) ?? []).length
 			: Array.from(source.replace(/\s/g, "")).length;
-		return { count, guide, over: count > guide };
+		const unit = useWords ? (isJapanese ? '語' : 'words') : (isJapanese ? '字' : 'chars');
+		return { count, guide, over: count > guide, unit };
 	});
 </script>
 
@@ -219,7 +220,6 @@
 
 <section class="panel-section">
 	<div class="section-head">
-		<span class="section-label">{t().inputSectionLabel}</span>
 		<div class="section-actions">
 			<!-- Model / catalog / staffage / canvas apply to every input mode, so the
 			     button row is identical across the three tabs. -->
@@ -293,6 +293,7 @@
 	</div>
 
 	{#if inputMode === 'single'}
+		<div class="input-label"><strong>{t().inputSectionLabel}</strong>{t().inputSectionHint}</div>
 		<textarea
 			bind:value={input}
 			rows="5"
@@ -300,7 +301,7 @@
 			placeholder={t().inputPlaceholder}
 			class="input-ta"
 		></textarea>
-		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide}</div>
+		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide} {singleInputStats.unit}</div>
 
 		{#if singleRunning}
 			<div class="gen-status-wrap">
@@ -430,11 +431,12 @@
 		justify-content: space-between;
 		align-items: center;
 	}
-	.section-label {
-		font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
-		color: var(--fg2);
+	.section-actions { display: flex; gap: 5px; min-width: 0; flex: 1; }
+	.input-label {
+		font-size: 12px; line-height: 1.5; color: var(--fg2);
+		font-weight: 400;
 	}
-	.section-actions { display: flex; gap: 5px; min-width: 0; }
+	.input-label strong { font-weight: 600; color: var(--fg); }
 	.ghost-btn {
 		padding: var(--btn-sm-padding);
 		border: 1px solid var(--border2);
@@ -455,6 +457,7 @@
 		vertical-align: bottom;
 	}
 	.create-btn {
+		margin-left: auto;
 		background: #fff7e8;
 		border-color: #d8b36a;
 		color: #6c4a10;

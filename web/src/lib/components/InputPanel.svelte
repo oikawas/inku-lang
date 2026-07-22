@@ -224,7 +224,7 @@
 			<!-- Model / catalog / staffage / canvas apply to every input mode, so the
 			     button row is identical across the three tabs. -->
 			<Tooltip text={t().tooltipInputModel}>
-				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
+				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelButton}</button>
 			</Tooltip>
 			<Tooltip text={t().tooltipInputCatalog}>
 				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>

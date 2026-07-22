@@ -64,6 +64,7 @@ export const en: LangPack = {
 	canvasAspectButton: 'Canvas',
 	canvasAspectTitle: 'Canvas Aspect',
 	modelSelectButton: 'Model Selection',
+	modelButton: 'Model',
 	colorCatalogButton: 'Color Catalog',
 	instructionLangLabel: 'Description Language',
 	instructionLangAuto: 'Auto',

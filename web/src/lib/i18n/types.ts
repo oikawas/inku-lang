@@ -136,6 +136,7 @@ export interface LangPack {
 	canvasAspectButton: string;
 	canvasAspectTitle: string;
 	modelSelectButton: string;
+	modelButton: string;
 	colorCatalogButton: string;
 	instructionLangLabel: string;
 	instructionLangAuto: string;

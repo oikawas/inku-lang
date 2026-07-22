@@ -64,6 +64,7 @@ export const ja: LangPack = {
 	canvasAspectButton: 'キャンバス',
 	canvasAspectTitle: 'キャンバス比率',
 	modelSelectButton: 'モデル選択',
+	modelButton: 'モデル',
 	colorCatalogButton: '色カタログ',
 	instructionLangLabel: '記述の言語',
 	instructionLangAuto: '自動',

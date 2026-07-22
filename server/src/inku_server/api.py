@@ -7,6 +7,7 @@ GET  /health      : liveness
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import json
 import logging
 import os
@@ -74,7 +75,15 @@ from .model_settings import (
 )
 from . import db as _db
 
-_APP_VERSION = "0.1.0"
+def _app_version() -> str:
+    """Report the installed distribution version so pyproject.toml stays the single source."""
+    try:
+        return importlib.metadata.version("inku-server")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.0.0+unknown"
+
+
+_APP_VERSION = _app_version()
 app = FastAPI(title="inku-server", version=_APP_VERSION)
 
 _db.init_db()

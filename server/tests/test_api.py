@@ -7,6 +7,7 @@ Stage 2 composer を monkeypatch でバイパスし、FastAPI のスキーマ/�
 from __future__ import annotations
 
 import builtins
+import importlib.metadata
 import json
 from datetime import datetime, timezone
 import logging
@@ -126,7 +127,9 @@ def test_info_reports_version_and_build_number():
     assert r.status_code == 200
     data = r.json()
     assert data["name"] == "inku-server"
-    assert data["version"] == "0.1.0"
+    # Track the installed distribution rather than a literal, so release version
+    # bumps in pyproject.toml do not require editing this test.
+    assert data["version"] == importlib.metadata.version("inku-server")
     assert data["build_number"]
 
 

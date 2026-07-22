@@ -2,6 +2,13 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-07-22 — Stated the Bootstrap Administrator Premise
+
+- Documented in Server Configuration 2.2 and Application Installation 7 that inku has no self-service registration, that starting an empty DB without a bootstrap administrator leaves no way to sign in, and that setting the password and restarting recovers it.
+- Documented that a blank `INKU_BOOTSTRAP_ADMIN_PASSWORD` counts as unset, so blanking the line and deleting it are equivalent after initial creation.
+- Noted in Application Installation 16 Container Deployment that Compose refuses to start without a value.
+- Added the same note to the bootstrap administrator section of the environment variable template.
+
 ## 2026-07-15 — Unreleased v1.85 Baseline (Web Build 564)
 
 - Added inku-cli api for permission-aware access to every public API and documented every CLI command.

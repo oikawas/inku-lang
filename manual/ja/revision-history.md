@@ -2,6 +2,13 @@
 
 この履歴は`manual/`配下の利用・運用文書の改訂を記録します。製品機能そのものの詳細な変更履歴は`SPEC.ja.md`を参照してください。
 
+## 2026-07-22 — bootstrap adminの前提を明記
+
+- inkuにセルフサインアップが無いこと、bootstrap adminなしで空のDBを起動するとログイン手段が無くなること、passwordを設定して再起動すれば復旧することを「Server Configuration 2.2」と「Application Installation 7」に追記。
+- `INKU_BOOTSTRAP_ADMIN_PASSWORD` の空文字が未設定と同じ扱いになること（初回作成後は空欄でも行削除でも同じ）を追記。
+- 「Application Installation 16 コンテナ実行」に、composeが値の無いまま起動を拒否することを追記。
+- 環境変数テンプレートのbootstrap admin節にも同じ注記を追加。
+
 ## 2026-07-15 — v1.85未リリース基準（Web Build 564）
 
 - 全公開APIを権限に応じて操作できる inku-cli api と全コマンド一覧を追加した。

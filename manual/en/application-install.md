@@ -111,7 +111,9 @@ GEMINI_API_KEY=
 NVIDIA_API_KEY=
 ```
 
-`INKU_BOOTSTRAP_ADMIN_PASSWORD` must be at least eight characters. A bootstrap admin is created only when the DB has no users. Remove the password from the environment after initial creation or move it to a secret manager.
+`INKU_BOOTSTRAP_ADMIN_PASSWORD` must be at least eight characters. A bootstrap admin is created only when the DB has no users. Remove the password from the environment after initial creation or move it to a secret manager; a blank value counts as unset, so deleting the line and blanking it are equivalent.
+
+**This first setting cannot be skipped.** inku has no self-service registration, and only an authenticated administrator or group lead can create accounts. A server started against an empty DB without a bootstrap admin offers no way to sign in. If it was missed, set the password and restart: the account is created then, and because creation is attempted only while the DB has no users, existing accounts are unaffected.
 
 ## 8. Verify with Manual Startup
 
@@ -265,6 +267,8 @@ The existing uv, npm, and systemd development and operating procedures remain su
     docker compose build
     docker compose up -d
     docker compose ps
+
+`INKU_BOOTSTRAP_ADMIN_PASSWORD` is required. Running `docker compose up` without a value stops Compose before any container starts and reports what is missing, because on a server booted from an empty data volume that administrator is the only way in.
 
 The Web service publishes port 5173. Its Node server proxies same-origin /api requests to the internal FastAPI container. SQLite, backups, and artifacts persist in the inku-data volume. The API container runs as a non-root user.
 

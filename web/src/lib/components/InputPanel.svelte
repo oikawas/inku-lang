@@ -219,6 +219,10 @@
 </div>
 
 <section class="panel-section">
+	<!-- The button row and the settings readout are the same for every input
+	     mode, but the 記述 tab puts them below the input box: the description is
+	     written first, the settings are confirmed just before painting. -->
+	{#snippet inputSettings()}
 	<div class="section-head">
 		<div class="section-actions">
 			<!-- Model / catalog / staffage / canvas apply to every input mode, so the
@@ -291,6 +295,7 @@
 			<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
 		</span>
 	</div>
+	{/snippet}
 
 	{#if inputMode === 'single'}
 		<div class="input-label"><strong>{t().inputSectionLabel}</strong>{t().inputSectionHint}</div>
@@ -302,6 +307,8 @@
 			class="input-ta"
 		></textarea>
 		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.count} / {singleInputStats.guide} {singleInputStats.unit}</div>
+
+		{@render inputSettings()}
 
 		{#if singleRunning}
 			<div class="gen-status-wrap">
@@ -323,6 +330,7 @@
 
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'batch'}
+		{@render inputSettings()}
 		<BatchPanel
 			{runTokensIn}
 			{runTokensOut}
@@ -353,6 +361,7 @@
 			onStop={onStop}
 		/>
 	{:else}
+		{@render inputSettings()}
 		<DemoPanel
 			{runTokensIn}
 			{runTokensOut}

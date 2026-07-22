@@ -170,11 +170,14 @@
 		font-family: inherit;
 	}
 	.ghost-btn:hover { background: var(--bg2); }
+	/* --action-* is the theme-aware primary pair. Painting var(--fg) with a
+	   hardcoded white label collapses to white-on-white in the dark theme. */
 	.primary-inline {
-		background: var(--fg);
-		color: #fff;
-		border-color: var(--fg);
+		background: var(--action-bg);
+		color: var(--action-fg);
+		border-color: var(--action-bg);
 	}
+	.primary-inline:hover { background: var(--action-hover); border-color: var(--action-hover); }
 	@media (max-width: 760px) {
 		.catalog-body { grid-template-columns: 1fr; }
 		.catalog-detail { border-left: none; border-top: 1px solid var(--border); }

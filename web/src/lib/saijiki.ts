@@ -25,8 +25,8 @@ export function hydrateSaijiki(categories: SaijikiCategory[]): void {
 // English surfaces of the same table (GET /api/saijiki?lang=en). Highlighting
 // matches English DDL regardless of the UI language (instruction_lang can
 // differ from it), and the saijiki panels take their display words from here
-// when the UI is English. Position-aligned with SAIJIKI per category: index i
-// is the same vocabulary entry in either language.
+// when the UI is English. The server derives both position-aligned lists from
+// bilingual word entries, so index i is the same entry in either language.
 export let SAIJIKI_EN: SaijikiCategory[] = GENERATED_SAIJIKI_EN.map((cat) => ({
 	...cat,
 	words: [...cat.words]

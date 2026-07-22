@@ -246,7 +246,9 @@
 					/>
 				</Tooltip>
 			{/if}
-			{#if inputMode !== 'demo'}
+			<!-- On the 記述 tab this button lives at the right end of the label row
+			     instead, next to the text it clears. -->
+			{#if inputMode === 'batch'}
 				<Tooltip placement="left" text={t().tooltipInputClear}>
 					<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
 				</Tooltip>
@@ -298,7 +300,12 @@
 	{/snippet}
 
 	{#if inputMode === 'single'}
-		<div class="input-label"><strong>{t().inputSectionLabel}</strong>{t().inputSectionHint}</div>
+		<div class="input-label">
+			<span class="input-label-text"><strong>{t().inputSectionLabel}</strong>{t().inputSectionHint}</span>
+			<Tooltip placement="left" text={t().tooltipInputClear}>
+				<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+			</Tooltip>
+		</div>
 		<textarea
 			bind:value={input}
 			rows="5"
@@ -442,9 +449,15 @@
 	}
 	.section-actions { display: flex; gap: 5px; min-width: 0; flex: 1; }
 	.input-label {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
 		font-size: 12px; line-height: 1.5; color: var(--fg2);
 		font-weight: 400;
 	}
+	.input-label-text { min-width: 0; }
+	.input-label :global(.tooltip-wrap) { flex: none; }
 	.input-label strong { font-weight: 600; color: var(--fg); }
 	.ghost-btn {
 		padding: var(--btn-sm-padding);
@@ -466,7 +479,6 @@
 		vertical-align: bottom;
 	}
 	.create-btn {
-		margin-left: auto;
 		background: #fff7e8;
 		border-color: #d8b36a;
 		color: #6c4a10;

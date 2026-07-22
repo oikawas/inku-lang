@@ -36,7 +36,7 @@ LLMをベースにしていますが、各層には厳しい制約を設けて�
 
 以下は実際に inku で描かれた作品です。**それぞれの絵の下に、書かれた一文（詞書）と、そこから生まれた指示書（正規化DDL）を添えました。** 言葉と絵の対応こそが、この言語の中身です。
 
-<img src="docs/assets/gallery/ballroom-current-waltz.png" width="480" alt="濃い青の地一面に、白と灰の細い線が斜めに交差して束をなし、短い破線の群れがその間に散る">
+<table><tr><td><img src="docs/assets/gallery/ballroom-current-waltz.png" width="480" alt="濃い青の地一面に、白と灰の細い線が斜めに交差して束をなし、短い破線の群れがその間に散る"></td></tr></table>
 
 > 沈んだ客船の舞踏室で、海流だけが、最後のワルツの拍子を守っていた。
 
@@ -53,7 +53,7 @@ LLMをベースにしていますが、各層には厳しい制約を設けて�
 
 </details>
 
-<img src="docs/assets/gallery/ebb-tide-foam-arcs.png" width="480" alt="ほぼ白い画面に、輪郭のぼやけた灰色の弧が三つ、少しずつ位置をずらして重なる">
+<table><tr><td><img src="docs/assets/gallery/ebb-tide-foam-arcs.png" width="480" alt="ほぼ白い画面に、輪郭のぼやけた灰色の弧が三つ、少しずつ位置をずらして重なる"></td></tr></table>
 
 > 干潮の砂浜に、引き波が残した泡の弧が、幾重にも重なって乾いていった。
 
@@ -68,7 +68,7 @@ LLMをベースにしていますが、各層には厳しい制約を設けて�
 
 </details>
 
-<img src="docs/assets/gallery/blackout-candle-lattice.png" width="480" alt="黒い地の中央に、白いクレヨンで擦った四角が数十、隙間を残して重なり合い不揃いな塊をつくる。中心近くに小さな赤い印">
+<table><tr><td><img src="docs/assets/gallery/blackout-candle-lattice.png" width="480" alt="黒い地の中央に、白いクレヨンで擦った四角が数十、隙間を残して重なり合い不揃いな塊をつくる。中心近くに小さな赤い印"></td></tr></table>
 
 > 停電の夜、団地の窓にひとつずつ蝋燭が灯り、闇に不揃いな格子が浮かんだ。
 
@@ -85,7 +85,7 @@ LLMをベースにしていますが、各層には厳しい制約を設けて�
 
 </details>
 
-<img src="docs/assets/gallery/whale-bones-low-tide-city.png" width="480" alt="生成りの地。右上に大きなくすんだ赤の円、左上に下へ開く赤い細い弧、下半分に縦長の枠が二つ並び、内側に青と灰の小さな点が散る">
+<table><tr><td><img src="docs/assets/gallery/whale-bones-low-tide-city.png" width="480" alt="生成りの地。右上に大きなくすんだ赤の円、左上に下へ開く赤い細い弧、下半分に縦長の枠が二つ並び、内側に青と灰の小さな点が散る"></td></tr></table>
 
 > 海が引いたあとの街で、ビルの谷間に鯨の骨が横たわり、朝日を梳いていた。
 
@@ -104,7 +104,7 @@ LLMをベースにしていますが、各層には厳しい制約を設けて�
 
 </details>
 
-<img src="docs/assets/gallery/aquarium-jellyfish-phases.png" width="480" alt="紺の地に、赤と青の半透明な塊が三つ重なって傘のような形をつくり、白と青の細い輪がその周りを巡り、下に細い赤い糸が垂れる">
+<table><tr><td><img src="docs/assets/gallery/aquarium-jellyfish-phases.png" width="480" alt="紺の地に、赤と青の半透明な塊が三つ重なって傘のような形をつくり、白と青の細い輪がその周りを巡り、下に細い赤い糸が垂れる"></td></tr></table>
 
 > 灯りを消した水族館で、くらげは月の代わりに、ゆっくりと満ち欠けした。
 
@@ -119,7 +119,7 @@ LLMをベースにしていますが、各層には厳しい制約を設けて�
 
 </details>
 
-<img src="docs/assets/gallery/silent-piano-dust-chord.png" width="480" alt="生成りの地に、灰色の縦長の帯と細い枠の対が十ほど、左下から右上へ段をなして並び、淡い赤の波線が三本余白を横切る">
+<table><tr><td><img src="docs/assets/gallery/silent-piano-dust-chord.png" width="480" alt="生成りの地に、灰色の縦長の帯と細い枠の対が十ほど、左下から右上へ段をなして並び、淡い赤の波線が三本余白を横切る"></td></tr></table>
 
 > 誰も弾かなくなったピアノの中で、埃が鍵盤の順番に、光の和音を組んでいた。
 
@@ -235,15 +235,15 @@ SVG（演奏 — 一回性）
 
 左に記述、右に作品。その間に**指示書（正規化DDL）**が置かれ、書いた語がどう読まれたかを墨の濃淡で示します。下段は履歴です。画面に出ているのは、このページ冒頭のギャラリー 1 点目そのものです。
 
-<img src="docs/assets/ui/describe-and-paint-dark.ja.png" width="900" alt="画面左に記述の入力欄と、その下に語ごとに色を付けた指示書（正規化DDL）。右の大きなキャンバスに、青地を白い線が交差する作品が表示され、最下段に履歴のサムネイル列が並ぶ">
+<table><tr><td><img src="docs/assets/ui/describe-and-paint-dark.ja.png" width="900" alt="画面左に記述の入力欄と、その下に語ごとに色を付けた指示書（正規化DDL）。右の大きなキャンバスに、青地を白い線が交差する作品が表示され、最下段に履歴のサムネイル列が並ぶ"></td></tr></table>
 
 「系譜」に切り替えると、その作品から生まれた世代が枝分かれして並びます。表示中の作品が、次の推敲の親になります。**選ぶことは、書くことと並ぶ創作の一部です。**
 
-<img src="docs/assets/ui/lineage-dark.ja.png" width="900" alt="系譜のタブ。第1世代の作品カードから二本の矢印が下へ伸び、第2世代の二つの候補につながる。左側の記述と指示書はそのまま残っている">
+<table><tr><td><img src="docs/assets/ui/lineage-dark.ja.png" width="900" alt="系譜のタブ。第1世代の作品カードから二本の矢印が下へ伸び、第2世代の二つの候補につながる。左側の記述と指示書はそのまま残っている"></td></tr></table>
 
 指示書はそのまま手で編集して描き直せます。右の歳時記は、語を選ぶとその筆致の見本と効き方を返します——語彙を覚えてから書くのではなく、見ながら書けます。ライト・ダークはいつでも切り替えられます。
 
-<img src="docs/assets/ui/edit-instructions-saijiki-light.ja.png" width="900" alt="指示書エディタのダイアログ。左に行番号付きの指示書、右は歳時記で、選んだビュランの筆致見本と説明が上に出ている。かたち・てざわり・いろなどの語彙がボタンで並ぶ。ライトテーマ">
+<table><tr><td><img src="docs/assets/ui/edit-instructions-saijiki-light.ja.png" width="900" alt="指示書エディタのダイアログ。左に行番号付きの指示書、右は歳時記で、選んだビュランの筆致見本と説明が上に出ている。かたち・てざわり・いろなどの語彙がボタンで並ぶ。ライトテーマ"></td></tr></table>
 
 ---
 

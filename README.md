@@ -38,7 +38,7 @@ The pieces below were drawn by inku. **Under each picture is the sentence that w
 
 These works were written in Japanese; the original text is given with an English rendering.
 
-<img src="docs/assets/gallery/ballroom-current-waltz.png" width="480" alt="A deep blue field crossed by dense bundles of thin white and gray lines running diagonally in two directions, with flocks of short dashes scattered between them">
+<table><tr><td><img src="docs/assets/gallery/ballroom-current-waltz.png" width="480" alt="A deep blue field crossed by dense bundles of thin white and gray lines running diagonally in two directions, with flocks of short dashes scattered between them"></td></tr></table>
 
 > *In the ballroom of the sunken liner, only the current kept the time of the last waltz.*
 >
@@ -61,7 +61,7 @@ These works were written in Japanese; the original text is given with an English
 
 </details>
 
-<img src="docs/assets/gallery/ebb-tide-foam-arcs.png" width="480" alt="An almost white field with three blur-edged gray arcs overlapping at slightly shifted positions">
+<table><tr><td><img src="docs/assets/gallery/ebb-tide-foam-arcs.png" width="480" alt="An almost white field with three blur-edged gray arcs overlapping at slightly shifted positions"></td></tr></table>
 
 > *On the low-tide sand, the arcs of foam left by the receding wave dried, layer upon layer.*
 >
@@ -80,7 +80,7 @@ These works were written in Japanese; the original text is given with an English
 
 </details>
 
-<img src="docs/assets/gallery/blackout-candle-lattice.png" width="480" alt="On a black ground, dozens of white crayon-scrubbed squares overlap into an uneven mass with gaps left open, a small red mark near the center">
+<table><tr><td><img src="docs/assets/gallery/blackout-candle-lattice.png" width="480" alt="On a black ground, dozens of white crayon-scrubbed squares overlap into an uneven mass with gaps left open, a small red mark near the center"></td></tr></table>
 
 > *On the night of the blackout, candles were lit one by one in the windows of the housing block, and an uneven lattice surfaced in the dark.*
 >
@@ -103,7 +103,7 @@ These works were written in Japanese; the original text is given with an English
 
 </details>
 
-<img src="docs/assets/gallery/whale-bones-low-tide-city.png" width="480" alt="An off-white ground: a large dull red circle at the upper right, a thin red arc opening downward at the upper left, and two tall frames in the lower half sprinkled with small blue and gray dots">
+<table><tr><td><img src="docs/assets/gallery/whale-bones-low-tide-city.png" width="480" alt="An off-white ground: a large dull red circle at the upper right, a thin red arc opening downward at the upper left, and two tall frames in the lower half sprinkled with small blue and gray dots"></td></tr></table>
 
 > *In the city after the sea withdrew, whale bones lay in the canyon between the buildings, combing the morning sun.*
 >
@@ -130,7 +130,7 @@ These works were written in Japanese; the original text is given with an English
 
 </details>
 
-<img src="docs/assets/gallery/aquarium-jellyfish-phases.png" width="480" alt="On a navy ground, three translucent red and blue masses overlap into a bell-like form, ringed by thin white and blue loops, with a slender red thread trailing below">
+<table><tr><td><img src="docs/assets/gallery/aquarium-jellyfish-phases.png" width="480" alt="On a navy ground, three translucent red and blue masses overlap into a bell-like form, ringed by thin white and blue loops, with a slender red thread trailing below"></td></tr></table>
 
 > *In the aquarium with its lights out, the jellyfish waxed and waned slowly, in place of the moon.*
 >
@@ -149,7 +149,7 @@ These works were written in Japanese; the original text is given with an English
 
 </details>
 
-<img src="docs/assets/gallery/silent-piano-dust-chord.png" width="480" alt="On an off-white ground, about ten pairs of gray vertical bars and thin frames step upward from lower left to upper right, with three pale red wavy lines crossing the empty space">
+<table><tr><td><img src="docs/assets/gallery/silent-piano-dust-chord.png" width="480" alt="On an off-white ground, about ten pairs of gray vertical bars and thin frames step upward from lower left to upper right, with three pale red wavy lines crossing the empty space"></td></tr></table>
 
 > *Inside the piano no one plays anymore, dust assembled a chord of light in the order of the keys.*
 >
@@ -274,15 +274,15 @@ Scores may also carry surface and ground texture. A circle can say it is filled 
 
 The description sits on the left, the work on the right, and the **instructions (normalized DDL)** in between, ink-shaded to show how each written word was read. History runs along the bottom.
 
-<img src="docs/assets/ui/describe-and-paint-dark.en.png" width="900" alt="The description input on the left with word-highlighted instructions (normalized DDL) beneath it, a large canvas on the right showing pale overlapping squares on a cream ground, and a strip of history thumbnails along the bottom">
+<table><tr><td><img src="docs/assets/ui/describe-and-paint-dark.en.png" width="900" alt="The description input on the left with word-highlighted instructions (normalized DDL) beneath it, a large canvas on the right showing pale overlapping squares on a cream ground, and a strip of history thumbnails along the bottom"></td></tr></table>
 
 Switching to Lineage lays out the generations that grew from that work. Whichever work is displayed becomes the parent of your next refinement. **Choosing is part of the work, alongside writing.**
 
-<img src="docs/assets/ui/lineage-dark.en.png" width="900" alt="The lineage tab: two arrows descend from the first-generation work card to two second-generation candidates, while the description and instructions remain on the left">
+<table><tr><td><img src="docs/assets/ui/lineage-dark.en.png" width="900" alt="The lineage tab: two arrows descend from the first-generation work card to two second-generation candidates, while the description and instructions remain on the left"></td></tr></table>
 
 The instructions can be edited by hand and drawn again. Selecting a word in the Saijiki on the right returns a sample of that stroke and a note on what it does — so you write while looking, rather than after memorizing the vocabulary. Light and dark themes can be switched at any time.
 
-<img src="docs/assets/ui/edit-instructions-saijiki-light.en.png" width="900" alt="The instructions editor dialog: numbered instruction lines on the left, and the Saijiki on the right showing a stroke sample and explanation for the selected thick-brush, with vocabulary buttons grouped by forms, touches, angles and colors. Light theme">
+<table><tr><td><img src="docs/assets/ui/edit-instructions-saijiki-light.en.png" width="900" alt="The instructions editor dialog: numbered instruction lines on the left, and the Saijiki on the right showing a stroke sample and explanation for the selected thick-brush, with vocabulary buttons grouped by forms, touches, angles and colors. Light theme"></td></tr></table>
 
 ---
 

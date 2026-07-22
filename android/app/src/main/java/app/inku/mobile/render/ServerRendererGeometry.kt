@@ -42,7 +42,7 @@ internal object ServerRendererGeometry {
     }
 
     fun hash01(i: Int, seed: Int, salt: String = ""): Double {
-        val rawStr = if (salt.isBlank()) "$seed:$i" else "$salt:$seed:$i"
+        val rawStr = "$seed:$salt:$i"
         val digest = MessageDigest.getInstance("SHA-256").digest(rawStr.toByteArray(Charsets.UTF_8))
         val raw = (digest[0].toLong() and 0xffL) or
             ((digest[1].toLong() and 0xffL) shl 8) or
@@ -52,7 +52,13 @@ internal object ServerRendererGeometry {
     }
 
     fun hashToUnit(i: Int, seed: Int): Double {
-        return hash01(i, seed, "geom-unit") * 2.0 - 1.0
+        val rawStr = "$seed:$i"
+        val digest = MessageDigest.getInstance("SHA-256").digest(rawStr.toByteArray(Charsets.UTF_8))
+        var raw = 0L
+        for (offset in 0 until 8) {
+            raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
+        }
+        return raw.toDouble() / 9_223_372_036_854_775_808.0
     }
 
     fun wavePhase(seed: Int): Double {

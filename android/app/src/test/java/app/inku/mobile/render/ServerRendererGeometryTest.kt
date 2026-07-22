@@ -107,4 +107,102 @@ class ServerRendererGeometryTest {
         assertEquals("Path must be deterministic for same seed", path1, path2)
         assertNotEquals("Path should differ for different seeds", path1, pathOtherSeed)
     }
+
+    @Test
+    fun testReferencePrimitivesExactParity() {
+        val stream = javaClass.getResourceAsStream("/server_reference/renderer_variation_primitives.json")
+            ?: error("Resource /server_reference/renderer_variation_primitives.json not found")
+        val jsonStr = stream.bufferedReader().use { it.readText() }
+        val root = JSONObject(jsonStr)
+
+        // 1. Frequency cycles
+        val freqObj = root.getJSONObject("frequency_cycles")
+        assertEquals(2.0, ServerRendererGeometry.getFrequencyCycles(JSONObject().put("frequency", "slow")), 1e-9)
+        assertEquals(6.0, ServerRendererGeometry.getFrequencyCycles(JSONObject().put("frequency", "medium")), 1e-9)
+        assertEquals(14.0, ServerRendererGeometry.getFrequencyCycles(JSONObject().put("frequency", "high")), 1e-9)
+        assertEquals(2.0, freqObj.getDouble("slow"), 1e-9)
+        assertEquals(6.0, freqObj.getDouble("medium"), 1e-9)
+        assertEquals(14.0, freqObj.getDouble("high"), 1e-9)
+
+        // 2. Wave phase
+        val wavePhaseArr = root.getJSONArray("wave_phase")
+        for (i in 0 until wavePhaseArr.length()) {
+            val item = wavePhaseArr.getJSONObject(i)
+            val seed = item.getInt("seed")
+            val expected = item.getDouble("value")
+            assertEquals("wave_phase mismatch for seed $seed", expected, ServerRendererGeometry.wavePhase(seed), 1e-9)
+        }
+
+        // 3. hash01
+        val hash01Arr = root.getJSONArray("hash01")
+        for (i in 0 until hash01Arr.length()) {
+            val item = hash01Arr.getJSONObject(i)
+            val idx = item.getInt("i")
+            val seed = item.getInt("seed")
+            val salt = item.getString("salt")
+            val expected = item.getDouble("value")
+            val actual = ServerRendererGeometry.hash01(idx, seed, salt)
+            assertEquals("hash01 mismatch for ($idx, $seed, $salt)", expected, actual, 1e-9)
+        }
+
+        // 4. hash_to_unit
+        val hashToUnitArr = root.getJSONArray("hash_to_unit")
+        for (i in 0 until hashToUnitArr.length()) {
+            val item = hashToUnitArr.getJSONObject(i)
+            val idx = item.getInt("i")
+            val seed = item.getInt("seed")
+            val expected = item.getDouble("value")
+            assertEquals("hashToUnit mismatch for ($idx, $seed)", expected, ServerRendererGeometry.hashToUnit(idx, seed), 1e-9)
+        }
+
+        // 5. value_noise_1d
+        val valueNoiseArr = root.getJSONArray("value_noise_1d")
+        for (i in 0 until valueNoiseArr.length()) {
+            val item = valueNoiseArr.getJSONObject(i)
+            val x = item.getDouble("x")
+            val seed = item.getInt("seed")
+            val expected = item.getDouble("value")
+            assertEquals("valueNoise1D mismatch for ($x, $seed)", expected, ServerRendererGeometry.valueNoise1D(x, seed), 1e-9)
+        }
+
+        // 6. periodic_value_noise_1d
+        val periodicNoiseArr = root.getJSONArray("periodic_value_noise_1d")
+        for (i in 0 until periodicNoiseArr.length()) {
+            val item = periodicNoiseArr.getJSONObject(i)
+            val x = item.getDouble("x")
+            val seed = item.getInt("seed")
+            val period = item.getInt("period")
+            val expected = item.getDouble("value")
+            assertEquals("periodicValueNoise1D mismatch for ($x, $seed, $period)", expected, ServerRendererGeometry.periodicValueNoise1D(x, seed, period), 1e-9)
+        }
+
+        // 7. sample_offset & sample_offset_periodic
+        val sampleOffsetArr = root.getJSONArray("sample_offset")
+        for (i in 0 until sampleOffsetArr.length()) {
+            val group = sampleOffsetArr.getJSONObject(i)
+            val quality = group.getString("quality")
+            val frequency = group.getString("frequency")
+            val seed = group.getInt("seed")
+            val amp = group.getDouble("amp")
+            val samples = group.getJSONArray("samples")
+
+            val variation = JSONObject()
+                .put("quality", quality)
+                .put("frequency", frequency)
+
+            for (j in 0 until samples.length()) {
+                val item = samples.getJSONObject(j)
+                val t = item.getDouble("t")
+                val segment = item.getInt("segment")
+                val expectedOpen = item.getDouble("open")
+                val expectedPeriodic = item.getDouble("periodic")
+
+                val actualOpen = ServerRendererGeometry.sampleOffset(t, variation, seed, segment, amp)
+                assertEquals("sampleOffset mismatch at group $i sample $j (q=$quality, f=$frequency, t=$t)", expectedOpen, actualOpen, 1e-9)
+
+                val actualPeriodic = ServerRendererGeometry.sampleOffsetPeriodic(t, variation, seed, segment, amp)
+                assertEquals("sampleOffsetPeriodic mismatch at group $i sample $j (q=$quality, f=$frequency, t=$t)", expectedPeriodic, actualPeriodic, 1e-9)
+            }
+        }
+    }
 }

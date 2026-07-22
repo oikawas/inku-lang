@@ -1493,3 +1493,27 @@ In accordance with contract `antigravity-android-phase2-renderer.md` §4/§5, Ph
 `gradle :app:testDebugUnitTest` (all 15 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` is `148070`; `android/VERSION` remains `1.48.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2a′ (Exact Server Alignment of Variation Primitives)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8, Phase 2a′ exact alignment of variation primitives (`_hash01`, `_hash_to_unit`) was completed.
+
+### Explicit Separation & Specification of Two Hash Functions
+
+1. **`_hash01(i, seed, salt)`**:
+   - String format is **`"{seed}:{salt}:{i}"`** (yielding `"{seed}::{i}"` when `salt` is empty).
+   - Extracts the first 4 bytes of SHA-256 digest as a little-endian unsigned 32-bit integer, divided by `0xFFFFFFFF` (4294967295) to produce a float in $[0.0, 1.0]$. Used for `wavePhase` etc.
+2. **`_hash_to_unit(i, seed)`**:
+   - Has a completely independent arithmetic structure from `_hash01`. String format is **`"{seed}:{i}"`** (no salt).
+   - Extracts the first 8 bytes of SHA-256 digest as a little-endian **signed 64-bit integer** (`Long`), divided by $2^{63}$ (`9223372036854775808.0`) to produce a float in $[-1.0, 1.0]$.
+   - Used as the foundation for `valueNoise1D` (Perlin lattice) and `white` noise.
+
+### Verification
+
+Added `testReferencePrimitivesExactParity` to `ServerRendererGeometryTest.kt` to assert against `renderer_variation_primitives.json`.
+
+- All items for `wave_phase` (3 cases), `hash01` (6 cases), `hash_to_unit` (5 cases, including negative $i$), `value_noise_1d` (5 cases), `periodic_value_noise_1d` (5 cases), `sample_offset` (36 samples), and `sample_offset_periodic` (36 samples) match server measured values 100% within **tolerance 1e-9**.
+
+`gradle :app:testDebugUnitTest` (all 16 tests) and `gradle :app:assembleDebug` succeed.
+`android/BUILD_NUMBER` is `148071`; `android/VERSION` remains `1.48.0-android.1`.
+
+

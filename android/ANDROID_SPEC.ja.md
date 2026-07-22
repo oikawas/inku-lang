@@ -1072,3 +1072,27 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 `gradle :app:testDebugUnitTest` （全 15 件）および `gradle :app:assembleDebug` が成功する。
 `android/BUILD_NUMBER` は `148070`、`android/VERSION` は `1.48.0-android.1` を維持。
 
+## 2026-07-23 web/server v2 追随 Phase 2a′ (揺らぎ基本関数の server 完全整合)
+
+契約 `antigravity-android-phase2-renderer.md` §8 に基づき、Phase 2a′ の揺らぎ基本関数（`_hash01`, `_hash_to_unit`）の完全整合を実施した。
+
+### 2 種類のハッシュ関数の明確な分離と仕様
+
+1. **`_hash01(i, seed, salt)`**:
+   - ハッシュ文字列は **`"{seed}:{salt}:{i}"`**（`salt` が空文字列の場合でも `"{seed}::{i}"` のフォーマット）。
+   - SHA-256 の先頭 4 バイトを little-endian unsigned 32-bit integer として取り出し、`0xFFFFFFFF` (4294967295) で除算して $[0.0, 1.0]$ の実数を返す。`wavePhase` 等で利用。
+2. **`_hash_to_unit(i, seed)`**:
+   - `_hash01` とは完全に独立した算術構造を持つ。文字列フォーマットは **`"{seed}:{i}"`** (salt なし)。
+   - SHA-256 の先頭 8 バイトを little-endian **signed 64-bit integer** (`Long`) として取り出し、$2^{63}$ (`9223372036854775808.0`) で除算して $[-1.0, 1.0]$ の実数を返す。
+   - `valueNoise1D` (Perlin 格子値) および `white` 雑音の土台として利用。
+
+### 検証
+
+`ServerRendererGeometryTest.kt` に参照コーパス `renderer_variation_primitives.json` を全件アサートする `testReferencePrimitivesExactParity` を追加した。
+
+- `wave_phase` (3 件), `hash01` (6 件), `hash_to_unit` (5 件, 負の $i$ 含む), `value_noise_1d` (5 件), `periodic_value_noise_1d` (5 件), `sample_offset` (36 サンプル), `sample_offset_periodic` (36 サンプル) の全項目が **許容誤差 1e-9** で server 実測値と 100% 完全一致する。
+
+`gradle :app:testDebugUnitTest` （全 16 件）および `gradle :app:assembleDebug` が成功する。
+`android/BUILD_NUMBER` は `148071`、`android/VERSION` は `1.48.0-android.1` を維持。
+
+

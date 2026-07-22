@@ -203,5 +203,167 @@
       "contour-stroke-v1 controls-96 events-0",
       "surface-stroke-v1 hatch-spacing-22.500"
     ]
+  },
+  "07_circle_wave": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.25,
+          "weight": "pen",
+          "variation": {
+            "amplitude": "broad",
+            "frequency": "medium",
+            "quality": "wave",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ]
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "bytes": 12211,
+    "counts": {
+      "path": 1,
+      "polyline": 0,
+      "polygon": 1,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 7
+    },
+    "classes": [
+      "contour-stroke-v1 controls-157 events-1"
+    ]
+  },
+  "08_circle_perlin": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.25,
+          "weight": "pen",
+          "variation": {
+            "amplitude": "fine",
+            "frequency": "high",
+            "quality": "perlin",
+            "dimensions": [
+              "radius"
+            ]
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "bytes": 12217,
+    "counts": {
+      "path": 1,
+      "polyline": 0,
+      "polygon": 1,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 7
+    },
+    "classes": [
+      "contour-stroke-v1 controls-157 events-0"
+    ]
+  },
+  "09_line_white": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "line",
+          "from": [
+            0.1,
+            0.5
+          ],
+          "to": [
+            0.9,
+            0.5
+          ],
+          "weight": "pencil",
+          "variation": {
+            "amplitude": "medium",
+            "frequency": "medium",
+            "quality": "white",
+            "dimensions": [
+              "position_y"
+            ]
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "bytes": 7756,
+    "counts": {
+      "path": 1,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 30,
+      "ellipse": 0,
+      "line": 2,
+      "rect": 1,
+      "g": 7
+    },
+    "classes": [
+      "stroke-engine-v1 controls-39 events-0"
+    ]
+  },
+  "10_arc_wave": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "arc",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.3,
+          "angle_start": 0,
+          "angle_end": 180,
+          "weight": "pen",
+          "variation": {
+            "amplitude": "medium",
+            "frequency": "slow",
+            "quality": "wave",
+            "dimensions": [
+              "position_y"
+            ]
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "bytes": 7726,
+    "counts": {
+      "path": 1,
+      "polyline": 1,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 6
+    },
+    "classes": [
+      "arc-stroke-v1 controls-95 events-0"
+    ]
   }
 }

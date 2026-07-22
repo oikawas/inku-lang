@@ -74,10 +74,9 @@ def test_generated_ts_matches_table():
     assert module.render_ts() == _GENERATED_TS.read_text(encoding="utf-8")
 
 
-# 表示リストの ja↔en 対応。web の歳時記パネルは両言語のリストを位置で突き合わせ、
-# 表示語 (英語) から解説 (正本は日本語見出し) を引くため、この対応が崩れると語と
-# 解説がずれる。長さ検査では検出できない (2026-07-22 に words_en の並べ替えで
-# 引く/埋める が fill/draw と入れ違っていた) ので、対応そのものを固定する。
+# 表示リストの ja↔en 対応。web へは言語別リストとして配信するため、最終表現の
+# 位置対応を固定する。サーバー正本では1語が両言語表面を所有し、並べ替えによる
+# 引く/埋める と draw/fill の入れ違いを構造上起こせない。
 _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "katachi": (
         ("円", "circle"), ("楕円", "ellipse"), ("三角", "triangle"), ("四角", "square"),

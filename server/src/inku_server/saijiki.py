@@ -17,9 +17,9 @@ schema からは削除しない。
 - display: 歳時記表示 (web / API) へ出す
 - marker:  プラグイン閉包マーカーにする (None = prompt に従う)
 
-順序の扱い: words_* は Stage 1 プロンプトの表示順で持つ。閉包マーカーの順序が
-プロンプト順と異なるカテゴリ (かたち・うごき・あいだ) は marker_order_* で
-明示する。順序は表示・互換のための指定であり、所属 (membership) は常に語の
+順序の扱い: words は Stage 1 プロンプトの表示順で持つ。閉包マーカーの順序が
+プロンプト順と異なるカテゴリ (かたち・うごき・あいだ) は marker_order_* で明示する。
+順序は表示・互換のための指定であり、所属 (membership) は常に語の
 フラグから導出される。
 """
 
@@ -47,20 +47,30 @@ _LANGS = ("ja", "en")
 
 @dataclass(frozen=True)
 class SaijikiWord:
-    surface: str
+    surface_ja: str
+    surface_en: str | None
     default: bool = False  # プロンプトで「(既定)」/" (default)" を付ける
     prompt: bool = True  # Stage 1 語彙ブロック・列挙へ出す
     display: bool = True  # 歳時記表示 (web / API) へ出す
     marker: bool | None = None  # 閉包マーカー所属 (None = prompt に従う)
-    # マーカー表面の上書き。例: en「line-up」は互換のため従来マーカー「arrange」を保つ。
-    marker_surfaces: tuple[str, ...] | None = None
+    score_value: str | None = None  # Weight / Color の Score enum 値
+    # マーカー表面の言語別上書き。en「line-up」は従来マーカー「arrange」を保つ。
+    marker_surfaces_ja: tuple[str, ...] | None = None
+    marker_surfaces_en: tuple[str, ...] | None = None
+
+    def surface(self, lang: str) -> str | None:
+        return self.surface_ja if lang == "ja" else self.surface_en
 
     @property
     def is_marker(self) -> bool:
         return self.prompt if self.marker is None else self.marker
 
-    def marker_names(self) -> tuple[str, ...]:
-        return self.marker_surfaces if self.marker_surfaces is not None else (self.surface,)
+    def marker_names(self, lang: str) -> tuple[str, ...]:
+        override = self.marker_surfaces_ja if lang == "ja" else self.marker_surfaces_en
+        if override is not None:
+            return override
+        surface = self.surface(lang)
+        return () if surface is None else (surface,)
 
 
 @dataclass(frozen=True)
@@ -70,14 +80,13 @@ class SaijikiCategory:
     name_en: str
     # reference §3 のマーカー分類名。None はマーカーへ出さないカテゴリ (つらなり)。
     marker_class: str | None
-    words_ja: tuple[SaijikiWord, ...]
-    words_en: tuple[SaijikiWord, ...]
+    words: tuple[SaijikiWord, ...]
     # 閉包マーカーの順序がプロンプト順と異なる場合の明示順 (marker 表面名で指定)
     marker_order_ja: tuple[str, ...] | None = None
     marker_order_en: tuple[str, ...] | None = None
 
-    def words(self, lang: str) -> tuple[SaijikiWord, ...]:
-        return self.words_ja if lang == "ja" else self.words_en
+    def words_for(self, lang: str) -> tuple[SaijikiWord, ...]:
+        return tuple(word for word in self.words if word.surface(lang) is not None)
 
     def marker_order(self, lang: str) -> tuple[str, ...] | None:
         return self.marker_order_ja if lang == "ja" else self.marker_order_en
@@ -95,8 +104,8 @@ class RelationWord:
         return self.surface_ja if lang == "ja" else self.surface_en
 
 
-def _w(surface: str, **kwargs: object) -> SaijikiWord:
-    return SaijikiWord(surface, **kwargs)  # type: ignore[arg-type]
+def _w(surface_ja: str, surface_en: str | None, **kwargs: object) -> SaijikiWord:
+    return SaijikiWord(surface_ja, surface_en, **kwargs)  # type: ignore[arg-type]
 
 
 # 多角形/polygon は Score primitive としてマーカーに残すが、歳時記語彙ではない。
@@ -110,25 +119,15 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_ja="かたち",
         name_en="forms",
         marker_class="shape",
-        words_ja=(
-            _w("円"),
-            _w("楕円"),
-            _w("三角"),
-            _w("四角"),
-            _w("線"),
-            _w("弧"),
-            _w("雲形"),
-            _w("多角形", **_HIDDEN_MARKER),
-        ),
-        words_en=(
-            _w("circle"),
-            _w("ellipse"),
-            _w("triangle"),
-            _w("square"),
-            _w("line"),
-            _w("arc"),
-            _w("cloudform"),
-            _w("polygon", **_HIDDEN_MARKER),
+        words=(
+            _w("円", "circle"),
+            _w("楕円", "ellipse"),
+            _w("三角", "triangle"),
+            _w("四角", "square"),
+            _w("線", "line"),
+            _w("弧", "arc"),
+            _w("雲形", "cloudform"),
+            _w("多角形", "polygon", **_HIDDEN_MARKER),
         ),
         marker_order_ja=("線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形"),
         marker_order_en=("line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform"),
@@ -138,37 +137,31 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_ja="かたむき",
         name_en="angles",
         marker_class="angle",
-        words_ja=(_w("水平"), _w("垂直"), _w("斜め"), _w("右上がり"), _w("右下がり"), _w("回転")),
-        words_en=(_w("horizontal"), _w("vertical"), _w("diagonal"), _w("rising"), _w("falling"), _w("rotated")),
+        words=(
+            _w("水平", "horizontal"),
+            _w("垂直", "vertical"),
+            _w("斜め", "diagonal"),
+            _w("右上がり", "rising"),
+            _w("右下がり", "falling"),
+            _w("回転", "rotated"),
+        ),
     ),
     SaijikiCategory(
         key="tezawari",
         name_ja="てざわり",
         name_en="touches",
         marker_class="material",
-        words_ja=(
-            _w("髪", **_PRUNED),  # P0-3 削除 (Score Weight は互換のため維持)
-            _w("鉛筆"),
-            _w("ペン", default=True),
-            _w("ロットリング"),
-            _w("クレヨン"),
-            _w("チョーク"),
-            _w("細筆"),
-            _w("太筆"),
-            _w("ビュラン"),
-            _w("ドライポイント"),
-        ),
-        words_en=(
-            _w("hair", **_PRUNED),  # P0-3 削除
-            _w("pencil"),
-            _w("pen", default=True),
-            _w("rotring"),
-            _w("crayon"),
-            _w("chalk"),
-            _w("fine-brush"),
-            _w("thick-brush"),
-            _w("burin"),
-            _w("drypoint"),
+        words=(
+            _w("髪", "hair", score_value="hair", **_PRUNED),  # P0-3 削除 (Score Weight は互換のため維持)
+            _w("鉛筆", "pencil", score_value="pencil"),
+            _w("ペン", "pen", default=True, score_value="pen"),
+            _w("ロットリング", "rotring", score_value="rotring"),
+            _w("クレヨン", "crayon", score_value="crayon"),
+            _w("チョーク", "chalk", score_value="chalk"),
+            _w("細筆", "fine-brush", score_value="brush_thin"),
+            _w("太筆", "thick-brush", score_value="brush_thick"),
+            _w("ビュラン", "burin", score_value="burin"),
+            _w("ドライポイント", "drypoint", score_value="drypoint"),
         ),
     ),
     SaijikiCategory(
@@ -176,41 +169,41 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_ja="つらなり",
         name_en="continuity",
         marker_class=None,  # 現行どおり閉包マーカーには出さない
-        words_ja=(_w("実線", default=True), _w("破線"), _w("点線"), _w("一点鎖線")),
-        words_en=(_w("solid", default=True), _w("dashed"), _w("dotted"), _w("dash-dot")),
+        words=(
+            _w("実線", "solid", default=True),
+            _w("破線", "dashed"),
+            _w("点線", "dotted"),
+            _w("一点鎖線", "dash-dot"),
+        ),
     ),
     SaijikiCategory(
         key="iro",
         name_ja="いろ",
         name_en="colors",
         marker_class="color",
-        words_ja=(_w("白"), _w("黒", default=True), _w("青"), _w("赤"), _w("緑"), _w("灰")),
-        words_en=(_w("white"), _w("black", default=True), _w("blue"), _w("red"), _w("green"), _w("gray")),
+        words=(
+            _w("白", "white", score_value="white"),
+            _w("黒", "black", default=True, score_value="black"),
+            _w("青", "blue", score_value="blue"),
+            _w("赤", "red", score_value="red"),
+            _w("緑", "green", score_value="green"),
+            _w("灰", "gray", score_value="gray"),
+        ),
     ),
     SaijikiCategory(
         key="yuragi",
         name_ja="ゆらぎ",
         name_en="movements",
         marker_class="variation",
-        words_ja=(
-            _w("細かく"),
-            _w("大きく"),
-            _w("ゆっくり"),
-            _w("速く"),
-            _w("揺れる"),
-            _w("波打つ"),
-            _w("震える"),
-            _w("滲む"),
-        ),
-        words_en=(
-            _w("fine"),
-            _w("large"),
-            _w("slowly"),
-            _w("quickly"),
-            _w("swaying"),
-            _w("undulating"),
-            _w("trembling"),
-            _w("blurring"),
+        words=(
+            _w("細かく", "fine"),
+            _w("大きく", "large"),
+            _w("ゆっくり", "slowly"),
+            _w("速く", "quickly"),
+            _w("揺れる", "swaying"),
+            _w("波打つ", "undulating"),
+            _w("震える", "trembling"),
+            _w("滲む", "blurring"),
         ),
     ),
     SaijikiCategory(
@@ -218,27 +211,16 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_ja="ばしょ",
         name_en="places",
         marker_class="place",
-        words_ja=(
-            _w("上"),
-            _w("下"),
-            _w("中央"),
-            _w("左端"),
-            _w("右端"),
-            _w("上端"),
-            _w("下端"),
-            _w("中心"),
-            _w("隅"),
-        ),
-        words_en=(
-            _w("top"),
-            _w("bottom"),
-            _w("center"),
-            _w("left-edge"),
-            _w("right-edge"),
-            _w("top-edge"),
-            _w("bottom-edge"),
-            _w("middle"),
-            _w("corner"),
+        words=(
+            _w("上", "top"),
+            _w("下", "bottom"),
+            _w("中央", "center"),
+            _w("左端", "left-edge"),
+            _w("右端", "right-edge"),
+            _w("上端", "top-edge"),
+            _w("下端", "bottom-edge"),
+            _w("中心", "middle"),
+            _w("隅", "corner"),
         ),
     ),
     SaijikiCategory(
@@ -246,26 +228,16 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_ja="うごき",
         name_en="motions",
         marker_class="operation",
-        words_ja=(
-            _w("置く"),
-            _w("並べる"),
-            _w("引く"),
-            _w("描く", **_PRUNED),  # P0-2b 削除
-            _w("散らす"),
-            _w("埋める"),
-            _w("敷き詰める"),
-        ),
-        # 表示語は words_ja と同順で並べる (削剪語を除いた位置で対応させる)。
-        # web の歳時記パネルは両言語の表示リストを位置で突き合わせるため、
-        # ここが崩れると語と解説の対応がずれる。
-        words_en=(
-            _w("place"),
+        words=(
+            _w("置く", "place"),
             # 従来の閉包マーカー「arrange」を互換のため保持する (語彙は line-up)。
-            _w("line-up", marker_surfaces=("arrange",)),
-            _w("draw"),  # 引く の対訳。ja「描く」の削剪後も en マーカーとして残る
-            _w("scatter"),
-            _w("fill"),
-            _w("tile"),
+            _w("並べる", "line-up", marker_surfaces_en=("arrange",)),
+            _w("引く", "draw"),
+            # 日本語だけに残す削剪済みの墓標。英語の draw は「引く」の対訳。
+            _w("描く", None, **_PRUNED),
+            _w("散らす", "scatter"),
+            _w("埋める", "fill"),
+            _w("敷き詰める", "tile"),
         ),
         marker_order_ja=("置く", "引く", "並べる", "散らす", "敷き詰める", "描く", "埋める"),
         marker_order_en=("place", "draw", "arrange", "scatter", "tile", "fill"),
@@ -275,25 +247,15 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_ja="わりあい",
         name_en="proportions",
         marker_class="ratio",
-        words_ja=(
-            _w("縦長"),
-            _w("横長"),
-            _w("全幅"),
-            _w("半幅"),
-            _w("半円"),
-            _w("上弦"),
-            _w("下弦"),
-            _w("三日月"),
-        ),
-        words_en=(
-            _w("tall"),
-            _w("wide"),
-            _w("full-width"),
-            _w("half-width"),
-            _w("semicircle"),
-            _w("waxing"),
-            _w("waning"),
-            _w("crescent"),
+        words=(
+            _w("縦長", "tall"),
+            _w("横長", "wide"),
+            _w("全幅", "full-width"),
+            _w("半幅", "half-width"),
+            _w("半円", "semicircle"),
+            _w("上弦", "waxing"),
+            _w("下弦", "waning"),
+            _w("三日月", "crescent"),
         ),
     ),
 )
@@ -329,14 +291,22 @@ _RELATION_MARKER_ORDER = {
 _RELATION_DISPLAY_ORDER = ("along", "not_touching", "cutting", "between", "touching")
 
 
+def _surface(word: SaijikiWord, lang: str) -> str:
+    surface = word.surface(lang)
+    if surface is None:
+        raise ValueError(f"saijiki word has no {lang} surface: {word.surface_ja}")
+    return surface
+
+
 def _annotated(word: SaijikiWord, lang: str) -> str:
+    surface = _surface(word, lang)
     if not word.default:
-        return word.surface
-    return f"{word.surface}(既定)" if lang == "ja" else f"{word.surface} (default)"
+        return surface
+    return f"{surface}(既定)" if lang == "ja" else f"{surface} (default)"
 
 
 def _prompt_words(category: SaijikiCategory, lang: str) -> tuple[SaijikiWord, ...]:
-    return tuple(word for word in category.words(lang) if word.prompt)
+    return tuple(word for word in category.words_for(lang) if word.prompt)
 
 
 def prompt_block(lang: str) -> str:
@@ -353,7 +323,7 @@ def prompt_block(lang: str) -> str:
 def texture_material_enumeration(lang: str) -> str:
     """てざわり選択則の素材列挙。ja は「・」結び、en は ', ' + ', or ' 結び。"""
     category = next(c for c in SAIJIKI if c.key == "tezawari")
-    surfaces = [word.surface for word in _prompt_words(category, lang)]
+    surfaces = [_surface(word, lang) for word in _prompt_words(category, lang)]
     if lang == "ja":
         return "・".join(surfaces)
     return ", ".join(surfaces[:-1]) + ", or " + surfaces[-1]
@@ -362,9 +332,9 @@ def texture_material_enumeration(lang: str) -> str:
 def _marker_surfaces(category: SaijikiCategory, lang: str) -> tuple[str, ...]:
     """カテゴリの有効マーカー表面。marker_order があればその順、なければ語順。"""
     enabled: list[str] = []
-    for word in category.words(lang):
+    for word in category.words_for(lang):
         if word.is_marker:
-            enabled.extend(word.marker_names())
+            enabled.extend(word.marker_names(lang))
     order = category.marker_order(lang)
     if order is None:
         return tuple(enabled)
@@ -435,43 +405,37 @@ def reference_categories(lang: str) -> list[tuple[str, tuple[str, ...]]]:
     return result
 
 
-# てざわり語 → Score Weight 値（saijiki 語順 = Weight enum 順。削剪語 髪/hair も
-# 保存済み Score 互換のため対応を残す）
-_WEIGHT_VALUES = (
-    "hair", "pencil", "pen", "rotring", "crayon", "chalk",
-    "brush_thin", "brush_thick", "burin", "drypoint",
-)
-# いろ語 → Score Color 値
-_COLOR_VALUES = ("white", "black", "blue", "red", "green", "gray")
-
-
-def _surface_value_map(category_key: str, values: tuple[str, ...]) -> dict[str, str]:
+# てざわり語・いろ語 → Score enum 値。値は各二言語語エントリに付属する。
+def _surface_value_map(category_key: str) -> dict[str, str]:
     category = next(c for c in SAIJIKI if c.key == category_key)
     mapping: dict[str, str] = {}
-    for lang in _LANGS:
-        words = category.words(lang)
-        if len(words) != len(values):
-            raise ValueError(f"saijiki {category_key}/{lang} と enum の要素数が不一致")
-        for word, value in zip(words, values):
-            mapping[word.surface] = value
+    for word in category.words:
+        if word.score_value is None:
+            raise ValueError(f"saijiki {category_key} に Score 値のない語がある: {word.surface_ja}")
+        for lang in _LANGS:
+            surface = word.surface(lang)
+            if surface is not None:
+                mapping[surface] = word.score_value
     return mapping
 
 
 def weight_for_surface() -> dict[str, str]:
     """てざわり表層語（日英・削剪語含む）→ Weight 値の対応表。"""
-    return _surface_value_map("tezawari", _WEIGHT_VALUES)
+    return _surface_value_map("tezawari")
 
 
 def color_for_surface() -> dict[str, str]:
     """いろ表層語（日英）→ Color 値の対応表。"""
-    return _surface_value_map("iro", _COLOR_VALUES)
+    return _surface_value_map("iro")
 
 
 def display_categories(lang: str) -> list[dict[str, object]]:
     """歳時記表示 (Phase 3: API / web スナップショット) 用のカテゴリ一覧。"""
     result: list[dict[str, object]] = []
     for category in SAIJIKI:
-        words = tuple(word.surface for word in category.words(lang) if word.display)
+        words = tuple(
+            _surface(word, lang) for word in category.words_for(lang) if word.display
+        )
         result.append(
             {
                 "key": category.key,

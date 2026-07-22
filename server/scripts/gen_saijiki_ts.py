@@ -48,9 +48,8 @@ def render_ts() -> str:
     ]
     lines += _render_array("GENERATED_SAIJIKI", "ja")
     lines.append("")
-    # The two arrays are position-aligned per category: the word at index i is
-    # the same vocabulary entry in either language. The saijiki table keeps
-    # words_ja / words_en in the same order for that reason.
+    # The two arrays are position-aligned per category because each saijiki
+    # entry owns both language surfaces; language-only tombstones are hidden.
     lines += _render_array("GENERATED_SAIJIKI_EN", "en")
     return "\n".join(lines) + "\n"
 

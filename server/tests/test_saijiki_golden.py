@@ -5,9 +5,9 @@ Stage 1 プロンプト全文。許可差分は作者裁定による語彙削剪
 
 - ja: 「髪、」「髪・」の除去 (P0-3)、「描く、」×2 の除去 (P0-2b) — 2026-07-18
 - en: "hair, " ×2 の除去 (P0-3) — 2026-07-18
-- en: うごき の語順を words_ja と同順へ修正 (2026-07-22)。web の歳時記パネルは
+- en: うごき の語順を日本語と同順へ修正 (2026-07-22)。web の歳時記パネルは
   両言語の表示リストを位置で突き合わせるため、引く=draw / 埋める=fill の対応が
-  位置で成立している必要がある
+  二言語語エントリから同順で導出される必要がある
 
 これ以外の差分 (空白・順序・行の脱落 = 組み立てバグ) はテスト失敗とする。
 """
@@ -28,6 +28,24 @@ _ALLOWED_EN = (("hair, ", 2),)
 # (置換対象, 置換後, 期待出現回数)。削剪では表せない許可差分 (語順修正)。
 _REORDERED_JA: tuple[tuple[str, str, int], ...] = ()
 _REORDERED_EN = (("line-up, fill, scatter, draw, tile", "line-up, draw, scatter, fill, tile", 1),)
+
+
+def test_saijiki_categories_store_one_bilingual_word_sequence() -> None:
+    fields = saijiki.SaijikiCategory.__dataclass_fields__
+    assert "words" in fields
+    assert "words_ja" not in fields
+    assert "words_en" not in fields
+
+    ugoki = next(category for category in saijiki.SAIJIKI if category.key == "ugoki")
+    pairs = tuple((word.surface_ja, word.surface_en) for word in ugoki.words)
+    assert ("引く", "draw") in pairs
+    assert ("描く", None) in pairs
+
+
+def test_score_values_are_attached_to_bilingual_words() -> None:
+    for category_key in ("tezawari", "iro"):
+        category = next(category for category in saijiki.SAIJIKI if category.key == category_key)
+        assert all(word.score_value is not None for word in category.words)
 
 
 def _expected(

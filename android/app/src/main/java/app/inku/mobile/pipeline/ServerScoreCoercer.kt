@@ -85,6 +85,17 @@ internal object ServerScoreCoercer {
         postCoerce(primitive, data)
         applyMaterialHint(data, ddl)
         applyVariationHint(primitive, data, ddl)
+
+        // Strip unknown extra fields to comply with ConfigDict(extra="forbid")
+        val allowedKeys = setOf(
+            "primitive", "from", "to", "center", "radius", "sides", "position", "size",
+            "angle_start", "angle_end", "rotation", "filled", "style", "weight",
+            "mode", "carve_depth", "color", "color_hint", "variation", "arrangement",
+            "at", "relation", "surface",
+        )
+        val keysToRemove = data.keys().asSequence().filter { it !in allowedKeys }.toList()
+        keysToRemove.forEach { data.remove(it) }
+
         return data
     }
 

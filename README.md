@@ -5,7 +5,7 @@
 <table align="center">
 <tr>
 <td width="33%"><img src="docs/assets/gallery/ballroom-current-waltz.png" width="100%" alt="A deep blue field crossed by dense bundles of thin white and gray lines running diagonally in two directions, with flocks of short dashes scattered between them"></td>
-<td width="33%"><img src="docs/assets/gallery/ebb-tide-foam-arcs.png" width="100%" alt="An almost white field with three blur-edged gray arcs overlapping at slightly shifted positions"></td>
+<td width="33%"><img src="docs/assets/gallery/armistice-morning-silver-shoal.png" width="100%" alt="On a white ground, gray wavy lines run in layered bands with small black ellipses shoaling across them, and a single red line descends at the right edge"></td>
 <td width="33%"><img src="docs/assets/gallery/blackout-candle-lattice.png" width="100%" alt="On a black ground, dozens of white crayon-scrubbed squares overlap into an uneven mass with gaps left open, a small red mark near the center"></td>
 </tr>
 </table>
@@ -61,22 +61,28 @@ These works were written in Japanese; the original text is given with an English
 
 </details>
 
-<table><tr><td><img src="docs/assets/gallery/ebb-tide-foam-arcs.png" width="480" alt="An almost white field with three blur-edged gray arcs overlapping at slightly shifted positions"></td></tr></table>
+<table><tr><td><img src="docs/assets/gallery/armistice-morning-silver-shoal.png" width="480" alt="On a white ground, gray wavy lines run in layered bands with small black ellipses shoaling across them, and a single red line descends at the right edge"></td></tr></table>
 
-> *On the low-tide sand, the arcs of foam left by the receding wave dried, layer upon layer.*
+> *On the morning the war ended, the sniper and the fisherman on opposite banks were watching the same silver of the shoal.*
 >
-> 干潮の砂浜に、引き波が残した泡の弧が、幾重にも重なって乾いていった。
+> 戦争が終わった朝、対岸の狙撃手と漁師は、同じ魚群の銀色を見ていた。
 
 <details>
 <summary>Instructions (normalized DDL) and source SVG</summary>
 
 ```
-白い細筆の弧を、太さを変えて五本を並べる。波打つ軌跡に沿って、弧を重ねて置く。面: 滲む。
+背景を白で塗りつぶす。
+画面下半分に灰色の細筆の横線を二十本並べる。
+中央付近に白い小さな楕円を百二十個、波打つ軌跡に沿って散らす。
+右端に黒い鉛筆の縦線を一本引く。
 ```
 
-> Line up five white fine-brush arcs, varying the thickness. Place the arcs overlapping along an undulating path. Surface: blur.
+> Fill the background with white.
+> Line up twenty gray fine-brush horizontal lines across the lower half.
+> Scatter one hundred and twenty small white ellipses near the center, along an undulating path.
+> Draw one black pencil vertical line at the right edge.
 
-[ebb-tide-foam-arcs.svg](docs/assets/gallery/ebb-tide-foam-arcs.svg) — seed `1997407931189975` / color catalog inku Default
+[armistice-morning-silver-shoal.svg](docs/assets/gallery/armistice-morning-silver-shoal.svg) — seed `1759981552357047` / color catalog inku Default
 
 </details>
 
@@ -209,21 +215,28 @@ SVG (the performance — one-time)
 
 ### One work, followed through the layers
 
-Take the second piece in the gallery, the arcs of ebb-tide foam. The description was this sentence:
+Take the second piece in the gallery, the silver of the shoal. The description was this sentence:
 
 ```
-干潮の砂浜に、引き波が残した泡の弧が、幾重にも重なって乾いていった。
-（On the low-tide sand, the arcs of foam left by the receding wave dried, layer upon layer.）
+戦争が終わった朝、対岸の狙撃手と漁師は、同じ魚群の銀色を見ていた。
+（On the morning the war ended, the sniper and the fisherman on opposite banks
+ were watching the same silver of the shoal.）
 ```
 
-Interpretation reads it into instructions (normalized DDL). No emotional word survives — only shape, material, and motion.
+Interpretation reads it into instructions (normalized DDL). Neither the sniper nor the fisherman nor the war survives — only shape, material, and motion.
 
 ```
-白い細筆の弧を、太さを変えて五本を並べる。波打つ軌跡に沿って、弧を重ねて置く。面: 滲む。
-（Line up five white fine-brush arcs, varying the thickness. Place the arcs overlapping along an undulating path. Surface: blur.）
+背景を白で塗りつぶす。
+画面下半分に灰色の細筆の横線を二十本並べる。
+中央付近に白い小さな楕円を百二十個、波打つ軌跡に沿って散らす。
+右端に黒い鉛筆の縦線を一本引く。
+（Fill the background with white. Line up twenty gray fine-brush horizontal lines
+ across the lower half. Scatter one hundred and twenty small white ellipses near
+ the center, along an undulating path. Draw one black pencil vertical line at the
+ right edge.）
 ```
 
-Structuring writes those instructions down as a score (JSON Score). This is the excerpt actually stored — the first of three instructions, with `null` fields omitted.
+Structuring writes those instructions down as a score (JSON Score). This is the excerpt actually stored — the second of three instructions, the shoal itself, with `null` fields omitted.
 
 ```json
 {
@@ -232,31 +245,32 @@ Structuring writes those instructions down as a score (JSON Score). This is the 
   "background": "white",
   "instructions": [
     {
-      "primitive": "arc",
+      "primitive": "ellipse",
       "center": [0.5, 0.5],
-      "radius": 0.3,
-      "angle_start": 0.0,
-      "angle_end": 270.0,
-      "weight": "brush_thin",
+      "size": [0.02, 0.01],
+      "rotation": 18.0,
+      "filled": false,
+      "weight": "pencil",
       "color": "black",
       "variation": {
         "amplitude": "medium",
-        "frequency": "medium",
-        "quality": "pink",
+        "frequency": "slow",
+        "quality": "wave",
         "dimensions": ["position_x", "position_y"]
       },
       "arrangement": {
-        "count": 5,
+        "count": 110,
         "layout": "scatter",
         "path": "wave",
         "color_cycle": ["black", "white"],
+        "density": "high",
+        "cluster_count": 7,
         "fade": "outward",
         "rhythm_spacing": "loose"
       },
       "surface": {
-        "texture": "bleed",
+        "texture": "wash",
         "opacity": 0.6,
-        "bleed": 0.3,
         "tone_steps": 3
       }
     }
@@ -264,7 +278,7 @@ Structuring writes those instructions down as a score (JSON Score). This is the 
 }
 ```
 
-"Layer upon layer" landed in `arrangement.count` and `layout`; "dried" landed in `surface.texture: bleed` and `fade: outward`. The renderer performs this score — slightly differently each time. Because the output is vector, it holds up framed on paper, stretched across a wall, or viewed on a phone. There is no physical size constraint.
+"Shoal" landed in `count` and `cluster_count: 7`; "along an undulating path" landed in `path: wave`; "silver" landed in `color_cycle` and `surface.texture: wash`. The "opposite bank" became the single vertical line at the right edge. The renderer performs this score — slightly differently each time. Because the output is vector, it holds up framed on paper, stretched across a wall, or viewed on a phone. There is no physical size constraint.
 
 Scores may also carry surface and ground texture. A circle can say it is filled with wash or stipple through `instruction.surface`; the canvas can say it is off-white paper, washi, or ink-wash ground through `canvas.ground`. Those fields stay abstract. The renderer decides whether to perform them as SVG filters, clipped vector marks, or simplified compat output.
 

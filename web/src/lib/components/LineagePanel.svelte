@@ -495,8 +495,7 @@ $effect(() => {
 	<header>
 		<div>
 			<h2>{isJapanese ? '作品の系譜' : 'Artwork Lineage'}</h2>
-			<p>{overviewOpen ? (isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.') : (isJapanese ? '表示中の作品を中心に、祖先から子作品へ上から下に辿れます。' : 'Trace ancestors and descendants from top to bottom.')}</p>
-			{#if graph}<p class="lineage-context">{isJapanese ? '表示中の作品が、次の推敲の親になります。' : 'The displayed artwork will be the parent of your next refinement.'}</p>{/if}
+			{#if overviewOpen}<p>{isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.'}</p>{/if}
 		</div>
 <div class="lineage-actions">
 	<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
@@ -718,7 +717,6 @@ $effect(() => {
 	header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 	h2 { margin: 0 0 4px; font-size: 1.05rem; }
 	p { margin: 0; color: var(--fg3); font-size: .82rem; }
-	.lineage-context { margin-top: 5px; color: var(--fg2); font-weight: 600; }
 	.lineage-actions, .overview-zoom { display: flex; align-items: center; gap: 8px; }
 	.overview-zoom { padding-right: 8px; border-right: 1px solid var(--border); }
 	.overview-zoom span { min-width: 42px; color: var(--fg3); font-size: .72rem; text-align: center; }

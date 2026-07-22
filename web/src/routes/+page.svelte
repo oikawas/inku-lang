@@ -501,7 +501,39 @@
 		svg: string;
 	};
 
+	// One entry per saijiki word. The copy exists in both UI languages; the
+	// artwork is shared, since the preview shows the same drawing either way.
+	type PreviewEntry = {
+		effect: string;
+		example: string;
+		effectEn: string;
+		exampleEn: string;
+		svg: string;
+	};
+
+	// The preview is resolved from the surface the chip actually shows. The
+	// caller derives its canonical word by pairing the two language lists by
+	// position, and that pairing does not hold everywhere (うごき lists 引く/
+	// 埋める opposite fill/draw), so the canonical word is only a last resort.
+	const SAIJIKI_EN_TO_JA: Record<string, string> = {
+		circle: '円', ellipse: '楕円', triangle: '三角', square: '四角', line: '線', arc: '弧', cloudform: '雲形',
+		horizontal: '水平', vertical: '垂直', diagonal: '斜め', rising: '右上がり', falling: '右下がり', rotated: '回転',
+		hair: '髪', pencil: '鉛筆', pen: 'ペン', rotring: 'ロットリング', crayon: 'クレヨン', chalk: 'チョーク',
+		'fine-brush': '細筆', 'thick-brush': '太筆', burin: 'ビュラン', drypoint: 'ドライポイント',
+		solid: '実線', dashed: '破線', dotted: '点線', 'dash-dot': '一点鎖線',
+		white: '白', black: '黒', blue: '青', red: '赤', green: '緑', gray: '灰',
+		fine: '細かく', large: '大きく', slowly: 'ゆっくり', quickly: '速く',
+		swaying: '揺れる', undulating: '波打つ', trembling: '震える', blurring: '滲む',
+		top: '上', bottom: '下', center: '中央', 'left-edge': '左端', 'right-edge': '右端',
+		'top-edge': '上端', 'bottom-edge': '下端', middle: '中心', corner: '隅',
+		place: '置く', 'line-up': '並べる', draw: '引く', scatter: '散らす', fill: '埋める', tile: '敷き詰める',
+		tall: '縦長', wide: '横長', 'full-width': '全幅', 'half-width': '半幅',
+		semicircle: '半円', waxing: '上弦', waning: '下弦', crescent: '三日月',
+		along: '沿う', 'not touching': '触れない', cutting: '切る', between: '間に', touching: '触れる',
+	};
+
 	function saijikiPreview(categoryKey: string, canonicalWord: string, word: string): SaijikiPreview {
+		const isJa = getLang() === 'ja';
 		const base = {
 			categoryKey,
 			word,
@@ -510,6 +542,11 @@
 			example: '',
 			svg: '',
 		};
+		const localized = (entry: PreviewEntry) => ({
+			effect: isJa ? entry.effect : entry.effectEn,
+			example: isJa ? entry.example : entry.exampleEn,
+			svg: entry.svg,
+		});
 		const lineSvg = (attrs = '', strokeWidth = 5, lineCap = 'round', stroke = '#2b2b2b') => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M22 56 C56 26 95 76 158 38" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="${lineCap}" ${attrs}/></svg>`;
 		const shapeSvg = (shape: string) => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/>${shape}</svg>`;
 		const touchSvg = (kind: string) => {
@@ -530,94 +567,99 @@
 		};
 		if (categoryKey === "plugin-nature") {
 			const natureSvg = shapeSvg("<path d=\"M32 48 C52 28 74 68 94 48 S132 28 150 48\" stroke=\"#b95845\" stroke-width=\"5\" fill=\"none\" stroke-linecap=\"round\"/><path d=\"M34 62 C58 50 78 76 102 62 S134 50 150 62\" stroke=\"#d39a7b\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/>");
-			const naturePreviews: Record<string, Omit<SaijikiPreview, "categoryKey" | "word" | "canonicalWord">> = {
-				"Nature.風": { effect: "左から右へのゆるやかな揺れを全体に通します。", example: "Nature.風を通す", svg: natureSvg },
-				"Nature.うねり": { effect: "媒質を限定しない大きな波の揺れを全体に通します。", example: "Nature.うねりを通す", svg: natureSvg },
-				"Nature.無風": { effect: "揺らぎと配置軌跡を抑え、静止に寄せます。", example: "Nature.無風", svg: natureSvg },
-				"Nature.wind": { effect: "Adds a slow left-to-right wind-like sway.", example: "Nature.wind", svg: natureSvg },
-				"Nature.undulation": { effect: "Adds a broad medium-free undulation.", example: "Nature.undulation", svg: natureSvg },
-				"Nature.stillness": { effect: "Suppresses sway and placement paths.", example: "Nature.stillness", svg: natureSvg },
+			const naturePreviews: Record<string, PreviewEntry> = {
+				"Nature.風": { effect: "左から右へのゆるやかな揺れを全体に通します。", example: "Nature.風を通す", effectEn: "Runs a slow left-to-right sway through the whole drawing.", exampleEn: "Nature.wind", svg: natureSvg },
+				"Nature.うねり": { effect: "媒質を限定しない大きな波の揺れを全体に通します。", example: "Nature.うねりを通す", effectEn: "Runs a broad medium-free undulation through the whole drawing.", exampleEn: "Nature.undulation", svg: natureSvg },
+				"Nature.無風": { effect: "揺らぎと配置軌跡を抑え、静止に寄せます。", example: "Nature.無風", effectEn: "Suppresses sway and placement paths, settling toward stillness.", exampleEn: "Nature.stillness", svg: natureSvg },
 			};
-			return { ...base, ...(naturePreviews[canonicalWord] ?? naturePreviews[word] ?? naturePreviews["Nature.うねり"]) };
+			naturePreviews["Nature.wind"] = naturePreviews["Nature.風"];
+			naturePreviews["Nature.undulation"] = naturePreviews["Nature.うねり"];
+			naturePreviews["Nature.stillness"] = naturePreviews["Nature.無風"];
+			return { ...base, ...localized(naturePreviews[canonicalWord] ?? naturePreviews[word] ?? naturePreviews["Nature.うねり"]) };
 		}
 		const angleSvg = (rotation: number, line = false) => shapeSvg(line
 			? `<g transform="rotate(${rotation} 90 46)"><path d="M42 46 H138" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`
 			: `<g transform="rotate(${rotation} 90 46)"><rect x="58" y="29" width="64" height="34" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`);
 		const scatter = `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><circle cx="42" cy="35" r="5" fill="#2b2b2b"/><circle cx="84" cy="58" r="4" fill="#2b2b2b"/><circle cx="122" cy="30" r="5" fill="#2b2b2b"/><circle cx="146" cy="65" r="3.5" fill="#2b2b2b"/><circle cx="62" cy="72" r="3.5" fill="#2b2b2b"/></svg>`;
-		const previews: Record<string, Omit<SaijikiPreview, 'categoryKey' | 'word' | 'canonicalWord'>> = {
-			円: { effect: '正円を描く。中心と半径で配置される。', example: '中央に黒い円を置く', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
-			楕円: { effect: '横または縦に伸びた円を描く。', example: '横長の楕円を置く', svg: shapeSvg('<ellipse cx="90" cy="46" rx="42" ry="22" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
-			三角: { effect: '三つの頂点を持つ形を描く。', example: '上に三角を置く', svg: shapeSvg('<path d="M90 20 L132 70 L48 70 Z" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>') },
-			四角: { effect: '矩形を描く。比率語で縦長・横長にもなる。', example: '中央に四角を置く', svg: shapeSvg('<rect x="58" y="24" width="64" height="44" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/>') },
-			線: { effect: '始点から終点へ線を引く。', example: '左から右へ線を引く', svg: lineSvg() },
-			弧: { effect: '円周の一部を描く。半円や三日月の基礎になる。', example: '上弦の弧を引く', svg: shapeSvg('<path d="M44 58 Q90 18 136 58" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
-			雲形: {
-				effect: word === 'cloudform' ? 'A closed irregular form whose contour is decided anew for each performance.' : '輪郭が演奏ごとに決まる、不規則さの文法を持つ閉じた形。',
-				example: word === 'cloudform' ? 'Place a wide cloudform at center' : '中央に横長の雲形を置く',
-				svg: shapeSvg('<path d="M45 52 C40 34 58 22 77 28 C90 15 111 22 113 36 C135 35 143 52 131 65 C116 76 96 66 82 72 C63 78 46 68 45 52 Z" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>')
-			},
-			水平: { effect: '0度の向き。線なら横線として扱う。', example: '水平の線を引く', svg: angleSvg(0, true) },
-			垂直: { effect: '90度の向き。線なら縦線として扱う。', example: '垂直の線を引く', svg: angleSvg(90, true) },
-			斜め: { effect: '約45度の傾きを与える。', example: '斜めの四角を置く', svg: angleSvg(45) },
-			右上がり: { effect: '左下から右上へ向かう傾き。', example: '右上がりの線', svg: angleSvg(-30, true) },
-			右下がり: { effect: '左上から右下へ向かう傾き。', example: '右下がりの線', svg: angleSvg(30, true) },
-			回転: { effect: '図形全体を中心まわりに回転させる。', example: '回転した横長の四角', svg: angleSvg(30) },
-			髪: { effect: '非常に細く、筆致の変化をほぼ抑えた線。', example: '髪のように細い線', svg: touchSvg('hair') },
-			鉛筆: { effect: '幅と横揺れが連動し、細かな副線と紙目の粒を伴う。', example: '鉛筆の線を引く', svg: touchSvg('pencil') },
-			ペン: { effect: '明瞭さを保ちながら、わずかな幅と軌道の変化を持つ。', example: 'ペンの線を引く', svg: touchSvg('pen') },
-			ロットリング: { effect: '共有筆致を遮断した、均一で硬い製図線。', example: 'ロットリングの線', svg: touchSvg('rotring') },
-			クレヨン: { effect: '太い主線に擦れた副線と粒を重ねる。', example: '青いクレヨンの線', svg: touchSvg('crayon') },
-			チョーク: { effect: '幅の崩れ、途切れ、粉状の粒を含む淡い線。', example: '白いチョークの線', svg: touchSvg('chalk') },
-			細筆: { effect: '入りと抜きが細く、筆圧で幅が大きく変わる。', example: '細筆で線を引く', svg: touchSvg('brush_thin') },
-			太筆: { effect: '大きな幅変化と穂先の筋を持つ太い筆線。', example: '太筆で黒い線を引く', svg: touchSvg('brush_thick') },
-			ビュラン: { effect: '入りと抜きが細く、中央に彫りの勢いが集まる硬い線。', example: 'ビュランで線を彫る', svg: touchSvg('burin') },
-			ドライポイント: { effect: '緩い中膨らみと、片側だけの柔らかなburrを伴う線。', example: 'ドライポイントの線', svg: touchSvg('drypoint') },
-			実線: { effect: '切れ目のない線。', example: '実線で引く', svg: lineSvg() },
-			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', svg: lineSvg('stroke-dasharray="14 9"') },
-			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', svg: lineSvg('stroke-dasharray="1 12"') },
-			一点鎖線: { effect: '長線と点を交互に並べる。', example: '一点鎖線を引く', svg: lineSvg('stroke-dasharray="18 7 2 7"') },
-			白: { effect: '白系の色で描く。背景との対比に注意。', example: '白い円', svg: shapeSvg('<rect x="48" y="18" width="84" height="56" fill="#2b2b2b" opacity="0.16"/><circle cx="90" cy="46" r="24" fill="#ffffff" stroke="#c9c2b5" stroke-width="4"/>') },
-			黒: { effect: '黒で描く。最も強い輪郭になる。', example: '黒い円', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="#2b2b2b"/>') },
-			青: { effect: '青系の色で描く。', example: '青い線', svg: lineSvg('', 5, 'round', '#2c5fb8') },
-			赤: { effect: '赤系の色で描く。', example: '赤い三角', svg: shapeSvg('<path d="M90 20 L132 70 L48 70 Z" fill="none" stroke="#c9362d" stroke-width="6" stroke-linejoin="round"/>') },
-			緑: { effect: '緑系の色で描く。', example: '緑の点を散らす', svg: scatter.replaceAll('#2b2b2b', '#2f8a4b') },
-			灰: { effect: '灰色で描く。弱い輪郭や背景に向く。', example: '灰色の四角', svg: shapeSvg('<rect x="58" y="24" width="64" height="44" fill="none" stroke="#777777" stroke-width="6" rx="2"/>') },
-			細かく: { effect: '小さな揺らぎを加える。', example: '細かく揺れる線', svg: lineSvg() },
-			大きく: { effect: '振幅の大きな揺らぎを加える。', example: '大きく波打つ線', svg: shapeSvg('<path d="M20 48 C42 8 64 84 88 48 S134 8 160 48" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>') },
-			ゆっくり: { effect: 'ゆったりした周期の動きとして解釈する。', example: 'ゆっくり波打つ線', svg: shapeSvg('<path d="M22 48 C62 20 112 76 158 48" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>') },
-			速く: { effect: '細かく速い振動として解釈する。', example: '速く震える線', svg: shapeSvg('<path d="M20 48 L32 40 L44 56 L56 40 L68 56 L80 40 L92 56 L104 40 L116 56 L128 40 L140 56 L158 48" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>') },
-			揺れる: { effect: '自然な揺れを線や配置に与える。', example: '揺れる線', svg: lineSvg() },
-			波打つ: { effect: '波形のうねりを作る。', example: '波打つ青い線', svg: shapeSvg('<path d="M20 48 C42 22 66 74 88 48 S134 22 160 48" fill="none" stroke="#2c5fb8" stroke-width="5" stroke-linecap="round"/>') },
-			震える: { effect: '細かい震えを作る。', example: '震える黒い線', svg: shapeSvg('<path d="M20 48 L30 45 L40 52 L50 44 L60 50 L70 43 L80 51 L90 45 L100 53 L110 44 L120 50 L130 43 L140 51 L160 48" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>') },
-			滲む: { effect: '輪郭をぼかし、墨が染みるようにする。', example: '滲む黒い円', svg: shapeSvg('<defs><filter id="pblur"><feGaussianBlur stdDeviation="3"/></filter></defs><circle cx="90" cy="46" r="24" fill="#2b2b2b" opacity="0.72" filter="url(#pblur)"/><circle cx="90" cy="46" r="20" fill="#2b2b2b" opacity="0.62"/>') },
-			上: { effect: '画面の上側へ配置する。', example: '上に円を置く', svg: shapeSvg('<circle cx="90" cy="25" r="14" fill="#2b2b2b"/><path d="M28 70 H152" stroke="#d7d1c4" stroke-width="2"/>') },
-			下: { effect: '画面の下側へ配置する。', example: '下に円を置く', svg: shapeSvg('<path d="M28 22 H152" stroke="#d7d1c4" stroke-width="2"/><circle cx="90" cy="67" r="14" fill="#2b2b2b"/>') },
-			中央: { effect: '中央付近へ配置する。', example: '中央に円を置く', svg: shapeSvg('<circle cx="90" cy="46" r="16" fill="#2b2b2b"/>') },
-			左端: { effect: '左端近くへ寄せる。', example: '左端に線を置く', svg: shapeSvg('<path d="M30 18 V74" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/><path d="M90 16 V76" stroke="#d7d1c4" stroke-width="2"/>') },
-			右端: { effect: '右端近くへ寄せる。', example: '右端に線を置く', svg: shapeSvg('<path d="M90 16 V76" stroke="#d7d1c4" stroke-width="2"/><path d="M150 18 V74" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>') },
-			上端: { effect: '上の縁へ寄せる。', example: '上端に線を引く', svg: shapeSvg('<path d="M30 18 H150" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/><path d="M28 46 H152" stroke="#d7d1c4" stroke-width="2"/>') },
-			下端: { effect: '下の縁へ寄せる。', example: '下端に線を引く', svg: shapeSvg('<path d="M28 46 H152" stroke="#d7d1c4" stroke-width="2"/><path d="M30 74 H150" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>') },
-			中心: { effect: '中心座標を基準に配置する。', example: '中心に円を置く', svg: shapeSvg('<path d="M90 14 V78 M32 46 H148" stroke="#d7d1c4" stroke-width="2"/><circle cx="90" cy="46" r="15" fill="#2b2b2b"/>') },
-			隅: { effect: '四隅のいずれかへ配置する。', example: '隅に小さな円を置く', svg: shapeSvg('<circle cx="36" cy="25" r="11" fill="#2b2b2b"/><circle cx="144" cy="67" r="11" fill="#2b2b2b" opacity="0.28"/>') },
-			置く: { effect: '指定した場所に一つ置く。', example: '中央に円を置く', svg: shapeSvg('<circle cx="90" cy="46" r="22" fill="#2b2b2b"/>') },
-			並べる: { effect: '同じ要素を列として並べる。', example: '円を横に並べる', svg: shapeSvg('<circle cx="55" cy="46" r="12" fill="#2b2b2b"/><circle cx="90" cy="46" r="12" fill="#2b2b2b"/><circle cx="125" cy="46" r="12" fill="#2b2b2b"/>') },
-			埋める: { effect: '面や領域を密に満たす。', example: '点で埋める', svg: shapeSvg('<circle cx="50" cy="28" r="5" fill="#2b2b2b"/><circle cx="80" cy="32" r="5" fill="#2b2b2b"/><circle cx="112" cy="29" r="5" fill="#2b2b2b"/><circle cx="62" cy="55" r="5" fill="#2b2b2b"/><circle cx="97" cy="58" r="5" fill="#2b2b2b"/><circle cx="132" cy="55" r="5" fill="#2b2b2b"/>') },
-			散らす: { effect: '要素を不規則に散布する。', example: '黒い点を散らす', svg: scatter },
-			引く: { effect: '線や弧を描く動作。', example: '線を引く', svg: lineSvg() },
-			縦長: { effect: '縦方向に長い比率にする。', example: '縦長の楕円', svg: shapeSvg('<ellipse cx="90" cy="46" rx="20" ry="34" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
-			横長: { effect: '横方向に長い比率にする。', example: '横長の楕円', svg: shapeSvg('<ellipse cx="90" cy="46" rx="42" ry="18" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
-			全幅: { effect: '画面幅いっぱいに広げる。', example: '全幅の線', svg: shapeSvg('<path d="M14 46 H166" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
-			半幅: { effect: '画面の半分程度の幅にする。', example: '半幅の線', svg: shapeSvg('<path d="M45 46 H135" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/><path d="M14 72 H166" stroke="#d7d1c4" stroke-width="2"/>') },
-			半円: { effect: '円の半分を描く。', example: '半円を置く', svg: shapeSvg('<path d="M50 60 A40 40 0 0 1 130 60" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
-			上弦: { effect: '上側に弦を持つ弧として扱う。', example: '上弦の月', svg: shapeSvg('<path d="M50 56 Q90 22 130 56" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
-			下弦: { effect: '下側に弦を持つ弧として扱う。', example: '下弦の月', svg: shapeSvg('<path d="M50 36 Q90 70 130 36" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
-			三日月: { effect: '細い月形を描く。', example: '三日月を置く', svg: shapeSvg('<path d="M106 18 C76 24 62 52 82 74 C52 63 50 27 82 14 C92 12 100 14 106 18 Z" fill="#2b2b2b"/>') },
-			沿う: { effect: `直前の線を参照する関係。`, example: `前の線に沿って`, svg: shapeSvg(`<path d="M24 56 C58 28 104 70 156 34" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/><circle cx="62" cy="45" r="5" fill="#c9362d"/><circle cx="94" cy="51" r="5" fill="#c9362d"/><circle cx="126" cy="43" r="5" fill="#c9362d"/>`) },
-			触れない: { effect: `直前の形に接触しない関係。`, example: `前の形に触れない`, svg: shapeSvg(`<circle cx="78" cy="46" r="22" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="124" cy="46" r="10" fill="none" stroke="#c9362d" stroke-width="5"/>`) },
-			切る: { effect: `直前の線を横切る関係。`, example: `前の線を切る`, svg: shapeSvg(`<path d="M38 46 H142" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/><path d="M92 20 L78 72" stroke="#c9362d" stroke-width="6" stroke-linecap="round"/>`) },
-			間に: { effect: `直前の二つの要素の間に置く関係。`, example: `前の二つの間に`, svg: shapeSvg(`<circle cx="56" cy="46" r="14" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="124" cy="46" r="14" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="90" cy="46" r="8" fill="#c9362d"/>`) },
+		const previews: Record<string, PreviewEntry> = {
+			円: { effect: '正円を描く。中心と半径で配置される。', example: '中央に黒い円を置く', effectEn: 'Draws a true circle, placed by its center and radius.', exampleEn: 'Place a black circle at center', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
+			楕円: { effect: '横または縦に伸びた円を描く。', example: '横長の楕円を置く', effectEn: 'Draws a circle stretched along one axis.', exampleEn: 'Place a wide ellipse', svg: shapeSvg('<ellipse cx="90" cy="46" rx="42" ry="22" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
+			三角: { effect: '三つの頂点を持つ形を描く。', example: '上に三角を置く', effectEn: 'Draws a form with three vertices.', exampleEn: 'Place a triangle at the top', svg: shapeSvg('<path d="M90 20 L132 70 L48 70 Z" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>') },
+			四角: { effect: '矩形を描く。比率語で縦長・横長にもなる。', example: '中央に四角を置く', effectEn: 'Draws a rectangle. Proportion words make it tall or wide.', exampleEn: 'Place a square at center', svg: shapeSvg('<rect x="58" y="24" width="64" height="44" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/>') },
+			線: { effect: '始点から終点へ線を引く。', example: '左から右へ線を引く', effectEn: 'Draws a line from a start point to an end point.', exampleEn: 'Draw a line from left to right', svg: lineSvg() },
+			弧: { effect: '円周の一部を描く。半円や三日月の基礎になる。', example: '上弦の弧を引く', effectEn: 'Draws part of a circumference. The basis for semicircles and crescents.', exampleEn: 'Draw a waxing arc', svg: shapeSvg('<path d="M44 58 Q90 18 136 58" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			雲形: { effect: '輪郭が演奏ごとに決まる、不規則さの文法を持つ閉じた形。', example: '中央に横長の雲形を置く', effectEn: 'A closed irregular form whose contour is decided anew for each performance.', exampleEn: 'Place a wide cloudform at center', svg: shapeSvg('<path d="M45 52 C40 34 58 22 77 28 C90 15 111 22 113 36 C135 35 143 52 131 65 C116 76 96 66 82 72 C63 78 46 68 45 52 Z" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>') },
+			水平: { effect: '0度の向き。線なら横線として扱う。', example: '水平の線を引く', effectEn: 'A 0-degree orientation. A line is read as horizontal.', exampleEn: 'Draw a horizontal line', svg: angleSvg(0, true) },
+			垂直: { effect: '90度の向き。線なら縦線として扱う。', example: '垂直の線を引く', effectEn: 'A 90-degree orientation. A line is read as vertical.', exampleEn: 'Draw a vertical line', svg: angleSvg(90, true) },
+			斜め: { effect: '約45度の傾きを与える。', example: '斜めの四角を置く', effectEn: 'Applies a tilt of about 45 degrees.', exampleEn: 'Place a diagonal square', svg: angleSvg(45) },
+			右上がり: { effect: '左下から右上へ向かう傾き。', example: '右上がりの線', effectEn: 'A tilt running from lower left to upper right.', exampleEn: 'A rising line', svg: angleSvg(-30, true) },
+			右下がり: { effect: '左上から右下へ向かう傾き。', example: '右下がりの線', effectEn: 'A tilt running from upper left to lower right.', exampleEn: 'A falling line', svg: angleSvg(30, true) },
+			回転: { effect: '図形全体を中心まわりに回転させる。', example: '回転した横長の四角', effectEn: 'Rotates the whole form around its center.', exampleEn: 'A rotated wide square', svg: angleSvg(30) },
+			髪: { effect: '非常に細く、筆致の変化をほぼ抑えた線。', example: '髪のように細い線', effectEn: 'A very thin line with almost no variation in touch.', exampleEn: 'A line as thin as hair', svg: touchSvg('hair') },
+			鉛筆: { effect: '幅と横揺れが連動し、細かな副線と紙目の粒を伴う。', example: '鉛筆の線を引く', effectEn: 'Width and lateral sway move together, with fine secondary strokes and paper grain.', exampleEn: 'Draw a pencil line', svg: touchSvg('pencil') },
+			ペン: { effect: '明瞭さを保ちながら、わずかな幅と軌道の変化を持つ。', example: 'ペンの線を引く', effectEn: 'Stays clear while varying slightly in width and path.', exampleEn: 'Draw a pen line', svg: touchSvg('pen') },
+			ロットリング: { effect: '共有筆致を遮断した、均一で硬い製図線。', example: 'ロットリングの線', effectEn: 'A uniform, hard drafting line that blocks the shared touch.', exampleEn: 'A rotring line', svg: touchSvg('rotring') },
+			クレヨン: { effect: '太い主線に擦れた副線と粒を重ねる。', example: '青いクレヨンの線', effectEn: 'Lays scuffed secondary strokes and grain over a thick main stroke.', exampleEn: 'A blue crayon line', svg: touchSvg('crayon') },
+			チョーク: { effect: '幅の崩れ、途切れ、粉状の粒を含む淡い線。', example: '白いチョークの線', effectEn: 'A pale line with broken width, gaps, and powdery grain.', exampleEn: 'A white chalk line', svg: touchSvg('chalk') },
+			細筆: { effect: '入りと抜きが細く、筆圧で幅が大きく変わる。', example: '細筆で線を引く', effectEn: 'Thin at entry and release, with width changing widely under pressure.', exampleEn: 'Draw a line with a fine brush', svg: touchSvg('brush_thin') },
+			太筆: { effect: '大きな幅変化と穂先の筋を持つ太い筆線。', example: '太筆で黒い線を引く', effectEn: 'A thick brush stroke with wide width changes and streaks from the tip.', exampleEn: 'Draw a black line with a thick brush', svg: touchSvg('brush_thick') },
+			ビュラン: { effect: '入りと抜きが細く、中央に彫りの勢いが集まる硬い線。', example: 'ビュランで線を彫る', effectEn: 'A hard line, thin at both ends, with the cutting force gathered at the center.', exampleEn: 'Cut a line with a burin', svg: touchSvg('burin') },
+			ドライポイント: { effect: '緩い中膨らみと、片側だけの柔らかなburrを伴う線。', example: 'ドライポイントの線', effectEn: 'A line with a slight mid-swell and a soft burr on one side only.', exampleEn: 'A drypoint line', svg: touchSvg('drypoint') },
+			実線: { effect: '切れ目のない線。', example: '実線で引く', effectEn: 'An unbroken line.', exampleEn: 'Draw with a solid line', svg: lineSvg() },
+			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', effectEn: 'Places short segments with gaps between them.', exampleEn: 'A dashed arc', svg: lineSvg('stroke-dasharray="14 9"') },
+			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', effectEn: 'Draws as a run of dots.', exampleEn: 'Enclose with a dotted line', svg: lineSvg('stroke-dasharray="1 12"') },
+			一点鎖線: { effect: '長線と点を交互に並べる。', example: '一点鎖線を引く', effectEn: 'Alternates long dashes with dots.', exampleEn: 'Draw a dash-dot line', svg: lineSvg('stroke-dasharray="18 7 2 7"') },
+			白: { effect: '白系の色で描く。背景との対比に注意。', example: '白い円', effectEn: 'Draws in a white tone. Mind the contrast against the ground.', exampleEn: 'A white circle', svg: shapeSvg('<rect x="48" y="18" width="84" height="56" fill="#2b2b2b" opacity="0.16"/><circle cx="90" cy="46" r="24" fill="#ffffff" stroke="#c9c2b5" stroke-width="4"/>') },
+			黒: { effect: '黒で描く。最も強い輪郭になる。', example: '黒い円', effectEn: 'Draws in black, giving the strongest contour.', exampleEn: 'A black circle', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="#2b2b2b"/>') },
+			青: { effect: '青系の色で描く。', example: '青い線', effectEn: 'Draws in a blue tone.', exampleEn: 'A blue line', svg: lineSvg('', 5, 'round', '#2c5fb8') },
+			赤: { effect: '赤系の色で描く。', example: '赤い三角', effectEn: 'Draws in a red tone.', exampleEn: 'A red triangle', svg: shapeSvg('<path d="M90 20 L132 70 L48 70 Z" fill="none" stroke="#c9362d" stroke-width="6" stroke-linejoin="round"/>') },
+			緑: { effect: '緑系の色で描く。', example: '緑の点を散らす', effectEn: 'Draws in a green tone.', exampleEn: 'Scatter green dots', svg: scatter.replaceAll('#2b2b2b', '#2f8a4b') },
+			灰: { effect: '灰色で描く。弱い輪郭や背景に向く。', example: '灰色の四角', effectEn: 'Draws in gray. Suits weak contours and grounds.', exampleEn: 'A gray square', svg: shapeSvg('<rect x="58" y="24" width="64" height="44" fill="none" stroke="#777777" stroke-width="6" rx="2"/>') },
+			細かく: { effect: '小さな揺らぎを加える。', example: '細かく揺れる線', effectEn: 'Adds a small-amplitude fluctuation.', exampleEn: 'A finely swaying line', svg: lineSvg() },
+			大きく: { effect: '振幅の大きな揺らぎを加える。', example: '大きく波打つ線', effectEn: 'Adds a large-amplitude fluctuation.', exampleEn: 'A largely undulating line', svg: shapeSvg('<path d="M20 48 C42 8 64 84 88 48 S134 8 160 48" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>') },
+			ゆっくり: { effect: 'ゆったりした周期の動きとして解釈する。', example: 'ゆっくり波打つ線', effectEn: 'Read as motion with a long period.', exampleEn: 'A slowly undulating line', svg: shapeSvg('<path d="M22 48 C62 20 112 76 158 48" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>') },
+			速く: { effect: '細かく速い振動として解釈する。', example: '速く震える線', effectEn: 'Read as a fine, fast vibration.', exampleEn: 'A quickly trembling line', svg: shapeSvg('<path d="M20 48 L32 40 L44 56 L56 40 L68 56 L80 40 L92 56 L104 40 L116 56 L128 40 L140 56 L158 48" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>') },
+			揺れる: { effect: '自然な揺れを線や配置に与える。', example: '揺れる線', effectEn: 'Gives lines and placement a natural sway.', exampleEn: 'A swaying line', svg: lineSvg() },
+			波打つ: { effect: '波形のうねりを作る。', example: '波打つ青い線', effectEn: 'Makes a wave-shaped undulation.', exampleEn: 'An undulating blue line', svg: shapeSvg('<path d="M20 48 C42 22 66 74 88 48 S134 22 160 48" fill="none" stroke="#2c5fb8" stroke-width="5" stroke-linecap="round"/>') },
+			震える: { effect: '細かい震えを作る。', example: '震える黒い線', effectEn: 'Makes a fine tremble.', exampleEn: 'A trembling black line', svg: shapeSvg('<path d="M20 48 L30 45 L40 52 L50 44 L60 50 L70 43 L80 51 L90 45 L100 53 L110 44 L120 50 L130 43 L140 51 L160 48" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>') },
+			滲む: { effect: '輪郭をぼかし、墨が染みるようにする。', example: '滲む黒い円', effectEn: 'Softens the contour so the ink bleeds.', exampleEn: 'A blurring black circle', svg: shapeSvg('<defs><filter id="pblur"><feGaussianBlur stdDeviation="3"/></filter></defs><circle cx="90" cy="46" r="24" fill="#2b2b2b" opacity="0.72" filter="url(#pblur)"/><circle cx="90" cy="46" r="20" fill="#2b2b2b" opacity="0.62"/>') },
+			上: { effect: '画面の上側へ配置する。', example: '上に円を置く', effectEn: 'Places toward the upper side of the frame.', exampleEn: 'Place a circle at the top', svg: shapeSvg('<circle cx="90" cy="25" r="14" fill="#2b2b2b"/><path d="M28 70 H152" stroke="#d7d1c4" stroke-width="2"/>') },
+			下: { effect: '画面の下側へ配置する。', example: '下に円を置く', effectEn: 'Places toward the lower side of the frame.', exampleEn: 'Place a circle at the bottom', svg: shapeSvg('<path d="M28 22 H152" stroke="#d7d1c4" stroke-width="2"/><circle cx="90" cy="67" r="14" fill="#2b2b2b"/>') },
+			中央: { effect: '中央付近へ配置する。', example: '中央に円を置く', effectEn: 'Places near the middle of the frame.', exampleEn: 'Place a circle at center', svg: shapeSvg('<circle cx="90" cy="46" r="16" fill="#2b2b2b"/>') },
+			左端: { effect: '左端近くへ寄せる。', example: '左端に線を置く', effectEn: 'Pulls close to the left edge.', exampleEn: 'Place a line at the left edge', svg: shapeSvg('<path d="M30 18 V74" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/><path d="M90 16 V76" stroke="#d7d1c4" stroke-width="2"/>') },
+			右端: { effect: '右端近くへ寄せる。', example: '右端に線を置く', effectEn: 'Pulls close to the right edge.', exampleEn: 'Place a line at the right edge', svg: shapeSvg('<path d="M90 16 V76" stroke="#d7d1c4" stroke-width="2"/><path d="M150 18 V74" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>') },
+			上端: { effect: '上の縁へ寄せる。', example: '上端に線を引く', effectEn: 'Pulls to the upper margin.', exampleEn: 'Draw a line at the top edge', svg: shapeSvg('<path d="M30 18 H150" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/><path d="M28 46 H152" stroke="#d7d1c4" stroke-width="2"/>') },
+			下端: { effect: '下の縁へ寄せる。', example: '下端に線を引く', effectEn: 'Pulls to the lower margin.', exampleEn: 'Draw a line at the bottom edge', svg: shapeSvg('<path d="M28 46 H152" stroke="#d7d1c4" stroke-width="2"/><path d="M30 74 H150" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>') },
+			中心: { effect: '中心座標を基準に配置する。', example: '中心に円を置く', effectEn: 'Places against the center coordinate.', exampleEn: 'Place a circle at the middle', svg: shapeSvg('<path d="M90 14 V78 M32 46 H148" stroke="#d7d1c4" stroke-width="2"/><circle cx="90" cy="46" r="15" fill="#2b2b2b"/>') },
+			隅: { effect: '四隅のいずれかへ配置する。', example: '隅に小さな円を置く', effectEn: 'Places at one of the four corners.', exampleEn: 'Place a small circle in a corner', svg: shapeSvg('<circle cx="36" cy="25" r="11" fill="#2b2b2b"/><circle cx="144" cy="67" r="11" fill="#2b2b2b" opacity="0.28"/>') },
+			置く: { effect: '指定した場所に一つ置く。', example: '中央に円を置く', effectEn: 'Places one element at the given location.', exampleEn: 'Place a circle at center', svg: shapeSvg('<circle cx="90" cy="46" r="22" fill="#2b2b2b"/>') },
+			並べる: { effect: '同じ要素を列として並べる。', example: '円を横に並べる', effectEn: 'Lines the same element up as a row.', exampleEn: 'Line circles up horizontally', svg: shapeSvg('<circle cx="55" cy="46" r="12" fill="#2b2b2b"/><circle cx="90" cy="46" r="12" fill="#2b2b2b"/><circle cx="125" cy="46" r="12" fill="#2b2b2b"/>') },
+			埋める: { effect: '面や領域を密に満たす。', example: '点で埋める', effectEn: 'Fills a face or region densely.', exampleEn: 'Fill with dots', svg: shapeSvg('<circle cx="50" cy="28" r="5" fill="#2b2b2b"/><circle cx="80" cy="32" r="5" fill="#2b2b2b"/><circle cx="112" cy="29" r="5" fill="#2b2b2b"/><circle cx="62" cy="55" r="5" fill="#2b2b2b"/><circle cx="97" cy="58" r="5" fill="#2b2b2b"/><circle cx="132" cy="55" r="5" fill="#2b2b2b"/>') },
+			散らす: { effect: '要素を不規則に散布する。', example: '黒い点を散らす', effectEn: 'Scatters elements irregularly.', exampleEn: 'Scatter black dots', svg: scatter },
+			引く: { effect: '線や弧を描く動作。', example: '線を引く', effectEn: 'The act of drawing a line or an arc.', exampleEn: 'Draw a line', svg: lineSvg() },
+			敷き詰める: { effect: '要素を隙間なく反復して領域を覆う。', example: '四角で敷き詰める', effectEn: 'Repeats an element without gaps to cover the region.', exampleEn: 'Tile with squares', svg: shapeSvg('<g fill="none" stroke="#2b2b2b" stroke-width="3"><rect x="24" y="20" width="32" height="30"/><rect x="60" y="20" width="32" height="30"/><rect x="96" y="20" width="32" height="30"/><rect x="132" y="20" width="32" height="30"/><rect x="24" y="54" width="32" height="30"/><rect x="60" y="54" width="32" height="30"/><rect x="96" y="54" width="32" height="30"/><rect x="132" y="54" width="32" height="30"/></g>') },
+			縦長: { effect: '縦方向に長い比率にする。', example: '縦長の楕円', effectEn: 'Makes the proportion long in the vertical direction.', exampleEn: 'A tall ellipse', svg: shapeSvg('<ellipse cx="90" cy="46" rx="20" ry="34" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
+			横長: { effect: '横方向に長い比率にする。', example: '横長の楕円', effectEn: 'Makes the proportion long in the horizontal direction.', exampleEn: 'A wide ellipse', svg: shapeSvg('<ellipse cx="90" cy="46" rx="42" ry="18" fill="none" stroke="#2b2b2b" stroke-width="5"/>') },
+			全幅: { effect: '画面幅いっぱいに広げる。', example: '全幅の線', effectEn: 'Spreads across the full width of the frame.', exampleEn: 'A full-width line', svg: shapeSvg('<path d="M14 46 H166" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			半幅: { effect: '画面の半分程度の幅にする。', example: '半幅の線', effectEn: 'Sets the width to about half the frame.', exampleEn: 'A half-width line', svg: shapeSvg('<path d="M45 46 H135" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/><path d="M14 72 H166" stroke="#d7d1c4" stroke-width="2"/>') },
+			半円: { effect: '円の半分を描く。', example: '半円を置く', effectEn: 'Draws half of a circle.', exampleEn: 'Place a semicircle', svg: shapeSvg('<path d="M50 60 A40 40 0 0 1 130 60" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			上弦: { effect: '上側に弦を持つ弧として扱う。', example: '上弦の月', effectEn: 'Read as an arc with its chord on the upper side.', exampleEn: 'A waxing moon', svg: shapeSvg('<path d="M50 56 Q90 22 130 56" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			下弦: { effect: '下側に弦を持つ弧として扱う。', example: '下弦の月', effectEn: 'Read as an arc with its chord on the lower side.', exampleEn: 'A waning moon', svg: shapeSvg('<path d="M50 36 Q90 70 130 36" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>') },
+			三日月: { effect: '細い月形を描く。', example: '三日月を置く', effectEn: 'Draws a thin moon form.', exampleEn: 'Place a crescent', svg: shapeSvg('<path d="M106 18 C76 24 62 52 82 74 C52 63 50 27 82 14 C92 12 100 14 106 18 Z" fill="#2b2b2b"/>') },
+			沿う: { effect: `直前の線を参照する関係。`, example: `前の線に沿って`, effectEn: `A relation that refers to the preceding line.`, exampleEn: `along the previous line`, svg: shapeSvg(`<path d="M24 56 C58 28 104 70 156 34" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/><circle cx="62" cy="45" r="5" fill="#c9362d"/><circle cx="94" cy="51" r="5" fill="#c9362d"/><circle cx="126" cy="43" r="5" fill="#c9362d"/>`) },
+			触れない: { effect: `直前の形に接触しない関係。`, example: `前の形に触れない`, effectEn: `A relation that makes no contact with the preceding shape.`, exampleEn: `not touching the previous shape`, svg: shapeSvg(`<circle cx="78" cy="46" r="22" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="124" cy="46" r="10" fill="none" stroke="#c9362d" stroke-width="5"/>`) },
+			触れる: { effect: `直前の形に接触する関係。`, example: `前の線に触れる`, effectEn: `A relation that makes contact with the preceding shape.`, exampleEn: `touching the previous line`, svg: shapeSvg(`<circle cx="78" cy="46" r="22" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="124" cy="46" r="24" fill="none" stroke="#c9362d" stroke-width="5"/>`) },
+			切る: { effect: `直前の線を横切る関係。`, example: `前の線を切る`, effectEn: `A relation that crosses the preceding line.`, exampleEn: `cutting the previous line`, svg: shapeSvg(`<path d="M38 46 H142" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/><path d="M92 20 L78 72" stroke="#c9362d" stroke-width="6" stroke-linecap="round"/>`) },
+			間に: { effect: `直前の二つの要素の間に置く関係。`, example: `前の二つの間に`, effectEn: `A relation that places between the two preceding elements.`, exampleEn: `between the previous two`, svg: shapeSvg(`<circle cx="56" cy="46" r="14" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="124" cy="46" r="14" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="90" cy="46" r="8" fill="#c9362d"/>`) },
 		};
-		return { ...base, ...(previews[canonicalWord] ?? { effect: '記述の解釈に影響する語彙です。', example: `${word}を使う`, svg: lineSvg() }) };
+		const entry = previews[word] ?? previews[SAIJIKI_EN_TO_JA[word] ?? ''] ?? previews[canonicalWord];
+		if (entry) return { ...base, ...localized(entry) };
+		return {
+			...base,
+			effect: isJa ? '記述の解釈に影響する語彙です。' : 'A vocabulary word that shapes how the description is read.',
+			example: isJa ? `${word}を使う` : `Use "${word}"`,
+			svg: lineSvg(),
+		};
 	}
 
 	// ── Color catalog ────────────────────────────────────────

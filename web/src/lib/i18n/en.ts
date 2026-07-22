@@ -639,7 +639,7 @@ export const en: LangPack = {
 	historySecondsHeader: 'Seconds',
 	historyCatalogHeader: 'Color Catalog',
 	historyActionHeader: 'Actions',
-	okugakiRead: 'Read the Okugaki',
+	okugakiRead: 'Okugaki',
 	okugakiTooltip: 'Recite the branch to the displayed artwork as a first-person reader',
 	okugakiTitle: 'Okugaki — Lineage Recitation',
 	okugakiDescription: 'Records observed changes generation by generation and the invariants across them. Readings are appended and never edited.',
@@ -664,7 +664,7 @@ export const en: LangPack = {
 	saijikiWords: {
 		katachi: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc', 'cloudform'],
 		katamuki: ['horizontal', 'vertical', 'diagonal', 'rising', 'falling', 'rotated'],
-		tezawari: ['hair', 'pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'burin', 'drypoint'],
+		tezawari: ['pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'burin', 'drypoint'],
 		tsuranari: ['solid', 'dashed', 'dotted', 'dash-dot'],
 		iro: ['white', 'black', 'blue', 'red', 'green', 'gray'],
 		yuragi: ['fine', 'large', 'slowly', 'quickly', 'swaying', 'undulating', 'trembling', 'blurring'],

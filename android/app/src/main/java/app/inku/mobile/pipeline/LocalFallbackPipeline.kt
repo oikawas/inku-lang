@@ -1484,24 +1484,27 @@ class LocalFallbackPipeline(
         return ServerScoreSemantics.visibleForeground(color, background)
     }
 
+    fun descriptionHash(input: String): String {
+        val normalized = java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFC)
+            .replace("\r\n", "\n")
+            .replace("\r", "\n")
+            .trim()
+        return "dh1:" + sha256(normalized)
+    }
+
     private fun renderHash(input: String, ddl: String, scoreJson: String, svg: String, renderMetadataJson: String, catalogId: String): String {
         val metadata = JSONObject(renderMetadataJson)
+        val scoreObj = runCatching { JSONObject(scoreJson) }.getOrNull() ?: JSONObject()
         val payload = JSONObject()
-            .put("input", input)
-            .put("ddl", ddl)
-            .put("score", JSONObject(scoreJson))
-            .put("svg", svg)
-            .put("render_build_number", JSONObject.NULL)
-            .put("render_engine_id", metadata.opt("render_engine_id"))
-            .put("render_engine_version", metadata.opt("render_engine_version"))
-            .put("render_canvas_aspect", metadata.opt("render_canvas_aspect"))
-            .put("render_canvas_aspect_id", metadata.opt("render_canvas_aspect_id"))
-            .put("render_canvas_aspect_ratio", metadata.opt("render_canvas_aspect_ratio"))
+            .put("version", "rh2")
+            .put("score", scoreObj)
+            .put("render_seed", metadata.opt("render_seed") ?: metadata.opt("seed"))
+            .put("vary_seed", metadata.opt("vary_seed"))
+            .put("render_build_number", metadata.opt("render_build_number"))
+            .put("render_engine_id", metadata.opt("render_engine_id") ?: "default")
+            .put("render_engine_version", metadata.opt("render_engine_version") ?: "2")
             .put("render_color_catalog_id", metadata.opt("render_color_catalog_id") ?: catalogId)
-            .put("render_color_catalog_name", metadata.opt("render_color_catalog_name"))
-            .put("render_color_catalog_sub", metadata.opt("render_color_catalog_sub"))
-            .put("render_color_map", metadata.optJSONObject("render_color_map"))
-        return sha256(canonicalJson(payload))
+        return "rh2:" + sha256(canonicalJson(payload))
     }
 
     private fun canonicalJson(value: Any?): String {

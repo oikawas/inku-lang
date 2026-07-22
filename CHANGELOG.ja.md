@@ -2533,3 +2533,24 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **検証:** pytest **1022 passed / 30 skipped**（新規 `test_arc_strokes.py` 37 件: 手描き 9 weight の帯存在・rotring 不変・solid の意図弧不可視と抽出器規準で弧 1 個・変奏ありの polyline 化・破線可視化・drypoint burr・材質併存・決定性・seed 追随・変奏後合成）、cli 68 passed、ruff clean（Mac / pentala 両環境）。`test_touching.py` 全通過（200 seed の幾何 / replay 契約含む）。
 - **目視採取:** `cli/out2/646-v2.3.1-arc-strokes/`（SVG / PNG 8 組、resvg で材質 filter 込み: pencil の taper・brush_thick の濃淡・crayon / chalk の粒・drypoint の burr・rotring の幾何・破線・wave 変奏）。
 - **残件:** 実 UI 目視（弧の帯の筆致・両端 taper・weight 差）。葉の見え方が変わるため Stage 3 葉の再目視も候補（「双弧が円に見える」所感との対照）。サイズ上限規則は引き続き後付け（今回サイズ網羅採取は未実施）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v24-arc-strokes-result.md`。
+
+
+### v2.3.2 — 対話型 UI 調整（v2.3.1 機能群への追随）・描画並列度の管理者設定・用語の層別統一（Build 683、2026-07-22）
+
+- **対話型セッションによる UI 調整 35 件（Build 648〜682）:** 作者の逐次指示 → 実装 → pentala 実 UI 確認の反復で実施。主な内容:
+  - **歳時記ハイライトの英語対応**（`/api/saijiki` を日英並行取得し両語彙で最長一致、ASCII は単語境界 + 大小無視、色分けはカテゴリ `key` 基準）
+  - **指示書エディタの拡充**（描画モデル選択ボタン・現在モデル表示、記述タブに「DDL を編集」ボタン、描画完了後は作品タブへ遷移）
+  - **4 案描画の進捗表示**（並行実行のため「何番目」でなく完了数 `n/N` をステータスメタ行に表示）
+  - **PNG ダウンロードに EXIF 撮影日**（新規 `pngMetadata.ts`。`eXIf` チャンクの `DateTime*` / `OffsetTime*` と `tEXt` "Creation Time" を作品の生成日で書込み、Pillow 読出し検証済み）
+  - **入力 3 タブ（記述・バッチ・デモ）の整理**（ボタン列と設定状況帯 `.current-selection` を共通化、入力ボックス優先の再配置、バッチ・デモにも添景設定を結線〔従来はサーバー既定で描画されていた挙動変更〕、記述ラベルの入力ボックス直上移動と字数メーターの単位表示〔`34 / 31 字`、短歌 31 音由来。英語入力は 12 words〕）
+  - **コンタクトシート**（履歴管理モーダルから選択作品を PNG シート化。人用 = 7×4/枚・キャプション付き、AI 用 = 3×4・長辺 1568px・連番バッジのみ + **作品番号・記述・来歴を結ぶ md ノートを同時出力**〔番号→記述→楽譜の三段照合用、`ddl` 収録・`expanded_ddl` 非収録は作者承認〕。SVG 入れ子合成は filter id 衝突のため canvas ラスタライズ経路を採用。作者確認で AI 認識良好）
+  - **生成情報の詳細タブ拡充**（作成日・SVG サイズ・添景を追加。添景行は v1.97 以前の作品で行ごと消えていた条件表示を無条件化）
+  - **ログイン画面**（バージョン / Build 表示、初期メッセージ枠の抑制）
+  - **ダークモードのコントラスト是正**（`--accent-fg` トークンを新設し accent 塗り 13 箇所を寄せた。`var(--fg)`+`#fff` 直書き 3 箇所は `--action-*` へ。未定義トークン参照 2 件〔`--accent-fg` / `--button-active-fg`〕を解消 — **`ConfirmDialog` / `LineagePanel` はライトモード側も見え方が変わる**〔従来が誤り〕）
+  - **バッチの追従性**（履歴ストリップの「表示中」バッジを画面上の作品 id で引き直し、バッチ入力欄を `clamp(200px, 42vh, 640px)` 固定高 + 行番号ガーター同期 + 実行行の自動スクロール）
+- **描画並列度の管理者設定（サーバー変更、作者裁定 2 件）:** 4 案同時描画が既定並列度 2 を超え 503 になる問題への両面対応。サーバーは固定 `BoundedSemaphore` を実行時変更可能な `_RenderCapacity` へ置換し、DB 設定 `render_concurrency_settings`（`server_limit` / `client_limit`、1〜16）+ `PUT /api/settings/render-concurrency`（管理者のみ）+ `GET /api/client-config`（認証済み読取）を追加。環境変数 `INKU_RENDER_CONCURRENCY` は DB 未設定時の初期値へ格下げ。クライアントは `render capacity is full` の 503 のみ最大 3 回再試行（`Retry-After` 尊重）+ 候補生成ファンアウトの上限制御 + 専用エラー文言。設定 UI は「その他」タブに管理者専用の数値入力 2 つ。
+- **用語の層別統一（作者教義の確定、2026-07-22）:** 「Sol LeWitt の指示書 = 正規化DDL。inku は詩歌的な入力層を一段上に足している」。UI の語彙を層別に整理（入力層 = 記述 / Description、Stage 1 の行為 = 解釈 / Interpret、その生成物 = **指示書（正規化DDL）/ Instructions**、詞書 = 記述の再掲）。i18n 13 キーを relabel し、App Info モーダルに常設の語彙対応表「用語と層」を新設。**SPEC.ja §5 を改訂**（記述と正規化DDL を別層に分離した 4 段パイプライン図、LeWitt との違いに層対応を明記、§5.3 に用語対応表を収録）、SPEC.md §2 に LeWitt 対応の一文 + 同表、README 日英「しくみ」節にも用語表を収録（UI ダイアログと同一内容を単一正本とする）。
+- **運用上の発見（Build 664）:** `web/BUILD_NUMBER` は `web/src/` の外にあり従来の rsync 範囲外 + `vite.config.ts` の起動時 `define` 注入のため、**BUILD_NUMBER の反映には明示 rsync と `inku-server.service`（Vite）再起動が必要**。以降の反映は 3 手セット（`web/src/` + `BUILD_NUMBER` 明示 + Vite 再起動）に是正。
+- **不変:** render engine version は 10 のまま。Score schema / coerce / rh2・renderer / stroke_engine は無変更（サーバー変更は並列度制御のみ）。
+- **検証:** pytest **1023 passed / 30 skipped**（新規 `test_render_concurrency_settings_are_admin_only`: 一般 PUT 403・管理者 PUT 反映・`/api/client-config` 401/未認証・範囲外 400）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）。Mac / pentala 両環境。作者の実 UI 目視確認多数（対話サイクル内）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-ui-adjustments-result.md`。
+- **保留・持ち越し:** UI 調整の続き（対話型・新セッション）、マスコット 2 種の扱い、描画所要時間・並列度 4 の CPU・503 発生率の計測、バッチ実行中に履歴ストリップがページ 0 へ戻る挙動（作者指示待ち）。

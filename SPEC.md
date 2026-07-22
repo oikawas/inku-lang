@@ -57,6 +57,25 @@ human          Stage 1          Stage 1.5      Stage 2       Renderer
 The description remains readable by humans.  The JSON Score remains structured
 enough for machines.  The SVG is a performance.
 
+In LeWitt's terms, the normalized DDL is the instruction sheet; Stage 1 stands
+where LeWitt stood when he wrote the instructions.  inku adds one layer above
+it: the author writes a poem-like description, and the machine transcribes it
+into LeWitt-style instructions.
+
+The vocabulary maps to the layers as follows.  This table matches the UI's
+vocabulary dialog (App Info, "Vocabulary & Layers") and is the single source
+of truth.
+
+| Term (ja) | Term (en) | Layer / act |
+|---|---|---|
+| 記述 | Description | The poem-like input the author writes. The top layer of the work (inku-specific; no LeWitt counterpart) |
+| 解釈 | Interpret | Stage 1's **act** of reading the description into instructions |
+| 指示書（正規化DDL） | Instructions (Normalized DDL) | The executable specification the interpretation produces. **Corresponds to LeWitt's instruction sheet** |
+| 楽譜（JSON Score） | Score (JSON Score) | The structured intermediate form of the instructions. Stored deterministically |
+| 演奏（SVG） | Performance (SVG) | The one-time result of playing the score (the draftsman's realization) |
+| 詞書 | Kotobagaki (caption) | The description re-presented beside the finished work (as in tanka) |
+| 読み取り | Reading | Rebuilding candidates by re-reading the words (another interpretation) |
+
 Variation is intentional.  DDL does not attempt to eliminate all model or
 renderer variation.  It uses variation as part of the medium, while keeping the
 score, schema, and renderer boundaries explicit.

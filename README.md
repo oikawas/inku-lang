@@ -54,6 +54,18 @@ SVG (the performance — one-time)
 
 **The description is permanent; the performance is one-time.** The score remains fixed, while each picture is born with its own variation. Just as LeWitt's instructions became a slightly different wall drawing under each craftsman's hand, the same score becomes a slightly different performance each time. Variation is not a bug here — it is the specification of the language.
 
+### Vocabulary and layers
+
+| Term | Layer / act |
+|---|---|
+| **Description** | The poem-like input the author writes. The top layer of the work (inku-specific; no LeWitt counterpart) |
+| **Interpret** | Stage 1's act of reading the description into instructions |
+| **Instructions (Normalized DDL)** | The executable specification the interpretation produces. Corresponds to LeWitt's instruction sheet |
+| **Score (JSON Score)** | The structured intermediate form of the instructions. Stored deterministically |
+| **Performance (SVG)** | The one-time result of playing the score |
+| **Kotobagaki (caption)** | The description re-presented beside the finished work (as in tanka) |
+| **Reading** | Rebuilding candidates by re-reading the words (another interpretation) |
+
 ---
 
 ## Example

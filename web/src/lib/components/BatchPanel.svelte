@@ -79,16 +79,35 @@
 		settings,
 	}: Props = $props();
 
+	// Row pitch of the textarea (13px × 1.65). The gutter, the active-line band
+	// and the follow-the-run scrolling all step by it.
+	const LINE_HEIGHT = 21.45;
+	const TEXT_PAD_TOP = 9;
+
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
 	let batchScrollTop = $state(0);
 	let selectedHistoryPrompt = $state('');
 	const displayLineNumbersText = $derived(batchInput.trim() ? lineNumbersText : t().batchPlaceholder.split('\n').map((_, i) => String(i + 1)).join('\n'));
-	const batchTextareaHeight = $derived(`${Math.max(240, displayLineNumbersText.split('\n').length * 21.45 + 18)}px`);
 	const batchActiveLineStyle = $derived(
 		batchActiveLine === null
 			? ''
-			: `--batch-active-top: ${9 + (batchActiveLine - 1) * 21.45 - batchScrollTop}px`
+			: `--batch-active-top: ${TEXT_PAD_TOP + (batchActiveLine - 1) * LINE_HEIGHT - batchScrollTop}px`
 	);
+
+	// The box no longer grows with the line count, so on a long batch the line
+	// being painted can sit below the fold. Keep it in view while the box is
+	// read-only; once the run ends the caret is the user's again.
+	$effect(() => {
+		const line = batchActiveLine;
+		const el = batchTextareaEl;
+		if (!batchRunning || line === null || !el) return;
+		const top = (line - 1) * LINE_HEIGHT;
+		const viewTop = el.scrollTop;
+		const viewBottom = viewTop + el.clientHeight - LINE_HEIGHT * 2;
+		if (top < viewTop || top > viewBottom) {
+			el.scrollTop = Math.max(0, top - el.clientHeight / 2);
+		}
+	});
 
 	function normalizePrompt(text: string): string {
 		return text.trim().replace(/\r\n/g, '\n');
@@ -116,7 +135,11 @@
 </script>
 
 <div class="batch-wrap">
-	<div class="line-nums" aria-hidden="true">{displayLineNumbersText}</div>
+	<div class="line-nums" aria-hidden="true">
+		<!-- The gutter is a plain block, so it is scrolled by hand to stay level
+		     with the textarea it labels. -->
+		<div class="line-nums-inner" style={`transform: translateY(${-batchScrollTop}px)`}>{displayLineNumbersText}</div>
+	</div>
 	<div class="batch-ta-wrap">
 		{#if batchRunning && batchActiveLine !== null}
 			<div class="batch-active-line" style={batchActiveLineStyle}></div>
@@ -130,7 +153,6 @@
 			wrap="off"
 			placeholder={t().batchPlaceholder}
 			readonly={batchRunning}
-			style={`height: ${batchTextareaHeight}`}
 			onscroll={() => (batchScrollTop = batchTextareaEl?.scrollTop ?? 0)}
 		></textarea>
 	</div>
@@ -223,6 +245,7 @@
 		text-align: right; color: var(--fg3); user-select: none;
 		font-family: inherit;
 		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
+		overflow: hidden;
 	}
 	.batch-ta {
 		width: 100%; padding: 9px 10px;
@@ -234,11 +257,13 @@
 		resize: vertical; outline: none;
 		white-space: pre;
 		overflow-wrap: normal;
-		overflow-x: auto;
+		overflow: auto;
 		position: relative;
 		z-index: 1;
-		min-height: 240px;
-		height: 100%;
+		/* Sized to the window, not to the line count: a long batch scrolls inside
+		   the box instead of pushing the run button off the bottom of the panel.
+		   Still draggable, so a taller box is one gesture away. */
+		height: clamp(200px, 42vh, 640px);
 	}
 	.batch-ta:focus { border-color: var(--accent); }
 	.batch-ta:read-only {

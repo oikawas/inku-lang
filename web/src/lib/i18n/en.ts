@@ -660,18 +660,4 @@ export const en: LangPack = {
 	confirmTrashMessage: (n) => `Move ${n} item${n === 1 ? '' : 's'} to trash?`,
 	confirmRestoreMessage: (n) => `Restore ${n} item${n === 1 ? '' : 's'}?`,
 	confirmPermanentDeleteMessage: (n) => `Permanently delete ${n} item${n === 1 ? '' : 's'}?`,
-
-	saijikiWords: {
-		katachi: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc', 'cloudform'],
-		katamuki: ['horizontal', 'vertical', 'diagonal', 'rising', 'falling', 'rotated'],
-		tezawari: ['pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'burin', 'drypoint'],
-		tsuranari: ['solid', 'dashed', 'dotted', 'dash-dot'],
-		iro: ['white', 'black', 'blue', 'red', 'green', 'gray'],
-		yuragi: ['fine', 'large', 'slowly', 'quickly', 'swaying', 'undulating', 'trembling', 'blurring'],
-		basho: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'middle', 'corner'],
-		ugoki: ['place', 'line-up', 'fill', 'scatter', 'draw', 'tile'],
-		aida: ['along', 'not touching', 'cutting', 'between', 'touching'],
-		wariai: ['tall', 'wide', 'full-width', 'half-width', 'semicircle', 'waxing', 'waning', 'crescent'],
-		'plugin-nature': ['Nature.wind', 'Nature.undulation', 'Nature.stillness'],
-	},
 };

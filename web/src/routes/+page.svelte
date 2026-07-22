@@ -511,27 +511,9 @@
 		svg: string;
 	};
 
-	// The preview is resolved from the surface the chip actually shows. The
-	// caller derives its canonical word by pairing the two language lists by
-	// position, and that pairing does not hold everywhere (うごき lists 引く/
-	// 埋める opposite fill/draw), so the canonical word is only a last resort.
-	const SAIJIKI_EN_TO_JA: Record<string, string> = {
-		circle: '円', ellipse: '楕円', triangle: '三角', square: '四角', line: '線', arc: '弧', cloudform: '雲形',
-		horizontal: '水平', vertical: '垂直', diagonal: '斜め', rising: '右上がり', falling: '右下がり', rotated: '回転',
-		hair: '髪', pencil: '鉛筆', pen: 'ペン', rotring: 'ロットリング', crayon: 'クレヨン', chalk: 'チョーク',
-		'fine-brush': '細筆', 'thick-brush': '太筆', burin: 'ビュラン', drypoint: 'ドライポイント',
-		solid: '実線', dashed: '破線', dotted: '点線', 'dash-dot': '一点鎖線',
-		white: '白', black: '黒', blue: '青', red: '赤', green: '緑', gray: '灰',
-		fine: '細かく', large: '大きく', slowly: 'ゆっくり', quickly: '速く',
-		swaying: '揺れる', undulating: '波打つ', trembling: '震える', blurring: '滲む',
-		top: '上', bottom: '下', center: '中央', 'left-edge': '左端', 'right-edge': '右端',
-		'top-edge': '上端', 'bottom-edge': '下端', middle: '中心', corner: '隅',
-		place: '置く', 'line-up': '並べる', draw: '引く', scatter: '散らす', fill: '埋める', tile: '敷き詰める',
-		tall: '縦長', wide: '横長', 'full-width': '全幅', 'half-width': '半幅',
-		semicircle: '半円', waxing: '上弦', waning: '下弦', crescent: '三日月',
-		along: '沿う', 'not touching': '触れない', cutting: '切る', between: '間に', touching: '触れる',
-	};
-
+	// Entries are keyed by the Japanese surface. The caller pairs the two
+	// display lists by position to derive the canonical word, an invariant the
+	// saijiki table holds and server tests lock (test_saijiki_api.py).
 	function saijikiPreview(categoryKey: string, canonicalWord: string, word: string): SaijikiPreview {
 		const isJa = getLang() === 'ja';
 		const base = {
@@ -652,7 +634,7 @@
 			切る: { effect: `直前の線を横切る関係。`, example: `前の線を切る`, effectEn: `A relation that crosses the preceding line.`, exampleEn: `cutting the previous line`, svg: shapeSvg(`<path d="M38 46 H142" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/><path d="M92 20 L78 72" stroke="#c9362d" stroke-width="6" stroke-linecap="round"/>`) },
 			間に: { effect: `直前の二つの要素の間に置く関係。`, example: `前の二つの間に`, effectEn: `A relation that places between the two preceding elements.`, exampleEn: `between the previous two`, svg: shapeSvg(`<circle cx="56" cy="46" r="14" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="124" cy="46" r="14" fill="none" stroke="#2b2b2b" stroke-width="5"/><circle cx="90" cy="46" r="8" fill="#c9362d"/>`) },
 		};
-		const entry = previews[word] ?? previews[SAIJIKI_EN_TO_JA[word] ?? ''] ?? previews[canonicalWord];
+		const entry = previews[canonicalWord] ?? previews[word];
 		if (entry) return { ...base, ...localized(entry) };
 		return {
 			...base,

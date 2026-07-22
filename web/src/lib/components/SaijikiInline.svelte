@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import { SAIJIKI } from '$lib/saijiki';
+	import { SAIJIKI, saijikiWordsFor } from '$lib/saijiki';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -54,7 +54,7 @@
 	</div>
 	<div class="saijiki-list">
 		{#each SAIJIKI as cat (cat.key)}
-			{@const words = t().saijikiWords[cat.key] ?? cat.words}
+			{@const words = saijikiWordsFor(cat.key, isJapanese)}
 			<div class="saijiki-cat" class:plugin-cat={cat.key.startsWith("plugin-")}>
 				<div class="saijiki-cat-head">
 					<span class="saijiki-cat-ja">{cat.label}</span>

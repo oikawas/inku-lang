@@ -1,10 +1,13 @@
 """v1.92 歳時記構造化の golden 検査 (allow-list 方式)。
 
 fixture (tests/fixtures/prompts/) は構造化前 (Build 591 / v1.91 クローズ時点) の
-Stage 1 プロンプト全文。許可差分は作者裁定 (2026-07-18) の語彙削剪のみ:
+Stage 1 プロンプト全文。許可差分は作者裁定による語彙削剪と語順修正のみ:
 
-- ja: 「髪、」「髪・」の除去 (P0-3)、「描く、」×2 の除去 (P0-2b)
-- en: "hair, " ×2 の除去 (P0-3)
+- ja: 「髪、」「髪・」の除去 (P0-3)、「描く、」×2 の除去 (P0-2b) — 2026-07-18
+- en: "hair, " ×2 の除去 (P0-3) — 2026-07-18
+- en: うごき の語順を words_ja と同順へ修正 (2026-07-22)。web の歳時記パネルは
+  両言語の表示リストを位置で突き合わせるため、引く=draw / 埋める=fill の対応が
+  位置で成立している必要がある
 
 これ以外の差分 (空白・順序・行の脱落 = 組み立てバグ) はテスト失敗とする。
 """
@@ -22,21 +25,36 @@ _FIXTURES = Path(__file__).parent / "fixtures" / "prompts"
 _ALLOWED_JA = (("髪、", 1), ("髪・", 1), ("描く、", 2))
 _ALLOWED_EN = (("hair, ", 2),)
 
+# (置換対象, 置換後, 期待出現回数)。削剪では表せない許可差分 (語順修正)。
+_REORDERED_JA: tuple[tuple[str, str, int], ...] = ()
+_REORDERED_EN = (("line-up, fill, scatter, draw, tile", "line-up, draw, scatter, fill, tile", 1),)
 
-def _expected(fixture_name: str, allowed: tuple[tuple[str, int], ...]) -> str:
+
+def _expected(
+    fixture_name: str,
+    allowed: tuple[tuple[str, int], ...],
+    reordered: tuple[tuple[str, str, int], ...] = (),
+) -> str:
     text = (_FIXTURES / fixture_name).read_text(encoding="utf-8")
     for needle, count in allowed:
         assert text.count(needle) == count, f"fixture drift: {needle!r} x{text.count(needle)}"
         text = text.replace(needle, "")
+    for needle, replacement, count in reordered:
+        assert text.count(needle) == count, f"fixture drift: {needle!r} x{text.count(needle)}"
+        text = text.replace(needle, replacement)
     return text
 
 
 def test_stage1_prompt_ja_matches_golden_with_pruning() -> None:
-    assert SYSTEM_PROMPT_PREFIX == _expected("stage1_prefix_ja.golden.txt", _ALLOWED_JA)
+    assert SYSTEM_PROMPT_PREFIX == _expected(
+        "stage1_prefix_ja.golden.txt", _ALLOWED_JA, _REORDERED_JA
+    )
 
 
 def test_stage1_prompt_en_matches_golden_with_pruning() -> None:
-    assert SYSTEM_PROMPT_PREFIX_EN == _expected("stage1_prefix_en.golden.txt", _ALLOWED_EN)
+    assert SYSTEM_PROMPT_PREFIX_EN == _expected(
+        "stage1_prefix_en.golden.txt", _ALLOWED_EN, _REORDERED_EN
+    )
 
 
 # --- 閉包マーカーの golden (Build 591 の実表から削剪分のみを除いた期待値) ---

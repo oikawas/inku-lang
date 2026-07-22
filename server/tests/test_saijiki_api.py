@@ -74,6 +74,63 @@ def test_generated_ts_matches_table():
     assert module.render_ts() == _GENERATED_TS.read_text(encoding="utf-8")
 
 
+# 表示リストの ja↔en 対応。web の歳時記パネルは両言語のリストを位置で突き合わせ、
+# 表示語 (英語) から解説 (正本は日本語見出し) を引くため、この対応が崩れると語と
+# 解説がずれる。長さ検査では検出できない (2026-07-22 に words_en の並べ替えで
+# 引く/埋める が fill/draw と入れ違っていた) ので、対応そのものを固定する。
+_EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
+    "katachi": (
+        ("円", "circle"), ("楕円", "ellipse"), ("三角", "triangle"), ("四角", "square"),
+        ("線", "line"), ("弧", "arc"), ("雲形", "cloudform"),
+    ),
+    "katamuki": (
+        ("水平", "horizontal"), ("垂直", "vertical"), ("斜め", "diagonal"),
+        ("右上がり", "rising"), ("右下がり", "falling"), ("回転", "rotated"),
+    ),
+    "tezawari": (
+        ("鉛筆", "pencil"), ("ペン", "pen"), ("ロットリング", "rotring"), ("クレヨン", "crayon"),
+        ("チョーク", "chalk"), ("細筆", "fine-brush"), ("太筆", "thick-brush"),
+        ("ビュラン", "burin"), ("ドライポイント", "drypoint"),
+    ),
+    "tsuranari": (
+        ("実線", "solid"), ("破線", "dashed"), ("点線", "dotted"), ("一点鎖線", "dash-dot"),
+    ),
+    "iro": (
+        ("白", "white"), ("黒", "black"), ("青", "blue"),
+        ("赤", "red"), ("緑", "green"), ("灰", "gray"),
+    ),
+    "yuragi": (
+        ("細かく", "fine"), ("大きく", "large"), ("ゆっくり", "slowly"), ("速く", "quickly"),
+        ("揺れる", "swaying"), ("波打つ", "undulating"), ("震える", "trembling"), ("滲む", "blurring"),
+    ),
+    "basho": (
+        ("上", "top"), ("下", "bottom"), ("中央", "center"), ("左端", "left-edge"),
+        ("右端", "right-edge"), ("上端", "top-edge"), ("下端", "bottom-edge"),
+        ("中心", "middle"), ("隅", "corner"),
+    ),
+    "ugoki": (
+        ("置く", "place"), ("並べる", "line-up"), ("引く", "draw"),
+        ("散らす", "scatter"), ("埋める", "fill"), ("敷き詰める", "tile"),
+    ),
+    "wariai": (
+        ("縦長", "tall"), ("横長", "wide"), ("全幅", "full-width"), ("半幅", "half-width"),
+        ("半円", "semicircle"), ("上弦", "waxing"), ("下弦", "waning"), ("三日月", "crescent"),
+    ),
+    "aida": (
+        ("沿う", "along"), ("触れない", "not touching"), ("切る", "cutting"),
+        ("間に", "between"), ("触れる", "touching"),
+    ),
+}
+
+
+def test_display_lists_pair_ja_and_en_by_position():
+    ja = {cat["key"]: cat["words"] for cat in saijiki.display_categories("ja")}
+    en = {cat["key"]: cat["words"] for cat in saijiki.display_categories("en")}
+    assert set(ja) == set(en) == set(_EXPECTED_PAIRING)
+    for key, expected in _EXPECTED_PAIRING.items():
+        assert tuple(zip(ja[key], en[key], strict=True)) == expected, f"pairing drift in {key}"
+
+
 def test_pruned_words_absent_from_display():
     words = {w for cat in saijiki.display_categories("ja") for w in cat["words"]}
     words |= {w for cat in saijiki.display_categories("en") for w in cat["words"]}

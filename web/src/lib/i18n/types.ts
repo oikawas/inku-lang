@@ -662,7 +662,4 @@ export interface LangPack {
 	confirmTrashMessage: (n: number) => string;
 	confirmRestoreMessage: (n: number) => string;
 	confirmPermanentDeleteMessage: (n: number) => string;
-
-	// Saijiki vocabulary (localized words per category key)
-	saijikiWords: Record<string, string[]>;
 }

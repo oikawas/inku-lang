@@ -1,4 +1,4 @@
-import { GENERATED_SAIJIKI } from './saijiki.generated';
+import { GENERATED_SAIJIKI, GENERATED_SAIJIKI_EN } from './saijiki.generated';
 
 export type SaijikiCategory = {
 	key: string;
@@ -22,12 +22,22 @@ export function hydrateSaijiki(categories: SaijikiCategory[]): void {
 	SAIJIKI = categories;
 }
 
-// English surfaces of the same table (GET /api/saijiki?lang=en). Display
-// components keep reading SAIJIKI; this store exists so highlighting can match
-// English DDL regardless of the UI language (instruction_lang can differ from
-// it). There is no codegen snapshot for it, so it stays empty until hydration.
-export let SAIJIKI_EN: SaijikiCategory[] = [];
+// English surfaces of the same table (GET /api/saijiki?lang=en). Highlighting
+// matches English DDL regardless of the UI language (instruction_lang can
+// differ from it), and the saijiki panels take their display words from here
+// when the UI is English. Position-aligned with SAIJIKI per category: index i
+// is the same vocabulary entry in either language.
+export let SAIJIKI_EN: SaijikiCategory[] = GENERATED_SAIJIKI_EN.map((cat) => ({
+	...cat,
+	words: [...cat.words]
+}));
 
 export function hydrateSaijikiEn(categories: SaijikiCategory[]): void {
 	SAIJIKI_EN = categories;
+}
+
+/** Display words for a category in the current UI language. */
+export function saijikiWordsFor(categoryKey: string, isJapanese: boolean): string[] {
+	const source = isJapanese ? SAIJIKI : SAIJIKI_EN;
+	return source.find((cat) => cat.key === categoryKey)?.words ?? [];
 }

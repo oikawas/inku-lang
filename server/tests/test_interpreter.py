@@ -276,5 +276,5 @@ def test_literal_tiling_prompt_en_uses_saijiki_term_and_examples():
 
     assert "Use \"tile\" only when a literal wallpaper" in prompt
     assert 'never introduce "tile" spontaneously' in prompt
-    assert "motions: place, line-up, fill, scatter, draw, tile" in prompt
+    assert "motions: place, line-up, draw, scatter, fill, tile" in prompt
     assert "Tile four hundred short faded blue pencil vertical lines" in prompt

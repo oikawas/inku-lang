@@ -1065,7 +1065,9 @@
 	}
 	.ghost-btn:hover { background: var(--bg2); }
 	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.ghost-btn.ghost-active { background: var(--fg); color: #fff; border-color: var(--fg); }
+	/* --action-* is the theme-aware primary pair; var(--fg) with a hardcoded
+	   white label collapses to white-on-white in the dark theme. */
+	.ghost-btn.ghost-active { background: var(--action-bg); color: var(--action-fg); border-color: var(--action-bg); }
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }

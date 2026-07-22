@@ -172,7 +172,9 @@
 	}
 	.login-lang-btn:last-child { border-right: none; }
 	.login-lang-btn:hover { color: var(--fg); background: var(--panel); }
-	.login-lang-btn.active { background: var(--fg); color: #fff; }
+	/* --action-* is the theme-aware primary pair; var(--fg) with a hardcoded
+	   white label collapses to white-on-white in the dark theme. */
+	.login-lang-btn.active { background: var(--action-bg); color: var(--action-fg); }
 	.login-title {
 		padding: 18px 24px 0;
 		font-size: 16px;

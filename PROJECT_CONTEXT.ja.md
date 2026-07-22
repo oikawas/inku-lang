@@ -113,6 +113,8 @@ v2.3.2（Build 683）では v2.3.1 機能群に UI を追随させる対話型�
 
 v2.4.0（Build 684）ではリリース配布パイプラインを確立した。git タグ `vX.Y.Z` の push で GitHub Actions が `ghcr.io/oikawas/inku-api` / `inku-web` を multi-arch（amd64 / arm64）build & push し、利用者は `deploy/` の compose + `.env.example` で起動する（SPEC.ja §15.4）。`server/Dockerfile` に BUILD_NUMBER を焼き込み（コンテナの `/api/info` と `render_build_number` の null を解消）、`/api/info` の `version` を `server/pyproject.toml` 由来の単一情報源にしてリリースごとに採番（本リリースで 2.4.0）、nature-leaves プラグイン v0.3.0 を git 管理化してイメージ同梱、bootstrap admin の空文字を「未設定」扱いに是正して compose 側を `:?` で必須化した（セルフサインアップ不在の前提を manual / SETUP / SPEC に明記）。engine 10・Score schema・web UI は不変。
 
+README 整備（2026-07-22、docs のみ・採番なし）では README 日英に作品ギャラリー 6 点（`docs/assets/gallery/`。作者のスター付き履歴から選定、絵 + 詞書 + `<details>` の指示書・SVG・seed）と UI スクリーンショット 6 点（`docs/assets/ui/`、日英各 3。`*.ja/.en.png` で各 README が自言語のみ参照）を追加し、構成を「作品 — 記述が絵になる → しくみ（実 Score の層解説）→ 画面 → … → ドキュメント（末尾へ）」に改訂した。GitHub のサニタイザ下で唯一残る枠線手段として単一セル `<table>` を採用し、`.gitignore` を `docs/*` + `!docs/assets/` に変更。白背景に溶けていた 2 点目は公開後に silver-shoal（B962）へ差し替え済み。コード・engine・採番は不変。
+
 ## 変更時の確認先
 
 | 変更領域 | 主に読むもの |

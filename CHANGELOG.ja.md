@@ -2702,3 +2702,46 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **検証:** `gradle :app:testDebugUnitTest --rerun-tasks` を main で独立実行し **44 件 / failures 0 / errors 0**（`app/build/test-results/testDebugUnitTest/*.xml` から自力集計）。参照 SVG 10 件すべてで class 属性列と要素数が一致し、うち 4 件（`03_square_filled` / `04_arc_crayon` / `06_surface_hatch` / `10_arc_wave`）は `<path d>` が**文字列完全一致**。`05_circle_rotring` はストローク帯を持たないことを否定テストで固定。
 - **不変:** 変更は `android/` のみ。server / web / cli / shared は無変更で、**web/server の描画結果・`APP_VERSION` / `web/BUILD_NUMBER` は動かしていない**。pentala 反映も不要。
 - **申し送り（次段 2g で処理）:** ① テストが渡す `colorCatalogId = "sumi"` は**存在しないカタログ ID**（実在は `default` ほか 11 種）で、10 箇所が未是正のまま残っている。描画結果は色に依存しない比較なので engine の版には影響しない ② 未知カタログ ID の扱いが server（HTTP 422）と Android（黙って `default` へフォールバック）で**非対称** ③ `ANDROID_SPEC` の 2f 節が「全 10 参照 SVG で `path d` 完全一致」と過大に書かれている（実際は上記のとおり 4 件）ほか、engine 10 到達に触れていない。2g では雲形・touching・v1.94 双弧修正を扱う。
+
+### v2.4.7 — 決定的な DDL 層を凍結する（DDL 参照コーパスと `ddl_version` / `ddl_engine_version`）（Build 697、2026-07-24）
+
+**v2.4.4 で描画の出力を凍結したのと同じことを、パイプラインの手前側で行った。** 決定的な層は
+描画だけではない。プラグイン展開・Stage 1.5 の展開と変奏・coerce も、同じ入力と同じ seed から
+必ず同じ結果を返す。ここに初めて版と参照コーパスを与えた。
+
+- **決定的な DDL 層の参照コーパスを新設:** `server/reference/ddl-engine-1/`。29 ケース、生成器は
+  `server/scripts/gen_ddl_reference.py`。**A（展開）と B（補正）を連結していない**のが設計の要点で、
+  A は `expand_intermediate_ddl` の出力（DDL 全文）15 件、B は `coerce_score` の出力
+  （補正後 Score 全文 + `branch_report`）14 件。**B の入力 Score は生成器内の literal** であり、
+  A の出力を渡していない。連結すると展開側の欠陥が補正側の欠陥を覆い隠す。
+- **なぜ 2 本に分かれるか:** 決定的な層は隣り合っていない。Stage 1.5（DDL→DDL）と
+  coerce（Score→Score）のあいだに Stage 2 の LLM が挟まるため、「DDL から Score まで」を
+  1 本の基準線にはできない（SPEC §15.5 の層マップ）。
+- **`ddl_version` と `ddl_engine_version` を導入:** ともに **`1`** から。`layer_versions.py` が正本。
+  **`ddl_version` は DDL 言語仕様（文法・キーワード）の版**、**`ddl_engine_version` は決定的変換層の版**で、
+  名前空間が別である。**SPEC §15.6 が v2.4.6 で先に書いた値と実装が一致した。**
+- **作品への記録:** 新規生成の compose / paint / render-score の応答と履歴・保存 artifact に
+  両方が乗る。history テーブルへは nullable の列を非破壊 `ALTER TABLE` で追加した。
+  **既存行は backfill しない** — 記録の無い作品の版数を推測して埋めることは、来歴の捏造にあたる。
+- **エディション ID は不変:** `ddl_*` は **rh3 の payload に入れていない**。描画が 1 バイトも
+  変わらないのに ID が動くことを避けるという v2.4.5 の判断をそのまま守る。
+- **判別力の設計:** `ddl` 引数の有無で同じ Score が **発火 0 → 6・instruction 1 → 3** に変わり、
+  `tenkei` 三段（auto / sparse / none）で **発火 6 / 4 / 3・instruction 3 / 2 / 1** に分かれる。
+  発火しないケース（線 40 本・雲形・presence のみ）も入れて、**「何も起きない」ことも固定した**。
+  `branch_report` は**全体のキー集合を固定せず**、ケースごとの発火キー対応だけを固定している
+  （全体を literal にすると分岐を足すたびに壊れ、実質の検査にならない）。
+- **CI:** `reference-corpus.yml` に `ddl-engine` job を独立して追加し、render job の対象は
+  `render-engine-10/` に限定した。**検査が実際に落ちることを 2 通りで実証した** — 実装セッションは
+  `coerce.py`（B 側）に観測用の分岐を足して、検証側は `ddl_expander`（A 側）の返り値を摂動させて、
+  いずれも生成器が exit 1 と
+  `DDL corpus changed without an identity-field change; bump the appropriate version instead of rewriting a frozen corpus`
+  で停止することを確認している。
+- **描画は不変:** `render_engine_version` は **`10`** のまま。render corpus を再生成して
+  220 件すべてに差分が無いことを確認した。
+- **検証:** pytest **1043 passed / 30 skipped**（v2.4.6 の 1038 + 新規 5）、cli 68 passed、
+  ruff clean、`npm run check` 0 errors / 2 warnings。両コーパスを再生成して
+  `server/reference/` に差分ゼロ。
+- **積み残し（記録）:** 歳時記（`saijiki.py`）は決定的な層から参照されておらず、
+  流入先は Stage 1 のプロンプト（版を持たない層）である。したがって**歳時記に語が増えても
+  このコーパスは動かない**。語彙の追加は `ddl_version` を上げる事象だが、**それを機械が
+  検出する仕組みはまだ無い**（Phase 4 の `stage1_prompt_digest` が半分を担う）。

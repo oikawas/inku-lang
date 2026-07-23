@@ -1608,9 +1608,20 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
   連結した瞬間に「どちらの層が変えたのか」を判定できなくなる
 - コーパスの入力は、その層以外への依存を**すべて生成器側に literal で固定する**。色表も Score の全フィールドも書き下し、`COLOR_MAP` や schema の既定値を参照しない。出力が動いたのに manifest 先頭の識別子（`corpus_format_version` / `engine_version` / `schema_version` / `color_map_digest`）がどれも動いていないなら、**固定し損ねた依存が残っている**
 
-現在の実体は `server/reference/render-engine-10/`（220 ケース）。
+現在の実体は 2 本ある（v2.4.7）。
+
+| コーパス | 置き場 | 何を凍結するか | ケース数 |
+|---|---|---|---|
+| 描画 | `server/reference/render-engine-10/` | `renderer.py` / `stroke_engine.py` の演奏結果（SVG） | 220 |
+| 決定的 DDL 層 | `server/reference/ddl-engine-1/` | **A** = `expand_intermediate_ddl` の展開後 DDL / **B** = `coerce_score` の補正後 Score + `branch_report` | 29（A 15 / B 14） |
+
+**DDL 側が A と B の 2 部に分かれるのは、決定的な層が隣り合っていないからである**（§15.5）。
+Stage 1.5（DDL→DDL）と coerce（Score→Score）のあいだに Stage 2 の LLM が挟まるため、
+「DDL から Score まで」を 1 本の基準線にはできない。**A の出力を B の入力に使わない**のは
+上記の「コーパス同士を連結しない」規律そのものである。
+
 運用手順は成果物の隣（`server/reference/README.md`）に置き、再生成のバイト一致は
-CI（`.github/workflows/reference-corpus.yml`）が強制する。
+CI（`.github/workflows/reference-corpus.yml`）が層ごとに独立した job で強制する。
 **採番の規律を「人が覚えているもの」から「機械的な制約」へ移すことが、この仕組みの目的である。**
 
 **世代の比較はこう行う。** 版が上がるとき、新しいディレクトリを作り、前版の manifest と digest を突き合わせる。

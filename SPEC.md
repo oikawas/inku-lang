@@ -1102,9 +1102,21 @@ outputs, frozen, produced from fixed inputs.** A version number carries only one
   identity fields (`corpus_format_version`, `engine_version`, `schema_version`,
   `color_map_digest`) move, **a dependency was left unfixed**.
 
-The current instance is `server/reference/render-engine-10/` (220 cases). The
-operating procedure lives next to the artifacts (`server/reference/README.md`), and
-CI (`.github/workflows/reference-corpus.yml`) enforces byte-identical regeneration.
+There are two instances as of v2.4.7.
+
+| Corpus | Location | What it freezes | Cases |
+|---|---|---|---|
+| Drawing | `server/reference/render-engine-10/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 220 |
+| Deterministic DDL layers | `server/reference/ddl-engine-1/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 29 (A 15 / B 14) |
+
+**The DDL side splits into A and B because the deterministic layers are not
+adjacent** (§12.2). Stage 2's LLM sits between Stage 1.5 (DDL→DDL) and coercion
+(Score→Score), so "DDL through to Score" cannot be a single baseline. **A's output is
+never used as B's input** — that is the "corpora are never chained" rule above.
+
+The operating procedure lives next to the artifacts (`server/reference/README.md`), and
+CI (`.github/workflows/reference-corpus.yml`) enforces byte-identical regeneration with
+one independent job per layer.
 **The point is to move the versioning discipline from something people remember to
 something the machine enforces.**
 

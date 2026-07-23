@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.4.6 / Build 696**
+**対象バージョン: v2.4.7 / Build 697**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -121,6 +121,8 @@ v2.4.2（Build 689）は歳時記語彙の日英ペアリングを構造で担�
 v2.4.1（Build 687）は UI 調整 2 巡目。DDL エディタの語プレビュー全 69 エントリを日英化し、作業中に発見した歳時記語彙の日英対応バグ 2 件（削剪済み `髪`/`hair` の i18n 残置による 1 ずれ、`words_en` の並び非対応による解説の交差）を是正した。原因だった i18n の手書き複製 `saijikiWords` を廃止し、表示語はハイドレート済み `SAIJIKI` / `SAIJIKI_EN` から直接取得。全 68 語の日英対応を明示テーブルで固定するテストを追加。副作用として英語版 Stage 1 プロンプトの `motions:` 語順が変わる（集合不変、ベンチ未確認）。記述タブは短歌の目安をヒント文からカウンタへ移動。engine 10 のまま。UI 調整は対話で継続中。
 
 v2.4.3（Build 693）は UI 調整 3 巡目。環境変数 `INKU_DEVELOPER_MODE` を新設し、NVIDIA NIM と常時表示の Build 番号を開発環境限定にした（**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・`render_build_number` は無効時も不変**。配布 compose は既定で無効、開発・ベンチ compose は既定で有効。SPEC.ja §15.4）。系譜と系譜全体図に共有の「縦／横」切替を追加（横は左から右へ世代が進み同世代は縦積み。矢印とスクロールも方向に追随し、選択はブラウザへ保存。系譜 API・スキーマ・保存データは不変）。デモに 1〜1,440 分（最大 24 時間）のタイムアウトを追加（既定 60 分。締切を越えても進行中の 1 件は完了・反映してから停止し、残り時間を `HH:MM:SS` で表示）。engine 10 のまま、Score schema / coerce / rh2 / renderer / stroke_engine は無変更。pytest 1029/30。あわせて SETUP 日英のコンテナ節新設と 3 件是正（**Python 要件が 3.10 以上と誤記、実際は 3.12 以上**ほか）、README 日英の再生成節を「推敲による作品の追求」へ全面改稿した分を本版へ畳んでいる。UI 調整は対話で継続中。
+
+v2.4.7（Build 697）では決定的な DDL 層を凍結した。`server/reference/ddl-engine-1/` に 29 ケース（A = 展開 15 / B = 補正 14）を焼き、`ddl_version` と `ddl_engine_version` を **1** から導入した（正本 `layer_versions.py`）。**A と B は連結していない** — B の入力 Score は生成器内の literal で、A の出力を渡していない（連結すると展開側の欠陥が補正側の欠陥を覆い隠す）。**決定的な層は隣り合っておらず**、Stage 1.5 と coerce のあいだに Stage 2 の LLM が挟まるため、1 本の基準線にできないことがこの分割の理由である（SPEC §15.5）。判別の中心は `ddl` 引数の有無（同じ Score が発火 0 → 6・instruction 1 → 3）と `tenkei` 三段（発火 6 / 4 / 3・instruction 3 / 2 / 1）で、発火しないケースも固定した。`branch_report` は全体のキー集合を固定せずケースごとの対応だけを固定する。両版は新規作品の応答・履歴・保存 artifact に乗るが、**既存行は backfill しない**（記録の無い版数を推測して埋めることは来歴の捏造にあたる）。**`ddl_*` は rh3 の payload に入れていない**ので作品エディションID は不変。CI は `ddl-engine` job を独立させ、**A 側・B 側の両方から摂動して実際に落ちることを確認した**。engine 10・renderer・stroke_engine・schema・coerce は不変で、render corpus は再生成で 220 件すべて差分ゼロ。pytest 1043/30。**積み残し**: 歳時記は決定的な層から参照されておらず（流入先は Stage 1 のプロンプト＝版を持たない層）、**語が増えてもこのコーパスは動かない**。語彙の追加は `ddl_version` を上げる事象だが検出機構はまだ無い（Phase 4 の `stage1_prompt_digest` が半分を担う）。Phase 4〜5（prompt digest・版差表示）は未着手。
 
 v2.4.5（Build 695）では作品エディションID を `rh3` へ移した。payload は `score` + `render_seed` + render engine の ID と版 + `render_color_catalog_id` の 5 つで、**`render_build_number` と `vary_seed` を外した**。build 番号は UI だけの変更でも採番されるため、**描画が 1 バイトも変わらないのにエディションIDが変わる**偽の差分を生んでいた（v1.60 で engine 版の採番規律が無い時代の保険として入ったもので、その役割は v1.99 以降 `render_engine_version` が引き継いでいる）。build 番号は来歴として保持する。**`rh2` は legacy として再計算せず保持し、`rh2` と `rh3` は別の hash 空間**（起動時 backfill は空の行にだけ rh3 を書く）。`render_hash` を等値比較する経路は server に無いため挙動は変わらない。SPEC §7 / §11.2。engine 10・renderer・schema・coerce は不変で、参照コーパスも再生成で差分ゼロ。pytest 1038/30。
 

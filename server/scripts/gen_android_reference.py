@@ -18,6 +18,8 @@ Outputs land in `android/app/src/test/resources/server_reference/`:
                                           for four strokes along a centerline
 - `renderer_seed_range.json`              unsigned 64-bit seeds and `_seed_for_instruction`
 - `renderer_fill_and_arc.json`            fill scanlines, hatch line geometry and arc centerlines
+- `renderer_cloudform_and_relations.json` cloudform contours per tool grammar, minor-arc
+                                          reconstruction, and region-before-relation resolution
 - `<name>.svg`                            full renders at the current engine version
 - `svg_index.json`                        the Score, seed, byte size, element counts,
                                           and class attributes of each SVG
@@ -35,9 +37,11 @@ import math
 import pathlib
 import re
 
+from inku_server import arc_geometry as ag
+from inku_server import cloudform as cf
 from inku_server import renderer
 from inku_server import stroke_engine as se
-from inku_server.schema import Score
+from inku_server.schema import Score, Variation
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "android/app/src/test/resources/server_reference"
 RENDER_SEED = 12345
@@ -763,14 +767,169 @@ def fill_and_arc_fixtures() -> None:
     (OUT / "renderer_fill_and_arc.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
+WEIGHTS_ALL = (
+    "hair", "pencil", "pen", "rotring", "crayon",
+    "chalk", "brush_thin", "brush_thick", "burin", "drypoint",
+)
+
+CLOUDFORM_SCORES: dict[str, dict] = {
+    "11_cloudform_pencil": {"instructions": [{"primitive": "cloudform", "center": [0.5, 0.5], "size": [0.5, 0.34], "weight": "pencil"}]},
+    "12_cloudform_rotring": {"instructions": [{"primitive": "cloudform", "center": [0.5, 0.5], "size": [0.5, 0.34], "weight": "rotring"}]},
+    # 双弧（葉形）。prior が arc のとき sagitta の符号が反転し、対向する劣弧になる。
+    "13_touching_arcs": {"instructions": [
+        {"primitive": "arc", "center": [0.5, 0.5], "radius": 0.26, "angle_start": 200.0, "angle_end": 340.0, "weight": "pen"},
+        {"primitive": "arc", "center": [0.5, 0.5], "radius": 0.26, "angle_start": 20.0, "angle_end": 160.0, "weight": "pen",
+         "relation": {"type": "touching", "contact": "both_ends"}},
+    ]},
+    # region 配置 → relation 解決の順序（v1.94）。逆順だと relation が無言で落ちる。
+    "14_region_then_relation": {"instructions": [
+        {"primitive": "arc", "center": [0.35, 0.4], "radius": 0.18, "angle_start": 200.0, "angle_end": 340.0, "weight": "pencil"},
+        {"primitive": "arc", "center": [0.5, 0.5], "radius": 0.18, "angle_start": 20.0, "angle_end": 160.0, "weight": "pencil",
+         "at": {"region": [0.55, 0.55, 0.95, 0.95]},
+         "relation": {"type": "touching", "contact": "both_ends"}},
+    ]},
+}
+
+
+def _round_points(points) -> list[list[float]]:
+    return [[round(x, 9), round(y, 9)] for x, y in points]
+
+
+def cloudform_and_relation_fixtures() -> None:
+    """Phase 2g expectations: cloudform contours, minor arcs, and resolve order.
+
+    The discriminating axis is the tool grammar. `_base_radius` scales its touch
+    term by `GRAMMARS[weight].energy_lateral * 0.018`, so a port that invents its
+    own weight table (rather than reusing the grammar table already ported in 2c)
+    lands on different radii for every tool. `rotring` is the sharpest probe: its
+    lateral energy is exactly 0.0, so its contour must carry no touch term at all.
+    """
+    out: dict = {}
+
+    # 道具ごとの lateral energy。雲形の touch 項はこの値だけで決まる。
+    out["tool_energy_lateral"] = [
+        {"weight": w, "energy_lateral": se.GRAMMARS[w].energy_lateral,
+         "touch_gain": round(se.GRAMMARS[w].energy_lateral * 0.018, 12)}
+        for w in WEIGHTS_ALL
+    ]
+
+    # seed 導出。符号なし 64bit をまたぐ値を混ぜる。
+    out["cloudform_seed"] = [
+        {"performance_seed": ps, "instruction_index": ii, "mark_index": mi,
+         "value": str(cf.cloudform_seed(ps, ii, mi))}
+        for ps, ii, mi in (
+            (None, 0, 0), (12345, 0, 0), (12345, 1, 0), (12345, 0, 2),
+            (2**63 + 1, 0, 0), (2**64 - 1, 3, 1),
+        )
+    ]
+
+    # _base_radius を全道具 × 代表角で。ここが外れると輪郭全体が外れる。
+    thetas = [0.0, math.tau / 8, math.tau / 3, math.tau * 0.77]
+    seed = cf.cloudform_seed(12345, 0, 0)
+    out["base_radius"] = [
+        {"weight": w, "seed": str(seed), "theta": round(t, 12),
+         "value": round(cf._base_radius(t, seed, None, w), 12)}
+        for w in WEIGHTS_ALL for t in thetas
+    ]
+
+    varied = Variation.model_validate(
+        {"amplitude": "broad", "frequency": "medium", "quality": "wave",
+         "dimensions": ["position_x", "position_y"]})
+    out["base_radius_varied"] = [
+        {"weight": w, "seed": str(seed), "theta": round(t, 12),
+         "value": round(cf._base_radius(t, seed, varied, w), 12)}
+        for w in ("pencil", "rotring", "brush_thick") for t in thetas
+    ]
+
+    # 輪郭そのもの。全道具 + 変奏 + 高位 seed。
+    contours = []
+    for w in WEIGHTS_ALL:
+        c = cf.generate_cloudform_contour(
+            (0.5, 0.5), (0.5, 0.34), performance_seed=12345,
+            instruction_index=0, mark_index=0, variation=None, weight=w)
+        contours.append({"case": f"{w}-plain", "weight": w, "performance_seed": 12345,
+                         "variation": None, "point_count": len(c.points),
+                         "points": _round_points(c.points), "path_d": c.path_d})
+    for w, ps, var in (("pencil", 12345, varied), ("rotring", 12345, varied),
+                       ("pencil", 2**63 + 1, None), ("brush_thick", 2**64 - 1, None)):
+        c = cf.generate_cloudform_contour(
+            (0.5, 0.5), (0.5, 0.34), performance_seed=ps,
+            instruction_index=0, mark_index=0, variation=var, weight=w)
+        contours.append({
+            "case": f"{w}-seed{ps}-{'varied' if var else 'plain'}", "weight": w,
+            "performance_seed": str(ps),
+            "variation": (var.model_dump(by_alias=True) if var else None),
+            "point_count": len(c.points), "points": _round_points(c.points),
+            "path_d": c.path_d})
+    out["cloudform_contour"] = contours
+
+    # 劣弧再構成の素。touching はこの 3 関数の上に載る。
+    out["minor_arc_delta"] = [
+        {"angle_start": a, "angle_end": b, "value": round(ag.minor_arc_delta(a, b), 12)}
+        for a, b in ((0.0, 90.0), (0.0, 270.0), (350.0, 10.0), (10.0, 350.0), (0.0, 180.0), (-45.0, 200.0))
+    ]
+    out["arc_from_endpoints_and_sagitta"] = []
+    for start, end, sag in (((100.0, 500.0), (400.0, 500.0), 60.0),
+                            ((100.0, 500.0), (400.0, 500.0), -60.0),
+                            ((200.0, 200.0), (600.0, 640.0), 90.0)):
+        g = ag.arc_from_endpoints_and_sagitta(start, end, sag)
+        out["arc_from_endpoints_and_sagitta"].append({
+            "start": list(start), "end": list(end), "sagitta": sag,
+            "center": [round(g.center[0], 9), round(g.center[1], 9)],
+            "radius": round(g.radius, 9),
+            "angle_start": round(g.angle_start, 9), "angle_end": round(g.angle_end, 9),
+            "signed_sagitta_roundtrip": round(
+                ag.signed_arc_sagitta(g.center, g.radius, g.angle_start, g.angle_end), 9),
+        })
+
+    # region 配置 → relation 解決の順序。逆順だと relation が落ちる。
+    resolved = []
+    for name, raw in CLOUDFORM_SCORES.items():
+        if name.startswith(("11_", "12_")):
+            continue
+        score = Score.model_validate(raw)
+        after = renderer._resolve_performance_score(score, RENDER_SEED)
+        resolved.append({
+            "case": name, "performance_seed": RENDER_SEED,
+            "score_in": raw,
+            "score_out": after.model_dump(by_alias=True),
+        })
+    # 負例: circle への touching は落ちるのが正しい（line/arc でないため）。
+    circle_raw = {"instructions": [
+        {"primitive": "circle", "center": [0.36, 0.5], "radius": 0.16, "weight": "pen"},
+        {"primitive": "circle", "center": [0.68, 0.5], "radius": 0.16, "weight": "pen",
+         "relation": {"type": "touching", "contact": "both_ends"}},
+    ]}
+    circle_after = renderer._resolve_performance_score(Score.model_validate(circle_raw), RENDER_SEED)
+    resolved.append({"case": "circle_touching_drops", "performance_seed": RENDER_SEED,
+                     "score_in": circle_raw, "score_out": circle_after.model_dump(by_alias=True)})
+
+    # grid arrangement + relation は relation が落ちるのが正しい。
+    grid_raw = {"instructions": [
+        {"primitive": "circle", "center": [0.3, 0.3], "radius": 0.1, "weight": "pen"},
+        {"primitive": "circle", "center": [0.6, 0.6], "radius": 0.1, "weight": "pen",
+         "arrangement": {"layout": "grid", "count": 4, "rows": 2, "cols": 2},
+         "relation": {"type": "touching", "contact": "both_ends"}},
+    ]}
+    grid_after = renderer._resolve_performance_score(Score.model_validate(grid_raw), RENDER_SEED)
+    resolved.append({"case": "grid_drops_relation", "performance_seed": RENDER_SEED,
+                     "score_in": grid_raw, "score_out": grid_after.model_dump(by_alias=True)})
+    out["resolve_performance_score"] = resolved
+
+    (OUT / "renderer_cloudform_and_relations.json").write_text(
+        json.dumps(out, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
+    SCORES.update(CLOUDFORM_SCORES)
     stroke_engine_fixtures()
     variation_fixtures()
     proportional_fixtures()
     seed_range_fixtures()
     fill_and_arc_fixtures()
+    cloudform_and_relation_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

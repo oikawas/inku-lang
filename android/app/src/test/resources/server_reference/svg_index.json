@@ -365,5 +365,179 @@
     "classes": [
       "arc-stroke-v1 controls-95 events-0"
     ]
+  },
+  "11_cloudform_pencil": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "cloudform",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0.5,
+            0.34
+          ],
+          "weight": "pencil"
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "bytes": 3350,
+    "counts": {
+      "path": 1,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 5
+    },
+    "classes": [
+      "cloudform contour-v1 stroke-engine-touch"
+    ]
+  },
+  "12_cloudform_rotring": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "cloudform",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0.5,
+            0.34
+          ],
+          "weight": "rotring"
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "bytes": 3329,
+    "counts": {
+      "path": 1,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 5
+    },
+    "classes": [
+      "cloudform contour-v1 stroke-engine-touch"
+    ]
+  },
+  "13_touching_arcs": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "arc",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.26,
+          "angle_start": 200.0,
+          "angle_end": 340.0,
+          "weight": "pen"
+        },
+        {
+          "primitive": "arc",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.26,
+          "angle_start": 20.0,
+          "angle_end": 160.0,
+          "weight": "pen",
+          "relation": {
+            "type": "touching",
+            "contact": "both_ends"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "bytes": 3400,
+    "counts": {
+      "path": 4,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 8
+    },
+    "classes": [
+      "arc-stroke-v1 controls-31 events-0"
+    ]
+  },
+  "14_region_then_relation": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "arc",
+          "center": [
+            0.35,
+            0.4
+          ],
+          "radius": 0.18,
+          "angle_start": 200.0,
+          "angle_end": 340.0,
+          "weight": "pencil"
+        },
+        {
+          "primitive": "arc",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.18,
+          "angle_start": 20.0,
+          "angle_end": 160.0,
+          "weight": "pencil",
+          "at": {
+            "region": [
+              0.55,
+              0.55,
+              0.95,
+              0.95
+            ]
+          },
+          "relation": {
+            "type": "touching",
+            "contact": "both_ends"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "bytes": 7512,
+    "counts": {
+      "path": 8,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 32,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 8
+    },
+    "classes": [
+      "arc-stroke-v1 controls-22 events-0",
+      "arc-stroke-v1 controls-22 events-2",
+      "material-outline"
+    ]
   }
 }

@@ -16,16 +16,30 @@ internal object ServerRendererGeometry {
 
     fun fmt(value: Double): String = "%.3f".format(java.util.Locale.US, value)
 
-    fun seedToInt(seed: Any?): Int {
+    fun seedToLong(seed: Any?): Long {
         return when (seed) {
-            is Number -> seed.toInt()
-            is String -> seed.toIntOrNull() ?: seed.hashCode()
-            else -> 0
+            is Number -> seed.toLong()
+            is String -> seed.toULongOrNull()?.toLong() ?: seed.toLongOrNull() ?: seed.hashCode().toLong()
+            else -> 0L
         }
     }
 
-    fun signedHash(i: Int, seed: String): Double {
-        val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$i".toByteArray())
+    fun seedToInt(seed: Any?): Int {
+        return seedToLong(seed).toInt()
+    }
+
+    private fun formatSeed(seed: Any): String {
+        return when (seed) {
+            is Long -> seed.toULong().toString()
+            is ULong -> seed.toString()
+            is String -> seed.toULongOrNull()?.toString() ?: seed
+            else -> seed.toString()
+        }
+    }
+
+    fun signedHash(i: Int, seed: Any): Double {
+        val seedStr = formatSeed(seed)
+        val digest = MessageDigest.getInstance("SHA-256").digest("$seedStr:$i".toByteArray())
         var raw = 0L
         for (offset in 0 until 8) {
             raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
@@ -33,16 +47,9 @@ internal object ServerRendererGeometry {
         return raw.toDouble() / 9_223_372_036_854_775_808.0
     }
 
-    fun signedHash(i: Int, seed: Int): Double {
-        return signedHash(i, seed.toString())
-    }
-
-    fun hash01(i: Int, seed: String): Double {
-        return hash01(i, seedToInt(seed), "")
-    }
-
-    fun hash01(i: Int, seed: Int, salt: String = ""): Double {
-        val rawStr = "$seed:$salt:$i"
+    fun hash01(i: Int, seed: Any, salt: String = ""): Double {
+        val seedStr = formatSeed(seed)
+        val rawStr = "$seedStr:$salt:$i"
         val digest = MessageDigest.getInstance("SHA-256").digest(rawStr.toByteArray(Charsets.UTF_8))
         val raw = (digest[0].toLong() and 0xffL) or
             ((digest[1].toLong() and 0xffL) shl 8) or
@@ -51,8 +58,9 @@ internal object ServerRendererGeometry {
         return (raw and 0xffffffffL).toDouble() / 0xffffffffL.toDouble()
     }
 
-    fun hashToUnit(i: Int, seed: Int): Double {
-        val rawStr = "$seed:$i"
+    fun hashToUnit(i: Int, seed: Any): Double {
+        val seedStr = formatSeed(seed)
+        val rawStr = "$seedStr:$i"
         val digest = MessageDigest.getInstance("SHA-256").digest(rawStr.toByteArray(Charsets.UTF_8))
         var raw = 0L
         for (offset in 0 until 8) {
@@ -61,11 +69,11 @@ internal object ServerRendererGeometry {
         return raw.toDouble() / 9_223_372_036_854_775_808.0
     }
 
-    fun wavePhase(seed: Int): Double {
+    fun wavePhase(seed: Any): Double {
         return hash01(0, seed, "wave-phase") * 2.0 * Math.PI
     }
 
-    fun valueNoise1D(x: Double, seed: Int): Double {
+    fun valueNoise1D(x: Double, seed: Any): Double {
         val xi = floor(x).toInt()
         val xf = x - xi
         val v1 = hashToUnit(xi, seed)
@@ -74,7 +82,7 @@ internal object ServerRendererGeometry {
         return v1 * (1.0 - t) + v2 * t
     }
 
-    fun periodicValueNoise1D(x: Double, seed: Int, period: Int): Double {
+    fun periodicValueNoise1D(x: Double, seed: Any, period: Int): Double {
         val xi = floor(x).toInt()
         val xf = x - xi
         val p = max(1, period)
@@ -161,21 +169,36 @@ internal object ServerRendererGeometry {
         }
     }
 
-    fun sampleOffset(t: Double, variation: JSONObject, seed: Int, segment: Int, amp: Double): Double {
+    private fun xorSeed(seed: Any, mask: Long): Any {
+        return when (seed) {
+            is Long -> seed xor mask
+            is Int -> (seed.toLong() xor mask).toInt()
+            is ULong -> seed xor mask.toULong()
+            is Number -> seed.toLong() xor mask
+            is String -> {
+                val ul = seed.toULongOrNull()
+                if (ul != null) (ul xor mask.toULong()).toString()
+                else ((seed.toLongOrNull() ?: seed.hashCode().toLong()) xor mask).toString()
+            }
+            else -> mask
+        }
+    }
+
+    fun sampleOffset(t: Double, variation: JSONObject, seed: Any, segment: Int, amp: Double): Double {
         val freq = getFrequencyCycles(variation)
         return when (variation.optString("quality", "none")) {
             "wave" -> sin(t * 2.0 * Math.PI * freq + wavePhase(seed)) * amp
             "perlin" -> valueNoise1D(t * freq, seed) * amp
             "pink" -> (
                 valueNoise1D(t * freq, seed) * amp +
-                    valueNoise1D(t * freq * 2.0, seed xor 0x9E37) * amp * 0.5
+                    valueNoise1D(t * freq * 2.0, xorSeed(seed, 0x9E37L)) * amp * 0.5
                 ) / 1.5
             "white" -> hashToUnit(segment, seed) * amp
             else -> 0.0
         }
     }
 
-    fun sampleOffsetPeriodic(t: Double, variation: JSONObject, seed: Int, segment: Int, amp: Double): Double {
+    fun sampleOffsetPeriodic(t: Double, variation: JSONObject, seed: Any, segment: Int, amp: Double): Double {
         val freq = getFrequencyCycles(variation)
         return when (variation.optString("quality", "none")) {
             "wave" -> sin(t * 2.0 * Math.PI * freq + wavePhase(seed)) * amp
@@ -303,18 +326,18 @@ internal object ServerRendererGeometry {
     }
 
     fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String): List<Pair<Double, Double>> {
-        return variedLinePoints(x1, y1, x2, y2, variation, seedToInt(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
+        return variedLinePoints(x1, y1, x2, y2, variation, seedToLong(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
-    fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: Int): List<Pair<Double, Double>> {
+    fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: Long): List<Pair<Double, Double>> {
         return variedLinePoints(x1, y1, x2, y2, variation, seed, JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
     fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
-        return variedLinePoints(x1, y1, x2, y2, variation, seedToInt(seed), ins, width, height, unit)
+        return variedLinePoints(x1, y1, x2, y2, variation, seedToLong(seed), ins, width, height, unit)
     }
 
-    fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: Int, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+    fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: Long, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
         if (variation == null) return listOf(x1 to y1, x2 to y2)
         val dx = x2 - x1
         val dy = y2 - y1

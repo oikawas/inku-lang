@@ -35,7 +35,7 @@ internal object ServerRendererMaterial {
         }
     }
 
-    fun lineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double): String? {
+    fun lineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double, includeBase: Boolean = true): String? {
         val weight = ins.optString("weight", "pen")
         if (weight !in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint")) return null
         val seedStr = ins.toString()
@@ -43,7 +43,10 @@ internal object ServerRendererMaterial {
         val scale = unit / 1000.0
         val lineLen = kotlin.math.hypot(x2 - x1, y2 - y1)
         val out = StringBuilder()
-        out.append("""<g><line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" ${attrs.toSvgAttributes(includeFill = false)}/>""")
+        out.append("<g>")
+        if (includeBase) {
+            out.append("""<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" ${attrs.toSvgAttributes(includeFill = false)}/>""")
+        }
         when (weight) {
             "pencil" -> {
                 listOf(-0.9 * scale, 1.1 * scale).forEachIndexed { idx, amount ->

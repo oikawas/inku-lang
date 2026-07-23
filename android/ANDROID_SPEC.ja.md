@@ -1172,6 +1172,33 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 `gradle :app:testDebugUnitTest --rerun-tasks`（全 25 件）および `gradle :app:assembleDebug` が成功する。
 `android/BUILD_NUMBER` は `148074` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
 
+## 2026-07-23 web/server v2 追随 Phase 2d (線の筆致化 `stroke-engine-v1`)
+
+契約 `antigravity-android-phase2-renderer.md` §8 に基づき、`weight == "rotring"` 以外の `primitive == "line"` の描画分岐を `ServerStrokeEngine.synthesizeStroke` へ接続し、可変幅輪郭 `<path>` を保持するグループ `<g class="stroke-engine-v1 controls-N events-M">` の生成へ移行した（`rotring` は従来の幾何線 `<line>` / `<polyline>` を維持）。
+
+### 実装およびシード計算の完全同期
+
+1. **`DefaultSvgRenderer.kt` の `line` 筆致化**:
+   - `rotring` 以外の `line` 描画で `renderHandStroke` を呼出し、`stroke-engine-v1` グループを構成。
+   - 変奏あり（`needsPathVariation`）の線では、1 回目の `synthesizeStroke` (サンプル数 39) でグループの `class` 属性（`controls-39 events-M`）を決め、2 回目の `synthesizeStroke`（サンプル数 `centerline.size`）で得た各点幅列を `outlineForCenterline` に渡して帯輪郭 `<path>` を生成。
+2. **Python サーバー `_seed_for_instruction` とのシード文字列一致**:
+   - `serverInstructionJson` のキー順序、`from_` キー名、`variation` フィルタリング（変奏なし `line` は `null`）、`null` フィールド（`center`, `radius`, `at`, `relation`, `surface` 等）を Python Pydantic `model_dump(mode="json")` と完全一致させた。
+   - `renderSeed` 付与時の `:render:{renderSeed}` 連結および Little-Endian Unsigned 64-bit (`ULong`) ハッシュ解釈の完全同期。
+3. **64-bit シードのフォーマットおよび変奏ハッシュ修正**:
+   - `ServerStrokeEngine.kt` の `unitHash` で `$seed` を符号なし 64-bit 整数文字列（`seed.toULong().toString()`）としてフォーマットするよう修正（Python 側の `f"{seed}:{label}:{index}"` と完全致）。
+   - `ServerRendererGeometry.kt` の `seedToInt` による 32-bit オーバーフロー `hashCode()` 破壊を解消し、`seedToLong` / `hash01` / `signedHash` / `sampleOffset` / `xorSeed` (`seed ^ 0x9E37`) で 64-bit シード数値を保持。
+
+### 検証
+
+`DefaultSvgRendererPhase2dTest.kt` を新規作成し、参照コーパス SVG に対する完全一致検証を実施した。
+
+- `02_line_brush.svg`: `stroke-engine-v1 controls-39 events-2` 属性および `path d` 座標列が参照 SVG と **完全一致**。
+- `09_line_white.svg`: `stroke-engine-v1 controls-39 events-0` 属性および変奏中心線帯の `path d` 座標列が参照 SVG と **完全一致**。
+- `05_circle_rotring.svg` (Rotring 線の検証): `stroke-engine-v1` グループを生成せず、従来の幾何線 `<line>` が正しく生成されることを確認。
+
+`gradle :app:testDebugUnitTest --rerun-tasks`（全 28 件）および `gradle :app:assembleDebug` が成功する。
+`android/BUILD_NUMBER` は `148075` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
+
 
 
 

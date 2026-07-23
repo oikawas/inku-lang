@@ -1002,6 +1002,19 @@ release). It is a separate namespace from the web display version
 (`APP_VERSION`), but the numbers normally coincide because releases are
 repo-wide.
 
+**Developer mode (v2.4.3):** the `INKU_DEVELOPER_MODE` environment variable
+decides only whether developer-facing options are shown. With it off, NVIDIA NIM
+drops out of the display catalogs (`GET /api/models`, the administrator model
+settings, and the provider model refresh), and the persistent Build number
+disappears from the left rail, the sign-in screen, and the app info dialog.
+**Only the display is gated: the execution path, stored model settings, the
+model information on history entries, and each artwork's `render_build_number`
+are unchanged when it is off** (if a stored setting points at a hidden provider,
+only the on-screen selection falls back to the first public model). The
+distributed compose file defaults it off; the development and bench compose file
+defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
+before sign-in.
+
 ---
 
 ## 13. CLI

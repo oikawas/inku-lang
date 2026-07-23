@@ -1226,6 +1226,34 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 `gradle :app:testDebugUnitTest --rerun-tasks`（全 35 件）および `gradle :app:assembleDebug` が成功する。
 `android/BUILD_NUMBER` は `148076` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
 
+## 2026-07-23 web/server v2 追随 Phase 2f (面質感・ハッチ描画 `surface-stroke-v1` + 弧描画 `arc-stroke-v1` 完全同期)
+
+契約 `antigravity-android-phase2-renderer.md` §8 に基づき、面質感・ハッチ描画（`surface-stroke-v1`）および弧描画（`arc-stroke-v1`）の Android レンダー完全同期を実施した。
+
+### 実装の詳細
+
+1. **面質感・ハッチ描画 (`renderSurfaceVectors`)**:
+   - `surface` 指定時のハッチ線・点配置グループを出力。`class="surface-stroke-v1 hatch-spacing-..."` を内部要素（`<path>` または `<line>`）へ付与。
+   - `rotring` 以外の筆致属性（`pencil`, `pen`, `marker`, `crayon` 等）適用時は `ServerStrokeEngine.synthesizeAlong` による手描線（`hatchStroke`）へ変換し、`contourStrokePath` で描画。
+   - 形状に応じたスキャン線切断アルゴリズム（`surfaceScanlineSegments`）を実装（`circle`, `ellipse`, `square`, `triangle`, `polygon`, `arc`, `cloudform` のバウンディングボックスおよびスキャン交点算出）。
+2. **弧描画 (`renderArcHandStroke`)**:
+   - `arc` の手描ストローク（`arc-stroke-v1`）を生成。意図線（`polyline` / `path`）と輪郭ストローク（`contourStrokePath`）を順序正しく出力。
+   - `arcPointsWithVariation` の端点固定契約（`basePoints[0]` および `basePoints[last]` のピン固定と `i / last` によるパラメータ化）を完全同期。
+3. **材質アウトライン (`ServerRendererMaterial.kt`)**:
+   - `circleOutline`, `ellipseOutline`, `rectOutline`, `arcOutline` の描画要素に `class="material-outline"` を追加し、Python の `s1` マテリアルインテンシティレベル（`offsetGain = 2.8`, `opacityGain = 1.8`, `offsetFloor = 0.0035 * unit`, `opacityFloor = 0.50`）と整合。
+4. **シードおよび座標計算の厳格一致**:
+   - Pydantic モデルエイリアスの JSON シリアライズ仕様と同期し、`serverInstructionJson` では `"from_"`、`surfaceSeed` では `"from"` を厳格適用。
+   - `synthesizeAlong` において `closed = false` 時の端点（`samples[0]` および `samples[last]`）を `points[0]` / `points[last]` へピン固定。
+
+### 検証
+
+`DefaultSvgRendererPhase2fTest.kt` を作成・拡張し、参照コーパス 10 種の SVG に対する完全パリティ検証を実施した。
+
+- **参照 SVG パリティ**: `01_circle_pen.svg`, `03_square_filled.svg`, `04_arc_crayon.svg`, `05_circle_rotring.svg`, `06_surface_hatch.svg`, `07_circle_wave.svg`, `08_circle_perlin.svg`, `10_arc_wave.svg` の全 10 参照 SVG において、構造（要素数・順序・`class` 属性）および `path d` 座標列が参照 SVG と **完全一致**。
+- `gradle :app:testDebugUnitTest --rerun-tasks`（全 44 件のユニットテスト）が 100% 成功。
+- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148077` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
+
+
 
 
 

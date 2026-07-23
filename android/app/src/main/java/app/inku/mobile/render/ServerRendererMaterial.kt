@@ -105,12 +105,12 @@ internal object ServerRendererMaterial {
     }
 
     fun circleOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double, unit: Double): String {
-        val seed = ins.toString()
         val weight = ins.optString("weight", "pen")
+        val seed = ins.toString()
         val out = StringBuilder()
         materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
-            out.append("""<circle cx="${ServerRendererGeometry.fmt(cx)}" cy="${ServerRendererGeometry.fmt(cy)}" r="${ServerRendererGeometry.fmt(max(0.0, r + offset))}" ${outline.toSvgAttributes()}/>""")
+            out.append("""<circle cx="${ServerRendererGeometry.fmt(cx)}" cy="${ServerRendererGeometry.fmt(cy)}" r="${ServerRendererGeometry.fmt(max(0.0, r + offset))}" ${outline.toSvgAttributes()} class="material-outline"/>""")
         }
         val perim = 2.0 * Math.PI * r
         val spec = speckProfile(weight, perim, unit)
@@ -124,7 +124,7 @@ internal object ServerRendererMaterial {
         val out = StringBuilder()
         materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
-            out.append("""<ellipse cx="${ServerRendererGeometry.fmt(cx)}" cy="${ServerRendererGeometry.fmt(cy)}" rx="${ServerRendererGeometry.fmt(max(0.0, rx + offset))}" ry="${ServerRendererGeometry.fmt(max(0.0, ry + offset))}" ${outline.toSvgAttributes()}/>""")
+            out.append("""<ellipse cx="${ServerRendererGeometry.fmt(cx)}" cy="${ServerRendererGeometry.fmt(cy)}" rx="${ServerRendererGeometry.fmt(max(0.0, rx + offset))}" ry="${ServerRendererGeometry.fmt(max(0.0, ry + offset))}" ${outline.toSvgAttributes()} class="material-outline"/>""")
         }
         val approxPerim = Math.PI * (3.0 * (rx + ry) - sqrt((3.0 * rx + ry) * (rx + 3.0 * ry)))
         val spec = speckProfile(weight, approxPerim, unit)
@@ -138,7 +138,7 @@ internal object ServerRendererMaterial {
         val out = StringBuilder()
         materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
-            out.append("""<rect x="${ServerRendererGeometry.fmt(x - offset)}" y="${ServerRendererGeometry.fmt(y - offset)}" width="${ServerRendererGeometry.fmt(max(0.0, w + offset * 2.0))}" height="${ServerRendererGeometry.fmt(max(0.0, h + offset * 2.0))}" ${outline.toSvgAttributes()}/>""")
+            out.append("""<rect x="${ServerRendererGeometry.fmt(x - offset)}" y="${ServerRendererGeometry.fmt(y - offset)}" width="${ServerRendererGeometry.fmt(max(0.0, w + offset * 2.0))}" height="${ServerRendererGeometry.fmt(max(0.0, h + offset * 2.0))}" ${outline.toSvgAttributes()} class="material-outline"/>""")
         }
         val perim = 2.0 * (w + h)
         val spec = speckProfile(weight, perim, unit)
@@ -152,7 +152,7 @@ internal object ServerRendererMaterial {
         val out = StringBuilder()
         materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
-            out.append("""<path d="${ServerRendererGeometry.arcPathD(cx, cy, max(0.0, r + offset), start, end)}" ${outline.toSvgAttributes()}/>""")
+            out.append("""<path class="material-outline" d="${ServerRendererGeometry.arcPathD(cx, cy, max(0.0, r + offset), start, end)}" ${outline.toSvgAttributes()}/>""")
         }
         val deltaDeg = ((end - start) % 360.0 + 360.0) % 360.0
         val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
@@ -165,21 +165,48 @@ internal object ServerRendererMaterial {
     private fun materialOutlineProfile(weight: String, unit: Double): List<OutlineProfile> {
         val scale = unit / 1000.0
         val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val offsetGain = 2.8
+        val opacityGain = 1.8
+        val offsetFloor = 0.0035 * unit
+        val opacityFloor = 0.50
+
+        fun calcOffset(raw: Double): Double {
+            val v = raw * scale * offsetGain
+            return if (kotlin.math.abs(v) >= offsetFloor) v else (if (v < 0) -offsetFloor else offsetFloor)
+        }
+
+        fun calcOpacity(raw: Double): Double {
+            return kotlin.math.max(opacityFloor, kotlin.math.min(1.0, raw * opacityGain))
+        }
+
         val rawProfiles = when (weight) {
-            "pencil" -> listOf(OutlineProfile(-1.0, 0.45 * scale, 0.24, scaleDash("1,7", scale)), OutlineProfile(1.2, 0.5 * scale, 0.20, scaleDash("1,5", scale)))
-            "chalk" -> listOf(OutlineProfile(-3.2, 1.2 * scale, 0.30, scaleDash("8,12,1,8", scale)), OutlineProfile(3.6, 1.0 * scale, 0.24, scaleDash("5,10,1,6", scale)))
-            "brush_thin" -> listOf(OutlineProfile(-1.6, 1.0 * scale, 0.32, scaleDash("22,9", scale)), OutlineProfile(1.8, 1.4 * scale, 0.28, scaleDash("14,8", scale)))
-            "brush_thick" -> listOf(OutlineProfile(-4.0, baseWidth * 0.28, 0.36, scaleDash("18,7,3,11", scale)), OutlineProfile(3.2, baseWidth * 0.22, 0.28, scaleDash("11,9", scale)))
-            "crayon" -> listOf(OutlineProfile(-3.4, baseWidth * 0.24, 0.24, scaleDash("2,5,9,7", scale)), OutlineProfile(-1.5, baseWidth * 0.20, 0.20, scaleDash("4,8", scale)), OutlineProfile(2.4, baseWidth * 0.22, 0.22, scaleDash("2,5,9,7", scale)))
-            "burin", "drypoint" -> listOf(OutlineProfile(-0.8, 0.4 * scale, 0.30, scaleDash("1,4", scale)))
+            "pencil" -> listOf(
+                OutlineProfile(calcOffset(-1.0), 0.45 * scale, calcOpacity(0.24), scaleDash("1,7", scale)),
+                OutlineProfile(calcOffset(1.2), 0.50 * scale, calcOpacity(0.20), scaleDash("1,5", scale))
+            )
+            "chalk" -> listOf(
+                OutlineProfile(calcOffset(-3.2), 1.20 * scale, calcOpacity(0.30), scaleDash("8,12,1,8", scale)),
+                OutlineProfile(calcOffset(3.6), 1.00 * scale, calcOpacity(0.24), scaleDash("5,10,1,6", scale))
+            )
+            "brush_thin" -> listOf(
+                OutlineProfile(calcOffset(-1.6), 1.00 * scale, calcOpacity(0.32), scaleDash("22,9", scale)),
+                OutlineProfile(calcOffset(1.8), 1.40 * scale, calcOpacity(0.28), scaleDash("14,8", scale))
+            )
+            "brush_thick" -> listOf(
+                OutlineProfile(calcOffset(-4.0), baseWidth * 0.28, calcOpacity(0.36), scaleDash("18,7,3,11", scale)),
+                OutlineProfile(calcOffset(3.2), baseWidth * 0.22, calcOpacity(0.28), scaleDash("11,9", scale))
+            )
+            "crayon" -> listOf(
+                OutlineProfile(calcOffset(-3.4), baseWidth * 0.24, calcOpacity(0.24), scaleDash("2,5,9,7", scale)),
+                OutlineProfile(calcOffset(-1.5), baseWidth * 0.20, calcOpacity(0.20), scaleDash("4,8", scale)),
+                OutlineProfile(calcOffset(2.4), baseWidth * 0.22, calcOpacity(0.22), scaleDash("2,5,9,7", scale))
+            )
+            "burin", "drypoint" -> listOf(
+                OutlineProfile(calcOffset(-0.8), 0.40 * scale, calcOpacity(0.30), scaleDash("1,4", scale))
+            )
             else -> emptyList()
         }
-        return rawProfiles.map { prof ->
-            prof.copy(
-                offset = outlineOffsetPx(prof.offset, unit),
-                opacity = outlineOpacity(prof.opacity),
-            )
-        }
+        return rawProfiles
     }
 
     fun speckCount(baseCount: Int, pathLengthPx: Double, unit: Double): Int {

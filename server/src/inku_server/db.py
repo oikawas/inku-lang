@@ -564,7 +564,7 @@ def _canonical_seed(value):
         return value
 
 
-def render_hash_for_item(item: dict) -> str:
+def _legacy_render_hash_for_item(item: dict) -> str:
     payload = {
         "version": "rh2",
         "score": item.get("score") or {},
@@ -576,6 +576,18 @@ def render_hash_for_item(item: dict) -> str:
         "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
     }
     return "rh2:" + sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+def render_hash_for_item(item: dict) -> str:
+    payload = {
+        "version": "rh3",
+        "score": item.get("score") or {},
+        "render_seed": _canonical_seed(item.get("render_seed")),
+        "render_engine_id": item.get("render_engine_id"),
+        "render_engine_version": item.get("render_engine_version"),
+        "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
+    }
+    return "rh3:" + sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 
 def render_hash_short(render_hash: str | None) -> str | None:

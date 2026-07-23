@@ -690,7 +690,7 @@ def test_compose_happy_path(monkeypatch, auth_context):
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
     assert "<circle" in data["svg"]
-    assert data["render_hash"].startswith("rh2:")
+    assert data["render_hash"].startswith("rh3:")
     assert len(data["render_hash"]) == 68
     assert data["render_hash_short"] == data["render_hash"][-4:].upper()
     assert data["instruction_lang_requested"] == "auto"
@@ -805,7 +805,7 @@ def test_language_metadata_does_not_change_render_hash():
     assert db.render_hash_for_item(with_language) == db.render_hash_for_item(item)
 
 
-def test_render_hash_v2_uses_saved_score_and_render_conditions_not_svg_or_text():
+def test_render_hash_v3_uses_saved_score_and_render_conditions_not_svg_or_text():
     base = {
         "input": "one black line",
         "ddl": "Draw one black line.",
@@ -831,12 +831,12 @@ def test_render_hash_v2_uses_saved_score_and_render_conditions_not_svg_or_text()
     }
 
     render_hash = db.render_hash_for_item(base)
-    assert render_hash.startswith("rh2:")
+    assert render_hash.startswith("rh3:")
     assert len(render_hash) == 68
     assert db.render_hash_for_item(same_edition) == render_hash
 
 
-def test_render_hash_v2_changes_with_render_or_vary_seed():
+def test_render_hash_v3_changes_with_render_seed_but_not_vary_seed():
     base = {
         "score": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]},
         "render_seed": 7,
@@ -848,7 +848,7 @@ def test_render_hash_v2_changes_with_render_or_vary_seed():
     }
 
     assert db.render_hash_for_item({**base, "render_seed": 8}) != db.render_hash_for_item(base)
-    assert db.render_hash_for_item({**base, "vary_seed": 3}) != db.render_hash_for_item(base)
+    assert db.render_hash_for_item({**base, "vary_seed": 3}) == db.render_hash_for_item(base)
 
 
 def test_legacy_render_hash_short_remains_display_compatible():
@@ -1893,7 +1893,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     data = r.json()
     assert data["history_id"]
     assert data["history_at"] == 1_700_000_000_000
-    assert data["render_hash"].startswith("rh2:")
+    assert data["render_hash"].startswith("rh3:")
     assert len(data["render_hash"]) == 68
     assert data["render_hash_short"] == data["render_hash"][-4:].upper()
     assert data["render_color_catalog_id"] == "vivid_material"
@@ -1971,7 +1971,7 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
     assert data["score"]["instructions"][0]["center"] == [0.5, 0.5]
     assert data["score"]["instructions"][0]["radius"] == 0.1
     assert data["score"]["instructions"][0]["color"] == "green"
-    assert data["render_hash"].startswith("rh2:")
+    assert data["render_hash"].startswith("rh3:")
     assert data["render_hash_short"]
 
     alternate = client.post(

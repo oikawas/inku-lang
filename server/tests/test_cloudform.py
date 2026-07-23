@@ -372,7 +372,7 @@ def test_cloudform_can_be_previous_relation_contour() -> None:
     assert "cloudform" in render(score, render_seed=301)
 
 
-def test_cloudform_render_does_not_add_contour_to_rh2_inputs() -> None:
+def test_cloudform_render_does_not_add_contour_to_rh3_inputs() -> None:
     score = _cloud_score().model_dump(mode="json", by_alias=True)
     base = {
         "score": score,
@@ -385,7 +385,7 @@ def test_cloudform_render_does_not_add_contour_to_rh2_inputs() -> None:
         "svg": render(_cloud_score(), render_seed=22),
     }
     changed_artifact = {**base, "svg": render(_cloud_score(), render_seed=23)}
-    assert db.render_hash_for_item(base).startswith("rh2:")
+    assert db.render_hash_for_item(base).startswith("rh3:")
     assert db.render_hash_for_item(changed_artifact) == db.render_hash_for_item(base)
 
 

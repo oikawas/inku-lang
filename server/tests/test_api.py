@@ -122,7 +122,8 @@ def test_health():
     assert r.json() == {"ok": True}
 
 
-def test_info_reports_version_and_build_number():
+def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
+    monkeypatch.delenv("INKU_DEVELOPER_MODE", raising=False)
     r = client.get("/api/info")
     assert r.status_code == 200
     data = r.json()
@@ -131,6 +132,11 @@ def test_info_reports_version_and_build_number():
     # bumps in pyproject.toml do not require editing this test.
     assert data["version"] == importlib.metadata.version("inku-server")
     assert data["build_number"]
+    assert data["developer_mode"] is False
+
+    monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
+    enabled = client.get("/api/info")
+    assert enabled.json()["developer_mode"] is True
 
 
 def test_color_catalogs_are_served_by_api():
@@ -553,6 +559,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
     assert initial.json()["save_files"] is False
     assert initial.json()["random_color_catalog"] is False
     assert initial.json()["interval_seconds"] == 30
+    assert initial.json()["timeout_seconds"] == 3600
 
     body = {
         "save_db": True,
@@ -560,6 +567,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
         "prompt_model": "meta/llama-3.3-70b-instruct",
         "seed_phrase": "短い冬の情景を生成",
         "interval_seconds": 45,
+        "timeout_seconds": 7200,
         "random_color_catalog": True,
     }
     updated = client.put("/api/auth/me/demo-settings", headers=headers, json=body)
@@ -572,6 +580,10 @@ def test_current_user_demo_settings_are_persisted(auth_context):
 
     invalid = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "interval_seconds": 0})
     assert invalid.status_code == 422
+    too_short = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "timeout_seconds": 59})
+    assert too_short.status_code == 422
+    too_long = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "timeout_seconds": 86401})
+    assert too_long.status_code == 422
 
 
 def test_current_user_plugin_storage_is_persisted(auth_context):
@@ -1662,6 +1674,7 @@ def test_retired_models_are_marked_eol_in_the_catalog():
 
 def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
     """取得ボタンを押しても、過去の作品が参照するモデルの情報を落とさない。"""
+    monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"fetch-models-{suffix}")
     admin = db.add_user(
@@ -2864,6 +2877,29 @@ def test_log_retention_settings_are_admin_only():
         db.delete_user_group(group["id"])
 
 
+def test_models_hide_nvidia_outside_developer_mode(monkeypatch, auth_context):
+    monkeypatch.delenv("INKU_DEVELOPER_MODE", raising=False)
+    headers, _, _ = auth_context
+
+    response = client.get("/api/models", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert all(provider["id"] != "nvidia" for provider in data["catalog"])
+    assert all(provider["id"] != "nvidia" for provider in data["llm_catalog"])
+    assert all(provider["id"] != "nvidia" for provider in data["vision_catalog"])
+
+    settings = default_model_settings()
+    assert "nvidia" in settings["providers"]
+    assert all(
+        provider["id"] != "nvidia"
+        for provider in model_provider_catalog(settings, include_developer=False)
+    )
+    assert any(
+        provider["id"] == "nvidia"
+        for provider in model_provider_catalog(settings, include_developer=True)
+    )
+
+
 def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     settings = default_model_settings()
     nvidia_models = settings["providers"]["nvidia"]["models"]
@@ -2932,6 +2968,7 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
 
 def test_model_settings_store_keys_server_side(monkeypatch):
     monkeypatch.setenv("INKU_SECRET_KEY", "test-secret-for-model-settings")
+    monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"model-settings-admins-{suffix}")
     admin = db.add_user(

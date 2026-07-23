@@ -81,8 +81,11 @@ export interface LangPack {
 	demoPromptModel: string;
 	demoSeedPhrase: string;
 	demoInterval: string;
+	demoTimeout: string;
 	demoStart: string;
 	demoRunning: string;
+	demoTimeoutRemaining: (time: string) => string;
+	demoTimedOut: string;
 	demoGeneratedPrompt: string;
 	demoGeneratedDdl: string;
 	demoSaveCurrent: string;

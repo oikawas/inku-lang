@@ -14,6 +14,7 @@
 		settingsOpen: boolean;
 		darkMode: boolean;
 		buildNumber: string;
+		developerMode: boolean;
 		onToggleUserMenu: () => void;
 		onOpenProfile: () => void;
 		onLogout: () => void | Promise<void>;
@@ -29,6 +30,7 @@
 		settingsOpen,
 		darkMode,
 		buildNumber,
+		developerMode,
 		onToggleUserMenu,
 		onOpenProfile,
 		onLogout,
@@ -119,11 +121,13 @@
 	</div>
 
 	<div class="rail-spacer"></div>
-	<Tooltip placement="right" text={`Build ${buildNumber}`}>
-		<div class="rail-build">
-			{#if expanded}<span>Build </span>{/if}{buildNumber}
-		</div>
-	</Tooltip>
+	{#if developerMode}
+		<Tooltip placement="right" text={`Build ${buildNumber}`}>
+			<div class="rail-build">
+				{#if expanded}<span>Build </span>{/if}{buildNumber}
+			</div>
+		</Tooltip>
+	{/if}
 </aside>
 
 <style>

@@ -61,6 +61,7 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         "id": "nvidia",
         "label": "NVIDIA NIM",
         "kind": "openai_compatible",
+        "developer_only": True,
         "api_key_env": "NVIDIA_API_KEY",
         "base_url_env": "NVIDIA_BASE_URL",
         "default_base_url": "https://integrate.api.nvidia.com/v1",
@@ -357,12 +358,16 @@ def model_provider_catalog(
     settings: dict[str, Any] | None = None,
     *,
     include_disabled: bool = True,
+    include_developer: bool = True,
     purpose: str | None = None,
 ) -> list[dict[str, Any]]:
     clean = normalize_model_settings(settings)
     catalog: list[dict[str, Any]] = []
     for provider_id, provider in clean["providers"].items():
         if not provider.get("active", True):
+            continue
+        builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
+        if not include_developer and builtin and builtin.get("developer_only"):
             continue
         enabled_models = provider["enabled_models"]
         models = []
@@ -405,11 +410,18 @@ def storage_model_settings(settings: dict[str, Any]) -> dict[str, Any]:
     return stored
 
 
-def public_model_settings(settings: dict[str, Any]) -> dict[str, Any]:
+def public_model_settings(
+    settings: dict[str, Any],
+    *,
+    include_developer: bool = True,
+) -> dict[str, Any]:
     clean = normalize_model_settings(settings)
     providers: dict[str, dict[str, Any]] = {}
     for provider_id, provider in clean["providers"].items():
         if not provider.get("active", True):
+            continue
+        builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
+        if not include_developer and builtin and builtin.get("developer_only"):
             continue
         stored = clean["providers"][provider_id]
         api_key = decrypt_secret(str(stored.get("api_key") or ""))

@@ -311,6 +311,7 @@
 	let demoGeneratedPrompt = $state('');
 	let demoGeneratedDdl = $state<string | null>(null);
 	let demoError = $state<string | null>(null);
+	let demoTimedOut = $state(false);
 	let demoSaveStatus = $state<string | null>(null);
 	let demoSavingCurrent = $state(false);
 	let demoCurrentSaved = $state(false);
@@ -480,6 +481,7 @@
 	let modelSelectionAllowVision = $state(true);
 	let renderConcurrencyStatus = $state<string | null>(null);
 	let renderFanoutLimit = $state(4);
+	let developerMode = $state(false);
 	let showKiwi = $state(true);
 	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
@@ -670,8 +672,8 @@
 	let modelSettingsStatus = $state<string | null>(null);
 	let modelFetchResults = $state<Record<string, { type: 'success' | 'error'; message: string }>>({});
 	let modelSettingsLoading = $state(false);
-	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
-	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
+	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
+	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
 	let dbBackupStatus = $state<string | null>(null);
@@ -803,7 +805,9 @@
 	}
 
 	function modelsFor(provider: Provider) {
-		return availableModelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
+		const group = availableModelCatalog.find((item) => item.id === provider);
+		if (group) return group.models;
+		return availableModelsLoaded ? [] : modelsForProvider(provider);
 	}
 
 	function visionModelsFor(provider: Provider) {
@@ -941,6 +945,7 @@
 			prompt_model: settings.prompt_model || DEFAULT_MODEL,
 			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
 			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
+			timeout_seconds: Math.max(60, Math.min(86400, Math.round(settings.timeout_seconds || 3600))),
 			random_color_catalog: !!settings.random_color_catalog,
 		};
 	}
@@ -1357,15 +1362,25 @@
 				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
 			}
 			if (!modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
-				stage1Model = modelsFor(stage1Provider)[0]?.id ?? stage1Model;
+				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
+				stage1Provider = fallbackGroup?.id ?? stage1Provider;
+				stage1Model = fallbackGroup?.models[0]?.id ?? stage1Model;
 			}
 			if (!modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
-				stage2Model = modelsFor(stage2Provider)[0]?.id ?? stage2Model;
+				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
+				stage2Provider = fallbackGroup?.id ?? stage2Provider;
+				stage2Model = fallbackGroup?.models[0]?.id ?? stage2Model;
 			}
 			if (!visionModelsFor(visionProvider).some((model) => model.id === visionModel)) {
 				const fallbackGroup = availableVisionModelCatalog.find((group) => group.models.length > 0);
 				visionProvider = fallbackGroup?.id ?? visionProvider;
 				visionModel = fallbackGroup?.models[0]?.id ?? visionModel;
+			}
+			const okugakiModelAvailable = availableVisionModelCatalog.some((group) =>
+				group.models.some((model) => qualifiedModelId(group.id, model.id) === okugakiModel)
+			);
+			if (!okugakiModelAvailable) {
+				okugakiModel = qualifiedModelId(visionProvider, visionModel);
 			}
 			reconcileDemoPromptModel();
 		} catch (e) {
@@ -1926,6 +1941,20 @@
 		} catch (e) {
 			renderConcurrencyStatus = e instanceof Error ? e.message : String(e);
 			console.warn('failed to update render concurrency settings', e);
+		}
+	}
+
+	async function loadPublicAppInfo() {
+		try {
+			const r = await fetch('/api/info', {
+				cache: 'no-store',
+				credentials: 'same-origin'
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { developer_mode?: boolean };
+			developerMode = data.developer_mode === true;
+		} catch (error) {
+			console.warn('failed to load public app info', error);
 		}
 	}
 
@@ -2872,8 +2901,8 @@ if (unreadWords.length > 0) {
 		return data.instruction;
 	}
 
-	async function runDemoLoop(runId: number) {
-		while (demoRunId === runId && loading) {
+	async function runDemoLoop(runId: number, timeoutAt: number) {
+		while (demoRunId === runId && loading && Date.now() < timeoutAt) {
 			const startedAt = Date.now();
 			demoCurrentStartedAt = startedAt;
 			demoCurrentLiveMs = 0;
@@ -2921,18 +2950,24 @@ if (unreadWords.length > 0) {
 				demoTotalTokensOut += currentTokensOut;
 				demoRenderCount += 1;
 				if (settings.save_db) await refreshHistoryAfterServerSave();
-				const remainingMs = Math.max(0, settings.interval_seconds * 1000 - (Date.now() - startedAt));
+				if (Date.now() >= timeoutAt) break;
+				const intervalRemainingMs = settings.interval_seconds * 1000 - (Date.now() - startedAt);
+				const timeoutRemainingMs = timeoutAt - Date.now();
+				const remainingMs = Math.max(0, Math.min(intervalRemainingMs, timeoutRemainingMs));
+				const waitingForNextRender = intervalRemainingMs <= timeoutRemainingMs;
 				for (let left = Math.ceil(remainingMs / 1000); left > 0 && demoRunId === runId && loading; left--) {
-					demoWaitingSeconds = left;
+					demoWaitingSeconds = waitingForNextRender ? left : null;
 					await sleep(Math.min(1000, remainingMs));
 				}
 			} catch (e) {
 				demoCurrentStartedAt = null;
 				demoError = e instanceof Error ? e.message : String(e);
-				await sleep(1000);
+				const retryDelayMs = Math.min(1000, Math.max(0, timeoutAt - Date.now()));
+				if (retryDelayMs > 0) await sleep(retryDelayMs);
 			}
 		}
 		if (demoRunId === runId) {
+			demoTimedOut = Date.now() >= timeoutAt;
 			demoCurrentStartedAt = null;
 			stopTimer();
 			loading = false;
@@ -2946,6 +2981,7 @@ if (unreadWords.length > 0) {
 		if (loading || variationGridBusy) return;
 		clearInput();
 		demoError = null;
+		demoTimedOut = false;
 		demoSaveStatus = null;
 		demoCurrentSaved = false;
 		error = null;
@@ -2964,11 +3000,13 @@ if (unreadWords.length > 0) {
 		loading = true;
 		demoRunId += 1;
 		startTimer();
-		await runDemoLoop(demoRunId);
+		const timeoutAt = Date.now() + normalizeDemoSettings(demoSettings).timeout_seconds * 1000;
+		await runDemoLoop(demoRunId, timeoutAt);
 	}
 
 	function stopDemo() {
 		demoRunId += 1;
+		demoTimedOut = false;
 		demoCurrentStartedAt = null;
 		loading = false;
 		activeRunMode = null;
@@ -5824,7 +5862,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			miscSettingsLoaded = true;
 		} catch {}
 		void (async () => {
-			await Promise.all([loadColorCatalogs(), loadCurrentUser(), fetchPrompts()]);
+			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), loadCurrentUser(), fetchPrompts()]);
 		})();
 
 		return () => {
@@ -5872,6 +5910,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onLogin={login}
 		appVersion={APP_VERSION}
 		buildNumber={__BUILD_NUMBER__}
+		{developerMode}
 	/>
 {:else}
 <div class="root">
@@ -5882,6 +5921,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{settingsOpen}
 		{darkMode}
 		buildNumber={__BUILD_NUMBER__}
+		{developerMode}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
 		onOpenProfile={openProfile}
 		onLogout={logout}
@@ -5921,6 +5961,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						bind:demoSettings
 						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}
+						{demoTimedOut}
 						{demoWaitingSeconds}
 						{demoCurrentLiveMs}
 						{demoCurrentElapsedMs}
@@ -6431,10 +6472,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<dt>{t().appInfoVersionLabel}</dt>
 					<dd>{APP_VERSION}</dd>
 				</div>
-				<div>
-					<dt>{t().appInfoBuildLabel}</dt>
-					<dd>{__BUILD_NUMBER__}</dd>
-				</div>
+				{#if developerMode}
+					<div>
+						<dt>{t().appInfoBuildLabel}</dt>
+						<dd>{__BUILD_NUMBER__}</dd>
+					</div>
+				{/if}
 				<div>
 					<dt>{t().appInfoRepositoryLabel}</dt>
 					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>

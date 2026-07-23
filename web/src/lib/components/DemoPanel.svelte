@@ -10,6 +10,7 @@
 		settings: DemoSettings;
 		providerGroups: ProviderGroup[];
 		running: boolean;
+		timedOut: boolean;
 		liveMs: number;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
@@ -41,6 +42,7 @@
 		settings = $bindable(),
 		providerGroups,
 		running,
+		timedOut,
 		liveMs,
 		runTokensIn,
 		runTokensOut,
@@ -80,6 +82,12 @@
 		updateSettings({ interval_seconds: next });
 	}
 
+	function stepTimeoutMinutes(delta: number) {
+		const currentMinutes = Math.round(settings.timeout_seconds / 60);
+		const nextMinutes = Math.max(1, Math.min(1440, currentMinutes + delta));
+		updateSettings({ timeout_seconds: nextMinutes * 60 });
+	}
+
 	function formatMs(ms: number | null) {
 		if (ms === null) return t().demoStatsPending;
 		return `${(ms / 1000).toFixed(1)}s`;
@@ -90,7 +98,20 @@
 		return `${input}->${output}tok`;
 	}
 
+	function formatDuration(seconds: number) {
+		const hours = Math.floor(seconds / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		const remainingSeconds = seconds % 60;
+		return [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, '0')).join(':');
+	}
+
 	const displayedCurrentMs = $derived(currentElapsedMs ?? currentLiveMs);
+	const timeoutRemainingSeconds = $derived(Math.max(0, settings.timeout_seconds - Math.floor(liveMs / 1000)));
+	const runStatusLabel = $derived([
+		t().demoRunning,
+		t().demoTimeoutRemaining(formatDuration(timeoutRemainingSeconds)),
+		...(waitingSeconds !== null ? [t().demoWaiting(waitingSeconds)] : []),
+	].join(' · '));
 </script>
 
 <div class="demo-panel">
@@ -149,12 +170,28 @@
 				<button type="button" class="step-btn" disabled={running || settings.interval_seconds >= 999} onclick={() => stepInterval(1)}>+</button>
 			</div>
 		</label>
+		<label>
+			<span>{t().demoTimeout}</span>
+			<div class="interval-control">
+				<button type="button" class="step-btn" disabled={running || settings.timeout_seconds <= 60} onclick={() => stepTimeoutMinutes(-1)}>−</button>
+				<input
+					class="interval-input"
+					type="number"
+					min="1"
+					max="1440"
+					value={Math.round(settings.timeout_seconds / 60)}
+					disabled={running}
+					oninput={(event) => updateSettings({ timeout_seconds: Math.max(1, Math.min(1440, Number((event.currentTarget as HTMLInputElement).value) || 1)) * 60 })}
+				/>
+				<button type="button" class="step-btn" disabled={running || settings.timeout_seconds >= 86400} onclick={() => stepTimeoutMinutes(1)}>+</button>
+			</div>
+		</label>
 	</div>
 
 	<div class="demo-actions">
 		{#if running}
 			<RunStatus
-				label={waitingSeconds !== null ? `${t().demoRunning} · ${t().demoWaiting(waitingSeconds)}` : t().demoRunning}
+				label={runStatusLabel}
 				stage1Model={drawingStage1ModelLabel}
 				stage2Model={drawingStage2ModelLabel}
 				elapsedMs={liveMs}
@@ -190,6 +227,7 @@
 		{#if saveStatus}<span>{saveStatus}</span>{/if}
 	</div>
 
+	{#if timedOut}<p class="status-text">{t().demoTimedOut}</p>{/if}
 	{#if error}<p class="error-text">{error}</p>{/if}
 
 	<div class="demo-observe">
@@ -254,7 +292,7 @@
 		background: var(--panel);
 		color: var(--fg2);
 		font: inherit;
-		font-size: 14px;
+		font-size: var(--btn-sm-font-size);
 		line-height: 1;
 		cursor: pointer;
 	}
@@ -308,6 +346,11 @@
 		color: var(--fg3);
 		font-size: 11px;
 		min-height: 26px;
+	}
+	.status-text {
+		margin: 0;
+		color: var(--fg2);
+		font-size: 12px;
 	}
 	.error-text {
 		margin: 0;

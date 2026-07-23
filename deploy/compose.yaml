@@ -12,6 +12,7 @@ services:
   api:
     image: ghcr.io/oikawas/inku-api:${INKU_IMAGE_TAG:-latest}
     environment:
+      INKU_DEVELOPER_MODE: ${INKU_DEVELOPER_MODE:-0}
       INKU_ENV: production
       INKU_SESSION_COOKIE_SECURE: ${INKU_SESSION_COOKIE_SECURE:-0}
       INKU_CORS_ORIGINS: ${INKU_CORS_ORIGINS:-}

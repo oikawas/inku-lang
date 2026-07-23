@@ -10,8 +10,12 @@ Run from `server/`:
 
 Outputs land in `android/app/src/test/resources/server_reference/`:
 
+- `stroke_engine_primitives.json`         tool grammars, `_unit`, `_smooth_noise`,
+                                          `_event_map`, normals and arc-length parameters
 - `stroke_engine_latent_energy.json`      latent_energy samples per seed
-- `stroke_engine_synthesize_along.json`   both banks and the path `d` for four strokes
+- `stroke_engine_synthesize_stroke.json`  per-sample state, outline and burr for six straight strokes
+- `stroke_engine_synthesize_along.json`   per-sample state, both banks, burr and the path `d`
+                                          for four strokes along a centerline
 - `<name>.svg`                            full renders at the current engine version
 - `svg_index.json`                        the Score, seed, byte size, element counts,
                                           and class attributes of each SVG
@@ -38,6 +42,21 @@ RENDER_SEED = 12345
 SVG_PROFILE = "editable"  # structured output without filters; the port compares against this
 
 
+def _samples(samples) -> list[dict]:
+    return [
+        {
+            "t": round(s.t, 9),
+            "x": round(s.x, 6),
+            "y": round(s.y, 6),
+            "width": round(s.width, 9),
+            "energy": round(s.energy, 9),
+            "lateral": round(s.lateral, 9),
+            "event": s.event,
+        }
+        for s in samples
+    ]
+
+
 def _along(name, centerline, base_width, weight, seed, closed, anchors=frozenset()):
     result = se.synthesize_along(centerline, base_width, weight, seed, closed=closed, anchors=anchors)
     return {
@@ -50,8 +69,12 @@ def _along(name, centerline, base_width, weight, seed, closed, anchors=frozenset
             "closed": closed,
             "anchors": sorted(anchors),
         },
+        "samples": _samples(result.samples),
         "left": [[round(x, 6), round(y, 6)] for x, y in result.left],
         "right": [[round(x, 6), round(y, 6)] for x, y in result.right],
+        "event_count": result.event_count,
+        "burr_side": result.burr_side,
+        "burr_opacity": round(result.burr_opacity, 9),
         "path_d": se.contour_stroke_path(result),
     }
 
@@ -66,6 +89,9 @@ def stroke_engine_fixtures() -> None:
         _along("open_line_brush_thick", line, 6.0, "brush_thick", 999, False),
         _along("closed_circle_pencil", circle, 5.0, "pencil", 4242, True),
         _along("closed_square_crayon", square, 5.0, "crayon", 7, True, frozenset({0, 1, 2, 3})),
+        # Closed, no anchors, with events: the seam correction and the event
+        # branches have to hold at the same time.
+        _along("closed_circle_chalk_events", circle, 5.0, "chalk", 12, True),
     ]
     (OUT / "stroke_engine_synthesize_along.json").write_text(json.dumps(cases, ensure_ascii=False, indent=2))
 
@@ -74,6 +100,129 @@ def stroke_engine_fixtures() -> None:
         for seed in (1, 12345, 999)
     ]
     (OUT / "stroke_engine_latent_energy.json").write_text(json.dumps(energy, ensure_ascii=False, indent=2))
+
+    # The seeds are chosen so the event branches are actually taken: chalk seed 1
+    # fires a `fade`, chalk seed 2 a `catch`, pencil seed 12 both a `correction`
+    # and a `fade`, and chalk seed 21 would fire three but is cut to two by the
+    # cap in `_event_map`. A port that never emits events passes only the first
+    # four cases.
+    straight = [
+        _stroke("line_pen_no_event", (100.0, 500.0), (900.0, 500.0), 6.0, "pen", 12345),
+        _stroke("line_rotring_flat", (100.0, 500.0), (900.0, 500.0), 6.0, "rotring", 12345),
+        _stroke("line_brush_thick_taper", (200.0, 200.0), (800.0, 800.0), 8.0, "brush_thick", 999),
+        _stroke("line_burin_bulge", (100.0, 300.0), (900.0, 700.0), 4.0, "burin", 4242),
+        _stroke("line_chalk_fade", (100.0, 500.0), (900.0, 500.0), 6.0, "chalk", 1),
+        _stroke("line_chalk_catch", (100.0, 500.0), (900.0, 500.0), 6.0, "chalk", 2),
+        _stroke("line_pencil_two_events", (100.0, 500.0), (900.0, 500.0), 6.0, "pencil", 12),
+        _stroke("line_chalk_event_cap", (100.0, 500.0), (900.0, 500.0), 6.0, "chalk", 21),
+        _stroke("line_short_pencil", (400.0, 400.0), (600.0, 400.0), 3.0, "pencil", 31, samples=17),
+    ]
+    (OUT / "stroke_engine_synthesize_stroke.json").write_text(json.dumps(straight, ensure_ascii=False, indent=2))
+
+    primitive_fixtures()
+
+
+def _stroke(name, start, end, base_width, weight, seed, samples=49):
+    result = se.synthesize_stroke(start, end, base_width, weight, seed, samples=samples)
+    return {
+        "name": name,
+        "input": {
+            "start": list(start), "end": list(end), "base_width": base_width,
+            "weight": weight, "seed": seed, "samples": samples,
+        },
+        "samples": _samples(result.samples),
+        "outline": [[round(x, 6), round(y, 6)] for x, y in result.outline],
+        "event_count": result.event_count,
+        "burr_side": result.burr_side,
+        "burr_opacity": round(result.burr_opacity, 9),
+        "path_d": se.polygon_path(result.outline),
+    }
+
+
+def primitive_fixtures() -> None:
+    """The functions under `latent_energy` and `synthesize_*`, sampled directly.
+
+    `_unit` is a THIRD hash construction, different from both `_hash01` and
+    `_hash_to_unit` in the renderer: it hashes "{seed}:{label}:{index}" and reads
+    the first 8 bytes as an UNSIGNED little-endian int64 over `2**64 - 1`, so it
+    lands in [0, 1). Getting the signedness or the divisor wrong shifts every
+    stroke without breaking determinism, which is the failure mode the geometry
+    port already hit once.
+
+    `_event_map` and the closed-loop helpers are not reachable through
+    `latent_energy`, so they are pinned here rather than left to the end-to-end
+    comparison.
+    """
+    labels = ("energy-1", "energy-6", "event-arrival", "event-kind", "catch-side", "burr-side", "burr-ink")
+    unit = [
+        {"seed": seed, "label": label, "index": index, "value": round(se._unit(seed, label, index), 12)}
+        for seed in (1, 12345)
+        for label in labels
+        for index in (0, 1, 7, 48)
+    ]
+    smooth = [
+        {"t": t, "seed": seed, "octave": octave, "value": round(se._smooth_noise(t, seed, octave), 12)}
+        for seed in (12345, 999)
+        for octave in (1, 3, 6)
+        for t in (0.0, 0.25, 0.5, 1.0)
+    ]
+    # rate 0.0 (rotring) must yield no events at all; 0.9 (chalk) hits the
+    # two-event cap; count 8 exercises the range(3, count - 3) window.
+    events = [
+        {
+            "seed": seed, "rate": rate, "count": count,
+            "events": [{"index": i, "kind": k} for i, k in sorted(se._event_map(seed, rate, count).items())],
+        }
+        for seed, rate, count in (
+            (12345, 0.0, 49),    # rotring: rate 0 never fires
+            (999, 0.0, 49),
+            (12345, 0.9, 49),    # empty even at the highest rate
+            (1, 0.9, 49),        # one fade
+            (2, 0.9, 49),        # one catch
+            (12, 0.9, 49),       # correction then fade
+            (4, 0.9, 49),        # fade then correction
+            (21, 0.9, 49),       # three would fire; the cap keeps two
+            (31, 0.9, 49),       # four would fire; the cap keeps two
+            (12, 0.55, 49),      # same seed, lower rate
+            (2, 0.04, 49),       # hair: rate too low to fire
+            (18, 0.9, 8),        # short run: the window is range(3, 5)
+            (68, 0.9, 8),        # both window slots fire
+            (12345, 0.9, 4),     # empty window
+            (647, 0.12, 100),    # probability capped at 0.12
+            (1593, 0.12, 100),   # three would fire; the cap keeps two
+        )
+    ]
+
+    open_line = [(100.0, 500.0), (300.0, 520.0), (500.0, 480.0), (900.0, 500.0)]
+    closed_tri = [(500.0, 300.0), (700.0, 700.0), (300.0, 700.0)]
+    normals = [
+        {
+            "name": name, "closed": closed, "points": [list(p) for p in pts],
+            "normals": [[round(nx, 12), round(ny, 12)] for nx, ny in se.centerline_normals(pts, closed)],
+            "arc_length_parameters": [round(v, 12) for v in se._arc_length_parameters(pts, closed)],
+        }
+        for name, pts, closed in (
+            ("open_polyline", open_line, False),
+            ("closed_triangle", closed_tri, True),
+            ("closed_polyline_as_open", closed_tri, False),
+        )
+    ]
+
+    (OUT / "stroke_engine_primitives.json").write_text(json.dumps({
+        "grammars": {
+            weight: {
+                "stiffness": g.stiffness, "damping": g.damping,
+                "energy_width": g.energy_width, "energy_lateral": g.energy_lateral,
+                "event_rate": g.event_rate, "taper": g.taper, "bulge": g.bulge,
+            }
+            for weight, g in se.GRAMMARS.items()
+        },
+        "closed_envelope_floor": se.CLOSED_ENVELOPE_FLOOR,
+        "unit": unit,
+        "smooth_noise": smooth,
+        "event_map": events,
+        "centerline": normals,
+    }, ensure_ascii=False, indent=2))
 
 
 SCORES: dict[str, dict] = {

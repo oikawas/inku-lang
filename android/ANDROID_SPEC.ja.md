@@ -1249,9 +1249,32 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 
 `DefaultSvgRendererPhase2fTest.kt` を作成・拡張し、参照コーパス 10 種の SVG に対する完全パリティ検証を実施した。
 
-- **参照 SVG パリティ**: `01_circle_pen.svg`, `03_square_filled.svg`, `04_arc_crayon.svg`, `05_circle_rotring.svg`, `06_surface_hatch.svg`, `07_circle_wave.svg`, `08_circle_perlin.svg`, `10_arc_wave.svg` の全 10 参照 SVG において、構造（要素数・順序・`class` 属性）および `path d` 座標列が参照 SVG と **完全一致**。
+- **参照 SVG パリティ**: 全 10 参照 SVG（`01_circle_pen.svg`, `02_line_brush.svg`, `03_square_filled.svg`, `04_arc_crayon.svg`, `05_circle_rotring.svg`, `06_surface_hatch.svg`, `07_circle_wave.svg`, `08_circle_perlin.svg`, `09_line_white.svg`, `10_arc_wave.svg`）において構造（要素数・順序・`class` 属性）が一致し、うち 4 件（`03_square_filled.svg`, `04_arc_crayon.svg`, `06_surface_hatch.svg`, `10_arc_wave.svg`）においては `path d` 座標列も参照 SVG と **完全一致**。
+- **Engine 10 到達とバージョン更新**: 2f 完了に伴い `render_engine_version` を `"10"` に更新。`android/VERSION` は `2.0.0-android.1` に採番更新された。
 - `gradle :app:testDebugUnitTest --rerun-tasks`（全 44 件のユニットテスト）が 100% 成功。
-- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148077` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
+- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148077` にインクリメント。
+
+## 2026-07-23 web/server v2 追随 Phase 2g (雲形輪郭・touching 劣弧再構成・region/relation 解決順序完全同期 & 2f 積み残し是正)
+
+契約 `antigravity-android-phase2-renderer.md` §8 に基づき、Phase 2 の最終段となる 2g (雲形輪郭・`touching` 劣弧再構成・region → relation 解決順序の是正・2f 積み残し是正) を完了した。
+
+### 実装および是正の詳細
+
+1. **2f 積み残しの是正 (⓪)**:
+   - テストコード内に残っていた存在しないカタログ ID (`"sumi"`, `"sumi_traditional"`) 計 11 箇所を `default` へ修正し、全テストの通過を確認。
+   - 未知カタログ ID に対する挙動方針として、Android ネイティブアプリの安定稼働と画面表示の堅牢性を担保するため `ColorCatalogs.get()` による `default` への決定性フォールバック方針を維持・ドキュメント化。
+   - `ANDROID_SPEC.ja.md` および `ANDROID_SPEC.md` における 2f 節の記述誤差（参照 SVG の列挙漏れ、文字列一致と構造一致の区分、engine 10 到達および `2.0.0-android.1` バージョン表記）を正確に訂正。
+2. **雲形の輪郭生成 (`ServerRendererGeometry.kt`)**:
+   - `cloudform.py` より `generateCloudformContour`, `sampleClosedCatmullRom`, 1/f 基底, 49 点閉 Bezier, 自己交差・曲率・凹み制限アルゴリズムを移植。
+3. **`touching` 劣弧再構成と Performance Resolution 順序の同期 (`DefaultSvgRenderer.kt`)**:
+   - `resolvePerformanceScore` を `DefaultSvgRenderer` の描画前処理に組み込み、region 配置 (`resolveAtRegion`) を先行処理した上で relation 解決 (`resolveRelation`: `touching`, `along`, `cutting`, `between`, `not_touching`) を追随させる正当な解決順序（v1.94 双弧修正）を完全移植。
+   - `touching` において `minorArcDelta` と `arcFromEndpointsAndSagitta` により接点を保持した劣弧再構成を同期。
+
+### 検証
+
+`app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 45 件のユニットテストが 100% 通過（参照 SVG 10 件のパリティと構造一致、`05_circle_rotring.svg` の帯非形成、`cloudform` の決定性・生成テストを含む）。
+`render_engine_version` は engine 10 到達済みの `"10"` を維持。
+`gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148078` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
 
 
 

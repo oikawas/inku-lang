@@ -1674,6 +1674,28 @@ Created and expanded `DefaultSvgRendererPhase2fTest.kt` to validate structural a
 - `gradle :app:testDebugUnitTest --rerun-tasks` (all 44 unit tests) passes 100%.
 - `gradle :app:assembleDebug` succeeds, incrementing `android/BUILD_NUMBER` to `148077`. `android/VERSION` remains `1.48.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2g (Cloudform Contour, Touching Reconstruction, Region/Relation Ordering & 2f Remediation)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8, the final Phase 2 stage (Phase 2g) covering cloudform contour generation, minor-arc reconstruction for `touching`, region/relation resolution ordering, and 2f leftover remediations was completed.
+
+### Implementation & Remediation Details
+
+1. **2f Leftover Remediation (⓪)**:
+   - Replaced 11 invalid color catalog ID references (`"sumi"`, `"sumi_traditional"`) in test code with valid `"default"`, verifying all tests pass.
+   - Documented decision on unknown catalog IDs: retained deterministic fallback to `"default"` via `ColorCatalogs.get()` to preserve Android native application stability and robust UI rendering.
+   - Corrected 2f section documentation errors in `ANDROID_SPEC.ja.md` and `ANDROID_SPEC.md` regarding reference SVG enumeration, structural vs path coordinate parity distinctions, engine 10 arrival, and `2.0.0-android.1` version numbering.
+2. **Cloudform Contour Generation (`ServerRendererGeometry.kt`)**:
+   - Ported `generateCloudformContour`, `sampleClosedCatmullRom`, 1/f harmonic bases, 49-point closed Bezier curves, and self-intersection / curvature / clearance bounding constraints from `cloudform.py`.
+3. **`touching` Reconstruction & Performance Resolution Order (`DefaultSvgRenderer.kt`)**:
+   - Integrated `resolvePerformanceScore` into `DefaultSvgRenderer` preprocessing pipeline, enforcing region placement (`resolveAtRegion`) prior to relation resolution (`resolveRelation`: `touching`, `along`, `cutting`, `between`, `not_touching`) to match server v1.94 ordering.
+   - Synchronized contact-preserving minor arc reconstruction via `minorArcDelta` and `arcFromEndpointsAndSagitta`.
+
+### Verification
+
+XML test result aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms all 45 unit tests pass 100% (including all 10 reference SVG structural/class parity checks, non-band rotring behavior, and cloudform determinism).
+`render_engine_version` remains `"10"`.
+`gradle :app:assembleDebug` succeeds, incrementing `android/BUILD_NUMBER` to `148078`. `android/VERSION` remains `2.0.0-android.1`.
+
 
 
 

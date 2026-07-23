@@ -150,14 +150,14 @@ class ServerScoreParityTest {
             "render_build_number": "689",
             "render_engine_id": "default",
             "render_engine_version": "2",
-            "render_color_catalog_id": "sumi_traditional"
+            "render_color_catalog_id": "default"
         }"""
         val request = PaintRequest(
             description = "中心に円を置く。",
             originalText = "中心に円を置く。",
             stage1Model = "local-litert-lm:gemma-4b-it",
             stage2Model = "local-litert-lm:gemma-4b-it",
-            colorCatalogId = "sumi_traditional",
+            colorCatalogId = "default",
             canvasAspect = "square",
             autoRepair = true,
         )
@@ -181,7 +181,7 @@ class ServerScoreParityTest {
             scoreStr,
             "<svg></svg>",
             metadataJson,
-            "sumi_traditional",
+            "default",
         ) as String
 
         val canonicalMethod = LocalFallbackPipeline::class.java.getDeclaredMethod("canonicalJson", Any::class.java).apply { isAccessible = true }
@@ -194,16 +194,16 @@ class ServerScoreParityTest {
             .put("render_build_number", "689")
             .put("render_engine_id", "default")
             .put("render_engine_version", "2")
-            .put("render_color_catalog_id", "sumi_traditional")
+            .put("render_color_catalog_id", "default")
         val ktCanonical = canonicalMethod.invoke(pipeline, payload) as String
         println("KT_CANONICAL: $ktCanonical")
         println("COMPUTED_HASH: $hash")
 
         assertEquals(
-            "rh2:b96d71a1af99a98373fd47b093b12bd836f9af33a0da0546a1312fdc253adb99",
+            "rh2:d4b42a90425a23c49b23f3b0fe3b52383b158be92ce39286482496cb53021ea6",
             hash,
         )
-        assertEquals("DB99", hash.takeLast(4).uppercase())
+        assertEquals("1EA6", hash.takeLast(4).uppercase())
     }
 
     @Test

@@ -28,10 +28,11 @@ class DefaultSvgRenderer : SvgRenderer {
         val textureWeights = textureWeights(instructions)
         val neededBlurs = mutableMapOf<String, Double>()
 
+        val resolvedInstructions = resolvePerformanceScore(instructions, renderSeed)
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
         body.append("""<g clip-path="url(#canvas-clip)">""")
-        for (i in 0 until instructions.length()) {
-            val instruction = instructions.optJSONObject(i) ?: continue
+        for (i in 0 until resolvedInstructions.length()) {
+            val instruction = resolvedInstructions.optJSONObject(i) ?: continue
             val expanded = expandArrangement(instruction)
             for ((index, mark) in expanded.withIndex()) {
                 body.append(renderInstruction(mark, colors, width, height, unit, neededBlurs, index, renderSeed))
@@ -1518,6 +1519,323 @@ class DefaultSvgRenderer : SvgRenderer {
 
         sb.append("</g>")
         return sb.toString()
+    }
+
+    private fun resolvePerformanceScore(instructions: JSONArray, renderSeed: Long?): JSONArray {
+        if (renderSeed == null) return instructions
+        val result = JSONArray()
+        val resolved = mutableListOf<JSONObject>()
+        for (i in 0 until instructions.length()) {
+            val original = instructions.optJSONObject(i) ?: continue
+            var ins = JSONObject(original.toString())
+            val arr = ins.optJSONObject("arrangement")
+            if (arr != null && arr.optString("layout") == "grid") {
+                ins.remove("relation")
+            } else {
+                ins = resolveAtRegion(ins, renderSeed, i)
+                ins = resolveRelation(ins, resolved, renderSeed, i)
+            }
+            resolved.add(ins)
+            result.put(ins)
+        }
+        return result
+    }
+
+    private fun resolveAtRegion(ins: JSONObject, seed: Long, index: Int): JSONObject {
+        val at = ins.optJSONObject("at") ?: return ins
+        val region = at.optJSONArray("region") ?: return ins
+        if (region.length() < 4) return ins
+        val x0 = region.getDouble(0)
+        val y0 = region.getDouble(1)
+        val x1 = region.getDouble(2)
+        val y1 = region.getDouble(3)
+        val x = x0 + (x1 - x0) * ServerRendererGeometry.hash01(index, seed, "region-x")
+        val y = y0 + (y1 - y0) * ServerRendererGeometry.hash01(index, seed, "region-y")
+        return moveAnchorTo(ins, x to y, keepRelation = true)
+    }
+
+    private fun resolveRelation(ins: JSONObject, previous: List<JSONObject>, seed: Long, index: Int): JSONObject {
+        val rel = ins.optJSONObject("relation") ?: return ins
+        val type = rel.optString("type", "")
+        if (type == "touching") {
+            return resolveTouchingRelation(ins, previous, seed, index)
+        }
+        if (type == "between" && previous.size < 2) {
+            ins.remove("relation")
+            return ins
+        }
+        if (type != "between" && previous.isEmpty()) {
+            ins.remove("relation")
+            return ins
+        }
+        val prev = previous.lastOrNull() ?: return ins
+        val prevCenter = instructionCenter(prev, seed, index - 1)
+        val prevRadius = instructionRadius(prev, seed, index - 1)
+        val gapStr = rel.optString("gap", "medium")
+        val gap = relationGap(seed, index, gapStr)
+
+        val target = when (type) {
+            "between" -> {
+                val other = previous.getOrNull(previous.size - 2) ?: return ins
+                val otherCenter = instructionCenter(other, seed, index - 2)
+                val jitter = 0.08 * (ServerRendererGeometry.hash01(index, seed, "between-jitter") - 0.5)
+                clamp01((prevCenter.first + otherCenter.first) / 2.0 + jitter) to clamp01((prevCenter.second + otherCenter.second) / 2.0 - jitter)
+            }
+            "along" -> {
+                val pPrimitive = prev.optString("primitive", "")
+                if (pPrimitive == "line" && prev.has("from") && prev.has("to")) {
+                    val geom = canvasEndpointGeometry(prev, seed, index - 1)
+                    if (geom != null) {
+                        val (lineStart, lineEnd) = geom[0] to geom[1]
+                        val t = 0.18 + 0.64 * ServerRendererGeometry.hash01(index, seed, "along-t")
+                        val lx = lineStart.first + (lineEnd.first - lineStart.first) * t
+                        val ly = lineStart.second + (lineEnd.second - lineStart.second) * t
+                        val dx = lineEnd.first - lineStart.first
+                        val dy = lineEnd.second - lineStart.second
+                        val len = kotlin.math.max(kotlin.math.hypot(dx, dy), 1e-9)
+                        val ox = -dy / len * gap
+                        val oy = dx / len * gap
+                        val side = if (ServerRendererGeometry.hash01(index, seed, "along-side") < 0.5) -1.0 else 1.0
+                        clamp01(lx + ox * side) to clamp01(ly + oy * side)
+                    } else {
+                        val angle = 2.0 * Math.PI * ServerRendererGeometry.hash01(index, seed, "along-angle")
+                        clamp01(prevCenter.first + kotlin.math.cos(angle) * (prevRadius + gap)) to clamp01(prevCenter.second + kotlin.math.sin(angle) * (prevRadius + gap))
+                    }
+                } else if (pPrimitive == "cloudform" && prev.has("center") && prev.has("size")) {
+                    val pCenter = prev.getJSONArray("center")
+                    val pSize = prev.getJSONArray("size")
+                    val contour = ServerRendererGeometry.generateCloudformContour(
+                        center = pCenter.getDouble(0) to pCenter.getDouble(1),
+                        size = pSize.getDouble(0) to pSize.getDouble(1),
+                        performanceSeed = seedForInstruction(prev, seed),
+                        instructionIndex = index - 1,
+                        markIndex = 0,
+                        variation = prev.optJSONObject("variation"),
+                        weight = prev.optString("weight", "pen")
+                    )
+                    val ptIdx = (ServerRendererGeometry.hash01(index, seed, "along-cloudform") * contour.points.size).toInt()
+                    val pt = contour.points[ptIdx % contour.points.size]
+                    val rot = prev.optDouble("rotation", 0.0)
+                    val (px, py) = rotatePoint(pt, pCenter.getDouble(0) to pCenter.getDouble(1), rot)
+                    val dx = px - prevCenter.first
+                    val dy = py - prevCenter.second
+                    val dist = kotlin.math.max(kotlin.math.hypot(dx, dy), 1e-9)
+                    clamp01(px + dx / dist * gap) to clamp01(py + dy / dist * gap)
+                } else {
+                    val angle = 2.0 * Math.PI * ServerRendererGeometry.hash01(index, seed, "along-angle")
+                    clamp01(prevCenter.first + kotlin.math.cos(angle) * (prevRadius + gap)) to clamp01(prevCenter.second + kotlin.math.sin(angle) * (prevRadius + gap))
+                }
+            }
+            "cutting" -> {
+                val targetCenter = prevCenter
+                if (ins.optString("primitive", "") == "line") {
+                    val angle = 2.0 * Math.PI * ServerRendererGeometry.hash01(index, seed, "cut-angle")
+                    val length = 0.28 + 0.18 * ServerRendererGeometry.hash01(index, seed, "cut-length")
+                    ins.remove("relation")
+                    ins.remove("at")
+                    ins.put("from", JSONArray(listOf(
+                        clamp01(targetCenter.first - kotlin.math.cos(angle) * length / 2.0),
+                        clamp01(targetCenter.second - kotlin.math.sin(angle) * length / 2.0)
+                    )))
+                    ins.put("to", JSONArray(listOf(
+                        clamp01(targetCenter.first + kotlin.math.cos(angle) * length / 2.0),
+                        clamp01(targetCenter.second + kotlin.math.sin(angle) * length / 2.0)
+                    )))
+                    return ins
+                }
+                targetCenter
+            }
+            else -> { // not_touching
+                val ownRadius = instructionRadius(ins, seed, index)
+                val distance = prevRadius + ownRadius + gap
+                val angle = 2.0 * Math.PI * ServerRendererGeometry.hash01(index, seed, "not-touching-angle")
+                clamp01(prevCenter.first + kotlin.math.cos(angle) * distance) to clamp01(prevCenter.second + kotlin.math.sin(angle) * distance)
+            }
+        }
+        return moveAnchorTo(ins, target)
+    }
+
+    private fun resolveTouchingRelation(ins: JSONObject, previous: List<JSONObject>, seed: Long, index: Int): JSONObject {
+        val primitive = ins.optString("primitive", "")
+        if (primitive !in setOf("line", "arc") || previous.isEmpty()) {
+            ins.remove("relation")
+            return ins
+        }
+        val prior = previous.last()
+        if (prior.optString("primitive", "") !in setOf("line", "arc")) {
+            ins.remove("relation")
+            return ins
+        }
+        val priorGeom = canvasEndpointGeometry(prior, seed, index - 1)
+        if (priorGeom == null) {
+            ins.remove("relation")
+            return ins
+        }
+        val start = priorGeom[0]
+        val end = priorGeom[1]
+        ins.remove("relation")
+        ins.put("rotation", JSONObject.NULL)
+
+        if (primitive == "line") {
+            ins.put("from", JSONArray(listOf(start.first, start.second)))
+            ins.put("to", JSONArray(listOf(end.first, end.second)))
+            return ins
+        }
+
+        val ownSagitta = performedArcSagitta(ins, seed, index)
+        if (ownSagitta == null || kotlin.math.abs(ownSagitta) <= 1e-12) {
+            return ins
+        }
+        var sagitta = ownSagitta
+        if (prior.optString("primitive", "") == "arc") {
+            val priorSagitta = performedArcSagitta(prior, seed, index - 1)
+            if (priorSagitta != null && kotlin.math.abs(priorSagitta) > 1e-12) {
+                sagitta = -Math.copySign(kotlin.math.abs(ownSagitta), priorSagitta)
+            }
+        }
+        try {
+            val geom = ServerRendererGeometry.arcFromEndpointsAndSagitta(start, end, sagitta)
+            ins.put("center", JSONArray(listOf(geom.center.first, geom.center.second)))
+            ins.put("radius", geom.radius)
+            ins.put("angle_start", geom.angleStart)
+            ins.put("angle_end", geom.angleEnd)
+        } catch (e: Exception) {
+            // failed
+        }
+        return ins
+    }
+
+    private fun performedArcSagitta(ins: JSONObject, seed: Long, index: Int): Double? {
+        if (ins.optString("primitive", "") != "arc" || !ins.has("center") || !ins.has("radius") || !ins.has("angle_start") || !ins.has("angle_end")) return null
+        val endpoints = canvasEndpointGeometry(ins, seed, index) ?: return null
+        val start = endpoints[0]
+        val end = endpoints[1]
+        val angleStart = ins.getDouble("angle_start")
+        val angleEnd = ins.getDouble("angle_end")
+        val delta = ServerRendererGeometry.minorArcDelta(angleStart, angleEnd)
+        val center = ins.getJSONArray("center")
+        val cx = center.getDouble(0)
+        val cy = center.getDouble(1)
+        val r = ins.getDouble("radius")
+        val rot = ins.optDouble("rotation", 0.0)
+        val localApexX = cx + r * kotlin.math.cos(Math.toRadians(angleStart + delta / 2.0))
+        val localApexY = cy + r * kotlin.math.sin(Math.toRadians(angleStart + delta / 2.0))
+        val apex = rotatePoint(localApexX to localApexY, cx to cy, rot)
+        val chordX = end.first - start.first
+        val chordY = end.second - start.second
+        val length = kotlin.math.hypot(chordX, chordY)
+        if (length <= 1e-12) return null
+        val mx = (start.first + end.first) / 2.0
+        val my = (start.second + end.second) / 2.0
+        val nx = -chordY / length
+        val ny = chordX / length
+        return (apex.first - mx) * nx + (apex.second - my) * ny
+    }
+
+    private fun canvasEndpointGeometry(ins: JSONObject, seed: Long, index: Int): Array<Pair<Double, Double>>? {
+        val primitive = ins.optString("primitive", "")
+        val rot = ins.optDouble("rotation", 0.0)
+        if (primitive == "line" && ins.has("from") && ins.has("to")) {
+            val from = ins.getJSONArray("from")
+            val to = ins.getJSONArray("to")
+            val p1 = from.getDouble(0) to from.getDouble(1)
+            val p2 = to.getDouble(0) to to.getDouble(1)
+            val anchor = ((p1.first + p2.first) / 2.0) to ((p1.second + p2.second) / 2.0)
+            val r1 = rotatePoint(p1, anchor, rot)
+            val r2 = rotatePoint(p2, anchor, rot)
+            return arrayOf(r1, r2)
+        }
+        if (primitive == "arc" && ins.has("center") && ins.has("radius") && ins.has("angle_start") && ins.has("angle_end")) {
+            val center = ins.getJSONArray("center")
+            val cx = center.getDouble(0)
+            val cy = center.getDouble(1)
+            val r = ins.getDouble("radius")
+            val aStart = ins.getDouble("angle_start")
+            val aEnd = ins.getDouble("angle_end")
+            val p1 = (cx + r * kotlin.math.cos(Math.toRadians(aStart))) to (cy + r * kotlin.math.sin(Math.toRadians(aStart)))
+            val p2 = (cx + r * kotlin.math.cos(Math.toRadians(aEnd))) to (cy + r * kotlin.math.sin(Math.toRadians(aEnd)))
+            val r1 = rotatePoint(p1, cx to cy, rot)
+            val r2 = rotatePoint(p2, cx to cy, rot)
+            return arrayOf(r1, r2)
+        }
+        return null
+    }
+
+    private fun instructionCenter(ins: JSONObject, seed: Long, index: Int): Pair<Double, Double> {
+        val p = ins.optString("primitive", "")
+        if (ins.has("center") && !ins.isNull("center")) {
+            val c = ins.getJSONArray("center")
+            return c.getDouble(0) to c.getDouble(1)
+        }
+        if (ins.has("position") && !ins.isNull("position")) {
+            val pos = ins.getJSONArray("position")
+            val size = ins.optJSONArray("size")
+            val w = size?.optDouble(0, 0.24) ?: 0.24
+            val h = size?.optDouble(1, 0.24) ?: 0.24
+            return (pos.getDouble(0) + w / 2.0) to (pos.getDouble(1) + h / 2.0)
+        }
+        if (p == "line" && ins.has("from") && ins.has("to")) {
+            val f = ins.getJSONArray("from")
+            val t = ins.getJSONArray("to")
+            return ((f.getDouble(0) + t.getDouble(0)) / 2.0) to ((f.getDouble(1) + t.getDouble(1)) / 2.0)
+        }
+        return 0.5 to 0.5
+    }
+
+    private fun instructionRadius(ins: JSONObject, seed: Long, index: Int): Double {
+        if (ins.has("radius") && !ins.isNull("radius")) return ins.getDouble("radius")
+        if (ins.has("size") && !ins.isNull("size")) {
+            val s = ins.getJSONArray("size")
+            return kotlin.math.max(s.optDouble(0, 0.2), s.optDouble(1, 0.2)) / 2.0
+        }
+        return 0.1
+    }
+
+    private fun relationGap(seed: Long, index: Int, gap: String): Double {
+        val (lo, hi) = when (gap) {
+            "narrow" -> 0.02 to 0.05
+            "wide" -> 0.15 to 0.30
+            else -> 0.06 to 0.12
+        }
+        return lo + (hi - lo) * ServerRendererGeometry.hash01(index, seed, "relation-gap")
+    }
+
+    private fun moveAnchorTo(ins: JSONObject, target: Pair<Double, Double>, keepRelation: Boolean = false): JSONObject {
+        if (!keepRelation) ins.remove("relation")
+        ins.remove("at")
+        val primitive = ins.optString("primitive", "")
+        val current = instructionCenter(ins, 0L, 0)
+        val dx = target.first - current.first
+        val dy = target.second - current.second
+        if (primitive == "line" && ins.has("from") && ins.has("to")) {
+            val f = ins.getJSONArray("from")
+            val t = ins.getJSONArray("to")
+            ins.put("from", JSONArray(listOf(clamp01(f.getDouble(0) + dx), clamp01(f.getDouble(1) + dy))))
+            ins.put("to", JSONArray(listOf(clamp01(t.getDouble(0) + dx), clamp01(t.getDouble(1) + dy))))
+        } else if (ins.has("center") && !ins.isNull("center")) {
+            ins.put("center", JSONArray(listOf(clamp01(target.first), clamp01(target.second))))
+        } else if (primitive in setOf("square", "triangle")) {
+            if (ins.has("position") && !ins.isNull("position")) {
+                val pos = ins.getJSONArray("position")
+                ins.put("position", JSONArray(listOf(clamp01(pos.getDouble(0) + dx), clamp01(pos.getDouble(1) + dy))))
+            } else {
+                val size = ins.optJSONArray("size") ?: JSONArray(listOf(0.2, 0.2))
+                val w = size.optDouble(0, 0.2)
+                val h = size.optDouble(1, 0.2)
+                ins.put("size", size)
+                ins.put("position", JSONArray(listOf(clamp01(target.first - w / 2.0), clamp01(target.second - h / 2.0))))
+            }
+        }
+        return ins
+    }
+
+    private fun rotatePoint(point: Pair<Double, Double>, center: Pair<Double, Double>, degrees: Double): Pair<Double, Double> {
+        val rad = Math.toRadians(degrees)
+        val cos = kotlin.math.cos(rad)
+        val sin = kotlin.math.sin(rad)
+        val dx = point.first - center.first
+        val dy = point.second - center.second
+        return (center.first + dx * cos - dy * sin) to (center.second + dx * sin + dy * cos)
     }
 
     private fun sha256(value: String): String {

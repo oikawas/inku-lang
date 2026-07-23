@@ -42,8 +42,8 @@ class ServerRendererProportionalWiringTest {
                         .put("to", JSONArray(listOf(0.9, 0.5)))
                 )).toString()
 
-            val resSquare = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "square", svgProfile = "editable"))
-            val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "pillar", svgProfile = "editable"))
+            val resSquare = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "default", canvasAspect = "square", svgProfile = "editable"))
+            val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "default", canvasAspect = "pillar", svgProfile = "editable"))
 
             if (weight == "rotring") {
                 val widthSquare = extractStrokeWidth(resSquare.svg)
@@ -78,8 +78,8 @@ class ServerRendererProportionalWiringTest {
                     )
             )).toString()
 
-        val resSquare = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "square", svgProfile = "editable"))
-        val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "pillar", svgProfile = "editable"))
+        val resSquare = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "default", canvasAspect = "square", svgProfile = "editable"))
+        val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "default", canvasAspect = "pillar", svgProfile = "editable"))
 
         val devSquare = maxRadiusDeviation(resSquare.svg, 500.0, 500.0, 200.0)
         val devPillar = maxRadiusDeviation(resPillar.svg, 100.0, 500.0, 40.0)
@@ -110,8 +110,8 @@ class ServerRendererProportionalWiringTest {
                     )
             )).toString()
 
-        val resSquare = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "square", svgProfile = "editable"))
-        val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "pillar", svgProfile = "editable"))
+        val resSquare = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "default", canvasAspect = "square", svgProfile = "editable"))
+        val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "default", canvasAspect = "pillar", svgProfile = "editable"))
 
         val stdSquare = extractGaussianBlurStd(resSquare.svg)
         val stdPillar = extractGaussianBlurStd(resPillar.svg)
@@ -134,7 +134,7 @@ class ServerRendererProportionalWiringTest {
                     .put("radius", 0.20)
             )).toString()
 
-        val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "pillar", svgProfile = "editable"))
+        val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "default", canvasAspect = "pillar", svgProfile = "editable"))
 
 
         // Check speck count in pillar (perim = 2*PI*40 = 251.327, anchorPerim = 200*1.2566... = 251.327 -> ratio = 1.0 -> 28 * 2.6 = 72.8 -> 73 specks)

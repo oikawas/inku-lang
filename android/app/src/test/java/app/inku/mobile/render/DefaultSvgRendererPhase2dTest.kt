@@ -54,7 +54,7 @@ class DefaultSvgRendererPhase2dTest {
         val actualResult = renderer.render(
             RenderRequest(
                 scoreJson = scoreJson,
-                colorCatalogId = "sumi",
+                colorCatalogId = "default",
                 canvasAspect = "square",
                 svgProfile = "editable"
             )
@@ -86,7 +86,7 @@ class DefaultSvgRendererPhase2dTest {
         val actualResult = renderer.render(
             RenderRequest(
                 scoreJson = scoreJson,
-                colorCatalogId = "sumi",
+                colorCatalogId = "default",
                 canvasAspect = "square",
                 svgProfile = "editable"
             )
@@ -125,7 +125,7 @@ class DefaultSvgRendererPhase2dTest {
         val actualResult = renderer.render(
             RenderRequest(
                 scoreJson = scoreJson,
-                colorCatalogId = "sumi",
+                colorCatalogId = "default",
                 canvasAspect = "square",
                 svgProfile = "editable"
             )

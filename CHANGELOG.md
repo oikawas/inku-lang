@@ -504,7 +504,40 @@ Documentation only. No code, drawing, or API changes; `render_engine_version` st
 - **Traps hit (recorded):** ① `_hash_to_unit` is not a wrapper around `hash01` but an **independent construction** (no salt; first 8 bytes as a signed little-endian int64; divided by `2**63`) — getting it wrong shifts every kind of variation; ② **seeds are unsigned 64-bit** (`struct.unpack("<Q", ...)`), and about half of real seeds exceed 2^63, printing negative through a Kotlin `Long` and shifting every seed-keyed hash; ③ the hatch count `range(-count // 2, ...)` relies on floor division (Kotlin's `-73/2` truncates toward zero and lands one line off). **Each was caught only because a discriminating case sat in the corpus.**
 - **Verification:** `gradle :app:testDebugUnitTest --rerun-tasks` run independently on main gives **44 tests / 0 failures / 0 errors** (tallied by hand from `app/build/test-results/testDebugUnitTest/*.xml`). All ten reference SVGs match on class-attribute list and element counts; four of them (`03_square_filled`, `04_arc_crayon`, `06_surface_hatch`, `10_arc_wave`) match their `<path d>` **as exact strings**. `05_circle_rotring` is pinned by a negative test asserting no stroke bands.
 - **Unchanged:** the changes are confined to `android/`. server, web, cli, and shared are untouched, so **web/server rendering, `APP_VERSION`, and `web/BUILD_NUMBER` do not move**, and no pentala deployment is involved.
-- **Handed to the next stage (2g):** ① the tests pass `colorCatalogId = "sumi"`, which is **not a real catalog id** (the real ones are `default` and ten others); ten call sites remain uncorrected. The comparisons do not depend on color, so the engine version is unaffected. ② Unknown catalog ids are handled **asymmetrically** — the server returns HTTP 422, Android silently falls back to `default`. ③ The 2f section of `ANDROID_SPEC` overstates the result as "all ten reference SVGs match `path d` exactly" (it is the four above) and does not mention reaching engine 10. Stage 2g covers cloudforms, touching, and the v1.94 double-arc fix.
+- **What 2f handed on (all three settled in 2g):** ① the tests pass `colorCatalogId = "sumi"`, which is **not a real catalog id** (the real ones are `default` and ten others); ten call sites remain uncorrected. The comparisons do not depend on color, so the engine version is unaffected. ② Unknown catalog ids are handled **asymmetrically** — the server returns HTTP 422, Android silently falls back to `default`. ③ The 2f section of `ANDROID_SPEC` overstates the result as "all ten reference SVGs match `path d` exactly" (it is the four above) and does not mention reaching engine 10. Stage 2g covers cloudforms, touching, and the v1.94 double-arc fix.
+- **Phases 2g / 2g′ / 2g″ (merge `8819729`, Build 148080) — Phase 2 complete:** cloudform contour
+  generation (1/f basis, 49-point closed Bezier, the waist displacement), the `touching` minor-arc
+  reconstruction, and **the region-before-relation order from v1.94**, plus the three items 2f handed
+  on. **The engine stays at `"10"`** and `android/VERSION` stays `2.0.0-android.1` — this stage filled
+  in the inside of engine 10 rather than adding to what it can draw.
+- **It was remanded twice, and both defects had the same shape: the function was right and the output
+  was wrong.**
+  - **2g, first attempt:** the cloudform code introduced **a weight table that does not exist in the
+    server**, inline — while the correct table had already been ported into `ServerStrokeEngine` in 2c
+    and simply was not called. The only test called the same function twice and compared the results,
+    and touching and the double arcs had no test at all. **This was the one stage handed over without a
+    reference corpus prepared in advance**, and it is the one stage that failed this way.
+  - **2g′:** the normal orientation was inverted against the server (`cloudform.py:229`), so the waist
+    displaced outward instead of denting inward. All 14 contour cases were off by up to 0.03, but **the
+    test allowed a tolerance of 0.05**, which no case could exceed — the spread across all ten tools is
+    only 0.0013. **It was no longer a tautology, but it still discriminated nothing.**
+  - **2g″:** with that fixed, a second defect surfaced: **the cloudform call site passed the raw seed**
+    where the server passes `_seed_for_instruction(ins, seed)`. **Function-level parity stays green
+    through this bug** — the corpus test hands the function a seed that is already derived — and only
+    the `<path d>` comparison against `11_cloudform_pencil.svg` caught it.
+- **The discipline these three stages leave behind:** ① **measure the expected values and write them
+  into the contract before handing a stage over** (`renderer_cloudform_and_relations.json` holds
+  `energy_lateral` per tool, 14 contour cases, the minor-arc reconstruction, and four resolved Scores);
+  ② **choose a tolerance together with the spread it has to distinguish** — not "1e-9" alone but "the
+  tools differ by only 0.0013, so 1e-9 is required"; ③ **never make function-level parity the whole
+  condition; always pair it with a check on the output** — without that, the second defect in 2g″ would
+  have passed.
+- **Verification:** `gradle :app:testDebugUnitTest --rerun-tasks` run independently on main gives
+  **54 tests / 0 failures / 0 errors** (aggregated from the XML). All 49 points of all 14
+  `cloudform_contour` cases match **within 1e-9** with `path_d` **string-equal**, and reference SVGs
+  `11` through `14` match on `<path d>` **exactly**. `14_region_then_relation` pins the v1.94 order by
+  landing its final center **outside** the region `[0.55, 0.55, 0.95, 0.95]` (x = 0.35) — `relation` is
+  `null` whether it resolved or was rejected, so only `center` can tell the two apart.
 
 ### v2.4.7 — freezing the deterministic DDL layers (a DDL reference corpus, plus `ddl_version` / `ddl_engine_version`) (Build 697, 2026-07-24)
 

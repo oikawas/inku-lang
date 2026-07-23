@@ -128,7 +128,7 @@ v2.4.5（Build 695）では作品エディションID を `rh3` へ移した。p
 
 v2.4.4（Build 694）では engine 10 の描画出力を凍結した。`server/reference/render-engine-10/` に 220 ケース（基盤 80 / 変奏 72 / 塗り・面・地 40 / 判別 28）の入力全文・digest・要素数・class を記録し、**再生成のバイト一致を CI（`.github/workflows/reference-corpus.yml`）が強制する**。目的は「どこが変わったとき描画結果がどう変わったか」を AI が判定できるようにすることで、**版数は 1 ビットしか運ばないため出力の実物を凍結する**。engine 1〜9 の出力は復元不能なので engine 10 から始める。入力は生成器側に literal で固定し（色表・Score 全フィールド）、`COLOR_MAP` も schema 既定値も参照しないため、コーパスを動かせるのは `renderer.py` と `stroke_engine.py` だけになる。副産物として **`ground.absorbency` が死にフィールドである確証**を得た（digest が動かない。本改修では直さない）。手順は成果物の隣 `server/reference/README.md`、契約は SPEC §15.5。`.gitattributes` で配布物からは除外。**描画結果は 1 バイトも変わらず**、engine 10・renderer・stroke_engine・schema・coerce・rh2 は不変。Phase 2〜5（rh3・ddl corpus・prompt digest・版差表示）は未着手。
 
-Android 版（`android/`、Kotlin + Compose + Room、端末内で全パイプライン）は **`2.0.0-android.1` / Build 148077 で render engine 10 へ到達**（2026-07-23）。版の名前空間は web/server と別で、`android/VERSION` と `android/BUILD_NUMBER` が正本。移植は server を正本として後から追随する形であり、**server 側の設計を Android に合わせて曲げない**。詳細は CHANGELOG の Android entry と `android/ANDROID_SPEC.ja.md`。
+Android 版（`android/`、Kotlin + Compose + Room、端末内で全パイプライン）は **`2.0.0-android.1` / Build 148080 で Phase 2 完了＝ render engine 10 の移植が全段そろった**（2026-07-24。engine 10 への到達自体は 2f / Build 148077）。版の名前空間は web/server と別で、`android/VERSION` と `android/BUILD_NUMBER` が正本。移植は server を正本として後から追随する形であり、**server 側の設計を Android に合わせて曲げない**。詳細は CHANGELOG の Android entry と `android/ANDROID_SPEC.ja.md`。
 
 ## 変更時の確認先
 

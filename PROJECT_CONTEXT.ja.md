@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.4.4 / Build 694**
+**対象バージョン: v2.4.5 / Build 695**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -54,7 +54,7 @@
 - Stage 1.5は入力の意味を上書きせず、固定レシピの大量注入を避ける。
 - coerceは長期的に縮小する。新しい様式を自動注入せず、不正値は可能な限りdrop-onlyで扱う。
 - 同一Scoreと同一seedは同じ作品を再現する。暗黙の時刻seedや自動varyを導入しない。
-- `dh1`（記述同一性）、`rh2`（作品エディション）、履歴ID、系譜node IDを混同しない。
+- `dh1`（記述同一性）、`rh3`（作品エディション。旧 `rh2` は legacy として保持）、履歴ID、系譜node IDを混同しない。
 - 系譜は明示された派生操作だけを記録し、類似度、時刻、hash一致から親子関係を推測しない。
 - 品質指標、類似度、Vision所見は監査の鏡であり、生成ゲートや「最良枝」の自動選択に接続しない。
 - プラグインはコードではなく検証済みの宣言的文書であり、Stage 1直後にコアDDLへ展開する。Stage 1.5 / coerce / Score / rh2はプラグインに依存しない。
@@ -120,6 +120,8 @@ v2.4.2（Build 689）は歳時記語彙の日英ペアリングを構造で担�
 v2.4.1（Build 687）は UI 調整 2 巡目。DDL エディタの語プレビュー全 69 エントリを日英化し、作業中に発見した歳時記語彙の日英対応バグ 2 件（削剪済み `髪`/`hair` の i18n 残置による 1 ずれ、`words_en` の並び非対応による解説の交差）を是正した。原因だった i18n の手書き複製 `saijikiWords` を廃止し、表示語はハイドレート済み `SAIJIKI` / `SAIJIKI_EN` から直接取得。全 68 語の日英対応を明示テーブルで固定するテストを追加。副作用として英語版 Stage 1 プロンプトの `motions:` 語順が変わる（集合不変、ベンチ未確認）。記述タブは短歌の目安をヒント文からカウンタへ移動。engine 10 のまま。UI 調整は対話で継続中。
 
 v2.4.3（Build 693）は UI 調整 3 巡目。環境変数 `INKU_DEVELOPER_MODE` を新設し、NVIDIA NIM と常時表示の Build 番号を開発環境限定にした（**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・`render_build_number` は無効時も不変**。配布 compose は既定で無効、開発・ベンチ compose は既定で有効。SPEC.ja §15.4）。系譜と系譜全体図に共有の「縦／横」切替を追加（横は左から右へ世代が進み同世代は縦積み。矢印とスクロールも方向に追随し、選択はブラウザへ保存。系譜 API・スキーマ・保存データは不変）。デモに 1〜1,440 分（最大 24 時間）のタイムアウトを追加（既定 60 分。締切を越えても進行中の 1 件は完了・反映してから停止し、残り時間を `HH:MM:SS` で表示）。engine 10 のまま、Score schema / coerce / rh2 / renderer / stroke_engine は無変更。pytest 1029/30。あわせて SETUP 日英のコンテナ節新設と 3 件是正（**Python 要件が 3.10 以上と誤記、実際は 3.12 以上**ほか）、README 日英の再生成節を「推敲による作品の追求」へ全面改稿した分を本版へ畳んでいる。UI 調整は対話で継続中。
+
+v2.4.5（Build 695）では作品エディションID を `rh3` へ移した。payload は `score` + `render_seed` + render engine の ID と版 + `render_color_catalog_id` の 5 つで、**`render_build_number` と `vary_seed` を外した**。build 番号は UI だけの変更でも採番されるため、**描画が 1 バイトも変わらないのにエディションIDが変わる**偽の差分を生んでいた（v1.60 で engine 版の採番規律が無い時代の保険として入ったもので、その役割は v1.99 以降 `render_engine_version` が引き継いでいる）。build 番号は来歴として保持する。**`rh2` は legacy として再計算せず保持し、`rh2` と `rh3` は別の hash 空間**（起動時 backfill は空の行にだけ rh3 を書く）。`render_hash` を等値比較する経路は server に無いため挙動は変わらない。SPEC §7 / §11.2。engine 10・renderer・schema・coerce は不変で、参照コーパスも再生成で差分ゼロ。pytest 1038/30。
 
 v2.4.4（Build 694）では engine 10 の描画出力を凍結した。`server/reference/render-engine-10/` に 220 ケース（基盤 80 / 変奏 72 / 塗り・面・地 40 / 判別 28）の入力全文・digest・要素数・class を記録し、**再生成のバイト一致を CI（`.github/workflows/reference-corpus.yml`）が強制する**。目的は「どこが変わったとき描画結果がどう変わったか」を AI が判定できるようにすることで、**版数は 1 ビットしか運ばないため出力の実物を凍結する**。engine 1〜9 の出力は復元不能なので engine 10 から始める。入力は生成器側に literal で固定し（色表・Score 全フィールド）、`COLOR_MAP` も schema 既定値も参照しないため、コーパスを動かせるのは `renderer.py` と `stroke_engine.py` だけになる。副産物として **`ground.absorbency` が死にフィールドである確証**を得た（digest が動かない。本改修では直さない）。手順は成果物の隣 `server/reference/README.md`、契約は SPEC §15.5。`.gitattributes` で配布物からは除外。**描画結果は 1 バイトも変わらず**、engine 10・renderer・stroke_engine・schema・coerce・rh2 は不変。Phase 2〜5（rh3・ddl corpus・prompt digest・版差表示）は未着手。
 

@@ -2629,6 +2629,20 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **検証:** pytest **1033 passed / 30 skipped**（+4 = 件数・入力の明示性・段 D の判別・SVG と manifest の突き合わせ）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings。**git 管理セッションが独立に再現した**: 生成器を再実行して `git status` が空（220 件バイト一致）、`git archive` の除外、CI ガードの発火と復元。新規テスト `test_render_reference_inputs_are_fully_explicit` は生成器の literal を Pydantic の実フィールド集合と突き合わせるので、**schema にフィールドが増えれば落ちる**（固定し忘れが自動で露見する）。実装レポートは `no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md`。
 - **残り（Phase 2〜5、未着手）:** Edition ID を rh3 へ（`render_build_number` と `vary_seed` を外す。rh2 は legacy 保持）／ ddl corpus（`a_expand` / `b_coerce`）と `ddl_engine_version` / `ddl_version` の新設／ `stage1_prompt_digest` / `stage2_prompt_digest` ／ 再描画時の版差表示。**全 Phase を通じて `render_engine_version` は 10 のまま**でなければならない。
 
+### v2.4.5 — 作品エディションID を rh3 へ（build 番号と Score 側 seed を同一性から外す）（Build 695、2026-07-24）
+
+- **何が壊れていたか:** rh2 は payload に `render_build_number` を含んでいた。build 番号は `web/BUILD_NUMBER` の中身で、**UI だけの変更でも採番される**。つまり**描画が 1 バイトも変わっていないのにエディションIDが変わる**状態で、偽の差分を生んでいた。engine 10 に対し build は 689 まで進んでおり、描画と無関係に数百回動いている。
+- **経緯:** v1.25 で `render_build_number` は来歴として導入され、v1.60 で **engine 版の採番規律がまだ無かったため保険として** hash へ入った。その役割は v1.99 以降 `render_engine_version` が引き継いでいる。保険はもう要らない。
+- **rh3 の定義:** payload は `score` + `render_seed` + `render_engine_id` + `render_engine_version` + `render_color_catalog_id` の 5 つ。**`render_build_number` と `vary_seed` を外した。** `vary_seed` は Score を作る側の seed で、**Score が違えば ID も違う**ため冗長である。canvas aspect は `_score_with_canvas` が render 前に適用して保存 score へ焼き込まれるので、個別には足していない。
+- **`render_build_number` は残す。** カラム・保存・返却経路とも無変更。**来歴として価値があり、同一性の定義に入れる価値がない**、という切り分けである。
+- **rh2 は legacy として保持し、再計算しない。** 計算経路は `_legacy_render_hash_for_item` として残した。保存済みの `rh2:` 行はそのままで、破壊的 migration は行わない（既存履歴の 64 桁 hex hash を legacy として残したときと同じ扱い）。**`rh2` と `rh3` は別の hash 空間であり、突き合わせて同一性を判定してはならない。** 起動時の backfill（`db.py:484`）は `render_hash` が空の行にだけ rh3 を書き、既存の rh2 行には触れない。
+- **挙動は変わらない。** `render_hash` を**等値比較している経路は server に存在しない**（保存・index・表示のみ。web 5 ファイルと `cli.py` も末尾 4 桁の表示だけ）ことを事前調査で確認済みで、本改修でも判定経路を新設していない。`render_hash_short` も無変更。
+- **直列化は既存のまま。** `_canonical_json`（`sort_keys` + 区切り詰め）と `_canonical_seed`（`int()` 化）を流用し、新しい正規化を作っていない。これにより文字列 `"12345"` と整数 `12345` が同じ rh3 になり、**別のインストールでも同じ値**が出る。
+- **期待値は git 管理セッションが先に実測して契約へ埋め、実装はそれに一致させた**（[[参照コーパス先出し]]の型）。基準 `rh3:1f28ff5586ca6047…` に対し、**外したフィールドで基準と同一になる 4 件**（build 変更 / `vary_seed` 変更 / 両方同時 / 文字列 seed）と、**残したフィールドで別値になる 4 件**（`render_seed` / カタログ / `render_engine_version` / 2\*\*63+1 seed）を digest で固定した。「違う値になった」では受け入れない条件にしてある。
+- **不変:** render engine version 10 のまま。renderer / stroke_engine / Score schema / coerce / DDL 解釈は無変更で、**参照コーパス `server/reference/render-engine-10/` は再生成しても差分ゼロ**。`MATERIAL_NONE_SEED_DIGESTS` 5 件も無更新で通過。web UI は採番のみ。
+- **検証:** pytest **1038 passed / 30 skipped**（+5 = 基準値・外したフィールド・残したフィールド・legacy rh2 の存続・backfill）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings。**git 管理セッションが独立に再現した**: 契約の 12 個の digest を実装から計算し直して全件一致、SQLite の実 DB に rh2 行と NULL 行を並べて backfill を走らせ、**rh2 行が無変更・NULL 行に rh3 の基準値**が入ることを実測。実装レポートは `no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md`。
+- **残り（Phase 3〜5、未着手）:** ddl corpus（`a_expand` / `b_coerce`）と `ddl_engine_version` / `ddl_version` の新設／ `stage1_prompt_digest` / `stage2_prompt_digest` ／ 再描画時の版差表示。
+
 ### Android `2.0.0-android.1` — 描画コアが render engine 10 へ到達（Phase 1〜2f、android Build 148077、2026-07-23）
 
 **記載方針**: Android の移植は段ごとに版を起こさず、**engine 10 到達をもって 1 件にまとめる**（web/server とは版の名前空間が別で、`android/VERSION` / `android/BUILD_NUMBER` が正本）。以下は Phase 1 から 2f までの通し記録である。

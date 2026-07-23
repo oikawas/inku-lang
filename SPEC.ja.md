@@ -231,7 +231,11 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 - 特定の Stage 2 モデルや prompt pack に合わせて調整したエンジン
 
 ただし、Render Engine は DB 正本の互換性を壊してはならない。
-履歴、JSONタブ、CLI、ベンチマークが読む正規メタデータ形式は安定させる。`render_hash` は v1.60 以降、保存済み JSON Score と `render_seed` / `vary_seed` / `render_build_number` / `render_color_catalog_id` / render engine metadata から作る作品エディションID（`rh2:<sha256>`）とし、SVG本文・入力文・正規化DDL・LLM応答本文は hash の主材料に含めない。既存履歴の64桁hex hash は legacy として表示互換を維持し、破壊的 migration は行わない。
+履歴、JSONタブ、CLI、ベンチマークが読む正規メタデータ形式は安定させる。`render_hash` は作品エディションIDで、SVG本文・入力文・正規化DDL・LLM応答本文は hash の主材料に含めない。
+
+**現行形式は `rh3:<sha256>`（v2.4.5）。** 同一性は保存済み JSON Score・`render_seed`・render engine の ID と版・`render_color_catalog_id` から決まる。**`render_build_number` と Score を作る側の seed（`vary_seed`）は含めない。** build 番号は `web/BUILD_NUMBER` の中身で UI の変更でも採番されるため、**描画が 1 バイトも変わらないのにエディションIDが変わる**（偽の差分になる）。build 番号は来歴メタデータとして保持し、同一性の定義からは外す。作る側の seed は「Score が違えば ID も違う」ので冗長である。
+
+**`rh2`（v1.60〜v2.4.4）は legacy として保持し、再計算しない。** 保存済みの `rh2:` 行はそのままで、破壊的 migration は行わない（既存履歴の 64 桁 hex hash を legacy として残したときと同じ扱い）。**`rh2` と `rh3` は別の hash 空間であり、突き合わせて同一性を判定してはならない。** 起動時の backfill は `render_hash` が空の行にだけ `rh3` を書く。`render_hash_short`（末尾 4 桁）は形式によらず同じ。
 外部任意コードをロードする仕組みは現時点では実装しない。まず内部境界とメタデータ記録を作り、
 2つ目以降の実エンジンが必要になった段階で、配布形式・安全性・依存関係を設計する。
 

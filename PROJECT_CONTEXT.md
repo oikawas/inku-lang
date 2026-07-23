@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.4.5 / Build 695**
+**Target version: v2.4.6 / Build 696**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 
@@ -60,6 +60,7 @@ instruction
 - Plugins are validated declarative documents, expanded to core DDL immediately after Stage 1. Stage 1.5, coerce, Score, replay, and rh2 do not depend on plugin content.
 - The saijiki table (`server/src/inku_server/saijiki.py`, v1.92) is the source of truth for vocabulary. The Stage 1 prompt vocabulary block, plugin closure markers, relation phrases, web Saijiki display, and reference §1 are derived from it; vocabulary changes go through the table and its golden tests.
 - Japanese and English behavior must stay aligned. Do not introduce English-only requirements.
+- **The engine does not go backwards** (SPEC §12.5). Past drawing engines are not kept in the system and no mechanism selects a version. Replay always runs on the latest engine, and reproducing an edition as it was is **guaranteed by returning the saved SVG**. As in printmaking, the carving advances and the prints remain, but the block cannot be restored — **which is why the reference corpus, a proof print, is pulled while a version is still current.**
 
 ## Current Product State
 

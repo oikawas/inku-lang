@@ -408,8 +408,38 @@ Non-determinism lives in exactly two places: the renderer's performance (perform
 4. No fixed canvas — coordinates are ratios from 0.0 to 1.0, scalable to any medium
 5. Output is still — the viewer moves, not the image
 6. Input is a constrained DSL, not free-form natural language
+7. The engine does not go backwards — like a woodblock being carved, the drawing engine only moves in one direction
 
 For the public English specification, see [SPEC.md](SPEC.md). The canonical Japanese source is [SPEC.ja.md](SPEC.ja.md).
+
+---
+
+## The engine as a woodblock
+
+inku's drawing engine has **no past versions**. There is a tenth-generation engine and nothing else; the ninth cannot be selected. Its code is not kept either.
+
+This is a choice, not an omission.
+
+> The carving advances. The block only changes in one direction. The prints that came off it remain, but the block cannot be returned to what it was before the cut.
+> **If the application itself is thought of as a work, this is the implementation that follows.**
+
+A saved work is **a print**. The SVG itself persists, so the piece as it was can always be seen. The engine is **the block**, and only its carved-forward state exists. Redrawing pulls a fresh print from the current engine, and that is a new edition. Both are never warehoused at once.
+
+### So proof prints are pulled before the next cut
+
+The block cannot be restored. The prints can be kept.
+
+When a generation of the engine rises, losing track of **what that generation drew and how** makes the change impossible to verify afterwards. So for each generation, the actual output from a fixed set of inputs is frozen (`server/reference/`) — 220 cases: ten tools against eight shapes as the base, plus variation, fills, canvas ratios, and boundary values.
+
+| | |
+|---|---|
+| What is frozen | the **actual output** (the SVG, its element counts, classes, and a coordinate digest) |
+| How it holds | CI fails if regenerating an existing case is not byte-identical |
+| When it differs | the drawing changed — **increment the engine version** |
+
+A version number carries only one bit: that something moved. **What moved, and how, can only be answered by comparing the outputs themselves.** Each time a generation rises, only the cases that moved are recorded. The number of directories is itself the record of how many times the engine changed.
+
+**That cost has already been paid.** The output of generations 1 through 9 is gone — neither code nor pictures survive. That is why the reference corpus begins at the tenth. So the prints are pulled while a generation is still current.
 
 ---
 

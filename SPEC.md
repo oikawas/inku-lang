@@ -146,6 +146,7 @@ reactions without increasing overall density.
 6. Output is still image SVG; the viewer moves, not the image.
 7. The input language is constrained enough to support iteration.
 8. Optional concrete worlds belong in plugins, not the core language.
+9. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (Section 12.5).
 
 DDL avoids words such as "beautifully" or "powerfully" in the core.  The system
 should express such ideas through visible choices: number, placement, material,
@@ -1019,36 +1020,141 @@ distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
 
-### 12.2 Reference Corpora (v2.4.4)
+### 12.2 Deterministic and Non-Deterministic Layers (v2.4.6)
 
-**Each version of a deterministic rendering layer has exactly one reference
-corpus: the actual outputs, frozen, produced from fixed inputs.** A version
-number carries only one bit — that something changed. What changed, and how, can
-only be answered by comparing the outputs themselves.
+**The pipeline alternates between LLM layers and deterministic ones.** Where the
+system reproduces and where it varies differs layer by layer. Only deterministic
+layers can carry a version, and this table draws that line.
 
-- **Regenerating an existing case must be byte-identical.** If it is not, the
-  drawing changed, and **the layer version must be incremented**.
-- **A frozen version is never regenerated to absorb changed output.** Create the
-  next version directory instead.
+| Layer | Implementation | Deterministic | LLM calls | Version |
+|---|---|---|---|---|
+| Input (description) | text written by the author | — | — | `dh1` (description identity) |
+| **Stage 1 interpretation** | `interpreter.py` | **no** | 19 | none (`stage1_prompt_digest` records provenance only) |
+| **Plugin expansion** | `expand_plugin_ddl` | **yes** | 0 | `ddl_engine_version` |
+| **Stage 1.5 expansion / variation** | `expand_intermediate_ddl` | **yes** | 0 | `ddl_engine_version` |
+| **Stage 2 composition** | `composer.py` | **no** | 19 | none (`stage2_prompt_digest` records provenance only) |
+| **coerce / validation** | `coerce_score` | **yes** | 0 | `ddl_engine_version` |
+| JSON Score | `schema.py` | — | — | `version` (`"0.1.0"`, the schema version) |
+| **Renderer performance** | `renderer.py` / `stroke_engine.py` | **yes** (given a seed) | 0 | `render_engine_version` |
+| Output (SVG) | the saved work | — | — | `rh3` (work edition) |
+
+**The deterministic layers are not adjacent.** Stage 2's LLM sits between Stage 1.5
+(DDL→DDL) and coerce (Score→Score), so "DDL through to Score" cannot be one baseline.
+Each deterministic stretch gets its own corpus instead (§12.3).
+
+**Why LLM layers get no version:** the same prompt and the same model still vary.
+A version number implies "same version, same result", so attaching one where that
+does not hold would be a lie. Instead the digest of the prompt actually sent is
+recorded per work — a weaker claim that **can assert "the input conditions differed"
+but never asserts "the output will change"**.
+
+> `stage1_model`, `stage2_model`, and `stage*_prompt_digest` record **what was asked
+> for**, not the environment that ran it. Two works carrying the same record are not
+> guaranteed to produce the same Score. That is not a defect; it follows from the
+> principle that variation is part of the specification.
+
+### 12.3 Versions and Identity IDs (v2.4.5)
+
+**These are separate namespaces.** Numbers that look close are not linked.
+
+| Name | Versions what | Current | Incremented when |
+|---|---|---|---|
+| `render_engine_version` | the drawing engine | `10` | **the same Score and seed perform differently** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `1` | the same input and seed produce different output |
+| `ddl_version` | the DDL language itself (grammar, keywords) | `1` | grammar is added, changed, or retired |
+| Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.4.5 | per release |
+| `web/BUILD_NUMBER` | build serial | 695 | **moves for UI-only changes too** |
+
+`ddl_version` and `ddl_engine_version` **start counting at 1** (author's ruling,
+2026-07-24). No other version shares those numbers, which keeps the separate
+namespaces from being read as linked. They step in whole integers.
+
+**The work-edition ID is `rh3`** (details in the render-metadata section). Identity
+comes from `score`, `render_seed`, the render engine's ID and version, and
+`render_color_catalog_id`.
+
+- **`render_build_number` is not part of identity.** It is stamped for UI-only
+  changes, so it gave a new edition ID to a drawing that had not changed by a single
+  byte. It stays as provenance: worth keeping as history, not worth putting in the
+  definition of sameness.
+- **The Score-side seed (`vary_seed`) is excluded too** — a different Score already
+  yields a different ID.
+- **`rh2` is retained as legacy and never recalculated.** `rh2` and `rh3` are
+  separate hash spaces and must not be compared to decide sameness.
+
+### 12.4 Comparing Generations Through the Corpus (v2.4.4)
+
+**Each version of a deterministic layer has exactly one reference corpus: the actual
+outputs, frozen, produced from fixed inputs.** A version number carries only one bit.
+**What changed, and how, can only be answered by comparing the outputs themselves.**
+
+- **Regenerating an existing case must be byte-identical.** If it is not, the output
+  changed, and **the layer version must be incremented**.
+- **A frozen version is never regenerated to absorb changed output.** Create the next
+  version directory instead.
 - **Case IDs are permanent.** They may not be renamed or removed; only added.
-- **Corpora are never chained** — one layer's corpus output must not become
-  another layer's corpus input.
+- **Corpora are never chained** — one layer's corpus output must not become another's
+  input. Chaining them destroys the ability to say which layer moved.
 - A corpus fixes **every dependency outside its own layer as a literal in the
-  generator**: the color map and every Score field are written out rather than
-  read from `COLOR_MAP` or the schema defaults. If output moves while none of the
-  manifest identity fields (`corpus_format_version`, `engine_version`,
-  `schema_version`, `color_map_digest`) move, **a dependency was left unfixed**.
+  generator**: the color map and every Score field are written out rather than read
+  from `COLOR_MAP` or the schema defaults. If output moves while none of the manifest
+  identity fields (`corpus_format_version`, `engine_version`, `schema_version`,
+  `color_map_digest`) move, **a dependency was left unfixed**.
 
-The current instance is `server/reference/render-engine-10/` (220 cases).
-**Outputs for render engines 1 through 9 were never preserved and cannot be
-recovered**, so the corpus begins at engine 10. The operating procedure lives
-next to the artifacts (`server/reference/README.md`), and CI
-(`.github/workflows/reference-corpus.yml`) enforces byte-identical
-regeneration. **The point is to move the versioning discipline from something
-people remember to something the machine enforces.**
+The current instance is `server/reference/render-engine-10/` (220 cases). The
+operating procedure lives next to the artifacts (`server/reference/README.md`), and
+CI (`.github/workflows/reference-corpus.yml`) enforces byte-identical regeneration.
+**The point is to move the versioning discipline from something people remember to
+something the machine enforces.**
 
-The corpus ships with no release: `server/reference/ export-ignore` in
-`.gitattributes` keeps it out of `git archive`.
+**Generations are compared like this.** When a version rises, a new directory is
+created and its manifest digests are compared against the previous one. Only the case
+IDs that moved are listed in `changed_from_previous`, and **only those cases' actual
+output is stored**. Cases that did not move are still current in the older version.
+"How does engine 11 draw case X?" resolves mechanically by finding **the last version
+in which X moved**.
+
+**The number of directories is itself the record of how many times that layer changed.**
+
+The corpus ships with no release: `server/reference/ export-ignore` in `.gitattributes`
+keeps it out of `git archive`.
+
+### 12.5 The Engine Does Not Go Backwards — Implemented as Printmaking (v2.4.6)
+
+**Past drawing engines are not kept in the system, and no mechanism exists to select
+a version.**
+
+- **Replay always runs on the latest engine.** `current_render_engine()` takes no
+  argument and offers no choice.
+- A recorded `render_engine_version` is **provenance**, not an input to redrawing.
+- **Reproducing the edition as it was is guaranteed by returning the saved SVG**, not
+  by redrawing it.
+- When a redraw finds that the recorded version differs from the current one, the UI
+  **says so and nothing more**.
+- The DDL side works the same way: reinterpretation always runs on the latest, and the
+  result is a new edition.
+
+**This is the stance of printmaking.**
+
+> The carving advances. The block only changes in one direction. The prints that came
+> off it remain, but **the block cannot be returned to what it was before the cut**.
+> If the application itself is thought of as a work, this is the implementation that
+> follows.
+
+The work — a saved SVG with its Score, seed, and edition ID — is **the print**, and it
+persists. The engine is **the block**, and only its carved-forward state exists.
+Refusing to conflate the two, refusing to warehouse old blocks, is the choice this
+design makes.
+
+**The cost has already been paid: the output of engines 1 through 9 is gone.** Neither
+the code nor the renderings survive. The reference corpus (§12.4) begins at engine 10.
+**That is precisely why prints are pulled while a version is still current.** A corpus
+is a **proof print**, taken before the next cut. The block cannot be restored; the
+print can be kept.
+
+**Recording only the version number while discarding the output is like noting the date
+of the carving and throwing away the print.**
 
 ---
 

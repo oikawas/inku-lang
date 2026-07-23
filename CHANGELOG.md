@@ -436,6 +436,57 @@ Web-UI-only work. The drawing machinery (Score, render, pipeline) is untouched a
 - **Verification:** pytest **1038 passed / 30 skipped** (+5: the reference value, the excluded fields, the retained fields, legacy rh2 still computable, and the backfill), cli 68 passed, ruff clean, `npm run check` 0 errors / 2 warnings. **The git session reproduced this independently**: all twelve contract digests recomputed from the implementation and matched, and a real SQLite database holding one rh2 row and one null row was run through the backfill, confirming **the rh2 row unchanged and the null row filled with the rh3 reference value**. Implementation report: `no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md`.
 - **Still ahead (Phases 3–5):** the ddl corpus (`a_expand` / `b_coerce`) with new `ddl_engine_version` and `ddl_version`; `stage1_prompt_digest` / `stage2_prompt_digest`; and showing the version gap on redraw.
 
+### v2.4.6 — the engine as a woodblock (putting the stance and the layer map into the SPEC) (Build 696, 2026-07-24)
+
+Documentation only. No code, drawing, or API changes; `render_engine_version` stays 10.
+
+- **A seventh design principle in both SPECs:** **"the engine does not go backwards."**
+  Like a woodblock being carved, the drawing engine only moves in one direction; past
+  versions are not kept in the system and cannot be selected. **What remains is the
+  printed work — the saved SVG — not the block as it was before the cut.**
+- **`SPEC.md` §12.2 / `SPEC.ja.md` §15.5, "Deterministic and Non-Deterministic Layers":**
+  one table covering all nine pipeline layers — implementation, determinism, LLM call
+  count, and the version each carries. **The deterministic layers are not adjacent**
+  (Stage 2's LLM sits between Stage 1.5 and coerce), so "DDL through to Score" cannot be
+  a single baseline. It also states **why LLM layers get no version**: a version number
+  implies "same version, same result", so attaching one where that does not hold would be
+  a lie. A prompt digest records that the inputs differed, and claims nothing more.
+- **§12.3 / §15.6, "Versions and Identity IDs":** `render_engine_version` 10,
+  `ddl_engine_version` 1, `ddl_version` 1, Score `version` 0.1.0, `APP_VERSION`, and
+  `web/BUILD_NUMBER` in one table **that makes the separate namespaces legible**, each with
+  the condition that increments it. The two `ddl_*` entries are documented ahead of their
+  implementation by the author's ruling (2026-07-24). Why rh3 excludes
+  `render_build_number` and `vary_seed` is consolidated here.
+- **§12.4 / §15.7, "Comparing Generations Through the Corpus":** the v2.4.4 text grown into
+  **how generations are actually compared**. A rising version creates a new directory,
+  lists only the case IDs that moved in `changed_from_previous`, and **stores only those
+  cases' actual output**. "How does engine 11 draw case X?" resolves by finding **the last
+  version in which X moved**. **The number of directories is itself the record of how many
+  times that layer changed.**
+- **§12.5 / §15.8, "The Engine Does Not Go Backwards (Implemented as Printmaking)" — the
+  heart of this revision:** replay always runs on the latest engine; a recorded version is
+  provenance, not an input. Reproducing the edition as it was is **guaranteed by returning
+  the saved SVG**, never by redrawing.
+
+  > The carving advances. The block only changes in one direction. The prints that came off
+  > it remain, but **the block cannot be returned to what it was before the cut**. If the
+  > application itself is thought of as a work, this is the implementation that follows.
+
+  The work is **the print**; the engine is **the block**. Refusing to conflate them, refusing
+  to warehouse old blocks, is the choice. **The cost has already been paid: the output of
+  engines 1 through 9 is gone.** That is why prints are pulled while a version is current —
+  **a corpus is a proof print, taken before the next cut.** **Recording only the version
+  number while discarding the output is like noting the date of the carving and throwing
+  away the print.**
+- **A new "The engine as a woodblock" section in both READMEs**, carrying the same essence at
+  a reader's density, plus the seventh design principle. It states that the corpus holds 220
+  cases (ten tools against eight shapes as the base, plus variation, fills, canvas ratios, and
+  boundary values), that CI enforces byte-identical regeneration, and that generations 1
+  through 9 are lost.
+- **Verification:** every number was checked against the implementation (manifest cases = 220,
+  stage A = 80 = ten tools × eight shapes, `render_engine_version` = `"10"`). No code changed,
+  so pytest, cli, and ruff are identical to v2.4.5.
+
 ### Android `2.0.0-android.1` — the drawing core reaches render engine 10 (Phases 1–2f, android Build 148077, 2026-07-23)
 
 **Recording policy:** the Android port does not open a version entry per phase. It gets **one entry at the moment engine 10 is reached**. Android has its own version namespace, with `android/VERSION` and `android/BUILD_NUMBER` as the canonical files. What follows covers Phase 1 through 2f.

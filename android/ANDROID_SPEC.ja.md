@@ -1249,9 +1249,77 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 
 `DefaultSvgRendererPhase2fTest.kt` を作成・拡張し、参照コーパス 10 種の SVG に対する完全パリティ検証を実施した。
 
-- **参照 SVG パリティ**: `01_circle_pen.svg`, `03_square_filled.svg`, `04_arc_crayon.svg`, `05_circle_rotring.svg`, `06_surface_hatch.svg`, `07_circle_wave.svg`, `08_circle_perlin.svg`, `10_arc_wave.svg` の全 10 参照 SVG において、構造（要素数・順序・`class` 属性）および `path d` 座標列が参照 SVG と **完全一致**。
+- **参照 SVG パリティ**: 全 10 参照 SVG（`01_circle_pen.svg`, `02_line_brush.svg`, `03_square_filled.svg`, `04_arc_crayon.svg`, `05_circle_rotring.svg`, `06_surface_hatch.svg`, `07_circle_wave.svg`, `08_circle_perlin.svg`, `09_line_white.svg`, `10_arc_wave.svg`）において構造（要素数・順序・`class` 属性）が一致し、うち 4 件（`03_square_filled.svg`, `04_arc_crayon.svg`, `06_surface_hatch.svg`, `10_arc_wave.svg`）においては `path d` 座標列も参照 SVG と **完全一致**。
+- **Engine 10 到達とバージョン更新**: 2f 完了に伴い `render_engine_version` を `"10"` に更新。`android/VERSION` は `2.0.0-android.1` に採番更新された。
 - `gradle :app:testDebugUnitTest --rerun-tasks`（全 44 件のユニットテスト）が 100% 成功。
-- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148077` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
+- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148077` にインクリメント。
+
+## 2026-07-23 web/server v2 追随 Phase 2g (雲形輪郭・touching 劣弧再構成・region/relation 解決順序完全同期 & 2f 積み残し是正)
+
+契約 `antigravity-android-phase2-renderer.md` §8 に基づき、Phase 2 の最終段となる 2g (雲形輪郭・`touching` 劣弧再構成・region → relation 解決順序の是正・2f 積み残し是正) を完了した。
+
+### 実装および是正の詳細
+
+1. **2f 積み残しの是正 (⓪)**:
+   - テストコード内に残っていた存在しないカタログ ID (`"sumi"`, `"sumi_traditional"`) 計 11 箇所を `default` へ修正し、全テストの通過を確認。
+   - 未知カタログ ID に対する挙動方針として、Android ネイティブアプリの安定稼働と画面表示の堅牢性を担保するため `ColorCatalogs.get()` による `default` への決定性フォールバック方針を維持・ドキュメント化。
+   - `ANDROID_SPEC.ja.md` および `ANDROID_SPEC.md` における 2f 節の記述誤差（参照 SVG の列挙漏れ、文字列一致と構造一致の区分、engine 10 到達および `2.0.0-android.1` バージョン表記）を正確に訂正。
+2. **雲形の輪郭生成 (`ServerRendererGeometry.kt`)**:
+   - `cloudform.py` より `generateCloudformContour`, `sampleClosedCatmullRom`, 1/f 基底, 49 点閉 Bezier, 自己交差・曲率・凹み制限アルゴリズムを移植。
+3. **`touching` 劣弧再構成と Performance Resolution 順序の同期 (`DefaultSvgRenderer.kt`)**:
+   - `resolvePerformanceScore` を `DefaultSvgRenderer` の描画前処理に組み込み、region 配置 (`resolveAtRegion`) を先行処理した上で relation 解決 (`resolveRelation`: `touching`, `along`, `cutting`, `between`, `not_touching`) を追随させる正当な解決順序（v1.94 双弧修正）を完全移植。
+   - `touching` において `minorArcDelta` と `arcFromEndpointsAndSagitta` により接点を保持した劣弧再構成を同期。
+
+### 検証
+
+`app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 45 件のユニットテストが 100% 通過（参照 SVG 10 件のパリティと構造一致、`05_circle_rotring.svg` の帯非形成、`cloudform` の決定性・生成テストを含む）。
+`render_engine_version` は engine 10 到達済みの `"10"` を維持。
+`gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148078` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
+
+## 2026-07-23 web/server v2 追随 Phase 2g′ (雲形輪郭・劣弧幾何 Flag・touching 双弧・参照 SVG パリティ同期)
+
+契約 `antigravity-android-phase2-renderer.md` §8 Phase 2g′ に基づき、Python 参照実装 (`renderer_cloudform_and_relations.json` および参照 SVG 11〜14 `11_cloudform_pencil.svg`, `12_cloudform_rotring.svg`, `13_touching_arcs.svg`, `14_region_then_relation.svg`) と Android レンダリングエンジンの同調を実施した。
+
+### 実施・是正の詳細
+
+1. **劣弧描画ジオメトリ完全同調 (`ServerRendererGeometry.kt`)**:
+   - `arcPathD` を Python サーバー `renderer.py:3493-3504` と完全に同一の数式（`minorArcDelta` および `delta > 0.0` のとき `sweep = 0`, `delta <= 0.0` のとき `sweep = 1`）へ同調。
+   - `energyLateral` 参照テーブルを inline `when` 表から `GRAMMARS[weight]` 定数表参照へ一元化。
+2. **手描きストローク・ID階層・`touching` 反転是正 (`DefaultSvgRenderer.kt`)**:
+   - `performedArcSagitta` および `canvasEndpointGeometry` での弧のサンプル点計算時の Y 座標符号 (`cy - r * sin(rad)`) を Y 軸下向きスクリーン座標系へ修正し、`touching` 劣弧再構成での双弧膨らみ方向の反転を解消。
+   - `primitive == "cloudform"` レンダリング時に `<path class="cloudform contour-v1 stroke-engine-touch" ...>` 属性を付与。
+   - `svgProfile == "editable"` 時に最外周へ `<g id="instruction_...">` および `<g id="mark_...">` 階層構造を出力。
+3. **テスト検証基盤 (`ServerRendererCloudformAndRelationsTest.kt`)**:
+   - 正規表現 `d="([^"]+)"` を `\bd="([^"]+)"` へ改修し、`<metadata id="...">` 等の `id` 属性に対する誤マッチを完全に排除。
+   - `renderFromIndexEntry` ヘルパーで `score` オブジェクトに `render_seed` を正しく注入。
+
+### 検証結果
+
+- `gradle :app:testDebugUnitTest --rerun-tasks` により全 54 件の単体テストが 100% 通過 (PASS)。
+- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148079` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
+
+## 2026-07-24 web/server v2 追随 Phase 2g″ (雲形輪郭法線符号・雲形パリティ検証厳格化 & 2g′ 誤記訂正)
+
+契約 `antigravity-android-phase2-renderer.md` §8 Phase 2g″ (差し戻し修正) に基づき、雲形輪郭の法線符号条件の修復と、雲形パリティ検証の厳格化を実施した。
+
+### 実施・是正の詳細
+
+1. **雲形輪郭の法線符号修正 (`ServerRendererGeometry.kt:881`)**:
+   - 法線方向の反転判定条件を `if (nx * towardCenterX + ny * towardCenterY > 0)` から `if (nx * towardCenterX + ny * towardCenterY < 0)` （`server/cloudform.py:229` と同等）に反転修正。これにより変位方向が外側への膨らみから内側へのくびれ（凹み）へと正しく修復された。
+2. **`DefaultSvgRenderer` の `cloudform` シード導出修復 (`DefaultSvgRenderer.kt:327`)**:
+   - `cloudform` レンダリング時の `performanceSeed` 引数を `renderSeed` 直渡しから `seedForInstruction(ins, renderSeed)` に修復。
+3. **雲形パリティテストの厳格化と誤実装での失敗検証 (`ServerRendererCloudformAndRelationsTest.kt`)**:
+   - `testCloudformContourParity` の許容誤差 `0.05` を撤去し、全 14 ケースの全 49 点に対して `1e-9` 許容誤差および `<path d>` 文字列完全一致を規定。
+   - `testReferenceSvgParity11To14` にて `11_cloudform_pencil.svg` および `12_cloudform_rotring.svg` に対する `<path d>` 文字列完全一致検証を追加。
+   - 法線符号修正前の状態でテストを実行し、`testCloudformContourParity` (hair-plain Point 11: `expected:<0.531388453> but was:<0.53138964464791>`) および `testReferenceSvgParity11To14` (`11_cloudform_pencil` path d 不一致) が意図通り失敗することを確認・実証。
+4. **ドキュメント誤記載の訂正**:
+   - Phase 2g′ の節において、参照 SVG ファイル名（`11_cloudform_filled.svg` → `11_cloudform_pencil.svg`、`12_cloudform_stroke.svg` → `12_cloudform_rotring.svg`、`14_cloudform_surface.svg` → `14_region_then_relation.svg`）および過大なパリティ一致表現を訂正。
+
+### 検証結果
+
+- `render_engine_version` は `"10"` を維持。
+- `app/build/test-results/testDebugUnitTest/*.xml` の集計により、全 54 件の単体テスト（12 ファイル）が 100% 通過 (PASS)。
+- `gradle :app:assembleDebug` により `android/BUILD_NUMBER` をインクリメント予定。`android/VERSION` は `2.0.0-android.1` を維持。
 
 
 

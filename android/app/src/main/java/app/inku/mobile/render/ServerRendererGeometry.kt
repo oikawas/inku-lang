@@ -255,9 +255,9 @@ internal object ServerRendererGeometry {
         val y1 = cy - r * sin(sa)
         val x2 = cx + r * cos(ea)
         val y2 = cy - r * sin(ea)
-        val delta = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
-        val largeArc = if (delta > 180.0) 1 else 0
-        val sweep = if (endDeg > startDeg) 0 else 1
+        val delta = endDeg - startDeg
+        val largeArc = if (kotlin.math.abs(delta) > 180.0) 1 else 0
+        val sweep = if (delta > 0.0) 0 else 1
         return "M ${fmt(x1)} ${fmt(y1)} A ${fmt(r)} ${fmt(r)} 0 $largeArc $sweep ${fmt(x2)} ${fmt(y2)}"
     }
 
@@ -608,5 +608,312 @@ internal object ServerRendererGeometry {
         result.add(basePoints[last])
         return result
     }
+
+    data class ArcGeometry(
+        val center: Pair<Double, Double>,
+        val radius: Double,
+        val angleStart: Double,
+        val angleEnd: Double
+    )
+
+    fun minorArcDelta(angleStart: Double, angleEnd: Double): Double {
+        var diff = (angleEnd - angleStart + 180.0) % 360.0
+        if (diff < 0) diff += 360.0
+        return diff - 180.0
+    }
+
+    fun arcPoint(center: Pair<Double, Double>, radius: Double, angleDegrees: Double): Pair<Double, Double> {
+        val rad = Math.toRadians(angleDegrees)
+        return (center.first + radius * cos(rad)) to (center.second - radius * sin(rad))
+    }
+
+    fun arcFromEndpointsAndSagitta(
+        start: Pair<Double, Double>,
+        end: Pair<Double, Double>,
+        sagitta: Double
+    ): ArcGeometry {
+        val dx = end.first - start.first
+        val dy = end.second - start.second
+        val chord = hypot(dx, dy)
+        val height = kotlin.math.abs(sagitta)
+        require(chord > 1e-12) { "arc chord must be non-zero" }
+        require(height > 1e-12 && height < chord / 2.0) { "arc sagitta must be positive and smaller than half the chord" }
+
+        val radius = chord * chord / (8.0 * height) + height / 2.0
+        val midpoint = ((start.first + end.first) / 2.0) to ((start.second + end.second) / 2.0)
+        val normal = (-dy / chord) to (dx / chord)
+        val sign = if (sagitta > 0.0) 1.0 else -1.0
+        val center = (midpoint.first - sign * (radius - height) * normal.first) to
+            (midpoint.second - sign * (radius - height) * normal.second)
+
+        fun angle(p: Pair<Double, Double>): Double {
+            return Math.toDegrees(kotlin.math.atan2(-(p.second - center.second), p.first - center.first))
+        }
+
+        val angleStart = angle(start)
+        val delta = minorArcDelta(angleStart, angle(end))
+        require(kotlin.math.abs(delta) < 180.0 - 1e-9) { "arc must use a sweep smaller than 180 degrees" }
+        return ArcGeometry(
+            center = center,
+            radius = radius,
+            angleStart = angleStart,
+            angleEnd = angleStart + delta
+        )
+    }
+
+    data class CloudContour(
+        val points: List<Pair<Double, Double>>,
+        val pathD: String
+    )
+
+    private fun cloudformUnit(seed: Long, label: String, index: Int): Double {
+        val seedStr = seed.toULong().toString()
+        val rawStr = "$seedStr:$label:$index"
+        val digest = MessageDigest.getInstance("SHA-256").digest(rawStr.toByteArray(Charsets.UTF_8))
+        var raw = 0L
+        for (offset in 0 until 8) {
+            raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
+        }
+        val ulongVal = raw.toULong()
+        return ulongVal.toDouble() / 18446744073709551615.0
+    }
+
+    fun cloudformSeed(performanceSeed: Any?, instructionIndex: Int, markIndex: Int): Long {
+        val perfSeedStr = when (performanceSeed) {
+            is Long -> performanceSeed.toULong().toString()
+            is ULong -> performanceSeed.toString()
+            is String -> performanceSeed.toULongOrNull()?.toString() ?: performanceSeed
+            else -> performanceSeed?.toString() ?: "None"
+        }
+        val rawStr = "cloudform-v1:$perfSeedStr:$instructionIndex:$markIndex"
+        val digest = MessageDigest.getInstance("SHA-256").digest(rawStr.toByteArray(Charsets.UTF_8))
+        var raw = 0L
+        for (offset in 0 until 8) {
+            raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
+        }
+        return raw
+    }
+
+    private fun frequencyRange(variation: JSONObject?): IntRange {
+        val frequency = variation?.optString("frequency", "medium") ?: "medium"
+        return when (frequency) {
+            "slow" -> 2..5
+            "high" -> 5..10
+            else -> 3..7
+        }
+    }
+
+    private fun variationGain(variation: JSONObject?): Double {
+        if (variation == null) return 0.16
+        return when (variation.optString("amplitude", "medium")) {
+            "fine" -> 0.10
+            "medium" -> 0.17
+            "broad" -> 0.25
+            else -> 0.17
+        }
+    }
+
+    private fun spectrumPower(variation: JSONObject?): Double {
+        val quality = variation?.optString("quality", "pink") ?: "pink"
+        return when (quality) {
+            "wave" -> 1.15
+            "pink" -> 0.50
+            "perlin" -> 0.72
+            "white" -> 0.0
+            "none" -> 0.58
+            else -> 0.50
+        }
+    }
+
+    private fun normalizedHarmonicSignal(
+        theta: Double,
+        seed: Long,
+        label: String,
+        frequencies: IntRange,
+        spectrumPower: Double
+    ): Double {
+        var total = 0.0
+        var normalizer = 0.0
+        for (harmonic in frequencies) {
+            val amplitude = 1.0 / Math.pow(harmonic.toDouble(), spectrumPower)
+            val phase = 2.0 * Math.PI * cloudformUnit(seed, "$label-phase", harmonic)
+            val sign = if (cloudformUnit(seed, "$label-sign", harmonic) < 0.5) -1.0 else 1.0
+            total += sign * amplitude * cos(harmonic * theta + phase)
+            normalizer += amplitude
+        }
+        return total / max(normalizer, 1e-9)
+    }
+
+    private fun baseRadius(
+        theta: Double,
+        seed: Long,
+        variation: JSONObject?,
+        weight: String
+    ): Double {
+        val gain = variationGain(variation)
+        val primary = normalizedHarmonicSignal(
+            theta,
+            seed,
+            "contour",
+            frequencyRange(variation),
+            spectrumPower(variation)
+        )
+        val grammar = GRAMMARS[weight] ?: GRAMMARS["pen"]!!
+        val touchGain = grammar.energyLateral * 0.018
+        val touch = normalizedHarmonicSignal(
+            theta,
+            seed xor 0x7001L,
+            "touch",
+            9..14,
+            0.65
+        )
+        return max(0.58, min(1.12, 0.88 + gain * primary + touchGain * touch))
+    }
+
+    private fun curvatureRadius(before: Pair<Double, Double>, point: Pair<Double, Double>, after: Pair<Double, Double>): Double {
+        val a = hypot(point.first - before.first, point.second - before.second)
+        val b = hypot(after.first - point.first, after.second - point.second)
+        val c = hypot(before.first - after.first, before.second - after.second)
+        val twiceArea = kotlin.math.abs(
+            (point.first - before.first) * (after.second - before.second) -
+            (point.second - before.second) * (after.first - before.first)
+        )
+        if (twiceArea < 1e-9) return Double.POSITIVE_INFINITY
+        return a * b * c / (2.0 * twiceArea)
+    }
+
+    private fun closedCatmullRomPath(points: List<Pair<Double, Double>>): String {
+        val count = points.size
+        require(count >= 3) { "cloudform contour requires at least three points" }
+        val sb = StringBuilder()
+        sb.append("M ").append(fmt(points[0].first)).append(" ").append(fmt(points[0].second))
+        for (i in 0 until count) {
+            val p0 = points[(i - 1 + count) % count]
+            val p1 = points[i]
+            val p2 = points[(i + 1) % count]
+            val p3 = points[(i + 2) % count]
+            val c1x = p1.first + (p2.first - p0.first) / 6.0
+            val c1y = p1.second + (p2.second - p0.second) / 6.0
+            val c2x = p2.first - (p3.first - p1.first) / 6.0
+            val c2y = p2.second - (p3.second - p1.second) / 6.0
+            sb.append(" C ").append(fmt(c1x)).append(" ").append(fmt(c1y))
+                .append(" ").append(fmt(c2x)).append(" ").append(fmt(c2y))
+                .append(" ").append(fmt(p2.first)).append(" ").append(fmt(p2.second))
+        }
+        sb.append(" Z")
+        return sb.toString()
+    }
+
+    fun sampleClosedCatmullRom(
+        points: List<Pair<Double, Double>>,
+        samplesPerSegment: Int = 5
+    ): List<Pair<Double, Double>> {
+        val count = points.size
+        val numSamples = max(2, samplesPerSegment)
+        val sampled = mutableListOf<Pair<Double, Double>>()
+        for (i in 0 until count) {
+            val p0 = points[(i - 1 + count) % count]
+            val p1 = points[i]
+            val p2 = points[(i + 1) % count]
+            val p3 = points[(i + 2) % count]
+            val c1x = p1.first + (p2.first - p0.first) / 6.0
+            val c1y = p1.second + (p2.second - p0.second) / 6.0
+            val c2x = p2.first - (p3.first - p1.first) / 6.0
+            val c2y = p2.second - (p3.second - p1.second) / 6.0
+            for (step in 0 until numSamples) {
+                val t = step.toDouble() / numSamples.toDouble()
+                val inv = 1.0 - t
+                val x = inv * inv * inv * p1.first + 3.0 * inv * inv * t * c1x + 3.0 * inv * t * t * c2x + t * t * t * p2.first
+                val y = inv * inv * inv * p1.second + 3.0 * inv * inv * t * c1y + 3.0 * inv * t * t * c2y + t * t * t * p2.second
+                sampled.add(x to y)
+            }
+        }
+        return sampled
+    }
+
+    fun generateCloudformContour(
+        center: Pair<Double, Double>,
+        size: Pair<Double, Double>,
+        performanceSeed: Any?,
+        instructionIndex: Int,
+        markIndex: Int,
+        variation: JSONObject? = null,
+        weight: String = "pen",
+        pointCount: Int = 49
+    ): CloudContour {
+        val count = max(24, min(72, pointCount))
+        val seed = cloudformSeed(performanceSeed, instructionIndex, markIndex)
+        val rx = max(1e-6, size.first / 2.0)
+        val ry = max(1e-6, size.second / 2.0)
+        val angles = (0 until count).map { 2.0 * Math.PI * it.toDouble() / count.toDouble() }
+        val baseRadii = angles.map { baseRadius(it, seed, variation, weight) }
+        val basePoints = angles.zip(baseRadii).map { (theta, r) ->
+            (center.first + rx * r * cos(theta)) to (center.second + ry * r * sin(theta))
+        }
+        val lengths = (0 until count).map { i ->
+            hypot(
+                basePoints[(i + 1) % count].first - basePoints[i].first,
+                basePoints[(i + 1) % count].second - basePoints[i].second
+            )
+        }
+        val perimeter = max(lengths.sum(), 1e-9)
+        val arcPositions = mutableListOf<Double>()
+        var travelled = 0.0
+        for (len in lengths) {
+            arcPositions.add(travelled / perimeter)
+            travelled += len
+        }
+        val gain = variationGain(variation)
+        val nominalScale = min(rx, ry)
+        val displaced = mutableListOf<Pair<Double, Double>>()
+        for (i in 0 until count) {
+            val basePoint = basePoints[i]
+            val arcPos = arcPositions[i]
+            val before = basePoints[(i - 1 + count) % count]
+            val after = basePoints[(i + 1) % count]
+            val tx = after.first - before.first
+            val ty = after.second - before.second
+            val tangentLen = max(hypot(tx, ty), 1e-9)
+            var nx = -ty / tangentLen
+            var ny = tx / tangentLen
+            val towardCenterX = center.first - basePoint.first
+            val towardCenterY = center.second - basePoint.second
+            if (nx * towardCenterX + ny * towardCenterY < 0) {
+                nx = -nx
+                ny = -ny
+            }
+            val waistSignal = normalizedHarmonicSignal(
+                2.0 * Math.PI * arcPos,
+                seed xor 0xC10D5EEDL,
+                "waist",
+                2..4,
+                0.72
+            )
+            val reqSignal = max(0.0, -waistSignal)
+            val requested = reqSignal * reqSignal * (0.08 + gain * 0.36) * nominalScale
+            val curvatureR = curvatureRadius(before, basePoint, after)
+            var nonlocalSeparation = Double.POSITIVE_INFINITY
+            for (otherIdx in 0 until count) {
+                val diff1 = (otherIdx - i + count) % count
+                val diff2 = (i - otherIdx + count) % count
+                if (min(diff1, diff2) > 3) {
+                    val dist = hypot(basePoint.first - basePoints[otherIdx].first, basePoint.second - basePoints[otherIdx].second)
+                    if (dist < nonlocalSeparation) {
+                        nonlocalSeparation = dist
+                    }
+                }
+            }
+            val distToCenter = hypot(basePoint.first - center.first, basePoint.second - center.second)
+            val radialClearance = max(0.0, distToCenter - nominalScale * 0.48)
+            val maximum = min(
+                min(curvatureR * 0.20, nonlocalSeparation * 0.18),
+                min(radialClearance * 0.50, nominalScale * (0.08 + gain * 0.36))
+            )
+            val distance = min(requested, maximum)
+            displaced.add((basePoint.first + nx * distance) to (basePoint.second + ny * distance))
+        }
+        return CloudContour(points = displaced, pathD = closedCatmullRomPath(displaced))
+    }
 }
+
 

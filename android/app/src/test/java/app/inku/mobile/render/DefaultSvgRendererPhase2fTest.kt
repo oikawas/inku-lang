@@ -35,7 +35,7 @@ class DefaultSvgRendererPhase2fTest {
         val result = renderer.render(
             RenderRequest(
                 scoreJson = scoreObj.toString(),
-                colorCatalogId = "sumi",
+                colorCatalogId = "default",
                 canvasAspect = "square",
                 svgProfile = "editable"
             )

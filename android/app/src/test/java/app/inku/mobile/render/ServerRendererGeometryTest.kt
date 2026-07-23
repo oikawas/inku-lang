@@ -270,6 +270,38 @@ class ServerRendererGeometryTest {
         }
     }
 
+    @Test
+    fun testCloudformContourDeterminismAndGeneration() {
+        val center = 0.5 to 0.5
+        val size = 0.4 to 0.3
+        val seed = 12345L
+        val contour1 = ServerRendererGeometry.generateCloudformContour(
+            center = center,
+            size = size,
+            performanceSeed = seed,
+            instructionIndex = 0,
+            markIndex = 0
+        )
+        val contour2 = ServerRendererGeometry.generateCloudformContour(
+            center = center,
+            size = size,
+            performanceSeed = seed,
+            instructionIndex = 0,
+            markIndex = 0
+        )
+
+        assertEquals(49, contour1.points.size)
+        assertEquals(contour1.points.size, contour2.points.size)
+
+        for (i in contour1.points.indices) {
+            assertEquals("Point $i X match", contour1.points[i].first, contour2.points[i].first, 1e-9)
+            assertEquals("Point $i Y match", contour1.points[i].second, contour2.points[i].second, 1e-9)
+        }
+        assertEquals("Path D match", contour1.pathD, contour2.pathD)
+        assertTrue("Path D starts with M", contour1.pathD.startsWith("M "))
+        assertTrue("Path D ends with Z", contour1.pathD.endsWith(" Z"))
+    }
+
     private fun DefaultSvgRenderer_seedForInstructionHelper(ins: JSONObject, renderSeed: Long?): String {
         val renderer = DefaultSvgRenderer()
         val method = DefaultSvgRenderer::class.java.getDeclaredMethod("seedForInstruction", JSONObject::class.java, java.lang.Long::class.java)

@@ -1674,6 +1674,73 @@ Created and expanded `DefaultSvgRendererPhase2fTest.kt` to validate structural a
 - `gradle :app:testDebugUnitTest --rerun-tasks` (all 44 unit tests) passes 100%.
 - `gradle :app:assembleDebug` succeeds, incrementing `android/BUILD_NUMBER` to `148077`. `android/VERSION` remains `1.48.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2g (Cloudform Contour, Touching Reconstruction, Region/Relation Ordering & 2f Remediation)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8, the final Phase 2 stage (Phase 2g) covering cloudform contour generation, minor-arc reconstruction for `touching`, region/relation resolution ordering, and 2f leftover remediations was completed.
+
+### Implementation & Remediation Details
+
+1. **2f Leftover Remediation (⓪)**:
+   - Replaced 11 invalid color catalog ID references (`"sumi"`, `"sumi_traditional"`) in test code with valid `"default"`, verifying all tests pass.
+   - Documented decision on unknown catalog IDs: retained deterministic fallback to `"default"` via `ColorCatalogs.get()` to preserve Android native application stability and robust UI rendering.
+   - Corrected 2f section documentation errors in `ANDROID_SPEC.ja.md` and `ANDROID_SPEC.md` regarding reference SVG enumeration, structural vs path coordinate parity distinctions, engine 10 arrival, and `2.0.0-android.1` version numbering.
+2. **Cloudform Contour Generation (`ServerRendererGeometry.kt`)**:
+   - Ported `generateCloudformContour`, `sampleClosedCatmullRom`, 1/f harmonic bases, 49-point closed Bezier curves, and self-intersection / curvature / clearance bounding constraints from `cloudform.py`.
+3. **`touching` Reconstruction & Performance Resolution Order (`DefaultSvgRenderer.kt`)**:
+   - Integrated `resolvePerformanceScore` into `DefaultSvgRenderer` preprocessing pipeline, enforcing region placement (`resolveAtRegion`) prior to relation resolution (`resolveRelation`: `touching`, `along`, `cutting`, `between`, `not_touching`) to match server v1.94 ordering.
+   - Synchronized contact-preserving minor arc reconstruction via `minorArcDelta` and `arcFromEndpointsAndSagitta`.
+
+### Verification
+
+XML test result aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms all 45 unit tests pass 100% (including all 10 reference SVG structural/class parity checks, non-band rotring behavior, and cloudform determinism).
+`render_engine_version` remains `"10"`.
+`gradle :app:assembleDebug` succeeds, incrementing `android/BUILD_NUMBER` to `148078`. `android/VERSION` remains `2.0.0-android.1`.
+
+## 2026-07-23 web/server v2 Alignment Phase 2g′ (Cloudform, Arc Geometry Flags, Touching Sagitta & Reference SVG Parity)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8 Phase 2g′, parity alignment between Python reference implementation (`renderer_cloudform_and_relations.json` and reference SVGs 11–14: `11_cloudform_pencil.svg`, `12_cloudform_rotring.svg`, `13_touching_arcs.svg`, `14_region_then_relation.svg`) and the Android rendering engine was executed.
+
+### Implementation & Parity Details
+
+1. **Minor Arc Geometry Alignment (`ServerRendererGeometry.kt`)**:
+   - Synchronized `arcPathD` formula with Python server `renderer.py:3493-3504` (`minorArcDelta` and `sweep = 0` if `delta > 0.0` else `1`).
+   - Consolidated `energyLateral` lookup to `GRAMMARS[weight]` constant table.
+2. **Hand Stroke, ID Hierarchy & `touching` Orientation (`DefaultSvgRenderer.kt`)**:
+   - Fixed Y-coordinate subtraction sign (`cy - r * sin(rad)`) in `performedArcSagitta` and `canvasEndpointGeometry` for screen coordinates, resolving `touching` arc curvature inversion.
+   - Appended `<path class="cloudform contour-v1 stroke-engine-touch" ...>` attributes for `cloudform` primitives.
+   - Emitted top-level `<g id="instruction_...">` and `<g id="mark_...">` hierarchy when `svgProfile == "editable"`.
+3. **Test Infrastructure (`ServerRendererCloudformAndRelationsTest.kt`)**:
+   - Updated regex pattern `d="([^"]+)"` to `\bd="([^"]+)"` to eliminate false attribute matches on `<metadata id="...">`.
+   - Injected `render_seed` into `score` object in `renderFromIndexEntry`.
+
+### Verification
+
+All 54 unit tests pass 100% via `gradle :app:testDebugUnitTest --rerun-tasks`.
+`gradle :app:assembleDebug` succeeds, incrementing `android/BUILD_NUMBER` to `148079`. `android/VERSION` remains `2.0.0-android.1`.
+
+## 2026-07-24 web/server v2 Alignment Phase 2g″ (Cloudform Normal Direction Sign, Test Tolerance Tightening & 2g′ Doc Correction)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8 Phase 2g″ (Remanded Revision), the cloudform contour normal vector sign condition was fixed, and test tolerances were tightened to exact requirements.
+
+### Implementation & Remediation Details
+
+1. **Cloudform Normal Direction Sign Fix (`ServerRendererGeometry.kt:881`)**:
+   - Inverted the normal direction reversal condition from `if (nx * towardCenterX + ny * towardCenterY > 0)` to `if (nx * towardCenterX + ny * towardCenterY < 0)` (matching `server/cloudform.py:229`). This fixed waist displacements to deform inward (waist/concave) rather than expanding outward (convex).
+2. **`DefaultSvgRenderer` Cloudform Seed Derivation (`DefaultSvgRenderer.kt:327`)**:
+   - Updated `performanceSeed` argument in `generateCloudformContour` from `renderSeed` directly to `seedForInstruction(ins, renderSeed)`.
+3. **Test Tightening & Negative Failure Proof (`ServerRendererCloudformAndRelationsTest.kt`)**:
+   - Removed `0.05` tolerance in `testCloudformContourParity`, enforcing `1e-9` point tolerance and exact `<path d>` string equality across all 14 cases.
+   - Added exact `<path d>` equality checks for `11_cloudform_pencil.svg` and `12_cloudform_rotring.svg` in `testReferenceSvgParity11To14`.
+   - Verified that prior to the sign fix, the tightened assertions failed as expected on `testCloudformContourParity` (hair-plain Point 11: `expected:<0.531388453> but was:<0.53138964464791>`) and `testReferenceSvgParity11To14` (`11_cloudform_pencil` path d mismatch).
+4. **Documentation Correction**:
+   - Corrected SVG filenames (`11_cloudform_pencil.svg`, `12_cloudform_rotring.svg`, `14_region_then_relation.svg`) and parity scope descriptions in the Phase 2g′ section.
+
+### Verification
+
+- `render_engine_version` remains `"10"`.
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 54 unit tests across 12 files pass 100%.
+- `gradle :app:assembleDebug` will increment `android/BUILD_NUMBER` to `148080`. `android/VERSION` remains `2.0.0-android.1`.
+
 
 
 

@@ -62,7 +62,7 @@ internal object ServerRendererGeometry {
         for (offset in 0 until 8) {
             raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
         }
-        return raw.toDouble() / 9_223_372_036_854_775_808.0
+        return raw.toDouble() / 9223372036854775808.0
     }
 
     fun wavePhase(seed: Any): Double {
@@ -448,4 +448,165 @@ internal object ServerRendererGeometry {
         return sb.toString()
     }
 
+    fun fillScanAngle(seed: Any): Double {
+        return hash01(0, seed, "fill-angle") * Math.PI
+    }
+
+    fun fillScanSpacing(ins: JSONObject, unit: Double): Double {
+        val weight = ins.optString("weight", "pen")
+        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        return max(baseWidth * 1.5, unit * 0.012)
+    }
+
+    fun fillStrokeSeed(seed: Any, index: Int): Long {
+        val seedStr = formatSeed(seed)
+        val digest = MessageDigest.getInstance("SHA-256").digest("$seedStr:fill-stroke:$index".toByteArray(Charsets.UTF_8))
+        var raw = 0L
+        for (offset in 0 until 8) {
+            raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
+        }
+        return raw
+    }
+
+    fun scanlineSegments(
+        contour: List<Pair<Double, Double>>,
+        angle: Double,
+        spacing: Double,
+        seed: Any
+    ): List<Triple<Int, Pair<Double, Double>, Pair<Double, Double>>> {
+        if (contour.isEmpty()) return emptyList()
+        val ux = cos(angle)
+        val uy = sin(angle)
+        val nx = -uy
+        val ny = ux
+        val projections = contour.map { it.first * nx + it.second * ny }
+        val lo = projections.minOrNull() ?: return emptyList()
+        val hi = projections.maxOrNull() ?: return emptyList()
+        val segments = mutableListOf<Triple<Int, Pair<Double, Double>, Pair<Double, Double>>>()
+        var offset = lo + spacing * 0.5
+        var index = 0
+        val n = contour.size
+        val fillSpacingJitter = 0.24
+        while (offset < hi && index < 4096) {
+            val hits = mutableListOf<Double>()
+            for (edge in 0 until n) {
+                val ax = contour[edge].first
+                val ay = contour[edge].second
+                val bx = contour[(edge + 1) % n].first
+                val by = contour[(edge + 1) % n].second
+                val da = ax * nx + ay * ny - offset
+                val db = bx * nx + by * ny - offset
+                if ((da <= 0.0 && db > 0.0) || (db <= 0.0 && da > 0.0)) {
+                    val t = da / (da - db)
+                    val px = ax + (bx - ax) * t
+                    val py = ay + (by - ay) * t
+                    hits.add(px * ux + py * uy)
+                }
+            }
+            hits.sort()
+            for (pair in 0 until hits.size - 1 step 2) {
+                val s0 = hits[pair]
+                val s1 = hits[pair + 1]
+                segments.add(
+                    Triple(
+                        index,
+                        (nx * offset + ux * s0) to (ny * offset + uy * s0),
+                        (nx * offset + ux * s1) to (ny * offset + uy * s1)
+                    )
+                )
+            }
+            val jitter = 1.0 + (hash01(index, seed, "fill-spacing") - 0.5) * fillSpacingJitter
+            offset += spacing * jitter
+            index += 1
+        }
+        return segments
+    }
+
+    fun surfaceLineAngle(direction: String): Double {
+        return when (direction) {
+            "horizontal" -> 0.0
+            "vertical" -> Math.PI / 2.0
+            "diagonal_rising" -> -Math.PI / 4.0
+            "diagonal_falling" -> Math.PI / 4.0
+            else -> Math.PI / 4.0
+        }
+    }
+
+    fun shapeBbox(ins: JSONObject, width: Double, height: Double, unit: Double): DoubleArray? {
+        val primitive = ins.optString("primitive", "")
+        return when (primitive) {
+            "circle" -> {
+                val center = ins.optJSONArray("center")
+                val cx = (center?.optDouble(0, 0.5) ?: 0.5) * width
+                val cy = (center?.optDouble(1, 0.5) ?: 0.5) * height
+                val r = ins.optDouble("radius", 0.12) * unit
+                doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
+            }
+            "ellipse" -> {
+                val center = ins.optJSONArray("center")
+                val size = ins.optJSONArray("size")
+                val cx = (center?.optDouble(0, 0.5) ?: 0.5) * width
+                val cy = (center?.optDouble(1, 0.5) ?: 0.5) * height
+                val w = (size?.optDouble(0, 0.26) ?: 0.26) * width
+                val h = (size?.optDouble(1, 0.16) ?: 0.16) * height
+                doubleArrayOf(cx - w / 2.0, cy - h / 2.0, w, h)
+            }
+            "square", "triangle" -> {
+                val pos = ins.optJSONArray("position")
+                val size = ins.optJSONArray("size")
+                val x = (pos?.optDouble(0, 0.38) ?: 0.38) * width
+                val y = (pos?.optDouble(1, 0.38) ?: 0.38) * height
+                val w = (size?.optDouble(0, 0.24) ?: 0.24) * width
+                val h = (size?.optDouble(1, 0.24) ?: 0.24) * height
+                doubleArrayOf(x, y, w, h)
+            }
+            "polygon" -> {
+                val center = ins.optJSONArray("center")
+                val pos = ins.optJSONArray("position")
+                val size = ins.optJSONArray("size")
+                val cx = (center?.optDouble(0) ?: ((pos?.optDouble(0, 0.4) ?: 0.4) + (size?.optDouble(0, 0.2) ?: 0.2) / 2.0)) * width
+                val cy = (center?.optDouble(1) ?: ((pos?.optDouble(1, 0.4) ?: 0.4) + (size?.optDouble(1, 0.2) ?: 0.2) / 2.0)) * height
+                val r = ins.optDouble("radius", (size?.optDouble(0, 0.22) ?: 0.22) / 2.0) * unit
+                doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
+            }
+            else -> null
+        }
+    }
+
+    fun arcPointsWithVariation(
+        cx: Double,
+        cy: Double,
+        r: Double,
+        startDeg: Double,
+        endDeg: Double,
+        variation: JSONObject,
+        seed: Any,
+        ins: JSONObject,
+        width: Double,
+        height: Double,
+        unit: Double
+    ): List<Pair<Double, Double>> {
+        val arcLen = 2.0 * Math.PI * r * (Math.abs(endDeg - startDeg) / 360.0)
+        val count = segmentCount(arcLen, unit) + 1
+        val basePoints = arcPoints(cx, cy, r, startDeg, endDeg, count)
+        if (!needsPathVariation(variation)) return basePoints
+        val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
+        val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
+        val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
+        val amp = amplitudePx(variation, ins, width, height, unit)
+        val center = cx to cy
+        val seedLong = seedToLong(seed)
+        val last = basePoints.size - 1
+        if (last <= 0) return basePoints
+        val result = mutableListOf(basePoints[0])
+        for (i in 1 until last) {
+            val (x, y) = basePoints[i]
+            val t = i.toDouble() / last.toDouble()
+            val off = sampleOffset(t, variation, seedLong, i, amp)
+            result.add(offsetContourPoint(x, y, off, center, axisX, axisY))
+        }
+        result.add(basePoints[last])
+        return result
+    }
 }
+

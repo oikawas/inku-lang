@@ -142,8 +142,8 @@ class ServerRendererProportionalWiringTest {
         assertEquals("Speck count in pillar for crayon circle", 73, speckMatches.size)
 
         // Check outline offset floor in pillar (unit = 200, floor = 0.0035 * 200 = 0.7)
-        // Crayon outline offset -1.5 * scale = -0.3. Absolute value 0.3 < 0.7, so floor 0.7 is applied with copysign -> r = 40.0 - 0.7 = 39.3
-        assertTrue("Contains outline circle with floor offset r=39.300", resPillar.svg.contains("""r="39.300""""))
+        // Crayon outline offset -1.5 * scale * offsetGain(2.8) = -0.84 -> r = 40.0 - 0.84 = 39.160
+        assertTrue("Contains outline circle with floor offset r=39.160", resPillar.svg.contains("""r="39.160""""))
     }
 
     private fun extractStrokeWidth(svg: String): Double {

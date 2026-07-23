@@ -1647,6 +1647,34 @@ In accordance with contract `antigravity-android-phase2-renderer.md` §8, closed
 `gradle :app:testDebugUnitTest --rerun-tasks` (all 35 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` incremented to `148076`. `android/VERSION` remains `1.48.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2f (Surface Texture & Hatch `surface-stroke-v1` + Arc `arc-stroke-v1` Full Parity)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8, full Android rendering synchronization for surface textures / hatches (`surface-stroke-v1`) and arc strokes (`arc-stroke-v1`) was completed.
+
+### Implementation Details
+
+1. **Surface Texture & Hatch Rendering (`renderSurfaceVectors`)**:
+   - Renders hatch lines and stipple groups when `surface` is specified, applying `class="surface-stroke-v1 hatch-spacing-..."` directly to child elements (`<path>` or `<line>`).
+   - For non-`rotring` weights (`pencil`, `pen`, `marker`, `crayon`, etc.), converts hatch segments to hand-drawn strokes (`hatchStroke`) via `ServerStrokeEngine.synthesizeAlong` and outputs them using `contourStrokePath`.
+   - Implemented shape-specific scanline intersection algorithms (`surfaceScanlineSegments`) for `circle`, `ellipse`, `square`, `triangle`, `polygon`, `arc`, and `cloudform` bounding boxes and scanline clips.
+2. **Arc Expressive Stroke Rendering (`renderArcHandStroke`)**:
+   - Generates expressive hand strokes (`arc-stroke-v1`) for `arc` primitives, emitting intent lines (`polyline` / `path`) and outline band paths (`contourStrokePath`) in exact sequence.
+   - Fully synchronized `arcPointsWithVariation` endpoint pinning contract (`basePoints[0]` and `basePoints[last]` pinned, parameterized via `i / last`).
+3. **Material Outline Profile (`ServerRendererMaterial.kt`)**:
+   - Added `class="material-outline"` to `circleOutline`, `ellipseOutline`, `rectOutline`, and `arcOutline` elements, aligning with Python `s1` material intensity level (`offsetGain = 2.8`, `opacityGain = 1.8`, `offsetFloor = 0.0035 * unit`, `opacityFloor = 0.50`).
+4. **Seed & Field Serialization Alignment**:
+   - Strictly aligned with Pydantic JSON field aliases: `serverInstructionJson` uses `"from_"` (matching Python `model_dump(mode="json")`), while `surfaceSeed` uses `"from"` (matching `model_dump_json(by_alias=True)`).
+   - `synthesizeAlong` pins open stroke endpoints (`samples[0]` and `samples[last]`) to `points[0]` / `points[last]` when `closed = false`.
+
+### Verification
+
+Created and expanded `DefaultSvgRendererPhase2fTest.kt` to validate structural and exact string parity against 10 reference server SVGs:
+
+- **Reference SVG Parity**: All 10 reference SVGs (`01_circle_pen.svg`, `03_square_filled.svg`, `04_arc_crayon.svg`, `05_circle_rotring.svg`, `06_surface_hatch.svg`, `07_circle_wave.svg`, `08_circle_perlin.svg`, `10_arc_wave.svg`, etc.) match 100% in structure (element count, order, `class` attributes) and `<path d="...">` coordinate strings.
+- `gradle :app:testDebugUnitTest --rerun-tasks` (all 44 unit tests) passes 100%.
+- `gradle :app:assembleDebug` succeeds, incrementing `android/BUILD_NUMBER` to `148077`. `android/VERSION` remains `1.48.0-android.1`.
+
+
 
 
 

@@ -1142,6 +1142,37 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 `gradle :app:testDebugUnitTest --rerun-tasks`（全 21 件）および `gradle :app:assembleDebug` が成功する。
 `android/BUILD_NUMBER` は `148073` にインクリメント。
 
+## 2026-07-23 web/server v2 追随 Phase 2c (`ServerStrokeEngine.kt` の新規作成と検証)
+
+契約 `antigravity-android-phase2-renderer.md` §8 に基づき、`server/src/inku_server/stroke_engine.py` (438 行) を Kotlin へ完全移植し、新規ファイル `ServerStrokeEngine.kt` およびテスト `ServerStrokeEngineTest.kt` を作成・検証した。
+
+### 移植における重要設計方針・アルゴリズム
+
+1. **`_unit` は第 3 のハッシュ構成**:
+   - `_hash01` や `_hash_to_unit` とは異なり、ハッシュ文字列は `"{seed}:{label}:{index}"`。
+   - SHA-256 の先頭 8 バイトを **Unsigned Little-Endian 64-bit integer (`ULong`)** として解釈し、`2^64 - 1` (`18446744073709551615.0`) で除算して $[0.0, 1.0]$ の実数を返す。
+2. **`synthesize_stroke` と `synthesize_along` の積分器の分離**:
+   - 直線用 `synthesize_stroke` と任意中心線沿い `synthesize_along` は積分器の式が異なる。
+   - `synthesize_along` では意図の歩幅 `step` をフィードフォワードし、バネ追跡器は残差のみを運ぶ構造となっており、曲線での内縮みを防ぐ。両者を共通化せず独立保持。
+3. **負インデックス・継ぎ目・イベント窓の忠実な移植**:
+   - 閉輪郭法線の前後の点参照で `(index - 1 + count) % count` を適用（Python の負インデックス対策）。
+   - 閉輪郭の `_arc_length_parameters` は継ぎ目の一辺を `total` のみに加算（正規化後の末尾は 1.0 未満に保つ）。
+   - `_event_map` は `3 until (count - 3)` の窓で最大 2 件まで発火して `break` する打ち切りロジックを再現。
+   - `polygon_path` / `ring_path` 等の `path_d` 出力では Python 互換の偶数丸め (HALF_EVEN) を適用。
+
+### 検証
+
+`ServerStrokeEngineTest.kt` を新規作成し、参照コーパス JSON（4 ファイル）に対する完全整合テストを実施した。
+
+- `stroke_engine_primitives.json`: `grammars` 10 種（完全一致）、`unit` 56 件（許容誤差 1e-12）、`smooth_noise` 24 件（許容誤差 1e-12）、`event_map` 16 ケース（並び含め完全一致）、`centerline` 3 ケース（許容誤差 1e-12）。
+- `stroke_engine_latent_energy.json`: 3 seed × 21 点（許容誤差 1e-6）。
+- `stroke_engine_synthesize_stroke.json`: 9 ケースの `samples` (1e-6), `outline` (1e-6), `event_count`, `burr_side`, `burr_opacity` (1e-9), `path_d` (文字列完全一致)。
+- `stroke_engine_synthesize_along.json`: 5 ケースの `samples`, `left`, `right` (各点 1e-4), `path_d` (文字列完全一致)。
+
+`gradle :app:testDebugUnitTest --rerun-tasks`（全 26 件）および `gradle :app:assembleDebug` が成功する。
+`android/BUILD_NUMBER` は `148074` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
+
+
 
 
 

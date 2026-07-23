@@ -9,6 +9,7 @@
 		onLogin: () => void | Promise<void>;
 		appVersion: string;
 		buildNumber: string;
+		developerMode: boolean;
 	};
 
 	let {
@@ -18,7 +19,8 @@
 		loginStatus,
 		onLogin,
 		appVersion,
-		buildNumber
+		buildNumber,
+		developerMode
 	}: Props = $props();
 </script>
 
@@ -84,7 +86,9 @@
 				<button class="ghost-btn login-submit" onclick={onLogin}>{t().loginSubmit}</button>
 			</div>
 		</div>
-		<div class="login-meta">{appVersion} {t().appInfoBuildLabel} {buildNumber}</div>
+		<div class="login-meta">
+			{appVersion}{#if developerMode} {t().appInfoBuildLabel} {buildNumber}{/if}
+		</div>
 	</section>
 </main>
 

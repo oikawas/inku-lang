@@ -480,6 +480,7 @@
 	let modelSelectionAllowVision = $state(true);
 	let renderConcurrencyStatus = $state<string | null>(null);
 	let renderFanoutLimit = $state(4);
+	let developerMode = $state(false);
 	let showKiwi = $state(true);
 	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
@@ -670,8 +671,8 @@
 	let modelSettingsStatus = $state<string | null>(null);
 	let modelFetchResults = $state<Record<string, { type: 'success' | 'error'; message: string }>>({});
 	let modelSettingsLoading = $state(false);
-	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
-	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS);
+	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
+	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
 	let dbBackupStatus = $state<string | null>(null);
@@ -803,7 +804,9 @@
 	}
 
 	function modelsFor(provider: Provider) {
-		return availableModelCatalog.find((group) => group.id === provider)?.models ?? modelsForProvider(provider);
+		const group = availableModelCatalog.find((item) => item.id === provider);
+		if (group) return group.models;
+		return availableModelsLoaded ? [] : modelsForProvider(provider);
 	}
 
 	function visionModelsFor(provider: Provider) {
@@ -1357,15 +1360,25 @@
 				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
 			}
 			if (!modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
-				stage1Model = modelsFor(stage1Provider)[0]?.id ?? stage1Model;
+				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
+				stage1Provider = fallbackGroup?.id ?? stage1Provider;
+				stage1Model = fallbackGroup?.models[0]?.id ?? stage1Model;
 			}
 			if (!modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
-				stage2Model = modelsFor(stage2Provider)[0]?.id ?? stage2Model;
+				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
+				stage2Provider = fallbackGroup?.id ?? stage2Provider;
+				stage2Model = fallbackGroup?.models[0]?.id ?? stage2Model;
 			}
 			if (!visionModelsFor(visionProvider).some((model) => model.id === visionModel)) {
 				const fallbackGroup = availableVisionModelCatalog.find((group) => group.models.length > 0);
 				visionProvider = fallbackGroup?.id ?? visionProvider;
 				visionModel = fallbackGroup?.models[0]?.id ?? visionModel;
+			}
+			const okugakiModelAvailable = availableVisionModelCatalog.some((group) =>
+				group.models.some((model) => qualifiedModelId(group.id, model.id) === okugakiModel)
+			);
+			if (!okugakiModelAvailable) {
+				okugakiModel = qualifiedModelId(visionProvider, visionModel);
 			}
 			reconcileDemoPromptModel();
 		} catch (e) {
@@ -1926,6 +1939,20 @@
 		} catch (e) {
 			renderConcurrencyStatus = e instanceof Error ? e.message : String(e);
 			console.warn('failed to update render concurrency settings', e);
+		}
+	}
+
+	async function loadPublicAppInfo() {
+		try {
+			const r = await fetch('/api/info', {
+				cache: 'no-store',
+				credentials: 'same-origin'
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const data = await r.json() as { developer_mode?: boolean };
+			developerMode = data.developer_mode === true;
+		} catch (error) {
+			console.warn('failed to load public app info', error);
 		}
 	}
 
@@ -5824,7 +5851,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			miscSettingsLoaded = true;
 		} catch {}
 		void (async () => {
-			await Promise.all([loadColorCatalogs(), loadCurrentUser(), fetchPrompts()]);
+			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), loadCurrentUser(), fetchPrompts()]);
 		})();
 
 		return () => {
@@ -5872,6 +5899,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onLogin={login}
 		appVersion={APP_VERSION}
 		buildNumber={__BUILD_NUMBER__}
+		{developerMode}
 	/>
 {:else}
 <div class="root">
@@ -5882,6 +5910,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{settingsOpen}
 		{darkMode}
 		buildNumber={__BUILD_NUMBER__}
+		{developerMode}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
 		onOpenProfile={openProfile}
 		onLogout={logout}
@@ -6431,10 +6460,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<dt>{t().appInfoVersionLabel}</dt>
 					<dd>{APP_VERSION}</dd>
 				</div>
-				<div>
-					<dt>{t().appInfoBuildLabel}</dt>
-					<dd>{__BUILD_NUMBER__}</dd>
-				</div>
+				{#if developerMode}
+					<div>
+						<dt>{t().appInfoBuildLabel}</dt>
+						<dd>{__BUILD_NUMBER__}</dd>
+					</div>
+				{/if}
 				<div>
 					<dt>{t().appInfoRepositoryLabel}</dt>
 					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>

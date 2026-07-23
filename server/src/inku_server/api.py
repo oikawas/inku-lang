@@ -1148,6 +1148,7 @@ class AppInfoResponse(BaseModel):
     name: str
     version: str
     build_number: str | None = None
+    developer_mode: bool = False
 
 
 class ColorCatalogsResponse(BaseModel):
@@ -1633,7 +1634,12 @@ def health() -> dict[str, bool]:
 
 @app.get("/api/info", response_model=AppInfoResponse)
 def api_info() -> AppInfoResponse:
-    return AppInfoResponse(name="inku-server", version=_APP_VERSION, build_number=_build_number())
+    return AppInfoResponse(
+        name="inku-server",
+        version=_APP_VERSION,
+        build_number=_build_number(),
+        developer_mode=_env_flag("INKU_DEVELOPER_MODE"),
+    )
 
 
 @app.get("/api/color-catalogs", response_model=ColorCatalogsResponse)
@@ -1703,10 +1709,17 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
 @app.get("/api/models", response_model=ModelSettingsResponse)
 def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
     settings = _db.get_model_settings()
+    developer_mode = _env_flag("INKU_DEVELOPER_MODE")
     return ModelSettingsResponse(
-        catalog=model_provider_catalog(settings, include_disabled=False, purpose="llm"),
-        llm_catalog=model_provider_catalog(settings, include_disabled=False, purpose="llm"),
-        vision_catalog=model_provider_catalog(settings, include_disabled=False, purpose="vision"),
+        catalog=model_provider_catalog(
+            settings, include_disabled=False, include_developer=developer_mode, purpose="llm"
+        ),
+        llm_catalog=model_provider_catalog(
+            settings, include_disabled=False, include_developer=developer_mode, purpose="llm"
+        ),
+        vision_catalog=model_provider_catalog(
+            settings, include_disabled=False, include_developer=developer_mode, purpose="vision"
+        ),
         settings={"model_settings": actor.get("model_settings") or {}},
     )
 
@@ -2003,9 +2016,12 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
 @app.get("/api/settings/models", response_model=ModelSettingsResponse)
 def api_settings_models(actor: dict = Depends(_admin_user)) -> ModelSettingsResponse:
     settings = _db.get_model_settings()
+    developer_mode = _env_flag("INKU_DEVELOPER_MODE")
     return ModelSettingsResponse(
-        catalog=model_provider_catalog(settings, include_disabled=True),
-        settings=public_model_settings(settings),
+        catalog=model_provider_catalog(
+            settings, include_disabled=True, include_developer=developer_mode
+        ),
+        settings=public_model_settings(settings, include_developer=developer_mode),
     )
 
 
@@ -2024,14 +2040,22 @@ def api_settings_update_models(
         "providers": provider_patch,
     })
     saved = _db.update_model_settings(next_settings)
+    developer_mode = _env_flag("INKU_DEVELOPER_MODE")
     return ModelSettingsResponse(
-        catalog=model_provider_catalog(saved, include_disabled=True),
-        settings=public_model_settings(saved),
+        catalog=model_provider_catalog(
+            saved, include_disabled=True, include_developer=developer_mode
+        ),
+        settings=public_model_settings(saved, include_developer=developer_mode),
     )
 
 
 def _fetch_provider_model_list(provider_id: str, settings: dict) -> list[dict[str, str]]:
-    catalog = {str(provider["id"]): provider for provider in model_provider_catalog(settings, include_disabled=True)}
+    catalog = {
+        str(provider["id"]): provider
+        for provider in model_provider_catalog(
+            settings, include_disabled=True, include_developer=_env_flag("INKU_DEVELOPER_MODE")
+        )
+    }
     provider = catalog.get(provider_id)
     if not provider:
         raise ValueError("unknown provider")
@@ -2151,9 +2175,12 @@ def api_settings_fetch_provider_models(
             }
         }
     }))
+    developer_mode = _env_flag("INKU_DEVELOPER_MODE")
     return ModelSettingsResponse(
-        catalog=model_provider_catalog(saved, include_disabled=True),
-        settings=public_model_settings(saved),
+        catalog=model_provider_catalog(
+            saved, include_disabled=True, include_developer=developer_mode
+        ),
+        settings=public_model_settings(saved, include_developer=developer_mode),
     )
 
 

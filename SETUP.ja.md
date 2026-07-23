@@ -22,6 +22,7 @@
 含まれないもの:
 
 - `no-git-sync/`
+- `server/reference/`（版ごとに凍結した開発用参照コーパス）
 - `.env` / `.env.local`
 - APIキー、ローカルユーザー情報、ローカルサーバー情報
 - SQLite DB、履歴データ、生成画像、`cli/out/`

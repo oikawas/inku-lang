@@ -1015,6 +1015,37 @@ distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
 
+### 12.2 Reference Corpora (v2.4.4)
+
+**Each version of a deterministic rendering layer has exactly one reference
+corpus: the actual outputs, frozen, produced from fixed inputs.** A version
+number carries only one bit — that something changed. What changed, and how, can
+only be answered by comparing the outputs themselves.
+
+- **Regenerating an existing case must be byte-identical.** If it is not, the
+  drawing changed, and **the layer version must be incremented**.
+- **A frozen version is never regenerated to absorb changed output.** Create the
+  next version directory instead.
+- **Case IDs are permanent.** They may not be renamed or removed; only added.
+- **Corpora are never chained** — one layer's corpus output must not become
+  another layer's corpus input.
+- A corpus fixes **every dependency outside its own layer as a literal in the
+  generator**: the color map and every Score field are written out rather than
+  read from `COLOR_MAP` or the schema defaults. If output moves while none of the
+  manifest identity fields (`corpus_format_version`, `engine_version`,
+  `schema_version`, `color_map_digest`) move, **a dependency was left unfixed**.
+
+The current instance is `server/reference/render-engine-10/` (220 cases).
+**Outputs for render engines 1 through 9 were never preserved and cannot be
+recovered**, so the corpus begins at engine 10. The operating procedure lives
+next to the artifacts (`server/reference/README.md`), and CI
+(`.github/workflows/reference-corpus.yml`) enforces byte-identical
+regeneration. **The point is to move the versioning discipline from something
+people remember to something the machine enforces.**
+
+The corpus ships with no release: `server/reference/ export-ignore` in
+`.gitattributes` keeps it out of `git archive`.
+
 ---
 
 ## 13. CLI

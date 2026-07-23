@@ -2613,6 +2613,22 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
   - **`README.ja.md` / `README.md`（`a15f699`）:** 再生成の節を「三つの『もう一度』」から **「推敲による作品の追求」** へ全面改稿。実装は推敲 5 種（`RefineKind`）+ AI 自律推敲 2 方式で、色カタログ変更・変奏・AI 自律推敲が記載から漏れていた。
 - **保留・持ち越し:** UI 調整は対話で継続中（4 巡目へ）。マスコット 2 種、バッチ実行中に履歴ストリップがページ 0 へ戻る挙動、計測 3 件（1 巡目から据え置き）。
 
+### v2.4.4 — engine 10 の描画出力を凍結する（参照コーパスとバイト一致の CI）（Build 694、2026-07-23）
+
+- **目的（作者の一文）:** 描画コアを版上げしていくにあたり、**どこが変わったとき描画結果がどう変わったのかを、主に AI が判定しやすくすること**。版数は「変わった」という 1 ビットしか運ばない。何がどう変わったかは**出力の実物**を突き合わせないと分からない。
+- **急いだ理由:** **render engine 1〜9 の出力は保存されておらず、コードも残っていない。復元できない。** Replay は常に最新 engine で行うと決めた以上、**その版が現役のうちに凍結しなければ engine 10 も同じように失われる**。
+- **`server/reference/render-engine-10/` を新設し 220 ケースを凍結:** 段 A = 10 道具 × 8 図形の基盤（80）、段 B = 変奏 4 種 × 振幅 3 × 図形 3 × 道具 2（72）、段 C = 塗り・surface 8 種・`ground` material 6 種と `density` / `opacity` / `absorbency` の判別（40）、段 D = 判別（28）。各ケースに入力の全文・座標正規化 digest・バイト数・要素数・class 文字列を記録する。容量 3.2MB（manifest 412KB）。
+- **段 D が最も効く。** `pillar`（`unit_scale` 0.2）は絶対 px の残存を暴き、**2\*\*63 を超える seed**（2^63+1 と 2^64-1）は符号の取り違えを暴き、極小図形は `FILL_MIN_SCANLINES` による領域 fill への縮退を暴く。実測でも `square` と `pillar` の digest は異なり、高位 seed 2 件は通常 seed と別 digest、極小図形は `fill-stroke-v1` を**持たない**（`contour-stroke-v1 controls-17 events-0` + `material-outline` へ縮退）。
+- **入力は生成器側に literal で固定する（設計の要）:** 色表・Score・Instruction・Surface・Ground の**全フィールドを書き下し**、`renderer.COLOR_MAP` も `color_catalogs.py` も schema の既定値も参照しない。`coerce_score` も通さない。これにより `render-engine-10/` を動かせるのは **`renderer.py` と `stroke_engine.py` だけ**になる。実証として `COLOR_MAP["white"]` と `Score.background` の既定値をそれぞれ一時改変して再生成し、220 件すべてが変化しないことを確認した（確認後に復元）。
+- **CI が本改修の本体（`.github/workflows/reference-corpus.yml`）:** 再生成 → `git diff --exit-code -- server/reference/` + 未追跡ファイル検査。これにより「**既存ケースの再生成は必ずバイト一致する。しないなら版を上げなければならない**」が破れない制約になる。従来の採番規律は人が守るもので 6 回守られてきたが、7 回目を保証するものは無かった。**「覚えている規律」から「機械的な制約」への転換が目的である。** 生成器側にも二重の番人があり、出力が動いたのに manifest 先頭の識別子（`corpus_format_version` / `engine_version` / `schema_version` / `color_map_digest`）がどれも動いていなければ異常終了する（= 固定し損ねた依存が残っているというコーパス設計自体のバグ）。
+- **CI が実際に落ちることを実証した:** `stroke_engine.py` の `polygon_path` の座標整形を `.3f` → `.4f` に変えて再生成すると、生成器が exit 1 と「bump the appropriate version instead of rewriting a frozen corpus」を返した。確認後に摂動と corpus を復元し、再生成でバイト一致に戻ることを確かめた。**「CI を書いた」だけでは受け入れない**という条件を契約に置いた結果である。
+- **`absorbency` は死にフィールドだった（副産物）:** `ground` の `density` / `opacity` / `absorbency` をそれぞれ変えた 3 件を並べたところ、density と opacity は digest が動くのに **`absorbency` だけ基準と同一 digest**（`4c267d64…`）。**現行 renderer は absorbency を読んでいない。** 以前の監査（`intent_audit_plan`）の疑いが確証になった。**本改修では直していない**（コーパスの目的は判定であって修正ではない）。
+- **運用ルールの置き場を三層に分けた:** 契約 = SPEC（§15.5 / §12.1 の次）、**手順 = `server/reference/README.md`（成果物の隣。再生成しようとした人が最初に開く場所）**、強制 = CI。`docs/` と `CLAUDE.md` と `AGENTS.md` は git 管理外で clone した人に見えないため、規則の正本にしない。
+- **配布物から除外:** `.gitattributes` を新設して `server/reference/ export-ignore`。`git archive HEAD` に `server/reference/` が 1 件も含まれないことを実測した。`SETUP.ja.md` → `SETUP.md` の「含まれないもの」にも 1 行足した。
+- **不変:** **描画結果は 1 バイトも変わっていない。** `render_engine_version` は 10 のまま、`renderer.py` / `stroke_engine.py` / Score schema / coerce / rh2 は無変更で、`MATERIAL_NONE_SEED_DIGESTS` の 5 件は**全件無更新で通過**した。web UI も無変更（採番のみ）。
+- **検証:** pytest **1033 passed / 30 skipped**（+4 = 件数・入力の明示性・段 D の判別・SVG と manifest の突き合わせ）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings。**git 管理セッションが独立に再現した**: 生成器を再実行して `git status` が空（220 件バイト一致）、`git archive` の除外、CI ガードの発火と復元。新規テスト `test_render_reference_inputs_are_fully_explicit` は生成器の literal を Pydantic の実フィールド集合と突き合わせるので、**schema にフィールドが増えれば落ちる**（固定し忘れが自動で露見する）。実装レポートは `no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md`。
+- **残り（Phase 2〜5、未着手）:** Edition ID を rh3 へ（`render_build_number` と `vary_seed` を外す。rh2 は legacy 保持）／ ddl corpus（`a_expand` / `b_coerce`）と `ddl_engine_version` / `ddl_version` の新設／ `stage1_prompt_digest` / `stage2_prompt_digest` ／ 再描画時の版差表示。**全 Phase を通じて `render_engine_version` は 10 のまま**でなければならない。
+
 ### Android `2.0.0-android.1` — 描画コアが render engine 10 へ到達（Phase 1〜2f、android Build 148077、2026-07-23）
 
 **記載方針**: Android の移植は段ごとに版を起こさず、**engine 10 到達をもって 1 件にまとめる**（web/server とは版の名前空間が別で、`android/VERSION` / `android/BUILD_NUMBER` が正本）。以下は Phase 1 から 2f までの通し記録である。

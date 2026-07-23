@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.4.3 / Build 693**
+**対象バージョン: v2.4.4 / Build 694**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
@@ -120,6 +120,8 @@ v2.4.2（Build 689）は歳時記語彙の日英ペアリングを構造で担�
 v2.4.1（Build 687）は UI 調整 2 巡目。DDL エディタの語プレビュー全 69 エントリを日英化し、作業中に発見した歳時記語彙の日英対応バグ 2 件（削剪済み `髪`/`hair` の i18n 残置による 1 ずれ、`words_en` の並び非対応による解説の交差）を是正した。原因だった i18n の手書き複製 `saijikiWords` を廃止し、表示語はハイドレート済み `SAIJIKI` / `SAIJIKI_EN` から直接取得。全 68 語の日英対応を明示テーブルで固定するテストを追加。副作用として英語版 Stage 1 プロンプトの `motions:` 語順が変わる（集合不変、ベンチ未確認）。記述タブは短歌の目安をヒント文からカウンタへ移動。engine 10 のまま。UI 調整は対話で継続中。
 
 v2.4.3（Build 693）は UI 調整 3 巡目。環境変数 `INKU_DEVELOPER_MODE` を新設し、NVIDIA NIM と常時表示の Build 番号を開発環境限定にした（**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・`render_build_number` は無効時も不変**。配布 compose は既定で無効、開発・ベンチ compose は既定で有効。SPEC.ja §15.4）。系譜と系譜全体図に共有の「縦／横」切替を追加（横は左から右へ世代が進み同世代は縦積み。矢印とスクロールも方向に追随し、選択はブラウザへ保存。系譜 API・スキーマ・保存データは不変）。デモに 1〜1,440 分（最大 24 時間）のタイムアウトを追加（既定 60 分。締切を越えても進行中の 1 件は完了・反映してから停止し、残り時間を `HH:MM:SS` で表示）。engine 10 のまま、Score schema / coerce / rh2 / renderer / stroke_engine は無変更。pytest 1029/30。あわせて SETUP 日英のコンテナ節新設と 3 件是正（**Python 要件が 3.10 以上と誤記、実際は 3.12 以上**ほか）、README 日英の再生成節を「推敲による作品の追求」へ全面改稿した分を本版へ畳んでいる。UI 調整は対話で継続中。
+
+v2.4.4（Build 694）では engine 10 の描画出力を凍結した。`server/reference/render-engine-10/` に 220 ケース（基盤 80 / 変奏 72 / 塗り・面・地 40 / 判別 28）の入力全文・digest・要素数・class を記録し、**再生成のバイト一致を CI（`.github/workflows/reference-corpus.yml`）が強制する**。目的は「どこが変わったとき描画結果がどう変わったか」を AI が判定できるようにすることで、**版数は 1 ビットしか運ばないため出力の実物を凍結する**。engine 1〜9 の出力は復元不能なので engine 10 から始める。入力は生成器側に literal で固定し（色表・Score 全フィールド）、`COLOR_MAP` も schema 既定値も参照しないため、コーパスを動かせるのは `renderer.py` と `stroke_engine.py` だけになる。副産物として **`ground.absorbency` が死にフィールドである確証**を得た（digest が動かない。本改修では直さない）。手順は成果物の隣 `server/reference/README.md`、契約は SPEC §15.5。`.gitattributes` で配布物からは除外。**描画結果は 1 バイトも変わらず**、engine 10・renderer・stroke_engine・schema・coerce・rh2 は不変。Phase 2〜5（rh3・ddl corpus・prompt digest・版差表示）は未着手。
 
 Android 版（`android/`、Kotlin + Compose + Room、端末内で全パイプライン）は **`2.0.0-android.1` / Build 148077 で render engine 10 へ到達**（2026-07-23）。版の名前空間は web/server と別で、`android/VERSION` と `android/BUILD_NUMBER` が正本。移植は server を正本として後から追随する形であり、**server 側の設計を Android に合わせて曲げない**。詳細は CHANGELOG の Android entry と `android/ANDROID_SPEC.ja.md`。
 

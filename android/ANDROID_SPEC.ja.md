@@ -1276,9 +1276,9 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 `render_engine_version` は engine 10 到達済みの `"10"` を維持。
 `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148078` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
 
-## 2026-07-23 web/server v2 追随 Phase 2g′ (雲形輪郭・劣弧幾何 Flag・touching 双弧・全参照 SVG パリティ 100% 完全同期)
+## 2026-07-23 web/server v2 追随 Phase 2g′ (雲形輪郭・劣弧幾何 Flag・touching 双弧・参照 SVG パリティ同期)
 
-契約 `antigravity-android-phase2-renderer.md` §8 Phase 2g′ に基づき、Python 参照実装 (`renderer_cloudform_and_relations.json` および参照 SVG 11〜14 `11_cloudform_filled.svg`, `12_cloudform_stroke.svg`, `13_touching_arcs.svg`, `14_cloudform_surface.svg`) と Android レンダリングエンジンの完全同調を完了した。
+契約 `antigravity-android-phase2-renderer.md` §8 Phase 2g′ に基づき、Python 参照実装 (`renderer_cloudform_and_relations.json` および参照 SVG 11〜14 `11_cloudform_pencil.svg`, `12_cloudform_rotring.svg`, `13_touching_arcs.svg`, `14_region_then_relation.svg`) と Android レンダリングエンジンの同調を実施した。
 
 ### 実施・是正の詳細
 
@@ -1297,6 +1297,29 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 
 - `gradle :app:testDebugUnitTest --rerun-tasks` により全 54 件の単体テストが 100% 通過 (PASS)。
 - `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148079` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
+
+## 2026-07-24 web/server v2 追随 Phase 2g″ (雲形輪郭法線符号・雲形パリティ検証厳格化 & 2g′ 誤記訂正)
+
+契約 `antigravity-android-phase2-renderer.md` §8 Phase 2g″ (差し戻し修正) に基づき、雲形輪郭の法線符号条件の修復と、雲形パリティ検証の厳格化を実施した。
+
+### 実施・是正の詳細
+
+1. **雲形輪郭の法線符号修正 (`ServerRendererGeometry.kt:881`)**:
+   - 法線方向の反転判定条件を `if (nx * towardCenterX + ny * towardCenterY > 0)` から `if (nx * towardCenterX + ny * towardCenterY < 0)` （`server/cloudform.py:229` と同等）に反転修正。これにより変位方向が外側への膨らみから内側へのくびれ（凹み）へと正しく修復された。
+2. **`DefaultSvgRenderer` の `cloudform` シード導出修復 (`DefaultSvgRenderer.kt:327`)**:
+   - `cloudform` レンダリング時の `performanceSeed` 引数を `renderSeed` 直渡しから `seedForInstruction(ins, renderSeed)` に修復。
+3. **雲形パリティテストの厳格化と誤実装での失敗検証 (`ServerRendererCloudformAndRelationsTest.kt`)**:
+   - `testCloudformContourParity` の許容誤差 `0.05` を撤去し、全 14 ケースの全 49 点に対して `1e-9` 許容誤差および `<path d>` 文字列完全一致を規定。
+   - `testReferenceSvgParity11To14` にて `11_cloudform_pencil.svg` および `12_cloudform_rotring.svg` に対する `<path d>` 文字列完全一致検証を追加。
+   - 法線符号修正前の状態でテストを実行し、`testCloudformContourParity` (hair-plain Point 11: `expected:<0.531388453> but was:<0.53138964464791>`) および `testReferenceSvgParity11To14` (`11_cloudform_pencil` path d 不一致) が意図通り失敗することを確認・実証。
+4. **ドキュメント誤記載の訂正**:
+   - Phase 2g′ の節において、参照 SVG ファイル名（`11_cloudform_filled.svg` → `11_cloudform_pencil.svg`、`12_cloudform_stroke.svg` → `12_cloudform_rotring.svg`、`14_cloudform_surface.svg` → `14_region_then_relation.svg`）および過大なパリティ一致表現を訂正。
+
+### 検証結果
+
+- `render_engine_version` は `"10"` を維持。
+- `app/build/test-results/testDebugUnitTest/*.xml` の集計により、全 54 件の単体テスト（12 ファイル）が 100% 通過 (PASS)。
+- `gradle :app:assembleDebug` により `android/BUILD_NUMBER` をインクリメント予定。`android/VERSION` は `2.0.0-android.1` を維持。
 
 
 

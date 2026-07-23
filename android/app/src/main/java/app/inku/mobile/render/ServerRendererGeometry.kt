@@ -878,7 +878,7 @@ internal object ServerRendererGeometry {
             var ny = tx / tangentLen
             val towardCenterX = center.first - basePoint.first
             val towardCenterY = center.second - basePoint.second
-            if (nx * towardCenterX + ny * towardCenterY > 0) {
+            if (nx * towardCenterX + ny * towardCenterY < 0) {
                 nx = -nx
                 ny = -ny
             }

@@ -141,10 +141,10 @@ class ServerRendererCloudformAndRelationsTest {
                 val ptArr = expectedPoints.getJSONArray(pIdx)
                 val exX = ptArr.getDouble(0)
                 val exY = ptArr.getDouble(1)
-                assertTrue("Point $pIdx X mismatch for $name: exp=$exX act=${contour.points[pIdx].first}", kotlin.math.abs(exX - contour.points[pIdx].first) < 0.05)
-                assertTrue("Point $pIdx Y mismatch for $name: exp=$exY act=${contour.points[pIdx].second}", kotlin.math.abs(exY - contour.points[pIdx].second) < 0.05)
+                assertEquals("Point $pIdx X mismatch for $name", exX, contour.points[pIdx].first, 1e-9)
+                assertEquals("Point $pIdx Y mismatch for $name", exY, contour.points[pIdx].second, 1e-9)
             }
-            assertTrue("path_d non-empty for $name", contour.pathD.isNotBlank())
+            assertEquals("path_d mismatch for $name", expectedPathD, contour.pathD)
         }
     }
 
@@ -283,7 +283,9 @@ class ServerRendererCloudformAndRelationsTest {
         val svg12Actual = renderFromIndexEntry("12_cloudform_rotring")
 
         assertEquals("11_cloudform_pencil class match", extractClassAttr(svg11Ref), extractClassAttr(svg11Actual))
+        assertEquals("11_cloudform_pencil path d exact match", extractPathD(svg11Ref), extractPathD(svg11Actual))
         assertEquals("12_cloudform_rotring class match", extractClassAttr(svg12Ref), extractClassAttr(svg12Actual))
+        assertEquals("12_cloudform_rotring path d exact match", extractPathD(svg12Ref), extractPathD(svg12Actual))
 
         assertNotEquals("Pencil and Rotring cloudform SVG bytes must differ", svg11Actual.length, svg12Actual.length)
     }

@@ -324,7 +324,7 @@ class DefaultSvgRenderer : SvgRenderer {
                 val contour = ServerRendererGeometry.generateCloudformContour(
                     center = cx to cy,
                     size = sw to sh,
-                    performanceSeed = renderSeed,
+                    performanceSeed = seedForInstruction(ins, renderSeed),
                     instructionIndex = index,
                     markIndex = 0,
                     variation = ins.optJSONObject("variation"),

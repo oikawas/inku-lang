@@ -1593,6 +1593,33 @@ In accordance with contract `antigravity-android-phase2-renderer.md` §8, `serve
 `gradle :app:testDebugUnitTest --rerun-tasks` (all 26 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` incremented to `148074`. `android/VERSION` remains `1.48.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2d (Line Expressive Rendering `stroke-engine-v1`)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8, non-`rotring` `primitive == "line"` rendering was routed to `ServerStrokeEngine.synthesizeStroke`, emitting `<g class="stroke-engine-v1 controls-N events-M">` containing variable-width outline `<path>` elements (`rotring` lines remain geometric `<line>` / `<polyline>`).
+
+### Implementation & Seed Calculation Synchronization
+
+1. **Expressive `line` Rendering in `DefaultSvgRenderer.kt`**:
+   - Delegates non-`rotring` line rendering to `renderHandStroke` to construct `stroke-engine-v1` groups.
+   - For lines with variation (`needsPathVariation`), the first `synthesizeStroke` pass (39 samples) determines the group `class` attribute (`controls-39 events-M`), while the second `synthesizeStroke` pass (`centerline.size` samples) provides per-sample widths to `outlineForCenterline` for the variable-width band.
+2. **Key & Seed Parity with Python `_seed_for_instruction`**:
+   - `serverInstructionJson` matches Python Pydantic `model_dump(mode="json")` exact key order, `from_` key alias, `variation` filtering (`null` for lines without variation), and default `null` fields (`center`, `radius`, `at`, `relation`, `surface`, etc.).
+   - Appends `:render:{renderSeed}` and interprets SHA-256 digest bytes as Little-Endian Unsigned 64-bit integer (`ULong`).
+3. **64-bit Seed Formatting & Variation Hash Repairs**:
+   - `ServerStrokeEngine.kt` `unitHash` formats `$seed` as unsigned 64-bit string (`seed.toULong().toString()`), matching Python's `f"{seed}:{label}:{index}"`.
+   - `ServerRendererGeometry.kt` replaces 32-bit truncation `seedToInt` with `seedToLong`, maintaining 64-bit seed values across `hash01`, `signedHash`, `sampleOffset`, and `xorSeed` (`seed ^ 0x9E37`).
+
+### Verification
+
+`DefaultSvgRendererPhase2dTest.kt` was created to perform exact parity validation against server reference SVG fixtures:
+
+- `02_line_brush.svg`: `stroke-engine-v1 controls-39 events-2` class attribute and `path d` coordinate string **match reference SVG exactly**.
+- `09_line_white.svg`: `stroke-engine-v1 controls-39 events-0` class attribute and varied centerline band `path d` coordinate string **match reference SVG exactly**.
+- `05_circle_rotring.svg` (Rotring Verification): Does not create `stroke-engine-v1` group and renders geometric `<line>` correctly.
+
+`gradle :app:testDebugUnitTest --rerun-tasks` (all 28 tests) and `gradle :app:assembleDebug` succeed.
+`android/BUILD_NUMBER` incremented to `148075`. `android/VERSION` remains `1.48.0-android.1`.
+
 
 
 

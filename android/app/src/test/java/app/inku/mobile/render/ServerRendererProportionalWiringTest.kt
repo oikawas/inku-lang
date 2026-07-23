@@ -43,13 +43,18 @@ class ServerRendererProportionalWiringTest {
                 )).toString()
 
             val resSquare = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "square", svgProfile = "editable"))
-            val widthSquare = extractStrokeWidth(resSquare.svg)
-            assertEquals("Square stroke-width for $weight", expected.first, widthSquare, 1e-9)
-
             val resPillar = renderer.render(RenderRequest(scoreJson = scoreJson, colorCatalogId = "sumi", canvasAspect = "pillar", svgProfile = "editable"))
 
-            val widthPillar = extractStrokeWidth(resPillar.svg)
-            assertEquals("Pillar stroke-width for $weight", expected.second, widthPillar, 1e-9)
+            if (weight == "rotring") {
+                val widthSquare = extractStrokeWidth(resSquare.svg)
+                assertEquals("Square stroke-width for $weight", expected.first, widthSquare, 1e-9)
+
+                val widthPillar = extractStrokeWidth(resPillar.svg)
+                assertEquals("Pillar stroke-width for $weight", expected.second, widthPillar, 1e-9)
+            } else {
+                assertTrue("Non-rotring line ($weight) should produce stroke-engine-v1 band in square", resSquare.svg.contains("stroke-engine-v1"))
+                assertTrue("Non-rotring line ($weight) should produce stroke-engine-v1 band in pillar", resPillar.svg.contains("stroke-engine-v1"))
+            }
         }
     }
 

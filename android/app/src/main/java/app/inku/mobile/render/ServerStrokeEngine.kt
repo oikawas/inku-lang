@@ -65,7 +65,7 @@ object ServerStrokeEngine {
 
     fun unitHash(seed: Long, label: String, index: Int): Double {
         val digest = MessageDigest.getInstance("SHA-256")
-        val input = "$seed:$label:$index".toByteArray(Charsets.UTF_8)
+        val input = "${seed.toULong()}:$label:$index".toByteArray(Charsets.UTF_8)
         val hash = digest.digest(input)
         
         var raw: ULong = 0uL

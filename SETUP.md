@@ -22,6 +22,7 @@ Included:
 Excluded:
 
 - `no-git-sync/`
+- `server/reference/` (the version-frozen development reference corpus)
 - `.env` / `.env.local`
 - API keys, local user data, local server details
 - SQLite databases, history data, generated drawings, `cli/out/`

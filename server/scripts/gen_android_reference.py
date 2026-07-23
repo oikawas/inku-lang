@@ -308,6 +308,85 @@ def variation_fixtures() -> None:
     }, ensure_ascii=False, indent=2))
 
 
+def seed_range_fixtures() -> None:
+    """Seeds as they actually occur, and the derivation that produces them.
+
+    `_seed_for_instruction` returns `struct.unpack("<Q", ...)`, an UNSIGNED 64-bit
+    integer, so roughly half of all real seeds exceed 2**63. Python prints those
+    as their unsigned decimal; a Kotlin `Long` holding the same bits prints a
+    negative number, and every hash keyed on `f"{seed}:..."` then diverges. The
+    Phase 2c/2a fixtures all used small literal seeds, so none of them could see
+    this. These do.
+
+    The instruction cases also pin the canonical payload itself — key order,
+    the `from` alias, the variation-field filter, and the fields that get popped
+    — which a port otherwise has to guess from Pydantic's dump order.
+    """
+    from inku_server.schema import Instruction, Variation
+
+    big = [
+        0,
+        1,
+        2**31 - 1,
+        2**31,
+        2**32,
+        2**63 - 1,
+        2**63,  # first value a signed 64-bit Long renders as negative
+        2**63 + 1,
+        2**64 - 1,
+        11790467468943091504,  # the real seed of `line_plain` below; a Long renders it negative
+    ]
+    out: dict = {
+        "note": "seeds are unsigned 64-bit; format them as unsigned decimal before hashing",
+        "stroke_engine_unit": [
+            {"seed": seed, "label": label, "index": index,
+             "value": round(se._unit(seed, label, index), 12)}
+            for seed in big
+            for label, index in (("energy-1", 0), ("event-arrival", 7), ("burr-side", 0))
+        ],
+        "renderer_hash01": [
+            {"i": i, "seed": seed, "salt": salt, "value": renderer._hash01(i, seed, salt)}
+            for seed in big
+            for i, salt in ((0, "wave-phase"), (5, ""))
+        ],
+        "renderer_hash_to_unit": [
+            {"i": i, "seed": seed, "value": renderer._hash_to_unit(i, seed)}
+            for seed in big
+            for i in (0, 3)
+        ],
+        "instruction_seed": [],
+    }
+
+    cases = {
+        "line_plain": (Instruction(primitive="line", **{"from": (0.1, 0.5)}, to=(0.9, 0.5), weight="brush_thick"), None),
+        "line_plain_render_seed": (Instruction(primitive="line", **{"from": (0.1, 0.5)}, to=(0.9, 0.5), weight="brush_thick"), 12345),
+        "line_variation_white": (Instruction(primitive="line", **{"from": (0.1, 0.5)}, to=(0.9, 0.5), weight="pencil",
+                                             variation=Variation(amplitude="medium", frequency="medium", quality="white", dimensions=["position_y"])), 12345),
+        "circle_plain": (Instruction(primitive="circle", center=(0.5, 0.5), radius=0.2, weight="pen"), 12345),
+        "circle_variation_wave": (Instruction(primitive="circle", center=(0.5, 0.5), radius=0.25, weight="pen",
+                                              variation=Variation(amplitude="broad", frequency="medium", quality="wave", dimensions=["position_x", "position_y"])), 12345),
+        "circle_variation_pink": (Instruction(primitive="circle", center=(0.5, 0.5), radius=0.25, weight="pen",
+                                              variation=Variation(amplitude="medium", frequency="medium", quality="pink", dimensions=["position_x"])), 12345),
+        "square_filled": (Instruction(primitive="square", position=(0.3, 0.3), size=(0.4, 0.4), weight="pencil", filled=True), 12345),
+        "arc_crayon": (Instruction(primitive="arc", center=(0.5, 0.5), radius=0.3, angle_start=0, angle_end=180, weight="crayon"), 12345),
+    }
+    for name, (ins, performance_seed) in cases.items():
+        payload = ins.model_dump(mode="json")
+        out["instruction_seed"].append({
+            "name": name,
+            "instruction": payload,
+            "performance_seed": performance_seed,
+            "seed": renderer._seed_for_instruction(ins, performance_seed),
+            "variation_seed_fields": (
+                sorted(renderer._variation_seed_fields(ins))
+                if renderer._variation_seed_fields(ins) is not None
+                else None
+            ),
+        })
+
+    (OUT / "renderer_seed_range.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+
+
 def proportional_fixtures() -> None:
     """The engine 7 proportional system, sampled per canvas aspect.
 
@@ -406,6 +485,7 @@ def main() -> None:
     stroke_engine_fixtures()
     variation_fixtures()
     proportional_fixtures()
+    seed_range_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

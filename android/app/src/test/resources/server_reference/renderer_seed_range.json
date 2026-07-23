@@ -1,0 +1,730 @@
+{
+  "note": "seeds are unsigned 64-bit; format them as unsigned decimal before hashing",
+  "stroke_engine_unit": [
+    {
+      "seed": 0,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.311204799589
+    },
+    {
+      "seed": 0,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.92959466248
+    },
+    {
+      "seed": 0,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.933665780174
+    },
+    {
+      "seed": 1,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.997337030424
+    },
+    {
+      "seed": 1,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.305344595416
+    },
+    {
+      "seed": 1,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.167291617777
+    },
+    {
+      "seed": 2147483647,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.441614721517
+    },
+    {
+      "seed": 2147483647,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.389982308238
+    },
+    {
+      "seed": 2147483647,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.90147072665
+    },
+    {
+      "seed": 2147483648,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.816725237122
+    },
+    {
+      "seed": 2147483648,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.64134600817
+    },
+    {
+      "seed": 2147483648,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.399176694473
+    },
+    {
+      "seed": 4294967296,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.051843627527
+    },
+    {
+      "seed": 4294967296,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.452649891034
+    },
+    {
+      "seed": 4294967296,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.087116692289
+    },
+    {
+      "seed": 9223372036854775807,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.16998459754
+    },
+    {
+      "seed": 9223372036854775807,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.145746723625
+    },
+    {
+      "seed": 9223372036854775807,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.621201723907
+    },
+    {
+      "seed": 9223372036854775808,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.157202246201
+    },
+    {
+      "seed": 9223372036854775808,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.526402290432
+    },
+    {
+      "seed": 9223372036854775808,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.411603131717
+    },
+    {
+      "seed": 9223372036854775809,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.961219583281
+    },
+    {
+      "seed": 9223372036854775809,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.58422279861
+    },
+    {
+      "seed": 9223372036854775809,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.268222764921
+    },
+    {
+      "seed": 18446744073709551615,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.302162171984
+    },
+    {
+      "seed": 18446744073709551615,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.487315257479
+    },
+    {
+      "seed": 18446744073709551615,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.424936817783
+    },
+    {
+      "seed": 11790467468943091504,
+      "label": "energy-1",
+      "index": 0,
+      "value": 0.100180323459
+    },
+    {
+      "seed": 11790467468943091504,
+      "label": "event-arrival",
+      "index": 7,
+      "value": 0.805900942191
+    },
+    {
+      "seed": 11790467468943091504,
+      "label": "burr-side",
+      "index": 0,
+      "value": 0.826168193216
+    }
+  ],
+  "renderer_hash01": [
+    {
+      "i": 0,
+      "seed": 0,
+      "salt": "wave-phase",
+      "value": 0.007098559058992788
+    },
+    {
+      "i": 5,
+      "seed": 0,
+      "salt": "",
+      "value": 0.028638086055554002
+    },
+    {
+      "i": 0,
+      "seed": 1,
+      "salt": "wave-phase",
+      "value": 0.26900007791561076
+    },
+    {
+      "i": 5,
+      "seed": 1,
+      "salt": "",
+      "value": 0.42467264654689296
+    },
+    {
+      "i": 0,
+      "seed": 2147483647,
+      "salt": "wave-phase",
+      "value": 0.32924556669994387
+    },
+    {
+      "i": 5,
+      "seed": 2147483647,
+      "salt": "",
+      "value": 0.03999252711422568
+    },
+    {
+      "i": 0,
+      "seed": 2147483648,
+      "salt": "wave-phase",
+      "value": 0.7414050772184052
+    },
+    {
+      "i": 5,
+      "seed": 2147483648,
+      "salt": "",
+      "value": 0.766016881392807
+    },
+    {
+      "i": 0,
+      "seed": 4294967296,
+      "salt": "wave-phase",
+      "value": 0.9842923348732974
+    },
+    {
+      "i": 5,
+      "seed": 4294967296,
+      "salt": "",
+      "value": 0.09597552826068725
+    },
+    {
+      "i": 0,
+      "seed": 9223372036854775807,
+      "salt": "wave-phase",
+      "value": 0.3399931584345161
+    },
+    {
+      "i": 5,
+      "seed": 9223372036854775807,
+      "salt": "",
+      "value": 0.6134465629266218
+    },
+    {
+      "i": 0,
+      "seed": 9223372036854775808,
+      "salt": "wave-phase",
+      "value": 0.25763268355690705
+    },
+    {
+      "i": 5,
+      "seed": 9223372036854775808,
+      "salt": "",
+      "value": 0.38633818747157656
+    },
+    {
+      "i": 0,
+      "seed": 9223372036854775809,
+      "salt": "wave-phase",
+      "value": 0.38921172995800424
+    },
+    {
+      "i": 5,
+      "seed": 9223372036854775809,
+      "salt": "",
+      "value": 0.6109640054895924
+    },
+    {
+      "i": 0,
+      "seed": 18446744073709551615,
+      "salt": "wave-phase",
+      "value": 0.6604094083095923
+    },
+    {
+      "i": 5,
+      "seed": 18446744073709551615,
+      "salt": "",
+      "value": 0.5524773103074351
+    },
+    {
+      "i": 0,
+      "seed": 11790467468943091504,
+      "salt": "wave-phase",
+      "value": 0.952092437760926
+    },
+    {
+      "i": 5,
+      "seed": 11790467468943091504,
+      "salt": "",
+      "value": 0.5241120430929848
+    }
+  ],
+  "renderer_hash_to_unit": [
+    {
+      "i": 0,
+      "seed": 0,
+      "value": -0.49144240071070694
+    },
+    {
+      "i": 3,
+      "seed": 0,
+      "value": -0.8477153778389747
+    },
+    {
+      "i": 0,
+      "seed": 1,
+      "value": -0.027470900569146233
+    },
+    {
+      "i": 3,
+      "seed": 1,
+      "value": -0.46910208668680337
+    },
+    {
+      "i": 0,
+      "seed": 2147483647,
+      "value": -0.7970158670791017
+    },
+    {
+      "i": 3,
+      "seed": 2147483647,
+      "value": 0.004998051922636709
+    },
+    {
+      "i": 0,
+      "seed": 2147483648,
+      "value": 0.23443251847413654
+    },
+    {
+      "i": 3,
+      "seed": 2147483648,
+      "value": 0.40038019175496925
+    },
+    {
+      "i": 0,
+      "seed": 4294967296,
+      "value": -0.2335992579378836
+    },
+    {
+      "i": 3,
+      "seed": 4294967296,
+      "value": -0.23548662308969245
+    },
+    {
+      "i": 0,
+      "seed": 9223372036854775807,
+      "value": 0.20018330756479402
+    },
+    {
+      "i": 3,
+      "seed": 9223372036854775807,
+      "value": 0.10942503089900026
+    },
+    {
+      "i": 0,
+      "seed": 9223372036854775808,
+      "value": 0.6731018754184444
+    },
+    {
+      "i": 3,
+      "seed": 9223372036854775808,
+      "value": 0.29093459799486376
+    },
+    {
+      "i": 0,
+      "seed": 9223372036854775809,
+      "value": 0.1394155148489168
+    },
+    {
+      "i": 3,
+      "seed": 9223372036854775809,
+      "value": -0.6312769430146944
+    },
+    {
+      "i": 0,
+      "seed": 18446744073709551615,
+      "value": -0.5276035805635118
+    },
+    {
+      "i": 3,
+      "seed": 18446744073709551615,
+      "value": -0.9576670758231538
+    },
+    {
+      "i": 0,
+      "seed": 11790467468943091504,
+      "value": 0.4732694860912877
+    },
+    {
+      "i": 3,
+      "seed": 11790467468943091504,
+      "value": 0.4411309570460573
+    }
+  ],
+  "instruction_seed": [
+    {
+      "name": "line_plain",
+      "instruction": {
+        "primitive": "line",
+        "from_": [
+          0.1,
+          0.5
+        ],
+        "to": [
+          0.9,
+          0.5
+        ],
+        "center": null,
+        "radius": null,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "brush_thick",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": null,
+        "arrangement": null,
+        "at": null,
+        "relation": null,
+        "surface": null
+      },
+      "performance_seed": null,
+      "seed": 11790467468943091504,
+      "variation_seed_fields": null
+    },
+    {
+      "name": "line_plain_render_seed",
+      "instruction": {
+        "primitive": "line",
+        "from_": [
+          0.1,
+          0.5
+        ],
+        "to": [
+          0.9,
+          0.5
+        ],
+        "center": null,
+        "radius": null,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "brush_thick",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": null,
+        "arrangement": null,
+        "at": null,
+        "relation": null,
+        "surface": null
+      },
+      "performance_seed": 12345,
+      "seed": 14205023900426347214,
+      "variation_seed_fields": null
+    },
+    {
+      "name": "line_variation_white",
+      "instruction": {
+        "primitive": "line",
+        "from_": [
+          0.1,
+          0.5
+        ],
+        "to": [
+          0.9,
+          0.5
+        ],
+        "center": null,
+        "radius": null,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "pencil",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": {
+          "amplitude": "medium",
+          "frequency": "medium",
+          "quality": "white",
+          "dimensions": [
+            "position_y"
+          ]
+        },
+        "arrangement": null,
+        "at": null,
+        "relation": null,
+        "surface": null
+      },
+      "performance_seed": 12345,
+      "seed": 10946165901032747316,
+      "variation_seed_fields": [
+        "amplitude",
+        "dimensions",
+        "frequency",
+        "quality"
+      ]
+    },
+    {
+      "name": "circle_plain",
+      "instruction": {
+        "primitive": "circle",
+        "from_": null,
+        "to": null,
+        "center": [
+          0.5,
+          0.5
+        ],
+        "radius": 0.2,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": null,
+        "arrangement": null,
+        "at": null,
+        "relation": null,
+        "surface": null
+      },
+      "performance_seed": 12345,
+      "seed": 2500842217868645181,
+      "variation_seed_fields": null
+    },
+    {
+      "name": "circle_variation_wave",
+      "instruction": {
+        "primitive": "circle",
+        "from_": null,
+        "to": null,
+        "center": [
+          0.5,
+          0.5
+        ],
+        "radius": 0.25,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": {
+          "amplitude": "broad",
+          "frequency": "medium",
+          "quality": "wave",
+          "dimensions": [
+            "position_x",
+            "position_y"
+          ]
+        },
+        "arrangement": null,
+        "at": null,
+        "relation": null,
+        "surface": null
+      },
+      "performance_seed": 12345,
+      "seed": 2579494135070841018,
+      "variation_seed_fields": [
+        "amplitude",
+        "dimensions",
+        "frequency",
+        "quality"
+      ]
+    },
+    {
+      "name": "circle_variation_pink",
+      "instruction": {
+        "primitive": "circle",
+        "from_": null,
+        "to": null,
+        "center": [
+          0.5,
+          0.5
+        ],
+        "radius": 0.25,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": {
+          "amplitude": "medium",
+          "frequency": "medium",
+          "quality": "pink",
+          "dimensions": [
+            "position_x"
+          ]
+        },
+        "arrangement": null,
+        "at": null,
+        "relation": null,
+        "surface": null
+      },
+      "performance_seed": 12345,
+      "seed": 8366159528298881582,
+      "variation_seed_fields": [
+        "amplitude",
+        "quality"
+      ]
+    },
+    {
+      "name": "square_filled",
+      "instruction": {
+        "primitive": "square",
+        "from_": null,
+        "to": null,
+        "center": null,
+        "radius": null,
+        "sides": null,
+        "position": [
+          0.3,
+          0.3
+        ],
+        "size": [
+          0.4,
+          0.4
+        ],
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": true,
+        "style": "solid",
+        "weight": "pencil",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": null,
+        "arrangement": null,
+        "at": null,
+        "relation": null,
+        "surface": null
+      },
+      "performance_seed": 12345,
+      "seed": 5339599463572800547,
+      "variation_seed_fields": null
+    },
+    {
+      "name": "arc_crayon",
+      "instruction": {
+        "primitive": "arc",
+        "from_": null,
+        "to": null,
+        "center": [
+          0.5,
+          0.5
+        ],
+        "radius": 0.3,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": 0.0,
+        "angle_end": 180.0,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "crayon",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": null,
+        "arrangement": null,
+        "at": null,
+        "relation": null,
+        "surface": null
+      },
+      "performance_seed": 12345,
+      "seed": 11281162071161425080,
+      "variation_seed_fields": null
+    }
+  ]
+}

@@ -39,7 +39,7 @@ internal object ServerRendererMaterial {
         val weight = ins.optString("weight", "pen")
         if (weight !in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint")) return null
         val seedStr = ins.toString()
-        val seedInt = ServerRendererGeometry.seedToInt(seedStr)
+        val seedInt = ServerRendererGeometry.seedToLong(seedStr)
         val scale = unit / 1000.0
         val lineLen = kotlin.math.hypot(x2 - x1, y2 - y1)
         val out = StringBuilder()

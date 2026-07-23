@@ -24,10 +24,6 @@ internal object ServerRendererGeometry {
         }
     }
 
-    fun seedToInt(seed: Any?): Int {
-        return seedToLong(seed).toInt()
-    }
-
     private fun formatSeed(seed: Any): String {
         return when (seed) {
             is Long -> seed.toULong().toString()
@@ -370,19 +366,15 @@ internal object ServerRendererGeometry {
         return result
     }
 
-    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: String, count: Int = 100): List<Pair<Double, Double>> {
-        return variedCirclePoints(cx, cy, rx, ry, variation, seedToInt(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
+    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: Any?, count: Int = 100): List<Pair<Double, Double>> {
+        return variedCirclePoints(cx, cy, rx, ry, variation, seedToLong(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
-    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: Int, count: Int = 100): List<Pair<Double, Double>> {
-        return variedCirclePoints(cx, cy, rx, ry, variation, seed, JSONObject(), 1000.0, 1000.0, 1000.0)
+    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: Any?, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return variedCirclePoints(cx, cy, rx, ry, variation, seedToLong(seed), ins, width, height, unit)
     }
 
-    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
-        return variedCirclePoints(cx, cy, rx, ry, variation, seedToInt(seed), ins, width, height, unit)
-    }
-
-    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: Int, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: Long, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
         val approxPerimeter = Math.PI * (3.0 * (rx + ry) - sqrt((3.0 * rx + ry) * (rx + 3.0 * ry)))
         val count = segmentCount(approxPerimeter, unit)
         val basePoints = circlePoints(cx, cy, rx, ry, count)
@@ -399,19 +391,15 @@ internal object ServerRendererGeometry {
         }
     }
 
-    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: String, cx: Double, cy: Double): List<Pair<Double, Double>> {
-        return variedPolygonPoints(points, variation, seedToInt(seed), cx, cy, JSONObject(), 1000.0, 1000.0, 1000.0)
+    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Any?, cx: Double, cy: Double): List<Pair<Double, Double>> {
+        return variedPolygonPoints(points, variation, seedToLong(seed), cx, cy, JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
-    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Int, cx: Double, cy: Double): List<Pair<Double, Double>> {
-        return variedPolygonPoints(points, variation, seed, cx, cy, JSONObject(), 1000.0, 1000.0, 1000.0)
+    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Any?, cx: Double, cy: Double, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return variedPolygonPoints(points, variation, seedToLong(seed), cx, cy, ins, width, height, unit)
     }
 
-    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: String, cx: Double, cy: Double, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
-        return variedPolygonPoints(points, variation, seedToInt(seed), cx, cy, ins, width, height, unit)
-    }
-
-    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Int, cx: Double, cy: Double, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Long, cx: Double, cy: Double, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
         if (variation == null || !needsPathVariation(variation) || points.isEmpty()) return points
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
@@ -426,19 +414,15 @@ internal object ServerRendererGeometry {
         }
     }
 
-    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: String, count: Int = 60): String {
-        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToInt(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
+    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Any?, count: Int = 60): String {
+        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToLong(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
-    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Int, count: Int = 60): String {
-        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seed, JSONObject(), 1000.0, 1000.0, 1000.0)
+    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Any?, ins: JSONObject, width: Double, height: Double, unit: Double): String {
+        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToLong(seed), ins, width, height, unit)
     }
 
-    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): String {
-        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToInt(seed), ins, width, height, unit)
-    }
-
-    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Int, ins: JSONObject, width: Double, height: Double, unit: Double): String {
+    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Long, ins: JSONObject, width: Double, height: Double, unit: Double): String {
         if (variation == null || !needsPathVariation(variation)) {
             return arcPathD(cx, cy, r, startDeg, endDeg)
         }

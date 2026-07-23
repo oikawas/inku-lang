@@ -1620,6 +1620,34 @@ In accordance with contract `antigravity-android-phase2-renderer.md` §8, non-`r
 `gradle :app:testDebugUnitTest --rerun-tasks` (all 28 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` incremented to `148075`. `android/VERSION` remains `1.48.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2e (Closed Shape Expressive Outline `contour-stroke-v1`)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8, closed shape primitives (`circle`, `ellipse`, `square`, `triangle`, `polygon`) with non-`rotring` weights were migrated to single-stroke ring bands (`contour-stroke-v1` with `fill-rule="evenodd"` 2-subpath `<path>`). `rotring` shapes maintain their original geometric elements.
+
+### Implementation & Seed Calculation Synchronization
+
+1. **64-bit Seed Truncation Elimination**:
+   - Completely removed `seedToInt` (32-bit truncation) across `ServerRendererGeometry.kt`, `ServerRendererMaterial.kt`, and `DefaultSvgRenderer.kt`, preserving 64-bit seed values (`Long` representing unsigned 64-bit bit patterns) throughout.
+   - Added parity test in `ServerRendererGeometryTest.kt` verifying `renderer_seed_range.json` reference values (`stroke_engine_unit`, `renderer_hash01`, `renderer_hash_to_unit`, `instruction_seed`), proving 100% deterministic seed calculation matching Python server.
+2. **`contour-stroke-v1` Band Generation in `DefaultSvgRenderer.kt`**:
+   - Non-`rotring` closed shapes use `usesHandStroke(weight)` (`weight != "rotring" && weight in GRAMMARS`) to synthesize `contour-stroke-v1` bands.
+   - Non-varied shapes sample contours based on `strokeSampleCount`.
+   - Varied shapes sample contours based on `segmentCount` and apply per-edge seeds (`seed + (i + 1) * 7919`) and representative dimension amplitude `amp` for polygons.
+   - Base shape elements update `fill` and `stroke` according to `region_fill` (`false` if `surface` specified), scaling `stroke-width` by 0.42 for non-`solid` styles.
+   - `drypoint` shapes render burr polygons using per-sample normals `centerlineNormals`.
+
+### Verification
+
+`DefaultSvgRendererPhase2eTest.kt` and `ServerRendererGeometryTest.kt` were created and expanded to validate structural and exact string parity against reference server SVGs:
+
+- `01_circle_pen.svg`, `07_circle_wave.svg`, `08_circle_perlin.svg`: `contour-stroke-v1` class attribute and `<path d="...">` coordinate strings **match reference SVGs exactly**.
+- `05_circle_rotring.svg`: Does not create `contour-stroke-v1` band and renders plain `<circle>`.
+- `03_square_filled.svg`, `06_surface_hatch.svg`: `contour-stroke-v1` class attributes match reference SVGs.
+
+`gradle :app:testDebugUnitTest --rerun-tasks` (all 35 tests) and `gradle :app:assembleDebug` succeed.
+`android/BUILD_NUMBER` incremented to `148076`. `android/VERSION` remains `1.48.0-android.1`.
+
+
 
 
 

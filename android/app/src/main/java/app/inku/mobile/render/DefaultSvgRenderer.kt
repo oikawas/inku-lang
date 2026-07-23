@@ -98,14 +98,29 @@ class DefaultSvgRenderer : SvgRenderer {
                 val cy = px(center?.optDouble(1, 0.5) ?: 0.5, height)
                 val r = px(ins.optDouble("radius", 0.12), min(width, height))
                 val variation = ins.optJSONObject("variation")
-                val base = if (needsPathVariation(variation)) {
-                    val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins), ins, width, height, unit)
-                        .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
-                    """<polygon points="$pts" fill="$fill" $common/>"""
+                val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+                if (usesHandStroke(weight)) {
+                    val contour = if (variation != null && needsPathVariation(variation)) {
+                        ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
+                    } else {
+                        val count = ServerRendererGeometry.strokeSampleCount(2.0 * Math.PI * r, unit)
+                        ServerRendererGeometry.circlePoints(cx, cy, r, r, count)
+                    }
+                    val bodyPts = if (needsPathVariation(variation)) contour else emptyList()
+                    val body = renderBodyShape("circle", ins, attrs, regionFill, cx, cy, r, r, 0.0, 0.0, 0.0, 0.0, bodyPts)
+                    val band = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed)
+                    val outline = if (usesMaterialOutline(weight)) materialCircleOutline(ins, attrs, cx, cy, r, unit) else ""
+                    """<g>$body$band$outline</g>"""
                 } else {
-                    """<circle cx="$cx" cy="$cy" r="$r" fill="$fill" $common/>"""
+                    val base = if (needsPathVariation(variation)) {
+                        val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
+                            .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                        """<polygon points="$pts" fill="$fill" $common/>"""
+                    } else {
+                        """<circle cx="$cx" cy="$cy" r="$r" fill="$fill" $common/>"""
+                    }
+                    if (usesMaterialOutline(weight)) """<g>$base${materialCircleOutline(ins, attrs, cx, cy, r, unit)}</g>""" else base
                 }
-                if (usesMaterialOutline(weight)) """<g>$base${materialCircleOutline(ins, attrs, cx, cy, r, unit)}</g>""" else base
             }
             "ellipse" -> {
                 val center = ins.optJSONArray("center")
@@ -115,14 +130,30 @@ class DefaultSvgRenderer : SvgRenderer {
                 val rx = px((size?.optDouble(0, 0.26) ?: 0.26) / 2.0, width)
                 val ry = px((size?.optDouble(1, 0.16) ?: 0.16) / 2.0, height)
                 val variation = ins.optJSONObject("variation")
-                val base = if (needsPathVariation(variation)) {
-                    val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins), ins, width, height, unit)
-                        .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
-                    """<polygon points="$pts" fill="$fill" $common/>"""
+                val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+                if (usesHandStroke(weight)) {
+                    val approxPerimeter = Math.PI * (3.0 * (rx + ry) - sqrt((3.0 * rx + ry) * (rx + 3.0 * ry)))
+                    val contour = if (variation != null && needsPathVariation(variation)) {
+                        ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
+                    } else {
+                        val count = ServerRendererGeometry.strokeSampleCount(approxPerimeter, unit)
+                        ServerRendererGeometry.circlePoints(cx, cy, rx, ry, count)
+                    }
+                    val bodyPts = if (needsPathVariation(variation)) contour else emptyList()
+                    val body = renderBodyShape("ellipse", ins, attrs, regionFill, cx, cy, rx, ry, 0.0, 0.0, 0.0, 0.0, bodyPts)
+                    val band = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed)
+                    val outline = if (usesMaterialOutline(weight)) materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit) else ""
+                    """<g>$body$band$outline</g>"""
                 } else {
-                    """<ellipse cx="$cx" cy="$cy" rx="$rx" ry="$ry" fill="$fill" $common/>"""
+                    val base = if (needsPathVariation(variation)) {
+                        val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
+                            .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                        """<polygon points="$pts" fill="$fill" $common/>"""
+                    } else {
+                        """<ellipse cx="$cx" cy="$cy" rx="$rx" ry="$ry" fill="$fill" $common/>"""
+                    }
+                    if (usesMaterialOutline(weight)) """<g>$base${materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit)}</g>""" else base
                 }
-                if (usesMaterialOutline(weight)) """<g>$base${materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit)}</g>""" else base
             }
             "square" -> {
                 val pos = ins.optJSONArray("position")
@@ -132,44 +163,93 @@ class DefaultSvgRenderer : SvgRenderer {
                 val w = px(size?.optDouble(0, 0.24) ?: 0.24, width)
                 val h = px(size?.optDouble(1, 0.24) ?: 0.24, height)
                 val variation = ins.optJSONObject("variation")
-                val base = if (needsPathVariation(variation)) {
-                    val rectPts = ServerRendererGeometry.rectPoints(x, y, w, h, 80)
-                    val pts = ServerRendererGeometry.variedPolygonPoints(rectPts, variation, seedForInstruction(ins), x + w / 2.0, y + h / 2.0, ins, width, height, unit)
-                        .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
-                    """<polygon points="$pts" fill="$fill" $common/>"""
+                val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+                val corners = listOf(x to y, (x + w) to y, (x + w) to (y + h), x to (y + h))
+                if (usesHandStroke(weight)) {
+                    val seedStr = seedForInstruction(ins, renderSeed)
+                    val (contour, anchors) = edgeContourWithAnchors(corners, variation, seedStr, ins, width, height, unit)
+                    val bodyPts = if (needsPathVariation(variation)) {
+                        val rectPts = ServerRendererGeometry.rectPoints(x, y, w, h, 80)
+                        ServerRendererGeometry.variedPolygonPoints(rectPts, variation, seedStr, x + w / 2.0, y + h / 2.0, ins, width, height, unit)
+                    } else {
+                        emptyList()
+                    }
+                    val body = renderBodyShape("square", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, x, y, w, h, bodyPts)
+                    val band = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed)
+                    val outline = if (usesMaterialOutline(weight)) materialRectOutline(ins, attrs, x, y, w, h, unit) else ""
+                    """<g>$body$band$outline</g>"""
                 } else {
-                    """<rect x="$x" y="$y" width="$w" height="$h" fill="$fill" $common/>"""
+                    val base = if (needsPathVariation(variation)) {
+                        val rectPts = ServerRendererGeometry.rectPoints(x, y, w, h, 80)
+                        val pts = ServerRendererGeometry.variedPolygonPoints(rectPts, variation, seedForInstruction(ins, renderSeed), x + w / 2.0, y + h / 2.0, ins, width, height, unit)
+                            .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                        """<polygon points="$pts" fill="$fill" $common/>"""
+                    } else {
+                        """<rect x="$x" y="$y" width="$w" height="$h" fill="$fill" $common/>"""
+                    }
+                    if (usesMaterialOutline(weight)) """<g>$base${materialRectOutline(ins, attrs, x, y, w, h, unit)}</g>""" else base
                 }
-                if (usesMaterialOutline(weight)) """<g>$base${materialRectOutline(ins, attrs, x, y, w, h, unit)}</g>""" else base
             }
             "triangle" -> {
                 val points = trianglePoints(ins, width, height)
                 val variation = ins.optJSONObject("variation")
-                val pts = if (needsPathVariation(variation)) {
+                val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+                if (usesHandStroke(weight)) {
+                    val seedStr = seedForInstruction(ins, renderSeed)
+                    val (contour, anchors) = edgeContourWithAnchors(points, variation, seedStr, ins, width, height, unit)
                     val pos = ins.optJSONArray("position")
                     val size = ins.optJSONArray("size")
                     val cx = px((pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.30) ?: 0.30) / 2.0, width)
                     val cy = px((pos?.optDouble(1, 0.35) ?: 0.35) + (size?.optDouble(1, 0.30) ?: 0.30) / 2.0, height)
-                    ServerRendererGeometry.variedPolygonPoints(points, variation, seedForInstruction(ins), cx, cy, ins, width, height, unit)
+                    val bodyPts = if (needsPathVariation(variation)) {
+                        ServerRendererGeometry.variedPolygonPoints(points, variation, seedStr, cx, cy, ins, width, height, unit)
+                    } else {
+                        points
+                    }
+                    val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
+                    val band = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed)
+                    """<g>$body$band</g>"""
                 } else {
-                    points
+                    val pts = if (needsPathVariation(variation)) {
+                        val pos = ins.optJSONArray("position")
+                        val size = ins.optJSONArray("size")
+                        val cx = px((pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.30) ?: 0.30) / 2.0, width)
+                        val cy = px((pos?.optDouble(1, 0.35) ?: 0.35) + (size?.optDouble(1, 0.30) ?: 0.30) / 2.0, height)
+                        ServerRendererGeometry.variedPolygonPoints(points, variation, seedForInstruction(ins, renderSeed), cx, cy, ins, width, height, unit)
+                    } else {
+                        points
+                    }
+                    polygon(pts, fill, common)
                 }
-                polygon(pts, fill, common)
             }
             "polygon" -> {
                 val rawPoints = pointsForRegular(ins, ins.optInt("sides", 5).coerceIn(5, 8), width, height)
                 val variation = ins.optJSONObject("variation")
-                val pts = if (needsPathVariation(variation)) {
-                    val center = ins.optJSONArray("center")
-                    val position = ins.optJSONArray("position")
-                    val size = ins.optJSONArray("size")
-                    val cx = px(center?.optDouble(0) ?: ((position?.optDouble(0, 0.4) ?: 0.4) + (size?.optDouble(0, 0.2) ?: 0.2) / 2.0), width)
-                    val cy = px(center?.optDouble(1) ?: ((position?.optDouble(1, 0.4) ?: 0.4) + (size?.optDouble(1, 0.2) ?: 0.2) / 2.0), height)
-                    ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedForInstruction(ins), cx, cy, ins, width, height, unit)
+                val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+                val center = ins.optJSONArray("center")
+                val position = ins.optJSONArray("position")
+                val size = ins.optJSONArray("size")
+                val cx = px(center?.optDouble(0) ?: ((position?.optDouble(0, 0.4) ?: 0.4) + (size?.optDouble(0, 0.2) ?: 0.2) / 2.0), width)
+                val cy = px(center?.optDouble(1) ?: ((position?.optDouble(1, 0.4) ?: 0.4) + (size?.optDouble(1, 0.2) ?: 0.2) / 2.0), height)
+                if (usesHandStroke(weight)) {
+                    val seedStr = seedForInstruction(ins, renderSeed)
+                    val (contour, anchors) = edgeContourWithAnchors(rawPoints, variation, seedStr, ins, width, height, unit)
+                    val bodyPts = if (needsPathVariation(variation)) {
+                        ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedStr, cx, cy, ins, width, height, unit)
+                    } else {
+                        rawPoints
+                    }
+                    val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
+                    val band = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed)
+                    """<g>$body$band</g>"""
                 } else {
-                    rawPoints
+                    val pts = if (needsPathVariation(variation)) {
+                        ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedForInstruction(ins, renderSeed), cx, cy, ins, width, height, unit)
+                    } else {
+                        rawPoints
+                    }
+                    polygon(pts, fill, common)
                 }
-                polygon(pts, fill, common)
             }
             "arc" -> {
                 val center = ins.optJSONArray("center")
@@ -179,7 +259,7 @@ class DefaultSvgRenderer : SvgRenderer {
                 val start = ins.optDouble("angle_start", 20.0)
                 val end = ins.optDouble("angle_end", 300.0)
                 val variation = ins.optJSONObject("variation")
-                val path = ServerRendererGeometry.variedArcPathD(cx, cy, r, start, end, variation, seedForInstruction(ins), ins, width, height, unit)
+                val path = ServerRendererGeometry.variedArcPathD(cx, cy, r, start, end, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
                 val base = """<path d="$path" fill="none" $common/>"""
                 if (usesMaterialOutline(weight)) """<g>$base${materialArcOutline(ins, attrs, cx, cy, r, start, end, unit)}</g>""" else base
             }
@@ -446,6 +526,154 @@ class DefaultSvgRenderer : SvgRenderer {
 
     private fun trianglePoints(ins: JSONObject, width: Double, height: Double): List<Pair<Double, Double>> {
         return ServerRendererGeometry.trianglePoints(ins, width, height)
+    }
+
+    private fun usesHandStroke(weight: String): Boolean {
+        return weight != "rotring" && weight in GRAMMARS
+    }
+
+    private fun edgeContourWithAnchors(
+        corners: List<Pair<Double, Double>>,
+        variation: JSONObject?,
+        seedStr: String,
+        ins: JSONObject,
+        width: Double,
+        height: Double,
+        unit: Double
+    ): Pair<List<Pair<Double, Double>>, Set<Int>> {
+        val result = mutableListOf<Pair<Double, Double>>()
+        val anchors = mutableSetOf<Int>()
+        val n = corners.size
+        val seedLong = ServerRendererGeometry.seedToLong(seedStr)
+        for (i in 0 until n) {
+            val start = corners[i]
+            val end = corners[(i + 1) % n]
+            anchors.add(result.size)
+            val edge = if (variation == null || !needsPathVariation(variation)) {
+                val len = kotlin.math.hypot(end.first - start.first, end.second - start.second)
+                val segments = ServerRendererGeometry.strokeSampleCount(len, unit)
+                (0..segments).map { k ->
+                    val t = k.toDouble() / segments.toDouble()
+                    (start.first + (end.first - start.first) * t) to (start.second + (end.second - start.second) * t)
+                }
+            } else {
+                val edgeSeed = seedLong + (i + 1) * 7919L
+                ServerRendererGeometry.variedLinePoints(start.first, start.second, end.first, end.second, variation, edgeSeed, ins, width, height, unit)
+            }
+            if (edge.size > 1) {
+                result.addAll(edge.dropLast(1))
+            } else {
+                result.addAll(edge)
+            }
+        }
+        return result to anchors
+    }
+
+    private fun renderContourHandStroke(
+        ins: JSONObject,
+        attrs: SvgAttrs,
+        contour: List<Pair<Double, Double>>,
+        anchors: Set<Int>,
+        unit: Double,
+        width: Double,
+        height: Double,
+        renderSeed: Long? = null
+    ): String {
+        val weight = ins.optString("weight", "pen")
+        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val seedStr = seedForInstruction(ins, renderSeed)
+        val seedLong = ServerRendererGeometry.seedToLong(seedStr)
+
+        val stroke = ServerStrokeEngine.synthesizeAlong(
+            centerline = contour,
+            baseWidth = baseWidth,
+            weight = weight,
+            seed = seedLong,
+            closed = true,
+            anchors = anchors
+        )
+
+        val groupClass = "contour-stroke-v1 controls-${stroke.samples.size} events-${stroke.eventCount}"
+        val color = attrs.stroke
+        val opacity = attrs.strokeOpacity
+
+        val sb = StringBuilder()
+        sb.append("""<g class="$groupClass">""")
+
+        val pathD = ServerStrokeEngine.contourStrokePath(stroke)
+        val textureFilterWeights = setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "drypoint")
+        val filterAttr = if (weight in textureFilterWeights && weight != "drypoint") """ filter="url(#texture-$weight)"""" else ""
+        val fillOpacityStr = fmt(opacity)
+
+        sb.append("""<path d="$pathD" fill="$color" fill-opacity="$fillOpacityStr" fill-rule="evenodd" stroke="none"$filterAttr/>""")
+
+        if (weight == "drypoint") {
+            val offset = stroke.burrSide * baseWidth
+            val normals = ServerStrokeEngine.centerlineNormals(stroke.samples.map { it.x to it.y }, closed = true)
+            val burrPoints = stroke.samples.zip(normals).map { (sample, normal) ->
+                (sample.x + normal.first * offset) to (sample.y + normal.second * offset)
+            }
+            val ptsStr = burrPoints.joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+            val burrOpacityStr = fmt(stroke.burrOpacity)
+            val burrWidthStr = fmt(baseWidth * 1.25)
+            sb.append("""<polygon points="$ptsStr" fill="none" stroke="$color" stroke-width="$burrWidthStr" stroke-opacity="$burrOpacityStr" stroke-linecap="round"$filterAttr/>""")
+        }
+
+        sb.append("</g>")
+        return sb.toString()
+    }
+
+    private fun renderBodyShape(
+        primitive: String,
+        ins: JSONObject,
+        attrs: SvgAttrs,
+        regionFill: Boolean,
+        cx: Double, cy: Double, rx: Double, ry: Double,
+        x: Double, y: Double, w: Double, h: Double,
+        pts: List<Pair<Double, Double>>
+    ): String {
+        val fillVal = if (regionFill) attrs.fill else "none"
+        val fillOpacityAttr = if (regionFill && attrs.fillOpacity != null) """ fill-opacity="${attrs.fillOpacity}"""" else ""
+        val isSolid = ins.optString("style", "solid") == "solid"
+        val strokeAttr = if (isSolid) {
+            """stroke="none""""
+        } else {
+            val sw = attrs.strokeWidth * 0.42
+            val dashAttr = if (!attrs.dash.isNullOrBlank()) """ stroke-dasharray="${attrs.dash}"""" else ""
+            """stroke="${attrs.stroke}" stroke-width="${fmt(sw)}" stroke-linecap="${attrs.strokeLinecap}" stroke-opacity="${attrs.strokeOpacity}"$dashAttr"""
+        }
+
+        return when (primitive) {
+            "circle" -> {
+                if (pts.isNotEmpty()) {
+                    val ptsStr = pts.joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                    """<polygon points="$ptsStr" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
+                } else {
+                    """<circle cx="$cx" cy="$cy" r="$rx" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
+                }
+            }
+            "ellipse" -> {
+                if (pts.isNotEmpty()) {
+                    val ptsStr = pts.joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                    """<polygon points="$ptsStr" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
+                } else {
+                    """<ellipse cx="$cx" cy="$cy" rx="$rx" ry="$ry" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
+                }
+            }
+            "square" -> {
+                if (pts.isNotEmpty()) {
+                    val ptsStr = pts.joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                    """<polygon points="$ptsStr" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
+                } else {
+                    """<rect x="$x" y="$y" width="$w" height="$h" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
+                }
+            }
+            "polygon" -> {
+                val ptsStr = pts.joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                """<polygon points="$ptsStr" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
+            }
+            else -> ""
+        }
     }
 
     private fun polygon(points: List<Pair<Double, Double>>, fill: String, common: String): String {
@@ -825,7 +1053,7 @@ class DefaultSvgRenderer : SvgRenderer {
         return buildString {
             append("{")
             append("\"primitive\":"); append(jsonString(ins.optString("primitive", "line")))
-            append(",\"from_\":"); append(coordJson(ins.optJSONArray("from")))
+            append(",\"from_\":"); append(coordJson(ins.optJSONArray("from_") ?: ins.optJSONArray("from")))
             append(",\"to\":"); append(coordJson(ins.optJSONArray("to")))
             append(",\"center\":"); append(coordJson(ins.optJSONArray("center")))
             append(",\"radius\":"); append(numberOrNull(ins, "radius"))
@@ -872,15 +1100,37 @@ class DefaultSvgRenderer : SvgRenderer {
     private fun variationJson(ins: JSONObject, variation: JSONObject?): String {
         if (variation == null) return "null"
         val primitive = ins.optString("primitive", "line")
-        if (primitive == "line" && !needsPathVariation(variation)) return "null"
-        return buildString {
-            append("{")
-            append("\"amplitude\":"); append(jsonString(variation.optString("amplitude", "medium")))
-            append(",\"frequency\":"); append(jsonString(variation.optString("frequency", "medium")))
-            append(",\"quality\":"); append(jsonString(variation.optString("quality", "none")))
-            append(",\"dimensions\":"); append(stringArrayJson(variation.optJSONArray("dimensions")))
-            append("}")
+        val quality = variation.optString("quality", "none")
+        val dimsArr = variation.optJSONArray("dimensions")
+        val dimsSet = mutableSetOf<String>()
+        if (dimsArr != null) {
+            for (i in 0 until dimsArr.length()) {
+                dimsSet.add(dimsArr.optString(i))
+            }
         }
+        val isPink = quality == "pink"
+        val needsPathVar = quality in setOf("perlin", "wave", "white") && ("position_x" in dimsSet || "position_y" in dimsSet)
+        val needsContourVar = quality in setOf("perlin", "wave", "white") && ("position_x" in dimsSet || "position_y" in dimsSet || "radius" in dimsSet)
+
+        val fields: List<String>? = when {
+            primitive == "cloudform" -> listOf("amplitude", "frequency", "quality")
+            isPink -> listOf("amplitude", "quality")
+            primitive == "line" -> if (needsPathVar) listOf("amplitude", "frequency", "quality", "dimensions") else null
+            needsContourVar -> listOf("amplitude", "frequency", "quality", "dimensions")
+            else -> null
+        }
+        if (fields == null) return "null"
+
+        val parts = mutableListOf<String>()
+        for (field in fields) {
+            when (field) {
+                "amplitude" -> parts.add("\"amplitude\":" + jsonString(variation.optString("amplitude", "medium")))
+                "frequency" -> parts.add("\"frequency\":" + jsonString(variation.optString("frequency", "medium")))
+                "quality" -> parts.add("\"quality\":" + jsonString(variation.optString("quality", "none")))
+                "dimensions" -> parts.add("\"dimensions\":" + stringArrayJson(variation.optJSONArray("dimensions")))
+            }
+        }
+        return parts.joinToString(prefix = "{", postfix = "}", separator = ",")
     }
 
     private fun coordJson(array: JSONArray?): String {

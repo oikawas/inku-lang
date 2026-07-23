@@ -42,6 +42,7 @@ from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import _finalize_score, compose
 from .ddl_expander import FOCUS_IDS, VARIATION_AMPLITUDES
 from .interpreter import _sanitize_placement_words, interpret_detail
+from .layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 from .languages import (
     SUPPORTED_INSTRUCTION_LANGS,
     expand_intermediate_for_lang,
@@ -617,6 +618,8 @@ def _history_render_metadata(item: dict) -> dict | None:
             metadata["render_hash_short"] = item.get("render_hash_short") or _db.render_hash_short(item.get("render_hash"))
         return metadata
     keys = (
+        "ddl_version",
+        "ddl_engine_version",
         "render_build_number",
         "render_color_profile",
         "render_engine_id",
@@ -739,6 +742,8 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
     if catalog is None or color_map is None:
         raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
     metadata = {
+        "ddl_version": DDL_VERSION,
+        "ddl_engine_version": DDL_ENGINE_VERSION,
         "render_build_number": _build_number(),
         "render_color_profile": dict(_SRGB_COLOR_PROFILE),
     }
@@ -886,6 +891,8 @@ class ComposeResponse(BaseModel):
     score: Score
     svg: str
     stage2_model: str | None = None
+    ddl_version: str | None = None
+    ddl_engine_version: str | None = None
     render_build_number: str | None = None
     render_color_profile: dict[str, str] | None = None
     render_engine_id: str | None = None
@@ -999,6 +1006,8 @@ class PaintResponse(BaseModel):
     svg: str
     stage1_model: str | None = None
     stage2_model: str | None = None
+    ddl_version: str | None = None
+    ddl_engine_version: str | None = None
     render_build_number: str | None = None
     render_color_profile: dict[str, str] | None = None
     render_engine_id: str | None = None
@@ -1083,6 +1092,8 @@ class RenderScoreResponse(BaseModel):
     score: Score
     svg: str
     catalog_id: str
+    ddl_version: str
+    ddl_engine_version: str
     render_build_number: str
     render_color_profile: dict[str, str]
     render_engine_id: str
@@ -1173,6 +1184,8 @@ class HistoryPostBody(BaseModel):
     tokens_in: int | None = None
     tokens_out: int | None = None
     catalog_id: str | None = None
+    ddl_version: str | None = None
+    ddl_engine_version: str | None = None
     render_build_number: str | None = None
     render_color_profile: dict[str, str] | None = None
     render_engine_id: str | None = None
@@ -3379,6 +3392,8 @@ def _add_history_item(
     score_dict = score.model_dump(by_alias=True)
     prefix = _output_prefix(actor["id"], item_id, at)
     metadata = dict(render_metadata or {})
+    metadata.setdefault("ddl_version", DDL_VERSION)
+    metadata.setdefault("ddl_engine_version", DDL_ENGINE_VERSION)
     if not metadata.get("render_hash"):
         metadata.update(
             _render_hash_metadata(

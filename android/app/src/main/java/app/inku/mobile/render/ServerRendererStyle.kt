@@ -37,7 +37,7 @@ internal data class SvgAttrs(
 }
 
 internal object ServerRendererStyle {
-    fun strokeAttrs(primitive: String, weight: String, colorKey: String, colorMap: Map<String, String>, ins: JSONObject, unit: Double = 1000.0): SvgAttrs {
+    fun strokeAttrs(primitive: String, weight: String, colorKey: String, colorMap: Map<String, String>, ins: JSONObject, unit: Double): SvgAttrs {
         val colorHint = if (ins.has("color_hint") && !ins.isNull("color_hint")) ins.optString("color_hint") else null
         val color = resolveColor(colorKey, colorHint, colorMap)
         val closedShape = primitive in setOf("circle", "ellipse", "square", "triangle", "polygon")
@@ -100,7 +100,7 @@ internal object ServerRendererStyle {
         return attrs.copy(strokeWidth = strokeWidth, strokeOpacity = opacity, fill = "none", fillOpacity = null, dash = dash ?: attrs.dash)
     }
 
-    fun strokeWidth(weight: String, unit: Double = 1000.0): Double {
+    fun strokeWidth(weight: String, unit: Double): Double {
         val base = when (weight) {
             "hair" -> 0.5
             "pencil" -> 1.5
@@ -169,25 +169,27 @@ internal object ServerRendererStyle {
         return if (weight in setOf("pencil", "crayon", "chalk", "brush_thick")) " filter=\"url(#texture-$weight)\"" else ""
     }
 
-    fun textureFilterDefs(weights: Set<String>): String = buildString {
-        if ("pencil" in weights) append("""<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/></filter>""")
-        if ("crayon" in weights) append("""<filter id="texture-crayon" x="-18%" y="-18%" width="136%" height="136%"><feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="17" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8"/></filter>""")
-        if ("chalk" in weights) append("""<filter id="texture-chalk" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="23" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2"/><feGaussianBlur stdDeviation="0.9"/></filter>""")
-        if ("brush_thick" in weights) append("""<filter id="texture-brush_thick" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="2" seed="31" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4"/><feGaussianBlur stdDeviation="0.6"/></filter>""")
+    fun textureFilterDefs(weights: Set<String>, unit: Double): String = buildString {
+        val scale = unit / 1000.0
+        val fmt = { v: Double -> ServerRendererGeometry.fmt(v) }
+        if ("pencil" in weights) append("""<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.9 / scale)}" numOctaves="2" seed="11" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${fmt(0.7 * scale)}"/></filter>""")
+        if ("crayon" in weights) append("""<filter id="texture-crayon" x="-18%" y="-18%" width="136%" height="136%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.55 / scale)}" numOctaves="3" seed="17" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${fmt(1.8 * scale)}"/></filter>""")
+        if ("chalk" in weights) append("""<filter id="texture-chalk" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.75 / scale)}" numOctaves="3" seed="23" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${fmt(2.2 * scale)}"/><feGaussianBlur stdDeviation="${fmt(0.9 * scale)}"/></filter>""")
+        if ("brush_thick" in weights) append("""<filter id="texture-brush_thick" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.2 / scale)}" numOctaves="2" seed="31" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${fmt(1.4 * scale)}"/><feGaussianBlur stdDeviation="${fmt(0.6 * scale)}"/></filter>""")
     }
 
-    fun blurFilterDefs(): String {
-        return """<filter id="blur-fine" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="2.0"/></filter><filter id="blur-medium" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="6.0"/></filter><filter id="blur-broad" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="15.0"/></filter>"""
-    }
-
-    fun blurFilterId(variation: JSONObject?): String? {
-        if (variation?.optString("quality") != "pink") return null
-        val amp = when (variation.optString("amplitude", "medium")) {
-            "fine" -> "fine"
-            "broad" -> "broad"
-            else -> "medium"
+    fun blurFilterDefs(neededBlurs: Map<String, Double>): String = buildString {
+        neededBlurs.forEach { (id, std) ->
+            append("""<filter id="$id" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="${ServerRendererGeometry.fmt(std)}"/></filter>""")
         }
-        return "blur-$amp"
+    }
+
+    fun blurFilterId(variation: JSONObject?, ins: JSONObject, width: Double, height: Double, unit: Double): String? {
+        if (variation == null || variation.optString("quality") != "pink") return null
+        val std = ServerRendererGeometry.blurStdPx(variation, ins, width, height, unit)
+        val amp = variation.optString("amplitude", "medium")
+        val stdInt = Math.rint(std * 10.0).toInt()
+        return "blur-$amp-$stdInt"
     }
 
     private fun resolveColor(colorKey: String, colorHint: String?, colorMap: Map<String, String>): String {

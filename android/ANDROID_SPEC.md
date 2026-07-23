@@ -1542,5 +1542,27 @@ Added `ServerRendererProportionalTest.kt` to assert against `renderer_proportion
 `gradle :app:testDebugUnitTest` (all 17 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` is `148072`; `android/VERSION` remains `1.48.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2b′ (Wiring Proportional Scale to Render Pipeline & Resolving Unimplemented Items)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §10, proportional scale functions added in 2b were fully wired into the rendering pipeline (`DefaultSvgRenderer.kt`, `ServerRendererGeometry.kt`, `ServerRendererStyle.kt`, `ServerRendererMaterial.kt`), removing all hardcoded legacy absolute functions and default parameters.
+
+### Wiring & Resolution of Unimplemented Requirements
+1. **Complete Removal of Legacy Functions & Defaults**: Removed `ServerRendererGeometry.getAmplitudePx` in favor of `amplitudePx`. Removed default parameter `= 1000.0` from `ServerRendererStyle.strokeAttrs` and `strokeWidth`.
+2. **Full Propagation of Canvas `unit` (`min(width, height)`)**: Threaded `unit` down from `DefaultSvgRenderer` to all geometry, material, and style calls.
+3. **Dynamic Blur Filter Aggregation**: Replaced static `blur-fine / blur-medium / blur-broad` with dynamic `filter_id = "blur-${amp}-${int(std*10)}"` aggregation computed from `blurStdPx` and outputted to `<defs>`.
+4. **Proportional Texture Filters**: Updated `baseFrequency` to be inversely proportional to `unit` (`base * (1000.0 / unit)`) and displacement scale to be proportional to `unit`.
+5. **Material Constraints**: Applied material outline offset floor `0.0035 * unit` (preserving sign via `Math.copySign`), outline opacity floor 0.5 (capped at 1.0), speck opacity floor 0.4 (capped at 1.0), and perimeter-proportional speck counts.
+
+### Verification
+Added `ServerRendererProportionalWiringTest.kt` to assert rendered SVG output across 4 dimensions:
+- **Stroke Width Scaling**: 9 weights across `square` (unit 1000) and `pillar` (unit 200) match reference fixture `stroke_width_px` within 1e-9 tolerance.
+- **Variation Amplitude Scaling**: Wave variation radius deviation ratio between square and pillar equals 5.0 (±5% tolerance) and remains within upper bounds (16.0 for square / 3.2 for pillar).
+- **Blur Scaling**: `<feGaussianBlur>` `stdDeviation` dynamically scales (6.0 for square / 1.2 for pillar).
+- **Material Scaling**: Speck counts and outline offset floor (0.7px for pillar) are accurately reflected in rendered SVG elements.
+
+`gradle :app:testDebugUnitTest --rerun-tasks` (all 22 tests) and `gradle :app:assembleDebug` succeed.
+`android/BUILD_NUMBER` incremented to `148073`.
+
+
 
 

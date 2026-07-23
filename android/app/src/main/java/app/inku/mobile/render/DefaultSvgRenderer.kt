@@ -20,8 +20,12 @@ class DefaultSvgRenderer : SvgRenderer {
         val colors = catalog.renderMap
         val background = colors[score.optString("background", "white")] ?: "#ffffff"
         val instructions = score.optJSONArray("instructions") ?: JSONArray()
+        val width = canvas.width.toDouble()
+        val height = canvas.height.toDouble()
+        val unit = min(width, height)
         val body = StringBuilder()
         val textureWeights = textureWeights(instructions)
+        val neededBlurs = mutableMapOf<String, Double>()
 
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
         body.append("""<g clip-path="url(#canvas-clip)">""")
@@ -29,17 +33,17 @@ class DefaultSvgRenderer : SvgRenderer {
             val instruction = instructions.optJSONObject(i) ?: continue
             val expanded = expandArrangement(instruction)
             for ((index, mark) in expanded.withIndex()) {
-                body.append(renderInstruction(mark, colors, canvas.width.toDouble(), canvas.height.toDouble(), index))
+                body.append(renderInstruction(mark, colors, width, height, unit, neededBlurs, index))
             }
         }
-        body.append(renderPresenceLayer(score, colors, canvas.width.toDouble(), canvas.height.toDouble()))
+        body.append(renderPresenceLayer(score, colors, width, height))
         body.append("</g>")
 
         val svg = buildString {
             append("""<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}">""")
             append("""<defs><clipPath id="canvas-clip"><rect x="0" y="0" width="${canvas.width}" height="${canvas.height}"/></clipPath>""")
-            append(textureFilterDefs(textureWeights))
-            append(blurFilterDefs())
+            append(textureFilterDefs(textureWeights, unit))
+            append(blurFilterDefs(neededBlurs))
             append("</defs>")
             append(body)
             append("</svg>")
@@ -59,11 +63,11 @@ class DefaultSvgRenderer : SvgRenderer {
         return RenderResult(svg = svg, metadataJson = metadata.put("render_hash", hash).toString(), renderHash = hash)
     }
 
-    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, index: Int = 0): String {
+    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, unit: Double, neededBlurs: MutableMap<String, Double>, index: Int = 0): String {
         val primitive = ins.optString("primitive", "line")
         val colorKey = ins.optString("color", "black")
         val weight = ins.optString("weight", "pen")
-        val attrs = strokeAttrs(primitive, weight, colorKey, colors, ins)
+        val attrs = strokeAttrs(primitive, weight, colorKey, colors, ins, unit)
         val common = attrs.toSvgAttributes(includeFill = false)
         val fill = attrs.fill
         val raw = when (primitive) {
@@ -76,11 +80,11 @@ class DefaultSvgRenderer : SvgRenderer {
                 val y2 = px(to?.optDouble(1, 1.0) ?: 1.0, height)
                 val variation = ins.optJSONObject("variation")
                 if (needsPathVariation(variation)) {
-                    val points = variedLinePoints(x1, y1, x2, y2, variation, seedForInstruction(ins))
+                    val points = variedLinePoints(x1, y1, x2, y2, variation, seedForInstruction(ins), ins, width, height, unit)
                         .joinToString(" ") { "${it.first},${it.second}" }
                     """<polyline points="$points" fill="none" $common/>"""
                 } else {
-                    materialLineGroup(ins, attrs, x1, y1, x2, y2) ?: """<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" $common/>"""
+                    materialLineGroup(ins, attrs, x1, y1, x2, y2, unit) ?: """<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" $common/>"""
                 }
             }
             "circle" -> {
@@ -90,13 +94,13 @@ class DefaultSvgRenderer : SvgRenderer {
                 val r = px(ins.optDouble("radius", 0.12), min(width, height))
                 val variation = ins.optJSONObject("variation")
                 val base = if (needsPathVariation(variation)) {
-                    val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins))
+                    val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins), ins, width, height, unit)
                         .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
                     """<polygon points="$pts" fill="$fill" $common/>"""
                 } else {
                     """<circle cx="$cx" cy="$cy" r="$r" fill="$fill" $common/>"""
                 }
-                if (usesMaterialOutline(weight)) """<g>$base${materialCircleOutline(ins, attrs, cx, cy, r)}</g>""" else base
+                if (usesMaterialOutline(weight)) """<g>$base${materialCircleOutline(ins, attrs, cx, cy, r, unit)}</g>""" else base
             }
             "ellipse" -> {
                 val center = ins.optJSONArray("center")
@@ -107,13 +111,13 @@ class DefaultSvgRenderer : SvgRenderer {
                 val ry = px((size?.optDouble(1, 0.16) ?: 0.16) / 2.0, height)
                 val variation = ins.optJSONObject("variation")
                 val base = if (needsPathVariation(variation)) {
-                    val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins))
+                    val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins), ins, width, height, unit)
                         .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
                     """<polygon points="$pts" fill="$fill" $common/>"""
                 } else {
                     """<ellipse cx="$cx" cy="$cy" rx="$rx" ry="$ry" fill="$fill" $common/>"""
                 }
-                if (usesMaterialOutline(weight)) """<g>$base${materialEllipseOutline(ins, attrs, cx, cy, rx, ry)}</g>""" else base
+                if (usesMaterialOutline(weight)) """<g>$base${materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit)}</g>""" else base
             }
             "square" -> {
                 val pos = ins.optJSONArray("position")
@@ -125,13 +129,13 @@ class DefaultSvgRenderer : SvgRenderer {
                 val variation = ins.optJSONObject("variation")
                 val base = if (needsPathVariation(variation)) {
                     val rectPts = ServerRendererGeometry.rectPoints(x, y, w, h, 80)
-                    val pts = ServerRendererGeometry.variedPolygonPoints(rectPts, variation, seedForInstruction(ins), x + w / 2.0, y + h / 2.0)
+                    val pts = ServerRendererGeometry.variedPolygonPoints(rectPts, variation, seedForInstruction(ins), x + w / 2.0, y + h / 2.0, ins, width, height, unit)
                         .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
                     """<polygon points="$pts" fill="$fill" $common/>"""
                 } else {
                     """<rect x="$x" y="$y" width="$w" height="$h" fill="$fill" $common/>"""
                 }
-                if (usesMaterialOutline(weight)) """<g>$base${materialRectOutline(ins, attrs, x, y, w, h)}</g>""" else base
+                if (usesMaterialOutline(weight)) """<g>$base${materialRectOutline(ins, attrs, x, y, w, h, unit)}</g>""" else base
             }
             "triangle" -> {
                 val points = trianglePoints(ins, width, height)
@@ -141,7 +145,7 @@ class DefaultSvgRenderer : SvgRenderer {
                     val size = ins.optJSONArray("size")
                     val cx = px((pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.30) ?: 0.30) / 2.0, width)
                     val cy = px((pos?.optDouble(1, 0.35) ?: 0.35) + (size?.optDouble(1, 0.30) ?: 0.30) / 2.0, height)
-                    ServerRendererGeometry.variedPolygonPoints(points, variation, seedForInstruction(ins), cx, cy)
+                    ServerRendererGeometry.variedPolygonPoints(points, variation, seedForInstruction(ins), cx, cy, ins, width, height, unit)
                 } else {
                     points
                 }
@@ -156,7 +160,7 @@ class DefaultSvgRenderer : SvgRenderer {
                     val size = ins.optJSONArray("size")
                     val cx = px(center?.optDouble(0) ?: ((position?.optDouble(0, 0.4) ?: 0.4) + (size?.optDouble(0, 0.2) ?: 0.2) / 2.0), width)
                     val cy = px(center?.optDouble(1) ?: ((position?.optDouble(1, 0.4) ?: 0.4) + (size?.optDouble(1, 0.2) ?: 0.2) / 2.0), height)
-                    ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedForInstruction(ins), cx, cy)
+                    ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedForInstruction(ins), cx, cy, ins, width, height, unit)
                 } else {
                     rawPoints
                 }
@@ -170,26 +174,22 @@ class DefaultSvgRenderer : SvgRenderer {
                 val start = ins.optDouble("angle_start", 20.0)
                 val end = ins.optDouble("angle_end", 300.0)
                 val variation = ins.optJSONObject("variation")
-                val path = ServerRendererGeometry.variedArcPathD(cx, cy, r, start, end, variation, seedForInstruction(ins))
+                val path = ServerRendererGeometry.variedArcPathD(cx, cy, r, start, end, variation, seedForInstruction(ins), ins, width, height, unit)
                 val base = """<path d="$path" fill="none" $common/>"""
-                if (usesMaterialOutline(weight)) """<g>$base${materialArcOutline(ins, attrs, cx, cy, r, start, end)}</g>""" else base
+                if (usesMaterialOutline(weight)) """<g>$base${materialArcOutline(ins, attrs, cx, cy, r, start, end, unit)}</g>""" else base
             }
             else -> ""
         }
         val rendered = applyRotation(raw, ins, width, height, primitive)
-        val blur = blurFilterId(ins.optJSONObject("variation"))
-        return if (blur != null) """<g filter="url(#$blur)">$rendered</g>""" else rendered
-    }
-
-    private fun strokeAttrs(primitive: String, weight: String, colorKey: String, colors: Map<String, String>, ins: JSONObject): SvgAttrs {
-        return ServerRendererStyle.strokeAttrs(primitive, weight, colorKey, colors, ins)
-    }
-
-    private fun outlineAttrs(attrs: SvgAttrs, strokeWidth: Double, opacity: Double, dash: String?): SvgAttrs {
-        return ServerRendererStyle.outlineAttrs(attrs, strokeWidth, opacity, dash)
+        val blurId = blurFilterId(ins.optJSONObject("variation"), ins, width, height, unit)
+        if (blurId != null && ins.optJSONObject("variation") != null) {
+            neededBlurs[blurId] = ServerRendererGeometry.blurStdPx(ins.optJSONObject("variation")!!, ins, width, height, unit)
+        }
+        return if (blurId != null) """<g filter="url(#$blurId)">$rendered</g>""" else rendered
     }
 
     private fun expandArrangement(ins: JSONObject): List<JSONObject> {
+
         val arr = ins.optJSONObject("arrangement") ?: return listOf(ins)
         val count = arr.optInt("count", 1).coerceIn(1, 1000)
         val layout = arr.optString("layout", "horizontal")
@@ -452,29 +452,53 @@ class DefaultSvgRenderer : SvgRenderer {
         return ServerRendererGeometry.arcPathD(cx, cy, r, startDeg, endDeg)
     }
 
-    private fun materialLineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double): String? {
-        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2)
+    private fun materialLineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double): String? {
+        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit)
     }
 
-    private fun materialCircleOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double): String {
-        return ServerRendererMaterial.circleOutline(ins, attrs, cx, cy, r)
+    private fun materialCircleOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double, unit: Double): String {
+        return ServerRendererMaterial.circleOutline(ins, attrs, cx, cy, r, unit)
     }
 
-    private fun materialEllipseOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, rx: Double, ry: Double): String {
-        return ServerRendererMaterial.ellipseOutline(ins, attrs, cx, cy, rx, ry)
+    private fun materialEllipseOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, rx: Double, ry: Double, unit: Double): String {
+        return ServerRendererMaterial.ellipseOutline(ins, attrs, cx, cy, rx, ry, unit)
     }
 
-    private fun materialRectOutline(ins: JSONObject, attrs: SvgAttrs, x: Double, y: Double, w: Double, h: Double): String {
-        return ServerRendererMaterial.rectOutline(ins, attrs, x, y, w, h)
+    private fun materialRectOutline(ins: JSONObject, attrs: SvgAttrs, x: Double, y: Double, w: Double, h: Double, unit: Double): String {
+        return ServerRendererMaterial.rectOutline(ins, attrs, x, y, w, h, unit)
     }
 
-    private fun materialArcOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double, start: Double, end: Double): String {
-        return ServerRendererMaterial.arcOutline(ins, attrs, cx, cy, r, start, end)
+    private fun materialArcOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double, start: Double, end: Double, unit: Double): String {
+        return ServerRendererMaterial.arcOutline(ins, attrs, cx, cy, r, start, end, unit)
     }
 
     private fun usesMaterialOutline(weight: String): Boolean = ServerRendererMaterial.usesMaterialOutline(weight)
 
+    private fun rotationCenter(ins: JSONObject, width: Double, height: Double, primitive: String): Pair<Double, Double> {
+        return when (primitive) {
+            "line" -> {
+                val from = ins.optJSONArray("from")
+                val to = ins.optJSONArray("to")
+                val x = ((from?.optDouble(0, 0.1) ?: 0.1) + (to?.optDouble(0, 0.9) ?: 0.9)) / 2.0
+                val y = ((from?.optDouble(1, 0.5) ?: 0.5) + (to?.optDouble(1, 0.5) ?: 0.5)) / 2.0
+                px(x, width) to px(y, height)
+            }
+            "square", "triangle" -> {
+                val pos = ins.optJSONArray("position")
+                val size = ins.optJSONArray("size")
+                val x = (pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.3) ?: 0.3) / 2.0
+                val y = (pos?.optDouble(1, 0.35) ?: 0.35) + (size?.optDouble(1, 0.3) ?: 0.3) / 2.0
+                px(x, width) to px(y, height)
+            }
+            else -> {
+                val center = ins.optJSONArray("center")
+                px(center?.optDouble(0, 0.5) ?: 0.5, width) to px(center?.optDouble(1, 0.5) ?: 0.5, height)
+            }
+        }
+    }
+
     private fun applyRotation(element: String, ins: JSONObject, width: Double, height: Double, primitive: String): String {
+
         val rotation = ins.optDouble("rotation", 0.0)
         if (kotlin.math.abs(rotation) < 1e-9 || element.isBlank()) return element
         val center = rotationCenter(ins, width, height, primitive)
@@ -603,31 +627,16 @@ class DefaultSvgRenderer : SvgRenderer {
         return out.toString()
     }
 
-    private fun rotationCenter(ins: JSONObject, width: Double, height: Double, primitive: String): Pair<Double, Double> {
-        return when (primitive) {
-            "line" -> {
-                val from = ins.optJSONArray("from")
-                val to = ins.optJSONArray("to")
-                val x = ((from?.optDouble(0, 0.1) ?: 0.1) + (to?.optDouble(0, 0.9) ?: 0.9)) / 2.0
-                val y = ((from?.optDouble(1, 0.5) ?: 0.5) + (to?.optDouble(1, 0.5) ?: 0.5)) / 2.0
-                px(x, width) to px(y, height)
-            }
-            "square", "triangle" -> {
-                val pos = ins.optJSONArray("position")
-                val size = ins.optJSONArray("size")
-                val x = (pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.3) ?: 0.3) / 2.0
-                val y = (pos?.optDouble(1, 0.35) ?: 0.35) + (size?.optDouble(1, 0.3) ?: 0.3) / 2.0
-                px(x, width) to px(y, height)
-            }
-            else -> {
-                val center = ins.optJSONArray("center")
-                px(center?.optDouble(0, 0.5) ?: 0.5, width) to px(center?.optDouble(1, 0.5) ?: 0.5, height)
-            }
-        }
+    private fun strokeAttrs(primitive: String, weight: String, colorKey: String, colors: Map<String, String>, ins: JSONObject, unit: Double): SvgAttrs {
+        return ServerRendererStyle.strokeAttrs(primitive, weight, colorKey, colors, ins, unit)
     }
 
-    private fun strokeWidth(weight: String): Double = when (weight) {
-        else -> ServerRendererStyle.strokeWidth(weight)
+    private fun outlineAttrs(attrs: SvgAttrs, strokeWidth: Double, opacity: Double, dash: String?): SvgAttrs {
+        return ServerRendererStyle.outlineAttrs(attrs, strokeWidth, opacity, dash)
+    }
+
+    private fun strokeWidth(weight: String, unit: Double): Double {
+        return ServerRendererStyle.strokeWidth(weight, unit)
     }
 
     private fun strokeOpacity(weight: String): Double = when (weight) {
@@ -658,53 +667,27 @@ class DefaultSvgRenderer : SvgRenderer {
         return ServerRendererStyle.filterAttr(weight, variation)
     }
 
-    private fun textureFilterDefs(weights: Set<String>): String = buildString {
-        append(ServerRendererStyle.textureFilterDefs(weights))
+    private fun textureFilterDefs(weights: Set<String>, unit: Double): String = buildString {
+        append(ServerRendererStyle.textureFilterDefs(weights, unit))
     }
 
-    private fun blurFilterDefs(): String {
-        return ServerRendererStyle.blurFilterDefs()
+    private fun blurFilterDefs(neededBlurs: Map<String, Double>): String {
+        return ServerRendererStyle.blurFilterDefs(neededBlurs)
     }
 
-    private fun blurFilterId(variation: JSONObject?): String? {
-        return ServerRendererStyle.blurFilterId(variation)
+    private fun blurFilterId(variation: JSONObject?, ins: JSONObject, width: Double, height: Double, unit: Double): String? {
+        return ServerRendererStyle.blurFilterId(variation, ins, width, height, unit)
     }
 
     private fun needsPathVariation(variation: JSONObject?): Boolean {
         return ServerRendererGeometry.needsPathVariation(variation)
     }
 
-    private fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String): List<Pair<Double, Double>> {
-        return ServerRendererGeometry.variedLinePoints(x1, y1, x2, y2, variation, seed)
+    private fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return ServerRendererGeometry.variedLinePoints(x1, y1, x2, y2, variation, seed, ins, width, height, unit)
     }
 
-    private fun variationOffset(t: Double, segment: Int, variation: JSONObject, seed: String): Double {
-        val amp = when (variation.optString("amplitude", "medium")) {
-            "fine" -> 7.0
-            "broad" -> 30.0
-            else -> 12.0
-        }
-        val freq = when (variation.optString("frequency", "medium")) {
-            "slow" -> 2.0
-            "high" -> 14.0
-            else -> 6.0
-        }
-        return when (variation.optString("quality", "none")) {
-            "wave" -> sin(t * Math.PI * 2.0 * freq) * amp
-            "perlin" -> smoothNoise(t * freq, seed) * amp
-            "white" -> (hash01(segment, seed) * 2.0 - 1.0) * amp
-            else -> 0.0
-        }
-    }
 
-    private fun smoothNoise(x: Double, seed: String): Double {
-        val xi = kotlin.math.floor(x).toInt()
-        val xf = x - xi
-        val v1 = signedHash(xi, seed)
-        val v2 = signedHash(xi + 1, seed)
-        val t = xf * xf * (3.0 - 2.0 * xf)
-        return v1 * (1.0 - t) + v2 * t
-    }
 
     private fun px(value: Double, scale: Double): Double = value * scale
 

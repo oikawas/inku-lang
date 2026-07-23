@@ -1276,6 +1276,28 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 `render_engine_version` は engine 10 到達済みの `"10"` を維持。
 `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148078` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
 
+## 2026-07-23 web/server v2 追随 Phase 2g′ (雲形輪郭・劣弧幾何 Flag・touching 双弧・全参照 SVG パリティ 100% 完全同期)
+
+契約 `antigravity-android-phase2-renderer.md` §8 Phase 2g′ に基づき、Python 参照実装 (`renderer_cloudform_and_relations.json` および参照 SVG 11〜14 `11_cloudform_filled.svg`, `12_cloudform_stroke.svg`, `13_touching_arcs.svg`, `14_cloudform_surface.svg`) と Android レンダリングエンジンの完全同調を完了した。
+
+### 実施・是正の詳細
+
+1. **劣弧描画ジオメトリ完全同調 (`ServerRendererGeometry.kt`)**:
+   - `arcPathD` を Python サーバー `renderer.py:3493-3504` と完全に同一の数式（`minorArcDelta` および `delta > 0.0` のとき `sweep = 0`, `delta <= 0.0` のとき `sweep = 1`）へ同調。
+   - `energyLateral` 参照テーブルを inline `when` 表から `GRAMMARS[weight]` 定数表参照へ一元化。
+2. **手描きストローク・ID階層・`touching` 反転是正 (`DefaultSvgRenderer.kt`)**:
+   - `performedArcSagitta` および `canvasEndpointGeometry` での弧のサンプル点計算時の Y 座標符号 (`cy - r * sin(rad)`) を Y 軸下向きスクリーン座標系へ修正し、`touching` 劣弧再構成での双弧膨らみ方向の反転を解消。
+   - `primitive == "cloudform"` レンダリング時に `<path class="cloudform contour-v1 stroke-engine-touch" ...>` 属性を付与。
+   - `svgProfile == "editable"` 時に最外周へ `<g id="instruction_...">` および `<g id="mark_...">` 階層構造を出力。
+3. **テスト検証基盤 (`ServerRendererCloudformAndRelationsTest.kt`)**:
+   - 正規表現 `d="([^"]+)"` を `\bd="([^"]+)"` へ改修し、`<metadata id="...">` 等の `id` 属性に対する誤マッチを完全に排除。
+   - `renderFromIndexEntry` ヘルパーで `score` オブジェクトに `render_seed` を正しく注入。
+
+### 検証結果
+
+- `gradle :app:testDebugUnitTest --rerun-tasks` により全 54 件の単体テストが 100% 通過 (PASS)。
+- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148079` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
+
 
 
 

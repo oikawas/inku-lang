@@ -255,9 +255,9 @@ internal object ServerRendererGeometry {
         val y1 = cy - r * sin(sa)
         val x2 = cx + r * cos(ea)
         val y2 = cy - r * sin(ea)
-        val delta = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
-        val largeArc = if (delta > 180.0) 1 else 0
-        val sweep = if (endDeg > startDeg) 0 else 1
+        val delta = endDeg - startDeg
+        val largeArc = if (kotlin.math.abs(delta) > 180.0) 1 else 0
+        val sweep = if (delta > 0.0) 0 else 1
         return "M ${fmt(x1)} ${fmt(y1)} A ${fmt(r)} ${fmt(r)} 0 $largeArc $sweep ${fmt(x2)} ${fmt(y2)}"
     }
 
@@ -617,10 +617,14 @@ internal object ServerRendererGeometry {
     )
 
     fun minorArcDelta(angleStart: Double, angleEnd: Double): Double {
-        var delta = (angleEnd - angleStart) % 360.0
-        if (delta > 180.0) delta -= 360.0
-        if (delta < -180.0) delta += 360.0
-        return delta
+        var diff = (angleEnd - angleStart + 180.0) % 360.0
+        if (diff < 0) diff += 360.0
+        return diff - 180.0
+    }
+
+    fun arcPoint(center: Pair<Double, Double>, radius: Double, angleDegrees: Double): Pair<Double, Double> {
+        val rad = Math.toRadians(angleDegrees)
+        return (center.first + radius * cos(rad)) to (center.second - radius * sin(rad))
     }
 
     fun arcFromEndpointsAndSagitta(
@@ -630,31 +634,30 @@ internal object ServerRendererGeometry {
     ): ArcGeometry {
         val dx = end.first - start.first
         val dy = end.second - start.second
-        val length = hypot(dx, dy)
-        require(length > 1e-12) { "endpoints are identical or too close" }
-        require(kotlin.math.abs(sagitta) > 1e-12) { "sagitta must be non-zero" }
-        val mx = (start.first + end.first) / 2.0
-        val my = (start.second + end.second) / 2.0
-        val nx = -dy / length
-        val ny = dx / length
-        val sagittaAbs = kotlin.math.abs(sagitta)
-        val radius = (length * length / 4.0 + sagittaAbs * sagittaAbs) / (2.0 * sagittaAbs)
-        val distanceToCenter = radius - sagittaAbs
-        val sign = kotlin.math.sign(sagitta)
-        val cx = mx - sign * nx * distanceToCenter
-        val cy = my - sign * ny * distanceToCenter
-        val rawStart = Math.toDegrees(kotlin.math.atan2(start.second - cy, start.first - cx))
-        val rawEnd = Math.toDegrees(kotlin.math.atan2(end.second - cy, end.first - cx))
-        var delta = (rawEnd - rawStart) % 360.0
-        if (delta > 180.0) delta -= 360.0
-        if (delta < -180.0) delta += 360.0
-        if (sagitta > 0 && delta < 0) delta += 360.0
-        if (sagitta < 0 && delta > 0) delta -= 360.0
+        val chord = hypot(dx, dy)
+        val height = kotlin.math.abs(sagitta)
+        require(chord > 1e-12) { "arc chord must be non-zero" }
+        require(height > 1e-12 && height < chord / 2.0) { "arc sagitta must be positive and smaller than half the chord" }
+
+        val radius = chord * chord / (8.0 * height) + height / 2.0
+        val midpoint = ((start.first + end.first) / 2.0) to ((start.second + end.second) / 2.0)
+        val normal = (-dy / chord) to (dx / chord)
+        val sign = if (sagitta > 0.0) 1.0 else -1.0
+        val center = (midpoint.first - sign * (radius - height) * normal.first) to
+            (midpoint.second - sign * (radius - height) * normal.second)
+
+        fun angle(p: Pair<Double, Double>): Double {
+            return Math.toDegrees(kotlin.math.atan2(-(p.second - center.second), p.first - center.first))
+        }
+
+        val angleStart = angle(start)
+        val delta = minorArcDelta(angleStart, angle(end))
+        require(kotlin.math.abs(delta) < 180.0 - 1e-9) { "arc must use a sweep smaller than 180 degrees" }
         return ArcGeometry(
-            center = cx to cy,
+            center = center,
             radius = radius,
-            angleStart = (rawStart + 360.0) % 360.0,
-            angleEnd = rawStart + delta
+            angleStart = angleStart,
+            angleEnd = angleStart + delta
         )
     }
 
@@ -755,20 +758,8 @@ internal object ServerRendererGeometry {
             frequencyRange(variation),
             spectrumPower(variation)
         )
-        val lateralEnergy = when (weight) {
-            "pencil" -> 0.70
-            "pen" -> 0.25
-            "marker" -> 0.40
-            "crayon" -> 1.20
-            "rotring" -> 0.05
-            "brush" -> 1.50
-            "sumi" -> 1.80
-            "fountain_pen" -> 0.35
-            "burin" -> 0.15
-            "drypoint" -> 0.20
-            else -> 0.25
-        }
-        val touchGain = lateralEnergy * 0.018
+        val grammar = GRAMMARS[weight] ?: GRAMMARS["pen"]!!
+        val touchGain = grammar.energyLateral * 0.018
         val touch = normalizedHarmonicSignal(
             theta,
             seed xor 0x7001L,
@@ -887,7 +878,7 @@ internal object ServerRendererGeometry {
             var ny = tx / tangentLen
             val towardCenterX = center.first - basePoint.first
             val towardCenterY = center.second - basePoint.second
-            if (nx * towardCenterX + ny * towardCenterY < 0) {
+            if (nx * towardCenterX + ny * towardCenterY > 0) {
                 nx = -nx
                 ny = -ny
             }

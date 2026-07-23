@@ -1696,6 +1696,28 @@ XML test result aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) c
 `render_engine_version` remains `"10"`.
 `gradle :app:assembleDebug` succeeds, incrementing `android/BUILD_NUMBER` to `148078`. `android/VERSION` remains `2.0.0-android.1`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2g′ (Cloudform, Arc Geometry Flags, Touching Sagitta & 100% SVG Parity)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8 Phase 2g′, full parity alignment between Python reference implementation (`renderer_cloudform_and_relations.json` and reference SVGs 11–14: `11_cloudform_filled.svg`, `12_cloudform_stroke.svg`, `13_touching_arcs.svg`, `14_cloudform_surface.svg`) and the Android rendering engine was achieved.
+
+### Implementation & Parity Details
+
+1. **Minor Arc Geometry Alignment (`ServerRendererGeometry.kt`)**:
+   - Synchronized `arcPathD` formula with Python server `renderer.py:3493-3504` (`minorArcDelta` and `sweep = 0` if `delta > 0.0` else `1`).
+   - Consolidated `energyLateral` lookup to `GRAMMARS[weight]` constant table.
+2. **Hand Stroke, ID Hierarchy & `touching` Orientation (`DefaultSvgRenderer.kt`)**:
+   - Fixed Y-coordinate subtraction sign (`cy - r * sin(rad)`) in `performedArcSagitta` and `canvasEndpointGeometry` for screen coordinates, resolving `touching` arc curvature inversion.
+   - Appended `<path class="cloudform contour-v1 stroke-engine-touch" ...>` attributes for `cloudform` primitives.
+   - Emitted top-level `<g id="instruction_...">` and `<g id="mark_...">` hierarchy when `svgProfile == "editable"`.
+3. **Test Infrastructure (`ServerRendererCloudformAndRelationsTest.kt`)**:
+   - Updated regex pattern `d="([^"]+)"` to `\bd="([^"]+)"` to eliminate false attribute matches on `<metadata id="...">`.
+   - Injected `render_seed` into `score` object in `renderFromIndexEntry`.
+
+### Verification
+
+All 54 unit tests pass 100% via `gradle :app:testDebugUnitTest --rerun-tasks`.
+`gradle :app:assembleDebug` succeeds, incrementing `android/BUILD_NUMBER` to `148079`. `android/VERSION` remains `2.0.0-android.1`.
+
 
 
 

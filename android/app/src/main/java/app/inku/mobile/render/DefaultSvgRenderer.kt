@@ -29,13 +29,31 @@ class DefaultSvgRenderer : SvgRenderer {
         val neededBlurs = mutableMapOf<String, Double>()
 
         val resolvedInstructions = resolvePerformanceScore(instructions, renderSeed)
+        val structured = request.svgProfile == "editable"
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
         body.append("""<g clip-path="url(#canvas-clip)">""")
         for (i in 0 until resolvedInstructions.length()) {
             val instruction = resolvedInstructions.optJSONObject(i) ?: continue
+            val primitive = instruction.optString("primitive", "line")
+            val colorKey = instruction.optString("color", "black")
+            val weight = instruction.optString("weight", "pen")
+            val insId = "instruction_${"%03d".format(i)}_${primitive}_${colorKey}_${weight}"
             val expanded = expandArrangement(instruction)
+            val insSb = StringBuilder()
             for ((index, mark) in expanded.withIndex()) {
-                body.append(renderInstruction(mark, colors, width, height, unit, neededBlurs, index, renderSeed))
+                val markId = "mark_${"%03d".format(i)}_${"%03d".format(index)}_${primitive}"
+                var elem = renderInstruction(mark, colors, width, height, unit, neededBlurs, i, renderSeed)
+                if (structured && elem.startsWith("<g ")) {
+                    elem = elem.replaceFirst(">", """ id="$markId">""")
+                } else if (structured && elem.startsWith("<path ")) {
+                    elem = elem.replaceFirst(">", """ id="$markId">""")
+                }
+                insSb.append(elem)
+            }
+            if (structured) {
+                body.append("""<g id="$insId">$insSb</g>""")
+            } else {
+                body.append(insSb)
             }
         }
         body.append(renderPresenceLayer(score, colors, width, height))
@@ -295,6 +313,28 @@ class DefaultSvgRenderer : SvgRenderer {
                     val outline = if (usesMaterialOutline(weight)) materialArcOutline(ins, attrs, cx, cy, r, start, end, unit) else ""
                     if (outline.isNotEmpty()) """<g>$base$outline</g>""" else base
                 }
+            }
+            "cloudform" -> {
+                val center = ins.optJSONArray("center")
+                val size = ins.optJSONArray("size")
+                val cx = px(center?.optDouble(0, 0.5) ?: 0.5, width)
+                val cy = px(center?.optDouble(1, 0.5) ?: 0.5, height)
+                val sw = px(size?.optDouble(0, 0.5) ?: 0.5, width)
+                val sh = px(size?.optDouble(1, 0.34) ?: 0.34, height)
+                val contour = ServerRendererGeometry.generateCloudformContour(
+                    center = cx to cy,
+                    size = sw to sh,
+                    performanceSeed = renderSeed,
+                    instructionIndex = index,
+                    markIndex = 0,
+                    variation = ins.optJSONObject("variation"),
+                    weight = weight,
+                    pointCount = 49
+                )
+                val (fillGroup, _) = interiorFill(ins, attrs, contour.points, unit, renderSeed)
+                val classAttr = """class="cloudform contour-v1 stroke-engine-touch""""
+                val pathStr = """<path d="${contour.pathD}" fill="$fill" $common $classAttr/>"""
+                if (fillGroup != null) """<g>$pathStr$fillGroup</g>""" else pathStr
             }
 
             else -> ""
@@ -1718,9 +1758,8 @@ class DefaultSvgRenderer : SvgRenderer {
         val cy = center.getDouble(1)
         val r = ins.getDouble("radius")
         val rot = ins.optDouble("rotation", 0.0)
-        val localApexX = cx + r * kotlin.math.cos(Math.toRadians(angleStart + delta / 2.0))
-        val localApexY = cy + r * kotlin.math.sin(Math.toRadians(angleStart + delta / 2.0))
-        val apex = rotatePoint(localApexX to localApexY, cx to cy, rot)
+        val localApex = ServerRendererGeometry.arcPoint(cx to cy, r, angleStart + delta / 2.0)
+        val apex = rotatePoint(localApex, cx to cy, rot)
         val chordX = end.first - start.first
         val chordY = end.second - start.second
         val length = kotlin.math.hypot(chordX, chordY)
@@ -1752,8 +1791,8 @@ class DefaultSvgRenderer : SvgRenderer {
             val r = ins.getDouble("radius")
             val aStart = ins.getDouble("angle_start")
             val aEnd = ins.getDouble("angle_end")
-            val p1 = (cx + r * kotlin.math.cos(Math.toRadians(aStart))) to (cy + r * kotlin.math.sin(Math.toRadians(aStart)))
-            val p2 = (cx + r * kotlin.math.cos(Math.toRadians(aEnd))) to (cy + r * kotlin.math.sin(Math.toRadians(aEnd)))
+            val p1 = ServerRendererGeometry.arcPoint(cx to cy, r, aStart)
+            val p2 = ServerRendererGeometry.arcPoint(cx to cy, r, aEnd)
             val r1 = rotatePoint(p1, cx to cy, rot)
             val r2 = rotatePoint(p2, cx to cy, rot)
             return arrayOf(r1, r2)

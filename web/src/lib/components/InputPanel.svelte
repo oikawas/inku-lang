@@ -51,6 +51,7 @@
 		demoSettings: DemoSettings;
 		demoModelProviderGroups: ProviderGroup[];
 		demoRunning: boolean;
+		demoTimedOut: boolean;
 		demoWaitingSeconds: number | null;
 		demoCurrentLiveMs: number | null;
 		demoCurrentElapsedMs: number | null;
@@ -124,6 +125,7 @@
 		demoSettings = $bindable(),
 		demoModelProviderGroups,
 		demoRunning,
+		demoTimedOut,
 		demoWaitingSeconds,
 		demoCurrentLiveMs,
 		demoCurrentElapsedMs,
@@ -374,6 +376,7 @@
 			bind:settings={demoSettings}
 			providerGroups={demoModelProviderGroups}
 			running={demoRunning}
+			timedOut={demoTimedOut}
 			{liveMs}
 			waitingSeconds={demoWaitingSeconds}
 			currentLiveMs={demoCurrentLiveMs}

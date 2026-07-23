@@ -559,6 +559,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
     assert initial.json()["save_files"] is False
     assert initial.json()["random_color_catalog"] is False
     assert initial.json()["interval_seconds"] == 30
+    assert initial.json()["timeout_seconds"] == 3600
 
     body = {
         "save_db": True,
@@ -566,6 +567,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
         "prompt_model": "meta/llama-3.3-70b-instruct",
         "seed_phrase": "短い冬の情景を生成",
         "interval_seconds": 45,
+        "timeout_seconds": 7200,
         "random_color_catalog": True,
     }
     updated = client.put("/api/auth/me/demo-settings", headers=headers, json=body)
@@ -578,6 +580,10 @@ def test_current_user_demo_settings_are_persisted(auth_context):
 
     invalid = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "interval_seconds": 0})
     assert invalid.status_code == 422
+    too_short = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "timeout_seconds": 59})
+    assert too_short.status_code == 422
+    too_long = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "timeout_seconds": 86401})
+    assert too_long.status_code == 422
 
 
 def test_current_user_plugin_storage_is_persisted(auth_context):

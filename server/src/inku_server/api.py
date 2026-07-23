@@ -1386,6 +1386,7 @@ class DemoSettingsBody(BaseModel):
     prompt_model: str = Field(default="google/gemma-4-31b-it", min_length=1)
     seed_phrase: str = Field(default="日本の四季を感じさせる文章を40語以内で生成", min_length=1, max_length=1000)
     interval_seconds: int = Field(default=30, ge=1, le=3600)
+    timeout_seconds: int = Field(default=3600, ge=60, le=86400)
     random_color_catalog: bool = False
 
 

@@ -311,6 +311,7 @@
 	let demoGeneratedPrompt = $state('');
 	let demoGeneratedDdl = $state<string | null>(null);
 	let demoError = $state<string | null>(null);
+	let demoTimedOut = $state(false);
 	let demoSaveStatus = $state<string | null>(null);
 	let demoSavingCurrent = $state(false);
 	let demoCurrentSaved = $state(false);
@@ -944,6 +945,7 @@
 			prompt_model: settings.prompt_model || DEFAULT_MODEL,
 			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
 			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
+			timeout_seconds: Math.max(60, Math.min(86400, Math.round(settings.timeout_seconds || 3600))),
 			random_color_catalog: !!settings.random_color_catalog,
 		};
 	}
@@ -2899,8 +2901,8 @@ if (unreadWords.length > 0) {
 		return data.instruction;
 	}
 
-	async function runDemoLoop(runId: number) {
-		while (demoRunId === runId && loading) {
+	async function runDemoLoop(runId: number, timeoutAt: number) {
+		while (demoRunId === runId && loading && Date.now() < timeoutAt) {
 			const startedAt = Date.now();
 			demoCurrentStartedAt = startedAt;
 			demoCurrentLiveMs = 0;
@@ -2948,18 +2950,24 @@ if (unreadWords.length > 0) {
 				demoTotalTokensOut += currentTokensOut;
 				demoRenderCount += 1;
 				if (settings.save_db) await refreshHistoryAfterServerSave();
-				const remainingMs = Math.max(0, settings.interval_seconds * 1000 - (Date.now() - startedAt));
+				if (Date.now() >= timeoutAt) break;
+				const intervalRemainingMs = settings.interval_seconds * 1000 - (Date.now() - startedAt);
+				const timeoutRemainingMs = timeoutAt - Date.now();
+				const remainingMs = Math.max(0, Math.min(intervalRemainingMs, timeoutRemainingMs));
+				const waitingForNextRender = intervalRemainingMs <= timeoutRemainingMs;
 				for (let left = Math.ceil(remainingMs / 1000); left > 0 && demoRunId === runId && loading; left--) {
-					demoWaitingSeconds = left;
+					demoWaitingSeconds = waitingForNextRender ? left : null;
 					await sleep(Math.min(1000, remainingMs));
 				}
 			} catch (e) {
 				demoCurrentStartedAt = null;
 				demoError = e instanceof Error ? e.message : String(e);
-				await sleep(1000);
+				const retryDelayMs = Math.min(1000, Math.max(0, timeoutAt - Date.now()));
+				if (retryDelayMs > 0) await sleep(retryDelayMs);
 			}
 		}
 		if (demoRunId === runId) {
+			demoTimedOut = Date.now() >= timeoutAt;
 			demoCurrentStartedAt = null;
 			stopTimer();
 			loading = false;
@@ -2973,6 +2981,7 @@ if (unreadWords.length > 0) {
 		if (loading || variationGridBusy) return;
 		clearInput();
 		demoError = null;
+		demoTimedOut = false;
 		demoSaveStatus = null;
 		demoCurrentSaved = false;
 		error = null;
@@ -2991,11 +3000,13 @@ if (unreadWords.length > 0) {
 		loading = true;
 		demoRunId += 1;
 		startTimer();
-		await runDemoLoop(demoRunId);
+		const timeoutAt = Date.now() + normalizeDemoSettings(demoSettings).timeout_seconds * 1000;
+		await runDemoLoop(demoRunId, timeoutAt);
 	}
 
 	function stopDemo() {
 		demoRunId += 1;
+		demoTimedOut = false;
 		demoCurrentStartedAt = null;
 		loading = false;
 		activeRunMode = null;
@@ -5950,6 +5961,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						bind:demoSettings
 						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}
+						{demoTimedOut}
 						{demoWaitingSeconds}
 						{demoCurrentLiveMs}
 						{demoCurrentElapsedMs}

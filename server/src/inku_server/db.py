@@ -345,6 +345,7 @@ _DEMO_DEFAULT_SETTINGS = {
     "prompt_model": "google/gemma-4-31b-it",
     "seed_phrase": "日本の四季を感じさせる文章を40語以内で生成",
     "interval_seconds": 30,
+    "timeout_seconds": 3600,
     "random_color_catalog": False,
 }
 _EXPORT_TEMPLATE_LIMIT = 20
@@ -2407,6 +2408,14 @@ def _normalize_demo_settings(settings: dict) -> dict:
         if interval < 1 or interval > 3600:
             raise ValueError("demo interval must be between 1 and 3600 seconds")
         clean["interval_seconds"] = interval
+    if "timeout_seconds" in settings:
+        try:
+            timeout = int(settings["timeout_seconds"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("demo timeout must be an integer") from exc
+        if timeout < 60 or timeout > 86400:
+            raise ValueError("demo timeout must be between 60 and 86400 seconds")
+        clean["timeout_seconds"] = timeout
     return clean
 
 

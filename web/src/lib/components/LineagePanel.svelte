@@ -60,6 +60,8 @@
 		visionProviderGroups: ProviderGroup[];
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
+	type LineageOrientation = 'vertical' | 'horizontal';
+	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
 
 	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
 
@@ -81,6 +83,7 @@
 	let overviewOpen = $state(false);
 	let overviewLoading = $state(false);
 	let overviewScale = $state(1);
+	let lineageOrientation = $state<LineageOrientation>('vertical');
 	let activeMenuNodeId = $state<string | null>(null);
 	let activeAIRefineNode = $state<LineageNode | null>(null);
 	let activeEditNode = $state<LineageNode | null>(null);
@@ -360,6 +363,17 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			if (lineageScrollEl) lineageScrollEl.scrollTop = savedScrollTop;
 		}
 	}
+	function setLineageOrientation(next: LineageOrientation): void {
+		if (next === lineageOrientation) return;
+		lineageOrientation = next;
+		try { localStorage.setItem(LINEAGE_ORIENTATION_KEY, next); } catch {}
+		void tick().then(() => {
+			scheduleArrowUpdate();
+			const focusId = graph?.focus_node_id;
+			if (focusId) cardElements.get(focusId)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+		});
+	}
+
 	async function openOverview(): Promise<void> {
 		overviewOpen = true;
 		overviewLoading = true;
@@ -400,14 +414,25 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			if (!parent || !child) return [];
 			const parentRect = getRelativeCoords(parent, container);
 			const childRect = getRelativeCoords(child, container);
-			const x1 = parentRect.left + parentRect.width / 2;
-			const y1 = parentRect.top + parentRect.height + 1;
-			const x2 = childRect.left + childRect.width / 2;
-			const y2 = childRect.top - 7;
-			const bend = Math.max(18, (y2 - y1) / 2);
+			let path: string;
+			if (lineageOrientation === 'horizontal') {
+				const x1 = parentRect.left + parentRect.width + 1;
+				const y1 = parentRect.top + parentRect.height / 2;
+				const x2 = childRect.left - 7;
+				const y2 = childRect.top + childRect.height / 2;
+				const bend = Math.max(18, (x2 - x1) / 2);
+				path = `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
+			} else {
+				const x1 = parentRect.left + parentRect.width / 2;
+				const y1 = parentRect.top + parentRect.height + 1;
+				const x2 = childRect.left + childRect.width / 2;
+				const y2 = childRect.top - 7;
+				const bend = Math.max(18, (y2 - y1) / 2);
+				path = `M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`;
+			}
 			return [{
 				id: edge.id,
-				path: `M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`,
+				path,
 				tombstone: nodeById.get(edge.parent_node_id)?.state === 'tombstone' || nodeById.get(edge.child_node_id)?.state === 'tombstone',
 			}];
 		});
@@ -447,6 +472,10 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 	}
 
 	onMount(() => {
+		try {
+			const savedOrientation = localStorage.getItem(LINEAGE_ORIENTATION_KEY);
+			if (savedOrientation === 'vertical' || savedOrientation === 'horizontal') lineageOrientation = savedOrientation;
+		} catch {}
 		resizeObserver = new ResizeObserver(scheduleArrowUpdate);
 		if (lineageColumnsEl) resizeObserver.observe(lineageColumnsEl);
 		for (const element of cardElements.values()) resizeObserver.observe(element);
@@ -468,6 +497,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		if (focusChanged) { lastFocusNodeId = focusId; expandedNodeIds = [focusId]; }
 		columns;
 		overviewScale;
+		lineageOrientation;
 		void tick().then(() => {
 			scheduleArrowUpdate();
 			if (focusChanged && focusId && !overviewOpen) {
@@ -495,9 +525,13 @@ $effect(() => {
 	<header>
 		<div>
 			<h2>{isJapanese ? '作品の系譜' : 'Artwork Lineage'}</h2>
-			{#if overviewOpen}<p>{isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.'}</p>{/if}
+			{#if overviewOpen}<p>{lineageOrientation === 'horizontal' ? (isJapanese ? '全体を左から右へ見渡せます。' : 'Review the complete tree from left to right.') : (isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.')}</p>{/if}
 		</div>
 <div class="lineage-actions">
+	<div class="orientation-toggle" role="group" aria-label={isJapanese ? '系譜の方向' : 'Lineage direction'}>
+		<button type="button" class:active={lineageOrientation === 'vertical'} aria-pressed={lineageOrientation === 'vertical'} onclick={() => setLineageOrientation('vertical')}>{isJapanese ? '縦' : 'Vertical'}</button>
+		<button type="button" class:active={lineageOrientation === 'horizontal'} aria-pressed={lineageOrientation === 'horizontal'} onclick={() => setLineageOrientation('horizontal')}>{isJapanese ? '横' : 'Horizontal'}</button>
+	</div>
 	<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
 	{#if overviewOpen}
 		<div class="overview-zoom"><button type="button" onclick={() => (overviewScale = Math.max(.4, overviewScale - .1))}>−</button><span>{Math.round(overviewScale * 100)}%</span><button type="button" onclick={() => (overviewScale = Math.min(1.4, overviewScale + .1))}>＋</button></div>
@@ -519,8 +553,8 @@ $effect(() => {
 	{:else if !graph || graph.nodes.length === 0}
 		<div class="lineage-message">{isJapanese ? '保存すると、ここに系譜が表示されます。' : 'Save an artwork to begin its lineage.'}</div>
 	{:else}
-		<div class="lineage-scroll" class:overview-scroll={overviewOpen} bind:this={lineageScrollEl}>
-			<div class="lineage-columns" bind:this={lineageColumnsEl} style={overviewOpen ? `transform: scale(${overviewScale}); transform-origin: top left; width: ${100 / overviewScale}%; height: ${100 / overviewScale}%;` : undefined}>
+		<div class="lineage-scroll" class:overview-scroll={overviewOpen} class:horizontal={lineageOrientation === 'horizontal'} bind:this={lineageScrollEl}>
+			<div class="lineage-columns" class:horizontal={lineageOrientation === 'horizontal'} bind:this={lineageColumnsEl} style={overviewOpen ? (lineageOrientation === 'horizontal' ? `transform: scale(${overviewScale}); transform-origin: top left;` : `transform: scale(${overviewScale}); transform-origin: top left; width: ${100 / overviewScale}%; height: ${100 / overviewScale}%;`) : undefined}>
 				<svg class="lineage-arrows" aria-hidden="true">
 					<defs>
 						<marker id="lineage-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
@@ -717,8 +751,10 @@ $effect(() => {
 	header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 	h2 { margin: 0 0 4px; font-size: 1.05rem; }
 	p { margin: 0; color: var(--fg3); font-size: .82rem; }
-	.lineage-actions, .overview-zoom { display: flex; align-items: center; gap: 8px; }
-	.overview-zoom { padding-right: 8px; border-right: 1px solid var(--border); }
+	.lineage-actions, .overview-zoom, .orientation-toggle { display: flex; align-items: center; gap: 8px; }
+	.lineage-actions { flex-wrap: wrap; justify-content: flex-end; }
+	.overview-zoom, .orientation-toggle { padding-right: 8px; border-right: 1px solid var(--border); }
+	.orientation-toggle button.active { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
 	.overview-zoom span { min-width: 42px; color: var(--fg3); font-size: .72rem; text-align: center; }
 	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-family: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
 	/* 寸法は header button 側 (--btn-sm-*) に従う。ここでは色だけを上書きする。 */
@@ -730,14 +766,18 @@ $effect(() => {
 	.lineage-message { margin: auto; color: var(--fg3); }
 	.lineage-message.error { color: var(--danger, #9b3d32); white-space: pre-line; }
 	.lineage-scroll { min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 8px 18px 24px 8px; }
+	.lineage-scroll.horizontal { overflow: auto; }
 	.lineage-columns { position: relative; width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 58px; transform-origin: top center; }
+	.lineage-columns.horizontal { width: max-content; min-width: 100%; flex-direction: row; align-items: flex-start; transform-origin: top left; }
 	.lineage-arrows { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 	.lineage-arrow { fill: none; stroke: color-mix(in srgb, var(--fg2) 72%, transparent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 	.lineage-arrow.tombstone-arrow { stroke-dasharray: 5 4; }
 	.lineage-arrows marker path { fill: var(--fg2); }
 	.lineage-column { position: relative; z-index: 1; width: 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 14px 18px; }
+	.lineage-columns.horizontal .lineage-column { flex: 0 0 210px; width: 210px; min-width: 210px; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 14px; }
 	.lineage-column.menu-layer { z-index: 20; }
 	.generation { flex: 0 0 100%; color: var(--fg3); font-size: .72rem; text-align: center; }
+	.lineage-columns.horizontal .generation { flex: 0 0 auto; width: 100%; }
 	.lineage-card { position: relative; box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); }
 	.lineage-card.menu-open { z-index: 10; overflow: visible; }
 	.lineage-card.focus { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }

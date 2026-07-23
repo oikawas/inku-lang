@@ -2612,3 +2612,23 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
   - **`SETUP.ja.md` / `SETUP.md`（`fe63584`）:** コンテナ経路の節を新設（GHCR pull とソースからのビルドの 2 経路。詳細は `deploy/README.md` へ送る）。あわせて 3 件を是正 — ①「配布パッケージの内容」が `compose.yaml` / `deploy/` / Dockerfile 2 種などを落としていた ②**Python 要件を 3.10 以上と書いていたが実際は 3.12 以上**（利用者が `uv sync` で実際に踏む誤り）③ PNG ラスタライズを CairoSVG のみと書いていたが実装は resvg 優先で、落ちると材質フィルタが失われる。
   - **`README.ja.md` / `README.md`（`a15f699`）:** 再生成の節を「三つの『もう一度』」から **「推敲による作品の追求」** へ全面改稿。実装は推敲 5 種（`RefineKind`）+ AI 自律推敲 2 方式で、色カタログ変更・変奏・AI 自律推敲が記載から漏れていた。
 - **保留・持ち越し:** UI 調整は対話で継続中（4 巡目へ）。マスコット 2 種、バッチ実行中に履歴ストリップがページ 0 へ戻る挙動、計測 3 件（1 巡目から据え置き）。
+
+### Android `2.0.0-android.1` — 描画コアが render engine 10 へ到達（Phase 1〜2f、android Build 148077、2026-07-23）
+
+**記載方針**: Android の移植は段ごとに版を起こさず、**engine 10 到達をもって 1 件にまとめる**（web/server とは版の名前空間が別で、`android/VERSION` / `android/BUILD_NUMBER` が正本）。以下は Phase 1 から 2f までの通し記録である。
+
+- **到達点:** `DefaultSvgRenderer.kt` の `render_engine_version` が **`"2"` → `"10"`**。web/server の engine 10（v2.3.1 時点）と同じ描画機構が端末内で動く。`android/VERSION` は `1.48.0-android.1` → **`2.0.0-android.1`**（engine 10 到達時に 2.x とする作者裁定）。**約 2.5 か月・44 版ぶんの遅れを解消した**。
+- **版の申告を最後まで動かさなかった（作者裁定）:** 部分移植の途中で中途の版を名乗ると render hash 経由で履歴互換が壊れるため、**engine 10 の全体が揃うまで `"2"` を申告し続け、2f 完了と同じコミットで初めて `"10"` にした**。
+- **Phase 1 / 1.5（merge `89f3c9b`、Build 148069）:** Score schema JSON に cloudform / burin / drypoint / mode・carve_depth / grid / at・relation・surface を追加し全オブジェクトへ `additionalProperties:false`、coercer を追随、`rope` を除去、Edition ID の `rh2` と記述ハッシュ `dh1` を移植。
+- **Phase 2a / 2a′（merge `d5dff1b`、Build 148071）:** 揺らぎの演奏（white / perlin / pink / wave）。
+- **Phase 2b / 2b′（merge `9bdfdd5`、Build 148073）:** engine 7 の比例系。振幅・滲み・分割数・材質強度を絶対 px から `canvas.unit` 相対へ。
+- **Phase 2c（merge `651b4ab`、Build 148074）:** `stroke_engine.py` 438 行を `ServerStrokeEngine.kt` へ移植。
+- **Phase 2d（merge `3f9538c`、Build 148075）:** 線の筆致化（`stroke-engine-v1`）。
+- **Phase 2e（merge `1be5229`、Build 148076）:** 閉図形の輪郭を `contour-stroke-v1` の帯へ。
+- **Phase 2f（merge `1c8d22d`、Build 148077）:** 塗り（`fill-stroke-v1`）・面のハッチ（`surface-stroke-v1`）・弧（`arc-stroke-v1`）を 1 段で移植。走査線切断を全図形種別へ、弧は両端点固定の契約を同期、材質輪郭へ `class="material-outline"`。
+- **移植を成立させた方法 = 参照コーパスの先出し:** server 側で期待値を実測した JSON / SVG を
+  `android/app/src/test/resources/server_reference/` に置き、実装セッションへ**先に渡した**。SVG の class が `contour-stroke-v1 controls-62 events-1` のように**制御点数・イベント数を数値で持つ**ため、バイト一致でなく構造一致を機械判定できる。`05_circle_rotring.svg` は class を**持たない**ことを仕様として置いた（作らないことの固定）。
+- **踏んだ罠（記録）:** ① `_hash_to_unit` は `hash01` のラッパーではなく**独立構成**（salt なし・先頭 8 バイトを符号付き little-endian int64・`2**63` で除算）で、これを取り違えると揺らぎ全種がずれる ② **seed は符号なし 64bit**（`struct.unpack("<Q", ...)`）で、実 seed の約半分が 2^63 を超える。Kotlin の `Long` では負に印字され、seed を鍵にするハッシュが全部ずれる ③ ハッチ本数 `range(-count // 2, ...)` の floor 除算（Kotlin の `-73/2` はゼロ方向丸めで 1 本ずれる）。いずれも**判別力のあるケースをコーパスに入れて初めて捕まった**。
+- **検証:** `gradle :app:testDebugUnitTest --rerun-tasks` を main で独立実行し **44 件 / failures 0 / errors 0**（`app/build/test-results/testDebugUnitTest/*.xml` から自力集計）。参照 SVG 10 件すべてで class 属性列と要素数が一致し、うち 4 件（`03_square_filled` / `04_arc_crayon` / `06_surface_hatch` / `10_arc_wave`）は `<path d>` が**文字列完全一致**。`05_circle_rotring` はストローク帯を持たないことを否定テストで固定。
+- **不変:** 変更は `android/` のみ。server / web / cli / shared は無変更で、**web/server の描画結果・`APP_VERSION` / `web/BUILD_NUMBER` は動かしていない**。pentala 反映も不要。
+- **申し送り（次段 2g で処理）:** ① テストが渡す `colorCatalogId = "sumi"` は**存在しないカタログ ID**（実在は `default` ほか 11 種）で、10 箇所が未是正のまま残っている。描画結果は色に依存しない比較なので engine の版には影響しない ② 未知カタログ ID の扱いが server（HTTP 422）と Android（黙って `default` へフォールバック）で**非対称** ③ `ANDROID_SPEC` の 2f 節が「全 10 参照 SVG で `path d` 完全一致」と過大に書かれている（実際は上記のとおり 4 件）ほか、engine 10 到達に触れていない。2g では雲形・touching・v1.94 双弧修正を扱う。

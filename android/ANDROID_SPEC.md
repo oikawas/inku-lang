@@ -1560,7 +1560,7 @@ Added `ServerRendererProportionalWiringTest.kt` to assert rendered SVG output ac
 - **Blur Scaling**: `<feGaussianBlur>` `stdDeviation` dynamically scales (6.0 for square / 1.2 for pillar).
 - **Material Scaling**: Speck counts and outline offset floor (0.7px for pillar) are accurately reflected in rendered SVG elements.
 
-`gradle :app:testDebugUnitTest --rerun-tasks` (all 22 tests) and `gradle :app:assembleDebug` succeed.
+`gradle :app:testDebugUnitTest --rerun-tasks` (all 21 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` incremented to `148073`.
 
 

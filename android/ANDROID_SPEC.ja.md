@@ -1139,7 +1139,7 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - **滲み比例**: `<feGaussianBlur>` の `stdDeviation` が square で 6.0、pillar で 1.2 に動的変化。
 - **材質比例**: pillar での speck 個数および輪郭オフセット下限 (0.7px) が SVG に正しく反映。
 
-`gradle :app:testDebugUnitTest --rerun-tasks`（全 22 件）および `gradle :app:assembleDebug` が成功する。
+`gradle :app:testDebugUnitTest --rerun-tasks`（全 21 件）および `gradle :app:assembleDebug` が成功する。
 `android/BUILD_NUMBER` は `148073` にインクリメント。
 
 

@@ -1199,6 +1199,34 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 `gradle :app:testDebugUnitTest --rerun-tasks`（全 28 件）および `gradle :app:assembleDebug` が成功する。
 `android/BUILD_NUMBER` は `148075` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
 
+## 2026-07-23 web/server v2 追随 Phase 2e (閉図形の輪郭帯化 `contour-stroke-v1`)
+
+契約 `antigravity-android-phase2-renderer.md` §8 に基づき、`weight != "rotring"` の閉図形（`circle`, `ellipse`, `square`, `triangle`, `polygon`）の輪郭を `contour-stroke-v1` の一筆の帯（`fill-rule="evenodd"` 2 サブパス）へ移行した（`rotring` は従来の幾何要素を維持）。
+
+### 実装およびシード計算の完全同期
+
+1. **64-bit seed 切り詰めの解消と一貫化**:
+   - `ServerRendererGeometry.kt` / `ServerRendererMaterial.kt` / `DefaultSvgRenderer.kt` から `seedToInt`（32-bit 切り詰め）を完全廃止し、`Long` (符号なし 64-bit ビット表現) のままシードを保持・伝搬。
+   - `renderer_seed_range.json` の参照値（`stroke_engine_unit`, `renderer_hash01`, `renderer_hash_to_unit`, `instruction_seed`）を検証する parity テストを追加し、符号なし 64-bit シードの決定性と完全一致を実証。
+2. **`DefaultSvgRenderer.kt` の閉図形帯化**:
+   - `usesHandStroke(weight)` (`weight != "rotring" && weight in GRAMMARS`) の時、`contour-stroke-v1` の帯を生成。
+   - 変奏なし（`variation == null`）の場合：`strokeSampleCount` に基づき標本化。
+   - 変奏ありの場合：`segmentCount` に基づき標本化し、多角形の各辺には辺ごとのシード（`seed + (i + 1) * 7919`）および代表寸法振幅 `amp` を適用。
+   - 本体要素は `region_fill` の判定（`surface` 指定時 `false`）に従い `fill` / `stroke` 属性を差し替え（`solid` 以外は `stroke-width` を 0.42 倍）。
+   - `drypoint` の場合は標本ごとの法線 `centerlineNormals` に基づく burr ポリゴンを付与。
+
+### 検証
+
+`DefaultSvgRendererPhase2eTest.kt` および `ServerRendererGeometryTest.kt` を作成・拡張し、参照コーパス SVG に対する一致検証を実施した。
+
+- `01_circle_pen.svg`, `07_circle_wave.svg`, `08_circle_perlin.svg`: `contour-stroke-v1` の `class` 属性および `path d` 座標列が参照 SVG と **完全一致**。
+- `05_circle_rotring.svg`: 帯を形成せず `<circle>` のみ生成されることを確認。
+- `03_square_filled.svg`, `06_surface_hatch.svg`: `contour-stroke-v1` の `class` 属性が参照 SVG と一致。
+
+`gradle :app:testDebugUnitTest --rerun-tasks`（全 35 件）および `gradle :app:assembleDebug` が成功する。
+`android/BUILD_NUMBER` は `148076` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
+
+
 
 
 

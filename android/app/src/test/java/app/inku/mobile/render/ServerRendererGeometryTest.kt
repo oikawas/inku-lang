@@ -205,4 +205,75 @@ class ServerRendererGeometryTest {
             }
         }
     }
+
+    @Test
+    fun testRendererSeedRangeParity() {
+        val stream = javaClass.getResourceAsStream("/server_reference/renderer_seed_range.json")
+            ?: error("Resource /server_reference/renderer_seed_range.json not found")
+        val jsonStr = stream.bufferedReader().use { it.readText() }
+        val root = JSONObject(jsonStr)
+
+        // 1. stroke_engine_unit
+        if (root.has("stroke_engine_unit")) {
+            val arr = root.getJSONArray("stroke_engine_unit")
+            for (i in 0 until arr.length()) {
+                val item = arr.getJSONObject(i)
+                val seedStr = item.get("seed").toString()
+                val seedULong = seedStr.toULong()
+                val idx = item.getInt("index")
+                val label = item.getString("label")
+                val expected = item.getDouble("value")
+                val actual = ServerStrokeEngine.unitHash(seedULong.toLong(), label, idx)
+                assertEquals("stroke_engine_unit mismatch for label=$label, seed=$seedULong, index=$idx", expected, actual, 1e-12)
+            }
+        }
+
+        // 2. renderer_hash01
+        if (root.has("renderer_hash01")) {
+            val arr = root.getJSONArray("renderer_hash01")
+            for (i in 0 until arr.length()) {
+                val item = arr.getJSONObject(i)
+                val seedStr = item.get("seed").toString()
+                val idx = item.getInt("i")
+                val salt = item.optString("salt", "")
+                val expected = item.getDouble("value")
+                val actual = ServerRendererGeometry.hash01(idx, seedStr, salt)
+                assertEquals("renderer_hash01 mismatch for seed=$seedStr, index=$idx, salt=$salt", expected, actual, 1e-12)
+            }
+        }
+
+        // 3. renderer_hash_to_unit
+        if (root.has("renderer_hash_to_unit")) {
+            val arr = root.getJSONArray("renderer_hash_to_unit")
+            for (i in 0 until arr.length()) {
+                val item = arr.getJSONObject(i)
+                val seedStr = item.get("seed").toString()
+                val idx = item.getInt("i")
+                val expected = item.getDouble("value")
+                val actual = ServerRendererGeometry.hashToUnit(idx, seedStr)
+                assertEquals("renderer_hash_to_unit mismatch for seed=$seedStr, index=$idx", expected, actual, 1e-12)
+            }
+        }
+
+        // 4. instruction_seed
+        if (root.has("instruction_seed")) {
+            val arr = root.getJSONArray("instruction_seed")
+            for (i in 0 until arr.length()) {
+                val item = arr.getJSONObject(i)
+                val name = item.optString("name", "item-$i")
+                val ins = item.getJSONObject("instruction")
+                val renderSeed = if (item.has("performance_seed") && !item.isNull("performance_seed")) item.getLong("performance_seed") else null
+                val expectedSeedStr = item.get("seed").toString()
+                val actualSeedStr = DefaultSvgRenderer_seedForInstructionHelper(ins, renderSeed)
+                assertEquals("instruction_seed mismatch for name=$name", expectedSeedStr, actualSeedStr)
+            }
+        }
+    }
+
+    private fun DefaultSvgRenderer_seedForInstructionHelper(ins: JSONObject, renderSeed: Long?): String {
+        val renderer = DefaultSvgRenderer()
+        val method = DefaultSvgRenderer::class.java.getDeclaredMethod("seedForInstruction", JSONObject::class.java, java.lang.Long::class.java)
+        method.isAccessible = true
+        return method.invoke(renderer, ins, renderSeed) as String
+    }
 }

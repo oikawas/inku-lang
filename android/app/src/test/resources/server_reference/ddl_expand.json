@@ -1,0 +1,1257 @@
+{
+  "note": "Expansion is deterministic and calls no LLM. Fifteen A-* cases share their inputs with server/reference/ddl-engine-1/a_expand/, so those outputs must match both corpora.",
+  "plugin_vocabulary_ja": [
+    "Nature.若葉",
+    "若葉",
+    "わかば",
+    "新芽",
+    "芽吹き",
+    "Nature.下草",
+    "下草",
+    "したくさ",
+    "草むら",
+    "菖蒲",
+    "あやめ",
+    "燕子花",
+    "かきつばた",
+    "薄",
+    "すすき",
+    "Nature.青葉",
+    "青葉",
+    "あおば",
+    "茂み",
+    "枝葉",
+    "Nature.紅葉",
+    "紅葉",
+    "もみじ",
+    "カエデ",
+    "Nature.落葉",
+    "落葉",
+    "おちば",
+    "落ち葉",
+    "散る葉",
+    "Nature.枯草",
+    "枯草",
+    "枯れ草",
+    "枯尾花",
+    "枯れ薄",
+    "Nature.枯葉",
+    "枯葉",
+    "かれは",
+    "枯れ葉",
+    "朽ち葉"
+  ],
+  "plugin_vocabulary_en": [
+    "Nature.若葉",
+    "young leaves",
+    "new leaves",
+    "budding leaves",
+    "Nature.下草",
+    "undergrowth",
+    "grasses",
+    "iris leaves",
+    "kakitsubata",
+    "pampas grass",
+    "Nature.青葉",
+    "summer leaves",
+    "green leaves",
+    "green foliage",
+    "leafy branch",
+    "Nature.紅葉",
+    "autumn leaves",
+    "maple leaves",
+    "maple",
+    "momiji",
+    "Nature.落葉",
+    "fallen leaves",
+    "falling leaves",
+    "scattering leaves",
+    "Nature.枯草",
+    "withered grass",
+    "dry grass",
+    "dead grasses",
+    "withered pampas",
+    "Nature.枯葉",
+    "withered leaves",
+    "dry leaves",
+    "dead leaves"
+  ],
+  "variation_amplitudes": [
+    "small",
+    "medium",
+    "large"
+  ],
+  "focus_ids": [
+    "lower_left",
+    "lower_right",
+    "right_half",
+    "upper_edge",
+    "upper_left",
+    "upper_right"
+  ],
+  "cases": [
+    {
+      "case": "A-base-ja",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。黒いロットリングの細い横線を遠近法の奥行きとして上へ細かく三本並べる。",
+      "bytes": 177,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "A-base-en",
+      "input": {
+        "ddl": "Place one black square near the center. Draw three white horizontal lines.",
+        "lang": "en",
+        "context_text": "Place one black square near the center. Draw three white horizontal lines.",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "Place one black square near the lower-right focus. Draw three white horizontal lines.",
+      "bytes": 85,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-amplitude-only",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。黒いロットリングの細い横線を遠近法の奥行きとして上へ細かく三本並べる。",
+      "bytes": 177,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "A-variation-seed-only",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": 12345
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。黒いロットリングの細い横線を遠近法の奥行きとして上へ細かく三本並べる。",
+      "bytes": 177,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "A-plugin-enabled",
+      "input": {
+        "ddl": "黒い線を三本引く。Nature.うねり。",
+        "lang": "ja",
+        "context_text": "黒い線を三本引く。Nature.うねり。",
+        "vary_seed": null,
+        "enable_plugins": true,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "黒い線を三本引く。全体の反復配置を波打つ軌跡に沿わせる。揺らぎは大きくゆっくり。",
+      "bytes": 120,
+      "variation_report": {
+        "resolved_focus": null,
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-plugin-disabled",
+      "input": {
+        "ddl": "黒い線を三本引く。Nature.うねり。",
+        "lang": "ja",
+        "context_text": "黒い線を三本引く。Nature.うねり。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "黒い線を三本引く。Nature.うねり。黒いペンの細い斜め線を右上がりに三本並べる。細かく震える。",
+      "bytes": 133,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [],
+        "category_counts": [
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-small-1",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "small",
+        "variation_seed": 1
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "0"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-small-12345",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "small",
+        "variation_seed": 12345
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。白い回転した小さな四角を前の形に触れないように上から下への縦の帯に十三個散らす。",
+      "bytes": 192,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [
+          {
+            "axis": "type_swap",
+            "from": "遠近法",
+            "to": "点描の四角"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "A-variation-medium-1",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "medium",
+        "variation_seed": 1
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。青いロットリングの細い線を均一線として左から右へ五本並べる。",
+      "bytes": 162,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [
+          {
+            "axis": "touch",
+            "from": "ロットリング",
+            "to": "鉛筆"
+          },
+          {
+            "axis": "color",
+            "from": "白い・黒い",
+            "to": "赤い・青い"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "A-variation-medium-12345",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "右下の焦点に黒い四角を置く。白い横線を三本引く。黒いチョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。黒い鉛筆の細い線を余白線として上端寄りに二本並べる。細かく震える。",
+      "bytes": 279,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "2"
+          },
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "右下"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "case": "A-variation-large-1",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": 1
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "0"
+          },
+          {
+            "axis": "color",
+            "from": "白い・黒い",
+            "to": "灰色の・緑の"
+          },
+          {
+            "axis": "type_family",
+            "from": "絵画",
+            "to": "構造"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-large-12345",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": 12345
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [
+          {
+            "axis": "type_swap",
+            "from": "遠近法",
+            "to": "パッチワーク"
+          },
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "0"
+          },
+          {
+            "axis": "type_family",
+            "from": "絵画",
+            "to": "音楽"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-tenkei-auto",
+      "input": {
+        "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "lang": "ja",
+        "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "赤い円を三つ置く。小さな点を画面全体に散らす。赤い鉛筆の短い線を画面全体へ三本散らす。細かく震える。",
+      "bytes": 150,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [],
+        "category_counts": [
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-tenkei-sparse",
+      "input": {
+        "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "lang": "ja",
+        "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "sparse",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "赤い円を三つ置く。小さな点を画面全体に散らす。赤い鉛筆の短い線を画面全体へ三本散らす。細かく震える。",
+      "bytes": 150,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [],
+        "category_counts": [
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-tenkei-none",
+      "input": {
+        "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "lang": "ja",
+        "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "none",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+      "bytes": 69,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-variation-seed-9223372036854775809",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "medium",
+        "variation_seed": 9223372036854775809
+      },
+      "output": "上端寄りの焦点に黒い四角を置く。白い横線を三本引く。白い太筆の短い線を油絵の厚塗りとして横に三本並べる。",
+      "bytes": 156,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "上端"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "B-variation-seed-18446744073709551615",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "medium",
+        "variation_seed": 18446744073709551615
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "0"
+          },
+          {
+            "axis": "color",
+            "from": "白い・黒い",
+            "to": "青い・緑の"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-variation-en",
+      "input": {
+        "ddl": "Place one black square near the center. Draw three white horizontal lines.",
+        "lang": "en",
+        "context_text": "Place one black square near the center. Draw three white horizontal lines.",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": 12345
+      },
+      "output": "Place one black square near the upper-right focus. Draw three white horizontal lines. Line up three thin black rotring diagonal lines rising to the right. Fine trembling.",
+      "bytes": 170,
+      "variation_report": {
+        "resolved_focus": "upper_right",
+        "moved_axes": [
+          {
+            "axis": "count",
+            "from": "0",
+            "to": "1"
+          },
+          {
+            "axis": "focus",
+            "from": "lower right",
+            "to": "upper right"
+          }
+        ],
+        "category_counts": [
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-none-varied",
+      "input": {
+        "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "lang": "ja",
+        "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "none",
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": 12345
+      },
+      "output": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+      "bytes": 69,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-focus-upper_left",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": "upper_left",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "左上の焦点に黒い四角を置く。白い横線を三本引く。黒いロットリングの細い線を前の線に沿って上端寄りの焦点へ三本引く。黒いロットリングの細い横線を遠近法の奥行きとして上へ細かく三本並べる。",
+      "bytes": 276,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [
+          {
+            "axis": "type_swap",
+            "from": "素描",
+            "to": "一点透視"
+          },
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "2"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "case": "B-focus-lower_right",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": "lower_right",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "右下の焦点に黒い四角を置く。白い横線を三本引く。黒い細筆の縦線を水墨の濃淡として左から右へ三本並べる。境界が滲む。白い太筆の短い線を油絵の厚塗りとして横に三本並べる。",
+      "bytes": 249,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [
+          {
+            "axis": "type_swap",
+            "from": "フレスコ",
+            "to": "鉛筆の余白線"
+          },
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "2"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "case": "B-focus-right_half",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": "right_half",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "右半分の焦点に黒い四角を置く。白い横線を三本引く。黒いペンの細い線を前の線に沿って上端寄りの焦点へ三本引く。赤・青・緑・灰の回転した小さな四角をパッチワークとして格子状に六個並べる。",
+      "bytes": 273,
+      "variation_report": {
+        "resolved_focus": "right_half",
+        "moved_axes": [
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "2"
+          },
+          {
+            "axis": "touch",
+            "from": "ロットリング",
+            "to": "ペン"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "case": "B-focus-upper_edge",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": "upper_edge",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "上端寄りの焦点に黒い四角を置く。白い横線を三本引く。黒いチョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。黒いロットリングの細い線を均一線として左から右へ五本並べる。",
+      "bytes": 276,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [
+          {
+            "axis": "type_swap",
+            "from": "油絵",
+            "to": "フレスコ"
+          },
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "2"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "case": "B-focus-not-a-focus",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": "not-a-focus",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "右下の焦点に黒い四角を置く。白い横線を三本引く。黒いチョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。黒い鉛筆の細い線を余白線として上端寄りに二本並べる。細かく震える。",
+      "bytes": 279,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [
+          {
+            "axis": "count",
+            "from": "1",
+            "to": "2"
+          },
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "右下"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-sensory-auto",
+      "input": {
+        "ddl": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+        "lang": "ja",
+        "context_text": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。緑の小さな楕円を香りの層として波打つ軌跡に沿って七個散らす。ゆっくり揺れる。白い薄い水彩の楕円を五感の気配として右上に二つ重ねる。境界が滲む。",
+      "bytes": 300,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [],
+        "category_counts": [
+          2,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-music-auto",
+      "input": {
+        "ddl": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+        "lang": "ja",
+        "context_text": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。黒いロットリングの細い斜め線を右上がりに三本並べる。細かく震える。黒いロットリングの細い線を前の線を切るように二本置く。細かく震える。",
+      "bytes": 333,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          1,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-en-auto",
+      "input": {
+        "ddl": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+        "lang": "en",
+        "context_text": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "A damp air lingers and a scent remains. Draw three lines. Place two circles. Scatter seven small green ellipses along an undulating trace as a scent layer. Swaying slowly. Layer two pale white watercolor ellipses in the upper right as five-sense presence. Edges blurring.",
+      "bytes": 271,
+      "variation_report": {
+        "resolved_focus": "right_half",
+        "moved_axes": [],
+        "category_counts": [
+          2,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-sensory-sparse",
+      "input": {
+        "ddl": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+        "lang": "ja",
+        "context_text": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "sparse",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。緑の小さな楕円を香りの層として波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "bytes": 201,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [],
+        "category_counts": [
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-music-sparse",
+      "input": {
+        "ddl": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+        "lang": "ja",
+        "context_text": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "sparse",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。黒いロットリングの細い斜め線を右上がりに三本並べる。細かく震える。",
+      "bytes": 231,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-en-sparse",
+      "input": {
+        "ddl": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+        "lang": "en",
+        "context_text": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "sparse",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "A damp air lingers and a scent remains. Draw three lines. Place two circles. Scatter seven small green ellipses along an undulating trace as a scent layer. Swaying slowly.",
+      "bytes": 171,
+      "variation_report": {
+        "resolved_focus": "right_half",
+        "moved_axes": [],
+        "category_counts": [
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-sensory-none",
+      "input": {
+        "ddl": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+        "lang": "ja",
+        "context_text": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "none",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+      "bytes": 87,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-music-none",
+      "input": {
+        "ddl": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+        "lang": "ja",
+        "context_text": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "none",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+      "bytes": 132,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-tenkei-en-none",
+      "input": {
+        "ddl": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+        "lang": "en",
+        "context_text": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "none",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+      "bytes": 76,
+      "variation_report": {
+        "resolved_focus": "right_half",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-vary-seed-0",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": 0,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。黒いチョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。",
+      "bytes": 180,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "B-vary-seed-12345",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": 12345,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。黒い鉛筆の細い線を余白線として上端寄りに二本並べる。細かく震える。",
+      "bytes": 171,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "B-vary-seed-9223372036854775809",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "vary_seed": 9223372036854775809,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。黒いチョークの横線をフレスコの下地として画面下に三本並べる。境界が滲む。",
+      "bytes": 180,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "B-plugin-instructions-present",
+      "input": {
+        "ddl": "黒い線を三本引く。Nature.うねり。",
+        "lang": "ja",
+        "context_text": "黒い線を三本引く。Nature.うねり。",
+        "vary_seed": null,
+        "enable_plugins": true,
+        "plugin_instructions_present": true,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "黒い線を三本引く。全体の反復配置を波打つ軌跡に沿わせる。揺らぎは大きくゆっくり。",
+      "bytes": 120,
+      "variation_report": {
+        "resolved_focus": null,
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-context-differs",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。黒いロットリングの細い横線を遠近法の奥行きとして上へ細かく三本並べる。",
+      "bytes": 177,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "B-context-none",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": null,
+        "vary_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "tenkei": "auto",
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。黒い細筆の細い線を素描の下線として左から右へ三本並べる。細かく震える。",
+      "bytes": 177,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          1
+        ]
+      }
+    }
+  ]
+}

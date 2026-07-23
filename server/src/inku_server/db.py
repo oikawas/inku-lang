@@ -88,6 +88,8 @@ class HistoryRow(Base):
     tokens_in    = Column(Integer,    nullable=True)
     tokens_out   = Column(Integer,    nullable=True)
     catalog_id   = Column(String,     nullable=True)
+    ddl_version = Column(String, nullable=True)
+    ddl_engine_version = Column(String, nullable=True)
     render_build_number = Column(String, nullable=True)
     render_color_profile = Column(Text, nullable=True)
     render_engine_id = Column(String, nullable=True)
@@ -260,6 +262,8 @@ _UNSET = object()
 _HISTORY_COLUMN_MIGRATIONS = {
     "user_id": "ALTER TABLE history ADD COLUMN user_id VARCHAR",
     "catalog_id": "ALTER TABLE history ADD COLUMN catalog_id VARCHAR",
+    "ddl_version": "ALTER TABLE history ADD COLUMN ddl_version VARCHAR",
+    "ddl_engine_version": "ALTER TABLE history ADD COLUMN ddl_engine_version VARCHAR",
     "render_build_number": "ALTER TABLE history ADD COLUMN render_build_number VARCHAR",
     "render_color_profile": "ALTER TABLE history ADD COLUMN render_color_profile TEXT",
     "render_engine_id": "ALTER TABLE history ADD COLUMN render_engine_id VARCHAR",
@@ -1638,6 +1642,10 @@ def _row_to_dict(row: HistoryRow) -> dict:
 }
     if data_warnings:
         item["data_warnings"] = data_warnings
+    if row.ddl_version is not None:
+        item["ddl_version"] = row.ddl_version
+    if row.ddl_engine_version is not None:
+        item["ddl_engine_version"] = row.ddl_engine_version
     if row.render_build_number is not None:
         item["render_build_number"] = row.render_build_number
     if row.render_color_profile is not None:
@@ -1824,6 +1832,7 @@ def add_item(item: dict) -> dict:
         output_path=item.get("output_path"), elapsed_ms=item.get("elapsed_ms", 0),
         stage1_model=item.get("stage1_model"), stage2_model=item.get("stage2_model"),
         tokens_in=item.get("tokens_in"), tokens_out=item.get("tokens_out"), catalog_id=item.get("catalog_id"),
+        ddl_version=item.get("ddl_version"), ddl_engine_version=item.get("ddl_engine_version"),
         render_build_number=item.get("render_build_number"),
         render_color_profile=json.dumps(item.get("render_color_profile"), ensure_ascii=False) if item.get("render_color_profile") is not None else None,
         render_engine_id=item.get("render_engine_id"), render_engine_version=item.get("render_engine_version"),

@@ -11,8 +11,13 @@ Included:
 - `server/`: FastAPI backend
 - `web/`: SvelteKit frontend
 - `cli/`: `inku-cli`
+- `shared/`: the package the server and the CLI share
 - `manual/`: user manuals
-- `README*.md`, `SPEC*.md`, `SETUP*.md`, `LICENSE`
+- `docs/`: supporting material
+- `android/`: the Android application
+- `compose.yaml`, `server/Dockerfile`, `web/Dockerfile`, `.dockerignore`: the definitions that build containers from source
+- `deploy/`: the compose file and guide for deploying released images
+- `README*.md`, `SPEC*.md`, `SETUP*.md`, `CHANGELOG*.md`, `PROJECT_CONTEXT*.md`, `PLUGIN.md`, `LICENSE`
 
 Excluded:
 
@@ -24,11 +29,21 @@ Excluded:
 
 ## Requirements
 
-- Python 3.10 or newer
+To run from source:
+
+- Python 3.12 or newer (both `server` and `cli` declare `requires-python = ">=3.12"`)
 - `uv`
 - Node.js 20 or newer is recommended
 - npm
-- An OS environment where CairoSVG works when PNG export is needed
+- An SVG rasterizer when PNG export is needed
+
+To run in containers:
+
+- Docker Engine and Docker Compose v2
+
+### About PNG output
+
+PNG conversion **prefers resvg and falls back to CairoSVG**. The fallback still writes PNGs, but **the material filters (pencil / crayon / chalk / brush_thick) are lost from both the PNG and the Vision input**. Which backend is in use is logged once at server startup. PNG output is disabled when no rasterizer is installed at all.
 
 ## Unpack
 
@@ -36,6 +51,38 @@ Excluded:
 tar xzf inku-lang-source-<build>.tar.gz
 cd inku-lang-source-<build>
 ```
+
+## Running in Containers
+
+There are two container routes. **[`deploy/README.md`](deploy/README.md) is the authoritative deployment guide**; the first account, data persistence, version pinning, HTTPS and logs are covered there.
+
+### Pull the released images (no build)
+
+Releases are published as container images on GHCR (`ghcr.io/oikawas/inku-api` and `ghcr.io/oikawas/inku-web`, amd64 and arm64). This route builds nothing, so it does not need this tarball either.
+
+```sh
+mkdir inku && cd inku
+curl -O https://raw.githubusercontent.com/oikawas/inku-lang/main/deploy/compose.yaml
+curl -o .env https://raw.githubusercontent.com/oikawas/inku-lang/main/deploy/.env.example
+$EDITOR .env   # Fill in INKU_BOOTSTRAP_ADMIN_PASSWORD (8 characters or more) and your LLM API key
+docker compose up -d
+```
+
+The web UI answers on `http://localhost:5173` and the API on `http://localhost:8100`. Sign in as `admin` with the password from `.env`.
+
+### Build from this source
+
+The `compose.yaml` at the root of the tarball builds images from the source at hand, using `server/Dockerfile` and `web/Dockerfile`. Use it to check a version under development.
+
+```sh
+INKU_BOOTSTRAP_ADMIN_PASSWORD='change-this-password' docker compose up -d --build
+```
+
+The web UI answers on `http://localhost:5173` and the API is published on `http://localhost:8101` by default (`INKU_WEB_PORT` and `INKU_API_PORT` change these). The DB persists in the `inku-data` volume.
+
+**`INKU_BOOTSTRAP_ADMIN_PASSWORD` is required.** Both compose files refuse to start while it is blank, for the reason given in the next section: there is no self-service registration, so an empty DB with no initial admin offers no way to sign in.
+
+The sections below are the from-source route.
 
 ## Server Setup
 
@@ -153,9 +200,19 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue circle in the upp
 | `GEMINI_API_KEY` | Gemini API key |
 | `NVIDIA_API_KEY` | NVIDIA API key |
 
+Used only when running in containers:
+
+| Variable | Purpose |
+| --- | --- |
+| `INKU_IMAGE_TAG` | The image tag `deploy/compose.yaml` pulls. Defaults to `latest`; set it to pin a version |
+| `INKU_WEB_PORT` | The host port the web UI is published on. Defaults to `5173` |
+| `INKU_API_PORT` | The host port the API is published on. Defaults to `8100` in `deploy/compose.yaml` and to `8101` in the `compose.yaml` that builds from source |
+| `INKU_ORIGIN` | The web UI origin. Defaults to `http://localhost:5173` |
+
 ## Notes
 
 - Do not place secrets in the distribution tarball.
 - If you use `.env`, create it locally and do not commit or redistribute it.
 - Databases, history records, and generated drawings are runtime data and are not part of the source package.
-- If the Web UI is exposed beyond localhost, configure TLS, secure cookies, a reverse proxy, firewall rules, and user management for your deployment environment.
+- If the Web UI is exposed beyond localhost, configure TLS, secure cookies, a reverse proxy, firewall rules, and user management for your deployment environment. For containers, [`deploy/README.md`](deploy/README.md) covers this under "Serving over HTTPS".
+- `.env` is also the file compose reads. The same rule applies: do not commit or redistribute it.

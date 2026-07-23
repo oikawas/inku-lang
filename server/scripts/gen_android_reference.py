@@ -16,6 +16,8 @@ Outputs land in `android/app/src/test/resources/server_reference/`:
 - `stroke_engine_synthesize_stroke.json`  per-sample state, outline and burr for six straight strokes
 - `stroke_engine_synthesize_along.json`   per-sample state, both banks, burr and the path `d`
                                           for four strokes along a centerline
+- `renderer_seed_range.json`              unsigned 64-bit seeds and `_seed_for_instruction`
+- `renderer_fill_and_arc.json`            fill scanlines, hatch line geometry and arc centerlines
 - `<name>.svg`                            full renders at the current engine version
 - `svg_index.json`                        the Score, seed, byte size, element counts,
                                           and class attributes of each SVG
@@ -479,6 +481,288 @@ VARIATION_SCORES: dict[str, dict] = {
 }
 
 
+def fill_and_arc_fixtures() -> None:
+    """The engine 9/10 interior fill, hatch strokes and arc centerlines.
+
+    Everything the phase 2f port needs before it can compare a `<path d>`: the
+    scan angle and spacing that place the scanlines, the per-brush seed, the
+    intersection segments themselves, the hatch line geometry, and the arc
+    centerlines that feed `synthesize_along`.
+
+    The scanline walk is where a port silently diverges. The half-open edge test
+    (`da <= 0 < db`) decides whether a scanline grazing a vertex is counted once
+    or twice, the spacing jitter advances the offset by a hashed factor rather
+    than by a constant, and the `index % 2` flip reverses every other brush. Any
+    one of those getting dropped still produces a plausible fill and a wrong
+    `strokes-NN`.
+    """
+    from inku_server.plugins import canvas_size_for_aspect
+    from inku_server.schema import Instruction, SurfaceSpec
+
+    canvases = {a: canvas_size_for_aspect(a) for a in ("square", "pillar")}
+
+    def poly(points):
+        return [[round(x, 6), round(y, 6)] for x, y in points]
+
+    # A convex square, a sampled circle and a concave L: the concave contour is
+    # the one that needs more than two intersections per scanline.
+    contours = {
+        "square_400": [(300.0, 300.0), (700.0, 300.0), (700.0, 700.0), (300.0, 700.0)],
+        "circle_r200": [
+            (500.0 + 200.0 * math.cos(2 * math.pi * i / 62), 500.0 + 200.0 * math.sin(2 * math.pi * i / 62))
+            for i in range(62)
+        ],
+        "concave_l": [
+            (200.0, 200.0), (800.0, 200.0), (800.0, 400.0),
+            (400.0, 400.0), (400.0, 800.0), (200.0, 800.0),
+        ],
+    }
+
+    fill_shapes = {
+        "square_pencil": Instruction(primitive="square", position=(0.3, 0.3), size=(0.4, 0.4), weight="pencil", filled=True),
+        "square_brush_thick": Instruction(primitive="square", position=(0.3, 0.3), size=(0.4, 0.4), weight="brush_thick", filled=True),
+        "circle_pen": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.2, weight="pen", filled=True),
+        "square_rotring": Instruction(primitive="square", position=(0.3, 0.3), size=(0.4, 0.4), weight="rotring", filled=True),
+        "tiny_dot_pencil": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.004, weight="pencil", filled=True),
+        "square_surface": Instruction(primitive="square", position=(0.25, 0.25), size=(0.5, 0.5), weight="pen", filled=True,
+                                      surface=SurfaceSpec(texture="hatch", density=0.5, direction="diagonal_rising")),
+    }
+
+    seeds = [0, 12345, 2**63, 11790467468943091504]
+
+    out: dict = {
+        "note": "fill scanlines, hatch strokes and arc centerlines; seeds are unsigned 64-bit",
+        "constants": {
+            "FILL_SPACING_WIDTH_GAIN": renderer.FILL_SPACING_WIDTH_GAIN,
+            "FILL_SPACING_UNIT_RATIO": renderer.FILL_SPACING_UNIT_RATIO,
+            "FILL_SPACING_JITTER": renderer.FILL_SPACING_JITTER,
+            "FILL_MIN_SCANLINES": renderer.FILL_MIN_SCANLINES,
+            "FILL_MIN_STROKE_WIDTHS": renderer.FILL_MIN_STROKE_WIDTHS,
+        },
+        "fill_scan_angle": [
+            {"seed": seed, "value": round(renderer._fill_scan_angle(seed), 12)}
+            for seed in seeds
+        ],
+        "fill_scan_spacing": [
+            {"aspect": aspect, "shape": name, "weight": ins.weight,
+             "value": round(renderer._fill_scan_spacing(ins, canvas), 9)}
+            for aspect, canvas in canvases.items()
+            for name, ins in fill_shapes.items()
+        ],
+        "fill_stroke_seed": [
+            {"seed": seed, "index": index, "value": renderer._fill_stroke_seed(seed, index)}
+            for seed in seeds
+            for index in (0, 1, 47, 4096)
+        ],
+        # `_fills_interior` is `false` whenever a surface is present, whatever
+        # `filled` says, and `_interior_fill` degrades rotring to a region fill.
+        "fills_interior": [
+            {"shape": name, "filled": ins.filled, "has_surface": ins.surface is not None,
+             "value": renderer._fills_interior(ins),
+             "uses_hand_stroke": renderer._uses_hand_stroke(ins.weight)}
+            for name, ins in fill_shapes.items()
+        ],
+        "scanline_segments": [],
+        "fill_stroke_group": [],
+        "surface_hatch": [],
+        "arc_centerline": [],
+    }
+
+    # The contour the fill scans is NOT the sampled stroke contour. Without a
+    # variation the caller passes the bare `corners` (4 points for a square) and
+    # only the varied branch passes the sampled contour. Scanning the sampled
+    # contour instead changes nothing visually but shifts every intersection,
+    # so `strokes-NN` comes out wrong. `03_square_filled` is the case that pins it.
+    import svgwrite
+
+    fill_group_cases = {
+        "square_filled_pencil": (fill_shapes["square_pencil"], "square"),
+        "square_filled_brush_thick": (fill_shapes["square_brush_thick"], "square"),
+        "square_filled_pencil_pillar": (fill_shapes["square_pencil"], "pillar"),
+        "circle_filled_pen": (fill_shapes["circle_pen"], "square"),
+        "tiny_dot_pencil": (fill_shapes["tiny_dot_pencil"], "square"),
+    }
+    for name, (ins, aspect) in fill_group_cases.items():
+        canvas = canvases[aspect]
+        seed = renderer._seed_for_instruction(ins, RENDER_SEED)
+        if ins.primitive == "square":
+            assert ins.position is not None and ins.size is not None
+            px, py = renderer._px(ins.position, canvas)
+            w = ins.size[0] * canvas.width
+            h = ins.size[1] * canvas.height
+            contour = [(px, py), (px + w, py), (px + w, py + h), (px, py + h)]
+        else:
+            assert ins.center is not None and ins.radius is not None
+            ccx = ins.center[0] * canvas.width
+            ccy = ins.center[1] * canvas.height
+            rr = ins.radius * canvas.unit
+            count = renderer._stroke_sample_count(2 * math.pi * rr, canvas)
+            contour = [
+                (ccx + rr * math.cos(2 * math.pi * i / count), ccy + rr * math.sin(2 * math.pi * i / count))
+                for i in range(count)
+            ]
+        attrs = {"stroke": "#111111", "fill": "#111111", "fill_opacity": 1.0, "stroke_opacity": 1.0}
+        group = renderer._render_fill_strokes(
+            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
+        )
+        paths = [] if group is None else [e.attribs.get("d", "") for e in group.elements]
+        out["fill_stroke_group"].append({
+            "case": name,
+            "aspect": aspect,
+            "weight": ins.weight,
+            "seed": seed,
+            "scan_contour": poly(contour),
+            "angle": round(renderer._fill_scan_angle(seed), 12),
+            "spacing": round(renderer._fill_scan_spacing(ins, canvas), 9),
+            "base_width": round(renderer._stroke_width_px(ins.weight, canvas), 9),
+            # None means the fill degraded to a region fill (`FILL_MIN_SCANLINES`).
+            "class": None if group is None else group.attribs.get("class"),
+            "stroke_count": len(paths),
+            "path_d": paths,
+        })
+
+    for contour_name, contour in contours.items():
+        for seed in seeds:
+            angle = renderer._fill_scan_angle(seed)
+            for spacing in (18.0, 45.0):
+                segments = renderer._scanline_segments(contour, angle, spacing, seed)
+                out["scanline_segments"].append({
+                    "contour": contour_name,
+                    "contour_points": poly(contour),
+                    "seed": seed,
+                    "angle": round(angle, 12),
+                    "spacing": spacing,
+                    "count": len(segments),
+                    "scanline_indices": sorted({index for index, _, _ in segments}),
+                    "segments": [
+                        {"index": index,
+                         "start": [round(s[0], 6), round(s[1], 6)],
+                         "end": [round(e[0], 6), round(e[1], 6)]}
+                        for index, s, e in segments
+                    ],
+                })
+
+    # Hatch geometry, straight out of `_render_surface_vectors`. The port has to
+    # reproduce the line placement before it can stroke it: the loop runs over
+    # `range(-count // 2, count // 2 + 1)`, and the per-line seed is
+    # `_fill_stroke_seed(seed, i + layer_index * 4096)` where `i` is the LINE
+    # index, not the sample index that shadows it inside the comprehension.
+    hatch_cases = {
+        "hatch_diagonal_rising": SurfaceSpec(texture="hatch", density=0.5, direction="diagonal_rising"),
+        "hatch_dense": SurfaceSpec(texture="hatch", density=0.9, direction="horizontal"),
+        "crosshatch_gradient": SurfaceSpec(texture="crosshatch", density=0.4, direction="vertical",
+                                       spacing_gradient="coarse_to_dense"),
+    }
+    for aspect, canvas in canvases.items():
+        for case_name, surface in hatch_cases.items():
+            ins = Instruction(primitive="square", position=(0.25, 0.25), size=(0.5, 0.5),
+                              weight="pen", surface=surface)
+            bbox = renderer._shape_bbox(ins, canvas)
+            assert bbox is not None
+            x, y, w, h = bbox
+            seed = renderer._seed_for_instruction(ins, RENDER_SEED)
+            angle = renderer._surface_line_angle(surface)
+            spacing = max(5.0, canvas.unit * (0.010 + (1.0 - surface.density) * 0.025))
+            span = math.hypot(w, h) * 1.3
+            count = min(80, max(3, int(span / spacing)))
+            angles = [angle]
+            if surface.texture == "crosshatch":
+                angles.append(angle + math.radians(60 + renderer._hash01(8, seed, "cross-angle") * 30))
+            lines = []
+            for layer_index, layer_angle in enumerate(angles):
+                lux, luy = math.cos(layer_angle), math.sin(layer_angle)
+                lnx, lny = -luy, lux
+                for i in range(-count // 2, count // 2 + 1):
+                    progress = (i + count / 2) / max(1, count)
+                    gradient = 1.0
+                    if surface.spacing_gradient == "coarse_to_dense":
+                        gradient = 1.35 - progress * 0.7
+                    elif surface.spacing_gradient == "dense_to_coarse":
+                        gradient = 0.65 + progress * 0.7
+                    offset = (i * spacing * gradient
+                              + renderer._hash_to_unit(i + layer_index * 401 + 500, seed) * spacing * 0.12)
+                    ox, oy = lnx * offset, lny * offset
+                    lines.append({
+                        "layer": layer_index,
+                        "i": i,
+                        "gradient": round(gradient, 12),
+                        "offset": round(offset, 9),
+                        "start": [round(x + w / 2 + ox - lux * span / 2, 6),
+                                  round(y + h / 2 + oy - luy * span / 2, 6)],
+                        "end": [round(x + w / 2 + ox + lux * span / 2, 6),
+                                round(y + h / 2 + oy + luy * span / 2, 6)],
+                        "hatch_class": f"hatch-spacing-{spacing * gradient:.3f}",
+                        "stroke_seed": renderer._fill_stroke_seed(seed, i + layer_index * 4096),
+                    })
+            out["surface_hatch"].append({
+                "aspect": aspect,
+                "case": case_name,
+                "seed": seed,
+                "bbox": [round(v, 6) for v in bbox],
+                "angle": round(angle, 12),
+                "spacing": round(spacing, 9),
+                "span": round(span, 9),
+                "count": count,
+                "layer_angles": [round(a, 12) for a in angles],
+                "sample_count": max(2, renderer._stroke_sample_count(span, canvas)),
+                "line_width": round(max(0.45, canvas.unit * 0.0016), 9),
+                "lines": lines,
+            })
+
+    # Arc centerlines. `_render_arc_hand_stroke` picks the sample count from the
+    # ARC LENGTH (`r * |end - start|` in radians), not from the chord, and the
+    # varied branch goes through `_arc_points_with_variation` instead.
+    from inku_server.schema import Variation
+
+    arc_cases = {
+        "arc_crayon": (Instruction(primitive="arc", center=(0.5, 0.5), radius=0.3,
+                                   angle_start=0, angle_end=180, weight="crayon"), "square"),
+        "arc_wave": (Instruction(primitive="arc", center=(0.5, 0.5), radius=0.3,
+                                 angle_start=0, angle_end=180, weight="pen",
+                                 variation=Variation(amplitude="medium", frequency="slow",
+                                                     quality="wave", dimensions=["position_y"])), "square"),
+        "arc_crayon_pillar": (Instruction(primitive="arc", center=(0.5, 0.5), radius=0.3,
+                                          angle_start=20, angle_end=300, weight="crayon"), "pillar"),
+    }
+    for name, (ins, aspect) in arc_cases.items():
+        canvas = canvases[aspect]
+        cx = 0.5 * canvas.width
+        cy = 0.5 * canvas.height
+        r = 0.3 * canvas.unit
+        seed = renderer._seed_for_instruction(ins, RENDER_SEED)
+        varied = renderer._needs_contour_variation(ins.variation)
+        if varied:
+            assert ins.variation is not None
+            centerline = renderer._arc_points_with_variation(
+                cx, cy, r, ins.angle_start, ins.angle_end, ins.variation, seed,
+                renderer._amplitude_px(ins.variation, ins, canvas), canvas,
+            )
+        else:
+            arc_len = r * abs(math.radians(ins.angle_end) - math.radians(ins.angle_start))
+            centerline = renderer._arc_points(
+                cx, cy, r, ins.angle_start, ins.angle_end,
+                renderer._stroke_sample_count(arc_len, canvas),
+            )
+        stroke = se.synthesize_along(centerline, renderer._stroke_width_px(ins.weight, canvas),
+                                     ins.weight, seed, closed=False)
+        out["arc_centerline"].append({
+            "case": name,
+            "aspect": aspect,
+            "seed": seed,
+            "varied": varied,
+            "cx": round(cx, 6), "cy": round(cy, 6), "r": round(r, 6),
+            "angle_start": ins.angle_start, "angle_end": ins.angle_end,
+            "arc_length_px": round(r * abs(math.radians(ins.angle_end) - math.radians(ins.angle_start)), 9),
+            "centerline": poly(centerline),
+            "intent_path_d": (None if varied
+                              else renderer._arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)),
+            "class": f"arc-stroke-v1 controls-{len(stroke.samples)} events-{stroke.event_count}",
+            "path_d": se.contour_stroke_path(stroke),
+        })
+
+    (OUT / "renderer_fill_and_arc.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
@@ -486,6 +770,7 @@ def main() -> None:
     variation_fixtures()
     proportional_fixtures()
     seed_range_fixtures()
+    fill_and_arc_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

@@ -300,19 +300,50 @@ The instructions can be edited by hand and drawn again. Selecting a word in the 
 
 ---
 
-## Three ways to say "again"
+## Pursuing the work through revision
 
-Every result offers three tiers of regeneration. None of them breaks default reproducibility; each acts only on your explicit request.
+The drawing that comes back from one sentence is not the finished piece. It is the **first generation**. You redraw from it, then redraw from what came back — **the work is made by accumulating generations**.
 
-| Operation | What is redrawn | What is kept |
-|---|---|---|
-| **Another performance** | Line tremor, placement phase (no LLM call) | Interpretation and composition |
-| **Another composition** | Composition family, focus, technique | Interpretation (how the words were read) |
-| **Another interpretation** | The reading of the words themselves | Your sentence |
+This is not pulling a lever until something good appears. Redrawing is split across five axes, and **you decide which one moves and which ones hold**. Then **you choose** among what comes back. That loop of variation and choice is what turns output into a work.
+
+### Five ways to redraw
+
+None of them breaks default reproducibility; each acts only on your explicit request.
+
+| Operation | What is redrawn | What is kept | Cost |
+|---|---|---|---|
+| **Another performance** (vary touch with words) | Line tremor, placement phase | Interpretation and composition | Very fast, no LLM call |
+| **Another color** (vary color catalog) | The color assignment | Interpretation, composition, performance | Very fast, no LLM call |
+| **Another composition** (vary layout) | Composition family, focus, technique | Interpretation (how the words were read) | Moderate, Stage 2 |
+| **Variation** (let the app change Stage 1.5) | Axes of the expansion layer; the range depends on the strength | Your sentence, its reading, and the axes the strength leaves alone | Moderate, Stage 2 |
+| **Another interpretation** | The reading of the words themselves | Your sentence | Slower, from Stage 1 |
 
 With *another interpretation*, the old and new instructions are shown side by side as a diff. The moment your words are read differently — that gap itself becomes material for the next sentence.
 
-You can also generate a grid of candidates and keep the ones you like (multiple selection is allowed), attaching a short note about why you chose them. **Choosing is part of the work, alongside writing.** History stores seeds and an edition ID, so anything you keep can be reproduced exactly as it was.
+*Variation* is the one where you say how far to go, in three steps. After it runs, the axes that actually moved are listed, so you never have to guess what changed.
+
+| Strength | Axes that move | Axes that hold |
+|---|---|---|
+| Small | One among type swap and count | Focus, color, composition |
+| Medium | The small axes plus touch, focus, main and contrast color (one or two) | Composition family, type family |
+| Large | The medium axes plus composition family and type family (two to four) | — the structure of the picture moves too |
+
+### Letting the AI carry it
+
+Instead of picking the axis yourself, you can hand the act of accumulating generations to the AI. There are two modes.
+
+- **Random automatic refinement** — each generation picks an axis at random from the ones you allowed
+- **AI Vision automatic refinement** — each image is actually observed, and one direction is passed to the next generation
+
+Either mode accepts a direction of your own (a sentence such as "festive, and yet cool"). Everything born while the AI runs is still recorded in the lineage, so you can pick a drawing from the middle of the run and go back to redrawing it by hand.
+
+### Accumulating generations
+
+Candidates can be made one at a time or as a grid of four. Keep the ones you like (multiple selection is allowed) and **attach a short note about why you chose them**. **Choosing is part of the work, alongside writing.**
+
+What you keep becomes the next parent. Another performance from there, another color, a variation — the whole back and forth is recorded in the **lineage**, so you can trace later which generation you redrew what from to arrive at the drawing in front of you. History stores seeds and an edition ID, so any generation along the way can be reproduced exactly as it was.
+
+**A piece is finished not when a generation happens to land, but when you decide to stop here.**
 
 ---
 

@@ -84,12 +84,73 @@ internal object ServerRendererGeometry {
         return v1 * (1.0 - t) + v2 * t
     }
 
-    fun getAmplitudePx(variation: JSONObject): Double {
-        return when (variation.optString("amplitude", "medium")) {
-            "fine" -> 7.0
-            "broad" -> 30.0
-            else -> 12.0
+    fun representativeSizePx(ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        val p = ins.optString("primitive", "")
+        if (p in listOf("circle", "polygon", "arc") && ins.has("radius")) {
+            return ins.getDouble("radius") * unit
         }
+        if (p == "ellipse" && ins.has("size")) {
+            val size = ins.getJSONArray("size")
+            val rx = size.getDouble(0) * width / 2.0
+            val ry = size.getDouble(1) * height / 2.0
+            return kotlin.math.sqrt(kotlin.math.max(0.0, rx * ry))
+        }
+        if (p in listOf("square", "triangle", "cloudform") && ins.has("size")) {
+            val size = ins.getJSONArray("size")
+            val w = size.getDouble(0) * width
+            val h = size.getDouble(1) * height
+            return kotlin.math.min(w, h) / 2.0
+        }
+        if (p == "line") {
+            val fromArr = if (ins.has("from")) ins.getJSONArray("from") else null
+            val toArr = if (ins.has("to")) ins.getJSONArray("to") else null
+            val x1 = (fromArr?.getDouble(0) ?: 0.5) * width
+            val y1 = (fromArr?.getDouble(1) ?: 0.0) * height
+            val x2 = (toArr?.getDouble(0) ?: 0.5) * width
+            val y2 = (toArr?.getDouble(1) ?: 1.0) * height
+            return kotlin.math.hypot(x2 - x1, y2 - y1)
+        }
+        return unit * 0.02
+    }
+
+    fun clampedRepresentativePx(ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        return kotlin.math.max(representativeSizePx(ins, width, height, unit), unit * 0.02)
+    }
+
+    fun amplitudePx(variation: JSONObject, ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        val rep = clampedRepresentativePx(ins, width, height, unit)
+        val ampStr = variation.optString("amplitude", "medium")
+        val ratio = when (ampStr) {
+            "fine" -> 0.025
+            "broad" -> 0.18
+            else -> 0.08
+        }
+        return kotlin.math.min(ratio * rep, 0.40 * rep)
+    }
+
+    fun blurStdPx(variation: JSONObject, ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        val rep = clampedRepresentativePx(ins, width, height, unit)
+        val ampStr = variation.optString("amplitude", "medium")
+        val ratio = when (ampStr) {
+            "fine" -> 0.009
+            "broad" -> 0.07
+            else -> 0.03
+        }
+        return kotlin.math.max(unit * 0.0005, ratio * rep)
+    }
+
+    fun segmentCount(pathLenPx: Double, unit: Double): Int {
+        val target = unit * 0.01
+        if (target <= 0) return 32
+        val cnt = Math.rint(pathLenPx / target).toInt()
+        return kotlin.math.max(32, kotlin.math.min(200, cnt))
+    }
+
+    fun strokeSampleCount(lengthPx: Double, unit: Double): Int {
+        val target = unit * (1.0 / 49.0)
+        if (target <= 0) return 17
+        val cnt = Math.rint(lengthPx / target).toInt()
+        return kotlin.math.max(17, kotlin.math.min(129, cnt))
     }
 
     fun getFrequencyCycles(variation: JSONObject): Double {
@@ -242,10 +303,18 @@ internal object ServerRendererGeometry {
     }
 
     fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String): List<Pair<Double, Double>> {
-        return variedLinePoints(x1, y1, x2, y2, variation, seedToInt(seed))
+        return variedLinePoints(x1, y1, x2, y2, variation, seedToInt(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
     fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: Int): List<Pair<Double, Double>> {
+        return variedLinePoints(x1, y1, x2, y2, variation, seed, JSONObject(), 1000.0, 1000.0, 1000.0)
+    }
+
+    fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return variedLinePoints(x1, y1, x2, y2, variation, seedToInt(seed), ins, width, height, unit)
+    }
+
+    fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: Int, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
         if (variation == null) return listOf(x1 to y1, x2 to y2)
         val dx = x2 - x1
         val dy = y2 - y1
@@ -256,9 +325,9 @@ internal object ServerRendererGeometry {
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
-        val amp = getAmplitudePx(variation)
+        val amp = amplitudePx(variation, ins, width, height, unit)
         val result = mutableListOf(x1 to y1)
-        val segments = 80
+        val segments = segmentCount(length, unit)
         for (i in 1 until segments) {
             val t = i.toDouble() / segments.toDouble()
             val offset = sampleOffset(t, variation, seed, i, amp)
@@ -279,16 +348,26 @@ internal object ServerRendererGeometry {
     }
 
     fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: String, count: Int = 100): List<Pair<Double, Double>> {
-        return variedCirclePoints(cx, cy, rx, ry, variation, seedToInt(seed), count)
+        return variedCirclePoints(cx, cy, rx, ry, variation, seedToInt(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
     fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: Int, count: Int = 100): List<Pair<Double, Double>> {
+        return variedCirclePoints(cx, cy, rx, ry, variation, seed, JSONObject(), 1000.0, 1000.0, 1000.0)
+    }
+
+    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return variedCirclePoints(cx, cy, rx, ry, variation, seedToInt(seed), ins, width, height, unit)
+    }
+
+    fun variedCirclePoints(cx: Double, cy: Double, rx: Double, ry: Double, variation: JSONObject?, seed: Int, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        val approxPerimeter = Math.PI * (3.0 * (rx + ry) - sqrt((3.0 * rx + ry) * (rx + 3.0 * ry)))
+        val count = segmentCount(approxPerimeter, unit)
         val basePoints = circlePoints(cx, cy, rx, ry, count)
         if (variation == null || !needsPathVariation(variation)) return basePoints
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
-        val amp = getAmplitudePx(variation)
+        val amp = amplitudePx(variation, ins, width, height, unit)
         val center = cx to cy
         return basePoints.mapIndexed { i, pt ->
             val t = i.toDouble() / count.toDouble()
@@ -298,15 +377,23 @@ internal object ServerRendererGeometry {
     }
 
     fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: String, cx: Double, cy: Double): List<Pair<Double, Double>> {
-        return variedPolygonPoints(points, variation, seedToInt(seed), cx, cy)
+        return variedPolygonPoints(points, variation, seedToInt(seed), cx, cy, JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
     fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Int, cx: Double, cy: Double): List<Pair<Double, Double>> {
+        return variedPolygonPoints(points, variation, seed, cx, cy, JSONObject(), 1000.0, 1000.0, 1000.0)
+    }
+
+    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: String, cx: Double, cy: Double, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return variedPolygonPoints(points, variation, seedToInt(seed), cx, cy, ins, width, height, unit)
+    }
+
+    fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Int, cx: Double, cy: Double, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
         if (variation == null || !needsPathVariation(variation) || points.isEmpty()) return points
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
-        val amp = getAmplitudePx(variation)
+        val amp = amplitudePx(variation, ins, width, height, unit)
         val center = cx to cy
         val count = points.size
         return points.mapIndexed { i, pt ->
@@ -317,18 +404,29 @@ internal object ServerRendererGeometry {
     }
 
     fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: String, count: Int = 60): String {
-        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToInt(seed), count)
+        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToInt(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
     fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Int, count: Int = 60): String {
+        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seed, JSONObject(), 1000.0, 1000.0, 1000.0)
+    }
+
+    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): String {
+        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToInt(seed), ins, width, height, unit)
+    }
+
+    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Int, ins: JSONObject, width: Double, height: Double, unit: Double): String {
         if (variation == null || !needsPathVariation(variation)) {
             return arcPathD(cx, cy, r, startDeg, endDeg)
         }
+        val deltaDeg = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
+        val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
+        val count = segmentCount(arcLen, unit)
         val points = arcPoints(cx, cy, r, startDeg, endDeg, count)
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
-        val amp = getAmplitudePx(variation)
+        val amp = amplitudePx(variation, ins, width, height, unit)
         val center = cx to cy
         val variedPts = points.mapIndexed { i, pt ->
             val t = i.toDouble() / count.toDouble()
@@ -342,4 +440,5 @@ internal object ServerRendererGeometry {
         }
         return sb.toString()
     }
+
 }

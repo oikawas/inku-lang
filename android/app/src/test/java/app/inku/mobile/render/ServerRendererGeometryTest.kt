@@ -42,7 +42,7 @@ class ServerRendererGeometryTest {
         val seed2 = 202
         val t = 0.25
         val segment = 1
-        val amp = ServerRendererGeometry.getAmplitudePx(variation)
+        val amp = ServerRendererGeometry.amplitudePx(variation, JSONObject(), 1000.0, 1000.0, 1000.0)
 
         val offset1 = ServerRendererGeometry.sampleOffset(t, variation, seed1, segment, amp)
         val offset2 = ServerRendererGeometry.sampleOffset(t, variation, seed2, segment, amp)

@@ -1095,4 +1095,53 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 `gradle :app:testDebugUnitTest` （全 16 件）および `gradle :app:assembleDebug` が成功する。
 `android/BUILD_NUMBER` は `148071`、`android/VERSION` は `1.48.0-android.1` を維持。
 
+## 2026-07-23 web/server v2 追随 Phase 2b (px 絶対値の全面比例系改修)
+
+契約 `antigravity-android-phase2-renderer.md` §9 に基づき、px 絶対値定数を `canvas.unit` および図形代表寸法基準の比例系へ改修した（engine 7 / v2.1.0 追随）。
+
+### 2 種類のスケール基準の明確な使い分け
+
+1. **`canvas.unit` 基準（`min(width, height)`）**:
+   - 線幅 $\text{strokeWidthPx}$（$\text{base} \times \frac{\text{unit}}{1000}$）、分割目標セグメント長（$\text{unit} \times 0.01$）、ストローク分割目標（$\text{unit} \times \frac{1}{49}$）、材質輪郭の下限オフセット（$\text{unit} \times 0.0035$）。
+2. **図形代表寸法 $\text{representativeSizePx}$ 基準**:
+   - `circle` / `polygon` / `arc`: 半径 $r \cdot \text{unit}$
+   - `ellipse`: 2 半径の相乗平均 $\sqrt{r_x \cdot r_y}$
+   - `square` / `triangle` / `cloudform`: 短辺の 1/2 ($\min(w, h) / 2$)
+   - `line`: 線長 $\text{hypot}(dx, dy)$
+   - 下限クランプ $\text{clampedRepresentativePx}$: $\max(\text{rep}, \text{unit} \times 0.02)$
+   - 揺らぎ振幅 `amplitudePx`（比率 0.025/0.08/0.18、上限 $0.40 \times \text{rep}$）、滲み `blurStdPx`（比率 0.009/0.03/0.07、下限 $\text{unit} \times 0.0005$）。
+
+### 検証
+
+`ServerRendererProportionalTest.kt` を新規作成し、参照コーパス `renderer_proportional.json`（4 比率 `square`, `wide`, `pillar`, `vertical`）の全 336 値に対するアサートを実施した。
+
+- `representative_size_px` (28 件), `amplitude_px` (84 件), `blur_std_px` (84 件), `stroke_width_px` (40 件) が **許容誤差 1e-9** で完全一致。
+- 整数丸め項目 `segment_count` (20 件), `stroke_sample_count` (20 件), `speck_count` (60 件) が Banker's Rounding (`Math.rint(...).toInt()`) により **100% 完全一致**。
+
+`gradle :app:testDebugUnitTest` （全 17 件）および `gradle :app:assembleDebug` が成功する。
+`android/BUILD_NUMBER` は `148072`、`android/VERSION` は `1.48.0-android.1` を維持。
+
+## 2026-07-23 web/server v2 追随 Phase 2b′ (比例系描画経路の配線と未実装解消)
+
+契約 `antigravity-android-phase2-renderer.md` §10 に基づき、2b で追加された比例系関数を描画経路（`DefaultSvgRenderer.kt`, `ServerRendererGeometry.kt`, `ServerRendererStyle.kt`, `ServerRendererMaterial.kt`）へ完全配線し、ハードコードされていた旧絶対値関数・既定引数を削除・置換した。
+
+### 配線および未実装事項の解消
+1. **旧関数と既定値の完全除去**: `ServerRendererGeometry.getAmplitudePx` を削除し `amplitudePx` へ置換。`ServerRendererStyle.strokeAttrs` / `strokeWidth` から既定値 `= 1000.0` を削除。
+2. **キャンバス `unit` (`min(width, height)`) の全伝鎖**: `DefaultSvgRenderer` から幾何・材質・スタイルの全描画処理へ `unit` を伝鎖。
+3. **動的滲み Filter の集計と出力**: 静的 `blur-fine / blur-medium / blur-broad` を廃止し、`blurStdPx` から動的に `filter_id = "blur-${amp}-${int(std*10)}"` を集計し `<defs>` に出力する方式へ変更。
+4. **質感 Filter の比例化**: `baseFrequency` を `unit` 反比例（`base * (1000.0 / unit)`）、変位量 scale を比例に更新。
+5. **材質条件の適用**: 輪郭オフセット下限 `0.0035 * unit`（`Math.copySign` による符号保持）、輪郭 opacity 下限 0.5 (max 1.0)、speck opacity 下限 0.4 (max 1.0)、speck 個数の周長比例化。
+
+### 検証
+`ServerRendererProportionalWiringTest.kt` を追加し、実描画 SVG に対する 4 観点のアサートを実施した。
+- **線幅比例**: 9 種の weight で `square` (unit 1000) と `pillar` (unit 200) の `stroke-width` が参照コーパスと 1e-9精度で一致。
+- **揺らぎ振幅比例**: Wave 揺らぎの最大半径偏差比が 5.0 (±5% 許容) かつ上限（square 16.0 / pillar 3.2）以下。
+- **滲み比例**: `<feGaussianBlur>` の `stdDeviation` が square で 6.0、pillar で 1.2 に動的変化。
+- **材質比例**: pillar での speck 個数および輪郭オフセット下限 (0.7px) が SVG に正しく反映。
+
+`gradle :app:testDebugUnitTest --rerun-tasks`（全 22 件）および `gradle :app:assembleDebug` が成功する。
+`android/BUILD_NUMBER` は `148073` にインクリメント。
+
+
+
 

@@ -1169,7 +1169,7 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `stroke_engine_synthesize_stroke.json`: 9 ケースの `samples` (1e-6), `outline` (1e-6), `event_count`, `burr_side`, `burr_opacity` (1e-9), `path_d` (文字列完全一致)。
 - `stroke_engine_synthesize_along.json`: 5 ケースの `samples`, `left`, `right` (各点 1e-4), `path_d` (文字列完全一致)。
 
-`gradle :app:testDebugUnitTest --rerun-tasks`（全 26 件）および `gradle :app:assembleDebug` が成功する。
+`gradle :app:testDebugUnitTest --rerun-tasks`（全 25 件）および `gradle :app:assembleDebug` が成功する。
 `android/BUILD_NUMBER` は `148074` にインクリメント。`android/VERSION` は `1.48.0-android.1` を維持。
 
 

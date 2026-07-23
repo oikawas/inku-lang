@@ -1590,7 +1590,7 @@ In accordance with contract `antigravity-android-phase2-renderer.md` §8, `serve
 - `stroke_engine_synthesize_stroke.json`: 9 cases for `samples` (1e-6), `outline` (1e-6), `event_count`, `burr_side`, `burr_opacity` (1e-9), and `path_d` (exact string match).
 - `stroke_engine_synthesize_along.json`: 5 cases for `samples`, `left`, `right` (1e-4 tolerance), and `path_d` (exact string match).
 
-`gradle :app:testDebugUnitTest --rerun-tasks` (all 26 tests) and `gradle :app:assembleDebug` succeed.
+`gradle :app:testDebugUnitTest --rerun-tasks` (all 25 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` incremented to `148074`. `android/VERSION` remains `1.48.0-android.1`.
 
 

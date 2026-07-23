@@ -1563,6 +1563,37 @@ Added `ServerRendererProportionalWiringTest.kt` to assert rendered SVG output ac
 `gradle :app:testDebugUnitTest --rerun-tasks` (all 22 tests) and `gradle :app:assembleDebug` succeed.
 `android/BUILD_NUMBER` incremented to `148073`.
 
+## 2026-07-23 web/server v2 Alignment Phase 2c (Creation of `ServerStrokeEngine.kt` & Verification)
+
+In accordance with contract `antigravity-android-phase2-renderer.md` §8, `server/src/inku_server/stroke_engine.py` (438 lines) was fully ported to Kotlin as new file `ServerStrokeEngine.kt` and verified with `ServerStrokeEngineTest.kt`.
+
+### Key Design Rationale & Algorithm Details
+
+1. **`_unit` Hash Construction**:
+   - Distinct from `_hash01` and `_hash_to_unit`, the hash format string is **`"{seed}:{label}:{index}"`**.
+   - Extracts the first 8 bytes of SHA-256 as an **Unsigned Little-Endian 64-bit integer (`ULong`)**, divided by `2^64 - 1` (`18446744073709551615.0`) to produce a float in $[0.0, 1.0]$.
+2. **Separation of Integrators in `synthesize_stroke` and `synthesize_along`**:
+   - `synthesize_stroke` (straight line) and `synthesize_along` (arbitrary centerline) use different integration formulas.
+   - `synthesize_along` feeds forward the intended step vector (`step`), leaving the spring tracker to carry only the residual deviation to prevent radial shrinkage on curves. The two integrators are kept strictly separate.
+3. **Negative Indexing, Seam Ramping & Event Window**:
+   - Centerline normal calculations handle negative indices via `(index - 1 + count) % count` for closed contours.
+   - `_arc_length_parameters` includes the seam segment in `total` for closed loops but not in `running`, ensuring `parameters.last() < 1.0`.
+   - `_event_map` scans window `3 until (count - 3)` and caps at 2 events max via early `break`.
+   - `polygon_path` / `ring_path` path generation applies Python-compatible HALF_EVEN rounding.
+
+### Verification
+
+`ServerStrokeEngineTest.kt` was created to perform exact parity testing against 4 server reference JSON fixtures:
+
+- `stroke_engine_primitives.json`: `grammars` (10 weights exact match), `unit` (56 cases, 1e-12 tolerance), `smooth_noise` (24 cases, 1e-12 tolerance), `event_map` (16 cases exact match), `centerline` (3 cases, 1e-12 tolerance).
+- `stroke_engine_latent_energy.json`: 3 seeds × 21 samples (1e-6 tolerance).
+- `stroke_engine_synthesize_stroke.json`: 9 cases for `samples` (1e-6), `outline` (1e-6), `event_count`, `burr_side`, `burr_opacity` (1e-9), and `path_d` (exact string match).
+- `stroke_engine_synthesize_along.json`: 5 cases for `samples`, `left`, `right` (1e-4 tolerance), and `path_d` (exact string match).
+
+`gradle :app:testDebugUnitTest --rerun-tasks` (all 26 tests) and `gradle :app:assembleDebug` succeed.
+`android/BUILD_NUMBER` incremented to `148074`. `android/VERSION` remains `1.48.0-android.1`.
+
+
 
 
 

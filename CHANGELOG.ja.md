@@ -2796,3 +2796,16 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **`server/pyproject.toml` の `description`**（`2308059`）: uv の雛形が残っていたので差し替えてあったもの。挙動は変わらないため単独では採番していなかった。
 - **Android の追随が要る:** engine 11 で `path d` が `.3f` から 6 桁固定へ変わるため、**Android の parity fixture は全滅する**。Stage 1.5 を扱う Phase 3b〜3d とは別軸なので、**描画層の engine 11 追随は Phase 2h として別契約に起票する**。
 - **検証:** pytest **1062 passed / 30 skipped**（v2.4.7 の 1043 + Phase 4 の 17 + engine 11 の 2）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings。
+
+### v2.4.9 — 再描画時の版差表示（参照コーパス Phase 5 完結）（Build 705、2026-07-25）
+
+**参照コーパスとレイヤー版数の親契約（全 5 段）がこれで完結する。** engine 10 → 11 の桁だけの差を実物で示せるようになった凍結コーパスを、**利用者の画面でも「この作品はどの版で描かれ、いま見ているのは何版か」を言葉で見せる**段。描画コア・stroke engine・Score schema・`server/reference/`・各版数（`render_engine_version="11"` / `ddl_version="1"` / `ddl_engine_version="1"`）はいずれも据え置きで、**表示だけを足した**。
+
+- **現行レイヤー版の取得口を `GET /api/info` に開けた:** 認証不要のこのエンドポイントへ `render_engine_id` / `render_engine_version` / `ddl_version` / `ddl_engine_version` の 4 フィールドを追加した。値は定数直書きではなく `current_render_engine()` と `DDL_VERSION` / `DDL_ENGINE_VERSION` から取る。テストは **engine 実体を monkeypatch すると `/api/info` が追随する**ことまで固定した（定数直書きなら落ちる形）。既存の `name` / `version` / `build_number` / `developer_mode` は維持し、`developer_mode` の真偽にかかわらず版フィールドを返す。
+- **生成情報ドロワーへ「DDL 仕様 / 変換層」を足した:** 表示元は選択履歴または現行結果に記録された `ddl_version` / `ddl_engine_version`。欠損時は**「記録なし」と表示し値を推測しない**。DB 1704 行のうち engine 版の記録なしが 590（35%）ある実データに対して、「記録が無い」と「版 1」を**画面上で区別する**ための表示である。
+- **再現比較モーダル（新規 `ReplayComparisonModal.svelte`）:** 再現ボタンは保存済み Score を `/api/render-svg` へ送って現行 Renderer で描き直し、**保存済み SVG（オリジナル）と描き直し SVG（現行）を左右に並べる**。各作品の上に記録 Renderer 版と現行 Renderer 版を出し、版が違えば「この作品は engine 10 で描かれました。いま画面にあるのは engine 11 による描き直しです。」（英語併記）を**作品の外・比較グリッドの上**に置く（SVG へ重ねない）。記録版と現行版が同じ場合、`/api/info` 失敗で現行版が不明な場合、履歴から開くだけの場合は版差通知を出さない。
+- **呼び出し元へ戻す:** 履歴管理／作品タブ／系譜タブのどこから開いても、閉じると元へ戻る。キャンバス下部バーの「生成情報」左隣へ再現ボタンを足し、`CanvasPanel` と `HistoryManager` の該当ボタンを `--btn-sm-*` 寸法トークンへ揃えた。
+- **seed 欠損作品の暫定比較（作者追加指示）:** `render_seed` と `seed_text` の双方がない履歴も比較可能にした。**DB は書き戻さず、比較要求の間だけ固定 seed `0` を補完する**ので同じ作品を再度比較しても現行側は変わらない。モーダルに「Seed を補完した暫定表示（seed: 0）」と注記する。API が NULL 列を応答から省くため、**完全な履歴項目の判定は `render_seed` フィールドの有無ではなく保存済み `score` と `svg` の有無で行う**（この取り違えで Build 703 では下部バーの再現ボタンが無効だった。作者提供スクリーンショットで確認し Build 704 で修正）。
+- **積み残さなかったもの（明示）:** 過去 Renderer の保持・選択・呼び戻しは実装していない。保存済み SVG は差し替えていない。既存履歴の版数・`render_seed` は backfill も書き戻しもしていない。`/api/render-svg` の SVG 本文応答は変えていない。web のテスト基盤は新設していない。
+- **仕様は動いていないため SPEC は触っていない**（`SPEC.ja.md` §15.8 の実装であり、契約 §3.1 のまま）。
+- **検証:** pytest **1063 passed / 30 skipped**（+1 = `/api/info` の版フィールド）、cli 68 passed、ruff clean、`npm run check` **0 errors / 2 warnings**（新規 `ReplayComparisonModal.svelte` を含む 217 files）、`npm run build` 成功。変更範囲は server 1 ファイル + test + web のみ。

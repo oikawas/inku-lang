@@ -2683,7 +2683,7 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **検証:** 記載した数値は実装と突き合わせた（manifest の cases = 220、段 A = 80 = 10 道具 × 8 図形、
   `render_engine_version` = `"10"`）。コードは 1 行も変えていないため pytest / cli / ruff は v2.4.5 と同一。
 
-### Android `2.0.0-android.1` — 描画コアが render engine 10 へ到達し、11 まで追随（Phase 1〜3a・2h、android Build 148077〜148081、2026-07-23〜24）
+### Android `2.0.0-android.1` — 描画コアが render engine 10 へ到達し 11 まで追随、Stage 1.5 は変奏まで（Phase 1〜3b・2h、android Build 148077〜148082、2026-07-23〜24）
 
 **記載方針**: Android の移植は段ごとに版を起こさず、**engine 10 到達をもって 1 件にまとめる**（web/server とは版の名前空間が別で、`android/VERSION` / `android/BUILD_NUMBER` が正本）。以下は Phase 1 から 2f までの通し記録である。
 
@@ -2717,7 +2717,10 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **判別テスト 3 本を新設し、3 本とも「意図したテストが落ちる」ことを摂動で確認した**（git 管理セッションが受け入れ時に独立実行）: ① `MASTER_GRID_DECIMALS` を 6 → 5 にすると `testEveryEmittedNumberSitsOnMasterGrid` が落ちる ② 整数もグリッドに載せると `testIntegersRemainIntegers` が落ちる ③ `Locale.US` を外すと `testLocaleIndependence` が落ちる。**着手時点で赤だった 12 件はすべて緑になり、その 12 件の assert は 1 つも書き換えていない**（緩めて通した箇所が無いことの証明）。
 - **整形の忠実性を実測した:** `String.format(Locale.US, "%.6f", v)` と、二進値そのものを見る `BigDecimal(v).setScale(6, HALF_EVEN)`（＝ Python の `f"{v:.6f}"` と同じ意味）を 0〜1000 の乱数 **200 万件**で突き合わせ、**不一致 0 件**。JVM の整形が Python と食い違いうる懸念（短縮表記経由の丸め）は、6 桁・この範囲では現れない。
 - **検証:** `gradle :app:testDebugUnitTest --rerun-tasks` を main で独立実行し **61 件 / failures 0 / errors 0**（XML 自力集計。ベースライン 58 + 判別 3）。`android/VERSION` は `2.0.0-android.1` 据え置き、`android/BUILD_NUMBER` も `148081` のまま。変更は `android/` のみで、**web/server の描画結果・`APP_VERSION` / `web/BUILD_NUMBER` は動かしていない**。pentala 反映も不要。
-- **申し送り:** Phase 3b〜3d（Stage 1.5 の残り）が次の段。本 Phase でブロックが外れた。
+- **Phase 3b（merge `467877f`、android Build 148082）＝ Stage 1.5 変奏の追随:** `variation_amplitude` と `variation_seed` が**両方揃ったとき**だけ DDL 本文と `variation_report` を決定的に変換する変奏層を移植した。`VariationPlan`・強度 3 段・7 軸（`type_swap` / `count` / `touch` / `focus` / `color` / `composition` / `type_family`）と `buildVariationPlan` / `effectiveVariationPlan`（実際に出力が動く軸だけを採る）/ `variationMovedAxes` / `resolveFocusId` を server の `ddl_expander.py:676-1040` から写した。**焦点 `focus` もこの段**（`_resolve_focus_id` が変奏プランの一部のため）。
+- **契約に着手時点を先出ししてあった:** 16 ケース中、変奏未実装でも通る 2 件（`amplitude-only` / `seed-only` = 基底と同一）を除く **14 件が DIFFER の状態**から始めた。**変奏は DDL を短くしうる**（`type_family` の削減で 24 文字へ縮む 4 件があり、「足すだけ」の実装では通らない）。**16 件すべてが `variation_report` を持つ**ので、テストは output 完全一致に加えて `moved_axes`（軸・from・to）と `resolved_focus` を全件照合する。
+- **git 管理セッションが独立に再現した受け入れ条件:** ① `testDebugUnitTest --rerun-tasks` を `feat/android-phase3` と main の両方で **62 件 / failures 0 / errors 0**（XML 自力集計。ベースライン 61 + 新規 1〔16 ケース内包〕）② **判別力を摂動で確認**——`java.lang.Long.toUnsignedString` を素の `toString` に戻すと落ちる（2^63 以上の seed 2 件が効いている証拠）／`moved_axes` の `axis` を汚すと**出力が正しいままでも落ちる**（report 照合が output とは独立に効いている証拠。契約が心配した「切り詰めるだけの実装」を、output+report の 11 種の相違で弾ける）③ 出力長が同じ focus 2 件（`upper_left` / `upper_edge` = 92 字）も本文の中身で判別される。**変更は `android/` のみ 6 ファイル**で、`render_engine_version` は **`"11"` のまま**、`android/VERSION` も `2.0.0-android.1` を維持。
+- **申し送り:** Phase 3c（添景）→ 3d（プラグイン・歳時記）が残り。3c は `tenkei` 三段と `_cap_category_plan`、期待値は `ddl_expand.json` に先出し済み（`A-tenkei-*` 3 + `B-tenkei-*` 9）。
 
 ### v2.4.7 — 決定的な DDL 層を凍結する（DDL 参照コーパスと `ddl_version` / `ddl_engine_version`）（Build 697、2026-07-24）
 

@@ -85,6 +85,9 @@ class HistoryRow(Base):
     elapsed_ms   = Column(Integer,    nullable=False, default=0)
     stage1_model = Column(String,     nullable=True)
     stage2_model = Column(String,     nullable=True)
+    stage1_prompt_digest = Column(String, nullable=True)
+    stage1_prompt_base_digest = Column(String, nullable=True)
+    stage2_prompt_digest = Column(String, nullable=True)
     tokens_in    = Column(Integer,    nullable=True)
     tokens_out   = Column(Integer,    nullable=True)
     catalog_id   = Column(String,     nullable=True)
@@ -264,6 +267,9 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "catalog_id": "ALTER TABLE history ADD COLUMN catalog_id VARCHAR",
     "ddl_version": "ALTER TABLE history ADD COLUMN ddl_version VARCHAR",
     "ddl_engine_version": "ALTER TABLE history ADD COLUMN ddl_engine_version VARCHAR",
+    "stage1_prompt_digest": "ALTER TABLE history ADD COLUMN stage1_prompt_digest VARCHAR",
+    "stage1_prompt_base_digest": "ALTER TABLE history ADD COLUMN stage1_prompt_base_digest VARCHAR",
+    "stage2_prompt_digest": "ALTER TABLE history ADD COLUMN stage2_prompt_digest VARCHAR",
     "render_build_number": "ALTER TABLE history ADD COLUMN render_build_number VARCHAR",
     "render_color_profile": "ALTER TABLE history ADD COLUMN render_color_profile TEXT",
     "render_engine_id": "ALTER TABLE history ADD COLUMN render_engine_id VARCHAR",
@@ -1642,6 +1648,12 @@ def _row_to_dict(row: HistoryRow) -> dict:
 }
     if data_warnings:
         item["data_warnings"] = data_warnings
+    if row.stage1_prompt_digest is not None:
+        item["stage1_prompt_digest"] = row.stage1_prompt_digest
+    if row.stage1_prompt_base_digest is not None:
+        item["stage1_prompt_base_digest"] = row.stage1_prompt_base_digest
+    if row.stage2_prompt_digest is not None:
+        item["stage2_prompt_digest"] = row.stage2_prompt_digest
     if row.ddl_version is not None:
         item["ddl_version"] = row.ddl_version
     if row.ddl_engine_version is not None:
@@ -1831,6 +1843,9 @@ def add_item(item: dict) -> dict:
         score=json.dumps(item.get("score", {})), svg=item.get("svg", ""),
         output_path=item.get("output_path"), elapsed_ms=item.get("elapsed_ms", 0),
         stage1_model=item.get("stage1_model"), stage2_model=item.get("stage2_model"),
+        stage1_prompt_digest=item.get("stage1_prompt_digest"),
+        stage1_prompt_base_digest=item.get("stage1_prompt_base_digest"),
+        stage2_prompt_digest=item.get("stage2_prompt_digest"),
         tokens_in=item.get("tokens_in"), tokens_out=item.get("tokens_out"), catalog_id=item.get("catalog_id"),
         ddl_version=item.get("ddl_version"), ddl_engine_version=item.get("ddl_engine_version"),
         render_build_number=item.get("render_build_number"),

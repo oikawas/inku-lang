@@ -618,6 +618,9 @@ def _history_render_metadata(item: dict) -> dict | None:
             metadata["render_hash_short"] = item.get("render_hash_short") or _db.render_hash_short(item.get("render_hash"))
         return metadata
     keys = (
+        "stage1_prompt_digest",
+        "stage1_prompt_base_digest",
+        "stage2_prompt_digest",
         "ddl_version",
         "ddl_engine_version",
         "render_build_number",
@@ -891,6 +894,7 @@ class ComposeResponse(BaseModel):
     score: Score
     svg: str
     stage2_model: str | None = None
+    stage2_prompt_digest: str | None = None
     ddl_version: str | None = None
     ddl_engine_version: str | None = None
     render_build_number: str | None = None
@@ -1006,6 +1010,9 @@ class PaintResponse(BaseModel):
     svg: str
     stage1_model: str | None = None
     stage2_model: str | None = None
+    stage1_prompt_digest: str | None = None
+    stage1_prompt_base_digest: str | None = None
+    stage2_prompt_digest: str | None = None
     ddl_version: str | None = None
     ddl_engine_version: str | None = None
     render_build_number: str | None = None
@@ -1122,6 +1129,8 @@ class InterpretDetail:
     fallback_used: bool = False
     fallback_reasons: list[str] = field(default_factory=list)
     raw: str | None = None  # trace: サニタイズ前の Stage 1 生 DDL (include_trace 時のみ)
+    stage1_prompt_digest: str | None = None
+    stage1_prompt_base_digest: str | None = None
 
 
 @dataclass
@@ -1148,6 +1157,7 @@ class ComposeDetail:
     # 変奏 (v2.0): 展開層が実際に振った結果。resolved_focus は history.focus の供給源。
     variation_moved_axes: list[dict[str, str]] = field(default_factory=list)
     resolved_focus: str | None = None
+    stage2_prompt_digest: str | None = None
 
 
 class PromptsResponse(BaseModel):
@@ -1181,6 +1191,9 @@ class HistoryPostBody(BaseModel):
     elapsed_ms: int = 0
     stage1_model: str | None = None
     stage2_model: str | None = None
+    stage1_prompt_digest: str | None = None
+    stage1_prompt_base_digest: str | None = None
+    stage2_prompt_digest: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
     catalog_id: str | None = None
@@ -2690,12 +2703,14 @@ def _call_compose_detail(
     retry_reasons: list[str] = []
     fallback_used = False
     attempts: list[dict] = [] if include_trace else []
+    prompt_metadata: dict[str, str] = {}
 
     def _detail_fields() -> dict:
         fields: dict = {
             "source_ddl": stage1_ddl_in,
             "variation_moved_axes": list(variation_report.get("moved_axes") or []),
             "resolved_focus": variation_report.get("resolved_focus"),
+            "stage2_prompt_digest": prompt_metadata.get("stage2_prompt_digest"),
         }
         if include_trace:
             fields.update(
@@ -2724,6 +2739,7 @@ def _call_compose_detail(
                 "original_text": original_text,
                 "system_prompt": prompt,
                 "lang": lang,
+                "prompt_metadata": prompt_metadata,
             }
             if sink is not None:  # only when tracing: keep the no-trace call byte-identical
                 kwargs["trace_sink"] = sink
@@ -2732,6 +2748,12 @@ def _call_compose_detail(
             except TypeError as e:
                 if "unexpected keyword argument" not in str(e):
                     raise
+                kwargs.pop("prompt_metadata", None)
+                try:
+                    return compose(ddl, **kwargs)
+                except TypeError as retry_error:
+                    if "unexpected keyword argument" not in str(retry_error):
+                        raise
                 return compose(ddl, model=model)
 
         value = _run_with_hard_timeout(
@@ -2830,6 +2852,7 @@ def _call_interpret_detail(
     tenkei: str = "auto",
 ) -> InterpretDetail:
     trace_sink: list[str] | None = [] if include_trace else None
+    prompt_metadata: dict[str, str] = {}
 
     def run_interpret():
         kwargs: dict = {
@@ -2838,6 +2861,7 @@ def _call_interpret_detail(
             "system_prompt_prefix": system_prompt_prefix,
             "lang": lang,
             "tenkei": tenkei,
+            "prompt_metadata": prompt_metadata,
         }
         if trace_sink is not None:  # only when tracing: keep the no-trace call byte-identical
             kwargs["trace_sink"] = trace_sink
@@ -2846,6 +2870,12 @@ def _call_interpret_detail(
         except TypeError as e:
             if "unexpected keyword argument" not in str(e):
                 raise
+            kwargs.pop("prompt_metadata", None)
+            try:
+                return interpret_detail(text, **kwargs)
+            except TypeError as retry_error:
+                if "unexpected keyword argument" not in str(retry_error):
+                    raise
             return interpret_detail(text, model=model, include_thinking=include_thinking)
 
     try:
@@ -2879,6 +2909,8 @@ def _call_interpret_detail(
             fallback_used=True,
             fallback_reasons=["stage1_empty_output"],
             raw=raw,
+            stage1_prompt_digest=prompt_metadata.get("stage1_prompt_digest"),
+            stage1_prompt_base_digest=prompt_metadata.get("stage1_prompt_base_digest"),
         )
     return InterpretDetail(
         ddl=_sanitize_placement_words(ddl),
@@ -2886,6 +2918,8 @@ def _call_interpret_detail(
         tokens_in=tokens_in,
         tokens_out=tokens_out,
         raw=raw,
+        stage1_prompt_digest=prompt_metadata.get("stage1_prompt_digest"),
+        stage1_prompt_base_digest=prompt_metadata.get("stage1_prompt_base_digest"),
     )
 
 
@@ -3024,6 +3058,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     score = _score_with_canvas(score, canvas_aspect)
     render_metadata = {
         **_render_metadata(req.catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+        "stage2_prompt_digest": compose_detail.stage2_prompt_digest,
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
@@ -3132,6 +3167,10 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
     }
+    if detail.stage1_prompt_digest is not None:
+        data["stage1_prompt_digest"] = detail.stage1_prompt_digest
+    if detail.stage1_prompt_base_digest is not None:
+        data["stage1_prompt_base_digest"] = detail.stage1_prompt_base_digest
     if plugin_provenance:
         data["plugin_provenance"] = plugin_provenance
     if plugin_warnings:
@@ -3493,7 +3532,7 @@ def _paint_events(
         raise _stage_http_error("interpret", 502) from e
     ddl = interpret_detail_result.ddl
     t1 = time.perf_counter()
-    yield {
+    stage1_event = {
         "event": "stage1",
         # 入力側 DDL (展開前)。done イベントの ddl は展開後なので別物。
         "ddl": ddl,
@@ -3505,6 +3544,13 @@ def _paint_events(
         "elapsed_ms": int((t1 - t0) * 1000),
         "interpret_fallback_used": interpret_detail_result.fallback_used,
     }
+    if interpret_detail_result.stage1_prompt_digest is not None:
+        stage1_event["stage1_prompt_digest"] = interpret_detail_result.stage1_prompt_digest
+    if interpret_detail_result.stage1_prompt_base_digest is not None:
+        stage1_event["stage1_prompt_base_digest"] = (
+            interpret_detail_result.stage1_prompt_base_digest
+        )
+    yield stage1_event
     try:
         compose_detail = _call_compose_detail(
             ddl,
@@ -3555,6 +3601,9 @@ def _paint_events(
     score = _score_with_canvas(score, canvas_aspect)
     render_metadata = {
         **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+        "stage1_prompt_digest": interpret_detail_result.stage1_prompt_digest,
+        "stage1_prompt_base_digest": interpret_detail_result.stage1_prompt_base_digest,
+        "stage2_prompt_digest": compose_detail.stage2_prompt_digest,
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
@@ -4144,6 +4193,9 @@ def api_history_post(
             score = _score_with_canvas(score, canvas_aspect)
         render_metadata = {
             **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+            "stage1_prompt_digest": body.stage1_prompt_digest,
+            "stage1_prompt_base_digest": body.stage1_prompt_base_digest,
+            "stage2_prompt_digest": body.stage2_prompt_digest,
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,

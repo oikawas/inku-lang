@@ -10,6 +10,7 @@ from xml.etree import ElementTree
 import pytest
 
 from inku_server import renderer
+from inku_server.master_grid import fmt
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.renderer import (
     AMPLITUDE_CLAMP_RATIO,
@@ -326,7 +327,10 @@ def test_dasharray_strings_are_unchanged_at_unit_1000():
             }
         )
     )
-    assert f'stroke-dasharray="{STYLE_TO_DASH["dashed"]}"' in svg
+    expected_dash = ",".join(
+        fmt(float(value)) for value in STYLE_TO_DASH["dashed"].split(",")
+    )
+    assert f'stroke-dasharray="{expected_dash}"' in svg
 
 
 def test_performance_touch_filter_is_unchanged_at_unit_1000():
@@ -342,14 +346,14 @@ def test_texture_filter_xml_is_unchanged_at_unit_1000(monkeypatch):
     monkeypatch.setattr(renderer, "MATERIAL_INTENSITY_LEVEL", "m0")
     assert _texture_filter_xml("pencil", SQUARE) == (
         '<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%">'
-        '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" '
+        '<feTurbulence type="fractalNoise" baseFrequency="0.900000" numOctaves="2" '
         'seed="11" result="noise"/>'
-        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/>'
+        '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.700000"/>'
         "</filter>"
     )
     assert _texture_filter_xml("drypoint", SQUARE) == (
         '<filter id="texture-drypoint" x="-35%" y="-35%" width="170%" height="170%">'
-        '<feGaussianBlur stdDeviation="1.8"/>'
+        '<feGaussianBlur stdDeviation="1.800000"/>'
         "</filter>"
     )
 

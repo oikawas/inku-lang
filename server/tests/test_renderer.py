@@ -1,7 +1,9 @@
 import hashlib
 import math
+import re
 from xml.etree import ElementTree
 
+from inku_server.master_grid import MASTER_GRID_DECIMALS
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import (
@@ -52,8 +54,8 @@ def test_render_seed_changes_touch_for_fixed_shapes_without_moving_geometry():
     assert first != alternate
     assert 'id="performance_touch_29"' in first
     assert 'id="performance_touch_30"' in alternate
-    assert 'cx="500.0"' in first and 'cx="500.0"' in alternate
-    assert 'cy="500.0"' in first and 'cy="500.0"' in alternate
+    assert 'cx="500.000000"' in first and 'cx="500.000000"' in alternate
+    assert 'cy="500.000000"' in first and 'cy="500.000000"' in alternate
 
 
 def test_render_seed_does_not_add_touch_filter_to_editable_profile():
@@ -75,9 +77,9 @@ def test_render_canvas_aspect_plugin_changes_viewbox_without_stretching_circle()
     svg = render(score, canvas_aspect="wide")
 
     assert 'viewBox="0 0 2350 1000"' in svg
-    assert 'cx="1175.0"' in svg
-    assert 'cy="500.0"' in svg
-    assert 'r="200.0"' in svg
+    assert 'cx="1175.000000"' in svg
+    assert 'cy="500.000000"' in svg
+    assert 'r="200.000000"' in svg
 
 
 def test_render_uses_score_canvas_when_no_explicit_aspect():
@@ -222,7 +224,7 @@ def test_render_dashed_line_has_dasharray():
     )
     svg = render(score)
     assert "stroke-dasharray" in svg
-    assert "12,8" in svg
+    assert "12.000000,8.000000" in svg
 
 
 def test_render_pencil_line_uses_material_texture():
@@ -239,8 +241,8 @@ def test_render_pencil_line_uses_material_texture():
         }
     )
     svg = render(score)
-    assert 'fill-opacity="0.66"' in svg
-    assert 'stroke-dasharray="1,7"' in svg
+    assert 'fill-opacity="0.660000"' in svg
+    assert 'stroke-dasharray="1.000000,7.000000"' in svg
     assert 'id="texture-pencil"' in svg
     assert 'filter="url(#texture-pencil)"' in svg
     assert svg.count("<circle") >= _expected_specks(18, 1000.0)
@@ -262,7 +264,7 @@ def test_render_chalk_line_uses_blurred_powder_texture():
     svg = render(score)
     assert 'id="texture-chalk"' in svg
     assert 'filter="url(#texture-chalk)"' in svg
-    assert 'stroke-dasharray="8,12,1,8"' in svg
+    assert 'stroke-dasharray="8.000000,12.000000,1.000000,8.000000"' in svg
     assert "<feTurbulence" in svg
     assert "<feDisplacementMap" in svg
     assert svg.count("<circle") >= _expected_specks(34, 1000.0)
@@ -284,7 +286,7 @@ def test_render_crayon_line_adds_rubbed_layers():
     svg = render(score)
     assert svg.count("<line") >= 4
     assert "stroke-engine-v1" in svg
-    assert 'stroke-dasharray="2,5,9,7"' in svg
+    assert 'stroke-dasharray="2.000000,5.000000,9.000000,7.000000"' in svg
     assert 'id="texture-crayon"' in svg
     assert svg.count("<circle") >= _expected_specks(26, 1000.0)
 
@@ -308,11 +310,11 @@ def test_render_scatter_path_wave_places_items_on_trace():
         }
     )
     svg = render(score)
-    assert 'cx="99.999' in svg
-    assert 'cx="300.000' in svg
-    assert 'cx="500.0"' in svg
-    assert 'cx="700.000' in svg
-    assert 'cx="900.0"' in svg
+    assert 'cx="100.000000"' in svg
+    assert 'cx="300.000000"' in svg
+    assert 'cx="500.000000"' in svg
+    assert 'cx="700.000000"' in svg
+    assert 'cx="900.000000"' in svg
     assert svg.count("<circle") == 5
 
 
@@ -399,7 +401,7 @@ def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
     assert svg.count("<rect") >= 25
     # v2.2 (engine 8): 手描き weight の閉図形は輪郭を帯で描くので、輪郭側の
     # 濃度は stroke-opacity ではなく帯の fill-opacity に載る。
-    assert 'fill-opacity="0.4"' in svg
+    assert 'fill-opacity="0.400000"' in svg
     # v2.3 (engine 9): `filled` の復権により、塗らない図形には fade の塗り濃度
     # (0.22) は載らない。fade は輪郭帯の濃度として読める。
     assert 'fill-opacity="0.22"' not in svg
@@ -451,8 +453,8 @@ def test_render_sensory_layers_have_distinct_opacity():
     )
     svg = render(score)
 
-    assert 'fill-opacity="0.14"' in svg
-    assert 'fill-opacity="0.2"' in svg
+    assert 'fill-opacity="0.140000"' in svg
+    assert 'fill-opacity="0.200000"' in svg
 
 
 def test_render_brush_lines_use_layered_material_texture():
@@ -477,8 +479,8 @@ def test_render_brush_lines_use_layered_material_texture():
     svg = render(score)
     assert svg.count("<line") >= 5
     assert svg.count("stroke-engine-v1") == 2
-    assert 'stroke-dasharray="22,9"' in svg
-    assert 'stroke-dasharray="18,7,3,11"' in svg
+    assert 'stroke-dasharray="22.000000,9.000000"' in svg
+    assert 'stroke-dasharray="18.000000,7.000000,3.000000,11.000000"' in svg
     assert 'id="texture-brush_thick"' in svg
 
 
@@ -498,7 +500,7 @@ def test_render_circle_material_applies_outline_texture():
     svg = render(score)
     assert svg.count("<circle") >= 2 + _expected_specks(36, 2 * math.pi * 180.0)
     assert 'id="texture-chalk"' in svg
-    assert 'stroke-dasharray="8,12,1,8"' in svg
+    assert 'stroke-dasharray="8.000000,12.000000,1.000000,8.000000"' in svg
 
 
 def test_render_ellipse_material_applies_outline_texture():
@@ -518,7 +520,7 @@ def test_render_ellipse_material_applies_outline_texture():
     assert svg.count("<ellipse") >= 4
     assert svg.count("<circle") >= _expected_specks(28, _ellipse_perimeter(200.0, 100.0))
     assert 'id="texture-crayon"' in svg
-    assert 'stroke-dasharray="2,5,9,7"' in svg
+    assert 'stroke-dasharray="2.000000,5.000000,9.000000,7.000000"' in svg
 
 
 def test_render_square_material_applies_outline_texture():
@@ -538,7 +540,7 @@ def test_render_square_material_applies_outline_texture():
     assert svg.count("<rect") >= 4
     assert svg.count("<circle") >= _expected_specks(18, 4 * 300.0)
     assert 'id="texture-pencil"' in svg
-    assert 'stroke-dasharray="1,7"' in svg
+    assert 'stroke-dasharray="1.000000,7.000000"' in svg
 
 
 def test_render_circle():
@@ -639,7 +641,7 @@ def test_render_square_rotation_applies_center_transform():
     )
     svg = render(score)
     assert "<rect" in svg
-    assert 'transform="rotate(-30.0,500.0,500.0)"' in svg
+    assert 'transform="rotate(-30.000000,500.000000,500.000000)"' in svg
 
 
 def test_render_line_rotation_applies_midpoint_transform():
@@ -657,7 +659,7 @@ def test_render_line_rotation_applies_midpoint_transform():
     )
     svg = render(score)
     assert "<path" in svg
-    assert 'transform="rotate(45.0,500.0,500.0)"' in svg
+    assert 'transform="rotate(45.000000,500.000000,500.000000)"' in svg
 
 
 def test_render_color_hint_uses_catalog_palette_match():
@@ -745,9 +747,9 @@ def test_render_arc_quarter():
     svg = render(score)
     assert "<path" in svg
     # 始点: center + r east = (0.8*1000, 0.5*1000) = (800, 500)
-    assert "M 800.000 500.000" in svg
+    assert "M 800.000000 500.000000" in svg
     # 終点: center + r north (y-flip) = (500, 0.5*1000 - 300) = (500, 200)
-    assert "A 300.000 300.000 0 0 0 500.000 200.000" in svg
+    assert "A 300.000000 300.000000 0 0 0 500.000000 200.000000" in svg
 
 
 def test_render_arc_half_upper():
@@ -892,7 +894,7 @@ def test_render_circle_with_pink_variation_emits_blur_filter():
     assert "feGaussianBlur" in svg
     # 滲みは図形寸法比なので filter id に std 値が入る (r=200 * 0.03 = 6.0px)
     assert 'filter="url(#blur-medium-60)"' in svg
-    assert 'stdDeviation="6.0"' in svg
+    assert 'stdDeviation="6.000000"' in svg
     assert "<circle" in svg
     assert "<polyline" not in svg
 
@@ -1030,7 +1032,7 @@ def test_render_presence_layer_gets_subtler_when_scene_is_dense():
     sparse_svg = render(sparse)
     dense_svg = render(dense)
 
-    assert 'stroke-opacity="0.1722"' in sparse_svg
+    assert 'stroke-opacity="0.172200"' in sparse_svg
     assert 'stroke-opacity="0.089544"' in dense_svg
 
 
@@ -1057,7 +1059,7 @@ def test_render_color_cycle_preserves_effect_hint_opacity():
     svg = render(score)
 
     # v2.3 (engine 9): 塗らない図形 (filled 未指定) では膜の濃度は輪郭帯に載る。
-    assert svg.count('fill-opacity="0.26"') == 2
+    assert svg.count('fill-opacity="0.260000"') == 2
     assert 'fill="#111111"' in svg
     assert 'fill="#ffffff"' in svg
 
@@ -1101,7 +1103,7 @@ def test_render_not_touching_relation_moves_second_mark_away_from_previous():
     svg = render(score, render_seed=5)
 
     assert svg.count("<circle") >= 2
-    assert svg.count('cx="500.0"') == 1
+    assert svg.count('cx="500.000000"') == 1
 
 
 def test_render_cutting_relation_crosses_previous_line_center():
@@ -1286,7 +1288,7 @@ def test_render_display_canvas_ground_uses_filter_behind_content():
     assert any(
         element.tag.endswith("rect")
         and element.attrib.get("fill") == "#f7f3e8"
-        and element.attrib.get("opacity") == "0.98"
+        and element.attrib.get("opacity") == "0.980000"
         for element in root.iter()
     )
     assert svg.index('id="layer_01_canvas_ground"') < svg.index(
@@ -1315,7 +1317,7 @@ def test_canvas_ground_non_display_profiles_remain_filter_free():
         assert any(
             element.tag.endswith("rect")
             and element.attrib.get("fill") == "#f7f3e8"
-            and element.attrib.get("opacity") == "0.98"
+            and element.attrib.get("opacity") == "0.980000"
             for element in root.iter()
         )
 
@@ -1604,8 +1606,46 @@ def test_legacy_arrangement_layouts_keep_golden_output():
         rendered.append(render(score, svg_profile="compat", render_seed=123))
 
     digest = hashlib.sha256("".join(rendered).encode()).hexdigest()
-    # v2.3 (engine 9) で再採取。`filled` の復権で閉図形の領域 fill が外れた分の差分。
-    assert digest == "01777e4a0deefda161e40082c2fa27865548b7ae0659d8829def72b9b9fb4d90"
+    # engine 11 (マスターグリッド宣言) で再採取。座標の書き出しが 3 桁から 6 桁へ
+    # 上がった分だけ値が動く。数値の個数は 1528 個で不変、最大変化量は 5e-4 未満。
+    # engine 10 まではこのダイジェストが素のバイト列だったため macOS でしか通らな
+    # かった。全数値がグリッドに載ったので、以後はどの OS でも同じ値になる。
+    assert digest == "f9769fbadba259de260dcd2cdaf19f3e4038f9353296646c9f7aaeed74b9397e"
+
+
+def test_every_emitted_number_sits_on_the_master_grid():
+    """出力のどの数値もマスターグリッドを超える桁を持たない。
+
+    書き出し箇所を一つずつ直す方式は漏れが黙って残る。素の float を書く経路が
+    後から足されたら、ここで落ちる。engine 10 では points / cx / cy が 17 桁を
+    書いており、それが macOS と Linux でコーパスが割れる原因だった。
+    """
+    shapes = (
+        {"primitive": "polygon", "center": [0.5, 0.5], "radius": 0.25, "sides": 7},
+        {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.24, "filled": True},
+        {"primitive": "arc", "center": [0.5, 0.5], "radius": 0.27,
+         "angle_start": 15.0, "angle_end": 285.0, "weight": "chalk"},
+        {"primitive": "line", "from": [0.18, 0.5], "to": [0.82, 0.5],
+         "weight": "brush_thick",
+         "variation": {"amplitude": "broad", "frequency": "high", "quality": "perlin",
+                       "dimensions": ["position_x", "position_y"]}},
+    )
+    off_grid = []
+    checked = 0
+    for shape in shapes:
+        score = Score.model_validate({"instructions": [dict(shape)]})
+        for profile in ("editable", "compat", "display"):
+            svg = render(score, svg_profile=profile, render_seed=12345)
+            for name, value in re.findall(r'([\w:-]+)="([^"]*)"', svg):
+                # version は SVG 文書の版 ("1.1")、class / id は識別子であって座標ではない。
+                if name in ("class", "id", "version"):
+                    continue
+                for decimals in re.findall(r"\d+\.(\d+)", value):
+                    checked += 1
+                    if len(decimals) != MASTER_GRID_DECIMALS:
+                        off_grid.append((shape["primitive"], profile, name, decimals))
+    assert checked > 1000, checked
+    assert off_grid == []
 
 
 def test_grid_render_is_bit_deterministic_for_same_score_and_seed():

@@ -12,6 +12,9 @@ server/reference/
 ├── render-engine-10/
 │   ├── manifest.json
 │   └── <permanent-case-id>.svg
+├── render-engine-11/
+│   ├── manifest.json
+│   └── <permanent-case-id>.svg
 └── ddl-engine-1/
     ├── manifest.json
     ├── a_expand/
@@ -29,6 +32,26 @@ Directories are immutable after they are frozen. Never regenerate an old
 version to accept changed output. Create the next version directory instead.
 Case IDs are permanent: do not rename or delete them; new cases may be added.
 
+## `render-engine-10` cannot be regenerated outside macOS
+
+Engine 10 wrote some SVG attributes (`points`, `cx`, `cy`) as raw Python floats,
+so 17 significant digits reached the file. `math.sin` differs by one unit in the
+last place between Apple libm and glibc, which made 81 of the 220 cases differ
+between macOS and Linux — the structure was identical and the largest relative
+difference was 2e-16, but the bytes were not equal. The frozen corpus was taken
+on macOS, so CI on Linux could never reproduce it.
+
+Engine 11 declares one master grid for every emitted number (see
+`inku_server.master_grid`), which puts the whole corpus four orders of magnitude
+above that platform noise. Engine 11 onward regenerates byte-identically on any
+platform; verified on macOS arm64 and Ubuntu x86_64.
+
+Engine 10 is kept because the 10 → 11 diff is the evidence that only the written
+digits changed and the drawing did not: across all 220 cases the count of numbers
+is identical and no number moved by more than 5e-4 (the half-step of the old
+three-decimal formatting). Do not try to verify engine 10 on Linux; only engine
+11 and later are checked by CI.
+
 ## Regenerate and compare
 
 Run from `server/`:
@@ -40,8 +63,13 @@ uv run python scripts/gen_render_reference.py
 UV_CACHE_DIR=/tmp/inku-uv-cache \
 UV_PYTHON_INSTALL_DIR=$HOME/.local/share/uv/python \
 uv run python scripts/gen_ddl_reference.py
-git diff --exit-code reference/render-engine-10/ reference/ddl-engine-1/
+git diff --exit-code reference/
 ```
+
+Each generator writes into the directory named by the layer version it reads, so
+bumping a layer version leaves the new directory untracked. CI checks the whole
+`reference/` tree, which means an unstaged new corpus fails the build until it is
+committed. That is intended: a version bump must land with its frozen output.
 
 For an unchanged layer, regeneration must be byte-identical. Each generator
 exits unsuccessfully if case output changes while its manifest identity fields

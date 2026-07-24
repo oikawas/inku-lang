@@ -18,6 +18,7 @@ from xml.sax.saxutils import escape
 import svgwrite
 
 from .cloudform import generate_cloudform_contour, sample_closed_catmull_rom
+from .master_grid import fmt
 from .plugins import CanvasSize, canvas_size_for_aspect
 from .schema import (
     CanvasGroundSpec,
@@ -407,16 +408,34 @@ def _speck_opacity(opacity: float) -> float:
     )
 
 
-def _fmt_num(value: float) -> str:
-    """SVG 属性用の数値整形。unit=1000 では元の px リテラルを再現する。"""
-    return f"{value:g}"
+_GRID_ATTR_RE = re.compile(r'([\w:-]+)="([^"]*)"')
+_GRID_NUM_RE = re.compile(r"-?\d+\.\d+(?:[eE][-+]?\d+)?")
+# 識別子であって座標ではないため、グリッドを当てない属性。
+_UNGRIDDED_ATTRS = frozenset({"version", "class", "id"})
+
+
+def _apply_master_grid(svg: str) -> str:
+    """全数値をマスターグリッドへ載せる。svgwrite が素の float で書いた属性も含む。
+
+    書き出し箇所を一つずつ直す方式は漏れが黙って残るため、出力の単一地点で
+    強制する。ここを通っていない数値は SVG 属性の外にしか存在しない。
+    """
+
+    def _attr(match: re.Match[str]) -> str:
+        name, value = match.group(1), match.group(2)
+        if name in _UNGRIDDED_ATTRS or "." not in value:
+            return match.group(0)
+        gridded = _GRID_NUM_RE.sub(lambda n: fmt(float(n.group(0))), value)
+        return f'{name}="{gridded}"'
+
+    return _GRID_ATTR_RE.sub(_attr, svg)
 
 
 def _scale_dash(spec: str | None, scale: float) -> str | None:
     """dasharray の各値を canvas.unit 相対へ写す。scale=1.0 で文字列同一。"""
     if spec is None:
         return None
-    return ",".join(_fmt_num(float(part) * scale) for part in spec.split(","))
+    return ",".join(fmt(float(part) * scale) for part in spec.split(","))
 
 
 def _texture_filter_xml(weight: str, canvas: CanvasSize) -> str:
@@ -432,7 +451,7 @@ def _texture_filter_xml(weight: str, canvas: CanvasSize) -> str:
         # baseFrequency は 1/px なので unit に反比例させる
         frequency = float(spec["base_frequency"]) / scale
         parts.append(
-            f'<feTurbulence type="fractalNoise" baseFrequency="{_fmt_num(frequency)}" '
+            f'<feTurbulence type="fractalNoise" baseFrequency="{fmt(frequency)}" '
             f'numOctaves="{spec["octaves"]}" seed="{spec["seed"]}" result="noise"/>'
         )
         displacement = (
@@ -440,11 +459,11 @@ def _texture_filter_xml(weight: str, canvas: CanvasSize) -> str:
         )
         parts.append(
             f'<feDisplacementMap in="SourceGraphic" in2="noise" '
-            f'scale="{_fmt_num(displacement)}"/>'
+            f'scale="{fmt(displacement)}"/>'
         )
     if "blur" in spec:
         blur = float(spec["blur"]) * scale * _material_gain("texture_blur")
-        parts.append(f'<feGaussianBlur stdDeviation="{_fmt_num(blur)}"/>')
+        parts.append(f'<feGaussianBlur stdDeviation="{fmt(blur)}"/>')
     parts.append("</filter>")
     return "".join(parts)
 
@@ -528,9 +547,9 @@ def _performance_touch_filter(render_seed: int, canvas: CanvasSize) -> tuple[str
     scale = (1.6 + _hash01(1, seed, "performance-touch-scale") * 1.4) * unit_scale
     xml = (
         f'<filter id="{filter_id}" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">'
-        f'<feTurbulence type="fractalNoise" baseFrequency="{frequency:.5f}" numOctaves="2" '
+        f'<feTurbulence type="fractalNoise" baseFrequency="{fmt(frequency)}" numOctaves="2" '
         f'seed="{seed % 9973}" result="touchNoise"/>'
-        f'<feDisplacementMap in="SourceGraphic" in2="touchNoise" scale="{scale:.2f}" '
+        f'<feDisplacementMap in="SourceGraphic" in2="touchNoise" scale="{fmt(scale)}" '
         'xChannelSelector="R" yChannelSelector="G"/>'
         "</filter>"
     )
@@ -1793,7 +1812,7 @@ def _inject_blur_filters(
     """
     filter_xml = "".join(
         f'<filter id="{filter_id}" x="-30%" y="-30%" width="160%" height="160%">'
-        f'<feGaussianBlur in="SourceGraphic" stdDeviation="{std:.1f}"/>'
+        f'<feGaussianBlur in="SourceGraphic" stdDeviation="{fmt(std)}"/>'
         f"</filter>"
         for filter_id, std in sorted(blur_needed.items())
     )
@@ -2300,7 +2319,7 @@ def _render_surface_texture(
                 group.add(rect)
                 return (
                     group,
-                    f'<filter id="{fid}" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="0.18" numOctaves="2" seed="{seed % 9973}" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="{1.5 + surface.bleed * 9:.2f}"/><feGaussianBlur stdDeviation="{surface.bleed * 5:.2f}"/></filter>',
+                    f'<filter id="{fid}" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="0.18" numOctaves="2" seed="{seed % 9973}" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="{fmt(1.5 + surface.bleed * 9)}"/><feGaussianBlur stdDeviation="{fmt(surface.bleed * 5)}"/></filter>',
                 )
         _render_surface_vectors(dwg, group, ins, canvas, cmap, seed=seed, clipped=True)
         return group, None
@@ -2541,7 +2560,7 @@ def render(
         svg = _inject_blur_filters(svg, blur_needed, blur_elems)
     if structured:
         svg = _inject_svg_document_metadata(svg, profile=profile)
-    return svg
+    return _apply_master_grid(svg)
 
 
 _CLOSED_SHAPES = frozenset(
@@ -2692,7 +2711,7 @@ def _render_presence_layer(
         xm = px + nx * lift * side * 1.4
         ym = py + ny * lift * side * 1.4
         path = dwg.path(
-            d=f"M {x1:.2f},{y1:.2f} Q {xm:.2f},{ym:.2f} {x2:.2f},{y2:.2f}",
+            d=f"M {fmt(x1)},{fmt(y1)} Q {fmt(xm)},{fmt(ym)} {fmt(x2)},{fmt(y2)}",
             fill="none",
             stroke=color,
             stroke_width=stroke,
@@ -3500,7 +3519,7 @@ def _arc_path_d(
     large_arc, sweep = arc_svg_flags(start_deg, end_deg)
 
     return (
-        f"M {x1:.3f} {y1:.3f} A {r:.3f} {r:.3f} 0 {large_arc} {sweep} {x2:.3f} {y2:.3f}"
+        f"M {fmt(x1)} {fmt(y1)} A {fmt(r)} {fmt(r)} 0 {large_arc} {sweep} {fmt(x2)} {fmt(y2)}"
     )
 
 

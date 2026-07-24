@@ -101,12 +101,15 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # v2.4 (engine 10) で arc をストローク化したため crayon_arc のみ再採取した
 # (幾何弧を不可視の意図要素として残し、上に材質込みの帯を重ねた分の増加)。
 # line (brush_thin_line) と閉図形 3 件は v2.4 でも不変。
+# engine 11 (マスターグリッド宣言) で再採取。座標の書き出しが 3 桁から 6 桁へ
+# 上がった分だけ値が動く。旧実装との差は 220 件のコーパスと本 5 件のいずれでも
+# 数値の個数が一致し、最大変化量は 5e-4 (旧 .3f の半幅) 未満に収まっている。
 MATERIAL_NONE_SEED_DIGESTS = {
-    "brush_thin_line": "caf585ff657f4430d6c4b38cbc51ceb5",
-    "chalk_square": "1c5f83ded213aab30a7273476dc8c11f",
-    "crayon_arc": "d7fb82a3bf483ca15ed8751896281c50",
-    "pencil_circle": "3c26c91346dba1512246074cae8527b9",
-    "pencil_ellipse": "ea2c0056db2a1a0308f15bb4791d3aa6",
+    "brush_thin_line": "2846417cd41d168a77a56d42bbe7bcdd",
+    "chalk_square": "32f81c5c84c4a240150d58f77f1417c2",
+    "crayon_arc": "579e607d9d0b112e0860d53e921b9993",
+    "pencil_circle": "d5fe8396489e32f357d9f86447651d91",
+    "pencil_ellipse": "8c27b9d3d7d1309dab0040bbec1f9dd7",
 }
 
 

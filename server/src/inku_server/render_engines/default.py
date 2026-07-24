@@ -19,9 +19,14 @@ class DefaultRenderEngine:
         color_map: dict[str, str] | None = None,
         svg_profile: str | None = None,
         render_seed: int | None = None,
+        wild: bool = False,
     ) -> RenderEngineResult:
         svg = render_svg(
-            score, color_map=color_map, svg_profile=svg_profile, render_seed=render_seed
+            score,
+            color_map=color_map,
+            svg_profile=svg_profile,
+            render_seed=render_seed,
+            wild=wild,
         )
         return RenderEngineResult(
             svg=svg,

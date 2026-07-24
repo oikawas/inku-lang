@@ -71,6 +71,8 @@
 		stageLabel: string;
 		tenkeiLevel: TenkeiLevel;
 		onSelectTenkei: (level: TenkeiLevel) => void;
+		wildEnabled: boolean;
+		onSelectWild: (value: boolean) => void;
 		showKiwi: boolean;
 		showCrab: boolean;
 		canvasAspectEnabled: boolean;
@@ -145,6 +147,8 @@
 		stageLabel,
 		tenkeiLevel,
 		onSelectTenkei,
+		wildEnabled,
+		onSelectWild,
 		showKiwi,
 		showCrab,
 		canvasAspectEnabled,
@@ -236,6 +240,15 @@
 			</Tooltip>
 			<Tooltip text={t().tooltipInputTenkei}>
 				<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
+			</Tooltip>
+			<Tooltip text={t().tooltipInputWild}>
+				<button
+					type="button"
+					class="ghost-btn wild-btn"
+					class:active={wildEnabled}
+					aria-pressed={wildEnabled}
+					onclick={() => onSelectWild(!wildEnabled)}
+				>{t().wildButton}</button>
 			</Tooltip>
 			{#if canvasAspectEnabled}
 				<Tooltip text={t().tooltipInputCanvas}>
@@ -473,6 +486,8 @@
 		white-space: nowrap;
 	}
 	.ghost-btn:hover { background: var(--bg2); }
+	.wild-btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+	.wild-btn.active:hover { background: var(--accent); }
 	.catalog-btn {
 		display: inline-block;
 		max-width: 128px;

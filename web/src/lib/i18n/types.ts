@@ -204,6 +204,8 @@ export interface LangPack {
 	tooltipInputModel: string;
 	tooltipInputClear: string;
 	tooltipInputTenkei: string;
+	wildButton: string;
+	tooltipInputWild: string;
 	tooltipInputCanvas: string;
 	tooltipDdlNew: string;
 	tooltipDdlEdit: string;

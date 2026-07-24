@@ -200,6 +200,8 @@ export const ja: LangPack = {
 	tooltipInputLang: '入力テキストの判定言語 (自動/日/英)',
 	tooltipInputModel: 'LLMモデルの選択 (解釈・構造化)',
 	tooltipInputTenkei: '添景（画面に添える小さな要素）の量を選びます。なし・控えめ・自動の三段階',
+	wildButton: '暴れる',
+	tooltipInputWild: '筆致の天井を外します。OFF は予想のつく標準、ON は奔放に折れ・巻き・重なりが出ます（作品全体・記録され再現されます）',
 	tooltipInputCanvas: 'キャンバスの縦横比を選びます（正方形・横長・縦長など）',
 	tooltipDdlNew: '記述を介さず、DDLコードを直接書いて独立した作品として描画します',
 	tooltipDdlEdit: '表示中の作品のDDLを編集して、その子として描き直します',

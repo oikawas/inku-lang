@@ -51,7 +51,8 @@ BASE_ITEM = {
     "render_color_catalog_id": "default",
 }
 
-BASE_RH3 = "rh3:1f28ff5586ca604740f227cce0f81cee7ddd83d6632fe59f2763f5af08d8a551"
+# engine 12: render_wild joined the rh3 payload (absent == False), re-baselining these.
+BASE_RH3 = "rh3:60fbf6514b72503eb65a4991457274c01aa3197fa8933d78b636fd4ee7f95eb6"
 BASE_RH2 = "rh2:bda92f348f2cf37760f187748575dbf6a1f7ddc58452d6e1fcfb130ff293e3f2"
 
 
@@ -76,24 +77,34 @@ def test_render_hash_v3_retained_fields_match_fixed_references() -> None:
     variants = (
         (
             {**BASE_ITEM, "render_seed": 12346},
-            "rh3:15dfce980c311dc9da4efd936fb211d5ccec0475fe79cc14fe4064958d0ca5cb",
+            "rh3:46079e493457812ff29f2aaea5a40df507a68b1f65d2ee5354b9184446465b81",
         ),
         (
             {**BASE_ITEM, "render_color_catalog_id": "vivid_material"},
-            "rh3:3002bdecbda9f0fb0dfb6005475bda62227b5cd92ce30536d17dfcc3f1f219ff",
+            "rh3:40c0eb26c341d32eca753a05a4738cd55fe4d2598fc8851e0f379b7d72103f07",
         ),
         (
             {**BASE_ITEM, "render_engine_version": "11"},
-            "rh3:fbc0144a419b947f0d4988927d7697f427e9a68c9db4d5ea02c4bf811fd1ab42",
+            "rh3:5fe152b6cb5532282f9da28ee3ae467608b3db456cb6ac8a9f08fe5deb66ba26",
         ),
         (
             {**BASE_ITEM, "render_seed": 2**63 + 1},
-            "rh3:59ed7227cab4da9aff9c8b1c0e637e29c22078fefef0751dea0e2b555394f6e6",
+            "rh3:c6b32e446ba759fd74a2b274c2713e2176f50baab02595e79cad36892db5b6a1",
         ),
     )
 
     for item, expected in variants:
         assert db.render_hash_for_item(item) == expected
+
+
+def test_render_hash_v3_wild_changes_edition_identity() -> None:
+    # engine 12: the wild (unleashed) performance changes the drawing, so it is
+    # part of the edition identity. Absent is treated as False.
+    off = db.render_hash_for_item({**BASE_ITEM, "render_wild": False})
+    on = db.render_hash_for_item({**BASE_ITEM, "render_wild": True})
+    assert off == BASE_RH3
+    assert on == "rh3:5dbbc6de270ec580c49bfb969596e730a7fb627b8362f1e0ae417f6310b84159"
+    assert off != on
 
 
 def test_legacy_render_hash_v2_calculation_remains_available() -> None:

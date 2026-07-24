@@ -109,6 +109,7 @@ class HistoryRow(Base):
     instruction_lang_resolved = Column(String, nullable=True)
     ui_lang = Column(String, nullable=True)
     render_seed = Column(String, nullable=True)
+    render_wild = Column(String, nullable=True)  # engine 12: "1"/"0"。NULL = 記録前の作品（OFF と区別する）
     vary_seed = Column(String, nullable=True)
     tenkei = Column(String, nullable=True)  # v1.97 添景水準 (none/sparse/auto)。NULL = 保存開始前の作品
     focus = Column(String, nullable=True)  # v1.98 焦点。NULL = DDL テキストから決定的に選択
@@ -286,6 +287,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "instruction_lang_resolved": "ALTER TABLE history ADD COLUMN instruction_lang_resolved VARCHAR",
     "ui_lang": "ALTER TABLE history ADD COLUMN ui_lang VARCHAR",
     "render_seed": "ALTER TABLE history ADD COLUMN render_seed VARCHAR",
+    "render_wild": "ALTER TABLE history ADD COLUMN render_wild VARCHAR",
     "vary_seed": "ALTER TABLE history ADD COLUMN vary_seed VARCHAR",
     "tenkei": "ALTER TABLE history ADD COLUMN tenkei VARCHAR",
     "focus": "ALTER TABLE history ADD COLUMN focus VARCHAR",
@@ -593,6 +595,7 @@ def render_hash_for_item(item: dict) -> str:
         "version": "rh3",
         "score": item.get("score") or {},
         "render_seed": _canonical_seed(item.get("render_seed")),
+        "render_wild": bool(item.get("render_wild")),
         "render_engine_id": item.get("render_engine_id"),
         "render_engine_version": item.get("render_engine_version"),
         "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
@@ -626,6 +629,7 @@ def _row_hash_payload(row: HistoryRow) -> dict:
         "render_color_catalog_name": row.render_color_catalog_name,
         "render_color_catalog_sub": row.render_color_catalog_sub,
         "render_seed": row.render_seed,
+        "render_wild": row.render_wild == "1",
         "vary_seed": row.vary_seed,
     }
     if row.render_color_map is not None:
@@ -1712,6 +1716,8 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["render_seed"] = int(row.render_seed)
         except ValueError:
             item["render_seed"] = row.render_seed
+    if row.render_wild is not None:
+        item["render_wild"] = row.render_wild == "1"
     if row.vary_seed is not None:
         try:
             item["vary_seed"] = int(row.vary_seed)
@@ -1861,6 +1867,7 @@ def add_item(item: dict) -> dict:
         instruction_lang_requested=item.get("instruction_lang_requested"),
         instruction_lang_resolved=item.get("instruction_lang_resolved"), ui_lang=item.get("ui_lang"),
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
+        render_wild=("1" if item.get("render_wild") else "0") if item.get("render_wild") is not None else None,
         vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
         tenkei=item.get("tenkei"), focus=item.get("focus"),
         variation_amplitude=item.get("variation_amplitude"),

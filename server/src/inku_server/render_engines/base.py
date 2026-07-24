@@ -23,5 +23,6 @@ class RenderEngine(Protocol):
         color_map: dict[str, str] | None = None,
         svg_profile: str | None = None,
         render_seed: int | None = None,
+        wild: bool = False,
     ) -> RenderEngineResult:
         ...

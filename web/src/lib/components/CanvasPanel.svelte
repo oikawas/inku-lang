@@ -17,9 +17,9 @@
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
+	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'hensou';
@@ -86,6 +86,8 @@
 		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
+		onReplayCurrent: () => void | Promise<void>;
+		replayDisabled: boolean;
 		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
 		onDownloadPNG: (size: number) => void | Promise<void>;
 		onVaryPerformance: () => void | Promise<void>;
@@ -237,6 +239,8 @@
 		onCopyPromptText,
 		onCopyStatusHash,
 		onToggleStar,
+		onReplayCurrent,
+		replayDisabled,
 		onDownloadSVG,
 		onDownloadPNG,
 		onVaryPerformance,
@@ -472,6 +476,8 @@
 	const detailRenderHash = $derived(statusHistoryItem?.render_hash ?? result?.render_hash ?? '');
 	const detailEngine = $derived(statusHistoryItem?.render_engine_id ?? result?.render_engine_id ?? '');
 	const detailEngineVersion = $derived(statusHistoryItem?.render_engine_version ?? result?.render_engine_version ?? '');
+	const detailDdlVersion = $derived(statusHistoryItem?.ddl_version ?? result?.ddl_version ?? '');
+	const detailDdlEngineVersion = $derived(statusHistoryItem?.ddl_engine_version ?? result?.ddl_engine_version ?? '');
 	const detailBuild = $derived(statusHistoryItem?.render_build_number ?? result?.render_build_number ?? '');
 	const detailDerivationMetadata = $derived(statusHistoryItem?.derivation_metadata ?? result?.derivation_metadata ?? {});
 	const detailResolvedLang = $derived(statusHistoryItem?.instruction_lang_resolved ?? result?.instruction_lang_resolved ?? '');
@@ -1034,6 +1040,7 @@
 							<dt>render hash</dt><dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
 							<dt>description hash</dt><dd><code>{detailDescriptionHash || '-'}</code></dd>
 							<dt>render engine</dt><dd>{detailEngine || '-'}{detailEngineVersion ? ' / ' + detailEngineVersion : ''}</dd>
+							<dt>{t().generationDdlVersions}</dt><dd>{detailDdlVersion || t().historyVersionNotRecorded} / {detailDdlEngineVersion || t().historyVersionNotRecorded}</dd>
 							<dt>Build</dt><dd>{detailBuild || '-'}</dd>
 							<dt>{isJapanese ? 'SVG サイズ' : 'SVG size'}</dt><dd>{formatBytes(detailSvgBytes)}</dd>
 							<dt>{isJapanese ? '\u51e6\u7406\u6642\u9593' : 'Elapsed'}</dt><dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
@@ -1082,6 +1089,14 @@
 				</button>
 			</Tooltip>
 		{/if}
+		<Tooltip placement="top" text={t().historyReplayTitle}>
+			<button
+				type="button"
+				class="generation-info-button"
+				disabled={replayDisabled}
+				onclick={onReplayCurrent}
+			>{t().historyReplay}</button>
+		</Tooltip>
 		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show generation details, prompts, and JSON for the selected artwork'}>
 			<button
 				type="button"
@@ -2050,12 +2065,12 @@
 	.generation-info-button {
 		flex: 0 0 auto;
 		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		padding: 5px 9px;
+		border-radius: var(--btn-sm-radius);
+		padding: var(--btn-sm-padding);
 		background: var(--panel);
 		color: var(--fg2);
 		font: inherit;
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		white-space: nowrap;
 		cursor: pointer;
 	}

@@ -14,6 +14,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
 	import TenkeiSelect from '$lib/components/TenkeiSelect.svelte';
+	import ReplayComparisonModal from '$lib/components/ReplayComparisonModal.svelte';
 	import { DEFAULT_TENKEI, normalizeTenkei, type TenkeiLevel } from '$lib/tenkei';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import DdlEditorDialog from '$lib/components/DdlEditorDialog.svelte';
@@ -88,6 +89,8 @@
 		render_color_profile?: Record<string, string> | null;
 		render_engine_id?: string | null;
 		render_engine_version?: string | null;
+		ddl_version?: string | null;
+		ddl_engine_version?: string | null;
 		render_hash?: string | null;
 		render_hash_short?: string | null;
 		render_color_catalog_id?: string | null;
@@ -133,6 +136,16 @@
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
+	type ReplaySource = 'history-manager' | 'canvas' | 'refine' | 'lineage';
+	type ReplayComparison = {
+		source: ReplaySource;
+		originalSvg: string;
+		replayedSvg: string;
+		recordedVersion: string | null;
+		currentVersion: string | null;
+		versionMessage: string | null;
+		provisionalSeed: number | null;
+	};
 	type BatchFailure = {
 		line: number;
 		input: string;
@@ -331,6 +344,7 @@
 	// ── Replay ──────────────────────────────────────────────
 	let reloading   = $state(false);
 	let reloadError = $state<string | null>(null);
+	let replayComparison = $state<ReplayComparison | null>(null);
 
 	// ── Result ──────────────────────────────────────────────
 	let ddl      = $state<string | null>(null);
@@ -482,6 +496,7 @@
 	let renderConcurrencyStatus = $state<string | null>(null);
 	let renderFanoutLimit = $state(4);
 	let developerMode = $state(false);
+	let currentRenderEngineVersion = $state<string | null>(null);
 	let showKiwi = $state(true);
 	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
@@ -1945,14 +1960,18 @@
 	}
 
 	async function loadPublicAppInfo() {
+		currentRenderEngineVersion = null;
 		try {
 			const r = await fetch('/api/info', {
 				cache: 'no-store',
 				credentials: 'same-origin'
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { developer_mode?: boolean };
+			const data = await r.json() as { developer_mode?: boolean; render_engine_version?: string };
 			developerMode = data.developer_mode === true;
+			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
+				? data.render_engine_version
+				: null;
 		} catch (error) {
 			console.warn('failed to load public app info', error);
 		}
@@ -4158,13 +4177,13 @@ if (unreadWords.length > 0) {
 		}
 	}
 
-	async function replayHistoryItem(it: Iteration) {
+	async function replayHistoryItem(it: Iteration, source: ReplaySource = outputTab) {
 		if (demoRunning || reloading) return;
 		const contextVersion = targetContextVersion;
-		if (it.render_seed == null) {
-			reloadError = t().historyReplayMissingSeed;
-			return;
-		}
+		const hasRecordedSeed = it.render_seed != null;
+		const hasSeedText = Boolean(it.seed_text?.trim());
+		const provisionalSeed = !hasRecordedSeed && !hasSeedText ? 0 : null;
+		const replaySeed = hasRecordedSeed ? Number(it.render_seed) : provisionalSeed;
 		reloading = true;
 		reloadError = null;
 		try {
@@ -4177,22 +4196,45 @@ if (unreadWords.length > 0) {
 					score: it.score,
 					catalog_id: catalogId,
 					canvas_aspect: canvasId,
-					render_seed: Number(it.render_seed),
+					render_seed: replaySeed,
 					seed_text: it.seed_text,
 				})
 			});
 			if (!r.ok) throw await apiError(r);
 			const svg = await r.text();
 			if (contextVersion !== targetContextVersion) return;
-			loadIterationItem({ ...it, svg });
-			result = result ? { ...result, svg, render_hash: it.render_hash, render_hash_short: it.render_hash_short } : result;
-			outputTab = 'canvas';
-			fitCanvasZoom();
+			const versionMessage = currentRenderEngineVersion
+				? (it.render_engine_version
+					? (it.render_engine_version === currentRenderEngineVersion
+						? null
+						: t().historyReplayVersionMismatch(it.render_engine_version, currentRenderEngineVersion))
+					: t().historyReplayVersionNotRecorded(currentRenderEngineVersion))
+				: null;
+			replayComparison = {
+				source,
+				originalSvg: it.svg,
+				replayedSvg: svg,
+				recordedVersion: it.render_engine_version ?? null,
+				currentVersion: currentRenderEngineVersion,
+				versionMessage,
+				provisionalSeed,
+			};
 		} catch (e) {
 			if (contextVersion === targetContextVersion) reloadError = e instanceof Error ? e.message : String(e);
 		} finally {
 			reloading = false;
 		}
+	}
+
+	function closeReplayComparison() {
+		const source = replayComparison?.source;
+		replayComparison = null;
+		if (!source) return;
+		if (source === 'history-manager') {
+			historyManager.open = true;
+			return;
+		}
+		outputTab = source;
 	}
 
 async function fetchLineage(nodeId: string, force = false, descendantDepth = 3): Promise<void> {
@@ -4577,6 +4619,7 @@ $effect(() => {
 
 		interpretationDiffParts = [];
 		reloadError = null;
+		replayComparison = null;
 		if (lineageIntermediateNoticeTimer !== null) {
 			window.clearTimeout(lineageIntermediateNoticeTimer);
 			lineageIntermediateNoticeTimer = null;
@@ -4627,6 +4670,8 @@ $effect(() => {
 			render_color_profile: it.render_color_profile,
 			render_engine_id: it.render_engine_id,
 			render_engine_version: it.render_engine_version,
+			ddl_version: it.ddl_version,
+			ddl_engine_version: it.ddl_engine_version,
 			render_color_catalog_id: it.render_color_catalog_id,
 			render_color_catalog_name: it.render_color_catalog_name,
 			render_color_catalog_sub: it.render_color_catalog_sub,
@@ -5582,6 +5627,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (inputMode === 'demo' || activeRunMode === 'demo') return null;
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
 	});
+	const replayableStatusHistoryItem = $derived(
+		statusHistoryItem && "score" in statusHistoryItem && "svg" in statusHistoryItem
+			? statusHistoryItem as Iteration
+			: null
+	);
 	const targetTenkei = $derived(normalizeTenkei(displayedHistoryItem?.tenkei) ?? DEFAULT_TENKEI);
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
@@ -6165,6 +6215,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onCopyPromptText={copyPromptText}
 				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}
+				onReplayCurrent={() => {
+					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
+				}}
+				replayDisabled={!replayableStatusHistoryItem || reloading}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
 				onVaryPerformance={varyPerformance}
@@ -6544,7 +6598,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onAskPermanentDelete={askPermanentDelete}
 		onToggleSelection={toggleHistorySelection}
 		onLoadItem={loadIterationItem}
-		onReplayItem={replayHistoryItem}
+		onReplayItem={(item) => replayHistoryItem(item, 'history-manager')}
 		onToggleStar={toggleHistoryStar}
 		{historyModelSummary}
 		{formatHistoryDate}
@@ -6555,6 +6609,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{apiFetch}
 		currentHistoryId={displayedHistoryItem?.id ?? result?.history_id ?? null}
 		currentLineageRootId={displayedHistoryItem?.lineage_root_node_id ?? null}
+	/>
+{/if}
+
+{#if replayComparison}
+	<ReplayComparisonModal
+		originalSvg={replayComparison.originalSvg}
+		replayedSvg={replayComparison.replayedSvg}
+		recordedVersion={replayComparison.recordedVersion}
+		currentVersion={replayComparison.currentVersion}
+		versionMessage={replayComparison.versionMessage}
+		provisionalSeed={replayComparison.provisionalSeed}
+		onClose={closeReplayComparison}
 	/>
 {/if}
 

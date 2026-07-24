@@ -209,9 +209,7 @@ object ServerStrokeEngine {
     }
 
     private fun formatCoord(valNum: Double): String {
-        return BigDecimal.valueOf(valNum)
-            .setScale(3, RoundingMode.HALF_EVEN)
-            .toPlainString()
+        return ServerRendererGeometry.fmt(valNum)
     }
 
     fun polygonPath(points: List<Pair<Double, Double>>): String {

@@ -59,7 +59,7 @@ class DefaultSvgRenderer : SvgRenderer {
         body.append(renderPresenceLayer(score, colors, width, height))
         body.append("</g>")
 
-        val svg = buildString {
+        val rawSvg = buildString {
             append("""<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}">""")
             append("<defs>")
             if (request.svgProfile == "display") {
@@ -71,9 +71,10 @@ class DefaultSvgRenderer : SvgRenderer {
             append(body)
             append("</svg>")
         }
+        val svg = applyMasterGrid(rawSvg)
         val metadata = JSONObject()
             .put("render_engine_id", "default")
-            .put("render_engine_version", "10")
+            .put("render_engine_version", "11")
             .put("render_canvas_aspect", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_id", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_ratio", CanvasAspects.ratioFor(request.canvasAspect))
@@ -1085,6 +1086,25 @@ class DefaultSvgRenderer : SvgRenderer {
 
     private fun fmt(value: Double): String = ServerRendererGeometry.fmt(value)
 
+    private fun applyMasterGrid(svg: String): String {
+        val attrRe = Regex("""([\w:-]+)="([^"]*)"""")
+        val numRe = Regex("""-?\d+\.\d+(?:[eE][-+]?\d+)?""")
+        val ungriddedAttrs = setOf("version", "class", "id")
+
+        return attrRe.replace(svg) { match ->
+            val name = match.groupValues[1]
+            val value = match.groupValues[2]
+            if (name in ungriddedAttrs || "." !in value) {
+                match.value
+            } else {
+                val gridded = numRe.replace(value) { nMatch ->
+                    ServerRendererGeometry.fmt(nMatch.value.toDouble())
+                }
+                """$name="$gridded""""
+            }
+        }
+    }
+
     private fun signedHash(i: Int, seed: String): Double = ServerRendererGeometry.signedHash(i, seed)
 
     private fun String.containsAny(vararg markers: String): Boolean = markers.any { contains(it) }
@@ -1307,8 +1327,6 @@ class DefaultSvgRenderer : SvgRenderer {
 
     private fun jsonString(value: String): String = JSONObject.quote(value)
 
-    private fun fmt3(value: Double): String = "%.3f".format(java.util.Locale.US, value)
-
     private fun renderSurfaceVectors(
         ins: JSONObject,
         attrs: SvgAttrs,
@@ -1369,7 +1387,7 @@ class DefaultSvgRenderer : SvgRenderer {
                     val p2x = cx + ox + lux * span / 2.0
                     val p2y = cy + oy + luy * span / 2.0
                     val lineWidth = max(0.45, unit * 0.0016)
-                    val hatchClass = "hatch-spacing-${fmt3(spacing * gradient)}"
+                    val hatchClass = "hatch-spacing-%.3f".format(java.util.Locale.US, spacing * gradient)
                     val opacityStr = fmt(opacity)
                     val strokeWidthStr = fmt(lineWidth)
 

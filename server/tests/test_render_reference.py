@@ -5,12 +5,17 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import re
 
+from inku_server.master_grid import MASTER_GRID_DECIMALS
+from inku_server.render_engines import current_render_engine
 from inku_server.schema import CanvasGroundSpec, Instruction, Score, SurfaceSpec
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
-MANIFEST_PATH = SERVER_ROOT / "reference" / "render-engine-10" / "manifest.json"
+ENGINE_VERSION = current_render_engine().version
+CORPUS_DIR = SERVER_ROOT / "reference" / f"render-engine-{ENGINE_VERSION}"
+MANIFEST_PATH = CORPUS_DIR / "manifest.json"
 
 
 def _generator():
@@ -77,3 +82,28 @@ def test_render_reference_svg_files_match_manifest() -> None:
         svg = (output_dir / f"{case_id}.svg").read_text(encoding="utf-8")
         assert len(svg.encode("utf-8")) == case["bytes"]
         assert generator._normalized_digest(svg) == case["digest"]
+
+
+def test_every_corpus_number_sits_on_the_master_grid() -> None:
+    """凍結物のどの数値も 6 桁固定で書かれている。
+
+    グリッドに載っていることを成果物そのものから読めるようにするための検査。
+    桁を詰めると 695.45787 が 6 桁グリッドの産物か生の float かを見分けられず、
+    「丸めてから詰めた」という手順を信じる形になる (2026-07-24 作者裁定)。
+
+    除外は 2 つだけ。SVG 文書の version="1.1" と、識別子である class / id。
+    """
+    off_grid = []
+    checked = 0
+    files = sorted(CORPUS_DIR.glob("*.svg"))
+    for path in files:
+        for name, value in re.findall(r'([\w:-]+)="([^"]*)"', path.read_text()):
+            if name in ("class", "id", "version"):
+                continue
+            for decimals in re.findall(r"\d+\.(\d+)", value):
+                checked += 1
+                if len(decimals) != MASTER_GRID_DECIMALS:
+                    off_grid.append((path.name, name, decimals))
+    assert len(files) == 220
+    assert checked > 100_000, checked
+    assert off_grid == []

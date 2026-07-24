@@ -27,8 +27,12 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-23"
-REASON = "Freeze the first complete render reference corpus at engine 10."
+FROZEN_AT = "2026-07-24"
+REASON = (
+    "Declare one master grid for every emitted number (master_grid.py). Engine 10 "
+    "mixed 1-3 decimal places with raw 17-digit floats, so the corpus could not be "
+    "reproduced outside macOS."
+)
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
 

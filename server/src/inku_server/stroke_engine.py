@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import hashlib
 import math
 
+from .master_grid import fmt
+
 
 @dataclass(frozen=True)
 class ToolGrammar:
@@ -204,7 +206,7 @@ def synthesize_stroke(
 def polygon_path(points: tuple[tuple[float, float], ...]) -> str:
     if not points:
         return ""
-    return "M " + " L ".join(f"{x:.3f} {y:.3f}" for x, y in points) + " Z"
+    return "M " + " L ".join(f"{fmt(x)} {fmt(y)}" for x, y in points) + " Z"
 
 
 def ring_path(

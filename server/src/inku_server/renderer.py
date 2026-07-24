@@ -2409,6 +2409,7 @@ def render(
     canvas_aspect: str | None = None,
     svg_profile: str | None = None,
     render_seed: int | None = None,
+    wild: bool = False,
 ) -> str:
     profile = _normalize_svg_profile(svg_profile)
     score = _resolve_performance_score(score, render_seed)
@@ -2485,6 +2486,7 @@ def render(
                 render_seed=render_seed,
                 ins_idx=ins_idx,
                 mark_idx=mark_idx,
+                wild=wild,
             )
             if element is not None:
                 if structured:
@@ -3533,6 +3535,7 @@ def _render_hand_stroke(
     render_seed: int | None,
     *,
     use_filters: bool,
+    wild: bool = False,
 ):
     length = math.hypot(end[0] - start[0], end[1] - start[1])
     base_width = _stroke_width_px(ins.weight, canvas)
@@ -3543,6 +3546,7 @@ def _render_hand_stroke(
         ins.weight,
         _seed_for_instruction(ins, render_seed),
         samples=_stroke_sample_count(length, canvas),
+        wild=wild,
     )
     group = dwg.g(
         class_=f"stroke-engine-v1 controls-{len(stroke.samples)} events-{stroke.event_count}"
@@ -3567,6 +3571,7 @@ def _render_hand_stroke(
             ins.weight,
             _seed_for_instruction(ins, render_seed),
             samples=len(centerline),
+            wild=wild,
         )
         outline = outline_for_centerline(
             centerline, [sample.width for sample in varied.samples]
@@ -4066,6 +4071,7 @@ def _render_instruction(
     render_seed: int | None = None,
     ins_idx: int = 0,
     mark_idx: int = 0,
+    wild: bool = False,
 ):
     canvas = canvas or canvas_size_for_aspect(None)
     attrs = _stroke_attrs(ins, cmap, canvas, use_filters=use_filters)
@@ -4090,6 +4096,7 @@ def _render_instruction(
                 canvas,
                 render_seed,
                 use_filters=use_filters,
+                wild=wild,
             )
         return _apply_rotation(dwg.line(start=start, end=end, **attrs), ins, canvas)
 

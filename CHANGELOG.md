@@ -539,6 +539,9 @@ Documentation only. No code, drawing, or API changes; `render_engine_version` st
   landing its final center **outside** the region `[0.55, 0.55, 0.95, 0.95]` (x = 0.35) — `relation` is
   `null` whether it resolved or was rejected, so only `center` can tell the two apart.
 
+- **Phase 3a (merge `642a476`, android Build 148081) — the core of the Stage 1.5 expansion layer.** The expansion filter itself (variation, tenkei, focus, plugin expansion) was ported, including the split between `ddl` and `context_text` and the fact that **`vary_seed` applies only to `context_text`** (it is not `variation_seed`). **Arguments for 3b–3d are accepted but ignored, and a test says so explicitly**, so that "the argument exists but is never read" cannot survive silently into a later phase. The 39 expected cases in `ddl_expand.json` were **measured and handed over before the work started**. The 15 `A-*` cases take the same input as the server's own `server/reference/ddl-engine-1/a_expand/` corpus and match byte for byte **apart from one trailing newline** (a comparison script needs `rstrip("\n")`). Verified by counting the JUnit XML directly: **58 tests, 0 failures, 0 errors** (baseline 54 plus 4 new), with the seven cases from §5 of the contract matching under `assertEquals`. Six files under `android/` changed; **`render_engine_version` stays `"10"`** and `android/VERSION` stays `2.0.0-android.1`.
+- **Engine 11 makes the parity fixtures stale (handover note).** v2.4.8 moved web/server `path d` from `.3f` to six fixed decimals, so the SVG comparisons under `server_reference/` **will all fail as they stand**. That is a different axis from Stage 1.5 Phases 3b–3d, so the drawing-layer catch-up is filed as **Phase 2h under its own contract**.
+
 ### v2.4.7 — freezing the deterministic DDL layers (a DDL reference corpus, plus `ddl_version` / `ddl_engine_version`) (Build 697, 2026-07-24)
 
 **The same thing v2.4.4 did for drawing, done at the front of the pipeline.** Drawing is
@@ -587,3 +590,90 @@ and a frozen corpus of their own.
   feeds the Stage 1 prompt, a layer that carries no version. **Adding vocabulary therefore does
   not move this corpus.** New words are a `ddl_version` event, but **nothing detects that
   mechanically yet** (Phase 4's `stage1_prompt_digest` will cover half of it).
+
+### v2.4.8 — declaring one master grid for the performed output (render engine 11), plus prompt provenance digests (Build 698, 2026-07-24)
+
+#### A. Render engine 11 — every emitted number lands on one grid
+
+- **It began with eight consecutive CI failures.** The `render-engine` job of the
+  `reference-corpus` workflow had **never been green** since the workflow was added. The
+  frozen corpus was taken on the author's macOS machine while CI regenerates it on Linux,
+  and `math.sin` differs there by one unit in the last place
+  (`344.12754953531663` versus `344.1275495353167`). Because `points` / `cx` / `cy`
+  reached svgwrite as raw Python floats, seventeen digits landed in the file and that
+  difference became a byte difference. **81 of the 220 cases** differed, with **zero
+  structural differences** and a largest relative difference of **2e-16**. The failure was
+  reproduced on pentala (Ubuntu x86_64) before anything was changed.
+- **Three numbers were measured:**
+  - **The platform noise floor sits between ten and eleven decimal places.** Rounding both
+    corpora to a varying number of digits, macOS and Linux agree completely through ten
+    decimals; four cases diverge at eleven and eighty at thirteen. **Of the seventeen
+    digits, only ten carried reproducible information.**
+  - **The coordinate grid was uneven.** Drawing geometry was formatted with `.1f` in one
+    place, `.2f` in nine, `.3f` in seven, with raw seventeen-digit floats mixed in. **The
+    master's ruling varied from 1e-4 to 1e-19 depending on where it was written.**
+  - **Shape fidelity is 2.2e-4 of the artboard.** Strokes are emitted as chains of straight
+    segments rather than curves (77,666 `L` commands against 490 `C`), with a median
+    segment of 2.07% of the canvas width. For a circle of radius 240 units the chord
+    sagitta is 0.224 units — roughly a **4.5K raster equivalent**.
+- **So this is not a change that discards resolution.** The digits were already two hundred
+  times finer than needed, and the effective resolution is set by sampling. This change
+  **gathers scattered precisions into one declaration**, and the drawing geometry moved
+  **up**, from one-to-three decimals to a uniform six.
+- **`master_grid.py` is the single declaration:** six fixed decimal places, a
+  canvas-relative step of **1e-9** on a 1000-unit canvas. That is four orders of magnitude
+  above the noise floor and three below any physical limit — 100nm when the artboard is
+  stretched across a 100m wall, finer than the wavelength of visible light.
+- **Fixed `.6f`, trailing zeros kept (author's ruling).** The reason is not file size but
+  **verifiability**. With a fixed width every emitted number matches `-?\d+\.\d{6}`, so a
+  single regular expression can confirm from the artifact itself that the grid was applied.
+  Trimming would leave `695.45787` indistinguishable from a raw float, and the claim would
+  rest on trusting the procedure. The price is 11.6% in size (2.48MB to 2.77MB).
+- **The grid is enforced at one point in the output**, applied once to the return value of
+  `render()`. There are 48 svgwrite call sites, and **fixing them one at a time leaves
+  omissions that pass silently**. Only `version="1.1"` and the `class` / `id` identifiers
+  are excluded.
+- **The drawing did not change.** Across all 220 cases the count of numbers is identical
+  and **no number moved by more than 5e-4**, exactly the half-step of the old three-decimal
+  formatting. The six golden digests were re-taken only after confirming the same property.
+- **The engine 10 corpus is kept (author's ruling).** The 10 → 11 diff is the evidence that
+  **only the written digits changed and the drawing did not**. Engine 10 cannot be
+  reproduced outside macOS, so CI no longer checks it; `server/reference/README.md` now
+  says so. This is the **first practical use of the reference corpus**.
+- **CI** now checks the whole `server/reference/` tree. A version bump therefore leaves a
+  new directory untracked and fails the build until it is committed — intended, and
+  documented in the README.
+- **Two checks, both confirmed to fail when perturbed:** one over freshly rendered output
+  across the `editable` / `compat` / `display` profiles, one over all 220 frozen files. For
+  the latter, a single digit was removed from one file to watch it fail before restoring.
+- **Reproducibility:** the 220 files and the manifest are **byte-identical** on macOS arm64
+  and Ubuntu x86_64. Running the generator twice leaves the tree unchanged.
+
+#### B. Prompt provenance digests (reference corpus Phase 4)
+
+- **Closing the gap Phase 3 left.** The saijiki (`saijiki.py`) is not referenced by any
+  deterministic layer; it flows into the **Stage 1 prompt, a layer that carries no
+  version**. Adding a word therefore moves neither the DDL corpus nor CI.
+  `stage1_prompt_base_digest` is the only mechanism that can detect it.
+- **Four fields.** `stage2_prompt_base_digest` is deliberately **not** created, because
+  Stage 2 means nothing without its tool schema.
+- **None of the three discriminating tests is vacuous:** one asserts that the digest of
+  what was actually sent **moves** with the input while the base does **not**; one asserts
+  that the base under an override path **differs** from the module constant, which proves
+  it is not computed from that constant; one asserts that changing a schema description
+  moves the combined digest while `SYSTEM_PROMPT` alone does **not**, which records in the
+  test why the tool schema has to be included.
+- **Existing rows are not backfilled.** Nullable columns were added with a non-destructive
+  `ALTER TABLE`; the versions of works that carry no record are not guessed.
+
+#### C. Folded in, and what is left
+
+- **`description` in `server/pyproject.toml`** (`2308059`): a leftover from the uv template
+  that had been replaced. It changes no behaviour, so it had not been numbered on its own.
+- **Android has to follow.** Engine 11 changes `path d` from `.3f` to six fixed decimals,
+  so **the Android parity fixtures all break**. That is a different axis from Stage 1.5
+  Phases 3b–3d, so the drawing-layer catch-up is filed as **Phase 2h under its own
+  contract**.
+- **Verification:** pytest **1062 passed / 30 skipped** (v2.4.7's 1043, plus 17 from
+  Phase 4 and 2 from engine 11), cli 68 passed, ruff clean, `npm run check` 0 errors /
+  2 warnings.

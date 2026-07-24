@@ -1059,12 +1059,12 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `10` | **the same Score and seed perform differently** |
+| `render_engine_version` | the drawing engine | `11` | **the same Score and seed perform differently** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `1` | the same input and seed produce different output |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `1` | grammar is added, changed, or retired |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.4.5 | per release |
-| `web/BUILD_NUMBER` | build serial | 695 | **moves for UI-only changes too** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.4.8 | per release |
+| `web/BUILD_NUMBER` | build serial | 698 | **moves for UI-only changes too** |
 
 `ddl_version` and `ddl_engine_version` **start counting at 1** (author's ruling,
 2026-07-24). No other version shares those numbers, which keeps the separate
@@ -1106,7 +1106,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-10/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 220 |
+| Drawing | `server/reference/render-engine-11/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 220 |
 | Deterministic DDL layers | `server/reference/ddl-engine-1/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 29 (A 15 / B 14) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -1131,6 +1131,37 @@ in which X moved**.
 
 The corpus ships with no release: `server/reference/ export-ignore` in `.gitattributes`
 keeps it out of `git archive`.
+
+#### The master grid (v2.4.8, engine 11)
+
+**Every emitted number lands on one grid**: six fixed decimal places, a canvas-relative
+step of **1e-9** on a 1000-unit canvas. `MASTER_GRID_DECIMALS` in
+`inku_server/master_grid.py` is the source of truth.
+
+An SVG scales freely, but **the numbers written into it are fixed-point**, so this constant
+is the effective master resolution. Through engine 10 the precision varied by write site
+(`.1f`, `.2f`, `.3f`, and seventeen digits wherever a raw float reached svgwrite), which
+meant **rulings from 1e-4 to 1e-19 shared one canvas**.
+
+The grid value is bounded from both sides.
+
+- **Below (reproducibility):** `math.sin` differs across platforms by a relative 2e-16.
+  Measured, macOS and Linux output starts to diverge **at the eleventh decimal**. The grid
+  sits four orders of magnitude above that, so any OS performs to the same string.
+- **Above (physics):** stretched across a 100m wall the step is 100nm, finer than the
+  wavelength of visible light. The drawing instrument reaches its limit first.
+
+**Trailing zeros are kept.** With a fixed width every number matches `-?\d+\.\d{6}`, so
+the artifact itself can be machine-checked for the grid. Trimming would leave `695.45787`
+indistinguishable from a raw float, and the claim would rest on trusting the procedure.
+
+**Integers stay integers** (canvas dimensions, `viewBox`). The grid governs values that
+carry a fractional part.
+
+**This grid is a different axis from shape fidelity.** Strokes are emitted as chains of
+straight segments rather than curves, so the effective resolution of the *shape* is
+**2.2e-4** of the artboard (the chord sagitta) — the digits are two hundred times finer.
+**At wall scale it is the sampling, not the digits, that binds.**
 
 ### 12.5 The Engine Does Not Go Backwards — Implemented as Printmaking (v2.4.6)
 

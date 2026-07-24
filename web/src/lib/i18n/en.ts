@@ -642,7 +642,7 @@ export const en: LangPack = {
 	historyReplayVersionNotRecorded: (current) => `The engine version used to render this artwork was not recorded. The image now on screen was re-rendered with engine ${current}.`,
 	historyVersionNotRecorded: 'not recorded',
 	historyVersionUnknown: 'unknown',
-	replayComparisonTitle: 'Replay — Original and Current',
+	replayComparisonTitle: 'Replay — Original Renderer and Current Renderer',
 	replayComparisonOriginal: 'Original',
 	replayComparisonCurrent: 'Re-rendered with the current engine',
 	generationDdlVersions: 'DDL specification / transform layer',

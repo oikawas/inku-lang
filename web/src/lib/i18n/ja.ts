@@ -642,7 +642,7 @@ export const ja: LangPack = {
 	historyReplayVersionNotRecorded: (current) => `この作品を描いた engine の版は記録されていません。いま画面にあるのは engine ${current} による描き直しです。`,
 	historyVersionNotRecorded: '記録なし',
 	historyVersionUnknown: '不明',
-	replayComparisonTitle: '再現 — オリジナルと現行版の比較',
+	replayComparisonTitle: '再現 — オリジナルRendererと現行Rendererの比較',
 	replayComparisonOriginal: 'オリジナル',
 	replayComparisonCurrent: '現行エンジンによる描き直し',
 	generationDdlVersions: 'DDL 仕様 / 変換層',

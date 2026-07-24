@@ -34,7 +34,6 @@
 		onOpenNearbyHistory: (id: string) => void;
 		unsavedRefinementPreview: boolean;
 		lineageIntermediateNotice: string | null;
-		replayVersionNotice: string | null;
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
 		nextDisabled: boolean;
@@ -186,7 +185,6 @@
 		onOpenNearbyHistory,
 		unsavedRefinementPreview = false,
 		lineageIntermediateNotice = null,
-		replayVersionNotice = null,
 		allowEmptyOutputTabs,
 		currentRenderedAt,
 		nextDisabled,
@@ -597,9 +595,6 @@
 {/if}
 {#if lineageIntermediateNotice}
 	<div class="lineage-intermediate-notice" role="status">{lineageIntermediateNotice}</div>
-{/if}
-{#if replayVersionNotice}
-	<div class="replay-version-notice" role="status">{replayVersionNotice}</div>
 {/if}
 {#if nearbyHistory.length > 0}
 	<div class="nearby-mirror" onpointerdown={(event) => event.stopPropagation()}>
@@ -1840,7 +1835,6 @@
 	.interpret-fallback-badge { position: absolute; top: 12px; right: 12px; z-index: 5; padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
 	:global(html[data-theme='dark']) .interpret-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
 	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: white; box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
-	.replay-version-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(640px, calc(100% - 48px)); padding: 8px 12px; border: 1px solid var(--border2); border-radius: var(--r); background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg); box-shadow: 0 4px 18px #0003; font-size: 11px; line-height: 1.45; text-align: center; }
 	.nearby-mirror { position: absolute; right: 64px; bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); box-shadow: 0 2px 10px #0002; color: var(--fg3); font-size: 0.68rem; z-index: 4; }
 	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: white; border: 1px solid var(--border); cursor: pointer; }
 	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }

@@ -1321,6 +1321,30 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の集計により、全 54 件の単体テスト（12 ファイル）が 100% 通過 (PASS)。
 - `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148080` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
 
+## 2026-07-24 web/server v2 追随 Phase 3a (Stage 1.5 展開フィルタ本体・プロファイル・構図族・決定性選出の追随)
+
+契約 `antigravity-android-phase3-expander.md` §8 Phase 3a に基づき、Stage 1.5 展開層の核心部である展開フィルタ本体（`_expand_ja` / `_expand_en`）およびプロファイル判定・動的焦点置換・カテゴリ計画・候補選出・構図族適用の Android 移植を完了した。
+
+### 実装および追随の詳細
+
+1. **展開フィルタ本体とプロファイル判定 (`WebDdlExpander.kt`)**:
+   - `expandIntermediateDdl` の引数シグネチャを拡張し、将来の Phase 3b/3c/3d 用パラメータ（`tenkei`, `focus`, `variationAmplitude`, `variationSeed`, `variationReport`, `enablePlugins`, `pluginInstructionsPresent`）を受容できるように構造化。
+   - `_profile_ja` / `_profile_en` による強弱レベル（`intensity`）、タグ集合（`tags`）、構図モード（`mode`）の決定性判定を同調。
+   - `_reframe_static_center_ja` / `_reframe_static_center_en` により DDL 本文中の静的中央表現（`画面中央` / `near the center` 等）を `_dynamic_focus_*` のハッシュ選定焦点へ決定的に置換。
+2. **決定性選出とハッシュ互換性**:
+   - SHA-256 ハッシュの先頭 8 バイトを Big-Endian 64bit 無符号整数（`ULong`）として計算する Python `_seed` 互換ハッシュ関数を実装。
+   - `varySeed` 文字列化において `java.lang.Long.toUnsignedString` を使用し、2^63 以上の符号なし 64-bit 整数が負の数へずれる問題を解消。
+   - `_category_plan` / `_cap_category_plan` によるカテゴリ構造計画（構造・音楽・絵画の採用数）と `_select_category` / `_pick` によるハッシュ順選出、および `_apply_composition_family_*` による構図族（`vertical_rhythm`, `horizontal_strata`, `radial_concentric` 等）の文面置換を完全移植。
+3. **Phase 3a コーパステスト基盤 (`WebDdlExpanderPhase3aTest.kt`)**:
+   - 参照コーパス `ddl_expand.json` を動的読み込み、Phase 3a 対象の 7 ケース（`A-base-ja`, `A-base-en`, `B-context-differs`, `B-context-none`, `B-vary-seed-0`, `B-vary-seed-12345`, `B-vary-seed-9223372036854775809`）において出力文字列が完全一致（`assertEquals`）することを検証。
+
+### 検証結果
+
+- `render_engine_version` は `"10"` を維持（描画層には一切変更なし）。
+- `app/build/test-results/testDebugUnitTest/*.xml` の集計により、全 58 件の単体テスト（既存 54 件 + Phase 3a テスト 4 件）が 100% 通過 (PASS)。
+- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148081` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
+
+
 
 
 

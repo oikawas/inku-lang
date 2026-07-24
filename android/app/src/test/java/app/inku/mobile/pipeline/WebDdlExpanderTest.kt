@@ -20,7 +20,7 @@ class WebDdlExpanderTest {
         assertFalse(expanded.contains("中心から"))
         assertFalse(expanded.contains("中央へ"))
         assertTrue(expanded.count { it == '。' } <= ddl.count { it == '。' } + 8)
-        assertTrue(listOf("小さな楕円", "短い線", "小さな四角", "細い弧").any { it in expanded })
+        assertTrue(listOf("小さな楕円", "短い線", "小さな四角", "細い弧", "細い斜め線").any { it in expanded })
         assertTrue(listOf("右上がり", "右下がり", "回転した", "焦点").any { it in expanded })
     }
 

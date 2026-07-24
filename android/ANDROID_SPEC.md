@@ -1739,7 +1739,31 @@ In accordance with contract `antigravity-android-phase2-renderer.md` §8 Phase 2
 
 - `render_engine_version` remains `"10"`.
 - XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 54 unit tests across 12 files pass 100%.
-- `gradle :app:assembleDebug` will increment `android/BUILD_NUMBER` to `148080`. `android/VERSION` remains `2.0.0-android.1`.
+- `gradle :app:assembleDebug` incremented `android/BUILD_NUMBER` to `148080`. `android/VERSION` remains `2.0.0-android.1`.
+
+## 2026-07-24 web/server v2 Alignment Phase 3a (Stage 1.5 Expander Core, Profile, Composition Family & Deterministic Selection)
+
+In accordance with contract `antigravity-android-phase3-expander.md` §8 Phase 3a, the Stage 1.5 DDL expander core (`_expand_ja` / `_expand_en`), filter profiles, dynamic focus replacement, category planning, candidate selection, and composition family application were ported to Android.
+
+### Implementation & Parity Details
+
+1. **Expander Core & Filter Profiles (`WebDdlExpander.kt`)**:
+   - Expanded parameter signature for `expandIntermediateDdl` to accept future Phase 3b/3c/3d parameters (`tenkei`, `focus`, `variationAmplitude`, `variationSeed`, `variationReport`, `enablePlugins`, `pluginInstructionsPresent`).
+   - Ported deterministic profile resolution (`_profile_ja` / `_profile_en`) for `intensity`, `tags`, and `mode`.
+   - Replaced static center keywords in DDL (`画面中央`, `near the center`, etc.) with hash-derived focus ids (`_reframe_static_center_ja` / `_reframe_static_center_en`).
+2. **Deterministic Candidate Selection & Hash Parity**:
+   - Implemented Python `_seed`-compatible SHA-256 Big-Endian 64-bit unsigned integer (`ULong`) hashing function.
+   - Fixed 64-bit unsigned integer string formatting using `java.lang.Long.toUnsignedString` for `varySeed` to prevent values >= 2^63 from printing negative values.
+   - Synchronized category counts (`_category_plan`, `_cap_category_plan`), deterministic selection (`_select_category`, `_category_pool`, `_pick`), and composition family text rewrite (`_apply_composition_family_ja`, `_apply_composition_family_en`).
+3. **Phase 3a Corpus Test Infrastructure (`WebDdlExpanderPhase3aTest.kt`)**:
+   - Dynamically loaded reference corpus `ddl_expand.json` and verified exact string equality (`assertEquals`) for the 7 Phase 3a corpus cases (`A-base-ja`, `A-base-en`, `B-context-differs`, `B-context-none`, `B-vary-seed-0`, `B-vary-seed-12345`, `B-vary-seed-9223372036854775809`).
+
+### Verification
+
+- `render_engine_version` remains `"10"`.
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 58 unit tests across 13 files pass 100%.
+- `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148081`. `android/VERSION` remains `2.0.0-android.1`.
+
 
 
 

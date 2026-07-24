@@ -8,7 +8,7 @@ Last updated: 2026-07-24.
 
 **Catch-up status**: Android sits at generation `2.0.0-android.1` with **render engine
 version `11`**. The master web/server implementation is at v2.4.8 with engine 11, so the
-drawing layer has caught up. The Stage 1.5 expander is ported through Phase 3a; 3b-3d
+drawing layer has caught up. The Stage 1.5 expander is ported through Phase 3b; 3c-3d
 remain. The port proceeds in phases; see the phase sections at the end of this document.
 
 ## Specification Update Workflow
@@ -1820,3 +1820,29 @@ places, fixed. **No geometry changed. Only the places that turn a number into a 
   that range the JVM formatter does not diverge from Python.
 - `android/VERSION` stays `2.0.0-android.1` and `android/BUILD_NUMBER` stays `148081`.
   Only `android/` changed; server, web, cli and shared are untouched.
+
+## 2026-07-24 web/server v2 Alignment Phase 3b (Stage 1.5 Variation Alignment)
+
+In accordance with contract `antigravity-android-phase3-expander.md` §8 Phase 3b, the Stage 1.5 variation feature (`build_variation_plan`, `_variation_ranked_axes`, `_variation_base_offset`, `_shift_*`, `_apply_count_axes`, `_variation_moved_axes`, `_resolve_focus_id`) was fully ported to Android.
+
+### Implementation & Parity Details
+
+1. **Variation Structure & Constants (`WebDdlExpander.kt`)**:
+   - Ported `VariationPlan` data class, amplitude ranks (`small`, `medium`, `large`), 7 axes (`type_swap`, `count`, `touch`, `focus`, `color`, `composition`, `type_family`), tier definitions, and amplitude axis range mappings.
+   - Deterministic plan generation implemented via `buildVariationPlan`, `variationRankedAxes`, and `variationBaseOffset`.
+2. **Unsigned 64-bit Hash Key Consistency**:
+   - Standardized seed string key generation (e.g. `$amplitude:${java.lang.Long.toUnsignedString(seed)}`) using `java.lang.Long.toUnsignedString` to prevent unsigned 64-bit integers >= 2^63 from printing negative values and causing key misalignment.
+3. **Effective Variation Plan & Decision Point Shifts**:
+   - Ported `effectiveVariationPlan` to dynamically verify actual output string diffs and fall back or shift axes deterministically.
+   - Applied shifts at decision points (`AXIS_COLOR`, `AXIS_TOUCH`, `AXIS_COMPOSITION`, `AXIS_TYPE_SWAP`, `AXIS_COUNT`, `AXIS_TYPE_FAMILY`, `AXIS_FOCUS`) via `shiftChoice`, `shiftCategoryCount`, `shiftCategoryFamily`, and `resolveFocusId`.
+4. **Dynamic `variation_report` Generation**:
+   - Implemented `variationMovedAxes` to record only axes that caused visible output changes, populating `moved_axes` and `resolved_focus` in `variationReport`.
+5. **Phase 3b Corpus Test Suite (`WebDdlExpanderPhase3bTest.kt`)**:
+   - Automated testing against 16 Phase 3b corpus cases (`A-variation-*` 8 cases, `B-variation-*` 3 cases, `B-focus-*` 5 cases) in `ddl_expand.json`, verifying exact output string matching (`assertEquals`) and `variation_report` parity.
+
+### Verification
+
+- `render_engine_version` remains `"11"`.
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 62 unit tests pass 100% (0 failures, 0 errors).
+- `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148082`. `android/VERSION` remains `2.0.0-android.1`.
+

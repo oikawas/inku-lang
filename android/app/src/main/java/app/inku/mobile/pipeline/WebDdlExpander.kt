@@ -14,6 +14,19 @@ internal data class DdlFilterCandidate(
     val label: String = "",
 )
 
+internal data class VariationPlan(
+    val amplitude: String,
+    val seed: Long,
+    val offsets: List<Pair<String, Int>>,
+) {
+    val axes: List<String> get() = offsets.map { it.first }
+
+    fun offset(axis: String): Int? = offsets.firstOrNull { it.first == axis }?.second
+
+    fun restrictedTo(axis: String): VariationPlan =
+        VariationPlan(amplitude, seed, offsets.filter { it.first == axis })
+}
+
 internal object WebDdlExpander {
     private val FOCUS_IDS = listOf(
         "upper_right",
@@ -41,6 +54,101 @@ internal object WebDdlExpander {
         "upper_edge" to "upper-edge focus",
         "right_half" to "right-half focus",
     )
+
+    private val focusShortJa = mapOf(
+        "upper_right" to "右上",
+        "upper_left" to "左上",
+        "lower_right" to "右下",
+        "lower_left" to "左下",
+        "upper_edge" to "上端",
+        "right_half" to "右半分",
+    )
+
+    private val focusShortEn = mapOf(
+        "upper_right" to "upper right",
+        "upper_left" to "upper left",
+        "lower_right" to "lower right",
+        "lower_left" to "lower left",
+        "upper_edge" to "upper edge",
+        "right_half" to "right half",
+    )
+
+    private val jaTouches = listOf("鉛筆の", "ペンの", "細筆の", "クレヨンの", "ロットリングの")
+    private val enTouches = listOf("pencil", "pen", "fine-brush", "crayon", "rotring")
+
+    private val touchShortJa = mapOf(
+        "鉛筆の" to "鉛筆",
+        "ペンの" to "ペン",
+        "細筆の" to "細筆",
+        "クレヨンの" to "クレヨン",
+        "ロットリングの" to "ロットリング",
+    )
+
+    private val touchShortEn = mapOf(
+        "pencil" to "pencil",
+        "pen" to "pen",
+        "fine-brush" to "fine-brush",
+        "crayon" to "crayon",
+        "rotring" to "rotring",
+    )
+
+    private val compositionShortJa = mapOf(
+        "vertical_rhythm" to "縦のリズム",
+        "horizontal_strata" to "横の層",
+        "radial_concentric" to "放射",
+        "one_sided_focus" to "片寄せ",
+        "central_stillness" to "中央静止",
+        "edge_retreat" to "端への退き",
+        "dispersal" to "分散",
+        "diagonal_band" to "斜めの帯",
+    )
+
+    private val compositionShortEn = mapOf(
+        "vertical_rhythm" to "vertical rhythm",
+        "horizontal_strata" to "horizontal strata",
+        "radial_concentric" to "radial",
+        "one_sided_focus" to "one-sided focus",
+        "central_stillness" to "central stillness",
+        "edge_retreat" to "edge retreat",
+        "dispersal" to "dispersal",
+        "diagonal_band" to "diagonal band",
+    )
+
+    private val categoryShortJa = listOf("構造", "音楽", "絵画")
+    private val categoryShortEn = listOf("structure", "music", "painting")
+
+    private val VARIATION_AMPLITUDES = listOf("small", "medium", "large")
+
+    private const val AXIS_TYPE_SWAP = "type_swap"
+    private const val AXIS_COUNT = "count"
+    private const val AXIS_TOUCH = "touch"
+    private const val AXIS_FOCUS = "focus"
+    private const val AXIS_COLOR = "color"
+    private const val AXIS_COMPOSITION = "composition"
+    private const val AXIS_TYPE_FAMILY = "type_family"
+
+    private val VARIATION_AXES = listOf(
+        AXIS_TYPE_SWAP,
+        AXIS_COUNT,
+        AXIS_TOUCH,
+        AXIS_FOCUS,
+        AXIS_COLOR,
+        AXIS_COMPOSITION,
+        AXIS_TYPE_FAMILY,
+    )
+
+    private val AXIS_TIER = mapOf(
+        AXIS_TYPE_SWAP to 1,
+        AXIS_COUNT to 1,
+        AXIS_TOUCH to 2,
+        AXIS_FOCUS to 2,
+        AXIS_COLOR to 2,
+        AXIS_COMPOSITION to 3,
+        AXIS_TYPE_FAMILY to 3,
+    )
+
+    private val AMPLITUDE_RANK = mapOf("small" to 1, "medium" to 2, "large" to 3)
+    private val AMPLITUDE_AXIS_RANGE = mapOf("small" to (1 to 1), "medium" to (1 to 2), "large" to (2 to 4))
 
     private val jaExpansionMarkers = setOf(
         "右半分の斜めの帯",
@@ -153,25 +261,65 @@ internal object WebDdlExpander {
         val sanitized = avoidGrayBackground(WebDdlSpec.sanitizePlacementWords(ddl).trim(), lang)
         if (sanitized.isBlank()) return sanitized
 
-        return if (lang == "en") {
-            expandEn(
-                sanitized,
-                contextText = contextText,
-                varySeed = varySeed,
-                pluginInstructionsPresent = pluginInstructionsPresent,
-                tenkei = tenkei,
-                focus = focus,
-            )
-        } else {
-            expandJa(
-                sanitized,
-                contextText = contextText,
-                varySeed = varySeed,
-                pluginInstructionsPresent = pluginInstructionsPresent,
-                tenkei = tenkei,
-                focus = focus,
-            )
+        fun runExpand(plan: VariationPlan?, decisions: MutableMap<String, Any>?): String {
+            return if (lang == "en") {
+                expandEn(
+                    sanitized,
+                    contextText = contextText,
+                    varySeed = varySeed,
+                    pluginInstructionsPresent = pluginInstructionsPresent,
+                    tenkei = tenkei,
+                    focus = focus,
+                    plan = plan,
+                    decisions = decisions,
+                )
+            } else {
+                expandJa(
+                    sanitized,
+                    contextText = contextText,
+                    varySeed = varySeed,
+                    pluginInstructionsPresent = pluginInstructionsPresent,
+                    tenkei = tenkei,
+                    focus = focus,
+                    plan = plan,
+                    decisions = decisions,
+                )
+            }
         }
+
+        val plan = buildVariationPlan(variationAmplitude, variationSeed, tenkei = tenkei)
+        val baseDecisions = mutableMapOf<String, Any>()
+        val baseText = runExpand(null, baseDecisions)
+
+        if (variationReport != null) {
+            variationReport["resolved_focus"] = baseDecisions[AXIS_FOCUS] ?: ""
+            variationReport["moved_axes"] = emptyList<Map<String, String>>()
+            variationReport["category_counts"] = baseDecisions["category_counts"] ?: listOf(0, 0, 0)
+        }
+
+        val effectivePlan = if (plan != null) {
+            effectiveVariationPlan(plan, tenkei = tenkei, baseText = baseText) { p, d ->
+                runExpand(p, d)
+            }
+        } else null
+
+        if (effectivePlan == null) {
+            return baseText
+        }
+
+        val decisions = mutableMapOf<String, Any>()
+        val text = runExpand(effectivePlan, decisions)
+        if (variationReport != null) {
+            variationReport["resolved_focus"] = decisions[AXIS_FOCUS] ?: ""
+            variationReport["category_counts"] = decisions["category_counts"] ?: listOf(0, 0, 0)
+            variationReport["moved_axes"] = variationMovedAxes(
+                effectivePlan,
+                baseText = baseText,
+                baseDecisions = baseDecisions,
+                lang = lang,
+            ) { p, d -> runExpand(p, d) }
+        }
+        return text
     }
 
     private fun expandJa(
@@ -181,6 +329,8 @@ internal object WebDdlExpander {
         pluginInstructionsPresent: Boolean,
         tenkei: String,
         focus: String?,
+        plan: VariationPlan?,
+        decisions: MutableMap<String, Any>?,
     ): String {
         if (pluginInstructionsPresent ||
             hasExplicitNumericRegions(ddl, "ja") ||
@@ -189,24 +339,44 @@ internal object WebDdlExpander {
             return ddl
         }
 
-        val focusId = resolveFocusId(ddl, focus, lang = "ja")
+        val focusId = resolveFocusId(ddl, focus, plan, lang = "ja")
+        if (decisions != null) {
+            decisions[AXIS_FOCUS] = focusId
+        }
         val reframed = reframeStaticCenterJa(ddl, focusId)
         if (tenkei == "none") return reframed
 
         val sentences = splitSentences(reframed, "ja")
         val structural = mutableListOf<DdlFilterCandidate>()
-        val mainColor = dominantJaColor(reframed)
-        val contrastColor = contrastJaColor(reframed)
+        var mainColor = dominantJaColor(reframed)
+        var contrastColor = contrastJaColor(reframed)
+        val colorOffset = plan?.offset(AXIS_COLOR)
+        if (colorOffset != null) {
+            val palette = jaColorWord.values.toList()
+            mainColor = shiftChoice(mainColor, palette, colorOffset)
+            contrastColor = shiftChoice(contrastColor, palette.filter { it != mainColor }, colorOffset)
+        }
+        if (decisions != null) {
+            decisions[AXIS_COLOR] = "$mainColor・$contrastColor"
+        }
+
         val context = "${contextText.orEmpty()}\n$reframed"
         val seedContext = varyContext(context, varySeed)
         val profile = profileJa(context)
 
-        val touch = when {
+        var touch = when {
             "geometry" in profile.tags -> "ロットリングの"
             "dense" in profile.tags -> "クレヨンの"
             profile.tags.intersect(setOf("water", "soft", "sensory", "atmosphere")).isNotEmpty() -> "細筆の"
             "contrast" in profile.tags -> "ペンの"
             else -> "鉛筆の"
+        }
+        val touchOffset = plan?.offset(AXIS_TOUCH)
+        if (touchOffset != null) {
+            touch = shiftChoice(touch, jaTouches, touchOffset)
+        }
+        if (decisions != null) {
+            decisions[AXIS_TOUCH] = touchShortJa[touch] ?: touch
         }
 
         fun add(label: String, text: String) {
@@ -286,15 +456,39 @@ internal object WebDdlExpander {
             DdlFilterCandidate("白い薄い水彩の楕円を五感の気配として右上に二つ重ねる。境界が滲む。", setOf("sensory", "soft", "quiet"), "五感の水彩"),
         )
 
-        val counts = capCategoryPlan(categoryPlan(profile, structural.isNotEmpty()), tenkei)
+        var counts = capCategoryPlan(categoryPlan(profile, structural.isNotEmpty()), tenkei)
+        counts = applyCountAxes(
+            counts,
+            plan = plan,
+            tenkei = tenkei,
+            profile = profile,
+            categories = Triple(structural, music, painting),
+            decisions = decisions,
+            categoryWords = categoryShortJa,
+        )
         val (structuralCount, musicCount, paintingCount) = counts
 
-        var selected = selectCategory(structural, structuralCount, profile, seedContext, modeSalt(profile, "ja-structure")) +
-            selectCategory(music, musicCount, profile, seedContext, modeSalt(profile, "ja-music")) +
-            selectCategory(painting, paintingCount, profile, seedContext, modeSalt(profile, "ja-painting"))
+        val swapOffset = plan?.offset(AXIS_TYPE_SWAP)
+        var selected = selectCategory(structural, structuralCount, profile, seedContext, modeSalt(profile, "ja-structure"), swapOffset) +
+            selectCategory(music, musicCount, profile, seedContext, modeSalt(profile, "ja-music"), swapOffset) +
+            selectCategory(painting, paintingCount, profile, seedContext, modeSalt(profile, "ja-painting"), swapOffset)
+
+        if (decisions != null) {
+            decisions[AXIS_TYPE_SWAP] = selectedLabels(selected, listOf(structural, music, painting))
+        }
 
         selected = limitCentered(selected, listOf("中心", "中央", "放射状", "同心円状"))
-        selected = applyCompositionFamilyJa(selected, profile, seedContext)
+
+        var family = compositionFamily(profile, seedContext, "ja")
+        val familyOffset = plan?.offset(AXIS_COMPOSITION)
+        if (familyOffset != null) {
+            family = shiftChoice(family, compositionPool(profile), familyOffset)
+        }
+        if (decisions != null) {
+            decisions[AXIS_COMPOSITION] = compositionShortJa[family] ?: family
+        }
+
+        selected = applyCompositionFamilyJa(selected, profile, seedContext, family)
 
         return joinSentences(sentences + selected, "ja")
     }
@@ -306,6 +500,8 @@ internal object WebDdlExpander {
         pluginInstructionsPresent: Boolean,
         tenkei: String,
         focus: String?,
+        plan: VariationPlan?,
+        decisions: MutableMap<String, Any>?,
     ): String {
         val lower = ddl.lowercase()
         if (pluginInstructionsPresent ||
@@ -315,26 +511,46 @@ internal object WebDdlExpander {
             return ddl
         }
 
-        val focusId = resolveFocusId(ddl, focus, lang = "en")
+        val focusId = resolveFocusId(ddl, focus, plan, lang = "en")
+        if (decisions != null) {
+            decisions[AXIS_FOCUS] = focusId
+        }
         val reframed = reframeStaticCenterEn(ddl, focusId)
         if (tenkei == "none") return reframed
 
         val reframedLower = reframed.lowercase()
         val sentences = splitSentences(reframed, "en")
         val structural = mutableListOf<DdlFilterCandidate>()
-        val mainColor = dominantEnColor(reframed)
-        val contrastColor = contrastEnColor(reframed)
+        var mainColor = dominantEnColor(reframed)
+        var contrastColor = contrastEnColor(reframed)
+        val colorOffset = plan?.offset(AXIS_COLOR)
+        if (colorOffset != null) {
+            val palette = enColors
+            mainColor = shiftChoice(mainColor, palette, colorOffset)
+            contrastColor = shiftChoice(contrastColor, palette.filter { it != mainColor }, colorOffset)
+        }
+        if (decisions != null) {
+            decisions[AXIS_COLOR] = "$mainColor, $contrastColor"
+        }
+
         val context = "${contextText.orEmpty()}\n$reframed"
         val contextLower = context.lowercase()
         val seedContext = varyContext(context, varySeed)
         val profile = profileEn(context)
 
-        val touch = when {
+        var touch = when {
             "geometry" in profile.tags -> "rotring"
             "dense" in profile.tags -> "crayon"
             profile.tags.intersect(setOf("water", "soft", "sensory", "atmosphere")).isNotEmpty() -> "fine-brush"
             "contrast" in profile.tags -> "pen"
             else -> "pencil"
+        }
+        val touchOffset = plan?.offset(AXIS_TOUCH)
+        if (touchOffset != null) {
+            touch = shiftChoice(touch, enTouches, touchOffset)
+        }
+        if (decisions != null) {
+            decisions[AXIS_TOUCH] = touchShortEn[touch] ?: touch
         }
 
         fun add(label: String, text: String) {
@@ -414,15 +630,39 @@ internal object WebDdlExpander {
             DdlFilterCandidate("Layer two pale white watercolor ellipses in the upper right as five-sense presence. Edges blurring.", setOf("sensory", "soft", "quiet"), "five-sense watercolor"),
         )
 
-        val counts = capCategoryPlan(categoryPlan(profile, structural.isNotEmpty()), tenkei)
+        var counts = capCategoryPlan(categoryPlan(profile, structural.isNotEmpty()), tenkei)
+        counts = applyCountAxes(
+            counts,
+            plan = plan,
+            tenkei = tenkei,
+            profile = profile,
+            categories = Triple(structural, music, painting),
+            decisions = decisions,
+            categoryWords = categoryShortEn,
+        )
         val (structuralCount, musicCount, paintingCount) = counts
 
-        var selected = selectCategory(structural, structuralCount, profile, seedContext, modeSalt(profile, "en-structure")) +
-            selectCategory(music, musicCount, profile, seedContext, modeSalt(profile, "en-music")) +
-            selectCategory(painting, paintingCount, profile, seedContext, modeSalt(profile, "en-painting"))
+        val swapOffset = plan?.offset(AXIS_TYPE_SWAP)
+        var selected = selectCategory(structural, structuralCount, profile, seedContext, modeSalt(profile, "en-structure"), swapOffset) +
+            selectCategory(music, musicCount, profile, seedContext, modeSalt(profile, "en-music"), swapOffset) +
+            selectCategory(painting, paintingCount, profile, seedContext, modeSalt(profile, "en-painting"), swapOffset)
+
+        if (decisions != null) {
+            decisions[AXIS_TYPE_SWAP] = selectedLabels(selected, listOf(structural, music, painting))
+        }
 
         selected = limitCentered(selected, listOf("center", "radial", "concentric"))
-        selected = applyCompositionFamilyEn(selected, profile, seedContext)
+
+        var family = compositionFamily(profile, seedContext, "en")
+        val familyOffset = plan?.offset(AXIS_COMPOSITION)
+        if (familyOffset != null) {
+            family = shiftChoice(family, compositionPool(profile), familyOffset)
+        }
+        if (decisions != null) {
+            decisions[AXIS_COMPOSITION] = compositionShortEn[family] ?: family
+        }
+
+        selected = applyCompositionFamilyEn(selected, profile, seedContext, family)
 
         return joinSentences(sentences + selected, "en")
     }
@@ -475,11 +715,238 @@ internal object WebDdlExpander {
         return "$text#vary${java.lang.Long.toUnsignedString(varySeed)}"
     }
 
-    private fun resolveFocusId(text: String, focus: String?, lang: String): String {
+    private fun variationRankedAxes(amplitude: String, seed: Long, tenkei: String): List<String> {
+        if (tenkei == "none") return listOf(AXIS_FOCUS)
+        val rank = AMPLITUDE_RANK.getValue(amplitude)
+        val pool = VARIATION_AXES.filter { AXIS_TIER.getValue(it) <= rank }
+        val key = "$amplitude:${java.lang.Long.toUnsignedString(seed)}"
+        return pool.sortedBy { axis -> seed("$key:$axis", "variation-axis") }
+    }
+
+    private fun variationBaseOffset(amplitude: String, seed: Long, axis: String): Int {
+        return 1 + (seed("$amplitude:${java.lang.Long.toUnsignedString(seed)}:$axis", "variation-offset") % 97UL).toInt()
+    }
+
+    private fun buildVariationPlan(amplitude: String?, seed: Long?, tenkei: String = "auto"): VariationPlan? {
+        if (amplitude == null || amplitude !in VARIATION_AMPLITUDES || seed == null) return null
+        val ranked = variationRankedAxes(amplitude, seed, tenkei)
+        val (rawLow, rawHigh) = if (tenkei == "none") (1 to 1) else AMPLITUDE_AXIS_RANGE.getValue(amplitude)
+        val high = minOf(rawHigh, ranked.size)
+        val low = minOf(rawLow, high)
+        if (high <= 0) return null
+        val key = "$amplitude:${java.lang.Long.toUnsignedString(seed)}"
+        val count = low + (seed(key, "variation-count") % (high - low + 1).toULong()).toInt()
+        val chosen = ranked.take(count).toSet()
+        val offsets = VARIATION_AXES.filter { it in chosen }.map { axis ->
+            axis to variationBaseOffset(amplitude, seed, axis)
+        }
+        return VariationPlan(amplitude, seed, offsets)
+    }
+
+    private const val VARIATION_OFFSET_TRIES = 8
+
+    private fun effectiveVariationPlan(
+        plan: VariationPlan,
+        tenkei: String,
+        baseText: String,
+        run: (VariationPlan, MutableMap<String, Any>?) -> String,
+    ): VariationPlan? {
+        val wanted = plan.offsets.size
+        val resolved = mutableListOf<Pair<String, Int>>()
+        for (axis in variationRankedAxes(plan.amplitude, plan.seed, tenkei)) {
+            if (resolved.size >= wanted) break
+            val baseOffset = variationBaseOffset(plan.amplitude, plan.seed, axis)
+            for (step in 0 until VARIATION_OFFSET_TRIES) {
+                val offset = baseOffset + step
+                val trial = VariationPlan(plan.amplitude, plan.seed, listOf(axis to offset))
+                if (run(trial, null) != baseText) {
+                    resolved.add(axis to offset)
+                    break
+                }
+            }
+        }
+        if (resolved.isEmpty()) return null
+        while (resolved.size > 1) {
+            val ordered = VARIATION_AXES.flatMap { axis -> resolved.filter { it.first == axis } }
+            val combined = VariationPlan(plan.amplitude, plan.seed, ordered)
+            if (run(combined, null) != baseText) return combined
+            resolved.removeAt(resolved.lastIndex)
+        }
+        val ordered = VARIATION_AXES.flatMap { axis -> resolved.filter { it.first == axis } }
+        return VariationPlan(plan.amplitude, plan.seed, ordered)
+    }
+
+    private fun shiftChoice(default: String, pool: List<String>, offset: Int): String {
+        val unique = pool.distinct()
+        val others = unique.filter { it != default }
+        if (others.isEmpty()) return default
+        return others[offset % others.size]
+    }
+
+    private fun recapAfterVariation(counts: Triple<Int, Int, Int>, tenkei: String): Triple<Int, Int, Int> {
+        if (tenkei == "none") return Triple(0, 0, 0)
+        if (tenkei != "sparse") return counts
+        val (c0, c1, c2) = counts
+        if (c0 + c1 + c2 <= 1) return counts
+        val list = listOf(c0, c1, c2)
+        for (index in list.indices) {
+            if (list[index] != 0) {
+                val reduced = mutableListOf(0, 0, 0)
+                reduced[index] = 1
+                return Triple(reduced[0], reduced[1], reduced[2])
+            }
+        }
+        return counts
+    }
+
+    private fun shiftCategoryCount(
+        counts: Triple<Int, Int, Int>,
+        offset: Int,
+        tenkei: String,
+        available: Triple<Int, Int, Int>,
+    ): Triple<Int, Int, Int> {
+        val countList = listOf(counts.first, counts.second, counts.third)
+        val availList = listOf(available.first, available.second, available.third)
+        var pool = countList.indices.filter { countList[it] > 0 }
+        if (pool.isEmpty()) {
+            pool = availList.indices.filter { availList[it] > 0 }
+        }
+        if (pool.isEmpty()) return counts
+        val index = pool[offset % pool.size]
+        val delta = if ((offset / pool.size) % 2 == 0) 1 else -1
+        val shifted = countList.toMutableList()
+        shifted[index] = (shifted[index] + delta).coerceIn(0, availList[index])
+        return recapAfterVariation(Triple(shifted[0], shifted[1], shifted[2]), tenkei)
+    }
+
+    private fun shiftCategoryFamily(
+        counts: Triple<Int, Int, Int>,
+        offset: Int,
+        available: Triple<Int, Int, Int>,
+    ): Triple<Int, Int, Int> {
+        val countList = listOf(counts.first, counts.second, counts.third)
+        val availList = listOf(available.first, available.second, available.third)
+        val sources = countList.indices.filter { countList[it] > 0 }
+        if (sources.isEmpty()) return counts
+        val source = sources[offset % sources.size]
+        val targets = countList.indices.filter { it != source && availList[it] > countList[it] }
+        if (targets.isEmpty()) return counts
+        val target = targets[(offset / sources.size) % targets.size]
+        val shifted = countList.toMutableList()
+        shifted[source] -= 1
+        shifted[target] += 1
+        return Triple(shifted[0], shifted[1], shifted[2])
+    }
+
+    private fun resolveFocusId(text: String, focus: String?, plan: VariationPlan? = null, lang: String): String {
         if (focus in FOCUS_IDS) return focus!!
         val salt = if (lang == "en") "en-focus" else "ja-focus"
-        val idx = (seed(text, salt) % FOCUS_IDS.size.toULong()).toInt()
-        return FOCUS_IDS[idx]
+        val defaultFocus = FOCUS_IDS[(seed(text, salt) % FOCUS_IDS.size.toULong()).toInt()]
+        val offset = plan?.offset(AXIS_FOCUS)
+        if (offset == null) return defaultFocus
+        return shiftChoice(defaultFocus, FOCUS_IDS, offset)
+    }
+
+    private fun applyCountAxes(
+        counts: Triple<Int, Int, Int>,
+        plan: VariationPlan?,
+        tenkei: String,
+        profile: DdlFilterProfile,
+        categories: Triple<List<DdlFilterCandidate>, List<DdlFilterCandidate>, List<DdlFilterCandidate>>,
+        decisions: MutableMap<String, Any>?,
+        categoryWords: List<String>,
+    ): Triple<Int, Int, Int> {
+        val available = Triple(
+            if (categories.first.isNotEmpty()) categoryPool(categories.first, profile).size else 0,
+            if (categories.second.isNotEmpty()) categoryPool(categories.second, profile).size else 0,
+            if (categories.third.isNotEmpty()) categoryPool(categories.third, profile).size else 0,
+        )
+        var resCounts = counts
+        if (plan != null) {
+            val familyOffset = plan.offset(AXIS_TYPE_FAMILY)
+            if (familyOffset != null) {
+                resCounts = shiftCategoryFamily(resCounts, familyOffset, available)
+            }
+            val countOffset = plan.offset(AXIS_COUNT)
+            if (countOffset != null) {
+                resCounts = shiftCategoryCount(resCounts, countOffset, tenkei, available)
+            }
+        }
+        if (decisions != null) {
+            val (c0, c1, c2) = resCounts
+            decisions["category_counts"] = listOf(c0, c1, c2)
+            decisions[AXIS_COUNT] = (c0 + c1 + c2).toString()
+            val familyList = mutableListOf<String>()
+            repeat(c0) { familyList.add(categoryWords[0]) }
+            repeat(c1) { familyList.add(categoryWords[1]) }
+            repeat(c2) { familyList.add(categoryWords[2]) }
+            decisions[AXIS_TYPE_FAMILY] = familyList
+        }
+        return resCounts
+    }
+
+    private fun selectedLabels(
+        selected: List<String>,
+        categories: List<List<DdlFilterCandidate>>,
+    ): List<String> {
+        val labels = mutableMapOf<String, String>()
+        for (items in categories) {
+            for (candidate in items) {
+                labels[candidate.text] = candidate.label
+            }
+        }
+        return selected.map { labels[it] ?: "" }
+    }
+
+    private fun axisValue(axis: String, decisions: Map<String, Any>, lang: String, joiner: String): String {
+        val value = decisions[axis]
+        if (axis == AXIS_FOCUS) {
+            val words = if (lang == "en") focusShortEn else focusShortJa
+            return words[value?.toString()].orEmpty().ifEmpty { value?.toString().orEmpty() }
+        }
+        if (value is List<*>) {
+            return value.filterNotNull().map { it.toString() }.filter { it.isNotBlank() }.joinToString(joiner)
+        }
+        return value?.toString().orEmpty()
+    }
+
+    private fun variationMovedAxes(
+        plan: VariationPlan,
+        baseText: String,
+        baseDecisions: Map<String, Any>,
+        lang: String,
+        expand: (VariationPlan, MutableMap<String, Any>) -> String,
+    ): List<Map<String, String>> {
+        val joiner = if (lang == "en") ", " else "・"
+        val moved = mutableListOf<Map<String, String>>()
+        for (axis in plan.axes) {
+            val soloDecisions = mutableMapOf<String, Any>()
+            val soloText = expand(plan.restrictedTo(axis), soloDecisions)
+            if (soloText == baseText) continue
+
+            var before = axisValue(axis, baseDecisions, lang, joiner)
+            var after = axisValue(axis, soloDecisions, lang, joiner)
+
+            if (axis == AXIS_TYPE_SWAP) {
+                @Suppress("UNCHECKED_CAST")
+                val baseLabels = (baseDecisions[axis] as? List<String>).orEmpty()
+                @Suppress("UNCHECKED_CAST")
+                val soloLabels = (soloDecisions[axis] as? List<String>).orEmpty()
+                if (before == after) {
+                    before = baseLabels.joinToString(joiner)
+                    after = soloLabels.joinToString(joiner)
+                } else {
+                    val dropped = baseLabels.filter { it !in soloLabels }
+                    val gained = soloLabels.filter { it !in baseLabels }
+                    if (dropped.isNotEmpty() || gained.isNotEmpty()) {
+                        before = dropped.joinToString(joiner).ifEmpty { before }
+                        after = gained.joinToString(joiner).ifEmpty { after }
+                    }
+                }
+            }
+            moved.add(mapOf("axis" to axis, "from" to before, "to" to after))
+        }
+        return moved
     }
 
     private fun dynamicFocusJa(text: String, focus: String?): String {
@@ -669,10 +1136,26 @@ internal object WebDdlExpander {
         return matched.ifEmpty { candidates }
     }
 
-    private fun selectCategory(candidates: List<DdlFilterCandidate>, count: Int, profile: DdlFilterProfile, text: String, salt: String): List<String> {
+    private fun selectCategory(
+        candidates: List<DdlFilterCandidate>,
+        count: Int,
+        profile: DdlFilterProfile,
+        text: String,
+        salt: String,
+        swapOffset: Int? = null,
+    ): List<String> {
         if (count <= 0) return emptyList()
         val pool = categoryPool(candidates, profile).map { it.text }
-        return pick(pool, count, text, salt)
+        val defaultChoice = pick(pool, count, text, salt)
+        if (swapOffset == null) return defaultChoice
+        var reordered: List<String>? = null
+        for (step in 0..pool.size) {
+            val alternate = pick(pool, count, text, "$salt#hensou${swapOffset + step}")
+            if (alternate == defaultChoice) continue
+            if (alternate.toSet() != defaultChoice.toSet()) return alternate
+            if (reordered == null) reordered = alternate
+        }
+        return reordered ?: defaultChoice
     }
 
     private fun categoryPlan(profile: DdlFilterProfile, hasStructural: Boolean): Triple<Int, Int, Int> {
@@ -756,8 +1239,12 @@ internal object WebDdlExpander {
         return result
     }
 
-    private fun applyCompositionFamilyJa(items: List<String>, profile: DdlFilterProfile, text: String): List<String> {
-        val family = compositionFamily(profile, text, "ja")
+    private fun applyCompositionFamilyJa(
+        items: List<String>,
+        profile: DdlFilterProfile,
+        text: String,
+        family: String = compositionFamily(profile, text, "ja"),
+    ): List<String> {
         val maps = mapOf(
             "vertical_rhythm" to listOf("右半分の斜めの帯" to "上から下への縦の帯", "左下から右上へ" to "上から下へ", "右上の焦点" to "上端寄りの焦点", "左下の焦点" to "上端寄りの焦点"),
             "horizontal_strata" to listOf("右半分の斜めの帯" to "左から右への横の帯", "左下から右上へ" to "左から右へ", "右上の焦点" to "右半分の焦点", "左下の焦点" to "右半分の焦点"),
@@ -770,8 +1257,12 @@ internal object WebDdlExpander {
         return rewriteByMap(items, maps[family].orEmpty())
     }
 
-    private fun applyCompositionFamilyEn(items: List<String>, profile: DdlFilterProfile, text: String): List<String> {
-        val family = compositionFamily(profile, text, "en")
+    private fun applyCompositionFamilyEn(
+        items: List<String>,
+        profile: DdlFilterProfile,
+        text: String,
+        family: String = compositionFamily(profile, text, "en"),
+    ): List<String> {
         val maps = mapOf(
             "vertical_rhythm" to listOf("along a diagonal band in the right half" to "from top to bottom in a vertical band", "from lower left to upper right" to "from top to bottom", "upper-right focus" to "upper-edge focus", "lower-left focus" to "upper-edge focus"),
             "horizontal_strata" to listOf("along a diagonal band in the right half" to "left to right in horizontal strata", "from lower left to upper right" to "left to right", "upper-right focus" to "right-half focus", "lower-left focus" to "right-half focus"),
@@ -788,3 +1279,4 @@ internal object WebDdlExpander {
 
     private fun String.containsAny(tokens: List<String>): Boolean = tokens.any { it in this }
 }
+

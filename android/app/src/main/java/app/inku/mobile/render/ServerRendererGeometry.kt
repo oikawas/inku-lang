@@ -12,9 +12,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ServerRendererGeometry {
+    const val MASTER_GRID_DECIMALS: Int = 6
+
     fun px(value: Double, scale: Double): Double = min(max(value, 0.0), 1.0) * scale
 
-    fun fmt(value: Double): String = "%.3f".format(java.util.Locale.US, value)
+    fun fmt(value: Double): String {
+        val text = "%.${MASTER_GRID_DECIMALS}f".format(java.util.Locale.US, value)
+        return if (text.startsWith("-") && text.toDouble() == 0.0) text.substring(1) else text
+    }
 
     fun seedToLong(seed: Any?): Long {
         return when (seed) {
@@ -785,8 +790,9 @@ internal object ServerRendererGeometry {
     private fun closedCatmullRomPath(points: List<Pair<Double, Double>>): String {
         val count = points.size
         require(count >= 3) { "cloudform contour requires at least three points" }
+        val fmt3 = { v: Double -> "%.3f".format(java.util.Locale.US, v) }
         val sb = StringBuilder()
-        sb.append("M ").append(fmt(points[0].first)).append(" ").append(fmt(points[0].second))
+        sb.append("M ").append(fmt3(points[0].first)).append(" ").append(fmt3(points[0].second))
         for (i in 0 until count) {
             val p0 = points[(i - 1 + count) % count]
             val p1 = points[i]
@@ -796,9 +802,9 @@ internal object ServerRendererGeometry {
             val c1y = p1.second + (p2.second - p0.second) / 6.0
             val c2x = p2.first - (p3.first - p1.first) / 6.0
             val c2y = p2.second - (p3.second - p1.second) / 6.0
-            sb.append(" C ").append(fmt(c1x)).append(" ").append(fmt(c1y))
-                .append(" ").append(fmt(c2x)).append(" ").append(fmt(c2y))
-                .append(" ").append(fmt(p2.first)).append(" ").append(fmt(p2.second))
+            sb.append(" C ").append(fmt3(c1x)).append(" ").append(fmt3(c1y))
+                .append(" ").append(fmt3(c2x)).append(" ").append(fmt3(c2y))
+                .append(" ").append(fmt3(p2.first)).append(" ").append(fmt3(p2.second))
         }
         sb.append(" Z")
         return sb.toString()

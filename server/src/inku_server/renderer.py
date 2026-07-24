@@ -2983,11 +2983,65 @@ def _line_direction(
     return dx / length, dy / length
 
 
+def _offset_polyline(
+    points: list[tuple[float, float]], amount: float
+) -> list[tuple[float, float]]:
+    """Offset an open polyline by `amount` along per-vertex normals.
+
+    The material outline layers used to be straight start->end lines. Once the
+    stroke centreline gained a gesture they had to follow that same curve, or the
+    straight remnants read as a faint line joining the endpoints.
+    """
+    n = len(points)
+    if n < 2:
+        return list(points)
+    out: list[tuple[float, float]] = []
+    for i in range(n):
+        if i == 0:
+            tx, ty = points[1][0] - points[0][0], points[1][1] - points[0][1]
+        elif i == n - 1:
+            tx, ty = points[-1][0] - points[-2][0], points[-1][1] - points[-2][1]
+        else:
+            tx, ty = points[i + 1][0] - points[i - 1][0], points[i + 1][1] - points[i - 1][1]
+        length = math.hypot(tx, ty) or 1.0
+        nx, ny = -ty / length, tx / length
+        out.append((points[i][0] + nx * amount, points[i][1] + ny * amount))
+    return out
+
+
+def _polyline_sample(
+    points: list[tuple[float, float]], t: float
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Position and unit tangent at arc-length fraction `t` (0..1) of a polyline."""
+    if len(points) < 2:
+        p = points[0] if points else (0.0, 0.0)
+        return p, (1.0, 0.0)
+    segs = [
+        math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1])
+        for i in range(len(points) - 1)
+    ]
+    total = sum(segs)
+    if total < 1e-9:
+        return points[0], (1.0, 0.0)
+    target = t * total
+    acc = 0.0
+    for i, d in enumerate(segs):
+        if acc + d >= target or i == len(segs) - 1:
+            f = (target - acc) / d if d > 1e-9 else 0.0
+            x = points[i][0] + (points[i + 1][0] - points[i][0]) * f
+            y = points[i][1] + (points[i + 1][1] - points[i][1]) * f
+            length = d or 1.0
+            ux = (points[i + 1][0] - points[i][0]) / length
+            uy = (points[i + 1][1] - points[i][1]) / length
+            return (x, y), (ux, uy)
+        acc += d
+    return points[-1], (1.0, 0.0)
+
+
 def _add_powder_specks(
     dwg: svgwrite.Drawing,
     group,
-    start: tuple[float, float],
-    end: tuple[float, float],
+    centerline: list[tuple[float, float]],
     attrs: dict,
     seed: int,
     canvas: CanvasSize,
@@ -3001,10 +3055,10 @@ def _add_powder_specks(
     min_radius = 0.35 * _unit_scale(canvas)
     for idx in range(count):
         t = (idx + 0.5) / count
-        px, py = _point_on_line(start, end, t)
-        ox, oy = _line_perp_offsets(start, end, _hash_to_unit(idx, seed) * spread)
+        (px, py), (ux, uy) = _polyline_sample(centerline, t)
+        perp = _hash_to_unit(idx, seed) * spread
+        ox, oy = -uy * perp, ux * perp
         along = _hash_to_unit(idx + 101, seed) * spread * 0.45
-        ux, uy = _line_direction(start, end)
         group.add(
             dwg.circle(
                 center=(px + ox + ux * along, py + oy + uy * along),
@@ -3351,14 +3405,15 @@ def _material_line_group(
     use_filters: bool = True,
     include_base: bool = True,
     render_seed: int | None = None,
+    centerline: list[tuple[float, float]] | None = None,
 ):
     if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick"):
         return None
 
+    # The texture layers ride the actual (possibly gestured) centreline, not the
+    # straight start->end line. Without a centreline they fall back to it.
+    path = [tuple(p) for p in centerline] if centerline else [start, end]
     group = dwg.g()
-    if include_base:
-        base = _copy_attrs(attrs)
-        group.add(dwg.line(start=start, end=end, **base))
     seed = _seed_for_instruction(ins, render_seed)
     scale = _unit_scale(canvas)
     offset_gain = _material_gain("outline_offset")
@@ -3372,28 +3427,29 @@ def _material_line_group(
     def _layer_offset(amount: float) -> float:
         return _outline_offset_px(amount * scale * offset_gain, canvas)
 
+    def _emit_layer(amount: float, layer_attrs: dict) -> None:
+        la = _copy_attrs(layer_attrs)
+        la["fill"] = "none"
+        group.add(dwg.polyline(points=_offset_polyline(path, _layer_offset(amount)), **la))
+
+    if include_base:
+        base = _copy_attrs(attrs)
+        base["fill"] = "none"
+        group.add(dwg.polyline(points=path, **base))
+
     if ins.weight == "pencil":
-        for idx, amount in enumerate((-0.9, 1.1)):
-            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
+        for amount in (-0.9, 1.1):
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = 0.45 * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.26)
             layer_attrs["stroke_dasharray"] = _scale_dash("1,7", scale)
             if use_filters:
                 layer_attrs["filter"] = "url(#texture-pencil)"
-            jitter = _hash_to_unit(idx, seed) * 0.6 * scale
-            group.add(
-                dwg.line(
-                    start=(start[0] + ox + jitter, start[1] + oy),
-                    end=(end[0] + ox - jitter, end[1] + oy),
-                    **layer_attrs,
-                )
-            )
+            _emit_layer(amount, layer_attrs)
         _add_powder_specks(
             dwg,
             group,
-            start,
-            end,
+            path,
             attrs,
             seed,
             canvas,
@@ -3403,25 +3459,16 @@ def _material_line_group(
             opacity=_speck_opacity(0.20),
         )
     elif ins.weight == "chalk":
-        for idx, amount in enumerate((-3.0, 3.4)):
-            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
+        for amount in (-3.0, 3.4):
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = 1.1 * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.28)
             layer_attrs["stroke_dasharray"] = _scale_dash("8,12,1,8", scale)
-            jitter = _hash_to_unit(idx, seed) * 1.4 * scale
-            group.add(
-                dwg.line(
-                    start=(start[0] + ox + jitter, start[1] + oy),
-                    end=(end[0] + ox - jitter, end[1] + oy),
-                    **layer_attrs,
-                )
-            )
+            _emit_layer(amount, layer_attrs)
         _add_powder_specks(
             dwg,
             group,
-            start,
-            end,
+            path,
             attrs,
             seed,
             canvas,
@@ -3432,28 +3479,14 @@ def _material_line_group(
         )
     elif ins.weight == "brush_thin":
         for idx, amount in enumerate((-1.4, 1.8)):
-            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = (0.9 + idx * 0.5) * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.32)
             layer_attrs["stroke_dasharray"] = _scale_dash("22,9", scale)
-            jitter = _hash_to_unit(idx, seed) * 1.1 * scale
-            group.add(
-                dwg.line(
-                    start=(start[0] + ox + jitter, start[1] + oy),
-                    end=(end[0] + ox - jitter, end[1] + oy),
-                    **layer_attrs,
-                )
-            )
+            _emit_layer(amount, layer_attrs)
     else:
         amounts = (-3.2, -1.4, 2.0, 3.6) if ins.weight == "crayon" else (-3.5, 2.8, 5.0)
-        for idx, amount in enumerate(amounts):
-            ox, oy = _line_perp_offsets(start, end, _layer_offset(amount))
-            jitter = (
-                _hash_to_unit(idx, seed)
-                * (2.2 if ins.weight == "crayon" else 2.8)
-                * scale
-            )
+        for amount in amounts:
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = max(
                 0.8 * scale,
@@ -3466,19 +3499,12 @@ def _material_line_group(
             layer_attrs["stroke_dasharray"] = _scale_dash(
                 "2,5,9,7" if ins.weight == "crayon" else "18,7,3,11", scale
             )
-            group.add(
-                dwg.line(
-                    start=(start[0] + ox + jitter, start[1] + oy),
-                    end=(end[0] + ox - jitter, end[1] + oy),
-                    **layer_attrs,
-                )
-            )
+            _emit_layer(amount, layer_attrs)
         if ins.weight == "crayon":
             _add_powder_specks(
                 dwg,
                 group,
-                start,
-                end,
+                path,
                 attrs,
                 seed,
                 canvas,
@@ -3554,6 +3580,7 @@ def _render_hand_stroke(
     color = attrs.get("stroke", "#111111")
     opacity = float(attrs.get("stroke_opacity", 1.0))
     outline = stroke.outline
+    material_centerline = [(s.x, s.y) for s in stroke.samples]
     if _needs_path_variation(ins.variation):
         assert ins.variation is not None
         centerline = _line_with_variation(
@@ -3576,6 +3603,7 @@ def _render_hand_stroke(
         outline = outline_for_centerline(
             centerline, [sample.width for sample in varied.samples]
         )
+        material_centerline = centerline
     path_attrs = {
         "d": polygon_path(outline),
         "fill": color,
@@ -3600,6 +3628,7 @@ def _render_hand_stroke(
         use_filters=False,
         include_base=False,
         render_seed=render_seed,
+        centerline=material_centerline,
     )
     if material is not None:
         group.add(material)

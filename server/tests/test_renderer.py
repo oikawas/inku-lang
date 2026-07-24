@@ -284,7 +284,8 @@ def test_render_crayon_line_adds_rubbed_layers():
         }
     )
     svg = render(score)
-    assert svg.count("<line") >= 4
+    # Material texture layers ride the (gestured) centreline as polylines now.
+    assert svg.count("<polyline") >= 4
     assert "stroke-engine-v1" in svg
     assert 'stroke-dasharray="2.000000,5.000000,9.000000,7.000000"' in svg
     assert 'id="texture-crayon"' in svg
@@ -477,7 +478,8 @@ def test_render_brush_lines_use_layered_material_texture():
         }
     )
     svg = render(score)
-    assert svg.count("<line") >= 5
+    # Material texture layers ride the (gestured) centreline as polylines now.
+    assert svg.count("<polyline") >= 5
     assert svg.count("stroke-engine-v1") == 2
     assert 'stroke-dasharray="22.000000,9.000000"' in svg
     assert 'stroke-dasharray="18.000000,7.000000,3.000000,11.000000"' in svg

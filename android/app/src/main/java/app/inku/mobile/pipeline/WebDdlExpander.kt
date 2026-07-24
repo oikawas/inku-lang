@@ -258,7 +258,11 @@ internal object WebDdlExpander {
         variationSeed: Long? = null,
         variationReport: MutableMap<String, Any>? = null,
     ): String {
-        val sanitized = avoidGrayBackground(WebDdlSpec.sanitizePlacementWords(ddl).trim(), lang)
+        val sanitized = applyNaturePluginMacros(
+            avoidGrayBackground(WebDdlSpec.sanitizePlacementWords(ddl).trim(), lang),
+            lang = lang,
+            enablePlugins = enablePlugins,
+        )
         if (sanitized.isBlank()) return sanitized
 
         fun runExpand(plan: VariationPlan?, decisions: MutableMap<String, Any>?): String {
@@ -708,6 +712,67 @@ internal object WebDdlExpander {
             return text.replace(Regex("""Fill background with gr[ae]y\.?""", RegexOption.IGNORE_CASE), "Fill background with white.")
         }
         return text.replace(Regex("""背景を灰(?:色)?で塗りつぶす。?"""), "背景を白で塗りつぶす。")
+    }
+
+    private val NATURE_PLUGIN_RE = Regex("""Nature\.(風|うねり|無風|wind|undulation|stillness|calm)""", RegexOption.IGNORE_CASE)
+
+    private fun naturePluginTerms(text: String): Set<String> {
+        val terms = mutableSetOf<String>()
+        for (match in NATURE_PLUGIN_RE.findAll(text)) {
+            val term = match.groupValues[1].lowercase()
+            when (term) {
+                "風", "wind" -> terms.add("wind")
+                "うねり", "undulation" -> terms.add("undulation")
+                "無風", "stillness", "calm" -> terms.add("stillness")
+            }
+        }
+        return terms
+    }
+
+    private fun dropNaturePluginSentences(text: String, lang: String): String {
+        val sentences = splitSentences(text, lang)
+        val kept = sentences.filter { !NATURE_PLUGIN_RE.containsMatchIn(it) }
+        if (kept.isNotEmpty()) {
+            return joinSentences(kept, lang)
+        }
+        return ""
+    }
+
+    private fun applyNaturePluginMacros(ddl: String, lang: String, enablePlugins: Boolean): String {
+        if (!enablePlugins) return ddl
+        val terms = naturePluginTerms(ddl)
+        if (terms.isEmpty()) return ddl
+        val base = dropNaturePluginSentences(ddl, lang)
+        val macro = mutableListOf<String>()
+        if (lang == "en") {
+            if ("stillness" in terms) {
+                macro.add("Use no variation. Use no placement path; keep the repeated placement still.")
+            } else {
+                if ("wind" in terms) {
+                    macro.add("Set repeated placement left to right in horizontal strata. Swaying slowly.")
+                }
+                if ("undulation" in terms) {
+                    macro.add("Set repeated placement along an undulating trace. Broad slow swaying.")
+                }
+            }
+        } else {
+            if ("stillness" in terms) {
+                macro.add("全体の揺らぎをなしにする。配置軌跡は使わず静止させる。")
+            } else {
+                if ("wind" in terms) {
+                    macro.add("全体の反復配置を左から右への横の帯に沿わせる。ゆっくり揺れる。")
+                }
+                if ("undulation" in terms) {
+                    macro.add("全体の反復配置を波打つ軌跡に沿わせる。揺らぎは大きくゆっくり。")
+                }
+            }
+        }
+        val joinedMacro = if (macro.isNotEmpty()) joinSentences(macro, lang) else ""
+        return if (base.isNotEmpty() && joinedMacro.isNotEmpty()) {
+            joinSentences(listOf(base, joinedMacro), lang)
+        } else {
+            base.ifEmpty { joinedMacro.ifEmpty { ddl } }
+        }
     }
 
     private fun varyContext(text: String, varySeed: Long?): String {

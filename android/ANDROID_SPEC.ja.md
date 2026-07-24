@@ -1425,3 +1425,27 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 62 件の単体テスト（既存 61 件 + Phase 3b 新設 1 件 [16ケース内包]）が 100% 通過 (PASS / Failures 0 / Errors 0)。
 - `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148082` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
 
+## 2026-07-25 web/server v2 追随 Phase 3d (組み込み Nature プラグイン展開の追随)
+
+契約 `antigravity-android-phase3-expander.md` §8 Phase 3d に基づき、組み込み nature プラグイン展開機能（`Nature.風` / `Nature.うねり` / `Nature.無風` および英語表現 `wind` / `undulation` / `stillness` / `calm`）の Android 移植を完了した。
+
+### 実装および追随の詳細
+
+1. **Nature プラグイン正規表現と単語抽出 (`WebDdlExpander.kt`)**:
+   - `NATURE_PLUGIN_RE` (`Nature.(風|うねり|無風|wind|undulation|stillness|calm)`) を定義し、`naturePluginTerms` により出現キーワードから `"wind"`, `"undulation"`, `"stillness"` のカテゴリタグ集合を決定的に抽出。
+2. **文削除とマクロ構文結合**:
+   - `dropNaturePluginSentences` により `NATURE_PLUGIN_RE` にマッチする文を除去し、言語 (`ja` / `en`) に応じた既定文末処理 (`joinSentences`) で再構成。
+   - `applyNaturePluginMacros` により、抽出されたタグおよび言語に応じて適切な自然言語マクロ（「全体の反復配置を波打つ軌跡に沿わせる。揺らぎは大きくゆっくり。」等）を決定論的に挿入。
+3. **展開パイプラインエントリポイントへの組み込み**:
+   - `expandIntermediateDdl` の冒頭（`sanitized` 生成直後）で `applyNaturePluginMacros` を呼び出すよう変更（`enablePlugins=true` の場合にのみ展開、`false` の場合は素通り）。
+4. **Phase 3d コーパステスト基盤 (`WebDdlExpanderPhase3dTest.kt`)**:
+   - 参照コーパス `ddl_expand.json` の 3d 対象 3 ケース（`A-plugin-enabled`, `B-plugin-instructions-present`, `A-plugin-disabled`）において出力文字列が完全一致（`assertEquals`）することを確認。
+   - `testNaturePluginMacroSensitivityToAvoidTautology` を追加し、`enablePlugins=false` 時に `A-plugin-enabled` の出力が変わることを検証（恒真テスト回避）。
+
+### 検証結果
+
+- `render_engine_version` は `"11"` を維持（本 Phase は Stage 1.5 のため描画層には触れない）。
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 64 件の単体テスト（既存 62 件 + Phase 3d 新設 2 件）が 100% 通過 (PASS / Failures 0 / Errors 0)。
+- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148083` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
+
+

@@ -5628,7 +5628,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
 	});
 	const replayableStatusHistoryItem = $derived(
-		statusHistoryItem && "render_seed" in statusHistoryItem && "svg" in statusHistoryItem
+		statusHistoryItem && "score" in statusHistoryItem && "svg" in statusHistoryItem
 			? statusHistoryItem as Iteration
 			: null
 	);
